@@ -38,8 +38,12 @@ from rdkit import Chem
 from .functional_replacement import (
     build_acyl_halide_name,
     build_frn_acid_name,
+    build_p_frn_acid_name,
     build_polyacid_name,
 )
+
+# Single-bonded halogen -> class-infix combining form (P-67.1.2.3.2 (1)).
+_HALIDO_INFIX = {"Cl": "chlorido", "F": "fluorido", "Br": "bromido", "I": "iodido"}
 
 # Keyed by RDKit ``Chem.MolToSmiles`` canonical SMILES of the neutral, fully
 # protonated acid. Every name has been confirmed to round-trip through OPSIN to
@@ -271,6 +275,175 @@ def name_silicate_ester(mol) -> Optional[str]:
     return " ".join(parts) + " silicate"
 
 
+def _is_cyanatido_oxygen(mol, o_atom, p_idx: int) -> bool:
+    """True iff ``o_atom`` (a single-bonded neighbour of the acid P) is the O of an
+    ``-O-C#N`` cyanatido group (P-67.1.2.4.1.3): O bonded only to P and a two-
+    coordinate carbon that is triple-bonded to a terminal N."""
+    others = [x for x in o_atom.GetNeighbors() if x.GetIdx() != p_idx]
+    if len(others) != 1 or others[0].GetSymbol() != "C":
+        return False
+    c = others[0]
+    if c.GetDegree() != 2:
+        return False
+    c_others = [x for x in c.GetNeighbors() if x.GetIdx() != o_atom.GetIdx()]
+    if len(c_others) != 1 or c_others[0].GetSymbol() != "N":
+        return False
+    n = c_others[0]
+    if n.GetDegree() != 1 or n.GetFormalCharge() != 0:
+        return False
+    return mol.GetBondBetweenAtoms(c.GetIdx(), n.GetIdx()).GetBondType() == \
+        Chem.BondType.TRIPLE
+
+
+def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
+    """Return the N-locant detachable-prefix string for an amido nitrogen
+    ``-N(R)(R')`` bonded to the acid P — ``"N,N-dimethyl"``, ``"N-methyl"``,
+    ``"N-ethyl-N-methyl"`` — ``""`` for a bare ``-NH2``, or ``None`` (fail-closed)
+    when any N-substituent is not a simple unbranched alkyl / phenyl-naphthyl aryl
+    (P-67.1.2.4.1: nonacidic-hydrogen substitution cited with the italic N locant).
+    """
+    from collections import Counter
+    from .substituent_purity import pure_organyl_prefix_name
+    from ..assembly.naming_utils import alpha_sort_key
+
+    n = mol.GetAtomWithIdx(n_idx)
+    sub_names: list = []
+    for nb in n.GetNeighbors():
+        if nb.GetIdx() == p_idx:
+            continue
+        if mol.GetBondBetweenAtoms(n_idx, nb.GetIdx()).GetBondType() != \
+                Chem.BondType.SINGLE:
+            return None
+        nm = pure_organyl_prefix_name(mol, nb.GetIdx(), n_idx)
+        if nm is None:
+            return None
+        sub_names.append(nm)
+    if not sub_names:
+        return ""                                    # bare -NH2
+    _MULT = {1: "", 2: "di", 3: "tri"}
+    counts = Counter(sub_names)
+    segs = []
+    for nm in sorted(counts, key=alpha_sort_key):
+        c = counts[nm]
+        if c not in _MULT:
+            return None
+        locs = ",".join(["N"] * c)
+        segs.append(f"{locs}-{_MULT[c]}{nm}")
+    return "-".join(segs)
+
+
+def name_p_oxoacid_frn(mol) -> Optional[str]:
+    """P-67.1.2.4 mononuclear-P oxoacid functional-replacement PIN (Engine A).
+
+    A NEUTRAL, single-fragment molecule with exactly one P that bears one ``P=O``,
+    at least one remaining ``-OH`` (so the class is 'acid', P-67.1.2.4), and at
+    least one ``-OH`` REPLACED by a class group — amido (``-N(R)(R')``), halido
+    (``-Cl/-F/-Br/-I``) or cyanatido (``-O-C#N``). The skeletal substituent count
+    on P selects the parent: 0 organyl/H -> phosphoric (``phosphor``); 1 ->
+    phosphonic (``phosphon``, P-67.1.2.4.2: a C-P bond forces the 'phosphono'
+    stem, never 'phosphinic').
+
+        (CH3)2N-P(O)(OH)2       -> N,N-dimethylphosphoramidic acid
+        CH3-P(O)(OCN)(OH)       -> methylphosphonocyanatidic acid
+        C6H5-P(O)(Cl)(OH)       -> phenylphosphonochloridic acid
+
+    Fail-closed (returns ``None``) off this exact shape: a plain phosphonic /
+    phosphoric acid (no class group -> the existing suffix/table paths own it), a
+    fully-replaced acid with no -OH (an amide / acid-halide functional class), any
+    ester ``-OR`` neighbour, a P=N/P#N/P=S multiple bond, >=2 organyl groups
+    (phosphinic FRN — out of scope), or the organyl+N-substituent combination that
+    needs P-/N- locant disambiguation (P-45). Pure: no mol mutation.
+    """
+    from .substituent_purity import pure_organyl_prefix_name
+
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    ps = [a for a in mol.GetAtoms() if a.GetSymbol() == "P"]
+    if len(ps) != 1:
+        return None
+    p = ps[0]
+    if p.GetFormalCharge() != 0 or p.GetNumRadicalElectrons() != 0:
+        return None
+
+    dbl_o = 0
+    single_nbrs = []
+    for b in p.GetBonds():
+        o = b.GetOtherAtom(p)
+        bt = b.GetBondType()
+        if bt == Chem.BondType.DOUBLE and o.GetSymbol() == "O":
+            dbl_o += 1
+        elif bt == Chem.BondType.SINGLE:
+            single_nbrs.append(o)
+        else:
+            return None                              # P=N / P#N / P=S -> not a target
+    if dbl_o != 1:
+        return None
+
+    oh_count = 0
+    organyl_c: list = []
+    amido_n: list = []
+    infix_counts: dict = {}
+    for nb in single_nbrs:
+        sym = nb.GetSymbol()
+        if sym == "O":
+            if nb.GetFormalCharge() != 0:
+                return None
+            others = [x for x in nb.GetNeighbors() if x.GetIdx() != p.GetIdx()]
+            if nb.GetTotalNumHs() == 1 and not others:
+                oh_count += 1
+            elif _is_cyanatido_oxygen(mol, nb, p.GetIdx()):
+                infix_counts["cyanatido"] = infix_counts.get("cyanatido", 0) + 1
+            else:
+                return None                          # ester -OR / peroxide -> defer
+        elif sym == "C":
+            organyl_c.append(nb.GetIdx())
+        elif sym in _HALIDO_INFIX:
+            k = _HALIDO_INFIX[sym]
+            infix_counts[k] = infix_counts.get(k, 0) + 1
+        elif sym == "N":
+            if nb.GetFormalCharge() != 0:
+                return None
+            if any(b.GetBondType() != Chem.BondType.SINGLE for b in nb.GetBonds()):
+                return None                          # imido/hydrazono/nitrido -> defer
+            amido_n.append(nb.GetIdx())
+            infix_counts["amido"] = infix_counts.get("amido", 0) + 1
+        else:
+            return None
+
+    if oh_count < 1 or not infix_counts:             # class 'acid' + >=1 replacement
+        return None
+    skeletal = len(organyl_c) + p.GetTotalNumHs()
+    parent_stem = {0: "phosphor", 1: "phosphon"}.get(skeletal)
+    if parent_stem is None:
+        return None                                  # phosphinic FRN out of scope
+
+    organyl_names = []
+    for c_idx in organyl_c:
+        nm = pure_organyl_prefix_name(mol, c_idx, p.GetIdx())
+        if nm is None:
+            return None
+        organyl_names.append(nm)
+    n_prefixes = []
+    for n_idx in amido_n:
+        seg = _amido_n_prefix(mol, n_idx, p.GetIdx())
+        if seg is None:
+            return None
+        if seg:
+            n_prefixes.append(seg)
+    if organyl_names and n_prefixes:
+        return None                                  # needs P-/N- locants -> defer
+
+    if organyl_names:
+        front = organyl_names[0]
+    elif n_prefixes:
+        front = "-".join(sorted(n_prefixes))
+    else:
+        front = ""
+    return build_p_frn_acid_name(front, parent_stem, infix_counts)
+
+
 def name_inorganic_acid(mol) -> Optional[str]:
     """Return the PIN for a free inorganic oxoacid or its tabled functional-class
     derivative (acid halide / amide / carbonic-FRN acid), the tetraalkyl silicate
@@ -288,6 +461,14 @@ def name_inorganic_acid(mol) -> Optional[str]:
     tabled = _ALL_INORGANIC.get(canonical)
     if tabled is not None:
         return tabled
+    # W3-P10 (P-67.1.2.4): mononuclear-P oxoacid functional-replacement (Engine A):
+    # phosphoramidic / phosphonocyanatidic / phosphonochloridic acids. Fires only on
+    # an acid (>=1 -OH) carrying a class replacement group, so plain phosphonic /
+    # phosphoric acids (no class group) and the amide/acid-halide functional classes
+    # (no -OH) never match here and keep their existing paths.
+    frn = name_p_oxoacid_frn(mol)
+    if frn is not None:
+        return frn
     # D-FOLLOWON item 10: tetraalkyl silicate ester (Si(OR)4). Routed here (@40)
     # so it intercepts BEFORE ORGANOMETALLIC@50 (which mis-claims Si as a metalloid
     # hub and linearizes the silyl-ester ligands into nonsense).

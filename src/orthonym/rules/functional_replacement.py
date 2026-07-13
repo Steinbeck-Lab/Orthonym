@@ -25,10 +25,75 @@ The italic O/S/Se tautomer-locant word-forms (``carbonothioic S-acid``) are
 DEFERRED to Phase 19 — OPSIN rejects the word-form, so they require name-exact
 gold rather than round-trip validation (V23 plan §6, Phase 19).
 """
-from typing import List, Optional, Tuple
+import re
+from typing import Dict, List, Optional, Tuple
 
 # Numerical multiplying prefixes (P-14.2). Index = count.
 _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+
+# --- W3-P10 (P-67.1.2.3.2 / P-67.1.2.4): class infixes for the mononuclear-P
+# oxoacid functional-replacement engine. Each combining form carries a trailing
+# linking ``o`` that is elided before a vowel (P-67.1.2.3.5). The chalcogen /
+# peroxo infixes (thio/seleno/telluro/peroxo) do NOT belong here — they never
+# elide their ``o`` and are spelled by :func:`build_frn_acid_name`. Keyed by the
+# combining form so the builder both validates the infix and orders it
+# alphabetically. ---
+_CLASS_INFIX = {
+    # halido (P-67.1.2.3.2 (1); cited in alphabetical order among themselves)
+    "bromido", "chlorido", "fluorido", "iodido",
+    # pseudohalido (P-67.1.2.3.2 (2); alphabetical)
+    "azido", "cyanatido", "cyanido", "isocyanatido", "isocyanido",
+    "isothiocyanatido", "thiocyanatido",
+    # amido / hydrazido / nitrido (P-67.1.2.3.2 (3)-(5))
+    "amido", "hydrazido", "nitrido",
+}
+
+
+def _elide_o_before_vowel(word: str) -> str:
+    """P-67.1.2.3.5: elide a linking ``o`` immediately before a vowel. Applied to
+    the class-infix acid stems only (chalcogen infixes are never routed here, so
+    their protected ``o`` is untouched)."""
+    return re.sub(r"o(?=[aeiou])", "", word)
+
+
+def build_p_frn_acid_name(front_prefix: str, parent_stem: str,
+                          infix_counts: Dict[str, int]) -> Optional[str]:
+    """Spell a mononuclear noncarbon-oxoacid functional-replacement acid
+    (P-67.1.2.4) whose replacements are class infixes (amido / halido /
+    pseudohalido), NOT chalcogen infixes.
+
+    ``front_prefix``  — already-assembled detachable-prefix string cited in front
+                        (organyl on P: ``"methyl"`` / ``"phenyl"``; or the
+                        N-locant amido substituents: ``"N,N-dimethyl"``). ``""``
+                        for the bare parent.
+    ``parent_stem``   — parent-acid stem WITHOUT its linking vowel: ``"phosphor"``
+                        (phosphoric), ``"phosphon"`` (phosphonic), ``"phosphin"``
+                        (phosphinic), ``"arsor"``/``"arson"`` etc.
+    ``infix_counts``  — ``{combining-form: multiplicity}`` for the class infixes
+                        present, e.g. ``{"amido": 1}`` / ``{"chlorido": 1}`` /
+                        ``{"cyanatido": 1}``.
+
+    Returns ``None`` (fail-closed) for an unknown infix or an out-of-range count.
+
+    Examples::
+
+        build_p_frn_acid_name("N,N-dimethyl", "phosphor", {"amido": 1})
+            -> "N,N-dimethylphosphoramidic acid"
+        build_p_frn_acid_name("methyl", "phosphon", {"cyanatido": 1})
+            -> "methylphosphonocyanatidic acid"
+        build_p_frn_acid_name("phenyl", "phosphon", {"chlorido": 1})
+            -> "phenylphosphonochloridic acid"
+    """
+    parts = [parent_stem + "o"]                       # phosphor -> phosphoro
+    for infix in sorted(infix_counts):                # alphabetical (P-67.1.2.3.5)
+        if infix not in _CLASS_INFIX:
+            return None
+        cnt = infix_counts[infix]
+        if cnt not in _MULT:
+            return None
+        parts.append(f"{_MULT[cnt]}{infix}")
+    stem_word = _elide_o_before_vowel("".join(parts) + "ic")
+    return f"{front_prefix}{stem_word} acid"
 
 # FRN infix combining forms inserted before the ``-ic acid`` ending
 # (P-67.1.2.3 / P-65.2.1.2). The chalcogen/peroxo infixes take the linking ``o``
@@ -88,4 +153,5 @@ def build_acyl_halide_name(acyl_word: str, halide_word: str, count: int) -> Opti
     return f"{acyl_word} {_MULT[count]}{halide_word}"
 
 
-__all__ = ["build_frn_acid_name", "build_polyacid_name", "build_acyl_halide_name"]
+__all__ = ["build_frn_acid_name", "build_polyacid_name", "build_acyl_halide_name",
+           "build_p_frn_acid_name"]
