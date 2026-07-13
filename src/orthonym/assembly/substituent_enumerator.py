@@ -2147,44 +2147,80 @@ def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
 def _name_mixed_chalcogen_branch(mol, frag_atoms, attach_idx, parent_atoms):
     """Wave2 T6c (P-63.3.2): name a MIXED divalent-chalcogen bridge substituent.
 
-    Supported positively: attach through O with an S inner atom, i.e.
-    -O-S-R -> ``(Rsulfanyl)oxy`` ([(methylsulfanyl)oxy]ethane for CCOSC,
-    OPSIN-verified). Everything else in the mixed-bridge family — S-attached
-    -S-O-R (needs the alkoxy contraction), Se/Te bridges, terminal-H inner
-    chalcogens — returns None; the CALLERS treat a detected mixed bridge whose
-    namer declined as a terminal decline (fail closed), never falling through
-    to the generic tiers that mangle the bridge into a bogus
-    'hydroxymethane-SO-thioperoxyl' fragment.
+    Supported positively:
+      * attach through O with an S inner atom, ``-O-S-R -> (Rsulfanyl)oxy``
+        ([(methylsulfanyl)oxy]ethane for CCOSC, OPSIN-verified);
+      * attach through S with a chalcogen (O/Se/Te) inner atom, ``-S-R ->
+        {(R)}sulfanyl`` — the whole R beyond the S is named by the shared
+        substituent cascade and enclosed if compound: ``-S-O-O-CH3 ->
+        (methylperoxy)sulfanyl`` (P-63.3.2 / P-65.6.3.4.2, the compound-sulfanyl
+        substituent of the acyl-hetero pseudoketone).
+
+    Every other mixed shape (terminal-H inner chalcogen, branched inner atom)
+    returns None; the CALLERS treat a detected mixed bridge whose namer declined
+    as a terminal decline (fail closed), never falling through to the generic
+    tiers that mangle the bridge into a bogus fragment.
     """
     frag_set = set(frag_atoms)
     a1 = mol.GetAtomWithIdx(attach_idx)
-    if a1.GetSymbol() != 'O' or not _is_divalent_chalcogen_atom(a1):
+    if not _is_divalent_chalcogen_atom(a1):
         return None
-    s_idx = None
-    for nbr in a1.GetNeighbors():
-        nbr_idx = nbr.GetIdx()
-        if nbr_idx in parent_atoms or nbr_idx not in frag_set:
-            continue
-        if nbr.GetSymbol() == 'S' and _is_divalent_chalcogen_atom(nbr):
-            s_idx = nbr_idx
+    attach_sym = a1.GetSymbol()
+
+    # -O-S-R (attach through O, inner S) -> (Rsulfanyl)oxy
+    if attach_sym == 'O':
+        s_idx = None
+        for nbr in a1.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in parent_atoms or nbr_idx not in frag_set:
+                continue
+            if nbr.GetSymbol() == 'S' and _is_divalent_chalcogen_atom(nbr):
+                s_idx = nbr_idx
+                break
+        if s_idx is None:
+            return None
+        s_atom = mol.GetAtomWithIdx(s_idx)
+        r_start = None
+        for nbr in s_atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx == attach_idx or nbr_idx not in frag_set:
+                continue
+            r_start = nbr_idx
             break
-    if s_idx is None:
-        return None
-    s_atom = mol.GetAtomWithIdx(s_idx)
-    r_start = None
-    for nbr in s_atom.GetNeighbors():
-        nbr_idx = nbr.GetIdx()
-        if nbr_idx == attach_idx or nbr_idx not in frag_set:
-            continue
-        r_start = nbr_idx
-        break
-    if r_start is None:
-        return None  # terminal -O-SH is the os_thioperoxol suffix, not this path
-    r_name = _name_peroxy_or_disulfanyl_R(
-        mol, r_start, {attach_idx, s_idx}, frag_set)
-    if not r_name:
-        return None
-    return f"({r_name}sulfanyl)oxy"
+        if r_start is None:
+            return None  # terminal -O-SH is the os_thioperoxol suffix, not this path
+        r_name = _name_peroxy_or_disulfanyl_R(
+            mol, r_start, {attach_idx, s_idx}, frag_set)
+        if not r_name:
+            return None
+        return f"({r_name}sulfanyl)oxy"
+
+    # -[S/Se/Te]-R (attach through a chalcogen, inner DIFFERENT chalcogen) ->
+    # {(R)}sulfanyl / selanyl / tellanyl. The mixed-bridge gate guarantees the
+    # inner neighbour is a DIFFERENT divalent chalcogen (so -S-S-R disulfanyl and
+    # -S-C alkylsulfanyl never reach here); name the whole R group beyond the hub
+    # via the shared cascade and enclose a compound R.
+    _CHALCOGEN_YL = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}
+    if attach_sym in _CHALCOGEN_YL:
+        r_start = None
+        for nbr in a1.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in parent_atoms or nbr_idx not in frag_set:
+                continue
+            if r_start is not None:
+                return None  # branched hub -> not this simple sulfanyl shape
+            r_start = nbr_idx
+        if r_start is None:
+            return None
+        r_name = name_substituent(mol, sorted(frag_set - {attach_idx}), r_start)
+        if not r_name:
+            return None
+        from .naming_utils import is_complex_substituent, apply_enclosing_marks
+        if is_complex_substituent(r_name) or '(' in r_name or '[' in r_name:
+            r_name = apply_enclosing_marks(r_name, depth=-1)
+        return f"{r_name}{_CHALCOGEN_YL[attach_sym]}"
+
+    return None
 
 
 def _is_mixed_chalcogen_bridge_attach(mol, attach_idx, frag_atoms_set):

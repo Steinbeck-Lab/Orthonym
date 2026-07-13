@@ -221,6 +221,13 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
     _HUBS = {'Si', 'Ge', 'P', 'As'}
+    # Group-16 hubs (P-65.6.3.4.2): an acyl on a chalcogen whose non-acyl
+    # neighbour is a HETEROATOM (compound substituent) is a pseudoketone
+    # (R-CO-S-OO-CH3 -> [1-(methylperoxy)sulfanyl]butan-1-one). A chalcogen hub
+    # carrying a PLAIN CARBON (R-CO-S-C) is an ordinary thioester (senior, named
+    # elsewhere) and the discriminator below declines it.
+    _CHALCOGEN_HUBS = {'S', 'Se', 'Te'}
+    _ALL_HUBS = _HUBS | _CHALCOGEN_HUBS
 
     carbonyls = []
     for atom in mol.GetAtoms():
@@ -233,7 +240,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             if (other.GetSymbol() == 'O' and other.GetDegree() == 1
                     and b.GetBondType() == Chem.BondType.DOUBLE):
                 oxo = other
-            elif (other.GetSymbol() in _HUBS
+            elif (other.GetSymbol() in _ALL_HUBS
                     and b.GetBondType() == Chem.BondType.SINGLE
                     and not other.GetIsAromatic() and not other.IsInRing()):
                 hub = other
@@ -282,6 +289,29 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             if c == catom.GetIdx() and ni in (oxo.GetIdx(), hub.GetIdx()):
                 continue
             return None
+
+    # Group-16 (chalcogen) hub: acyl-hetero pseudoketone (P-65.6.3.4.2). The
+    # hub's non-acyl neighbour must be a HETEROATOM (a compound substituent such
+    # as the -OO-CH3 peroxy chain); a PLAIN-CARBON non-acyl neighbour makes this
+    # an ordinary thioester (R-CO-S-C, senior) which must NOT be swallowed here —
+    # decline so the cascade reaches the thioester handler. A bare -SH / -SeH
+    # (thioic S-acid) has no heteroatom substituent and also declines.
+    if hub.GetSymbol() in _CHALCOGEN_HUBS:
+        non_acyl = [nb for nb in hub.GetNeighbors()
+                    if nb.GetIdx() != catom.GetIdx()]
+        if any(nb.GetAtomicNum() == 6 for nb in non_acyl):
+            return None  # thioester (plain carbon on the chalcogen) -> decline
+        if not any(nb.GetAtomicNum() not in (1, 6) for nb in non_acyl):
+            return None  # no compound-heteroatom substituent -> not this class
+        from ..assembly.substituent_enumerator import name_substituent
+        hubyl = name_substituent(mol, sorted(hub_frag), hub.GetIdx())
+        if not hubyl:
+            return None  # unnameable hub substituent -> fail closed
+        length = len(chain)
+        base_name = f"{get_chain_prefix(length)}an"
+        # BB P-65.6.3.4.2 verbatim encloses the located substituent in the outer
+        # marks: [1-(methylperoxy)sulfanyl]butan-1-one.
+        return f"[1-{hubyl}]{base_name}-1-one"
 
     # Hub scope (fail-closed): the hub carries only H or pure ORGANYL
     # substituents — a heteroatom on the hub (Si-OH: silanol territory,
