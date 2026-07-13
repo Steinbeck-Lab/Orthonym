@@ -373,6 +373,114 @@ def name_acyloxy_phosphonic_acid(mol) -> Optional[str]:
     return f"({acyloxy})phosphonic acid"
 
 
+_PNICTOGEN_ACID_STEM = {'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane'}
+_PNICTOGEN_ACID_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta'}
+
+
+def name_phosphane_carboxylic_acid(mol) -> Optional[str]:
+    """P-68.3.2.3.1 (BB 39117): a carboxylic acid ``-C(=O)OH`` on a Group-15
+    P/As/Sb parent hydride is expressed as the added-carbon ``-carboxylic acid``
+    suffix on the phosphane/arsane/stibane parent hydride — NOT a phosphanyl
+    prefix on methanoic acid (the generic acid namer's non-PIN
+    ``1-phosphanylmethanoic acid``)::
+
+        H2P-COOH -> phosphanecarboxylic acid (PIN)
+
+    Exactly analogous to the added-carbon ``-carboxylic acid`` on carbocycles
+    (cyclohexanecarboxylic acid) and to polyazane's azane-1-carboxylic acid.
+
+    Scope (fail-closed graph classifier, NOT SMARTS): exactly ONE bare carboxyl
+    carbon (``=O`` + ``-OH`` + one pnictogen neighbour, degree 3) on a PURE
+    homonuclear P/As/Sb chain (H-saturated, standard bonding number 3, neutral,
+    acyclic). A ``P=O`` (phosphonic/phosphinic, retained acids), a
+    lambda5 hydride, a ring, a second characteristic group, a stray heteroatom, a
+    charge/radical, or an interior carboxyl attachment fails a guard and cascades
+    onward. Pure: no mol mutation.
+    """
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+
+    # Locate exactly ONE bare carboxyl carbon bonded to a pnictogen.
+    carboxyl_c = hub = None
+    n_carboxyls = 0
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C':
+            continue
+        nbrs = atom.GetNeighbors()
+        o_double = [n for n in nbrs if n.GetSymbol() == 'O' and n.GetDegree() == 1
+                    and mol.GetBondBetweenAtoms(
+                        atom.GetIdx(), n.GetIdx()).GetBondTypeAsDouble() == 2.0]
+        o_single = [n for n in nbrs if n.GetSymbol() == 'O' and n.GetDegree() == 1
+                    and n.GetTotalNumHs() >= 1
+                    and mol.GetBondBetweenAtoms(
+                        atom.GetIdx(), n.GetIdx()).GetBondTypeAsDouble() == 1.0]
+        p_nbrs = [n for n in nbrs if n.GetSymbol() in _PNICTOGEN_ACID_STEM]
+        if (len(o_double) == 1 and len(o_single) == 1 and len(p_nbrs) == 1
+                and atom.GetDegree() == 3):
+            n_carboxyls += 1
+            carboxyl_c = atom.GetIdx()
+            hub = p_nbrs[0].GetIdx()
+    if carboxyl_c is None or n_carboxyls != 1:
+        return None
+
+    element = mol.GetAtomWithIdx(hub).GetSymbol()
+    stem = _PNICTOGEN_ACID_STEM[element]
+
+    # The rest of the molecule must be a PURE homonuclear pnictogen chain of the
+    # SAME element plus the single carboxyl (C + its two O's).
+    pnic = [a for a in mol.GetAtoms() if a.GetSymbol() in _PNICTOGEN_ACID_STEM]
+    if any(a.GetSymbol() != element for a in pnic):
+        return None
+    pnic_idxs = {a.GetIdx() for a in pnic}
+    carboxyl_atoms = {carboxyl_c}
+    for n in mol.GetAtomWithIdx(carboxyl_c).GetNeighbors():
+        if n.GetSymbol() == 'O':
+            carboxyl_atoms.add(n.GetIdx())
+    for a in mol.GetAtoms():
+        if a.GetSymbol() == 'H':
+            continue
+        if a.GetIdx() in pnic_idxs or a.GetIdx() in carboxyl_atoms:
+            continue
+        return None                              # stray heteroatom / extra carbon
+
+    # Every pnictogen: standard bonding number 3, only single bonds to another
+    # pnictogen or the carboxyl carbon (a P=O phosphoryl / any hetero on P -> defer).
+    for a in pnic:
+        if nonstandard_bonding_number(mol, a.GetIdx()) is not None:
+            return None
+        for b in a.GetBonds():
+            other = b.GetOtherAtom(a)
+            if other.GetSymbol() == 'H':
+                continue
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            if other.GetIdx() not in pnic_idxs and other.GetIdx() != carboxyl_c:
+                return None
+
+    deg = {a.GetIdx(): sum(1 for nb in a.GetNeighbors()
+                           if nb.GetIdx() in pnic_idxs) for a in pnic}
+    if any(d > 2 for d in deg.values()):
+        return None                              # branched pnictogen chain
+
+    n = len(pnic)
+    if n == 1:
+        return f"{stem}carboxylic acid"          # phosphanecarboxylic acid (PIN)
+    # Multinuclear: the acid-bearing pnictogen (hub) must be a chain terminus so
+    # the '-carboxylic acid' suffix takes locant 1 (P-31.1.4, lowest locant).
+    ends = [i for i, d in deg.items() if d <= 1]
+    if len(ends) != 2 or hub not in ends:
+        return None
+    mult = _PNICTOGEN_ACID_MULT.get(n)
+    if not mult:
+        return None
+    return f"{mult}{stem}-1-carboxylic acid"
+
+
 def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str]:
     """
     Name a phosphinic acid with dialkyl/aryl prefix and phosphinic acid suffix.

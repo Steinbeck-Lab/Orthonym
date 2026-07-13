@@ -140,6 +140,7 @@ class StoutClass(_StrEnumBase):
     POLYCHALCOGEN_OXIDE = "polychalcogen_oxide"      # W3-P13 (P-68.4.3.2 di-/polysulfoxide-sulfone: CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione; priority 46.5 — after CHALCOGEN_CHAIN@46, before POLYAZANE@47)
     CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
     HOMONUCLEAR_PNICTOGEN_CHAIN = "homonuclear_pnictogen_chain"  # W3-P14 (P-68.3.2.2 homonuclear Group-15 catenated hydride: PP -> diphosphane, pentaarsane, dibismuthane; priority 47.6 — pnictogen analogue of POLYAZANE@47)
+    PNICTOGEN_CARBOXYLIC_ACID = "pnictogen_carboxylic_acid"  # W3-P14 (P-68.3.2.3.1 added-carbon -carboxylic acid on a P/As/Sb parent hydride: H2P-COOH -> phosphanecarboxylic acid; priority 47.65 — ahead of the generic acid namer in GENERAL)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
@@ -1412,6 +1413,23 @@ def _handle_homonuclear_pnictogen_chain(mol, smiles, canonical_smiles, features=
     return name_homonuclear_pnictogen_chain(mol)
 
 
+def _is_pnictogen_carboxylic_acid(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """W3-P14 (P-68.3.2.3.1); priority 47.65. An added-carbon -carboxylic acid on
+    a P/As/Sb parent hydride (H2P-COOH -> phosphanecarboxylic acid). PURE graph
+    classifier, fail-closed; runs ahead of the generic acid namer (GENERAL)."""
+    if mol is None:
+        return False
+    from orthonym.rules.phosphorus import name_phosphane_carboxylic_acid
+    return name_phosphane_carboxylic_acid(mol) is not None
+
+
+def _handle_pnictogen_carboxylic_acid(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the pnictogen -carboxylic acid PIN (P-68.3.2.3.1), else None
+    (cascade-continuation)."""
+    from orthonym.rules.phosphorus import name_phosphane_carboxylic_acid
+    return name_phosphane_carboxylic_acid(mol)
+
+
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
                            style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
@@ -1550,6 +1568,24 @@ _register_dispatch(
     description="Homonuclear Group-15 catenated parent hydride "
                 "(diphosphane / pentaarsane / dibismuthane); graph classifier, "
                 "fail-closed",
+)
+
+
+# --- W3-P14: PNICTOGEN_CARBOXYLIC_ACID at priority 47.65 (after ---
+# HOMONUCLEAR_PNICTOGEN_CHAIN@47.6, before FREE_HOMONUCLEAR_G14_HYDRIDE@47.7).
+# An added-carbon -carboxylic acid on a Group-15 P/As/Sb parent hydride
+# (P-68.3.2.3.1): H2P-COOH -> phosphanecarboxylic acid. Runs AHEAD of the generic
+# acid namer (GENERAL@99999), which otherwise picks the carboxyl C as parent and
+# emits the non-PIN '1-phosphanylmethanoic acid'. Graph classifier, fail-closed
+# (a P=O phosphonic/phosphinic acid keeps its retained acid); cascade-continuation
+# on None. ---
+_register_dispatch(
+    class_id=StoutClass.PNICTOGEN_CARBOXYLIC_ACID, priority=47.65, tier=1,
+    predicate=_is_pnictogen_carboxylic_acid,
+    handler=_handle_pnictogen_carboxylic_acid,
+    iupac_section="Blue Book P-68.3.2.3.1",
+    description="Added-carbon -carboxylic acid on a P/As/Sb parent hydride "
+                "(phosphanecarboxylic acid); graph classifier, fail-closed",
 )
 
 
