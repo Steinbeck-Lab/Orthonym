@@ -177,7 +177,16 @@ def is_failure_name(name: Optional[str]) -> bool:
     """
     if not name:
         return True
-    return 'unknown' in name.lower()
+    # A descriptive fallback ('<metal> compound (not supported)', 'inorganic
+    # compound (not supported)', 'compound with wildcard atoms (not supported)')
+    # is ALSO a failure signal — Orthonym emits it precisely when it cannot name
+    # the input. The old check saw only ''/'unknown', so after name() started
+    # normalizing an empty fail-closed result to the descriptive fallback
+    # (determinism fix), a metal-bearing unnameable input returned e.g. 'antimony
+    # compound (not supported)' and was wrongly treated as a REAL name (raise_on_limit
+    # never fired; the trivial fallback never triggered).
+    low = name.lower()
+    return 'unknown' in low or '(not supported)' in low
 
 
 def classify_scope_limit(mol: Chem.Mol) -> Optional[OrthonymLimitError]:
