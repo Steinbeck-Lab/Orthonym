@@ -58,7 +58,12 @@ _SUFFIX_PRIORITY = [
     'sulfinic acid',
     'phosphonic acid',
     'selenonic acid',
+    # W3-P11 (P-65.3): Se/Te -inic ring oxoacids, junior to their -onic parents
+    # (-onic > -inic) — near-zero-corpus tie only; standalone naming is
+    # rank-independent (benzeneseleninic acid is the sole suffix here).
+    'seleninic acid',
     'telluronic acid',
+    'tellurinic acid',
     'sulfonamide',
     # Wave-2 P1AM (P-66.4.1.1): sulfonimidamide ranks just below sulfonamide.
     'sulfonimidamide',
@@ -114,7 +119,9 @@ _SUFFIX_TO_PREFIX = {
     'sulfinic acid': 'sulfino',
     'phosphonic acid': 'phosphono',
     'selenonic acid': 'selenono',
+    'seleninic acid': 'selenino',  # W3-P11 (P-65.3): -inic prefix form
     'telluronic acid': 'tellurono',
+    'tellurinic acid': 'tellurino',  # W3-P11 (P-65.3): -inic prefix form
     'sulfonamide': 'sulfamoyl',
     'sulfonohydrazide': 'hydrazinesulfonyl',  # C1 (P-65.3.1)
     'carbonyl chloride': 'carbonochloridoyl',
@@ -188,6 +195,13 @@ _BENZENE_FG_SMARTS = {
     'phosphonic': Chem.MolFromSmarts('[PX4](=O)([OX2H1])[OX2H1]'),
     'selenonic': Chem.MolFromSmarts('[SeX4](=O)(=O)[OX2H1]'),
     'telluronic': Chem.MolFromSmarts('[TeX4](=O)(=O)[OX2H1]'),
+    # W3-P11 (P-65.3 Se/Te -inic acids): the SeX3/TeX3 seleninic/tellurinic ring
+    # oxoacids (R-Se(=O)-OH / R-Te(=O)-OH), the -inic analogues of the SeX4/TeX4
+    # -onic acids above. The chain path already names ethaneseleninic acid; only
+    # the benzene ring-suffix handler lacked the SeX3/TeX3 pattern -> the target
+    # phenyl-Se(=O)-OH was 'unknown'. -> benzeneseleninic acid.
+    'seleninic': Chem.MolFromSmarts('[SeX3](=O)[OX2H1]'),
+    'tellurinic': Chem.MolFromSmarts('[TeX3](=O)[OX2H1]'),
 }
 
 
@@ -661,7 +675,12 @@ def _identify_suffix_fg_on_benzene(
         for _sym, _fg, _suffix in (
             ('P', 'phosphonic', 'phosphonic acid'),
             ('Se', 'selenonic', 'selenonic acid'),
+            # W3-P11 (P-65.3): SeX3/TeX3 -inic ring oxoacids. Ordered AFTER the
+            # -onic (SeX4/TeX4) pattern so a genuine SeX4 acid matches -onic first
+            # (the SeX3 SMARTS cannot match an SeX4 atom anyway; belt-and-braces).
+            ('Se', 'seleninic', 'seleninic acid'),
             ('Te', 'telluronic', 'telluronic acid'),
+            ('Te', 'tellurinic', 'tellurinic acid'),
         ):
             if symbol != _sym:
                 continue
