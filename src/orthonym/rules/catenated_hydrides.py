@@ -99,4 +99,84 @@ def name_catenated_hydride(mol) -> Optional[str]:
     return f"{multiplier}{base}"
 
 
-__all__ = ["name_catenated_hydride"]
+# ---------------------------------------------------------------------------
+# P-68.3.2.2 — homonuclear Group-15 (pnictogen) catenated parent hydrides
+# ---------------------------------------------------------------------------
+# The pnictogen (P/As/Sb/Bi) analogue of the polyazane family (N -> polyazane):
+# an unbranched chain of >=2 IDENTICAL Group-15 atoms, fully H-saturated,
+# neutral, acyclic, standard valence -> <multiplier><stem> (P-21.2.2, no elision
+# of the multiplier vowel):
+#     PP -> diphosphane (BB 39081; not 'diphosphine')
+#     AsAsAsAsAs -> pentaarsane (BB 39083)   H2Bi-BiH2 -> dibismuthane (BB 39278)
+# Mirrors polyazane's saturated homonuclear-chain logic. Nitrogen deliberately
+# routes to polyazane (higher functionality of amines, P-21.2.3.1); this family
+# is P/As/Sb/Bi only.
+_PNICTOGEN_STEM = {'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane',
+                   'Bi': 'bismuthane'}
+# Basic multiplying prefixes (Table 1.4). NO elision of the terminal vowel
+# (P-21.2.2): penta+arsane -> "pentaarsane".
+_PNICTOGEN_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
+                   7: 'hepta', 8: 'octa'}
+
+
+def name_homonuclear_pnictogen_chain(mol) -> Optional[str]:
+    """Return the PIN for a homonuclear Group-15 catenated parent hydride
+    (P-68.3.2.2), else ``None`` (fail-closed cascade-continuation).
+
+    Scope (a pure graph classifier, NOT SMARTS): a single unbranched chain of
+    >=2 IDENTICAL pnictogen atoms {P, As, Sb, Bi}, every one H-saturated, neutral,
+    non-radical, standard bonding number (3), acyclic, single fragment. ANY carbon
+    (organyl phosphane -> name_phosphine), a mononuclear hub (PH3 -> mononuclear
+    hydride), a heteronuclear chain (Si-As -> dinuclear hydride), nitrogen
+    (-> polyazane), a branch, a ring, a multiple bond, a charge/radical, or a
+    nonstandard valence fails a guard and cascades onward. Pure: no mol mutation.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+
+    heavy = [a for a in mol.GetAtoms() if a.GetSymbol() != 'H']
+    if len(heavy) < 2:
+        return None                      # mononuclear PH3 -> mononuclear hydride
+    syms = {a.GetSymbol() for a in heavy}
+    if len(syms) != 1:
+        return None                      # heteronuclear / has carbon -> not here
+    element = next(iter(syms))
+    stem = _PNICTOGEN_STEM.get(element)
+    if stem is None:
+        return None                      # not a Group-15 P/As/Sb/Bi element
+
+    from .lambda_convention import nonstandard_bonding_number
+    idxs = {a.GetIdx() for a in heavy}
+    deg = {}
+    for a in heavy:
+        if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
+            return None
+        if nonstandard_bonding_number(mol, a.GetIdx()) is not None:
+            return None                  # lambda5 phosphane chain not built here
+        d = sum(1 for nb in a.GetNeighbors() if nb.GetIdx() in idxs)
+        if d > 2:
+            return None                  # branch
+        deg[a.GetIdx()] = d
+
+    # Every chain bond must be single (a P=P diphosphene is not built here).
+    for b in mol.GetBonds():
+        if b.GetBeginAtomIdx() in idxs and b.GetEndAtomIdx() in idxs:
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                return None
+
+    ends = [i for i, d in deg.items() if d == 1]
+    if len(ends) != 2:
+        return None                      # ring (no endpoint) or malformed
+
+    n = len(heavy)
+    mult = _PNICTOGEN_MULT.get(n)
+    if mult is None:
+        return None                      # chain too long for the multiplier table
+    return f"{mult}{stem}"
+
+
+__all__ = ["name_catenated_hydride", "name_homonuclear_pnictogen_chain"]

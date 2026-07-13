@@ -139,6 +139,7 @@ class StoutClass(_StrEnumBase):
     LAMBDA_SULFANE_IMINE_OXIDE = "lambda_sulfane_imine_oxide"  # W3-P13 (P-68.4.3.3-.8 mononuclear S/Se/Te imine/oxide: sulfimide/sulfoximide/sulfonediimine/sulfur di-/tri-imide; priority 48.75 — after HETEROIMINE@48.7, before KETENE@49)
     POLYCHALCOGEN_OXIDE = "polychalcogen_oxide"      # W3-P13 (P-68.4.3.2 di-/polysulfoxide-sulfone: CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione; priority 46.5 — after CHALCOGEN_CHAIN@46, before POLYAZANE@47)
     CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
+    HOMONUCLEAR_PNICTOGEN_CHAIN = "homonuclear_pnictogen_chain"  # W3-P14 (P-68.3.2.2 homonuclear Group-15 catenated hydride: PP -> diphosphane, pentaarsane, dibismuthane; priority 47.6 — pnictogen analogue of POLYAZANE@47)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
     # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
@@ -1394,6 +1395,23 @@ def _handle_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kw
     return name_catenated_hydride(mol)
 
 
+def _is_homonuclear_pnictogen_chain(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """W3-P14 (P-68.3.2.2); priority 47.6. A homonuclear Group-15 catenated parent
+    hydride (PP -> diphosphane, pentaarsane, dibismuthane). PURE graph classifier,
+    fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.catenated_hydrides import name_homonuclear_pnictogen_chain
+    return name_homonuclear_pnictogen_chain(mol) is not None
+
+
+def _handle_homonuclear_pnictogen_chain(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the homonuclear Group-15 catenated-hydride PIN (P-68.3.2.2), else
+    None (cascade-continuation)."""
+    from orthonym.rules.catenated_hydrides import name_homonuclear_pnictogen_chain
+    return name_homonuclear_pnictogen_chain(mol)
+
+
 def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
                            style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors handlers.organometallic.name_organometallic (audit § 1 row ORGM).
@@ -1513,6 +1531,25 @@ _register_dispatch(
     description="Alternating Group-14/bridge catenated parent hydride "
                 "(disiloxane / trisiloxane / disilazane / distannoxane); "
                 "graph classifier, fail-closed",
+)
+
+
+# --- W3-P14: HOMONUCLEAR_PNICTOGEN_CHAIN at priority 47.6 (after ---
+# CATENATED_HYDRIDE@47.5, before FREE_HOMONUCLEAR_G14_HYDRIDE@47.7 / DINUCLEAR@48).
+# The Group-15 pnictogen analogue of POLYAZANE@47 (N -> polyazane): a homonuclear
+# unbranched H-saturated chain of >=2 identical P/As/Sb/Bi atoms (P-68.3.2.2):
+# PP -> diphosphane, pentaarsane, dibismuthane. All 'unknown organic compound'
+# before (MONONUCLEAR@45 declines a >=2-atom chain, the heteronuclear DINUCLEAR@48
+# declines a homonuclear one, ORGM@50 declines a nonmetal). Graph classifier,
+# fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.HOMONUCLEAR_PNICTOGEN_CHAIN, priority=47.6, tier=1,
+    predicate=_is_homonuclear_pnictogen_chain,
+    handler=_handle_homonuclear_pnictogen_chain,
+    iupac_section="Blue Book P-68.3.2.2 / P-21.2.2",
+    description="Homonuclear Group-15 catenated parent hydride "
+                "(diphosphane / pentaarsane / dibismuthane); graph classifier, "
+                "fail-closed",
 )
 
 
