@@ -62,12 +62,15 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
     if mol is None:
         return None
 
-    # SMARTS: carbonyl carbon with double-bonded O and single-bonded O
-    # [CX3](=O)[OX2] matches the ester/acid core
-    # match[0] = carbonyl carbon
-    # match[1] = carbonyl oxygen (=O, exocyclic)
-    # match[2] = ester oxygen (-O-, must be in ring)
-    pattern = Chem.MolFromSmarts("[CX3](=O)[OX2]")
+    # SMARTS: carbonyl(-like) carbon with a double-bonded chalcogen and a
+    # single-bonded ester O. The double-bond partner may be O (ordinary
+    # lactone) or S/Se/Te (thiono / seleno / telluro lactone, P-65.6.3.5.1);
+    # the ester O stays O in every case (the ring oxygen).
+    #   [CX3](=[O,S,#34,#52])[OX2]
+    #   match[0] = carbonyl carbon
+    #   match[1] = carbonyl chalcogen (=O/=S/=Se/=Te, exocyclic)
+    #   match[2] = ester oxygen (-O-, must be in ring)
+    pattern = Chem.MolFromSmarts("[CX3](=[O,S,#34,#52])[OX2]")
     matches = mol.GetSubstructMatches(pattern)
 
     if not matches:
@@ -128,6 +131,10 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                     "carbonyl_O_idx": carbonyl_o,
                     "ring_size": len(ring),
                     "extra_ring_O_idx": extra_o,
+                    # Exocyclic double-bond partner symbol: 'O' (ordinary
+                    # lactone) or 'S'/'Se'/'Te' (thiono/seleno/telluro lactone,
+                    # P-65.6.3.5.1 -> -thione/-selone/-tellone suffix).
+                    "chalcogen": mol.GetAtomWithIdx(carbonyl_o).GetSymbol(),
                 }
 
     return None
@@ -143,8 +150,27 @@ _HW_RING_SIZES = frozenset(range(3, 11))
 # Maximum ring size for macrolide lactone naming
 _MAX_MACROLIDE_SIZE = 50
 
+# Exocyclic-chalcogen -> lactone suffix (P-65.6.3.5.1). The ordinary lactone
+# (=O) keeps '-one'; the thiono/seleno/telluro lactones take -thione/-selone/
+# -tellone. Vowel elision is suffix-driven: '-one' elides the parent's terminal
+# 'e' (oxolan-2-one) but the consonant-initial -thione does NOT (oxolane-2-thione).
+_LACTONE_CHALCOGEN_SUFFIX = {"O": "one", "S": "thione", "Se": "selone", "Te": "tellone"}
+_ELISION_VOWELS = "aeiouy"
 
-def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None) -> Optional[str]:
+
+def _join_lactone_suffix(parent_name: str, locant: int, suffix: str) -> str:
+    """Join an HW parent name with a '-{locant}-{suffix}' lactone/thiono suffix,
+    eliding the parent's terminal 'e' only when ``suffix`` begins with an elision
+    vowel ('one' -> oxolan-2-one; 'thione' -> oxolane-2-thione)."""
+    if parent_name.endswith("e") and suffix[:1] in _ELISION_VOWELS:
+        stem = parent_name[:-1]
+    else:
+        stem = parent_name
+    return f"{stem}-{locant}-{suffix}"
+
+
+def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
+                      chalcogen: str = "O") -> Optional[str]:
     """
     Get the IUPAC name for a monocyclic lactone of a given ring size.
 
@@ -182,6 +208,10 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None) -> O
     if ring_size < 3:
         return None
 
+    suffix = _LACTONE_CHALCOGEN_SUFFIX.get(chalcogen)
+    if suffix is None:
+        return None
+
     # P-64.1.2.1(a) cyclic carbonate: two ring oxygens bonded to the
     # carbonyl C. Only the 1,3 geometry (extra O at locant 3) is a valid
     # dioxanone/dioxolanone; anything else is out of this namer's scope.
@@ -197,8 +227,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None) -> O
         if not parent_name:
             return None
         # build_hw_name already emits the '1,3-' locant prefix.
-        stem = parent_name[:-1] if parent_name.endswith("e") else parent_name
-        return f"{stem}-2-one"
+        return _join_lactone_suffix(parent_name, 2, suffix)
 
     # Hantzsch-Widman naming for ring sizes 3-10
     if ring_size in _HW_RING_SIZES:
@@ -212,13 +241,8 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None) -> O
         if not parent_name:
             return None
 
-        # Apply vowel elision: remove terminal 'e' before '-one'
-        if parent_name.endswith("e"):
-            stem = parent_name[:-1]
-        else:
-            stem = parent_name
-
-        return f"{stem}-2-one"
+        # Suffix-driven vowel elision ('-one' elides, '-thione' does not).
+        return _join_lactone_suffix(parent_name, 2, suffix)
 
     # Macrolide naming for ring sizes 11+
     # Uses replacement nomenclature: oxacyclo{chain_prefix}an-2-one
@@ -234,10 +258,10 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None) -> O
     except ValueError:
         return None
 
-    # Build: oxacyclo + {prefix} + an-2-one
-    # The chain prefix already provides the stem (e.g., "undec" for 11)
-    # Combine: "oxacyclo" + prefix + "an-2-one"
-    return f"oxacyclo{chain_prefix}an-2-one"
+    # Build: oxacyclo + {prefix} + an-2-{suffix}
+    # The chain prefix already provides the stem (e.g., "undec" for 11);
+    # 'oxacyclo...an' ends in a consonant so no elision applies.
+    return f"oxacyclo{chain_prefix}an-2-{suffix}"
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +299,10 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     # P-64.1.2.1(a) cyclic carbonate: the second ring O bonded to the
     # carbonyl C sits at locant 3 by the O=1, carbonyl C=2 numbering.
     extra_o_locant = 3 if info.get("extra_ring_O_idx") is not None else None
-    parent_name = name_lactone_ring(info["ring_size"], extra_o_locant=extra_o_locant)
+    parent_name = name_lactone_ring(
+        info["ring_size"], extra_o_locant=extra_o_locant,
+        chalcogen=info.get("chalcogen", "O"),
+    )
     if parent_name is None:
         return None
 
