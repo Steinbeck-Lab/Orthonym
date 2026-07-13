@@ -301,7 +301,13 @@ def name_salt(mol, style: str = 'pin') -> str:
     if len(frags['anions']) == 1 and cation_names:
         anion_frag = frags['anions'][0]
         protonated_acids = _count_protonated_acid_sites(anion_frag['mol'])
-        if protonated_acids > 0:
+        # Method (1) P-65.6.2.3.1 (PIN for organic acid salts): when the anion is
+        # already named with a 'carboxy' prefix (the un-ionized -COOH expressed
+        # substitutively -> 'potassium 6-carboxyhexanoate'), the acidic hydrogen is
+        # already accounted for -> do NOT also insert the method-(2) 'hydrogen'
+        # word. Only method-(2) salts (general-nomenclature form) take 'hydrogen'.
+        method1_used = any('carboxy' in a for a in anion_names)
+        if protonated_acids > 0 and not method1_used:
             hydrogen_prefix = _HYDROGEN_PREFIXES.get(
                 protonated_acids, 'hydrogen'
             )

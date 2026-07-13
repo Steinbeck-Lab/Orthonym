@@ -2596,6 +2596,92 @@ def _amino_acid_carboxylate(mol, anion_site: Dict) -> str:
     return ''
 
 
+def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
+    """Method (1) P-65.6.2.3.1 — PIN for acid salts of polybasic ORGANIC acids.
+
+    A partially-ionized polybasic acid anion expresses the ionized carboxyl as the
+    ``-oate`` principal characteristic group (C1) and each still-protonated ``-COOH``
+    as a ``carboxy`` substituent prefix, e.g. ``HOOC-[CH2]5-COO(-)`` ->
+    ``6-carboxyhexanoate`` (BB 31602), ``HOOC-CH2-CH2-COO(-)`` ->
+    ``3-carboxypropanoate`` (BB 31606). This differs from method (2)
+    (``hydrogen heptanedioate``), which is retained for general nomenclature only.
+
+    Scope (fail-closed -> caller keeps method (2)): built for the clean, acyclic,
+    all-carbon linear diacid mono-anion where the whole molecule is
+    ``HO2C-[CH2]k-CO2(-)`` — the diacid family the target belongs to. Any other
+    shape (ring, branch, hetero-substituent, unsaturation, >1 protonated -COOH,
+    the inorganic 1-carbon carbonic anion) returns '' so the existing path/method
+    (2) still applies. NEVER emits a wrong name.
+    """
+    from rdkit.Chem import MolFromSmarts
+    from rdkit.Chem import rdmolops
+
+    # Partial ionization: exactly one still-protonated -COOH (the mono-anion diacid).
+    acid_pat = MolFromSmarts('[CX3](=O)[OX2H1]')
+    if acid_pat is None:
+        return ''
+    prot_matches = mol.GetSubstructMatches(acid_pat)
+    if len(prot_matches) != 1:
+        return ''
+    cp = prot_matches[0][0]            # protonated carboxyl carbon
+
+    # Acyclic only (a ring parent is out of this linear construction).
+    if mol.GetRingInfo().NumRings() > 0:
+        return ''
+
+    # The ionized carboxyl carbon (C1) = the heavy-C neighbour of the anion [O-].
+    anion_idx = anion_site['atom_idx']
+    ci = None
+    for nb in mol.GetAtomWithIdx(anion_idx).GetNeighbors():
+        if nb.GetSymbol() == 'C':
+            ci = nb.GetIdx()
+            break
+    if ci is None or ci == cp:
+        return ''
+
+    # Skeleton must be all-carbon apart from carboxyl oxygens; the ONLY oxygenated
+    # carbons are the two carboxyl carbons (no third carboxyl / carbonyl / hetero).
+    carboxyl_cs = {ci, cp}
+    for atom in mol.GetAtoms():
+        sym = atom.GetSymbol()
+        if sym == 'O':
+            if not any(n.GetIdx() in carboxyl_cs for n in atom.GetNeighbors()):
+                return ''
+        elif sym != 'C':
+            return ''
+    oxy_cs = {a.GetIdx() for a in mol.GetAtoms()
+              if a.GetSymbol() == 'C'
+              and any(n.GetSymbol() == 'O' for n in a.GetNeighbors())}
+    if oxy_cs != carboxyl_cs:
+        return ''
+
+    # The backbone from C1 to the protonated carboxyl must be the WHOLE carbon
+    # chain (no branches) and fully saturated (single C-C bonds only).
+    path = rdmolops.GetShortestPath(mol, ci, cp)
+    if not path:
+        return ''
+    n_carbons = sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'C')
+    if len(path) != n_carbons:
+        return ''
+    for bond in mol.GetBonds():
+        if (bond.GetBeginAtom().GetSymbol() == 'C'
+                and bond.GetEndAtom().GetSymbol() == 'C'
+                and bond.GetBondType() != Chem.BondType.SINGLE):
+            return ''
+
+    # Parent = the chain rooted at the ionized carboxyl (C1) EXCLUDING the
+    # protonated carboxyl carbon; that carbon becomes a 'carboxy' prefix on the
+    # last parent carbon (locant = parent length).
+    parent_len = len(path) - 1
+    if parent_len < 1:
+        return ''
+    from ..data.chain_names import get_chain_prefix
+    prefix = get_chain_prefix(parent_len)
+    if not prefix:
+        return ''
+    return f"{parent_len}-carboxy{prefix}anoate"
+
+
 def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     """Generate systematic name for carboxylate anion.
 
@@ -2604,6 +2690,14 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     substituents, stereo, unsaturation), then convert '-oic acid' to '-oate'.
     This ensures all substituents are properly detected and included.
     """
+    # Method (1) P-65.6.2.3.1 (PIN): a partially-ionized polybasic ORGANIC acid
+    # expresses the un-ionized -COOH as a 'carboxy' prefix (6-carboxyhexanoate),
+    # NOT the general-only method (2) 'hydrogen ...' form. Fail-closed -> the
+    # existing neutralize->-oate path below handles the plain mono-carboxylate.
+    partial = _name_partial_acid_salt_anion(mol, anion_site)
+    if partial:
+        return partial
+
     # NEW: Check for aromatic parent FIRST
     carboxyl_carbon = _find_carboxyl_carbon(mol, anion_site)
     if carboxyl_carbon is not None:
