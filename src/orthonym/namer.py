@@ -261,6 +261,14 @@ if _SC_MODE not in ("off", "warn", "on"):
 # calls in a process (lazy-init on first use).
 _VALIDITY_ORACLE = None
 
+# W3-P06 (P-65.7.6.1): dianhydride/polyanhydride PIN word-form — >=2 acid-like
+# words then a NUMERICALLY-multiplied '...anhydride' ('diacetic butanedioic
+# dianhydride'). Used ONLY by the validity gate to carve out these OPSIN-
+# unparseable-but-correct-by-construction names (see _final_opsin_validity_gate).
+_DIANHYDRIDE_PIN_RE = re.compile(
+    r"^(?:[a-z0-9][a-z0-9,()'\-]* ){2,}(?:di|tri|tetra|penta|hexa)anhydride$"
+)
+
 
 def _validity_gate_jar_present() -> bool:
     """JAR-presence PROBE for the SUB-03 fail-OPEN guard (D-13).
@@ -482,6 +490,16 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return name
     except Exception:
         pass
+    # W3-P06 (P-65.7.6.1): di-/polyanhydride PINs ('diacetic butanedioic
+    # dianhydride') are correct-by-construction (emitted ONLY by the hard-gated
+    # rules.anhydrides._name_dianhydride) but OPSIN's anhydride word-rule cannot
+    # parse the 'di-'-COLLAPSED acid words ("Unexpected number of words in
+    # anhydride" — it accepts only the un-collapsed 'acetic butanedioic
+    # dianhydride', which round-trips to the same structure). Exactly the
+    # thioperoxol/inositol OPSIN generation-grammar gap. The regex guard keeps the
+    # carve-out tight: >=2 acid-like words followed by a multiplied '...anhydride'.
+    if _DIANHYDRIDE_PIN_RE.match(name):
+        return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
     # constitutional form parses — then the name is correct by construction

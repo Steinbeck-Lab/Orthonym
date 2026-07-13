@@ -80,6 +80,14 @@ def name_anhydride(features) -> Optional[str]:
     if not matches:
         return None
 
+    # W3-P06 Task 8 (P-65.7.6.1): di- and polyanhydrides — TWO or more -CO-O-CO-
+    # linkages. Must be handled before the single-match path (which takes
+    # matches[0] and whose acyl-BFS would cross the 2nd linkage -> wrong name).
+    if len(matches) >= 2:
+        _da = _name_dianhydride(mol, matches)
+        if _da:
+            return _da
+
     # Take first match
     match = matches[0]
     # SMARTS [CX3](=O)[OX2][CX3](=O) matches: (C1, O1_carbonyl, O_bridge, C2, O2_carbonyl)
@@ -230,6 +238,123 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
 
 _CHALCOGEN_CLASS_TERM = {"S": "thioanhydride", "Se": "selenoanhydride",
                          "Te": "telluroanhydride"}
+
+
+_NUMERIC_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+
+
+def _diacid_stem(mol, frag_atoms, carbonyls) -> Optional[str]:
+    """Chain diacid stem (e.g. 'butanedioic') for a LINEAR, unsubstituted diacid
+    residue whose two carbonyls sit at both chain ends. Fail-closed (None) for
+    branched / substituted / non-terminal-carbonyl residues."""
+    frag = set(frag_atoms)
+    carbons = [a for a in frag if mol.GetAtomWithIdx(a).GetSymbol() == "C"]
+    # Linear: no chain carbon has >2 in-fragment carbon neighbours.
+    for a in carbons:
+        cn = sum(1 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                 if nb.GetIdx() in frag and nb.GetSymbol() == "C")
+        if cn > 2:
+            return None
+    # Both carbonyls terminal (exactly one in-fragment carbon neighbour).
+    for c in carbonyls:
+        cn = sum(1 for nb in mol.GetAtomWithIdx(c).GetNeighbors()
+                 if nb.GetIdx() in frag and nb.GetSymbol() == "C")
+        if cn != 1:
+            return None
+    # Unsubstituted: every non-carbon fragment atom is a carbonyl =O.
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != "O" for a in frag
+           if mol.GetAtomWithIdx(a).GetSymbol() != "C"):
+        return None
+    return get_chain_prefix(len(carbons)) + "anedioic"
+
+
+def _name_residue_acid(mol, frag_atoms, carbonyls, carbonyl_meta):
+    """Name one acid residue of a di/polyanhydride: a monoacid (1 carbonyl) via
+    _name_acyl_acid, a diacid (2 carbonyls) via _diacid_stem."""
+    if len(carbonyls) == 1:
+        c = carbonyls[0]
+        bo, co = carbonyl_meta[c]
+        nm, _sub = _name_acyl_acid(mol, c, bo, co)
+        return nm
+    if len(carbonyls) == 2:
+        return _diacid_stem(mol, frag_atoms, carbonyls)
+    return None
+
+
+def _name_dianhydride(mol, matches) -> Optional[str]:
+    """P-65.7.6.1: di-/polyanhydride (>=2 -CO-O-CO- linkages) ->
+    '<acid groups in occurrence order> {di|tri|...}anhydride'.
+
+    Acid residues are cited in their order of occurrence in the structure,
+    beginning with the end acid group lower in alphabetical order; identical
+    residues collapse with a numeric multiplier ('diacetic butanedioic
+    dianhydride', BB 32386). Handles the LINEAR di/poly-anhydride topology
+    (mono-...-diacid-...-mono); fail-closed (None) for branched/complex
+    topologies, whereupon name_anhydride falls through to the single-linkage
+    path."""
+    infos = []
+    bridge_os = set()
+    for m in matches:
+        info = _parse_anhydride_core(mol, m)
+        if info is None or info['o1'] is None or info['o2'] is None:
+            return None
+        infos.append(info)
+        bridge_os.add(info['bridge_o'])
+
+    # carbonyl carbon -> (its bridge O, its =O) for monoacid residue naming.
+    carbonyl_meta = {}
+    for info in infos:
+        carbonyl_meta[info['c1']] = (info['bridge_o'], info['o1'])
+        carbonyl_meta[info['c2']] = (info['bridge_o'], info['o2'])
+
+    # Residue fragment for each carbonyl = atoms reachable without crossing ANY
+    # bridge O. Carbonyls in the same fragment (a central diacid) share it.
+    frag_of = {c: frozenset(_bfs_side_atoms(mol, c, bridge_os))
+               for c in carbonyl_meta}
+    uniq = {}
+    for c, f in frag_of.items():
+        uniq.setdefault(f, []).append(c)
+
+    res_name = {}
+    for f, cs in uniq.items():
+        nm = _name_residue_acid(mol, f, cs, carbonyl_meta)
+        if nm is None:
+            return None
+        res_name[f] = nm
+
+    # Residue adjacency graph (one edge per anhydride linkage).
+    adj = {f: [] for f in uniq}
+    for info in infos:
+        fa, fb = frag_of[info['c1']], frag_of[info['c2']]
+        adj[fa].append(fb)
+        adj[fb].append(fa)
+    terminals = [f for f in uniq if len(adj[f]) == 1]
+    if len(terminals) != 2:
+        return None  # not a simple linear di/poly-anhydride chain
+
+    # Walk from the terminal whose acid name is alphabetically lower.
+    start = min(terminals, key=lambda f: res_name[f])
+    order, visited, prev, cur = [], set(), None, start
+    while cur is not None and cur not in visited:
+        visited.add(cur)
+        order.append(res_name[cur])
+        nxts = [x for x in adj[cur] if x != prev and x not in visited]
+        prev, cur = cur, (nxts[0] if nxts else None)
+    if len(visited) != len(uniq):
+        return None  # topology is not a simple path
+
+    # Collapse identical residues (first-occurrence order) with a NUMERIC prefix
+    # (P-65.7.6.1: "The numerical prefix 'di-' is used").
+    seq, counts = [], {}
+    for nm in order:
+        if nm not in counts:
+            seq.append(nm)
+            counts[nm] = 0
+        counts[nm] += 1
+    parts = [(_NUMERIC_MULT.get(counts[nm], "") if counts[nm] > 1 else "") + nm
+             for nm in seq]
+    class_term = _NUMERIC_MULT.get(len(matches), "") + "anhydride"
+    return " ".join(parts) + " " + class_term
 
 
 def _name_dicarbonic_dihalide(mol, c1: int, c2: int, bridge_o: int) -> Optional[str]:
