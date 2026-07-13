@@ -132,17 +132,23 @@ def name_anhydride(features) -> Optional[str]:
     # Acyclic anhydride: name each acyl fragment as its corresponding acid.
     # Uses _name_acyl_acid() which calls _integrate_universal_prefixes()
     # per D-01 to discover branch substituents on acyl chains.
-    acid1_name = _name_acyl_acid(mol, c1_idx, bridge_o, anhydride_info['o1'])
-    acid2_name = _name_acyl_acid(mol, c2_idx, bridge_o, anhydride_info['o2'])
+    acid1_name, sub1 = _name_acyl_acid(mol, c1_idx, bridge_o, anhydride_info['o1'])
+    acid2_name, sub2 = _name_acyl_acid(mol, c2_idx, bridge_o, anhydride_info['o2'])
 
     if acid1_name is None or acid2_name is None:
         return None
 
     if acid1_name == acid2_name:
-        # Symmetric anhydride
+        # Symmetric anhydride. P-65.7.8.1: a SYMMETRICALLY SUBSTITUTED
+        # monocarboxylic-acid anhydride is named 'bis({acid}) anhydride'
+        # (bis(6-aminohexanoic) anhydride, bis(chloroacetic) anhydride). An
+        # unsubstituted symmetric acid keeps '{acid} anhydride' (acetic /
+        # propanoic / benzoic).
+        if sub1:
+            return f"bis({acid1_name}) anhydride"
         return f"{acid1_name} anhydride"
     else:
-        # Mixed/asymmetric anhydride: alphabetical order
+        # Mixed/asymmetric anhydride: alphabetical order (P-65.7.2 / P-65.7.8.2).
         acids = sorted([acid1_name, acid2_name])
         return f"{acids[0]} {acids[1]} anhydride"
 
@@ -232,11 +238,14 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
     class_term = _CHALCOGEN_CLASS_TERM.get(mol.GetAtomWithIdx(x).GetSymbol())
     if class_term is None:
         return None
-    acid1 = _name_acyl_acid(mol, c1, x, o1)
-    acid2 = _name_acyl_acid(mol, c2, x, o2)
+    acid1, sub1 = _name_acyl_acid(mol, c1, x, o1)
+    acid2, sub2 = _name_acyl_acid(mol, c2, x, o2)
     if acid1 is None or acid2 is None:
         return None
     if acid1 == acid2:
+        # Symmetric-substituted -> bis(...) (P-65.7.8.1 extends to chalcogen anhydrides).
+        if sub1:
+            return f"bis({acid1}) {class_term}"
         return f"{acid1} {class_term}"
     acids = sorted([acid1, acid2])
     return f"{acids[0]} {acids[1]} {class_term}"
@@ -275,14 +284,16 @@ def _name_peroxy_anhydride(mol) -> Optional[str]:
                           None)
         if near_o is None or carbonyl_o is None:
             return None
-        nm = _name_acyl_acid(mol, c, near_o, carbonyl_o)
+        nm, sub = _name_acyl_acid(mol, c, near_o, carbonyl_o)
         if nm is None:
             return None
-        acids.append(nm)
-    if acids[0] == acids[1]:
-        return f"{acids[0]} peroxyanhydride"
-    acids = sorted(acids)
-    return f"{acids[0]} {acids[1]} peroxyanhydride"
+        acids.append((nm, sub))
+    if acids[0][0] == acids[1][0]:
+        if acids[0][1]:
+            return f"bis({acids[0][0]}) peroxyanhydride"
+        return f"{acids[0][0]} peroxyanhydride"
+    names = sorted(a[0] for a in acids)
+    return f"{names[0]} {names[1]} peroxyanhydride"
 
 
 def _parse_anhydride_core(mol, match: tuple) -> Optional[dict]:
@@ -452,7 +463,7 @@ def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
     return best_path
 
 
-def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int) -> str:
+def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     """Name an acyl fragment as its corresponding acid, with substituent prefixes.
 
     Uses _integrate_universal_prefixes() (per D-01) to discover branch
@@ -466,7 +477,11 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int) -> str
         carbonyl_o: Index of the carbonyl oxygen (=O).
 
     Returns:
-        Acid name WITHOUT " acid" suffix (e.g., "2-methylpropanoic"), or None.
+        W3-P06: a ``(name, is_substituted)`` tuple — the acid name WITHOUT the
+        " acid" word (e.g. "2-methylpropanoic"), plus a flag that is True iff the
+        acid carries a substituent prefix (a non-empty ``prefix_str``). The flag
+        drives the P-65.7.8.1 symmetric-substituted 'bis(...)' wrap WITHOUT
+        string-sniffing the name. Returns ``(None, False)`` on failure.
     """
     frag_atoms = _collect_acyl_fragment_atoms(mol, carbonyl_c, bridge_o)
 
@@ -503,7 +518,7 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int) -> str
     if acid_is_ring_acid(mol, frag_list) or (
         not is_branched and not non_c_non_carbonyl_o
     ):
-        return get_acid_fragment_name(mol, frag_list)
+        return get_acid_fragment_name(mol, frag_list), False
 
     # Branched or has heteroatom substituents: use _integrate_universal_prefixes()
     # per D-01 to discover and name substituents on the acyl chain.
@@ -531,8 +546,8 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int) -> str
 
     base_acid = _build_acid_name(len(principal_chain))
     if prefix_str:
-        return f"{prefix_str}{base_acid}"
-    return base_acid
+        return f"{prefix_str}{base_acid}", True
+    return base_acid, False
 
 
 def _build_acid_name(chain_length: int) -> str:
