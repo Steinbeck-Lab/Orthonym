@@ -1693,6 +1693,43 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         _amidine_excluded_n.update({_ih_dbl, _ih_sgl, _ih_nh2})
                     continue
 
+        # W3-P02-4 (P-65.1.3.2.2, BB 30089): a hydrazonic acid C(=N-NH2)(OH)
+        # DEMOTED by a senior group (COOH) whose geminal carbon sits on the
+        # parent chain splits into 'hydroxy' (the geminal C-OH) + 'hydrazinylidene'
+        # (the =N-NH2) prefixes on that carbon's locant — PIN
+        # '5-hydrazinylidene-5-hydroxypentanoic acid'. SMARTS match tuple
+        # (C, imino-N, amino-N, hydroxyl-O). Fires only when every match's C is a
+        # chain member; else falls through (fail closed). The imino-N/amino-N/O
+        # are added to the substituent-exclusion set so the alkyl walk does not
+        # re-name the =N-NH2 or -OH branch.
+        if fg_name == 'hydrazonic_acid' and chain_set:
+            _hzc_ok = True
+            _hzc_units = {}
+            for _m in matches:
+                if len(_m) < 4:
+                    _hzc_ok = False
+                    break
+                _c, _nim, _nam, _o = _m[0], _m[1], _m[2], _m[3]
+                if _c not in chain_set:
+                    _hzc_ok = False
+                    break
+                _hzc_units[_c] = (_nim, _nam, _o)
+            if _hzc_ok and _hzc_units:
+                _hzc_prefixes = []
+                for _c, (_nim, _nam, _o) in _hzc_units.items():
+                    _loc = atom_to_locant.get(_c)
+                    if _loc is None:
+                        _hzc_ok = False
+                        break
+                    _hzc_prefixes.append(format_fg_prefix('hydroxy', [_loc], 1))
+                    _hzc_prefixes.append(
+                        format_fg_prefix('hydrazinylidene', [_loc], 1))
+                if _hzc_ok:
+                    all_prefixes.extend(_hzc_prefixes)
+                    for _c, (_nim, _nam, _o) in _hzc_units.items():
+                        _amidine_excluded_n.update({_nim, _nam, _o})
+                    continue
+
         # PF-2 (P-66.4.2.3.5): an amidrazone attached to the chain via its AMINO
         # nitrogen (chain-N(H)-C(=N-NH2)-R) is expressed by _check_for_acylamino
         # as the '(...hydrazonamido)' prefix, NOT the C-attached
