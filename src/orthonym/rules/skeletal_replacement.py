@@ -480,6 +480,16 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             and mol.HasSubstructMatch(_ACYCLIC_AMINE_PATTERN)):
         return None
 
+    # Gate 2c-bis (W3-P15, P-68.3.1.1.1.3): an N,O-disubstituted hydroxylamine
+    # (R-NH-O-R') is an O-substituted AMINE; the BB note (@38390) EXPLICITLY
+    # forbids skeletal ('a') replacement for it (an 'a' chain cannot terminate
+    # on oxygen and the amine characteristic group would be lost). Decline so the
+    # substitutive amine namer (handlers.hydroxylamine._name_no_disub_hydroxylamine)
+    # produces the PIN (CNOC -> N-methoxymethanamine) instead of '2-oxa-3-azabutane'.
+    from ..assembly.handlers.hydroxylamine import no_disub_hydroxylamine_core
+    if no_disub_hydroxylamine_core(mol) is not None:
+        return None
+
     # ----------------------------------------------------------------
     # Gate 2b (BBR-PERC/DEF-3, Phase 169.7): no prefix-only characteristic-group
     # atoms. Azide / diazo / nitroso / nitrite / nitro / N-oxide heteroatoms are

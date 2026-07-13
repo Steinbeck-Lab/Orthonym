@@ -35,10 +35,64 @@ def _is_hydroxylamine(features: Any) -> bool:
     hydroxylamine derivative with no more-senior parent (P-68.3.1.1.1.2: the
     O-substituted-N-bare form's PIN is O-substituted hydroxylamine, e.g.
     CON -> O-methylhydroxylamine, NOT the prefix 'aminooxy...' which applies only
-    when a senior parent is present)."""
+    when a senior parent is present), OR when the molecule is an N,O-disubstituted
+    hydroxylamine (P-68.3.1.1.1.3), whose PIN is an O-substituted AMINE."""
     if getattr(features, "principal_group", None) == "hydroxylamine":
         return True
-    return _is_pure_aminooxy_hydroxylamine(features)
+    if _is_pure_aminooxy_hydroxylamine(features):
+        return True
+    mol = getattr(features, "mol", None)
+    return mol is not None and no_disub_hydroxylamine_core(mol) is not None
+
+
+def no_disub_hydroxylamine_core(mol) -> Optional[Tuple[int, int]]:
+    """Return ``(n_idx, o_idx)`` for an N,O-DISUBSTITUTED hydroxylamine core
+    (R-NH-O-R' or R2N-O-R'), else None. The PIN of such a compound is an
+    O-substituted AMINE (P-68.3.1.1.1.3), and skeletal ('a') replacement is
+    explicitly forbidden (BB note @38390).
+
+    Fail-closed to None off this exact class: a single acyclic neutral N-O single
+    bond where the N bears >=1 carbon (besides O) AND the O bears exactly one
+    carbon (no O-H), with N/O the ONLY heteroatoms and every other heavy atom a
+    carbon (pure hydrocarbyl substituents), no multiple bond on N/O. This keeps
+    the simpler O-substituted (H2N-O-R) and N-substituted (R-NH-OH) forms — whose
+    PIN is the hydroxylamine parent — out (there the O bears H, or the N bears
+    only H)."""
+    from rdkit import Chem
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    n_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "N"]
+    o_atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == "O"]
+    if len(n_atoms) != 1 or len(o_atoms) != 1:
+        return None
+    # N and O are the only heteroatoms; everything else must be carbon.
+    for a in mol.GetAtoms():
+        if a.GetSymbol() not in ("C", "N", "O"):
+            return None
+        if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
+            return None
+    n, o = n_atoms[0], o_atoms[0]
+    if n.IsInRing() or o.IsInRing():
+        return None
+    bond = mol.GetBondBetweenAtoms(n.GetIdx(), o.GetIdx())
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+    # No double bond anywhere touching N or O (would be oxime/nitroso/etc.).
+    for b in mol.GetBonds():
+        if b.GetBondType() != Chem.BondType.SINGLE:
+            syms = {b.GetBeginAtom().GetSymbol(), b.GetEndAtom().GetSymbol()}
+            if syms & {"N", "O"}:
+                return None
+    # N bears >=1 carbon (besides O); O bears exactly one carbon (no O-H).
+    n_carbons = [nb for nb in n.GetNeighbors()
+                 if nb.GetSymbol() == "C"]
+    o_carbons = [nb for nb in o.GetNeighbors()
+                 if nb.GetSymbol() == "C"]
+    if len(n_carbons) < 1 or len(o_carbons) != 1:
+        return None
+    if o.GetTotalNumHs() != 0:
+        return None
+    return (n.GetIdx(), o.GetIdx())
 
 
 def _is_pure_aminooxy_hydroxylamine(features: Any) -> bool:
@@ -138,10 +192,108 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
     return out
 
 
+_CONTRACTED_ALKOXY = {
+    "methyl": "methoxy", "ethyl": "ethoxy", "propyl": "propoxy",
+    "butyl": "butoxy", "phenyl": "phenoxy",
+}
+
+
+def _alkoxy_prefix(mol, o_idx: int, r_c_idx: int) -> Optional[str]:
+    """Name the ``-O-R'`` group as an alkoxy/aryloxy substituent prefix
+    (P-63.2.2.2): methyl -> methoxy, ethyl -> ethoxy, ...; longer / complex R'
+    -> ``{R'}oxy`` or ``({R'})oxy``. None if R' cannot be named."""
+    from ..substituent_naming import name_substituent_fragment
+    frag = _collect_substituent_fragment(mol, r_c_idx, o_idx)
+    alkyl = name_substituent_fragment(mol, frag, r_c_idx, [o_idx])
+    if not alkyl or not alkyl.endswith("yl"):
+        return None
+    if alkyl in _CONTRACTED_ALKOXY:
+        return _CONTRACTED_ALKOXY[alkyl]
+    if any(ch.isdigit() for ch in alkyl) or "-" in alkyl or "(" in alkyl:
+        return f"({alkyl})oxy"
+    return f"{alkyl}oxy"
+
+
+def _name_no_disub_hydroxylamine(features: Any) -> Optional[NamingResult]:
+    """P-68.3.1.1.1.3: an N,O-disubstituted hydroxylamine (R-NH-O-R') is named
+    as an O-substituted AMINE — the N-carbon skeleton is the amine parent and the
+    ``-O-R'`` is an N-(R'-oxy) substituent: CNOC -> N-methoxymethanamine;
+    C6H5-NH-O-CH2CH3 -> N-ethoxyaniline. Skeletal ('a') replacement is forbidden
+    for these (BB note @38390), so this must outrank it.
+
+    SCOPE (fail-closed -> None): the N bears EXACTLY ONE carbon (the clean
+    R-NH-O-R' parent-amine case); R2N-O-R' (a second N-carbon needing N-locant
+    disambiguation among N-substituents) is deferred."""
+    from rdkit import Chem
+    mol = features.mol
+    core = no_disub_hydroxylamine_core(mol)
+    if core is None:
+        return None
+    n_idx, o_idx = core
+    n = mol.GetAtomWithIdx(n_idx)
+    o = mol.GetAtomWithIdx(o_idx)
+    n_carbons = [nb.GetIdx() for nb in n.GetNeighbors() if nb.GetSymbol() == "C"]
+    if len(n_carbons) != 1:
+        return None                                  # R2N-O-R' -> defer
+    r_c = [nb.GetIdx() for nb in o.GetNeighbors() if nb.GetSymbol() == "C"][0]
+
+    alkoxy = _alkoxy_prefix(mol, o_idx, r_c)
+    if not alkoxy:
+        return None
+
+    # Build the parent amine (R-NH2) by deleting the O atom (which severs -O-R'),
+    # then name the N-bearing fragment via the full namer.
+    try:
+        rw = Chem.RWMol(mol)
+        rw.RemoveAtom(o_idx)
+        frag_mol = rw.GetMol()
+        Chem.SanitizeMol(frag_mol)
+    except Exception:
+        return None
+    pieces = Chem.GetMolFrags(frag_mol, asMols=True, sanitizeFrags=True)
+    amine_piece = None
+    for p in pieces:
+        if any(a.GetSymbol() == "N" for a in p.GetAtoms()):
+            amine_piece = p
+            break
+    if amine_piece is None:
+        return None
+    from ...namer import name_compound as _name_compound
+    try:
+        base = _name_compound(Chem.MolToSmiles(amine_piece))
+    except Exception:
+        return None
+    # The fragment is a clean primary amine (R-NH2), so its PIN is an amine parent
+    # ('methanamine', 'ethanamine', 'aniline', ...). Reject only a failure sentinel.
+    if not base or "unknown" in base or "not supported" in base:
+        return None
+    name = f"N-{alkoxy}{base}"
+
+    from ..candidate_pool import get_current_pool
+    from ..composer import _inject_stereo_if_missing
+    pool = get_current_pool()
+    pool.add(name, "hydroxylamine", features)
+    final_name = _inject_stereo_if_missing(features, pool.best().name)
+    return NamingResult(
+        name=final_name,
+        tree=NameTreeNode(
+            parent_stem=base, fragment_legacy=final_name,
+            class_id="hydroxylamine", iupac_section_cite="P-68.3.1.1.1.3",
+        ),
+        atom_to_locant_hint=None,
+    )
+
+
 def name_hydroxylamine(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Name a substituted hydroxylamine on the ``hydroxylamine`` parent."""
+    """Name a substituted hydroxylamine on the ``hydroxylamine`` parent, or an
+    N,O-disubstituted hydroxylamine as an O-substituted amine (P-68.3.1.1.1.3)."""
+    # P-68.3.1.1.1.3: N,O-disubstituted hydroxylamine -> O-substituted amine
+    # (skeletal 'a'-replacement forbidden). Try this first; fail-closed otherwise.
+    _no_disub = _name_no_disub_hydroxylamine(features)
+    if _no_disub is not None:
+        return _no_disub
     m = features.mol
     matches = features.functional_groups.get("hydroxylamine", [])
     if matches:
@@ -194,4 +346,6 @@ def name_hydroxylamine(
     )
 
 
-__all__ = ["name_hydroxylamine", "_is_hydroxylamine"]
+__all__ = [
+    "name_hydroxylamine", "_is_hydroxylamine", "no_disub_hydroxylamine_core",
+]
