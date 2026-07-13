@@ -175,12 +175,30 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
     # --- ester suffix ---
     acylates = [acylate_by_loc[loc] for loc in acyl_locants]
     if len(set(acylates)) != 1 and n_acyl > 1:
-        # Mixed (different) acyls: the multi-locant-ester functional-class form
-        # (`propane-1,2,3-triyl 1-X 2-Y ...`) is NOT OPSIN-parseable, so naming it
-        # here would regress rows the general (acyloxy)-prefix path already round-
-        # trips. Honest-gate to None (D-11) → cascade to the general pipeline.
-        return None
-    suffix = _multiplied_acylate(acylates[0], n_acyl)
+        # W3-P07 (P-65.6.3.3.3.2 method (1), the PIN): DIFFERENT anions are cited
+        # in alphanumerical order, EACH preceded by its attachment locant(s); a
+        # multiplicative prefix (di/tri) denotes a multiplicity of identical
+        # anions — 'propane-1,2,3-triyl 1,3-diacetate 2-propanoate'. This clean
+        # two-word-list form applies only to the FULLY-esterified backbone (no
+        # free-OH / glyco / phospho prefix); otherwise defer to the general
+        # (acyloxy)-prefix pipeline (method (2), acceptable in general nomenclature).
+        # The name is a valid BB PIN even though OPSIN cannot parse this
+        # functional-class multi-anion syntax (BB is the sole PIN authority).
+        if oh_atoms or glyco_atoms or phospho_atoms:
+            return None
+        from collections import defaultdict as _defaultdict
+        _groups = _defaultdict(list)
+        for _loc in acyl_locants:
+            _groups[acylate_by_loc[_loc]].append(_loc)
+        _ordered = sorted(_groups, key=_alpha_key)
+        _parts = []
+        for _aname in _ordered:
+            _locs = sorted(_groups[_aname])
+            _loc_str = ",".join(str(x) for x in _locs)
+            _parts.append(f"{_loc_str}-{_multiplied_acylate(_aname, len(_locs))}")
+        suffix = " ".join(_parts)
+    else:
+        suffix = _multiplied_acylate(acylates[0], n_acyl)
 
     # --- prefixes (free-OH, glycosyl, phosphoryloxy) on the non-acyl positions ---
     prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms)

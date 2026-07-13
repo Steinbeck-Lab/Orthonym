@@ -269,6 +269,19 @@ _DIANHYDRIDE_PIN_RE = re.compile(
     r"^(?:[a-z0-9][a-z0-9,()'\-]* ){2,}(?:di|tri|tetra|penta|hexa)anhydride$"
 )
 
+# W3-P07 (P-65.6.3.3.3.2 method (1)): the functional-class polyol polyester PIN —
+# a multivalent parent-group descriptor ('propane-1,2,3-triyl') followed by >=2
+# space-separated, locant-prefixed anion words each ending in '...ate'
+# ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate'). Emitted ONLY by the
+# hard-gated rules.lipids._assemble_glyceride mixed-acyl branch (correct-by-
+# construction numbering), but OPSIN cannot parse the multi-anion functional-class
+# syntax. Used ONLY by the validity gate to carve out this OPSIN-unparseable-but-
+# correct PIN (exactly the inositol / dianhydride situation).
+_POLYOL_POLYESTER_PIN_RE = re.compile(
+    r"^[a-z]+ane-[0-9,]+-(?:di|tri|tetra|penta)yl"
+    r"(?: [0-9,]+-[A-Za-z0-9()\[\],'*-]*ate){2,}$"
+)
+
 
 def _validity_gate_jar_present() -> bool:
     """JAR-presence PROBE for the SUB-03 fail-OPEN guard (D-13).
@@ -499,6 +512,12 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # thioperoxol/inositol OPSIN generation-grammar gap. The regex guard keeps the
     # carve-out tight: >=2 acid-like words followed by a multiplied '...anhydride'.
     if _DIANHYDRIDE_PIN_RE.match(name):
+        return name
+    # W3-P07 (P-65.6.3.3.3.2 method (1)): functional-class polyol polyester PIN
+    # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate') — correct-by-construction
+    # from _assemble_glyceride but OPSIN cannot parse the multi-anion syntax
+    # (exactly the inositol/dianhydride generation-grammar gap).
+    if _POLYOL_POLYESTER_PIN_RE.match(name):
         return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
