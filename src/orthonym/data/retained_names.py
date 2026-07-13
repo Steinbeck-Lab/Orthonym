@@ -192,6 +192,10 @@ RETAINED_NAMES = {
     # (BB:38697); BB:38695 'the names carbonohydrazide, carbohydrazide, and
     # carbazide are not recommended'. Canonical key of NNC(=O)NN.
     "NNC(=O)NN": "hydrazinecarbohydrazide",
+    # W3-P01-5 (P-68.3.1.3.4): HN=N-C(=O)-NH-NH2. PIN diazenecarbohydrazide
+    # (BB:38900); BB:38898 'The name carbazone is not recommended'. Canonical
+    # key of N=NC(=O)NN.
+    "N=NC(=O)NN": "diazenecarbohydrazide",
 
     # === COMMON SOLVENTS AND REAGENTS ===
     "ClCCl": "dichloromethane",
