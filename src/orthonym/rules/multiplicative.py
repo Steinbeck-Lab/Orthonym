@@ -1798,6 +1798,26 @@ def _classify_single_atom_bridge_ext(
       * C with exactly one terminal single-bonded halogen, 1 H -> '{halo}methylene'
     """
     sym = atom.GetSymbol()
+    # W3-P10 (P-67.1.4.1.1.5): hydroxyphosphoryl bridge -P(=O)(OH)- linking two
+    # identical ring parents (each a benzoic acid) -> '(hydroxyphosphoryl)'. The
+    # phosphoryl -P(=O)< bridge carries the residual -OH concatenated as 'hydroxy'.
+    if (sym == "P" and atom.GetFormalCharge() == 0
+            and atom.GetTotalNumHs() == 0 and len(sub_nbrs) == 2):
+        d_o = oh_o = None
+        for s in sub_nbrs:
+            if s.GetSymbol() != "O" or s.GetFormalCharge() != 0 or s.GetDegree() != 1:
+                return None
+            b = mol.GetBondBetweenAtoms(atom.GetIdx(), s.GetIdx())
+            if b.GetBondType() == Chem.BondType.DOUBLE and s.GetTotalNumHs() == 0:
+                d_o = s
+            elif b.GetBondType() == Chem.BondType.SINGLE and s.GetTotalNumHs() == 1:
+                oh_o = s
+            else:
+                return None
+        if d_o is None or oh_o is None:
+            return None
+        return ("hydroxyphosphoryl", "hydroxyphosphoryl",
+                [d_o.GetIdx(), oh_o.GetIdx()])
     if sym != "C" or len(sub_nbrs) != 1:
         return None
     sub = sub_nbrs[0]
@@ -2549,9 +2569,16 @@ def _assemble_multiplicative_name(
     _substituted_methylene = (
         bridge_name != "methylene" and bridge_name.endswith("methylene")
     )
+    # W3-P10 (P-16.3.3): a composite substituted-phosphoryl bridge
+    # ('hydroxyphosphoryl') is a compound prefix -> parenthesised (like the
+    # substituted-methylene case); a bare 'phosphoryl' would stay unenclosed.
+    _substituted_phosphoryl = (
+        bridge_name != "phosphoryl" and bridge_name.endswith("phosphoryl")
+    )
     if "(" in bridge_name:
         bridge_token = f"[{bridge_name}]"
-    elif any(ch.isdigit() for ch in bridge_name) or _substituted_methylene:
+    elif (any(ch.isdigit() for ch in bridge_name) or _substituted_methylene
+            or _substituted_phosphoryl):
         bridge_token = f"({bridge_name})"
     else:
         bridge_token = bridge_name
