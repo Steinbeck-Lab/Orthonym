@@ -138,6 +138,62 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     return ''.join(p[1] for p in parts)
 
 
+def _format_substituted_polyazane(n: int, dbpos: int,
+                                  subs: List[Tuple[int, str]]) -> Optional[str]:
+    """P-68.3.1.4 / P-31.1.4: substituted polyazane (>=3 N) or polyazene PIN.
+
+    Numbers the homogeneous N-chain in the direction giving (1) the lowest
+    locant to the skeletal double bond (the 'ene'), then (2) the lowest locants
+    to the detachable substituent prefixes; cites organyl substituents with
+    N-chain locants. Returns the full substituted name, or None (fail-closed).
+
+        Ph-N=N-NH-Ph  ->  1,3-diphenyltriaz-1-ene   (P-68.3.1.4.2)
+        CH3-NH-NH-NH2 ->  1-methyltriazane          (P-68.3.1.4.1)
+
+    A locant-bearing / substituted substituent name is enclosed in parentheses
+    and multiplied with the SIMPLE multiplier ('di', not 'bis' — BB verbatim
+    '1,3-di(naphthalen-2-yl)triaz-1-ene')."""
+    from ..assembly.naming_utils import is_complex_substituent, alpha_sort_key
+
+    def _analyse(rev: bool):
+        def loc(p: int) -> int:
+            return (n - p) if rev else (p + 1)
+        ene = None if dbpos < 0 else min(loc(dbpos), loc(dbpos + 1))
+        sub_locs = sorted(loc(p) for p, _ in subs)
+        return ene, sub_locs, loc
+
+    fwd, rev = _analyse(False), _analyse(True)
+
+    def _key(d):
+        ene, sub_locs, _ = d
+        return (ene if ene is not None else 0, sub_locs)
+
+    ene, _sub_locs, loc = min((fwd, rev), key=_key)
+
+    if dbpos < 0:
+        parent = _saturated_parent(n)
+    else:
+        parent = _ene_parent(n, ene)
+    if parent is None:
+        return None
+
+    by_name: Dict[str, List[int]] = {}
+    for p, name in subs:
+        by_name.setdefault(name, []).append(loc(p))
+    # Cite prefixes in ALPHABETICAL order (P-14.5.2), each with its locant set;
+    # join with a hyphen between a letter and a following locant digit.
+    parts: List[str] = []
+    for name in sorted(by_name, key=alpha_sort_key):
+        locs = sorted(by_name[name])
+        mult = _SUB_MULTIPLIER.get(len(locs))
+        if mult is None:
+            return None
+        enclosed = f"({name})" if is_complex_substituent(name) else name
+        parts.append(f"{','.join(map(str, locs))}-{mult}{enclosed}")
+    from ..assembly.substituent_naming import _joined_prefix_parts
+    return ''.join(_joined_prefix_parts(parts)) + parent
+
+
 def _name_azane_carboxylic_acid(mol) -> Optional[str]:
     """P-58.3.2 (BB 24896): H2N-(NH)k-COOH -> '<azane>-1-carboxylic acid'.
 
@@ -274,11 +330,14 @@ def name_polyazane(mol) -> Optional[str]:
 
     if not subs:
         return parent
-    # Substituted members handled only for the 2-N parents (hydrazine/diazene);
-    # longer substituted polyazanes need full N-locant rules -> fail-closed.
-    if n != 2:
-        return None
-    return f"{_format_n2_substituents(subs)}{parent}"
+    # The 2-N parents (hydrazine/diazene) keep the special single-substituent
+    # locant-omission rule (methylhydrazine, not 1-methylhydrazine, P-14.3.4.2).
+    if n == 2:
+        return f"{_format_n2_substituents(subs)}{parent}"
+    # W3-P15 (P-68.3.1.4.2 / P-31.1.4): substituted polyazanes/polyazenes with
+    # >=3 N are numbered for lowest ene-then-substituent locants and cite organyl
+    # substituents with N-chain locants (1,3-diphenyltriaz-1-ene). Fail-closed.
+    return _format_substituted_polyazane(n, dbpos, subs)
 
 
 __all__ = ["name_polyazane"]
