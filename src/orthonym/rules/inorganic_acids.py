@@ -140,8 +140,28 @@ _CARBONIC_FRN = {
     "O=C(O)OC(=O)OC(=O)O": build_polyacid_name("carbonic acid", 3),  # tricarbonic acid
 }
 
-# Merged lookup (no key overlap across the three tables — distinct structures).
-_ALL_INORGANIC = {**_INORGANIC_OXOACIDS, **_INORGANIC_ACID_DERIVATIVES, **_CARBONIC_FRN}
+# --- W3-P05 (P-65.1.8.1): carbonic-acid halides ---
+# Carbonic acid (HO-CO-OH) with one -OH replaced by a halogen -> the retained
+# ``carbono{halogen}idic acid`` PIN (P-65.1.8.1; BB 30684-30686: 'Cl-COOH
+# carbonochloridic acid (PIN), not chloroformic acid'). P-65.1.8.1 (BB 30670)
+# FORBIDS naming X-CO-OH as a substituted formic/methanoic acid, so the general
+# chain-acid path's '1-chloro-1-oxomethanoic acid' is a non-PIN that MUST be
+# intercepted @40. Exact full-molecule canonical-SMILES keys => zero false
+# positives. Every name OPSIN-RT-confirmed.
+_CARBONIC_ACID_HALIDES = {
+    "O=C(O)Cl": "carbonochloridic acid",   # P-65.1.8.1  Cl-CO-OH
+    "O=C(O)Br": "carbonobromidic acid",    # P-65.1.8.1  Br-CO-OH
+    "O=C(O)F": "carbonofluoridic acid",    # P-65.1.8.1  F-CO-OH
+    "O=C(O)I": "carbonoiodidic acid",      # P-65.1.8.1  I-CO-OH
+}
+
+# Merged lookup (no key overlap across the tables — distinct structures).
+_ALL_INORGANIC = {
+    **_INORGANIC_OXOACIDS,
+    **_INORGANIC_ACID_DERIVATIVES,
+    **_CARBONIC_FRN,
+    **_CARBONIC_ACID_HALIDES,
+}
 
 
 def lookup_exact_acid_name(canonical_smiles: str) -> Optional[str]:
