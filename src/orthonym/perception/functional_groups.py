@@ -476,6 +476,9 @@ for _fg_name, _smarts in FUNCTIONAL_GROUP_SMARTS.items():
 _ANHYDRIDE_BRIDGE_SMARTS = {
     # sulfonic anhydride R-SO2-O-SO2-R' (P-65.7.1; BB 32247 'benzenesulfonic anhydride')
     "sulfonic_anhydride": "[SX4](=O)(=O)[OX2][SX4](=O)(=O)",
+    # chalcogen-bridge anhydride R-CO-X-CO-R', X = S/Se/Te (P-65.7.3; BB 32292
+    # 'benzoic thioanhydride'). The bridge is S/Se/Te, not O, so the base core misses it.
+    "chalcogen_anhydride": "[CX3](=O)[SX2,SeX2,TeX2][CX3](=O)",
 }
 _COMPILED_ANHYDRIDE_BRIDGE = {}
 for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
@@ -697,7 +700,11 @@ def _resolve_fg_collisions(results):
         # derivatives (formates, formamides, etc.); suppress aldehyde on overlap
         ('carboxylic_acid', ['aldehyde']),
         ('ester', ['aldehyde']),
-        ('anhydride', ['aldehyde']),
+        # W3-P06 (P-65.7.3): a chalcogen-bridge anhydride folded into 'anhydride'
+        # also matches thio/seleno/telluro-ester (CO-X-CO) and, defensively,
+        # ketone on its carbonyl carbons — suppress them so the whole -CO-X-CO-
+        # unit is owned by the anhydride handler.
+        ('anhydride', ['aldehyde', 'thioester', 'selenoester', 'telluroester', 'ketone']),
         ('acid_chloride', ['aldehyde']),
         ('acid_bromide', ['aldehyde']),
         ('acid_fluoride', ['aldehyde']),

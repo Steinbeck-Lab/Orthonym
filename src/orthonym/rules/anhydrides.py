@@ -210,10 +210,36 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
     return f"{acids[0]} {acids[1]} anhydride"
 
 
+_CHALCOGEN_CLASS_TERM = {"S": "thioanhydride", "Se": "selenoanhydride",
+                         "Te": "telluroanhydride"}
+
+
 def _name_chalcogen_anhydride(mol) -> Optional[str]:
-    """P-65.7.3: R-CO-X-CO-R' (X = S/Se/Te) -> thio/seleno/telluroanhydride.
-    Filled in W3-P06 Task 6."""
-    return None
+    """P-65.7.3: R-CO-X-CO-R' (X = S/Se/Te) -> '<acid stem(s)> {class}anhydride'.
+
+    Each acyl side is named as its corresponding acid (benzoic, acetic, ...); the
+    class term is thio/seleno/telluroanhydride per the bridge element. Symmetric
+    -> '{acid} thioanhydride' (benzoic thioanhydride); mixed -> alphabetical two
+    words. Returns None when no -CO-X-CO- core is present."""
+    pat = Chem.MolFromSmarts(_CHALCOGEN_ANHYDRIDE_SMARTS)
+    if pat is None:
+        return None
+    matches = mol.GetSubstructMatches(pat, uniquify=True)
+    if not matches:
+        return None
+    m = matches[0]                       # (c1, =O, X, c2, =O)
+    c1, o1, x, c2, o2 = m[0], m[1], m[2], m[3], m[4]
+    class_term = _CHALCOGEN_CLASS_TERM.get(mol.GetAtomWithIdx(x).GetSymbol())
+    if class_term is None:
+        return None
+    acid1 = _name_acyl_acid(mol, c1, x, o1)
+    acid2 = _name_acyl_acid(mol, c2, x, o2)
+    if acid1 is None or acid2 is None:
+        return None
+    if acid1 == acid2:
+        return f"{acid1} {class_term}"
+    acids = sorted([acid1, acid2])
+    return f"{acids[0]} {acids[1]} {class_term}"
 
 
 def _name_peroxy_anhydride(mol) -> Optional[str]:
