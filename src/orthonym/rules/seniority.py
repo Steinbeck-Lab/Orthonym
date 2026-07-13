@@ -275,6 +275,7 @@ SENIORITY_ORDER = [
     # Wave2 T2b: terminal N-heteroatom preselected prefixes (P-35.2.2 /
     # P-68.3.1.1.1.5 / P-35.3.1) — prefix-only, junior to all suffix groups
     "aminooxy",        # -O-NH2 aminooxy (P-68.3.1.1.1.5; no o-elision)
+    "nitrooxy",        # -O-NO2 nitrooxy (P-67.1.4.3.1 preselected; nitric-acid ester)
     "diazenyl",        # HN=N- diazenyl (P-35.2.2 preselected)
     "n_fluoroamine",   # -NH-F fluoroamino (P-35.3.1 compound prefix)
     "n_chloroamine",   # -NH-Cl chloroamino (P-35.3.1)
@@ -343,6 +344,7 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
     # Wave2 T2b: terminal N-heteroatom preselected prefixes (P-35.2.2 /
     # P-68.3.1.1.1.5 / P-35.3.1)
     "aminooxy",
+    "nitrooxy",
     "diazenyl",
     "n_fluoroamine",
     "n_chloroamine",
@@ -629,6 +631,7 @@ SUFFIX_FORMS = {
     "hydrazine_fg": None,        # P-62.4: prefix-only
     # Wave2 T2b: terminal N-heteroatom preselected prefixes — prefix-only
     "aminooxy": None,            # P-68.3.1.1.1.5
+    "nitrooxy": None,            # P-67.1.4.3.1 (prefix-only)
     "diazenyl": None,            # P-35.2.2
     "n_fluoroamine": None,       # P-35.3.1
     "n_chloroamine": None,       # P-35.3.1
@@ -713,6 +716,9 @@ PREFIX_FORMS = {
     # (P-68.3.1.1.1.5); 'diazenyl (preselected prefix; see P-12.2)'
     # (P-35.2.2); '-NH-Cl chloroamino (preselected prefix)' (P-35.3.1).
     "aminooxy": "aminooxy",
+    # W3-P11 (P-67.1.4.3.1): -O-NO2 preselected prefix 'nitrooxy' (BB verbatim);
+    # compound '(nitrooxy)' takes enclosing marks (see needs_brackets).
+    "nitrooxy": "nitrooxy",
     "diazenyl": "diazenyl",
     "n_fluoroamine": "fluoroamino",
     "n_chloroamine": "chloroamino",

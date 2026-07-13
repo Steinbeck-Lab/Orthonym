@@ -132,6 +132,9 @@ _COMPOUND_FG_PREFIXES = (
 _COMPOUND_HETEROATOM_AMINO_PREFIXES = frozenset({
     'hydroxyamino', 'aminooxy',
     'fluoroamino', 'chloroamino', 'bromoamino', 'iodoamino',
+    # W3-P11 (P-67.1.4.3.1): -O-NO2 nitrooxy is a compound (acyl-on-oxy)
+    # preselected prefix -> enclosing marks: '3-(nitrooxy)propanoic acid'.
+    'nitrooxy',
 })
 
 # Wave2 T3b: parent-hydride stems used as roots of the PIN acid-stem

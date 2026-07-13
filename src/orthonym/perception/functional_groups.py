@@ -366,6 +366,15 @@ FUNCTIONAL_GROUP_SMARTS = {
     # O), so N-substituted forms R'-NH-O-R stay unperceived → fail-closed
     # (their PIN is O-substituted-hydroxylamine territory, P-68.3.1.1.1.2).
     "aminooxy": "[NX3H2][OX2][#6]",
+    # W3-P11 (P-67.1.4.3.1): -O-NO2 nitrooxy preselected prefix (ester of nitric
+    # acid, named by concatenating the acyl 'nitro' onto 'oxy'). BB verbatim
+    # '-O-NO2 nitrooxy (preselected prefix)' -> '3-(nitrooxy)propanoic acid'.
+    # The nitro N+ is bonded to the ester O (not carbon), so the C-attached
+    # `nitro` SMARTS [NX3+;$([NX3+][#6])] cannot claim it and there is no overlap
+    # with any existing FG (R-O-NO2 was previously perceived as nothing ->
+    # 'unknown'). Match tuple (O-, N+, =O, ester-O, C); the C attachment is last,
+    # mirroring aminooxy. Only the O/N heteroatoms enter get_chain_excluded_atoms.
+    "nitrooxy": "[OX1-][NX3+](=[OX1])[OX2][#6]",
     # Wave2 T2b: -NH-X N-haloamines → compound prefixes fluoroamino/
     # chloroamino/bromoamino/iodoamino (P-35.3.1; BB verbatim '-NH-Cl
     # chloroamino (preselected prefix)'). NX3H1 with the halogen + one C pins
@@ -591,6 +600,10 @@ def detect_features(mol) -> Dict[str, List[Tuple[int, ...]]]:
 _CHAIN_EXCLUDED_FG = frozenset({
     "azido", "diazo", "nitroso", "nitrite", "nitro",
     "n_oxide_aromatic", "n_oxide_aliphatic",
+    # W3-P11 (P-67.1.4.3.1): nitrooxy -O-NO2 is a prefix-only characteristic
+    # group; its O/N heteroatoms must never be walked into an oxa/aza skeletal
+    # chain (parallel to nitro/nitrite). Only the carbon attachment is preserved.
+    "nitrooxy",
 })
 
 
