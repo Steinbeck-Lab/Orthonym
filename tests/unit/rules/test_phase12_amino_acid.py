@@ -71,7 +71,7 @@ class TestGlycinateAnion:
         ("CC(=O)[O-]", "acetate"),                       # no amino — unaffected
         ("[O-]C(=O)c1ccccc1", "benzoate"),               # aromatic carboxylate — unaffected
         ("[O-]C(=O)CCCC", "pentanoate"),                 # simple chain — unaffected
-        ("[O-]C(=O)CCC(=O)[O-]", "succinate"),           # dicarboxylate — unaffected
+        ("[O-]C(=O)CCC(=O)[O-]", "butanedioate"),        # dicarboxylate — butanedioate is PIN (P-65.6.2.1); succinate general-only
     ])
     def test_carboxylate_regressions(self, smiles, expected):
         assert name_compound(smiles) == expected
