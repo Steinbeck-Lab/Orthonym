@@ -444,6 +444,62 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
     return build_p_frn_acid_name(front, parent_stem, infix_counts)
 
 
+# Chalcogen replacement -> prefix (P-67.1.2.2 / P-67.1.2.3.3). No linking-o
+# elision on these prefixes (P-67.1.2.4.1.2 'thiosilicic acid').
+_CHALCOGENOL_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
+_CHALCOGEN_PREFIX_ORDER = {"thio": 2, "seleno": 0, "telluro": 1}  # alpha: seleno<telluro<thio
+
+
+def name_silicic_acid_frn(mol) -> Optional[str]:
+    """P-67.1.2.4.1.2 chalcogen-prefix functional replacement on silicic acid.
+
+    Silicic acid Si(OH)4 with one or more -OH replaced by -SH / -SeH / -TeH ->
+    ``{thio|seleno|telluro}silicic acid`` (prefixes, cited alphabetically, no 'o'
+    elision, no italic locant; BB L35670 ``Si(OH)3(SH) thiosilicic acid``).
+
+    Fail-closed (returns ``None``) off this exact shape: any Si-C bond (genuine
+    organosilicon), any non-``OH``/non-chalcogenol neighbour, no chalcogen
+    replacement at all (-> the tabled ``silicic acid`` row owns it), no -OH left
+    (not class 'acid'), a charge, or more than one Si. Pure: no mol mutation.
+    """
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    sis = [a for a in mol.GetAtoms() if a.GetSymbol() == "Si"]
+    if len(sis) != 1:
+        return None
+    si = sis[0]
+    if si.GetFormalCharge() != 0 or si.GetDegree() != 4 or si.GetTotalNumHs() != 0:
+        return None
+    oh_count = 0
+    chalco: dict = {}
+    for b in si.GetBonds():
+        if b.GetBondType() != Chem.BondType.SINGLE:
+            return None
+        nb = b.GetOtherAtom(si)
+        sym = nb.GetSymbol()
+        if (sym == "O" and nb.GetFormalCharge() == 0 and nb.GetDegree() == 1
+                and nb.GetTotalNumHs() == 1):
+            oh_count += 1
+        elif (sym in _CHALCOGENOL_PREFIX and nb.GetFormalCharge() == 0
+                and nb.GetDegree() == 1 and nb.GetTotalNumHs() == 1):
+            pre = _CHALCOGENOL_PREFIX[sym]
+            chalco[pre] = chalco.get(pre, 0) + 1
+        else:
+            return None
+    if oh_count < 1 or not chalco:
+        return None
+    _MULT = {1: "", 2: "di", 3: "tri"}
+    parts = []
+    for pre in sorted(chalco, key=lambda p: _CHALCOGEN_PREFIX_ORDER[p]):
+        c = chalco[pre]
+        if c not in _MULT:
+            return None
+        parts.append(f"{_MULT[c]}{pre}")
+    return "".join(parts) + "silicic acid"
+
+
 def name_inorganic_acid(mol) -> Optional[str]:
     """Return the PIN for a free inorganic oxoacid or its tabled functional-class
     derivative (acid halide / amide / carbonic-FRN acid), the tetraalkyl silicate
@@ -469,6 +525,10 @@ def name_inorganic_acid(mol) -> Optional[str]:
     frn = name_p_oxoacid_frn(mol)
     if frn is not None:
         return frn
+    # W3-P10 (P-67.1.2.4.1.2): chalcogen-prefix FRN on silicic acid (thiosilicic).
+    si_frn = name_silicic_acid_frn(mol)
+    if si_frn is not None:
+        return si_frn
     # D-FOLLOWON item 10: tetraalkyl silicate ester (Si(OR)4). Routed here (@40)
     # so it intercepts BEFORE ORGANOMETALLIC@50 (which mis-claims Si as a metalloid
     # hub and linearizes the silyl-ester ligands into nonsense).
