@@ -500,6 +500,48 @@ def name_silicic_acid_frn(mol) -> Optional[str]:
     return "".join(parts) + "silicic acid"
 
 
+def name_borane_amine(mol) -> Optional[str]:
+    """P-67.1.2.6.2: amides of the boron acids are named SUBSTITUTIVELY on the
+    parent hydride borane (BH3), not as ``boric triamide``.
+
+        B(NH2)3   -> boranetriamine   (BB L35838; 'not boric triamide')
+        HB(NH2)2  -> boranediamine
+        H2B-NH2   -> boranamine
+
+    Fail-closed (returns ``None``) off this exact shape: any B-C or B-O bond (a
+    carbon-bearing boron -> boronic path; an oxygen-bearing boron -> the boric-acid
+    table), an N that is not a terminal ``-NH2``, a charge, more than one B, or any
+    heavy atom other than B/N. Pure: no mol mutation.
+    """
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    bs = [a for a in mol.GetAtoms() if a.GetSymbol() == "B"]
+    if len(bs) != 1:
+        return None
+    b = bs[0]
+    if b.GetFormalCharge() != 0 or b.GetNumRadicalElectrons() != 0:
+        return None
+    # No heavy atom other than the single B and its amine nitrogens.
+    if any(a.GetSymbol() not in ("B", "N", "H") for a in mol.GetAtoms()):
+        return None
+    n_count = 0
+    for bond in b.GetBonds():
+        if bond.GetBondType() != Chem.BondType.SINGLE:
+            return None
+        nb = bond.GetOtherAtom(b)
+        if (nb.GetSymbol() != "N" or nb.GetFormalCharge() != 0
+                or nb.GetDegree() != 1 or nb.GetTotalNumHs() != 2):
+            return None                              # only terminal -NH2
+        n_count += 1
+    if n_count != b.GetDegree() or n_count < 1:
+        return None
+    if n_count == 1:
+        return "boranamine"                          # borane + amine (e elided)
+    return "borane" + {2: "di", 3: "tri", 4: "tetra"}.get(n_count, "") + "amine"
+
+
 def name_inorganic_acid(mol) -> Optional[str]:
     """Return the PIN for a free inorganic oxoacid or its tabled functional-class
     derivative (acid halide / amide / carbonic-FRN acid), the tetraalkyl silicate
@@ -529,6 +571,10 @@ def name_inorganic_acid(mol) -> Optional[str]:
     si_frn = name_silicic_acid_frn(mol)
     if si_frn is not None:
         return si_frn
+    # W3-P10 (P-67.1.2.6.2): boron-acid amides named on borane (boranetriamine).
+    b_amine = name_borane_amine(mol)
+    if b_amine is not None:
+        return b_amine
     # D-FOLLOWON item 10: tetraalkyl silicate ester (Si(OR)4). Routed here (@40)
     # so it intercepts BEFORE ORGANOMETALLIC@50 (which mis-claims Si as a metalloid
     # hub and linearizes the silyl-ester ligands into nonsense).
