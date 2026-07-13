@@ -130,6 +130,17 @@ def name_anhydride(features) -> Optional[str]:
         # declines.
         return _name_cyclic_anhydride(total_chain_length)
 
+    # W3-P06 Task 3 (P-65.5.3.2): the diacyl halide of dicarbonic acid,
+    # X-CO-O-CO-X. BOTH carbonyl carbons are 'carbono' units (bridge O + one =O +
+    # exactly one halide, NO carbon neighbour) -> 'dicarbonic <halide word(s)>'
+    # (dicarbonic dichloride; mixed -> alphabetical 'dicarbonic bromide chloride',
+    # BB 31492/31496). Checked BEFORE _name_acyl_acid (which would mis-read each
+    # Cl-CO- side as '1-chloromethanoic acid'). Fails closed (falls through) if
+    # either side has a carbon neighbour (a real acid anhydride) or lacks a halide.
+    _dc = _name_dicarbonic_dihalide(mol, c1_idx, c2_idx, bridge_o)
+    if _dc:
+        return _dc
+
     # Acyclic anhydride: name each acyl fragment as its corresponding acid.
     # Uses _name_acyl_acid() which calls _integrate_universal_prefixes()
     # per D-01 to discover branch substituents on acyl chains.
@@ -219,6 +230,48 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
 
 _CHALCOGEN_CLASS_TERM = {"S": "thioanhydride", "Se": "selenoanhydride",
                          "Te": "telluroanhydride"}
+
+
+def _name_dicarbonic_dihalide(mol, c1: int, c2: int, bridge_o: int) -> Optional[str]:
+    """P-65.5.3.2: X-CO-O-CO-X (X = halogen) -> 'dicarbonic <halide word(s)>'.
+
+    BOTH carbonyl carbons must be 'carbono' units: bonded to the bridge O (single
+    bond) + exactly one =O + exactly one halogen (F/Cl/Br/I), with NO carbon
+    neighbour. Halide words are cited in ALPHABETICAL order (bromide < chloride <
+    fluoride < iodide); identical halides collapse with a numeric multiplier
+    ('dicarbonic dichloride'); different halides -> two words ('dicarbonic bromide
+    chloride'). Returns None (fail-closed) if either side is a real acyl (has a
+    carbon neighbour) or lacks a halide."""
+    from ..assembly.naming_utils import get_multiplier_prefix
+    halides = []
+    for c in (c1, c2):
+        atom = mol.GetAtomWithIdx(c)
+        has_bridge = n_double_o = n_halide = n_carbon = 0
+        halide_sym = None
+        for nb in atom.GetNeighbors():
+            bond = mol.GetBondBetweenAtoms(c, nb.GetIdx())
+            bt = bond.GetBondTypeAsDouble()
+            sym = nb.GetSymbol()
+            if nb.GetIdx() == bridge_o and bt == 1.0:
+                has_bridge += 1
+            elif sym == 'O' and bt == 2.0:
+                n_double_o += 1
+            elif sym in ('F', 'Cl', 'Br', 'I') and bt == 1.0:
+                n_halide += 1
+                halide_sym = sym
+            elif sym == 'C':
+                n_carbon += 1
+            else:
+                return None
+        if not (has_bridge == 1 and n_double_o == 1 and n_halide == 1
+                and n_carbon == 0):
+            return None
+        halides.append(halide_sym)
+    words = sorted(_HALIDE_WORD[h] for h in halides)   # alphabetical
+    if words[0] == words[1]:
+        mult = get_multiplier_prefix(2, words[0])
+        return f"dicarbonic {mult}{words[0]}"
+    return f"dicarbonic {words[0]} {words[1]}"
 
 
 def _name_chalcogen_anhydride(mol) -> Optional[str]:
