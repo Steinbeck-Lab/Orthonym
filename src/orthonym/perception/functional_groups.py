@@ -479,6 +479,10 @@ _ANHYDRIDE_BRIDGE_SMARTS = {
     # chalcogen-bridge anhydride R-CO-X-CO-R', X = S/Se/Te (P-65.7.3; BB 32292
     # 'benzoic thioanhydride'). The bridge is S/Se/Te, not O, so the base core misses it.
     "chalcogen_anhydride": "[CX3](=O)[SX2,SeX2,TeX2][CX3](=O)",
+    # peroxy anhydride R-CO-OO-CO-R' (P-65.7.4; BB 32344 'acetic peroxyanhydride').
+    # The -O-O- bridge cannot match the single-O base core (no single O bonded to
+    # both carbonyls), so this NEVER double-fires as a plain anhydride.
+    "peroxy_anhydride": "[CX3](=O)[OX2][OX2][CX3](=O)",
 }
 _COMPILED_ANHYDRIDE_BRIDGE = {}
 for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
@@ -700,11 +704,12 @@ def _resolve_fg_collisions(results):
         # derivatives (formates, formamides, etc.); suppress aldehyde on overlap
         ('carboxylic_acid', ['aldehyde']),
         ('ester', ['aldehyde']),
-        # W3-P06 (P-65.7.3): a chalcogen-bridge anhydride folded into 'anhydride'
-        # also matches thio/seleno/telluro-ester (CO-X-CO) and, defensively,
-        # ketone on its carbonyl carbons — suppress them so the whole -CO-X-CO-
-        # unit is owned by the anhydride handler.
-        ('anhydride', ['aldehyde', 'thioester', 'selenoester', 'telluroester', 'ketone']),
+        # W3-P06 (P-65.7.3/.4): a chalcogen-bridge anhydride folded into
+        # 'anhydride' also matches thio/seleno/telluro-ester (CO-X-CO); a peroxy
+        # anhydride (CO-OO-CO) matches 'peroxide' on its bridge. Suppress those
+        # sub-component reads (+ defensively ketone) so the whole bridge unit is
+        # owned by the anhydride handler.
+        ('anhydride', ['aldehyde', 'thioester', 'selenoester', 'telluroester', 'ketone', 'peroxide']),
         ('acid_chloride', ['aldehyde']),
         ('acid_bromide', ['aldehyde']),
         ('acid_fluoride', ['aldehyde']),

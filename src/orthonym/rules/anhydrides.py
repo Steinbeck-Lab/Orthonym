@@ -243,8 +243,46 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
 
 
 def _name_peroxy_anhydride(mol) -> Optional[str]:
-    """P-65.7.4: R-CO-OO-CO-R' -> peroxyanhydride. Filled in W3-P06 Task 7."""
-    return None
+    """P-65.7.4: R-CO-OO-CO-R' -> '<acid stem(s)> peroxyanhydride'.
+
+    Each acyl side is named as its corresponding acid; the class term 'acid' is
+    replaced by 'peroxyanhydride'. Symmetric -> '{acid} peroxyanhydride' (acetic
+    peroxyanhydride); mixed -> alphabetical two words. Returns None when no
+    -CO-OO-CO- core is present."""
+    pat = Chem.MolFromSmarts(_PEROXY_ANHYDRIDE_SMARTS)
+    if pat is None:
+        return None
+    matches = mol.GetSubstructMatches(pat, uniquify=True)
+    if not matches:
+        return None
+    m = matches[0]
+    carbonyls = [a for a in m if mol.GetAtomWithIdx(a).GetSymbol() == "C"]
+    # The two bridge O's = the peroxy O-O pair (each has an O neighbour).
+    bridge_pair = [a for a in m
+                   if mol.GetAtomWithIdx(a).GetSymbol() == "O"
+                   and any(mol.GetAtomWithIdx(n.GetIdx()).GetSymbol() == "O"
+                           for n in mol.GetAtomWithIdx(a).GetNeighbors())]
+    if len(carbonyls) != 2 or len(bridge_pair) != 2:
+        return None
+    acids = []
+    for c in carbonyls:
+        atom = mol.GetAtomWithIdx(c)
+        near_o = next((n.GetIdx() for n in atom.GetNeighbors()
+                       if n.GetIdx() in bridge_pair), None)
+        carbonyl_o = next((n.GetIdx() for n in atom.GetNeighbors()
+                           if n.GetSymbol() == "O"
+                           and mol.GetBondBetweenAtoms(c, n.GetIdx()).GetBondTypeAsDouble() == 2.0),
+                          None)
+        if near_o is None or carbonyl_o is None:
+            return None
+        nm = _name_acyl_acid(mol, c, near_o, carbonyl_o)
+        if nm is None:
+            return None
+        acids.append(nm)
+    if acids[0] == acids[1]:
+        return f"{acids[0]} peroxyanhydride"
+    acids = sorted(acids)
+    return f"{acids[0]} {acids[1]} peroxyanhydride"
 
 
 def _parse_anhydride_core(mol, match: tuple) -> Optional[dict]:
