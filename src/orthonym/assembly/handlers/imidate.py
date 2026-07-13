@@ -336,10 +336,11 @@ def _name_chain_with_imidate_suffix(mol: Any, atoms: "tuple[int, ...]",
     producing ``methyl pentanimidate`` for tert-butyl acetimidate
     (CC(C)(C)C(=N)OC; correct stem is 2,2-dimethylpropanimidate).
 
-    Naming rules per IUPAC P-65.1.7:
-    - 2C linear stem  -> "acetimidate" (retained PIN)
+    Naming rules per IUPAC P-65.6.3.3.7.1:
     - aromatic ring at anchor -> "benzimidate" (retained PIN, FRN-D-04)
-    - 3+ C linear stem -> "{chainprefix}animidate"  e.g. propanimidate
+    - N-C linear stem -> "{chainprefix}animidate" (SYSTEMATIC PIN; BBv2 L31993:
+      'methyl ethanimidate (PIN) methyl acetimidate' -> acetimidate is general-
+      nomenclature only, so 2C uses 'ethanimidate' like every other length)
     - branched stem -> "{locant-substituent-list}{chainprefix}animidate"
 
     PURE per D-07: read-only mol queries; no mutation.
@@ -369,16 +370,15 @@ def _name_chain_with_imidate_suffix(mol: Any, atoms: "tuple[int, ...]",
     if chain_len < 1:
         return None
 
-    # Build base stem.
-    if chain_len == 2:
-        # IUPAC P-65.1.7: acetimidate retained
-        base = "acetimidate"
-    else:
-        try:
-            from ...data.chain_names import get_chain_prefix
-            base = get_chain_prefix(chain_len) + "animidate"
-        except (ValueError, KeyError, ImportError):
-            return None
+    # Build base stem. W3-P08 (P-65.6.3.3.7.1, BBv2 L31993): the PIN is the
+    # SYSTEMATIC '{chainprefix}animidate' for EVERY chain length. 'acetimidate'
+    # (2C) is general-nomenclature only, so 2C -> 'ethanimidate' via the same
+    # path as all other lengths (get_chain_prefix(2)='eth').
+    try:
+        from ...data.chain_names import get_chain_prefix
+        base = get_chain_prefix(chain_len) + "animidate"
+    except (ValueError, KeyError, ImportError):
+        return None
 
     # Enumerate substituents off the chain (CR-03 branched-stem support).
     chain_set = set(principal_chain)
