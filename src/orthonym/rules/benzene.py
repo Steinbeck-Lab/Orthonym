@@ -3174,8 +3174,16 @@ def _assemble_benzene_with_suffix(
     multiplier = get_multiplier_prefix(chosen_count, chosen_suffix) if chosen_count > 1 else ""
     locant_str = ",".join(str(loc) for loc in chosen_locants)
 
-    # Build prefix part from remaining groups
-    prefix_part = _build_prefix_string(remaining_prefix_groups)
+    # Build prefix part from remaining groups.
+    # W3-P04 (P-65.3.2.1 / P-14.4): the general multi-suffix path must PRESERVE
+    # prefix locants — remaining_prefix_groups is already keyed by the final ring
+    # locants (same numbering as chosen_locants), so a bare _build_prefix_string
+    # would drop e.g. the '4-' on sulfo ('sulfobenzene-1,2-dicarboxylic acid' ->
+    # OPSIN reparses to the wrong isomer -> SELF-01). Use the locant-preserving
+    # builder (mono_needs_locant=True) exactly like the retained-base branches.
+    prefix_part = _build_prefix_string_with_locants(
+        remaining_prefix_groups, mono_needs_locant=True
+    )
 
     # Assemble: {prefix}benzene-{locants}-{multiplier}{suffix}
     if chosen_count > 1:
