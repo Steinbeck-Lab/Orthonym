@@ -139,6 +139,7 @@ class StoutClass(_StrEnumBase):
     LAMBDA_SULFANE_IMINE_OXIDE = "lambda_sulfane_imine_oxide"  # W3-P13 (P-68.4.3.3-.8 mononuclear S/Se/Te imine/oxide: sulfimide/sulfoximide/sulfonediimine/sulfur di-/tri-imide; priority 48.75 — after HETEROIMINE@48.7, before KETENE@49)
     POLYCHALCOGEN_OXIDE = "polychalcogen_oxide"      # W3-P13 (P-68.4.3.2 di-/polysulfoxide-sulfone: CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione; priority 46.5 — after CHALCOGEN_CHAIN@46, before POLYAZANE@47)
     CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
+    HETEROCHALCOGEN_ABA = "heterochalcogen_aba"      # W3-P14 (P-68.4.2.1/P-21.2.3.1 pure-chalcogen a[ba]n parent hydride: HS-O-SH -> dithioxane, CH3-S-O-SH -> methyldithioxane; priority 47.55 — after CATENATED_HYDRIDE@47.5, BEFORE SKELETAL_REPLACEMENT@1500 so the preselected dithioxane parent pre-empts the '3-oxa-2,4-dithiapentane' skeletal name)
     HOMONUCLEAR_PNICTOGEN_CHAIN = "homonuclear_pnictogen_chain"  # W3-P14 (P-68.3.2.2 homonuclear Group-15 catenated hydride: PP -> diphosphane, pentaarsane, dibismuthane; priority 47.6 — pnictogen analogue of POLYAZANE@47)
     PNICTOGEN_CARBOXYLIC_ACID = "pnictogen_carboxylic_acid"  # W3-P14 (P-68.3.2.3.1 added-carbon -carboxylic acid on a P/As/Sb parent hydride: H2P-COOH -> phosphanecarboxylic acid; priority 47.65 — ahead of the generic acid namer in GENERAL)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
@@ -1396,6 +1397,23 @@ def _handle_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kw
     return name_catenated_hydride(mol)
 
 
+def _is_heterochalcogen_aba(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """W3-P14 (P-68.4.2.1/P-21.2.3.1); priority 47.55. A pure-chalcogen a[ba]n
+    parent hydride (HS-O-SH -> dithioxane, CH3-S-O-S-CH3 -> dimethyldithioxane).
+    PURE graph classifier, fail-closed; pre-empts SKELETAL_REPLACEMENT@1500."""
+    if mol is None:
+        return False
+    from orthonym.rules.catenated_hydrides import name_heterochalcogen_aba
+    return name_heterochalcogen_aba(mol) is not None
+
+
+def _handle_heterochalcogen_aba(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the pure-chalcogen a[ba]n PIN (P-68.4.2.1 / P-21.2.3.1: dithioxane),
+    else None (cascade-continuation)."""
+    from orthonym.rules.catenated_hydrides import name_heterochalcogen_aba
+    return name_heterochalcogen_aba(mol)
+
+
 def _is_homonuclear_pnictogen_chain(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """W3-P14 (P-68.3.2.2); priority 47.6. A homonuclear Group-15 catenated parent
     hydride (PP -> diphosphane, pentaarsane, dibismuthane). PURE graph classifier,
@@ -1548,6 +1566,25 @@ _register_dispatch(
     iupac_section="Blue Book P-21.2.3 / P-52.1.3",
     description="Alternating Group-14/bridge catenated parent hydride "
                 "(disiloxane / trisiloxane / disilazane / distannoxane); "
+                "graph classifier, fail-closed",
+)
+
+
+# --- W3-P14: HETEROCHALCOGEN_ABA at priority 47.55 (after CATENATED_HYDRIDE@47.5, ---
+# before HOMONUCLEAR_PNICTOGEN_CHAIN@47.6). A pure-chalcogen a[ba]n parent hydride
+# (P-68.4.2.1 / P-21.2.3.1): HS-O-SH -> dithioxane, CH3-S-O-SH -> methyldithioxane,
+# CH3-S-O-S-CH3 -> dimethyldithioxane. These preselected parent hydrides receive
+# the PIN and MUST pre-empt SKELETAL_REPLACEMENT@1500 (CH3-S-O-S-CH3 would else be
+# the valid-but-non-PIN '3-oxa-2,4-dithiapentane'). NARROW (every backbone atom a
+# chalcogen, both termini the same JUNIOR chalcogen) so carbon-in-chain skeletal
+# names (2,4,7,10-tetraoxaundecane, methoxymethane) are untouched. Graph
+# classifier, fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.HETEROCHALCOGEN_ABA, priority=47.55, tier=1,
+    predicate=_is_heterochalcogen_aba, handler=_handle_heterochalcogen_aba,
+    iupac_section="Blue Book P-68.4.2.1 / P-21.2.3.1",
+    description="Pure-chalcogen a[ba]n parent hydride "
+                "(dithioxane / methyldithioxane / dimethyldithioxane); "
                 "graph classifier, fail-closed",
 )
 

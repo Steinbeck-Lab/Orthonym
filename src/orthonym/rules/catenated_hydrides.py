@@ -30,6 +30,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
+from .substituent_purity import pure_organyl_prefix_name
 
 _GROUP14_STEM = {'Si': 'sil', 'Ge': 'germ', 'Sn': 'stann', 'Pb': 'plumb'}
 _BRIDGE_SUFFIX = {
@@ -179,4 +180,165 @@ def name_homonuclear_pnictogen_chain(mol) -> Optional[str]:
     return f"{mult}{stem}"
 
 
-__all__ = ["name_catenated_hydride", "name_homonuclear_pnictogen_chain"]
+# ---------------------------------------------------------------------------
+# P-68.4.2.1 / P-21.2.3.1 — pure-chalcogen a[ba]n parent hydrides (dithioxane)
+# ---------------------------------------------------------------------------
+# An unbranched chain of chalcogen atoms strictly ALTERNATING between two
+# distinct elements and TERMINATED at both ends by the element coming LATER in
+# the seniority order O > S > Se > Te (the JUNIOR terminal element)::
+#
+#     HS-O-SH        -> dithioxane          (2 terminal S junior, 1 central O senior)
+#     CH3-S-O-SH     -> methyldithioxane    (BB: not methylsulfane-OS-thioperoxol)
+#     CH3-S-O-S-CH3  -> dimethyldithioxane
+#
+# Name (P-21.2.3.1) = <multiplier(# terminal atoms)> + 'a'-term of the JUNIOR
+# terminal element + 'a'-term of the SENIOR central element + 'ane' (with 'a'
+# elision before a vowel; the multiplier vowel is NOT elided). Terminal organyls
+# are cited as prefixes; the two terminal positions are equivalent by symmetry so
+# BB omits their locants (methyldithioxane / dimethyldithioxane / methyl(phenyl)-
+# dithioxane). These preselected parent hydrides receive the PIN and PRE-EMPT the
+# skeletal-replacement 'a'-name (CH3-S-O-S-CH3 is 'dimethyldithioxane', NOT the
+# valid-but-non-PIN '3-oxa-2,4-dithiapentane') per P-68.4.2.1.
+_CHALCOGEN_ATERM = {'O': 'oxa', 'S': 'thia', 'Se': 'selena', 'Te': 'tellura'}
+# Seniority index (lower = senior) for the a[ba]n terminal/central choice.
+_CHALCOGEN_SENIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3}
+_ABA_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_SUB_MULT_ABA = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+
+
+def _join_aterms(terms) -> str:
+    """Concatenate 'a'-terms + 'ane', eliding a trailing 'a' before a vowel
+    (thia+oxa+ane -> thioxane)."""
+    out = ''
+    for t in terms:
+        if out and out[-1] == 'a' and t[0] in _VOWELS:
+            out = out[:-1]
+        out += t
+    return out
+
+
+def name_heterochalcogen_aba(mol) -> Optional[str]:
+    """Return the PIN for a pure-chalcogen a[ba]n parent hydride (P-68.4.2.1 /
+    P-21.2.3.1: dithioxane / methyldithioxane / dimethyldithioxane), else ``None``
+    (fail-closed cascade-continuation). Pure: no mol mutation.
+
+    Scope (a graph classifier, NOT SMARTS): a single unbranched chain of >=3
+    chalcogen atoms strictly alternating between EXACTLY two distinct elements,
+    both termini the SAME element and that element JUNIOR (later in O>S>Se>Te) to
+    the central element; every internal chalcogen H-only; terminal chalcogens bear
+    one H or one pure organyl; neutral, non-radical, acyclic, single fragment; the
+    only non-chalcogen heavy atoms are terminal organyl carbons. A homogeneous
+    chalcogen chain (-> chalcogen_chain), a carbon-in-backbone chain
+    (-> skeletal_replacement), a Group-14 a[ba]n (-> catenated_hydride), a ring,
+    an ion, or a radical fails a guard and cascades onward.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    # Every heavy atom is a chalcogen or a carbon (organyl); collect chalcogens.
+    chal = []
+    for atom in mol.GetAtoms():
+        sym = atom.GetSymbol()
+        if sym == 'H':
+            continue
+        if sym in _CHALCOGEN_ATERM:
+            chal.append(atom.GetIdx())
+        elif sym != 'C':
+            return None                          # stray heteroatom -> not this class
+    if len(chal) < 3:
+        return None
+    chal_set = set(chal)
+
+    # The chalcogens must form one unbranched single-bonded path.
+    adj = {i: [] for i in chal}
+    for i in chal:
+        for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
+            j = nbr.GetIdx()
+            if j in chal_set:
+                bond = mol.GetBondBetweenAtoms(i, j)
+                if bond.GetBondType() != Chem.BondType.SINGLE:
+                    return None
+                adj[i].append(j)
+    if any(len(adj[i]) > 2 for i in chal):
+        return None
+    endpoints = [i for i in chal if len(adj[i]) == 1]
+    if len(endpoints) != 2:
+        return None                              # ring / forked / disconnected
+    order = [endpoints[0]]
+    prev, cur = -1, endpoints[0]
+    while True:
+        nxts = [j for j in adj[cur] if j != prev]
+        if not nxts:
+            break
+        prev, cur = cur, nxts[0]
+        order.append(cur)
+    if len(order) != len(chal):
+        return None
+
+    syms = [mol.GetAtomWithIdx(i).GetSymbol() for i in order]
+    # Exactly two distinct elements, strictly alternating along the chain.
+    if len(set(syms)) != 2:
+        return None
+    for k in range(len(syms) - 1):
+        if syms[k] == syms[k + 1]:
+            return None                          # a run of identical -> not a[ba]n
+    terminal_elem = syms[0]
+    if syms[-1] != terminal_elem:
+        return None                              # both termini must be the same element
+    central_elem = syms[1]
+    # The terminal element must be JUNIOR (later in seniority) to the central.
+    if _CHALCOGEN_SENIORITY[terminal_elem] <= _CHALCOGEN_SENIORITY[central_elem]:
+        return None
+
+    # Internal chalcogens carry only H; terminal chalcogens bear one organyl or H.
+    subs = []
+    for pos, idx in enumerate(order):
+        atom = mol.GetAtomWithIdx(idx)
+        heavy_nonchain = [n for n in atom.GetNeighbors()
+                          if n.GetIdx() not in chal_set and n.GetSymbol() != 'H']
+        is_terminal = pos in (0, len(order) - 1)
+        if not heavy_nonchain:
+            continue
+        if not is_terminal or len(heavy_nonchain) != 1:
+            return None                          # internal / >1 organyl -> decline
+        name = pure_organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
+        if name is None:
+            return None
+        subs.append(name)
+
+    n_terminal = syms.count(terminal_elem)
+    mult = _ABA_MULT.get(n_terminal)
+    if mult is None:
+        return None
+    base = _join_aterms([_CHALCOGEN_ATERM[terminal_elem],
+                         _CHALCOGEN_ATERM[central_elem], 'ane'])
+    parent = f"{mult}{base}"                      # dithioxane / trithioxane ...
+    if not subs:
+        return parent
+
+    # Terminal organyls: no locants (the terminal positions are symmetric — BB
+    # methyldithioxane / dimethyldithioxane / methyl(phenyl)dithioxane).
+    from collections import Counter
+    counts = Counter(subs)
+    uniq = sorted(counts)
+    parts = []
+    for i, nm in enumerate(uniq):
+        m = _SUB_MULT_ABA.get(counts[nm])
+        if m is None:
+            return None
+        token = f"{m}{nm}"
+        if len(uniq) >= 2 and i > 0:
+            token = f"({token})"                 # P-16.5.1.3 second+ unique in marks
+        parts.append(token)
+    return f"{''.join(parts)}{parent}"
+
+
+__all__ = ["name_catenated_hydride", "name_homonuclear_pnictogen_chain",
+           "name_heterochalcogen_aba"]
