@@ -194,6 +194,76 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     return ''.join(_joined_prefix_parts(parts)) + parent
 
 
+def _name_azoxy(mol) -> Optional[str]:
+    """P-68.3.1.3.3.1 azoxy compound R-N=N(O)-R' -> '{diazene base} oxide'
+    (method (1) = PIN). The N-oxide of an azo compound is a zwitterion
+    ([O-]-[N+]=N-): one chain nitrogen is a degree-3 [N+] bearing an -O(-), the
+    other a degree-2 neutral =N; each nitrogen bears one organyl group.
+
+        C6H5-N=N(O)-C6H5  ->  diphenyldiazene oxide   (BB 38857)
+
+    SCOPE (fail-closed -> None): only the SYMMETRIC diaryl/dialkyl case
+    (R == R'), which per the BB example omits the oxide locant
+    ('diphenyldiazene oxide', not '...1-oxide'). The unsymmetric case needs the
+    NNO/ONN oxide-locant machinery (P-68.3.1.3.3.1 method (2)) and is left
+    unbuilt (returns None) rather than emitting a locant-ambiguous name. Also
+    fail-closed for a non-organyl R, a ring N, or any extra charge. Pure."""
+    from rdkit import Chem
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    n_plus = [a for a in mol.GetAtoms()
+              if a.GetSymbol() == 'N' and a.GetFormalCharge() == 1]
+    if len(n_plus) != 1:
+        return None
+    na = n_plus[0]
+    if na.IsInRing() or na.GetDegree() != 3 or na.GetNumRadicalElectrons() != 0:
+        return None
+    o_minus = nb = c_a = None
+    for b in na.GetBonds():
+        other = b.GetOtherAtom(na)
+        bt = b.GetBondType()
+        if (other.GetSymbol() == 'O' and other.GetDegree() == 1
+                and other.GetFormalCharge() == -1
+                and bt == Chem.BondType.SINGLE):
+            o_minus = other
+        elif other.GetSymbol() == 'N' and bt == Chem.BondType.DOUBLE:
+            nb = other
+        elif other.GetSymbol() == 'C' and bt == Chem.BondType.SINGLE:
+            c_a = other
+        else:
+            return None
+    if o_minus is None or nb is None or c_a is None:
+        return None
+    # The other nitrogen: neutral, acyclic, degree 2 (=na + one organyl C).
+    if (nb.GetFormalCharge() != 0 or nb.IsInRing() or nb.GetDegree() != 2
+            or nb.GetNumRadicalElectrons() != 0):
+        return None
+    c_b = None
+    for b in nb.GetBonds():
+        other = b.GetOtherAtom(nb)
+        if other.GetIdx() == na.GetIdx():
+            continue
+        if other.GetSymbol() == 'C' and b.GetBondType() == Chem.BondType.SINGLE:
+            c_b = other
+        else:
+            return None
+    if c_b is None:
+        return None
+    # No charge anywhere but the N+/O- zwitterion pair.
+    if any(a.GetFormalCharge() != 0 for a in mol.GetAtoms()
+           if a.GetIdx() not in (na.GetIdx(), o_minus.GetIdx())):
+        return None
+    ra = pure_organyl_prefix_name(mol, c_a.GetIdx(), na.GetIdx())
+    rb = pure_organyl_prefix_name(mol, c_b.GetIdx(), nb.GetIdx())
+    if ra is None or rb is None:
+        return None
+    if ra != rb:
+        return None                          # unsymmetric -> NNO/ONN machinery
+    from ..assembly.naming_utils import is_complex_substituent
+    enclosed = f"({ra})" if is_complex_substituent(ra) else ra
+    return f"di{enclosed}diazene oxide"
+
+
 def _name_azane_carboxylic_acid(mol) -> Optional[str]:
     """P-58.3.2 (BB 24896): H2N-(NH)k-COOH -> '<azane>-1-carboxylic acid'.
 
@@ -280,6 +350,13 @@ def name_polyazane(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
+    # W3-P15 (P-68.3.1.3.3): azoxy R-N=N(O)-R' is the zwitterionic N-oxide of a
+    # diazene ([N+]=N with an [O-]); it must be recognised BEFORE the general
+    # neutral-only charge guard below, which would otherwise decline it. Method
+    # (1) gives the PIN ('diphenyldiazene oxide'). Fail-closed -> the guard.
+    _azoxy = _name_azoxy(mol)
+    if _azoxy is not None:
+        return _azoxy
     for atom in mol.GetAtoms():
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
