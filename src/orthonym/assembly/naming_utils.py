@@ -278,6 +278,11 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # 'ethane-1-sulfinic acid'. methane (chain_length==1) is already elided by
     # Rule 1; a chain of 3+ carbons (butane-2-sulfinic acid) keeps its locant.
     "sulfinic_acid", "sulfonic_acid",
+    # W3-P04 (P-14.3.4.4 / P-65.3.1): the FRN-modified sulfur-oxo-acid suffixes
+    # attach to a chain carbon exactly like sulfonic/sulfinic, so their locant
+    # elides on the symmetric 2-carbon (ethane) parent (ethanesulfonothioic
+    # S-acid, PIN); methane is covered by Rule 1; C3+ keeps the locant.
+    "sulfonoperoxoic_acid",
     "selenonic_acid", "seleninic_acid", "telluronic_acid", "tellurinic_acid",
     # C1 (P-14.3.4.4 / P-65.3.1): sulfonohydrazide is the N-analogue of sulfonic
     # acid and attaches to a chain carbon exactly the same way, so it elides its

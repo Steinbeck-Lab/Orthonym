@@ -95,6 +95,12 @@ SENIORITY_ORDER = [
     # Carbamic acid (IUPAC P-65.2.3) -- retained acid name, rank with carboxylic acids
     "carbamic_acid",
     "sulfonic_acid",
+    # W3-P04 (P-65.3.1.2 @31184): FRN -OO- modification of the sulfonic acid
+    # suffix. BB @31178 orders replacements 'unmodified acids followed by
+    # -OO- > S > Se > Te', so it ranks DIRECTLY BELOW unmodified sulfonic_acid —
+    # exactly as peroxy_acid sits directly below carboxylic_acid. (Governs only
+    # near-zero-corpus S-vs-S polyfunctional ties; additive insert.)
+    "sulfonoperoxoic_acid",
     "sulfinic_acid",
     "sulfenic_acid",   # IUPAC P-65.3.1.4: between sulfinic and phosphonic
     # v23 Phase 9 (P-65.3.0 Table 6.2): Se/Te chalcogen-suffix acids, parallel to
@@ -429,6 +435,9 @@ SUFFIX_FORMS = {
     "hydroximic_acid": None,
     "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
+    # W3-P04 (P-65.3.1.2 @31184): FRN peroxy-modified sulfonic acid suffix; chain
+    # stem + 'sulfonoperoxoic acid' (methanesulfonoperoxoic acid, PIN @31190).
+    "sulfonoperoxoic_acid": ("sulfonoperoxoic acid", "sulfonoperoxoic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
     # v23 Phase 9 (P-65.3): Se/Te suffix-acid forms (chain stem + suffix, e.g.
     # ethaneselenonic acid), parallel to sulfonic.
@@ -606,6 +615,10 @@ PREFIX_FORMS = {
     "ditelluroic_acid": "ditellurocarboxy",
     "carbamic_acid": "carbamoyloxy",  # When not principal group
     "sulfonic_acid": "sulfo",
+    # W3-P04 (P-65.3.1.2): demoted-prefix case of the FRN sulfur-oxo-acids fails
+    # closed (None), exactly like imidic_acid — these are in-scope only as the
+    # principal group; a wrong prefix would be worse than fail-closed abstention.
+    "sulfonoperoxoic_acid": None,
     "sulfinic_acid": "sulfino",
     # v23 Phase 9 (P-65.3.2.1): Se/Te prefix forms (demoted when a senior group present)
     "selenonic_acid": "selenono",
