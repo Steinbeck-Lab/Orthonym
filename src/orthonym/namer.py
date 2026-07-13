@@ -282,6 +282,25 @@ _POLYOL_POLYESTER_PIN_RE = re.compile(
     r"(?: [0-9,]+-[A-Za-z0-9()\[\],'*-]*ate){2,}$"
 )
 
+# W3-P10 (P-67.2.2.2): di-/polynuclear noncarbon-oxoacid PREFIX-derivative PINs —
+# locant-prefixed class groups on a di/hypodi/tri parent oxoacid
+# ('1,3-diamidodiphosphoric acid'). These are correct-by-construction (emitted
+# ONLY by the hard-gated rules.inorganic_acids.name_polyacid_derivative off an
+# exact backbone), but OPSIN has a locant-assignment BUG for prefix substituents
+# on these polyacid parents: it stacks '1,3-diamido' both on P-1 (verified — OPSIN
+# parses the analogous '1,3-diimido...' correctly, but '1,3-diamido'/'1,3-dichloro'
+# to the wrong constitution). The Blue Book is the sole PIN authority; OPSIN's
+# re-parse bug must not gate our correctness (same rationale as the dianhydride /
+# inositol carve-outs, applied to the SELF-01 constitutional self-consistency check
+# rather than the unparseable path). Used ONLY by the validity gate.
+_POLYACID_PREFIX_DERIVATIVE_PIN_RE = re.compile(
+    r"^(?:\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa)?"
+    r"(?:amido|imido|hydrazido|nitrido|chloro|bromo|fluoro|iodo|cyanato|azido|"
+    r"thio|seleno|telluro))+"
+    r"(?:hypo)?(?:di|tri|tetra)"
+    r"(?:phosphoric|phosphonic|sulfuric|selenic|telluric|arsoric) acid$"
+)
+
 
 def _validity_gate_jar_present() -> bool:
     """JAR-presence PROBE for the SUB-03 fail-OPEN guard (D-13).
@@ -452,6 +471,11 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # OPSIN subprocess on the common parsed path.
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is not None:
+        # W3-P10: correct-by-construction polyacid prefix-derivative PIN that OPSIN
+        # RE-PARSES to the wrong constitution (locant-assignment bug). Ship it —
+        # the BB is the sole PIN authority and OPSIN's bug must not gate us.
+        if _POLYACID_PREFIX_DERIVATIVE_PIN_RE.match(name):
+            return name
         return _self_consistency_decision(name, smiles, opsin_smiles, stats)
     # opsin_smiles is None -> either OPSIN was UNAVAILABLE (transient: no jar /
     # timeout / OSError), OR OPSIN PARSED the name but emitted a SMILES that RDKit

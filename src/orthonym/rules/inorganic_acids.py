@@ -58,6 +58,7 @@ _INORGANIC_OXOACIDS = {
     #  RETAINED_NAME tier; zwitterion/salt predicates decline its charge-separated
     #  form, so no early mis-route. Kept out to avoid a duplicate-table drift.)
     "O=P(O)(O)OP(=O)(O)O": "diphosphoric acid",  # P-67.2.1   (HO)2P(O)-O-P(O)(OH)2
+    "O=P(O)(O)P(=O)(O)O": "hypodiphosphoric acid",  # P-67.2.1 (HO)2P(O)-P(O)(OH)2 (direct P-P; W3-P10 idx 1892 parent)
     "O=S(=O)(O)OS(=O)(=O)O": "disulfuric acid",  # P-67.2.1   (HO)SO2-O-SO2(OH)
     # --- v23 Phase 7: mononuclear halogen oxoacids (P-67.1.1.1, all preselected
     #     PINs). RDKit canonicalises the hypervalent X(=O)n(OH) forms to a
@@ -542,6 +543,243 @@ def name_borane_amine(mol) -> Optional[str]:
     return "borane" + {2: "di", 3: "tri", 4: "tetra"}.get(n_count, "") + "amine"
 
 
+# --- W3-P10 Engine B: di-/polynuclear noncarbon-oxoacid derivatives (P-67.2) ---
+# Parent (preselected) names keyed by (acid-centre element, bridge slot). A direct
+# centre-centre bond (no bridge) is the 'hypo' parent.
+_POLYACID_PARENT = {
+    ("P", "bridge"): "diphosphoric acid",
+    ("P", "direct"): "hypodiphosphoric acid",
+    ("S", "bridge"): "disulfuric acid",
+    ("Se", "bridge"): "diselenic acid",
+}
+_POLYACID_OXO = {"P": 1, "S": 2, "Se": 2}       # =O count that marks an acid centre
+_BRIDGE_THIO_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
+
+
+def _find_polyacid_backbone(mol):
+    """Detect a neutral di-nuclear noncarbon-oxoacid backbone. Return
+    ``(parent_name, [c1, c2], bridge_idx_or_None, bridge_elem_or_None)`` or None.
+
+    Acid centres = exactly two same-element P/S/Se atoms each carrying the required
+    ``=O`` count. They are either directly bonded (``hypo`` parent) or joined by a
+    single bridging atom (O = parent; S/Se/Te = chalcogen-replaced bridge)."""
+    centres = []
+    for a in mol.GetAtoms():
+        sym = a.GetSymbol()
+        need = _POLYACID_OXO.get(sym)
+        if need is None:
+            continue
+        if a.GetFormalCharge() != 0 or a.GetDegree() != 4:
+            continue
+        oxo = sum(1 for b in a.GetBonds()
+                  if b.GetBondType() == Chem.BondType.DOUBLE
+                  and b.GetOtherAtom(a).GetSymbol() == "O")
+        if oxo == need:
+            centres.append(a)
+    if len(centres) != 2:
+        return None
+    c1, c2 = centres
+    if c1.GetSymbol() != c2.GetSymbol():
+        return None
+    elem = c1.GetSymbol()
+    # Direct centre-centre bond -> 'hypo' parent (P only).
+    if mol.GetBondBetweenAtoms(c1.GetIdx(), c2.GetIdx()) is not None:
+        parent = _POLYACID_PARENT.get((elem, "direct"))
+        return (parent, [c1.GetIdx(), c2.GetIdx()], None, None) if parent else None
+    # Single bridging atom bonded to both centres.
+    n1 = {nb.GetIdx() for nb in c1.GetNeighbors()}
+    n2 = {nb.GetIdx() for nb in c2.GetNeighbors()}
+    shared = n1 & n2
+    if len(shared) != 1:
+        return None
+    bridge = mol.GetAtomWithIdx(next(iter(shared)))
+    if bridge.GetFormalCharge() != 0 or bridge.GetDegree() != 2:
+        return None
+    if any(b.GetBondType() != Chem.BondType.SINGLE for b in bridge.GetBonds()):
+        return None
+    belem = bridge.GetSymbol()
+    if belem != "O" and belem not in _BRIDGE_THIO_PREFIX:
+        return None
+    parent = _POLYACID_PARENT.get((elem, "bridge"))
+    if parent is None:
+        return None
+    return (parent, [c1.GetIdx(), c2.GetIdx()], bridge.GetIdx(), belem)
+
+
+def _classify_acid_position(mol, nb, centre_idx):
+    """Classify a single-bonded acid-position neighbour of a polyacid centre.
+    Returns ('oh', None) | ('halido', combining) | ('amido', n_prefix_str) |
+    ('acyloxy', (acyl_c_idx, o_idx)) | ('cyanatido', None), or None (fail-closed)."""
+    sym = nb.GetSymbol()
+    if sym == "O":
+        if nb.GetFormalCharge() != 0:
+            return None
+        others = [x for x in nb.GetNeighbors() if x.GetIdx() != centre_idx]
+        if nb.GetTotalNumHs() == 1 and not others:
+            return ("oh", None)
+        if _is_cyanatido_oxygen(mol, nb, centre_idx):
+            return ("cyanatido", None)
+        if nb.GetDegree() == 2 and len(others) == 1 and others[0].GetSymbol() == "C":
+            c = others[0]
+            if any(bb.GetBondType() == Chem.BondType.DOUBLE
+                   and bb.GetOtherAtom(c).GetSymbol() == "O" for bb in c.GetBonds()):
+                return ("acyloxy", (c.GetIdx(), nb.GetIdx()))
+        return None
+    if sym in _HALIDO_INFIX:
+        return ("halido", _HALIDO_INFIX[sym])
+    if sym == "N":
+        if nb.GetFormalCharge() != 0:
+            return None
+        if any(b.GetBondType() != Chem.BondType.SINGLE for b in nb.GetBonds()):
+            return None
+        seg = _amido_n_prefix(mol, nb.GetIdx(), centre_idx)
+        return ("amido", seg) if seg is not None else None
+    return None
+
+
+def name_polyacid_derivative(mol) -> Optional[str]:
+    """P-67.2.2/.2.3/.2.4/.2.5.3: PIN for a di-nuclear noncarbon-oxoacid
+    derivative (Engine B). Handles, off a tightly-detected backbone:
+
+      * uniform full replacement -> functional class (P-67.2.3/.2.4):
+        ``diphosphoric tetrachloride`` / ``diphosphoric tetraamide``
+      * bridge chalcogen replacement -> prefix at the bridge locant (P-67.2.2.2):
+        ``2-thiodisulfuric acid``
+      * partial replacement -> class prefix on the acid with centre locants
+        (P-67.2.2.2): ``1,3-diamidodiphosphoric acid``
+      * full acyl esterification -> anhydride (P-67.2.5.3):
+        ``tetraacetic hypodiphosphoric tetraanhydride``
+
+    Fail-closed (returns ``None``) off the tabled backbone set or for any mixed /
+    unrecognised acid-position group. Pure: no mol mutation. The free parent acids
+    (diphosphoric / disulfuric) are the tabled table rows and never reach here.
+    """
+    from collections import Counter
+    from .functional_replacement import _MULT
+
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    bb = _find_polyacid_backbone(mol)
+    if bb is None:
+        return None
+    parent, centres, bridge_idx, bridge_elem = bb
+    parent_word = parent[:-len(" acid")]             # 'diphosphoric'
+
+    # Collect classified acid positions per centre (position 1 and 3 for a bridged
+    # backbone; 1 and 2 for a direct P-P). Exclude the bridge / other centre / =O.
+    exclude = set(centres)
+    if bridge_idx is not None:
+        exclude.add(bridge_idx)
+    positions = {}                                   # centre_idx -> list of (kind, data)
+    for c_idx in centres:
+        c = mol.GetAtomWithIdx(c_idx)
+        plist = []
+        for b in c.GetBonds():
+            nb = b.GetOtherAtom(c)
+            if nb.GetIdx() in exclude:
+                continue
+            if b.GetBondType() == Chem.BondType.DOUBLE and nb.GetSymbol() == "O":
+                continue                             # the centre's =O
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            kind = _classify_acid_position(mol, nb, c_idx)
+            if kind is None:
+                return None
+            plist.append(kind)
+        positions[c_idx] = plist
+
+    all_kinds = [k for pl in positions.values() for (k, _) in pl]
+    if not all_kinds:
+        return None
+    n_total = len(all_kinds)
+    oh_n = all_kinds.count("oh")
+    kinds_set = set(all_kinds)
+
+    # Centre locants: bridged -> {1,3}; direct -> {1,2}. (Symmetric backbones make
+    # the two orientations equivalent; targets are symmetric.)
+    locs = ([1, 3] if bridge_idx is not None else [1, 2])
+    centre_loc = {centres[0]: locs[0], centres[1]: locs[1]}
+    bridge_loc = 2 if bridge_idx is not None else None
+
+    # --- Case D: full acyl esterification -> anhydride (P-67.2.5.3) ---
+    if kinds_set == {"acyloxy"} and bridge_elem in (None, "O"):
+        from .lipids import _acid_fragment_name
+        acids = []
+        for pl in positions.values():
+            for (_, site) in pl:
+                acid = _acid_fragment_name(mol, site[0], site[1])
+                if not acid or not acid.endswith(" acid"):
+                    return None
+                acids.append(acid[:-len(" acid")])   # 'acetic acid' -> 'acetic'
+        acid_counts = Counter(acids)
+        if len(acid_counts) != 1:
+            return None                              # mixed acyls -> out of scope
+        aname, acnt = next(iter(acid_counts.items()))
+        acid_cited = f"{_MULT.get(acnt, '')}{aname}"
+        anh_mult = _MULT.get(n_total, "")
+        return f"{acid_cited} {parent_word} {anh_mult}anhydride"
+
+    # --- Case A: uniform full replacement -> functional class (P-67.2.3/.2.4) ---
+    if oh_n == 0 and bridge_elem in (None, "O"):
+        if kinds_set == {"halido"}:
+            hal_words = {"chlorido": "chloride", "fluorido": "fluoride",
+                         "bromido": "bromide", "iodido": "iodide"}
+            hals = [hal_words[d] for pl in positions.values() for (_, d) in pl]
+            hc = Counter(hals)
+            if len(hc) != 1:
+                return None                          # mixed halides -> defer
+            w, cnt = next(iter(hc.items()))
+            return f"{parent_word} {_MULT.get(cnt, '')}{w}"
+        if kinds_set == {"amido"}:
+            # all-bare-amide functional class ('diphosphoric tetraamide'); any
+            # N-substituent would need N-locants (out of scope) -> the amido segs
+            # must all be empty.
+            if any(seg for pl in positions.values() for (_, seg) in pl):
+                return None
+            return f"{parent_word} {_MULT.get(n_total, '')}amide"
+        return None
+
+    # --- Case C / B: >=1 -OH left (class 'acid') -> prefixes on the acid ---
+    if oh_n >= 1:
+        prefixes = []                                # (sort_key, cited_string)
+        # bridge chalcogen replacement -> '{2}-thio' etc. (P-67.2.2.2)
+        if bridge_elem not in (None, "O"):
+            pre = _BRIDGE_THIO_PREFIX[bridge_elem]
+            prefixes.append((pre, f"{bridge_loc}-{pre}"))
+        # class-group replacements on centres, with centre locants
+        class_locs = {}                              # combining/base -> [locants]
+        class_segs = {}                              # 'amido' -> list of n_prefix segs
+        for c_idx, pl in positions.items():
+            for (kind, data) in pl:
+                if kind == "oh":
+                    continue
+                if kind == "halido":
+                    key = {"chlorido": "chloro", "fluorido": "fluoro",
+                           "bromido": "bromo", "iodido": "iodo"}[data]
+                elif kind == "amido":
+                    key = "amido"
+                    class_segs.setdefault("amido", []).append(data)
+                elif kind == "cyanatido":
+                    key = "cyanato"
+                else:
+                    return None                      # acyloxy alongside -OH -> defer
+                class_locs.setdefault(key, []).append(centre_loc[c_idx])
+        for key, ls in class_locs.items():
+            ls = sorted(ls)
+            # N-substituents on a partial amido would need N-locants -> out of scope
+            if key == "amido" and any(class_segs.get("amido", [])):
+                return None
+            mult = _MULT.get(len(ls), "")
+            loc_str = ",".join(str(x) for x in ls)
+            prefixes.append((key, f"{loc_str}-{mult}{key}"))
+        if not prefixes:
+            return None                              # a plain parent acid -> tabled
+        prefixes.sort(key=lambda t: t[0])            # alphabetical by prefix stem
+        return "".join(p[1] for p in prefixes) + parent
+
+
 def name_inorganic_acid(mol) -> Optional[str]:
     """Return the PIN for a free inorganic oxoacid or its tabled functional-class
     derivative (acid halide / amide / carbonic-FRN acid), the tetraalkyl silicate
@@ -581,6 +819,12 @@ def name_inorganic_acid(mol) -> Optional[str]:
     axp = name_acyloxy_phosphonic_acid(mol)
     if axp is not None:
         return axp
+    # W3-P10 (P-67.2.x): di-/polynuclear oxoacid derivatives (Engine B):
+    # diphosphoric tetrachloride/tetraamide, 2-thiodisulfuric acid,
+    # 1,3-diamidodiphosphoric acid, tetraacetic hypodiphosphoric tetraanhydride.
+    poly = name_polyacid_derivative(mol)
+    if poly is not None:
+        return poly
     # D-FOLLOWON item 10: tetraalkyl silicate ester (Si(OR)4). Routed here (@40)
     # so it intercepts BEFORE ORGANOMETALLIC@50 (which mis-claims Si as a metalloid
     # hub and linearizes the silyl-ester ligands into nonsense).
