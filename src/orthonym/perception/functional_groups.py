@@ -559,10 +559,17 @@ def _resolve_fg_collisions(results):
         # Thiocarboxylic acids: SH in C(=O)SH or C(=S)SH must NOT match thiol
         # C(=O)SH must NOT match thioester either (C(=O)S is substructure of both)
         ('thioic_S_acid', ['thiol', 'thioester']),
-        ('dithioic_acid', ['thiol', 'thioketone']),
+        # W3-P03-3 (P-65.1.5.1): the C1 case H-C(=S)-SH / H-C(=S)-OH bears an H on
+        # the thiocarbonyl C, so the broad thioaldehyde SMARTS [CX3H1](=S) also
+        # matches it (exactly parallel to thioic_S_acid suppressing the broad
+        # aldehyde below). The thio/dithio-acid FG owns that carbon -> suppress
+        # thioaldehyde so C1 acids don't gain a spurious '1-thioxo' prefix
+        # (e.g. methanethioic O-acid OC=S; the C2+ cases never matched thioaldehyde
+        # because their carbon has no H).
+        ('dithioic_acid', ['thiol', 'thioketone', 'thioaldehyde']),
         # C(=S)OH should not collide with carboxylic_acid (different SMARTS: =S vs =O)
-        # but suppress thioketone matches on the C=S carbon
-        ('thioic_O_acid', ['thioketone']),
+        # but suppress thioketone/thioaldehyde matches on the C=S carbon
+        ('thioic_O_acid', ['thioketone', 'thioaldehyde']),
         # Phase 163 Tier FRN-A: chalcogen-acid suppressions
         # (mirror thioic_S_acid -> thiol+thioester at line 228 above; AUDIT-FRN § 2.1)
         # Forward-reference note: selenoester/telluroester/tellurol added in
