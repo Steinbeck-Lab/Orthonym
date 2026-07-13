@@ -52,32 +52,25 @@ class TestCarbamoylPrefixE2E:
     """End-to-end tests: primary amide as non-principal FG produces carbamoyl."""
 
     def test_4_carbamoylbutanoic_acid(self):
-        """NC(=O)CCC(=O)O -> 4-carbamoylbutanoic acid"""
+        """NC(=O)CCC(=O)O -> 4-amino-4-oxobutanoic acid (P-65.1.6.1 amino-oxo PIN;
+        carbamoyl is general-only for the linear-chain terminal primary amide)."""
         result = name_compound("NC(=O)CCC(=O)O")
-        assert result is not None
-        assert "carbamoyl" in result
-        assert "acid" in result
+        assert result == "4-amino-4-oxobutanoic acid"
 
     def test_3_carbamoylpropanoic_acid(self):
-        """NC(=O)CC(=O)O -> 3-carbamoylpropanoic acid"""
+        """NC(=O)CC(=O)O -> 3-amino-3-oxopropanoic acid (P-65.1.6.1 amino-oxo PIN)."""
         result = name_compound("NC(=O)CC(=O)O")
-        assert result is not None
-        assert "carbamoyl" in result
-        assert "acid" in result
+        assert result == "3-amino-3-oxopropanoic acid"
 
     def test_5_carbamoylpentanoic_acid(self):
-        """NC(=O)CCCC(=O)O -> 5-carbamoylpentanoic acid"""
+        """NC(=O)CCCC(=O)O -> 5-amino-5-oxopentanoic acid (P-65.1.6.1 amino-oxo PIN)."""
         result = name_compound("NC(=O)CCCC(=O)O")
-        assert result is not None
-        assert "carbamoyl" in result
-        assert "acid" in result
+        assert result == "5-amino-5-oxopentanoic acid"
 
     def test_6_carbamoylhexanoic_acid(self):
-        """NC(=O)CCCCC(=O)O -> 6-carbamoylhexanoic acid"""
+        """NC(=O)CCCCC(=O)O -> 6-amino-6-oxohexanoic acid (P-65.1.6.1 amino-oxo PIN)."""
         result = name_compound("NC(=O)CCCCC(=O)O")
-        assert result is not None
-        assert "carbamoyl" in result
-        assert "acid" in result
+        assert result == "6-amino-6-oxohexanoic acid"
 
     def test_4_carbamoylbenzoic_acid(self):
         """OC(=O)c1ccc(C(N)=O)cc1 -> 4-carbamoylbenzoic acid"""
@@ -127,11 +120,9 @@ class TestCarbamoylPrefixE2E:
         assert "carbamoyl" in result
 
     def test_carbamoyl_with_hydroxy(self):
-        """NC(=O)CC(O)C(=O)O -> carbamoyl + hydroxy on acid chain"""
+        """NC(=O)CC(O)C(=O)O -> 4-amino-2-hydroxy-4-oxobutanoic acid (amino-oxo PIN)."""
         result = name_compound("NC(=O)CC(O)C(=O)O")
-        assert result is not None
-        assert "carbamoyl" in result
-        assert "acid" in result
+        assert result == "4-amino-2-hydroxy-4-oxobutanoic acid"
 
 
 # ============================================================================
@@ -145,8 +136,7 @@ class TestCarbamoylRoundTrip:
     def test_4_carbamoylbutanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
         smiles = "NC(=O)CCC(=O)O"
         name = name_compound(smiles)
-        assert name is not None
-        assert "carbamoyl" in name
+        assert name == "4-amino-4-oxobutanoic acid"
         parsed = opsin_to_smiles(name)
         if parsed:
             assert canonical(parsed) == canonical(smiles)
@@ -155,8 +145,7 @@ class TestCarbamoylRoundTrip:
     def test_3_carbamoylpropanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
         smiles = "NC(=O)CC(=O)O"
         name = name_compound(smiles)
-        assert name is not None
-        assert "carbamoyl" in name
+        assert name == "3-amino-3-oxopropanoic acid"
         parsed = opsin_to_smiles(name)
         if parsed:
             assert canonical(parsed) == canonical(smiles)
@@ -165,8 +154,7 @@ class TestCarbamoylRoundTrip:
     def test_5_carbamoylpentanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
         smiles = "NC(=O)CCCC(=O)O"
         name = name_compound(smiles)
-        assert name is not None
-        assert "carbamoyl" in name
+        assert name == "5-amino-5-oxopentanoic acid"
         parsed = opsin_to_smiles(name)
         if parsed:
             assert canonical(parsed) == canonical(smiles)
@@ -175,8 +163,7 @@ class TestCarbamoylRoundTrip:
     def test_6_carbamoylhexanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
         smiles = "NC(=O)CCCCC(=O)O"
         name = name_compound(smiles)
-        assert name is not None
-        assert "carbamoyl" in name
+        assert name == "6-amino-6-oxohexanoic acid"
         parsed = opsin_to_smiles(name)
         if parsed:
             assert canonical(parsed) == canonical(smiles)
@@ -235,8 +222,7 @@ class TestCarbamoylRoundTrip:
     def test_carbamoyl_hydroxy_acid_roundtrip(self, opsin_to_smiles, canonical):
         smiles = "NC(=O)CC(O)C(=O)O"
         name = name_compound(smiles)
-        assert name is not None
-        assert "carbamoyl" in name
+        assert name == "4-amino-2-hydroxy-4-oxobutanoic acid"
         parsed = opsin_to_smiles(name)
         if parsed:
             assert canonical(parsed) == canonical(smiles)
@@ -250,12 +236,16 @@ class TestCarbamoylDoubleCounting:
     """Ensure single primary amide produces exactly one carbamoyl in name."""
 
     def test_single_amide_single_carbamoyl(self):
-        """A compound with one primary amide group should have exactly one carbamoyl."""
+        """One primary amide (non-principal, linear chain) -> single amino-oxo pair.
+
+        Post-wave-3 the non-principal linear-chain terminal primary amide is
+        expressed as the amino-oxo PIN form (P-65.1.6.1), so the double-naming
+        guard is exactly one 'amino' and one 'oxo'.
+        """
         result = name_compound("NC(=O)CCC(=O)O")
-        assert result is not None
-        assert result.count("carbamoyl") == 1, (
-            f"Expected exactly 1 'carbamoyl' in name, got {result.count('carbamoyl')}: {result}"
-        )
+        assert result == "4-amino-4-oxobutanoic acid"
+        assert result.count("amino") == 1
+        assert result.count("oxo") == 1
 
     def test_single_amide_on_ring_single_carbamoyl(self):
         """A compound with one primary amide on a ring should have exactly one carbamoyl."""
