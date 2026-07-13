@@ -526,6 +526,24 @@ def name_substituent(mol, frag_atoms, attach_idx):
             except Exception:
                 pass
 
+    # ---- Tier 1.93b (W3-P10, P-67.1.5.1 / P-68.3): arsanyl (As-rooted) ----
+    # An arsenic-rooted substituent (-As(OH)2 -> dihydroxyarsanyl) cited as a
+    # prefix under a senior organic group (-COOH). MUST precede the Tier-5
+    # descriptive fallback, which returns the 'inorganic compound (not supported)'
+    # sentinel for a lone As and fails the whole molecule closed. Fail-closed
+    # (falls through) for any non-As / decorated-As shape.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'As':
+            try:
+                from ..rules.mononuclear_hydrides import name_arsanyl_substituent
+                _as = name_arsanyl_substituent(
+                    mol, list(frag_atoms_set), attach_idx
+                )
+                if _as:
+                    return _stereo_route(_as)
+            except Exception:
+                pass
+
     # ---- Wave2 T3c: aryl-vinyl / styryl (SUBST-01 two-namer rule) ----
     # Mirror name_substituent_fragment's aryl-vinyl handler here so the benzene
     # generic-C fallback (benzene.py, which calls name_substituent and rejects the

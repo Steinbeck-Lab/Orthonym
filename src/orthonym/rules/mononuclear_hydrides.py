@@ -219,6 +219,52 @@ def _assemble(prefix_block: str, lam: Optional[int], stem: str) -> str:
     return f"{prefix_block}-lambda{lam}-{stem}"
 
 
+def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
+    """P-67.1.5.1 / P-68.3: an arsenic-rooted substituent named on the parent
+    hydride arsane -> ``{prefixes}arsanyl``.
+
+        -As(OH)2 -> dihydroxyarsanyl   (P-67.1.5.1: -COOH is senior to -As(OH)2,
+                                        so the arsonic acid is cited as a prefix)
+        -AsH2    -> arsanyl
+        -As(CH3)2 -> dimethylarsanyl
+
+    Fail-closed (returns ``None``) for a non-As attachment, a charge / radical, any
+    multiple bond on As, or a substituent that is neither a terminal ``-OH`` nor a
+    simple unbranched-alkyl / phenyl-naphthyl organyl. Pure: no mol mutation."""
+    if attach_idx is None:
+        return None
+    frag_set = set(frag_atoms)
+    if attach_idx not in frag_set:
+        return None
+    a = mol.GetAtomWithIdx(attach_idx)
+    if (a.GetSymbol() != 'As' or a.GetFormalCharge() != 0
+            or a.GetNumRadicalElectrons() != 0):
+        return None
+    from .substituent_purity import pure_organyl_prefix_name
+    from .phosphorus import _build_substituent_string
+    prefixes = []
+    for b in a.GetBonds():
+        nb = b.GetOtherAtom(a)
+        if nb.GetIdx() not in frag_set:
+            continue                                  # the parent attachment
+        if b.GetBondType() != Chem.BondType.SINGLE:
+            return None
+        sym = nb.GetSymbol()
+        if (sym == 'O' and nb.GetFormalCharge() == 0 and nb.GetDegree() == 1
+                and nb.GetTotalNumHs() == 1):
+            prefixes.append('hydroxy')
+        elif sym == 'C':
+            nm = pure_organyl_prefix_name(mol, nb.GetIdx(), attach_idx)
+            if nm is None:
+                return None
+            prefixes.append(nm)
+        else:
+            return None
+    if not prefixes:
+        return 'arsanyl'                              # bare -AsH2
+    return f"{_build_substituent_string(prefixes)}arsanyl"
+
+
 def name_mononuclear_hydride(mol) -> Optional[str]:
     """Return the substitutive PIN for a mononuclear parent hydride (P-68 /
     P-31.1.4.2), else ``None`` (fail-closed cascade-continuation).

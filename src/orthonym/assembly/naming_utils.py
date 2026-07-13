@@ -910,6 +910,13 @@ def is_complex_substituent(name: str) -> bool:
     # Acylamino compound substituents: "ethanoylamino", "propanoylamino" etc.
     if name.endswith('amino') and 'oyl' in name:
         return True
+    # W3-P10 (P-16.3.3): a SUBSTITUTED pnictogen-yl prefix (dihydroxyarsanyl /
+    # dimethylarsanyl / ...stibanyl / ...bismuthanyl) is a compound substituent
+    # requiring enclosing marks -> '4-(dihydroxyarsanyl)benzoic acid'. The bare
+    # parent-hydride-yl form ('arsanyl', 'stibanyl') stays simple.
+    for _pnictyl in ('arsanyl', 'stibanyl', 'bismuthanyl'):
+        if name.endswith(_pnictyl) and name != _pnictyl:
+            return True
     # (R-oxy)alkyl compound substituents per IUPAC P-16.3.3 / P-63.2.2.2 (v22
     # C-T2 / V-3): an alkoxy/aryloxy unit ('<R>oxy') fused to a terminal alkyl-yl
     # stem is a compound prefix taking enclosing marks — '(phenoxymethyl)benzene',

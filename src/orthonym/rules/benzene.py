@@ -984,6 +984,18 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         if prefix:
             return {'name': prefix, 'atoms': sub_atoms}
 
+    # W3-P10 (P-67.1.5.1): arsenic-based substituent -As(OH)2 -> dihydroxyarsanyl,
+    # cited as a prefix when a senior organic group (-COOH) is the parent PCG. HEAD
+    # had no 'As' branch, so the whole As unit fell through unnamed and the molecule
+    # failed closed to 'inorganic compound (not supported)'. Fail-closed (falls
+    # through) for any decorated-As shape the arsanyl namer declines.
+    if symbol == 'As':
+        from ..rules.mononuclear_hydrides import name_arsanyl_substituent
+        sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
+        as_name = name_arsanyl_substituent(mol, sub_atoms, start_idx)
+        if as_name:
+            return {'name': as_name, 'atoms': sub_atoms}
+
     # Carbon-based groups (alkyl or functionalized chain) - fallback for non-suffix C
     if symbol == 'C':
         # Check for nitrile C#N pattern FIRST (BUG-2 fix)
