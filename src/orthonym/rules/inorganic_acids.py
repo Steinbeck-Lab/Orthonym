@@ -575,6 +575,12 @@ def name_inorganic_acid(mol) -> Optional[str]:
     b_amine = name_borane_amine(mol)
     if b_amine is not None:
         return b_amine
+    # W3-P10 (P-67.3.1): mixed acyl/phosphoric anhydride named substitutively as
+    # an (acyloxy)phosphonic acid (acid senior to anhydride).
+    from .phosphorus import name_acyloxy_phosphonic_acid
+    axp = name_acyloxy_phosphonic_acid(mol)
+    if axp is not None:
+        return axp
     # D-FOLLOWON item 10: tetraalkyl silicate ester (Si(OR)4). Routed here (@40)
     # so it intercepts BEFORE ORGANOMETALLIC@50 (which mis-claims Si as a metalloid
     # hub and linearizes the silyl-ester ligands into nonsense).

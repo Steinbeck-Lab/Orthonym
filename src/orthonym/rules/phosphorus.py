@@ -304,6 +304,75 @@ def name_phosphonic_acid(mol, phosphonic_atoms: Tuple[int, ...]) -> Optional[str
     return f"{prefix}phosphonic acid"
 
 
+def name_acyloxy_phosphonic_acid(mol) -> Optional[str]:
+    """P-67.3.1 (BB L36999): a mixed acyl/phosphoric anhydride named
+    SUBSTITUTIVELY as an ``(acyloxy)phosphonic acid`` (acid is senior to
+    anhydride, so the substitutive acid name is the PIN, NOT the functional-class
+    ``acetic phosphoric monoanhydride``).
+
+        CH3-CO-O-P(O)(OH)2 -> (acetyloxy)phosphonic acid
+
+    Structural shape: exactly one NEUTRAL P of degree 4 bearing one ``P=O``, two
+    ``-OH`` and one ``-O-acyl`` (the bridging O joins P to a carbonyl carbon). The
+    fourth position of phosphonic acid ``HP(=O)(OH)2`` — normally the central-atom
+    H (methylphosphonic) — is here substituted by the acyloxy group.
+
+    Fail-closed (returns ``None``) off this shape: any C-P bond (genuine
+    organophosphonic acid -> the suffix path), an ``-O-alkyl`` bridge (a phosphate
+    ester, not an anhydride), fewer/more than two -OH, a charge, or an acyl group
+    the acyloxy namer cannot spell. Pure: no mol mutation.
+    """
+    from rdkit import Chem as _Chem
+    from .lipids import _acyloxy_for_site
+
+    if mol is None or len(_Chem.GetMolFrags(mol)) != 1:
+        return None
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    ps = [a for a in mol.GetAtoms() if a.GetSymbol() == "P"]
+    if len(ps) != 1:
+        return None
+    p = ps[0]
+    if (p.GetFormalCharge() != 0 or p.GetDegree() != 4
+            or p.GetTotalNumHs() != 0):
+        return None
+    dbl_o = 0
+    oh_count = 0
+    acyloxy_site = None
+    for b in p.GetBonds():
+        nb = b.GetOtherAtom(p)
+        bt = b.GetBondType()
+        if bt == _Chem.BondType.DOUBLE and nb.GetSymbol() == "O":
+            dbl_o += 1
+            continue
+        if bt != _Chem.BondType.SINGLE or nb.GetSymbol() != "O" \
+                or nb.GetFormalCharge() != 0:
+            return None                              # any C-P / N-P / X-P -> defer
+        others = [x for x in nb.GetNeighbors() if x.GetIdx() != p.GetIdx()]
+        if nb.GetTotalNumHs() == 1 and not others:
+            oh_count += 1
+        elif nb.GetDegree() == 2 and len(others) == 1 and others[0].GetSymbol() == "C":
+            c = others[0]
+            # the bridge carbon must be a CARBONYL carbon (acyl), not alkyl:
+            is_carbonyl = any(
+                bb.GetBondType() == _Chem.BondType.DOUBLE
+                and bb.GetOtherAtom(c).GetSymbol() == "O"
+                for bb in c.GetBonds())
+            if not is_carbonyl:
+                return None                          # -O-alkyl -> phosphate ester
+            if acyloxy_site is not None:
+                return None                          # >1 acyloxy -> out of scope
+            acyloxy_site = (c.GetIdx(), nb.GetIdx())
+        else:
+            return None
+    if dbl_o != 1 or oh_count != 2 or acyloxy_site is None:
+        return None
+    acyloxy = _acyloxy_for_site(mol, ("acyl", acyloxy_site[0], acyloxy_site[1]))
+    if not acyloxy:
+        return None
+    return f"({acyloxy})phosphonic acid"
+
+
 def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str]:
     """
     Name a phosphinic acid with dialkyl/aryl prefix and phosphinic acid suffix.
