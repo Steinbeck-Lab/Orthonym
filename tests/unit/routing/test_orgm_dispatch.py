@@ -155,7 +155,12 @@ class TestOrgmDispatch:
             # (glycolide -> 1,4-dioxane-2,5-dione), and W3-P13 POLYCHALCOGEN_OXIDE
             # @46.5 (...disulfane-1,2-dione) + LAMBDA_SULFANE_IMINE_OXIDE@48.75
             # (S,S-diethyl-N-phenyl-lambda4-sulfanimine) — all < 50, all mutually
-            # decline.)
+            # decline. Further wave-3 sub-50 interceptors:
+            # HETEROCHALCOGEN_ABA@47.55 (pure-chalcogen a[ba]n parent hydride,
+            # dithioxane), HOMONUCLEAR_PNICTOGEN_CHAIN@47.6,
+            # PNICTOGEN_CARBOXYLIC_ACID@47.65, ACYL_CHALCOGENCHAIN_PSEUDOKETONE
+            # @48.65 — all element-hydride-family recognizers with predicates
+            # disjoint from ORGM (they mutually decline); all < 50.)
             if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE,
                        StoutClass.CHALCOGEN_CHAIN, StoutClass.POLYAZANE,
                        StoutClass.CATENATED_HYDRIDE, StoutClass.DINUCLEAR_HYDRIDE,
@@ -167,7 +172,11 @@ class TestOrgmDispatch:
                        StoutClass.FREE_HOMONUCLEAR_G14_HYDRIDE,
                        StoutClass.CYCLIC_POLYESTER,
                        StoutClass.POLYCHALCOGEN_OXIDE,
-                       StoutClass.LAMBDA_SULFANE_IMINE_OXIDE):
+                       StoutClass.LAMBDA_SULFANE_IMINE_OXIDE,
+                       StoutClass.HETEROCHALCOGEN_ABA,
+                       StoutClass.HOMONUCLEAR_PNICTOGEN_CHAIN,
+                       StoutClass.PNICTOGEN_CARBOXYLIC_ACID,
+                       StoutClass.ACYL_CHALCOGENCHAIN_PSEUDOKETONE):
                 continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "
