@@ -3330,6 +3330,58 @@ def name_substituent_fragment(
         if _g14:
             return _g14
 
+    # W3-P02-2 (P-65.1.3.1.2(1), BB 30033 / acyl table 56178): a substituent
+    # that is the imidic-acid carbon -C(=NH)-OH attached to a ring/ring-system
+    # (or any parent) is the compound acyl prefix 'C-hydroxycarbonimidoyl'
+    # (HO-C(=NH)-; the italic 'C-' marks the hydroxy ON CARBON, distinguishing
+    # it from an N-hydroxy form). Without this the recursive fallback names the
+    # fragment 'methanimidic acid' + 'yl' = 'methanimidic acidyl' (OPSIN-
+    # unparseable -> SELF-01 -> unknown). Detect: the attach C carries exactly a
+    # terminal neutral =NH (degree-1, charge-0, unsubstituted) + a terminal -OH
+    # (degree-1, one H) + one bond to the parent; the whole substituent is those
+    # three atoms. Fail closed on anything else (N-substituted imino, O-alkyl,
+    # extra branch) so a wrong name is never emitted.
+    if attach_idx is not None and len(sub_atoms) == 3:
+        _ic = mol.GetAtomWithIdx(attach_idx)
+        if _ic.GetSymbol() == 'C' and _ic.GetFormalCharge() == 0:
+            _sub_set = set(sub_atoms)
+            _im_n = None
+            _oh_o = None
+            _ic_ok = True
+            for _nb in _ic.GetNeighbors():
+                _ni = _nb.GetIdx()
+                if _ni not in _sub_set:
+                    continue  # the single bond back to the parent
+                _b = mol.GetBondBetweenAtoms(attach_idx, _ni)
+                if (_nb.GetSymbol() == 'N'
+                        and _b.GetBondTypeAsDouble() == 2.0
+                        and _nb.GetFormalCharge() == 0
+                        and _nb.GetDegree() == 1):
+                    _im_n = _ni
+                elif (_nb.GetSymbol() == 'O'
+                        and _b.GetBondTypeAsDouble() == 1.0
+                        and _nb.GetDegree() == 1
+                        and _nb.GetTotalNumHs() == 1):
+                    _oh_o = _ni
+                else:
+                    _ic_ok = False
+                    break
+            if (_ic_ok and _im_n is not None and _oh_o is not None
+                    and _sub_set == {attach_idx, _im_n, _oh_o}):
+                # Only DEMOTE the imidic acid to this acyl prefix when a SENIOR
+                # group is present (mode 1, P-65.1.3.1.2). If imidic acid is the
+                # molecule's principal characteristic group it belongs in the
+                # suffix ('benzenecarboximidic acid'), so fail closed here rather
+                # than emit the valid-but-non-PIN '(C-hydroxycarbonimidoyl)benzene'.
+                from ..perception.functional_groups import (
+                    detect_functional_groups as _dfg,
+                )
+                from ..rules.seniority import get_principal_group as _gpg
+                _pg, _ = _gpg(mol, _dfg(mol))
+                if _pg == 'imidic_acid':
+                    return None
+                return 'C-hydroxycarbonimidoyl'
+
     # Wave2 T3c (P-31.1.3.4): aryl-vinyl / styryl — an acyclic UNSATURATED chain
     # bearing a ring substituent (Ar-CH=CH- -> (E)-2-phenylethenyl). MUST precede
     # the Step 1c ring chokepoint (which declines because the free valence is on
