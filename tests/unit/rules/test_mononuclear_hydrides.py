@@ -86,9 +86,17 @@ class TestGroup14Halides:
     def test_group14_tetrahalides(self, smiles, expected):
         assert _name(smiles) == expected
 
+    def test_group14_mixed_organyl_halide_names(self):
+        """Wave-3: mixed organyl+halide Group-14 hub now NAMES (P-67.1.2.5.2).
+
+        C[Si](F)(F)F -> trifluoro(methyl)silane (OPSIN-RT ok). Previously this
+        was expected to fail-closed; the element-hydride namer now builds the
+        mixed organyl+halide substituent set directly.
+        """
+        assert _name("C[Si](F)(F)F") == "trifluoro(methyl)silane"
+
     @pytest.mark.parametrize("smiles,why", [
         ("C[Si](C)(C)C", "tetramethylsilane: organyl Si -> P-69 namer owns it"),
-        ("C[Si](F)(F)F", "methyltrifluorosilane: mixed organyl+halide -> fail-closed"),
         ("CO[Si](OC)(OC)OC", "tetramethoxysilane: alkoxy ligands, not halides"),
         ("c1cc[siH]c1", "silole: Si ring member, not a parent hydride"),
     ])
