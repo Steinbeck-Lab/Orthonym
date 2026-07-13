@@ -81,7 +81,7 @@ class TestPrefixAndFrnClasses:
     @pytest.mark.parametrize("smiles,expected", [
         ("N=C(O)O", "carbonimidic acid"),
         ("N=C(N)O", "carbamimidic acid"),
-        ("CC(=N)OC", "methyl acetimidate"),
+        ("CC(=N)OC", "methyl ethanimidate"),
         ("CC(=N)N", "ethanimidamide"),
     ])
     def test_imidic_neighbours_protected(self, smiles, expected):
