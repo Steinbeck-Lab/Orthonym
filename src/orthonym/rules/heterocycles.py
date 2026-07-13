@@ -554,10 +554,20 @@ def build_hw_name(
     all_locants = sorted(loc for locs in element_locants.values() for loc in locs)
     total_het = len(all_locants)
     locant_prefix = ""
+    # P-22.2.2.1.3: a ring in which ONE heteroatom element occupies EVERY skeletal
+    # position needs no heteroatom locants — the numbering is unambiguous
+    # (hexasilinane, not '1,2,3,4,5,6-hexasilinane'; hexathiane). This holds only
+    # when a single distinct element fills all ring positions AND no lambda is
+    # present (a lambda always cites its locant, P-22.2.7.1). A same-element ring
+    # NOT spanning all positions (1,2-disilinane) still needs its locants.
+    _one_element_all_positions = (
+        len(element_locants) == 1 and total_het == ring_size
+        and not lambda_by_locant
+    )
     # P-22.2.7.1: a lambda-bearing ring ALWAYS cites its heteroatom locants,
     # even for a single heteroatom (1lambda3-iodinane, not 'lambda3-iodinane'),
     # with the lambda token immediately after its locant (1,3lambda5-oxaphosphole).
-    if total_het > 1 or lambda_by_locant:
+    if (total_het > 1 or lambda_by_locant) and not _one_element_all_positions:
         from .lambda_convention import format_lambda_token
         locant_prefix = ','.join(
             format_lambda_token(loc, lambda_by_locant.get(loc))
