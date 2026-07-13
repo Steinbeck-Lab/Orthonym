@@ -19,6 +19,7 @@ The acid name derives from the acyl fragment:
 Reference: IUPAC 2013 Blue Book, P-65.3.1 (Acid anhydrides)
 """
 
+import re
 from collections import deque
 from typing import Optional, List, Tuple
 from rdkit import Chem
@@ -544,6 +545,16 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
         exclude_atoms=exclude,
     )
 
+    # W3-P06 Task 5 (P-65.1.1.1): a substituted 2-carbon acid uses the RETAINED
+    # 'acetic' stem with UNLOCANTED substituent prefixes (chloroacetic,
+    # dichloroacetic) — acetic has a single substitutable carbon, so no locant is
+    # cited (BB 30346 'difluoroacetic acid (not 2,2-difluoroacetic acid)'; BB
+    # 32571 'bis(chloroacetic) anhydride'). Guard: only for SIMPLE substituents
+    # (no '(' complex substituent, whose own internal locants must not be
+    # stripped) — a complex-substituted C2 acid keeps the systematic 'ethanoic'.
+    if prefix_str and len(principal_chain) == 2 and "(" not in prefix_str:
+        unlocanted = re.sub(r"\d+(?:,\d+)*-", "", prefix_str)
+        return f"{unlocanted}acetic", True
     base_acid = _build_acid_name(len(principal_chain))
     if prefix_str:
         return f"{prefix_str}{base_acid}", True
