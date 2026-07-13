@@ -90,18 +90,49 @@ _HUB_STEMS = {
     # Si/Ge: carbon-substituted forms stay with the P-69 organometallic namer.
     'Sn': 'stannane',
     'Pb': 'plumbane',
+    # Wave-3 (P-68.1.1.1 / P-69.1 / P-61.3.2.1): Group-13 B/Ga/In/Tl parent
+    # hydrides ([BH3] -> borane, C[Ga](C)C -> trimethylgallane). Stems mirror
+    # ions.py::_GROUP13_UIDE_STEMS. B standard bonding number is 3, so BH3 ->
+    # borane (no lambda). Al is DELIBERATELY excluded (it stays on the
+    # organometallics Branch B to protect the trimethylaluminum canary; see
+    # _ORGANYL_HUBS below). B is kept OUT of _ORGANYL_HUBS so a boron oxoacid
+    # (methylboronic acid, boronic acid) is never claimed here — it fails the
+    # halogen/organyl guards on its O neighbours and cascades to the boron-acid
+    # handler; only bare BH3 (bare path) and the mixed halo+organyl regime
+    # (dichloro(methyl)borane) reach a boron name here. Ga/In/Tl ARE organyl
+    # hubs (trimethylgallane / dimethylindigane), directly parallel to As/Sb/Bi.
+    'B': 'borane',
+    'Ga': 'gallane',
+    'In': 'indigane',
+    'Tl': 'thallane',
 }
 
 # Hubs that additionally accept ORGANYL / bare substituents (no pre-existing
 # substitutive namer; the P-69 organometallic handler mangles them). Restricted
-# to the Group-15 metals; P stays with name_phosphine, chalcogens/iodine with
-# their halide-only regime.
-_ORGANYL_HUBS = frozenset({'As', 'Sb', 'Bi'})
+# to the Group-15 metals As/Sb/Bi + the Group-13 metals Ga/In/Tl (P-69.1
+# substitutive parent-hydride names: C[Ga](C)C -> trimethylgallane, C[In]C ->
+# dimethylindigane — the trivalent organyl branch is valence-agnostic, so these
+# parallel the working As/Sb/Bi hubs exactly). P stays with name_phosphine,
+# chalcogens/iodine with their halide-only / mixed regimes. B and Al are
+# EXCLUDED: B protects the boron-oxoacid handler (bare BH3 uses the bare-hydride
+# path; mixed CH3-BCl2 uses the mixed regime below), and Al stays on the
+# organometallic Branch B to protect the trimethylaluminum canary (ORG-T3-10).
+_ORGANYL_HUBS = frozenset({'As', 'Sb', 'Bi', 'Ga', 'In', 'Tl'})
 
 # Halogen substituent prefixes (cited alphanumerically, P-14.5.2; the
 # multiplying prefix di/tri/... does NOT count for ordering).
 _HALO_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
 _HALOGENS = frozenset(_HALO_PREFIX)
+
+# Hubs that accept the MIXED halogen + organyl regime (P-61.3.2.1 / P-67.1.2.5.2
+# / P-68.5.1): a hub bearing BOTH terminal halogen(s) AND pure-organyl group(s).
+# Group-13 (B/Ga/In/Tl) + Group-14 (Si/Ge/Sn/Pb) at standard valence, plus the
+# halogen hub I ONLY when hypervalent (lambda != None) so CH3-I stays a
+# halo-alkane. BB P-61.3.2.1 sanctions halogen prefixes on exactly this element
+# set. Al is excluded (not a hub); P/As/Sb/Bi mixed halo+organyl forms cascade
+# (fail-closed) — they are not in the BB P-61.3.2.1 substitutive-halide list.
+_MIXED_HALO_ORGANYL_HUBS = frozenset({'B', 'Ga', 'In', 'Tl',
+                                      'Si', 'Ge', 'Sn', 'Pb', 'I'})
 
 
 # === v23 Phase 10 (P-69.5.3): di-nuclear Group-14 / Group-15 catenated hydride ===
@@ -207,6 +238,86 @@ def _classify_organyls(mol, hub) -> Optional[List[str]]:
            for a in mol.GetAtoms() if a.GetSymbol() != 'H'):
         return None
     return names
+
+
+def _classify_mixed_halo_organyl(mol, hub) -> Optional[List[str]]:
+    """Return the combined list of substituent prefix names (halogen prefixes +
+    organyl prefixes) for a hub bearing BOTH at least one terminal halogen AND at
+    least one pure-organyl group, else None (fail-closed).
+
+    The pure-halogen regime (``_classify_halogens``) and the pure-organyl regime
+    (``_classify_organyls``) handle their own cases; this one fires only for the
+    genuinely MIXED hub (P-61.3.2.1 / P-67.1.2.5.2 / P-68.5.1), e.g. CH3-SiCl3 ->
+    trichloro(methyl)silane, CH3-BCl2 -> dichloro(methyl)borane, CH3-ICl2 ->
+    dichloro(methyl)-lambda3-iodane. A stray heteroatom (O/N on a boron oxoacid),
+    a non-terminal halide, or an impure organyl -> None."""
+    hub_idx = hub.GetIdx()
+    names: List[str] = []
+    n_halo = 0
+    n_org = 0
+    halo_nbr_idxs = set()
+    for nbr in hub.GetNeighbors():
+        sym = nbr.GetSymbol()
+        if sym == 'H':
+            continue
+        if sym in _HALOGENS:
+            if nbr.GetDegree() != 1:
+                return None
+            bond = mol.GetBondBetweenAtoms(nbr.GetIdx(), hub_idx)
+            if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            names.append(_HALO_PREFIX[sym])
+            halo_nbr_idxs.add(nbr.GetIdx())
+            n_halo += 1
+        elif sym == 'C':
+            name = pure_organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+            if name is None:
+                return None
+            names.append(name)
+            n_org += 1
+        else:
+            return None  # stray heteroatom (boron oxoacid O, amino N, ...)
+    if n_halo == 0 or n_org == 0:
+        return None  # not mixed -> a dedicated pure regime handles it
+    # Full coverage: every heavy atom is the hub, a counted terminal halogen, or a
+    # carbon inside a pure-hydrocarbyl organyl (pure_organyl_prefix_name rejected
+    # any internal heteroatom). No stray heteroatom remains.
+    for a in mol.GetAtoms():
+        if a.GetSymbol() == 'H':
+            continue
+        if a.GetIdx() == hub_idx or a.GetIdx() in halo_nbr_idxs or a.GetSymbol() == 'C':
+            continue
+        return None
+    return names
+
+
+def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
+    """Compose the halogen+organyl prefix block per P-16.3.3 / P-16.5.1.3, exactly
+    as the Blue Book cites the substitutive halides of B/Si/... parent hydrides:
+    sort ALL substituent base-names alphanumerically; the FIRST unique group takes
+    no enclosing marks, each SUBSEQUENT unique group is enclosed in parentheses
+    with its multiplying prefix OUTSIDE the marks.
+
+        ['chloro','chloro','chloro','methyl'] -> 'trichloro(methyl)'   (BB 35754)
+        ['chloro','chloro','methyl']          -> 'dichloro(methyl)'    (BB 39668)
+        ['chloro','methyl','methyl']          -> 'chlorodi(methyl)'    (BB 25866)
+        ['bromo','chloro','phenyl']           -> 'bromo(chloro)(phenyl)' (BB 35750)
+
+    Returns None if a multiplicity exceeds the supported multiplier table."""
+    from collections import Counter
+    _MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra',
+             5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa'}
+    counts = Counter(names)
+    parts = []
+    for i, name in enumerate(sorted(counts)):
+        mult = _MULT.get(counts[name])
+        if mult is None:
+            return None
+        if i == 0:
+            parts.append(f"{mult}{name}")            # first unique: no marks
+        else:
+            parts.append(f"{mult}({name})")          # subsequent: marks, mult OUTSIDE
+    return ''.join(parts)
 
 
 def _assemble(prefix_block: str, lam: Optional[int], stem: str) -> str:
@@ -323,12 +434,25 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
             halo_parts.append(f"{multiplier}{halo_name}")
         return _assemble(''.join(halo_parts), lam, stem)
 
-    # --- Organyl / bare regime (Group-15 As/Sb/Bi only). ---
+    # --- Organyl / bare regime (Group-15 As/Sb/Bi + Group-13 Ga/In/Tl). ---
     if hub.GetSymbol() in _ORGANYL_HUBS:
         organyls = _classify_organyls(mol, hub)
         if organyls is not None:
             prefix_block = _build_substituent_string(organyls) if organyls else ""
             return _assemble(prefix_block, lam, stem)
+
+    # --- Mixed halogen + organyl regime (P-61.3.2.1 / P-67.1.2.5.2 / P-68.5.1):
+    #     Group-13 (B/Ga/In/Tl) + Group-14 (Si/Ge/Sn/Pb) at any valence, plus a
+    #     hypervalent iodine hub (lambda != None so CH3-I stays a halo-alkane).
+    #     CH3-SiCl3 -> trichloro(methyl)silane, CH3-BCl2 -> dichloro(methyl)borane,
+    #     CH3-ICl2 -> dichloro(methyl)-lambda3-iodane. ---
+    if hub.GetSymbol() in _MIXED_HALO_ORGANYL_HUBS and not (
+            hub.GetSymbol() in _HALOGENS and lam is None):
+        mixed = _classify_mixed_halo_organyl(mol, hub)
+        if mixed is not None:
+            prefix_block = _build_mixed_substituent_string(mixed)
+            if prefix_block is not None:
+                return _assemble(prefix_block, lam, stem)
 
     # --- P-44.1.2: a phosphane hub bearing a SILYL (SiH3) substituent (with
     #     optional pure-hydrocarbyl organyls). P > Si in the seniority of
