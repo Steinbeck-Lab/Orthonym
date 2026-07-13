@@ -84,6 +84,9 @@ SENIORITY_ORDER = [
     # Imidic acid (P-65.1.3.1) -- N-replacement ranks after the O/S/Se/Te
     # chalcogen-replacement block
     "imidic_acid",
+    # Hydrazonic acid (P-65.1.3.2): =O -> =N-NH2 replacement acid; ranks
+    # immediately below imidic acid (P-65.1.3.1) per the P-65.1.3 sub-order.
+    "hydrazonic_acid",
     # Carbamic acid (IUPAC P-65.2.3) -- retained acid name, rank with carboxylic acids
     "carbamic_acid",
     "sulfonic_acid",
@@ -410,6 +413,10 @@ SUFFIX_FORMS = {
     "telluroic_O_acid": ("telluroic O-acid", "carbotelluroic O-acid"),
     "ditelluroic_acid": ("ditelluroic acid", "carboditelluroic acid"),
     "imidic_acid": ("imidic acid", "carboximidic acid"),  # P-65.1.3.1 / Table 4.3
+    # W3-P02-3 (P-65.1.3.2 / Table 4.3): hydrazonic acid, the =N-NH2 analogue of
+    # imidic acid. Chain 'hydrazonic acid' (methanehydrazonic acid); ring/appended-C
+    # 'carbohydrazonic acid'. The C is always chain-terminal (see TERMINAL_FG_TYPES).
+    "hydrazonic_acid": ("hydrazonic acid", "carbohydrazonic acid"),
     "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
@@ -739,6 +746,11 @@ PREFIX_FORMS = {
     "sulfinimidamide": "S-aminosulfinimidoyl",
     "peroxy_acid": None,          # demoted case fails closed (P-43.1)
     "imidic_acid": None,          # demoted case fails closed (P-65.1.3.1)
+    # W3-P02-4 (P-65.1.3.2.2): demoted hydrazonic acid at a chain end splits into
+    # 'hydroxy' + 'hydrazinylidene' prefixes on the geminal locant — a two-prefix
+    # decomposition emitted by name_polyfunctional's chain-end block, NOT a single
+    # static prefix. None here (handled specially, like imidic_acid).
+    "hydrazonic_acid": None,
     "sulfinohydrazonohydrazide": None,  # demoted case fails closed (P-66.4.3.2)
     "selenonimidamide": None,   # demoted case fails closed (P-66.4.1.1)
     "seleninimidamide": None,   # demoted case fails closed (P-66.4.1.1)

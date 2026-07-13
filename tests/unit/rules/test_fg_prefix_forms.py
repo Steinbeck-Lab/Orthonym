@@ -40,6 +40,10 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     # Wave2 completion B4 (fail-closed demotions, no BB-attested prefix):
     'peroxy_acid',       # P-43.1: demoted case fails closed (no PIN acid prefix)
     'imidic_acid',       # P-65.1.3.1: demoted case fails closed
+    # W3-P02 (P-65.1.3.2): hydrazonic acid has no SINGLE static prefix — when
+    # demoted at a chain end it splits into 'hydroxy' + 'hydrazinylidene'
+    # (P-65.1.3.2.2), emitted by name_polyfunctional's chain-end block.
+    'hydrazonic_acid',
     'sulfinohydrazonohydrazide',  # P-66.4.3.2: demoted case fails closed
     'iminoester',        # P-65.1.7: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
     'selenoester',       # P-65.3: functional class (Se-alkyl alkaneselenoate); chalcogen analog of ester

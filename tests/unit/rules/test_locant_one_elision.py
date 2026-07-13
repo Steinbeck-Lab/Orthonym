@@ -257,6 +257,10 @@ class TestTerminalFGTypes:
             # + imidic acid (P-65.1.3.1, ethanimidic acid) -- the acid carbon
             # is always chain-terminal.
             "peroxy_acid", "imidic_acid",
+            # W3-P02-3 (P-65.1.3.2): hydrazonic acid, the =N-NH2 analogue of
+            # imidic acid — the acid carbon is always chain-terminal
+            # (methanehydrazonic acid).
+            "hydrazonic_acid",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -268,5 +272,6 @@ class TestTerminalFGTypes:
         """TERMINAL_FG_TYPES count: 13 baseline + 12 chalcogen (Phase 163) + 1 amidine
         (v23 D-FOLLOWON item 8) + 1 hydrazide (Wave 1 R8a, P-66.3.1.1) + 3 Wave2 T3d
         (hydrazonamide/hydrazidine/thiohydrazide) + 2 Wave2-completion-B4
-        (peroxy_acid/imidic_acid, P-43.1/P-65.1.3.1) = 32 entries."""
-        assert len(TERMINAL_FG_TYPES) == 32
+        (peroxy_acid/imidic_acid, P-43.1/P-65.1.3.1) + 1 W3-P02
+        (hydrazonic_acid, P-65.1.3.2) = 33 entries."""
+        assert len(TERMINAL_FG_TYPES) == 33

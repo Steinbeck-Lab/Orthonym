@@ -203,6 +203,7 @@ TERMINAL_FG_TYPES = frozenset({
     "carboxylic_acid",  # Always at chain end (locant 1)
     "peroxy_acid",      # Always at chain end (P-43.1: propaneperoxoic acid)
     "imidic_acid",      # Always at chain end (P-65.1.3.1: ethanimidic acid)
+    "hydrazonic_acid",  # Always at chain end (P-65.1.3.2: methanehydrazonic acid)
     "aldehyde",         # Always at chain end (locant 1)
     "nitrile",          # Always at chain end (locant 1)
     "primary_amide",    # Always at chain end (locant 1)

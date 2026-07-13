@@ -102,6 +102,15 @@ FUNCTIONAL_GROUP_SMARTS = {
     # inorganic-acid entries (third neighbour = O/N -> excluded). Match tuple
     # stays (C, imino-N, hydroxyl-O).
     "imidic_acid": "[CX3;$([CX3](=[NX2H1])[OX2H1]);!$([CX3]([#7,#8])(=[NX2H1])[OX2H1])](=[NX2H1])[OX2H1]",
+    # Hydrazonic acid R-C(=N-NH2)-OH (P-65.1.3.2 / Table 4.3 'hydrazonic acid'),
+    # the =O -> =N-NH2 replacement analogue of imidic acid. W3-P02-3. The
+    # geminal C-OH (sp2 C) is NOT perceived by the [OX2H][CX4] alcohol pattern,
+    # so without this FG the group mis-reads as a plain hydrazone and the -OH is
+    # dropped. Match tuple (C, imino-N, amino-N, hydroxyl-O). The terminal
+    # amino N is [NX3H2] (unsubstituted hydrazono); the
+    # `!$([CX3]([#7,#8])...)` guard keeps the third C neighbour H or carbon
+    # (excludes an extra N/O, e.g. hydrazono-carbonic/amidrazone hybrids).
+    "hydrazonic_acid": "[CX3;!$([CX3]([#7,#8])(=[NX2][NX3])[OX2H1])](=[NX2][NX3H2])[OX2H1]",
     "thioester": "[CX3](=O)[SX2][#6]",
     # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
     "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
@@ -641,6 +650,13 @@ def _resolve_fg_collisions(results):
         # the imine SMARTS and its -OH the alcohol/enol patterns.
         ('imidic_acid', ['imine', 'alcohol', 'primary_alcohol',
                          'secondary_alcohol', 'tertiary_alcohol', 'enol']),
+        # W3-P02-3 (P-65.1.3.2): the C=N-NH2 of a hydrazonic acid matches the
+        # hydrazone SMARTS; the hydrazonic_acid FG owns the whole geminal
+        # C(=N-NH2)(OH) unit (suffix 'hydrazonic acid' / demoted hydroxy +
+        # hydrazinylidene). Also defensively clears imine/alcohol/enol on its
+        # atoms (the sp2 C keeps alcohol/enol from matching anyway).
+        ('hydrazonic_acid', ['hydrazone', 'imine', 'alcohol', 'primary_alcohol',
+                             'secondary_alcohol', 'tertiary_alcohol', 'enol']),
         # Wave2 completion (P-66.4.3.2): the S-hydrazido/hydrazono N pairs
         # match the hydrazine/hydrazone/imine/amine patterns.
         ('sulfinohydrazonohydrazide', ['hydrazine_fg', 'sulfinimidamide',
