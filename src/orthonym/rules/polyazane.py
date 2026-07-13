@@ -264,6 +264,119 @@ def _name_azoxy(mol) -> Optional[str]:
     return f"di{enclosed}diazene oxide"
 
 
+def _formazan_terminal_n(mol, inner_n, central_c, bond_type):
+    """Return the terminal-N neighbour of a formazan inner nitrogen ``inner_n``
+    (the neighbour that is NOT ``central_c``, joined by ``bond_type`` and being
+    an acyclic N), or None."""
+    from rdkit import Chem
+    other = None
+    for nb in inner_n.GetNeighbors():
+        if nb.GetIdx() == central_c.GetIdx():
+            continue
+        bt = mol.GetBondBetweenAtoms(inner_n.GetIdx(), nb.GetIdx()).GetBondType()
+        if nb.GetSymbol() == 'N' and bt == bond_type and not nb.IsInRing():
+            if other is not None:
+                return None
+            other = nb
+        else:
+            return None
+    return other
+
+
+def _formazan_substituent(mol, atom_idx, skeleton):
+    """The single organyl substituent name on a formazan skeleton atom, or None
+    (bare), or False (fail-closed: >1 substituent, a non-single bond, or a
+    non-organyl / non-nameable group)."""
+    from rdkit import Chem
+    names = []
+    for nb in mol.GetAtomWithIdx(atom_idx).GetNeighbors():
+        if nb.GetIdx() in skeleton or nb.GetAtomicNum() <= 1:
+            continue
+        bond = mol.GetBondBetweenAtoms(atom_idx, nb.GetIdx())
+        if bond.GetBondType() != Chem.BondType.SINGLE or nb.GetSymbol() != 'C':
+            return False
+        nm = pure_organyl_prefix_name(mol, nb.GetIdx(), atom_idx)
+        if nm is None:
+            return False
+        names.append(nm)
+    if len(names) > 1:
+        return False
+    return names[0] if names else None
+
+
+def name_formazan(mol) -> Optional[str]:
+    """P-68.3.1.3.5: substituted formazan named on the retained parent hydride
+    'formazan' (H2N-N=CH-N=NH) with its special fixed numbering — N1 the
+    diazenyl-terminal N (C3-N2=N1), C3 the central carbon, N5 the
+    hydrazinyl-terminal N (C3=N4-N5). Organyl substituents on N1/C3/N5 are cited
+    by those locants:
+
+        Ph-NH-N=CH-N=N-Ph  ->  1,5-diphenylformazan   (BB 38938)
+
+    Fail-closed (returns None): the UNSUBSTITUTED parent (kept on the retained
+    RETAINED_NAME table), any charge/radical, a ring skeleton atom, a
+    non-organyl substituent, a substituent on an inner N, or any shape not
+    matching the N=N-C(=N-N) formazan skeleton. Pure: no mol mutation."""
+    from rdkit import Chem
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for a in mol.GetAtoms():
+        if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
+            return None
+    for c in mol.GetAtoms():
+        if c.GetSymbol() != 'C' or c.IsInRing():
+            continue
+        n_dbl, n_sgl, bad = [], [], False
+        for b in c.GetBonds():
+            o = b.GetOtherAtom(c)
+            if o.GetSymbol() != 'N':
+                continue
+            bt = b.GetBondType()
+            if bt == Chem.BondType.DOUBLE:
+                n_dbl.append(o)
+            elif bt == Chem.BondType.SINGLE:
+                n_sgl.append(o)
+            else:
+                bad = True
+        if bad or len(n_dbl) != 1 or len(n_sgl) != 1:
+            continue
+        n4, n2 = n_dbl[0], n_sgl[0]        # C3=N4 (hydrazinyl), C3-N2 (diazenyl)
+        if (n4.IsInRing() or n2.IsInRing() or n4.GetDegree() != 2
+                or n2.GetDegree() != 2 or n4.GetTotalNumHs() != 0
+                or n2.GetTotalNumHs() != 0):
+            continue
+        n5 = _formazan_terminal_n(mol, n4, c, Chem.BondType.SINGLE)   # N4-N5
+        n1 = _formazan_terminal_n(mol, n2, c, Chem.BondType.DOUBLE)   # N2=N1
+        if n1 is None or n5 is None:
+            continue
+        skeleton = {c.GetIdx(), n1.GetIdx(), n2.GetIdx(), n4.GetIdx(), n5.GetIdx()}
+        if len(skeleton) != 5:
+            continue
+        s1 = _formazan_substituent(mol, n1.GetIdx(), skeleton)
+        s3 = _formazan_substituent(mol, c.GetIdx(), skeleton)
+        s5 = _formazan_substituent(mol, n5.GetIdx(), skeleton)
+        if s1 is False or s3 is False or s5 is False:
+            continue
+        placed = [(loc, nm) for loc, nm in ((1, s1), (3, s3), (5, s5)) if nm]
+        if not placed:
+            return None                    # bare formazan -> retained table
+        from ..assembly.naming_utils import is_complex_substituent, alpha_sort_key
+        from ..assembly.substituent_naming import _joined_prefix_parts
+        by_name: Dict[str, List[int]] = {}
+        for loc, nm in placed:
+            by_name.setdefault(nm, []).append(loc)
+        parts: List[str] = []
+        for nm in sorted(by_name, key=alpha_sort_key):
+            locs = sorted(by_name[nm])
+            mult = _SUB_MULTIPLIER.get(len(locs))
+            if mult is None:
+                return None
+            enc = f"({nm})" if is_complex_substituent(nm) else nm
+            parts.append(f"{','.join(map(str, locs))}-{mult}{enc}")
+        return ''.join(_joined_prefix_parts(parts)) + 'formazan'
+    return None
+
+
 def _name_azane_carboxylic_acid(mol) -> Optional[str]:
     """P-58.3.2 (BB 24896): H2N-(NH)k-COOH -> '<azane>-1-carboxylic acid'.
 
@@ -357,6 +470,14 @@ def name_polyazane(mol) -> Optional[str]:
     _azoxy = _name_azoxy(mol)
     if _azoxy is not None:
         return _azoxy
+    # W3-P15 (P-68.3.1.3.5): a SUBSTITUTED formazan (R-N=N-C(R')=N-NH-R'') is
+    # named on the retained parent 'formazan' with its special numbering. The
+    # unsubstituted parent keeps its RETAINED_NAME table entry (name_formazan
+    # returns None for it). Detected here (the N-N chain is broken by the central
+    # C, so _nitrogen_chain below never sees it).
+    _formazan = name_formazan(mol)
+    if _formazan is not None:
+        return _formazan
     for atom in mol.GetAtoms():
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
