@@ -2055,6 +2055,65 @@ def _try_name_semicarbazone(features: Any) -> Optional[str]:
     return f"2-({yl}idene)hydrazine-1-carboxamide"
 
 
+def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
+    """P-68.3.1.2.2 (BB 38562): R2C=N-NH2 -> the SUBSTITUTIVE PIN, an 'ylidene'
+    derivative of the parent hydride hydrazine (H2N-NH2) — 'propylidenehydrazine'
+    (PIN), NOT the functional-class 'propanal hydrazone'. Method (1) is the PIN.
+
+    Mirrors ``_try_name_semicarbazone`` minus the carboxamide tail: match the
+    bare hydrazone motif R2C=N-NH2, BFS the ylidene fragment from the sp2 C
+    (never crossing the =N), name it via the substituent pipeline ('-yl' ->
+    '-ylidene'), and cite it on 'hydrazine'. A LONE ylidene on the symmetric
+    hydrazine takes no position locant (P-14.3.4.2: unambiguous); a complex
+    ylidene name is enclosed in parentheses.
+
+    Fail-closed (returns None -> the functional-class fallback): exactly one
+    motif; the terminal N MUST be an unsubstituted -NH2 (the [NX3H2] guard) and
+    the imino N must bear only the =C and the -NH2 (no N-substituent — that is
+    the 1,1-/1,2-disubstituted-hydrazine class, N-locant machinery not built
+    here); the ylidene fragment must name via the substituent pipeline as a
+    '-yl'; and it must account for every non-core atom."""
+    from rdkit import Chem
+    mol = features.mol
+    patt = Chem.MolFromSmarts("[CX3]=[NX2][NX3H2]")
+    matches = mol.GetSubstructMatches(patt)
+    if len(matches) != 1:
+        return None
+    c, n2, n1 = matches[0]
+    # The imino N (n2) must carry ONLY the =C and the -NH2 (degree 2, no extra
+    # substituent -> not a 1,2-disubstituted hydrazine).
+    if mol.GetAtomWithIdx(n2).GetDegree() != 2:
+        return None
+    core = {n2, n1}
+    # BFS the ylidene fragment from the sp2 C, never crossing into the core.
+    frag = {c}
+    _stack = [c]
+    while _stack:
+        _i = _stack.pop()
+        for _nb in mol.GetAtomWithIdx(_i).GetNeighbors():
+            _j = _nb.GetIdx()
+            if _j not in frag and _j not in core:
+                frag.add(_j)
+                _stack.append(_j)
+    if frag | core != {a.GetIdx() for a in mol.GetAtoms()}:
+        return None
+    # The ylidene C's only bond leaving the fragment must be the =N2 (double).
+    c_atom = mol.GetAtomWithIdx(c)
+    _ext = [nb.GetIdx() for nb in c_atom.GetNeighbors()
+            if nb.GetIdx() not in frag]
+    if _ext != [n2]:
+        return None
+    from .substituent_enumerator import name_substituent
+    from .naming_utils import is_complex_substituent
+    yl = name_substituent(mol, frag, c)
+    if not yl or not yl.endswith("yl"):
+        return None
+    ylidene = f"{yl}idene"
+    if is_complex_substituent(ylidene):
+        ylidene = f"({ylidene})"
+    return f"{ylidene}hydrazine"
+
+
 def _try_name_urea(features: Any) -> Optional[str]:
     """Name urea derivatives as retained name with N-substitution.
 

@@ -42,6 +42,7 @@ def name_hydrazone(
     from ..candidate_pool import get_current_pool
     from ..composer import (
         _name_oxime_or_hydrazone, _try_name_semicarbazone,
+        _try_name_hydrazone_substitutive,
         _enrich_handler_name, _inject_stereo_if_missing,
     )
 
@@ -52,6 +53,13 @@ def name_hydrazone(
     # functional-class rebuild (which drops the carbamoyl -> a different
     # molecule). Fail-closed -> falls through to the plain hydrazone path.
     hydrazone_name = _try_name_semicarbazone(features)
+    # P-68.3.1.2.2 (W3-P15): a bare hydrazone R2C=N-NH2 -> the SUBSTITUTIVE PIN
+    # ('propylidenehydrazine'), an 'ylidene' derivative of hydrazine (method (1)
+    # = PIN), NOT the functional-class 'propanal hydrazone'. Tried after the
+    # semicarbazone builder (whose N-CO-NH2 tail its [NX3H2] guard excludes) and
+    # before the functional-class rebuild. Fail-closed -> functional-class path.
+    if not hydrazone_name:
+        hydrazone_name = _try_name_hydrazone_substitutive(features)
     if not hydrazone_name:
         hydrazone_name = _name_oxime_or_hydrazone(features, 'hydrazone')
     if not hydrazone_name:
