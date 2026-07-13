@@ -555,6 +555,15 @@ _POLYACID_PARENT = {
 _POLYACID_OXO = {"P": 1, "S": 2, "Se": 2}       # =O count that marks an acid centre
 _BRIDGE_THIO_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
 
+# Irregular retained oxoanion words (P-67.2.5.1.1) — NOT a mechanical 'ic acid'
+# -> 'ate' transform (phosphoric->phosphate, sulfuric->sulfate).
+_POLYACID_ANION_WORD = {
+    "diphosphoric acid": "diphosphate",
+    "hypodiphosphoric acid": "hypodiphosphate",
+    "disulfuric acid": "disulfate",
+    "diselenic acid": "diselenate",
+}
+
 
 def _find_polyacid_backbone(mol):
     """Detect a neutral di-nuclear noncarbon-oxoacid backbone. Return
@@ -778,6 +787,43 @@ def name_polyacid_derivative(mol) -> Optional[str]:
             return None                              # a plain parent acid -> tabled
         prefixes.sort(key=lambda t: t[0])            # alphabetical by prefix stem
         return "".join(p[1] for p in prefixes) + parent
+
+
+def name_polyacid_anion(frag_mol) -> Optional[str]:
+    """P-67.2.5.1.1: anion word for a (partially or fully) deprotonated
+    di-/polynuclear noncarbon-oxoacid whose NEUTRAL parent is a tabled polyacid.
+    Re-protonates every terminal ``-O(-)`` to ``-OH``, and iff the result is a
+    recognised di-nuclear polyacid backbone with a tabled ``...ic acid`` parent,
+    returns the anion word (``'ic acid'`` -> ``'ate'``): ``diphosphate`` /
+    ``disulfate`` / ``hypodiphosphate``.
+
+    Fail-closed (returns ``None``) for a non-anion, a mononuclear phosphate/sulfate
+    (owned by the ``INORGANIC_ANIONS`` retained table), or any backbone outside the
+    tabled polyacid set. Pure: operates on a COPY, no input mutation.
+    """
+    if frag_mol is None or Chem.GetFormalCharge(frag_mol) >= 0:
+        return None
+    rw = Chem.RWMol(frag_mol)
+    for a in rw.GetAtoms():
+        if (a.GetSymbol() == "O" and a.GetFormalCharge() == -1
+                and a.GetDegree() == 1):
+            a.SetFormalCharge(0)
+            a.SetNumExplicitHs(1)
+    try:
+        Chem.SanitizeMol(rw)
+    except Exception:
+        return None
+    if Chem.GetFormalCharge(rw) != 0:
+        return None
+    # Must be a genuine di-nuclear polyacid backbone (so mononuclear phosphate /
+    # sulfate — handled by INORGANIC_ANIONS — never reaches here).
+    if _find_polyacid_backbone(rw) is None:
+        return None
+    parent = _INORGANIC_OXOACIDS.get(Chem.MolToSmiles(rw))
+    # The oxoanion words are irregular retained forms (phosphoric->phosphate,
+    # sulfuric->sulfate), so an explicit parent-name -> anion-word map, NOT a naive
+    # 'ic acid'->'ate' string transform.
+    return _POLYACID_ANION_WORD.get(parent)
 
 
 def name_inorganic_acid(mol) -> Optional[str]:

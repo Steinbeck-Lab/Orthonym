@@ -163,17 +163,29 @@ _HYDROGEN_PREFIXES = {
 
 
 def _count_protonated_acid_sites(frag_mol) -> int:
-    """Count the number of still-protonated carboxylic acid sites (-COOH).
+    """Count the number of still-protonated acid -OH sites in a partially
+    deprotonated anion — used to insert the ``hydrogen`` / ``dihydrogen`` word in
+    an acid-salt name (IUPAC P-72.2.1 / P-67.2.5.1.2).
 
-    Only counts protonated acid groups, NOT deprotonated carboxylates.
-    Used to detect partial deprotonation for "hydrogen" prefix in salt names.
-    E.g., sodium hydrogen fumarate has 1 COOH + 1 COO-.
+    Counts protonated carboxylic acid groups (-COOH) PLUS residual oxoacid -OH on
+    a P/S/Se acid centre (a P/S/Se bearing at least one ``=O``) — the latter for
+    the di-/polynuclear noncarbon-oxoacid acid salts (``disodium dihydrogen
+    diphosphate``). Deprotonated ``-O(-)`` sites are NOT counted.
     """
     from rdkit.Chem import MolFromSmarts
+    from rdkit import Chem
+    count = 0
     acid_pat = MolFromSmarts('[CX3](=O)[OX2H1]')
     if acid_pat:
-        return len(frag_mol.GetSubstructMatches(acid_pat))
-    return 0
+        count += len(frag_mol.GetSubstructMatches(acid_pat))
+    # Residual oxoacid -OH on a P/S/Se centre carrying a =O.
+    oxoacid_oh = MolFromSmarts('[OX2H1][#15,#16,#34]=O')
+    if oxoacid_oh:
+        seen = set()
+        for m in frag_mol.GetSubstructMatches(oxoacid_oh):
+            seen.add(m[0])                           # the -OH oxygen
+        count += len(seen)
+    return count
 
 
 def normalize_imbalanced_acid_salt(smiles: str) -> Optional[str]:
@@ -346,6 +358,14 @@ def name_salt(mol, style: str = 'pin') -> str:
 
         if smiles in INORGANIC_ANIONS:
             anion_names.append(INORGANIC_ANIONS[smiles])
+            continue
+        # W3-P10 (P-67.2.5.1.1): di-/polynuclear oxoacid anion word ('diphosphate')
+        # BEFORE the generic name_anion, which would otherwise emit the neutral acid
+        # name ('diphosphoric acid') and collapse the salt to the unsupported fallback.
+        from .inorganic_acids import name_polyacid_anion
+        poly_anion = name_polyacid_anion(frag_mol)
+        if poly_anion:
+            anion_names.append(poly_anion)
             continue
         # Organic anion: chokepoint first (the sound parent decision), then the
         # legacy name_anion path on '' (retained carboxylate names etc.).
