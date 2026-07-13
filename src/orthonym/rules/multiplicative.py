@@ -828,6 +828,86 @@ def _try_group14_hydride_bridge(mol) -> Optional[str]:
     return None
 
 
+def _walk_homogeneous_chalcogen_arm(mol, start: int, bridge: int):
+    """From ``start`` (a chalcogen bonded to a central CH2 ``bridge``), walk an
+    unbranched HOMOGENEOUS chalcogen chain away from ``bridge``. Returns
+    ``(element, length, atom_idxs)`` or None. The bridge attaches at a TERMINAL
+    chalcogen (unit locant 1); every arm atom is the same chalcogen element,
+    unbranched, and bears only H besides the chain (a BARE polychalcogen arm — an
+    organyl on the arm declines, so only the bare-trisulfane methylenebis case
+    fires). Pure."""
+    element = mol.GetAtomWithIdx(start).GetSymbol()
+    idxs = []
+    prev, cur = bridge, start
+    while True:
+        atom = mol.GetAtomWithIdx(cur)
+        if atom.GetSymbol() != element or atom.GetFormalCharge() != 0:
+            return None
+        idxs.append(cur)
+        chal_nbrs = []
+        for n in atom.GetNeighbors():
+            if n.GetAtomicNum() <= 1 or n.GetIdx() == prev:
+                continue
+            if n.GetSymbol() != element:
+                return None                       # organyl / heteroatom on arm -> decline
+            bond = mol.GetBondBetweenAtoms(cur, n.GetIdx())
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            chal_nbrs.append(n.GetIdx())
+        if len(chal_nbrs) == 0:
+            break                                 # far terminus (bears only H)
+        if len(chal_nbrs) > 1:
+            return None                           # branch
+        prev, cur = cur, chal_nbrs[0]
+    return (element, len(idxs), idxs)
+
+
+def _try_methylene_bis_polychalcogen(mol) -> Optional[str]:
+    """P-68.4.1.2 (BB 39379): a central -CH2- linking two IDENTICAL homogeneous
+    chalcogen-chain parent hydrides (n>=3) at their terminal chalcogen ->
+    ``1,1'-methylenebis(trisulfane)`` (HS-S-S-CH2-S-S-SH). Sibling of
+    _try_group14_hydride_bridge; the divalent central 'methylene' is P-29.3.2.2.
+
+    Fail-closed: a single neutral non-ring CH2 whose two heavy neighbours are both
+    chalcogens, each beginning an identical BARE homogeneous chalcogen chain of
+    n>=3 (the >=3 gate keeps sulfides/disulfides out, mirroring polychalcogen), the
+    whole molecule being exactly the CH2 + both arms. Pure: no mol mutation."""
+    from .polychalcogen import _CHALCOGEN_STEMS, _MULTIPLIER
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C' or atom.GetTotalNumHs() != 2 or atom.IsInRing():
+            continue
+        heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy) != 2 or any(n.GetSymbol() not in _CHALCOGEN_STEMS
+                                  for n in heavy):
+            continue
+        arm_a = _walk_homogeneous_chalcogen_arm(mol, heavy[0].GetIdx(),
+                                                atom.GetIdx())
+        arm_b = _walk_homogeneous_chalcogen_arm(mol, heavy[1].GetIdx(),
+                                                atom.GetIdx())
+        if arm_a is None or arm_b is None:
+            continue
+        (e1, n1, s1), (e2, n2, s2) = arm_a, arm_b
+        if e1 != e2 or n1 != n2 or n1 < 3:
+            continue
+        covered = {atom.GetIdx()} | set(s1) | set(s2)
+        if any(a.GetIdx() not in covered
+               for a in mol.GetAtoms() if a.GetAtomicNum() > 1):
+            continue
+        stem = _CHALCOGEN_STEMS.get(e1)
+        mult = _MULTIPLIER.get(n1)
+        if stem is None or mult is None:
+            continue
+        return f"1,1'-methylenebis({mult}{stem})"
+    return None
+
+
 def _try_azanediyl_methylene_phosphonic(mol) -> Optional[str]:
     """P-15.3.1.2.2.1 Note: OP(=O)(O)CNCP(=O)(O)O ->
     [azanediylbis(methylene)]bis(phosphonic acid) (BB verbatim — the
@@ -1304,6 +1384,12 @@ def name_multiplicative(mol) -> Optional[str]:
     # CH2 joining two Group-14 catenated hydrides (Wave2 completion,
     # P-15.3.1.1(b)): 1,1'-methylenebis(disilane).
     result = _try_group14_hydride_bridge(mol)
+    if result is not None:
+        return result
+
+    # CH2 joining two identical homogeneous chalcogen-chain parent hydrides
+    # (W3-P14, P-68.4.1.2): 1,1'-methylenebis(trisulfane).
+    result = _try_methylene_bis_polychalcogen(mol)
     if result is not None:
         return result
 
