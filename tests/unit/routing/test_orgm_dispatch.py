@@ -150,6 +150,12 @@ class TestOrgmDispatch:
             # CP=N -> 1-methylphosphanimine), HYDRO_FUSED_PEROXOL@49.6 (W2E-P1FG),
             # THIOIMIDE@49.7 (W2E-D3: CC(=S)NC(C)=S ->
             # N-(ethanethioyl)ethanethioamide) — all < 50, all mutually decline).
+            # (Wave-3 additions to the sub-50 interceptor set: FREE_HOMONUCLEAR_
+            # G14_HYDRIDE@47.7 (disilane/digermene), CYCLIC_POLYESTER@49.8
+            # (glycolide -> 1,4-dioxane-2,5-dione), and W3-P13 POLYCHALCOGEN_OXIDE
+            # @46.5 (...disulfane-1,2-dione) + LAMBDA_SULFANE_IMINE_OXIDE@48.75
+            # (S,S-diethyl-N-phenyl-lambda4-sulfanimine) — all < 50, all mutually
+            # decline.)
             if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE,
                        StoutClass.CHALCOGEN_CHAIN, StoutClass.POLYAZANE,
                        StoutClass.CATENATED_HYDRIDE, StoutClass.DINUCLEAR_HYDRIDE,
@@ -157,7 +163,11 @@ class TestOrgmDispatch:
                        StoutClass.AZINIC_DERIVATIVE, StoutClass.HETERONE,
                        StoutClass.SULFINE, StoutClass.PSEUDOKETONE_HETERO,
                        StoutClass.HETEROIMINE, StoutClass.HYDRO_FUSED_PEROXOL,
-                       StoutClass.THIOIMIDE):
+                       StoutClass.THIOIMIDE,
+                       StoutClass.FREE_HOMONUCLEAR_G14_HYDRIDE,
+                       StoutClass.CYCLIC_POLYESTER,
+                       StoutClass.POLYCHALCOGEN_OXIDE,
+                       StoutClass.LAMBDA_SULFANE_IMINE_OXIDE):
                 continue
             assert orgm_prio < entry.priority, (
                 f"ORGM@{orgm_prio} not lower than {cls.name}@{entry.priority}; "

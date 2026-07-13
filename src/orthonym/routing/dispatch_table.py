@@ -136,6 +136,8 @@ class StoutClass(_StrEnumBase):
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
     PSEUDOKETONE_HETERO = "pseudoketone_hetero"      # Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2 1-silylethan-1-one; priority 48.6)
     HETEROIMINE = "heteroimine"                      # W2E-P1FG (P-62.3.1.3 X=NH -> 1-methylphosphanimine; priority 48.7)
+    LAMBDA_SULFANE_IMINE_OXIDE = "lambda_sulfane_imine_oxide"  # W3-P13 (P-68.4.3.3-.8 mononuclear S/Se/Te imine/oxide: sulfimide/sulfoximide/sulfonediimine/sulfur di-/tri-imide; priority 48.75 — after HETEROIMINE@48.7, before KETENE@49)
+    POLYCHALCOGEN_OXIDE = "polychalcogen_oxide"      # W3-P13 (P-68.4.3.2 di-/polysulfoxide-sulfone: CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione; priority 46.5 — after CHALCOGEN_CHAIN@46, before POLYAZANE@47)
     CATENATED_HYDRIDE = "catenated_hydride"          # Wave-2 completion (P-21.2.3/P-52.1.3 disiloxane/trisiloxane/disilazane; priority 47.5 — after CHALCOGEN_CHAIN@46/POLYAZANE@47, before ORGM@50)
     INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
     NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
@@ -1123,6 +1125,24 @@ def _handle_chalcogen_chain(mol, smiles, canonical_smiles, features=None, **kwar
     return name_chalcogen_chain(mol)
 
 
+def _is_polychalcogen_oxide(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """W3-P13 (P-68.4.3.2); priority 46.5. A di-/polysulfoxide-sulfone: a chain
+    of >=2 identical S/Se/Te (each lambda4/lambda6) every one bearing >=1 =O
+    (CH3-S(=O)-S(=O)-CH3 -> ...disulfane-1,2-dione). PURE graph classifier,
+    fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.polychalcogen import name_polysulfoxide_sulfone
+    return name_polysulfoxide_sulfone(mol) is not None
+
+
+def _handle_polychalcogen_oxide(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    """Return the di-/polysulfoxide-sulfone PIN (P-68.4.3.2), else None
+    (cascade-continuation)."""
+    from orthonym.rules.polychalcogen import name_polysulfoxide_sulfone
+    return name_polysulfoxide_sulfone(mol)
+
+
 def _is_polyazane(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """v23 Phase 7 (P-68.3.1.1/.3); priority 47. A polyazane-family parent hydride
     (hydrazine/diazene/triazane/azo). PURE graph classifier, fail-closed."""
@@ -1258,6 +1278,24 @@ def _handle_heteroimine(mol, smiles, canonical_smiles, features=None,
                         **kwargs) -> Optional[str]:
     from orthonym.rules.mononuclear_hydrides import name_heteroimine
     return name_heteroimine(mol)
+
+
+def _is_lambda_sulfane_imine_oxide(mol, smiles, canonical_smiles, features=None,
+                                   **kwargs) -> bool:
+    """W3-P13 (P-68.4.3.3-.8); priority 48.75. Mononuclear S/Se/Te hub of
+    non-standard valence bearing >=1 imine (=N-H/=N-R) plus optional =O and
+    organyls: sulfimide/sulfoximide/sulfonediimine/sulfur di-/tri-imide
+    (S,S-diethyl-N-phenyl-lambda4-sulfanimine). PURE graph classifier."""
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_lambda_sulfane_imine_oxide
+    return name_lambda_sulfane_imine_oxide(mol) is not None
+
+
+def _handle_lambda_sulfane_imine_oxide(mol, smiles, canonical_smiles, features=None,
+                                       **kwargs) -> Optional[str]:
+    from orthonym.rules.mononuclear_hydrides import name_lambda_sulfane_imine_oxide
+    return name_lambda_sulfane_imine_oxide(mol)
 
 
 def _is_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
@@ -1428,6 +1466,24 @@ _register_dispatch(
 )
 
 
+# --- W3-P13: POLYCHALCOGEN_OXIDE at priority 46.5 (after CHALCOGEN_CHAIN@46, ---
+# before POLYAZANE@47). A di-/polysulfoxide-sulfone (P-68.4.3.2): a chain of >=2
+# identical S/Se/Te (each lambda4/lambda6) every one bearing >=1 =O, named by
+# adding '-one' to the lambda-<multiplier>sulfane parent — CH3-S(=O)-S(=O)-CH3 ->
+# 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione ('unknown' before this).
+# CHALCOGEN_CHAIN@46 already declines it (the =O makes O a non-chain heteroatom),
+# and the single-S sulfoxide/sulfone (n=1) stays with the P-63.6 sulfur handler.
+# Graph classifier, fail-closed; cascade-continuation on None per D-02. ---
+_register_dispatch(
+    class_id=StoutClass.POLYCHALCOGEN_OXIDE, priority=46.5, tier=1,
+    predicate=_is_polychalcogen_oxide, handler=_handle_polychalcogen_oxide,
+    iupac_section="Blue Book P-68.4.3.2",
+    description="Di-/polysulfoxide-sulfone chain named on the lambda-disulfane "
+                "parent (1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione); "
+                "graph classifier, fail-closed",
+)
+
+
 # --- v23 Phase 7: POLYAZANE at priority 47 (after CHALCOGEN_CHAIN@46). ---
 # The polyazane parent-hydride family (P-68.3.1.1 / P-68.3.1.3): NN -> hydrazine,
 # N=N -> diazene, NNN -> triazane, N=NN -> triaz-1-ene, CN=NC -> 1,2-dimethyldiazene,
@@ -1530,6 +1586,25 @@ _register_dispatch(
     iupac_section="Blue Book P-62.3.1.3",
     description="Heteroatom imine X=NH on a P/As/Si mononuclear hub "
                 "(1-methylphosphanimine); graph classifier, fail-closed",
+)
+# --- W3-P13: LAMBDA_SULFANE_IMINE_OXIDE at priority 48.75 (after HETEROIMINE@48.7,
+# before KETENE@49). The mononuclear lambda-sulfane imine/oxide family
+# (P-68.4.3.3-.8): a single non-ring S/Se/Te hub of non-standard valence bearing
+# >=1 imine (=N-H/=N-R) plus optional =O and organyls — sulfimide / sulfonediimine
+# / sulfoximide / sulfur di-/tri-imide. =O outranks =N (P-41): oxo -> -one/-dione
+# suffix + (R-imino) prefix; imine-only -> -imine/-diimine/-triimine suffix. All
+# 'unknown' before this; the earlier chalcogen/imine handlers (heterone@48.4,
+# sulfine@48.5, heteroimine@48.7) all decline these (no S hub / wrong degree).
+# Graph classifier, fail-closed; cascade-continuation on None per D-02. ---
+_register_dispatch(
+    class_id=StoutClass.LAMBDA_SULFANE_IMINE_OXIDE, priority=48.75, tier=1,
+    predicate=_is_lambda_sulfane_imine_oxide,
+    handler=_handle_lambda_sulfane_imine_oxide,
+    iupac_section="Blue Book P-68.4.3.3 / .4 / .5 / .6 / .7 / .8",
+    description="Mononuclear lambda-sulfane imine/oxide (S,S-diethyl-N-phenyl-"
+                "lambda4-sulfanimine / diphenyl-lambda6-sulfanediimine / "
+                "dimethyl(phenylimino)-lambda6-sulfanone); graph classifier, "
+                "fail-closed",
 )
 
 # --- Wave-2 completion: KETENE at priority 49 (after DINUCLEAR_HYDRIDE@48, ---

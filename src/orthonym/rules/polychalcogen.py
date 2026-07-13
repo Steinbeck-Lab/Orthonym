@@ -208,4 +208,159 @@ def name_chalcogen_chain(mol) -> Optional[str]:
     return f"{_format_substituents(subs, n)}{base}"
 
 
-__all__ = ["name_chalcogen_chain"]
+# Chain-element stems for the polysulfoxide/sulfone family (P-68.4.3.2). Oxygen
+# is EXCLUDED as a chain element — an O-O chain is a peroxide, not a chain of
+# oxo-bearing chalcogens; here O appears only as the terminal =O (oxo) group.
+_POLYSO_CHAIN_STEMS = {'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane'}
+_ONE_SUFFIX_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetr', 5: 'penta', 6: 'hexa'}
+
+
+def name_polysulfoxide_sulfone(mol) -> Optional[str]:
+    """P-68.4.3.2 di-/polysulfoxides, polysulfones and their Se/Te analogues:
+    a chain of >=2 IDENTICAL chalcogen atoms E in {S, Se, Te} (each of
+    non-standard valence lambda4 / lambda6) singly bonded end-to-end, every chain
+    atom bearing at least one terminal ``=O`` (oxo) and optionally organyl
+    groups. Named substitutively by adding the ``-one`` suffix to the
+    lambda-<multiplier><stem> parent hydride (method (1), the PIN)::
+
+        CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione
+        CH3CH2-SO2-SO2-CH3  -> 1-ethyl-2-methyl-1lambda6,2lambda6-disulfane-1,1,2,2-tetrone
+
+    Each lambda4 centre contributes one oxo (one ``one`` at its locant); each
+    lambda6 centre contributes two. The molecule orientation is chosen for lowest
+    locants to the lambda set (higher bonding number first on a tie), then to the
+    oxo suffix, then to the substituents.
+
+    SCOPE (fail-closed, accuracy-first — a graph classifier, NOT a SMARTS
+    broadening): exactly one chain element (S/Se/Te), a simple linear chain of
+    >=2 of them, every chain atom lambda4/lambda6 with >=1 oxo, every non-chain
+    non-oxo neighbour a pure-hydrocarbyl organyl, neutral, non-radical, single
+    fragment, no ring. A single-S sulfoxide/sulfone (n=1 -> P-63.6 sulfur
+    handler), a bare polysulfane (no oxo -> P-21.2.2 chalcogen-chain), a
+    hetero-chain, a stray heteroatom, an ion, a radical or a ring all fail a
+    guard and cascade onward. Pure: no mol mutation.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    # Exactly one chain element among S/Se/Te (O excluded — it is the oxo group).
+    chain_elems = {a.GetSymbol() for a in mol.GetAtoms()
+                   if a.GetSymbol() in _POLYSO_CHAIN_STEMS}
+    if len(chain_elems) != 1:
+        return None
+    element = next(iter(chain_elems))
+
+    # Every heavy atom is the chain element, an oxo O, or an organyl carbon.
+    if any(a.GetSymbol() not in (element, 'O', 'C')
+           for a in mol.GetAtoms() if a.GetSymbol() != 'H'):
+        return None
+
+    chain = _chalcogen_chain(mol, element)
+    if chain is None or len(chain) < 2:
+        return None
+    n = len(chain)
+    chain_set = set(chain)
+
+    lam_by_pos: dict = {}
+    oxo_by_pos: dict = {}
+    sub_by_pos: dict = {}
+    oxo_idxs = set()
+    for pos, idx in enumerate(chain):
+        atom = mol.GetAtomWithIdx(idx)
+        lam = nonstandard_bonding_number(mol, idx)
+        if lam not in (4, 6):
+            return None
+        n_oxo = 0
+        organyls: List[str] = []
+        for b in atom.GetBonds():
+            nbr = b.GetOtherAtom(atom)
+            if nbr.GetIdx() in chain_set:
+                if b.GetBondType() != Chem.BondType.SINGLE:
+                    return None  # chain bond must be single
+                continue
+            sym = nbr.GetSymbol()
+            bt = b.GetBondType()
+            if (sym == 'O' and bt == Chem.BondType.DOUBLE
+                    and nbr.GetDegree() == 1 and nbr.GetTotalNumHs() == 0):
+                n_oxo += 1
+                oxo_idxs.add(nbr.GetIdx())
+            elif sym == 'C' and bt == Chem.BondType.SINGLE:
+                name = pure_organyl_prefix_name(mol, nbr.GetIdx(), idx)
+                if name is None:
+                    return None
+                organyls.append(name)
+            else:
+                return None
+        if n_oxo < 1:
+            return None  # a bare -S- in the chain -> not a polysulfoxide/sulfone
+        lam_by_pos[pos] = lam
+        oxo_by_pos[pos] = n_oxo
+        sub_by_pos[pos] = organyls
+
+    # Coverage: every heavy atom is a chain atom, a counted oxo O, or an organyl C.
+    for a in mol.GetAtoms():
+        if a.GetSymbol() in ('H', 'C') or a.GetIdx() in chain_set \
+                or a.GetIdx() in oxo_idxs:
+            continue
+        return None
+
+    def locant(pos, flip):
+        return (n - 1 - pos) + 1 if flip else pos + 1
+
+    def descriptor(flip):
+        lam_key = sorted((locant(p, flip), -lam_by_pos[p]) for p in lam_by_pos)
+        oxo_key = sorted(locant(p, flip)
+                         for p in oxo_by_pos for _ in range(oxo_by_pos[p]))
+        sub_key = sorted(locant(p, flip)
+                         for p in sub_by_pos for _ in sub_by_pos[p])
+        return (lam_key, oxo_key, sub_key)
+
+    flip = descriptor(True) < descriptor(False)
+
+    stem = _POLYSO_CHAIN_STEMS[element]
+    base = f"{_MULTIPLIER[n]}{stem}" if n in _MULTIPLIER else None
+    if base is None:
+        return None
+
+    # lambda block: cite each chain atom's locant + lambda in ascending locant.
+    lam_tokens = [format_lambda_token(locant(p, flip), lam_by_pos[p])
+                  for p in sorted(lam_by_pos, key=lambda p: locant(p, flip))]
+    lam_block = ','.join(lam_tokens)
+
+    # oxo (-one) suffix: one 'one' per oxo, cited with its locant.
+    oxo_locs = sorted(locant(p, flip)
+                      for p in oxo_by_pos for _ in range(oxo_by_pos[p]))
+    total_oxo = len(oxo_locs)
+    one_mult = _ONE_SUFFIX_MULT.get(total_oxo)
+    if one_mult is None:
+        return None
+    oxo_suffix = f"-{','.join(str(l) for l in oxo_locs)}-{one_mult}one"
+
+    # substituent block (alphanumeric by name, each with ascending locants).
+    by_name: dict = {}
+    for pos, names in sub_by_pos.items():
+        for nm in names:
+            by_name.setdefault(nm, []).append(locant(pos, flip))
+    sub_parts = []
+    for nm in sorted(by_name):
+        locs = sorted(by_name[nm])
+        mult = _SUB_MULTIPLIER.get(len(locs))
+        if mult is None:
+            return None
+        sub_parts.append((min(locs),
+                          f"{','.join(str(l) for l in locs)}-{mult}{nm}"))
+    sub_parts.sort()
+    sub_block = ''.join(p[1] for p in sub_parts)
+
+    core = f"{lam_block}-{base}{oxo_suffix}"
+    return f"{sub_block}-{core}" if sub_block else core
+
+
+__all__ = ["name_chalcogen_chain", "name_polysulfoxide_sulfone"]

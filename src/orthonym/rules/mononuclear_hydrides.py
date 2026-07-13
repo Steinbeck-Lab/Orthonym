@@ -604,6 +604,237 @@ def name_heteroimine(mol) -> Optional[str]:
     return f"1-{organyls[0]}{stem}imine"
 
 
+_LAMBDA_IMINE_OXIDE_HUBS = {'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane'}
+# Suffix multipliers for the -one / -imine char-group suffix (P-16.3.4).
+_IO_SUFFIX_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetr'}
+# Prefix multipliers (di/tri) for substituent + imino prefixes.
+_IO_PREFIX_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+
+
+def _apply_hydride_suffix(stem: str, suffix: str) -> str:
+    """Attach a suffix to a parent-hydride stem, eliding the stem's terminal 'e'
+    before a vowel-initial suffix (P-16.3.3): sulfane+one -> sulfanone,
+    sulfane+imine -> sulfanimine, but sulfane+dione -> sulfanedione (consonant)."""
+    if suffix and suffix[0] in 'aeiouy' and stem.endswith('e'):
+        return stem[:-1] + suffix
+    return stem + suffix
+
+
+def _compose_io_prefixes(items) -> Optional[str]:
+    """Build the alphanumerically-ordered detachable-prefix block for the
+    lambda-sulfane imine/oxide family, per P-16.3.3 (a compound/complex prefix
+    such as ``methylimino`` is ALWAYS enclosed) + P-16.5.1.3 (for a mononuclear
+    parent hydride the FIRST cited group takes no marks and each subsequent group
+    is enclosed).
+
+    ``items`` is a list of ``(name, is_complex)`` tuples. Returns the composed
+    string, or None if a multiplicity exceeds the supported table.
+
+        [('methylimino', True)]                       -> '(methylimino)'
+        [('methyl',False),('methyl',False),('phenylimino',True)]
+                                                       -> 'dimethyl(phenylimino)'
+        [('phenyl',False),('phenyl',False)]           -> 'diphenyl'
+        [('ethyl',False),('methyl',False)]            -> 'ethyl(methyl)'
+    """
+    from collections import Counter
+    names = [n for n, _ in items]
+    complex_names = {n for n, c in items if c}
+    counts = Counter(names)
+    parts = []
+    for i, name in enumerate(sorted(counts)):
+        mult = _IO_PREFIX_MULT.get(counts[name])
+        if mult is None:
+            return None
+        needs_marks = (i > 0) or (name in complex_names)
+        frag = f"{mult}{name}"
+        parts.append(f"({frag})" if needs_marks else frag)
+    return ''.join(parts)
+
+
+def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:
+    """P-68.4.3.3 / .4 / .5 / .6 / .7 / .8: the mononuclear lambda-sulfane
+    imine/oxide family — a single non-ring chalcogen hub E in {S, Se, Te} of
+    non-standard valence (lambda4 / lambda6) bearing any combination of
+
+      * single-bonded organyl groups (S-substituents),
+      * terminal ``=O`` (oxo), and
+      * ``=N-H`` / ``=N-R`` imine groups,
+
+    with AT LEAST ONE imine (a pure sulfoxide/sulfone with no imine stays with
+    the P-63.6 sulfur handler). Seniority (P-41): ``=O`` outranks ``=N``, so when
+    ANY oxo is present it is the principal characteristic group (``-one``/
+    ``-dione`` suffix) and every imine becomes an ``(R-imino)`` prefix; when NO
+    oxo is present the imines are the suffix (``-imine``/``-diimine``/
+    ``-triimine``)::
+
+        (C2H5)2S=N-C6H5      -> S,S-diethyl-N-phenyl-lambda4-sulfanimine  (.3)
+        CH3-N=S(=O)2         -> (methylimino)-lambda6-sulfanedione        (.4)
+        (C6H5)2S(=NH)2       -> diphenyl-lambda6-sulfanediimine           (.5)
+        (CH3)2S(=O)=N-C6H5   -> dimethyl(phenylimino)-lambda6-sulfanone   (.6)
+        CH3-N=S=N-CH2CH3     -> ethyl(methyl)-lambda4-sulfanediimine      (.7)
+        CH3-N=S(=NCH3)=NC6H5 -> dimethyl(phenyl)-lambda6-sulfanetriimine  (.8)
+
+    Italic element locants (``S,S-`` / ``N-``) are cited ONLY when substituents
+    sit on BOTH the hub AND an imine nitrogen (P-68.4.3.3 example); when all
+    substituents live on one kind of atom the italic locants are unnecessary and
+    omitted (the other five examples). Every emitted name round-trips through
+    OPSIN 2.9.0.
+
+    SCOPE (fail-closed, accuracy-first — a graph classifier, NOT a SMARTS
+    broadening): exactly one S/Se/Te hub, not in a ring, neutral, non-radical,
+    single fragment, hub valence non-standard, >=1 imine, and every hub
+    neighbour is a pure-hydrocarbyl organyl (single bond), a terminal =O, or an
+    =N with at most one pure-hydrocarbyl substituent. A non-hydrocarbyl N/S
+    substituent (which would create a SENIOR parent, P-68.4.3.3 note), a
+    single-bonded heteroatom on the hub, a standard-valence hub, or the
+    both-substituted-with-multiple-imine-N combination all fail a guard and
+    cascade onward — zero false positives. Pure: no mol mutation.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    hubs = [a for a in mol.GetAtoms() if a.GetSymbol() in _LAMBDA_IMINE_OXIDE_HUBS]
+    if len(hubs) != 1:
+        return None
+    hub = hubs[0]
+    if hub.IsInRing():
+        return None
+    hub_idx = hub.GetIdx()
+    lam = nonstandard_bonding_number(mol, hub_idx)
+    if lam is None:
+        return None  # standard-valence chalcogen (a sulfide/sulfoxide) — decline
+
+    oxo_atoms = []       # terminal =O
+    imine_ns = []        # =N (=NH or =N-R)
+    s_organyls = []      # single-bonded organyl prefix names on the hub
+    for b in hub.GetBonds():
+        nbr = b.GetOtherAtom(hub)
+        sym = nbr.GetSymbol()
+        bt = b.GetBondType()
+        if bt == Chem.BondType.DOUBLE:
+            if sym == 'O':
+                if nbr.GetDegree() != 1 or nbr.GetTotalNumHs() != 0:
+                    return None
+                oxo_atoms.append(nbr)
+            elif sym == 'N':
+                imine_ns.append(nbr)
+            else:
+                return None  # =C (sulfine) / =S etc. — not this family
+        elif bt == Chem.BondType.SINGLE:
+            if sym != 'C':
+                return None  # single-bonded heteroatom on hub — not this family
+            name = pure_organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+            if name is None:
+                return None
+            s_organyls.append(name)
+        else:
+            return None  # triple / aromatic bond on hub
+
+    if not imine_ns:
+        return None  # pure sulfoxide/sulfone — P-63.6 sulfur handler owns it
+
+    # Validate each imine N: double-bonded to the hub only, at most one pure-
+    # hydrocarbyl substituent (a non-hydrocarbyl N-substituent would create a
+    # senior parent — P-68.4.3.3 note — so fail closed).
+    n_substituents = []
+    for n in imine_ns:
+        if n.GetFormalCharge() != 0 or n.IsInRing():
+            return None
+        for nb in n.GetBonds():
+            if nb.GetOtherAtom(n).GetIdx() == hub_idx:
+                continue
+            if nb.GetBondType() != Chem.BondType.SINGLE:
+                return None  # N=X (X != hub) — cumulated/azo — not this family
+        heavy_other = [x for x in n.GetNeighbors()
+                       if x.GetIdx() != hub_idx and x.GetSymbol() != 'H']
+        if not heavy_other:
+            if n.GetDegree() != 1:
+                return None  # =N- with no organyl but degree>1 — malformed
+            continue         # =NH
+        if len(heavy_other) != 1 or heavy_other[0].GetSymbol() != 'C':
+            return None
+        name = pure_organyl_prefix_name(mol, heavy_other[0].GetIdx(), n.GetIdx())
+        if name is None:
+            return None
+        n_substituents.append(name)
+
+    # Full coverage: every heavy atom is the hub, a counted oxo O, an imine N, or
+    # a carbon inside a verified organyl (any stray heteroatom -> fail closed).
+    allowed = {hub_idx}
+    allowed |= {a.GetIdx() for a in oxo_atoms}
+    allowed |= {a.GetIdx() for a in imine_ns}
+    for a in mol.GetAtoms():
+        if a.GetSymbol() in ('H', 'C') or a.GetIdx() in allowed:
+            continue
+        return None
+
+    stem = _LAMBDA_IMINE_OXIDE_HUBS[hub.GetSymbol()]
+    o = len(oxo_atoms)
+    i = len(imine_ns)
+
+    if o >= 1:
+        # P-41: =O is the principal characteristic group -> -one suffix; every
+        # imine becomes an (R-imino) prefix. S-organyls are plain prefixes.
+        suffix_mult = _IO_SUFFIX_MULT.get(o)
+        if suffix_mult is None:
+            return None
+        suffix = f"{suffix_mult}one"
+        items = [(nm, False) for nm in s_organyls]
+        for nm in n_substituents:
+            items.append((f"{nm}imino", True))
+        # An unsubstituted =NH alongside oxo would be a plain 'imino' prefix.
+        for _ in range(i - len(n_substituents)):
+            items.append(('imino', False))
+        prefix_block = _compose_io_prefixes(items)
+        if prefix_block is None:
+            return None
+        return _assemble(prefix_block, lam, _apply_hydride_suffix(stem, suffix))
+
+    # o == 0, i >= 1: the imines are the principal characteristic group.
+    suffix_mult = _IO_SUFFIX_MULT.get(i)
+    if suffix_mult is None:
+        return None
+    suffix = f"{suffix_mult}imine"
+    stem_suffix = _apply_hydride_suffix(stem, suffix)
+
+    both_substituted = bool(s_organyls) and bool(n_substituents)
+    if both_substituted:
+        # Element locants needed to distinguish hub- from N-substituents
+        # (P-68.4.3.3). Priming for >1 substituted imine N is not built here —
+        # fail closed (accuracy-first) rather than emit an unverified primed name.
+        if len(n_substituents) > 1:
+            return None
+        from collections import Counter
+        loc_by_name: dict = {}
+        for nm in s_organyls:
+            loc_by_name.setdefault(nm, []).append('S')
+        for nm in n_substituents:
+            loc_by_name.setdefault(nm, []).append('N')
+        parts = []
+        for nm in sorted(loc_by_name):
+            locs = loc_by_name[nm]
+            # italic element locants ordered N < S (alphabetical).
+            locs_sorted = sorted(locs)
+            mult = _IO_PREFIX_MULT.get(len(locs))
+            if mult is None:
+                return None
+            parts.append(f"{','.join(locs_sorted)}-{mult}{nm}")
+        prefix_block = '-'.join(parts)
+        return _assemble(prefix_block, lam, stem_suffix)
+
+    # All substituents on one kind of atom (or none): plain alphanumeric prefixes.
+    items = [(nm, False) for nm in s_organyls] + [(nm, False) for nm in n_substituents]
+    prefix_block = _compose_io_prefixes(items) if items else ''
+    if prefix_block is None:
+        return None
+    return _assemble(prefix_block, lam, stem_suffix)
+
+
 def name_sulfine(mol) -> Optional[str]:
     """P-64.4.2 acyclic thiocarbonyl S-oxides (Wave-2 completion C):
     CH3-CH2-CH=S=O -> propylidene-lambda4-sulfanone (BB verbatim). The S has
@@ -732,4 +963,5 @@ def name_dinuclear_hydride(mol) -> Optional[str]:
             f"{_GROUP15_HYDRIDE_PARENT[parent_atom.GetSymbol()]}")
 
 
-__all__ = ["name_mononuclear_hydride", "name_dinuclear_hydride"]
+__all__ = ["name_mononuclear_hydride", "name_dinuclear_hydride",
+           "name_lambda_sulfane_imine_oxide"]
