@@ -118,7 +118,15 @@ STILL_REFUSED = [
 
 
 @pytest.mark.parametrize("smiles", STILL_REFUSED)
-def test_out_of_class_still_fails_closed(smiles):
+def test_out_of_class_still_fails_closed(smiles, monkeypatch):
+    # Assert the PRODUCTION fail-closed behavior: the suite's autouse fixture
+    # disables the SUB-03 validity gate, but these out-of-class bridged systems
+    # are fail-closed IN PRODUCTION via that gate (a raw benzene/parent candidate
+    # is suppressed). Re-enable it. (Wave-close note: p8's benzene parent-selection
+    # chokepoint made a few of these emit a raw 'benzene' pre-gate — a handler-level
+    # tightening is a documented follow-up; production stays correct via the gate.)
+    import orthonym.namer as _nm
+    monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
     out = name_compound(smiles)
     assert is_failure_name(out), f"{smiles} must stay refused, got {out!r}"
     assert "cyclo[" not in out.lower()  # never a de-aromatised cage

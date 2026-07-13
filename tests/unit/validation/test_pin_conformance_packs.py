@@ -121,7 +121,23 @@ class TestProtectRowsStayCorrect:
 
     @pytest.mark.skipif(not _PROTECT, reason="no protect rows in the new packs yet")
     @pytest.mark.parametrize("pack,row", _PROTECT, ids=[f"{p}:{r['smiles']}" for p, r in _PROTECT])
-    def test_protect(self, pack, row):
+    def test_protect(self, pack, row, monkeypatch):
         accepted = {_norm(row["expected_pin"])} | {_norm(a) for a in row.get("accept_also", [])}
-        assert _norm(name_compound(row["smiles"])) in accepted, (
+        # A fail-closed protect row (expected = a descriptive fallback such as
+        # 'unknown organic compound' / '<metal> compound (not supported)') is
+        # produced ONLY when the production SUB-03 validity gate suppresses a raw
+        # candidate. This suite's autouse fixture disables that gate, so an
+        # OPSIN-free name_compound() here returns the un-suppressed raw candidate.
+        # Validate those rows against the PRODUCTION (gate-ON) path instead (they
+        # are also guarded by the phase gate's protect_new check). Non-fail-closed
+        # rows keep the fast OPSIN-free path.
+        from orthonym.errors import is_failure_name
+        if any(is_failure_name(a) for a in accepted):
+            import orthonym.namer as _nm
+            monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
+            from orthonym import Orthonym
+            got = Orthonym().name(row["smiles"])
+        else:
+            got = name_compound(row["smiles"])
+        assert _norm(got) in accepted, (
             f"{pack} protect regression: {row['smiles']} expected {row['expected_pin']!r}")

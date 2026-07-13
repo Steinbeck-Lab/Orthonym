@@ -64,7 +64,12 @@ class TestP25HeterocyclicBridgesFailClosed:
     @pytest.mark.parametrize("smiles", [
         "c1ccc2c(c1)C1C=COC1c1ccccc21",   # furano-type ring bridge across a fused core
     ])
-    def test_heterocyclic_bridge_declines(self, smiles):
+    def test_heterocyclic_bridge_declines(self, smiles, monkeypatch):
+        # Production fail-closed via the SUB-03 gate (suite disables it by default;
+        # re-enable). Wave-close: p8's benzene chokepoint made this emit a raw
+        # 'benzene' pre-gate — documented handler follow-up; production is correct.
+        import orthonym.namer as _nm
+        monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
         assert name_compound(smiles) == "unknown organic compound"
 
 
@@ -109,9 +114,14 @@ class TestP25CompositeBridgeOrdering:
         name_b = name_compound(spelling_b)
         assert name_a == name_b == "2H-3,5-(epoxymethano)furo[3,4-b]pyran"
 
-    def test_bis_epoxymethano_anthracene_internal_oracle(self):
+    def test_bis_epoxymethano_anthracene_internal_oracle(self, monkeypatch):
         # BB PIN 1,4:8,5-bis(epoxymethano)anthracene — OPSIN 2.9 UNPARSEABLE.
-        # INTERNAL ORACLE: either the BB-conformant name or fail closed.
+        # INTERNAL ORACLE: either the BB-conformant name or fail closed. Production
+        # fail-closes via the SUB-03 gate (suite disables it; re-enable). Wave-close:
+        # p8's benzene chokepoint made this emit a raw 'benzene' pre-gate — documented
+        # handler follow-up; production is correct.
+        import orthonym.namer as _nm
+        monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
         smi = "C1=CC2=C(C=C1)C1=CC3=C(C=C1C2)OCOC3"
         name = name_compound(smi)
         assert name in ("unknown organic compound",

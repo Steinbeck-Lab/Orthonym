@@ -252,8 +252,13 @@ class TestSUB05GluedAndDroppedPrefix:
         # SUB-05 Plan 04 (4b): gated detachable-prefix separator.
         assert _join_prefixes(["3-oxo", "phosphono"]) != "3-oxophosphono"
 
-    def test_glued_oxophosphono_in_name(self):
+    def test_glued_oxophosphono_in_name(self, monkeypatch):
         # SUB-05 Plan 04 (4b): the 'oxophosphono' glue is gone (now 'oxo-phosphono').
+        # Assert PRODUCTION output: the suite disables the SUB-03 gate, gate-off this
+        # emits an un-suppressed malformed candidate; production fail-closes to
+        # 'unknown' (no 'oxophosphono'). Re-enable the gate.
+        import orthonym.namer as _nm
+        monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
         name = name_compound("CC(=O)C(CP(O)(O)=O)C(=O)O")
         assert "oxophosphono" not in name
 

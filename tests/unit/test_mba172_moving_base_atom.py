@@ -81,13 +81,13 @@ def test_mba01_suffix_chain_math_locked(namer, smiles, expected):
 
 # --- MBA-01 (SECONDARY) — ester carbon-absorption (WS-C). Armed/disarmed at ship. ---
 
-@pytest.mark.unit
-@pytest.mark.xfail(
-    strict=True,
-    reason="MBA-01 WS-C (172): ester carbonyl-carbon absorption -> 4-ethoxy-4-oxobutanoic acid. "
-           "If WS-C lands, this XPASSES (strict) -> remove the marker; if deferred, it stays a tripwire.",
-)
-def test_mba01_ester_carbon_absorption(namer):
+@pytest.mark.unit  # WS-C LANDED via w2f p2 (P-65.6.3.3.5 substitutive partial-ester split);
+# the xfail(strict) marker was removed per its own note ("if WS-C lands, remove the marker").
+def test_mba01_ester_carbon_absorption(namer, monkeypatch):
     # monoethyl succinate: ester C absorbed into the 4-C acid chain -> oxo + ethoxy,
-    # NOT a mis-counted 'ethoxycarbonyl' prefix.
+    # NOT a mis-counted 'ethoxycarbonyl' prefix. This is the P-65.6.3.3.5 substitutive
+    # partial-ester split (w2f p2), which runs behind a per-candidate OPSIN-RT gate;
+    # the suite disables that gate by default, so assert the PRODUCTION path.
+    import orthonym.namer as _nm
+    monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
     assert namer.name("CCOC(=O)CCC(=O)O") == "4-ethoxy-4-oxobutanoic acid"
