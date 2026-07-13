@@ -371,6 +371,205 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     return name
 
 
+# ---------------------------------------------------------------------------
+# Cyclic di/polyester (lactide) — P-65.6.3.5.3
+# ---------------------------------------------------------------------------
+
+def name_cyclic_polyester(mol) -> Optional[str]:
+    """P-65.6.3.5.3: name a cyclic di-/polyester (lactide) as a Hantzsch-Widman
+    heterocycle whose acyl carbons are expressed with a ``-dione``/``-trione``
+    suffix::
+
+        O=C1COC(=O)CO1   (glycolide)  -> 1,4-dioxane-2,5-dione (PIN)
+
+    The single-carbonyl lactone namer (:func:`name_monocyclic_lactone`) fails
+    closed on this class because a SECOND ring oxygen is itself an ester O
+    bearing its own ring carbonyl. Here every ring O is an ester oxygen (bonded
+    to exactly ONE ring carbonyl C) and there are >=2 such carbonyls, so the
+    ring is numbered with the O heteroatoms lowest (HW) and the carbonyls become
+    a multiplied ``-one`` suffix.
+
+    Fail-closed scope (accuracy-first, never a wrong name): one saturated
+    monocyclic ring of only C and O (ring size 3-10); >=2 ring ester carbonyls;
+    every ring O bonded to exactly one ring carbonyl C. This DECLINES:
+      * the ordinary single lactone (1 carbonyl, handled upstream),
+      * the cyclic carbonate (both ring O on one carbonyl -> len(o_nbrs)!=1),
+      * the cyclic anhydride (a bridging ring O bonded to TWO carbonyls),
+      * any ring bearing an unnameable substituent.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return None
+    ring = list(ri.AtomRings()[0])
+    n = len(ring)
+    if n not in _HW_RING_SIZES:
+        return None
+    ring_set = set(ring)
+
+    # Ring atoms restricted to C/O; skeleton fully saturated (C=O exocyclic).
+    for i in ring:
+        at = mol.GetAtomWithIdx(i)
+        if at.GetSymbol() not in ("C", "O") or at.GetIsAromatic():
+            return None
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in ring_set and j in ring_set and b.GetBondType() != Chem.BondType.SINGLE:
+            return None
+
+    carbonyls: List[int] = []
+    ester_os: List[int] = []
+    carbonyl_o: Dict[int, int] = {}
+    for i in ring:
+        at = mol.GetAtomWithIdx(i)
+        if at.GetSymbol() == "O":
+            if at.GetTotalNumHs() != 0:
+                return None
+            nbrs = [nb.GetIdx() for nb in at.GetNeighbors()]
+            if len(nbrs) != 2 or any(x not in ring_set for x in nbrs):
+                return None
+            ester_os.append(i)
+        else:  # carbon
+            oxo = None
+            for nb in at.GetNeighbors():
+                if nb.GetIdx() in ring_set:
+                    continue
+                bond = mol.GetBondBetweenAtoms(i, nb.GetIdx())
+                if (nb.GetSymbol() == "O" and nb.GetDegree() == 1
+                        and nb.GetTotalNumHs() == 0
+                        and bond.GetBondType() == Chem.BondType.DOUBLE):
+                    if oxo is not None:
+                        return None  # two =O on one ring C -> not this class
+                    oxo = nb.GetIdx()
+            if oxo is not None:
+                carbonyls.append(i)
+                carbonyl_o[i] = oxo
+    if len(carbonyls) < 2 or not ester_os:
+        return None
+
+    carbonyl_set = set(carbonyls)
+    # Every ring O is an ester O: exactly ONE ring-carbonyl neighbour (excludes
+    # ether O [0 carbonyls] and the anhydride bridge O [2 carbonyls]).
+    for o in ester_os:
+        cnt = sum(1 for nb in mol.GetAtomWithIdx(o).GetNeighbors()
+                  if nb.GetIdx() in carbonyl_set)
+        if cnt != 1:
+            return None
+    # Every ring carbonyl is an ester carbonyl: exactly one ring-O neighbour
+    # (excludes carbonate/anhydride carbonyls bonded to two ring O).
+    for c in carbonyls:
+        o_nbrs = [nb.GetIdx() for nb in mol.GetAtomWithIdx(c).GetNeighbors()
+                  if nb.GetIdx() in ring_set
+                  and mol.GetAtomWithIdx(nb.GetIdx()).GetSymbol() == "O"]
+        if len(o_nbrs) != 1:
+            return None
+
+    # Exocyclic heavy substituents on each ring atom (excluding the carbonyl =O).
+    def _exo_heavy(i):
+        out = []
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            j = nb.GetIdx()
+            if j in ring_set:
+                continue
+            if i in carbonyl_o and j == carbonyl_o[i]:
+                continue
+            if nb.GetAtomicNum() > 1:
+                out.append(j)
+        return out
+
+    sub_atoms = {i for i in ring if _exo_heavy(i)}
+
+    # Numbering: heteroatom(O) locants lowest as a set, then carbonyl(-one)
+    # locants lowest, then substituent locants lowest (RingInfo returns the
+    # ring in cyclic-adjacency order; enumerate all rotations x both directions).
+    best = None
+    for start in range(n):
+        for direction in (1, -1):
+            order = [ring[(start + direction * k) % n] for k in range(n)]
+            loc = {a: k + 1 for k, a in enumerate(order)}
+            key = (
+                tuple(sorted(loc[a] for a in ester_os)),
+                tuple(sorted(loc[a] for a in carbonyls)),
+                tuple(sorted(loc[a] for a in sub_atoms)),
+            )
+            if best is None or key < best[0]:
+                best = (key, order, loc)
+    if best is None:
+        return None
+    _, order, loc = best
+
+    o_locs = sorted(loc[a] for a in ester_os)
+    parent = build_hw_name(
+        heteroatoms=[(l, "O") for l in o_locs],
+        ring_size=n, is_saturated=True, is_aromatic=False,
+    )
+    if not parent:
+        return None
+
+    c_locs = sorted(loc[a] for a in carbonyls)
+    mult = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}.get(len(c_locs))
+    if mult is None:
+        return None
+    suffix = f"{mult}one"  # 'dione' / 'trione' (consonant-initial: no elision)
+    loc_str = ",".join(str(x) for x in c_locs)
+    stem = parent[:-1] if (parent.endswith("e") and suffix[0] in _ELISION_VOWELS) else parent
+    core = f"{stem}-{loc_str}-{suffix}"
+
+    # Substituents (fail-closed) — mirror rules.anhydrides._name_saturated_oxa_dione.
+    from ..assembly.substituent_enumerator import name_substituent
+    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+    subs = []  # (locant, name)
+    for a in sub_atoms:
+        for attach in _exo_heavy(a):
+            frag, seen, stack = [], set(ring_set), [attach]
+            while stack:
+                x = stack.pop()
+                if x in seen:
+                    continue
+                seen.add(x)
+                frag.append(x)
+                stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors()
+                             if nb.GetIdx() not in seen)
+            nm = name_substituent(mol, frag, attach)
+            if not nm:
+                return None  # unnameable substituent -> fail closed
+            subs.append((loc[a], nm))
+
+    from .stereochemistry import (collect_stereodescriptors,
+                                  format_stereodescriptor_string)
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(mol)
+    stereo_descriptors = collect_stereodescriptors(mol, loc)
+
+    prefix = ""
+    if subs:
+        groups: Dict[str, List[int]] = {}
+        for locant, nm in subs:
+            groups.setdefault(nm, []).append(locant)
+        parts = []
+        for nm in sorted(groups, key=alpha_sort_key):
+            locs = sorted(groups[nm])
+            m = get_multiplier_prefix(len(locs), nm) if len(locs) > 1 else ""
+            parts.append(f"{','.join(str(x) for x in locs)}-{m}{nm}")
+        prefix = "-".join(parts)
+
+    if prefix:
+        sep = "-" if core[:1].isdigit() else ""
+        name = f"{prefix}{sep}{core}"
+    else:
+        name = core
+    if stereo_descriptors:
+        name = f"{format_stereodescriptor_string(stereo_descriptors)}{name}"
+    return name
+
+
 def _detect_lactone_substituents(mol, ordered_ring, atom_to_locant, excluded):
     """
     Detect substituents on a lactone ring.

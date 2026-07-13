@@ -129,6 +129,7 @@ class StoutClass(_StrEnumBase):
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
     HYDRO_FUSED_PEROXOL = "hydro_fused_peroxol"     # W2E-P1FG (P-63.4.1 1,2,3,4-tetrahydronaphthalene-1-peroxol; priority 49.6)
     THIOIMIDE = "thioimide"                          # W2E-D3 (P-66.1.4.2 acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' -> N-(ethanethioyl)ethanethioamide; priority 49.7 — after HYDRO_FUSED_PEROXOL@49.6, before ORGM@50)
+    CYCLIC_POLYESTER = "cyclic_polyester"            # W3-P08 (P-65.6.3.5.3 lactide / cyclic di-/polyester -> 1,4-dioxane-2,5-dione; priority 49.8 — after THIOIMIDE@49.7, before ORGM@50)
     AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C (P-61.5.3 ethylideneazinic acid; priority 48.3)
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
@@ -1260,6 +1261,25 @@ def _handle_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
     return name_ring_chalcogen_oxide(mol)
 
 
+def _is_cyclic_polyester(mol, smiles, canonical_smiles, features=None,
+                         **kwargs) -> bool:
+    """W3-P08 (P-65.6.3.5.3); priority 49.8. A saturated monocyclic C/O ring
+    with >=2 ester carbonyls (lactide) -> 1,4-dioxane-2,5-dione. Fail-closed
+    graph classifier (declines single lactone / carbonate / anhydride)."""
+    if mol is None:
+        return False
+    from orthonym.rules.lactones import name_cyclic_polyester
+    return name_cyclic_polyester(mol) is not None
+
+
+def _handle_cyclic_polyester(mol, smiles, canonical_smiles, features=None,
+                             **kwargs) -> Optional[str]:
+    """Return the lactide / cyclic-polyester dione PIN (P-65.6.3.5.3), else
+    None (cascade-continuation)."""
+    from orthonym.rules.lactones import name_cyclic_polyester
+    return name_cyclic_polyester(mol)
+
+
 def _is_hydro_fused_peroxol(mol, smiles, canonical_smiles, features=None,
                             **kwargs) -> bool:
     """W2E-P1FG (P-63.4.1); priority 49.6. -OOH on an sp3 carbon of a
@@ -1531,6 +1551,21 @@ _register_dispatch(
     iupac_section="Blue Book P-66.1.4.2",
     description="Acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' on the "
                 "N-(alkanethioyl)alkanethioamide PIN; fail-closed",
+)
+# --- W3-P08: CYCLIC_POLYESTER at priority 49.8 (after THIOIMIDE@49.7, before
+# ORGM@50). A lactide / cyclic di-/polyester -- a saturated monocyclic C/O ring
+# with >=2 ester carbonyls -- named as a Hantzsch-Widman heterocycle with the
+# acyl carbons as a -dione/-trione suffix (P-65.6.3.5.3): glycolide
+# O=C1COC(=O)CO1 -> 1,4-dioxane-2,5-dione ('unknown' before this; the single-
+# carbonyl lactone namer fails closed on the 2nd ring ester O). Fail-closed
+# classifier+namer (declines single lactone / carbonate / anhydride); cascade-
+# continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.CYCLIC_POLYESTER, priority=49.8, tier=1,
+    predicate=_is_cyclic_polyester, handler=_handle_cyclic_polyester,
+    iupac_section="Blue Book P-65.6.3.5.3",
+    description="Lactide / cyclic di-/polyester named as an HW heterocycle "
+                "-dione (glycolide -> 1,4-dioxane-2,5-dione); fail-closed",
 )
 
 
