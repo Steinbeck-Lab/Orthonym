@@ -106,6 +106,11 @@ SENIORITY_ORDER = [
     # ranks below sulfonoperoxoic_acid (-OO-) and above the =NH imidic block.
     "sulfonothioic_S_acid",
     "sulfinic_acid",
+    # W3-P04 (P-65.3.1.4 @31212): FRN =NH (imidic) modification of the sulfinic
+    # acid suffix (-S(=NH)-OH). Imidic (=NH) replacement ranks below the
+    # unmodified acid (parallel to imidic_acid below the carboxylic chalcogen
+    # block); grouped with its sulfinic parent.
+    "sulfinimidic_acid",
     "sulfenic_acid",   # IUPAC P-65.3.1.4: between sulfinic and phosphonic
     # v23 Phase 9 (P-65.3.0 Table 6.2): Se/Te chalcogen-suffix acids, parallel to
     # sulfonic/sulfinic. Standalone naming is rank-independent; this relative
@@ -447,6 +452,9 @@ SUFFIX_FORMS = {
     # sulfonothioic S-acid'); chain stem + 'sulfonothioic S-acid'
     # (ethanesulfonothioic S-acid, PIN).
     "sulfonothioic_S_acid": ("sulfonothioic S-acid", "sulfonothioic S-acid"),
+    # W3-P04 (P-65.3.1.4 @31212): FRN =NH modified sulfinic acid; chain stem +
+    # 'sulfinimidic acid' (methanesulfinimidic acid, PIN @31220).
+    "sulfinimidic_acid": ("sulfinimidic acid", "sulfinimidic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
     # v23 Phase 9 (P-65.3): Se/Te suffix-acid forms (chain stem + suffix, e.g.
     # ethaneselenonic acid), parallel to sulfonic.
@@ -629,6 +637,7 @@ PREFIX_FORMS = {
     # principal group; a wrong prefix would be worse than fail-closed abstention.
     "sulfonoperoxoic_acid": None,
     "sulfonothioic_S_acid": None,  # W3-P04 (P-65.3.1.3): demoted-prefix fails closed
+    "sulfinimidic_acid": None,     # W3-P04 (P-65.3.1.4): demoted-prefix fails closed
     "sulfinic_acid": "sulfino",
     # v23 Phase 9 (P-65.3.2.1): Se/Te prefix forms (demoted when a senior group present)
     "selenonic_acid": "selenono",

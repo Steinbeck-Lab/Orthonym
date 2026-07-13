@@ -68,6 +68,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     # The -OH of sulfonic acid is replaced by -SH. Match tuple (S, =O, =O, S-H).
     # The thiol SMARTS [SX2H][#6] cannot claim the -SH (its S is on S, not C).
     "sulfonothioic_S_acid": "[SX4;$([SX4][#6])](=O)(=O)[SX2H1]",
+    # -S(=NH)-OH sulfinimidic acid (P-65.3.1.4; BB @31220, =NH replacement of the
+    # sulfinic-acid =O). SX3 (sulfinic-derived). Match tuple (S, =NH, -OH). The
+    # required [OX2H1] keeps this from stealing sulfinimidamide -S(=NH)-NH2 (the
+    # third neighbour is N, not OH there).
+    "sulfinimidic_acid": "[SX3;$([SX3][#6])](=[NX2])[OX2H1]",
     "sulfinic_acid": "[SX3;$([SX3][#6])](=O)[OX2H1]",
     "sulfenic_acid": "[SX2]([OX2H])[#6]",  # DATA-05d: IUPAC P-65.3.1.4 R-S-OH
     # v23 Phase 9 (P-65.3 / Table 6.2): selenium & tellurium analogues of the
@@ -802,6 +807,12 @@ def _resolve_fg_collisions(results):
         # sulfonyl S bears one C) but suppress defensively.
         ('sulfonothioic_S_acid', ['sulfonic_acid', 'sulfuric_acid', 'sulfone',
                                   'thiol', 'thioether', 'disulfide']),
+        # W3-P04 (P-65.3.1.4): the =NH-modified sulfinic acid owns its
+        # R-S(=NH)-OH unit; suppress the generic sulfinic read and any imine
+        # (S=N) / alcohol (S-OH) reads defensively.
+        ('sulfinimidic_acid', ['sulfinic_acid', 'imine', 'alcohol',
+                               'primary_alcohol', 'secondary_alcohol',
+                               'tertiary_alcohol']),
         ('nitric_acid', ['nitro', 'nitroso']),
         # WSD-05 (PERC-03): a nitrite ester (R-O-N=O) suppresses any residual
         # `nitroso` on its atoms — makes the O-vs-C precedence explicit/robust on
