@@ -1283,6 +1283,11 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
     acid_frag = next((f for f in Chem.GetMolFrags(m2) if acid_center in f), None)
     if acid_frag is None:
         return None
+    # Cyclic ester (sultone/sultine/lactone-like): severing the ester bond leaves
+    # the organyl STILL bonded to the acid center via the ring — the two-component
+    # 'organyl acylate' form does not apply. Fail-closed.
+    if organyl in acid_frag:
+        return None
     try:
         acid_smi = Chem.MolFragmentToSmiles(
             m2, atomsToUse=list(acid_frag), canonical=True, isomericSmiles=True)

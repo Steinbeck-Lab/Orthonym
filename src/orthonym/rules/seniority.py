@@ -150,6 +150,11 @@ SENIORITY_ORDER = [
     # organyl) at the ester tier. Below the carboxylic 'ester' block; only governs
     # the near-zero-corpus pseudoester-vs-other-ester tie. Functional-class only.
     "pseudoester",
+    # W3-P07 (P-65.6.3.2.1): sulfonic/sulfinic esters (R-SO2-O-R' / R-S(=O)-O-R').
+    # Below the carboxylic ester block, mirroring sulfonic_acid < carboxylic_acid
+    # (P-41). Functional-class only ('alkyl alkanesulfonate' / '-sulfinate').
+    "sulfonic_ester",
+    "sulfinic_ester",
     "acid_chloride",
     "acid_bromide",
     "acid_fluoride",
@@ -582,6 +587,8 @@ SUFFIX_FORMS = {
     "selenoester": None,         # P-65.6: functional-class "Se-alkyl alkaneselenoate"
     "telluroester": None,        # P-65.6: functional-class "Te-alkyl alkanetelluroate"
     "pseudoester": None,         # W3-P07 P-65.6.3.1.2: functional-class "Zyl acylate" (handler-emitted)
+    "sulfonic_ester": None,      # W3-P07 P-65.6.3.2.1: functional-class "alkyl alkanesulfonate"
+    "sulfinic_ester": None,      # W3-P07 P-65.6.3.2.1: functional-class "alkyl alkanesulfinate"
     "isocyanide": None,          # IUPAC 2013 P-66.5.3: prefix-only (isocyano)
     "sulfoxide": None,           # IUPAC P-63.6: functional class naming (dialkyl sulfoxide)
     "sulfone": None,             # IUPAC P-63.6: functional class naming (dialkyl sulfone)
@@ -759,6 +766,8 @@ PREFIX_FORMS = {
     # Esters (handled specially in polyfunctional.py as acyloxy prefixes)
     "ester": None,  # Esters use alkoxycarbonyl prefix (generated in polyfunctional.py get_fg_prefix_form)
     "pseudoester": None,  # W3-P07 P-65.6.3.1.2: functional-class only (no principal-group prefix)
+    "sulfonic_ester": None,  # W3-P07 P-65.6.3.2.1: functional-class only
+    "sulfinic_ester": None,  # W3-P07 P-65.6.3.2.1: functional-class only
     # Ethers and thioethers
     "ether": None,  # Named by substitution: methoxy, ethoxy, etc.
     "thioether": None,  # IUPAC P-63.2: functional class naming (dialkyl sulfide)

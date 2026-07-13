@@ -165,6 +165,15 @@ FUNCTIONAL_GROUP_SMARTS = {
     # non-carbon-ester handler (build the neutral carboxylic acid -> '-ate' +
     # organyl-Z substituent). Ranked at the ester tier (P-41).
     "pseudoester": "[CX3](=O)[OX2][Si,Ge,Sn,Pb,B,Al,Ga,In,Tl,P,As,Sb,Bi]",
+    # W3-P07 (P-65.6.3.2.1): SULFONIC / SULFINIC esters R-SO2-O-R' / R-S(=O)-O-R'
+    # ('methyl methanesulfonate'). No carbonyl -> the 'ester' pattern never
+    # matches; without these the molecule reads 'unknown'. The recursive
+    # $([S..][#6]) requires a CARBON on S (C-S bond of a genuine sulfonic/sulfinic
+    # acid) so sulfate/sulfite esters (C-O-S-O-C, no C-S) are excluded. Match
+    # tuples: sulfonate (S, =O, =O, ester_o, alkyl_c); sulfinate (S, =O, ester_o,
+    # alkyl_c). Named by the shared non-carbon-ester handler.
+    "sulfonic_ester": "[SX4;$([SX4][#6])](=O)(=O)[OX2][#6]",
+    "sulfinic_ester": "[SX3;$([SX3][#6])](=O)[OX2][#6]",
     "acid_chloride": "[CX3](=O)[Cl]",
     "acid_bromide": "[CX3](=O)[Br]",
     "acid_fluoride": "[CX3](=O)[F]",
