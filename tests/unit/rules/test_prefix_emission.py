@@ -20,31 +20,23 @@ class TestCarbamoylPrefix:
     """Non-principal amide groups should emit 'carbamoyl' prefix."""
 
     def test_carbamoyl_glutamine(self):
-        """Glutamine: NC(=O)CCCC(N)C(=O)O should produce name with 'carbamoyl'
-        and 'pentanoic' (5C chain), NOT 'hexanoic' (6C chain).
+        """NC(=O)CCCC(N)C(=O)O -> 2,6-diamino-6-oxohexanoic acid.
 
-        The amide C should NOT extend the principal chain.
+        Post-wave-3 the non-principal terminal primary amide is expressed as the
+        amino-oxo PIN form (P-65.1.6.1); the amide carbon IS part of the 6C
+        parent chain (as C6, bearing 6-amino-6-oxo), so the parent is hexanoic.
         """
         name = name_compound("NC(=O)CCCC(N)C(=O)O")
-        assert "carbamoyl" in name, f"Expected 'carbamoyl' in '{name}'"
-        assert "pentanoic" in name or "butanoic" in name, (
-            f"Expected 'pentanoic' or 'butanoic' chain in '{name}', not 'hexanoic'"
-        )
-        assert "hexanoic" not in name, (
-            f"Should NOT contain 'hexanoic' (6C chain including amide C) in '{name}'"
-        )
+        assert name == "2,6-diamino-6-oxohexanoic acid"
 
     def test_carbamoyl_longer_analog(self):
-        """Longer glutamine analog: NC(=O)CCCCC(N)C(=O)O should have carbamoyl prefix.
+        """NC(=O)CCCCC(N)C(=O)O -> 2,7-diamino-7-oxoheptanoic acid (amino-oxo PIN).
 
-        6C total backbone (not counting amide C), amide is non-principal.
+        Post-wave-3 the amide carbon IS part of the 7C parent chain (as C7,
+        bearing 7-amino-7-oxo), so the parent is heptanoic acid.
         """
         name = name_compound("NC(=O)CCCCC(N)C(=O)O")
-        assert "carbamoyl" in name, f"Expected 'carbamoyl' in '{name}'"
-        # Chain should be hexanoic (6C) not heptanoic (7C with amide C inflating)
-        assert "heptanoic" not in name, (
-            f"Should NOT contain 'heptanoic' in '{name}' - amide C inflating chain"
-        )
+        assert name == "2,7-diamino-7-oxoheptanoic acid"
 
 
 class TestCyanoPrefix:
