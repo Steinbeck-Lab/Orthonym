@@ -5,15 +5,25 @@ IUPAC P-44.1: The principal chain must contain the principal
 characteristic group and be the longest chain meeting all criteria.
 
 Non-principal FG terminal carbons whose prefix form includes the carbon
-(e.g., carbamoyl = -C(=O)NH2) are excluded from chain enumeration.
-This prevents chain inflation and ensures correct round-trip naming.
+AND has no in-chain oxo+heteroatom expansion (e.g., a non-principal nitrile
+-> 'cyano') are excluded from chain enumeration. This prevents chain inflation
+and ensures correct round-trip naming.
 
 A NON-PRINCIPAL nitrile is the 'cyano' prefix whose carbon belongs to the
 prefix (-C#N), NOT the parent chain, so it is EXCLUDED (v22 Phase B / DD1
 Fix 1, P-66.5.1.1.4). When the nitrile IS the principal group its carbon
 stays in the chain (the -nitrile suffix counts it).
 
-Ref: IUPAC 2013 P-66.1(c) (carbamoyl), P-66.5.1.1.4 (cyano-prefix exclusion).
+W3-P03-5 (P-65.1.6.1, BB 30384): a non-principal PRIMARY amide -CO-NH2 at a
+chain end is DIFFERENT — per the Blue Book its carbon STAYS in the chain and
+the group is expressed as 'oxo' (=O) + 'amino' (-NH2): "4-amino-4-oxobutanoic
+acid" (PIN), NOT the non-PIN "3-carbamoylpropanoic acid". So primary_amide is
+NOT excluded from chain enumeration (mirroring the acid-halide oxo+halo and
+amidine amino+imino decisions). The 'carbamoyl' prefix remains the PIN only
+for a RING-attached amide, where the carbon cannot join the ring.
+
+Ref: IUPAC 2013 P-65.1.6.1 (amide amino+oxo, chain end),
+P-66.5.1.1.4 (cyano-prefix exclusion).
 """
 
 import pytest
@@ -26,12 +36,12 @@ from orthonym.perception.functional_groups import detect_functional_groups
 class TestChainFGBehavior:
     """Test principal chain behavior with functional group carbons."""
 
-    def test_linear_amide_acid_excludes_amide_carbon(self):
-        """NC(=O)CCCC(=O)O -- 4-carbamoylbutanoic acid.
+    def test_linear_amide_acid_includes_amide_carbon(self):
+        """NC(=O)CCCC(=O)O -- 5-amino-5-oxopentanoic acid (PIN).
 
-        The amide C is excluded from the chain because carbamoyl prefix
-        includes the C.  Chain = 4 carbons (butanoic acid).
-        Round-trip: OPSIN parses "4-carbamoylbutanoic acid" correctly.
+        W3-P03-5 (P-65.1.6.1, BB 30384): the chain-end primary amide C STAYS in
+        the chain, expressed as oxo+amino. Chain = 5 carbons (pentanoic acid).
+        Round-trip: OPSIN parses "5-amino-5-oxopentanoic acid" correctly.
         """
         mol = Chem.MolFromSmiles("NC(=O)CCCC(=O)O")
         fgs = detect_functional_groups(mol)
@@ -40,22 +50,24 @@ class TestChainFGBehavior:
         cooh_carbon = fgs["carboxylic_acid"][0][0]
         amide_carbon = fgs["primary_amide"][0][0]
         assert cooh_carbon in chain, "COOH carbon must be in chain"
-        assert amide_carbon not in chain, (
-            f"Amide C (atom {amide_carbon}) should be excluded from chain "
-            f"(carbamoyl prefix includes it). Chain: {chain}"
+        assert amide_carbon in chain, (
+            f"Amide C (atom {amide_carbon}) must STAY in the chain "
+            f"(P-65.1.6.1: expressed as oxo+amino, not carbamoyl). Chain: {chain}"
         )
-        assert len(chain) == 4, (
-            f"Chain should be 4 carbons (butanoic acid), got {len(chain)}"
+        assert len(chain) == 5, (
+            f"Chain should be 5 carbons (pentanoic acid), got {len(chain)}"
         )
 
     def test_linear_shorter_amide_acids(self):
         """NC(=O)CCC(=O)O and NC(=O)CC(=O)O -- shorter linear amide acids.
 
-        Same principle: amide C excluded because carbamoyl prefix includes it.
+        W3-P03-5 (P-65.1.6.1): the chain-end amide C stays in the chain
+        (oxo+amino), so the chain is one carbon LONGER than the old carbamoyl
+        form -> 4-amino-4-oxobutanoic acid / 3-amino-3-oxopropanoic acid (PINs).
         """
         for smiles, expected_len, name in [
-            ("NC(=O)CCC(=O)O", 3, "3-carbamoylpropanoic acid"),
-            ("NC(=O)CC(=O)O", 2, "2-carbamoylethanoic acid"),
+            ("NC(=O)CCC(=O)O", 4, "4-amino-4-oxobutanoic acid"),
+            ("NC(=O)CC(=O)O", 3, "3-amino-3-oxopropanoic acid"),
         ]:
             mol = Chem.MolFromSmiles(smiles)
             fgs = detect_functional_groups(mol)
@@ -84,26 +96,26 @@ class TestChainFGBehavior:
             f"Chain should be 5 carbons (pentanoic acid backbone), got {len(chain)}"
         )
 
-    def test_glutamine_like_chain_excludes_amide_carbon(self):
+    def test_glutamine_like_chain_includes_amide_carbon(self):
         """NC(=O)CCCC(N)C(=O)O -- glutamine-like compound.
 
-        The amide C is excluded from the chain (carbamoyl prefix includes it).
-        Chain = 5 carbons: COOH-C(NH2)-C-C-C = pentanoic acid backbone.
-        The amide becomes a carbamoyl substituent at position 5.
+        W3-P03-5 (P-65.1.6.1): the chain-end amide C STAYS in the chain
+        (oxo+amino). Chain = 6 carbons: COOH-C(NH2)-C-C-C-C(=O amide) ->
+        2,6-diamino-6-oxohexanoic acid (PIN).
         """
         mol = Chem.MolFromSmiles("NC(=O)CCCC(N)C(=O)O")
         fgs = detect_functional_groups(mol)
         chain = find_principal_chain(mol, fgs, principal_group="carboxylic_acid")
 
-        assert len(chain) == 5, (
-            f"Chain should be 5 carbons (pentanoic acid), "
+        assert len(chain) == 6, (
+            f"Chain should be 6 carbons (hexanoic acid backbone), "
             f"got {len(chain)}. Chain: {chain}"
         )
         cooh_carbon = fgs["carboxylic_acid"][0][0]
         amide_carbon = fgs["primary_amide"][0][0]
         assert cooh_carbon in chain, "COOH carbon must be in chain"
-        assert amide_carbon not in chain, (
-            "Amide C excluded (carbamoyl prefix includes it)"
+        assert amide_carbon in chain, (
+            "Amide C stays in chain (P-65.1.6.1: oxo+amino, not carbamoyl)"
         )
 
     def test_nitrile_amino_acid_excludes_nitrile_carbon(self):

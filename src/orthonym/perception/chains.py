@@ -295,7 +295,16 @@ def _get_non_principal_terminal_carbons(
     # path does not use chain enumeration so it is unaffected.)
     _TERMINAL_C_FGS = {
         'carboxylic_acid': 0,
-        'primary_amide': 0,
+        # W3-P03-5 (P-65.1.6.1, BB 30384): primary_amide is DELIBERATELY NOT in
+        # this set. On a CHAIN parent a non-principal -CO-NH2 at a chain end keeps
+        # its carbon IN the chain, expressed as 'oxo' (=O) + 'amino' (-NH2):
+        # "4-amino-4-oxobutanoic acid" (PIN) -- NOT the longer 'carbamoyl' prefix
+        # (the general/non-PIN alternative "3-carbamoylpropanoic acid", and the PIN
+        # only on a RING parent where the carbon cannot join the ring,
+        # "2-carbamoylbenzoic acid" L30377; ring parents do not use chain
+        # enumeration so they are unaffected). Mirrors the acid-halide (oxo+halo)
+        # and amidine (amino+imino) decisions above/below; the chain-end oxo+amino
+        # split is emitted in rules/polyfunctional.py.
         # P-66.5.1.1.4: a non-principal nitrile is the 'cyano' prefix whose carbon
         # is excluded from the parent chain. SMARTS '[CX2]#[NX1]' -> index 0 = C.
         # Skipped automatically when nitrile IS the principal group (suffix path).

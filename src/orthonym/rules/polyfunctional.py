@@ -1425,6 +1425,34 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 )
                 continue
 
+        # W3-P03-5 (P-65.1.6.1, BB 30384): a non-principal PRIMARY amide whose
+        # carbonyl C terminates an ACYCLIC chain parent (a senior group present,
+        # e.g. COOH) is expressed as 'oxo' (=O) + 'amino' (-NH2) at that carbon's
+        # locant -- '4-amino-4-oxobutanoic acid' (PIN) -- NOT the 'carbamoyl'
+        # prefix (the non-PIN general form '3-carbamoylpropanoic acid', and the
+        # PIN only for a RING-attached amide, L30377 '2-carbamoylbenzoic acid').
+        # Mirrors the acid-halide oxo+halo split above. Fires only when EVERY
+        # primary-amide C is a chain member; else falls through to the carbamoyl
+        # PREFIX_FORMS path (ring / off-chain case). SMARTS [CX3](=O)[NX3H2]:
+        # match[0]=C, match[2]=N.
+        if fg_name == 'primary_amide' and chain_set:
+            _pa_locs = []
+            _pa_ns = []
+            for _m in matches:
+                _pac = _m[0]
+                if _pac in chain_set:
+                    _loc = atom_to_locant.get(_pac)
+                    if _loc is not None:
+                        _pa_locs.append(_loc)
+                        _pa_ns.append(_m[2])
+            if _pa_locs and len(_pa_locs) == len(matches):
+                _pa_locs.sort()
+                _n = len(_pa_locs)
+                all_prefixes.append(format_fg_prefix('oxo', _pa_locs, _n))
+                all_prefixes.append(format_fg_prefix('amino', _pa_locs, _n))
+                _amidine_excluded_n.update(_pa_ns)
+                continue
+
         # AM-6 (P-66.1.1.4.3): a sulfonamide bonded to the chain via its N
         # (R-SO2-NH-chain) is expressed by _check_for_acylamino as the
         # '(...sulfonamido)' prefix, NOT the 'sulfamoyl' FG prefix (which is the
