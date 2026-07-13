@@ -28,6 +28,7 @@ from typing import List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..assembly.naming_utils import apply_vowel_elision
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 from .substituent_purity import pure_organyl_prefix_name
 
@@ -130,11 +131,160 @@ def _format_substituents(subs: List[Tuple[int, str]], n: int) -> str:
     return ''.join(p[1] for p in parts)
 
 
+# P-63.1.2 / P-63.4 chalcogen functional-group suffixes for the P-68.4.2.2/.3
+# heterogeneous-chalcogen parent+suffix layer. Suffix seniority follows the
+# element order O > S > Se > Te (-ol senior to -thiol senior to ...).
+_CHALCOGEN_SUFFIX_NAME = {'O': 'ol', 'S': 'thiol', 'Se': 'selenol', 'Te': 'tellurol'}
+_SUFFIX_SENIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3}
+
+
+def _all_chalcogen_chain(mol) -> Optional[List[int]]:
+    """Return every chalcogen atom (O/S/Se/Te, ANY element) ordered as a single
+    unbranched single-bonded path, or None (branch, ring, fork, multi-component,
+    double bond). Heterogeneous sibling of :func:`_chalcogen_chain`."""
+    chal = [a.GetIdx() for a in mol.GetAtoms()
+            if a.GetSymbol() in _CHALCOGEN_STEMS]
+    if len(chal) < 2:
+        return None
+    cset = set(chal)
+    adj: dict = {i: [] for i in chal}
+    for i in chal:
+        for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
+            j = nbr.GetIdx()
+            if j in cset:
+                bond = mol.GetBondBetweenAtoms(i, j)
+                if bond.GetBondType() != Chem.BondType.SINGLE:
+                    return None
+                adj[i].append(j)
+    if any(len(adj[i]) > 2 for i in chal):
+        return None
+    endpoints = [i for i in chal if len(adj[i]) == 1]
+    if len(endpoints) != 2:
+        return None
+    order = [endpoints[0]]
+    prev, cur = -1, endpoints[0]
+    while True:
+        nxts = [j for j in adj[cur] if j != prev]
+        if not nxts:
+            break
+        prev, cur = cur, nxts[0]
+        order.append(cur)
+    return order if len(order) == len(chal) else None
+
+
+def _name_chalcogen_chain_with_suffix(mol) -> Optional[str]:
+    """P-68.4.2.2/.3 (BB 39427/39433/39441): a HETEROGENEOUS contiguous chalcogen
+    chain named on a homogeneous chalcogen PARENT hydride carrying a functional
+    ``-ol``/``-thiol``/``-selenol``/``-tellurol`` suffix (the terminal ``-XH`` on a
+    DIFFERENT chalcogen)::
+
+        HS-OH      -> sulfanol         (parent sulfane; oxidane is never a parent)
+        CH3-SS-OH  -> methyldisulfanol (parent disulfane, -ol, methyl prefix)
+
+    The senior functional group (-OH > -SH > -SeH > -TeH) is expressed as the
+    suffix; the remaining atoms are the parent hydride. A run of 2-3 identical
+    chalcogens must not be broken (P-68.4.2.2), so the removable suffix atom is a
+    single terminal chalcogen (element differs from its neighbour) and the
+    remainder must be one homogeneous run.
+
+    Fires ONLY when the parent run length >= 2 (an unbreakable run forces the
+    parent-hydride name, e.g. disulfane) OR the molecule has NO carbon (a pure
+    inorganic pair, e.g. HS-OH). Otherwise a P-63 carbon-parent name wins
+    (CH3-S-OH -> methane-*SO*-thioperoxol) and this declines. Fail-closed; pure.
+    """
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if mol.GetRingInfo().NumRings() > 0:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() == 'H':
+            continue
+        if atom.GetSymbol() not in _CHALCOGEN_STEMS and atom.GetSymbol() != 'C':
+            return None                       # stray heteroatom -> not this class
+
+    chain = _all_chalcogen_chain(mol)
+    if chain is None or len(chain) < 2:
+        return None
+    syms = [mol.GetAtomWithIdx(i).GetSymbol() for i in chain]
+    if len(set(syms)) < 2:
+        return None                           # homogeneous -> the parent-hydride path
+
+    chain_set = set(chain)
+    # Suffix candidates: an endpoint whose element differs from its single chain
+    # neighbour (a removable len-1 run) that bears >=1 H and no organyl.
+    candidates = []
+    for endpt, neigh in ((0, 1), (len(chain) - 1, len(chain) - 2)):
+        if syms[endpt] == syms[neigh]:
+            continue                          # part of a run -> not removable
+        atom = mol.GetAtomWithIdx(chain[endpt])
+        if atom.GetTotalNumHs() < 1:
+            continue                          # bears organyl not -H -> not a suffix
+        if any(n.GetIdx() not in chain_set and n.GetSymbol() != 'H'
+               for n in atom.GetNeighbors()):
+            continue                          # organyl on the suffix atom -> skip
+        candidates.append(endpt)
+    if not candidates:
+        return None
+    # Express the SENIOR suffix (-ol > -thiol > ...); junior chalcogen -> parent.
+    suffix_pos = min(candidates, key=lambda p: _SUFFIX_SENIORITY[syms[p]])
+    suffix_elem = syms[suffix_pos]
+
+    remaining = [chain[i] for i in range(len(chain)) if i != suffix_pos]
+    rem_syms = {mol.GetAtomWithIdx(i).GetSymbol() for i in remaining}
+    if len(rem_syms) != 1:
+        return None                           # parent not a homogeneous run
+    parent_elem = next(iter(rem_syms))
+    parent_len = len(remaining)
+
+    has_carbon = any(a.GetSymbol() == 'C' for a in mol.GetAtoms())
+    if not (parent_len >= 2 or not has_carbon):
+        return None                           # P-63 carbon-parent name wins -> defer
+
+    # Organyls: only on the parent-run TERMINI (at most one; internal atoms H-only).
+    subs = []
+    for pos, idx in enumerate(remaining):
+        atom = mol.GetAtomWithIdx(idx)
+        heavy_nonchain = [n for n in atom.GetNeighbors()
+                          if n.GetIdx() not in chain_set and n.GetSymbol() != 'H']
+        is_terminal = pos in (0, len(remaining) - 1)
+        if not heavy_nonchain:
+            continue
+        if not is_terminal or len(heavy_nonchain) != 1:
+            return None
+        name = pure_organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
+        if name is None:
+            return None
+        subs.append(name)
+    if len(subs) > 1:
+        return None
+
+    if parent_len == 1:
+        parent = _CHALCOGEN_STEMS[parent_elem]           # sulfane
+    elif parent_len in _MULTIPLIER:
+        parent = f"{_MULTIPLIER[parent_len]}{_CHALCOGEN_STEMS[parent_elem]}"  # disulfane
+    else:
+        return None
+    core = apply_vowel_elision(parent, _CHALCOGEN_SUFFIX_NAME[suffix_elem])
+    return f"{subs[0]}{core}" if subs else core
+
+
 def name_chalcogen_chain(mol) -> Optional[str]:
     """Return the PIN for a homogeneous chalcogen-chain parent hydride (P-21.2.2),
     else None (fail-closed cascade-continuation). Pure: no mol mutation."""
     if mol is None:
         return None
+    # W3-P14 (P-68.4.2.2/.3): a HETEROGENEOUS chalcogen chain named as a
+    # homogeneous parent hydride + a functional -ol/-thiol suffix
+    # (methyldisulfanol / sulfanol). Runs first; declines (None) for the
+    # homogeneous chains handled by the parent-hydride logic below.
+    _suffixed = _name_chalcogen_chain_with_suffix(mol)
+    if _suffixed is not None:
+        return _suffixed
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
     if mol.GetRingInfo().NumRings() > 0:
