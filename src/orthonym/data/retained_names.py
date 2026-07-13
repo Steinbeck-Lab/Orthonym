@@ -196,6 +196,14 @@ RETAINED_NAMES = {
     # P-66.5.3.1 (Wave-2 completion C): functional-class IS the PIN for
     # carbonic-acid nitriles; the engine cannot derive these word-forms.
     "N#CC(=O)C#N": "carbonyl dicyanide",
+    # W3-P01-2 (P-65.1.4.1): methaneperoxoic acid IS the PIN for HC(=O)-O-OH
+    # (BB:30170 '...(PIN) peroxyformic acid performic acid'). Unlike the C>=2
+    # case (CCC(=O)OO->propaneperoxoic acid works via the systematic peroxoic
+    # suffix), the C1 formic edge case is mis-perceived as an aldehyde and the
+    # engine emits the wrong '1-hydroperoxymethanal'. Exact-SMILES retained PIN
+    # (phosgene model); the trivial 'performic acid' is denied in
+    # iupac_2013_pin_list.json (--trivial fallback). Canonical key of O=COO.
+    "O=COO": "methaneperoxoic acid",
     "CCOC(C)=O": "ethyl acetate",
     "COC(C)=O": "methyl acetate",
     "CC#N": "acetonitrile",
