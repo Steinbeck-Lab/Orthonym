@@ -1581,6 +1581,20 @@ class Orthonym:
                     # isotopes). Accuracy-first: never emit a label-dropping name.
                     end_naming_session()
                     return _descriptive_fallback(smiles)
+        # --- W3-P09 (P-65.6.2.3.2): normalize a charge-imbalanced acid-salt
+        # notation. A metal cation + a NEUTRAL polybasic inorganic oxoacid written
+        # without the balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1) is a
+        # valid acid salt in a malformed charge representation. Rewrite it to the
+        # balanced salt so species classification -> name_salt (method 2 PIN) ->
+        # the self-consistency gate all see the chemically-valid net-0 structure.
+        # Fail-closed (returns None) for every other shape -> smiles unchanged.
+        # Cheap gate: only a multi-fragment ('.') input carrying a cation ('+')
+        # can be this shape, so single-fragment / anion-only inputs skip the parse.
+        if is_top_level_naming() and '.' in smiles and '+' in smiles:
+            from .rules.salts import normalize_imbalanced_acid_salt
+            _bal = normalize_imbalanced_acid_salt(smiles)
+            if _bal is not None:
+                smiles = _bal
         try:
             # HYG-02: structural scope pre-check (opt-in). Only the wildcard
             # class is refused here — the one class with zero in-scope risk.

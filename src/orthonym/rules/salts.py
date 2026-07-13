@@ -176,6 +176,68 @@ def _count_protonated_acid_sites(frag_mol) -> int:
     return 0
 
 
+def normalize_imbalanced_acid_salt(smiles: str) -> Optional[str]:
+    """P-65.6.2.3.2: normalize a charge-imbalanced acid-salt NOTATION to its
+    chemically-valid balanced salt.
+
+    A metal cation + a NEUTRAL polybasic INORGANIC oxoacid, written without the
+    balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1), is a valid acid salt
+    in a malformed charge representation. Deprotonate the acid by the net positive
+    charge so the whole pipeline sees the balanced salt (species-type -> 'salt',
+    name_salt -> 'sodium hydrogen carbonate', and the self-consistency gate compares
+    a balanced net-0 structure). Return the balanced-salt canonical SMILES, or None
+    (fail-closed -> caller keeps the original smiles) for any other shape.
+
+    Narrow by construction: fires only when the mol is multi-fragment with net
+    charge > 0, exactly one neutral fragment that IS a recognized inorganic oxoacid,
+    at least one cation fragment, NO anion fragment, and the acid has enough -OH
+    protons to balance the charge — so no organic acid / real salt / plain ion is
+    touched.
+    """
+    from rdkit.Chem import MolFromSmarts
+    from .inorganic_acids import name_inorganic_acid
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    if Chem.GetFormalCharge(mol) <= 0:
+        return None
+    frags = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
+    if len(frags) < 2:
+        return None
+    cations = [f for f in frags if Chem.GetFormalCharge(f) > 0]
+    anions = [f for f in frags if Chem.GetFormalCharge(f) < 0]
+    neutrals = [f for f in frags if Chem.GetFormalCharge(f) == 0]
+    if anions or not cations or len(neutrals) != 1:
+        return None
+    acid = neutrals[0]
+    if name_inorganic_acid(acid) is None:
+        return None
+
+    n_protons = sum(Chem.GetFormalCharge(f) for f in cations)
+    oh_pat = MolFromSmarts('[OX2H1]')
+    if oh_pat is None:
+        return None
+    oh_matches = acid.GetSubstructMatches(oh_pat)
+    if len(oh_matches) < n_protons:
+        return None
+    rw = Chem.RWMol(acid)
+    for (o_idx,) in oh_matches[:n_protons]:
+        o = rw.GetAtomWithIdx(o_idx)
+        o.SetFormalCharge(-1)
+        o.SetNumExplicitHs(0)
+    try:
+        Chem.SanitizeMol(rw)
+    except Exception:
+        return None
+    anion_smi = Chem.MolToSmiles(rw)
+    parts = [Chem.MolToSmiles(c) for c in cations] + [anion_smi]
+    balanced = '.'.join(parts)
+    if Chem.MolFromSmiles(balanced) is None:
+        return None
+    return balanced
+
+
 def name_salt(mol, style: str = 'pin') -> str:
     """
     Name a salt using compositional nomenclature.
@@ -301,13 +363,16 @@ def name_salt(mol, style: str = 'pin') -> str:
     if len(frags['anions']) == 1 and cation_names:
         anion_frag = frags['anions'][0]
         protonated_acids = _count_protonated_acid_sites(anion_frag['mol'])
-        # Method (1) P-65.6.2.3.1 (PIN for organic acid salts): when the anion is
-        # already named with a 'carboxy' prefix (the un-ionized -COOH expressed
-        # substitutively -> 'potassium 6-carboxyhexanoate'), the acidic hydrogen is
-        # already accounted for -> do NOT also insert the method-(2) 'hydrogen'
-        # word. Only method-(2) salts (general-nomenclature form) take 'hydrogen'.
-        method1_used = any('carboxy' in a for a in anion_names)
-        if protonated_acids > 0 and not method1_used:
+        # Do NOT insert the method-(2) 'hydrogen' word when the anion name already
+        # expresses the acidic hydrogen(s): method (1) organic salts carry a
+        # 'carboxy' prefix ('potassium 6-carboxyhexanoate', P-65.6.2.3.1), and the
+        # inorganic acid-anion words already embed 'hydrogen' ('hydrogen carbonate',
+        # 'dihydrogen phosphate', P-65.6.2.3.2). Only a fully-systematic organic
+        # '-oate/-dioate' anion takes the separate 'hydrogen' (method 2 general
+        # form, e.g. 'sodium hydrogen but-2-enedioate').
+        acid_h_expressed = any(('carboxy' in a) or ('hydrogen' in a)
+                               for a in anion_names)
+        if protonated_acids > 0 and not acid_h_expressed:
             hydrogen_prefix = _HYDROGEN_PREFIXES.get(
                 protonated_acids, 'hydrogen'
             )
