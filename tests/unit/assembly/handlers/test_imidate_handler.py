@@ -100,8 +100,9 @@ class TestNameImidateBranchCoverage:
         self._run("CCC(=N)OC", "methyl propanimidate")
 
     def test_FRN_D_02_methyl_acetimidate(self):
-        """FRN-D-02: CC(=N)OC -> methyl acetimidate (acetimidate retained)."""
-        self._run("CC(=N)OC", "methyl acetimidate")
+        """FRN-D-02: CC(=N)OC -> methyl ethanimidate (P-65.6.3.3.7.1 systematic PIN;
+        acetimidate is general-only)."""
+        self._run("CC(=N)OC", "methyl ethanimidate")
 
     def test_FRN_D_03_ethyl_propanimidate(self):
         """FRN-D-03: CCC(=N)OCC -> ethyl propanimidate."""
@@ -116,8 +117,8 @@ class TestNameImidateBranchCoverage:
         self._run("CCCCC(=N)OC", "methyl pentanimidate")
 
     def test_FRN_D_06_ethyl_acetimidate(self):
-        """FRN-D-06: CC(=N)OCC -> ethyl acetimidate."""
-        self._run("CC(=N)OCC", "ethyl acetimidate")
+        """FRN-D-06: CC(=N)OCC -> ethyl ethanimidate (P-65.6.3.3.7.1 systematic PIN)."""
+        self._run("CC(=N)OCC", "ethyl ethanimidate")
 
 
 @pytest.mark.unit
@@ -238,8 +239,9 @@ class TestImidateBranchedAndSubstituted:
         )
 
     def test_isopropyl_acetimidate(self):
-        """CR-02: branched alkyl side (isopropyl, not propyl)."""
-        self._run("CC(=N)OC(C)C", "isopropyl acetimidate")
+        """CR-02: branched alkyl side -> propan-2-yl (PIN) + ethanimidate stem
+        (P-65.6.3.3.7.1 systematic + P-29 PIN alkyl)."""
+        self._run("CC(=N)OC(C)C", "propan-2-yl ethanimidate")
 
     def test_alpha_methyl_propanimidate(self):
         """CR-03: α-methyl-branched stem (propanimidate with 2-methyl)."""
@@ -256,8 +258,9 @@ class TestImidateBranchedAndSubstituted:
         self._run("CC(Cl)C(=N)OC", "methyl 2-chloropropanimidate")
 
     def test_benzyl_acetimidate(self):
-        """CR-02: benzyl alkyl side (retained substituent)."""
-        self._run("CC(=N)OCc1ccccc1", "benzyl acetimidate")
+        """CR-02: benzyl alkyl side (retained substituent) + ethanimidate stem
+        (P-65.6.3.3.7.1 systematic PIN)."""
+        self._run("CC(=N)OCc1ccccc1", "benzyl ethanimidate")
 
 
 @pytest.mark.unit
