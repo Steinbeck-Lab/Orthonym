@@ -70,8 +70,9 @@ class TestAmidineAsPrefix:
         ("CC(=O)Nc1ccc(C(=O)O)cc1", "4-acetamidobenzoic acid"),
         # Schiff base (imino N on ring) must NOT be captured as imidamido
         ("CC=Nc1ccc(C(=O)O)cc1", "4-ethaniminylbenzoic acid"),
-        # guanidine must NOT be captured
-        ("N=C(N)Nc1ccc(C(=O)O)cc1", "4-guanidinylbenzoic acid"),
+        # guanidine must NOT be captured (aryl guanidino demoted to the PIN
+        # prefix carbamimidoylamino per P-66.4.1.2.1.3 / BBv2 L1700; Wave-3 heal)
+        ("N=C(N)Nc1ccc(C(=O)O)cc1", "4-(carbamimidoylamino)benzoic acid"),
     ])
     def test_amidine_prefix_controls(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -88,7 +89,9 @@ class TestNoPerceptionRegression:
         ("CC=NO", "N-hydroxyethanimine"),
         ("CCC=NO", "N-hydroxypropan-1-imine"),
         ("CC(C)=NO", "N-hydroxypropan-2-imine"),
-        ("CC(=NN)c1ccccc1", "acetophenone hydrazone"),
+        # Wave-3: substitutive ylidene-hydrazine is PIN (P-68.3.1.2.2);
+        # 'acetophenone hydrazone' is functional-class / general-only.
+        ("CC(=NN)c1ccccc1", "(1-phenylethylidene)hydrazine"),
         ("CCC(N)=N", "propanimidamide"),
         ("CC(=N)N", "ethanimidamide"),
         ("NNC(C)=O", "acetohydrazide"),
