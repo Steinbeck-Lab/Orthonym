@@ -2634,8 +2634,26 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
             features.canonical_smiles, named_atom_count,
         )
 
-    # Orient the ring for lowest locants
-    oriented_ring = orient_benzene(mol, ring_atoms, substituents)
+    # Orient the ring for lowest locants.
+    # W3-P04 (P-14.4(c)): anchor the principal characteristic group (ring atoms
+    # bearing a suffix-type FG) to the lowest locant BEFORE detachable
+    # substituents. Without this the numberer minimized the COMBINED substituent
+    # set, giving e.g. '1-methylbenzene-2,4-disulfonic acid' instead of the PIN
+    # '4-methylbenzene-1,3-disulfonic acid'. Mirrors the shipped E1/DD4 anchor in
+    # namer.py Branch 3 (so the locant HINT and emitted NAME agree). Phenols
+    # (hydroxy = prefix) leave the set empty -> no-op (anchored downstream).
+    _pcg_positions = set()
+    if isinstance(substituents, dict):
+        _pcg_positions = {
+            atom_idx for atom_idx, subs in substituents.items()
+            if isinstance(subs, list) and any(
+                isinstance(s, dict) and s.get("is_suffix") for s in subs
+            )
+        }
+    oriented_ring = orient_benzene(
+        mol, ring_atoms, substituents,
+        principal_group_positions=_pcg_positions or None,
+    )
 
     # Phase 152 D-06: mirror features.heterocycle_atom_to_locant convention so
     # the Tier-A return injector at composer.py:1574 can consume an authoritative

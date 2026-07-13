@@ -3073,6 +3073,26 @@ def _assemble_benzene_with_suffix(
             atom_to_locant, oriented_ring
         )
 
+    # W3-P04 (P-65.3.1 / P-14.3.4.2): single sulfonic/sulfinic acid on benzene.
+    # Bare -> 'benzenesulfonic acid' (no locant, P-65.3.1 @31163). With ANY other
+    # ring substituent the systematic ring suffix MUST cite its locant per the
+    # Blue Book PINs: '4-aminobenzene-1-sulfonic acid' (@31174),
+    # '2-(dimethylsulfamoyl)benzene-1-sulfonic acid' (@32982),
+    # '4-benzamidobenzene-1-sulfonic acid' (@33016). The general path below drops
+    # this '-1-' (emitting the valid-but-non-PIN 'sulfanilic'-style form), so a
+    # substituted case is intercepted here and re-anchored to the acid (position
+    # 1). Sulfinic follows the identical P-65.3 pattern.
+    if chosen_suffix in ('sulfonic acid', 'sulfinic acid') and chosen_count == 1:
+        if not remaining_prefix_groups:
+            return f"benzene{chosen_suffix}"
+        renumbered_groups = _renumber_relative_to(
+            remaining_prefix_groups, chosen_locants[0]
+        )
+        prefix_part = _build_prefix_string_with_locants(
+            renumbered_groups, mono_needs_locant=True
+        )
+        return f"{prefix_part}benzene-1-{chosen_suffix}"
+
     # Check for benzamide-based naming:
     # Single carboxamide -> use "benzamide" as retained base
     if chosen_suffix == 'carboxamide' and chosen_count == 1:
@@ -4159,7 +4179,18 @@ def _preferred_benzene_parent_ring(mol):
         if not substituents:
             nm = "benzene"
         else:
-            oriented_ring = orient_benzene(mol, ring_atoms, substituents)
+            # W3-P04 (P-14.4(c)): anchor the principal characteristic group to
+            # the lowest locant before detachable substituents (mirrors the
+            # composer._assemble_benzene_name path and namer.py Branch 3, so the
+            # NAME and locant HINT agree). Empty set (phenols) is a no-op.
+            pcg_positions = {
+                atom_idx for atom_idx, subs in substituents.items()
+                if any(s.get("is_suffix") for s in subs)
+            }
+            oriented_ring = orient_benzene(
+                mol, ring_atoms, substituents,
+                principal_group_positions=pcg_positions or None,
+            )
             nm = name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents)
         if nm:
             scored.append((ring_atoms, nm))
