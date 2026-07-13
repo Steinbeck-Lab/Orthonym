@@ -132,6 +132,86 @@ import re as _re
 
 _PLAIN_IMINE_NAME_RE = _re.compile(r"^[a-z]+an(?:imine|-\d+-imine)$")
 
+# W3-P15 (P-68.3.1.1.3): a SUBSTITUTED alkane-imine parent — a block of
+# numeric-locant detachable prefixes followed by the '<stem>an[-N-]imine' parent
+# (e.g. '1-nitropropan-1-imine'). The stem alternation (longest-first) anchors
+# the parent so a prefix ending in an alkane-like fragment is not mis-split.
+_ALKANE_STEM_ALT = "|".join(
+    ["pentadec", "tetradec", "tridec", "dodec", "undec", "dec", "non", "oct",
+     "hept", "hex", "pent", "but", "prop", "eth", "meth"]
+)
+_SUBST_IMINE_RE = _re.compile(
+    r"^(?P<pre>\d.*?)(?P<par>(?:cyclo)?(?:" + _ALKANE_STEM_ALT
+    + r")an(?:-\d+-)?imine)$"
+)
+_SIMPLE_MULT_BY_COUNT = {2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+
+
+def _insert_n_hydroxy(sub: str) -> Optional[str]:
+    """Insert the italic-N prefix 'N-hydroxy' alphanumerically among the
+    detachable prefixes of a substituted alkane-imine name (P-68.3.1.1.3):
+    '1-nitropropan-1-imine' -> 'N-hydroxy-1-nitropropan-1-imine'.
+
+    Fail-closed (returns None) for any imine name that is not a plain block of
+    numeric-locant prefixes on an '<stem>an-imine' parent (complex/bracketed
+    prefixes, non-alkane parents, etc.) — those keep the functional-class
+    oxime fallback."""
+    from ..naming_utils import alpha_sort_key
+
+    def _join(parts):
+        # Insert a hyphen between adjacent prefix tokens when the previous ends
+        # in a letter / closing bracket and the next starts with a LOCANT — a
+        # digit (numeric locant, '1-nitro') OR an uppercase italic locant letter
+        # ('N-hydroxy'). Substituent names are lowercase, so an uppercase start
+        # unambiguously marks an italic locant.
+        out = []
+        for i, p in enumerate(parts):
+            if i > 0 and out:
+                prev, nxt = out[-1][-1], p[:1]
+                if (prev.isalpha() or prev in ")]}") and (
+                        nxt.isdigit() or (nxt.isalpha() and nxt.isupper())):
+                    out.append("-")
+            out.append(p)
+        return "".join(out)
+
+    m = _SUBST_IMINE_RE.match(sub)
+    if not m:
+        return None
+    pre, par = m.group("pre"), m.group("par")
+    # Tokenize the prefix block: a new token starts at a locant digit that
+    # follows a letter or a closing bracket (mirror of _joined_prefix_parts).
+    tokens, cur = [], ""
+    for ch in pre:
+        if ch.isdigit() and cur and (cur[-1].isalpha() or cur[-1] in ")]}"):
+            tokens.append(cur)
+            cur = ch
+        else:
+            cur += ch
+    if cur:
+        tokens.append(cur)
+
+    def _name_of(tok: str) -> Optional[str]:
+        mm = _re.match(r"^([\dN,]+)-(.+)$", tok)
+        if not mm:
+            return None
+        locs, rest = mm.group(1).split(","), mm.group(2)
+        if "(" in rest or "[" in rest:
+            return None                        # complex substituent -> defer
+        mult = _SIMPLE_MULT_BY_COUNT.get(len(locs))
+        if mult and rest.startswith(mult):
+            rest = rest[len(mult):]
+        return rest
+
+    entries = []
+    for tok in tokens:
+        nm = _name_of(tok)
+        if nm is None:
+            return None
+        entries.append((alpha_sort_key(nm), tok))
+    entries.append((alpha_sort_key("hydroxy"), "N-hydroxy"))
+    entries.sort(key=lambda e: e[0])
+    return _join([e[1] for e in entries]) + par
+
 
 def _substitutive_oxime_name(features: Any) -> Optional[str]:
     """Bounded substitutive-oxime builder: R2C=N-OH -> 'N-hydroxy<imine PIN>'.
@@ -175,10 +255,15 @@ def _substitutive_oxime_name(features: Any) -> Optional[str]:
         sub = _name_compound(imine_smiles)
     except Exception:
         return None
-    if not sub or not _PLAIN_IMINE_NAME_RE.match(sub):
+    if not sub:
         return None
-    joiner = "-" if sub[:1].isdigit() else ""
-    return f"N-hydroxy{joiner}{sub}"
+    if _PLAIN_IMINE_NAME_RE.match(sub):
+        joiner = "-" if sub[:1].isdigit() else ""
+        return f"N-hydroxy{joiner}{sub}"
+    # W3-P15 (P-68.3.1.1.3): a SUBSTITUTED imine parent (nitrolic/nitrosolic
+    # acids -> '1-nitropropan-1-imine' etc.) — insert 'N-hydroxy' alphanumerically
+    # among its prefixes. Fail-closed to the functional-class oxime otherwise.
+    return _insert_n_hydroxy(sub)
 
 
 __all__ = ["name_oxime", "_is_oxime", "_substitutive_oxime_name"]

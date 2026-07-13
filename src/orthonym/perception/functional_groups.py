@@ -279,7 +279,13 @@ FUNCTIONAL_GROUP_SMARTS = {
     # order stays (amidine_C, imino_N, amino_N) -> chains.py _TERMINAL_C_FGS
     # ['amidine']=0 remains correct. =[NX2] (not =O) still excludes urea; the N
     # (not O) neighbour still excludes imidates (COC(=N)C).
-    "amidine": "[CX3](=[NX2])[NX3]",  # DATA-03 / D1
+    # W3-P15 (P-68.3.1.1.3): the amino-N guard ``!$([NX3]~[OX1])`` excludes an N
+    # bearing a terminal =O/[O-] (a nitro / nitroso / N-oxide nitrogen). Without
+    # it a nitrolic acid R-C(=N-OH)-NO2 false-matched amidine (its nitro N is an
+    # [NX3]), suppressing the real oxime and abstaining. Real amidine amino-N's
+    # never carry an oxygen, so no amidine regresses. Match-tuple arity unchanged
+    # (C, imino_N, amino_N).
+    "amidine": "[CX3](=[NX2])[NX3;!$([NX3]~[OX1])]",  # DATA-03 / D1 / W3-P15
     # Wave2 T3d (P-66.4.2, BB Table 6.1 items 17-18): amidrazone / hydrazonamide
     # R-C(=N-NH2)-NH2 — an amidine whose imido =NH is a hydrazono =N-NH2. The
     # =[NX2][NX2,NX3] (imino N bonded to another N) is the discriminant vs plain

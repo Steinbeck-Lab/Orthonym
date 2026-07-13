@@ -11,11 +11,10 @@ class TestImineSuffixNaming:
     """Imine uses suffix naming: chain/ring + locant + 'imine'."""
 
     def test_simple_imine(self):
-        """CC=N -> ethan-1-imine"""
+        """CC=N -> ethanimine (C2 -> locant elided, P-14.3.4.2)."""
         result = name_compound("CC=N")
         assert "imine" in result
-        # Should be "ethan-1-imine" (suffix naming)
-        assert result == "ethan-1-imine"
+        assert result == "ethanimine"
 
     def test_internal_imine(self):
         """CC(=N)C -> propan-2-imine"""
@@ -31,36 +30,32 @@ class TestImineSuffixNaming:
 
 
 class TestOximeFunctionalClassNaming:
-    """Oxime uses functional class naming: '[parent carbonyl name] oxime'."""
+    """Oxime PINs are formed SUBSTITUTIVELY as N-hydroxy derivatives of imines
+    (P-66.6.5(f) / P-68.3.1.1.2), NOT by functional-class nomenclature (the
+    retired '[carbonyl] oxime'). The substitutive form has been the shipped PIN
+    since Wave2 T2a; these assertions were reconciled to it in W3-P15."""
 
     def test_ketone_oxime(self):
-        """CC(=NO)C -> 'acetone oxime' or 'propan-2-one oxime'."""
+        """CC(=NO)C -> 'N-hydroxypropan-2-imine' (PIN)."""
         result = name_compound("CC(=NO)C")
-        assert "oxime" in result
-        # Accept either retained or systematic form of the parent
-        assert result in ("acetone oxime", "propan-2-one oxime")
+        assert result == "N-hydroxypropan-2-imine"
 
     def test_aldehyde_oxime(self):
-        """CC=NO -> 'acetaldehyde oxime' or 'ethanal oxime'."""
+        """CC=NO -> 'N-hydroxyethanimine' (PIN)."""
         result = name_compound("CC=NO")
-        assert "oxime" in result
-        assert result in ("acetaldehyde oxime", "ethanal oxime")
+        assert result == "N-hydroxyethanimine"
 
     def test_cyclic_oxime(self):
-        """C1(=NO)CCCCC1 -> '[cyclohexanone variant] oxime'."""
+        """C1(=NO)CCCCC1 -> 'N-hydroxycyclohexan-1-imine' (PIN)."""
         result = name_compound("C1(=NO)CCCCC1")
-        assert "oxime" in result
-        # Cyclic ketone parent -- accept any valid cyclohexanone form
+        assert "imine" in result
         assert "cyclohex" in result
 
     def test_oxime_contains_parent_name(self):
-        """Verify the parent carbonyl name appears before ' oxime'."""
+        """The substitutive oxime PIN carries the 'N-hydroxy' prefix + imine parent."""
         result = name_compound("CC(=NO)C")
-        parts = result.rsplit(" ", 1)
-        assert len(parts) == 2
-        assert parts[1] == "oxime"
-        # Parent name should be a valid carbonyl name
-        assert len(parts[0]) > 0
+        assert result.startswith("N-hydroxy")
+        assert result.endswith("imine")
 
 
 class TestOximeEZStereoPreservation:
@@ -77,49 +72,50 @@ class TestOximeEZStereoPreservation:
         assert "6E" in result, f"Expected 6E in '{result}'"
 
     def test_simple_oxime_no_spurious_stereo(self):
-        """Simple oxime without C=N stereo should NOT get stereo added."""
+        """Simple oxime without C=N stereo should NOT get stereo added
+        (substitutive PIN 'N-hydroxypropan-2-imine')."""
         result = name_compound("CC(=NO)C")
-        assert "oxime" in result
+        assert "imine" in result
         # Should NOT contain E or Z
         assert "E" not in result, f"Unexpected E in simple oxime '{result}'"
         assert "Z" not in result, f"Unexpected Z in simple oxime '{result}'"
 
     def test_aldehyde_oxime_no_spurious_stereo(self):
-        """Aldehyde oxime without stereo should not get stereo added."""
+        """Aldehyde oxime without stereo should not get stereo added
+        (substitutive PIN 'N-hydroxyethanimine')."""
         result = name_compound("CC=NO")
-        assert "oxime" in result
+        assert "imine" in result
         assert "E" not in result
         assert "Z" not in result
 
 
 class TestHydrazoneFunctionalClassNaming:
-    """Hydrazone uses functional class naming: '[parent carbonyl name] hydrazone'."""
+    """Hydrazone PINs are formed SUBSTITUTIVELY as 'ylidene' derivatives of
+    hydrazine (P-68.3.1.2.2 method (1) = PIN), NOT by functional-class
+    nomenclature (the retired '[carbonyl] hydrazone'). Reconciled to the
+    substitutive PIN in W3-P15 (idx 1927)."""
 
     def test_ketone_hydrazone(self):
-        """CC(=NN)C -> 'acetone hydrazone' or 'propan-2-one hydrazone'."""
+        """CC(=NN)C -> '(propan-2-ylidene)hydrazine' (PIN)."""
         result = name_compound("CC(=NN)C")
-        assert "hydrazone" in result
-        assert result in ("acetone hydrazone", "propan-2-one hydrazone")
+        assert result == "(propan-2-ylidene)hydrazine"
 
     def test_aldehyde_hydrazone(self):
-        """CC=NN -> 'acetaldehyde hydrazone' or 'ethanal hydrazone'."""
+        """CC=NN -> 'ethylidenehydrazine' (PIN)."""
         result = name_compound("CC=NN")
-        assert "hydrazone" in result
-        assert result in ("acetaldehyde hydrazone", "ethanal hydrazone")
+        assert result == "ethylidenehydrazine"
 
     def test_cyclic_hydrazone(self):
-        """C1(=NN)CCCCC1 -> '[cyclohexanone variant] hydrazone'."""
+        """C1(=NN)CCCCC1 -> 'cyclohexylidenehydrazine' (PIN)."""
         result = name_compound("C1(=NN)CCCCC1")
-        assert "hydrazone" in result
+        assert "hydrazine" in result
         assert "cyclohex" in result
 
     def test_hydrazone_contains_parent_name(self):
-        """Verify the parent carbonyl name appears before ' hydrazone'."""
+        """The substitutive hydrazone PIN is an 'ylidene' derivative of hydrazine."""
         result = name_compound("CC(=NN)C")
-        parts = result.rsplit(" ", 1)
-        assert len(parts) == 2
-        assert parts[1] == "hydrazone"
-        assert len(parts[0]) > 0
+        assert result.endswith("hydrazine")
+        assert "ylidene" in result
 
 
 class TestFGDetectionNewGroups:
