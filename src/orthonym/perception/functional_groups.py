@@ -94,10 +94,14 @@ FUNCTIONAL_GROUP_SMARTS = {
     # AUDIT-FRN 2.4 =NH guard holds). Atom order: (central_C, imino_N, amino_N,
     # ester_O, alkyl_C).
     "carbamimidate": "[CX3](=[NX2])([NX3])[OX2][#6]",  # R''2N-C(=NR')-O-R (P-66.1.6.1.2.1)
-    # Imidic acid R-C(=NH)-OH (P-65.1.3.1 / Table 4.3 'imidic acid'); the
-    # [#6] guard keeps N=C(O)O / N=C(N)O on the exact-SMILES
-    # carbonimidic/carbamimidic inorganic-acid entries.
-    "imidic_acid": "[CX3;$([CX3]([#6])(=[NX2H1])[OX2H1])](=[NX2H1])[OX2H1]",
+    # Imidic acid R-C(=NH)-OH (P-65.1.3.1 / Table 4.3 'imidic acid'). W3-P02-1
+    # (P-65.1.3.1.1): the imidic C may bear an H (methanimidic HC(=NH)-OH, PIN
+    # 'methanimidic acid'), so the third neighbour is NO LONGER required to be
+    # [#6] — it may be H or C. The `!$([CX3]([#7,#8])...)` guard still keeps
+    # N=C(O)O / N=C(N)O routing to the exact-SMILES carbonimidic/carbamimidic
+    # inorganic-acid entries (third neighbour = O/N -> excluded). Match tuple
+    # stays (C, imino-N, hydroxyl-O).
+    "imidic_acid": "[CX3;$([CX3](=[NX2H1])[OX2H1]);!$([CX3]([#7,#8])(=[NX2H1])[OX2H1])](=[NX2H1])[OX2H1]",
     "thioester": "[CX3](=O)[SX2][#6]",
     # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
     "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
