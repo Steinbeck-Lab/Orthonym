@@ -196,6 +196,13 @@ RETAINED_NAMES = {
     # (BB:38900); BB:38898 'The name carbazone is not recommended'. Canonical
     # key of N=NC(=O)NN.
     "N=NC(=O)NN": "diazenecarbohydrazide",
+    # W3-P01-6 (P-68.3.1.3.6): HN=N-C(=O)-N=NH. PIN bis(diazenyl)methanone
+    # (BB:38997 '...(PIN) [not 1,1'-carbonylbis(diazene)]'); the -one suffix is
+    # senior to the diazene parent (P-41). REPRODUCE-FIRST: the substitutive
+    # engine fails closed (unknown) on this symmetric diazenyl ketone, so the
+    # exact-SMILES retained PIN supplies it; trivial 'carbodiazone' denied in
+    # iupac_2013_pin_list.json (--trivial). Canonical key of N=NC(=O)N=N.
+    "N=NC(=O)N=N": "bis(diazenyl)methanone",
 
     # === COMMON SOLVENTS AND REAGENTS ===
     "ClCCl": "dichloromethane",
