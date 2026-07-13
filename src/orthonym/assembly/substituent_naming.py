@@ -3382,6 +3382,55 @@ def name_substituent_fragment(
                     return None
                 return 'C-hydroxycarbonimidoyl'
 
+    # W3-P02-7 (P-65.1.7.2.2, BB 30462): a substituent that is an imidoyl carbon
+    # R-C(=NH)- (R = linear alkyl) is the '{stem}animidoyl' acyl prefix —
+    # 'ethanimidoyl' for CH3-C(=NH)-, 'methanimidoyl' for HC(=NH)-. Used e.g. as
+    # an amide N-substituent: 'N-ethanimidoyl-N-methylacetamide'. Mirrors the AM-5
+    # detector (benzene.py) at the universal substituent namer. Detect: the attach
+    # C (acyclic, neutral) bears exactly ONE terminal neutral unsubstituted =NH
+    # (degree-1, charge-0, one H); the remainder of the fragment (sub_atoms minus
+    # the imino N) is a pure ACYCLIC UNBRANCHED alkyl chain. The parent-attachment
+    # atom is the attach C neighbour NOT in sub_atoms (parent_chain is [] here, so
+    # the walk is confined to sub_atoms). Fail closed for ring / branched /
+    # substituted-imino / hetero remainders (other classes, e.g. the
+    # C-hydroxycarbonimidoyl detector above owns the -OH variant).
+    if attach_idx is not None and len(sub_atoms) >= 2:
+        _mc = mol.GetAtomWithIdx(attach_idx)
+        _sub_set2 = set(sub_atoms)
+        if (_mc.GetSymbol() == 'C' and _mc.GetFormalCharge() == 0
+                and not _mc.IsInRing()):
+            _im_ns = [
+                n.GetIdx() for n in _mc.GetNeighbors()
+                if n.GetSymbol() == 'N'
+                and n.GetIdx() in _sub_set2
+                and mol.GetBondBetweenAtoms(
+                    attach_idx, n.GetIdx()).GetBondTypeAsDouble() == 2.0
+            ]
+            if len(_im_ns) == 1:
+                _im_n2 = mol.GetAtomWithIdx(_im_ns[0])
+                _im_heavy = [y for y in _im_n2.GetNeighbors()
+                             if y.GetIdx() != attach_idx]
+                # The alkyl part is the whole fragment minus the imino N.
+                _alkyl_set = _sub_set2 - {_im_ns[0]}
+                _alkyl_ok = bool(_alkyl_set)
+                for _a in _alkyl_set:
+                    _aa = mol.GetAtomWithIdx(_a)
+                    if _aa.GetSymbol() != 'C' or _aa.IsInRing():
+                        _alkyl_ok = False
+                        break
+                    # linear chain: <=2 heavy neighbours WITHIN the alkyl part
+                    _ndeg = sum(1 for nb in _aa.GetNeighbors()
+                                if nb.GetIdx() in _alkyl_set)
+                    if _ndeg > 2:
+                        _alkyl_ok = False
+                        break
+                if (_alkyl_ok and _im_n2.GetFormalCharge() == 0
+                        and not _im_heavy and _im_n2.GetTotalNumHs() == 1):
+                    from ..data.chain_names import get_chain_prefix
+                    _stem = get_chain_prefix(len(_alkyl_set))
+                    if _stem:
+                        return f"{_stem}animidoyl"
+
     # Wave2 T3c (P-31.1.3.4): aryl-vinyl / styryl — an acyclic UNSATURATED chain
     # bearing a ring substituent (Ar-CH=CH- -> (E)-2-phenylethenyl). MUST precede
     # the Step 1c ring chokepoint (which declines because the free valence is on

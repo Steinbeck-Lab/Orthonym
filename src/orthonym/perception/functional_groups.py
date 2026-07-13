@@ -700,6 +700,17 @@ def _resolve_fg_collisions(results):
         # (the amidoxime -C(=N-OH)-NH2 is a P-66.4.4 N'-hydroxy amidine, NOT an
         # oxime; atom-scoped so standalone oximes CC=NO are untouched).
         ('amidine', ['imine', 'primary_amine', 'oxime']),
+        # W3-P02-7 (P-65.1.7.2.2 / P-41): an N-acyl amidine R-C(=NH)-N(R')-C(=O)-R''
+        # is a carboxAMIDE bearing an N-imidoyl substituent, NOT a free amidine —
+        # carboxamide is SENIOR to carboximidamide (P-41). When an amidine's
+        # amino-N is (also) an amide nitrogen (secondary/tertiary amide match
+        # shares that N and/or the imidoyl C), suppress the amidine so the amide
+        # is the sole principal group and the C(=NH)- becomes the N-'{stem}animidoyl'
+        # substituent (BB 30462: 'N-ethanimidoyl-N-methylacetamide'). Atom-overlap-
+        # scoped: a genuinely separate amidine elsewhere is untouched. Placed AFTER
+        # the amidine rule above so amidine's own imine/oxime suppressions fire first.
+        ('secondary_amide', ['amidine']),
+        ('tertiary_amide', ['amidine']),
         # Wave2 T3d (P-66.3.4): thiohydrazide suppresses thioamide + hydrazine_fg.
         ('thiohydrazide', ['thioamide', 'hydrazine_fg']),
         # DATA-04: acid iodide suppresses aldehyde (parallel to other acid halides)
