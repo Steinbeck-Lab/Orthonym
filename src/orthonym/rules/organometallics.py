@@ -547,7 +547,16 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # yl)methoxy]silane' BB-style); simple methyl/ethyl stay bare
             # unless multiplied next to a compound neighbour.
             def _ligand_token(count, name):
+                from ..assembly.naming_utils import needs_p1634_marks
                 mult = _multiplicative_prefix(count)
+                # W3-P03-7 (P-16.3.4(c)/(d), BB 38222): a multiplied alkyl ligand
+                # whose NAME begins with a numeric-multiplier syllable (decyl /
+                # dodecyl..nonadecyl) takes enclosing marks so the multiplier is
+                # not folded into the stem -- 'di(dodecyl)silane' (PIN) -- while
+                # KEEPING the basic di/tri multiplier (the alkyl is not otherwise
+                # complex, so it is NOT switched to bis). Gated on count > 1.
+                if count > 1 and needs_p1634_marks(name):
+                    return f'{mult}({name})'
                 complex_name = ('-' in name or '(' in name
                                 or name.endswith('oxy'))
                 if complex_name:

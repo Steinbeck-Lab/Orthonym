@@ -932,6 +932,50 @@ def is_complex_substituent(name: str) -> bool:
     return False
 
 
+# W3-P03-7 (P-16.3.4(c)/(d), BB 38222/L7104): unbranched primary-alkyl prefixes
+# whose NAME begins with a numerical-multiplier syllable take ENCLOSING MARKS
+# when multiplied (count > 1), so the reader cannot fold the multiplier into the
+# alkyl stem — 'di(dodecyl)silane' (PIN), 'di(decyl)', 'di(tridecyl)', 'tri(decyl)'
+# — while KEEPING the BASIC di/tri multiplier (NOT the derived bis/tris; the alkyl
+# name is not otherwise complex). The affected stems are decyl (C10; 'dec-'=deca)
+# and dodecyl..nonadecyl (C12-C19; 'do-'/'tri-'/'tetra-'/…/'nona-' + 'decyl').
+# EXCLUDED: methyl..nonyl (C1-C9, no leading multiplier syllable), undecyl (C11,
+# 'un-' is not a multiplier), and icosyl+ (C20+, 'icos-' is not a leading di/tri
+# syllable). This is orthogonal to is_complex_substituent (which would wrongly
+# switch the multiplier to bis) and to needs_brackets (which never flags them).
+_P1634_MARK_ALKYL_STEMS = frozenset({
+    "decyl",        # C10  (dec- = deca)
+    "dodecyl",      # C12  (do-  = di in dodeca)
+    "tridecyl",     # C13
+    "tetradecyl",   # C14
+    "pentadecyl",   # C15
+    "hexadecyl",    # C16
+    "heptadecyl",   # C17
+    "octadecyl",    # C18
+    "nonadecyl",    # C19
+})
+
+
+def needs_p1634_marks(name: str) -> bool:
+    """P-16.3.4(c)/(d): does this alkyl prefix take enclosing marks when multiplied?
+
+    Returns True for unbranched primary-alkyl names beginning with a numerical-
+    multiplier syllable (decyl C10; dodecyl..nonadecyl C12-C19). Such names are
+    parenthesised when count > 1 — 'di(dodecyl)silane' — but keep the basic di/tri
+    multiplier. undecyl (C11) and icosyl+ (C20+) are excluded (no leading
+    multiplier syllable), as are C1-C9. The caller applies the count > 1 gate.
+
+    Examples:
+        >>> needs_p1634_marks("dodecyl")
+        True
+        >>> needs_p1634_marks("undecyl")
+        False
+        >>> needs_p1634_marks("methyl")
+        False
+    """
+    return name.lower() in _P1634_MARK_ALKYL_STEMS
+
+
 # P-35.1 (BlueBookV2.md:17954): simple prefixes whose 'di'/'tri' concatenation
 # collides with a P-29.3.1 catenated-hydride prefix (disulfanyl = -SSH, NOT
 # two -SH). These take the derived multipliers bis/tris/... even though the
@@ -1164,6 +1208,23 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     #   but NOT for names that already have their own parenthesization (e.g., "(oxan-2-yl)oxy")
     #   and NOT for names that are just hyphenated (e.g., "3-sec-butyl" is fine)
     complex = is_complex_substituent(name)
+    # W3-P03-1 (P-16.3.3): FG-fused-alkyl prefixes (carboxymethyl, hydroxymethyl,
+    # aminomethyl, ...) are digit-less/hyphen-less COMPOUND substituents that
+    # is_complex_substituent misses but needs_brackets flags (BB '3-(carboxymethyl)
+    # heptanedioic acid'). Fold needs_brackets in here — the ONE canonical
+    # enclosing-mark predicate the docstring mandates. Preserve is_complex's
+    # deliberate tert-/sec- carve-out (P-16.3.4: di-tert-butyl, never bis/(tert-
+    # butyl)) by NOT letting the needs_brackets hyphen rule re-wrap those retained
+    # forms; is_complex already flags every other hyphen/digit compound.
+    if needs_brackets(name) and not name.lower().startswith(("tert-", "sec-")):
+        complex = True
+    # W3-P03-7 (P-16.3.4(c)/(d)): a multiplied alkyl name beginning with a numeric-
+    # multiplier syllable (decyl / dodecyl..nonadecyl) takes enclosing marks —
+    # 'di(dodecyl)silane' — but the multiplier stays basic di/tri (get_multiplier_
+    # prefix, computed above from is_complex_substituent, is untouched, so it is
+    # NOT switched to bis). Gated on count > 1: a single 'dodecylsilane' is bare.
+    if count > 1 and needs_p1634_marks(name):
+        complex = True
     if _has_stereo_prefix(name):
         # Name has a CIP stereo descriptor prefix (e.g., "(R)-sec-butyl"):
         # use square brackets per IUPAC P-16.3.3 nesting rules
