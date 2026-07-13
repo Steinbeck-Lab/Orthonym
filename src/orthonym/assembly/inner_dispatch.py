@@ -1042,6 +1042,27 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- W3-P04 (P-65.3.1.5): N-hydroxy sulfonimidic (hydroximic-of-sulfonic) handler.
+#     R-S(=O)(=N-OH)-OH is named as the N-hydroxy derivative of the corresponding
+#     sulfonimidic acid (PIN 'N-hydroxymethanesulfonimidic acid'). Priority 5212 —
+#     after hydroximic@5211. Predicate ALSO gates on a terminal -OH on the imino N,
+#     so the plain =NH parent (CS(=O)(=N)O) falls through to the suffix path.
+#     Fail-safe: returns None so general_acyclic@99999 stays the backstop.
+from .handlers.sulfonimidic_n_hydroxy import (  # noqa: E402
+    _is_sulfonimidic_n_hydroxy,
+    name_sulfonimidic_n_hydroxy,
+)
+
+_register_inner(
+    handler_id="sulfonimidic_n_hydroxy",
+    priority=5212,
+    predicate=_is_sulfonimidic_n_hydroxy,
+    handler=name_sulfonimidic_n_hydroxy,
+    iupac_section="P-65.3.1.5",
+    description="N-hydroxy sulfonimidic acid -> N-hydroxy<sulfonimidic acid> PIN (W3-P04; P-65.3.1.5)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-03 commit 03-03: amine (Tier-2 mid-tier with polyfunctional + Tier-A
 #     mutex; audit § 1 + § 3). Predicate:
 #       principal_group in {secondary_amine, tertiary_amine}

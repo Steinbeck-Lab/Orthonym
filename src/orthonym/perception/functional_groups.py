@@ -73,6 +73,12 @@ FUNCTIONAL_GROUP_SMARTS = {
     # required [OX2H1] keeps this from stealing sulfinimidamide -S(=NH)-NH2 (the
     # third neighbour is N, not OH there).
     "sulfinimidic_acid": "[SX3;$([SX3][#6])](=[NX2])[OX2H1]",
+    # -S(=O)(=NH)-OH sulfonimidic acid (P-65.3.1.4; BB @31234, one =O of the
+    # sulfonic acid replaced by =NH). SX4 (sulfonic-derived). Match tuple
+    # (S, =O, =NH, -OH). Required [OX2H1] keeps it from stealing sulfonimidamide
+    # -S(=O)(=NH)-NH2. The N may itself bear an -OH (=N-OH): that is the
+    # N-hydroxy hydroximic derivative (P-65.3.1.5), handled downstream.
+    "sulfonimidic_acid": "[SX4;$([SX4][#6])](=O)(=[NX2])[OX2H1]",
     "sulfinic_acid": "[SX3;$([SX3][#6])](=O)[OX2H1]",
     "sulfenic_acid": "[SX2]([OX2H])[#6]",  # DATA-05d: IUPAC P-65.3.1.4 R-S-OH
     # v23 Phase 9 (P-65.3 / Table 6.2): selenium & tellurium analogues of the
@@ -811,6 +817,14 @@ def _resolve_fg_collisions(results):
         # R-S(=NH)-OH unit; suppress the generic sulfinic read and any imine
         # (S=N) / alcohol (S-OH) reads defensively.
         ('sulfinimidic_acid', ['sulfinic_acid', 'imine', 'alcohol',
+                               'primary_alcohol', 'secondary_alcohol',
+                               'tertiary_alcohol']),
+        # W3-P04 (P-65.3.1.4 / P-65.3.1.5): the =NH-modified sulfonic acid owns
+        # its R-S(=O)(=NH)-OH unit; suppress the generic sulfonic/sulfone read
+        # and any imine (S=N) / oxime (=N-OH, the N-hydroxy variant) /
+        # hydroxylamine / alcohol reads on its atoms.
+        ('sulfonimidic_acid', ['sulfonic_acid', 'sulfuric_acid', 'sulfone',
+                               'imine', 'oxime', 'hydroxylamine', 'alcohol',
                                'primary_alcohol', 'secondary_alcohol',
                                'tertiary_alcohol']),
         ('nitric_acid', ['nitro', 'nitroso']),

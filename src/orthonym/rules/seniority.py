@@ -105,6 +105,11 @@ SENIORITY_ORDER = [
     # acid suffix. BB @31178 orders 'unmodified > -OO- > S > Se > Te', so it
     # ranks below sulfonoperoxoic_acid (-OO-) and above the =NH imidic block.
     "sulfonothioic_S_acid",
+    # W3-P04 (P-65.3.1.4 @31234): FRN =NH (imidic) modification of the sulfonic
+    # acid suffix (-S(=O)(=NH)-OH). =NH ranks below the chalcogen modifications
+    # (BB @31178 lists =NH after -OO-/S/Se/Te); grouped with its sulfonic parent,
+    # above the sulfinic block (sulfonic > sulfinic).
+    "sulfonimidic_acid",
     "sulfinic_acid",
     # W3-P04 (P-65.3.1.4 @31212): FRN =NH (imidic) modification of the sulfinic
     # acid suffix (-S(=NH)-OH). Imidic (=NH) replacement ranks below the
@@ -452,6 +457,10 @@ SUFFIX_FORMS = {
     # sulfonothioic S-acid'); chain stem + 'sulfonothioic S-acid'
     # (ethanesulfonothioic S-acid, PIN).
     "sulfonothioic_S_acid": ("sulfonothioic S-acid", "sulfonothioic S-acid"),
+    # W3-P04 (P-65.3.1.4 @31234): FRN =NH modified sulfonic acid; chain stem +
+    # 'sulfonimidic acid' (methanesulfonimidic acid). The N-hydroxy derivative
+    # (P-65.3.1.5) prepends 'N-hydroxy' via the dedicated handler.
+    "sulfonimidic_acid": ("sulfonimidic acid", "sulfonimidic acid"),
     # W3-P04 (P-65.3.1.4 @31212): FRN =NH modified sulfinic acid; chain stem +
     # 'sulfinimidic acid' (methanesulfinimidic acid, PIN @31220).
     "sulfinimidic_acid": ("sulfinimidic acid", "sulfinimidic acid"),
@@ -637,6 +646,7 @@ PREFIX_FORMS = {
     # principal group; a wrong prefix would be worse than fail-closed abstention.
     "sulfonoperoxoic_acid": None,
     "sulfonothioic_S_acid": None,  # W3-P04 (P-65.3.1.3): demoted-prefix fails closed
+    "sulfonimidic_acid": None,     # W3-P04 (P-65.3.1.4): demoted-prefix fails closed
     "sulfinimidic_acid": None,     # W3-P04 (P-65.3.1.4): demoted-prefix fails closed
     "sulfinic_acid": "sulfino",
     # v23 Phase 9 (P-65.3.2.1): Se/Te prefix forms (demoted when a senior group present)
