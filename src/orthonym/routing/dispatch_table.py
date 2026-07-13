@@ -135,6 +135,7 @@ class StoutClass(_StrEnumBase):
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
     PSEUDOKETONE_HETERO = "pseudoketone_hetero"      # Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2 1-silylethan-1-one; priority 48.6)
+    ACYL_CHALCOGENCHAIN_PSEUDOKETONE = "acyl_chalcogenchain_pseudoketone"  # W3-P14 (P-68.4.1.3 acyl on a homogeneous >=3-chalcogen chain: CH3CH2-CO-O-O-OH -> 1-trioxidanylpropan-1-one; priority 48.65 — after PSEUDOKETONE_HETERO@48.6, before HETEROIMINE@48.7)
     HETEROIMINE = "heteroimine"                      # W2E-P1FG (P-62.3.1.3 X=NH -> 1-methylphosphanimine; priority 48.7)
     LAMBDA_SULFANE_IMINE_OXIDE = "lambda_sulfane_imine_oxide"  # W3-P13 (P-68.4.3.3-.8 mononuclear S/Se/Te imine/oxide: sulfimide/sulfoximide/sulfonediimine/sulfur di-/tri-imide; priority 48.75 — after HETEROIMINE@48.7, before KETENE@49)
     POLYCHALCOGEN_OXIDE = "polychalcogen_oxide"      # W3-P13 (P-68.4.3.2 di-/polysulfoxide-sulfone: CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione; priority 46.5 — after CHALCOGEN_CHAIN@46, before POLYAZANE@47)
@@ -1267,6 +1268,25 @@ def _handle_pseudoketone_hetero(mol, smiles, canonical_smiles, features=None,
     return name_acyl_hetero_pseudoketone(mol)
 
 
+def _is_acyl_chalcogenchain_pseudoketone(mol, smiles, canonical_smiles,
+                                         features=None, **kwargs) -> bool:
+    """W3-P14 (P-68.4.1.3); priority 48.65. An acyl on a homogeneous >=3-chalcogen
+    chain (CH3CH2-CO-O-O-OH -> 1-trioxidanylpropan-1-one). PURE graph classifier,
+    fail-closed (declines ordinary esters/thioesters)."""
+    if mol is None:
+        return False
+    from orthonym.rules.pseudoketones import name_acyl_chalcogenchain_pseudoketone
+    return name_acyl_chalcogenchain_pseudoketone(mol) is not None
+
+
+def _handle_acyl_chalcogenchain_pseudoketone(mol, smiles, canonical_smiles,
+                                             features=None, **kwargs) -> Optional[str]:
+    """Return the acyl-chalcogenchain pseudoketone PIN (P-68.4.1.3), else None
+    (cascade-continuation)."""
+    from orthonym.rules.pseudoketones import name_acyl_chalcogenchain_pseudoketone
+    return name_acyl_chalcogenchain_pseudoketone(mol)
+
+
 def _is_heteroimine(mol, smiles, canonical_smiles, features=None,
                     **kwargs) -> bool:
     """W2E-P1FG (P-62.3.1.3); priority 48.7. X=NH where X is a mononuclear
@@ -1689,6 +1709,21 @@ _register_dispatch(
     iupac_section="Blue Book P-64.1.2.1 (b) / P-64.5.2.2",
     description="Acyl on Si/Ge/P/As hub (1-silylethan-1-one / "
                 "1-phosphanylbutan-1-one); graph classifier, fail-closed",
+)
+# --- W3-P14: ACYL_CHALCOGENCHAIN_PSEUDOKETONE at priority 48.65 (after ---
+# PSEUDOKETONE_HETERO@48.6, before HETEROIMINE@48.7). An acyl group terminating a
+# homogeneous chain of >=3 identical chalcogens (P-68.4.1.3): CH3CH2-CO-O-O-OH ->
+# 1-trioxidanylpropan-1-one (the chalcogen chain is the 'trioxidanyl' substituent
+# on the carbonyl parent). The >=3-chalcogen gate keeps ordinary esters (R-CO-O-C),
+# thioesters (R-CO-S-C), carboxylic acids (-CO-OH) and peroxy acids (-CO-O-OH) out.
+# Was 'unknown organic compound'. Graph classifier, fail-closed. ---
+_register_dispatch(
+    class_id=StoutClass.ACYL_CHALCOGENCHAIN_PSEUDOKETONE, priority=48.65, tier=1,
+    predicate=_is_acyl_chalcogenchain_pseudoketone,
+    handler=_handle_acyl_chalcogenchain_pseudoketone,
+    iupac_section="Blue Book P-68.4.1.3",
+    description="Acyl on a homogeneous >=3-chalcogen chain "
+                "(1-trioxidanylpropan-1-one); graph classifier, fail-closed",
 )
 _register_dispatch(
     class_id=StoutClass.HETEROIMINE, priority=48.7, tier=1,

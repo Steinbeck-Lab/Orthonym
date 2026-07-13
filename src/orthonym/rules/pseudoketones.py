@@ -360,3 +360,131 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
     length = len(chain)
     base_name = f"{get_chain_prefix(length)}an"
     return f"1-{token}{base_name}-1-one"
+
+
+# Chalcogen-chain parent-hydride stems (P-21.2.2) for the trioxidanyl substituent.
+_CHALCOGENCHAIN_STEMS = {"O": "oxidane", "S": "sulfane", "Se": "selane",
+                         "Te": "tellane"}
+_CHALCOGENCHAIN_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+
+
+def name_acyl_chalcogenchain_pseudoketone(mol) -> Optional[str]:
+    """P-68.4.1.3 (BB 39389): an acyl group terminating a HOMOGENEOUS chain of
+    >=3 identical chalcogens (``-O-O-OH`` = trioxidane) is named as a pseudoketone
+    whose carbonyl component is the parent (``-one``) and the chalcogen chain is
+    the ``-yl`` substituent::
+
+        CH3-CH2-CO-O-O-OH -> 1-trioxidanylpropan-1-one (PIN)
+
+    GUARD (w3p08 lesson): must NOT swallow ordinary esters/thioesters — an
+    ``R-CO-O-C`` ester or ``R-CO-S-C`` thioester has a CARBON on the acyl
+    chalcogen, so its "chain" is length 1 (< 3) and is declined; a carboxylic
+    acid (-CO-OH, chain length 1) and a peroxy acid (-CO-O-OH, chain length 2)
+    likewise decline. Fires only on a pure homogeneous >=3-chalcogen chain
+    terminated by -H (the -OH/-SH).
+
+    Fail-closed graph classifier (mirrors name_acyl_hetero_pseudoketone): exactly
+    one non-ring carbonyl C whose heavy neighbours are {terminal =O, one chain C,
+    one chalcogen hub}; the hub begins a homogeneous n>=3 chalcogen chain (all one
+    element, unbranched, H-terminated); the acyl chain is a clean unbranched all-C
+    chain; nothing else in the molecule. Pure: no mol mutation.
+    """
+    from rdkit import Chem
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    carbonyls = []
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != "C" or atom.IsInRing():
+            continue
+        oxo = hub = chain_c = None
+        extra = False
+        for b in atom.GetBonds():
+            other = b.GetOtherAtom(atom)
+            if (other.GetSymbol() == "O" and other.GetDegree() == 1
+                    and other.GetTotalNumHs() == 0
+                    and b.GetBondType() == Chem.BondType.DOUBLE):
+                oxo = other
+            elif (other.GetSymbol() in _CHALCOGENCHAIN_STEMS
+                    and b.GetBondType() == Chem.BondType.SINGLE
+                    and not other.IsInRing()):
+                hub = other
+            elif (other.GetSymbol() == "C"
+                    and b.GetBondType() == Chem.BondType.SINGLE):
+                chain_c = other
+            else:
+                extra = True
+        if (oxo is not None and hub is not None and chain_c is not None
+                and not extra and atom.GetTotalNumHs() == 0):
+            carbonyls.append((atom, oxo, hub, chain_c))
+    if len(carbonyls) != 1:
+        return None
+    catom, oxo, hub, chain_c = carbonyls[0]
+
+    # Hub begins a homogeneous chalcogen chain of >=3 identical chalcogens
+    # (unbranched) terminated by H, walking away from the carbonyl C.
+    element = hub.GetSymbol()
+    chain_idxs = []
+    prev, cur = catom.GetIdx(), hub.GetIdx()
+    while True:
+        a = mol.GetAtomWithIdx(cur)
+        if a.GetSymbol() != element or a.GetFormalCharge() != 0:
+            return None
+        chain_idxs.append(cur)
+        nxt = []
+        for n in a.GetNeighbors():
+            if n.GetIdx() == prev or n.GetAtomicNum() <= 1:
+                continue
+            if n.GetSymbol() != element:
+                return None                       # organyl/heteroatom -> ester guard
+            bond = mol.GetBondBetweenAtoms(cur, n.GetIdx())
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            nxt.append(n.GetIdx())
+        if len(nxt) == 0:
+            break
+        if len(nxt) > 1:
+            return None                           # branch
+        prev, cur = cur, nxt[0]
+    if len(chain_idxs) < 3:
+        return None                               # ester / peroxy-acid territory
+    if mol.GetAtomWithIdx(chain_idxs[-1]).GetTotalNumHs() < 1:
+        return None                               # far terminus must be -XH
+
+    # Acyl parent chain: longest all-C chain excluding the chalcogen side; the
+    # carbonyl C is a terminus (locant 1); clean (no other substituents).
+    hub_frag = set(chain_idxs)
+    chain = find_longest_carbon_chain(mol, exclude_atoms=hub_frag)
+    if not chain or catom.GetIdx() not in chain:
+        return None
+    if chain[0] != catom.GetIdx() and chain[-1] != catom.GetIdx():
+        return None
+    if chain[0] != catom.GetIdx():
+        chain = list(reversed(chain))
+    chain_set = set(chain)
+    for c in chain:
+        for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in chain_set or nbr.GetSymbol() == "H":
+                continue
+            if c == catom.GetIdx() and ni in (oxo.GetIdx(), hub.GetIdx()):
+                continue
+            return None
+
+    # Whole molecule = acyl chain + oxo + chalcogen chain (+H).
+    covered = chain_set | {oxo.GetIdx()} | hub_frag
+    if any(a.GetIdx() not in covered
+           for a in mol.GetAtoms() if a.GetAtomicNum() > 1):
+        return None
+
+    n = len(chain_idxs)
+    stem = _CHALCOGENCHAIN_STEMS[element]
+    mult = _CHALCOGENCHAIN_MULT.get(n)
+    if mult is None:
+        return None
+    subst = f"{mult}{stem}"[:-1] + "yl"           # trioxidane -> trioxidanyl
+    base = f"{get_chain_prefix(len(chain))}an"
+    return f"1-{subst}{base}-1-one"
