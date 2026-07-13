@@ -1816,17 +1816,27 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             mol, c_atom.GetIdx(), acyl_excluded
                         )
                         if acyl_atoms_list is not None and acyl_c > 0:
-                            from ..data.chain_names import get_chain_prefix
-                            try:
-                                acyl_prefix = get_chain_prefix(acyl_c)
-                                acyloxy_name = f"({acyl_prefix}anoyloxy)"
-                                return {
-                                    'name': acyloxy_name,
-                                    'atoms': sub_atoms,
-                                    'is_complex': True,
-                                }
-                            except (ValueError, KeyError):
-                                pass
+                            # W3-P07 (P-65.6.3.2.3): use the RETAINED acyl name for
+                            # the acyloxy prefix ('acetyloxy' is preferred to both
+                            # the systematic 'ethanoyloxy' AND 'acetoxy'; formyloxy
+                            # for HCO-O-). get_acyloxy_prefix consults the retained-
+                            # acyl table, falling back to systematic '<stem>anoyloxy'
+                            # for C>=3 (propanoyloxy, ...). acyl_atoms_list already
+                            # includes the carbonyl C; add the carbonyl O so the acid
+                            # fragment is named as the free acid.
+                            from .esters import (
+                                get_acid_fragment_name, get_acyloxy_prefix,
+                            )
+                            acid_atoms = list(acyl_atoms_list) + [cn.GetIdx()]
+                            acid_name = get_acid_fragment_name(mol, acid_atoms)
+                            if acid_name:
+                                acyloxy = get_acyloxy_prefix(acid_name)
+                                if acyloxy:
+                                    return {
+                                        'name': f"({acyloxy})",
+                                        'atoms': sub_atoms,
+                                        'is_complex': True,
+                                    }
                         break
 
             # Case 3: O -> non-aromatic ring C (glycoside/sugar etc.)
