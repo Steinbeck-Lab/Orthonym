@@ -1453,6 +1453,36 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 _amidine_excluded_n.update(_pa_ns)
                 continue
 
+        # W3-P03-2 (P-65.1.4.2, BB 30197): a non-principal PEROXY acid -CO-OOH
+        # whose carbonyl C terminates an ACYCLIC chain parent (a senior group
+        # present, e.g. COOH) is expressed as 'oxo' (=O) + 'hydroperoxy' (-OOH)
+        # at that carbon's locant -- '6-hydroperoxy-6-oxohexanoic acid' (PIN,
+        # L30193: "the combination of the simple prefixes hydroperoxy and oxo ...
+        # is used in preferred IUPAC names rather than ... carbonoperoxoyl-").
+        # Mirrors the acid-halide oxo+halo and amide oxo+amino splits above.
+        # Fires only when every peroxy-acid C is a chain member; else falls
+        # through (PREFIX_FORMS['peroxy_acid'] is None -> the RING/off-chain
+        # 'carbonoperoxoyl' acyl prefix is not built -> fail closed). SMARTS
+        # ...(=[OX1])[OX2][OX2H1]: match[0]=C, [1]==O, [2]=O, [3]=OH.
+        if fg_name == 'peroxy_acid' and chain_set:
+            _px_locs = []
+            _px_os = []
+            for _m in matches:
+                _pxc = _m[0]
+                if _pxc in chain_set:
+                    _loc = atom_to_locant.get(_pxc)
+                    if _loc is not None:
+                        _px_locs.append(_loc)
+                        _px_os.extend([_m[1], _m[2], _m[3]])
+            if _px_locs and len(_px_locs) == len(matches):
+                _px_locs.sort()
+                _n = len(_px_locs)
+                all_prefixes.append(format_fg_prefix('oxo', _px_locs, _n))
+                all_prefixes.append(
+                    format_fg_prefix('hydroperoxy', _px_locs, _n))
+                _amidine_excluded_n.update(_px_os)
+                continue
+
         # AM-6 (P-66.1.1.4.3): a sulfonamide bonded to the chain via its N
         # (R-SO2-NH-chain) is expressed by _check_for_acylamino as the
         # '(...sulfonamido)' prefix, NOT the 'sulfamoyl' FG prefix (which is the
