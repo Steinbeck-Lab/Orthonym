@@ -87,6 +87,11 @@ SENIORITY_ORDER = [
     # Hydrazonic acid (P-65.1.3.2): =O -> =N-NH2 replacement acid; ranks
     # immediately below imidic acid (P-65.1.3.1) per the P-65.1.3 sub-order.
     "hydrazonic_acid",
+    # Hydroximic acid (P-65.1.3.3): =O -> =N-OH replacement acid; ranks below
+    # hydrazonic acid (P-65.1.3.2). PIN is the N-hydroxy derivative of the imidic
+    # acid (P-65.1.3.3.1), emitted by the dedicated hydroximic_acid handler
+    # (SUFFIX_FORMS None, like hydroxamic_acid).
+    "hydroximic_acid",
     # Carbamic acid (IUPAC P-65.2.3) -- retained acid name, rank with carboxylic acids
     "carbamic_acid",
     "sulfonic_acid",
@@ -417,6 +422,11 @@ SUFFIX_FORMS = {
     # imidic acid. Chain 'hydrazonic acid' (methanehydrazonic acid); ring/appended-C
     # 'carbohydrazonic acid'. The C is always chain-terminal (see TERMINAL_FG_TYPES).
     "hydrazonic_acid": ("hydrazonic acid", "carbohydrazonic acid"),
+    # W3-P02-5 (P-65.1.3.3.1 Note): the '-hydroximic acid' suffix is general-only.
+    # The PIN is the N-hydroxy derivative of the imidic acid (N-hydroxyethanimidic
+    # acid), built by the dedicated hydroximic_acid handler — so NO substitutive
+    # suffix here (None, exactly like hydroxamic_acid).
+    "hydroximic_acid": None,
     "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
@@ -751,6 +761,10 @@ PREFIX_FORMS = {
     # decomposition emitted by name_polyfunctional's chain-end block, NOT a single
     # static prefix. None here (handled specially, like imidic_acid).
     "hydrazonic_acid": None,
+    # W3-P02-6 (P-65.1.3.3.2): demoted hydroximic acid at a chain end splits into
+    # 'hydroxy' + 'hydroxyimino' prefixes on the geminal locant (two-prefix
+    # decomposition emitted by name_polyfunctional's chain-end block). None here.
+    "hydroximic_acid": None,
     "sulfinohydrazonohydrazide": None,  # demoted case fails closed (P-66.4.3.2)
     "selenonimidamide": None,   # demoted case fails closed (P-66.4.1.1)
     "seleninimidamide": None,   # demoted case fails closed (P-66.4.1.1)

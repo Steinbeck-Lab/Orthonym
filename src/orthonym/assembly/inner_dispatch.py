@@ -1024,6 +1024,24 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- W3-P02 (P-65.1.3.3.1): hydroximic_acid handler.
+#     Hydroximic acid (R-C(=N-OH)-OH) is named as the N-hydroxy derivative of
+#     the corresponding imidic acid (PIN 'N-hydroxyethanimidic acid'), NOT with
+#     the general-only '-hydroximic acid' suffix. Priority 5211 — after
+#     hydroxamic@5210 (different principal_group mutex), before amine@5300.
+#     Fail-safe: returns None so general_acyclic@99999 stays the backstop.
+from .handlers.hydroximic_acid import _is_hydroximic_acid, name_hydroximic_acid  # noqa: E402
+
+_register_inner(
+    handler_id="hydroximic_acid",
+    priority=5211,
+    predicate=_is_hydroximic_acid,
+    handler=name_hydroximic_acid,
+    iupac_section="P-65.1.3.3.1",
+    description="Hydroximic acid -> N-hydroxy<imidic acid> PIN (W3-P02; P-65.1.3.3.1)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-03 commit 03-03: amine (Tier-2 mid-tier with polyfunctional + Tier-A
 #     mutex; audit § 1 + § 3). Predicate:
 #       principal_group in {secondary_amine, tertiary_amine}

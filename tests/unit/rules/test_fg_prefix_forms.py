@@ -44,6 +44,10 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     # demoted at a chain end it splits into 'hydroxy' + 'hydrazinylidene'
     # (P-65.1.3.2.2), emitted by name_polyfunctional's chain-end block.
     'hydrazonic_acid',
+    # W3-P02 (P-65.1.3.3): hydroximic acid — suffix is the N-hydroxy imidic acid
+    # (dedicated handler, no static suffix); demoted it splits into 'hydroxy' +
+    # 'hydroxyimino' (P-65.1.3.3.2), emitted by name_polyfunctional's chain-end block.
+    'hydroximic_acid',
     'sulfinohydrazonohydrazide',  # P-66.4.3.2: demoted case fails closed
     'iminoester',        # P-65.1.7: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
     'selenoester',       # P-65.3: functional class (Se-alkyl alkaneselenoate); chalcogen analog of ester

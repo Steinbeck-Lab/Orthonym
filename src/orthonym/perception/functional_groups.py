@@ -111,6 +111,16 @@ FUNCTIONAL_GROUP_SMARTS = {
     # `!$([CX3]([#7,#8])...)` guard keeps the third C neighbour H or carbon
     # (excludes an extra N/O, e.g. hydrazono-carbonic/amidrazone hybrids).
     "hydrazonic_acid": "[CX3;!$([CX3]([#7,#8])(=[NX2][NX3])[OX2H1])](=[NX2][NX3H2])[OX2H1]",
+    # Hydroximic acid R-C(=N-OH)-OH (P-65.1.3.3), the =O -> =N-OH replacement
+    # analogue. W3-P02-5. Per P-65.1.3.3.1 the PIN is the N-hydroxy derivative
+    # of the corresponding imidic acid (N-hydroxyethanimidic acid), NOT the
+    # general-only '-hydroximic acid' suffix; the dedicated handler builds that.
+    # The geminal C-OH (sp2 C) is not seen by the alcohol pattern, so without
+    # this FG the group mis-reads as a plain oxime and the -OH is dropped. Match
+    # tuple (C, imino-N, O-on-N, hydroxyl-O). The `!$([CX3]([#7,#8])...)` guard
+    # keeps the third C neighbour H or carbon (excludes amidoxime CC(=NO)N and
+    # any hydroxyimino-carbonic hybrid).
+    "hydroximic_acid": "[CX3;!$([CX3]([#7,#8])(=[NX2][OX2H1])[OX2H1])](=[NX2][OX2H1])[OX2H1]",
     "thioester": "[CX3](=O)[SX2][#6]",
     # Phase 163 Tier FRN-E: chalcogen-ester (P-65.6 ester extension) -- additive per CONTEXT D-08
     "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R' (P-65.6; Se-alkyl alkaneselenoate)
@@ -656,6 +666,12 @@ def _resolve_fg_collisions(results):
         # hydrazinylidene). Also defensively clears imine/alcohol/enol on its
         # atoms (the sp2 C keeps alcohol/enol from matching anyway).
         ('hydrazonic_acid', ['hydrazone', 'imine', 'alcohol', 'primary_alcohol',
+                             'secondary_alcohol', 'tertiary_alcohol', 'enol']),
+        # W3-P02-5 (P-65.1.3.3): the C=N-OH of a hydroximic acid matches the
+        # oxime SMARTS; the hydroximic_acid FG owns the whole geminal
+        # C(=N-OH)(OH) unit (PIN = N-hydroxy + imidic acid; demoted = hydroxy +
+        # hydroxyimino). Clears oxime + defensively imine/alcohol/enol.
+        ('hydroximic_acid', ['oxime', 'imine', 'alcohol', 'primary_alcohol',
                              'secondary_alcohol', 'tertiary_alcohol', 'enol']),
         # Wave2 completion (P-66.4.3.2): the S-hydrazido/hydrazono N pairs
         # match the hydrazine/hydrazone/imine/amine patterns.
