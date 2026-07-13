@@ -54,6 +54,10 @@ HALOGEN_PREFIX = {
     "F": "fluoro",
 }
 
+# W3-P06: halide functional-class word keyed by element symbol, cited in
+# ALPHABETICAL order bromide < chloride < fluoride < iodide (P-65.5.1 / P-65.5.3.2).
+_HALIDE_WORD = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide"}
+
 
 # P-65.2.1: the acid-anion word of a mono-ester of carbonic acid, keyed by the
 # acyl-halide FG type. 'chloride' -> 'carbonochloridate', etc. (OPSIN-verified).
@@ -170,6 +174,17 @@ def name_acid_halide(features) -> Optional[str]:
 
     num_halide_groups = len(acid_halide_matches)
 
+    # W3-P06 Task 1/2 (P-65.5.1): aggregate acyl-halide matches across ALL halide
+    # FG types. name_acid_halide's ``pg`` is a SINGLE senior halide type, so a
+    # MIXED diacyl halide (Br-CO-...-CO-Cl) or a mixed ring dicarbonyl would
+    # otherwise see only one end and mis-name the other as an oxo+halo
+    # substituent. ``combined`` = [(match, halide_symbol), ...] over every type.
+    _combined = []
+    for _ft, _sym in (("acid_chloride", "Cl"), ("acid_bromide", "Br"),
+                      ("acid_fluoride", "F"), ("acid_iodide", "I")):
+        for _m in features.functional_groups.get(_ft, []):
+            _combined.append((_m, _sym))
+
     # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): the acyl halide of a
     # MONO-ester of carbonic acid, X-C(=O)-O-R, is the functional-class name
     # '<R> carbono<halide>idate' (benzyl carbonochloridate, ethyl
@@ -223,9 +238,14 @@ def name_acid_halide(features) -> Optional[str]:
         # Fallback: count carbons connected to carbonyl
         chain_length = _count_acyl_chain(mol, acid_halide_matches[0][0], consumed_atoms)
 
-    # For diacid halides (both ends of chain have acid halide groups)
-    if num_halide_groups >= 2 and _is_diacid_halide(mol, acid_halide_matches, chain):
-        return _name_diacid_halide(chain_length, halide_word, num_halide_groups)
+    # For diacid halides (acyl halide at BOTH chain ends) — same OR mixed halides,
+    # via the combined cross-type list (W3-P06 Task 2). Handles the pre-existing
+    # same-halide case (pentanedioyl dichloride) AND mixed (butanedioyl bromide
+    # chloride, halide words alphabetical). A single-carbon 2-halide (Cl-CO-Cl,
+    # carbonyl dichloride) is EXCLUDED by the distinct-chain-ends guard inside.
+    _diacyl = _name_diacyl_halide_combined(mol, _combined, chain, chain_length)
+    if _diacyl:
+        return _diacyl
 
     # Single acid halide: build acyl name
     acyl_name = _build_acyl_name(chain_length)
@@ -329,6 +349,33 @@ def _name_diacid_halide(chain_length: int, halide_word: str, num_groups: int) ->
     multiplier = get_multiplier_prefix(num_groups, halide_word)
     # pentane -> pentanedioyl (diacid form)
     return f"{prefix}anedioyl {multiplier}{halide_word}"
+
+
+def _name_diacyl_halide_combined(mol, combined, chain, chain_length) -> Optional[str]:
+    """P-65.5.1: diacyl halide with an acyl halide at BOTH distinct chain ends
+    (same or mixed halides) -> '{chain}dioyl <halide word(s)>'.
+
+    Halide words are cited in ALPHABETICAL order (bromide < chloride < fluoride <
+    iodide); identical halides collapse with a numeric multiplier
+    ('pentanedioyl dichloride'); different halides -> two words
+    ('butanedioyl bromide chloride'). Returns None (fall through to single-acyl
+    naming) unless there are EXACTLY two carbonyl carbons and they are the two
+    DISTINCT ends of the chain — so a single-carbon 2-halide (carbonyl dichloride,
+    Cl-CO-Cl) is never captured (its two Cl share one carbon = one chain 'end')."""
+    if len(combined) != 2 or not chain or len(chain) < 2:
+        return None
+    if chain[0] == chain[-1]:
+        return None
+    carbonyls = {m[0] for m, _ in combined}
+    if carbonyls != {chain[0], chain[-1]}:
+        return None
+    words = sorted(_HALIDE_WORD[sym] for _, sym in combined)
+    prefix = get_chain_prefix(chain_length)
+    if words[0] == words[1]:
+        halide_part = f"{get_multiplier_prefix(2, words[0])}{words[0]}"
+    else:
+        halide_part = f"{words[0]} {words[1]}"
+    return f"{prefix}anedioyl {halide_part}"
 
 
 def _is_diacid_halide(mol, matches, chain) -> bool:
