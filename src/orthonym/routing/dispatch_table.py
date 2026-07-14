@@ -811,6 +811,14 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
                         neutral_name, carboxylate_count
                     )
                     if anion_name:
+                        # P-72.6: junior anionic groups -> anionic prefix
+                        # (carboxylato/oxido), not neutral carboxy/hydroxy.
+                        from orthonym.rules.ions import (
+                            _apply_anionic_substituent_prefixes,
+                        )
+                        anion_name = _apply_anionic_substituent_prefixes(
+                            mol, sites['anions'], anion_name
+                        )
                         return anion_name
                 return neutral_name
     except (ValueError, RuntimeError, KeyError, IndexError, RecursionError) as exc:

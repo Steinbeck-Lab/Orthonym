@@ -815,6 +815,9 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         if carboxylate_count > 0:
             anion_name = _acid_name_to_carboxylate(neutral_name, carboxylate_count)
             if anion_name:
+                # P-72.6: cite any JUNIOR anionic group (not in the parent) by its
+                # anionic prefix (carboxylato/oxido) instead of the neutral carboxy/hydroxy.
+                anion_name = _apply_anionic_substituent_prefixes(mol, anions, anion_name)
                 return _validate_anion_name(mol, anion_name)
         return _validate_anion_name(mol, neutral_name)
 
@@ -3036,6 +3039,49 @@ def _acid_name_to_carboxylate(acid_name: str, carboxylate_count: int) -> str:
         return acid_name[:-len('ic acid')] + 'ate'
 
     return ''
+
+
+def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
+    """P-72.6 (BB 41195): an anionic characteristic group that is NOT in the parent
+    structure is cited by its ANIONIC substituent prefix — carboxylato for -CO-O-
+    (P-72.6.1), oxido for -O- (P-72.6.2) — NOT the neutral prefix (carboxy/hydroxy).
+    The parent anion consumed the senior anionic centre (carboxylate > olate,
+    P-72.7e); each remaining anionic group is a junior prefix.
+
+    Root-cause transform on the multi-anion name (the parent-suffix conversion
+    _acid_name_to_carboxylate already runs the same kind of neutral->anion textual
+    step). Count-matched to the ACTUAL anionic sites so a genuine NEUTRAL -OH/-COOH
+    substituent is never converted, AND applied only when EVERY hydroxy/carboxy
+    prefix in the name is one of those anionic sites (all-anionic guard). Scoped to a
+    SINGLE junior anionic prefix so no alphanumerical prefix re-ordering is needed.
+    Examples (both verbatim BB PINs): 2-(carboxylatomethyl)benzoate (BB 41293),
+    3-oxidonaphthalene-2-carboxylate (BB 41295)."""
+    if not name:
+        return name
+    classes = [classify_anion(mol, a) for a in anions]
+    n_carb = sum(1 for c in classes if c == 'carboxylate')
+    n_ox = sum(1 for c in classes if c in ('phenolate', 'alkoxide'))
+    # Parent = the senior anionic class present (P-72.7e: carboxylate senior to olate).
+    if n_carb >= 1:
+        junior_carb, junior_ox = n_carb - 1, n_ox
+    elif n_ox >= 1:
+        junior_carb, junior_ox = 0, n_ox - 1
+    else:
+        return name
+    if junior_carb + junior_ox != 1:
+        return name  # single-junior scope (avoids prefix re-ordering)
+
+    out = name
+    if junior_carb == 1:
+        # 'carboxy' NOT part of 'carboxyl…' (the parent 'carboxylate'/'carboxylato').
+        if len(re.findall(r'carboxy(?!l)', out)) == 1:
+            out = re.sub(r'carboxy(?!l)', 'carboxylato', out, count=1)
+    if junior_ox == 1:
+        # Convert only when EVERY 'hydroxy' prefix is the single anionic O- (so a
+        # genuine neutral -OH is never turned into 'oxido').
+        if out.count('hydroxy') == 1:
+            out = out.replace('hydroxy', 'oxido', 1)
+    return out
 
 
 def _find_carboxylate_chain(mol, anion_site: Dict):
