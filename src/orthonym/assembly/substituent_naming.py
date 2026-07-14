@@ -3659,6 +3659,15 @@ def needs_recursive_naming(mol, sub_atoms: List[int]) -> bool:
 # improvement over the old `betaine`->`unknown organic compound` (RT=0).
 
 
+# W4-I4 (P-74.1.3 / P-74.2.1.1): parent-hydride cation stem for the onium
+# substituent prefix (stem + 'iumyl'). Nitrogen keeps 'azaniumyl' (the amine-based
+# '-methanaminiumyl' PIN is OPSIN-unparseable; azaniumyl is the OPSIN-valid form).
+_ONIUM_PREFIX_STEM = {
+    'N': 'azan', 'P': 'phosphan', 'As': 'arsan', 'Sb': 'stiban',
+    'O': 'oxidan', 'S': 'sulfan', 'Se': 'selan', 'Te': 'tellan',
+}
+
+
 def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int) -> str:
     """Build the cation-as-substituent prefix for a zwitterion (P-74.1.3).
 
@@ -3688,11 +3697,17 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int) -> str:
     """
     cat = mol.GetAtomWithIdx(cation_idx)
 
-    # SCOPE (D-06): only a nitrogen cation maps to the azaniumyl family. Onium
-    # cations on other elements (oxonium/sulfonium/phosphonium), ylides and
-    # amine-oxides are deferred (return '' -> legacy fallthrough / honest-fail).
-    if cat.GetSymbol() != 'N' or cat.GetFormalCharge() <= 0:
+    # SCOPE: the onium cation-substituent prefix is the parent-hydride cation stem
+    # + 'iumyl' (P-73.1.1.1 / P-74.1.3 / P-74.2.1.1). W4-I4 GENERALIZED from
+    # nitrogen-only (azaniumyl) to the P/O/S/Se/Te/As onium family:
+    #   N -> azaniumyl   P -> phosphaniumyl   O -> oxidaniumyl   S -> sulfaniumyl
+    # The nitrogen PIN is the amine-based '<...>methanaminiumyl', but that form is
+    # OPSIN-unparseable; 'azaniumyl' is the documented OPSIN-valid equivalent, so
+    # nitrogen keeps 'azaniumyl' here (W4-I4 note).
+    stem = _ONIUM_PREFIX_STEM.get(cat.GetSymbol())
+    if stem is None or cat.GetFormalCharge() <= 0:
         return ''
+    _onium_suffix = stem + 'iumyl'
 
     # Collect each N-substituent branch (every neighbour except the one leading
     # to the anionic parent). Each branch is named as a substituent prefix.
@@ -3708,13 +3723,13 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int) -> str:
         sub_prefixes.append(name)
 
     if not sub_prefixes:
-        # Bare protonated nitrogen with no extra substituents ([NH3+]-parent) is
-        # the `azaniumyl` group itself (P-74.1.3): e.g. glycine zwitterion's
-        # cation. The caller decides whether to use this or keep the amino-acid
-        # neutral/retained form (sequenced first, D-06).
-        return 'azaniumyl'
+        # Bare protonated heteroatom with no extra substituents ([NH3+]-parent) is
+        # the `<stem>iumyl` group itself (P-74.1.3): e.g. glycine zwitterion's
+        # cation is `azaniumyl`. The caller decides whether to use this or keep the
+        # amino-acid neutral/retained form (sequenced first, D-06).
+        return _onium_suffix
 
-    return _compose_n_substituent_prefix(sub_prefixes) + 'azaniumyl'
+    return _compose_n_substituent_prefix(sub_prefixes) + _onium_suffix
 
 
 def _collect_branch_atoms(mol, start_idx: int, block_idx: int) -> List[int]:

@@ -3791,3 +3791,96 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
     # directly ('...dimethyltriaz-...'); the trailing stem starts with a letter.
     prefix_str = '-'.join(p[2] for p in prefix_parts)
     return f"{prefix_str}{core}"
+
+
+# =============================================================================
+# W4-I4 (P-74.2.1.1): 'ylides' — an onium cation (N+/P+/O+/S+, no free H) bonded
+# directly to a carbanion. The carbanion is the '-ide' parent (propan-2-ide); the
+# onium cation is a substituent prefix on it (trimethylazaniumyl / ...phosphaniumyl
+# / dimethyloxidaniumyl / dimethylsulfaniumyl). Method (1) = PIN.
+# =============================================================================
+
+def _sever_and_name_carbanion(mol, carbanion_idx, cation_idx):
+    """Sever the carbanion<->cation bond, isolate the carbanion fragment, and name
+    it as a '-ide' parent hydride via emit_parent_hydride_cumulative_suffix. Returns
+    (parent_name, ide_locant) where ide_locant is the carbanion's chain locant
+    (None for a single-carbon methanide), or (None, None) on any decline."""
+    rw = Chem.RWMol(mol)
+    if rw.GetBondBetweenAtoms(carbanion_idx, cation_idx) is None:
+        return None, None
+    rw.RemoveBond(carbanion_idx, cation_idx)
+    built = rw.GetMol()
+    try:
+        frag_idxs = Chem.GetMolFrags(built, asMols=False, sanitizeFrags=False)
+        frag_mols = Chem.GetMolFrags(built, asMols=True, sanitizeFrags=False)
+    except Exception:
+        return None, None
+    carbanion_frag = None
+    new_idx = None
+    for fi, fm in zip(frag_idxs, frag_mols):
+        if carbanion_idx in fi:
+            carbanion_frag = fm
+            new_idx = fi.index(carbanion_idx)
+            break
+    if carbanion_frag is None:
+        return None, None
+    try:
+        Chem.SanitizeMol(carbanion_frag)
+    except Exception:
+        return None, None
+    name = emit_parent_hydride_cumulative_suffix(carbanion_frag, new_idx, 'ide')
+    if not name:
+        return None, None
+    # The carbanion is BOTH the '-ide' centre and the cation-substituent
+    # attachment, so the prefix locant == the '-ide' locant read off the parent
+    # name ('propan-2-ide' -> 2; the single-carbon 'methanide' carries no locant).
+    m = re.search(r'-(\d+)-ide$', name)
+    ide_loc = int(m.group(1)) if m else None
+    return name, ide_loc
+
+
+# W4-I4: elements whose closed-shell onium cation (no free H) forms an ylide with
+# an adjacent carbanion (P-74.2.1.1: usually N, P, S, Se, Te; also O oxonium).
+_YLIDE_ONIUM_ELEMENTS = frozenset({'N', 'P', 'As', 'Sb', 'O', 'S', 'Se', 'Te'})
+
+
+def emit_ylide(mol) -> Optional[str]:
+    """P-74.2.1.1 'ylide': a closed-shell onium cation X+ (X = N/P/O/S/..., no free
+    H) bonded directly to a carbanion Y-. Named (method 1 = PIN) as the carbanion
+    '-ide' parent hydride with the onium cation as an '<...>-aniumyl' prefix::
+
+        C[N+](C)(C)[C-](C)C  -> 2-(trimethylazaniumyl)propan-2-ide      (P-74.2.1.1.1)
+        C[P+](C)(C)[C-](C)C  -> 2-(trimethylphosphaniumyl)propan-2-ide  (BB 42526)
+        CC[C-](CC)[O+](C)C   -> 3-(dimethyloxidaniumyl)pentan-3-ide      (P-74.2.1.1.3)
+        CC[C-](CC)[S+](C)C   -> 3-(dimethylsulfaniumyl)pentan-3-ide      (P-74.2.1.1.4)
+
+    The nitrogen PIN is the amine-based '2-(N,N-dimethylmethanaminiumyl)propan-2-
+    ide', but that form is OPSIN-unparseable; the azane-based 'trimethylazaniumyl'
+    equivalent (which OPSIN accepts) is emitted instead (W4-I4). Fail-closed."""
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return None
+    if any(a.GetFormalCharge() not in (0, 1, -1) for a in mol.GetAtoms()):
+        return None
+    cations = [a for a in mol.GetAtoms() if a.GetFormalCharge() == 1]
+    anions = [a for a in mol.GetAtoms() if a.GetFormalCharge() == -1]
+    if len(cations) != 1 or len(anions) != 1:
+        return None
+    cat, an = cations[0], anions[0]
+    if an.GetSymbol() != 'C' or an.IsInRing():
+        return None  # carbanion parent (acyclic); ring carbanion ylides out of scope
+    if cat.GetSymbol() not in _YLIDE_ONIUM_ELEMENTS or cat.GetTotalNumHs() != 0:
+        return None  # onium must be a fully-substituted (no free H) closed-shell cation
+    bond = mol.GetBondBetweenAtoms(cat.GetIdx(), an.GetIdx())
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return None  # 1,2-dipole: cation and carbanion directly single-bonded
+    from ..assembly.substituent_naming import cation_to_prefix
+    cat_prefix = cation_to_prefix(mol, cat.GetIdx(), an.GetIdx())
+    if not cat_prefix:
+        return None
+    parent_name, ide_loc = _sever_and_name_carbanion(mol, an.GetIdx(), cat.GetIdx())
+    if not parent_name:
+        return None
+    locant_prefix = f"{ide_loc}-" if ide_loc is not None else ''
+    return f"{locant_prefix}({cat_prefix}){parent_name}"

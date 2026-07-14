@@ -135,6 +135,7 @@ class StoutClass(_StrEnumBase):
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
     CUMULATIVE_ZWITTERION = "cumulative_zwitterion"  # W4-I4 (P-74.1.1 same-parent -ium-...-ide on a homogeneous heteroatom chain: 1,2,2,2-tetramethylhydrazin-2-ium-1-ide / triaz-2-en-2-ium-1-ide / dioxidan-2-ium-1-ide; priority 48.35 — before HETERONE@48.4)
+    YLIDE = "ylide"                                  # W4-I4 (P-74.2.1.1 onium cation + adjacent carbanion: 2-(trimethylazaniumyl)propan-2-ide / ...phosphaniumyl / dimethyloxidaniumyl / dimethylsulfaniumyl; priority 48.36 — before HETERONE@48.4)
     PSEUDOKETONE_HETERO = "pseudoketone_hetero"      # Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2 1-silylethan-1-one; priority 48.6)
     ACYL_CHALCOGENCHAIN_PSEUDOKETONE = "acyl_chalcogenchain_pseudoketone"  # W3-P14 (P-68.4.1.3 acyl on a homogeneous >=3-chalcogen chain: CH3CH2-CO-O-O-OH -> 1-trioxidanylpropan-1-one; priority 48.65 — after PSEUDOKETONE_HETERO@48.6, before HETEROIMINE@48.7)
     HETEROIMINE = "heteroimine"                      # W2E-P1FG (P-62.3.1.3 X=NH -> 1-methylphosphanimine; priority 48.7)
@@ -1246,6 +1247,23 @@ def _handle_cumulative_zwitterion(mol, smiles, canonical_smiles, features=None,
     return emit_cumulative_ium_ide(mol)
 
 
+def _is_ylide(mol, smiles, canonical_smiles, features=None,
+              **kwargs) -> bool:
+    """W4-I4 (P-74.2.1.1); priority 48.36. Onium cation (N/P/O/S+, no free H)
+    bonded to an adjacent carbanion -> the carbanion '-ide' parent with the onium
+    '-aniumyl' prefix. PURE graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.ions import emit_ylide
+    return emit_ylide(mol) is not None
+
+
+def _handle_ylide(mol, smiles, canonical_smiles, features=None,
+                  **kwargs) -> Optional[str]:
+    from orthonym.rules.ions import emit_ylide
+    return emit_ylide(mol)
+
+
 def _is_heterone(mol, smiles, canonical_smiles, features=None,
                  **kwargs) -> bool:
     """Wave-2 completion C (P-64.1.2.2/P-64.4.1); priority 48.4. Si/Ge/P/As
@@ -1722,6 +1740,14 @@ _register_dispatch(
     description="Same-parent -ium-...-ide zwitterion on a homogeneous heteroatom "
                 "chain (1,2,2,2-tetramethylhydrazin-2-ium-1-ide / triaz-2-en-2-"
                 "ium-1-ide / dioxidan-2-ium-1-ide); graph classifier, fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.YLIDE, priority=48.36, tier=1,
+    predicate=_is_ylide, handler=_handle_ylide,
+    iupac_section="Blue Book P-74.2.1.1",
+    description="Ylide: onium cation + adjacent carbanion -> carbanion -ide parent "
+                "with onium -aniumyl prefix (2-(trimethylazaniumyl)propan-2-ide); "
+                "graph classifier, fail-closed",
 )
 _register_dispatch(
     class_id=StoutClass.HETERONE, priority=48.4, tier=1,
