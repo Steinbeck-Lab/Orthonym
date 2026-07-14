@@ -836,36 +836,55 @@ def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:
 
 
 def name_sulfine(mol) -> Optional[str]:
-    """P-64.4.2 acyclic thiocarbonyl S-oxides (Wave-2 completion C):
-    CH3-CH2-CH=S=O -> propylidene-lambda4-sulfanone (BB verbatim). The S has
-    exactly two double bonds — one terminal O, one to an unbranched
-    all-carbon chain. Ring S-oxides belong to ring_chalcogen_oxide; thials
-    (no O) keep their FG path. Fail-closed; pure."""
+    """P-64.4.2 / P-74.2.2.1.8 acyclic thiocarbonyl S-oxides (Wave-2 completion C;
+    W4-I4): CH3-CH2-CH=S=O -> propylidene-lambda4-sulfanone (BB verbatim). Accepts
+    BOTH the hypervalent form ``CH3CH2CH=S=O`` (neutral S, two S=X double bonds)
+    AND the equivalent charge-separated dipolar form ``CH3CH2CH=[S+]-[O-]``
+    (BB P-74.2.2.1.8, same InChI): the S bears one double bond to an unbranched
+    all-carbon chain and one bond (double =O, or single -O with the O carrying the
+    negative charge) to a terminal oxygen. Ring S-oxides belong to
+    ring_chalcogen_oxide; thials (no O) keep their FG path. Fail-closed; pure."""
     if mol is None:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    for atom in mol.GetAtoms():
-        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
-            return None
     sulfurs = [a for a in mol.GetAtoms() if a.GetSymbol() == 'S']
     if len(sulfurs) != 1:
         return None
     s = sulfurs[0]
     if s.IsInRing() or s.GetDegree() != 2 or s.GetTotalNumHs() != 0:
         return None
-    bonds = list(s.GetBonds())
-    if any(b.GetBondType() != Chem.BondType.DOUBLE for b in bonds):
+    # The sulfur hub is neutral (hypervalent =O) or +1 (charge-separated dipole).
+    if s.GetFormalCharge() not in (0, 1) or s.GetNumRadicalElectrons() != 0:
         return None
     oxo = c = None
-    for b in bonds:
+    for b in s.GetBonds():
         other = b.GetOtherAtom(s)
+        bt = b.GetBondType()
         if other.GetSymbol() == 'O' and other.GetDegree() == 1:
-            oxo = other
-        elif other.GetSymbol() == 'C':
+            # Terminal oxide: hypervalent (=O, O charge 0) or dipole (-O-, O charge -1).
+            oc = other.GetFormalCharge()
+            if bt == Chem.BondType.DOUBLE and oc == 0:
+                oxo = other
+            elif bt == Chem.BondType.SINGLE and oc == -1:
+                oxo = other
+            else:
+                return None
+        elif other.GetSymbol() == 'C' and bt == Chem.BondType.DOUBLE:
             c = other
+        else:
+            return None
     if oxo is None or c is None:
         return None
+    # Only the S/O dipole may carry charge, and it must be net-neutral (S+ + O- = 0);
+    # every other atom is neutral and non-radical (fail-closed).
+    if s.GetFormalCharge() + oxo.GetFormalCharge() != 0:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetIdx() in (s.GetIdx(), oxo.GetIdx()):
+            continue
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
     from ..assembly.naming_utils import unbranched_alkylidene_name
     ylidene = unbranched_alkylidene_name(mol, c.GetIdx(), s.GetIdx())
     if ylidene is None:
