@@ -501,6 +501,195 @@ def name_aryl_radical(mol, radical_site: Dict[str, Any]) -> str:
         return 'aryl'
 
 
+# === HETEROATOM-CENTRED RADICALS (P-71.2.1.2 / P-71.2.2.2 / P-71.3.2 / P-71.3.3) ===
+#
+# The carbon chokepoint (charged_router.route_charged) names a parent hydride by
+# neutralize -> re-enter -> _apply_radical_suffix, which drops the whole 'ane'
+# ending (methane->methyl, silane->silyl). That contraction is the P-71.2.1.1 rule
+# and is correct ONLY for Group-14 mononuclear hydrides / acyclic-hydrocarbon
+# termini / monocyclic saturated hydrocarbon rings. For a NON-Group-14 heteroatom
+# parent hydride (azane, sulfane, borane, ...) the P-71.2.1.2 general method elides
+# ONLY the final 'e' (azane->azanyl, sulfane->sulfanyl, borane->boranyl) — so the
+# chokepoint produced the WRONG 'azyl'/'sulfyl'/'boryl'. These namers own the
+# heteroatom cases with the correct, element-keyed contraction and fail closed
+# ('' -> the caller's carbon path) for everything else.
+
+# P-71.2.1.1 / P-71.2.2.1: Group-14 mononuclear parent hydrides -> drop 'ane'.
+_GROUP14_HYDRIDE_RADICAL = {
+    'C': 'methane', 'Si': 'silane', 'Ge': 'germane', 'Sn': 'stannane', 'Pb': 'plumbane',
+}
+# P-71.2.1.2 / P-71.2.2.2: non-Group-14 heteroatom parent hydrides -> elide 'e' only.
+_ELIDE_E_HYDRIDE_RADICAL = {
+    'N': 'azane', 'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane', 'Bi': 'bismuthane',
+    'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane',
+    'B': 'borane', 'Al': 'alumane', 'Ga': 'gallane', 'In': 'indigane', 'Tl': 'thallane',
+}
+_RADICAL_SUFFIX_BY_NE = {1: 'yl', 2: 'ylidene', 3: 'ylidyne'}
+# P-70.3.2: multiplying prefixes 'bis'/'tris'/... precede compound suffixes.
+_COMPOUND_MULTIPLIER = {2: 'bis', 3: 'tris', 4: 'tetrakis'}
+
+
+def _parent_hydride_radical_name(element: str, n_electrons: int) -> str:
+    """P-71.2.1.1/.2 + P-71.2.2.1/.2: name a MONONUCLEAR heteroatom radical from its
+    element's parent-hydride name. Group-14 (silane/germane) drop the whole 'ane';
+    non-Group-14 (azane/sulfane/borane) elide only the final 'e'.
+    -> azanyl, azanylidene, sulfanyl, boranyl, silyl, germyl. '' if unmapped.
+
+    BB (PIN/preselected): HS. sulfanyl (40430); H2N. azanyl (40434); H2B. boranyl,
+    'not boryl' (40438); HN: azanylidene (40506); H2Si: silylidene (40484)."""
+    suffix = _RADICAL_SUFFIX_BY_NE.get(n_electrons)
+    if suffix is None:
+        return ''
+    if element in _GROUP14_HYDRIDE_RADICAL:
+        return _GROUP14_HYDRIDE_RADICAL[element][:-3] + suffix
+    if element in _ELIDE_E_HYDRIDE_RADICAL:
+        return _ELIDE_E_HYDRIDE_RADICAL[element][:-1] + suffix
+    return ''
+
+
+def _reenter_neutral_name(mol) -> str:
+    """Name the neutral parent by re-entering the full pipeline with the OPSIN
+    validity gate disabled (radical intermediates are correct-by-construction; the
+    outer gate re-checks the final radical name). '' on failure/unknown."""
+    smi = Chem.MolToSmiles(mol)
+    if not smi:
+        return ''
+    try:
+        from ..namer import Orthonym
+        name = Orthonym(style='pin', _disable_opsin_validity_gate=True).name(smi)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not name or 'unknown' in name.lower():
+        return ''
+    return name
+
+
+def _name_amine_family_radical(mol, radical_site: Dict[str, Any]) -> str:
+    """P-71.3.2 (Table 7.2): a radical on a substituted amine / imine / amide N is
+    named with the compound suffix -aminyl / -iminyl / -amidyl on the NEUTRAL parent
+    name (the N as its principal characteristic group). The cumulative radical
+    suffix is appended by eliding the parent name's final 'e' (P-70.3.3.2.1):
+      methanamine -> methanaminyl, propan-1-imine -> propan-1-iminyl,
+      formamide -> formamidyl.
+    Fail-closed ('') when the neutral parent does NOT name the N as a suffix
+    (e.g. the retained 'aniline', where the systematic 'benzenamine' would be
+    needed for 'benzenaminyl') — never a wrong name."""
+    idx = radical_site['atom_idx']
+    n_e = radical_site['n_electrons']
+    cum = {1: 'yl', 2: 'ylidene'}.get(n_e)
+    if cum is None:
+        return ''
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(idx)
+        a.SetNumRadicalElectrons(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(a.GetTotalNumHs() + n_e)
+        wm = work.GetMol()
+        Chem.SanitizeMol(wm)
+    except (RuntimeError, ValueError):
+        return ''
+    neutral = _reenter_neutral_name(wm)
+    if not neutral:
+        return ''
+    # '-carboxamide'/'-amide'/'-imine'/'-amine' -> elide final 'e' + cumulative suffix.
+    for base in ('carboxamide', 'amide', 'imine', 'amine'):
+        if neutral.endswith(base):
+            return neutral[:-1] + cum
+    return ''
+
+
+def _name_multiplicative_amine_radical(mol, radical_sites: List[Dict[str, Any]]) -> str:
+    """P-71.3.3 method (1): poly-amine radicals named as
+    (central-multivalent-group)bis/tris(aminyl). Scope (tight, fail-closed): >=2
+    monovalent radical centres, each a nitrogen bearing exactly one carbon neighbour
+    (a primary-amine -NH.) on a shared acyclic all-carbon central skeleton, all
+    identically derived. -> [NH]CC[NH] (ethane-1,2-diyl)bis(aminyl) (BB 40660, PIN).
+
+    Per P-71.3.3 the parent radical in multiplicative nomenclature is 'azanyl'
+    (method 2); method (1) — the PIN — uses the reserved suffix 'aminyl'."""
+    centers_c: List[int] = []
+    for s in radical_sites:
+        a = mol.GetAtomWithIdx(s['atom_idx'])
+        if a.GetSymbol() != 'N' or s['n_electrons'] != 1:
+            return ''
+        heavy = [nb for nb in a.GetNeighbors() if nb.GetSymbol() != 'H']
+        if len(heavy) != 1 or heavy[0].GetSymbol() != 'C':
+            return ''
+        centers_c.append(heavy[0].GetIdx())
+    if len(set(centers_c)) != len(centers_c):
+        return ''  # two amine N on one carbon -> out of scope
+    mult = _COMPOUND_MULTIPLIER.get(len(radical_sites))
+    if mult is None:
+        return ''
+    # Build the central multivalent group: mark the attachment carbons, sever the
+    # amine nitrogens, set the carbons as free-valence centres, name via the
+    # polyvalent parent-hydride primitive (-> 'ethane-1,2-diyl').
+    n_idxs = [s['atom_idx'] for s in radical_sites]
+    work = Chem.RWMol(mol)
+    for c_idx in centers_c:
+        work.GetAtomWithIdx(c_idx).SetIntProp('_mult_center', 1)
+    for nidx in sorted(n_idxs, reverse=True):
+        work.RemoveAtom(nidx)
+    frag = work.GetMol()
+    centers: List[tuple] = []
+    for a in frag.GetAtoms():
+        if a.HasProp('_mult_center'):
+            a.SetNumRadicalElectrons(1)
+            a.SetNoImplicit(False)
+            a.ClearProp('_mult_center')
+            centers.append((a.GetIdx(), 1))
+    if len(centers) != len(radical_sites):
+        return ''
+    try:
+        Chem.SanitizeMol(frag)
+    except (RuntimeError, ValueError):
+        return ''
+    from .ions import emit_parent_hydride_polyvalent_suffixes
+    central = emit_parent_hydride_polyvalent_suffixes(frag, centers)
+    if not central:
+        return ''
+    return f"({central}){mult}(aminyl)"
+
+
+def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
+                            style: str = 'pin') -> str:
+    """Heteroatom-centred radical PINs (called from the route_charged chokepoint
+    BEFORE its carbon-centric path so a heteroatom never gets a wrong Group-14
+    contraction):
+
+      * P-71.2.1.2 / P-71.2.2.2 mononuclear parent-hydride radicals — azanyl,
+        azanylidene, sulfanyl, boranyl, silyl, germyl, ...
+      * P-71.3.2 amine / imine / amide compound-suffix radicals — methanaminyl,
+        propan-1-iminyl, formamidyl.
+      * P-71.3.3 multiplicative poly-amine radicals — (ethane-1,2-diyl)bis(aminyl).
+
+    Returns '' (fail-closed) for any carbon-centred or out-of-scope radical so the
+    caller's existing carbon path / name_radical helpers run unchanged."""
+    if not radical_sites:
+        return ''
+    # Multi-centre: only the P-71.3.3 multiplicative poly-amine class is in scope
+    # here; every other multi-radical is the carbon polyvalent primitive's job.
+    if len(radical_sites) >= 2:
+        return _name_multiplicative_amine_radical(mol, radical_sites)
+
+    site = radical_sites[0]
+    atom = mol.GetAtomWithIdx(site['atom_idx'])
+    element = atom.GetSymbol()
+    if element in ('C', 'O'):
+        # Carbon -> caller's chokepoint; oxygen -> the oxyl/hydroxyl handler.
+        return ''
+    heavy_nbrs = [nb for nb in atom.GetNeighbors() if nb.GetSymbol() != 'H']
+    # (A) Mononuclear heteroatom parent-hydride radical (only H neighbours).
+    if not heavy_nbrs and mol.GetNumHeavyAtoms() == 1:
+        return _parent_hydride_radical_name(element, site['n_electrons'])
+    # (B) Substituted nitrogen -> amine / imine / amide compound suffix.
+    if element == 'N':
+        return _name_amine_family_radical(mol, site)
+    # Substituted non-N heteroatom radical -> out of scope, fail closed.
+    return ''
+
+
 # === MAIN NAMING FUNCTION ===
 
 def name_radical(mol, style: str = 'pin') -> str:

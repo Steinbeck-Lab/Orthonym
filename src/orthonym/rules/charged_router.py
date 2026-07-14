@@ -881,6 +881,18 @@ def route_charged(mol, style: str = 'pin') -> str:
     anion_override_fg: Optional[str] = None  # T3: forced principal FG for the retry
 
     if radical_sites:
+        # HETEROATOM-CENTRED radicals (P-71.2.1.2 / P-71.2.2.2 parent-hydride
+        # radicals azanyl/sulfanyl/boranyl/azanylidene; P-71.3.2 amine/imine/amide
+        # compound suffixes methanaminyl/propan-1-iminyl/formamidyl; P-71.3.3
+        # multiplicative (ethane-1,2-diyl)bis(aminyl)) are named FIRST, with the
+        # correct element-keyed contraction — the carbon chokepoint below drops the
+        # whole 'ane' and would emit the wrong 'azyl'/'sulfyl'/'boryl'. The namer
+        # fail-closes ('') for carbon-centred / out-of-scope radicals so the carbon
+        # path runs unchanged (W4-I1).
+        from .radicals import name_heteroatom_radical
+        _het = name_heteroatom_radical(mol, radical_sites, style)
+        if _het:
+            return _het
         # Radicals funnel through the chokepoint too (kill radicals.py alkyl
         # carbon counting): neutralize -> re-enter -> append the P-71 -yl/
         # -ylidene/-ylidyne suffix (applied AFTER re-entry below). SCOPE: ONLY a
