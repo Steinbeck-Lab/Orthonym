@@ -1086,6 +1086,15 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
         cip = descriptors[0][1]
         return NameFragment(text=f"({cip})-", fragment_type="stereo")
 
+    # W4-S1 folded-fix #5 RECONCILE (P-93.4.2.1.1): the audit wanted the ethene
+    # E/Z locant ELIDED (`F/C=C/F` -> `(E)-1,2-difluoroethene`). It is WRONG.
+    # BB P-93.4.2.1.1 is explicit — "Locants ... are used before the
+    # stereodescriptors E and Z" — and gives the verbatim ethene PIN
+    # `(1Z)-1,2-dibromo-1-chloro-2-iodoethene (PIN)` WITH the `1` locant. HEAD's
+    # `(1E)-1,2-difluoroethene` is therefore already the PIN; NO elision here.
+    # (The STER-01 cyclooctene elision above is a DIFFERENT rule — P-93.5.1.4.1,
+    # where the PARENT NAME itself elides the ring double-bond locant.)
+
     # Format as "(2R,3S)-" etc
     text = format_stereodescriptor_string(descriptors)
 
