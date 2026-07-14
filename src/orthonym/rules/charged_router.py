@@ -1040,6 +1040,23 @@ def route_charged(mol, style: str = 'pin') -> str:
             if uide:
                 return uide
             return ''   # emitter declined -> legacy
+        # W4-I2 (P-72.2.2.2.3): a poly-AMINE dianion (a -1 on each of >=2 N atoms)
+        # uses the 'aminide' compound suffix multiplied by 'bis'/'tris' ('bis' NOT
+        # 'di', P-70.3.2): [NH-]CC[NH-] -> ethane-1,2-bis(aminide) (BB 41059). HEAD's
+        # generic seam produced the WRONG 'ethane-1,2-diaminide'. Neutralize ALL N
+        # centres -> re-enter -> map the poly-amine name to bis(aminide).
+        if _acls == {'aminide'} and len(sites['anions']) >= 2:
+            from .ions import _polyamine_to_bis_aminide
+            _neutral = _neutralize_fragment(mol)
+            if _neutral:
+                try:
+                    _nn = _reenter(_neutral, style)
+                except (RecursionError, ValueError, RuntimeError):
+                    _nn = ''
+                bis = _polyamine_to_bis_aminide(_nn) if _nn else ''
+                if bis:
+                    return bis
+            return ''   # not a clean poly-amine -> legacy fallthrough
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
         # WS-E.3 (D-11/D-12): charge-first PCG on the ORIGINAL (un-neutralized) mol.
         # The actually-ionized senior acid class anchors the name (P-72); a neutral

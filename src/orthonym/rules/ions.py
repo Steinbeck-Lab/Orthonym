@@ -620,6 +620,28 @@ def _name_acid_chalcogen_anion(mol) -> str:
     return _acid_anion_from_neutral(neutral) if neutral else ''
 
 
+# P-70.3.2 / P-72.2.2.2.3: a compound suffix (aminide) takes the multiplying
+# prefixes 'bis'/'tris'/... (NOT the basic di/tri). Maps the neutral polyamine's
+# di/tri/... multiplier to the bis-series.
+_BIS_MULTIPLIER = {'di': 'bis', 'tri': 'tris', 'tetra': 'tetrakis', 'penta': 'pentakis'}
+
+
+def _polyamine_to_bis_aminide(polyamine_name: str) -> str:
+    """P-72.2.2.2.3 (BB 41049/41059): amines with one negative charge on EACH of
+    two-or-more nitrogen atoms use the 'aminide' suffix multiplied by 'bis'/'tris'
+    (a compound suffix takes bis, P-70.3.2). ethane-1,2-diamine ->
+    ethane-1,2-bis(aminide) (BB 41059 verbatim PIN). Returns '' if the re-entered
+    name is not a poly-amine ('...diamine'/'...triamine'/…)."""
+    if not polyamine_name:
+        return ''
+    low = polyamine_name.lower()
+    for mult, bis in _BIS_MULTIPLIER.items():
+        suffix = mult + 'amine'
+        if low.endswith(suffix):
+            return polyamine_name[:-len(suffix)] + f'{bis}(aminide)'
+    return ''
+
+
 def _name_acyl_azanide(mol, anion_idx: int) -> str:
     """P-72.2.2.2.4 (BB 41069/41079): an amide-type anion R-CO-NH- is named on the
     preselected 'azanide' parent with the acyl group cited as a prefix
