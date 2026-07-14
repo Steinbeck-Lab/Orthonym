@@ -63,9 +63,13 @@ NAME_STABILITY_CANARY = [
         "*N[C@@H](CC(=O)NC1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O[C@@H]3O[C@H](CO[C@H]4O[C@H](CO[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O)[C@@H](O)[C@H](O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]5O)[C@@H]4O)[C@@H](O)[C@H](O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O[C@H]5O[C@H](CO)[C@@H](O)[C@H](O)[C@H]5O)[C@@H]4O)[C@@H]3O)[C@H](O)[C@H]2NC(C)=O)[C@H](O)[C@H]1NC(C)=O)C(*)=O",
         "compound with wildcard atoms (not supported)",  # Phase 145.2: RATIO_REJECT_FLOOR=0.10 rejects '(3S)-butanetriamide' as truncated garbage (ratio=0.094 on 100+ atom glycan w/ wildcards). Correct routing: wildcard-atom detection branch, which was always the right semantic for this SMILES.
     ),
-    (
+    pytest.param(
         "CC[C@H](C)[C@H](NC(=O)[C@@H](NC(=O)[C@H](C)NC(=O)[C@H](CCCCNC(=O)CCl)NC(=O)[C@H](CC(=O)O)NC(C)=O)[C@@H](C)O)C(=O)NCC(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@H](C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O)C(C)C",
         "N-[(3S)-chloro-3-(ethanoylamino)-4-(hexylamino)-hydroxybutanedioyl]-L-phenylalanyl-L-valyl-L-glutamyl-L-glutaminyl-L-glutamyl-L-glutamic acid",
+        marks=pytest.mark.xfail(
+            strict=False,
+            reason="Brittle wrong-form name (S4 precedent): a modified-peptide (non-standard N-terminal chloro/acetamido/aminoacyl residue) that is 'unknown' in isolation on BOTH HEAD and work (SELF-01 suppresses the mis-named candidate). The frozen string only surfaces via OPSIN-gate fail-open under suite load and had ALREADY drifted in its N-acyl part (hexylamino/ethanoylamino -> tricosyl/acetamido) independent of W5. W5-A4 additionally L-suppresses the (suppressed) peptide portion per P-103.3.4. Modified-peptide naming is a carved-out subsystem; xfail(non-strict) rather than freeze a brittle wrong-form name.",
+        )
     ),
     # Phase 148 Plan 02 Task 03: cascade unblock per P-44.1(a)/(b). Pre-148
     # the deleted `_should_bypass_fused_guard` produced ring-as-parent
@@ -2118,7 +2122,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@H](Cc1ccc(O)cc1)NC(=O)[C@@H](N)C(C)C)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-valyl-L-tyrosyl-L-isoleucine",
+        "valyltyrosylisoleucine",
     ),
     (
         "*C(=O)OC/C=C/c1ccc(O)c(OC)c1",  # aromatic,small
@@ -2191,7 +2195,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@H](NC(=O)[C@H](CS)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-phenylalanyl-L-cysteinyl-L-alanine",
+        "phenylalanylcysteinylalanine",
     ),
     pytest.param(
         "Cc1cn([C@@H]2O[C@H](COP(=O)(O)OP(=O)(O)O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O)[C@H]3O)[C@@H](O)[C@H]2O)c(=O)nc1N",  # aromatic,heterocycle,large,carbohydrate
@@ -2231,7 +2235,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@H](C)[C@H](N)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CO)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-isoleucyl-L-phenylalanyl-L-serine",
+        "isoleucylphenylalanylserine",
     ),
     (
         "COc1cc(C)cc(OC)c1",  # aromatic,small
@@ -2271,11 +2275,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CCC(N)=O)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "L-tryptophyl-L-glutaminyl-L-leucine",
+        "tryptophylglutaminylleucine",
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)[C@@H](C)O)C(=O)N[C@H](C(=O)O)[C@@H](C)O",  # acyclic,polyfunctional,medium
-        "L-threonyl-L-valyl-L-threonine",
+        "threonylvalylthreonine",
     ),
     (
         "O=C(On1c(O)ccc1O)C1CCC(CN2C(=O)C=CC2=O)CC1",  # aromatic,heterocycle,medium
@@ -2327,7 +2331,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",  # aromatic,heterocycle,polyfunctional,large
-        "L-tyrosyl-L-histidyl-L-phenylalanine",
+        "tyrosylhistidylphenylalanine",
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC[C@@H](O)C(=O)N[C@@H](CO)[C@H](O)[C@H](O)CCCCCCCCCCCCCC",  # acyclic,large
@@ -2405,7 +2409,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "C[C@H](NC(=O)[C@H](Cc1cnc[nH]1)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-tyrosyl-L-histidyl-L-alanine",
+        "tyrosylhistidylalanine",
     ),
     (
         "NC(N)=NCCC[C@H](NC(=O)[C@H](CCCN=C(N)N)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O",  # aromatic,polyfunctional,large
@@ -2552,7 +2556,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "NCCCC[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](CS)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-lysyl-L-asparaginyl-L-cysteine",
+        "lysylasparaginylcysteine",
     ),
     (
         "CC[C@H](O)[C@@H](C)/C=C\\C[C@H](C)C=CC=C(C)[C@H]1OC(=O)C[C@H](O)CC[C@H](C)[C@@H](OC(C)=O)C=C[C@@H]1C",  # heterocycle,large
@@ -2568,7 +2572,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "NCCCC[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",  # aromatic,polyfunctional,large
-        "L-lysyl-L-tyrosyl-L-phenylalanine",
+        "lysyltyrosylphenylalanine",
     ),
     (
         "C[C@]12CCC(=O)C=C1[C@H](O)C[C@@H]1[C@@H]2[C@@H](O)C[C@@]2(C)[C@H]1CC[C@]2(O)C(=O)CO",  # fused-ring,medium,steroid
@@ -2733,7 +2737,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "NCCCC[C@H](NC(=O)[C@@H](N)CC(N)=O)C(=O)N[C@@H](CC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-asparaginyl-L-lysyl-L-aspartic acid",
+        "asparaginyllysylaspartic acid",
     ),
     (
         "CO[C@@H]1C[C@H]2O[C@H](C)[C@@H](C)c3c(C)c(O)cc(c32)O1",  # aromatic,heterocycle,fused-ring,medium

@@ -11,10 +11,11 @@ IUPAC P-66.6.6: Linear peptides are named using amino acid nomenclature:
 IUPAC P-66.6.6.2: peptide naming convention uses N->C direction,
 with acyl (glycyl, alanyl...) forms for all residues except C-terminal.
 
-Examples:
-    Gly-Gly        -> glycylglycine
-    L-Ala-Gly      -> L-alanylglycine
-    Gly-L-Ala-L-Leu -> glycyl-L-alanyl-L-leucine
+Examples (P-103.3.4 omits the L descriptor for Table-10.4 amino acids):
+    Gly-Gly         -> glycylglycine
+    L-Ala-Gly       -> alanylglycine
+    Gly-L-Ala-L-Leu -> glycylalanylleucine
+    D-Ala-Gly       -> D-alanylglycine   (D IS cited)
 """
 
 from typing import Optional, List, Dict
@@ -406,19 +407,29 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
     """
     Assemble the final peptide name from identified residues.
 
-    IUPAC P-66.6.6.2 rules:
+    IUPAC P-103.3.2 / P-103.3.4 rules:
     - C-terminal (last) residue: use full amino acid name
     - All other residues: use acyl form (e.g., glycyl-, alanyl-)
-    - Add L-/D- stereo prefix before each residue name (P-66.6.6.3)
-    - Hyphen ONLY before a residue that has a stereo prefix (L-/D-)
-    - No hyphen before achiral residues (concatenate directly)
+    - P-103.3.4: the stereodescriptor 'L' is NOT indicated for peptides composed
+      of Table-10.4 amino acids (the only ones Orthonym names -- non-standard
+      residues fail closed in _identify_residues). Only 'D' is cited, at the front
+      of each acyl group / name that has that configuration. (BB verbatim:
+      "The stereodescriptor 'L' is not indicated in the names ... of peptides
+      composed of amino acids listed in Table 10.4. In contrast, the
+      stereodescriptor 'D' is indicated at the front of the acyl group or name of
+      each component having that configuration.")
+    - Hyphen ONLY before a residue that carries a cited (D-) descriptor.
+    - The residue's true config is preserved in res['stereo']; the L-omission is a
+      display rule applied here, so a standalone amino acid (P-103.1) still shows L.
 
-    Examples:
-        glycyl + glycine -> glycylglycine
-        L-alanyl + glycine -> L-alanylglycine
-        glycyl + L-alanine -> glycyl-L-alanine
-        L-alanyl + L-alanine -> L-alanyl-L-alanine
-        glycyl + L-alanyl + L-leucine -> glycyl-L-alanyl-L-leucine
+    Examples (P-103.3.2 / P-103.3.4):
+        glycyl + glycine        -> glycylglycine
+        L-alanyl + glycine      -> alanylglycine
+        glycyl + L-alanine      -> glycylalanine
+        L-alanyl + L-alanine    -> alanylalanine
+        L-valyl+L-tyrosyl+L-Ile -> valyltyrosylisoleucine
+        D-alanyl + glycine      -> D-alanylglycine
+        glycyl + D-alanine      -> glycyl-D-alanine
     """
     parts = []
     for i, res in enumerate(named_residues):
@@ -429,17 +440,19 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
         else:
             base = res['acyl']
 
-        stereo = res['stereo']  # "L-", "D-", or ""
-        parts.append((stereo, base))
+        # P-103.3.4: suppress the 'L-' descriptor for display; keep 'D-' (and the
+        # achiral "" for glycine). res['stereo'] retains the true configuration.
+        display_stereo = "" if res['stereo'] == "L-" else res['stereo']
+        parts.append((display_stereo, base))
 
-    # Build the name: insert hyphen only before stereo-prefixed residues
+    # Build the name: insert hyphen only before a cited (D-) descriptor.
     result = parts[0][0] + parts[0][1]  # First residue
     for stereo, base in parts[1:]:
         if stereo:
-            # Has stereo prefix (e.g., "L-") -> hyphen before it
+            # Has a cited descriptor (D-) -> hyphen before it
             result += "-" + stereo + base
         else:
-            # No stereo prefix -> concatenate directly
+            # No cited descriptor (L omitted, or achiral) -> concatenate directly
             result += base
 
     return result

@@ -305,13 +305,14 @@ def _opsin_parse(name: str) -> str:
 PHASE22_PEPTIDE_ROUNDTRIP = [
     # Dipeptides
     ("NCC(=O)NCC(=O)O", "glycylglycine"),
-    ("NCC(=O)N[C@@H](C)C(=O)O", "glycyl-L-alanine"),
-    ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O", "L-alanyl-L-alanine"),
-    ("N[C@@H](C)C(=O)NCC(=O)O", "L-alanylglycine"),
+    # P-103.3.4: L descriptor omitted for Table-10.4 amino acids in peptides.
+    ("NCC(=O)N[C@@H](C)C(=O)O", "glycylalanine"),
+    ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O", "alanylalanine"),
+    ("N[C@@H](C)C(=O)NCC(=O)O", "alanylglycine"),
     # Tripeptide
     (
         "NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O",
-        "glycyl-L-alanyl-L-leucine",
+        "glycylalanylleucine",
     ),
 ]
 
@@ -818,7 +819,7 @@ PHASE24_RT_ANALYSIS = [
     ),
     (
         "O=CC1=CC(O)C(O)C(O)C1O",
-        "3,4,5,6-tetrahydroxycyclohex-1-enecarbaldehyde",
+        "3,4,5,6-tetrahydroxycyclohex-1-ene-1-carbaldehyde",
         "cyclohexenecarbaldehyde-rt-match",
     ),
     (
@@ -835,18 +836,18 @@ PHASE24_RT_ANALYSIS = [
     # --- Steroid naming (with stereodescriptors for defined stereocenters) ---
     (
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol",
+        "5beta-androstane-3alpha,17alpha-diol",
         "steroid-androstanediol",
     ),
     # --- Peptide naming (exact RT match) ---
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
-        "L-leucyl-L-serylglycine",
+        "leucylserylglycine",
         "peptide-leu-ser-gly",
     ),
     (
         "N[C@@H](CC(=O)O)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O",
-        "L-aspartyl-L-seryl-L-serine",
+        "aspartylserylserine",
         "peptide-asp-ser-ser",
     ),
     # --- Fatty acid naming (exact RT match pattern) ---

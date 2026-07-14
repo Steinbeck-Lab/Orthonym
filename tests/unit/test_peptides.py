@@ -37,19 +37,19 @@ class TestDipeptidesWithStereo:
     """Test dipeptide naming with L/D stereochemistry prefixes."""
 
     def test_glycyl_l_alanine(self):
-        """Gly-L-Ala: achiral N-terminal + chiral C-terminal."""
+        """Gly-L-Ala: P-103.3.4 omits the L descriptor -> glycylalanine."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)O")
-        assert result == "glycyl-L-alanine"
+        assert result == "glycylalanine"
 
     def test_l_alanylglycine(self):
-        """L-Ala-Gly: chiral N-terminal + achiral C-terminal."""
+        """L-Ala-Gly: P-103.3.4 omits the L descriptor -> alanylglycine."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "L-alanylglycine"
+        assert result == "alanylglycine"
 
     def test_l_alanyl_l_alanine(self):
-        """L-Ala-L-Ala: both chiral, same residue."""
+        """L-Ala-L-Ala: P-103.3.4 omits the L descriptor -> alanylalanine."""
         result = name_compound("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O")
-        assert result == "L-alanyl-L-alanine"
+        assert result == "alanylalanine"
 
 
 # ── Tripeptides ───────────────────────────────────────────────────────
@@ -59,9 +59,9 @@ class TestTripeptides:
     """Test tripeptide naming (3 residues)."""
 
     def test_glycyl_l_alanyl_l_leucine(self):
-        """Gly-L-Ala-L-Leu: three residues, mixed chirality."""
+        """Gly-L-Ala-L-Leu: three residues, all L -> P-103.3.4 omits L."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O")
-        assert result == "glycyl-L-alanyl-L-leucine"
+        assert result == "glycylalanylleucine"
 
 
 # ── Edge cases: should NOT trigger peptide naming ─────────────────────
@@ -128,11 +128,15 @@ class TestStereoMapping:
     """Test S->L and R->D stereo prefix mapping."""
 
     def test_s_config_maps_to_l(self):
-        """S-configured alpha-carbon should get L- prefix."""
-        # L-alanine has S configuration at alpha carbon
+        """S-configured alpha-carbon is identified as L, then omitted (P-103.3.4).
+
+        L-alanine has S configuration; in a peptide the L descriptor is not cited,
+        so a correctly-L-identified N-terminal residue yields a bare acyl stem with
+        NO 'D-' prefix (a D misidentification would surface as 'D-alanyl').
+        """
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        # N-terminal L-Ala should produce "L-alanyl..."
-        assert result.startswith("L-alanyl")
+        assert result == "alanylglycine"
+        assert not result.startswith("D-")
 
     def test_glycine_no_stereo_prefix(self):
         """Glycine is achiral -- no L/D prefix."""
@@ -153,11 +157,18 @@ class TestCysteineStereoInversion:
     """
 
     def test_l_cysteine_gets_l_prefix(self):
-        """L-cysteine (R configuration) should get L- prefix."""
+        """L-cysteine (R config, inverted) is identified as L, then omitted.
+
+        P-103.3.4 suppresses the L descriptor; the CIP inversion still matters
+        because a broken inversion would tag R-cysteine as D and emit 'D-cysteine'.
+        So the invariant is: the residue names as (L-)cysteine with NO 'D-'.
+        """
         # L-cysteine: N[C@@H](CS)C(=O)O -- R configuration at alpha carbon
         result = name_compound("N[C@@H](CS)C(=O)NCC(=O)O")
-        assert "L-cysteine" in result or "L-cysteyl" in result or "L-cysteinyl" in result, \
-            f"Expected L-cysteine prefix, got: {result}"
+        assert "cysteinyl" in result or "cysteine" in result, \
+            f"Expected a cysteine residue, got: {result}"
+        assert "D-" not in result, \
+            f"L-cysteine must not be mis-tagged D-, got: {result}"
 
     def test_d_cysteine_gets_d_prefix(self):
         """D-cysteine (S configuration) should get D- prefix."""
@@ -167,29 +178,31 @@ class TestCysteineStereoInversion:
             f"Expected D-cysteine prefix, got: {result}"
 
     def test_l_alanine_still_correct(self):
-        """L-alanine (S configuration) should still get L- prefix (not inverted)."""
-        result = name_compound("N[C@@H](C)C(=O)O")
-        # Single amino acid, not a peptide - but if in peptide context:
+        """L-alanine (S config, NOT inverted) is identified as L, then omitted.
+
+        In a peptide the L is omitted (P-103.3.4), so the N-terminal residue must
+        be a bare 'alanyl' with no 'D-' (a broken S->L mapping would tag it D-).
+        """
         result_peptide = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result_peptide.startswith("L-alanyl"), \
-            f"Expected L-alanyl start, got: {result_peptide}"
+        assert result_peptide == "alanylglycine", \
+            f"Expected alanylglycine, got: {result_peptide}"
 
     def test_benchmark_peptide_with_l_cysteine_1(self):
-        """Benchmark peptide 1: Lys-Thr-Cys should have L-cysteine at C-terminal."""
+        """Benchmark peptide 1: Lys-Thr-Cys, C-terminal L-cysteine (L omitted)."""
         smiles = "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](CS)C(=O)O"
         result = name_compound(smiles)
         assert result is not None, "Should produce a name"
-        assert "L-cysteine" in result, \
-            f"Expected L-cysteine in name, got: {result}"
-        assert "D-cysteine" not in result, \
-            f"Should NOT contain D-cysteine, got: {result}"
+        assert result.endswith("cysteine"), \
+            f"Expected an L-cysteine C-terminal (L omitted, P-103.3.4), got: {result}"
+        assert "D-cysteine" not in result and "D-" not in result, \
+            f"Should NOT mis-tag D, got: {result}"
 
     def test_benchmark_peptide_with_l_cysteine_2(self):
-        """Benchmark peptide 2: Gln-Lys-Cys should have L-cysteine at C-terminal."""
+        """Benchmark peptide 2: Gln-Lys-Cys, C-terminal L-cysteine (L omitted)."""
         smiles = "NCCCC[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](CS)C(=O)O"
         result = name_compound(smiles)
         assert result is not None, "Should produce a name"
-        assert "L-cysteine" in result, \
-            f"Expected L-cysteine in name, got: {result}"
-        assert "D-cysteine" not in result, \
-            f"Should NOT contain D-cysteine, got: {result}"
+        assert result.endswith("cysteine"), \
+            f"Expected an L-cysteine C-terminal (L omitted, P-103.3.4), got: {result}"
+        assert "D-cysteine" not in result and "D-" not in result, \
+            f"Should NOT mis-tag D, got: {result}"

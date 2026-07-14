@@ -1305,6 +1305,24 @@ def _find_methoxys(
     return sorted(methoxys)
 
 
+def _np_parent_e(next_word: str) -> str:
+    """Return the parent-hydride terminal 'e' (``…ane``/``…ene``/``…yne``) that
+    precedes a following suffix, applying IUPAC P-16.3.3 vowel elision.
+
+    The 'e' is ELIDED before a vowel-initial suffix (single ``-ol``/``-one``) and
+    RETAINED before a consonant-initial (i.e. multiplied) suffix (``-diol`` /
+    ``-triol`` / ``-dione``), so ``estra-1,3,5(10)-triene-3,17-diol`` and
+    ``androst-4-ene-3,17-dione`` keep the 'e' while ``androstan-3-ol`` and
+    ``androstan-3-one`` elide it. ``next_word`` is the multiplier+suffix WORD
+    (``ol``/``diol``/``one``/``dione``), i.e. the suffix with its locants stripped.
+    Reuses ``_ELISION_VOWELS`` (which excludes 'e') for the vowel test.
+    """
+    from ..assembly.naming_utils import _ELISION_VOWELS
+    if not next_word:
+        return "e"
+    return "" if next_word[0] in _ELISION_VOWELS else "e"
+
+
 def _assemble_np_name(
     stem: str,
     scaffold_name: str,
@@ -1471,11 +1489,13 @@ def _assemble_np_name(
 
     # --- Build ketone suffix ---
     ketone_suffix = ""
+    ketone_word = ""  # the multiplier+suffix word (one/dione/trione) for P-16.3.3 elision
     if ketones:
         locant_str = ",".join(str(loc) for loc in ketones)
         count = len(ketones)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
-        ketone_suffix = f"-{locant_str}-{multiplier}one"
+        ketone_word = f"{multiplier}one"
+        ketone_suffix = f"-{locant_str}-{ketone_word}"
 
     # Phase 181 (WSC-02): free ring-face descriptors not consumed by any substituent/suffix
     # locant (typically C-5, and any cited inverted bridgehead with no decoration) are
@@ -1517,26 +1537,35 @@ def _assemble_np_name(
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         # P-63.1.2: elide the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
         from ..assembly.naming_utils import _join_multiplied_suffix
-        ol_suffix = f"-{locant_str}-{_join_multiplied_suffix(multiplier, 'ol')}"
+        ol_word = _join_multiplied_suffix(multiplier, 'ol')
+        ol_suffix = f"-{locant_str}-{ol_word}"
+        # P-16.3.3: the parent-hydride terminal 'e' is elided before the vowel-initial
+        # single '-ol' but RETAINED before a consonant-initial multiplied '-diol'/'-triol'
+        # (estradiol -> 'triene-3,17-diol'; 5alpha-androstane-3,17-diol).
+        e = _np_parent_e(ol_word)
         # non-OH prefix + modification_prefix + [stem-stereo] + effective_stem + unsaturation + -ol
         # e.g., "4-methylcholest-5-en-3-ol" or "5alpha-cholestan-3beta-ol"
-        return f"{stereo_prefix}{_stemjoin(non_oh_prefix + modification_prefix, effective_stem)}{unsat_suffix}{ol_suffix}"
+        return f"{stereo_prefix}{_stemjoin(non_oh_prefix + modification_prefix, effective_stem)}{unsat_suffix}{e}{ol_suffix}"
 
     # General case: prefix + modification_prefix + [stem-stereo] + effective_stem + unsaturation + ketone
     # e.g., "17beta-hydroxy-5alpha-androstan-3-one"
     if unsat_suffix == "an":
         # Saturated: prefix + modification_prefix + stem + "an" + ketone
-        # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-one, -ol, -yl)
-        # Keep 'e' only when no suffix follows (bare saturated name)
+        # P-16.3.3: terminal 'e' of "-ane" is elided before the vowel-initial single
+        # '-one' but RETAINED before a consonant-initial multiplied '-dione'/'-trione'
+        # (androstane-3,17-dione), and kept when no suffix follows (bare name).
         if ketone_suffix:
-            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}{ketone_suffix}"
+            e = _np_parent_e(ketone_word)
+            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}{e}{ketone_suffix}"
         else:
             return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}e"
     else:
         # Unsaturated: prefix + modification_prefix + effective_stem + unsaturation + ketone
-        # If no suffix follows, add terminal 'e' (IUPAC: "ene"/"yne" not "en"/"yn")
+        # P-16.3.3 as above: retain 'e' before '-dione' (androst-4-ene-3,17-dione),
+        # elide before single '-one' (androst-4-en-3-one); add 'e' when bare.
         if ketone_suffix:
-            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, effective_stem)}{unsat_suffix}{ketone_suffix}"
+            e = _np_parent_e(ketone_word)
+            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, effective_stem)}{unsat_suffix}{e}{ketone_suffix}"
         else:
             return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, effective_stem)}{unsat_suffix}e"
 

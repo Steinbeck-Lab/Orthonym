@@ -325,6 +325,74 @@ _DL_CONFIG_RE = re.compile(r'(^|[\s\-])([DL])-', re.I)
 # Peptide acyl chain (L-valyl- / D-glucosaminyl-) — case-insensitive.
 _PEPTIDE_ACYL_RE = re.compile(r'\b[DL]-[a-z]+yl-', re.I)
 
+# W5-A4 (P-103.3.4): detector for an L-SUPPRESSED peptide name. After L-omission
+# a peptide such as 'alanylalanine' / 'valyltyrosylisoleucine' carries no D/L
+# token, so Pattern D can no longer see it. This does an EXACT greedy
+# decomposition against the amino-acid acyl/terminal tables: internal residues
+# are acyl stems (optionally cited 'D-'), the final residue is a terminal AA name
+# (optionally cited 'D-'). Exact matching (not a loose regex) keeps it from
+# false-positively suppressing stereo injection on a non-peptide name.
+_PEPTIDE_STEM_SETS = None
+
+
+def _peptide_stem_sets():
+    """Return (acyl_stems, terminal_names) frozensets, L/D-stripped, cached."""
+    global _PEPTIDE_STEM_SETS
+    if _PEPTIDE_STEM_SETS is None:
+        try:
+            from ..data.amino_acids import AMINO_ACID_ACYL_NAMES
+        except Exception:
+            _PEPTIDE_STEM_SETS = (frozenset(), frozenset())
+            return _PEPTIDE_STEM_SETS
+
+        def _strip_dl(s: str) -> str:
+            for p in ("D-", "L-", "d-", "l-"):
+                if s.startswith(p):
+                    return s[len(p):]
+            return s
+
+        acyls = frozenset(_strip_dl(v) for v in AMINO_ACID_ACYL_NAMES.values())
+        terms = frozenset(_strip_dl(k) for k in AMINO_ACID_ACYL_NAMES.keys())
+        _PEPTIDE_STEM_SETS = (acyls, terms)
+    return _PEPTIDE_STEM_SETS
+
+
+def _looks_like_peptide(name: str) -> bool:
+    """True iff *name* is an Orthonym peptide of >=2 residues (P-103.3.2/.3.4).
+
+    Greedy longest-match decomposition: strip a cited 'D-' descriptor (leading, or
+    '-D-' before a later residue), consume the whole remainder as a terminal AA
+    name when it matches, else consume the longest acyl stem that leaves more to
+    parse, and repeat. Returns False on any residue that is not a known stem/name,
+    so non-peptides (and the exotic hyphenated AA-derivatives) fall through to the
+    normal injection path (which the allowlist already gates safely)."""
+    acyls, terms = _peptide_stem_sets()
+    if not acyls:
+        return False
+    acyls_by_len = sorted(acyls, key=len, reverse=True)
+    s = name.strip()
+    residues = 0
+    while s:
+        # Strip a cited D- descriptor: leading for the first residue, '-D-' later.
+        if residues == 0 and s.startswith("D-"):
+            s = s[2:]
+        elif residues > 0 and s.startswith("-D-"):
+            s = s[3:]
+        elif residues > 0 and s.startswith("-"):
+            return False  # a hyphen that is not '-D-' is not this peptide grammar
+        # Terminal residue: the remainder is exactly a terminal AA name.
+        if s in terms:
+            return residues + 1 >= 2
+        # Internal residue: longest acyl stem that leaves more of the chain.
+        stem = next(
+            (a for a in acyls_by_len if s.startswith(a) and len(s) > len(a)), None
+        )
+        if stem is None:
+            return False
+        s = s[len(stem):]
+        residues += 1
+    return False
+
 # BBR-GATE (Phase 169.7): a LEADING stereo / relative-configuration descriptor-block
 # matcher for strip_stereo. Mirrors  (the
 # validation precedent). Matches a leading (...)- block whose contents are PURELY
@@ -418,6 +486,14 @@ def needs_stereo_injection(mol, name: str) -> bool:
     # (peptides report complex_ring/unknown/direct, NOT heterocycle — RESEARCH
     # Pitfall 1 — so the inject-allowlist exclusion is not sufficient on its own).
     if _DL_CONFIG_RE.search(name) or _PEPTIDE_ACYL_RE.search(name):
+        return False
+    # Pattern E (W5-A4) — an L-SUPPRESSED peptide name (P-103.3.4). With the L
+    # descriptor omitted (alanylalanine, glycylalanine, valyltyrosylisoleucine),
+    # Patterns C/D no longer fire, so the descriptor-free peptide would wrongly
+    # look injection-eligible. name_peptide already carries all cited (D-) config
+    # and correctly omits L, so treat a recognised peptide name as stereo-complete
+    # (restores the Phase-177 Pattern-D protection for the post-W5-A4 name form).
+    if _looks_like_peptide(name):
         return False
 
     # Idempotent CIP assignment (D-05 read-only — assign_stereochemistry uses
