@@ -1020,10 +1020,11 @@ def route_charged(mol, style: str = 'pin') -> str:
             if het_name:
                 return het_name
             return ''   # primitive declined (un-nameable heterane) -> legacy
-        # F-T6 (DD3 Fix 5, P-72.3): a Group-13 -uide (hydride-addition) anion —
-        # the ate-complex / borate (B(CH3)4- / B(C6H5)4- / BF4-). Named by the
-        # substituted-'-uide'-parent emitter (cannot neutralize: B(CH3)4 is invalid).
-        if _acls == {'group13_uide_anion'} and len(sites['anions']) == 1:
+        # P-72.3 / P-72.8: a -uide (hydride-addition) anion — the ate-complex
+        # (B(CH3)4- / CH3-SiH4- / (CH3)4P- / (C6H5)2I-). Named by the
+        # substituted-'-uide'-parent emitter (cannot neutralize: the hypervalent
+        # neutral hydride is invalid). W4-I2: generalized beyond Group 13.
+        if _acls == {'uide_anion'} and len(sites['anions']) == 1:
             from .ions import _emit_group13_uide
             uide = _emit_group13_uide(mol, sites['anions'][0]['atom_idx'])
             if uide:

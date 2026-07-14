@@ -580,7 +580,7 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
     # 'trimethylsilane' instead of 'trimethylsilanide'; `C[B-](C)(C)C` -> 'unknown'
     # instead of 'tetramethylboranuide'). Decline here so the charged path wins:
     #   - 'heteroatom_hydride_anion' (P/As/Sb/Si/Ge/Sn/Pb) -> the -ide path;
-    #   - 'group13_uide_anion'       (B/Al/… ate-complex)  -> the -uide path.
+    #   - 'uide_anion'               (B/Si/P/… ate-complex) -> the -uide path.
     # PURE: only read-only perception/classification calls, no mutation (D-12/D-26).
     from orthonym.perception.ions import detect_species_type, get_ion_sites
     if detect_species_type(mol) == 'ion':
@@ -588,7 +588,7 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
         if len(_sites.get('anions', [])) == 1 and not _sites.get('cations'):
             from orthonym.rules.ions import classify_anion
             if classify_anion(mol, _sites['anions'][0]) in (
-                    'heteroatom_hydride_anion', 'group13_uide_anion'):
+                    'heteroatom_hydride_anion', 'uide_anion'):
                 return False
     # v23 Phase 7 (7a): a neutral mononuclear Group-15 (As/Sb/Bi) parent hydride
     # — trimethylarsane / triphenylarsane / arsane / trichloroarsane — is named

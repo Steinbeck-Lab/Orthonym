@@ -53,19 +53,36 @@ _HETEROATOM_HYDRIDE_IDE_VALENCE = {
     'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
 }
 
-# F-T6 (DD3 Fix 5, P-72.3): the -uide (hydride-ADDITION) family. A Group-13
-# centre at one bond ABOVE its standard valence carrying the -1 charge is the
-# ate-complex / -uide anion (BH3 + H- -> boranuide BH4-; B(CH3)4- ->
-# tetramethylboranuide; B(C6H5)4- -> tetraphenylboranuide). element -> parent
-# anion stem (the '-uide' is appended after eliding 'e'). standard valence 3 ->
-# the -uide centre has degree + H == 4.
-_GROUP13_UIDE_STEMS = {
-    'B': 'borane',
-    'Al': 'alumane',
-    'Ga': 'gallane',
-    'In': 'indigane',
-    'Tl': 'thallane',
+# P-72.3 / P-72.8 (W4-I2): the -uide (hydride-ADDITION) family, GENERALIZED beyond
+# Group 13. A centre at one bond ABOVE its standard bonding number carrying the -1
+# charge is the ate-complex / -uide anion. Method (1) — the 'uide' suffix on the
+# neutral parent hydride — gives the PIN (BB 41098), avoiding the λ-convention that
+# the alternative 'ide'-on-a-λ-parent form needs. element -> parent-hydride stem
+# (the '-uide' is appended after eliding the final 'e'). Examples (BB 41100-41116):
+#   BH3 + H-  -> boranuide (BH4-); B(CH3)4- -> tetramethylboranuide
+#   CH3-SiH4- -> methylsilanuide;  (CH3)4P- -> tetramethylphosphanuide
+#   (C6H5)2I- -> diphenyliodanuide
+_UIDE_STEMS = {
+    # Group 13 (standard bonding number 3 -> -uide centre has degree+H == 4)
+    'B': 'borane', 'Al': 'alumane', 'Ga': 'gallane', 'In': 'indigane', 'Tl': 'thallane',
+    # Group 14 (standard 4 -> -uide centre has degree+H == 5)
+    'Si': 'silane', 'Ge': 'germane', 'Sn': 'stannane', 'Pb': 'plumbane',
+    # Group 15 (standard 3 -> -uide centre has degree+H == 4)
+    'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane',
+    # Group 17 (standard 1 -> -uide centre has degree+H == 2; e.g. diphenyliodanuide)
+    'I': 'iodane', 'Br': 'bromane', 'Cl': 'chlorane',
 }
+
+# Standard bonding number for the -uide valence gate (degree + H == std + 1).
+_UIDE_STD_VALENCE = {
+    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
+    'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+    'P': 3, 'As': 3, 'Sb': 3,
+    'I': 1, 'Br': 1, 'Cl': 1,
+}
+
+# Backward-compat alias (Group-13 subset was the original name).
+_GROUP13_UIDE_STEMS = {k: _UIDE_STEMS[k] for k in ('B', 'Al', 'Ga', 'In', 'Tl')}
 
 
 # === SUFFIX MAPPINGS ===
@@ -249,17 +266,23 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
     # the organometallic-decline into a charge-dropped '' regression. Also excludes
     # a 3-coordinate P (not a clean phosphanide — no P-H was lost).
     elif element in _HETEROATOM_HYDRIDE_IDE_VALENCE:
-        if (atom.GetDegree() + atom.GetTotalNumHs() + 1
-                == _HETEROATOM_HYDRIDE_IDE_VALENCE[element]):
+        dh = atom.GetDegree() + atom.GetTotalNumHs()
+        # P-72.2.2.1: -ide (H+ LOSS) — one bond BELOW standard valence.
+        if dh + 1 == _HETEROATOM_HYDRIDE_IDE_VALENCE[element]:
             return 'heteroatom_hydride_anion'
+        # P-72.3 / P-72.8 (W4-I2): -uide (H- ADDITION) — one bond ABOVE standard
+        # valence. Generalizes the old Group-13-only -uide detection to Group-14/15
+        # metalloids: (CH3)4P- -> tetramethylphosphanuide, C[SiH4-] -> methylsilanuide.
+        if element in _UIDE_STD_VALENCE and dh == _UIDE_STD_VALENCE[element] + 1:
+            return 'uide_anion'
 
-    # F-T6 (DD3 Fix 5, P-72.3): a Group-13 centre ONE bond above its standard
-    # valence (degree + H == 4 for trivalent B/Al/…) carrying the -1 charge is the
-    # -uide hydride-addition anion (the ate-complex / borate): B(CH3)4- ->
-    # tetramethylboranuide, B(C6H5)4- -> tetraphenylboranuide.
-    elif element in _GROUP13_UIDE_STEMS:
-        if atom.GetDegree() + atom.GetTotalNumHs() == 4:
-            return 'group13_uide_anion'
+    # P-72.3 / P-72.8: the -uide (hydride-ADDITION) anion for elements NOT in the
+    # -ide (H+ loss) table — Group 13 (B/Al/Ga/In/Tl, the ate-complex / borate:
+    # B(CH3)4- -> tetramethylboranuide) and the halogens (diphenyliodanuide). A
+    # centre ONE bond above its standard bonding number carrying the -1 charge.
+    elif element in _UIDE_STD_VALENCE:
+        if atom.GetDegree() + atom.GetTotalNumHs() == _UIDE_STD_VALENCE[element] + 1:
+            return 'uide_anion'
 
     return 'unknown'
 
@@ -1722,16 +1745,18 @@ def _emit_heteroatom_cumulative_suffix(mol, center_idx: int, suffix: str) -> str
 
 
 def _emit_group13_uide(mol, center_idx: int) -> str:
-    """F-T6 (DD3 Fix 5, P-72.3): name a Group-13 -uide (hydride-addition) anion —
-    a centre ONE bond above its standard valence carrying the -1 charge (the
-    ate-complex / borate). Substituents on the centre are named as prefixes on the
-    '-uide' parent anion (boranuide = BH4-): B(CH3)4- -> tetramethylboranuide,
-    B(C6H5)4- -> tetraphenylboranuide, BF4- -> tetrafluoroboranuide. Explicit H on
-    the centre stay implicit on the parent (CH3-BH3- -> methylboranuide). Cannot
-    neutralize-then-re-enter (B(CH3)4 is an invalid neutral), so the substituents
-    are named directly. Returns '' on any decline (caller -> legacy)."""
+    """P-72.3 / P-72.8 (W4-I2): name a -uide (hydride-addition) anion — a centre ONE
+    bond above its standard bonding number carrying the -1 charge (the ate-complex).
+    GENERALIZED from Group-13-only to any _UIDE_STEMS element. Substituents on the
+    centre are named as prefixes on the '-uide' parent anion (boranuide = BH4-,
+    silanuide = SiH5-, phosphanuide = PH4-): B(CH3)4- -> tetramethylboranuide,
+    CH3-SiH4- -> methylsilanuide, (CH3)4P- -> tetramethylphosphanuide,
+    (C6H5)2I- -> diphenyliodanuide, BF4- -> tetrafluoroboranuide. Explicit/implicit
+    H on the centre stay implicit on the parent. Named directly (cannot
+    neutralize-then-re-enter — the neutral hypervalent hydride is invalid). Method
+    (1) PIN, so no λ-convention needed (BB 41098). Returns '' on any decline."""
     center = mol.GetAtomWithIdx(center_idx)
-    stem = _GROUP13_UIDE_STEMS.get(center.GetSymbol())
+    stem = _UIDE_STEMS.get(center.GetSymbol())
     if not stem:
         return ''
     from ..perception.chains import classify_substituent
