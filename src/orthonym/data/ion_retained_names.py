@@ -68,6 +68,13 @@ RETAINED_ANIONS = {
     # BBR-CHG-169.6-caveats (Phase 169.7): retained charged-species names recovered
     # from the 169.6 route_charged regression (neutralize-first produced OPSIN-
     # unparseable forms -> suppressed). All RT-verified; sanctioned by P-72/P-74.
+    # HOO- : BB P-72.2.2.2.2 (line 41031) "The retained names hydroxide, for HO-,
+    # and hydroperoxide, for HOO-, are preselected names but cannot be substituted."
+    # So the bare dioxidane anion is the preselected name 'hydroperoxide' (the
+    # systematic 'dioxidanide' is the alternative). HEAD dropped the charge to the
+    # neutral 'dioxidane'; this restores the correct anion word. Substituted
+    # peroxol anions (CH3-O-O-) keep the systematic -peroxolate/-dioxidanide path.
+    '[O-]O': 'hydroperoxide',
     'N[O-]': 'aminoxide',  # H2N-O- conjugate base of hydroxylamine (P-74); was -> unknown
     'O=S(=O)([N-]S(=O)(=O)C(F)(F)F)C(F)(F)F': 'bistriflimide',  # was -> 'triflimidic acid'
 }

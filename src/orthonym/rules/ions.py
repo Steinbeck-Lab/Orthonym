@@ -169,11 +169,38 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
             elif nb.GetSymbol() == 'P' and nb_has_carbon:
                 return 'phosphonate'
 
+            # P-72.2.2.2.1.1 (peroxy-acid anion): [O-]-O-C(=O)R (the acyl peroxo
+            # anion, e.g. CH3-CH2-CO-O-O- -> propaneperoxoate). The anionic O's
+            # single heavy neighbour is a peroxy O whose OTHER neighbour is an acyl
+            # carbon (a C bearing a double-bonded chalcogen). Distinct from a
+            # peroxol anion (R-O-O- with no acyl -> -peroxolate) and the bare
+            # dioxidane anion (HOO- -> retained 'hydroperoxide'), which fall
+            # through to alkoxide / the retained table.
+            if nb.GetSymbol() == 'O':
+                for far in nb.GetNeighbors():
+                    if far.GetIdx() != atom_idx and far.GetSymbol() == 'C' and any(
+                            b.GetBondType() == Chem.BondType.DOUBLE
+                            and b.GetOtherAtom(far).GetSymbol() in ('O', 'S', 'Se')
+                            for b in far.GetBonds()):
+                        return 'peroxy_acid_anion'
+
         # Default to alkoxide (O- attached to alkyl)
         return 'alkoxide'
 
     elif element == 'N':
-        # Nitrogen anion (aminide)
+        # P-72.2.2.2.4: an amide-type anion (N- on an acyl carbon, R-CO-NH-) is
+        # named on the preselected azanide parent with the acyl group as a prefix
+        # (acetylazanide, BB 41079), NOT the amine 'aminide' suffix (P-72.2.2.2.3,
+        # which is for an amine N- whose carbon is NOT acyl). Fires only for an N-
+        # with exactly one heavy neighbour that is an acyl carbon (C=O/C=S/C=Se).
+        heavy_n = [nb for nb in atom.GetNeighbors() if nb.GetSymbol() != 'H']
+        if len(heavy_n) == 1 and heavy_n[0].GetSymbol() == 'C' and any(
+                b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtom(heavy_n[0]).GetSymbol() in ('O', 'S', 'Se')
+                for b in heavy_n[0].GetBonds()):
+            return 'acyl_azanide'
+
+        # Nitrogen amine anion (aminide)
         return 'aminide'
 
     elif element == 'C':
@@ -520,6 +547,90 @@ def get_cation_suffix(cation_type: str) -> str:
     return CATION_SUFFIXES.get(cation_type, 'ium')
 
 
+# === ACID / AZANIDE ANION HELPERS (P-72.2.2.2.1 / P-72.2.2.2.4) ===
+
+# Chalcogen-designated acid endings ("...thioic S-acid", "...thioic O-acid",
+# "...selenoic Se-acid", ...). For the ANION the italic chalcogen designator is
+# dropped — both tautomers (CH3-CO-S- <-> CH3-CS-O-) name one delocalized -ate
+# (BB 40969/40971: ethanethioate / propanethioate). Longest first so " se-acid"
+# / " te-acid" win over " s-acid" / " o-acid".
+_CHALCOGEN_ACID_DESIGNATORS = (' se-acid', ' te-acid', ' s-acid', ' o-acid')
+
+
+def _acid_anion_from_neutral(neutral_name: str) -> str:
+    """P-72.2.2.2.1.1 (BB 40953): the PIN of an anion formed by removing a hydron
+    from the chalcogen atom of an acid or PEROXYACID characteristic group is the
+    neutral acid name with the 'ic acid'/'ous acid' ending replaced by 'ate'/'ite'.
+    A chalcogen designator (S-/O-/Se-/Te-acid) is dropped first (the delocalized
+    anion has no single-tautomer locant). Root-cause transform (not a per-molecule
+    replace): propaneperoxoic acid -> propaneperoxoate; ethanethioic S-acid ->
+    ethanethioate; propanedithioic acid -> propanedithioate. '' if not an acid name.
+    """
+    if not neutral_name:
+        return ''
+    n = neutral_name.strip()
+    low = n.lower()
+    for desig in _CHALCOGEN_ACID_DESIGNATORS:
+        if low.endswith(desig):
+            base = n[:-len(desig)]           # e.g. 'ethanethioic'
+            bl = base.lower()
+            if bl.endswith('ous'):
+                return base[:-3] + 'ite'
+            if bl.endswith('ic'):
+                return base[:-2] + 'ate'     # 'ethanethio' + 'ate'
+            return ''
+    if low.endswith('ous acid'):
+        return n[:-len('ous acid')] + 'ite'
+    if low.endswith('oic acid'):
+        return n[:-len('oic acid')] + 'oate'
+    if low.endswith('ic acid'):
+        return n[:-len('ic acid')] + 'ate'
+    return ''
+
+
+def _name_acid_chalcogen_anion(mol) -> str:
+    """P-72.2.2.2.1.1: name a peroxy-/thio-acid anion by re-protonating to the
+    neutral acid, naming it, and applying the acid -> -ate/-ite transform. Covers
+    the 'peroxy_acid_anion' and 'carbodithioate' classes (mono-thioate and
+    dithioate). Returns '' on any decline (caller falls through)."""
+    neutral = _try_neutralize_and_name(mol)
+    return _acid_anion_from_neutral(neutral) if neutral else ''
+
+
+def _name_acyl_azanide(mol, anion_idx: int) -> str:
+    """P-72.2.2.2.4 (BB 41069/41079): an amide-type anion R-CO-NH- is named on the
+    preselected 'azanide' parent with the acyl group cited as a prefix
+    (CH3-CO-NH- -> acetylazanide). Build the neutral parent acid R-COOH (transmute
+    the anionic N -> an -OH oxygen), name it, convert the acid name to the acyl
+    prefix, and append 'azanide'. Scope: an N- with exactly ONE heavy neighbour
+    (the acyl carbon) and no other N-substituent. Returns '' on any decline."""
+    anion = mol.GetAtomWithIdx(anion_idx)
+    heavy = [nb for nb in anion.GetNeighbors() if nb.GetSymbol() != 'H']
+    if len(heavy) != 1:
+        return ''
+    try:
+        rw = Chem.RWMol(mol)
+        a = rw.GetAtomWithIdx(anion_idx)
+        a.SetAtomicNum(8)            # N- -> O
+        a.SetFormalCharge(0)
+        a.SetNoImplicit(False)
+        a.SetNumExplicitHs(0)        # let RDKit add the acid -OH hydrogen
+        acid_mol = rw.GetMol()
+        Chem.SanitizeMol(acid_mol)
+        acid_smi = Chem.MolToSmiles(acid_mol)
+    except (RuntimeError, ValueError):
+        return ''
+    from ..assembly.fragment_naming import name_fragment_recursively
+    acid_name = name_fragment_recursively(acid_smi)
+    if not acid_name:
+        return ''
+    from .lipids import _acid_to_acyl
+    acyl = _acid_to_acyl(acid_name)
+    if not acyl:
+        return ''
+    return f'{acyl}azanide'
+
+
 # === MAIN NAMING FUNCTIONS ===
 
 def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = False) -> str:
@@ -604,6 +715,23 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         if anion_type == 'carboxylate':
             return _validate_anion_name(
                 mol, _name_carboxylate_systematic(mol, anion_site))
+
+        # P-72.2.2.2.1.1 (W4-I2): peroxy-/thio-acid anions are named on the neutral
+        # acid name with 'ic acid'/'ous acid' -> 'ate'/'ite' (dropping the chalcogen
+        # designator). This covers propaneperoxoate, ethanethioate and the
+        # (di)thioate acid anions uniformly — the generic route_charged suffix seam
+        # only keys 'oic acid' and cannot handle the '...thioic S-acid' ending.
+        if anion_type in ('peroxy_acid_anion', 'carbodithioate'):
+            acid_anion = _name_acid_chalcogen_anion(mol)
+            if acid_anion:
+                return _validate_anion_name(mol, acid_anion)
+
+        # P-72.2.2.2.4 (W4-I2): an amide-type anion (R-CO-NH-) is named on the
+        # azanide parent with the acyl group as a prefix (acetylazanide, BB 41079).
+        if anion_type == 'acyl_azanide':
+            azanide = _name_acyl_azanide(mol, anion_site['atom_idx'])
+            if azanide:
+                return _validate_anion_name(mol, azanide)
 
         # 169.6-03 (CHOKE-01): for every OTHER single-anion class delegate to the
         # SINGLE route_charged chokepoint. It generalizes _name_oxoacid_anion
