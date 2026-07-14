@@ -97,6 +97,51 @@ RETAINED_CATIONS = {
     # Guanidinium cation (P-73, Table 7.3)
     'NC(N)=[NH2+]': 'guanidinium',
 
+    # Uronium — protonated urea (P-73.1.2.2; BB 1717/41492/41496: the parent
+    # cation 'uronium', NO numerical locants in the PIN). Canonical key is the
+    # O-protonated tautomer RDKit picks for NC(=[OH+])N.
+    'NC(N)=[OH+]': 'uronium',
+
+    # H2N+ nitrenium (P-73.2.2.1 / BB 41563/42381): the PRESELECTED name is
+    # 'azanylium'; 'aminylium'/'nitrenium' are alternatives only. (HEAD emitted
+    # 'aminylium' via the general retained-name path — this row wins at
+    # CATION_RETAINED@500, ahead of retained_name@1300.)
+    '[NH2+]': 'azanylium',
+
+    # Group-14 ylium cations (P-73.2.2.1; BB 41557 lists methylium/propylium/
+    # cyclobutylium AND (C6H5)3Si+ 'triphenylsilylium' as PINs — the ylium of the
+    # parent hydride silane/germane). Bare [SiH3+]/[GeH3+] preselected forms.
+    '[SiH3+]': 'silylium',
+    '[GeH3+]': 'germylium',
+
+    # Chalcogen pyrylium cations (BB 41738-41740: thiopyrylium / selenopyrylium /
+    # telluropyrylium are ALL (PIN) — retained aromatic-cation parents).
+    'c1cc[s+]cc1': 'thiopyrylium',
+    'c1cc[se+]cc1': 'selenopyrylium',
+    'c1cc[te+]cc1': 'telluropyrylium',
+
+    # === Element-hydride onium cations (P-73.1.1.1) ===
+    # The '-onium' names in the BB 41345-41349 table are RETAINED/traditional
+    # forms; the PRESELECTED/PIN is the parent-hydride stem + '-ium' ('-anium'),
+    # documented verbatim in the BB "preselected name" column
+    # (41376/41378/41380/41382, plus 41362 diphenyliodanium PIN and 45996
+    # "Arsanium, stibanium ... treated ... as phosphorus centered cations").
+    # We emit the PIN; the retained -onium alternative is noted in-line.
+    #   H2Cl+ -> chloranium (41382)      [alt chloronium]
+    #   H2Br+ -> bromanium               [alt bromonium]  (halogen -anium PIN)
+    #   H2I+  -> iodanium (41362)        [alt iodonium]
+    #   H3Se+ -> selanium (42314 selaniumyl* preselected)   [alt selenonium]
+    #   H3Te+ -> tellanium               [alt telluronium]  (chalcogen -anium PIN)
+    #   H4As+ -> arsanium (45996)        [alt arsonium]
+    #   H4Sb+ -> stibanium (45996)       [alt stibonium]
+    '[ClH2+]': 'chloranium',
+    '[BrH2+]': 'bromanium',
+    '[IH2+]': 'iodanium',
+    '[SeH3+]': 'selanium',
+    '[TeH3+]': 'tellanium',
+    '[AsH4+]': 'arsanium',
+    '[SbH4+]': 'stibanium',
+
     # Carbocations (carbonium/carbenium ions)
     '[CH3+]': 'methylium',
     '[CH2+]C': 'ethylium',
@@ -120,7 +165,10 @@ RETAINED_CATIONS = {
     'C[S+](C)C': 'trimethylsulfonium',
 
     # Phosphonium cations
-    '[PH4+]': 'phosphonium',
+    # H4P+ PIN is 'phosphanium' (BB 41378/42393: "phosphanium (preselected
+    # name) phosphonium"; 41356/42120 confirm ...phosphanium (PIN)). Traditional
+    # 'phosphonium' is the alternative only.
+    '[PH4+]': 'phosphanium',
     'C[PH3+]': 'methylphosphonium',
     'C[P+](C)(C)C': 'tetramethylphosphonium',
 }
