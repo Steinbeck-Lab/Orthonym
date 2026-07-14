@@ -620,25 +620,44 @@ def _name_acid_chalcogen_anion(mol) -> str:
     return _acid_anion_from_neutral(neutral) if neutral else ''
 
 
-# P-70.3.2 / P-72.2.2.2.3: a compound suffix (aminide) takes the multiplying
-# prefixes 'bis'/'tris'/... (NOT the basic di/tri). Maps the neutral polyamine's
-# di/tri/... multiplier to the bis-series.
+# P-70.3.2 / P-72.2.2.2.2 / P-72.2.2.2.3: a COMPOUND suffix (olate/thiolate/
+# peroxolate/aminide) takes the multiplying prefixes 'bis'/'tris'/... (NOT the
+# basic di/tri) — "to avoid any ambiguity" (BB 28180/41011). Maps the neutral
+# poly-parent's di/tri/... multiplier to the bis-series.
 _BIS_MULTIPLIER = {'di': 'bis', 'tri': 'tris', 'tetra': 'tetrakis', 'penta': 'pentakis'}
 
+# (neutral suffix, anionic compound suffix), LONGEST neutral suffix first so
+# 'peroxol'/'thiol'/'selenol' win over their 'ol' substring.
+_BIS_COMPOUND_SUFFIXES = (
+    ('peroxol', 'peroxolate'),
+    ('tellurol', 'tellurolate'),
+    ('selenol', 'selenolate'),
+    ('thiol', 'thiolate'),
+    ('amine', 'aminide'),
+    ('ol', 'olate'),
+)
 
-def _polyamine_to_bis_aminide(polyamine_name: str) -> str:
-    """P-72.2.2.2.3 (BB 41049/41059): amines with one negative charge on EACH of
-    two-or-more nitrogen atoms use the 'aminide' suffix multiplied by 'bis'/'tris'
-    (a compound suffix takes bis, P-70.3.2). ethane-1,2-diamine ->
-    ethane-1,2-bis(aminide) (BB 41059 verbatim PIN). Returns '' if the re-entered
-    name is not a poly-amine ('...diamine'/'...triamine'/…)."""
-    if not polyamine_name:
+
+def _poly_to_bis_compound_suffix(neutral_name: str) -> str:
+    """P-72.2.2.2.2 / P-72.2.2.2.3 (BB 28192/41029/41059): a poly-hydroxy / -thiol /
+    -peroxol / -amine anion (one -1 on each of >= 2 chalcogen/nitrogen atoms) uses
+    the compound suffix olate/thiolate/peroxolate/aminide multiplied by 'bis'/'tris'
+    (NOT 'di'/'tri', P-70.3.2). Transforms the re-entered NEUTRAL poly-parent name:
+      ethane-1,2-diol   -> ethane-1,2-bis(olate)    (BB 41267)
+      benzene-1,2-diol  -> benzene-1,2-bis(olate)   (BB 28192)
+      ethane-1,2-dithiol-> ethane-1,2-bis(thiolate)
+      benzene-1,2-diol  ... ; ethane-1,2-diamine -> ethane-1,2-bis(aminide) (BB 41059)
+    Returns '' if the re-entered name is not a '...<di/tri>{suffix}' poly form
+    (e.g. a retained 'hydroquinone', or the substituent-form 'bis(sulfanyl)benzene'
+    — those fall through to the legacy path / fail-closed)."""
+    if not neutral_name:
         return ''
-    low = polyamine_name.lower()
-    for mult, bis in _BIS_MULTIPLIER.items():
-        suffix = mult + 'amine'
-        if low.endswith(suffix):
-            return polyamine_name[:-len(suffix)] + f'{bis}(aminide)'
+    low = neutral_name.lower()
+    for nsuf, asuf in _BIS_COMPOUND_SUFFIXES:
+        for mult, bis in _BIS_MULTIPLIER.items():
+            token = mult + nsuf
+            if low.endswith(token):
+                return neutral_name[:-len(token)] + f'{bis}({asuf})'
     return ''
 
 
