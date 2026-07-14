@@ -1766,6 +1766,27 @@ def _charged_ring_locants(mol, ring_system, center_idx):
     return best[1], best[2]
 
 
+def _is_saturated_carbocycle(mol, ring_system) -> bool:
+    """True iff ``ring_system`` is a MONOCYCLIC SATURATED HYDROCARBON ring (a
+    cycloalkane): a single ring, every member carbon, every ring bond single.
+    P-71.2.1.1 gives such a ring's radical the contracted, locant-free name
+    (cyclohexane -> cyclohexyl); every other ring shape (heterocyclic, unsaturated,
+    or polycyclic) takes the general P-71.2.1.2 elide-'e' + locant form."""
+    ring = set(ring_system)
+    for i in ring:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetSymbol() != 'C':
+            return False
+        ring_nbrs = [nb.GetIdx() for nb in a.GetNeighbors() if nb.GetIdx() in ring]
+        if len(ring_nbrs) != 2:  # bridgehead / fused -> not a simple monocycle
+            return False
+        for nb_idx in ring_nbrs:
+            bond = mol.GetBondBetweenAtoms(i, nb_idx)
+            if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+                return False
+    return True
+
+
 def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     """F-T6 (DD3): name a RING centre bearing a cumulative -ide (ring carbanion,
     P-72.2.2.1) or -ium (ring cation, P-73.1.1.2) suffix, with 'e' elision and a
@@ -1782,9 +1803,16 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         substituent(s) are severed, named as ring substituent prefix(es) at the
         centre locant, and the neutral ring takes the -ium. -> 1-methylpyridin-1-ium.
 
-    Returns '' for any other suffix (a ring radical keeps its legacy textual form,
-    preserving byte-identity) or on any decline (legacy fall-through)."""
-    if suffix not in ('ide', 'ium'):
+    RADICAL centres (-yl/-ylidene/-ylidyne) reuse the SAME in-place machinery
+    (P-71.2.1.2 / P-71.2.2.2 general method: elide the parent-hydride's final 'e'
+    and cite a first-class free-valence locant), e.g. `[C]1C=CSC=C1` ->
+    4H-thiopyran-4-ylidene. As an exception, a MONOCYCLIC SATURATED HYDROCARBON
+    ring radical keeps the contracted, locant-free 'cyclohexyl'-style name
+    (P-71.2.1.1) produced by the legacy `_apply_radical_suffix` textual path, so
+    this primitive fails-closed ('') for it (W4-I0/W4-I1).
+
+    Returns '' for any other suffix or on any decline (legacy fall-through)."""
+    if suffix not in ('ide', 'ium', 'yl', 'ylidene', 'ylidyne'):
         return ''
     from ..perception.rings import get_ring_systems
     ring_system = None
@@ -1796,6 +1824,15 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     except (RuntimeError, ValueError):
         return ''
     if ring_system is None:
+        return ''
+
+    # P-71.2.1.1 / P-71.2.2.1: a radical on a monocyclic saturated hydrocarbon ring
+    # (cyclohexane -> cyclohexyl) keeps the contracted, locant-free form via the
+    # legacy textual path; only the GENERAL ring radicals (heterocyclic /
+    # unsaturated / polycyclic, P-71.2.1.2 / P-71.2.2.2) take the locant form here.
+    # -ide / -ium always use the locant form (no such contraction rule applies).
+    if (suffix in ('yl', 'ylidene', 'ylidyne')
+            and _is_saturated_carbocycle(mol, ring_system)):
         return ''
 
     center = mol.GetAtomWithIdx(center_idx)
