@@ -337,6 +337,21 @@ _STRIP_STEREO_LEADING_RE = re.compile(
     r"^(\((?:[0-9]+[a-z]?[rsezRSEZ*]|[rsezRSEZ]|RS|SR|[,\-+ ])+\)|rel|rac|cis|trans|\(±\))-",
     re.IGNORECASE,
 )
+# W4-S2: the SAME pure-stereo descriptor block, but NESTED — i.e. sitting right
+# after an enclosing-mark opening as a substituent's own configuration
+# (``[(1r,4r)-4-methylcyclohexyl]benzene``, ``N-[(1s,4s)-4-methylcyclohexyl]…``).
+# The leading matcher above only reaches a block at name-start, so a nested
+# substituent-stereo block was invisible to the "does the constitutional form
+# parse?" probe, and the DEF-9 gate wrongly suppressed a correct-by-construction
+# PIN whose ONLY OPSIN-unparseable feature is the r/s cyclohexane stereo layer.
+# This removes ONLY the pure-stereo block, preserving the enclosing mark (so the
+# substituent constitution is left intact for the OPSIN parse test); it can never
+# turn a constitutionally-wrong name into a parseable one, so shipping stays
+# strictly gated on constitution. Same content class as the leading matcher.
+_STRIP_STEREO_NESTED_RE = re.compile(
+    r"([\[(])\((?:[0-9]+[a-z]?[rsezRSEZ*]|[rsezRSEZ]|RS|SR|[,\-+ ])+\)-",
+    re.IGNORECASE,
+)
 
 
 def strip_stereo(name: str) -> str:
@@ -357,6 +372,10 @@ def strip_stereo(name: str) -> str:
     while prev != s:
         prev = s
         s = _STRIP_STEREO_LEADING_RE.sub("", s).strip()
+        # W4-S2: also strip nested substituent-stereo blocks (``[(1r,4r)-…``),
+        # keeping the enclosing mark. Applied in the same fixpoint so a name with
+        # both a leading and a nested block converges (read-only gate probe only).
+        s = _STRIP_STEREO_NESTED_RE.sub(r"\1", s).strip()
     return s
 
 

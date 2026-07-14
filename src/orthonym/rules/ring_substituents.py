@@ -2403,9 +2403,35 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
             parts.append(f'{loc_str}-{mult}{rendered}')
         prefix_str = '-'.join(parts)
 
+    # W4-S2 (P-93.5.1.1.2 / BB 48117): emit the ring substituent's OWN internal
+    # stereodescriptors, keyed to the SAME numbering `order` the name uses. The
+    # pseudoasymmetric C-1/C-4 centres of a 1,4-disubstituted cyclohexane (and any
+    # ring-member stereocentre) were previously DROPPED entirely: the multi-centre
+    # branch of `_add_substituent_stereo` fail-closes because it cannot thread the
+    # substituent's own numbering. Here that numbering IS known (order = locant ->
+    # atom), so the descriptor is correct-by-construction and the locants match the
+    # emitted name exactly. Additive: fires ONLY when a ring atom carries a CIP
+    # label, so every non-stereo ring is byte-identical to the legacy output. The
+    # lowercase r/s pseudoasymmetric casing is inherited VERBATIM from RDKit (D-15;
+    # P-92.1.4.2) — the BB PIN is `bis[(1r,4r)-4-methylcyclohexyl]phosphane` (BB
+    # 48117), and `collect_stereodescriptors` is CALLED read-only (not modified).
+    # OPSIN's generation grammar rejects the r/s cyclohexane layer, but the
+    # constitutional form parses, so the DEF-9 stereo carve-out in the validity
+    # gate (namer.py) ships the full PIN — cf. `(1s,4s)-cyclohexane-1,4-diol`.
+    _stereo_prefix = ''
+    if any(mol.GetAtomWithIdx(i).HasProp('_CIPCode') for i in ring_list):
+        from .stereochemistry import (
+            collect_stereodescriptors as _collect_sd,
+            format_stereodescriptor_string as _fmt_sd,
+        )
+        _ring_a2l = {atom_idx: loc for loc, atom_idx in order.items()}
+        _stereo_prefix = _fmt_sd(
+            _collect_sd(mol, _ring_a2l, include_near_parent_ez=False)
+        )
+
     if het:
-        return f'{prefix_str}{stem}-{attachment_locant}-yl'
-    return f'{prefix_str}{stem}'
+        return f'{_stereo_prefix}{prefix_str}{stem}-{attachment_locant}-yl'
+    return f'{_stereo_prefix}{prefix_str}{stem}'
 
 
 def ring_atom_fg_prefixes(
