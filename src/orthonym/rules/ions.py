@@ -3594,3 +3594,200 @@ def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
                         queue.append(nbr_idx)
 
     return count
+
+
+# =============================================================================
+# W4-I4 (P-74.1.1 / P-74.2.1.3 / P-74.2.2.1.1 / P-74.2.2.1.2 / P-74.2.2.1.6):
+# cumulative same-parent '-ium-...-ide' zwitterion on a HOMOGENEOUS heteroatom
+# chain parent hydride (hydrazine / triazane->triazene / dioxidane). The single
+# cationic and single anionic skeletal centres sit on the SAME chain, so both
+# are expressed as cumulative suffixes ('-ium' cited first, '-ide' given low
+# locant) rather than the P-74.1.3 cation-as-prefix construction.
+# =============================================================================
+
+_HETEROCHAIN_NUM_PREFIX = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_HETEROCHAIN_ELEMENTS = frozenset({'N', 'O', 'S'})
+
+
+def _cumulative_chain_hydride_base(element, length, db_locants):
+    """Neutral parent-hydride base name for a homogeneous acyclic chain of
+    ``length`` atoms of ``element`` with in-chain double bonds at ``db_locants``
+    (P-21.2 / P-31.1.4). N: azane / hydrazine(2, PIN) / triazane ...; unsaturated
+    N-chain -> 'triaz-<locs>-ene'. O: oxidane/dioxidane/trioxidane. S:
+    sulfane/disulfane/trisulfane. Returns the base name or None (out of scope)."""
+    mult = _HETEROCHAIN_NUM_PREFIX.get(length)
+    if mult is None:
+        return None
+    if element == 'N':
+        if not db_locants:
+            return 'hydrazine' if length == 2 else f"{mult}azane"
+        if length < 3:
+            return None  # a 2-N unsaturated chain is 'diazene' -> out of scope here
+        ene_mult = _HETEROCHAIN_NUM_PREFIX.get(len(db_locants))
+        if ene_mult is None:
+            return None
+        locs = ','.join(str(d) for d in db_locants)
+        return f"{mult}az-{locs}-{ene_mult}ene"
+    if element in ('O', 'S'):
+        if db_locants:
+            return None
+        stem = 'oxidane' if element == 'O' else 'sulfane'
+        return f"{mult}{stem}"
+    return None
+
+
+def emit_cumulative_ium_ide(mol) -> Optional[str]:
+    """P-74.1.1 cumulative same-parent zwitterion: one cationic ('-ium') and one
+    anionic ('-ide') skeletal centre on the SAME homogeneous heteroatom chain
+    parent hydride. Covers amine imides (P-74.2.1.3), azo/azomethine imides
+    (P-74.2.2.1.1/.2) and carbonyl oxides (P-74.2.2.1.6)::
+
+        C[N-][N+](C)(C)C -> 1,2,2,2-tetramethylhydrazin-2-ium-1-ide       (BB 42423)
+        C[N+]([N-]C)=NC  -> 1,2,3-trimethyltriaz-2-en-2-ium-1-ide         (BB 43121)
+        C[N-][N+](=C)C   -> 1,2-dimethyl-2-methylidenehydrazin-2-ium-1-ide (BB 43143)
+        CC(C)=[O+][O-]   -> 2-(propan-2-ylidene)dioxidan-2-ium-1-ide      (BB 43187)
+
+    Numbering (P-74.1.1): anionic suffixes get seniority for low locants (so the
+    '-ide' locant is minimised before the '-ium' locant); the cationic suffix is
+    cited FIRST in the name ('<stem>-<ium>-ium-<ide>-ide'). Fail-closed (None)."""
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return None
+    if any(a.GetFormalCharge() not in (0, 1, -1) for a in mol.GetAtoms()):
+        return None
+    cations = [a for a in mol.GetAtoms() if a.GetFormalCharge() == 1]
+    anions = [a for a in mol.GetAtoms() if a.GetFormalCharge() == -1]
+    if len(cations) != 1 or len(anions) != 1:
+        return None
+    cat, an = cations[0], anions[0]
+    element = cat.GetSymbol()
+    if element != an.GetSymbol() or element not in _HETEROCHAIN_ELEMENTS:
+        return None
+
+    # --- Build the homogeneous parent-hydride chain (all `element` atoms linked
+    # by element-element bonds, reachable from the cation). ---
+    chain_set = set()
+    stack = [cat.GetIdx()]
+    while stack:
+        i = stack.pop()
+        if i in chain_set:
+            continue
+        chain_set.add(i)
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            if nb.GetSymbol() == element and nb.GetIdx() not in chain_set:
+                stack.append(nb.GetIdx())
+    if an.GetIdx() not in chain_set or len(chain_set) < 2:
+        return None
+    if any(mol.GetAtomWithIdx(i).IsInRing() for i in chain_set):
+        return None
+
+    # --- Order the chain into a simple linear path. ---
+    adj = {i: [nb.GetIdx() for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+               if nb.GetIdx() in chain_set] for i in chain_set}
+    if any(len(v) > 2 for v in adj.values()):
+        return None
+    ends = [i for i, v in adj.items() if len(v) == 1]
+    if len(ends) != 2:
+        return None  # not a simple open chain (a ring, or a lone atom)
+    order = [ends[0]]
+    prev, cur = None, ends[0]
+    while True:
+        nxts = [j for j in adj[cur] if j != prev]
+        if not nxts:
+            break
+        prev, cur = cur, nxts[0]
+        order.append(cur)
+    if len(order) != len(chain_set):
+        return None
+    L = len(order)
+
+    # --- Collect substituents per chain atom (orientation-independent). ---
+    from ..assembly.substituent_enumerator import name_substituent
+    atom_subs = {i: [] for i in chain_set}
+    for i in chain_set:
+        atom = mol.GetAtomWithIdx(i)
+        for nb in atom.GetNeighbors():
+            j = nb.GetIdx()
+            if j in chain_set or nb.GetSymbol() == 'H':
+                continue
+            if nb.GetSymbol() != 'C':
+                return None  # heteroatom substituent -> out of scope
+            bond = mol.GetBondBetweenAtoms(i, j)
+            bt = bond.GetBondType()
+            if bt not in (Chem.BondType.SINGLE, Chem.BondType.DOUBLE):
+                return None
+            # Collect the substituent branch (not crossing back into the chain).
+            frag = {j}
+            sst = [j]
+            while sst:
+                k = sst.pop()
+                for kn in mol.GetAtomWithIdx(k).GetNeighbors():
+                    kj = kn.GetIdx()
+                    if kj not in frag and kj not in chain_set:
+                        frag.add(kj)
+                        sst.append(kj)
+            yl = name_substituent(mol, frag, j)
+            if not yl:
+                return None
+            if bt == Chem.BondType.DOUBLE:
+                if not yl.endswith('yl'):
+                    return None
+                atom_subs[i].append(yl + 'idene')  # methyl -> methylidene
+            else:
+                atom_subs[i].append(yl)
+
+    # --- In-chain double bonds (element=element), as (posA, posB) atom pairs. ---
+    chain_double_pairs = []
+    for a_idx in range(L - 1):
+        b = mol.GetBondBetweenAtoms(order[a_idx], order[a_idx + 1])
+        if b is not None and b.GetBondType() == Chem.BondType.DOUBLE:
+            chain_double_pairs.append((order[a_idx], order[a_idx + 1]))
+
+    # --- Choose the orientation (forward / reverse) giving lowest locants in the
+    # P-74.1.1 order: (a) -ide centre, (b) -ium centre, (c) double bonds,
+    # (d) substituents. ---
+    def _score(seq):
+        loc = {atom: pos + 1 for pos, atom in enumerate(seq)}
+        ide_loc = loc[an.GetIdx()]
+        ium_loc = loc[cat.GetIdx()]
+        db = sorted(min(loc[x], loc[y]) for x, y in chain_double_pairs)
+        subl = sorted(loc[i] for i in chain_set for _ in atom_subs[i])
+        return (ide_loc, ium_loc, db, subl, loc)
+
+    best = min((_score(order), _score(order[::-1])), key=lambda t: t[:4])
+    ide_loc, ium_loc, db_locs, _subl, loc = best
+
+    base = _cumulative_chain_hydride_base(element, L, db_locs)
+    if base is None:
+        return None
+    stem = base[:-1] if base.endswith('e') else base
+    core = f"{stem}-{ium_loc}-ium-{ide_loc}-ide"
+
+    # --- Substituent prefixes: group by name, cite locants, alphabetise (P-14.5),
+    # multiply (di/tri or bis/tris for complex). ---
+    from ..assembly.naming_utils import (
+        get_multiplier_prefix, alpha_sort_key, is_complex_substituent)
+    name_to_locants = {}
+    for i in chain_set:
+        for nm in atom_subs[i]:
+            name_to_locants.setdefault(nm, []).append(loc[i])
+    prefix_parts = []
+    for nm, locants in name_to_locants.items():
+        locants_sorted = sorted(locants)
+        count = len(locants_sorted)
+        mult = get_multiplier_prefix(count, nm)
+        loc_str = ','.join(str(x) for x in locants_sorted)
+        if is_complex_substituent(nm) and count > 1:
+            body = f"{mult}({nm})"
+        elif is_complex_substituent(nm):
+            body = f"({nm})"
+        else:
+            body = f"{mult}{nm}"
+        prefix_parts.append((alpha_sort_key(nm), locants_sorted[0], f"{loc_str}-{body}"))
+    prefix_parts.sort(key=lambda t: (t[0], t[1]))
+    # Detachable prefix blocks are separated from one another by a hyphen
+    # ('2-ethyl-1,3-dimethyl'), but the last block attaches to the parent stem
+    # directly ('...dimethyltriaz-...'); the trailing stem starts with a letter.
+    prefix_str = '-'.join(p[2] for p in prefix_parts)
+    return f"{prefix_str}{core}"
