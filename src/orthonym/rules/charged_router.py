@@ -546,6 +546,67 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     return composed
 
 
+def _name_diazonium(mol, cation_idx: int, style: str) -> str:
+    """P-73.2.2.3: name a diazonium cation R-N2+ as ``<parent-hydride>diazonium``.
+
+    The cationic N (``cation_idx``) is bonded to (a) the diazo partner N via a
+    double/triple bond and (b) the parent-attachment atom. Sever the cation from
+    the parent, cap the parent side with H, discard the -N#N+ fragment, name the
+    neutral parent hydride (benzene / methane), and append 'diazonium'
+    (``benzenediazonium`` / ``methanediazonium``). Returns '' on any decline.
+    """
+    try:
+        cat = mol.GetAtomWithIdx(cation_idx)
+    except (RuntimeError, IndexError, OverflowError):
+        return ''
+    diazo_n = None
+    parent_attach = None
+    for nb in cat.GetNeighbors():
+        b = mol.GetBondBetweenAtoms(cation_idx, nb.GetIdx())
+        if (nb.GetSymbol() == 'N' and b is not None
+                and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)):
+            diazo_n = nb.GetIdx()
+        else:
+            parent_attach = nb.GetIdx()
+    if diazo_n is None or parent_attach is None:
+        return ''
+    # The diazo partner must be the TERMINAL N of the -N2+ group (degree 1): a
+    # genuine R-N+#N / R-N+=N. Anything else (an internal azo / ring N) is out.
+    if mol.GetAtomWithIdx(diazo_n).GetDegree() != 1:
+        return ''
+    rw = Chem.RWMol(mol)
+    rw.RemoveBond(cation_idx, parent_attach)
+    pa = rw.GetAtomWithIdx(parent_attach)
+    pa.SetNumExplicitHs(pa.GetNumExplicitHs() + 1)
+    built = rw.GetMol()
+    try:
+        frags = Chem.GetMolFrags(built, asMols=True, sanitizeFrags=False)
+        fidx = Chem.GetMolFrags(built, asMols=False, sanitizeFrags=False)
+    except Exception:
+        return ''
+    parent_mol = None
+    for fm, fi in zip(frags, fidx):
+        if cation_idx not in fi:
+            parent_mol = fm
+            break
+    if parent_mol is None:
+        return ''
+    try:
+        Chem.SanitizeMol(parent_mol)
+        parent_smi = Chem.MolToSmiles(parent_mol, canonical=True)
+    except Exception:
+        return ''
+    if not parent_smi:
+        return ''
+    try:
+        neutral = _reenter(parent_smi, style)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not neutral or _is_malformed_parent(neutral):
+        return ''
+    return apply_ion_suffix_to_name(neutral, 1, cation_class='diazonium') or ''
+
+
 def _neutralize_fragment(mol, *, add_h_for_cation: bool = False):
     """Strip ALL non-internal formal charges and radical electrons from a single
     organic fragment, returning the sanitized canonical neutral SMILES (or '').
@@ -866,6 +927,20 @@ def route_charged(mol, style: str = 'pin') -> str:
     if _is_zwitterion(sites):
         return _route_zwitterion(mol, sites, style)
 
+    # W4-I3 (P-73.2.3.4): R-S+ / R-Se+ sulfanylium/selanylium. RDKit assigns a
+    # 1-coordinate chalcogen cation SPURIOUS radical electrons (a valence-model
+    # artifact — chemically it is a closed-shell cation, BB 41565 phenylsulfanylium
+    # PIN), so it would trip the radical-ion bail below. Intercept it here as the
+    # genuine cation it is. emit_chalcogen_ylium is tightly gated (S/Se, +1, 0 H,
+    # one carbon substituent), so a REAL radical / other onium never matches (-> '').
+    if n_cations == 1 and not n_anions:
+        cc = classify_cation(mol, sites['cations'][0])
+        if cc == 'onium':
+            from .ions import emit_chalcogen_ylium
+            cy = emit_chalcogen_ylium(mol, sites['cations'][0]['atom_idx'])
+            if cy:
+                return cy
+
     # A charged AND radical species (radical ion) is out of scope here -> bail.
     if radical_sites and (n_anions or n_cations):
         return ''
@@ -933,6 +1008,43 @@ def route_charged(mol, style: str = 'pin') -> str:
         if len(cclasses) != 1:
             return ''  # heterogeneous multi-cation -> legacy fallthrough
         ccls = next(iter(cclasses))
+        # W4-I3 (P-73.5): MULTI-cation handling. The ONLY in-scope multi-cation
+        # construction here is a homogeneous poly-AMINIUM -> the bis/tris(aminium)
+        # compound-suffix form (mirror of the W4-I2 poly-anion bis(aminide) path):
+        # [NH3+]CC[NH3+] -> ethane-1,2-bis(aminium) (BB 42340). Neutralize ALL
+        # centres -> re-enter -> map the neutral di/tri-amine suffix to
+        # 'bis(aminium)' (NOT 'diaminium', P-70.3.2). EVERY other multi-cation
+        # shape (poly-onium on a phenylene needs a MULTIPLICATIVE engine; poly-
+        # quaternary; mixed) FAILS CLOSED here so the single-cation generic seam
+        # below never emits a wrong '…diaminium' — the caller's neutralize-recurse
+        # then names the neutral form (suppressed by the SELF gate) rather than
+        # shipping a wrong charged name.
+        if len(sites['cations']) >= 2:
+            if ccls == 'aminium':
+                from .ions import _poly_to_bis_cation_suffix
+                _neutral = _neutralize_fragment(mol)
+                _nn = ''
+                if _neutral:
+                    try:
+                        _nn = _reenter(_neutral, style)
+                    except (RecursionError, ValueError, RuntimeError):
+                        _nn = ''
+                bis = _poly_to_bis_cation_suffix(_nn) if _nn else ''
+                if bis:
+                    return bis
+            return ''
+        # W4-I3 (P-73.2.2.3): a diazonium cation R-N2+ is named by appending
+        # 'diazonium' to the parent hydride obtained by SEVERING the whole -N#N+
+        # group and capping the attachment with H ([N+](#N)c1ccccc1 -> benzene ->
+        # benzenediazonium). The generic neutralize (drop-charge) over-valences the
+        # surviving N, so a dedicated sever-and-name emitter owns it. Decline ('')
+        # -> fall through.
+        if ccls == 'diazonium':
+            dz = _name_diazonium(mol, sites['cations'][0]['atom_idx'], style)
+            if dz:
+                return dz
+        # (R-S+/R-Se+ sulfanylium is intercepted earlier, before the radical-ion
+        # bail, because RDKit flags the 1-coordinate chalcogen cation as a radical.)
         # WS-E.1 (P-73.1.2.1 + Table 7.4): a QUATERNARY ammonium N (0 H, degree
         # >= 4) CANNOT take the _neutralize_fragment path — removing the lost
         # proton leaves an over-valent neutral N and SanitizeMol raises -> ''

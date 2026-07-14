@@ -273,11 +273,12 @@ class TestNameCation:
         name = name_cation(mol)
         assert name == 'oxonium'
 
-    def test_phosphonium_retained(self):
-        """Phosphonium should use retained name."""
+    def test_phosphanium_pin(self):
+        """H4P+ PIN is 'phosphanium' (W4-I3; BB 41378/42393 'phosphanium
+        (preselected name) phosphonium'). Traditional 'phosphonium' is the alt."""
         mol = Chem.MolFromSmiles('[PH4+]')
         name = name_cation(mol)
-        assert name == 'phosphonium'
+        assert name == 'phosphanium'
 
 
 class TestSuffixTransformations:

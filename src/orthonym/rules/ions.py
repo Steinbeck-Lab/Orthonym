@@ -661,6 +661,32 @@ def _poly_to_bis_compound_suffix(neutral_name: str) -> str:
     return ''
 
 
+# P-73.5 (W4-I3): the CATION mirror of _poly_to_bis_compound_suffix. A homogeneous
+# poly-aminium (a +1 on each of >=2 amine N atoms of one parent) uses the 'aminium'
+# compound suffix multiplied by 'bis'/'tris' (NOT 'di'/'tri', P-70.3.2): the neutral
+# poly-parent 'ethane-1,2-diamine' -> 'ethane-1,2-bis(aminium)' (BB 42340).
+_BIS_CATION_SUFFIXES = (
+    ('amine', 'aminium'),
+)
+
+
+def _poly_to_bis_cation_suffix(neutral_name: str) -> str:
+    """P-73.5 (BB 42340): a poly-amine cation (>= 2 protonated amine N) uses the
+    compound suffix 'aminium' multiplied by 'bis'/'tris' (P-70.3.2). Transforms the
+    re-entered NEUTRAL poly-parent name ('ethane-1,2-diamine' -> 'ethane-1,2-
+    bis(aminium)'). Returns '' if the neutral is not a '...<di/tri>amine' poly form
+    (a substituent-form / retained name falls through -> fail-closed)."""
+    if not neutral_name:
+        return ''
+    low = neutral_name.lower()
+    for nsuf, asuf in _BIS_CATION_SUFFIXES:
+        for mult, bis in _BIS_MULTIPLIER.items():
+            token = mult + nsuf
+            if low.endswith(token):
+                return neutral_name[:-len(token)] + f'{bis}({asuf})'
+    return ''
+
+
 def _name_acyl_azanide(mol, anion_idx: int) -> str:
     """P-72.2.2.2.4 (BB 41069/41079): an amide-type anion R-CO-NH- is named on the
     preselected 'azanide' parent with the acyl group cited as a prefix
@@ -951,7 +977,16 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
 
         return _validate_cation_name(mol, result)
 
-    # Multiple cations - try neutralize-then-name approach
+    # Multiple cations - route through the chokepoint FIRST (W4-I3, P-73.5): a
+    # homogeneous poly-aminium becomes the bis/tris(aminium) compound-suffix PIN
+    # ([NH3+]CC[NH3+] -> ethane-1,2-bis(aminium)). route_charged returns '' for
+    # every OTHER multi-cation shape (fail-closed), so the existing
+    # neutralize-then-name fallback below stays byte-identical for them.
+    from .charged_router import route_charged
+    routed = route_charged(mol, style)
+    if routed:
+        return _validate_cation_name(mol, routed)
+
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
         return _validate_cation_name(mol, neutral_name)
@@ -1959,6 +1994,43 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
         parts.append((alpha_sort_key(sub_name), body))
     parts.sort(key=lambda t: t[0])
     return f"{''.join(p[1] for p in parts)}{suffix}"
+
+
+# P-73.2.3.4 (W4-I3): R-S+ / R-Se+ chalcogen ylium (sulfanylium / selanylium).
+_CHALCOGEN_YLIUM_STEMS = {'S': 'sulfanylium', 'Se': 'selanylium'}
+
+
+def emit_chalcogen_ylium(mol, center_idx: int) -> str:
+    """P-73.2.3.4 (BB 41565 phenylsulfanylium PIN): name a 1-coordinate chalcogen
+    cation R-S+ / R-Se+ as ``<R-prefix>sulfanylium`` / ``<R-prefix>selanylium``.
+
+    Scope (tight, so oxonium/sulfonium/phosphonium are never disturbed — they
+    return '' here): the centre is S or Se, formal charge +1, ZERO hydrogens, and
+    exactly ONE heavy neighbour which is a CARBON substituent R (alkyl/aryl). R is
+    named via classify_substituent; a complex R gets enclosing marks (P-14.5.2:
+    (2,2-dichloroethyl)sulfanylium). Acyl R (R-CO-S+) and R-S-S+ (disulfanylium)
+    are out of scope -> ''. Returns '' on any decline (caller falls through)."""
+    center = mol.GetAtomWithIdx(center_idx)
+    stem = _CHALCOGEN_YLIUM_STEMS.get(center.GetSymbol())
+    if not stem:
+        return ''
+    if center.GetFormalCharge() != 1 or center.GetTotalNumHs() != 0:
+        return ''
+    heavy = [nb for nb in center.GetNeighbors() if nb.GetSymbol() != 'H']
+    if len(heavy) != 1 or heavy[0].GetSymbol() != 'C':
+        return ''
+    from ..perception.chains import classify_substituent
+    from ..assembly.naming_utils import is_complex_substituent
+    sub_atoms = _collect_substituent_atoms(mol, center_idx, heavy[0].GetIdx(), set())
+    if sub_atoms is None:
+        return ''
+    info = classify_substituent(mol, sorted(sub_atoms), {center_idx})
+    sub_name = info.get('name')
+    if not sub_name:
+        return ''
+    if is_complex_substituent(sub_name):
+        return f"({sub_name}){stem}"
+    return f"{sub_name}{stem}"
 
 
 def _ring_iupac_locants(ring_mol):
