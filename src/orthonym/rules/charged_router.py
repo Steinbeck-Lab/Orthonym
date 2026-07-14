@@ -1095,6 +1095,18 @@ def route_charged(mol, style: str = 'pin') -> str:
                     mol, cat_idx, 'ium')
                 if ring_ium:
                     return ring_ium
+            # W4-I5 (P-77.1.2 / P-73.1.2.1): a mono-protonated di-/polyAMINE — the
+            # protonated N is the -aminium principal group, the OTHER neutral amine(s)
+            # become `amino` PREFIXES (BB 43568 `2-aminoethan-1-aminium`), NOT both as
+            # `diaminium`. The emitter self-declines ('') with no sibling amine (the
+            # ordinary single-amine case) or an out-of-scope skeleton, preserving the
+            # legacy `_aminium_or_azaniumyl` path below (including the senior-group
+            # azaniumyl case, whose senior group trips the emitter's scope gate).
+            else:
+                from .ions import emit_mono_ionized_polyfunctional
+                mono = emit_mono_ionized_polyfunctional(mol, cat_idx, 'aminium')
+                if mono:
+                    return mono
         cation_class, allowed_suffixes = _CATION_SPEC.get(ccls, (None, None))
         # ylium / acylium are HYDRIDE-LOSS cations (P-73.2.2.1.1 / P-73.2.3.1):
         # neutralize by ADDING the lost hydride so the parent hydride is named.
@@ -1191,6 +1203,26 @@ def route_charged(mol, style: str = 'pin') -> str:
                 if bis:
                     return bis
             return ''   # not a clean suffix-form poly -> legacy fallthrough
+        # W4-I5 (P-77.2.2 / P-72.2.2.2.2): a SINGLE alkoxide/thiolate anion on a chain
+        # that ALSO carries neutral sibling -OH / -SH groups is a mono-deprotonated
+        # POLYOL / polythiol: the -O(-)/-S(-) is the -olate/-thiolate principal group,
+        # the sibling(s) become hydroxy / sulfanyl PREFIXES (BB 43605
+        # `2-hydroxyethan-1-olate`). The emitter self-declines ('') when there is no
+        # sibling (the ordinary single-alkoxide case) or the skeleton is out of scope,
+        # so the byte-identical legacy path below is preserved.
+        _single = {classify_anion(mol, a) for a in sites['anions']}
+        if _single == {'alkoxide'} and len(sites['anions']) == 1:
+            from .ions import emit_mono_ionized_polyfunctional
+            mono = emit_mono_ionized_polyfunctional(
+                mol, sites['anions'][0]['atom_idx'], 'olate')
+            if mono:
+                return mono
+        elif _single == {'thiolate'} and len(sites['anions']) == 1:
+            from .ions import emit_mono_ionized_polyfunctional
+            mono = emit_mono_ionized_polyfunctional(
+                mol, sites['anions'][0]['atom_idx'], 'thiolate')
+            if mono:
+                return mono
         cation_class, allowed_suffixes = _classify_single_anion(mol, sites)
         # WS-E.3 (D-11/D-12): charge-first PCG on the ORIGINAL (un-neutralized) mol.
         # The actually-ionized senior acid class anchors the name (P-72); a neutral

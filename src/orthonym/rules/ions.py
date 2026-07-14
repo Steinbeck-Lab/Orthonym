@@ -1565,6 +1565,154 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     return f"{prefix_str}{core}"
 
 
+# P-77.1.2 / P-77.2.2 (P-73.1.2.1 / P-72.2.2.2.2): a fragment with ONE ionized
+# heteroatom centre but SEVERAL equivalent characteristic groups — a mono-
+# protonated polyAMINE or a mono-deprotonated polyOL / polythiol. Per P-72/P-73
+# the CHARGED group is the principal characteristic group (the -aminium / -olate /
+# -thiolate suffix); the identical NEUTRAL sibling groups differ only by not
+# bearing the charge, so they are demoted to hydroxy / sulfanyl / amino PREFIXES
+# (BB 43568 `2-aminoethan-1-aminium`; BB 43605 `2-hydroxyethan-1-olate`). Without
+# this the neutralize-all path re-enters a symmetric di-ol / di-amine and applies
+# the ionic suffix to BOTH groups (`ethane-1,2-diolate` / `ethane-1,2-diaminium`),
+# a name that encodes TWO charges — the validity gate then correctly suppresses it.
+#   kind -> (element, sibling total-H, sibling prefix, elide-'e', ionic ending)
+_MONO_IONIZED_SPEC = {
+    'olate':    ('O', 1, 'hydroxy',  True,  'olate'),      # ethan-1-olate
+    'thiolate': ('S', 1, 'sulfanyl', False, 'thiolate'),   # ethane-1-thiolate
+    'aminium':  ('N', 2, 'amino',    True,  'aminium'),     # ethan-1-aminium
+}
+
+
+def emit_mono_ionized_polyfunctional(mol, ion_idx: int, kind: str) -> str:
+    """Name a mono-ionized ACYCLIC polyfunctional chain, demoting the identical
+    NEUTRAL sibling groups to prefixes (see _MONO_IONIZED_SPEC / P-77.1.2 / P-77.2.2).
+
+    ``ion_idx`` is the charged heteroatom index on the index-preserving ``mol``.
+    Fail-closed ('' -> caller keeps the legacy single-group path) for any shape
+    outside the tight scope: a ring, a substituted / secondary sibling, no sibling
+    (the ordinary single-group case), an extra substituent on the chain, or a chain
+    the acyclic machinery cannot number. Accuracy first: never emit a wrong name."""
+    spec = _MONO_IONIZED_SPEC.get(kind)
+    if spec is None:
+        return ''
+    element, sib_h, sib_prefix, elide_e, ionic_ending = spec
+    try:
+        ion_atom = mol.GetAtomWithIdx(ion_idx)
+    except (RuntimeError, IndexError, OverflowError):
+        return ''
+    if ion_atom.GetSymbol() != element or ion_atom.IsInRing():
+        return ''
+    # The principal heteroatom must be a SIMPLE terminal group: one heavy neighbour,
+    # a carbon (its chain attachment C0).
+    ion_heavy = [n for n in ion_atom.GetNeighbors() if n.GetSymbol() != 'H']
+    if len(ion_heavy) != 1 or ion_heavy[0].GetSymbol() != 'C':
+        return ''
+    c0 = ion_heavy[0].GetIdx()
+
+    # --- Neutral sibling heteroatoms (same element, neutral, terminal, correct H).
+    def _is_sibling(a) -> bool:
+        if a.GetIdx() == ion_idx or a.GetSymbol() != element:
+            return False
+        if a.GetFormalCharge() != 0 or a.IsInRing():
+            return False
+        heavy = [n for n in a.GetNeighbors() if n.GetSymbol() != 'H']
+        return (len(heavy) == 1 and heavy[0].GetSymbol() == 'C'
+                and a.GetTotalNumHs() == sib_h)
+
+    siblings = [a.GetIdx() for a in mol.GetAtoms() if _is_sibling(a)]
+    if not siblings:
+        return ''  # ordinary single-group anion/cation -> legacy path owns it
+    sib_carbon = {
+        s: [n.GetIdx() for n in mol.GetAtomWithIdx(s).GetNeighbors()
+            if n.GetSymbol() != 'H'][0]
+        for s in siblings
+    }
+
+    # --- Build the neutral parent on an INDEX-PRESERVING copy (neutralize the ion;
+    #     the siblings are already neutral) and find the principal CARBON chain.
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(ion_idx)
+        a.SetFormalCharge(0)
+        a.SetNumRadicalElectrons(0)
+        a.SetNoImplicit(True)
+        delta = 1 if kind in ('olate', 'thiolate') else -1   # O-/S- +H ; N+ -H
+        new_h = a.GetTotalNumHs() + delta
+        if new_h < 0:
+            return ''
+        a.SetNumExplicitHs(new_h)
+        work_mol = work.GetMol()
+        Chem.SanitizeMol(work_mol)
+    except (RuntimeError, ValueError):
+        return ''
+
+    from ..perception.chains import find_principal_chain
+    from ..perception.functional_groups import detect_functional_groups
+    try:
+        fgs = detect_functional_groups(work_mol)
+        chain = find_principal_chain(work_mol, fgs, principal_group=None)
+    except (RuntimeError, ValueError, KeyError):
+        return ''
+    if not chain or len(chain) < 2:
+        return ''
+    chain_set = set(chain)
+    if c0 not in chain_set or any(sib_carbon[s] not in chain_set for s in siblings):
+        return ''
+    if any(work_mol.GetAtomWithIdx(i).IsInRing() for i in chain):
+        return ''
+
+    # SCOPE gate: every non-chain heavy neighbour of a chain carbon must be the
+    # principal ion heteroatom or a recognised neutral sibling — no other
+    # substituent / branch (fail-closed; accuracy first). Also forbids unsaturation
+    # in the chain (kept simple / correct for the polyol / polyamine class).
+    sib_set = set(siblings)
+    for ci in chain:
+        for nb in work_mol.GetAtomWithIdx(ci).GetNeighbors():
+            j = nb.GetIdx()
+            if j in chain_set or nb.GetSymbol() == 'H':
+                continue
+            if j == ion_idx or j in sib_set:
+                continue
+            return ''
+    for i in range(len(chain) - 1):
+        b = work_mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+        if b is None or b.GetBondType() != Chem.BondType.SINGLE:
+            return ''
+
+    # --- Orient: the principal group's carbon (c0) gets the lowest locant
+    #     (P-31.1.4 criterion (a)); the sibling carbons drive the tiebreak.
+    from .locants import orient_chain, build_atom_to_locant
+    substituent_positions: Dict[int, list] = {}
+    for s in siblings:
+        substituent_positions.setdefault(sib_carbon[s], []).append([s])
+    oriented = orient_chain(
+        chain, work_mol,
+        principal_group_atoms={c0},
+        double_bonds=[], triple_bonds=[],
+        substituent_positions=substituent_positions,
+    )
+    loc_map = build_atom_to_locant(oriented)
+
+    # --- Assemble: prefixes + stem + principal-group locant + ionic ending.
+    from ..data.chain_names import get_chain_prefix
+    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+    try:
+        stem = get_chain_prefix(len(oriented))
+    except ValueError:
+        return ''
+    principal_locant = loc_map[c0]
+    linker = 'an' if elide_e else 'ane'
+    core = f"{stem}{linker}-{principal_locant}-{ionic_ending}"
+
+    # Sibling prefixes (all share sib_prefix): grouped, multiplied (di/tri), sorted.
+    locants = sorted(loc_map[sib_carbon[s]] for s in siblings)
+    count = len(locants)
+    mult = get_multiplier_prefix(count, sib_prefix) or ''
+    loc_str = ','.join(str(l) for l in locants)
+    prefix_str = f"{loc_str}-{mult}{sib_prefix}"
+    return f"{prefix_str}{core}"
+
+
 def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]]) -> str:
     """P-71.2.3 / P-29.3.2.2 multi-site free-valence (polyradical) PIN on ONE
     acyclic all-carbon parent hydride.
@@ -2177,6 +2325,116 @@ def _is_saturated_carbocycle(mol, ring_system) -> bool:
     return True
 
 
+def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
+                                            suffix: str) -> str:
+    """P-76 (BB 40457/40896/40918): the LOCALIZED PIN for a DELOCALIZED radical/anion
+    on a BARE conjugated carbocyclic MONOCYCLE. The radical/anion carbon is locant 1
+    and the ring double bonds take the lowest locants — `cyclopentadienyl` ->
+    `cyclopenta-2,4-dien-1-yl` (PIN); `cyclopentadienide` -> `cyclopenta-2,4-dien-1-ide`
+    (PIN) — the locant-free `cyclopentadienyl`/`-ide` being the P-76 general/alt form.
+
+    DETERMINISM (the determinism-gate hazard the general in-place path hits): the
+    centre is neutralized to the SINGLE sp3 ring carbon, which forces a UNIQUE
+    kekulization iff every OTHER ring carbon then lies on exactly one ring double
+    bond (fully conjugated but for the centre). When that holds the double-bond
+    locants are STRUCTURE-determined (2,4,...) independent of the input SMILES atom
+    order; otherwise the localization is ambiguous and we FAIL CLOSED ('').
+
+    Returns '' for -ium, a hetero / substituted / polycyclic ring, or an ambiguous
+    localization (caller falls through to the general path)."""
+    if suffix not in ('yl', 'ylidene', 'ylidyne', 'ide'):
+        return ''
+    cyclic = _order_ring_cycle(mol, ring_system)
+    if cyclic is None or center_idx not in cyclic:
+        return ''
+    n = len(cyclic)
+    ring = set(cyclic)
+    # Bare all-carbon monocycle only: no ring heteroatom, no exocyclic heavy neighbour.
+    for i in cyclic:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetSymbol() != 'C':
+            return ''
+        if any(nb.GetIdx() not in ring and nb.GetSymbol() != 'H'
+               for nb in a.GetNeighbors()):
+            return ''
+    # Neutralize the centre (index-preserving) -> forces the delocalized system to
+    # localize (the sp3 centre breaks aromaticity so SanitizeMol kekulizes uniquely).
+    h_delta = _CUMULATIVE_SUFFIX_H_DELTA[suffix]
+    work = Chem.RWMol(mol)
+    try:
+        a = work.GetAtomWithIdx(center_idx)
+        a.SetFormalCharge(0)
+        a.SetNumRadicalElectrons(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(a.GetTotalNumHs() + h_delta)
+        ring_mol = work.GetMol()
+        Chem.SanitizeMol(ring_mol)
+    except (RuntimeError, ValueError):
+        return ''
+
+    def _ring_double_count(i):
+        c = 0
+        for nb in ring_mol.GetAtomWithIdx(i).GetNeighbors():
+            j = nb.GetIdx()
+            if j not in ring:
+                continue
+            b = ring_mol.GetBondBetweenAtoms(i, j)
+            if b is not None and b.GetBondType() == Chem.BondType.DOUBLE:
+                c += 1
+        return c
+
+    # Determinism guard: centre on zero ring double bonds, every other ring carbon
+    # on exactly one -> the double-bond placement is UNIQUE (order-independent).
+    for i in cyclic:
+        cnt = _ring_double_count(i)
+        if i == center_idx:
+            if cnt != 0:
+                return ''
+        elif cnt != 1:
+            return ''
+    n_double = sum(
+        1 for b in ring_mol.GetBonds()
+        if b.GetBondType() == Chem.BondType.DOUBLE
+        and b.GetBeginAtomIdx() in ring and b.GetEndAtomIdx() in ring)
+    if n_double < 1:
+        return ''
+
+    # Number: centre = locant 1; pick the direction giving the lowest double-bond
+    # locant set (a bare ring is symmetric, so both directions coincide, but the
+    # min-of-both keeps it order-independent and correct for any bare case).
+    start = cyclic.index(center_idx)
+    best = None
+    for direction in (1, -1):
+        order = [cyclic[(start + k * direction) % n] for k in range(n)]
+        loc = {idx: k + 1 for k, idx in enumerate(order)}
+        dbl = set()
+        for b in ring_mol.GetBonds():
+            if (b.GetBondType() == Chem.BondType.DOUBLE
+                    and b.GetBeginAtomIdx() in ring
+                    and b.GetEndAtomIdx() in ring):
+                dbl.add(min(loc[b.GetBeginAtomIdx()], loc[b.GetEndAtomIdx()]))
+        key = tuple(sorted(dbl))
+        if best is None or key < best:
+            best = key
+    dbl_locs = best
+
+    from ..data.chain_names import get_chain_prefix
+    from ..assembly.naming_utils import get_multiplier_prefix
+    try:
+        stem = get_chain_prefix(n)
+    except ValueError:
+        return ''
+    mult = get_multiplier_prefix(n_double, 'ene') or ''
+    loc_str = ','.join(str(l) for l in dbl_locs)
+    # P-16.3.3: the linking 'a' precedes a consonant-initial multiplied suffix
+    # (…a-2,4-dien…); a single vowel-initial 'ene' takes no 'a' (…-2-en…).
+    if mult:
+        ending = f"a-{loc_str}-{mult}en"
+    else:
+        ending = f"-{loc_str}-en"
+    return f"cyclo{stem}{ending}-1-{suffix}"
+
+
 def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     """F-T6 (DD3): name a RING centre bearing a cumulative -ide (ring carbanion,
     P-72.2.2.1) or -ium (ring cation, P-73.1.1.2) suffix, with 'e' elision and a
@@ -2224,6 +2482,17 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     if (suffix in ('yl', 'ylidene', 'ylidyne')
             and _is_saturated_carbocycle(mol, ring_system)):
         return ''
+
+    # P-76 (BB 40457/40896): a delocalized radical/anion on a bare conjugated
+    # carbocyclic monocycle (cyclopentadienyl / cyclopentadienide) is named as the
+    # LOCALIZED PIN with a UNIFIED, deterministic numbering (centre = 1, double
+    # bonds 2,4). The general in-place path below names the neutral ring separately
+    # and bolts on a centre locant from a DIFFERENT numbering, producing the wrong
+    # (structurally-invalid) `cyclopenta-1,3-dien-1-yl`.
+    conj = _emit_conjugated_carbocycle_radical_ion(
+        mol, center_idx, ring_system, suffix)
+    if conj:
+        return conj
 
     center = mol.GetAtomWithIdx(center_idx)
     h_delta = _CUMULATIVE_SUFFIX_H_DELTA[suffix]
