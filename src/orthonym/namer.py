@@ -146,6 +146,32 @@ def _final_stereo_check(
         # non-positive) or there was nothing to inject -> fall through to the
         # log-only branch (a missing descriptor beats a wrong one).
 
+    # W4-S1 (P-93.2.2 / P-93.2.3 / P-93.2.6): a SINGLE stereogenic unit on a
+    # NON-CARBON centre (sulfoxide S, quaternary N+, silane Si, chiral P, ...)
+    # that the parent atom_to_locant never covers -> the descriptor is dropped
+    # by the allow-list path above (the centre is a substituent atom, a
+    # characteristic-group heteroatom, or a mononuclear hetero parent, none of
+    # which appear in the carbon-parent locant map). Such a lone hetero
+    # stereocentre carries NO locant (a single unambiguous stereogenic unit;
+    # the same P-91 locant omission as the STEREO-06 mononuclear-methane case
+    # `(R)-bromo(chloro)(fluoro)methane`), so emit the bare "(R)-"/"(S)-".
+    # ACCURACY GATES (missing beats wrong): fire ONLY on EXACTLY ONE R/S atom
+    # with ZERO E/Z bonds (never drops a second descriptor), and ONLY when that
+    # centre is a non-carbon atom, so this can never emit a locant-less
+    # descriptor for a ring/chain carbon that requires a numeric locant.
+    # DETERMINISTIC: the CIP code is engine-assigned (order-independent) and
+    # there is no locant to compute.
+    _rs_atoms = [a for a in mol.GetAtoms() if a.HasProp('_CIPCode')]
+    _bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
+    if (
+        len(_rs_atoms) == 1
+        and _bond_stereo == 0
+        and _rs_atoms[0].GetSymbol() != 'C'
+    ):
+        _cip = _rs_atoms[0].GetProp('_CIPCode')
+        if _cip in ('R', 'S', 'r', 's'):
+            return f"({_cip})-{name}"
+
     # Predicate said True but no authoritative injection happened -> log gap.
     n_atom_stereo = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
     n_bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
