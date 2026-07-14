@@ -2222,9 +2222,14 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         if not sub_name:
             return ''
         sub_names.append(sub_name)
-    # Scope (kept tight): exactly one exocyclic substituent, no OTHER ring
-    # substituents (after severing, the neutral ring must be unsubstituted).
-    if len(sub_names) != 1:
+    # Scope: >=1 exocyclic substituent on the charged ring centre, no OTHER ring
+    # substituents (enforced after severing by _ring_frag_has_substituent). A
+    # single N-substituted aromatic (C[n+]1ccccc1 -> 1-methylpyridin-1-ium) AND a
+    # QUATERNARY ring N+ carrying >=2 substituents (C[N+]1(C)CCCCC1 ->
+    # 1,1-dimethylpiperidin-1-ium, P-73.1.1.2/P-73.4; C[N+]1(C)CCOCC1 ->
+    # 4,4-dimethylmorpholin-4-ium) are both in scope — all substituents share the
+    # centre locant and are grouped/multiplied/alphabetized below.
+    if not sub_names:
         return ''
     work = Chem.RWMol(mol)
     try:
@@ -2269,10 +2274,30 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     if not locants or center_frag_idx not in locants:
         return ''
     center_locant = locants[center_frag_idx]
-    # Substituent and -ium share the centre locant (P-73.1.1.2):
-    # '1-methyl' + 'pyridin-1-ium' -> '1-methylpyridin-1-ium'.
-    return (f"{center_locant}-{sub_names[0]}"
-            f"{_elide_terminal_e(parent)}-{center_locant}-{suffix}")
+    # All exocyclic substituents share the centre locant (P-73.1.1.2 / P-73.4);
+    # group by name, multiply (di/tri…), alphabetize (P-14.5.2). For one methyl:
+    # '1-methyl' + 'pyridin-1-ium' -> '1-methylpyridin-1-ium'. For two methyls on
+    # a quaternary N: '1,1-dimethyl' + 'piperidin-1-ium' -> '1,1-dimethylpiperidin-1-ium'.
+    from ..assembly.naming_utils import (
+        get_multiplier_prefix, alpha_sort_key, is_complex_substituent)
+    name_to_count: Dict[str, int] = {}
+    for sn in sub_names:
+        name_to_count[sn] = name_to_count.get(sn, 0) + 1
+    prefix_parts = []
+    for sn, count in name_to_count.items():
+        mult = get_multiplier_prefix(count, sn)
+        loc_str = ','.join([str(center_locant)] * count)
+        if is_complex_substituent(sn) and count > 1:
+            body = f"{mult}({sn})"
+        else:
+            body = f"{mult}{sn}"
+        prefix_parts.append((alpha_sort_key(sn), f"{loc_str}-{body}"))
+    prefix_parts.sort(key=lambda t: t[0])
+    # P-14.5.2: consecutive locant-bearing prefix blocks are separated by a hyphen
+    # ('1-ethyl' + '1-methyl' -> '1-ethyl-1-methyl'); the whole block then abuts the
+    # parent stem directly ('1,1-dimethyl' + 'piperidin' -> '1,1-dimethylpiperidin').
+    prefix_str = '-'.join(p[1] for p in prefix_parts)
+    return f"{prefix_str}{_elide_terminal_e(parent)}-{center_locant}-{suffix}"
 
 
 def _collect_substituent_atoms(mol, center_idx, start_idx, ring_system):

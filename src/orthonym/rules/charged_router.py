@@ -941,6 +941,21 @@ def route_charged(mol, style: str = 'pin') -> str:
         # demote-N -> find_principal_chain -> '-aminium' emitter on the ORIGINAL
         # mol. C[N+](C)(C)C -> N,N,N-trimethylmethanaminium.
         if ccls == 'quaternary' and len(sites['cations']) == 1:
+            cat_idx = sites['cations'][0]['atom_idx']
+            # W4-I3 (P-73.1.1.2 / P-73.4): a quaternary RING N+ is named on the
+            # ring parent with the -ium suffix and the exocyclic substituents at
+            # the ring-N locant (C[N+]1(C)CCCCC1 -> 1,1-dimethylpiperidin-1-ium,
+            # C[N+]1(C)CCOCC1 -> 4,4-dimethylmorpholin-4-ium), NOT demoted to an
+            # acyclic amine chain (name_quaternary_aminium would linearize the
+            # ring). The ring emitter's DEMOTE branch severs the substituents,
+            # names the bare ring, and re-cites them at the centre locant. On
+            # decline (fused/multi-ring) it returns '' -> fall through to the
+            # acyclic quaternary-aminium emitter below.
+            if mol.GetAtomWithIdx(cat_idx).IsInRing():
+                from .ions import emit_parent_hydride_cumulative_suffix
+                ring_ium = emit_parent_hydride_cumulative_suffix(mol, cat_idx, 'ium')
+                if ring_ium:
+                    return ring_ium
             from .ions import name_quaternary_aminium
             result = name_quaternary_aminium(mol, sites['cations'][0])
             if not result:
