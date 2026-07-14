@@ -1680,6 +1680,127 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
     return f"{prefix_str}{base}{ending}"
 
 
+def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
+    """P-72.2.2.1 (BB 40902): a MULTI-carbanion on one acyclic all-carbon parent
+    hydride — >= 2 carbon -ide centres — named with the '-ide' suffix and the
+    numerical multiplier 'di'/'tri' (P-70.3.2: 'ide' takes basic multipliers).
+    ``centers`` = the carbanion atom indices. Returns e.g. ethynediide
+    ([C-]#[C-], BB 40918), methanediide ([CH2-2]), butane-1,4-diide, or '' on any
+    out-of-scope shape (fail closed).
+
+    Mirrors emit_parent_hydride_polyvalent_suffixes (saturate every centre on one
+    index-preserving RWMol -> longest chain carrying ALL centres -> orient for
+    lowest locants to the -ide set), but the ending is '-<locs>-<mult>ide'.
+    Locant elision (P-14.3.4.4, 'no ambiguity'): the anionic locants are OMITTED
+    when they occupy EVERY carbon of the chain (a single unambiguous placement:
+    ethyne->ethynediide, methane->methanediide); the unsaturation locant is
+    likewise omitted for a 2-carbon parent (ethyne/ethene carry none)."""
+    if mol is None or len(centers) < 2 or len(set(centers)) != len(centers):
+        return ''
+    try:
+        atoms = [mol.GetAtomWithIdx(i) for i in centers]
+    except (RuntimeError, IndexError, OverflowError):
+        return ''
+    for a in atoms:
+        if a.GetSymbol() != 'C' or a.IsInRing():
+            return ''
+    try:
+        if len(Chem.GetMolFrags(mol)) != 1:
+            return ''
+    except Exception:
+        return ''
+
+    # Saturate every carbanion centre (+1 H each) on ONE index-preserving RWMol.
+    work = Chem.RWMol(mol)
+    try:
+        for idx in centers:
+            a = work.GetAtomWithIdx(idx)
+            a.SetFormalCharge(0)
+            a.SetNumRadicalElectrons(0)
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(a.GetTotalNumHs() + 1)
+        work_mol = work.GetMol()
+        Chem.SanitizeMol(work_mol)
+    except (RuntimeError, ValueError):
+        return ''
+
+    from ..perception.chains import find_all_carbon_chains, get_substituents
+    from .locants import build_atom_to_locant
+    from ..data.chain_names import get_chain_prefix
+    from ..assembly.naming_utils import get_multiplier_prefix
+    try:
+        all_chains = find_all_carbon_chains(work_mol, min_length=1)
+    except (RuntimeError, ValueError):
+        return ''
+    idx_set = set(centers)
+    cand = [c for c in all_chains
+            if idx_set.issubset(c)
+            and not any(work_mol.GetAtomWithIdx(i).IsInRing() for i in c)]
+    if not cand:
+        return ''
+    maxlen = max(len(c) for c in cand)
+    cand = [c for c in cand if len(c) == maxlen]
+
+    def _key(order):
+        loc = build_atom_to_locant(order)
+        return (tuple(sorted(loc[i] for i in centers)),
+                tuple(sorted(get_substituents(work_mol, order).keys())))
+    order = min(cand, key=_key)
+    loc_map = build_atom_to_locant(order)
+    chain_len = len(order)
+    # Substituents are out of v1 scope for the poly-carbanion (keep it tight): a
+    # substituted multi-carbanion falls through to the legacy path.
+    if get_substituents(work_mol, order):
+        return ''
+    try:
+        stem = get_chain_prefix(chain_len)
+    except ValueError:
+        return ''
+
+    double_bonds, triple_bonds = [], []
+    for i in range(len(order) - 1):
+        b = work_mol.GetBondBetweenAtoms(order[i], order[i + 1])
+        if b is None:
+            continue
+        if b.GetBondType() == Chem.BondType.DOUBLE:
+            double_bonds.append((order[i], order[i + 1]))
+        elif b.GetBondType() == Chem.BondType.TRIPLE:
+            triple_bonds.append((order[i], order[i + 1]))
+
+    def _bl(pair):
+        return min(loc_map[pair[0]], loc_map[pair[1]])
+    # 2-carbon parents (ethene/ethyne) carry no unsaturation locant.
+    elide_unsat_locant = (chain_len == 2)
+    unsat = ''
+    d_locs = sorted(_bl(b) for b in double_bonds)
+    t_locs = sorted(_bl(b) for b in triple_bonds)
+    if d_locs:
+        dmult = get_multiplier_prefix(len(d_locs), 'ene') or ''
+        joiner = 'a' if dmult else ''
+        locpart = '' if elide_unsat_locant else f"-{','.join(map(str, d_locs))}-"
+        unsat += f"{joiner}{locpart if locpart else '-'}{dmult}en" if not elide_unsat_locant else f"{dmult}en"
+    if t_locs:
+        tmult = get_multiplier_prefix(len(t_locs), 'yne') or ''
+        joiner = 'a' if tmult else ''
+        locpart = '' if elide_unsat_locant else f"-{','.join(map(str, t_locs))}-"
+        unsat += f"{joiner}{locpart}{tmult}yn" if not elide_unsat_locant else f"{tmult}yn"
+
+    ide_locs = sorted(loc_map[i] for i in centers)
+    mult = get_multiplier_prefix(len(ide_locs), 'ide') or ''
+    # Elide the anionic locants when they cover EVERY carbon (unambiguous single
+    # placement): ethyne->ethynediide, ethane->ethanediide.
+    cover_all = (ide_locs == list(range(1, chain_len + 1)))
+    # The parent-hydride terminal 'e' is KEPT here: the ending begins with a
+    # locant-hyphen or the consonant-initial multiplier 'di'/'tri', never a vowel
+    # (BB 40918 'ethynediide', not 'ethyndiide'; 'butane-1,4-diide'). Elision
+    # (P-72.2.2.1) applies only to the locant-less mono '-ide', handled by the
+    # single-centre emitter (hexan-3-ide).
+    base = f"{stem}{unsat}e" if unsat else f"{stem}ane"
+    if cover_all:
+        return f"{base}{mult}ide"                            # ethynediide / ethanediide
+    return f"{base}-{','.join(map(str, ide_locs))}-{mult}ide"  # butane-1,4-diide
+
+
 def _elide_terminal_e(name: str) -> str:
     """P-72/P-73 elision: drop a single trailing 'e' before a vowel-initial
     cumulative suffix ('pyridine' -> 'pyridin', 'cyclohexane' -> 'cyclohexan',

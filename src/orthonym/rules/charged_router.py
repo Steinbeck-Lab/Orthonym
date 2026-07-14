@@ -1006,6 +1006,16 @@ def route_charged(mol, style: str = 'pin') -> str:
             if carbanion_name:
                 return carbanion_name
             return ''   # primitive declined (out of scope) -> legacy fallthrough
+        # W4-I2 (P-72.2.2.1): a MULTI-carbanion on one acyclic all-carbon parent
+        # hydride -> the '-di/tri-ide' PIN ([C-]#[C-] -> ethynediide, BB 40918).
+        # HEAD dropped the charge (-> the retained general 'acetylide'/'acetylene').
+        if _acls == {'carbanion'} and len(sites['anions']) >= 2:
+            from .ions import emit_poly_carbanion_ide
+            poly = emit_poly_carbanion_ide(
+                mol, [a['atom_idx'] for a in sites['anions']])
+            if poly:
+                return poly
+            return ''   # emitter declined (out of scope) -> legacy fallthrough
         # F-T6 (DD3, P-72.2.2.1): a skeletal Group-14/15 heteroatom anion
         # (P/As/Sb/Si/Ge) has no neutral FG anchor and no -ol/-thiol suffix the
         # generic seam could catch, so neutralize->re-enter->suffix-map currently
