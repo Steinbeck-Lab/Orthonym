@@ -186,13 +186,21 @@ class TestOpsinCarbohydrateIntegration:
         assert "glucamine" in result[2].lower() or "glucamin" in result[2].lower()
 
     def test_opsin_carbohydrate_integration_sorbitol(self):
-        """Sorbitol (OPSIN simpleGroup) is lookupable via lookup_sugar."""
+        """The sorbitol structure resolves to its PIN retained name D-glucitol.
+
+        W5-A1 (P-102.5.6.5): the hand-curated ACYCLIC_PIN_SUGAR_NAMES entry
+        pre-empts the OPSIN 'sorbitol' simpleGroup synonym, so lookup_sugar now
+        returns the alditol PIN ('D', 'glucitol') rather than the deprecated
+        'sorbitol'. The structure is still lookupable (the point of the OPSIN
+        integration path); only the emitted name is now the PIN.
+        """
         from rdkit import Chem
         smi = "OC[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO"
         can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
         result = lookup_sugar(can)
-        assert result is not None, f"sorbitol not found in sugar lookup (canonical: {can})"
-        assert "sorbitol" in result[2].lower()
+        assert result is not None, f"glucitol not found in sugar lookup (canonical: {can})"
+        assert "glucitol" in result[2].lower()
+        assert result[1] == "D"
 
     def test_opsin_ring_carbohydrate_garosamine(self):
         """Garosamine (OPSIN ring entry, monosaccharide) is lookupable via lookup_sugar."""

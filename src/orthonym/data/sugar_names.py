@@ -143,6 +143,30 @@ URONIC_ACID_NAMES = {
     ),
 }
 
+# ============================================================================
+# Acyclic (open-chain) sugars — PIN retained names (v23 Wave 5, P-102.5)
+# ============================================================================
+# The OPSIN carbohydrate import (integrated below by _integrate_opsin_carbohydrates)
+# stores these open-chain forms under DEPRECATED synonyms — dextrose / sorbitol /
+# saccharic acid — or a lower-case configurational token (d-glyceraldehyde).  P-102
+# makes the small-capital D/L retained name the PIN, so these hand-curated entries
+# (which ALWAYS win over the OPSIN import: the integrator skips any canonical SMILES
+# already in ALL_SUGAR_NAMES) emit the P-102 PIN instead.  Descriptors are ASCII
+# (``D-``, Pitfall 6; the gold ``normalize()`` lower-cases so casing is match-neutral
+# but accuracy-first requires the correct small-capital D for the user-facing name).
+# The standalone join in ``_handle_carbohydrate_lookup`` renders ("", "D", "glucose")
+# -> "D-glucose" and ("", "D", "glucaric acid") -> "D-glucaric acid".
+ACYCLIC_PIN_SUGAR_NAMES = {
+    # aldehydo-D-glucose (open chain) — P-102.5.1.1; OPSIN synonym "dextrose"
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "glucose"),
+    # D-glucitol (alditol, ose->itol) — P-102.5.6.5; OPSIN synonym "sorbitol"
+    "OC[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "D", "glucitol"),
+    # D-glucaric acid (aldaric, NOT meso) — P-102.5.6.6.5.1; OPSIN synonym "saccharic acid"
+    "O=C(O)[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "D", "glucaric acid"),
+    # D-glyceraldehyde — P-102.3.2 (D/L small-capital); OPSIN stored lower-case
+    "O=C[C@H](O)CO": ("", "D", "glyceraldehyde"),
+}
+
 # Amino sugars (Phase 94)
 # === AMINO SUGARS (D-configuration) ===
 # Source: IUPAC 2-Carb carbohydrate nomenclature
@@ -405,6 +429,7 @@ ALL_SUGAR_NAMES = {
     **NACETYL_SUGAR_NAMES,
     **URONIC_ACID_NAMES,
     **AMINO_SUGAR_NAMES,
+    **ACYCLIC_PIN_SUGAR_NAMES,
     **SYSTEMATIC_MONOSACCHARIDE_NAMES,
 }
 
