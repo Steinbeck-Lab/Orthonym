@@ -138,6 +138,7 @@ class StoutClass(_StrEnumBase):
     YLIDE = "ylide"                                  # W4-I4 (P-74.2.1.1 onium cation + adjacent carbanion: 2-(trimethylazaniumyl)propan-2-ide / ...phosphaniumyl / dimethyloxidaniumyl / dimethylsulfaniumyl; priority 48.36 — before HETERONE@48.4)
     PSEUDOKETONE_HETERO = "pseudoketone_hetero"      # Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2 1-silylethan-1-one; priority 48.6)
     ACYL_CHALCOGENCHAIN_PSEUDOKETONE = "acyl_chalcogenchain_pseudoketone"  # W3-P14 (P-68.4.1.3 acyl on a homogeneous >=3-chalcogen chain: CH3CH2-CO-O-O-OH -> 1-trioxidanylpropan-1-one; priority 48.65 — after PSEUDOKETONE_HETERO@48.6, before HETEROIMINE@48.7)
+    LAMBDA5_PHOSPHANIMINE = "lambda5_phosphanimine"  # W4-I4 (P-74.2.1.5 phosphine imide R3X=N-R at lambda5: N-ethyl-P,P,P-triphenyl-lambda5-phosphanimine; priority 48.66 — before HETEROIMINE@48.7)
     HETEROIMINE = "heteroimine"                      # W2E-P1FG (P-62.3.1.3 X=NH -> 1-methylphosphanimine; priority 48.7)
     LAMBDA_SULFANE_IMINE_OXIDE = "lambda_sulfane_imine_oxide"  # W3-P13 (P-68.4.3.3-.8 mononuclear S/Se/Te imine/oxide: sulfimide/sulfoximide/sulfonediimine/sulfur di-/tri-imide; priority 48.75 — after HETEROIMINE@48.7, before KETENE@49)
     POLYCHALCOGEN_OXIDE = "polychalcogen_oxide"      # W3-P13 (P-68.4.3.2 di-/polysulfoxide-sulfone: CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione; priority 46.5 — after CHALCOGEN_CHAIN@46, before POLYAZANE@47)
@@ -1331,6 +1332,22 @@ def _handle_acyl_chalcogenchain_pseudoketone(mol, smiles, canonical_smiles,
     return name_acyl_chalcogenchain_pseudoketone(mol)
 
 
+def _is_lambda5_phosphanimine(mol, smiles, canonical_smiles, features=None,
+                              **kwargs) -> bool:
+    """W4-I4 (P-74.2.1.5); priority 48.66. Phosphine imide R3X=N-R (X=P/As/Sb) at
+    the lambda5 bonding number -> lambda5-phosphanimine PIN. PURE, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.mononuclear_hydrides import name_lambda5_phosphanimine
+    return name_lambda5_phosphanimine(mol) is not None
+
+
+def _handle_lambda5_phosphanimine(mol, smiles, canonical_smiles, features=None,
+                                  **kwargs) -> Optional[str]:
+    from orthonym.rules.mononuclear_hydrides import name_lambda5_phosphanimine
+    return name_lambda5_phosphanimine(mol)
+
+
 def _is_heteroimine(mol, smiles, canonical_smiles, features=None,
                     **kwargs) -> bool:
     """W2E-P1FG (P-62.3.1.3); priority 48.7. X=NH where X is a mononuclear
@@ -1784,6 +1801,13 @@ _register_dispatch(
     iupac_section="Blue Book P-68.4.1.3",
     description="Acyl on a homogeneous >=3-chalcogen chain "
                 "(1-trioxidanylpropan-1-one); graph classifier, fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.LAMBDA5_PHOSPHANIMINE, priority=48.66, tier=1,
+    predicate=_is_lambda5_phosphanimine, handler=_handle_lambda5_phosphanimine,
+    iupac_section="Blue Book P-74.2.1.5",
+    description="Phosphine imide R3X=N-R at lambda5 (N-ethyl-P,P,P-triphenyl-"
+                "lambda5-phosphanimine); graph classifier, fail-closed",
 )
 _register_dispatch(
     class_id=StoutClass.HETEROIMINE, priority=48.7, tier=1,

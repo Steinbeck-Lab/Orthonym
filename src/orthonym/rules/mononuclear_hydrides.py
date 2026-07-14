@@ -604,6 +604,104 @@ def name_heteroimine(mol) -> Optional[str]:
     return f"1-{organyls[0]}{stem}imine"
 
 
+_PHOSPHANIMINE_STEMS = {'P': 'phosphan', 'As': 'arsan', 'Sb': 'stiban'}
+_PHOSPHANIMINE_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+
+
+def name_lambda5_phosphanimine(mol) -> Optional[str]:
+    """P-74.2.1.5 phosphine imide, named substitutively (method 3 = PIN) as a
+    lambda5-phosphanimine (a heterimine on a lambda5 P/As/Sb hub)::
+
+        (C6H5)3P=N-CH2CH3 -> N-ethyl-P,P,P-triphenyl-lambda5-phosphanimine (BB 43076)
+
+    The hub X (P/As/Sb) carries exactly one imine ``=N`` and, at the non-standard
+    (lambda5) bonding number, three single-bonded organyls; the imine N may bear
+    one organyl (the 'N-' substituent) or an H. Organyls on the hub take the
+    italic element-symbol locant (P,P,P); the N-substituent takes 'N'. Only the
+    lambda5 (five-bond hub) case is owned here — the standard-valence heteroimine
+    (CH3-P=NH -> 1-methylphosphanimine) stays with ``name_heteroimine``.
+    Fail-closed (None); pure — no mol mutation."""
+    if mol is None:
+        return None
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    hubs = [a for a in mol.GetAtoms() if a.GetSymbol() in _PHOSPHANIMINE_STEMS]
+    if len(hubs) != 1:
+        return None
+    hub = hubs[0]
+    if hub.IsInRing():
+        return None
+    from .lambda_convention import nonstandard_bonding_number
+    if nonstandard_bonding_number(mol, hub.GetIdx()) != 5:
+        return None  # only lambda5 R3X=N-R owned here (lambda3 -> name_heteroimine)
+    # Exactly one imine =N on the hub (degree 1 =NH or degree 2 =N-R).
+    imine_ns = [b.GetOtherAtom(hub) for b in hub.GetBonds()
+                if b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtom(hub).GetSymbol() == 'N']
+    if len(imine_ns) != 1:
+        return None
+    n_atom = imine_ns[0]
+    # The imine N must carry ONLY the =X plus at most one single-bonded R (+ H).
+    n_heavy = [nb for nb in n_atom.GetNeighbors() if nb.GetIdx() != hub.GetIdx()
+               and nb.GetSymbol() != 'H']
+    if len(n_heavy) > 1:
+        return None
+    if any(b.GetBondType() != Chem.BondType.SINGLE
+           for b in n_atom.GetBonds()
+           if b.GetOtherAtom(n_atom).GetIdx() != hub.GetIdx()):
+        return None  # the N's non-hub bonds must be single (no cumulene)
+
+    # Hub organyls (every hub neighbour except the imine N): cited with 'P' locants.
+    hub_subs = []
+    for nb in hub.GetNeighbors():
+        if nb.GetIdx() == n_atom.GetIdx() or nb.GetSymbol() == 'H':
+            continue
+        name = pure_organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
+        if name is None:
+            return None
+        hub_subs.append(name)
+    # The imine-N substituent (if any): cited with the 'N' locant.
+    n_sub = None
+    if n_heavy:
+        n_sub = pure_organyl_prefix_name(mol, n_heavy[0].GetIdx(), n_atom.GetIdx())
+        if n_sub is None:
+            return None
+
+    from ..assembly.naming_utils import alpha_sort_key, is_complex_substituent
+    locant = 'P' if hub.GetSymbol() == 'P' else hub.GetSymbol()[0].upper()
+    from collections import Counter
+
+    def _block(name, locants):
+        count = len(locants)
+        mult = _PHOSPHANIMINE_MULT.get(count)
+        if mult is None:
+            return None
+        loc_str = ','.join(locants)
+        if is_complex_substituent(name):
+            body = f"{mult}({name})" if count > 1 else f"({name})"
+        else:
+            body = f"{mult}{name}"
+        return f"{loc_str}-{body}"
+
+    prefix_items = []  # (alpha_key, block_text)
+    for name, count in Counter(hub_subs).items():
+        blk = _block(name, [locant] * count)
+        if blk is None:
+            return None
+        prefix_items.append((alpha_sort_key(name), blk))
+    if n_sub is not None:
+        blk = _block(n_sub, ['N'])
+        if blk is None:
+            return None
+        prefix_items.append((alpha_sort_key(n_sub), blk))
+    prefix_items.sort(key=lambda t: t[0])
+    prefix_block = '-'.join(b for _, b in prefix_items)
+    return _assemble(prefix_block, 5, f"{_PHOSPHANIMINE_STEMS[hub.GetSymbol()]}imine")
+
+
 _LAMBDA_IMINE_OXIDE_HUBS = {'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane'}
 # Suffix multipliers for the -one / -imine char-group suffix (P-16.3.4).
 _IO_SUFFIX_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetr'}
