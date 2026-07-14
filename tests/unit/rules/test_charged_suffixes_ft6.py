@@ -164,13 +164,22 @@ def test_valence_gate_excludes_invalid_arities():
     assert _acls("C[Si-](C)(C)C") != "heteroatom_hydride_anion"  # 4-coord Si (-uide)
 
 
-def test_unnameable_heterane_never_emits_ide():
-    """An element whose neutral heterane the pipeline cannot name (As/Sb arsane/
-    stibane) must NEVER emit a garbage '-ide' — the heterane-stem guard fails
-    closed. The final name (legacy, charge-dropped) must not be a fake '*anide'."""
-    for smi in ["C[As-]C", "C[Sb-]C", "C[As-](C)C"]:
-        out = Orthonym().name(smi)
-        assert not out.endswith("anide"), f"{smi} -> {out} (spurious heteroatom -ide)"
+def test_heteroatom_hydride_anide_is_the_pin():
+    """P-72.2.2.1 (BB 39765 'dimethylarsanido'): a Group-15 heteroatom-hydride anion
+    (loss of H+ from dimethylarsane/dimethylstibane) IS named with the '-anide'
+    parent-hydride suffix — dimethylarsanide / dimethylstibanide are the PINs, NOT
+    garbage. The heterane-stem guard only fails closed when the neutral hydride
+    genuinely cannot be named."""
+    assert Orthonym().name("C[As-]C") == "dimethylarsanide"
+    assert Orthonym().name("C[Sb-]C") == "dimethylstibanide"
+
+
+def test_unnameable_heteroatom_anion_never_emits_fake_ide():
+    """The guard still fails closed for a genuinely un-nameable heteroatom anion:
+    (CH3)3As- (no As-H to lose -> not a clean '-anide') must NOT emit a fake
+    '*anide' (it fails closed to a descriptive 'not supported' form)."""
+    out = Orthonym().name("C[As-](C)C")
+    assert not out.endswith("anide"), f"C[As-](C)C -> {out} (spurious heteroatom -ide)"
 
 
 # --- Follow-on fixes: adjacent-N azolium (diazonium mis-class), indicated H,

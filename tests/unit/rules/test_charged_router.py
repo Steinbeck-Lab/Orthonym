@@ -79,9 +79,19 @@ class TestGuard1NoCrossFire:
     and dropped every substituent + the locant)."""
 
     def test_branched_alkoxide_is_structurally_complete(self):
-        """A branched alkoxide names the FULL substituted -olate (NOT a bare
-        carbon-count name) -- proves _name_alkoxide_systematic (heptanolate) dead."""
-        assert _rc("CC(C)(C)[O-]") == "2-methylpropan-2-olate"
+        """A branched alkoxide names the FULL substituted -olate with its locant
+        (NOT a bare carbon-count name) -- proves _name_alkoxide_systematic
+        (heptanolate) dead. Uses a genuinely SYSTEMATIC branched alkoxide;
+        CC(C)(C)[O-] is NOT used here because tert-butoxide is a RETAINED PIN
+        (BB P-72.2.2.2.2, lines 28180/41017: "tert-butoxide ... is also retained
+        as a preferred IUPAC name"), so it never exercises the systematic path."""
+        assert _rc("CCC(C)C[O-]") == "2-methylbutan-1-olate"
+
+    def test_tert_butoxide_is_retained_pin(self):
+        """BB P-72.2.2.2.2 (lines 28180/41017): tert-butoxide is retained AS A
+        PREFERRED IUPAC NAME (it just cannot be substituted). It must NOT be
+        systematised to 2-methylpropan-2-olate."""
+        assert _rc("CC(C)(C)[O-]") == "tert-butoxide"
 
     def test_long_chain_alkoxide_keeps_locant(self):
         """The canonical heptanolate bug: CCCCCCC[O-] used to drop the locant to
