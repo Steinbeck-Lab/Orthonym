@@ -310,6 +310,9 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === N-OXIDES ===
     "n_oxide_aromatic": "[n+][O-]",
     "n_oxide_aliphatic": "[NX4+]([#6])([#6])([#6])[O-]",
+    # W4-I4 (P-74.2.2.1.9 / P-62.5): imine (nitrone) N-oxide — an sp2 N+ double-
+    # bonded to C and single-bonded to a terminal O- (named '<imine> N-oxide').
+    "n_oxide_imine": "[NX2,NX3;+](=[#6])[OX1-]",
 
     # === BORONIC ACIDS ===
     "boronic_acid": "[#6][BX3]([OX2H])([OX2H])",
@@ -617,7 +620,7 @@ def detect_features(mol) -> Dict[str, List[Tuple[int, ...]]]:
 # walked into an aza/oxa chain (e.g. azidomethane CN=[N+]=[N-] -> wrong '2,3-diazabutane').
 _CHAIN_EXCLUDED_FG = frozenset({
     "azido", "diazo", "nitroso", "nitrite", "nitro",
-    "n_oxide_aromatic", "n_oxide_aliphatic",
+    "n_oxide_aromatic", "n_oxide_aliphatic", "n_oxide_imine",
     # W3-P11 (P-67.1.4.3.1): nitrooxy -O-NO2 is a prefix-only characteristic
     # group; its O/N heteroatoms must never be walked into an oxa/aza skeletal
     # chain (parallel to nitro/nitrite). Only the carbon attachment is preserved.

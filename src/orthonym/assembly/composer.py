@@ -1403,17 +1403,24 @@ def _try_name_n_oxide(features: Any) -> Optional[str]:
     # Check for aromatic N-oxide: [n+][O-]
     aromatic_pat = Chem.MolFromSmarts('[n+][O-]')
     aliphatic_pat = Chem.MolFromSmarts('[NX4+]([#6])([#6])([#6])[O-]')
+    # W4-I4 (P-74.2.2.1.9 / P-62.5): imine (aldo-/keto-nitrone) N-oxide, an sp2 N+
+    # double-bonded to C and single-bonded to a terminal O-. Named by functional
+    # class as '<imine> N-oxide' (CH3)2C=N+(CH3)-O- -> N-methylpropan-2-imine N-oxide.
+    imine_pat = Chem.MolFromSmarts('[NX2,NX3;+](=[#6])[OX1-]')
 
     aromatic_matches = mol.GetSubstructMatches(aromatic_pat) if aromatic_pat else ()
     aliphatic_matches = mol.GetSubstructMatches(aliphatic_pat) if aliphatic_pat else ()
+    imine_matches = mol.GetSubstructMatches(imine_pat) if imine_pat else ()
 
-    if not aromatic_matches and not aliphatic_matches:
+    if not aromatic_matches and not aliphatic_matches and not imine_matches:
         return None
 
     if aromatic_matches:
         return _name_aromatic_n_oxide(mol, aromatic_matches)
-    else:
+    elif aliphatic_matches:
         return _name_aliphatic_n_oxide(mol, aliphatic_matches)
+    else:
+        return _name_imine_n_oxide(mol, imine_matches)
 
 
 def _name_aromatic_n_oxide(mol, matches) -> Optional[str]:
@@ -1501,6 +1508,46 @@ def _name_aliphatic_n_oxide(mol, matches) -> Optional[str]:
         return None
 
     if not base_name:
+        return None
+
+    return f"{base_name} N-oxide"
+
+
+def _name_imine_n_oxide(mol, matches) -> Optional[str]:
+    """W4-I4 (P-74.2.2.1.9 / P-62.5): name an imine (nitrone) N-oxide as
+    '<imine> N-oxide' (functional class, the PIN). Strategy: neutralize the N+ and
+    delete the O-, name the base neutral imine recursively, then append ' N-oxide'::
+
+        (CH3)2C=N+(CH3)-O-  ->  N-methylpropan-2-imine N-oxide  (BB 26626)
+        CH2=N+(Cl)-O-       ->  N-chloromethanimine N-oxide     (BB 23126)
+
+    Fail-closed (returns None) on any decline; the caller falls through."""
+    from rdkit import Chem
+    from rdkit.Chem import RWMol
+
+    # SMARTS [NX2,NX3;+](=[#6])[OX1-]: (N+ index, C index, O- index).
+    n_idx = matches[0][0]
+    o_idx = matches[0][2]
+
+    rw = RWMol(mol)
+    rw.GetAtomWithIdx(n_idx).SetFormalCharge(0)
+    rw.RemoveBond(n_idx, o_idx)
+    rw.RemoveAtom(o_idx)
+
+    try:
+        modified_mol = rw.GetMol()
+        Chem.SanitizeMol(modified_mol)
+        modified_smiles = Chem.MolToSmiles(modified_mol, canonical=True)
+    except Exception:
+        return None
+
+    from .fragment_naming import name_fragment_recursively
+    try:
+        base_name = name_fragment_recursively(modified_smiles)
+    except Exception:
+        return None
+
+    if not base_name or 'unknown' in base_name.lower():
         return None
 
     return f"{base_name} N-oxide"

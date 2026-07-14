@@ -61,7 +61,8 @@ def _is_n_oxide(features: Any) -> bool:
     assembly); no writes.
     """
     fg = getattr(features, 'functional_groups', None) or {}
-    return bool(fg.get('n_oxide_aromatic')) or bool(fg.get('n_oxide_aliphatic'))
+    return (bool(fg.get('n_oxide_aromatic')) or bool(fg.get('n_oxide_aliphatic'))
+            or bool(fg.get('n_oxide_imine')))
 
 
 def name_n_oxide(
