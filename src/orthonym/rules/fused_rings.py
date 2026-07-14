@@ -2249,7 +2249,72 @@ def _name_saturated_fused_carbocyclic(mol) -> Optional[str]:
     if prefix is None:
         return None
 
-    return f"{prefix}hydro{parent}"
+    base = f"{prefix}hydro{parent}"
+
+    # P-93.5.4.1: ring-junction (bridgehead) stereodescriptors. The junction
+    # carbons of a symmetric saturated fused parent hydride are PSEUDOASYMMETRIC
+    # (BB 49620/49630: cis-decahydronaphthalene = (4as,8as); trans = (4ar,8ar)),
+    # so RDKit/centres assign lowercase r/s. This is the production caller that
+    # wires the (formerly dead) ring-junction stereo path. Emit ONLY when it is
+    # accuracy- AND determinism-safe (see _saturated_fused_junction_prefix);
+    # otherwise the name ships without stereo (missing beats wrong, P-93 policy).
+    return f"{_saturated_fused_junction_prefix(mol)}{base}"
+
+
+def _saturated_fused_junction_prefix(mol) -> str:
+    """Accuracy- and determinism-safe ring-junction stereo prefix (P-93.5.4.1).
+
+    Returns a ``(4ar,8ar)-`` / ``(4as,8as)-`` style prefix for a saturated
+    fused bicyclic parent hydride, or ``''`` when emitting one would risk a
+    wrong or non-deterministic name. All of the following must hold, else ``''``:
+
+    * There are exactly two bridgehead (ring-junction) atoms, both carry a
+      ``_CIPCode``, and they are the molecule's ONLY stereo-labelled atoms with
+      no E/Z bond stereo. This guarantees we are not silently dropping any
+      substituent stereocentre (a substituted decahydronaphthalene would have
+      extra centres and is fail-closed here).
+    * Every junction descriptor is IDENTICAL (e.g. both ``r`` or both ``s``).
+      The junction-locant assignment keys on ``sorted(bridgehead_atoms)`` (atom
+      index), which is NOT canonical across SMILES orderings; requiring equal
+      descriptors makes the emitted ``(locX,locX)`` string invariant under which
+      physical junction maps to which ``a``-locant. Symmetric parents (decalin,
+      octahydropentalene) always satisfy this when chiral; asymmetric ones whose
+      junctions differ fail closed.
+    * The junction-locant pair is one this module numbers correctly
+      (naphthalene 4a/8a, pentalene 3a/6a, indene 3a/7a, azulene 3a/8a,
+      heptalene 4a/9a — see get_junction_locants_for_fused_system).
+    """
+    assign_stereochemistry(mol)
+
+    bridgeheads = get_bridgehead_atoms(mol)
+    if len(bridgeheads) != 2:
+        return ""
+
+    # Guard: junctions must be the ONLY stereo-labelled units (no dropped stereo).
+    labelled_atoms = [a.GetIdx() for a in mol.GetAtoms() if a.HasProp('_CIPCode')]
+    if set(labelled_atoms) != set(bridgeheads):
+        return ""
+    if any(b.HasProp('_CIPCode') for b in mol.GetBonds()):
+        return ""
+
+    ring_sizes = get_fused_ring_sizes(mol)
+    if ring_sizes == (0, 0):
+        return ""
+
+    junction_locants = get_junction_locants_for_fused_system(
+        mol, bridgeheads, ring_sizes[0], ring_sizes[1]
+    )
+    descriptors = collect_ring_junction_stereo(mol, bridgeheads, junction_locants)
+    if len(descriptors) != 2:
+        return ""
+
+    # Determinism guard: emit only when both junction descriptors are identical,
+    # so the string does not depend on the bridgehead atom-index ordering.
+    cips = {cip for _loc, cip in descriptors}
+    if len(cips) != 1:
+        return ""
+
+    return format_ring_junction_stereo(descriptors)
 
 
 def is_fused_aromatic_system(mol) -> bool:

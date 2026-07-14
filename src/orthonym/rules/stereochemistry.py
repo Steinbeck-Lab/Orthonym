@@ -1023,11 +1023,30 @@ def get_junction_locants_for_fused_system(
                 bridgehead_atoms[1]: '7a'
             }
 
-    # For 5,5-fused (azulene type): 3a and 8a typically
+    # For 5,5-fused (pentalene type): 3a and 6a
+    # (pentalene numbering 1,2,3,3a,4,5,6,6a — junctions 3a/6a, NOT 3a/5a).
     if ring_size_1 == 5 and ring_size_2 == 5 and len(bridgehead_atoms) == 2:
         return {
             bridgehead_atoms[0]: '3a',
-            bridgehead_atoms[1]: '5a'
+            bridgehead_atoms[1]: '6a'
+        }
+
+    # For 5,7-fused (azulene type): 3a and 8a
+    # (azulene numbering 1,2,3,3a,4,5,6,7,8,8a — junctions 3a/8a).
+    if ((ring_size_1 == 5 and ring_size_2 == 7) or
+            (ring_size_1 == 7 and ring_size_2 == 5)) and len(bridgehead_atoms) == 2:
+        return {
+            bridgehead_atoms[0]: '3a',
+            bridgehead_atoms[1]: '8a'
+        }
+
+    # For 6,7-fused (heptalene type): 4a and 9a
+    # (heptalene numbering 1,2,3,4,4a,5,6,7,8,9,9a — junctions 4a/9a).
+    if ((ring_size_1 == 6 and ring_size_2 == 7) or
+            (ring_size_1 == 7 and ring_size_2 == 6)) and len(bridgehead_atoms) == 2:
+        return {
+            bridgehead_atoms[0]: '4a',
+            bridgehead_atoms[1]: '9a'
         }
 
     # Generic fallback: use sequential 'a' suffix locants
