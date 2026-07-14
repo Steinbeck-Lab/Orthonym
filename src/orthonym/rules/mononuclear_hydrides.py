@@ -536,16 +536,16 @@ def name_heterone(mol) -> Optional[str]:
         prefixes.append(name)
     from .lambda_convention import nonstandard_bonding_number
     lam = nonstandard_bonding_number(mol, hub.GetIdx())
-    from collections import Counter
-    counts = Counter(prefixes)
-    _MULT = {1: '', 2: 'di', 3: 'tri'}
-    parts = []
-    for name in sorted(counts):
-        m = _MULT.get(counts[name])
-        if m is None:
-            return None
-        parts.append(f"{m}{name}")
-    return _assemble(''.join(parts), lam, _HETERONE_STEMS[hub.GetSymbol()])
+    # P-16.5.1.3 mononuclear enclosing marks (W5-C): 2+ DIFFERENT substituents on a
+    # mononuclear hub are cited alphanumerically with the first unmarked and the rest
+    # in enclosing marks -> 'methyl(phenyl)(propyl)' (NOT the OPSIN-ambiguous
+    # 'methylphenylpropyl', where 'phenylpropyl' reads as one compound substituent).
+    # Identical substituents keep the plain multiplied form (trimethyl / triphenyl).
+    if len(prefixes) > 4:
+        return None
+    from .phosphorus import _build_substituent_string
+    prefix_str = _build_substituent_string(prefixes)
+    return _assemble(prefix_str, lam, _HETERONE_STEMS[hub.GetSymbol()])
 
 
 _HETEROIMINE_STEMS = {'P': 'phosphan', 'As': 'arsan', 'Si': 'silan'}
