@@ -413,3 +413,15 @@ class TestSugarOMethyl:
         from orthonym.data.sugar_names import name_sugar_o_methyl
         from rdkit import Chem
         assert name_sugar_o_methyl(Chem.MolFromSmiles("CC1CCCCO1"), "CC1CCCCO1") is None
+
+
+class TestW6bMultiplierElision:
+    """Wave 6b Task 1 (P-63.1.2): a multiplied -ol/-one/-amine suffix on the
+    generic HW/oxane namer must elide the multiplier's terminal 'a'
+    (tetra+ol -> tetrol, not tetraol)."""
+
+    def test_c_phenyl_sugar_tetrol_elision(self):
+        from orthonym import name_compound
+        # 2-C-phenyl sugar -> systematic oxane; -ol multiplier must elide.
+        assert name_compound("OC[C@H]1O[C@@H](O)[C@](O)(c2ccccc2)[C@@H](O)[C@@H]1O") == \
+            "(2R,3S,4S,5S,6R)-6-(hydroxymethyl)-3-phenyloxane-2,3,4,5-tetrol"

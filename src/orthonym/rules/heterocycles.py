@@ -2088,6 +2088,7 @@ def name_substituted_heterocycle(
         get_alkyl_name,
         alpha_sort_key,
         get_multiplier_prefix,
+        _join_multiplied_suffix,  # P-63.1.2/P-64.2.2.1 multiplier-'a' elision (tetraol->tetrol)
         _wrap_n_substituent,  # C4: italic-N substituent wrapping for amine suffix
     )
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
@@ -2298,7 +2299,9 @@ def name_substituted_heterocycle(
         count = len(chosen_locants)
         multiplier = get_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
         locant_str = ",".join(str(loc) for loc in chosen_locants)
-        suffix_token = f"{multiplier}{chosen_suffix}"
+        # P-63.1.2/P-64.2.2.1: elide the multiplier's terminal 'a' before a
+        # vowel-initial suffix ('tetra'+'ol' -> 'tetrol', not 'tetraol').
+        suffix_token = _join_multiplied_suffix(multiplier, chosen_suffix)
         # P-31.1.4.3.4: a suffixed retained HW-derived saturated hetero-ring
         # parent must cite its heteroatom locant set immediately before the
         # parent stem (thiazolidine -> 1,3-thiazolidin-4-one). Inject it at the
