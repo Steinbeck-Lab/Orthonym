@@ -179,6 +179,15 @@ ACYCLIC_PIN_SUGAR_NAMES = {
     # the true meso-* PINs and D-glucosaminitol are OPSIN-2.9-UNPARSEABLE -> those
     # stay fail-closed, documented in )
     "OC[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "", "xylitol"),
+    # W6B-T5 2-amino-2-deoxy-hexitols (aminoalditols, P-102.5.6.5.4), the reduced
+    # forms of glucosamine/galactosamine/mannosamine.  Verbatim OPSIN-generated
+    # PINs (OPSIN-RT verified).  NOTE: the retained 'D-glucosaminitol' spelling is
+    # OPSIN-2.9-UNPARSEABLE, and the ledger census SMILES for it has an UNDEFINED
+    # C2 stereocentre (so no config can be assigned) -> that defective SMILES stays
+    # fail-closed; only the fully-stereo-defined forms below are cataloged.
+    "N[C@@H](CO)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-glucitol"),
+    "N[C@@H](CO)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-galactitol"),
+    "N[C@H](CO)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-mannitol"),
 }
 
 # ============================================================================

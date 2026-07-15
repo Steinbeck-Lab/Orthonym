@@ -384,6 +384,28 @@ class TestW6bDeoxyHeptoseCatalog:
                 assert name_compound(canon) == pin
 
 
+class TestW6bAminoalditol:
+    """Wave 6b Task 5 (P-102.5.6.5.4): 2-amino-2-deoxy-hexitols catalog. The
+    ledger 'D-glucosaminitol' census SMILES has an UNDEFINED C2 -> stays
+    fail-closed (no config assignable); only fully-defined forms catalog."""
+
+    def test_amino_deoxy_glucitol(self):
+        from orthonym import name_compound
+        assert name_compound("N[C@@H](CO)[C@@H](O)[C@H](O)[C@H](O)CO") == \
+            "2-amino-2-deoxy-D-glucitol"
+
+    def test_amino_deoxy_galactitol(self):
+        from orthonym import name_compound
+        assert name_compound("N[C@@H](CO)[C@@H](O)[C@@H](O)[C@H](O)CO") == \
+            "2-amino-2-deoxy-D-galactitol"
+
+    def test_undefined_c2_census_not_amino_sugar_name(self):
+        from orthonym import name_compound
+        # undefined C2 -> a config cannot be assigned; must NOT ship the sugar name.
+        got = name_compound("NC(CO)[C@@H](O)[C@H](O)[C@H](O)CO")
+        assert got != "2-amino-2-deoxy-D-glucitol"
+
+
 @pytest.mark.unit
 class TestGlycosylamineAndHalide:
     """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).
