@@ -2422,6 +2422,171 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     return candidate
 
 
+def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
+    """Open-chain aldonic/aldaric acid ester (BB P-102.5.6.6.2.1 / P-102.5.6.6.5.3).
+
+    Aldonate: the C1-COOH of an open-chain aldonic acid is esterified ->
+    ``<R> <config>-<stem>onate`` (``propan-2-yl D-gluconate``).
+    Aldarate PARTIAL ester: an aldaric acid (both termini COOH) with exactly ONE
+    terminus esterified -> ``1-<R> hydrogen <config>-<stem>arate``
+    (``1-methyl hydrogen L-altrarate``).
+
+    Strip-and-name: the alkyl (R) group is named via the ester machinery
+    (:func:`~orthonym.rules.esters.get_alkyl_fragment_name`); the residual free
+    sugar-acid must be a RECOGNIZED aldonic/aldaric acid (:func:`name_free_sugar`),
+    else fail-closed.  OPSIN-RT gated; input mol never mutated.  Fail-closed on an
+    aldaric DI-ester, a cyclic acid backbone, or an unrecognized residual acid.
+    """
+    if mol is None:
+        return None
+    # Locate ester group(s): ester O (no H, degree 2) between a carbonyl C and an
+    # alkyl C.
+    esters = []  # (carbonyl_c, carbonyl_o, ester_o, alkyl_c)
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
+            continue
+        nbrs = list(atom.GetNeighbors())
+        if len(nbrs) != 2:
+            continue
+        carbonyl_c = carbonyl_o = alkyl_c = None
+        for n in nbrs:
+            if n.GetAtomicNum() != 6:
+                continue
+            dO = [b.GetOtherAtom(n).GetIdx() for b in n.GetBonds()
+                  if b.GetBondType() == Chem.BondType.DOUBLE
+                  and b.GetOtherAtom(n).GetAtomicNum() == 8]
+            if dO:
+                carbonyl_c, carbonyl_o = n.GetIdx(), dO[0]
+            else:
+                alkyl_c = n.GetIdx()
+        if carbonyl_c is not None and alkyl_c is not None:
+            esters.append((carbonyl_c, carbonyl_o, atom.GetIdx(), alkyl_c))
+    if len(esters) != 1:
+        return None
+    carbonyl_c, carbonyl_o, ester_o, alkyl_c = esters[0]
+    if mol.GetAtomWithIdx(carbonyl_c).IsInRing():
+        return None  # sugar-acid backbone must be acyclic
+
+    from orthonym.rules.esters import parse_ester_fragments, get_alkyl_fragment_name
+    _acid_atoms, alkyl_atoms = parse_ester_fragments(
+        mol, (carbonyl_c, carbonyl_o, ester_o, alkyl_c)
+    )
+    if not alkyl_atoms:
+        return None
+    alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
+    if not alkyl_name:
+        return None
+
+    # Count free carboxylic acids (C(=O)-OH) in the input: 0 -> aldonate,
+    # 1 -> aldarate partial ester; anything else -> fail-closed.
+    free_cooh = 0
+    for a in mol.GetAtoms():
+        if a.GetAtomicNum() != 6:
+            continue
+        has_dO = any(b.GetBondType() == Chem.BondType.DOUBLE
+                     and b.GetOtherAtom(a).GetAtomicNum() == 8 for b in a.GetBonds())
+        has_ohO = any(nb.GetAtomicNum() == 8 and nb.GetTotalNumHs() > 0
+                      for nb in a.GetNeighbors())
+        if has_dO and has_ohO:
+            free_cooh += 1
+    if free_cooh not in (0, 1):
+        return None
+
+    # Strip the ester -> free acid: cleave ester_o — alkyl_c, keep the carbonyl side
+    # (its ester-O relaxes to the acid -OH), canonicalize.
+    bond = mol.GetBondBetweenAtoms(ester_o, alkyl_c)
+    if bond is None:
+        return None
+    try:
+        frag = Chem.FragmentOnBonds(
+            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
+        )
+        mapping = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    acid_frag = None
+    for fm, mp in zip(frags, mapping):
+        if carbonyl_c in mp:
+            acid_frag = fm
+            break
+    if acid_frag is None:
+        return None
+    rw = Chem.RWMol(acid_frag)
+    for dummy in sorted(
+        (a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0), reverse=True
+    ):
+        rw.RemoveAtom(dummy)  # the ester-O relaxes to the acid -OH after sanitize
+    try:
+        Chem.SanitizeMol(rw)
+        residual = Chem.RemoveHs(rw)
+        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(residual))
+    except Exception:
+        return None
+    residual_mol = Chem.MolFromSmiles(residual_canon)
+    if residual_mol is None:
+        return None
+    acid_name = name_free_sugar(residual_mol, residual_canon)
+    if acid_name is None:
+        return None
+
+    if free_cooh == 0:
+        # Aldonate: the residual must be a recognized aldonic acid.
+        if not acid_name.endswith("onic acid"):
+            return None
+        acylate = acid_name[: -len("ic acid")] + "ate"  # ...onic acid -> ...onate
+        candidate = f"{alkyl_name} {acylate}"
+    else:
+        # Aldarate partial ester: the residual (free) must be a recognized aldaric
+        # acid; the esterified terminus is C1 (lowest locant).
+        if not acid_name.endswith("aric acid"):
+            return None
+        acylate = acid_name[: -len("ic acid")] + "ate"  # ...aric acid -> ...arate
+        candidate = f"1-{alkyl_name} hydrogen {acylate}"
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
+
+
+def _has_open_chain_acid_ester(mol) -> bool:
+    """Cheap NO-OPSIN detector (W6B-T8) for a candidate aldonate/aldarate ester: a
+    fully acyclic molecule with exactly one -C(=O)-O-C ester and >=2 hydroxylated
+    carbons (a polyol acid chain).  Safe for the dispatch predicate; the handler
+    (:func:`name_aldonate_ester`) does the real name_free_sugar + RT validation and
+    fails closed on a non-sugar-acid residual."""
+    if mol is None or mol.GetRingInfo().NumRings() > 0:
+        return False
+    n_ester = 0
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
+            continue
+        nbrs = list(atom.GetNeighbors())
+        if len(nbrs) != 2:
+            continue
+        cc = ac = None
+        for n in nbrs:
+            if n.GetAtomicNum() != 6:
+                continue
+            if any(b.GetBondType() == Chem.BondType.DOUBLE
+                   and b.GetOtherAtom(n).GetAtomicNum() == 8 for b in n.GetBonds()):
+                cc = n.GetIdx()
+            else:
+                ac = n.GetIdx()
+        if cc is not None and ac is not None:
+            n_ester += 1
+    if n_ester != 1:
+        return False
+    oh_c = sum(
+        1 for a in mol.GetAtoms()
+        if a.GetAtomicNum() == 6
+        and any(nb.GetAtomicNum() == 8 and nb.GetTotalNumHs() > 0
+                for nb in a.GetNeighbors())
+    )
+    return oh_c >= 2
+
+
 _OMETHYL_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
 
 

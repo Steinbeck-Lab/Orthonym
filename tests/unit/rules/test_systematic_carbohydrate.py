@@ -438,6 +438,31 @@ class TestW6bUlosonicAcid:
         assert name_compound("OC1(C(=O)O)CCCCO1") == "2-hydroxyoxane-2-carboxylic acid"
 
 
+class TestW6bAldonateAldarateEster:
+    """Wave 6b Task 8 (P-102.5.6.6.2.1/.5.3): open-chain aldonate + aldarate
+    partial esters; ordinary esters unaffected."""
+
+    def test_propan_2_yl_gluconate(self):
+        from orthonym import name_compound
+        assert name_compound("O=C([C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO)OC(C)C") == \
+            "propan-2-yl D-gluconate"
+
+    def test_methyl_gluconate(self):
+        from orthonym import name_compound
+        assert name_compound("O=C([C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO)OC") == \
+            "methyl D-gluconate"
+
+    def test_methyl_hydrogen_altrarate(self):
+        from orthonym import name_compound
+        assert name_compound("O=C([C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)C(=O)O)OC") == \
+            "1-methyl hydrogen L-altrarate"
+
+    def test_ordinary_esters_unaffected(self):
+        from orthonym import name_compound
+        assert name_compound("CCOC(C)=O") == "ethyl acetate"
+        assert name_compound("CC(O)C(=O)OC") == "methyl 2-hydroxypropanoate"
+
+
 @pytest.mark.unit
 class TestGlycosylamineAndHalide:
     """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).

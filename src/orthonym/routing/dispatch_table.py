@@ -462,6 +462,10 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     from orthonym.data.sugar_names import _is_uncataloged_ulosonic_acid
     if _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
         return True
+    # W6B-T8 open-chain aldonate/aldarate ester (acyclic sugar-acid ester).
+    from orthonym.data.sugar_names import _has_open_chain_acid_ester
+    if _has_open_chain_acid_ester(mol):
+        return True
     if _has_anomeric_hetero_sugar(mol):
         return True
     if _has_o_methyl_sugar(mol):
@@ -974,6 +978,12 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     ome = name_sugar_o_methyl(mol, canonical_smiles)
     if ome is not None:
         return ome
+
+    # W6B-T8: open-chain aldonate / aldarate(partial) ester (P-102.5.6.6.2.1/.5.3).
+    from orthonym.data.sugar_names import name_aldonate_ester
+    aldonate = name_aldonate_ester(mol, canonical_smiles)
+    if aldonate is not None:
+        return aldonate
 
     # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide
