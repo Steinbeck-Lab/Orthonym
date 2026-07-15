@@ -2587,6 +2587,136 @@ def _has_open_chain_acid_ester(mol) -> bool:
     return oh_c >= 2
 
 
+def name_amino_deoxy_open_sugar(mol, canonical_smiles: str) -> Optional[str]:
+    """N-alkylamino open-chain aldose (BB P-102.5.4.1.2): a backbone carbon of an
+    open-chain aldose bears -N(H)R (R = alkyl) in place of -OH ->
+    ``<n>-(<R>amino)-<n>-deoxy-<config>-<stem>`` (``2-(butylamino)-2-deoxy-D-glucose``).
+
+    Strip-and-name: replace the N (and its R group) with -OH IN PLACE (preserving
+    the backbone stereo tag), name the parent aldose via :func:`name_free_sugar`,
+    and cite the N-substituent.  OPSIN-RT gated.  Fail-closed on a ring form,
+    N-acyl / N-hydroxyalkyl (R carries O), or more than one amino carbon.
+    """
+    if mol is None or mol.GetRingInfo().NumRings() > 0:
+        return None
+    from orthonym.rules.esters import get_alkyl_fragment_name, _bfs_fragment
+
+    # C1 = the terminal aldehyde carbon (CHO): acyclic C, one =O (terminal), one C
+    # neighbour, >=1 H.
+    aldehyde = None
+    for a in mol.GetAtoms():
+        if a.GetAtomicNum() != 6:
+            continue
+        dO = [b.GetOtherAtom(a) for b in a.GetBonds()
+              if b.GetBondType() == Chem.BondType.DOUBLE
+              and b.GetOtherAtom(a).GetAtomicNum() == 8]
+        cN = [nb for nb in a.GetNeighbors() if nb.GetAtomicNum() == 6]
+        if len(dO) == 1 and len(cN) == 1 and a.GetTotalNumHs() >= 1 \
+                and dO[0].GetDegree() == 1:
+            if aldehyde is not None:
+                return None  # >1 aldehyde -> not a simple aldose
+            aldehyde = a.GetIdx()
+    if aldehyde is None:
+        return None
+
+    # Walk the carbon backbone from C1 -> locant map.
+    order = [aldehyde]
+    prev, cur = None, aldehyde
+    while True:
+        nxts = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
+                if nb.GetAtomicNum() == 6 and nb.GetIdx() != prev]
+        if len(nxts) != 1:
+            break
+        prev, cur = cur, nxts[0]
+        order.append(cur)
+    locant_of = {c: i + 1 for i, c in enumerate(order)}
+
+    # Exactly one backbone carbon bears an amine N (N-H, acyclic): primary (-NH2,
+    # 1 carbon neighbour = the backbone) or secondary alkyl (-NHR, 2 carbons).
+    amino_c = n_idx = r_c = None
+    for c in order:
+        for nb in mol.GetAtomWithIdx(c).GetNeighbors():
+            if nb.GetAtomicNum() == 7 and not nb.IsInRing() and nb.GetTotalNumHs() >= 1:
+                cnbrs = [x.GetIdx() for x in nb.GetNeighbors() if x.GetAtomicNum() == 6]
+                if len(cnbrs) not in (1, 2):
+                    return None
+                if amino_c is not None:
+                    return None  # >1 amino carbon -> fail-closed
+                amino_c, n_idx = c, nb.GetIdx()
+                r_c = next((x for x in cnbrs if x != c), None)  # None = primary
+    if amino_c is None:
+        return None
+
+    # Build the N-substituent citation and collect the R atoms to strip.
+    if r_c is None:
+        substituent = "amino"  # primary -NH2
+        r_atoms = []
+    else:
+        # R must be a pure-carbon (alkyl) group: an N-acyl / N-hydroxyalkyl would
+        # drop its O on the strip -> fail-closed.
+        r_atoms = _bfs_fragment(mol, r_c, n_idx)
+        if any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in r_atoms):
+            return None
+        r_name = get_alkyl_fragment_name(mol, r_atoms)
+        if not r_name:
+            return None
+        substituent = f"({r_name}amino)"
+
+    # Strip: N -> O in place (stereo tag preserved), delete the R atoms.
+    rw = Chem.RWMol(mol)
+    rw.GetAtomWithIdx(n_idx).SetAtomicNum(8)
+    for idx in sorted(r_atoms, reverse=True):
+        rw.RemoveAtom(idx)
+    try:
+        Chem.SanitizeMol(rw)
+        parent = Chem.RemoveHs(rw)
+        parent_canon = Chem.CanonSmiles(Chem.MolToSmiles(parent))
+    except Exception:
+        return None
+    parent_mol = Chem.MolFromSmiles(parent_canon)
+    if parent_mol is None:
+        return None
+    aldose_name = name_free_sugar(parent_mol, parent_canon)
+    if aldose_name is None:
+        return None
+    # Parent must be a plain open-chain aldose ('<config>-<stem>ose').
+    if " " in aldose_name or "acid" in aldose_name or not aldose_name.endswith("ose"):
+        return None
+
+    loc = locant_of[amino_c]
+    candidate = f"{loc}-{substituent}-{loc}-deoxy-{aldose_name}"
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
+
+
+def _has_open_chain_amino_aldose(mol) -> bool:
+    """Cheap NO-OPSIN detector (W6B-T9): an acyclic molecule with a terminal
+    aldehyde, a secondary alkyl-amine N-H, and >=3 hydroxylated carbons.  The
+    handler (:func:`name_amino_deoxy_open_sugar`) RT-gates the real name."""
+    if mol is None or mol.GetRingInfo().NumRings() > 0:
+        return False
+    has_cho = any(
+        a.GetAtomicNum() == 6 and a.GetTotalNumHs() >= 1
+        and any(b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtom(a).GetAtomicNum() == 8
+                and b.GetOtherAtom(a).GetDegree() == 1 for b in a.GetBonds())
+        for a in mol.GetAtoms()
+    )
+    has_nh_alkyl = any(
+        a.GetAtomicNum() == 7 and not a.IsInRing() and a.GetTotalNumHs() >= 1
+        and sum(1 for nb in a.GetNeighbors() if nb.GetAtomicNum() == 6) in (1, 2)
+        for a in mol.GetAtoms()
+    )
+    oh_c = sum(
+        1 for a in mol.GetAtoms()
+        if a.GetAtomicNum() == 6
+        and any(nb.GetAtomicNum() == 8 and nb.GetTotalNumHs() > 0
+                for nb in a.GetNeighbors())
+    )
+    return has_cho and has_nh_alkyl and oh_c >= 3
+
+
 _OMETHYL_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
 
 

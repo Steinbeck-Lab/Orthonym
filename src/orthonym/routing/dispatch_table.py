@@ -466,6 +466,10 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     from orthonym.data.sugar_names import _has_open_chain_acid_ester
     if _has_open_chain_acid_ester(mol):
         return True
+    # W6B-T9 N-alkylamino open-chain aldose.
+    from orthonym.data.sugar_names import _has_open_chain_amino_aldose
+    if _has_open_chain_amino_aldose(mol):
+        return True
     if _has_anomeric_hetero_sugar(mol):
         return True
     if _has_o_methyl_sugar(mol):
@@ -984,6 +988,12 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     aldonate = name_aldonate_ester(mol, canonical_smiles)
     if aldonate is not None:
         return aldonate
+
+    # W6B-T9: N-alkylamino open-chain aldose (P-102.5.4.1.2).
+    from orthonym.data.sugar_names import name_amino_deoxy_open_sugar
+    amino_open = name_amino_deoxy_open_sugar(mol, canonical_smiles)
+    if amino_open is not None:
+        return amino_open
 
     # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide

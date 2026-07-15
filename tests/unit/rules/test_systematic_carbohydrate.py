@@ -463,6 +463,27 @@ class TestW6bAldonateAldarateEster:
         assert name_compound("CC(O)C(=O)OC") == "methyl 2-hydroxypropanoate"
 
 
+class TestW6bAminoDeoxyOpenSugar:
+    """Wave 6b Task 9 (P-102.5.4.1.2): N-alkylamino / amino open-chain aldose;
+    N-acyl fails closed."""
+
+    def test_butylamino_glucose(self):
+        from orthonym import name_compound
+        assert name_compound("C(CCC)N[C@@H](C=O)[C@@H](O)[C@H](O)[C@H](O)CO") == \
+            "2-(butylamino)-2-deoxy-D-glucose"
+
+    def test_primary_amino_glucose(self):
+        from orthonym import name_compound
+        assert name_compound("N[C@@H](C=O)[C@@H](O)[C@H](O)[C@H](O)CO") == \
+            "2-amino-2-deoxy-D-glucose"
+
+    def test_n_acyl_fails_closed(self):
+        from orthonym.data.sugar_names import name_amino_deoxy_open_sugar
+        from rdkit import Chem
+        smi = "CC(=O)N[C@@H](C=O)[C@@H](O)[C@H](O)[C@H](O)CO"  # N-acetyl -> out of scope
+        assert name_amino_deoxy_open_sugar(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+
+
 @pytest.mark.unit
 class TestGlycosylamineAndHalide:
     """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).
