@@ -262,6 +262,40 @@ ALDONAMIDE_NAMES = {
     "NC(=O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "xylonamide"),
 }
 
+# Free open-chain aldoses (P-102.2.1 / Table 10.2): the bare retained name is the
+# acyclic-aldehydic-form PIN (D-glucose already in ACYCLIC_PIN_SUGAR_NAMES; the
+# cyclic pyranose/furanose forms are keyed separately).  27 rows (D/L glyceraldehyde
+# + aldotetr/pent/hex, minus the pre-existing D-glucose).
+ACYCLIC_ALDOSE_NAMES = {
+    "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "allose"),
+    "O=C[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "altrose"),
+    "O=C[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "arabinose"),
+    "O=C[C@H](O)[C@H](O)CO": ("", "D", "erythrose"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "galactose"),
+    "O=C[C@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "gulose"),
+    "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "idose"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "lyxose"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "mannose"),
+    "O=C[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "ribose"),
+    "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "talose"),
+    "O=C[C@@H](O)[C@H](O)CO": ("", "D", "threose"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "xylose"),
+    "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "allose"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "altrose"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "arabinose"),
+    "O=C[C@@H](O)[C@@H](O)CO": ("", "L", "erythrose"),
+    "O=C[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "galactose"),
+    "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "glucose"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "gulose"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "idose"),
+    "O=C[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "lyxose"),
+    "O=C[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "mannose"),
+    "O=C[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "ribose"),
+    "O=C[C@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "talose"),
+    "O=C[C@H](O)[C@@H](O)CO": ("", "L", "threose"),
+    "O=C[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "xylose"),
+}
+
 # Free open-chain 2-ketoses (P-102.5.2.2): retained Table-10.3 names are the PIN
 # for C3-C6 acyclic ketoses (P-102.2.1 "customarily used"; mirrors the retained
 # aldose treatment).  14 rows (D/L erythrulose, ribulose, xylulose, psicose,
@@ -595,6 +629,7 @@ ALL_SUGAR_NAMES = {
     **ACYCLIC_PIN_SUGAR_NAMES,
     **ALDONIC_ACID_NAMES,
     **ALDONAMIDE_NAMES,
+    **ACYCLIC_ALDOSE_NAMES,
     **ACYCLIC_KETOSE_NAMES,
     **ANHYDRO_SUGAR_NAMES,
     **ALDARIC_ACID_NAMES,
