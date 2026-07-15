@@ -524,13 +524,22 @@ def name_disaccharide(mol) -> Optional[str]:
         c_prime = _attachment_locant(mol, parent, par_attach)
         if c_prime is None:
             return None
-        # Parent retains -ose. D-09: emit NO anomer for an unspecified reducing end.
-        # The reducing anomer is conventionally omitted (mutarotation); relax that
-        # centre for the RT comparison since the name does not assert it.
-        parent_str = par_base  # bare base, no anomer/config-prefix injected here
-        if par_anomer and par_config:
-            parent_str = f"{par_config}-{par_base}"
-        relax.add(parent["anomeric_idx"])
+        # P-102.7.1.2: the reducing-end anomer MUST be cited when it is DEFINED
+        # (beta-maltose -> ...-(1->4)-beta-D-glucopyranose).  W6B-T10 root-cause
+        # fix: previously the anomer was always dropped (D-09) even for a defined
+        # reducing centre, which is only correct for an UNSPECIFIED (mutarotating)
+        # anomer.  When the reducing anomeric atom has no defined chirality, keep
+        # the omit-and-relax path (the name does not assert the anomer).
+        parent_anomeric = parent["anomeric_idx"]
+        anomeric_defined = (
+            mol.GetAtomWithIdx(parent_anomeric).GetChiralTag()
+            != Chem.ChiralType.CHI_UNSPECIFIED
+        )
+        if anomeric_defined and par_anomer and par_config:
+            parent_str = f"{par_anomer}-{par_config}-{par_base}"
+        else:
+            parent_str = f"{par_config}-{par_base}" if par_config else par_base
+            relax.add(parent_anomeric)
         name = f"{glycosyl_str}-({c}{_ARROW}{c_prime})-{parent_str}"
     else:
         parent_str = _glycoside_head(par_anomer, par_config, par_base)

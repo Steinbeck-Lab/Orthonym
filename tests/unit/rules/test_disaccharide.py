@@ -22,8 +22,9 @@ reducing-end detection, completeness invariant, fail-closed None) — the (1->4)
 arrow and trailing-parent checks pin the emitted form, not a string transform.
 
 Verified this session (OPSIN-RT True, ASCII descriptors + ASCII arrow):
-  maltose -> alpha-D-glucopyranosyl-(1->4)-D-glucopyranose  (unspecified
-             reducing end -> NO alpha/beta on the glucose parent, D-09)
+  beta-maltose -> alpha-D-glucopyranosyl-(1->4)-beta-D-glucopyranose  (W6B-T10:
+             a DEFINED reducing-end anomer is cited, P-102.7.1.2; only an
+             UNSPECIFIED reducing anomer is omitted, D-09)
   sucrose -> beta-D-fructofuranosyl alpha-D-glucopyranoside  (no free hemiacetal)
 """
 
@@ -37,9 +38,16 @@ RDLogger.DisableLog("rdApp.*")
 # ---------------------------------------------------------------------------
 # Verified disaccharide SMILES (OPSIN-RT True this session)
 # ---------------------------------------------------------------------------
-# Maltose: alpha-(1->4) glucosyl-glucose; reducing C1 is C(O) (unspecified anomer).
+# beta-Maltose: alpha-(1->4) glucosyl-glucose; the reducing C1 is a DEFINED beta
+# anomer (W6B-T10: cited per P-102.7.1.2, previously wrongly dropped).
 MALTOSE_SMILES = (
     "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](O)O[C@@H]2CO)"
+    "[C@H](O)[C@@H](O)[C@@H]1O"
+)
+# Maltose with an UNSPECIFIED reducing anomer (reducing-C1 stereo removed): the
+# anomer is correctly omitted (mutarotation, D-09).
+MALTOSE_UNSPEC_SMILES = (
+    "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)C(O)O[C@@H]2CO)"
     "[C@H](O)[C@@H](O)[C@@H]1O"
 )
 # Sucrose: no free hemiacetal (both anomeric carbons in the glycosidic linkage)
@@ -56,7 +64,7 @@ SUCROSE_SMILES = (
     "[C@@H](O)[C@@H]1O"
 )
 
-MALTOSE_EXPECTED = "alpha-D-glucopyranosyl-(1->4)-D-glucopyranose"
+MALTOSE_EXPECTED = "alpha-D-glucopyranosyl-(1->4)-beta-D-glucopyranose"
 SUCROSE_EXPECTED = "beta-D-fructofuranosyl alpha-D-glucopyranoside"
 
 
@@ -81,16 +89,23 @@ class TestDisaccharide:
         assert name_disaccharide(mol) == SUCROSE_EXPECTED
 
     def test_unspecified_reducing_end_no_anomer(self):
-        """Unspecified reducing-end anomer -> NO alpha/beta on the parent (D-09)."""
+        """UNSPECIFIED reducing-end anomer -> NO alpha/beta on the parent (D-09)."""
         from orthonym.rules.oligosaccharides import name_disaccharide
 
-        mol = Chem.MolFromSmiles(MALTOSE_SMILES)
+        mol = Chem.MolFromSmiles(MALTOSE_UNSPEC_SMILES)
         name = name_disaccharide(mol)
         assert name is not None
         # The glucose parent trails as bare "-D-glucopyranose" (no invented anomer).
         assert name.endswith("-D-glucopyranose")
         assert "alpha-D-glucopyranose" not in name
         assert "beta-D-glucopyranose" not in name
+
+    def test_defined_reducing_end_cites_anomer(self):
+        """W6B-T10 (P-102.7.1.2): a DEFINED reducing-end anomer MUST be cited."""
+        from orthonym.rules.oligosaccharides import name_disaccharide
+
+        mol = Chem.MolFromSmiles(MALTOSE_SMILES)
+        assert name_disaccharide(mol) == "alpha-D-glucopyranosyl-(1->4)-beta-D-glucopyranose"
 
     def test_linkage_arrow_glyph(self):
         """Linkage locant uses the ASCII (1->4) arrow matching the gold row (D-07)."""

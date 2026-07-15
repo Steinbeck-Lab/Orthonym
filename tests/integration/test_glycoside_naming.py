@@ -348,13 +348,13 @@ class TestSystematicCarbohydrateDispatch:
         assert "oxan" not in name.lower()
 
     def test_maltose_glycosylglycose(self):
-        """Maltose -> P-102.7.1.2 glycosylglycose, ASCII (1->4) arrow,
-        unspecified reducing-end anomer (no alpha/beta on the parent, D-09)."""
+        """alpha-Maltose -> P-102.7.1.2 glycosylglycose, ASCII (1->4) arrow;
+        the DEFINED reducing-end anomer is cited (W6B-T10, P-102.7.1.2)."""
         name = name_compound(
             "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O)O[C@@H]2CO)"
             "[C@H](O)[C@@H](O)[C@@H]1O"
         )
-        assert name == "alpha-D-glucopyranosyl-(1->4)-D-glucopyranose"
+        assert name == "alpha-D-glucopyranosyl-(1->4)-alpha-D-glucopyranose"
 
     def test_sucrose_glycosyl_glycoside(self):
         """Sucrose (no free hemiacetal) -> P-102.7.1.1 glycosyl glycoside."""
