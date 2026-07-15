@@ -620,9 +620,63 @@ SYSTEMATIC_MONOSACCHARIDE_NAMES = {
 # Merged lookup and non-stereo fallback
 # ============================================================================
 
+DEOXY_PENTOSE_NAMES = {
+    # W6B-T4 (P-102.5.3): 2-deoxypentofuranoses (alpha/beta x D/L x erythro/threo).
+    # OPSIN-generated (name->SMILES->RDKit-canon), verbatim ("", "", full PIN) form.
+    "OC[C@H]1O[C@H](O)C[C@@H]1O": ("", "", "2-deoxy-alpha-D-erythro-pentofuranose"),
+    "OC[C@H]1O[C@H](O)C[C@H]1O": ("", "", "2-deoxy-alpha-D-threo-pentofuranose"),
+    "OC[C@@H]1O[C@@H](O)C[C@H]1O": ("", "", "2-deoxy-alpha-L-erythro-pentofuranose"),
+    "OC[C@@H]1O[C@@H](O)C[C@@H]1O": ("", "", "2-deoxy-alpha-L-threo-pentofuranose"),
+    "OC[C@H]1O[C@@H](O)C[C@@H]1O": ("", "", "2-deoxy-beta-D-erythro-pentofuranose"),
+    "OC[C@H]1O[C@@H](O)C[C@H]1O": ("", "", "2-deoxy-beta-D-threo-pentofuranose"),
+    "OC[C@@H]1O[C@H](O)C[C@H]1O": ("", "", "2-deoxy-beta-L-erythro-pentofuranose"),
+    "OC[C@@H]1O[C@H](O)C[C@@H]1O": ("", "", "2-deoxy-beta-L-threo-pentofuranose"),
+}
+
+HEPTOSE_NAMES = {
+    # W6B-T4 (P-102.5.1): open-chain aldoheptoses (glycero-D/L x D/L x 8 configs).
+    # OPSIN-generated; NOTE the ledger label 'D-glycero-D-gluco-heptose' was WRONG
+    # (its SMILES is actually D-glycero-L-ido-heptose).
+    "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-allo-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-altro-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-gluco-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-manno-heptose"),
+    "O=C[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-gulo-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-ido-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-galacto-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "D-glycero-D-talo-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-allo-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-altro-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-gluco-heptose"),
+    "O=C[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-manno-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-gulo-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-ido-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-galacto-heptose"),
+    "O=C[C@H](O)[C@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "", "D-glycero-L-talo-heptose"),
+    "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-allo-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-altro-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-gluco-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-manno-heptose"),
+    "O=C[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-gulo-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-ido-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-galacto-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "", "L-glycero-D-talo-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-allo-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-altro-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-gluco-heptose"),
+    "O=C[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-manno-heptose"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-gulo-heptose"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-ido-heptose"),
+    "O=C[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-galacto-heptose"),
+    "O=C[C@H](O)[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "", "L-glycero-L-talo-heptose"),
+}
+
+
 # Unified lookup combining all four hand-curated tables
 ALL_SUGAR_NAMES = {
     **SUGAR_RETAINED_NAMES,
+    **DEOXY_PENTOSE_NAMES,
+    **HEPTOSE_NAMES,
     **NACETYL_SUGAR_NAMES,
     **URONIC_ACID_NAMES,
     **AMINO_SUGAR_NAMES,

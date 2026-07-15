@@ -55,7 +55,10 @@ CLEAN_GLUCOPYRANOSE = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
 # emits correctly today and MUST stay byte-identical; C7+ cyclic is honest-fail
 # per Assumption A3). HEAD output pinned below as the expected value.
 HEPTOSE_ACYCLIC_SMILES = "OC[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)C=O"
-HEPTOSE_ACYCLIC_HEAD_NAME = "(2S,3S,4R,5S,6R)-2,3,4,5,6,7-hexahydroxyheptanal"
+# W6B-T4: the open-chain aldoheptose now catalogs to its P-102.5.1 carbohydrate
+# PIN (configurational-prefix name is preferred over the substitutive
+# hexahydroxyheptanal per P-102.2.1); OPSIN-RT confirmed.
+HEPTOSE_ACYCLIC_HEAD_NAME = "D-glycero-L-gulo-heptose"
 
 
 def _idealize_to_parent_inline(smiles):
@@ -182,12 +185,10 @@ class TestSystematicMonosaccharide:
                 f"idealization of {smi} did not reproduce clean beta-D-glucopyranose"
             )
 
-    def test_heptose_acyclic_unchanged(self):
-        """C7+ acyclic aldose path is byte-identical (D-05 / Assumption A3 no-reg).
-
-        The open-chain substitutive form already emits correctly today; C7+
-        cyclic is honest-fail (no _SKELETON_FINGERPRINT_INDEX entry), so the
-        acyclic path MUST stay byte-identical. Pinned to the HEAD output.
+    def test_heptose_acyclic_catalog_pin(self):
+        """C7 acyclic aldoheptose: W6B-T4 catalogs it to the P-102.5.1
+        configurational-prefix carbohydrate PIN (preferred over the substitutive
+        hexahydroxyheptanal per P-102.2.1); OPSIN-RT confirmed.
         """
         from orthonym import name_compound
 
@@ -359,6 +360,28 @@ class TestW6bMultiPhosphateEster:
         from orthonym.data.sugar_names import name_sugar_ester
         smi = "OP(O)(=O)OP(=O)(O)O[C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO"  # P-O-P
         assert name_sugar_ester(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+
+
+class TestW6bDeoxyHeptoseCatalog:
+    """Wave 6b Task 4: 2-deoxypentofuranose (P-102.5.3) + open-chain aldoheptose
+    (P-102.5.1) catalogs. The heptose ledger label was mislabeled."""
+
+    def test_2_deoxy_erythro_pentofuranose(self):
+        from orthonym import name_compound
+        assert name_compound("O[C@H]1C[C@H](O)[C@H](O1)CO") == \
+            "2-deoxy-beta-D-erythro-pentofuranose"
+
+    def test_heptose_ledger_is_glycero_ido(self):
+        from orthonym import name_compound  # ledger 'D-glycero-D-gluco-heptose' label is WRONG
+        assert name_compound("OC[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)C=O") == \
+            "D-glycero-L-ido-heptose"
+
+    def test_all_catalog_rows_emit_pin(self):
+        from orthonym import name_compound
+        from orthonym.data.sugar_names import DEOXY_PENTOSE_NAMES, HEPTOSE_NAMES
+        for cat in (DEOXY_PENTOSE_NAMES, HEPTOSE_NAMES):
+            for canon, (_a, _c, pin) in cat.items():
+                assert name_compound(canon) == pin
 
 
 @pytest.mark.unit

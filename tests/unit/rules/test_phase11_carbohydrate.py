@@ -39,9 +39,8 @@ from orthonym.namer import name_compound
     # 1,5-anhydro-D-glucitol (oxane ring; NOT a catalog anhydro sugar -> fallback)
     ("C1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO",
      "(2R,3S,4R,5S)-2-(hydroxymethyl)oxane-3,4,5-triol"),
-    # 2-deoxy-beta-D-erythro-pentofuranose (oxolane ring): diol at {2,4}
-    ("O[C@H]1C[C@H](O)[C@H](O1)CO",
-     "(2R,4S,5R)-5-(hydroxymethyl)oxolane-2,4-diol"),
+    # (W6B-T4) the 2-deoxy-beta-D-erythro-pentofuranose that USED to hit this
+    # fallback now catalogs to its sugar PIN -- see TestW6bDeoxyHeptoseCatalog.
 ])
 def test_foxane_drop_hydroxymethyl_lowest_locant(smiles, expected):
     assert name_compound(smiles) == expected
@@ -72,7 +71,7 @@ def test_thio_anhydro_catalog_pin(smiles, expected):
 @pytest.mark.parametrize("smiles", [
     "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](S1)CO",   # 5-thio-glucopyranose (now catalog)
     "C1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO",        # 1,5-anhydroglucitol (fallback)
-    "O[C@H]1C[C@H](O)[C@H](O1)CO",                   # 2-deoxypentofuranose (fallback)
+    "O[C@H]1C[C@H](O)[C@H](O1)CO",                   # 2-deoxypentofuranose (W6B-T4 catalog)
 ])
 def test_foxane_drop_numbering_is_deterministic(smiles):
     """The ring numbering must not depend on the input SMILES atom order:
