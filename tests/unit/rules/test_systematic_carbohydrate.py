@@ -310,8 +310,10 @@ class TestSugarPhosphateSulfateEster:
         from orthonym.data.sugar_names import _find_sugar_oxoacid_ester
 
         def word(smi):
+            # W6B-T3: _find_sugar_oxoacid_ester now returns a LIST of ester tuples
+            # (multi-phosphate support); each tuple is (...,locant, word).
             found = _find_sugar_oxoacid_ester(Chem.MolFromSmiles(smi))
-            return found[-1] if found else None
+            return found[0][-1] if found else None
 
         assert word(self.GLC2S_ION) == "sulfate"
         assert word(self.GLC2S) == "hydrogen sulfate"
@@ -337,6 +339,26 @@ class TestSugarPhosphateSulfateEster:
         smi = "CCOP(=O)(O)O"  # ethyl dihydrogen phosphate
         mol = Chem.MolFromSmiles(smi)
         assert name_sugar_ester(mol, Chem.CanonSmiles(smi)) is None
+
+
+class TestW6bMultiPhosphateEster:
+    """Wave 6b Task 3 (P-102.5.6.1.2): 2-3 mono-phosphate esters -> bis/tris; the
+    ketose (fructose) numbering fix also enables fructose mono-phosphates."""
+
+    def test_fructose_1_6_bisphosphate(self):
+        from orthonym import name_compound
+        assert name_compound("P(=O)(O)(O)OCC1(O)[C@@H](O)[C@H](O)[C@H](O1)COP(=O)(O)O") == \
+            "D-fructofuranose 1,6-bis(dihydrogen phosphate)"
+
+    def test_fructose_6_phosphate_ketose_numbering(self):
+        from orthonym import name_compound
+        assert name_compound("OCC1(O)O[C@H](COP(=O)(O)O)[C@@H](O)[C@@H]1O") == \
+            "D-fructofuranose 6-(dihydrogen phosphate)"
+
+    def test_diphosphate_pop_still_fails_closed(self):
+        from orthonym.data.sugar_names import name_sugar_ester
+        smi = "OP(O)(=O)OP(=O)(O)O[C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO"  # P-O-P
+        assert name_sugar_ester(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
 
 
 @pytest.mark.unit

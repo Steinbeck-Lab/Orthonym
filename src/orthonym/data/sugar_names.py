@@ -1866,9 +1866,25 @@ def _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx):
             break
         prev, cur = cur, nxt[0]
     ring_carbons = [i for i in order if mol.GetAtomWithIdx(i).GetSymbol() == "C"]
-    locant_of = {c: k + 1 for k, c in enumerate(ring_carbons)}
+    # 2-ketose numbering (P-102): the anomeric carbon of a ketose (fructose,
+    # sorbose, ...) bears an exocyclic carbon — the C1 CH2OH — so the anomeric
+    # carbon is C2, not C1.  An aldose anomeric carbon has NO exocyclic carbon
+    # (only -OH/-H there), so this branch never fires and aldose numbering below
+    # stays byte-identical.
+    anomeric_exo_c = [
+        n.GetIdx()
+        for n in mol.GetAtomWithIdx(anomeric_idx).GetNeighbors()
+        if n.GetIdx() not in ringset and n.GetSymbol() == "C"
+    ]
+    is_ketose = len(anomeric_exo_c) == 1
+    offset = 2 if is_ketose else 1
+    locant_of = {c: k + offset for k, c in enumerate(ring_carbons)}
     result = dict(locant_of)
+    if is_ketose:
+        result[anomeric_exo_c[0]] = 1  # C1 = the exocyclic carbon on anomeric C2
     for ring_c in ring_carbons:
+        if is_ketose and ring_c == anomeric_idx:
+            continue  # its exocyclic carbon is C1, assigned above
         loc = locant_of[ring_c]
         for nbr in mol.GetAtomWithIdx(ring_c).GetNeighbors():
             if nbr.GetIdx() in ringset:
@@ -1879,14 +1895,14 @@ def _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx):
 
 
 def _find_sugar_oxoacid_ester(mol):
-    """Cheap STRUCTURAL detector for a free-sugar mono-phosphate/sulfate ester.
+    """Cheap STRUCTURAL detector for free-sugar phosphate/sulfate ester(s).
 
-    Returns ``(sugar_c_idx, ester_o_idx, central_idx, locant, word)`` for a single
-    sugar ring bearing exactly one ``-O-PO(...)`` / ``-O-SO2(...)`` ester on a ring
-    or exocyclic carbon, else ``None`` (fail-closed).  Pure RDKit walks + the
-    class-agnostic protonation->word maps — NO OPSIN, so it is safe to call from
-    the dispatch predicate.  Mono-ester only; a di/tri-phosphate or P-O-P bridge
-    (183/184 territory) returns ``None``.
+    Returns a LIST ``[(sugar_c_idx, ester_o_idx, central_idx, locant, word), ...]``
+    (1–3 esters) for a single sugar ring bearing ``-O-PO(...)`` / ``-O-SO2(...)``
+    ester(s) on ring or exocyclic carbons, else ``None`` (fail-closed).  Pure RDKit
+    walks + the class-agnostic protonation->word maps — NO OPSIN, so it is safe to
+    call from the dispatch predicate.  A P-O-P bridge (di/tri-phosphate, 183/184
+    territory) returns ``None`` per-ester; >3 esters returns ``None``.
     """
     if mol is None:
         return None
@@ -1910,7 +1926,7 @@ def _find_sugar_oxoacid_ester(mol):
         return None
 
     # Find the ester linker(s): an O with no H bonded to a sugar carbon AND to a
-    # P or S acid centre.  Exactly one -> mono-ester; else fail-closed.
+    # P or S acid centre.  1-3 -> named; else fail-closed.
     esters = []  # (sugar_carbon_idx, ester_o_idx, central_idx)
     for atom in mol.GetAtoms():
         if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
@@ -1926,9 +1942,8 @@ def _find_sugar_oxoacid_ester(mol):
                 central = n.GetIdx()
         if sugar_c is not None and central is not None:
             esters.append((sugar_c, atom.GetIdx(), central))
-    if len(esters) != 1:
+    if not (1 <= len(esters) <= 3):
         return None
-    sugar_c, ester_o, central = esters[0]
 
     from orthonym.rules.conjugate_controller import (
         PHOSPHATE_WORD,
@@ -1937,30 +1952,36 @@ def _find_sugar_oxoacid_ester(mol):
         _terminal_acid_oxygens,
     )
 
-    central_atom = mol.GetAtomWithIdx(central)
-    z = central_atom.GetAtomicNum()
-    if z == 16:  # sulfate: S with exactly two =O
-        if _count_double_bonded_oxygens(mol, central) != 2:
-            return None
-        prot, _anion = _terminal_acid_oxygens(mol, central, ester_o)
-        word = SULFATE_WORD.get(prot)
-    elif z == 15:  # phosphate (mono only): P with one =O and no second P
-        if _count_double_bonded_oxygens(mol, central) != 1:
-            return None
-        for n in central_atom.GetNeighbors():
-            if n.GetAtomicNum() == 8 and n.GetIdx() != ester_o:
-                if any(
-                    nn.GetAtomicNum() == 15 and nn.GetIdx() != central
-                    for nn in n.GetNeighbors()
-                ):
-                    return None  # P-O-P / di-tri-phosphate -> out of scope
-        prot, _anion = _terminal_acid_oxygens(mol, central, ester_o)
-        word = PHOSPHATE_WORD.get(prot)
-    else:
+    def _ester_word(ester_o, central):
+        """Protonation-state word for one phosphate/sulfate ester, or None."""
+        central_atom = mol.GetAtomWithIdx(central)
+        z = central_atom.GetAtomicNum()
+        if z == 16:  # sulfate: S with exactly two =O
+            if _count_double_bonded_oxygens(mol, central) != 2:
+                return None
+            prot, _anion = _terminal_acid_oxygens(mol, central, ester_o)
+            return SULFATE_WORD.get(prot)
+        if z == 15:  # phosphate (mono only): P with one =O and no second P
+            if _count_double_bonded_oxygens(mol, central) != 1:
+                return None
+            for n in central_atom.GetNeighbors():
+                if n.GetAtomicNum() == 8 and n.GetIdx() != ester_o:
+                    if any(
+                        nn.GetAtomicNum() == 15 and nn.GetIdx() != central
+                        for nn in n.GetNeighbors()
+                    ):
+                        return None  # P-O-P / di-tri-phosphate -> out of scope
+            prot, _anion = _terminal_acid_oxygens(mol, central, ester_o)
+            return PHOSPHATE_WORD.get(prot)
         return None
-    if word is None:
-        return None
-    return sugar_c, ester_o, central, locants[sugar_c], word
+
+    result = []
+    for sugar_c, ester_o, central in esters:
+        word = _ester_word(ester_o, central)
+        if word is None:
+            return None
+        result.append((sugar_c, ester_o, central, locants[sugar_c], word))
+    return result
 
 
 def _find_sugar_acyl_esters(mol):
@@ -2169,36 +2190,47 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     neutralize-then-rename), reusing the class-agnostic
     :mod:`~orthonym.rules.conjugate_controller` primitives.
 
-    Fail-closed (accuracy-first) on: >1 ester on the ring, a di/tri-phosphate or
-    P-O-P bridge (183/184 territory), any non-sugar-ring molecule, or a residual
-    the free-sugar namer cannot name.  Every emitted name is OPSIN-round-trip
-    gated (:func:`_mono_name_rt_ok`) so a wrong locant/anomer cascade-continues
-    rather than shipping.  The input mol is never mutated.
+    Multi-ester (W6B-T3, BB P-102.5.6.1.2): 2-3 mono-phosphate esters of one
+    sugar -> ``D-fructofuranose 1,6-bis(dihydrogen phosphate)`` (bis/tris, the
+    P-16.3.4 complex multiplier since the ester word carries a space).
+
+    Fail-closed (accuracy-first) on: >3 esters, a di/tri-phosphate or P-O-P bridge
+    (183/184 territory), mixed protonation states, any non-sugar-ring molecule, or
+    a residual the free-sugar namer cannot name.  Every emitted name is
+    OPSIN-round-trip gated (:func:`_mono_name_rt_ok`) so a wrong locant/anomer
+    cascade-continues rather than shipping.  The input mol is never mutated.
     """
     found = _find_sugar_oxoacid_ester(mol)
     if found is None:
         # W6B-T2: not a phosphate/sulfate ester -> try a free-sugar O-acyl ester.
         return _name_sugar_acyl_ester(mol)
-    sugar_c, ester_o, central, locant, word = found
+    # `found` is a list of (sugar_c, ester_o, central, locant, word); 1-3 esters.
+    words = [t[4] for t in found]
+    if len(set(words)) != 1:
+        return None  # mixed protonation state -> fail-closed
+    word = words[0]
+    locs = sorted(t[3] for t in found)
 
-    # Strip the ester group -> residual free sugar: cleave the ester-O — P/S bond,
-    # keep the sugar-side fragment (its ester-O relaxes to -OH), canonicalize.
-    bond = mol.GetBondBetweenAtoms(ester_o, central)
-    if bond is None:
-        return None
+    # Strip every ester group: cleave each ester-O — P/S bond, keep the sugar-side
+    # fragment (each ester-O relaxes to -OH), canonicalize.
+    bond_idxs = []
+    for (_sc, ester_o, central, _loc, _w) in found:
+        bond = mol.GetBondBetweenAtoms(ester_o, central)
+        if bond is None:
+            return None
+        bond_idxs.append(bond.GetIdx())
     try:
-        frag = Chem.FragmentOnBonds(
-            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
-        )
+        frag = Chem.FragmentOnBonds(mol, bond_idxs, addDummies=True)
         mapping = []
         frags = Chem.GetMolFrags(
             frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
         )
     except Exception:
         return None
+    any_ester_o = found[0][1]
     sugar_frag = None
     for fm, mp in zip(frags, mapping):
-        if ester_o in mp:
+        if any_ester_o in mp:
             sugar_frag = fm
             break
     if sugar_frag is None:
@@ -2207,12 +2239,11 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     for dummy in sorted(
         (a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0), reverse=True
     ):
-        rw.RemoveAtom(dummy)  # the ester-O relaxes to -OH after sanitize
+        rw.RemoveAtom(dummy)  # each ester-O relaxes to -OH after sanitize
     try:
         Chem.SanitizeMol(rw)
         residual = Chem.RemoveHs(rw)
-        residual_smi = Chem.MolToSmiles(residual)
-        residual_canon = Chem.CanonSmiles(residual_smi)
+        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(residual))
     except Exception:
         return None
     residual_mol = Chem.MolFromSmiles(residual_canon)
@@ -2223,8 +2254,22 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     if sugar_name is None:
         return None
 
-    ester_term = f"({word})" if " " in word else word
-    candidate = f"{sugar_name} {locant}-{ester_term}"
+    n = len(found)
+    if n == 1:
+        ester_term = f"({word})" if " " in word else word
+        candidate = f"{sugar_name} {locs[0]}-{ester_term}"
+    else:
+        # P-16.3.4: a word carrying a space/locant takes bis/tris + enclosing
+        # marks; a simple word (ionized 'sulfate') takes di/tri.
+        if any(ch in word for ch in " -("):
+            mult = {2: "bis", 3: "tris"}.get(n)
+            ester_term = f"({word})"
+        else:
+            mult = {2: "di", 3: "tri"}.get(n)
+            ester_term = word
+        if mult is None:
+            return None
+        candidate = f"{sugar_name} {','.join(str(x) for x in locs)}-{mult}{ester_term}"
     if not _mono_name_rt_ok(mol, candidate):
         return None
     return candidate
