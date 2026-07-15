@@ -443,6 +443,11 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
         return True
     if name_monosaccharide_systematic(mol) is not None:
         return True
+    # W6-P1: a single sugar ring bearing one O-phosphate/O-sulfate ester (cheap
+    # structural detect, NO OPSIN — the handler's name_sugar_ester RT-gates it).
+    from orthonym.data.sugar_names import _find_sugar_oxoacid_ester
+    if _find_sugar_oxoacid_ester(mol) is not None:
+        return True
     from orthonym.rules.oligosaccharides import _classify_units
     return _classify_units(mol) is not None
 
@@ -920,45 +925,23 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     The first non-None wins; otherwise ``None`` (cascade-continue -> the existing
     pipeline names it byte-identically). All imports are lazy/in-function.
     """
-    from orthonym.data.sugar_names import lookup_sugar
-    sugar_info = lookup_sugar(canonical_smiles)
-    if sugar_info is not None:
-        anomer, config, base_name = sugar_info
-        # D-10: a cataloged uronic base must emit the OPSIN-parseable free-acid
-        # form, not the unparseable "...uronopyranose" join.
-        if "urono" in base_name:
-            from orthonym.data.sugar_names import uronic_free_acid_name
-            free_acid = uronic_free_acid_name(anomer, config, base_name)
-            if free_acid is not None:
-                return free_acid
-            # uronic_free_acid_name fail-closed -> cascade-continue (D-11).
-            return None
-        # F-CATALOG-JOIN (v23 Phase 5): a prefix-bearing catalog base (the N-acetyl
-        # amino sugars store base_name="2-(acetylamino)-2-deoxy-glucopyranose",
-        # which already carries detachable prefixes) needs the configurational
-        # descriptor inserted immediately BEFORE the stereoparent stem, AFTER the
-        # prefixes. The naive "-".join([anomer, config, base_name]) produced the
-        # OPSIN-unparseable "beta-D-2-(acetylamino)-2-deoxy-glucopyranose", which the
-        # validity gate suppressed to 'unknown' (GlcNAc / GalNAc). Bare-stem bases
-        # (no hyphen) and prefix-bearing names without an anomer/config (d-/l-
-        # glyceraldehyde) keep the existing join unchanged. OPSIN-RT verified.
-        if (anomer or config) and "-" in base_name:
-            prefix_block, stem = base_name.rsplit("-", 1)
-            descriptor = "-".join(p for p in (anomer, config) if p)
-            return f"{prefix_block}-{descriptor}-{stem}"
-        parts = []
-        if anomer:
-            parts.append(anomer)
-        if config:
-            parts.append(config)
-        parts.append(base_name)
-        return "-".join(parts)
+    # Catalog-join (D-05/D-10/F-CATALOG-JOIN) then systematic monosaccharide
+    # (D-01) — factored into sugar_names.name_free_sugar so the free-sugar-ester
+    # path names its residual through the SAME cascade (DRY). Byte-identical.
+    from orthonym.data.sugar_names import name_free_sugar
+    free = name_free_sugar(mol, canonical_smiles)
+    if free is not None:
+        return free
 
-    # Catalog miss -> systematic monosaccharide (D-01), then disaccharide (D-02).
-    from orthonym.data.sugar_names import name_monosaccharide_systematic
-    mono = name_monosaccharide_systematic(mol)
-    if mono is not None:
-        return mono
+    # W6-P1: free-sugar mono-phosphate / sulfate ester (BB P-102.5.6.1.2/.1.3).
+    # Fires only on a single sugar ring bearing exactly one O-phosphate/O-sulfate;
+    # fail-closed (None) otherwise -> disaccharide, then cascade-continue.
+    from orthonym.data.sugar_names import name_sugar_ester
+    ester = name_sugar_ester(mol, canonical_smiles)
+    if ester is not None:
+        return ester
+
+    # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide
     return name_disaccharide(mol)
 

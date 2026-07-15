@@ -266,3 +266,74 @@ class TestCARB03ModifiedMonosaccharides:
         from orthonym.data.sugar_names import name_monosaccharide_systematic
 
         assert name_monosaccharide_systematic(Chem.MolFromSmiles("CCCl")) is None
+
+
+@pytest.mark.unit
+class TestSugarPhosphateSulfateEster:
+    """W6-P1 free-sugar mono-phosphate / sulfate esters (BB P-102.5.6.1.2/.1.3).
+
+    The sugar is the parent; the ester is cited as ``<locant>-(dihydrogen
+    phosphate)`` / ``<locant>-sulfate`` after the sugar name (BB 53209/53231).
+    Mono-ester only; di/bis-phosphate and P-O-P bridges fail closed (183/184).
+    Every emitted name is OPSIN-RT gated. Descriptors ASCII (Pitfall 6).
+    """
+
+    # BB 53209: D-glucopyranose 6-(dihydrogen phosphate) (acid form -OPO(OH)2, C6).
+    GLC6P = "O=P(O)(O)OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    # Corpus: D-mannopyranose 6-(dihydrogen phosphate) (anomer unspecified).
+    MAN6P = "O=P(O)(O)OC[C@H]1OC(O)[C@@H](O)[C@@H](O)[C@@H]1O"
+    # BB 53231: sugar 2-sulfate. ACID form -OSO3H -> '2-(hydrogen sulfate)';
+    # BB's bare '2-sulfate' is the ionized -OSO3(-) (its 'sulfonato' alternative).
+    GLC2S = "O=S(=O)(O)O[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
+    # Ionized glucose 2-sulfate (-OSO3(-)) -> bare '2-sulfate' (BB 53231 verbatim).
+    GLC2S_ION = "[O-]S(=O)(=O)O[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
+    # BB 53213: glycosyl phosphate at C1. ACID -OPO(OH)2 -> '1-(dihydrogen
+    # phosphate)'; ionized -OPO(O-)2 -> bare '1-phosphate'.
+    GLC1P = "O=P(O)(O)O[C@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"
+
+    def test_glucose_6_dihydrogen_phosphate(self):
+        from orthonym import name_compound
+        assert name_compound(self.GLC6P) == "beta-D-glucopyranose 6-(dihydrogen phosphate)"
+
+    def test_mannose_6_dihydrogen_phosphate(self):
+        from orthonym import name_compound
+        assert name_compound(self.MAN6P) == "D-mannopyranose 6-(dihydrogen phosphate)"
+
+    def test_glucose_2_hydrogen_sulfate_acid_form(self):
+        from orthonym import name_compound
+        assert name_compound(self.GLC2S) == "alpha-D-glucopyranose 2-(hydrogen sulfate)"
+
+    def test_protonation_words(self):
+        """The ester word is derived in-place from the acid centre's ionization
+        (BB 53199): -OSO3(-) sulfate / -OSO3H hydrogen sulfate; phosphate di-anion
+        / mono-anion / acid -> phosphate / hydrogen phosphate / dihydrogen phosphate."""
+        from orthonym.data.sugar_names import _find_sugar_oxoacid_ester
+
+        def word(smi):
+            found = _find_sugar_oxoacid_ester(Chem.MolFromSmiles(smi))
+            return found[-1] if found else None
+
+        assert word(self.GLC2S_ION) == "sulfate"
+        assert word(self.GLC2S) == "hydrogen sulfate"
+        assert word("O=P([O-])([O-])OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "phosphate"
+        assert word("O=P([O-])(O)OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "hydrogen phosphate"
+        assert word(self.GLC6P) == "dihydrogen phosphate"
+
+    def test_glucose_1_dihydrogen_phosphate_glycosyl(self):
+        from orthonym import name_compound
+        assert name_compound(self.GLC1P) == "alpha-D-glucopyranose 1-(dihydrogen phosphate)"
+
+    def test_diphosphate_fails_closed(self):
+        """A P-O-P (di/pyro-phosphate) bridge is out of scope -> not an ester name."""
+        from orthonym.data.sugar_names import name_sugar_ester
+        # beta-D-glucopyranose 6-(trihydrogen diphosphate) core (P-O-P): fail closed.
+        smi = "O=P(O)(O)OP(=O)(O)OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+        mol = Chem.MolFromSmiles(smi)
+        assert name_sugar_ester(mol, Chem.CanonSmiles(smi)) is None
+
+    def test_non_sugar_fails_closed(self):
+        """A plain phosphate ester with no sugar ring returns None."""
+        from orthonym.data.sugar_names import name_sugar_ester
+        smi = "CCOP(=O)(O)O"  # ethyl dihydrogen phosphate
+        mol = Chem.MolFromSmiles(smi)
+        assert name_sugar_ester(mol, Chem.CanonSmiles(smi)) is None

@@ -1599,3 +1599,233 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
     if not _mono_name_rt_ok(mol, candidate):
         return None
     return candidate
+
+
+def name_free_sugar(mol, canonical_smiles: str) -> Optional[str]:
+    """Name a free (non-glycosidic) monosaccharide: catalog-join then systematic.
+
+    This is the exact catalog-join + systematic cascade the carbohydrate dispatch
+    handler used inline (``routing/dispatch_table._handle_carbohydrate_lookup``);
+    factored here so the free-sugar-ester path (:func:`name_sugar_ester`) can name
+    the residual sugar through the SAME code (DRY, no drift). Returns the sugar
+    name or ``None`` (a catalog uronic-base whose :func:`uronic_free_acid_name`
+    fails, or an out-of-scope ring). Byte-identical to the handler's prior logic.
+    """
+    sugar_info = lookup_sugar(canonical_smiles)
+    if sugar_info is not None:
+        anomer, config, base_name = sugar_info
+        # D-10: a cataloged uronic base emits the OPSIN-parseable free-acid form.
+        if "urono" in base_name:
+            return uronic_free_acid_name(anomer, config, base_name)
+        # F-CATALOG-JOIN (v23 Phase 5): a prefix-bearing catalog base needs the
+        # configurational descriptor inserted BEFORE the stem, AFTER the prefixes.
+        if (anomer or config) and "-" in base_name:
+            prefix_block, stem = base_name.rsplit("-", 1)
+            descriptor = "-".join(p for p in (anomer, config) if p)
+            return f"{prefix_block}-{descriptor}-{stem}"
+        parts = [p for p in (anomer, config) if p]
+        parts.append(base_name)
+        return "-".join(parts)
+    # Catalog miss -> systematic monosaccharide.
+    return name_monosaccharide_systematic(mol)
+
+
+def _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx):
+    """Map each sugar carbon (ring carbon + its exocyclic carbon) to its IUPAC
+    carbohydrate locant.  Mirrors the numbering walk in
+    :func:`_classify_sugar_positions` (anomeric C = C1; step to the ring neighbour
+    that is NOT the ring oxygen, then walk the ring; the exocyclic carbon of ring
+    carbon *n* is locant *n+1*, so C5's exocyclic CH2OH is C6 on a hexopyranose).
+
+    Returns ``{atom_idx: locant}`` covering every ring carbon and each ring
+    carbon's single exocyclic carbon, or ``None`` if the ring is not a linear
+    single-anomeric chain (fail-closed).
+    """
+    ringset = set(ring)
+    adjacency = {
+        idx: [
+            n.GetIdx()
+            for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+            if n.GetIdx() in ringset
+        ]
+        for idx in ringset
+    }
+    non_oxygen_nbrs = [x for x in adjacency[anomeric_idx] if x != ring_oxygen]
+    if len(non_oxygen_nbrs) != 1:
+        return None
+    order = [anomeric_idx]
+    prev, cur = anomeric_idx, non_oxygen_nbrs[0]
+    while cur != anomeric_idx:
+        order.append(cur)
+        nxt = [x for x in adjacency[cur] if x != prev]
+        if not nxt:
+            break
+        prev, cur = cur, nxt[0]
+    ring_carbons = [i for i in order if mol.GetAtomWithIdx(i).GetSymbol() == "C"]
+    locant_of = {c: k + 1 for k, c in enumerate(ring_carbons)}
+    result = dict(locant_of)
+    for ring_c in ring_carbons:
+        loc = locant_of[ring_c]
+        for nbr in mol.GetAtomWithIdx(ring_c).GetNeighbors():
+            if nbr.GetIdx() in ringset:
+                continue
+            if nbr.GetSymbol() == "C":
+                result[nbr.GetIdx()] = loc + 1
+    return result
+
+
+def _find_sugar_oxoacid_ester(mol):
+    """Cheap STRUCTURAL detector for a free-sugar mono-phosphate/sulfate ester.
+
+    Returns ``(sugar_c_idx, ester_o_idx, central_idx, locant, word)`` for a single
+    sugar ring bearing exactly one ``-O-PO(...)`` / ``-O-SO2(...)`` ester on a ring
+    or exocyclic carbon, else ``None`` (fail-closed).  Pure RDKit walks + the
+    class-agnostic protonation->word maps — NO OPSIN, so it is safe to call from
+    the dispatch predicate.  Mono-ester only; a di/tri-phosphate or P-O-P bridge
+    (183/184 territory) returns ``None``.
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    # A phosphate/sulfate ester group adds no ring, so the sugar must be the ONLY
+    # ring (a glycoside/oligo has >1 sugar ring -> not this path).
+    if ri.NumRings() != 1:
+        return None
+    ring = ri.AtomRings()[0]
+    if len(set(ring)) not in (5, 6):
+        return None
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return None
+    ring_oxygen = ring_oxygens[0]
+    anomeric_idx = _locate_anomeric_carbon(mol, ring, ring_oxygen)
+    if anomeric_idx is None or anomeric_idx not in set(ring):
+        return None
+    locants = _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx)
+    if locants is None:
+        return None
+
+    # Find the ester linker(s): an O with no H bonded to a sugar carbon AND to a
+    # P or S acid centre.  Exactly one -> mono-ester; else fail-closed.
+    esters = []  # (sugar_carbon_idx, ester_o_idx, central_idx)
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
+            continue
+        nbrs = list(atom.GetNeighbors())
+        if len(nbrs) != 2:
+            continue
+        sugar_c = central = None
+        for n in nbrs:
+            if n.GetAtomicNum() == 6 and n.GetIdx() in locants:
+                sugar_c = n.GetIdx()
+            elif n.GetAtomicNum() in (15, 16):
+                central = n.GetIdx()
+        if sugar_c is not None and central is not None:
+            esters.append((sugar_c, atom.GetIdx(), central))
+    if len(esters) != 1:
+        return None
+    sugar_c, ester_o, central = esters[0]
+
+    from orthonym.rules.conjugate_controller import (
+        PHOSPHATE_WORD,
+        SULFATE_WORD,
+        _count_double_bonded_oxygens,
+        _terminal_acid_oxygens,
+    )
+
+    central_atom = mol.GetAtomWithIdx(central)
+    z = central_atom.GetAtomicNum()
+    if z == 16:  # sulfate: S with exactly two =O
+        if _count_double_bonded_oxygens(mol, central) != 2:
+            return None
+        prot, _anion = _terminal_acid_oxygens(mol, central, ester_o)
+        word = SULFATE_WORD.get(prot)
+    elif z == 15:  # phosphate (mono only): P with one =O and no second P
+        if _count_double_bonded_oxygens(mol, central) != 1:
+            return None
+        for n in central_atom.GetNeighbors():
+            if n.GetAtomicNum() == 8 and n.GetIdx() != ester_o:
+                if any(
+                    nn.GetAtomicNum() == 15 and nn.GetIdx() != central
+                    for nn in n.GetNeighbors()
+                ):
+                    return None  # P-O-P / di-tri-phosphate -> out of scope
+        prot, _anion = _terminal_acid_oxygens(mol, central, ester_o)
+        word = PHOSPHATE_WORD.get(prot)
+    else:
+        return None
+    if word is None:
+        return None
+    return sugar_c, ester_o, central, locants[sugar_c], word
+
+
+def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
+    """Free-sugar mono-phosphate / sulfate ester (BB P-102.5.6.1.2 / P-102.5.6.1.3).
+
+    The sugar is the parent; the ester is cited after the sugar name with its
+    locant: ``D-glucopyranose 6-(dihydrogen phosphate)`` (BB 53209),
+    ``alpha-D-glucopyranose 2-sulfate`` (ionized) / ``2-(hydrogen sulfate)``
+    (acid, BB 53231), ``alpha-D-glucopyranose 1-phosphate`` (ionized glycosyl
+    phosphate) / ``1-(dihydrogen phosphate)`` (acid, BB 53213).  The
+    protonation-state word is derived IN PLACE from the acid centre (never
+    neutralize-then-rename), reusing the class-agnostic
+    :mod:`~orthonym.rules.conjugate_controller` primitives.
+
+    Fail-closed (accuracy-first) on: >1 ester on the ring, a di/tri-phosphate or
+    P-O-P bridge (183/184 territory), any non-sugar-ring molecule, or a residual
+    the free-sugar namer cannot name.  Every emitted name is OPSIN-round-trip
+    gated (:func:`_mono_name_rt_ok`) so a wrong locant/anomer cascade-continues
+    rather than shipping.  The input mol is never mutated.
+    """
+    found = _find_sugar_oxoacid_ester(mol)
+    if found is None:
+        return None
+    sugar_c, ester_o, central, locant, word = found
+
+    # Strip the ester group -> residual free sugar: cleave the ester-O — P/S bond,
+    # keep the sugar-side fragment (its ester-O relaxes to -OH), canonicalize.
+    bond = mol.GetBondBetweenAtoms(ester_o, central)
+    if bond is None:
+        return None
+    try:
+        frag = Chem.FragmentOnBonds(
+            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
+        )
+        mapping = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    sugar_frag = None
+    for fm, mp in zip(frags, mapping):
+        if ester_o in mp:
+            sugar_frag = fm
+            break
+    if sugar_frag is None:
+        return None
+    rw = Chem.RWMol(sugar_frag)
+    for dummy in sorted(
+        (a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0), reverse=True
+    ):
+        rw.RemoveAtom(dummy)  # the ester-O relaxes to -OH after sanitize
+    try:
+        Chem.SanitizeMol(rw)
+        residual = Chem.RemoveHs(rw)
+        residual_smi = Chem.MolToSmiles(residual)
+        residual_canon = Chem.CanonSmiles(residual_smi)
+    except Exception:
+        return None
+    residual_mol = Chem.MolFromSmiles(residual_canon)
+    if residual_mol is None:
+        return None
+
+    sugar_name = name_free_sugar(residual_mol, residual_canon)
+    if sugar_name is None:
+        return None
+
+    ester_term = f"({word})" if " " in word else word
+    candidate = f"{sugar_name} {locant}-{ester_term}"
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
