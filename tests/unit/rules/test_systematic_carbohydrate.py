@@ -337,3 +337,38 @@ class TestSugarPhosphateSulfateEster:
         smi = "CCOP(=O)(O)O"  # ethyl dihydrogen phosphate
         mol = Chem.MolFromSmiles(smi)
         assert name_sugar_ester(mol, Chem.CanonSmiles(smi)) is None
+
+
+@pytest.mark.unit
+class TestGlycosylamineAndHalide:
+    """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).
+
+    The anomeric -OH is replaced by a bare -NH2 -> ``-osylamine`` head, or by a
+    single halogen -> functional-class ``<glycosyl> <halide>``. Fail-closed on
+    N-substituted amines, multi-halo, and C2/non-anomeric substitution (those are
+    amino/deoxy-halo sugars). Every name OPSIN-RT gated.
+    """
+
+    def test_glucosylamine(self):
+        from orthonym import name_compound
+        assert name_compound("N[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O") == \
+            "beta-D-glucopyranosylamine"
+
+    def test_glucosyl_bromide(self):
+        from orthonym import name_compound
+        assert name_compound("OC[C@H]1O[C@H](Br)[C@H](O)[C@@H](O)[C@@H]1O") == \
+            "alpha-D-glucopyranosyl bromide"
+
+    def test_c2_amino_sugar_not_misfired(self):
+        """A C2-amino sugar (glucosamine) is NOT a glycosylamine -> stays catalog."""
+        from orthonym import name_compound
+        assert name_compound("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O") == \
+            "alpha-D-glucosamine"
+
+    def test_n_substituted_amine_fails_closed(self):
+        """An N-acyl anomeric amine is out of scope for the bare -osylamine head."""
+        from orthonym.data.sugar_names import name_glycosylamine
+        from rdkit import Chem
+        # N-acetyl glycosylamine: anomeric N bears an acetyl -> not bare NH2.
+        smi = "CC(=O)N[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"
+        assert name_glycosylamine(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None

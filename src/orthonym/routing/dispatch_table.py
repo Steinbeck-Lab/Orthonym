@@ -448,6 +448,11 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     from orthonym.data.sugar_names import _find_sugar_oxoacid_ester
     if _find_sugar_oxoacid_ester(mol) is not None:
         return True
+    # W6-P2: a single sugar ring with an anomeric -NH2 / halogen (glycosylamine /
+    # glycosyl halide) — cheap structural detect; the handler RT-gates the name.
+    from orthonym.data.sugar_names import _has_anomeric_hetero_sugar
+    if _has_anomeric_hetero_sugar(mol):
+        return True
     from orthonym.rules.oligosaccharides import _classify_units
     return _classify_units(mol) is not None
 
@@ -940,6 +945,14 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     ester = name_sugar_ester(mol, canonical_smiles)
     if ester is not None:
         return ester
+
+    # W6-P2: glycosylamine (anomeric -NH2, P-102.6.1.3) and glycosyl halide
+    # (anomeric halogen, P-102.6.1.5). Each fail-closed on any non-exact shape.
+    from orthonym.data.sugar_names import name_glycosylamine, name_glycosyl_halide
+    for _fn in (name_glycosylamine, name_glycosyl_halide):
+        _nm = _fn(mol, canonical_smiles)
+        if _nm is not None:
+            return _nm
 
     # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide

@@ -1843,3 +1843,166 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     if not _mono_name_rt_ok(mol, candidate):
         return None
     return candidate
+
+
+def _locate_anomeric_hetero(mol, ring, ring_oxygen, hetero_syms):
+    """Find the anomeric carbon whose exocyclic substituent is a single bare
+    heteroatom in ``hetero_syms`` (``{"N"}`` for a glycosylamine, the halogens for
+    a glycosyl halide) INSTEAD of the usual -OH.  Returns ``(anomeric_idx,
+    hetero_idx)`` or ``None`` (fail-closed).  Distinct from
+    :func:`_locate_anomeric_carbon`, which requires an exocyclic O.
+    """
+    ringset = set(ring)
+    hits = []
+    for idx in ringset:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != "C":
+            continue
+        nbrs = list(atom.GetNeighbors())
+        if ring_oxygen not in {n.GetIdx() for n in nbrs}:
+            continue
+        exo = [n for n in nbrs if n.GetIdx() not in ringset]
+        # the anomeric must bear NO exocyclic O (that would be a normal sugar) and
+        # exactly one bare hetero in hetero_syms.
+        if any(n.GetSymbol() == "O" for n in exo):
+            continue
+        het = [n for n in exo if n.GetSymbol() in hetero_syms]
+        if len(het) != 1:
+            continue
+        hits.append((idx, het[0].GetIdx()))
+    if len(hits) != 1:
+        return None
+    return hits[0]
+
+
+def _residual_sugar_from_anomeric_hetero(mol, anomeric_idx, hetero_idx):
+    """Replace the anomeric exocyclic heteroatom with -OH -> free-sugar SMILES."""
+    rw = Chem.RWMol(mol)
+    het = rw.GetAtomWithIdx(hetero_idx)
+    to_del = [n.GetIdx() for n in het.GetNeighbors() if n.GetIdx() != anomeric_idx]
+    het.SetAtomicNum(8)
+    het.SetFormalCharge(0)
+    het.SetNoImplicit(False)
+    het.SetNumExplicitHs(1)
+    for d in sorted(to_del, reverse=True):
+        rw.RemoveAtom(d)
+    try:
+        Chem.SanitizeMol(rw)
+        return Chem.MolToSmiles(Chem.RemoveHs(rw))
+    except Exception:
+        return None
+
+
+def name_glycosylamine(mol, canonical_smiles: str) -> Optional[str]:
+    """Glycosylamine (BB P-102.1.2.3 / P-102.6.1.3): anomeric -OH replaced by a
+    bare -NH2, named ``<anomer>-<config>-glyco...osylamine`` (e.g.
+    ``beta-D-glucopyranosylamine``).  Bare primary amine only (N-substituted ->
+    fail-closed).  Every emitted name OPSIN-RT gated.  Input mol never mutated.
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return None
+    ring = ri.AtomRings()[0]
+    if len(set(ring)) not in (5, 6):
+        return None
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return None
+    found = _locate_anomeric_hetero(mol, ring, ring_oxygens[0], {"N"})
+    if found is None:
+        return None
+    anomeric_idx, n_idx = found
+    n = mol.GetAtomWithIdx(n_idx)
+    heavy = sum(1 for x in n.GetNeighbors() if x.GetAtomicNum() > 1)
+    if heavy != 1 or n.GetFormalCharge() != 0 or n.GetTotalNumHs() < 2:
+        return None  # N-acyl / N-alkyl / charged -> out of scope
+    residual = _residual_sugar_from_anomeric_hetero(mol, anomeric_idx, n_idx)
+    if residual is None:
+        return None
+    rmol = Chem.MolFromSmiles(residual)
+    if rmol is None:
+        return None
+    sugar = name_free_sugar(rmol, Chem.CanonSmiles(residual))
+    if not sugar or not sugar.endswith("ose"):
+        return None
+    candidate = sugar[:-1] + "ylamine"  # -ose -> -osylamine
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
+
+
+_HALIDE_WORD = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide"}
+
+
+def _has_anomeric_hetero_sugar(mol) -> bool:
+    """Cheap STRUCTURAL predicate (NO OPSIN): a single sugar ring whose anomeric C
+    bears a bare -NH2 (glycosylamine) or a single halogen (glycosyl halide).  Used
+    by the dispatch predicate to route to :func:`name_glycosylamine` /
+    :func:`name_glycosyl_halide` (which RT-gate the actual name)."""
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return False
+    ring = ri.AtomRings()[0]
+    if len(set(ring)) not in (5, 6):
+        return False
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return False
+    ring_o = ring_oxygens[0]
+    amine = _locate_anomeric_hetero(mol, ring, ring_o, {"N"})
+    if amine is not None:
+        n = mol.GetAtomWithIdx(amine[1])
+        heavy = sum(1 for x in n.GetNeighbors() if x.GetAtomicNum() > 1)
+        if heavy == 1 and n.GetFormalCharge() == 0 and n.GetTotalNumHs() >= 2:
+            return True
+    halide = _locate_anomeric_hetero(mol, ring, ring_o, set(_HALIDE_WORD))
+    if halide is not None and mol.GetAtomWithIdx(halide[1]).GetDegree() == 1:
+        return True
+    return False
+
+
+def name_glycosyl_halide(mol, canonical_smiles: str) -> Optional[str]:
+    """Glycosyl halide (BB P-102.6.1.5): anomeric -OH replaced by a single halogen,
+    named by the functional-class two-word form
+    ``<anomer>-<config>-glyco...osyl <halide>`` (e.g.
+    ``alpha-D-glucopyranosyl bromide``).  Mono-halo at the anomeric only;
+    fail-closed otherwise.  OPSIN-RT gated.  Input mol never mutated.
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return None
+    ring = ri.AtomRings()[0]
+    if len(set(ring)) not in (5, 6):
+        return None
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return None
+    found = _locate_anomeric_hetero(mol, ring, ring_oxygens[0], set(_HALIDE_WORD))
+    if found is None:
+        return None
+    anomeric_idx, x_idx = found
+    x = mol.GetAtomWithIdx(x_idx)
+    if x.GetDegree() != 1:
+        return None
+    word = _HALIDE_WORD.get(x.GetSymbol())
+    if word is None:
+        return None
+    residual = _residual_sugar_from_anomeric_hetero(mol, anomeric_idx, x_idx)
+    if residual is None:
+        return None
+    rmol = Chem.MolFromSmiles(residual)
+    if rmol is None:
+        return None
+    sugar = name_free_sugar(rmol, Chem.CanonSmiles(residual))
+    if not sugar or not sugar.endswith("ose"):
+        return None
+    candidate = f"{sugar[:-1]}yl {word}"  # -ose -> -osyl <halide>
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
