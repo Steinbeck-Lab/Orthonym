@@ -181,6 +181,49 @@ ACYCLIC_PIN_SUGAR_NAMES = {
     "OC[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "", "xylitol"),
 }
 
+# ============================================================================
+# Aldonic acids (open-chain sugar acids, P-102.5.6.6.2) — W6-P4
+# ============================================================================
+# Aldonic acids = aldose C1 CHO oxidized to COOH; the PIN is the retained
+# carbohydrate '<config>-<stem>onic acid' (e.g. D-gluconic acid), NOT the
+# systematic '(2R,3S,4R,5R)-...hexanoic acid' the general acid namer emits.
+# Complete D/L aldotetronic + aldopentonic + aldohexonic set (28 rows), generated
+# by OPSIN (name -> SMILES) + RDKit-canonicalized (mirrors the SYSTEMATIC_
+# MONOSACCHARIDE_NAMES generation).  The standalone join renders
+# ("", "D", "gluconic acid") -> "D-gluconic acid".  Adding these to ALL_SUGAR_NAMES
+# makes classify_compound_class() perceive them as 'carbohydrate' so lookup_sugar
+# emits the retained PIN before the general acid namer runs.
+ALDONIC_ACID_NAMES = {
+    "O=C(O)[C@H](O)[C@H](O)CO": ("", "D", "erythronic acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)CO": ("", "L", "erythronic acid"),
+    "O=C(O)[C@@H](O)[C@H](O)CO": ("", "D", "threonic acid"),
+    "O=C(O)[C@H](O)[C@@H](O)CO": ("", "L", "threonic acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "ribonic acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "ribonic acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "arabinonic acid"),
+    "O=C(O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "arabinonic acid"),
+    "O=C(O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "xylonic acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "xylonic acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "lyxonic acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "lyxonic acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "allonic acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "allonic acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "altronic acid"),
+    "O=C(O)[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "altronic acid"),
+    "O=C(O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "gluconic acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "gluconic acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "mannonic acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "mannonic acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "gulonic acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "gulonic acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "idonic acid"),
+    "O=C(O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "idonic acid"),
+    "O=C(O)[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "galactonic acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "galactonic acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "talonic acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "talonic acid"),
+}
+
 # Amino sugars (Phase 94)
 # === AMINO SUGARS (D-configuration) ===
 # Source: IUPAC 2-Carb carbohydrate nomenclature
@@ -444,6 +487,7 @@ ALL_SUGAR_NAMES = {
     **URONIC_ACID_NAMES,
     **AMINO_SUGAR_NAMES,
     **ACYCLIC_PIN_SUGAR_NAMES,
+    **ALDONIC_ACID_NAMES,
     **SYSTEMATIC_MONOSACCHARIDE_NAMES,
 }
 
