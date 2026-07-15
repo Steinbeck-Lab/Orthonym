@@ -433,28 +433,35 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     structural recognizers.
     """
     from orthonym.namer import classify_compound_class
-    if classify_compound_class(mol, canonical_smiles) != 'carbohydrate':
-        return False
+    is_carb = classify_compound_class(mol, canonical_smiles) == 'carbohydrate'
     from orthonym.data.sugar_names import (
         lookup_sugar,
         name_monosaccharide_systematic,
     )
-    if lookup_sugar(canonical_smiles) is not None:
-        return True
-    if name_monosaccharide_systematic(mol) is not None:
-        return True
-    # W6-P1: a single sugar ring bearing one O-phosphate/O-sulfate ester (cheap
-    # structural detect, NO OPSIN — the handler's name_sugar_ester RT-gates it).
-    from orthonym.data.sugar_names import _find_sugar_oxoacid_ester
+    if is_carb:
+        if lookup_sugar(canonical_smiles) is not None:
+            return True
+        if name_monosaccharide_systematic(mol) is not None:
+            return True
+    # W6 structural detectors (cheap RDKit ring-walks, NO OPSIN — the handler
+    # RT-gates every name).  These run EVEN when the sugar-ring SMARTS pre-gate
+    # misses: a fully-O-methylated ring has no free ring-OH for the SMARTS, yet is
+    # a bona-fide O-methyl sugar.  Each fast-fails on a non-sugar ring shape.
+    from orthonym.data.sugar_names import (
+        _find_sugar_oxoacid_ester,     # W6-P1 phosphate/sulfate ester
+        _has_anomeric_hetero_sugar,    # W6-P2 glycosylamine / glycosyl halide
+        _has_o_methyl_sugar,           # W6-P3 O-methyl ether
+    )
     if _find_sugar_oxoacid_ester(mol) is not None:
         return True
-    # W6-P2: a single sugar ring with an anomeric -NH2 / halogen (glycosylamine /
-    # glycosyl halide) — cheap structural detect; the handler RT-gates the name.
-    from orthonym.data.sugar_names import _has_anomeric_hetero_sugar
     if _has_anomeric_hetero_sugar(mol):
         return True
-    from orthonym.rules.oligosaccharides import _classify_units
-    return _classify_units(mol) is not None
+    if _has_o_methyl_sugar(mol):
+        return True
+    if is_carb:
+        from orthonym.rules.oligosaccharides import _classify_units
+        return _classify_units(mol) is not None
+    return False
 
 
 def _is_lipid(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
@@ -953,6 +960,12 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
         _nm = _fn(mol, canonical_smiles)
         if _nm is not None:
             return _nm
+
+    # W6-P3: O-methyl ether sugar (P-102.5.6.1). Fail-closed on non-O-methyl.
+    from orthonym.data.sugar_names import name_sugar_o_methyl
+    ome = name_sugar_o_methyl(mol, canonical_smiles)
+    if ome is not None:
+        return ome
 
     # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide

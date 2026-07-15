@@ -372,3 +372,44 @@ class TestGlycosylamineAndHalide:
         # N-acetyl glycosylamine: anomeric N bears an acetyl -> not bare NH2.
         smi = "CC(=O)N[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"
         assert name_glycosylamine(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+
+
+@pytest.mark.unit
+class TestSugarOMethyl:
+    """W6-P3 O-methyl (O-alkyl) ether sugars (BB P-102.5.6.1): n-O-methyl- prefix.
+
+    Strip-and-name (F-OXANE-DROP-safe: the residual must be a recognized free
+    sugar). The anomeric O-methyl is a GLYCOSIDE (methyl glucopyranoside), NOT an
+    O-methyl ether -> fail-closed so the glycoside path handles it. OPSIN-RT gated.
+    """
+
+    def test_tetra_o_methyl_glucopyranose(self):
+        from orthonym import name_compound
+        assert name_compound("CO[C@H]1[C@H](O)O[C@@H]([C@H]([C@@H]1OC)OC)COC") == \
+            "2,3,4,6-tetra-O-methyl-beta-D-glucopyranose"
+
+    def test_single_o_methyl_glucopyranose(self):
+        """A single non-anomeric O-methyl -> '3-O-methyl-…' (no double hyphen)."""
+        from orthonym import name_compound
+        assert name_compound("CO[C@@H]1[C@H]([C@H](O)O[C@@H]([C@H]1O)CO)O") == \
+            "3-O-methyl-beta-D-glucopyranose"
+
+    def test_2_o_methyl_rhamnopyranose(self):
+        """2-O-methyl-rhamnose: rhamnopyranose is a cataloged retained sugar, so the
+        residual names cleanly (no leading detachable prefix) -> the O-methyl prefix
+        composes correctly."""
+        from orthonym import name_compound
+        assert name_compound("CO[C@@H]1[C@H](O)[C@@H](O)[C@H](C)O[C@H]1O") == \
+            "2-O-methyl-alpha-L-rhamnopyranose"
+
+    def test_anomeric_o_methyl_is_glycoside_not_o_methyl(self):
+        """Methyl beta-D-glucopyranoside must NOT be named 1-O-methyl-..."""
+        from orthonym.data.sugar_names import name_sugar_o_methyl
+        from rdkit import Chem
+        smi = "CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"  # methyl beta-D-glucoside
+        assert name_sugar_o_methyl(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+
+    def test_plain_oxane_fails_closed(self):
+        from orthonym.data.sugar_names import name_sugar_o_methyl
+        from rdkit import Chem
+        assert name_sugar_o_methyl(Chem.MolFromSmiles("CC1CCCCO1"), "CC1CCCCO1") is None

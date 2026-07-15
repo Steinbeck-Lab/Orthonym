@@ -2035,6 +2035,151 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     return candidate
 
 
+_OMETHYL_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+
+
+def name_sugar_o_methyl(mol, canonical_smiles: str) -> Optional[str]:
+    """O-methyl ether sugar (BB P-102.5.6.1): non-anomeric ring/exocyclic C-OH
+    methylated -> ``<locants>-<mult>-O-methyl-<sugar>`` (e.g.
+    ``2,3,4,6-tetra-O-methyl-beta-D-glucopyranose``, ``2-O-methyl-alpha-L-
+    rhamnopyranose``).
+
+    Strip-and-name (F-OXANE-DROP-safe): every -O-CH3 is stripped to -OH, the
+    residual must be a RECOGNIZED free sugar (name_free_sugar), else fail-closed
+    (a non-sugar oxane's residual is not recognized).  An -O-CH3 at the ANOMERIC
+    position is a glycoside (methyl glycopyranoside), NOT an O-methyl ether ->
+    fail-closed so the glycoside path handles it.  Only bare -O-CH3 is in scope
+    (O-acyl / O-alkyl-larger / mixed-ester -> fail-closed).  OPSIN-RT gated;
+    input mol never mutated.
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return None
+    ring = ri.AtomRings()[0]
+    if len(set(ring)) not in (5, 6):
+        return None
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return None
+    ring_oxygen = ring_oxygens[0]
+    anomeric_idx = _locate_anomeric_carbon(mol, ring, ring_oxygen)
+    if anomeric_idx is None or anomeric_idx not in set(ring):
+        return None
+    locants = _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx)
+    if locants is None:
+        return None
+
+    # Collect every non-anomeric O-methyl (an ether O bonded to a sugar carbon and
+    # to a bare -CH3).  Any O-substituent that is NOT a bare -CH3 -> fail-closed.
+    methyl_locants = []
+    methyl_atoms = []  # (ester_o_idx, methyl_c_idx)
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
+            continue
+        nbrs = list(atom.GetNeighbors())
+        if len(nbrs) != 2:
+            continue
+        sugar_c = other = None
+        for n in nbrs:
+            if n.GetAtomicNum() == 6 and n.GetIdx() in locants:
+                sugar_c = n.GetIdx()
+            else:
+                other = n
+        if sugar_c is None or other is None:
+            continue
+        # The anomeric-O-methyl is a glycoside, not an O-methyl ether -> refuse.
+        if sugar_c == anomeric_idx:
+            return None
+        # `other` must be a bare methyl carbon (CH3): C, degree 1, 3 H, no charge.
+        if (other.GetAtomicNum() != 6 or other.GetDegree() != 1
+                or other.GetTotalNumHs() != 3 or other.GetFormalCharge() != 0):
+            return None  # O-acyl / O-alkyl-larger / O-P / O-S -> out of scope
+        methyl_locants.append(locants[sugar_c])
+        methyl_atoms.append((atom.GetIdx(), other.GetIdx()))
+    if not methyl_locants:
+        return None  # a clean sugar is lookup_sugar's job
+
+    # Strip every O-methyl: delete the methyl C, restore the ether O to -OH.
+    rw = Chem.RWMol(mol)
+    to_del = sorted((m for _, m in methyl_atoms), reverse=True)
+    for o_idx, _ in methyl_atoms:
+        eo = rw.GetAtomWithIdx(o_idx)
+        eo.SetNoImplicit(False)
+        eo.SetNumExplicitHs(1)
+    for m_idx in to_del:
+        rw.RemoveAtom(m_idx)
+    try:
+        Chem.SanitizeMol(rw)
+        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
+    except Exception:
+        return None
+    residual_mol = Chem.MolFromSmiles(residual_canon)
+    if residual_mol is None:
+        return None
+    sugar_name = name_free_sugar(residual_mol, residual_canon)
+    if sugar_name is None:
+        return None
+    # The residual must be a plain sugar (anomer/config first).  If it carries its
+    # OWN detachable prefix (e.g. a 6-deoxy residual for a methylated rhamnose), the
+    # O-methyl prefix would need to be merged + re-alphabetized with it — out of
+    # scope here -> fail-closed (never a mis-alphabetized name).
+    if sugar_name[:1].isdigit():
+        return None
+
+    mult = _OMETHYL_MULT.get(len(methyl_locants))
+    if mult is None:
+        return None  # >6 O-methyls -> out of scope
+    locs = ",".join(str(x) for x in sorted(methyl_locants))
+    prefix = f"{locs}-{mult}-O-methyl" if mult else f"{locs}-O-methyl"
+    candidate = f"{prefix}-{sugar_name}"
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
+
+
+def _has_o_methyl_sugar(mol) -> bool:
+    """Cheap STRUCTURAL predicate (NO OPSIN): a single sugar ring with a free
+    anomeric -OH and >=1 non-anomeric ring/exocyclic C bearing a bare -O-CH3.
+    Routes to :func:`name_sugar_o_methyl` (which RT-gates the name)."""
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    if ri.NumRings() != 1:
+        return False
+    ring = ri.AtomRings()[0]
+    if len(set(ring)) not in (5, 6):
+        return False
+    ring_oxygens = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+    if len(ring_oxygens) != 1:
+        return False
+    ring_oxygen = ring_oxygens[0]
+    anomeric_idx = _locate_anomeric_carbon(mol, ring, ring_oxygen)
+    if anomeric_idx is None:
+        return False
+    locants = _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx)
+    if locants is None:
+        return False
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
+            continue
+        nbrs = list(atom.GetNeighbors())
+        if len(nbrs) != 2:
+            continue
+        sugar_c = other = None
+        for n in nbrs:
+            if n.GetAtomicNum() == 6 and n.GetIdx() in locants:
+                sugar_c = n.GetIdx()
+            else:
+                other = n
+        if (sugar_c is not None and sugar_c != anomeric_idx and other is not None
+                and other.GetAtomicNum() == 6 and other.GetDegree() == 1
+                and other.GetTotalNumHs() == 3):
+            return True
+    return False
+
+
 def _locate_anomeric_hetero(mol, ring, ring_oxygen, hetero_syms):
     """Find the anomeric carbon whose exocyclic substituent is a single bare
     heteroatom in ``hetero_syms`` (``{"N"}`` for a glycosylamine, the halogens for
