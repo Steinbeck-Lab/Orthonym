@@ -862,7 +862,16 @@ def _assemble_glycoside(
 
         if sugar_tuple is not None and aglycone_prefix and single_sugar:
             anomer, config, base = sugar_tuple
-            head = sugar_to_glycoside_class_name(anomer, config, base)
+            # W6-P1: a uronic sugar core must use the P-102.5.6.6.4.2 head form
+            # "glucopyranosiduronic acid" (NOT the wrong "glucuronopyranoside"
+            # sugar_to_glycoside_class_name would build) -> methyl
+            # beta-D-glucopyranosiduronic acid. Fail-closed if the base is an
+            # out-of-map uronic skeleton (uronic_glycoside_head returns None).
+            if "urono" in base:
+                from ..data.sugar_names import uronic_glycoside_head
+                head = uronic_glycoside_head(anomer, config, base)
+            else:
+                head = sugar_to_glycoside_class_name(anomer, config, base)
             if head:
                 # Two-word functional-class form: "<substituent> <sugar>oside".
                 # The alpha/beta + D/L descriptors come from the sugar tuple and
