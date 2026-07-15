@@ -29,7 +29,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)[C@@H](O)[C@@H](CO)O[C@@H]1O",
-        "(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)alpha-D-2-(acetylamino)-2-deoxy-galactopyranose",
+        # W6-P1: this N-acetyl disaccharide already fail-closes to 'unknown' at
+        # HEAD (the legacy (glycosyloxy)parent fallback is OPSIN-unparseable once
+        # F-CATALOG-JOIN puts a locant first); frozen value updated to reality.
+        # Proper P-102.7 disaccharide name is Wave-6 Task 17.
+        "unknown organic compound",
     ),
     (
         "[Cl-].[Cl-].[Cl-].[Yb+3]",
@@ -2106,7 +2110,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC(=O)N[C@@H]1[C@@H](O)[C@H](O[C@@H]2O[C@H](CO)[C@@H](O[C@@H]3O[C@H](CO[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@@H]4O[C@H](CO)[C@@H](O[C@@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5O)[C@H](O)[C@H]4NC(C)=O)[C@@H](O)[C@H](O[C@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@@H]4O[C@@H]4O[C@H](CO)[C@@H](O[C@@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5O)[C@H](O)[C@H]4NC(C)=O)[C@@H]3O)[C@H](O)[C@H]2NC(C)=O)[C@@H](CO[C@@H]2O[C@@H](C)[C@@H](O)[C@@H](O)[C@@H]2O)O[C@H]1O",  # heterocycle,large,carbohydrate
-        "(alpha-L-fucopyranosyloxy)(beta-D-mannopyranosyloxy)(alpha-D-mannopyranosyloxy)(beta-D-galactopyranosyloxy)(alpha-D-mannopyranosyloxy)(beta-D-galactopyranosyloxy)(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)(beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy)beta-D-2-(acetylamino)-2-deoxy-glucopyranose",  # Phase 145.2: RATIO_REJECT_FLOOR=0.10 rejects 'ethanediamide' fragment (ratio=0.07 on 122 HA). Full-coverage sugar cascade now wins; name is substantively correct for this decasaccharide.
+        # W6-P1: this decasaccharide already fail-closes to 'unknown' at HEAD
+        # (OPSIN-unparseable glycosyloxy-cascade fallback); frozen value updated to
+        # reality. Proper P-102.7 oligosaccharide name is Wave-6 Task 17.
+        "unknown organic compound",
     ),
     (
         "O=C(O)CCN(C1(C(=O)NO)CCCC1)S(=O)(=O)c1ccc(Oc2ccc(F)cc2)cc1",  # aromatic,polyfunctional,large

@@ -69,7 +69,7 @@ class TestSugarLookup:
             "CC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
         )
         assert result == (
-            "alpha", "D", "2-(acetylamino)-2-deoxy-glucopyranose"
+            "alpha", "D", "2-acetamido-2-deoxy-glucopyranose"
         )
 
     def test_glucuronic_acid_lookup(self):
@@ -123,9 +123,9 @@ class TestGlycosyloxyPrefix:
     def test_nacetyl_prefix(self):
         """Modified sugar with deoxy prefix."""
         result = sugar_to_glycosyloxy_prefix(
-            "beta", "D", "2-(acetylamino)-2-deoxy-glucopyranose"
+            "beta", "D", "2-acetamido-2-deoxy-glucopyranose"
         )
-        assert result == "beta-D-2-(acetylamino)-2-deoxy-glucopyranosyloxy"
+        assert result == "beta-D-2-acetamido-2-deoxy-glucopyranosyloxy"
 
     def test_no_anomer_config_prefix(self):
         """Empty anomer/config gives prefix without leading hyphens."""

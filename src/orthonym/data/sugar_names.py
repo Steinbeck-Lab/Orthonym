@@ -117,19 +117,27 @@ SUGAR_RETAINED_NAMES = {
     "OC[C@H]1O[C@](O)(CO)[C@@H](O)[C@@H]1O": ("beta", "D", "fructofuranose"),
 }
 
-# N-acetylated sugars (additional entries)
+# N-acetylated sugars (additional entries).  BB P-102.5.6.4 (@53660): the PIN
+# cites the whole substituted amino group as 'acetamido' (the PREFERRED prefix per
+# @55416 'acetamido* = acetylamino'), i.e. 2-acetamido-2-deoxy-<anomer>-<config>-...
+# matching the ChEBI corpus refs and the codebase's general acylamino code.  The
+# FREE mono sugar names correctly (mono path).  N-acetyl sugars embedded in
+# glycosides/oligos already fail-closed to 'unknown' at HEAD (the legacy
+# (glycosyloxy)parent fallback in decomposition/engine.py is OPSIN-unparseable once
+# F-CATALOG-JOIN puts a locant first) — acetamido vs acetylamino does not change
+# that; the P-102.7 oligosaccharide namer (Wave-6 Task 17) is the proper fix.
 NACETYL_SUGAR_NAMES = {
     "CC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O": (
-        "alpha", "D", "2-(acetylamino)-2-deoxy-glucopyranose",
+        "alpha", "D", "2-acetamido-2-deoxy-glucopyranose",
     ),
     "CC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O": (
-        "beta", "D", "2-(acetylamino)-2-deoxy-glucopyranose",
+        "beta", "D", "2-acetamido-2-deoxy-glucopyranose",
     ),
     "CC(=O)N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@@H]1O": (
-        "alpha", "D", "2-(acetylamino)-2-deoxy-galactopyranose",
+        "alpha", "D", "2-acetamido-2-deoxy-galactopyranose",
     ),
     "CC(=O)N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](CO)O[C@H]1O": (
-        "beta", "D", "2-(acetylamino)-2-deoxy-galactopyranose",
+        "beta", "D", "2-acetamido-2-deoxy-galactopyranose",
     ),
 }
 
@@ -656,7 +664,7 @@ def sugar_to_glycosyloxy_prefix(
     # Convert -ose ending to -osyloxy
     # "glucopyranose" -> "glucopyranosyl" -> "glucopyranosyloxy"
     # Works for all sugar names including modified ones like
-    # "2-(acetylamino)-2-deoxy-glucopyranose"
+    # "2-acetamido-2-deoxy-glucopyranose"
     if base_name.endswith("ose"):
         stem = base_name[:-1] + "yl"  # -ose -> -osyl
     else:
