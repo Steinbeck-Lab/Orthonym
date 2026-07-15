@@ -224,6 +224,112 @@ ALDONIC_ACID_NAMES = {
     "O=C(O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "talonic acid"),
 }
 
+# ============================================================================
+# W6-P4 carbohydrate-derivative catalogs (OPSIN-generated + independently
+# RT-verified in-thread; workflow wf_5feae8ea-b73).  Each entry's (anomer,config,
+# base) reproduces the BB PIN through name_free_sugar's join / F-CATALOG-JOIN.
+# ============================================================================
+# Aldonamides (P-102.5.6.6.2.1): aldonic COOH -> CONH2 -> '<config>-<stem>onamide'
+# (complete D/L tetr/pent/hex, 28 rows; all chiral, no meso).
+ALDONAMIDE_NAMES = {
+    "NC(=O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "allonamide"),
+    "NC(=O)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "altronamide"),
+    "NC(=O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "arabinonamide"),
+    "NC(=O)[C@H](O)[C@H](O)CO": ("", "D", "erythronamide"),
+    "NC(=O)[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "galactonamide"),
+    "NC(=O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "gluconamide"),
+    "NC(=O)[C@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "gulonamide"),
+    "NC(=O)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "idonamide"),
+    "NC(=O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "lyxonamide"),
+    "NC(=O)[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "mannonamide"),
+    "NC(=O)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "ribonamide"),
+    "NC(=O)[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "talonamide"),
+    "NC(=O)[C@@H](O)[C@H](O)CO": ("", "D", "threonamide"),
+    "NC(=O)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "xylonamide"),
+    "NC(=O)[C@@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "allonamide"),
+    "NC(=O)[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "altronamide"),
+    "NC(=O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "arabinonamide"),
+    "NC(=O)[C@@H](O)[C@@H](O)CO": ("", "L", "erythronamide"),
+    "NC(=O)[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "galactonamide"),
+    "NC(=O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "gluconamide"),
+    "NC(=O)[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "gulonamide"),
+    "NC(=O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "idonamide"),
+    "NC(=O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "lyxonamide"),
+    "NC(=O)[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "mannonamide"),
+    "NC(=O)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "ribonamide"),
+    "NC(=O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "talonamide"),
+    "NC(=O)[C@H](O)[C@@H](O)CO": ("", "L", "threonamide"),
+    "NC(=O)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "xylonamide"),
+}
+
+# Free open-chain 2-ketoses (P-102.5.2.2): retained Table-10.3 names are the PIN
+# for C3-C6 acyclic ketoses (P-102.2.1 "customarily used"; mirrors the retained
+# aldose treatment).  14 rows (D/L erythrulose, ribulose, xylulose, psicose,
+# fructose, sorbose, tagatose).
+ACYCLIC_KETOSE_NAMES = {
+    "O=C(CO)[C@H](O)CO": ("", "D", "erythrulose"),
+    "O=C(CO)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "D", "fructose"),
+    "O=C(CO)[C@H](O)[C@H](O)[C@H](O)CO": ("", "D", "psicose"),
+    "O=C(CO)[C@H](O)[C@H](O)CO": ("", "D", "ribulose"),
+    "O=C(CO)[C@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "sorbose"),
+    "O=C(CO)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "D", "tagatose"),
+    "O=C(CO)[C@@H](O)[C@H](O)CO": ("", "D", "xylulose"),
+    "O=C(CO)[C@@H](O)CO": ("", "L", "erythrulose"),
+    "O=C(CO)[C@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "fructose"),
+    "O=C(CO)[C@@H](O)[C@@H](O)[C@@H](O)CO": ("", "L", "psicose"),
+    "O=C(CO)[C@@H](O)[C@@H](O)CO": ("", "L", "ribulose"),
+    "O=C(CO)[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "sorbose"),
+    "O=C(CO)[C@H](O)[C@H](O)[C@@H](O)CO": ("", "L", "tagatose"),
+    "O=C(CO)[C@H](O)[C@@H](O)CO": ("", "L", "xylulose"),
+}
+
+# Anhydro sugars (P-102.5.5 / P-102.5.6.7.1): intramolecular ether cited by the
+# 'n,m-anhydro' prefix.  These are BICYCLIC — the SMILES-keyed catalog entry makes
+# classify_compound_class perceive them as carbohydrate (lookup_sugar is its FIRST
+# check), so CARBOHYDRATE_LOOKUP (priority 1000) fires ABOVE the general bicyclic
+# namer that previously emitted a WRONG-stereo dioxabicyclooctane name (accuracy fix
+# for 1,6-anhydro-beta-D-glucopyranose).  F-CATALOG-JOIN inserts anomer/config.
+ANHYDRO_SUGAR_NAMES = {
+    "O[C@H]1[C@@H](O)[C@@H]2OC[C@@H](O2)[C@H]1O": ("beta", "D", "1,6-anhydro-allopyranose"),
+    "O[C@H]1[C@H](O)[C@@H]2OC[C@@H](O2)[C@H]1O": ("beta", "D", "1,6-anhydro-altropyranose"),
+    "O[C@H]1[C@@H](O)[C@H]2CO[C@H](O2)[C@@H]1O": ("beta", "D", "1,6-anhydro-galactopyranose"),
+    "O[C@@H]1[C@@H](O)[C@@H]2OC[C@@H](O)[C@H]1O2": ("beta", "D", "1,6-anhydro-glucofuranose"),
+    "O[C@@H]1[C@@H](O)[C@@H]2OC[C@@H](O2)[C@H]1O": ("beta", "D", "1,6-anhydro-glucopyranose"),
+    "O[C@@H]1[C@@H](O)[C@H]2CO[C@H](O2)[C@@H]1O": ("beta", "D", "1,6-anhydro-gulopyranose"),
+    "O[C@H]1[C@H](O)[C@@H]2OC[C@@H](O2)[C@@H]1O": ("beta", "D", "1,6-anhydro-idopyranose"),
+    "O[C@@H]1[C@H](O)[C@@H]2OC[C@@H](O2)[C@H]1O": ("beta", "D", "1,6-anhydro-mannopyranose"),
+    "O[C@@H]1[C@H](O)[C@@H]2OC[C@@H](O2)[C@@H]1O": ("beta", "D", "1,6-anhydro-talopyranose"),
+    "O[C@H]1[C@@H]2OC[C@H](O[C@H]1O)[C@H]2O": ("alpha", "L", "3,6-anhydro-galactopyranose"),
+}
+
+# Aldaric acids (P-102.5.6.6.5.1): both termini COOH -> '<config>-<stem>aric acid'.
+# CHIRAL members only (D/L); the SYMMETRIC/meso ones (mucic/galactaric, meso-ribaric,
+# meso-xylaric, meso-allaric) are FAIL-CLOSED — their PIN needs 'meso-' which OPSIN
+# 2.9 cannot parse (see CENSUS).  D-glucaric already in ACYCLIC_PIN_SUGAR_NAMES.
+ALDARIC_ACID_NAMES = {
+    "O=C(O)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)C(=O)O": ("", "D", "altraric acid"),
+    "O=C(O)[C@@H](O)C(O)[C@H](O)C(=O)O": ("", "D", "arabinaric acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)C(=O)O": ("", "D", "idaric acid"),
+    "O=C(O)[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)C(=O)O": ("", "D", "mannaric acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "L", "altraric acid"),
+    "O=C(O)[C@H](O)C(O)[C@@H](O)C(=O)O": ("", "L", "arabinaric acid"),
+    "O=C(O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H](O)C(=O)O": ("", "L", "glucaric acid"),
+    "O=C(O)[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "L", "idaric acid"),
+    "O=C(O)[C@H](O)[C@H](O)[C@@H](O)[C@@H](O)C(=O)O": ("", "L", "mannaric acid"),
+}
+
+# Thio sugars (P-102.5.5): ring-O replaced by ring-S, '5-thio-<anomer>-<config>-
+# glycopyranose'.  Like anhydro, the catalog entry self-heals classify (lookup_sugar
+# runs before the ring-O SMARTS gate) so the sugar handler fires.
+THIO_SUGAR_NAMES = {
+    "OC[C@H]1S[C@H](O)[C@H](O)[C@@H](O)[C@H]1O": ("alpha", "D", "5-thio-galactopyranose"),
+    "OC[C@H]1S[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("alpha", "D", "5-thio-glucopyranose"),
+    "OC[C@H]1S[C@H](O)[C@@H](O)[C@@H](O)[C@@H]1O": ("alpha", "D", "5-thio-mannopyranose"),
+    "OC[C@H]1S[C@@H](O)[C@H](O)[C@@H](O)[C@H]1O": ("beta", "D", "5-thio-galactopyranose"),
+    "OC[C@H]1S[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O": ("beta", "D", "5-thio-glucopyranose"),
+    "OC[C@H]1S[C@@H](O)[C@@H](O)[C@@H](O)[C@@H]1O": ("beta", "D", "5-thio-mannopyranose"),
+}
+
 # Amino sugars (Phase 94)
 # === AMINO SUGARS (D-configuration) ===
 # Source: IUPAC 2-Carb carbohydrate nomenclature
@@ -488,6 +594,11 @@ ALL_SUGAR_NAMES = {
     **AMINO_SUGAR_NAMES,
     **ACYCLIC_PIN_SUGAR_NAMES,
     **ALDONIC_ACID_NAMES,
+    **ALDONAMIDE_NAMES,
+    **ACYCLIC_KETOSE_NAMES,
+    **ANHYDRO_SUGAR_NAMES,
+    **ALDARIC_ACID_NAMES,
+    **THIO_SUGAR_NAMES,
     **SYSTEMATIC_MONOSACCHARIDE_NAMES,
 }
 
