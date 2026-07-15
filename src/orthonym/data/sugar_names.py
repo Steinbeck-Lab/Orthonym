@@ -173,6 +173,12 @@ ACYCLIC_PIN_SUGAR_NAMES = {
     "O=C(O)[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "D", "glucaric acid"),
     # D-glyceraldehyde — P-102.3.2 (D/L small-capital); OPSIN stored lower-case
     "O=C[C@H](O)CO": ("", "D", "glyceraldehyde"),
+    # xylitol (meso pentitol) — P-102.5.6.5.  BB P-102.5.6.5.2 requires the 'meso'
+    # prefix ONLY for erythritol/ribitol/galactitol (xylitol is NOT enumerated), so
+    # bare 'xylitol' is the retained name here; OPSIN-RT verified.  (NOTE W6-P1:
+    # the true meso-* PINs and D-glucosaminitol are OPSIN-2.9-UNPARSEABLE -> those
+    # stay fail-closed, documented in )
+    "OC[C@@H](O)[C@H](O)[C@@H](O)CO": ("", "", "xylitol"),
 }
 
 # Amino sugars (Phase 94)
