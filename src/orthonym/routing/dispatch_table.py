@@ -449,10 +449,13 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     # a bona-fide O-methyl sugar.  Each fast-fails on a non-sugar ring shape.
     from orthonym.data.sugar_names import (
         _find_sugar_oxoacid_ester,     # W6-P1 phosphate/sulfate ester
+        _find_sugar_acyl_esters,       # W6B-T2 O-acyl ester (acetate/benzoate/...)
         _has_anomeric_hetero_sugar,    # W6-P2 glycosylamine / glycosyl halide
         _has_o_methyl_sugar,           # W6-P3 O-methyl ether
     )
     if _find_sugar_oxoacid_ester(mol) is not None:
+        return True
+    if _find_sugar_acyl_esters(mol) is not None:
         return True
     if _has_anomeric_hetero_sugar(mol):
         return True

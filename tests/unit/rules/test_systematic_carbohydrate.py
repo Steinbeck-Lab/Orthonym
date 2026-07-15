@@ -425,3 +425,37 @@ class TestW6bMultiplierElision:
         # 2-C-phenyl sugar -> systematic oxane; -ol multiplier must elide.
         assert name_compound("OC[C@H]1O[C@@H](O)[C@](O)(c2ccccc2)[C@@H](O)[C@@H]1O") == \
             "(2R,3S,4S,5S,6R)-6-(hydroxymethyl)-3-phenyloxane-2,3,4,5-tetrol"
+
+
+class TestW6bSugarAcylEster:
+    """Wave 6b Task 2 (P-102.5.6.1.1): free-sugar O-acyl esters -> functional-class
+    ester name; anomeric O-acyl (glycosyl ester) and mixed-acyl fail closed."""
+
+    def test_glucose_6_acetate(self):
+        from orthonym import name_compound
+        assert name_compound("C(C)(=O)OC[C@@H]1[C@H]([C@@H]([C@H]([C@H](O)O1)O)O)O") == \
+            "beta-D-glucopyranose 6-acetate"
+
+    def test_glucose_6_benzoate_not_hexyl(self):
+        from orthonym import name_compound
+        # ACCURACY: previously mis-named '(...)-hexyl benzoate' (sugar dropped).
+        assert name_compound("C(C1=CC=CC=C1)(=O)OC[C@@H]1[C@H]([C@@H]([C@H]([C@H](O)O1)O)O)O") == \
+            "beta-D-glucopyranose 6-benzoate"
+
+    def test_glucopyranose_tetraacetate(self):
+        from orthonym import name_compound
+        assert name_compound("C(C)(=O)O[C@H]1[C@H](O)O[C@@H]([C@H]([C@@H]1OC(C)=O)OC(C)=O)COC(C)=O") == \
+            "beta-D-glucopyranose 2,3,4,6-tetraacetate"
+
+    def test_anomeric_o_acyl_fails_closed(self):
+        from orthonym.data.sugar_names import _find_sugar_acyl_esters
+        from rdkit import Chem
+        # 1-O-acetyl (anomeric) = glycosyl ester, out of scope -> None.
+        smi = "CC(=O)O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"
+        assert _find_sugar_acyl_esters(Chem.MolFromSmiles(smi)) is None
+
+    def test_mixed_acyl_fails_closed(self):
+        from orthonym.data.sugar_names import _name_sugar_acyl_ester
+        from rdkit import Chem
+        smi = "CC(=O)O[C@H]1[C@H](O)O[C@@H](CO)[C@H](O)[C@@H]1OC(=O)c1ccccc1"
+        assert _name_sugar_acyl_ester(Chem.MolFromSmiles(smi)) is None

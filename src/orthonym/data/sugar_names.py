@@ -1963,6 +1963,200 @@ def _find_sugar_oxoacid_ester(mol):
     return sugar_c, ester_o, central, locants[sugar_c], word
 
 
+def _find_sugar_acyl_esters(mol):
+    """Cheap STRUCTURAL detector for free-sugar O-acyl ester(s) (BB P-102.5.6.1.1).
+
+    Returns a locant-sorted list ``[(sugar_c, ester_o, acyl_c, locant), ...]`` for
+    every ester O (Z=8, no H, degree 2) bonding a NON-anomeric sugar carbon to a
+    carbonyl carbon (an acyl C=O), else ``None`` (fail-closed).  Pure RDKit walks —
+    NO OPSIN — so it is safe to call from the dispatch predicate.  An O-acyl at the
+    ANOMERIC position is a glycosyl ester (183/184 territory, out of scope) -> the
+    whole molecule fails closed.
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    # An acyl group MAY carry its own ring (benzoate -> phenyl), so — unlike the
+    # phosphate/sulfate detector — do NOT require a single ring.  Identify THE
+    # sugar ring: a 5/6-membered ring with exactly one ring oxygen and the rest
+    # carbons.  Require exactly one such ring (a glycoside/oligo has >1).
+    sugar_rings = [
+        r for r in ri.AtomRings()
+        if len(r) in (5, 6)
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "O") == 1
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "C") == len(r) - 1
+    ]
+    if len(sugar_rings) != 1:
+        return None
+    ring = sugar_rings[0]
+    ring_oxygen = next(
+        i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"
+    )
+    anomeric_idx = _locate_anomeric_carbon(mol, ring, ring_oxygen)
+    if anomeric_idx is None or anomeric_idx not in set(ring):
+        return None
+    locants = _sugar_carbon_locants(mol, ring, ring_oxygen, anomeric_idx)
+    if locants is None:
+        return None
+    esters = []
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 8 or atom.GetTotalNumHs() > 0:
+            continue
+        nbrs = list(atom.GetNeighbors())
+        if len(nbrs) != 2:
+            continue
+        sugar_c = acyl_c = None
+        for n in nbrs:
+            if n.GetAtomicNum() == 6 and n.GetIdx() in locants:
+                sugar_c = n.GetIdx()
+            elif n.GetAtomicNum() == 6 and any(
+                b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtom(n).GetAtomicNum() == 8
+                for b in n.GetBonds()
+            ):
+                acyl_c = n.GetIdx()  # carbonyl carbon (an acyl group)
+        if sugar_c is not None and acyl_c is not None:
+            if sugar_c == anomeric_idx:
+                return None  # anomeric O-acyl = glycosyl ester -> out of scope
+            esters.append((sugar_c, atom.GetIdx(), acyl_c, locants[sugar_c]))
+    if not esters:
+        return None
+    esters.sort(key=lambda t: t[3])
+    return esters
+
+
+def _acyl_to_ate_word(mol, acyl_c, ester_o, sugar_c):
+    """Reconstruct the free carboxylic acid R-C(=O)-OH of an O-acyl ester and
+    return its acylate word (``benzoate`` / ``acetate`` / ``formate`` /
+    ``propanoate`` / ...).  Cleaves the sugar_c—ester_o bond, keeps the acyl-side
+    fragment (its ester-O relaxes to the acid -OH), names it via the acid path, and
+    applies the P-65.3.1 acid->ester transform (``…oic acid``->``…oate``;
+    ``…ic acid``->``…ate``).  ``None`` if the fragment does not name as a
+    carboxylic acid (fail-closed)."""
+    bond = mol.GetBondBetweenAtoms(sugar_c, ester_o)
+    if bond is None:
+        return None
+    try:
+        frag = Chem.FragmentOnBonds(
+            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
+        )
+        mapping = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    acid_frag = None
+    for fm, mp in zip(frags, mapping):
+        if acyl_c in mp:
+            acid_frag = fm
+            break
+    if acid_frag is None:
+        return None
+    rw = Chem.RWMol(acid_frag)
+    for dummy in sorted(
+        (a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0), reverse=True
+    ):
+        rw.RemoveAtom(dummy)  # the ester-O relaxes to the acid -OH after sanitize
+    try:
+        Chem.SanitizeMol(rw)
+        acid = Chem.RemoveHs(rw)
+        acid_canon = Chem.CanonSmiles(Chem.MolToSmiles(acid))
+    except Exception:
+        return None
+    from orthonym import name_compound  # lazy: data -> namer is acyclic at runtime
+    acid_name = name_compound(acid_canon)
+    if not acid_name or "unknown" in acid_name:
+        return None
+    if acid_name.endswith("oic acid"):
+        return acid_name[: -len("oic acid")] + "oate"
+    if acid_name.endswith("ic acid"):
+        return acid_name[: -len("ic acid")] + "ate"
+    return None
+
+
+def _name_sugar_acyl_ester(mol) -> Optional[str]:
+    """Free-sugar O-acyl ester -> functional-class ester name
+    (``beta-D-glucopyranose 6-benzoate``, ``beta-D-glucopyranose
+    2,3,4,6-tetraacetate``; BB P-102.5.6.1.1).  All acyls must be identical (the
+    functional-class ester form multiplies one acylate word); mixed acyls (the
+    ``x-O-acetyl-y-O-benzoyl`` prefix form) and anomeric O-acyl -> fail-closed.
+    OPSIN-RT gated; the input mol is never mutated."""
+    acyls = _find_sugar_acyl_esters(mol)
+    if not acyls:
+        return None
+    words = []
+    for (sugar_c, ester_o, acyl_c, _loc) in acyls:
+        w = _acyl_to_ate_word(mol, acyl_c, ester_o, sugar_c)
+        if w is None:
+            return None
+        words.append(w)
+    if len(set(words)) != 1:
+        return None  # mixed acyl -> fail-closed (O-acyl-prefix form deferred)
+    word = words[0]
+    locs = sorted(t[3] for t in acyls)
+
+    # Strip every acyl ester: cleave each ester_o—acyl_c bond, keep the sugar side
+    # (each ester-O relaxes to -OH), then name the residual free sugar.
+    bond_idxs = []
+    for (_sc, ester_o, acyl_c, _loc) in acyls:
+        b = mol.GetBondBetweenAtoms(ester_o, acyl_c)
+        if b is None:
+            return None
+        bond_idxs.append(b.GetIdx())
+    try:
+        frag = Chem.FragmentOnBonds(mol, bond_idxs, addDummies=True)
+        mapping = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    any_ester_o = acyls[0][1]
+    sugar_frag = None
+    for fm, mp in zip(frags, mapping):
+        if any_ester_o in mp:
+            sugar_frag = fm
+            break
+    if sugar_frag is None:
+        return None
+    rw = Chem.RWMol(sugar_frag)
+    for dummy in sorted(
+        (a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0), reverse=True
+    ):
+        rw.RemoveAtom(dummy)
+    try:
+        Chem.SanitizeMol(rw)
+        residual = Chem.RemoveHs(rw)
+        residual_canon = Chem.CanonSmiles(Chem.MolToSmiles(residual))
+    except Exception:
+        return None
+    residual_mol = Chem.MolFromSmiles(residual_canon)
+    if residual_mol is None:
+        return None
+    sugar_name = name_free_sugar(residual_mol, residual_canon)
+    if sugar_name is None:
+        return None
+
+    n = len(acyls)
+    mult = _OMETHYL_MULT.get(n)
+    if mult is None:
+        return None
+    # P-16.3.4: a complex acylate word (carrying a locant/space) takes the
+    # bis/tris multiplier and enclosing marks; a simple word (acetate) does not.
+    if n > 1 and any(ch in word for ch in "- ("):
+        _BIS = {2: "bis", 3: "tris", 4: "tetrakis", 5: "pentakis", 6: "hexakis"}
+        mult = _BIS[n]
+        ester_term = f"({word})"
+    else:
+        ester_term = word
+    locant_str = ",".join(str(x) for x in locs)
+    candidate = f"{sugar_name} {locant_str}-{mult}{ester_term}"
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
+
+
 def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     """Free-sugar mono-phosphate / sulfate ester (BB P-102.5.6.1.2 / P-102.5.6.1.3).
 
@@ -1983,7 +2177,8 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     """
     found = _find_sugar_oxoacid_ester(mol)
     if found is None:
-        return None
+        # W6B-T2: not a phosphate/sulfate ester -> try a free-sugar O-acyl ester.
+        return _name_sugar_acyl_ester(mol)
     sugar_c, ester_o, central, locant, word = found
 
     # Strip the ester group -> residual free sugar: cleave the ester-O — P/S bond,
