@@ -629,6 +629,26 @@ SYSTEMATIC_MONOSACCHARIDE_NAMES = {
 # Merged lookup and non-stereo fallback
 # ============================================================================
 
+ULOSONIC_ACID_NAMES = {
+    # W6B-T7 (P-102.5.6.6.3): 2-ulosonic acids — KDO, KDN, N-glycolylneuraminic
+    # acid.  OPSIN-generated verbatim PINs; RT-verified.  (Neu5Ac + neuraminic
+    # acid already emit elsewhere.)  Cataloging these FIXES the general
+    # ring-carboxylic namer's stereo-dropping output (e.g. KDN was mis-named
+    # '...2-(1,2,3-trihydroxypropyl)oxane-6-carboxylic acid' with no side-chain
+    # stereo).
+    "O=C(O)[C@@]1(O)C[C@@H](O)[C@@H](O)[C@@H]([C@H](O)CO)O1": ("", "", "3-deoxy-alpha-D-manno-oct-2-ulopyranosonic acid"),
+    "O=C(O)[C@]1(O)C[C@@H](O)[C@@H](O)[C@@H]([C@H](O)CO)O1": ("", "", "3-deoxy-beta-D-manno-oct-2-ulopyranosonic acid"),
+    "O=C(O)[C@@]1(O)C[C@H](O)[C@@H](O)[C@H]([C@H](O)[C@H](O)CO)O1": ("", "", "3-deoxy-alpha-D-glycero-D-galacto-non-2-ulopyranosonic acid"),
+    "O=C(O)[C@]1(O)C[C@H](O)[C@@H](O)[C@H]([C@H](O)[C@H](O)CO)O1": ("", "", "3-deoxy-beta-D-glycero-D-galacto-non-2-ulopyranosonic acid"),
+    "O=C(CO)N[C@H]1[C@H]([C@H](O)[C@H](O)CO)OC(O)(C(=O)O)C[C@@H]1O": ("", "", "N-glycolylneuraminic acid"),
+    # Neu5Ac (reproduce-first: it was NOT actually cataloged and mis-emitted a
+    # stereo-dropped oxane-carboxylic name) + the alpha/beta neuraminic anomers.
+    "CC(=O)N[C@H]1[C@H]([C@H](O)[C@H](O)CO)OC(O)(C(=O)O)C[C@@H]1O": ("", "", "N-acetylneuraminic acid"),
+    "N[C@H]1[C@H]([C@H](O)[C@H](O)CO)O[C@@](O)(C(=O)O)C[C@@H]1O": ("", "", "alpha-neuraminic acid"),
+    "N[C@H]1[C@H]([C@H](O)[C@H](O)CO)O[C@](O)(C(=O)O)C[C@@H]1O": ("", "", "beta-neuraminic acid"),
+}
+
+
 DEOXY_PENTOSE_NAMES = {
     # W6B-T4 (P-102.5.3): 2-deoxypentofuranoses (alpha/beta x D/L x erythro/threo).
     # OPSIN-generated (name->SMILES->RDKit-canon), verbatim ("", "", full PIN) form.
@@ -684,6 +704,7 @@ HEPTOSE_NAMES = {
 # Unified lookup combining all four hand-curated tables
 ALL_SUGAR_NAMES = {
     **SUGAR_RETAINED_NAMES,
+    **ULOSONIC_ACID_NAMES,
     **DEOXY_PENTOSE_NAMES,
     **HEPTOSE_NAMES,
     **NACETYL_SUGAR_NAMES,
@@ -2107,6 +2128,69 @@ def _find_sugar_acyl_esters(mol):
         return None
     esters.sort(key=lambda t: t[3])
     return esters
+
+
+def _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
+    """VETO (W6B-T7, accuracy-first): True for a 2-ulosonic-acid-shaped ring — a
+    ketal ring carbon bearing ring-O + -OH + -COOH, plus an exocyclic polyol side
+    chain (>=2 hydroxylated exocyclic carbons) — that is NOT in the sugar catalog.
+
+    The general ring-carboxylic namer ships a stereo-DROPPING (RT-failing)
+    '...oxane-carboxylic acid' name for these (an uncataloged KDN/Neu5Ac
+    stereoisomer), so the carbohydrate handler fails closed (returns '') instead of
+    letting it fall through.  Returns False for cataloged ulosonics (lookup_sugar
+    names them) and for ordinary oxane-carboxylic acids (no ketal-OH, or no polyol
+    tail).  Pure RDKit; NO OPSIN, so it is safe in the dispatch predicate.
+    """
+    if mol is None:
+        return False
+    if lookup_sugar(canonical_smiles) is not None:
+        return False  # cataloged -> named, never vetoed
+    ri = mol.GetRingInfo()
+    ketal_acid = False
+    for ring in ri.AtomRings():
+        if len(ring) not in (5, 6):
+            continue
+        ringset = set(ring)
+        ring_os = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+        if len(ring_os) != 1:
+            continue
+        for i in ring:
+            a = mol.GetAtomWithIdx(i)
+            if a.GetSymbol() != "C":
+                continue
+            if not any(nb.GetIdx() in ring_os for nb in a.GetNeighbors()):
+                continue  # not the ring-O-bearing (anomeric/ketal) carbon
+            exo = [nb for nb in a.GetNeighbors() if nb.GetIdx() not in ringset]
+            has_oh = any(
+                nb.GetSymbol() == "O" and nb.GetTotalNumHs() > 0 for nb in exo
+            )
+            has_cooh = any(
+                nb.GetSymbol() == "C"
+                and any(b.GetBondType() == Chem.BondType.DOUBLE
+                        and b.GetOtherAtom(nb).GetSymbol() == "O"
+                        for b in nb.GetBonds())
+                and any(nn.GetSymbol() == "O" and nn.GetTotalNumHs() > 0
+                        for nn in nb.GetNeighbors())
+                for nb in exo
+            )
+            if has_oh and has_cooh:
+                ketal_acid = True
+    if not ketal_acid:
+        return False
+    # Require an exocyclic polyol side chain: >=2 non-ring carbons (other than the
+    # carboxyl carbon) that each bear an -OH (KDO tail=2, KDN tail=3).
+    polyol_c = 0
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != "C" or atom.IsInRing():
+            continue
+        if any(b.GetBondType() == Chem.BondType.DOUBLE
+               and b.GetOtherAtom(atom).GetSymbol() == "O" for b in atom.GetBonds()):
+            continue  # skip the carboxyl carbon
+        if any(nb.GetSymbol() == "O" and nb.GetTotalNumHs() > 0
+               for nb in atom.GetNeighbors()):
+            polyol_c += 1
+    return polyol_c >= 2
 
 
 def _acyl_to_ate_word(mol, acyl_c, ester_o, sugar_c):

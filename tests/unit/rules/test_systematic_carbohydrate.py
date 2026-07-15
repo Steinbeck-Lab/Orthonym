@@ -406,6 +406,38 @@ class TestW6bAminoalditol:
         assert got != "2-amino-2-deoxy-D-glucitol"
 
 
+class TestW6bUlosonicAcid:
+    """Wave 6b Task 7 (P-102.5.6.6.3): KDO/KDN/Neu5Ac/Neu5Gc catalog + a
+    fail-closed veto so uncataloged 2-ulosonic acids never ship a stereo-dropped
+    ring-carboxylic name."""
+
+    def test_kdo(self):
+        from orthonym import name_compound
+        assert name_compound("C([C@@]1(O)C[C@@H](O)[C@@H](O)[C@H](O1)[C@H](O)CO)(=O)O") == \
+            "3-deoxy-alpha-D-manno-oct-2-ulopyranosonic acid"
+
+    def test_kdn(self):
+        from orthonym import name_compound
+        assert name_compound("C([C@@]1(O)C[C@H](O)[C@@H](O)[C@@H](O1)[C@H](O)[C@H](O)CO)(=O)O") == \
+            "3-deoxy-alpha-D-glycero-D-galacto-non-2-ulopyranosonic acid"
+
+    def test_neu5ac(self):
+        from orthonym import name_compound
+        assert name_compound("CC(=O)N[C@H]1[C@H]([C@H](O)[C@H](O)CO)OC(O)(C(=O)O)C[C@@H]1O") == \
+            "N-acetylneuraminic acid"
+
+    def test_uncataloged_ulosonic_fails_closed(self):
+        from orthonym import name_compound
+        # an uncataloged 2-ulosonic stereoisomer must NOT ship a stereo-dropped name.
+        got = name_compound("C([C@@]1(O)C[C@H](O)[C@@H](O)[C@@H](O1)[C@H](O)[C@@H](O)CO)(=O)O")
+        assert got == "unknown organic compound"
+
+    def test_ordinary_oxane_carboxylic_unaffected(self):
+        from orthonym import name_compound
+        assert name_compound("OC(=O)C1CCCCO1") == "oxane-2-carboxylic acid"
+        assert name_compound("OC1(C(=O)O)CCCCO1") == "2-hydroxyoxane-2-carboxylic acid"
+
+
 @pytest.mark.unit
 class TestGlycosylamineAndHalide:
     """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).

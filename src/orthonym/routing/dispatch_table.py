@@ -457,6 +457,11 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
         return True
     if _find_sugar_acyl_esters(mol) is not None:
         return True
+    # W6B-T7 fail-closed veto: claim an uncataloged 2-ulosonic acid so the handler
+    # can refuse it (the general ring-carboxylic namer drops its side-chain stereo).
+    from orthonym.data.sugar_names import _is_uncataloged_ulosonic_acid
+    if _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
+        return True
     if _has_anomeric_hetero_sugar(mol):
         return True
     if _has_o_methyl_sugar(mol):
@@ -972,7 +977,17 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
 
     # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide
-    return name_disaccharide(mol)
+    disacc = name_disaccharide(mol)
+    if disacc is not None:
+        return disacc
+
+    # W6B-T7 fail-closed veto: an uncataloged 2-ulosonic acid must NOT fall through
+    # to the general ring-carboxylic namer (which drops side-chain stereo -> a
+    # wrong, RT-failing name).  Refuse ('' terminates the cascade -> 'unknown').
+    from orthonym.data.sugar_names import _is_uncataloged_ulosonic_acid
+    if _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
+        return ''
+    return None
 
 
 def _handle_natural_product(mol, smiles, canonical_smiles, features=None, *,
