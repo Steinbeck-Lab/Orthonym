@@ -151,3 +151,40 @@ class TestDisaccharide:
         # A non-sugar molecule -> None.
         non_sugar = Chem.MolFromSmiles("CCO")
         assert name_disaccharide(non_sugar) is None
+
+
+class TestW6bLinearOligosaccharide:
+    """Wave 6b Task 11 (P-102.7.2.2): linear reducing oligosaccharide chain +
+    1->6 disaccharide; branched / non-reducing fail closed."""
+
+    def test_maltotriose(self):
+        from orthonym import name_compound
+        assert name_compound(
+            "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O[C@H]3[C@H](O)"
+            "[C@@H](O)C(O)O[C@@H]3CO)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O"
+        ) == "alpha-D-glucopyranosyl-(1->4)-alpha-D-glucopyranosyl-(1->4)-D-glucopyranose"
+
+    def test_isomaltose_1_6(self):
+        from orthonym import name_compound
+        assert name_compound(
+            "OC[C@H]1O[C@H](OC[C@H]2O[C@H](O)[C@H](O)[C@@H](O)[C@@H]2O)"
+            "[C@H](O)[C@@H](O)[C@@H]1O"
+        ) == "alpha-D-glucopyranosyl-(1->6)-alpha-D-glucopyranose"
+
+    def test_branched_fails_closed(self):
+        from orthonym.rules.oligosaccharides import name_linear_oligosaccharide
+        # a glucose accepting TWO glycosyls (branched) -> None.
+        branched = Chem.MolFromSmiles(
+            "OC[C@H]1O[C@H](O[C@H]2[C@H](O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O)[C@H]3O)"
+            "[C@@H](O)[C@@H](O[C@H]3[C@H](O)[C@@H](O)C(O)O[C@@H]3CO)O[C@@H]2CO)"
+            "[C@H](O)[C@@H](O)[C@@H]1O"
+        )
+        assert name_linear_oligosaccharide(branched) is None
+
+    def test_maltotriose_deterministic(self):
+        from orthonym import name_compound
+        smi = ("OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O[C@H]3[C@H](O)"
+               "[C@@H](O)C(O)O[C@@H]3CO)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O")
+        mol = Chem.MolFromSmiles(smi)
+        names = {name_compound(Chem.MolToSmiles(mol, doRandom=True)) for _ in range(8)}
+        assert len(names) == 1, names

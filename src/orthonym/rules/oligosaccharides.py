@@ -443,8 +443,12 @@ def _count_sugar_rings(mol) -> int:
 # --------------------------------------------------------------------------- #
 # Public entry point (D-02)
 # --------------------------------------------------------------------------- #
-def name_disaccharide(mol) -> Optional[str]:
-    """Name a linear di/tri-saccharide by the P-102.7 form, else ``None`` (fail-closed).
+def _name_disaccharide_binary(mol) -> Optional[str]:
+    """Name a BINARY disaccharide (2 units, 1 link) by the P-102.7 form, else
+    ``None``.  This is the proven binary assembler; the public
+    :func:`name_disaccharide` wraps it and falls back to the general
+    :func:`name_linear_oligosaccharide` for 3+ unit chains and the 1->6 links the
+    ring-restricted SMARTS here misses.
 
     Composes the glycosylglycose / glycosyl-glycoside form with ASCII ``(c->c')``
     linkage locants and per-unit anomers (none invented for an unspecified reducing
@@ -548,6 +552,267 @@ def name_disaccharide(mol) -> Optional[str]:
         name = f"{glycosyl_str} {parent_str}"
 
     # --- RT-fallback gate (D-13) ---
+    if not _sugar_name_rt_ok(mol, name, relax_atoms=relax or None):
+        return None
+    return name
+
+
+def name_disaccharide(mol) -> Optional[str]:
+    """Public entry (D-02): name a linear di/oligo-saccharide by the P-102.7 form.
+
+    Tries the proven binary disaccharide assembler first (byte-identical to the
+    prior behaviour); if it declines, falls back to the general linear
+    oligosaccharide namer (W6B-T11) which handles 3+ unit reducing chains and the
+    1->6 links the binary ring-restricted SMARTS misses.  ``None`` (fail-closed)
+    for any out-of-scope topology.
+    """
+    result = _name_disaccharide_binary(mol)
+    if result is not None:
+        return result
+    return name_linear_oligosaccharide(mol)
+
+
+def _extract_unit_capped(mol, ringset: Set[int],
+                         bond_pairs: List[Tuple[int, int]]) -> Optional[str]:
+    """Isolate ONE sugar unit by capping ALL its inter-unit bonds (each a
+    ``(unit_carbon, bridging_o)`` pair) and restoring the -OH on every unit-side
+    carbon.  Returns the canonical SMILES of the isolated unit, or ``None``.
+    Multi-bond generalization of :func:`_extract_capped_sugar` (a middle unit of a
+    chain carries two bridging bonds)."""
+    if not bond_pairs:
+        return None
+    bond_ids = []
+    for c, o in bond_pairs:
+        b = mol.GetBondBetweenAtoms(c, o)
+        if b is None:
+            return None
+        bond_ids.append(b.GetIdx())
+    try:
+        frag = Chem.FragmentOnBonds(mol, bond_ids, addDummies=True)
+        mapping: List = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    sample = next(iter(ringset))
+    unit = None
+    for fm, mp in zip(frags, mapping):
+        if sample in mp:
+            unit = fm
+            break
+    if unit is None:
+        return None
+    rw = Chem.RWMol(unit)
+    for at in rw.GetAtoms():
+        if at.GetAtomicNum() == 0:  # a dummy from a cleaved bridging bond -> -OH
+            at.SetAtomicNum(8)
+            at.SetNoImplicit(False)
+            at.SetNumExplicitHs(1)
+    try:
+        Chem.SanitizeMol(rw)
+        clean = Chem.RemoveHs(rw)
+        return Chem.CanonSmiles(Chem.MolToSmiles(clean))
+    except Exception:
+        return None
+
+
+def _oligo_topology(mol) -> Optional[Dict]:
+    """Structural (NO-OPSIN) detection of a LINEAR reducing oligosaccharide chain.
+
+    Returns ``{units, links, order, parent_ui, bridging_os}`` for a chain of >=2
+    glycosidically-linked sugar rings with a unique free-hemiacetal reducing end
+    and no branching, else ``None``.  Shared by :func:`name_linear_oligosaccharide`
+    (which adds recognition + assembly + RT) and :func:`_has_oligo_chain` (the cheap
+    dispatch predicate).  Recognition and RT are NOT done here."""
+    if mol is None:
+        return None
+    from collections import Counter
+    ri = mol.GetRingInfo()
+
+    # 1. Sugar rings (5/6-membered, exactly one ring O, rest carbons) + anomeric C.
+    units: List[Dict] = []
+    for ring in ri.AtomRings():
+        if len(ring) not in (5, 6):
+            continue
+        if sum(1 for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O") != 1:
+            continue
+        if any(mol.GetAtomWithIdx(i).GetSymbol() not in ("C", "O") for i in ring):
+            continue
+        ro = _ring_oxygen(mol, ring)
+        if ro is None:
+            return None
+        ringset = set(ring)
+        anomeric_idx = anomeric_exo_o = None
+        for idx in ring:
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetSymbol() != "C" or not any(n.GetIdx() == ro for n in a.GetNeighbors()):
+                continue
+            exo_os = [n.GetIdx() for n in a.GetNeighbors()
+                      if n.GetIdx() not in ringset and n.GetSymbol() == "O"]
+            if len(exo_os) == 1:
+                anomeric_idx, anomeric_exo_o = idx, exo_os[0]
+                break
+        if anomeric_idx is None:
+            return None
+        units.append({"ring": ring, "ringset": ringset, "ring_oxygen": ro,
+                      "anomeric_idx": anomeric_idx, "anomeric_exo_o": anomeric_exo_o})
+    if len(units) < 2:
+        return None
+
+    # Map every unit carbon (ring + exocyclic) -> unit index (for acceptor lookup).
+    carbon_to_unit: Dict[int, int] = {}
+    for ui, u in enumerate(units):
+        for idx in u["ring"]:
+            if mol.GetAtomWithIdx(idx).GetSymbol() == "C":
+                carbon_to_unit[idx] = ui
+            for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+                if nbr.GetIdx() not in u["ringset"] and nbr.GetAtomicNum() == 6:
+                    carbon_to_unit.setdefault(nbr.GetIdx(), ui)
+
+    # 2. Glycosidic links: each unit's anomeric exocyclic O, if a bridging ether O
+    #    (no H, 2 carbons) whose OTHER carbon maps to a DIFFERENT sugar unit.
+    links: List[Tuple[int, int, int, int, int]] = []  # donor,acc,anom_c,bridge_o,acc_c
+    bridging_os: Set[int] = set()
+    for ui, u in enumerate(units):
+        o_idx = u["anomeric_exo_o"]
+        o_atom = mol.GetAtomWithIdx(o_idx)
+        if o_atom.GetTotalNumHs() > 0:
+            continue  # free -OH (reducing-end candidate), not a bridge
+        c_nbrs = [n.GetIdx() for n in o_atom.GetNeighbors() if n.GetAtomicNum() == 6]
+        if len(c_nbrs) != 2:
+            continue
+        acceptor_c = next((c for c in c_nbrs if c != u["anomeric_idx"]), None)
+        if acceptor_c is None:
+            continue
+        acc_ui = carbon_to_unit.get(acceptor_c)
+        if acc_ui is None or acc_ui == ui:
+            continue  # acceptor must belong to another sugar unit
+        links.append((ui, acc_ui, u["anomeric_idx"], o_idx, acceptor_c))
+        bridging_os.add(o_idx)
+    if not links:
+        return None
+
+    # 3. Reducing parent = the unique non-donor unit whose anomeric is a free -OH.
+    donors = {l[0] for l in links}
+    non_donors = [ui for ui in range(len(units)) if ui not in donors]
+    if len(non_donors) != 1:
+        return None
+    parent_ui = non_donors[0]
+    if mol.GetAtomWithIdx(units[parent_ui]["anomeric_exo_o"]).GetTotalNumHs() == 0:
+        return None  # parent anomeric linked -> non-reducing glycoside (deferred)
+    if any(v > 1 for v in Counter(l[1] for l in links).values()):
+        return None  # a unit accepts >1 glycosyl -> BRANCHED
+
+    # 4. Order the linear chain: walk parent <- donor <- ... (must cover every unit).
+    donor_of: Dict[int, Tuple] = {}
+    for l in links:
+        if l[1] in donor_of:
+            return None  # >1 donor onto one acceptor -> branched
+        donor_of[l[1]] = l
+    order = [parent_ui]
+    seen = {parent_ui}
+    cur = parent_ui
+    while cur in donor_of:
+        donor_ui = donor_of[cur][0]
+        if donor_ui in seen:
+            return None
+        order.append(donor_ui)
+        seen.add(donor_ui)
+        cur = donor_ui
+    if len(order) != len(units):
+        return None  # disconnected / not a single linear chain
+
+    return {"units": units, "links": links, "order": order,
+            "parent_ui": parent_ui, "bridging_os": bridging_os}
+
+
+def _has_oligo_chain(mol) -> bool:
+    """Cheap NO-OPSIN dispatch precondition for :func:`name_linear_oligosaccharide`."""
+    return _oligo_topology(mol) is not None
+
+
+def name_linear_oligosaccharide(mol) -> Optional[str]:
+    """Name a LINEAR reducing oligosaccharide (>=2 units) by P-102.7.2.2:
+    ``glycosyl-(1->c')-[glycosyl-(1->c')-]n-glycose`` (maltotriose ->
+    ``alpha-D-glucopyranosyl-(1->4)-alpha-D-glucopyranosyl-(1->4)-D-glucopyranose``;
+    isomaltose 1->6).  Fail-closed (``None``) on: a BRANCHED chain (a unit accepts
+    >1 glycosyl), a NON-reducing chain (no free-hemiacetal parent -> P-102.7.2.1
+    glycoside, deferred), >1 reducing unit, an unrecognized unit, a dropped atom,
+    or an RT-fail.  Each unit is recognized from its OWN isolated ring (D-09); the
+    whole name is OPSIN-RT gated (D-13)."""
+    topo = _oligo_topology(mol)
+    if topo is None:
+        return None
+    units = topo["units"]
+    links = topo["links"]
+    order = topo["order"]
+    parent_ui = topo["parent_ui"]
+    bridging_os = topo["bridging_os"]
+
+    # 5. Isolate + recognize each unit (D-09), collecting its bridging bonds.
+    unit_bridge_bonds: Dict[int, List[Tuple[int, int]]] = {ui: [] for ui in range(len(units))}
+    for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
+        unit_bridge_bonds[donor_ui].append((anom_c, o_idx))
+        unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
+    from orthonym.data.sugar_names import (
+        lookup_sugar, recognize_sugar_skeleton, name_monosaccharide_systematic,
+    )
+    tuples: Dict[int, Tuple[str, str, str]] = {}
+    for ui, u in enumerate(units):
+        canon = _extract_unit_capped(mol, u["ringset"], unit_bridge_bonds[ui])
+        if canon is None:
+            return None
+        sm = Chem.MolFromSmiles(canon)
+        if sm is None:
+            return None
+        tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
+        if tup is None:
+            systematic = name_monosaccharide_systematic(sm)
+            tup = ("", "", systematic) if systematic else None
+        if tup is None:
+            return None
+        tuples[ui] = tup
+
+    # 6. Assemble in name order (terminal donor ... -> reducing parent).
+    relax: Set[int] = set()
+    parts: List[str] = []
+    for ui in reversed(order):
+        if ui == parent_ui:
+            pa, pc, pb = tuples[ui]
+            anom_defined = (mol.GetAtomWithIdx(units[ui]["anomeric_idx"]).GetChiralTag()
+                            != Chem.ChiralType.CHI_UNSPECIFIED)
+            if anom_defined and pa and pc:
+                parent_str = f"{pa}-{pc}-{pb}"
+            else:
+                parent_str = f"{pc}-{pb}" if pc else pb
+                relax.add(units[ui]["anomeric_idx"])
+            parts.append(parent_str)
+        else:
+            ga, gc, gb = tuples[ui]
+            gterm = _glycosyl_term(ga, gc, gb)
+            if gterm is None:
+                return None
+            link = next(x for x in links if x[0] == ui)
+            _d, acc_ui, anom_c, _o, acc_c = link
+            acc_u = units[acc_ui]
+            acc_locs = _ring_carbon_locants(
+                mol, acc_u["ring"], acc_u["ring_oxygen"], acc_u["anomeric_idx"]
+            )
+            c_prime = acc_locs.get(acc_c)
+            if c_prime is None:
+                return None
+            c = _anomeric_locant(mol, units[ui]["ring"], units[ui]["ring_oxygen"], anom_c)
+            parts.append(f"{gterm}-({c}{_ARROW}{c_prime})")
+    name = "-".join(parts)
+
+    # 7. Completeness invariant (D-12) + RT gate (D-13).
+    all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    consumed: Set[int] = set(bridging_os)
+    for u in units:
+        consumed |= _unit_atoms(mol, u["ring"], bridging_os)
+    if consumed != all_heavy:
+        return None
     if not _sugar_name_rt_ok(mol, name, relax_atoms=relax or None):
         return None
     return name

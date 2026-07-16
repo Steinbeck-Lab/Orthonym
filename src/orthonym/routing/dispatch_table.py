@@ -470,6 +470,12 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     from orthonym.data.sugar_names import _has_open_chain_amino_aldose
     if _has_open_chain_amino_aldose(mol):
         return True
+    # W6B-T11 linear reducing oligosaccharide (3+ units / 1->6 links the binary
+    # disaccharide SMARTS misses) -> the handler's name_disaccharide falls back to
+    # name_linear_oligosaccharide (RT-gated).
+    from orthonym.rules.oligosaccharides import _has_oligo_chain
+    if _has_oligo_chain(mol):
+        return True
     if _has_anomeric_hetero_sugar(mol):
         return True
     if _has_o_methyl_sugar(mol):
