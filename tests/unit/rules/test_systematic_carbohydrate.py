@@ -508,6 +508,28 @@ class TestW6bGlycosyloxyAglycone:
         assert name_glycosyloxy_aglycone(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
 
 
+class TestW6bCGlycosyl:
+    """Wave 6b Task 13 (P-102.6.1.4): C-glycosyl on a senior aglycone. (The n-O-yl
+    form P-102.6.2 is deferred fail-closed -- Orthonym names the aglycone
+    'ethanoic acid' not the target 'acetic acid', and the '-n-O-yl' construction
+    has no clean placeholder; it stays 'unknown', never a wrong name.)"""
+
+    def test_c_glucosyl_phloroglucinol(self):
+        from orthonym import name_compound
+        assert name_compound("Oc1cc(O)c([C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)c(O)c1") == \
+            "2-(beta-D-glucopyranosyl)benzene-1,3,5-triol"
+
+    def test_plain_glucose_unaffected(self):
+        from orthonym import name_compound
+        assert name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "beta-D-glucopyranose"
+
+    def test_n_o_yl_deferred_not_wrong(self):
+        from orthonym import name_compound
+        # n-O-yl deferred: must fail-closed to 'unknown', never a wrong name.
+        got = name_compound("OC[C@H]1O[C@@H](O)[C@H](OCC(=O)O)[C@@H](O)[C@H]1O")
+        assert got == "unknown organic compound"
+
+
 @pytest.mark.unit
 class TestGlycosylamineAndHalide:
     """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).

@@ -2843,6 +2843,207 @@ def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:
     return candidate
 
 
+def _is_sugar_o_ether_leak(mol) -> bool:
+    """VETO (W6B-T13, accuracy-first): True for a sugar ring whose NON-anomeric
+    ring carbon bears an -O-R ether where R is neither a bare methyl (O-methyl,
+    named by :func:`name_sugar_o_methyl`) nor an acyl carbonyl (O-acyl ester,
+    named by :func:`name_sugar_ester`) -- e.g. the n-O-yl shape
+    (sugar-C-O-CH2-COOH).  The general chain namer drops the whole sugar for these
+    (-> a wrong 'ethanoic acid' name), so the carbohydrate handler must fail closed
+    instead.  Pure RDKit; NO OPSIN."""
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    sugar_rings = [
+        r for r in ri.AtomRings()
+        if len(r) in (5, 6)
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "O") == 1
+        and all(mol.GetAtomWithIdx(i).GetSymbol() in ("C", "O") for i in r)
+    ]
+    if len(sugar_rings) != 1:
+        return False
+    ring = sugar_rings[0]
+    ringset = set(ring)
+    ro = next((i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"), None)
+    if ro is None:
+        return False
+    # locate the anomeric carbon (ring C bonded to ring-O + an exocyclic O).
+    anomeric_idx = None
+    for idx in ring:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != "C" or not any(n.GetIdx() == ro for n in a.GetNeighbors()):
+            continue
+        if any(n.GetIdx() not in ringset and n.GetAtomicNum() == 8 for n in a.GetNeighbors()):
+            anomeric_idx = idx
+            break
+    for idx in ring:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != "C" or idx == anomeric_idx:
+            continue
+        for nb in a.GetNeighbors():
+            if nb.GetIdx() in ringset or nb.GetAtomicNum() != 8 or nb.GetTotalNumHs() > 0:
+                continue
+            # an ether O on a non-anomeric ring carbon: find the far carbon R.
+            r_c = next((x for x in nb.GetNeighbors()
+                        if x.GetIdx() != idx and x.GetAtomicNum() == 6), None)
+            if r_c is None:
+                continue
+            # bare methyl (O-methyl, handled) -> not a leak.
+            if (r_c.GetDegree() == 1 and r_c.GetTotalNumHs() == 3):
+                continue
+            # acyl carbonyl (O-acyl ester, handled) -> not a leak.
+            if any(b.GetBondType() == Chem.BondType.DOUBLE
+                   and b.GetOtherAtom(r_c).GetAtomicNum() == 8 for b in r_c.GetBonds()):
+                continue
+            return True  # a larger-alkyl / senior-bearing O-ether -> sugar-drop leak
+    return False
+
+
+def sugar_to_glycosyl_prefix(anomer: str, config: str, base_name: str) -> str:
+    """Convert sugar info to a C-glycosyl substituent prefix (``-ose`` -> ``-osyl``,
+    NO ``oxy``): ``sugar_to_glycosyl_prefix("beta","D","glucopyranose")`` ->
+    ``'beta-D-glucopyranosyl'``."""
+    if base_name.endswith("ose"):
+        stem = base_name[:-1] + "yl"
+    else:
+        stem = base_name + "yl"
+    if anomer and config:
+        return f"{anomer}-{config}-{stem}"
+    return stem
+
+
+def name_c_glycosyl_aglycone(mol, canonical_smiles: str) -> Optional[str]:
+    """C-glycosyl on a senior aglycone (BB P-102.6.1.4): a sugar bonded by a C-C
+    bond from its anomeric carbon to an aglycone that is the parent ->
+    ``n-(<config>-glycosyl)`` substituent prefix
+    (``2-(beta-D-glucopyranosyl)benzene-1,3,5-triol``).
+
+    Placeholder mechanism (RT-gated): cap the anomeric-C — aglycone-C bond to
+    recognize the sugar, then replace the sugar with a methyl (-> the aglycone
+    methyl-substituted parent, named natively), and swap the single ``methyl``
+    token for ``(<glycosyl>)``.  Fail-closed on >1 sugar ring, an exocyclic-O
+    anomeric (that is an O-glycoside, T12), an unrecognized sugar, or an RT-fail."""
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    sugar_rings = [
+        r for r in ri.AtomRings()
+        if len(r) in (5, 6)
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "O") == 1
+        and all(mol.GetAtomWithIdx(i).GetSymbol() in ("C", "O") for i in r)
+    ]
+    if len(sugar_rings) != 1:
+        return None
+    ring = sugar_rings[0]
+    ringset = set(ring)
+    ro = next(i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O")
+    from orthonym.rules.conjugate_controller import _extract_capped_sugar
+    for idx in ring:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != "C" or not any(n.GetIdx() == ro for n in a.GetNeighbors()):
+            continue
+        exo_c = [n.GetIdx() for n in a.GetNeighbors()
+                 if n.GetIdx() not in ringset and n.GetAtomicNum() == 6]
+        exo_o = [n for n in a.GetNeighbors()
+                 if n.GetIdx() not in ringset and n.GetAtomicNum() == 8]
+        if len(exo_c) != 1 or exo_o:
+            continue  # anomeric of a C-glycosyl: exactly one exocyclic C, NO exo O
+        aglycone_c = exo_c[0]
+        # The exocyclic carbon must NOT be a plain sugar CH2OH tail (that is C6).
+        agl_atom = mol.GetAtomWithIdx(aglycone_c)
+        if agl_atom.GetTotalNumHs() >= 2 and any(
+            nb.GetAtomicNum() == 8 for nb in agl_atom.GetNeighbors()
+        ):
+            continue  # looks like the C6 CH2OH, not an aglycone
+        sugar_canon = _extract_capped_sugar(mol, idx, aglycone_c)
+        if not sugar_canon:
+            continue
+        sm = Chem.MolFromSmiles(sugar_canon)
+        if sm is None:
+            continue
+        tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
+        if tup is None:
+            continue
+        glycosyl = sugar_to_glycosyl_prefix(*tup)
+
+        # Build the aglycone with a methyl in place of the sugar.
+        bond = mol.GetBondBetweenAtoms(idx, aglycone_c)
+        if bond is None:
+            return None
+        try:
+            frag = Chem.FragmentOnBonds(mol, [bond.GetIdx()], addDummies=True,
+                                        dummyLabels=[(0, 0)])
+            mapping: list = []
+            frags = Chem.GetMolFrags(frag, asMols=True, sanitizeFrags=False,
+                                     fragsMolAtomMapping=mapping)
+        except Exception:
+            return None
+        agl_frag = None
+        for fm, mp in zip(frags, mapping):
+            if aglycone_c in mp:
+                agl_frag = fm
+                break
+        if agl_frag is None:
+            return None
+        rw = Chem.RWMol(agl_frag)
+        for at in rw.GetAtoms():
+            if at.GetAtomicNum() == 0:  # dummy -> methyl
+                at.SetAtomicNum(6)
+                at.SetNoImplicit(False)
+                at.SetNumExplicitHs(3)
+        try:
+            Chem.SanitizeMol(rw)
+            agl_methyl = Chem.CanonSmiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
+        except Exception:
+            return None
+        from orthonym import name_compound
+        agl_name = name_compound(agl_methyl)
+        if not agl_name or "unknown" in agl_name or agl_name.count("methyl") != 1:
+            return None
+        candidate = agl_name.replace("methyl", f"({glycosyl})")
+        if not _mono_name_rt_ok(mol, candidate):
+            return None
+        return candidate
+    return None
+
+
+def _has_c_glycosyl_aglycone(mol) -> bool:
+    """Cheap NO-OPSIN precondition for :func:`name_c_glycosyl_aglycone`: exactly one
+    sugar ring whose anomeric carbon has a C-C bond to a non-sugar carbon (no
+    exocyclic O on that anomeric)."""
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    sugar_rings = [
+        r for r in ri.AtomRings()
+        if len(r) in (5, 6)
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "O") == 1
+        and all(mol.GetAtomWithIdx(i).GetSymbol() in ("C", "O") for i in r)
+    ]
+    if len(sugar_rings) != 1:
+        return False
+    ring = sugar_rings[0]
+    ringset = set(ring)
+    ro = next((i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"), None)
+    if ro is None:
+        return False
+    for idx in ring:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != "C" or not any(n.GetIdx() == ro for n in a.GetNeighbors()):
+            continue
+        exo_c = [n for n in a.GetNeighbors()
+                 if n.GetIdx() not in ringset and n.GetAtomicNum() == 6]
+        exo_o = [n for n in a.GetNeighbors()
+                 if n.GetIdx() not in ringset and n.GetAtomicNum() == 8]
+        if len(exo_c) == 1 and not exo_o:
+            agl = exo_c[0]
+            # exclude the C6 CH2OH tail (a sugar carbon, not an aglycone)
+            if not (agl.GetTotalNumHs() >= 2
+                    and any(nb.GetAtomicNum() == 8 for nb in agl.GetNeighbors())):
+                return True
+    return False
+
+
 def _has_glycosyloxy_aglycone(mol) -> bool:
     """Cheap NO-OPSIN precondition for :func:`name_glycosyloxy_aglycone`: exactly one
     sugar ring whose anomeric carbon is O-linked (no H) to a non-sugar aglycone

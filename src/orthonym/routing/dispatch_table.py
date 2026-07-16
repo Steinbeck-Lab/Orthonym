@@ -481,6 +481,15 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     from orthonym.data.sugar_names import _has_glycosyloxy_aglycone
     if _has_glycosyloxy_aglycone(mol):
         return True
+    # W6B-T13 C-glycosyl on a senior aglycone (sugar C-C linked).
+    from orthonym.data.sugar_names import _has_c_glycosyl_aglycone
+    if _has_c_glycosyl_aglycone(mol):
+        return True
+    # W6B-T13 fail-closed veto: a sugar with a non-methyl/non-acyl ring-O ether
+    # (the n-O-yl shape) whose sugar the general namer would drop.
+    from orthonym.data.sugar_names import _is_sugar_o_ether_leak
+    if _is_sugar_o_ether_leak(mol):
+        return True
     if _has_anomeric_hetero_sugar(mol):
         return True
     if _has_o_methyl_sugar(mol):
@@ -1013,6 +1022,19 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     glyoxy = name_glycosyloxy_aglycone(mol, canonical_smiles)
     if glyoxy is not None:
         return glyoxy
+
+    # W6B-T13: C-glycosyl on a senior aglycone (P-102.6.1.4).
+    from orthonym.data.sugar_names import name_c_glycosyl_aglycone
+    cgly = name_c_glycosyl_aglycone(mol, canonical_smiles)
+    if cgly is not None:
+        return cgly
+
+    # W6B-T13 fail-closed veto (n-O-yl, P-102.6.2 deferred): a sugar-O-ether the
+    # namers cannot handle would otherwise drop the sugar (a wrong name) via the
+    # general chain namer -> refuse ('' -> unknown), never ship a sugar-dropping name.
+    from orthonym.data.sugar_names import _is_sugar_o_ether_leak
+    if _is_sugar_o_ether_leak(mol):
+        return ''
 
     # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide
