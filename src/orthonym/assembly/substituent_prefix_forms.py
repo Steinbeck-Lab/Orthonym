@@ -112,6 +112,24 @@ def _count_fragment_atoms(
     return count
 
 
+def _collect_fragment_atoms(mol, start_atom: int, exclude: Set[int]) -> Set[int]:
+    """Return the set of atom indices in the fragment reachable from
+    ``start_atom`` without crossing any atom in ``exclude`` (BFS). Companion to
+    :func:`_count_fragment_atoms` used by the aryloxy decorator (P-45.6)."""
+    visited: Set[int] = set()
+    queue = deque([start_atom])
+    while queue:
+        idx = queue.popleft()
+        if idx in visited or idx in exclude:
+            continue
+        visited.add(idx)
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni not in visited and ni not in exclude:
+                queue.append(ni)
+    return visited
+
+
 def get_alkoxy_prefix(
     mol,
     ether_atoms: tuple,
@@ -170,19 +188,46 @@ def get_alkoxy_prefix(
     # Check if the substituent is aromatic (phenoxy, benzyloxy)
     sub_atom = mol.GetAtomWithIdx(sub_carbon)
 
-    # Case A: O -> aromatic C in 6-membered all-carbon ring -> "phenoxy"
+    # Case A: O -> aromatic ring C. A BARE phenyl -> retained 'phenoxy'
+    # (P-63.2.2.2). A SUBSTITUTED aryloxy ring MUST carry its ring substituents
+    # (P-45.6 / P-45.2.1): the old unconditional 'phenoxy' silently DROPPED them
+    # (4-chlorophenoxy -> 'phenoxy'), an atom-drop the OPSIN self-consistency
+    # gate suppresses to 'unknown' WITH Java and SHIPS wrong without it. The old
+    # blanket fallback also mis-named EVERY other aromatic ether 'phenoxy'
+    # (heteroaryl / fused / naphthyl) — now fail-closed instead of wrong.
     if sub_atom.GetIsAromatic():
         ring_info = mol.GetRingInfo()
+        arom_ring = None
         for ring in ring_info.AtomRings():
-            if sub_carbon in ring and len(ring) == 6:
-                if all(
-                    mol.GetAtomWithIdx(r).GetIsAromatic()
-                    and mol.GetAtomWithIdx(r).GetSymbol() == "C"
-                    for r in ring
-                ):
-                    return "phenoxy"
-        # Fallback for other aromatic ethers
-        return "phenoxy"
+            if sub_carbon in ring and all(
+                mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring
+            ):
+                arom_ring = ring
+                break
+        if arom_ring is None:
+            return None  # aromatic C not in a fully-aromatic ring -> fail closed
+        all_carbon_6 = len(arom_ring) == 6 and all(
+            mol.GetAtomWithIdx(r).GetSymbol() == "C" for r in arom_ring
+        )
+        frag = _collect_fragment_atoms(mol, sub_carbon, {oxygen_idx})
+        from ..rules.ring_substituents import decorated_ring_substituent_name
+        dec = decorated_ring_substituent_name(
+            mol, list(arom_ring), sub_carbon, expected_atoms=frag,
+        )
+        if dec is not None:
+            if dec.endswith("phenyl"):
+                # '4-chlorophenyl' -> '4-chlorophenoxy' (retained contraction)
+                return dec[:-6] + "phenoxy"
+            if dec.endswith("yl"):
+                # decorated heteroaryl: 'pyridin-2-yl' -> 'pyridin-2-yloxy'
+                return dec + "oxy"
+            return None
+        # dec is None -> a BARE ring (this function only decorates). Bare benzene
+        # is the only aromatic that contracts to 'phenoxy'; a bare heteroaryl /
+        # fused ring would drop its identity, so fail closed.
+        if all_carbon_6 and len(frag) == 6:
+            return "phenoxy"
+        return None
 
     # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
     # HYG-04 (Phase 167): single shared aryl-count helper (was inline benzyloxy here).

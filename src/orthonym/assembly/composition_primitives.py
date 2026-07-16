@@ -379,6 +379,36 @@ def _join_prefix_to_name(prefix_str: str, name: str) -> str:
     return f"{prefix_str}{name}"
 
 
+# Leading top-level (alpha-carbon) locant run on a formatted prefix, e.g. the
+# "2-" of "2-chloro" or the "2,2-" of "2,2-difluoro". Anchored at the string
+# start so INTERNAL locants of a complex substituent — the "4-" inside
+# "(4-chlorophenoxy)" — are preserved.
+_ALPHA_LOCANT_RE = re.compile(r'^\d+(?:,\d+)*-')
+
+
+def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> str:
+    """Assemble a SUBSTITUTED acetic-acid PIN from already-formatted substituent
+    prefix strings (P-65.1.1.1 retained functional parent + P-14.3.4.6 locant
+    omission).
+
+    Acetic acid has a single substitutable position (the alpha carbon), so ALL
+    substituent locants are omitted while multipliers and any INTERNAL locants of
+    a complex substituent are preserved::
+
+        ['2-chloro']              -> 'chloroacetic acid'
+        ['2,2-difluoro']          -> 'difluoroacetic acid'   (BB 3037)
+        ['2-phenyl']              -> 'phenylacetic acid'      (BB 6694)
+        ['2-(4-chlorophenoxy)']   -> '(4-chlorophenoxy)acetic acid'
+
+    The caller is responsible for gating this to the substituted-2-carbon-monoacid
+    context (carboxylic-acid PCG, saturated ethane parent, single -COOH); this
+    function only performs the retained-name assembly.
+    """
+    unlocanted = [_ALPHA_LOCANT_RE.sub('', t) for t in prefix_texts]
+    name = _join_prefix_to_name(_join_prefixes(unlocanted), "acetic acid")
+    return f"{stereo}{name}" if stereo else name
+
+
 # ---------------------------------------------------------------------------
 # Lifted P-16.5.1.3.1 mononuclear enclosing-marks block (from
 # _handler_shared.py:1037-1078) as a named function; the serializer calls this

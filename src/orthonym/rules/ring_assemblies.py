@@ -1181,12 +1181,19 @@ def _get_substituent_locant(
 
     # Walk from connection_atom in both directions
     def walk(start, direction_neighbor):
-        """Walk ring from start through direction_neighbor, return ordered atoms."""
+        """Walk ring from start through direction_neighbor, return ordered atoms.
+
+        Only step to UNVISITED neighbours: the old ``or n == start`` clause let
+        the walk pick the start atom back as ``nexts[0]`` on the second step and
+        terminate prematurely, so the short path to a META substituent was never
+        traversed (it returned the long-way locant 5 instead of the correct 3
+        for '[1,1'-biphenyl]-3-…'). The loop now enumerates every ring atom once
+        in ring order and stops when no unvisited neighbour remains."""
         visited = [start]
         current = direction_neighbor
         while current != start:
             visited.append(current)
-            nexts = [n for n in adj[current] if n not in visited or n == start]
+            nexts = [n for n in adj[current] if n not in visited]
             if not nexts:
                 break
             current = nexts[0]
@@ -1208,6 +1215,78 @@ def _get_substituent_locant(
 
     # Return the lower locant (IUPAC lowest locant rule)
     return min(locant_a, locant_b)
+
+
+def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
+    """P-14.4: number each CARBOCYCLIC ring system ONCE (connection atom = 1),
+    choosing the single direction giving the lowest locant SET to ALL its
+    substituents together.
+
+    :func:`_get_substituent_locant` picks each substituent's own min-locant
+    direction independently; when two substituents sit on the SAME ring that
+    collides (3,5-disubstituted benzene ring -> each min()s to 3 -> the invalid
+    '3,3' set, which OPSIN rejects). Choosing one shared direction per ring makes
+    the set '3,5'. Heterocyclic rings keep their fixed orient_heterocycle
+    numbering (handled in _get_substituent_locant) and are skipped here."""
+    ri = mol.GetRingInfo()
+    by_sys: Dict[int, List[Dict]] = {}
+    for s in substituents:
+        by_sys.setdefault(s['system_idx'], []).append(s)
+    for sys_idx, subs in by_sys.items():
+        if len(subs) < 2:
+            continue  # single substituent: per-atom min is already correct
+        sys_atoms = ring_systems[sys_idx]
+        conn = None
+        for a1, a2, s1, s2 in connections:
+            if s1 == sys_idx:
+                conn = a1
+                break
+            if s2 == sys_idx:
+                conn = a2
+                break
+        if conn is None:
+            continue
+        ring = None
+        for r in ri.AtomRings():
+            if conn in r and set(r) <= sys_atoms:
+                ring = r
+                break
+        if ring is None:
+            continue
+        # carbocyclic only (heteroatom rings keep orient_heterocycle numbering)
+        if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring):
+            continue
+        rset = set(ring)
+        adj: Dict[int, List[int]] = {i: [] for i in ring}
+        for b in mol.GetBonds():
+            x, y = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if x in rset and y in rset:
+                adj[x].append(y)
+                adj[y].append(x)
+
+        def _positions(first):
+            visited = [conn]
+            cur = first
+            while cur != conn:
+                visited.append(cur)
+                nxt = [n for n in adj[cur] if n not in visited]
+                if not nxt:
+                    break
+                cur = nxt[0]
+            return {a: i + 1 for i, a in enumerate(visited)}
+
+        nbrs = adj.get(conn, [])
+        if len(nbrs) < 2:
+            continue
+        pa = _positions(nbrs[0])
+        pb = _positions(nbrs[1])
+        big = len(ring) + 1
+        set_a = sorted(pa.get(s['ring_atom'], big) for s in subs)
+        set_b = sorted(pb.get(s['ring_atom'], big) for s in subs)
+        chosen = pa if set_a <= set_b else pb
+        for s in subs:
+            if s['ring_atom'] in chosen:
+                s['locant'] = chosen[s['ring_atom']]
 
 
 def _get_substituent_info(
@@ -1290,6 +1369,9 @@ def _get_substituent_info(
                 'locant': locant,
             })
 
+    # P-14.4 set-lowest numbering for rings bearing >=2 substituents (fixes the
+    # per-substituent min() collision, e.g. 3,5-disubstituted -> '3,3').
+    _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents)
     return substituents
 
 
@@ -1453,6 +1535,98 @@ def _is_carboxyl_substituent(mol, sub_atoms: List[int],
         elif bond.GetBondType() == Chem.BondType.SINGLE and a.GetTotalNumHs() == 1:
             oh = i
     return oxo is not None and oh is not None
+
+
+def _is_formyl_substituent(mol, sub_atoms: List[int],
+                           attachment_atom: int) -> bool:
+    """True iff *sub_atoms* is exactly a neutral -CHO (formyl) group attached
+    via its carbon: {C(H)(=O)}. Named as the added-carbon suffix -carbaldehyde
+    (P-66.6.1) on a ring assembly."""
+    if len(sub_atoms) != 2:
+        return False
+    c = mol.GetAtomWithIdx(attachment_atom)
+    if (c.GetSymbol() != 'C' or c.GetFormalCharge() != 0
+            or c.GetTotalNumHs() != 1):
+        return False
+    others = [i for i in sub_atoms if i != attachment_atom]
+    if len(others) != 1:
+        return False
+    o = mol.GetAtomWithIdx(others[0])
+    if (o.GetSymbol() != 'O' or o.GetDegree() != 1 or o.GetFormalCharge()
+            or o.GetTotalNumHs() != 0):
+        return False
+    bond = mol.GetBondBetweenAtoms(attachment_atom, others[0])
+    return bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE
+
+
+def _is_cyano_substituent(mol, sub_atoms: List[int],
+                          attachment_atom: int) -> bool:
+    """True iff *sub_atoms* is exactly a neutral -C#N (cyano) group attached via
+    its carbon. Named as the added-carbon suffix -carbonitrile (P-66.5.1) on a
+    ring assembly."""
+    if len(sub_atoms) != 2:
+        return False
+    c = mol.GetAtomWithIdx(attachment_atom)
+    if (c.GetSymbol() != 'C' or c.GetFormalCharge() != 0
+            or c.GetTotalNumHs() != 0):
+        return False
+    others = [i for i in sub_atoms if i != attachment_atom]
+    if len(others) != 1:
+        return False
+    n = mol.GetAtomWithIdx(others[0])
+    if (n.GetSymbol() != 'N' or n.GetDegree() != 1 or n.GetFormalCharge()
+            or n.GetTotalNumHs() != 0):
+        return False
+    bond = mol.GetBondBetweenAtoms(attachment_atom, others[0])
+    return bond is not None and bond.GetBondType() == Chem.BondType.TRIPLE
+
+
+def _is_primary_amine_substituent(mol, sub_atoms: List[int],
+                                  attachment_atom: int) -> bool:
+    """True iff *sub_atoms* is exactly a neutral primary -NH2 attached directly
+    to the ring. Named as the suffix -amine (P-62.2.1)."""
+    if len(sub_atoms) != 1 or sub_atoms[0] != attachment_atom:
+        return False
+    n = mol.GetAtomWithIdx(attachment_atom)
+    return (n.GetSymbol() == 'N' and n.GetFormalCharge() == 0
+            and n.GetDegree() == 1 and n.GetTotalNumHs() == 2)
+
+
+def _is_hydroxy_substituent(mol, sub_atoms: List[int],
+                            attachment_atom: int) -> bool:
+    """True iff *sub_atoms* is exactly a neutral -OH attached directly to the
+    ring. Named as the suffix -ol (P-63.1)."""
+    if len(sub_atoms) != 1 or sub_atoms[0] != attachment_atom:
+        return False
+    o = mol.GetAtomWithIdx(attachment_atom)
+    return (o.GetSymbol() == 'O' and o.GetFormalCharge() == 0
+            and o.GetDegree() == 1 and o.GetTotalNumHs() == 1)
+
+
+def _ring_assembly_pcg_suffix(mol, sub_atoms: List[int],
+                              attachment_atom: int) -> Optional[str]:
+    """Classify a ring-assembly substituent as a PRINCIPAL characteristic group
+    expressible as a SUFFIX on the enclosed assembly parent (P-28.2.1 + the P-66
+    suffix table). Returns the suffix stem, or None if the group is not a
+    single-kind suffix-expressible PCG handled here.
+
+      -C(=O)OH -> 'carboxylic acid'   (added exocyclic C)
+      -CHO     -> 'carbaldehyde'       (added exocyclic C)
+      -C#N     -> 'carbonitrile'       (added exocyclic C)
+      -NH2     -> 'amine'              (direct ring attachment)
+      -OH      -> 'ol'                 (direct ring attachment)
+    """
+    if _is_carboxyl_substituent(mol, sub_atoms, attachment_atom):
+        return 'carboxylic acid'
+    if _is_formyl_substituent(mol, sub_atoms, attachment_atom):
+        return 'carbaldehyde'
+    if _is_cyano_substituent(mol, sub_atoms, attachment_atom):
+        return 'carbonitrile'
+    if _is_primary_amine_substituent(mol, sub_atoms, attachment_atom):
+        return 'amine'
+    if _is_hydroxy_substituent(mol, sub_atoms, attachment_atom):
+        return 'ol'
+    return None
 
 
 def _format_prime(ring_index: int) -> str:
@@ -1631,24 +1805,24 @@ def name_ring_assembly(
     if not substituent_list:
         return base_name
 
-    # P-28.2.1 / P-16.5.2.1 (Wave-2 completion): a carboxylic acid on a ring
-    # assembly is the PRINCIPAL characteristic group and must be expressed as
-    # a SUFFIX on the enclosed assembly parent — '[1,1'-biphenyl]-4,4'-
-    # dicarboxylic acid' — never as a prefix (there is no PIN acid prefix).
-    # Scope (fail-closed): EVERY substituent is a clean -C(=O)OH; mixed
-    # prefix+suffix assemblies keep the established prefix-only path below
-    # (which cannot express an acid and correctly yields no name for them).
-    if all(
-        _is_carboxyl_substituent(
-            mol, s['sub_atoms'],
-            s['sub_atoms'][0] if len(s['sub_atoms']) == 1
-            else next(
-                (i for i in s['sub_atoms']
-                 if mol.GetAtomWithIdx(i).GetSymbol() == 'C'), s['sub_atoms'][0]
-            ),
-        )
+    # P-28.2.1 / P-16.5.2.1 / P-66 suffix table: a PRINCIPAL characteristic
+    # group on a ring assembly must be expressed as a SUFFIX on the enclosed
+    # assembly parent, never as a prefix. Added-carbon groups —
+    # '[1,1'-biphenyl]-4,4'-dicarboxylic acid', '[1,1'-biphenyl]-4-carbaldehyde',
+    # '[1,1'-biphenyl]-4-carbonitrile' — and direct groups —
+    # '[1,1'-biphenyl]-4-amine', '[1,1'-biphenyl]-4,4'-diol' — all follow the
+    # same enclosed-parent + locant + multiplied-suffix shape. Prefix forms for
+    # these mis-name or drop atoms (CHO -> 'formaldehydyl', CN -> 'hydrogen
+    # cyanidyl' — leaks the OPSIN self-consistency gate suppresses to 'unknown').
+    # Scope (fail-closed): EVERY substituent is the SAME suffix-expressible PCG;
+    # mixed / other decorations keep the established prefix-only path below.
+    _pcg_kinds = [
+        _ring_assembly_pcg_suffix(mol, s['sub_atoms'], s['sub_atoms'][0])
         for s in substituent_list
-    ):
+    ]
+    if _pcg_kinds and all(k is not None for k in _pcg_kinds) and \
+            len(set(_pcg_kinds)) == 1:
+        _suffix_stem = _pcg_kinds[0]
         suffix_pairs = [(s['locant'], s['system_idx'])
                         for s in substituent_list]
         # P-14.4(c) determinism: the suffix takes the LOWEST locants -- the
@@ -1680,7 +1854,20 @@ def name_ring_assembly(
         if indicated_h_match:
             return None  # indicated-H + suffix threading not built
         return (f"[{connection_str}-{multiplier}{ring_name}]"
-                f"-{locant_str}-{mult}carboxylic acid")
+                f"-{locant_str}-{mult}{_suffix_stem}")
+
+    # Fail-closed veto: a -CHO / -C#N on a ring assembly has NO valid prefix
+    # form — the generic substituent namer emits the bogus 'formaldehydyl' /
+    # 'hydrogen cyanidyl' (OPSIN-unparseable; suppressed WITH Java, shipped WRONG
+    # without it). The single-kind suffix path above already consumed the pure
+    # cases; reaching here means the group is MIXED with others, which needs the
+    # prefix+suffix ring-assembly builder (not yet built). Refuse rather than
+    # ship a wrong name (accuracy #1).
+    for _s in substituent_list:
+        _a = _s['sub_atoms'][0]
+        if (_is_formyl_substituent(mol, _s['sub_atoms'], _a)
+                or _is_cyano_substituent(mol, _s['sub_atoms'], _a)):
+            return None
 
     # Build substituent prefix
     # Group by name for multipliers

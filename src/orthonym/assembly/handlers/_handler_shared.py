@@ -1294,6 +1294,31 @@ def _assemble_fragments(
         double_locants = list(parent_frag.locants[0]) if parent_frag.locants[0] else []
         triple_locants = list(parent_frag.locants[1]) if len(parent_frag.locants) > 1 and parent_frag.locants[1] else []
 
+    # P-65.1.1.1 + P-14.3.4.6: a SUBSTITUTED 2-carbon monocarboxylic acid uses
+    # the RETAINED functional parent 'acetic acid' (itself a PIN, P-12.3), and
+    # because its ONLY substitutable position is the alpha-carbon, ALL
+    # substituent locants are OMITTED — 'chloroacetic acid', 'difluoroacetic
+    # acid' (BB 3037: "not 2,2-difluoroacetic acid"), 'phenylacetic acid' (BB
+    # 6694), 'cyanoacetic acid' (BB 30999), '(4-chlorophenoxy)acetic acid'.
+    # Substitution is limited to prefixes of LOWER seniority than the acid
+    # (P-15.1.8.2.1.1) — satisfied by construction here: the acid is the PCG
+    # (suffix) and everything else is a prefix; a second acid would form a longer
+    # diacid parent and never reach this 2-carbon monoacid branch. Bare CH3-COOH
+    # is caught upstream by the exact-SMILES retained-name lookup. The systematic
+    # 'ethanoic acid' form is kept (fall-through) only when a substituent carries
+    # a stereo locant, so the omitted-locant contraction cannot corrupt it.
+    _is_substituted_acetic = (
+        stem == "eth" and prefix_str
+        and suffix_frag and suffix_frag.text == "oic acid"
+        and not double_locants and not triple_locants
+        and max(len(list(suffix_frag.locants) if suffix_frag.locants else []),
+                getattr(suffix_frag, 'count', 1)) == 1
+        and not any(ch.isdigit() for ch in stereo)
+    )
+    if _is_substituted_acetic:
+        from ..composition_primitives import retained_acetic_from_prefixes
+        return retained_acetic_from_prefixes(prefix_texts, stereo)
+
     # Handle suffix attachment using PIN-style formatting
     if suffix_frag and suffix_frag.text:
         suffix_text = suffix_frag.text

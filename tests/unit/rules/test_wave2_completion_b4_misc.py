@@ -172,8 +172,25 @@ class TestRingAssemblyAcidSuffix:
     @pytest.mark.parametrize("smiles,expected", [
         ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
         ("Clc1ccc(-c2ccccc2)cc1", "4-chloro-1,1'-biphenyl"),
-        ("Oc1ccc(-c2ccc(O)cc2)cc1", "4,4'-dihydroxy-1,1'-biphenyl"),
         ("Cc1ccc(-c2ccc(C)cc2)cc1", "4,4'-dimethyl-1,1'-biphenyl"),
     ])
     def test_assembly_prefix_path_protected(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+    def test_biphenyl_diol_suffix(self):
+        # OH is the PCG -> cited as the -diol suffix on the enclosed assembly
+        # parent (P-28.2.1 + P-66/P-63.1), never as a 'dihydroxy' prefix.
+        assert (name_compound("Oc1ccc(-c2ccc(O)cc2)cc1")
+                == "[1,1'-biphenyl]-4,4'-diol")
+
+    def test_biphenyl_carbaldehyde_suffix(self):
+        assert (name_compound("O=Cc1ccc(-c2ccccc2)cc1")
+                == "[1,1'-biphenyl]-4-carbaldehyde")
+
+    def test_biphenyl_carbonitrile_suffix(self):
+        assert (name_compound("N#Cc1ccc(-c2ccccc2)cc1")
+                == "[1,1'-biphenyl]-4-carbonitrile")
+
+    def test_biphenyl_amine_suffix(self):
+        assert (name_compound("Nc1ccc(-c2ccccc2)cc1")
+                == "[1,1'-biphenyl]-4-amine")

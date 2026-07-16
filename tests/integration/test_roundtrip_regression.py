@@ -591,7 +591,7 @@ PHASE24_PARSE_FIXES = [
     # PG); OPSIN-roundtrip-verified.
     (
         "OC(=O)Cc1c[nH]c2ccc(Cl)cc12",
-        "2-(5-chloro-1H-indol-3-yl)ethanoic acid",  # P-44.1(a) chain wins (acid PG)
+        "(5-chloro-1H-indol-3-yl)acetic acid",  # P-44.1(a) chain wins (acid PG); retained acetic (P-65.1.1.1), no locant (P-14.3.4.6)
         "bracket-carboxymethyl-indole",
     ),
 

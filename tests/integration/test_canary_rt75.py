@@ -814,8 +814,8 @@ CANARY_COMPOUNDS = [
         "2-(3-hydroxyphenyl)ethanoic acid",
     ),
     (
-        "CCCCCCCCCc1ccc(OCCO)cc1",  # Sentinel: fragment_loss - nonylphenol ethoxylate
-        "2-phenoxyethan-1-ol",
+        "CCCCCCCCCc1ccc(OCCO)cc1",  # was fragment_loss ('2-phenoxyethan-1-ol', nonyl dropped); aryloxy decorator now carries the ring (P-45.6)
+        "2-(4-nonylphenoxy)ethan-1-ol",
     ),
     (
         r"CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12",  # Sentinel: fragment_loss - heptanoyl pyrrolidinone
@@ -879,15 +879,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "OC(=O)CC1CCCC1",
-        "2-cyclopentylethanoic acid",
+        "cyclopentylacetic acid",  # P-65.1.1.1 retained acetic + P-14.3.4.6 (no locant)
     ),
     (
         "OC(=O)CC1CCC1",
-        "2-cyclobutylethanoic acid",
+        "cyclobutylacetic acid",  # P-65.1.1.1 retained acetic + P-14.3.4.6 (no locant)
     ),
     (
         "OC(=O)CC1CCCCC1",
-        "2-cyclohexylethanoic acid",
+        "cyclohexylacetic acid",  # P-65.1.1.1 retained acetic + P-14.3.4.6 (no locant)
     ),
     (
         "CC(=O)C1CCCCC1",
@@ -1884,7 +1884,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(Cc1ccccc1)OC/C=C/c1ccccc1",  # aromatic,medium
-        "(2E)-3-phenylprop-2-enyl 2-phenylethanoate",
+        "(2E)-3-phenylprop-2-enyl phenylacetate",  # phenylacetic acid retained (BB 6694)
     ),
     (
         "N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CC(=O)O)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
@@ -2727,8 +2727,8 @@ CANARY_COMPOUNDS = [
         "L-tyrosine",
     ),
     (
-        "Oc1cc(O)cc(-c2ccccc2)c1",  # aromatic,small
-        "5,3-dihydroxy-1,1'-biphenyl",
+        "Oc1cc(O)cc(-c2ccccc2)c1",  # aromatic,small; OH is PCG -> -diol suffix on assembly parent (P-28.2.1)
+        "[1,1'-biphenyl]-3,5-diol",
     ),
     (
         "O=C(O)CC/C=C\\C/C=C\\C/C=C\\C=C\\[C@H](O)C/C=C\\C/C=C\\CCO",  # acyclic,medium

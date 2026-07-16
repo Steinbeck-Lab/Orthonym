@@ -2164,19 +2164,41 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         cleaned.append(ptext)
                 all_prefixes = cleaned
 
-    # Assemble the name
-    name = format_suffix_with_locants(
-        stem, unsaturation, suffix, suffix_locants, multiplier
+    # P-65.1.1.1 + P-14.3.4.6: a SUBSTITUTED 2-carbon monocarboxylic acid whose
+    # heteroatom-FG substituent (cyano / sulfanyl / hydroxy / aryloxy) routes
+    # through this polyfunctional path uses the retained parent 'acetic acid'
+    # with the alpha-carbon locants OMITTED — 'cyanoacetic acid' (BB 30999),
+    # 'sulfanylacetic acid' (BB 4967), '(4-chlorophenoxy)acetic acid'. Same rule
+    # as the general_acyclic path (_handler_shared). Guarded to a saturated
+    # 2-carbon CHAIN monoacid with substituents and no stereocentre (a C2 stereo
+    # locant cannot be omitted safely -> keep the systematic 'ethanoic' form).
+    _acetic_context = (
+        principal_group == 'carboxylic_acid'
+        and chain_length == 2 and count == 1
+        and not double_locants and not triple_locants
+        and all_prefixes
+        and not (getattr(features, 'is_cyclic', False)
+                 and not getattr(features, 'chain_is_parent', False))
+        and not features.stereocenters
+        and not getattr(features, 'double_bond_stereo', None)
     )
+    if _acetic_context:
+        from ..assembly.composition_primitives import retained_acetic_from_prefixes
+        name = retained_acetic_from_prefixes(all_prefixes)
+    else:
+        # Assemble the name
+        name = format_suffix_with_locants(
+            stem, unsaturation, suffix, suffix_locants, multiplier
+        )
 
-    # Add prefixes with proper hyphenation at boundary
-    if all_prefixes:
-        prefix_str = _join_prefixes(all_prefixes)
-        # Ensure hyphen between prefix ending with letter and name starting with digit
-        if prefix_str and name and prefix_str[-1].isalpha() and name[0].isdigit():
-            name = f"{prefix_str}-{name}"
-        else:
-            name = f"{prefix_str}{name}"
+        # Add prefixes with proper hyphenation at boundary
+        if all_prefixes:
+            prefix_str = _join_prefixes(all_prefixes)
+            # Ensure hyphen between prefix ending with letter and name starting with digit
+            if prefix_str and name and prefix_str[-1].isalpha() and name[0].isdigit():
+                name = f"{prefix_str}-{name}"
+            else:
+                name = f"{prefix_str}{name}"
 
     # Add stereodescriptors if present
     if features.stereocenters or getattr(features, 'double_bond_stereo', None):
