@@ -24,6 +24,7 @@ Usage:
 """
 
 import logging
+import re
 from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
@@ -2146,6 +2147,12 @@ def _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
         return False
     if lookup_sugar(canonical_smiles) is not None:
         return False  # cataloged -> named, never vetoed
+    # The veto exists to stop a STEREO-DROPPING name; if the molecule has no
+    # defined stereocentre there is nothing to drop, so the general name is valid
+    # -> do NOT veto (review W6B finding: avoid refusing a stereo-free ulosonic).
+    if not any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+               for a in mol.GetAtoms()):
+        return False
     ri = mol.GetRingInfo()
     ketal_acid = False
     for ring in ri.AtomRings():
@@ -2423,19 +2430,19 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
 
 
 def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
-    """Open-chain aldonic/aldaric acid ester (BB P-102.5.6.6.2.1 / P-102.5.6.6.5.3).
-
-    Aldonate: the C1-COOH of an open-chain aldonic acid is esterified ->
-    ``<R> <config>-<stem>onate`` (``propan-2-yl D-gluconate``).
-    Aldarate PARTIAL ester: an aldaric acid (both termini COOH) with exactly ONE
-    terminus esterified -> ``1-<R> hydrogen <config>-<stem>arate``
-    (``1-methyl hydrogen L-altrarate``).
+    """Open-chain ALDONATE ester (BB P-102.5.6.6.2.1): the C1-COOH of an open-chain
+    aldonic acid is esterified -> ``<R> <config>-<stem>onate``
+    (``propan-2-yl D-gluconate``).
 
     Strip-and-name: the alkyl (R) group is named via the ester machinery
     (:func:`~orthonym.rules.esters.get_alkyl_fragment_name`); the residual free
-    sugar-acid must be a RECOGNIZED aldonic/aldaric acid (:func:`name_free_sugar`),
-    else fail-closed.  OPSIN-RT gated; input mol never mutated.  Fail-closed on an
-    aldaric DI-ester, a cyclic acid backbone, or an unrecognized residual acid.
+    sugar-acid must be a RECOGNIZED aldonic acid (:func:`name_free_sugar`), else
+    fail-closed.  OPSIN-RT gated; input mol never mutated.
+
+    The aldarate PARTIAL ester (P-102.5.6.6.5.3) is DEFERRED fail-closed: the
+    residual free diacid canonicalizes identically regardless of which terminus
+    bore the ester, so the esterified-terminus locant/config cannot be derived
+    without shipping a wrong name for the opposite-terminus isomer.
     """
     if mol is None:
         return None
@@ -2532,19 +2539,19 @@ def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
     if acid_name is None:
         return None
 
-    if free_cooh == 0:
-        # Aldonate: the residual must be a recognized aldonic acid.
-        if not acid_name.endswith("onic acid"):
-            return None
-        acylate = acid_name[: -len("ic acid")] + "ate"  # ...onic acid -> ...onate
-        candidate = f"{alkyl_name} {acylate}"
-    else:
-        # Aldarate partial ester: the residual (free) must be a recognized aldaric
-        # acid; the esterified terminus is C1 (lowest locant).
-        if not acid_name.endswith("aric acid"):
-            return None
-        acylate = acid_name[: -len("ic acid")] + "ate"  # ...aric acid -> ...arate
-        candidate = f"1-{alkyl_name} hydrogen {acylate}"
+    # Only the aldonate (single-carboxyl) ester is named.  The aldarate PARTIAL
+    # ester (free_cooh==1) is DEFERRED fail-closed (review W6B finding): the
+    # residual free diacid canonicalizes IDENTICALLY no matter which of the two
+    # termini bore the ester, so the esterified-terminus locant cannot be derived
+    # here (a hardcoded '1-' + the diacid's own config would ship a wrong locant/
+    # config for the opposite-terminus isomer — and the RT gate fails OPEN with no
+    # Java).  Aldonate has no such ambiguity (its single COOH is C1).
+    if free_cooh != 0:
+        return None
+    if not acid_name.endswith("onic acid"):
+        return None
+    acylate = acid_name[: -len("ic acid")] + "ate"  # ...onic acid -> ...onate
+    candidate = f"{alkyl_name} {acylate}"
     if not _mono_name_rt_ok(mol, candidate):
         return None
     return candidate
@@ -2697,13 +2704,22 @@ _GLYCOSYLOXY_SENIOR_SUFFIXES = (
 
 
 def _escalate_enclosing_marks(name: str, token: str, replacement: str) -> Optional[str]:
-    """Replace the single ``token`` inside its enclosing ``(...)`` group with
-    ``replacement`` (which itself carries parentheses), and escalate that group's
-    delimiters from ``(...)`` to ``[...]`` (P-16.3.3 nesting).  Returns the rebuilt
-    name, or ``None`` if ``token`` is absent/ambiguous or unenclosed."""
-    if name.count(token) != 1:
+    """Replace the single WHOLE-WORD ``token`` inside its enclosing ``(...)`` group
+    with ``replacement`` (which itself carries parentheses), and escalate that
+    group's delimiters from ``(...)`` to ``[...]`` (P-16.3.3 nesting).  Returns the
+    rebuilt name, or ``None`` if ``token`` is absent/ambiguous or unenclosed.
+
+    LEFT-boundary match is essential: a substituent token concatenates onto its
+    parent with no space (``methoxyphenyl``), so a right boundary would fail; but a
+    native aglycone methoxy merges with the placeholder under a ``di``/``tri``
+    multiplier (``dimethoxy``), where the token is preceded by a LETTER — so
+    requiring a non-letter to the LEFT excludes the merged form and any second
+    (non-merged / ``methoxycarbonyl``) occurrence pushes the count off 1, failing
+    closed rather than corrupting a multiplied prefix (review W6B finding)."""
+    pat = re.compile(r'(?<![A-Za-z])' + re.escape(token))
+    if len(pat.findall(name)) != 1:
         return None
-    i = name.find(token)
+    i = pat.search(name).start()
     depth = 0
     open_i = None
     for j in range(i - 1, -1, -1):
@@ -2728,7 +2744,7 @@ def _escalate_enclosing_marks(name: str, token: str, replacement: str) -> Option
             depth -= 1
     if close_i is None:
         return None
-    inner = name[open_i + 1:close_i].replace(token, replacement)
+    inner = pat.sub(replacement, name[open_i + 1:close_i])
     return name[:open_i] + "[" + inner + "]" + name[close_i + 1:]
 
 
@@ -2895,7 +2911,21 @@ def _is_sugar_o_ether_leak(mol) -> bool:
             if any(b.GetBondType() == Chem.BondType.DOUBLE
                    and b.GetOtherAtom(r_c).GetAtomicNum() == 8 for b in r_c.GetBonds()):
                 continue
-            return True  # a larger-alkyl / senior-bearing O-ether -> sugar-drop leak
+            # SUGAR-NESS gate (review W6B finding): only veto when the ring is a
+            # REAL sugar -- cap the ether (restore its -OH) and require the isolated
+            # ring to recognize as a monosaccharide.  A plain (non-sugar)
+            # tetrahydropyran/-furan ether is NOT vetoed (it stays nameable).
+            from orthonym.rules.conjugate_controller import _extract_capped_sugar
+            capped = _extract_capped_sugar(mol, idx, nb.GetIdx())
+            if not capped:
+                continue
+            cap_mol = Chem.MolFromSmiles(capped)
+            if cap_mol is None:
+                continue
+            if (lookup_sugar(Chem.MolToSmiles(cap_mol)) is not None
+                    or recognize_sugar_skeleton(cap_mol) is not None
+                    or name_monosaccharide_systematic(cap_mol) is not None):
+                return True  # a real sugar with an O-ether the namers can't handle
     return False
 
 
@@ -2998,9 +3028,18 @@ def name_c_glycosyl_aglycone(mol, canonical_smiles: str) -> Optional[str]:
             return None
         from orthonym import name_compound
         agl_name = name_compound(agl_methyl)
-        if not agl_name or "unknown" in agl_name or agl_name.count("methyl") != 1:
+        if not agl_name or "unknown" in agl_name:
             return None
-        candidate = agl_name.replace("methyl", f"({glycosyl})")
+        # LEFT-boundary 'methyl' only: a substituent concatenates onto its parent
+        # with no space ('methylbenzene'), so a right boundary would fail; but a
+        # native aglycone methyl merges with the placeholder under a di/tri
+        # multiplier ('dimethyl'), where 'methyl' is preceded by a LETTER -> the
+        # left boundary excludes it, and any second occurrence ('methylene',
+        # non-merged native) pushes the count off 1, failing closed (review W6B).
+        pat = re.compile(r'(?<![A-Za-z])methyl')
+        if len(pat.findall(agl_name)) != 1:
+            return None
+        candidate = pat.sub(f"({glycosyl})", agl_name, count=1)
         if not _mono_name_rt_ok(mol, candidate):
             return None
         return candidate

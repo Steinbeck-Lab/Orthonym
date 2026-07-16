@@ -168,16 +168,19 @@ def _anomeric_locant(mol, ring: Tuple[int, ...], ring_oxygen: int,
                      anomeric_idx: int) -> int:
     """The glycosyl unit's anomeric locant ``c``: 1 for an aldose, 2 for a ketose.
 
-    A ketose anomeric carbon (e.g. fructose C2) bears TWO ring carbons; an aldose
-    anomeric carbon (C1) bears exactly one ring carbon. Derived structurally.
-    """
+    A KETOSE anomeric carbon (e.g. fructose C2) bears an EXOCYCLIC carbon — the C1
+    CH2OH — in addition to its ring-carbon neighbour; an aldose anomeric carbon
+    (C1) has no exocyclic carbon (only -OH/-OR / the glycosidic O). Derived
+    structurally by the presence of an exocyclic carbon (review W6B fix: the prior
+    ring-carbon count returned 1 for a keto-furanosyl/-pyranosyl donor, which bears
+    only ONE ring carbon)."""
     ringset = set(ring)
-    ring_carbon_nbrs = [
+    exo_carbon_nbrs = [
         n.GetIdx()
         for n in mol.GetAtomWithIdx(anomeric_idx).GetNeighbors()
-        if n.GetIdx() in ringset and n.GetAtomicNum() == 6
+        if n.GetIdx() not in ringset and n.GetAtomicNum() == 6
     ]
-    return 2 if len(ring_carbon_nbrs) >= 2 else 1
+    return 2 if exo_carbon_nbrs else 1
 
 
 # --------------------------------------------------------------------------- #
