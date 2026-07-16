@@ -476,6 +476,11 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     from orthonym.rules.oligosaccharides import _has_oligo_chain
     if _has_oligo_chain(mol):
         return True
+    # W6B-T12 glycosyloxy on a senior aglycone (sugar O-linked to a non-sugar
+    # aglycone bearing a group senior to hydroxy).
+    from orthonym.data.sugar_names import _has_glycosyloxy_aglycone
+    if _has_glycosyloxy_aglycone(mol):
+        return True
     if _has_anomeric_hetero_sugar(mol):
         return True
     if _has_o_methyl_sugar(mol):
@@ -1000,6 +1005,14 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     amino_open = name_amino_deoxy_open_sugar(mol, canonical_smiles)
     if amino_open is not None:
         return amino_open
+
+    # W6B-T12: glycosyloxy on a senior aglycone (P-102.6.1.2), ABOVE the glycoside
+    # decomposition path so the aglycone-as-parent form wins over the legacy
+    # (glycosyloxy)aglycone form.
+    from orthonym.data.sugar_names import name_glycosyloxy_aglycone
+    glyoxy = name_glycosyloxy_aglycone(mol, canonical_smiles)
+    if glyoxy is not None:
+        return glyoxy
 
     # Disaccharide / oligosaccharide (D-02).
     from orthonym.rules.oligosaccharides import name_disaccharide

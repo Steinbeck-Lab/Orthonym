@@ -484,6 +484,30 @@ class TestW6bAminoDeoxyOpenSugar:
         assert name_amino_deoxy_open_sugar(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
 
 
+class TestW6bGlycosyloxyAglycone:
+    """Wave 6b Task 12 (P-102.6.1.2): glycosyloxy on a senior aglycone; a
+    non-senior aglycone (phenol/methanol) stays a glycoside (fail-closed)."""
+
+    def test_glucosyloxy_acetophenone(self):
+        from orthonym import name_compound
+        # ACCURACY: previously the broken legacy (glycosyloxy)acetophenone -> unknown.
+        assert name_compound("CC(=O)c1ccc(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)cc1") == \
+            "1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one"
+
+    def test_phenyl_glucoside_stays_glycoside(self):
+        from orthonym.data.sugar_names import name_glycosyloxy_aglycone
+        from rdkit import Chem
+        # phenol is NOT senior to hydroxy -> glycosyloxy declines (glycoside form used).
+        smi = "O([C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O)c1ccccc1"
+        assert name_glycosyloxy_aglycone(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+
+    def test_methyl_glucoside_stays_glycoside(self):
+        from orthonym.data.sugar_names import name_glycosyloxy_aglycone
+        from rdkit import Chem
+        smi = "CO[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O"
+        assert name_glycosyloxy_aglycone(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+
+
 @pytest.mark.unit
 class TestGlycosylamineAndHalide:
     """W6-P2 glycosylamine (P-102.6.1.3) + glycosyl halide (P-102.6.1.5).

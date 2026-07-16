@@ -2690,6 +2690,192 @@ def name_amino_deoxy_open_sugar(mol, canonical_smiles: str) -> Optional[str]:
     return candidate
 
 
+_GLYCOSYLOXY_SENIOR_SUFFIXES = (
+    "one", "al", "oic acid", "amide", "nitrile", "carbaldehyde",
+    "carboxylic acid", "carbonitrile", "imine", "oyl chloride", "oyl bromide",
+)
+
+
+def _escalate_enclosing_marks(name: str, token: str, replacement: str) -> Optional[str]:
+    """Replace the single ``token`` inside its enclosing ``(...)`` group with
+    ``replacement`` (which itself carries parentheses), and escalate that group's
+    delimiters from ``(...)`` to ``[...]`` (P-16.3.3 nesting).  Returns the rebuilt
+    name, or ``None`` if ``token`` is absent/ambiguous or unenclosed."""
+    if name.count(token) != 1:
+        return None
+    i = name.find(token)
+    depth = 0
+    open_i = None
+    for j in range(i - 1, -1, -1):
+        if name[j] == ")":
+            depth += 1
+        elif name[j] == "(":
+            if depth == 0:
+                open_i = j
+                break
+            depth -= 1
+    if open_i is None:
+        return None
+    depth = 0
+    close_i = None
+    for j in range(i + len(token), len(name)):
+        if name[j] == "(":
+            depth += 1
+        elif name[j] == ")":
+            if depth == 0:
+                close_i = j
+                break
+            depth -= 1
+    if close_i is None:
+        return None
+    inner = name[open_i + 1:close_i].replace(token, replacement)
+    return name[:open_i] + "[" + inner + "]" + name[close_i + 1:]
+
+
+def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:
+    """Glycosyloxy on a senior aglycone (BB P-102.6.1.2): a sugar O-glycosidically
+    bonded to an aglycone that bears a characteristic group SENIOR to hydroxy is
+    named as a ``(<config>-glycosyloxy)`` substituent PREFIX on the aglycone parent
+    (``1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one``).
+
+    Placeholder mechanism (root-cause, RT-gated): replace the sugar with a methyl
+    (-> the aglycone methyl ether, which Orthonym names natively), require the
+    aglycone to carry a senior-group suffix (else it is a simple glycoside ->
+    fail-closed for the glycoside path), then swap the single ``methoxy`` token for
+    ``(<glycosyloxy>)`` and escalate its enclosing marks (P-16.3.3).  Fail-closed on
+    >1 sugar ring, a free/undefined anomeric, a non-senior aglycone, or an RT-fail.
+    """
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    sugar_rings = [
+        r for r in ri.AtomRings()
+        if len(r) in (5, 6)
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "O") == 1
+        and all(mol.GetAtomWithIdx(i).GetSymbol() in ("C", "O") for i in r)
+    ]
+    if len(sugar_rings) != 1:
+        return None  # 0 -> not a glycoside; >=2 -> disaccharide glycoside (elsewhere)
+    ring = sugar_rings[0]
+    ringset = set(ring)
+    ro = next(i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O")
+    anomeric_idx = anomeric_exo_o = None
+    for idx in ring:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != "C" or not any(n.GetIdx() == ro for n in a.GetNeighbors()):
+            continue
+        exo = [n.GetIdx() for n in a.GetNeighbors()
+               if n.GetIdx() not in ringset and n.GetSymbol() == "O"]
+        if len(exo) == 1:
+            anomeric_idx, anomeric_exo_o = idx, exo[0]
+            break
+    if anomeric_idx is None:
+        return None
+    o_atom = mol.GetAtomWithIdx(anomeric_exo_o)
+    if o_atom.GetTotalNumHs() > 0:
+        return None  # free anomeric -OH -> not a glycoside
+    c_nbrs = [n.GetIdx() for n in o_atom.GetNeighbors() if n.GetAtomicNum() == 6]
+    if len(c_nbrs) != 2:
+        return None
+    aglycone_c = next((c for c in c_nbrs if c != anomeric_idx), None)
+    if aglycone_c is None:
+        return None
+
+    # Recognize the sugar -> glycosyloxy prefix.
+    from orthonym.rules.conjugate_controller import _extract_capped_sugar
+    sugar_canon = _extract_capped_sugar(mol, anomeric_idx, anomeric_exo_o)
+    if not sugar_canon:
+        return None
+    sugar_mol = Chem.MolFromSmiles(sugar_canon)
+    if sugar_mol is None:
+        return None
+    tup = lookup_sugar(Chem.MolToSmiles(sugar_mol)) or recognize_sugar_skeleton(sugar_mol)
+    if tup is None:
+        return None
+    glycosyloxy = sugar_to_glycosyloxy_prefix(*tup)
+
+    # Build the aglycone methyl ether: cleave anomeric-C — glycosidic-O, keep the
+    # aglycone side, and cap the glycosidic O with a methyl.
+    bond = mol.GetBondBetweenAtoms(anomeric_idx, anomeric_exo_o)
+    if bond is None:
+        return None
+    try:
+        frag = Chem.FragmentOnBonds(mol, [bond.GetIdx()], addDummies=True,
+                                    dummyLabels=[(0, 0)])
+        mapping: list = []
+        frags = Chem.GetMolFrags(frag, asMols=True, sanitizeFrags=False,
+                                 fragsMolAtomMapping=mapping)
+    except Exception:
+        return None
+    aglycone_frag = None
+    for fm, mp in zip(frags, mapping):
+        if anomeric_exo_o in mp:
+            aglycone_frag = fm
+            break
+    if aglycone_frag is None:
+        return None
+    rw = Chem.RWMol(aglycone_frag)
+    for at in rw.GetAtoms():
+        if at.GetAtomicNum() == 0:  # dummy where the sugar was -> methyl cap
+            at.SetAtomicNum(6)
+            at.SetNoImplicit(False)
+            at.SetNumExplicitHs(3)
+    try:
+        Chem.SanitizeMol(rw)
+        aglycone_ether = Chem.CanonSmiles(Chem.MolToSmiles(Chem.RemoveHs(rw)))
+    except Exception:
+        return None
+    from orthonym import name_compound
+    ether_name = name_compound(aglycone_ether)
+    if not ether_name or "unknown" in ether_name:
+        return None
+    # The aglycone must bear a group SENIOR to hydroxy (else the glycoside
+    # functional-class form is preferred -> defer to that path).
+    if not any(ether_name.endswith(s) for s in _GLYCOSYLOXY_SENIOR_SUFFIXES):
+        return None
+    if "methoxy" not in ether_name:
+        return None
+    candidate = _escalate_enclosing_marks(ether_name, "methoxy", f"({glycosyloxy})")
+    if candidate is None:
+        return None
+    if not _mono_name_rt_ok(mol, candidate):
+        return None
+    return candidate
+
+
+def _has_glycosyloxy_aglycone(mol) -> bool:
+    """Cheap NO-OPSIN precondition for :func:`name_glycosyloxy_aglycone`: exactly one
+    sugar ring whose anomeric carbon is O-linked (no H) to a non-sugar aglycone
+    carbon."""
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    sugar_rings = [
+        r for r in ri.AtomRings()
+        if len(r) in (5, 6)
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "O") == 1
+        and all(mol.GetAtomWithIdx(i).GetSymbol() in ("C", "O") for i in r)
+    ]
+    if len(sugar_rings) != 1:
+        return False
+    ring = sugar_rings[0]
+    ringset = set(ring)
+    ro = next((i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"), None)
+    if ro is None:
+        return False
+    for idx in ring:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != "C" or not any(n.GetIdx() == ro for n in a.GetNeighbors()):
+            continue
+        exo = [n for n in a.GetNeighbors()
+               if n.GetIdx() not in ringset and n.GetSymbol() == "O"]
+        if len(exo) == 1 and exo[0].GetTotalNumHs() == 0:
+            # anomeric O has 2 carbons; the non-anomeric one is the aglycone
+            if sum(1 for n in exo[0].GetNeighbors() if n.GetAtomicNum() == 6) == 2:
+                return True
+    return False
+
+
 def _has_open_chain_amino_aldose(mol) -> bool:
     """Cheap NO-OPSIN detector (W6B-T9): an acyclic molecule with a terminal
     aldehyde, a secondary alkyl-amine N-H, and >=3 hydroxylated carbons.  The
