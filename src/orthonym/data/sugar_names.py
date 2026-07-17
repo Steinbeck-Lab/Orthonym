@@ -2550,13 +2550,30 @@ def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
     if acid_name is None:
         return None
 
-    # Only the aldonate (single-carboxyl) ester is named.  The aldarate PARTIAL
-    # ester (free_cooh==1) is DEFERRED fail-closed (review W6B finding): the
-    # residual free diacid canonicalizes IDENTICALLY no matter which of the two
-    # termini bore the ester, so the esterified-terminus locant cannot be derived
-    # here (a hardcoded '1-' + the diacid's own config would ship a wrong locant/
-    # config for the opposite-terminus isomer — and the RT gate fails OPEN with no
-    # Java).  Aldonate has no such ambiguity (its single COOH is C1).
+    # W8-P7b.3: aldarate PARTIAL (mono) ester (P-102.5.6.6.5.3), free_cooh==1.
+    # `<n>-<alkyl> hydrogen <config>-<stem>arate`. The 1-vs-6 ester locant labels
+    # two DISTINCT isomers (L-altraric is not palindromic; BB gives both 1-methyl
+    # and 6-methyl hydrogen L-altrarate), so the residual free diacid alone cannot
+    # fix it. Resolve by a HARD OPSIN round-trip of each candidate against the
+    # input — opsin_parse fails-CLOSED (returns None) without Java, so a genuinely
+    # unverifiable input falls through to the systematic name (never a wrong
+    # locant). meso aldarics are not cataloged (name_free_sugar -> None) -> already
+    # fail-closed above. Prefer the lowest ester locant (1 before 6).
+    if free_cooh == 1:
+        if not acid_name.endswith("aric acid"):
+            return None
+        arate = acid_name[: -len("ic acid")] + "ate"  # L-altraric acid -> L-altrarate
+        from ..validation.opsin_roundtrip import opsin_parse
+        target = Chem.MolToSmiles(mol)
+        for locant in (1, 6):
+            cand = f"{locant}-{alkyl_name} hydrogen {arate}"
+            parsed = opsin_parse(cand)
+            if parsed:
+                pm = Chem.MolFromSmiles(parsed)
+                if pm is not None and Chem.MolToSmiles(pm) == target:
+                    return cand
+        return None  # unverifiable / no match -> fail closed (systematic)
+    # Aldonate (single-carboxyl) ester: its single COOH is C1, no locant ambiguity.
     if free_cooh != 0:
         return None
     if not acid_name.endswith("onic acid"):

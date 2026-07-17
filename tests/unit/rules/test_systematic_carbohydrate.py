@@ -452,14 +452,17 @@ class TestW6bAldonateAldarateEster:
         assert name_compound("O=C([C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO)OC") == \
             "methyl D-gluconate"
 
-    def test_aldarate_partial_ester_deferred(self):
+    def test_aldarate_partial_ester_named(self):
         from orthonym.data.sugar_names import name_aldonate_ester
         from rdkit import Chem
-        # Aldarate partial ester is DEFERRED fail-closed (review W6B): the residual
-        # diacid canonicalizes identically regardless of which terminus was
-        # esterified, so the locant/config cannot be derived -> None (never a wrong name).
+        # W8-P7b.3: the aldarate partial ester is now NAMED (P-102.5.6.6.5.3). The
+        # 1-vs-6 ester locant (distinct isomers) is resolved by a HARD OPSIN
+        # round-trip of each candidate against the input (opsin_parse fails-CLOSED
+        # w/o Java), so no wrong locant can ship. (Was previously deferred.)
         smi = "O=C([C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)C(=O)O)OC"
-        assert name_aldonate_ester(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+        assert name_aldonate_ester(
+            Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)
+        ) == "1-methyl hydrogen L-altrarate"
 
     def test_ordinary_esters_unaffected(self):
         from orthonym import name_compound

@@ -40,3 +40,30 @@ def test_uronic_ring_form_unchanged():
     can = Chem.MolToSmiles(Chem.MolFromSmiles(
         "O=C(O)[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O"))
     assert GATED.name(can) == "alpha-D-glucopyranuronic acid"
+
+
+# 7b.3 — aldarate mono-ester (P-102.5.6.6.5.3). The C1 (or C6) carboxyl of an
+# aldaric acid esterified: `<n>-<alkyl> hydrogen <config>-<stem>arate`. The 1-vs-6
+# locant identifies distinct isomers (BB gives both 1-methyl and 6-methyl hydrogen
+# L-altrarate), disambiguated by a HARD OPSIN round-trip (fail-closed w/o Java).
+def test_aldarate_mono_methyl_ester_pin():
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(
+        "COC(=O)[C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)C(=O)O"))
+    assert GATED.name(can) == "1-methyl hydrogen L-altrarate"
+
+
+def test_meso_aldarate_ester_fails_closed():
+    # meso galactarate mono-methyl ester: galactaric acid is not a cataloged
+    # (D/L) aldaric -> the aldarate-ester path must fail closed (valid systematic),
+    # never a wrong retained name.
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(
+        "COC(=O)[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)C(=O)O"))
+    out = GATED.name(can)
+    assert "arate" not in out  # no retained aldarate name; systematic instead
+
+
+def test_aldonate_ester_unchanged():
+    # Regression: single-carboxyl aldonate ester keeps its existing PIN.
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(
+        "CC(C)OC(=O)[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)CO"))
+    assert GATED.name(can) == "propan-2-yl L-gulonate"
