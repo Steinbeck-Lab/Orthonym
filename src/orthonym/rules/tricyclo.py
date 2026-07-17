@@ -779,7 +779,11 @@ def _generate_heteroatom_prefix(
             prefix_parts.append(f"{','.join(str(loc) for loc in locants)}-{mult}{prefix_name}")
 
     if prefix_parts:
-        return "-".join(prefix_parts) + "-"
+        # S1 (v24): replacement 'a'-prefix attaches directly to the descriptor
+        # (P-23.3.1) — no trailing hyphen. (This higher-polycyclo path is currently
+        # unreachable from production, but fix the latent class-bug twin so it can
+        # never surface if wired up; its callers concatenate prefix+descriptor.)
+        return "-".join(prefix_parts)
 
     return ""
 

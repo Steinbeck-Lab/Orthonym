@@ -1892,7 +1892,11 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
         else:
             parts.append(f"{locant_str}-{prefix_name}")
 
-    return '-'.join(parts) + '-' if parts else ""
+    # S1 (v24): the replacement 'a'-prefix attaches DIRECTLY to the von-Baeyer
+    # descriptor (P-23.3.1: `2-oxabicyclo[2.2.2]octane`, not `2-oxa-bicyclo…`).
+    # The internal '-' between multiple replacement terms is kept by the join;
+    # emit NO trailing '-' (the callers concatenate prefix+descriptor directly).
+    return '-'.join(parts) if parts else ""
 
 
 def _is_purely_fused(mol, ring_atoms: Set[int], bridgeheads: Set[int]) -> bool:
@@ -2083,8 +2087,8 @@ def name_polycyclic_with_heteroatoms(mol) -> Optional[str]:
 
     # Assemble the complete name
     # Format: {hetero_prefix}{descriptor}{parent_name}{suffix}
-    # Example: 7-oxa-bicyclo[2.2.1]heptane
-    # Example: 3-oxa-bicyclo[3.2.1]octan-2-one
+    # Example: 7-oxabicyclo[2.2.1]heptane
+    # Example: 3-oxabicyclo[3.2.1]octan-2-one
     name = f"{hetero_prefix}{descriptor}{parent_name}{suffix}"
 
     return name
@@ -2824,7 +2828,16 @@ def name_polycyclic_complete(mol, features=None):
         name_parts.append(stereo_prefix)
 
     if substituent_prefix:
-        name_parts.append(substituent_prefix)
+        # S1 (v24) — same stray-hyphen class: a substituent prefix attaches DIRECTLY
+        # to the parent hydride (P-31/P-23). Keep its trailing '-' ONLY when a
+        # locant-initial heteroatom replacement prefix follows (3,3-dimethyl-2-oxabicyclo…);
+        # drop it when the letter-initial descriptor follows directly, else we emit
+        # `1-methyl-tricyclo…` instead of the PIN `1-methyltricyclo…`.
+        following = hetero_prefix or desc.descriptor_string
+        if following[:1].isdigit():
+            name_parts.append(substituent_prefix)
+        else:
+            name_parts.append(substituent_prefix.rstrip('-'))
 
     if hetero_prefix:
         name_parts.append(hetero_prefix)
@@ -2833,7 +2846,8 @@ def name_polycyclic_complete(mol, features=None):
     name_parts.append(desc.descriptor_string)
     name_parts.append(parent_name)
 
-    # Join - the stereo prefix ends with '-', substituent prefix ends with '-', etc.
+    # Join - the stereo prefix ends with '-'; the substituent prefix's trailing '-'
+    # is handled above (kept before a locant, dropped before the descriptor).
     name = ''.join(name_parts)
 
     return (name, ring_atoms, desc.numbering, True)

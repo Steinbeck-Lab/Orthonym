@@ -1005,7 +1005,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CCCCCC/C=C\\CCCCCCCC(=O)OC[C@@H]1COP(=O)(O)O[C@H]2[C@H](O)[C@@H](O)[C@H](O)[C@@H](CCCCCCC(=O)O1)[C@@H](O)C[C@@H](O)[C@H](/C=C/[C@@H](O)CCCCC)[C@@H](O)[C@H]2O",  # heterocycle,fused-ring,large
-        "(1R,6R,15S,16S,18R,19S,20R,21R,22R,23S,24R)-6-heptadecyl-3,16,18,20,21,22,23,24-octahydroxy-19-octyl-2,4,7-trioxa-3-phospha-bicyclo[13.6.3]tetracosan-8-one",
+        "(1R,6R,15S,16S,18R,19S,20R,21R,22R,23S,24R)-6-heptadecyl-3,16,18,20,21,22,23,24-octahydroxy-19-octyl-2,4,7-trioxa-3-phosphabicyclo[13.6.3]tetracosan-8-one",
     ),
     (
         "CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)OCC(COP(=O)(O)OCCNC)OC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC",  # acyclic,polyfunctional,large
@@ -1101,7 +1101,7 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "CC[C@H]1C=CC=CCC[C@@H](O)[C@@H](C)[C@@H](O)C[C@@H](OC)C[C@@H](O)[C@H](C)[C@H](O)[C@@H](C)C=CC(=O)O[C@H]2C[C@@]3(CC[C@H](C)[C@H](C[C@@H](C)O)O3)O[C@@H](CC1)[C@H]2CC",  # heterocycle,fused-ring,large,carbohydrate
-        "(1S,6S,7R,8S,9R,11R,13S,14R,15R,22R,25S,27R,29R,32S,33S)-22,29-diethyl-7,9,13,15-tetrahydroxy-11-methoxy-6,8,14,32-tetramethyl-33-propyl-2,26,34-trioxa-tricyclo[23.3.1]tetratriaconta-4,18,20-trien-3-one",
+        "(1S,6S,7R,8S,9R,11R,13S,14R,15R,22R,25S,27R,29R,32S,33S)-22,29-diethyl-7,9,13,15-tetrahydroxy-11-methoxy-6,8,14,32-tetramethyl-33-propyl-2,26,34-trioxatricyclo[23.3.1]tetratriaconta-4,18,20-trien-3-one",
     ),
     (
         "C/C1=C/C=C\\C=C/C=C\\C=C/C[C@@H]2C[C@H](O)C[C@](O)(C[C@H](O)C[C@@H](O)/C=C\\C[C@@H](O)C[C@@H](O)C[C@H](O)C[C@H](O)[C@H](C)[C@H](C(C)C)OC1=O)O2",  # heterocycle,fused-ring,large,carbohydrate

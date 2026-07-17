@@ -505,7 +505,49 @@ class TestVonBaeyerLambdaConvention:
     @pytest.mark.unit
     def test_full_name_round_trippable_pin(self):
         from orthonym.namer import name_compound
-        # Gate-off in the unit suite (conftest), so the raw name is emitted;
-        # it carries the stray VB 'a'-prefix hyphen (OPSIN-RT-tolerant).
+        # S1 (v24): the replacement 'a'-prefix attaches DIRECTLY to the von-Baeyer
+        # descriptor (P-23.3.1) — no hyphen. PIN is `3lambda4-thiabicyclo[3.2.1]octane`.
         name = name_compound("C12C[SH2]CC(CC1)C2")
-        assert "3lambda4" in name and "thia" in name and "bicyclo[3.2.1]octane" in name
+        assert name == "3lambda4-thiabicyclo[3.2.1]octane"
+
+
+class TestVonBaeyerReplacementPrefixNoStrayHyphen:
+    """S1 (v24): hetero von-Baeyer replacement prefix must not emit a stray hyphen
+    before the descriptor. PIN = `2-oxabicyclo[...]`, NOT `2-oxa-bicyclo[...]`
+    (P-23.3.1). The spiro/bicyclo.py paths were already correct; polycyclic.py's
+    `get_heteroatom_replacement_prefix` appended a trailing '-' (the duplicated-
+    formatter bug the cross-tool audit flagged as S1)."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,pin", [
+        ("O1CC2CCC1CC2", "2-oxabicyclo[2.2.2]octane"),
+        ("N1CC2CCCC1C2", "6-azabicyclo[3.2.1]octane"),
+        ("O1CC2CCC1O2", "2,7-dioxabicyclo[2.2.1]heptane"),
+        ("C12COCC(CC1)C2", "3-oxabicyclo[3.2.1]octane"),
+    ])
+    def test_no_stray_hyphen_before_descriptor(self, smiles, pin):
+        from orthonym.namer import name_compound
+        name = name_compound(smiles)
+        assert name == pin
+        # defensive: the a-prefix→descriptor join must never carry a hyphen
+        import re
+        assert not re.search(r"a-(?:bi|tri|tetra|penta|hexa|hepta)cyclo", name)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("smiles,pin", [
+        ("CC12CC3CC(C1)CC(C2)C3", "1-methyltricyclo[3.3.1.1^3,7]decane"),
+        ("CC1C2CC3C1C1C2C31", "2-methyltetracyclo[3.3.0.0^3,7.0^4,6]octane"),
+    ])
+    def test_carbocyclic_substituted_vb_no_stray_hyphen(self, smiles, pin):
+        # Same stray-hyphen class as S1, on the SUBSTITUENT-prefix path: for a
+        # substituted CARBOCYCLIC (no-heteroatom) von-Baeyer system the substituent
+        # prefix attaches DIRECTLY to the descriptor (P-31) -> `1-methyltricyclo...`,
+        # not `1-methyl-tricyclo...`. (bicyclo.py handles bicyclo correctly already;
+        # this is the name_polycyclic_complete tricyclo+ path.)
+        from orthonym.namer import name_compound
+        name = name_compound(smiles)
+        assert name == pin
+        import re
+        # a hyphen after a letter (substituent stem OR 'a'-prefix) before the descriptor
+        # is the bug; a stereo ')-' descriptor hyphen is correct and excluded by [a-z].
+        assert not re.search(r"[a-z]-(?:bi|tri|tetra|penta|hexa|hepta|octa|nona|deca)cyclo", name)
