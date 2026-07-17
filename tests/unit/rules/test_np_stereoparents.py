@@ -135,3 +135,23 @@ def test_name_exact_diterpene_triterpene_parents(smi, expected):
 def test_name_exact_alkaloid_parents(smi, expected):
     can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
     assert RAW.name(can) == expected
+
+
+# 7a.2c — bicyclic+ sesqui/di/sesterterpene parents (P-101.2.7 Table 10.1c).
+# Complex polycyclic (2-4 rings), analogs of the shipped cadinane/guaiane/eudesmane
+# (bicyclic sesquiterpane) class -> semisystematic PIN. Two-source verified,
+# OPSIN-unparseable -> name-exact. himachalane/ophiobolane were mis-named
+# (substituent/ring drop); picrasane/trichothecane carry a skeletal ether O.
+@pytest.mark.parametrize("smi,expected", [
+    ("C[C@H]1CC[C@H]2C(C)(C)CCC[C@]2(C)[C@H]1C", "drimane"),
+    ("CC(C)[C@@H]1CC[C@H](C)[C@@H]2CCC[C@@]2(C)C1", "ambrosane"),
+    ("CC(C)[C@@H]1CC[C@H]2CCC[C@H](C)[C@@]2(C)C1", "eremophilane"),
+    ("C[C@@H]1CCC[C@@H]2CC[C@@H]3[C@@H](C3(C)C)[C@]21C", "aristolane"),
+    ("CC1CC[C@H]2C(C)CCCC(C)(C)[C@H]2C1", "himachalane"),
+    ("CC(C)CCC[C@H](C)[C@H]1CC[C@]2(C)C[C@H]3[C@H](CC[C@@H]3C)[C@@H](C)CC[C@@H]12", "ophiobolane"),
+    ("C[C@@H]1CCC[C@]2(C)[C@H]3CC[C@H](C)[C@@H]4CCO[C@H](C[C@@H]12)[C@]34C", "picrasane"),
+    ("CC1CC[C@@]2(C)[C@@H](C1)O[C@@H]1CC[C@@]2(C)[C@@H]1C", "trichothecane"),
+])
+def test_name_exact_sesqui_di_terpene_parents(smi, expected):
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+    assert RAW.name(can) == expected

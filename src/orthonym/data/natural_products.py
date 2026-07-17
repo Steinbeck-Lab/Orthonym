@@ -148,6 +148,17 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@H]1CC[C@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@@]12C": "protostane",  # OORMXZNMRWBSTK
     "C[C@@H]1[C@@H]2CCC(C)(C)[C@H]2CC[C@@]23C[C@@H](CC[C@@H]12)[C@@H](C)C3": "grayanotoxane",  # OPCBUBFCCPXFES
     "CC[C@]1(C)CC[C@]2(C)[C@H](CC[C@@H]3[C@H]2CCCC3(C)C)C1": "rosane",  # CZEZFPXHDTYEBI
+    #   W8-P7a.2c bicyclic+ sesqui/di/sesterterpene parents (Table 10.1c) — analogs of
+    #   cadinane/guaiane/eudesmane above; two-source verified; OPSIN-unparseable. himachalane/
+    #   ophiobolane were mis-named (drop); picrasane/trichothecane have a skeletal ether O:
+    "C[C@H]1CC[C@H]2C(C)(C)CCC[C@]2(C)[C@H]1C": "drimane",  # CVRSZZJUWRLRDE
+    "CC(C)[C@@H]1CC[C@H](C)[C@@H]2CCC[C@@]2(C)C1": "ambrosane",  # TUKMYOLTOOBHQF
+    "CC(C)[C@@H]1CC[C@H]2CCC[C@H](C)[C@@]2(C)C1": "eremophilane",  # AJWBFJHTFGRNDG
+    "C[C@@H]1CCC[C@@H]2CC[C@@H]3[C@@H](C3(C)C)[C@]21C": "aristolane",  # MKGHZTWCWRGKCY
+    "CC1CC[C@H]2C(C)CCCC(C)(C)[C@H]2C1": "himachalane",  # DSIZXZISLDRGBM
+    "CC(C)CCC[C@H](C)[C@H]1CC[C@]2(C)C[C@H]3[C@H](CC[C@@H]3C)[C@@H](C)CC[C@@H]12": "ophiobolane",  # YDDRLCGKYATUCE
+    "C[C@@H]1CCC[C@]2(C)[C@H]3CC[C@H](C)[C@@H]4CCO[C@H](C[C@@H]12)[C@]34C": "picrasane",  # XKTUNHQVVRTGNO
+    "CC1CC[C@@]2(C)[C@@H](C1)O[C@@H]1CC[C@@]2(C)[C@@H]1C": "trichothecane",  # IZGCNPIQWCRGSF
     #   prostanoids (Table 10.1d) — these DO OPSIN-RT, but the retained NP parent is the PIN:
     "CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC": "prostane",
     "CCCCCCCC[C@H]1OCCC[C@@H]1CCCCCCC": "thromboxane",
@@ -394,6 +405,9 @@ NAME_EXACT_NP_PARENTS = frozenset({
     # Wave-8 P7a.2b: clean CHN alkaloid parent hydrides (Table 10.1a) — two-source verified.
     "cevane", "conanine", "corynan", "corynoxan", "emetan", "erythrinan", "galanthan",
     "hasubanan", "kopsan", "lycopodane", "solanidane", "tubulosan",
+    # Wave-8 P7a.2c: bicyclic+ sesqui/di/sesterterpene parents (Table 10.1c) — two-source verified.
+    "drimane", "ambrosane", "eremophilane", "aristolane", "himachalane", "ophiobolane",
+    "picrasane", "trichothecane",
     # Wave-8 P7c: sphingoid unsaturated parent (P-107.4.3.1, BB:55235) — OPSIN-unparseable.
     "(4E)-sphing-4-enine",
 })
