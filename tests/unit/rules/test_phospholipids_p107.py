@@ -22,6 +22,7 @@ from rdkit.Chem import rdCIPLabeler
 from orthonym.namer import Orthonym
 
 RAW = Orthonym(_disable_opsin_validity_gate=True)
+GATED = Orthonym()
 
 # (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol — verified CIP below.
 SPHING_4_ENINE = "CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO"
@@ -47,3 +48,12 @@ def test_sphing_4_enine_is_pin_not_sphingosine():
 def test_sphinganine_retained_name_unchanged():
     # Saturated C18 parent keeps its retained PIN (regression guard).
     assert RAW.name(SPHINGANINE) == "sphinganine"
+
+
+def test_phosphatidylserine_serine_parent_pin():
+    # 7c.3 (P-107.3.3): phosphatidylserine is named on the L-serine parent (the
+    # carboxylic acid outranks the phosphorus oxoacid, P-41), NOT the phosphate-
+    # ester-parent form. Locant/config RT-verified.
+    ps = "CCCCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)(O)OC[C@H](N)C(=O)O)OC(=O)CCCCCCCCCCCCCCCCC"
+    assert GATED.name(ps) == (
+        "O-{[(2R)-2,3-bis(octadecanoyloxy)propoxy]hydroxyphosphoryl}-L-serine")
