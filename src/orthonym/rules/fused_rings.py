@@ -840,9 +840,20 @@ def name_fused_heterocycle(mol):
             return (_lam_name, ring_atoms, {}, True)
         return None
 
-    # Check xanthine derivatives FIRST (caffeine, theophylline, etc.)
-    # These have specific N-position numbering that differs from standard
-    # heterocycle patterns (uses numeric locants like 1,3,7-trimethyl)
+    # Substituted purine-2,6-dione class (caffeine, theophylline, theobromine,
+    # paraxanthine, N-/8-substituted xanthines): systematic PIN on the retained
+    # purine parent with fixed numbering. Runs BEFORE the xanthine lookup so any
+    # alkyl/halogen-substituted member is named structurally (fixed-parent form
+    # 3,7-dihydro-1H-purine-2,6-dione) rather than via brittle canonical-SMILES
+    # keys; declines (fail-closed) for the bare parent, which keeps its retained
+    # name below.
+    from .purine_oxo import name_purine_26_dione
+    purine_dione_name = name_purine_26_dione(mol)
+    if purine_dione_name:
+        return (purine_dione_name, ring_atoms, {}, True)
+
+    # Check xanthine derivatives (caffeine, theophylline, etc.) — retained
+    # 'xanthine'/'hypoxanthine' parents and any member the class engine declines.
     xanthine_name = get_xanthine_name(mol)
     if xanthine_name:
         return (xanthine_name, ring_atoms, {}, True)

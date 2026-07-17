@@ -91,10 +91,12 @@ class TestXanthineData:
                 break
 
         assert theophylline_data is not None, "Theophylline entry not found"
-        assert theophylline_data['systematic_name'] == '1,3-dimethyl-7H-purine-2,6-dione'
+        # PIN uses the fixed family form 3,7-dihydro-1H-purine-2,6-dione (the
+        # older 7H- spelling was non-preferred; corrected 2026-07-17).
+        assert theophylline_data['systematic_name'] == '1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione'
         assert theophylline_data['n_positions'] == [1, 3]
-        assert theophylline_data['indicated_h'] == '7H'
-        assert theophylline_data['saturation'] is None  # No dihydro prefix
+        assert theophylline_data['indicated_h'] == '1H'
+        assert theophylline_data['saturation'] == '3,7-dihydro'
 
     @pytest.mark.unit
     def test_theobromine_entry(self):
@@ -197,7 +199,7 @@ class TestXanthineNaming:
         """Theophylline systematic name should be correct."""
         mol = Chem.MolFromSmiles('Cn1c2c(c(=O)n(c1=O)C)[nH]cn2')
         result = get_xanthine_name(mol)
-        assert result == '1,3-dimethyl-7H-purine-2,6-dione'
+        assert result == '1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione'
 
     @pytest.mark.unit
     def test_theobromine_systematic_name(self):

@@ -52,17 +52,19 @@ XANTHINE_DERIVATIVES: Dict[str, Dict[str, Any]] = {
     },
 
     # =========================================================================
-    # Theophylline: 1,3-dimethyl-7H-purine-2,6-dione
-    # N-1 and N-3 methylated, N-7 has H (7H indicated)
+    # Theophylline: 1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione
+    # N-1 and N-3 methylated, N-7 has H. The purine-2,6-dione parent has the
+    # fixed 3,7-dihydro-1H- added/indicated-H form for the whole family (verified
+    # OPSIN RT 2026-07-17); the older 7H- form was a non-preferred spelling.
     # Canonical: Cn1c(=O)c2[nH]cnc2n(C)c1=O
     # =========================================================================
     'Cn1c(=O)c2[nH]cnc2n(C)c1=O': {
-        'systematic_name': '1,3-dimethyl-7H-purine-2,6-dione',
+        'systematic_name': '1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione',
         'common_name': 'theophylline',
         'n_positions': [1, 3],
         'n_substituents': ['methyl', 'methyl'],
-        'indicated_h': '7H',
-        'saturation': None,
+        'indicated_h': '1H',
+        'saturation': '3,7-dihydro',
         'parent': 'purine-2,6-dione',
     },
 
@@ -85,9 +87,10 @@ XANTHINE_DERIVATIVES: Dict[str, Dict[str, Any]] = {
     # Paraxanthine: 1,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione
     # N-1 and N-7 methylated, N-3 has H
     # Major caffeine metabolite
-    # Canonical: Cn1cnc2c(=O)[nH]c(=O)n(C)c21
+    # Canonical: Cn1c(=O)[nH]c2ncn(C)c2c1=O  (OPSIN-authoritative; the previous
+    # key was a wrong-regiochemistry structure that never matched -> abstained)
     # =========================================================================
-    'Cn1cnc2c(=O)[nH]c(=O)n(C)c21': {
+    'Cn1c(=O)[nH]c2ncn(C)c2c1=O': {
         'systematic_name': '1,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione',
         'common_name': 'paraxanthine',
         'n_positions': [1, 7],
