@@ -530,11 +530,14 @@ class TestW6bCGlycosyl:
         from orthonym import name_compound
         assert name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "beta-D-glucopyranose"
 
-    def test_n_o_yl_deferred_not_wrong(self):
+    def test_n_o_yl_named(self):
         from orthonym import name_compound
-        # n-O-yl deferred: must fail-closed to 'unknown', never a wrong name.
+        # W8-P7b.5 (P-102.6.2): the glycosyloxy n-O-yl is now NAMED (sugar bonded
+        # via a non-anomeric ring O -> <anomer>-<config>-glycopyranos-n-O-yl on the
+        # senior parent). The locant is RT-verified (fail-closed w/o Java). (Was
+        # previously deferred fail-closed to 'unknown'.)
         got = name_compound("OC[C@H]1O[C@@H](O)[C@H](OCC(=O)O)[C@@H](O)[C@H]1O")
-        assert got == "unknown organic compound"
+        assert got == "(beta-D-galactopyranos-2-O-yl)acetic acid"
 
 
 @pytest.mark.unit

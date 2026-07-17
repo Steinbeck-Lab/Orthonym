@@ -62,6 +62,14 @@ def test_meso_aldarate_ester_fails_closed():
     assert "arate" not in out  # no retained aldarate name; systematic instead
 
 
+def test_glycosyloxy_n_o_yl_pin():
+    # 7b.5 (P-102.6.2): sugar attached via a NON-anomeric O to acetic acid ->
+    # (beta-D-glucopyranos-2-O-yl)acetic acid.
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(
+        "O=C(O)CO[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O"))
+    assert GATED.name(can) == "(beta-D-glucopyranos-2-O-yl)acetic acid"
+
+
 def test_aldonate_ester_unchanged():
     # Regression: single-carboxyl aldonate ester keeps its existing PIN.
     can = Chem.MolToSmiles(Chem.MolFromSmiles(

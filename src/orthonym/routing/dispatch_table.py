@@ -1029,7 +1029,15 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     if cgly is not None:
         return cgly
 
-    # W6B-T13 fail-closed veto (n-O-yl, P-102.6.2 deferred): a sugar-O-ether the
+    # W8-P7b.5: glycosyloxy n-O-yl on a senior parent (P-102.6.2) — a sugar bonded
+    # via a NON-anomeric ring O -> (<anomer>-<config>-glycopyranos-n-O-yl)<parent>.
+    # Fires ABOVE the deferral veto below; fail-closed (None) on any non-exact shape.
+    from orthonym.data.sugar_names import name_glycosyloxy_yl_parent
+    noyl = name_glycosyloxy_yl_parent(mol, canonical_smiles)
+    if noyl is not None:
+        return noyl
+
+    # W6B-T13 fail-closed veto (n-O-yl, P-102.6.2 remainder): a sugar-O-ether the
     # namers cannot handle would otherwise drop the sugar (a wrong name) via the
     # general chain namer -> refuse ('' -> unknown), never ship a sugar-dropping name.
     from orthonym.data.sugar_names import _is_sugar_o_ether_leak
