@@ -1034,6 +1034,19 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
     if not ring_double_bonds:
         return None
 
+    # Atom-conservation veto (R12, P-58.2.2.3): this emitter produces only a bare
+    # `<locants>-<prefix><parent>` name with NO substituent slot, so any exocyclic
+    # heavy-atom neighbour on a ring atom (e.g. the two ring-fusion -OH of
+    # naphthalene-4a,8a-diol) would be silently DROPPED, naming a different
+    # molecule. Gated, SELF-01 catches it; gate-off (no Java) it would ship the
+    # atom-dropped name. Fail closed here at the source so a substituted system is
+    # never mis-named as its bare hydro-parent. (Unsubstituted hydro-fused
+    # carbocycles have no off-ring heavy neighbour and are unaffected.)
+    for idx in ring_atoms:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() not in ring_atoms and nb.GetAtomicNum() > 1:
+                return None
+
     # The sp3 (saturated / "hydro") ring atoms.
     sp3_atoms = {
         idx for idx in ring_atoms

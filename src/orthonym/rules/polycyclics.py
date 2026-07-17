@@ -1471,6 +1471,22 @@ def name_partially_saturated_carbocycle(mol) -> Optional[str]:
     if sat_info is None:
         return None
 
+    # Atom-conservation veto (R12, P-58.2.2.3): this path names aromatic-ring
+    # substituents itself and relies on enrichment for NON-fusion sp3-ring
+    # substituents, but NEITHER can place a substituent on a ring-FUSION atom.
+    # A fusion atom bearing an off-ring heavy neighbour (e.g. the two 4a,8a-OH of
+    # naphthalene-4a,8a-diol, or a 4a-methyl) would therefore be silently dropped,
+    # naming a different molecule. Gated, SELF-01 catches it; gate-off (no Java)
+    # it would ship the atom-dropped name. Fail closed at the source. (General:
+    # any fusion-atom substituent declines, not a diol special-case.)
+    ri = mol.GetRingInfo()
+    for idx in ring_atoms:
+        if ri.NumAtomRings(idx) < 2:
+            continue  # not a ring-fusion atom
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() not in ring_atoms and nb.GetAtomicNum() > 1:
+                return None
+
     # Build the name
     return _assemble_partially_saturated_carbocycle_name(mol, sat_info)
 
