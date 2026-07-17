@@ -222,11 +222,31 @@ def get_alkoxy_prefix(
                 # decorated heteroaryl: 'pyridin-2-yl' -> 'pyridin-2-yloxy'
                 return dec + "oxy"
             return None
-        # dec is None -> a BARE ring (this function only decorates). Bare benzene
-        # is the only aromatic that contracts to 'phenoxy'; a bare heteroaryl /
-        # fused ring would drop its identity, so fail closed.
-        if all_carbon_6 and len(frag) == 6:
+        # dec is None -> a BARE ring (decorated_ring_substituent_name only handles
+        # DECORATED rings). Bare benzene contracts to the retained 'phenoxy'; a bare
+        # heteroaryl or fused-aryl ring is named from its full aromatic ring SYSTEM
+        # as '<ring>-yloxy' (W8-P2 Task 2.1, P-63.2.2.2 / P-29.3.1) instead of being
+        # dropped (the drop shipped a bare-parent name like 'ethanoic acid' gate-off).
+        # Atom-drop veto: name ONLY when the perceived aromatic ring system is exactly
+        # the collected fragment — any undecorated extra atom means an unhandled
+        # substituent, so fail closed (never drop).
+        _rings = [set(r) for r in ring_info.AtomRings()]
+        _sys = set(next(r for r in _rings if sub_carbon in r))
+        _changed = True
+        while _changed:
+            _changed = False
+            for _r in _rings:
+                if _r & _sys and not _r <= _sys:
+                    _sys |= _r
+                    _changed = True
+        if set(frag) != _sys:
+            return None  # undecorated extra atoms -> fail closed
+        if all_carbon_6 and len(_sys) == 6:
             return "phenoxy"
+        from ..rules.ring_substituents import get_ring_substituent_name
+        _nm = get_ring_substituent_name(mol, tuple(_sys), sub_carbon)
+        if _nm and _nm.endswith("yl") and _nm != "phenyl":
+            return _nm + "oxy"
         return None
 
     # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
