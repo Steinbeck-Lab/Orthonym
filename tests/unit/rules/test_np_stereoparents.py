@@ -109,3 +109,29 @@ def test_homolog_skeleton_namer_emits_no_steroid_retained_name():
 def test_name_exact_diterpene_triterpene_parents(smi, expected):
     can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
     assert RAW.name(can) == expected   # gate-off raw namer (name-exact path)
+
+
+# 7a.2b — complex polycyclic alkaloid stereoparents (P-101.2.7 Table 10.1a).
+# Clean CHN-only saturated parent hydrides, OPSIN-unparseable -> name-exact, two-
+# source verified (PubChem + NCI CACTUS full InChIKey). Direct analogs of the
+# shipped yohimban/aspidospermidine/vincane class (semisystematic PIN, P-101.2).
+# Several currently ship WRONG atom-dropped names (cevane->methylpiperidine,
+# corynan->diethylpiperidine, emetan->tetrahydroisoquinoline) -> this also closes
+# those structural leaks.
+@pytest.mark.parametrize("smi,expected", [
+    ("C[C@H]1CC[C@H]2[C@H](C)[C@H]3CC[C@@H]4[C@@H](C[C@H]5[C@H]4CC[C@@H]4CCCC[C@@]45C)[C@@H]3CN2C1", "cevane"),
+    ("C[C@H]1[C@H]2CC[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]23CN1C", "conanine"),
+    ("CC[C@H]1C[C@H]2c3[nH]c4ccccc4c3CCN2C[C@@H]1CC", "corynan"),
+    ("CC[C@@H]1CN2CC[C@@]3(CNc4ccccc43)[C@@H]2C[C@@H]1CC", "corynoxan"),
+    ("CC[C@H]1CN2CCc3ccccc3[C@@H]2C[C@@H]1C[C@H]1NCCc2ccccc21", "emetan"),
+    ("c1ccc2c(c1)CCN1CC[C@@H]3CCCC[C@@]231", "erythrinan"),
+    ("c1ccc2c(c1)CN1CC[C@@H]3CCC[C@@H]2[C@@H]31", "galanthan"),
+    ("c1ccc2c(c1)CC[C@@]13CCCC[C@@]21CCN3", "hasubanan"),
+    ("c1ccc2c(c1)N[C@]13CC[C@]45CCCN6CC(C[C@@H]1C4)[C@]23[C@@H]65", "kopsan"),
+    ("C1C[C@@H]2CC[C@@H]3CCC[C@@]24[C@@H]3CCCN4C1", "lycopodane"),
+    ("C[C@H]1CC[C@@H]2[C@@H](C)[C@H]3[C@H](C[C@H]4[C@@H]5CCC6CCCC[C@]6(C)[C@H]5CC[C@]34C)N2C1", "solanidane"),
+    ("CC[C@H]1CN2CCc3ccccc3[C@@H]2C[C@@H]1C[C@H]1NCCc2c1[nH]c1ccccc21", "tubulosan"),
+])
+def test_name_exact_alkaloid_parents(smi, expected):
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+    assert RAW.name(can) == expected
