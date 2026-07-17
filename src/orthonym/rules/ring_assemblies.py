@@ -1629,6 +1629,254 @@ def _ring_assembly_pcg_suffix(mol, sub_atoms: List[int],
     return None
 
 
+# Suffix-expressible ring-assembly PCG kind -> its detachable PREFIX form, used
+# when a group is DEMOTED (a more-senior PCG on the same assembly takes the
+# suffix). All RT-verified against OPSIN 2.9 (P-66.6.1 carboxy, aldehyde->formyl,
+# nitrile->cyano, P-63.1 hydroxy, P-62 amino).
+_RING_ASSEMBLY_PCG_PREFIX = {
+    'carboxylic acid': 'carboxy',
+    'carbaldehyde': 'formyl',
+    'carbonitrile': 'cyano',
+    'amine': 'amino',
+    'ol': 'hydroxy',
+}
+
+# Suffix-expressible ring-assembly PCG kind -> its rules.seniority key (so the
+# senior group is picked with the SHARED seniority order, never a hand-coded one).
+_RING_ASSEMBLY_PCG_SENIORITY_KEY = {
+    'carboxylic acid': 'carboxylic_acid',
+    'carbonitrile': 'nitrile',
+    'carbaldehyde': 'aldehyde',
+    'ol': 'alcohol',
+    'amine': 'primary_amine',
+}
+
+
+def _is_nitro_substituent(mol, sub_atoms: List[int],
+                          attachment_atom: int) -> bool:
+    """True iff *sub_atoms* is a nitro group -NO2 attached via its nitrogen
+    (matches both the [N+](=O)[O-] and neutral N(=O)=O drawings). Prefix
+    'nitro' (P-61.5.1)."""
+    if len(sub_atoms) != 3:
+        return False
+    n = mol.GetAtomWithIdx(attachment_atom)
+    if n.GetSymbol() != 'N':
+        return False
+    oxygens = [i for i in sub_atoms if i != attachment_atom]
+    if len(oxygens) != 2:
+        return False
+    return all(
+        mol.GetAtomWithIdx(i).GetSymbol() == 'O'
+        and mol.GetAtomWithIdx(i).GetDegree() == 1
+        for i in oxygens
+    )
+
+
+def _mixed_ring_assembly_prefix_name(
+    mol, sub_atoms: List[int], attachment_atom: int, pcg_kind: Optional[str]
+) -> Optional[str]:
+    """Prefix name for a NON-principal substituent in the mixed prefix+suffix
+    ring-assembly builder. Fails CLOSED (returns None) for anything outside the
+    supported carbocyclic-biaryl class, so the caller abstains rather than ship
+    a garbage/dropped prefix (the local ``_name_substituent`` returns the string
+    ``"substituent"`` / an ``"unknown organic compound"`` mangle for groups it
+    cannot name -- a no-Java leak).
+
+    Supported: demoted suffix-expressible PCG kinds (carboxy/formyl/cyano/
+    amino/hydroxy), nitro, single halogen, all-C/H alkyl, and O-attached alkoxy.
+    Every suffix-expressible group is one of the recognised PCG kinds, so a group
+    MORE senior than the chosen suffix can only reach here via an unrecognised
+    heteroatom pattern -> None -> abstain (never a wrong suffix)."""
+    if pcg_kind is not None:
+        return _RING_ASSEMBLY_PCG_PREFIX.get(pcg_kind)  # None -> abstain
+    if _is_nitro_substituent(mol, sub_atoms, attachment_atom):
+        return 'nitro'
+    # Single halogen.
+    if len(sub_atoms) == 1:
+        sym = mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol()
+        halo = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
+        if sym in halo:
+            return halo[sym]
+    # All-carbon/hydrogen alkyl.
+    if all(mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H') for i in sub_atoms):
+        nm = _name_substituent(mol, sub_atoms, attachment_atom)
+        if nm and nm != 'substituent' and 'unknown' not in nm:
+            return nm
+        return None
+    # O-attached alkoxy (O then only C/H).
+    a = mol.GetAtomWithIdx(attachment_atom)
+    if a.GetSymbol() == 'O' and attachment_atom in sub_atoms:
+        rest = [i for i in sub_atoms if i != attachment_atom]
+        if rest and all(
+            mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H') for i in rest
+        ):
+            nm = _name_substituent(mol, sub_atoms, attachment_atom)
+            if nm and nm != 'substituent' and 'unknown' not in nm:
+                return nm
+    return None
+
+
+def _build_mixed_pcg_ring_assembly(
+    mol, substituent_list: List[Dict], pcg_kinds: List[Optional[str]],
+    ring_systems: List[Set[int]], connections: List[Tuple[int, int, int, int]],
+    ring_name: str, multiplier: str, connection_str: str, count: int,
+) -> Optional[str]:
+    """Name a 2-ring CARBOCYCLIC assembly (biphenyl class) that bears a
+    suffix-expressible PCG mixed with other substituents (P-28.2.1 + P-66).
+
+    The most SENIOR PCG (via rules.seniority) is expressed as the assembly
+    SUFFIX on the enclosed parent; every other substituent becomes a detachable
+    PREFIX. The PCG-bearing ring is numbered UNPRIMED so the suffix takes the
+    lowest locant (P-31.1.4.3.4); the numbering direction of each ring is chosen
+    by first-point-of-difference on (suffix locants, then all substituent
+    locants, then the alphabetically-first prefix). PIN form places NO hyphen
+    between the prefix block and the opening bracket (BB P-16.3.3 examples:
+    6,6'-dinitro[1,1'-biphenyl]-2,2'-dicarboxylic acid).
+
+    Returns the PIN, or None to fail CLOSED (out-of-class / un-nameable prefix),
+    letting ``name_ring_assembly`` fall through to its veto / prefix-only path.
+    """
+    from .seniority import compare_seniority
+    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
+
+    # Scope: exactly a 2-component, single-bond, all-carbon single-ring assembly.
+    if count != 2 or len(connections) != 1 or len(ring_systems) != 2:
+        return None
+    present = [k for k in pcg_kinds if k is not None]
+    if not present:
+        return None  # no suffix-expressible PCG -> not this builder's job
+
+    ri = mol.GetRingInfo()
+    a1, a2, s1, s2 = connections[0]
+    junction = {s1: a1, s2: a2}
+    ring_of: Dict[int, Tuple[int, ...]] = {}
+    for sidx, satoms in enumerate(ring_systems):
+        rings = [r for r in ri.AtomRings() if set(r) <= set(satoms)]
+        if len(rings) != 1:
+            return None  # fused component -> out of class
+        ring = rings[0]
+        if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring):
+            return None  # heterocyclic assembly numbers junction != 1 -> abstain
+        if sidx not in junction or junction[sidx] not in ring:
+            return None
+        ring_of[sidx] = ring
+
+    # Senior PCG kind (shared seniority order; lower index = more senior).
+    senior = present[0]
+    for k in present[1:]:
+        if compare_seniority(
+            _RING_ASSEMBLY_PCG_SENIORITY_KEY[k],
+            _RING_ASSEMBLY_PCG_SENIORITY_KEY[senior],
+        ) < 0:
+            senior = k
+
+    # Partition; compute prefix names now (abstain on any un-nameable group).
+    suffix_subs, prefix_subs = [], []
+    for s, k in zip(substituent_list, pcg_kinds):
+        if k == senior:
+            suffix_subs.append(s)
+        else:
+            nm = _mixed_ring_assembly_prefix_name(
+                mol, s['sub_atoms'], s['sub_atoms'][0], k)
+            if nm is None:
+                return None  # un-nameable substituent -> fail closed
+            prefix_subs.append((s, nm))
+    if not suffix_subs:
+        return None
+
+    # Per-ring position maps (junction = locant 1; both walk directions).
+    def _position_maps(ring: Tuple[int, ...], conn: int) -> List[Dict[int, int]]:
+        rset = set(ring)
+        adj: Dict[int, List[int]] = {i: [] for i in ring}
+        for b in mol.GetBonds():
+            x, y = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if x in rset and y in rset:
+                adj[x].append(y)
+                adj[y].append(x)
+        maps: List[Dict[int, int]] = []
+        for first in adj[conn]:
+            visited = [conn]
+            cur = first
+            while cur != conn:
+                visited.append(cur)
+                nxt = [nn for nn in adj[cur] if nn not in visited]
+                if not nxt:
+                    break
+                cur = nxt[0]
+            if len(visited) == len(ring):
+                maps.append({a: i + 1 for i, a in enumerate(visited)})
+        return maps or [{a: i + 1 for i, a in enumerate(ring)}]
+
+    pos_maps = {
+        sidx: _position_maps(ring_of[sidx], junction[sidx])
+        for sidx in ring_of
+    }
+
+    # Search priming (which system is unprimed) x direction per ring; pick the
+    # assignment with lowest (suffix keys, all-substituent keys, alpha-first).
+    # A locant key is (number, prime_count): unprimed (0) < primed (1) at equal
+    # number, so plain tuple sort implements the P-31.1.4.3.4 lowest-locant rule.
+    best = None
+    best_key = None
+    systems = list(ring_of)  # [0, 1]
+    for unprimed in systems:
+        prime_of = {unprimed: 0, [x for x in systems if x != unprimed][0]: 1}
+        for m0 in pos_maps[systems[0]]:
+            for m1 in pos_maps[systems[1]]:
+                pmap = {systems[0]: m0, systems[1]: m1}
+
+                def _key(s):
+                    sy = s['system_idx']
+                    return (pmap[sy][s['ring_atom']], prime_of[sy])
+
+                suffix_keys = sorted(_key(s) for s in suffix_subs)
+                all_keys = sorted(
+                    [_key(s) for s in suffix_subs]
+                    + [_key(s) for s, _ in prefix_subs]
+                )
+                alpha_first = None
+                if prefix_subs:
+                    first_sub = min(prefix_subs, key=lambda sn: alpha_sort_key(sn[1]))
+                    alpha_first = _key(first_sub[0])
+                cand = (suffix_keys, all_keys, alpha_first or (0, 0))
+                if best_key is None or cand < best_key:
+                    best_key = cand
+                    best = (prime_of, pmap)
+
+    prime_of, pmap = best
+
+    def _loc(s):
+        sy = s['system_idx']
+        return pmap[sy][s['ring_atom']], prime_of[sy]
+
+    # Suffix block.
+    suffix_keys = sorted(_loc(s) for s in suffix_subs)
+    suffix_loc_str = ",".join(
+        f"{num}{_format_prime(pr)}" for num, pr in suffix_keys)
+    smult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(len(suffix_keys))
+    if smult is None:
+        return None
+    core = (f"[{connection_str}-{multiplier}{ring_name}]"
+            f"-{suffix_loc_str}-{smult}{senior}")
+
+    # Prefix block (alphanumerical, grouped multipliers). Directly abuts '[' with
+    # NO hyphen (P-16.3.3: no hyphen before an opening enclosing mark).
+    by_name: Dict[str, List[Tuple[int, int]]] = {}
+    for s, nm in prefix_subs:
+        by_name.setdefault(nm, []).append(_loc(s))
+    prefix_parts = []
+    for nm in sorted(by_name, key=alpha_sort_key):
+        keys = sorted(by_name[nm])
+        loc_str = ",".join(f"{num}{_format_prime(pr)}" for num, pr in keys)
+        if len(keys) > 1:
+            prefix_parts.append(f"{loc_str}-{get_multiplier_prefix(len(keys), nm)}{nm}")
+        else:
+            prefix_parts.append(f"{loc_str}-{nm}")
+    prefix_block = "-".join(prefix_parts)
+
+    return f"{prefix_block}{core}" if prefix_block else core
+
+
 def _format_prime(ring_index: int) -> str:
     """
     Format primed notation for a ring index.
@@ -1855,6 +2103,20 @@ def name_ring_assembly(
             return None  # indicated-H + suffix threading not built
         return (f"[{connection_str}-{multiplier}{ring_name}]"
                 f"-{locant_str}-{mult}{_suffix_stem}")
+
+    # P-28.2.1 + P-66: MIXED prefix+suffix assembly (a suffix-expressible PCG
+    # coexists with other substituents). The senior PCG becomes the suffix, the
+    # rest become prefixes. Only fires for the 2-ring carbocyclic (biphenyl)
+    # class; fails closed (returns None) otherwise, falling through to the veto /
+    # prefix-only path below. Purely additive: upgrades wrong-PIN prefix names
+    # ('4'-chloro-4-hydroxy-1,1'-biphenyl') and fail-closed 'unknown' cases to
+    # the PIN, and closes the nitro gate-off leak; never regresses a working name.
+    if any(k is not None for k in _pcg_kinds):
+        _mixed = _build_mixed_pcg_ring_assembly(
+            mol, substituent_list, _pcg_kinds, ring_systems, connections,
+            ring_name, multiplier, connection_str, count)
+        if _mixed is not None:
+            return _mixed
 
     # Fail-closed veto: a -CHO / -C#N on a ring assembly has NO valid prefix
     # form — the generic substituent namer emits the bogus 'formaldehydyl' /
