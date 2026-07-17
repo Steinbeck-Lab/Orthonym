@@ -189,6 +189,17 @@ ACYCLIC_PIN_SUGAR_NAMES = {
     "N[C@@H](CO)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-glucitol"),
     "N[C@@H](CO)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-galactitol"),
     "N[C@H](CO)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-mannitol"),
+    # W8-P7b.2 open-chain (aldehydo) uronic acids — P-102.5.6.6.4.1 (BB:53779-53783):
+    # aldose 'ose' -> 'uronic acid', C1 kept on the (potential) aldehyde. The RING
+    # forms (alpha/beta-D-glucopyranuronic acid) already name via URONIC_ACID_NAMES;
+    # these are the open-chain aldehydo forms (currently emit systematic
+    # ...-6-oxohexanoic acid). Structures OPSIN name->structure authoritative; all
+    # target names OPSIN-RT-clean (normal gate). Mirrors the D-glucaric acid entry.
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)C(=O)O": ("", "D", "glucuronic acid"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)C(=O)O": ("", "D", "galacturonic acid"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)C(=O)O": ("", "D", "mannuronic acid"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "L", "iduronic acid"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "L", "guluronic acid"),
 }
 
 # ============================================================================
