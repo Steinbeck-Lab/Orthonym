@@ -341,6 +341,16 @@ NATURAL_PRODUCT_DERIVATIVES = {
     # Menthane scaffold (monoterpene parent)
     "CC1CCC(C(C)C)CC1":
         "menthane",
+
+    # ---- Wave-8 P7c: sphingoid parent PIN (P-107.4.3.1) ----
+    # The retained name 'sphinganine' generates the PREFERRED names of its
+    # unsaturated derivatives; the C18 (2S,3R,4E) mono-ene is (4E)-sphing-4-enine
+    # (BB:55235), NOT the common name 'sphingosine' (not a Blue Book name). Both
+    # are OPSIN-unparseable -> name-exact (whitelisted below). Exact-canonical
+    # match only: different chain lengths / diastereomers are named systematically
+    # (BB:55231), so any non-match falls through and fails closed.
+    "CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO":
+        "(4E)-sphing-4-enine",
 }
 
 
@@ -354,6 +364,8 @@ NAME_EXACT_NP_PARENTS = frozenset({
     "gammacerane", "eudesmane", "cadinane", "guaiane", "germacrane", "pimarane", "gibbane",
     "beyerane", "atisane", "labdane", "dammarane", "cucurbitane", "yohimban", "sparteine",
     "ibogamine", "aspidospermidine", "vincane", "sarpagan", "strychnidine", "hetisane",
+    # Wave-8 P7c: sphingoid unsaturated parent (P-107.4.3.1, BB:55235) — OPSIN-unparseable.
+    "(4E)-sphing-4-enine",
 })
 
 
