@@ -177,10 +177,16 @@ _BENZENE_FG_SMARTS = {
     'hydrazidine_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX3])[NX3][NX3]'),
     'hydrazonamide_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX2,NX3])[NX3]'),
     'thiohydrazide_ring': Chem.MolFromSmarts('[CX3](=S)[NX3][NX3]'),
-    # R7 (P-66.1.4.1.1): ring-attached thioamide -C(=S)-NH2 (0-H carbon, so it is
-    # disjoint from the thioaldehyde [CX3H1](=[SX1]); tested AFTER thiohydrazide
-    # in the detector because thiohydrazide's =S,N,N partially matches this =S,N).
-    'thioamide': Chem.MolFromSmarts('[CX3](=[SX1])[NX3]'),
+    # R7 (P-66.1.4.1.1): ring-attached PRIMARY thioamide -C(=S)-NH2. The [NX3H2]
+    # (unsubstituted amide N) is deliberate: this bare-suffix path cannot cite an
+    # N-substituent, so restricting to -NH2 makes an N-mono/N,N-di/N-aryl thioamide
+    # NOT match here (both the suffix and the carbamothioyl-prefix roles) rather
+    # than silently DROP the N-substituent and emit a methyl-less name (a no-Java
+    # leak; SELF-01 masks it only when Java is present). Disjoint from the
+    # thioaldehyde [CX3H1](=[SX1]) (0-H carbon) and from thiohydrazide's -NH-NH2
+    # (its amide N is NX3H1, not NX3H2). N-substituted thioamides fall through to
+    # the pre-R7 behaviour (fail-closed / general substituent naming).
+    'thioamide': Chem.MolFromSmarts('[CX3](=[SX1])[NX3H2]'),
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),

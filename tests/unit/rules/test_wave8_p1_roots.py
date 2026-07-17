@@ -48,6 +48,25 @@ def test_r7_benzene_carbothioamide():
     assert name_compound("NC(=S)c1ccccc1", style="pin") == "benzenecarbothioamide"
 
 
+@pytest.mark.parametrize("smiles,label", [
+    ("CNC(=S)c1ccccc1", "N-methyl (suffix role)"),
+    ("CN(C)C(=S)c1ccccc1", "N,N-dimethyl (suffix role)"),
+    ("S=C(Nc1ccccc1)c1ccccc1", "N-phenyl (suffix role)"),
+    ("CNC(=S)c1ccc(C(=O)O)cc1", "N-methyl + senior COOH (prefix role)"),
+])
+def test_r7_n_substituted_thioamide_no_atom_drop(smiles, label):
+    """An N-SUBSTITUTED benzene thioamide cannot be cited by the bare
+    -carbothioamide suffix / carbamothioyl prefix (no N-substituent support), so
+    the carbothioamide detector must NOT fire for it — else it silently drops the
+    N-substituent and emits a name for a DIFFERENT molecule (e.g. the methyl-less
+    'benzenecarbothioamide' / '4-carbamothioylbenzoic acid'). Test env runs
+    gate-off, so this exercises the raw no-Java path directly. Fail closed."""
+    from orthonym.namer import name_compound
+    out = name_compound(smiles, style="pin")
+    assert out not in ("benzenecarbothioamide", "4-carbamothioylbenzoic acid"), \
+        f"{label}: N-substituent dropped -> {out!r}"
+
+
 def test_r6_benzophenone_demoted_to_diphenylmethanone():
     """R6 (P-64.2.1.2, BB 28326/28378): benzophenone is retained for GENERAL
     nomenclature only; the PIN is the systematic diphenylmethanone. Mirror of the
