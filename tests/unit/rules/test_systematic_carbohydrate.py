@@ -621,11 +621,13 @@ class TestW6bMultiplierElision:
     generic HW/oxane namer must elide the multiplier's terminal 'a'
     (tetra+ol -> tetrol, not tetraol)."""
 
-    def test_c_phenyl_sugar_tetrol_elision(self):
+    def test_c_phenyl_sugar_named_as_pin(self):
         from orthonym import name_compound
-        # 2-C-phenyl sugar -> systematic oxane; -ol multiplier must elide.
+        # W8-P7b.4 (P-102.5.6.3.1): the 2-C-phenyl sugar is now named as the
+        # carbohydrate PIN (config + anomer RT-verified), not the systematic
+        # oxane-tetrol it previously emitted.
         assert name_compound("OC[C@H]1O[C@@H](O)[C@](O)(c2ccccc2)[C@@H](O)[C@@H]1O") == \
-            "(2R,3S,4S,5S,6R)-6-(hydroxymethyl)-3-phenyloxane-2,3,4,5-tetrol"
+            "2-C-phenyl-beta-D-mannopyranose"
 
 
 class TestW6bSugarAcylEster:

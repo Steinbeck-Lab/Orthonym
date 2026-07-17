@@ -62,6 +62,21 @@ def test_meso_aldarate_ester_fails_closed():
     assert "arate" not in out  # no retained aldarate name; systematic instead
 
 
+@pytest.mark.parametrize("smi,expected", [
+    # 7b.4 (P-102.5.6.3.2): C-substitution replacing a non-terminal OH (deoxy-C).
+    ("OC[C@H]1O[C@H](O)[C@H](c2ccccc2)[C@@H](O)[C@@H]1O",
+     "2-deoxy-2-phenyl-alpha-D-glucopyranose"),
+    # 7b.4 (P-102.5.6.3.1): C-substitution ADDED at a non-terminal C (n-C-R).
+    ("C[C@]1(O)[C@@H](O)O[C@H](CO)[C@@H](O)[C@@H]1O",
+     "2-C-methyl-alpha-D-glucopyranose"),
+    ("C[C@@]1(O)[C@@H](CO)O[C@@H](O)[C@@H]1O",
+     "3-C-methyl-beta-D-ribofuranose"),
+])
+def test_c_substituted_sugar_pin(smi, expected):
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+    assert GATED.name(can) == expected
+
+
 def test_glycosyloxy_n_o_yl_pin():
     # 7b.5 (P-102.6.2): sugar attached via a NON-anomeric O to acetic acid ->
     # (beta-D-glucopyranos-2-O-yl)acetic acid.
