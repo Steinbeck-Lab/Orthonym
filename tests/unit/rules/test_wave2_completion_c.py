@@ -79,7 +79,11 @@ class TestMultiplicativeComposites:
                 == "1,1'-[oxybis(azanylylidenemethanylylidene)]dibenzene")
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("O=C(c1ccccc1)c1ccccc1", "benzophenone"),
+        # v24 W8-P1 R6: PIN is diphenylmethanone (BB 28326 verbatim
+        # "benzophenone diphenylmethanone (PIN) (not 1,1′-carbonyldibenzene)").
+        # The multiplicative-split protection still holds — the diaryl ketone must
+        # NOT become 1,1'-carbonyldibenzene; only the retained→systematic form changed.
+        ("O=C(c1ccccc1)c1ccccc1", "diphenylmethanone"),
         ("OC(=O)COCCOCC(=O)O",
          "2,2'-[ethane-1,2-diylbis(oxy)]diacetic acid"),
         ("c1ccccc1Oc1ccccc1", "1,1'-oxydibenzene"),

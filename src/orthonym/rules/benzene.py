@@ -76,6 +76,12 @@ _SUFFIX_PRIORITY = [
     'sulfinohydrazonohydrazide',
     'carbonyl chloride',
     'carboxamide',
+    # R7 (P-66.1.4.1.1, BB 18762): ring-attached thioamide -C(=S)-NH2 ->
+    # '-carbothioamide'. The S-analogue of carboxamide; junior to the O-amide
+    # (P-41 chalcogen seniority O > S) so a co-occurring carboxamide/acid stays
+    # principal. Rank among the amide cluster is standalone-independent for the
+    # sole-group target (benzenecarbothioamide).
+    'carbothioamide',
     # C1 (P-66.3.1.1): ring-attached -C(=O)NN -> '-carbohydrazide'. Ranks with
     # the carboxamide (both are added-carbon C-suffixes on the ring); placed after
     # carboxamide so a co-occurring amide would stay principal.
@@ -126,6 +132,7 @@ _SUFFIX_TO_PREFIX = {
     'sulfonohydrazide': 'hydrazinesulfonyl',  # C1 (P-65.3.1)
     'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
+    'carbothioamide': 'carbamothioyl',  # R7 (P-66.1.4.4 / BB 55681)
     'carbohydrazide': 'hydrazinecarbonyl',  # C1 (P-66.3.5)
     'carbohydrazonohydrazide': 'hydrazinecarbohydrazonoyl',  # Wave2 T3d (P-66.4.3.4.1)
     'carbothiohydrazide': 'hydrazinecarbothioyl',  # Wave2 T3d (P-66.3.4)
@@ -170,6 +177,10 @@ _BENZENE_FG_SMARTS = {
     'hydrazidine_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX3])[NX3][NX3]'),
     'hydrazonamide_ring': Chem.MolFromSmarts('[CX3](=[NX2][NX2,NX3])[NX3]'),
     'thiohydrazide_ring': Chem.MolFromSmarts('[CX3](=S)[NX3][NX3]'),
+    # R7 (P-66.1.4.1.1): ring-attached thioamide -C(=S)-NH2 (0-H carbon, so it is
+    # disjoint from the thioaldehyde [CX3H1](=[SX1]); tested AFTER thiohydrazide
+    # in the detector because thiohydrazide's =S,N,N partially matches this =S,N).
+    'thioamide': Chem.MolFromSmarts('[CX3](=[SX1])[NX3]'),
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
@@ -492,6 +503,9 @@ def _identify_suffix_fg_on_benzene(
             ('hydrazidine_ring', 'carbohydrazonohydrazide'),
             ('hydrazonamide_ring', 'carbohydrazonamide'),
             ('thiohydrazide_ring', 'carbothiohydrazide'),
+            # R7 (P-66.1.4.1.1): thioamide AFTER thiohydrazide (thiohydrazide's
+            # =S-N-N is more specific and would else be claimed as -carbothioamide).
+            ('thioamide', 'carbothioamide'),
         ):
             for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS[_fg]):
                 if match[0] == start_idx:

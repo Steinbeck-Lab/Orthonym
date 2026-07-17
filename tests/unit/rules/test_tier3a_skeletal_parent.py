@@ -61,13 +61,15 @@ class TestSkeletalSuffixChainParent:
         assert name_compound(smiles) == expected
 
     def test_diaryl_ketone_methanone_parent(self):
-        # Non-retained diaryl ketone: single-carbon methanone parent now
-        # eligible (benzophenone itself stays retained, tested below).
+        # Non-retained diaryl ketone: single-carbon methanone parent.
         assert name_compound("O=C(c1ccccc1)c1ccncc1") == \
             "phenyl(pyridin-4-yl)methanone"
 
-    def test_benzophenone_stays_retained(self):
-        assert name_compound("O=C(c1ccccc1)c1ccccc1") == "benzophenone"
+    def test_benzophenone_demoted_to_diphenylmethanone(self):
+        # v24 W8-P1 R6 (P-64.2.1.2, BB 28326/28378): 'benzophenone' is retained
+        # for GENERAL nomenclature only; the PIN is the systematic
+        # diphenylmethanone (mirror of acetophenone -> 1-phenylethan-1-one).
+        assert name_compound("O=C(c1ccccc1)c1ccccc1") == "diphenylmethanone"
 
 
 @pytest.mark.unit

@@ -38,6 +38,31 @@ def test_r12_unsubstituted_hydrofused_unregressed(smiles, expected):
     assert name_hydrogenated_fused_carbocycle(mol) == expected
 
 
+def test_r7_benzene_carbothioamide():
+    """R7 (P-66.1.4.1.1, BB 18762): a ring-attached -C(=S)NH2 on benzene is named
+    with the -carbothioamide suffix. PIN uses the no-locant `benzenecarbo...` form
+    (BB 6666 benzenecarbodithioic acid, 30000 benzenecarboximidic acid), matching
+    the existing benzenecarboximidamide / benzenecarbothiohydrazide siblings.
+    Was abstaining (fell to substituent naming -> mangled -> SELF-01 unknown)."""
+    from orthonym.namer import name_compound
+    assert name_compound("NC(=S)c1ccccc1", style="pin") == "benzenecarbothioamide"
+
+
+def test_r6_benzophenone_demoted_to_diphenylmethanone():
+    """R6 (P-64.2.1.2, BB 28326/28378): benzophenone is retained for GENERAL
+    nomenclature only; the PIN is the systematic diphenylmethanone. Mirror of the
+    already-demoted acetophenone -> 1-phenylethan-1-one."""
+    from orthonym.namer import name_compound
+    assert name_compound("O=C(c1ccccc1)c1ccccc1", style="pin") == "diphenylmethanone"
+
+
+def test_r6_substituted_diaryl_ketone_unregressed():
+    """The systematic diaryl-ketone builder must stay correct for non-retained
+    cases (regression guard for the benzophenone demotion)."""
+    from orthonym.namer import name_compound
+    assert name_compound("O=C(c1ccccc1)c1ccc(C)cc1", style="pin") == "(4-methylphenyl)phenylmethanone"
+
+
 def test_r12_fusion_diol_no_java_no_atom_drop():
     """Gate-off (no-Java) the namer must NOT emit an atom-dropping
     `...dihydronaphthalene` for the diol — fail closed (or name it correctly)."""
