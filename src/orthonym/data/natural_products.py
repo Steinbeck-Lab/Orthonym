@@ -140,6 +140,25 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC[C@@H](C)CC[C@H]1[C@@H](C)CC[C@H]2C(C)(C)CCC[C@]12C": "labdane",
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@]12C": "dammarane",
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@@H]3CCC4[C@@H](CCCC4(C)C)[C@]3(C)CC[C@]12C": "cucurbitane",
+    #   W8-P7a.2 complex diterpene/triterpene parents (Table 10.1c) — two-source
+    #   verified (PubChem + NCI CACTUS, full InChIKey agreement); OPSIN-unparseable
+    #   -> name-exact. Direct structural analogs of the abietane/lanostane class
+    #   above (unwieldy systematic von-Baeyer name -> semisystematic PIN, P-101.2):
+    "CC1(C)CCC[C@]2(C)[C@H]3CCCC[C@@H]3CC[C@@H]12": "podocarpane",  # OEWMDAWVOVKZEQ
+    "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@H]1CC[C@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@@]12C": "protostane",  # OORMXZNMRWBSTK
+    "C[C@@H]1[C@@H]2CCC(C)(C)[C@H]2CC[C@@]23C[C@@H](CC[C@@H]12)[C@@H](C)C3": "grayanotoxane",  # OPCBUBFCCPXFES
+    "CC[C@]1(C)CC[C@]2(C)[C@H](CC[C@@H]3[C@H]2CCCC3(C)C)C1": "rosane",  # CZEZFPXHDTYEBI
+    #   W8-P7a.2c bicyclic+ sesqui/di/sesterterpene parents (Table 10.1c) — analogs of
+    #   cadinane/guaiane/eudesmane above; two-source verified; OPSIN-unparseable. himachalane/
+    #   ophiobolane were mis-named (drop); picrasane/trichothecane have a skeletal ether O:
+    "C[C@H]1CC[C@H]2C(C)(C)CCC[C@]2(C)[C@H]1C": "drimane",  # CVRSZZJUWRLRDE
+    "CC(C)[C@@H]1CC[C@H](C)[C@@H]2CCC[C@@]2(C)C1": "ambrosane",  # TUKMYOLTOOBHQF
+    "CC(C)[C@@H]1CC[C@H]2CCC[C@H](C)[C@@]2(C)C1": "eremophilane",  # AJWBFJHTFGRNDG
+    "C[C@@H]1CCC[C@@H]2CC[C@@H]3[C@@H](C3(C)C)[C@]21C": "aristolane",  # MKGHZTWCWRGKCY
+    "CC1CC[C@H]2C(C)CCCC(C)(C)[C@H]2C1": "himachalane",  # DSIZXZISLDRGBM
+    "CC(C)CCC[C@H](C)[C@H]1CC[C@]2(C)C[C@H]3[C@H](CC[C@@H]3C)[C@@H](C)CC[C@@H]12": "ophiobolane",  # YDDRLCGKYATUCE
+    "C[C@@H]1CCC[C@]2(C)[C@H]3CC[C@H](C)[C@@H]4CCO[C@H](C[C@@H]12)[C@]34C": "picrasane",  # XKTUNHQVVRTGNO
+    "CC1CC[C@@]2(C)[C@@H](C1)O[C@@H]1CC[C@@]2(C)[C@@H]1C": "trichothecane",  # IZGCNPIQWCRGSF
     #   prostanoids (Table 10.1d) — these DO OPSIN-RT, but the retained NP parent is the PIN:
     "CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC": "prostane",
     "CCCCCCCC[C@H]1OCCC[C@@H]1CCCCCCC": "thromboxane",
@@ -152,6 +171,23 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "C/C=C1/CN2[C@H]3C[C@@H]1[C@@H](C)[C@@H]2Cc1c3[nH]c2ccccc12": "sarpagan",
     "C1=C2CN3CC[C@]45c6ccccc6N6CC[C@H](OC1)[C@@H]([C@H]64)[C@H]2C[C@H]35": "strychnidine",
     "C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6": "hetisane",
+    #   W8-P7a.2b clean saturated CHN alkaloid parent hydrides (Table 10.1a) —
+    #   two-source verified (PubChem + NCI CACTUS, full InChIKey); OPSIN-unparseable
+    #   -> name-exact. Analogs of the yohimban/aspidospermidine class above. Several
+    #   currently ship WRONG atom-dropped names (cevane->methylpiperidine etc.) — this
+    #   closes those structural leaks too:
+    "C[C@H]1CC[C@H]2[C@H](C)[C@H]3CC[C@@H]4[C@@H](C[C@H]5[C@H]4CC[C@@H]4CCCC[C@@]45C)[C@@H]3CN2C1": "cevane",  # GRTNBDIOACKBEA
+    "C[C@H]1[C@H]2CC[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]23CN1C": "conanine",  # ICKQFGPZAUSMPE
+    "CC[C@H]1C[C@H]2c3[nH]c4ccccc4c3CCN2C[C@@H]1CC": "corynan",  # YRMJWKVAHZDIHE
+    "CC[C@@H]1CN2CC[C@@]3(CNc4ccccc43)[C@@H]2C[C@@H]1CC": "corynoxan",  # NXFSUTOLIGTJLJ
+    "CC[C@H]1CN2CCc3ccccc3[C@@H]2C[C@@H]1C[C@H]1NCCc2ccccc21": "emetan",  # KSQYVPHTTWSOHG
+    "c1ccc2c(c1)CCN1CC[C@@H]3CCCC[C@@]231": "erythrinan",  # PERYEAFHHZTAKL
+    "c1ccc2c(c1)CN1CC[C@@H]3CCC[C@@H]2[C@@H]31": "galanthan",  # CDIONMUWHFYLPO
+    "c1ccc2c(c1)CC[C@@]13CCCC[C@@]21CCN3": "hasubanan",  # RKWPQIQYRNOTMT
+    "c1ccc2c(c1)N[C@]13CC[C@]45CCCN6CC(C[C@@H]1C4)[C@]23[C@@H]65": "kopsan",  # JLHICAHYXYIJFE
+    "C1C[C@@H]2CC[C@@H]3CCC[C@@]24[C@@H]3CCCN4C1": "lycopodane",  # WEUSZYFSAZZUMH
+    "C[C@H]1CC[C@@H]2[C@@H](C)[C@H]3[C@H](C[C@H]4[C@@H]5CCC6CCCC[C@]6(C)[C@H]5CC[C@]34C)N2C1": "solanidane",  # BWBOFECLRQWOIP
+    "CC[C@H]1CN2CCc3ccccc3[C@@H]2C[C@@H]1C[C@H]1NCCc2c1[nH]c1ccccc21": "tubulosan",  # AIZBUQBFRLEIBW
 
     # ---- Steroid derivatives ----
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C":
@@ -341,6 +377,16 @@ NATURAL_PRODUCT_DERIVATIVES = {
     # Menthane scaffold (monoterpene parent)
     "CC1CCC(C(C)C)CC1":
         "menthane",
+
+    # ---- Wave-8 P7c: sphingoid parent PIN (P-107.4.3.1) ----
+    # The retained name 'sphinganine' generates the PREFERRED names of its
+    # unsaturated derivatives; the C18 (2S,3R,4E) mono-ene is (4E)-sphing-4-enine
+    # (BB:55235), NOT the common name 'sphingosine' (not a Blue Book name). Both
+    # are OPSIN-unparseable -> name-exact (whitelisted below). Exact-canonical
+    # match only: different chain lengths / diastereomers are named systematically
+    # (BB:55231), so any non-match falls through and fails closed.
+    "CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO":
+        "(4E)-sphing-4-enine",
 }
 
 
@@ -354,6 +400,16 @@ NAME_EXACT_NP_PARENTS = frozenset({
     "gammacerane", "eudesmane", "cadinane", "guaiane", "germacrane", "pimarane", "gibbane",
     "beyerane", "atisane", "labdane", "dammarane", "cucurbitane", "yohimban", "sparteine",
     "ibogamine", "aspidospermidine", "vincane", "sarpagan", "strychnidine", "hetisane",
+    # Wave-8 P7a.2: complex diterpene/triterpene parents (Table 10.1c) — two-source verified.
+    "podocarpane", "protostane", "grayanotoxane", "rosane",
+    # Wave-8 P7a.2b: clean CHN alkaloid parent hydrides (Table 10.1a) — two-source verified.
+    "cevane", "conanine", "corynan", "corynoxan", "emetan", "erythrinan", "galanthan",
+    "hasubanan", "kopsan", "lycopodane", "solanidane", "tubulosan",
+    # Wave-8 P7a.2c: bicyclic+ sesqui/di/sesterterpene parents (Table 10.1c) — two-source verified.
+    "drimane", "ambrosane", "eremophilane", "aristolane", "himachalane", "ophiobolane",
+    "picrasane", "trichothecane",
+    # Wave-8 P7c: sphingoid unsaturated parent (P-107.4.3.1, BB:55235) — OPSIN-unparseable.
+    "(4E)-sphing-4-enine",
 })
 
 

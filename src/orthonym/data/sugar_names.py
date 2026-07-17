@@ -189,6 +189,17 @@ ACYCLIC_PIN_SUGAR_NAMES = {
     "N[C@@H](CO)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-glucitol"),
     "N[C@@H](CO)[C@@H](O)[C@@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-galactitol"),
     "N[C@H](CO)[C@@H](O)[C@H](O)[C@H](O)CO": ("", "", "2-amino-2-deoxy-D-mannitol"),
+    # W8-P7b.2 open-chain (aldehydo) uronic acids — P-102.5.6.6.4.1 (BB:53779-53783):
+    # aldose 'ose' -> 'uronic acid', C1 kept on the (potential) aldehyde. The RING
+    # forms (alpha/beta-D-glucopyranuronic acid) already name via URONIC_ACID_NAMES;
+    # these are the open-chain aldehydo forms (currently emit systematic
+    # ...-6-oxohexanoic acid). Structures OPSIN name->structure authoritative; all
+    # target names OPSIN-RT-clean (normal gate). Mirrors the D-glucaric acid entry.
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)C(=O)O": ("", "D", "glucuronic acid"),
+    "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)C(=O)O": ("", "D", "galacturonic acid"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)C(=O)O": ("", "D", "mannuronic acid"),
+    "O=C[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "L", "iduronic acid"),
+    "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@@H](O)C(=O)O": ("", "L", "guluronic acid"),
 }
 
 # ============================================================================
@@ -2539,13 +2550,30 @@ def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
     if acid_name is None:
         return None
 
-    # Only the aldonate (single-carboxyl) ester is named.  The aldarate PARTIAL
-    # ester (free_cooh==1) is DEFERRED fail-closed (review W6B finding): the
-    # residual free diacid canonicalizes IDENTICALLY no matter which of the two
-    # termini bore the ester, so the esterified-terminus locant cannot be derived
-    # here (a hardcoded '1-' + the diacid's own config would ship a wrong locant/
-    # config for the opposite-terminus isomer — and the RT gate fails OPEN with no
-    # Java).  Aldonate has no such ambiguity (its single COOH is C1).
+    # W8-P7b.3: aldarate PARTIAL (mono) ester (P-102.5.6.6.5.3), free_cooh==1.
+    # `<n>-<alkyl> hydrogen <config>-<stem>arate`. The 1-vs-6 ester locant labels
+    # two DISTINCT isomers (L-altraric is not palindromic; BB gives both 1-methyl
+    # and 6-methyl hydrogen L-altrarate), so the residual free diacid alone cannot
+    # fix it. Resolve by a HARD OPSIN round-trip of each candidate against the
+    # input — opsin_parse fails-CLOSED (returns None) without Java, so a genuinely
+    # unverifiable input falls through to the systematic name (never a wrong
+    # locant). meso aldarics are not cataloged (name_free_sugar -> None) -> already
+    # fail-closed above. Prefer the lowest ester locant (1 before 6).
+    if free_cooh == 1:
+        if not acid_name.endswith("aric acid"):
+            return None
+        arate = acid_name[: -len("ic acid")] + "ate"  # L-altraric acid -> L-altrarate
+        from ..validation.opsin_roundtrip import opsin_parse
+        target = Chem.MolToSmiles(mol)
+        for locant in (1, 6):
+            cand = f"{locant}-{alkyl_name} hydrogen {arate}"
+            parsed = opsin_parse(cand)
+            if parsed:
+                pm = Chem.MolFromSmiles(parsed)
+                if pm is not None and Chem.MolToSmiles(pm) == target:
+                    return cand
+        return None  # unverifiable / no match -> fail closed (systematic)
+    # Aldonate (single-carboxyl) ester: its single COOH is C1, no locant ambiguity.
     if free_cooh != 0:
         return None
     if not acid_name.endswith("onic acid"):
@@ -2555,6 +2583,279 @@ def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:
     if not _mono_name_rt_ok(mol, candidate):
         return None
     return candidate
+
+
+def _glyco_ring_atoms(mol):
+    """Return the atom-index set of a single pyranose/furanose sugar ring (exactly
+    one ring O, the rest ring C, most ring C bearing an exocyclic O), else None."""
+    ri = mol.GetRingInfo()
+    for ring in ri.AtomRings():
+        if len(ring) not in (5, 6):
+            continue
+        os_ = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+        cs_ = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "C"]
+        if len(os_) != 1 or len(cs_) != len(ring) - 1:
+            continue
+        o_bearing = sum(
+            1 for c in cs_ if any(
+                nb.GetSymbol() == "O" and nb.GetIdx() not in ring
+                for nb in mol.GetAtomWithIdx(c).GetNeighbors()))
+        if o_bearing >= len(cs_) - 1:
+            return set(ring)
+    return None
+
+
+def name_glycosyloxy_yl_parent(mol, canonical_smiles: str) -> Optional[str]:
+    """Glycosyloxy ``n-O-yl`` substituent on a senior parent (BB P-102.6.2).
+
+    A monosaccharide bonded through a **non-anomeric** ring-position oxygen to a
+    senior parent (e.g. acetic acid) is cited as the substituent
+    ``<anomer>-<config>-glycopyranos-<n>-O-yl`` (the locant distinguishes it from
+    the C-1 ``glycosyl``); the parent bears the principal characteristic group and
+    is named normally -> ``(beta-D-glucopyranos-2-O-yl)acetic acid``.
+
+    Deterministic + fail-closed: recognise a single clean sugar ring + a non-anomeric
+    exocyclic ether O to a non-ring parent carbon; reconstruct the free sugar
+    (ether O -> OH) via ``lookup_sugar``/``recognize_sugar_skeleton``; name the
+    parent fragment via a gate-off inner namer; then pick the ``n-O-yl`` LOCANT by
+    a HARD OPSIN round-trip of each candidate against the input (``opsin_parse``
+    fails-CLOSED without Java). Any miss -> ``None`` (cascade-continue). Never
+    mutates the input mol.
+    """
+    if mol is None:
+        return None
+    ring = _glyco_ring_atoms(mol)
+    if ring is None:
+        return None
+    ring_o = next(i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O")
+    anomeric = None
+    for c in ring:
+        a = mol.GetAtomWithIdx(c)
+        if a.GetSymbol() != "C":
+            continue
+        nb_idx = [n.GetIdx() for n in a.GetNeighbors()]
+        if ring_o in nb_idx and any(
+                nb.GetSymbol() == "O" and nb.GetIdx() not in ring
+                for nb in a.GetNeighbors()):
+            anomeric = c
+            break
+    # single non-anomeric ring-O ether to a non-ring parent carbon
+    links = []
+    for a in mol.GetAtoms():
+        if a.GetSymbol() != "O" or a.GetTotalNumHs() > 0 or a.GetDegree() != 2:
+            continue
+        rc = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() in ring]
+        pc = [n.GetIdx() for n in a.GetNeighbors()
+              if n.GetIdx() not in ring and n.GetSymbol() == "C"]
+        if len(rc) == 1 and len(pc) == 1 and rc[0] != anomeric:
+            links.append((a.GetIdx(), rc[0], pc[0]))
+    if len(links) != 1:
+        return None
+    link_o, ring_c, parent_c = links[0]
+
+    rw = Chem.RWMol(mol)
+    rw.RemoveBond(parent_c, link_o)
+    frags = Chem.GetMolFrags(rw, asMols=False)
+    sugar_atoms = next((set(f) for f in frags if ring_o in f), None)
+    parent_atoms = next((set(f) for f in frags if parent_c in f), None)
+    if sugar_atoms is None or parent_atoms is None or link_o not in sugar_atoms:
+        return None
+
+    def _submol(atomset):
+        bidx = [b.GetIdx() for b in rw.GetBonds()
+                if b.GetBeginAtomIdx() in atomset and b.GetEndAtomIdx() in atomset]
+        sm = Chem.PathToSubmol(rw, bidx)
+        try:
+            Chem.SanitizeMol(sm)
+        except Exception:
+            return None
+        return sm
+
+    sugar_mol = _submol(sugar_atoms)
+    parent_mol = _submol(parent_atoms)
+    if sugar_mol is None or parent_mol is None:
+        return None
+    sugar_can = Chem.MolToSmiles(sugar_mol)
+    info = lookup_sugar(sugar_can) or recognize_sugar_skeleton(
+        Chem.MolFromSmiles(sugar_can))
+    if info is None:
+        return None
+    anomer, config, base = info
+    if not (anomer and config and base.endswith("ose")):
+        return None
+
+    from orthonym.namer import Orthonym
+    parent_name = Orthonym(_disable_opsin_validity_gate=True).name(
+        Chem.MolToSmiles(parent_mol))
+    if not parent_name or parent_name == "unknown organic compound":
+        return None
+
+    from ..validation.opsin_roundtrip import opsin_parse
+    stem = base[:-1]  # glucopyranose -> glucopyranos
+    target = Chem.MolToSmiles(mol)
+    for n in (2, 3, 4, 5, 6):
+        cand = f"({anomer}-{config}-{stem}-{n}-O-yl){parent_name}"
+        parsed = opsin_parse(cand)
+        if parsed:
+            pm = Chem.MolFromSmiles(parsed)
+            if pm is not None and Chem.MolToSmiles(pm) == target:
+                return cand
+    return None
+
+
+_C_SUGAR_HALO = {9: "fluoro", 17: "chloro", 35: "bromo", 53: "iodo"}
+
+
+def _c_sugar_ring(mol):
+    """A single 5-/6-membered ring with exactly one ring O and the rest C
+    (loose sugar-ring gate; downstream lookup + RT verify supply the safety)."""
+    for ring in mol.GetRingInfo().AtomRings():
+        if len(ring) not in (5, 6):
+            continue
+        os_ = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+        cs_ = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "C"]
+        if len(os_) == 1 and len(cs_) == len(ring) - 1:
+            return set(ring)
+    return None
+
+
+def _c_sub_name(mol, sub_atoms, attach):
+    """Name the exocyclic C-substituent (halogen / alkyl / phenyl), else None."""
+    if len(sub_atoms) == 1:
+        a = mol.GetAtomWithIdx(next(iter(sub_atoms)))
+        if a.GetAtomicNum() in _C_SUGAR_HALO:
+            return _C_SUGAR_HALO[a.GetAtomicNum()]
+    atoms = [mol.GetAtomWithIdx(i) for i in sub_atoms]
+    if all(a.GetAtomicNum() == 6 for a in atoms):
+        if len(sub_atoms) == 6 and all(a.GetIsAromatic() for a in atoms):
+            return "phenyl"
+        from orthonym.rules.esters import get_alkyl_fragment_name
+        return get_alkyl_fragment_name(mol, list(sub_atoms)) or None
+    return None
+
+
+def _is_c_substituted_sugar_shape(mol) -> bool:
+    """Cheap NO-OPSIN pre-gate for the dispatch predicate: a single 5-/6-membered
+    one-O ring with EXACTLY one non-terminal ring carbon bearing an exocyclic C or
+    halogen substituent (beyond the sugar's own terminal CH2OH/CHO). The handler
+    (:func:`name_c_substituted_sugar`) does the real reconstruction + RT gate."""
+    if mol is None:
+        return False
+    ring = _c_sugar_ring(mol)
+    if ring is None:
+        return False
+    hits = 0
+    for c in ring:
+        a = mol.GetAtomWithIdx(c)
+        if a.GetSymbol() != "C":
+            continue
+        for nb in a.GetNeighbors():
+            if nb.GetIdx() in ring or nb.GetAtomicNum() == 8:
+                continue
+            if nb.GetAtomicNum() == 6:
+                heavy = [x for x in nb.GetNeighbors()
+                         if x.GetAtomicNum() > 1 and x.GetIdx() != c]
+                if len(heavy) == 1 and heavy[0].GetAtomicNum() == 8:
+                    continue
+            hits += 1
+    return hits == 1
+
+
+def name_c_substituted_sugar(mol, canonical_smiles: str) -> Optional[str]:
+    """C-substituted monosaccharide (BB P-102.5.6.3.1/.3.2).
+
+    A non-terminal ring carbon bearing an extra C-substituent (or a halogen):
+      * keeps its OH -> ``<n>-C-<substituent>-<sugar>`` (P-102.5.6.3.1);
+      * lost its OH -> ``<n>-deoxy-<n>-<substituent>-<sugar>`` (P-102.5.6.3.2).
+
+    The substituted centre's config is NOT structurally recoverable (the group
+    replaced/added at the OH position), so the parent aldose is reconstructed with
+    that ONE centre left unassigned, both epimers are enumerated, and the correct
+    ``(anomer, config, base)`` + LOCANT is fixed by a HARD OPSIN round-trip of each
+    candidate against the input (``opsin_parse`` fails-CLOSED without Java). Any
+    miss -> ``None`` (cascade-continue). Input mol never mutated.
+    """
+    if mol is None:
+        return None
+    ring = _c_sugar_ring(mol)
+    if ring is None:
+        return None
+    hits = []
+    for c in ring:
+        a = mol.GetAtomWithIdx(c)
+        if a.GetSymbol() != "C":
+            continue
+        for nb in a.GetNeighbors():
+            if nb.GetIdx() in ring or nb.GetAtomicNum() == 8:
+                continue
+            if nb.GetAtomicNum() == 6:
+                heavy = [x for x in nb.GetNeighbors()
+                         if x.GetAtomicNum() > 1 and x.GetIdx() != c]
+                if len(heavy) == 1 and heavy[0].GetAtomicNum() == 8:
+                    continue  # the sugar's own terminal CH2OH / CHO
+            hits.append((c, nb.GetIdx()))
+    if len(hits) != 1:
+        return None
+    ring_c, sub_start = hits[0]
+    has_oh = any(nb.GetAtomicNum() == 8 and nb.GetTotalNumHs() > 0
+                 for nb in mol.GetAtomWithIdx(ring_c).GetNeighbors())
+
+    from collections import deque as _deque
+    seen = {sub_start}
+    q = _deque([sub_start])
+    while q:
+        cur = q.popleft()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            if nb.GetIdx() != ring_c and nb.GetIdx() not in seen:
+                seen.add(nb.GetIdx())
+                q.append(nb.GetIdx())
+    sub_name = _c_sub_name(mol, seen, ring_c)
+    if sub_name is None:
+        return None
+
+    rw = Chem.RWMol(mol)
+    for idx in sorted(seen, reverse=True):
+        rw.RemoveAtom(idx)
+    rc = ring_c - sum(1 for i in seen if i < ring_c)
+    if not has_oh:  # deoxy-C: restore an OH where the substituent replaced it
+        newo = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(rc, newo, Chem.BondType.SINGLE)
+    rc_atom = rw.GetAtomWithIdx(rc)
+    rc_atom.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
+    rc_atom.SetNoImplicit(False)
+    rc_atom.SetNumExplicitHs(0)
+    try:
+        rc_atom.UpdatePropertyCache()
+        Chem.SanitizeMol(rw)
+    except Exception:
+        return None
+    from rdkit.Chem.EnumerateStereoisomers import (
+        EnumerateStereoisomers, StereoEnumerationOptions)
+    parent_infos = set()
+    for iso in EnumerateStereoisomers(
+            rw, options=StereoEnumerationOptions(onlyUnassigned=True)):
+        try:
+            pc = Chem.MolToSmiles(iso)
+        except Exception:
+            continue
+        info = lookup_sugar(pc) or recognize_sugar_skeleton(Chem.MolFromSmiles(pc))
+        if info and info[0] and info[1] and info[2].endswith("ose"):
+            parent_infos.add(info)
+    if not parent_infos:
+        return None
+
+    from ..validation.opsin_roundtrip import opsin_parse
+    target = Chem.MolToSmiles(mol)
+    for anomer, config, base in sorted(parent_infos):
+        for n in range(2, len(ring) + 1):
+            cand = (f"{n}-C-{sub_name}-{anomer}-{config}-{base}" if has_oh
+                    else f"{n}-deoxy-{n}-{sub_name}-{anomer}-{config}-{base}")
+            parsed = opsin_parse(cand)
+            if parsed:
+                pm = Chem.MolFromSmiles(parsed)
+                if pm is not None and Chem.MolToSmiles(pm) == target:
+                    return cand
+    return None
 
 
 def _has_open_chain_acid_ester(mol) -> bool:

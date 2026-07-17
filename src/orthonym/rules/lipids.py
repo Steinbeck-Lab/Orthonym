@@ -377,6 +377,25 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
         # (substitutive form) keep their existing paths. Fail-closed: declines to
         # the substitutive glyceride form when the head is not cleanly nameable.
         if head_desc not in ("choline", "ethanolamine", "glycerol", "inositol"):
+            # W8-P7c.3 (P-107.3.3): phosphatidylserine's PIN is on the L-serine
+            # parent (the serine carboxylic acid outranks the phosphorus oxoacid,
+            # P-41) -> O-{[<glyceryl-propoxy>]hydroxyphosphoryl}-<L|D>-serine, NOT
+            # the phosphate-ester-parent fallback below. The head-config + form are
+            # fixed by a HARD OPSIN round-trip (opsin_parse fails-CLOSED without
+            # Java -> the input falls through to the valid phosphate-ester form).
+            glyceryl_ser = _diacyl_glyceryl(
+                mol, match, central, phospho_atom, acyl_atoms, atom_site)
+            if glyceryl_ser is not None and glyceryl_ser.endswith("propyl"):
+                glyoxy = glyceryl_ser[: -len("propyl")] + "propoxy"
+                from ..validation.opsin_roundtrip import opsin_parse
+                target = Chem.MolToSmiles(mol)
+                for chir in ("L", "D"):
+                    cand = (f"O-{{[{glyoxy}]hydroxyphosphoryl}}-{chir}-serine")
+                    parsed = opsin_parse(cand)
+                    if parsed:
+                        pm = Chem.MolFromSmiles(parsed)
+                        if pm is not None and Chem.MolToSmiles(pm) == target:
+                            return cand
             head_o_idx = atom_site[phospho_atom][4]
             p_idx = atom_site[phospho_atom][1]
             head_name = (

@@ -452,14 +452,17 @@ class TestW6bAldonateAldarateEster:
         assert name_compound("O=C([C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO)OC") == \
             "methyl D-gluconate"
 
-    def test_aldarate_partial_ester_deferred(self):
+    def test_aldarate_partial_ester_named(self):
         from orthonym.data.sugar_names import name_aldonate_ester
         from rdkit import Chem
-        # Aldarate partial ester is DEFERRED fail-closed (review W6B): the residual
-        # diacid canonicalizes identically regardless of which terminus was
-        # esterified, so the locant/config cannot be derived -> None (never a wrong name).
+        # W8-P7b.3: the aldarate partial ester is now NAMED (P-102.5.6.6.5.3). The
+        # 1-vs-6 ester locant (distinct isomers) is resolved by a HARD OPSIN
+        # round-trip of each candidate against the input (opsin_parse fails-CLOSED
+        # w/o Java), so no wrong locant can ship. (Was previously deferred.)
         smi = "O=C([C@H](O)[C@@H](O)[C@@H](O)[C@@H](O)C(=O)O)OC"
-        assert name_aldonate_ester(Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)) is None
+        assert name_aldonate_ester(
+            Chem.MolFromSmiles(smi), Chem.CanonSmiles(smi)
+        ) == "1-methyl hydrogen L-altrarate"
 
     def test_ordinary_esters_unaffected(self):
         from orthonym import name_compound
@@ -527,11 +530,14 @@ class TestW6bCGlycosyl:
         from orthonym import name_compound
         assert name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "beta-D-glucopyranose"
 
-    def test_n_o_yl_deferred_not_wrong(self):
+    def test_n_o_yl_named(self):
         from orthonym import name_compound
-        # n-O-yl deferred: must fail-closed to 'unknown', never a wrong name.
+        # W8-P7b.5 (P-102.6.2): the glycosyloxy n-O-yl is now NAMED (sugar bonded
+        # via a non-anomeric ring O -> <anomer>-<config>-glycopyranos-n-O-yl on the
+        # senior parent). The locant is RT-verified (fail-closed w/o Java). (Was
+        # previously deferred fail-closed to 'unknown'.)
         got = name_compound("OC[C@H]1O[C@@H](O)[C@H](OCC(=O)O)[C@@H](O)[C@H]1O")
-        assert got == "unknown organic compound"
+        assert got == "(beta-D-galactopyranos-2-O-yl)acetic acid"
 
 
 @pytest.mark.unit
@@ -615,11 +621,13 @@ class TestW6bMultiplierElision:
     generic HW/oxane namer must elide the multiplier's terminal 'a'
     (tetra+ol -> tetrol, not tetraol)."""
 
-    def test_c_phenyl_sugar_tetrol_elision(self):
+    def test_c_phenyl_sugar_named_as_pin(self):
         from orthonym import name_compound
-        # 2-C-phenyl sugar -> systematic oxane; -ol multiplier must elide.
+        # W8-P7b.4 (P-102.5.6.3.1): the 2-C-phenyl sugar is now named as the
+        # carbohydrate PIN (config + anomer RT-verified), not the systematic
+        # oxane-tetrol it previously emitted.
         assert name_compound("OC[C@H]1O[C@@H](O)[C@](O)(c2ccccc2)[C@@H](O)[C@@H]1O") == \
-            "(2R,3S,4S,5S,6R)-6-(hydroxymethyl)-3-phenyloxane-2,3,4,5-tetrol"
+            "2-C-phenyl-beta-D-mannopyranose"
 
 
 class TestW6bSugarAcylEster:

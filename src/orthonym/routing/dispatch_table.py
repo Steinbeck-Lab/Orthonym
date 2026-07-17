@@ -457,6 +457,11 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
         return True
     if _find_sugar_acyl_esters(mol) is not None:
         return True
+    # W8-P7b.4 C-substituted sugar (n-C-R / n-deoxy-n-R): a ring carbon bears an
+    # extra C/halogen substituent, so the clean-sugar SMARTS pre-gate misses it.
+    from orthonym.data.sugar_names import _is_c_substituted_sugar_shape
+    if _is_c_substituted_sugar_shape(mol):
+        return True
     # W6B-T7 fail-closed veto: claim an uncataloged 2-ulosonic acid so the handler
     # can refuse it (the general ring-carboxylic namer drops its side-chain stereo).
     from orthonym.data.sugar_names import _is_uncataloged_ulosonic_acid
@@ -1029,7 +1034,23 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     if cgly is not None:
         return cgly
 
-    # W6B-T13 fail-closed veto (n-O-yl, P-102.6.2 deferred): a sugar-O-ether the
+    # W8-P7b.5: glycosyloxy n-O-yl on a senior parent (P-102.6.2) — a sugar bonded
+    # via a NON-anomeric ring O -> (<anomer>-<config>-glycopyranos-n-O-yl)<parent>.
+    # Fires ABOVE the deferral veto below; fail-closed (None) on any non-exact shape.
+    from orthonym.data.sugar_names import name_glycosyloxy_yl_parent
+    noyl = name_glycosyloxy_yl_parent(mol, canonical_smiles)
+    if noyl is not None:
+        return noyl
+
+    # W8-P7b.4: C-substituted monosaccharide (P-102.5.6.3.1/.3.2) -> <n>-C-<sub>- or
+    # <n>-deoxy-<n>-<sub>-<sugar>. Fail-closed (None) on any non-exact shape; the
+    # substituted-centre config + locant are RT-verified (fail-closed w/o Java).
+    from orthonym.data.sugar_names import name_c_substituted_sugar
+    csug = name_c_substituted_sugar(mol, canonical_smiles)
+    if csug is not None:
+        return csug
+
+    # W6B-T13 fail-closed veto (n-O-yl, P-102.6.2 remainder): a sugar-O-ether the
     # namers cannot handle would otherwise drop the sugar (a wrong name) via the
     # general chain namer -> refuse ('' -> unknown), never ship a sugar-dropping name.
     from orthonym.data.sugar_names import _is_sugar_o_ether_leak
