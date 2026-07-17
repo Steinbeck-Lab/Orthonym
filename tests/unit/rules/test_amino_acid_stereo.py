@@ -94,11 +94,12 @@ class TestWSD07RetainedStereo:
     def test_l_alanine_implicit(self):
         assert name_compound("C[C@H](N)C(=O)O") == "alanine"
 
-    def test_allo_isoleucine_defers(self):
-        # D-allo-isoleucine (2-centre diastereomer) must NOT emit 'isoleucine';
-        # full-stereo verification fails -> systematic name.
-        name = name_compound("CC[C@H](C)[C@@H](N)C(=O)O")
-        assert "isoleucine" not in name.lower(), f"allo-Ile should defer, got: {name}"
+    def test_allo_isoleucine_named(self):
+        # v24 W8 P3 Task 3.1 (P-103.1.3.2.2): the 2-centre allo diastereomers of
+        # threonine/isoleucine now emit their retained-name PIN. This SMILES is
+        # (2R,3S) = D-allo-isoleucine (CIP + OPSIN-RT verified). Previously this
+        # deferred to the systematic name (test formerly `test_allo_isoleucine_defers`).
+        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-allo-isoleucine"
 
     def test_glycine_achiral(self):
         assert name_compound("NCC(=O)O") == "glycine"

@@ -192,15 +192,36 @@ def _build_acyl_names(all_amino_acids: Dict[str, str],
     return generated
 
 
-# WSD-07 (Phase 175): L-form isomeric SMILES for standard amino acids with >1
-# stereocentre, where the alpha-carbon L/D descriptor alone cannot distinguish the
-# named (threo) diastereomer from its allo form. Full-stereo verification compares
-# the input's isomeric canonical SMILES against the L-form and its enantiomer (D-);
-# anything else (an allo diastereomer) DEFERS — never a wrong-config retained name.
-_MULTI_STEREO_AA_LFORM: Dict[str, str] = {
-    "isoleucine": "CC[C@H](C)[C@H](N)C(=O)O",
-    "threonine": "C[C@@H](O)[C@H](N)C(=O)O",
+# v24 W8 P3 Task 3.1 (P-103.1.3.2.2): the C-3 epimer of L-threonine / L-isoleucine
+# has the retained-name PIN `allo-<name>`. Base SMILES below are (L-form, L-allo
+# form = C-3 inverted, CIP-verified): L-Thr (2S,3R) / L-allo-Thr (2S,3S);
+# L-Ile (2S,3S) / L-allo-Ile (2S,3R). The full 4-stereoisomer descriptor map is
+# built on demand (canonical-SMILES keys -> descriptor prefix) so the bare
+# retained lookup can prepend allo-/D-allo- exactly like L(implicit)/D-.
+_ALLO_AA_BASE: Dict[str, tuple] = {
+    "threonine": ("C[C@@H](O)[C@H](N)C(=O)O", "C[C@H](O)[C@H](N)C(=O)O"),
+    "isoleucine": ("CC[C@H](C)[C@H](N)C(=O)O", "CC[C@@H](C)[C@H](N)C(=O)O"),
 }
+_ALLO_AA_FORMS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+
+
+def _allo_aa_forms() -> Dict[str, Dict[str, str]]:
+    """Canonical-isomeric-SMILES -> descriptor-prefix map per allo-capable AA.
+    Built lazily (RDKit at call time, not import time). Values: '' (L, implicit),
+    'D-', 'allo-' (L-allo), 'D-allo-'."""
+    global _ALLO_AA_FORMS_CACHE
+    if _ALLO_AA_FORMS_CACHE is None:
+        from rdkit import Chem
+        forms: Dict[str, Dict[str, str]] = {}
+        for nm, (l_smi, lallo_smi) in _ALLO_AA_BASE.items():
+            forms[nm] = {
+                Chem.CanonSmiles(l_smi): "",
+                _enantiomer_canon(l_smi): "D-",
+                Chem.CanonSmiles(lallo_smi): "allo-",
+                _enantiomer_canon(lallo_smi): "D-allo-",
+            }
+        _ALLO_AA_FORMS_CACHE = forms
+    return _ALLO_AA_FORMS_CACHE
 
 
 def _enantiomer_canon(smiles: str) -> Optional[str]:
@@ -226,16 +247,14 @@ def _aa_config_descriptor(mol, name: str) -> Optional[str]:
     retained name cannot represent (e.g. allo-isoleucine).
     """
     from rdkit import Chem
-    lform = _MULTI_STEREO_AA_LFORM.get(name)
-    if lform is not None:
-        # Multi-stereocentre: emit only for a clean L or D enantiomer; an allo
-        # diastereomer matches neither reference -> defer.
+    allo_forms = _allo_aa_forms().get(name)
+    if allo_forms is not None:
+        # Multi-stereocentre threonine/isoleucine: all four stereoisomers have a
+        # retained-name PIN (L implicit, D-, allo- = C-3 epimer, D-allo-).
+        # P-103.1.3.2.2. A SMILES matching none of the four (should not happen for
+        # these 2-stereocentre AAs) -> None (defer to systematic).
         input_canon = Chem.MolToSmiles(mol, canonical=True)  # isomeric (default)
-        if input_canon == Chem.CanonSmiles(lform):
-            return ""
-        if input_canon == _enantiomer_canon(lform):
-            return "D-"
-        return None
+        return allo_forms.get(input_canon)
     # Single-stereocentre: alpha-carbon CIP via the peptide descriptor logic
     # (lazy import avoids the data<->rules circular import at module load).
     from ..rules.peptides import _get_stereo_prefix
@@ -308,7 +327,8 @@ def get_amino_acid_name(
     desc = _aa_config_descriptor(m, name)
     if desc is None:
         return None  # diastereomer -> defer to the systematic namer
-    return f"D-{name}" if desc == "D-" else name
+    # desc in {"", "D-", "allo-", "D-allo-"} (P-103.1.1.1 / P-103.1.3.2.2).
+    return f"{desc}{name}"
 
 
 def is_standard_amino_acid(canonical_smiles: str) -> bool:

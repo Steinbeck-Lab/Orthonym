@@ -48,10 +48,14 @@ class TestBranchedAminoAcid:
     """P-103.2.3: a branched side chain must not collapse into a straight chain."""
 
     def test_branched_side_chain(self):
-        # CC[C@H](C)[C@@H](N)C(=O)O = a 3-methylpentanoic alpha-amino acid.
-        # HEAD collapsed it to the OPSIN-unparseable '(2R,3S)-2-aminohexanoic acid'.
-        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == \
-            "(2R,3S)-2-amino-3-methylpentanoic acid"
+        # CC[C@H](C)[C@@H](N)C(=O)O = (2R,3S)-2-amino-3-methylpentanoic acid, i.e.
+        # a stereoisomer of isoleucine. v24 W8 P3 Task 3.1 now names it with the
+        # retained-name PIN 'D-allo-isoleucine' (P-103.1.3.2.2; OPSIN-RT verified).
+        # The anti-collapse property this test guarded (HEAD once dropped the methyl
+        # -> '2-aminohexanoic acid') still holds: the retained name preserves the
+        # full 3-methylpentanoic skeleton (see test_straight_chain_unaffected for the
+        # non-retained-AA branched-chain guard).
+        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-allo-isoleucine"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("CCCC[C@H](N)C(=O)O", "(2S)-2-aminohexanoic acid"),  # straight chain — unaffected
