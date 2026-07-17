@@ -140,6 +140,14 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC[C@@H](C)CC[C@H]1[C@@H](C)CC[C@H]2C(C)(C)CCC[C@]12C": "labdane",
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@]12C": "dammarane",
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@@H]3CCC4[C@@H](CCCC4(C)C)[C@]3(C)CC[C@]12C": "cucurbitane",
+    #   W8-P7a.2 complex diterpene/triterpene parents (Table 10.1c) — two-source
+    #   verified (PubChem + NCI CACTUS, full InChIKey agreement); OPSIN-unparseable
+    #   -> name-exact. Direct structural analogs of the abietane/lanostane class
+    #   above (unwieldy systematic von-Baeyer name -> semisystematic PIN, P-101.2):
+    "CC1(C)CCC[C@]2(C)[C@H]3CCCC[C@@H]3CC[C@@H]12": "podocarpane",  # OEWMDAWVOVKZEQ
+    "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@H]1CC[C@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@@]12C": "protostane",  # OORMXZNMRWBSTK
+    "C[C@@H]1[C@@H]2CCC(C)(C)[C@H]2CC[C@@]23C[C@@H](CC[C@@H]12)[C@@H](C)C3": "grayanotoxane",  # OPCBUBFCCPXFES
+    "CC[C@]1(C)CC[C@]2(C)[C@H](CC[C@@H]3[C@H]2CCCC3(C)C)C1": "rosane",  # CZEZFPXHDTYEBI
     #   prostanoids (Table 10.1d) — these DO OPSIN-RT, but the retained NP parent is the PIN:
     "CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC": "prostane",
     "CCCCCCCC[C@H]1OCCC[C@@H]1CCCCCCC": "thromboxane",
@@ -364,6 +372,8 @@ NAME_EXACT_NP_PARENTS = frozenset({
     "gammacerane", "eudesmane", "cadinane", "guaiane", "germacrane", "pimarane", "gibbane",
     "beyerane", "atisane", "labdane", "dammarane", "cucurbitane", "yohimban", "sparteine",
     "ibogamine", "aspidospermidine", "vincane", "sarpagan", "strychnidine", "hetisane",
+    # Wave-8 P7a.2: complex diterpene/triterpene parents (Table 10.1c) — two-source verified.
+    "podocarpane", "protostane", "grayanotoxane", "rosane",
     # Wave-8 P7c: sphingoid unsaturated parent (P-107.4.3.1, BB:55235) — OPSIN-unparseable.
     "(4E)-sphing-4-enine",
 })

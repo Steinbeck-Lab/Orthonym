@@ -87,3 +87,25 @@ def test_homolog_skeleton_namer_emits_no_steroid_retained_name():
     out = RAW.name(D_HOMOANDROSTANE)
     for retained in ("androstane", "gonane", "estrane", "cholestane"):
         assert retained not in out, f"leaked '{retained}' in: {out!r}"
+
+
+# 7a.2 — complex polycyclic diterpene/triterpene stereoparents (P-101.2.7 Table
+# 10.1c). OPSIN-unparseable -> name-exact carve-out. Structures two-source
+# verified (PubChem + NCI CACTUS full InChIKey agreement). These are direct
+# structural analogs of the shipped abietane/lanostane-class name-exact PINs
+# (unwieldy systematic von-Baeyer name -> the semisystematic Table-10.1 name is
+# the PIN per P-101.2 BB:50985 "more complicated structure -> semisystematic").
+@pytest.mark.parametrize("smi,expected", [
+    # podocarpane — tricyclic diterpane (abietane class); was 'unknown'.
+    ("CC1(C)CCC[C@]2(C)[C@H]3CCCC[C@@H]3CC[C@@H]12", "podocarpane"),
+    # protostane — pentacyclic triterpane (lanostane/dammarane class).
+    ("CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@H]1CC[C@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@@]12C",
+     "protostane"),
+    # grayanotoxane — tetracyclic diterpane (kaurane/atisane class).
+    ("C[C@@H]1[C@@H]2CCC(C)(C)[C@H]2CC[C@@]23C[C@@H](CC[C@@H]12)[C@@H](C)C3", "grayanotoxane"),
+    # rosane — tricyclic diterpane (abietane class); was mis-named (substituent drop).
+    ("CC[C@]1(C)CC[C@]2(C)[C@H](CC[C@@H]3[C@H]2CCCC3(C)C)C1", "rosane"),
+])
+def test_name_exact_diterpene_triterpene_parents(smi, expected):
+    can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
+    assert RAW.name(can) == expected   # gate-off raw namer (name-exact path)
