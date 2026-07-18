@@ -327,6 +327,22 @@ _POLYACID_PREFIX_DERIVATIVE_PIN_RE = re.compile(
     r"(?:phosphoric|phosphonic|sulfuric|selenic|telluric|arsoric) acid$"
 )
 
+# W8-P9 (P-69.2.3/.4/.6): additive/coordination organometallic PINs contain
+# eta/kappa/mu multicentre descriptors (or '-ido' anionic-ligand words) that
+# OPSIN-2.9's generation grammar cannot parse. These are emitted ONLY by the
+# hard-gated organometallic assembler (rules.organometallics) -> correct by
+# construction. Same rationale as the inositol/dianhydride/thioperoxol carve-outs.
+# CR guard (Task 9.1 open question): tightened so it never un-suppresses an
+# unrelated malformed name -- requires EITHER an eta/kappa/mu descriptor OR a
+# '-ido' coordination-ligand token, AND the name must end in a known P-69
+# metal stem (optionally followed by a Stock/Ewens-Bassett suffix).
+_ORGANOMETALLIC_ADDITIVE_PIN_RE = re.compile(
+    r"^(?=.*(?:[ηκμ]|(?:chlorido|bromido|fluorido|iodido|hydrido)))"
+    r".*(?:titanium|chromium|iron|nickel|molybdenum|tungsten|manganese|"
+    r"platinum|iridium|mercury|osmium|ruthenium|cobalt|vanadium|rhodium)"
+    r"(?:\([0-9IVX+\-]+\))?$"
+)
+
 
 def _validity_gate_jar_present() -> bool:
     """JAR-presence PROBE for the SUB-03 fail-OPEN guard (D-13).
@@ -568,6 +584,10 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # from _assemble_glyceride but OPSIN cannot parse the multi-anion syntax
     # (exactly the inositol/dianhydride generation-grammar gap).
     if _POLYOL_POLYESTER_PIN_RE.match(name):
+        return name
+    # W8-P9 Task 9.1 (P-69.2.3/.4/.6): additive/coordination organometallic
+    # PIN carve-out — see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above.
+    if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name):
         return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
