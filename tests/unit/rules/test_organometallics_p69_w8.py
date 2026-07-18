@@ -266,3 +266,16 @@ class TestTask96DimetalClass1Class2:
         smi = "c1cc(sc1[Hg]O)[Hg]c1ccncc1[As](C)C"
         name = Orthonym().name(smi)
         assert name.endswith("(not supported)")
+
+    def test_class1_class2_dimetal_fails_closed(self):
+        """P-69.5.2 (class-1 central metal + class-2 substituent metal) is
+        deferred THIS cycle: reproduce-first confirmed the required
+        Sb-substituent namer ('diphenylstibanyl') does not yet exist
+        (unlike the As-rooted sibling, name_arsanyl_substituent, which
+        does) -- building it correctly requires a new cross-cutting
+        subsystem (Sb-substituent namer + a relaxed is_multimetal
+        detection + a new dimetal assembler), not a quick wire-up. Must
+        fail closed, never guess."""
+        smi = "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1"
+        name = Orthonym().name(smi)
+        assert name.endswith("(not supported)")

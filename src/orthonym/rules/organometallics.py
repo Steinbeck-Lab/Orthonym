@@ -336,6 +336,19 @@ METAL_RANKING_FOR_PARENT_SELECTION: Dict[str, int] = {
     'Ru': 44, 'Rh': 45, 'Pd': 46, 'Os': 76, 'Ir': 77, 'Pt': 78,
 }
 
+# W8-P9 Task 9.4 (P-69.2.3): transition metals (Groups 3-12, per METAL_NAMES
+# naming_system=='metal_direct') that get the NEW additive sigma-coordination
+# branch when bearing both anionic and organic ligands. Deliberately EXCLUDES
+# Zn/Cd/Hg (Group 12) -- those already have an established 'alkyl2' ligand
+# class (dimethylzinc etc.) with their own Stock-notation hints; this new
+# branch only fires for metals that previously fell through to `return None`
+# (dead code path) for any halide+organic combination, so it cannot regress
+# the existing Zn/Cd/Hg/Mg/Al/Li/Na/K forms.
+_TRANSITION_METAL_DIRECT_SYMBOLS: frozenset = frozenset({
+    'Ti', 'Zr', 'Hf', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu',
+    'Mo', 'W', 'Ru', 'Os', 'Rh', 'Ir', 'Pd', 'Pt', 'Re',
+})
+
 
 def select_ligand_naming(ligand_group: Any, hapticity: int,
                          style: str = "pin") -> str:
@@ -626,6 +639,50 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
         if naming_system == 'metal_direct':
             metal_name = metal_name_info['direct']
 
+            # W8-P9 Task 9.4 (P-69.2.3): additive sigma-coordination branch for
+            # a TRANSITION metal (Groups 3-12, excluding Zn/Cd/Hg which already
+            # have their own established alkyl2 form) bearing both anionic
+            # ('-ido') ligands and organic ligands directly sigma-bonded.
+            # BB verbatim (P6a.pdf P-69.2.3): "[Ti(CH3)Cl3] trichlorido
+            # (methanido)titanium trichlorido(methyl)titanium" -- ligands
+            # (including 'hydrido' for M-H) cited in alphanumerical order,
+            # then the metal name; PIN column uses the substitutive organic
+            # ligand name ('methyl'), always parenthesized (coordination-
+            # nomenclature convention -- every example in P-69.2.3 parenthesizes
+            # the organic/substitutive ligand, even the simple 'methyl'/'ethyl').
+            # No Stock number for a neutral complex (the BB Ti(IV) example
+            # shows none; Ti(CH3)Cl3 is neutral in SMILES).
+            # Fails closed (returns None, falls through to the ligand_class
+            # dispatch below -> eventually cascades, backstopped by the Task
+            # 9.2 veto) whenever it cannot verify every ligand structurally --
+            # never emits a partial/atom-dropping additive name.
+            if halide_ligs and organic_ligs and metal_symbol in _TRANSITION_METAL_DIRECT_SYMBOLS:
+                if any(lg.ligand_smarts_key not in LIGAND_NAMES for lg in halide_ligs):
+                    return None  # fail closed: unrecognised anionic ligand
+                halide_names = [LIGAND_NAMES[lg.ligand_smarts_key] for lg in halide_ligs]
+                # organic_names is already fully resolved + None-checked above.
+                halide_grouped = _group_ligand_counts(halide_names)
+                organic_grouped = _group_ligand_counts(organic_names)
+                all_tokens: List[Tuple[str, str]] = []
+                for count, name in halide_grouped:
+                    all_tokens.append((name, f"{_multiplicative_prefix(count)}{name}"))
+                for count, name in organic_grouped:
+                    if count > 1:
+                        mult = _COMPLEX_MULTIPLICATIVE_PREFIXES.get(count)
+                        if mult is None:
+                            return None  # fail closed: count outside supported range
+                    else:
+                        mult = ''
+                    all_tokens.append((name, f"{mult}({name})"))
+                all_tokens.sort(key=lambda t: t[0])
+                ligand_prefix = ''.join(tok for _key, tok in all_tokens)
+                full_name = f"{ligand_prefix}{metal_name}"
+                ligand_tree_nodes = [
+                    NameTreeNode(parent_stem=name, class_id='organometallic_ligand')
+                    for name, _tok in all_tokens
+                ]
+                return (full_name, metal_name, ligand_tree_nodes)
+
             # Determine ligand_class for Stock lookup
             if halide_ligs and metal_symbol == 'Mg':
                 ligand_class = 'alkyl_halide'
@@ -696,6 +753,205 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
 
     # No tier matched — cascade to SALT@100
     return None
+
+
+# === Metallacycle skeletal-replacement namer (W8-P9 Task 9.5, P-69.4) =======
+
+_METALLACYCLE_RING_STEM: Dict[int, str] = {
+    3: 'cycloprop', 4: 'cyclobut', 5: 'cyclopent',
+    6: 'cyclohex', 7: 'cyclohept', 8: 'cyclooct',
+}
+
+_METALLACYCLE_HALOGEN_PREFIX: Dict[str, str] = {
+    'Cl': 'chloro', 'Br': 'bromo', 'F': 'fluoro', 'I': 'iodo',
+}
+
+
+def _metallacycle_ring_core_name(n: int, double_bond_locants: List[int]) -> Optional[str]:
+    """Build the all-carbon von-Baeyer-style ring core name (metal replaced
+    by the 'a'-prefix at position 1; ``n`` is the TOTAL ring size including
+    the metal, matching the BB's own locant convention: 5-membered Pt ring
+    -> 'cyclopenta-2,4-diene', not 'cyclobuta...' for the 4 carbons alone).
+    Scope THIS CYCLE: 0-2 ring double bonds (>2 -- e.g. an aromatic
+    metallabenzene -- is out of scope, fails closed)."""
+    stem = _METALLACYCLE_RING_STEM.get(n)
+    if stem is None:
+        return None
+    if len(double_bond_locants) == 0:
+        return f"{stem}ane"
+    if len(double_bond_locants) == 1:
+        return f"{stem}-{double_bond_locants[0]}-ene"
+    if len(double_bond_locants) == 2:
+        locs = ','.join(str(x) for x in sorted(double_bond_locants))
+        return f"{stem}a-{locs}-diene"
+    return None
+
+
+def _ring_position_substituents(mol: Any, ring_atom_idx: int,
+                                 ring_set: Any) -> Optional[List[str]]:
+    """Collect simple TERMINAL substituents (methyl / halogen) hanging off a
+    single ring position (the metal position 1, or a ring carbon), excluding
+    other ring atoms. Returns None (fail closed) if any substituent is not a
+    simple recognised terminal group — narrow scope, W8-P9 Task 9.5; a
+    fancier substituent (ethyl, aryl, phosphane ligand, etc.) is deliberately
+    out of scope this cycle rather than risk a wrong/partial name."""
+    names: List[str] = []
+    atom = mol.GetAtomWithIdx(ring_atom_idx)
+    for nbr in atom.GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx in ring_set:
+            continue
+        heavy_deg = sum(1 for x in nbr.GetNeighbors() if x.GetAtomicNum() != 1)
+        if nbr.GetSymbol() == 'C':
+            if heavy_deg != 1 or nbr.GetTotalNumHs() != 3 or nbr.GetFormalCharge() != 0:
+                return None  # not a terminal methyl -- out of scope
+            names.append('methyl')
+        elif nbr.GetSymbol() in _METALLACYCLE_HALOGEN_PREFIX:
+            if heavy_deg != 1 or nbr.GetFormalCharge() != 0:
+                return None
+            names.append(_METALLACYCLE_HALOGEN_PREFIX[nbr.GetSymbol()])
+        else:
+            return None
+    return names
+
+
+def _walk_ring_from(mol: Any, start_idx: int, second_idx: int,
+                     ring_set: Any) -> Optional[List[int]]:
+    """Traverse a simple (non-fused) ring starting at ``start_idx`` (the
+    metal) via ``second_idx``, following the unique in-ring neighbour at
+    each step. Returns the full ordered atom-index list (length ==
+    len(ring_set)) or None if the ring branches internally (fused/bridged --
+    not a simple monocycle, out of this task's scope)."""
+    ordered = [start_idx, second_idx]
+    prev, cur = start_idx, second_idx
+    while True:
+        atom = mol.GetAtomWithIdx(cur)
+        nbrs_in_ring = [n.GetIdx() for n in atom.GetNeighbors()
+                        if n.GetIdx() in ring_set and n.GetIdx() != prev]
+        if len(nbrs_in_ring) != 1:
+            return None
+        nxt = nbrs_in_ring[0]
+        if nxt == start_idx:
+            break
+        ordered.append(nxt)
+        prev, cur = cur, nxt
+        if len(ordered) > len(ring_set):
+            return None
+    return ordered if len(ordered) == len(ring_set) else None
+
+
+def _build_metallacycle_candidate(
+    mol: Any, ordered: List[int], ring_set: Any, a_prefix: str,
+) -> Optional[Tuple[str, str, List[Any], Tuple[int, ...], Tuple[int, ...]]]:
+    """Build one ring-numbering candidate's full name + its locant sets (for
+    the lowest-locants tie-break between the two traversal directions).
+    Returns (full_name, a_prefix, ligand_tree_nodes, double_bond_locants,
+    substituent_locants) or None (fail closed) if this direction's ring
+    bonds / substituents fall outside this task's narrow scope."""
+    n = len(ordered)
+    double_bond_locants: List[int] = []
+    for i in range(n):
+        a, b = ordered[i], ordered[(i + 1) % n]
+        bd = mol.GetBondBetweenAtoms(a, b)
+        if bd is None:
+            return None
+        bt = bd.GetBondTypeAsDouble()
+        if bt == 2.0:
+            double_bond_locants.append(i + 1)
+        elif bt != 1.0:
+            return None  # aromatic / triple ring bond -- out of scope
+
+    ring_core = _metallacycle_ring_core_name(n, double_bond_locants)
+    if ring_core is None:
+        return None
+
+    sub_groups: Dict[str, List[int]] = {}
+    for i, atom_idx in enumerate(ordered):
+        locant = i + 1
+        subs = _ring_position_substituents(mol, atom_idx, ring_set)
+        if subs is None:
+            return None
+        for name in subs:
+            sub_groups.setdefault(name, []).append(locant)
+
+    sub_prefix_tokens: List[str] = []
+    all_sub_locants: List[int] = []
+    for name in sorted(sub_groups.keys()):
+        locants = sorted(sub_groups[name])
+        all_sub_locants.extend(locants)
+        mult = _multiplicative_prefix(len(locants))
+        loc_str = ','.join(str(x) for x in locants)
+        sub_prefix_tokens.append(f"{loc_str}-{mult}{name}")
+
+    ring_token = f"1-{a_prefix}{ring_core}"
+    full_name = '-'.join(sub_prefix_tokens + [ring_token])
+
+    ligand_tree_nodes = [
+        NameTreeNode(parent_stem=name, class_id='organometallic_ligand')
+        for name in sorted(sub_groups.keys())
+    ]
+    return (
+        full_name, a_prefix, ligand_tree_nodes,
+        tuple(sorted(double_bond_locants)), tuple(sorted(all_sub_locants)),
+    )
+
+
+def _assemble_metallacycle(info: Any, mol: Any, style: str = "pin"
+                            ) -> Optional[Tuple[str, str, List[Any]]]:
+    """P-69.4 skeletal-replacement metallacycle namer (W8-P9 Task 9.5, BUILT).
+
+    BB verbatim (P6a.pdf P-69.4): two acceptable names are given for a
+    metallacycle — Hantzsch-Widman-type ('...platinole') and skeletal-
+    replacement ('...-1-platinacyclopenta-2,4-diene'). Neither is labelled
+    (PIN) — P-69.0 explicitly states that PINs for transition-metal
+    organometallics await consideration by a future task group. Orthonym
+    ships the skeletal-replacement form as the systematic/preferred style,
+    consistent with the rest of this project's PIN-style target.
+
+    Scope THIS CYCLE (narrow, conservative — matches ``detect_metallacycle``
+    + ``_ring_position_substituents``): monocyclic all-carbon-backbone ring,
+    0-2 ring double bonds, exocyclic ligands on the metal are simple
+    terminal halides (named as ordinary 'chloro'-style substituent
+    prefixes per the BB's own worked example — NOT '-ido' coordination
+    ligand names, since this is the skeletal-replacement VIEW where the
+    metal is just another numbered ring position), ring-carbon substituents
+    are terminal methyl or halogen only. Fails closed (returns None,
+    cascading onward — backstopped by the Task 9.2 structure-loss veto)
+    outside that scope — e.g. an ethyl/aryl/phosphane ring substituent,
+    more than 2 ring double bonds, or a numbering direction this narrow
+    builder cannot resolve.
+    """
+    from ..data.organometallics import METALLACYCLE_A_PREFIX
+
+    metal_idx = info.metal_atom_idx
+    metal_symbol = mol.GetAtomWithIdx(metal_idx).GetSymbol()
+    a_prefix = METALLACYCLE_A_PREFIX.get(metal_symbol)
+    if a_prefix is None:
+        return None
+
+    ring_set = set(info.ring_atom_indices)
+    metal_atom = mol.GetAtomWithIdx(metal_idx)
+    ring_neighbors = [n.GetIdx() for n in metal_atom.GetNeighbors()
+                     if n.GetIdx() in ring_set]
+    if len(ring_neighbors) != 2:
+        return None  # not a simple monocyclic ring position
+
+    candidates = []
+    for second_idx in ring_neighbors:
+        ordered = _walk_ring_from(mol, metal_idx, second_idx, ring_set)
+        if ordered is None:
+            continue
+        cand = _build_metallacycle_candidate(mol, ordered, ring_set, a_prefix)
+        if cand is not None:
+            candidates.append(cand)
+    if not candidates:
+        return None
+
+    # P-31.1.4 lowest-locants tie-break: unsaturation locants first, then
+    # substituent locants.
+    candidates.sort(key=lambda c: (c[3], c[4]))
+    full_name, metal_name_part, ligand_tree_nodes, _db, _sub = candidates[0]
+    return (full_name, metal_name_part, ligand_tree_nodes)
 
 
 def _assemble_tier4(metal_complex: Any, mol: Any,

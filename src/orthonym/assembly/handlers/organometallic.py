@@ -55,9 +55,35 @@ def name_organometallic(
         return None
 
     # Lazy imports avoid circular dependency at module import time.
-    from ...perception.metals import detect_metal_complex
-    from ...rules.organometallics import assemble_organometallic_name
+    from ...perception.metals import detect_metal_complex, detect_metallacycle
+    from ...rules.organometallics import (
+        assemble_organometallic_name, _assemble_metallacycle,
+    )
     from ...data.organometallics import RETAINED_METALLOCENES
+
+    # W8-P9 Task 9.5 (P-69.4): a metal RING atom (metallacycle) is checked
+    # FIRST — detect_metal_complex's Tier-3 sigma-ligand walker would
+    # otherwise try to fold the whole ring backbone into one "ligand"
+    # fragment (a topology _ligand_name_from_atoms cannot name), returning
+    # None and cascading past this handler entirely (the Pt-metallacycle
+    # atom-drop leak; backstopped by the Task 9.2 veto, but the metallacycle
+    # namer below now supplies the correct name instead of just failing
+    # closed).
+    metallacycle_info = detect_metallacycle(mol)
+    if metallacycle_info is not None:
+        try:
+            mc_result = _assemble_metallacycle(metallacycle_info, mol, style=style)
+        except ValueError:
+            return None
+        if mc_result is None:
+            return None  # narrow builder declined -- cascade (Task 9.2 backstops)
+        full_name, _metal_part, _tree_nodes = mc_result
+        tree = NameTreeNode(
+            parent_stem=full_name,
+            class_id='organometallic',
+            iupac_section_cite='P-69.4 (skeletal replacement)',
+        )
+        return NamingResult(name=full_name, tree=tree, atom_to_locant_hint=None)
 
     metal_complex = detect_metal_complex(mol)
     if metal_complex is None:

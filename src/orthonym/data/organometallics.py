@@ -103,6 +103,30 @@ METAL_HYDRIDE_PARENT_NAMES: Dict[str, str] = {
 }
 
 
+# === METALLACYCLE_A_PREFIX (P-69.4; W8-P9 Task 9.5) ===
+# Skeletal-replacement nondetachable 'a'-prefix for a Group 2-12 metal ring
+# atom (BB P-69.4 verbatim, P6a.pdf): "selecting a parent hydrocarbon ring
+# ... and replacing one or more carbon atoms by a metal atom from Groups 2
+# through 12 using a nondetachable skeletal replacement ('a') prefix".
+# Table scoped to the metals with a worked BB example (platina/irida/titana)
+# plus the common analogues by the standard 'a'-suffix pattern (element stem
+# + 'a', matching the existing METAL_NAMES 'direct' stems). Deliberately
+# excludes Groups 13-16 (Si/Ge/Sn/Pb/B/etc.) — those are WSD-04's existing
+# Hantzsch-Widman-only ring territory (silole/borole/stannole), a SEPARATE
+# established path this table must not overlap.
+METALLACYCLE_A_PREFIX: Dict[str, str] = {
+    'Ti': 'titana', 'Zr': 'zirconia', 'Hf': 'hafnia',
+    'V': 'vanadia', 'Nb': 'nioba', 'Ta': 'tantala',
+    'Cr': 'chroma', 'Mo': 'molybda', 'W': 'tungsta',
+    'Mn': 'mangana', 'Re': 'rhena',
+    'Fe': 'ferra', 'Ru': 'ruthena', 'Os': 'osma',
+    'Co': 'cobalta', 'Rh': 'rhoda', 'Ir': 'irida',
+    'Ni': 'nickela', 'Pd': 'pallada', 'Pt': 'platina',
+    'Cu': 'cupra', 'Ag': 'argenta', 'Au': 'aura',
+    'Zn': 'zinca', 'Cd': 'cadmia', 'Hg': 'mercura',
+}
+
+
 # === LIGAND NAMES (SMARTS-canonical-key → IUPAC ligand name; AUDIT § 2) ===
 # Used for naming the prefix part of organometallic names. Per CBC ligand
 # classification (LibreTexts 13.02).
@@ -189,5 +213,6 @@ __all__ = [
     'METAL_HYDRIDE_PARENT_NAMES',
     'LIGAND_NAMES',
     'LIGAND_ETA_DEFAULTS',
+    'METALLACYCLE_A_PREFIX',
     'get_retained_metallocene_name',
 ]

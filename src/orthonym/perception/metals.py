@@ -80,6 +80,22 @@ class LigandGroup:
 
 
 @dataclass(frozen=True)
+class MetallacycleInfo:
+    """W8-P9 Task 9.5 (P-69.4): a metal atom that is itself a RING member.
+
+    ``ring_atom_indices`` lists the ring atoms in TRAVERSAL order starting at
+    the metal (index 0), in one of the two possible ring-walk directions
+    (the assembler tries both and picks the one giving the lowest locants).
+    ``exocyclic_atom_indices`` is one tuple of atom indices per exocyclic
+    substituent group hanging directly off the metal (e.g. the 2 Cl atoms on
+    Pt in `Cl[Pt]1(Cl)C(C)=C(C)C(C)=C1C`).
+    """
+    metal_atom_idx: int
+    ring_atom_indices: Tuple[int, ...]
+    exocyclic_atom_indices: Tuple[Tuple[int, ...], ...]
+
+
+@dataclass(frozen=True)
 class MetalComplex:
     """A complete metal-organometallic complex: one or more metals + ligands."""
     metal_atom_indices: Tuple[int, ...]                  # sorted
@@ -613,6 +629,71 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
     return False
 
 
+def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
+    """W8-P9 Task 9.5 (P-69.4): detect a metallacycle — a metal atom (Group
+    2-12, per ``data.organometallics.METALLACYCLE_A_PREFIX``) that is itself
+    a RING member.
+
+    Scope THIS CYCLE (monocyclic, all-carbon backbone; narrow and
+    conservative — fails closed, returns None, everywhere outside it):
+      - exactly one metal ring atom (>1 -> polymetallic ring, out of scope);
+      - the metal is in exactly ONE ring (fused/bridged/bicyclic metallacycles
+        — e.g. the BB's own titanabicyclo[3.2.0]heptane example — are
+        EXPLICITLY deferred per the plan's open question; a metal shared
+        between 2+ rings returns None here);
+      - ring size 4-8 (common metallacycle range);
+      - every OTHER ring atom is carbon (mixed-heteroatom-backbone
+        metallacycles, e.g. the BB's 1-sila-2-ferracyclopentane example, are
+        out of scope this cycle);
+      - the metal carries a formal charge of 0.
+
+    Does NOT collide with the WSD-04 Group-14/13 Hantzsch-Widman ring defer
+    (``_GROUP_14_13_RING_DEFER``) — that set (Si/Ge/Sn/Pb/B) is disjoint from
+    ``METALLACYCLE_A_PREFIX`` (Group 2-12) by construction.
+
+    PURE per CONTEXT D-12: read-only RingInfo/GetAtoms/GetBonds/GetNeighbors;
+    no mol mutation.
+    """
+    from ..data.organometallics import METALLACYCLE_A_PREFIX
+
+    if mol is None:
+        return None
+    metal_ring_atoms = [
+        atom.GetIdx() for atom in mol.GetAtoms()
+        if atom.GetSymbol() in METALLACYCLE_A_PREFIX and atom.IsInRing()
+    ]
+    if len(metal_ring_atoms) != 1:
+        return None
+    metal_idx = metal_ring_atoms[0]
+    metal_atom = mol.GetAtomWithIdx(metal_idx)
+    if metal_atom.GetFormalCharge() != 0:
+        return None
+
+    ri = mol.GetRingInfo()
+    atom_rings = [r for r in ri.AtomRings() if metal_idx in r]
+    if len(atom_rings) != 1:
+        return None  # metal in 0 or >1 rings -- fused/bicyclic, deferred
+    ring = atom_rings[0]
+    if not (4 <= len(ring) <= 8):
+        return None
+    if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring if i != metal_idx):
+        return None  # mixed-heteroatom-backbone metallacycle -- out of scope
+
+    ring_set = set(ring)
+    exocyclic: List[Tuple[int, ...]] = []
+    for bond in metal_atom.GetBonds():
+        other = bond.GetOtherAtomIdx(metal_idx)
+        if other in ring_set:
+            continue
+        exocyclic.append((other,))
+
+    return MetallacycleInfo(
+        metal_atom_idx=metal_idx,
+        ring_atom_indices=tuple(ring),
+        exocyclic_atom_indices=tuple(exocyclic),
+    )
+
+
 def enumerate_metal_ligand_groups(mol: "Chem.Mol") -> Tuple[LigandGroup, ...]:
     """For each metal atom in mol, partition coordinated atoms into ligand groups.
 
@@ -637,8 +718,10 @@ __all__ = [
     'is_metal_element',
     'LigandGroup',
     'MetalComplex',
+    'MetallacycleInfo',
     'detect_metal_complex',
     'compute_hapticity',
     'enumerate_metal_ligand_groups',
     'has_covalent_metal_carbon_bond',
+    'detect_metallacycle',
 ]
