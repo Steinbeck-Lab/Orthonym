@@ -607,6 +607,51 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
     return apply_ion_suffix_to_name(neutral, 1, cation_class='diazonium') or ''
 
 
+def emit_acylium(mol, cation_idx: int, style: str) -> str:
+    """P-73.2.3.1 (BB 41623 PIN): name an acylium cation R-C(+)=O.
+
+    Reconstructs the ACID (adds an -OH back onto the C+, restoring R-COOH),
+    names it, then applies the acid->acylium class-keyed transform
+    ('carboxylic acid'->'carbonylium', 'oic acid'->'oylium', 'ic acid'->
+    'ylium'; ``apply_ion_suffix_to_name`` / ``_CLASS_KEYED_CATION_TRANSFORMS
+    ['acylium']``). Deliberately NOT the generic ``add_h_for_cation`` path used
+    for a plain carbenium ylium -- THAT restores an ALDEHYDE (R-CHO), not an
+    acid, which would misname 'acetylium' as an aldehyde-ylium.
+
+    Mirrors ``_name_diazonium`` (sever/reconstruct, name, class-keyed
+    transform), but ADDS an atom (the reconstructed -OH) instead of severing
+    one. Returns '' on any decline -- the caller's generic cascade then runs
+    (``add_h_for_cation`` there cannot mis-fire either: an aldehyde name never
+    ends in an acid suffix, so ``apply_ion_suffix_to_name`` also returns ''
+    on that fallback path -- fail-closed, never a wrong name).
+    """
+    try:
+        cat = mol.GetAtomWithIdx(cation_idx)
+    except (RuntimeError, IndexError, OverflowError):
+        return ''
+    if cat.GetSymbol() != 'C' or cat.GetFormalCharge() != 1:
+        return ''
+    rw = Chem.RWMol(mol)
+    rw.GetAtomWithIdx(cation_idx).SetFormalCharge(0)
+    oh_idx = rw.AddAtom(Chem.Atom('O'))
+    rw.AddBond(cation_idx, oh_idx, Chem.BondType.SINGLE)
+    try:
+        built = rw.GetMol()
+        Chem.SanitizeMol(built)
+        acid_smi = Chem.MolToSmiles(built, canonical=True)
+    except Exception:
+        return ''
+    if not acid_smi:
+        return ''
+    try:
+        acid_name = _reenter(acid_smi, style)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not acid_name or _is_malformed_parent(acid_name):
+        return ''
+    return apply_ion_suffix_to_name(acid_name, 1, cation_class='acylium') or ''
+
+
 def _neutralize_fragment(mol, *, add_h_for_cation: bool = False):
     """Strip ALL non-internal formal charges and radical electrons from a single
     organic fragment, returning the sanitized canonical neutral SMILES (or '').
@@ -1043,6 +1088,14 @@ def route_charged(mol, style: str = 'pin') -> str:
             dz = _name_diazonium(mol, sites['cations'][0]['atom_idx'], style)
             if dz:
                 return dz
+        # W8-P5 Task 1 (P-73.2.3.1): an acylium cation R-C(+)=O is named on the
+        # RECONSTRUCTED ACID (add -OH), never the generic hydride-loss
+        # ('add H' -> aldehyde) path below -- emit_acylium owns it. Mirrors the
+        # diazonium interception immediately above.
+        if ccls == 'acylium':
+            acy = emit_acylium(mol, sites['cations'][0]['atom_idx'], style)
+            if acy:
+                return acy
         # (R-S+/R-Se+ sulfanylium is intercepted earlier, before the radical-ion
         # bail, because RDKit flags the 1-coordinate chalcogen cation as a radical.)
         # WS-E.1 (P-73.1.2.1 + Table 7.4): a QUATERNARY ammonium N (0 H, degree

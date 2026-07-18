@@ -3,10 +3,19 @@
 Task 0: guard-characterization test locking the ~44 already-built charged
 golds so later work in this subsystem can never regress them (these already
 pass at HEAD; this is a characterization lock, not a new-behaviour test).
+
+Task 1 (P-73.2.3.1, BB 41623 PIN): acylium detection + neutralize-as-acid
+emitter — ``classify_cation`` must return 'acylium' (not the generic
+carbenium 'ylium') for a C+ double-bonded to O, and the name must be the
+reconstructed-acid PIN ('acetylium'/'cyclohexanecarbonylium'), never the
+generic hydride-loss aldehyde form ('acetaldehydylium').
 """
 import pytest
+from rdkit import Chem
 
 from orthonym.namer import Orthonym
+from orthonym.perception.ions import get_ion_sites
+from orthonym.rules.ions import classify_cation
 
 
 GUARD = {
@@ -30,3 +39,43 @@ GUARD = {
 @pytest.mark.parametrize("smi,expected", GUARD.items())
 def test_charged_guard_no_regression(smi, expected):
     assert Orthonym().name(smi) == expected
+
+
+# === Task 1: acylium (P-73.2.3.1) =============================================
+
+def test_classify_acylium():
+    mol = Chem.MolFromSmiles("C[C+]=O")  # CH3-C(+)=O
+    site = get_ion_sites(mol)["cations"][0]
+    assert classify_cation(mol, site) == "acylium"
+
+
+def test_classify_cyclohexanecarbonylium():
+    mol = Chem.MolFromSmiles("[C+](=O)C1CCCCC1")
+    site = get_ion_sites(mol)["cations"][0]
+    assert classify_cation(mol, site) == "acylium"
+
+
+def test_classify_plain_carbenium_unaffected():
+    """A plain carbenium (no double-bonded O) must stay 'ylium' (no regression
+    on the pre-existing carbenium path)."""
+    mol = Chem.MolFromSmiles("C[C+](C)C")  # tert-butyl cation
+    site = get_ion_sites(mol)["cations"][0]
+    assert classify_cation(mol, site) == "ylium"
+
+
+def test_acetylium_pin():
+    assert Orthonym().name("C[C+]=O") == "acetylium"
+
+
+def test_cyclohexanecarbonylium_pin():
+    assert Orthonym().name("[C+](=O)C1CCCCC1") == "cyclohexanecarbonylium"
+
+
+def test_acylium_gated_equals_raw():
+    """Gated == raw (gate-off) confirms the emitter is source-level correct,
+    not merely OPSIN-lucky (Global Constraint: verify with the gate-off
+    namer since the RT-gate fails OPEN without Java)."""
+    gated = Orthonym()
+    raw = Orthonym(_disable_opsin_validity_gate=True)
+    for smi in ("C[C+]=O", "[C+](=O)C1CCCCC1"):
+        assert gated.name(smi) == raw.name(smi)

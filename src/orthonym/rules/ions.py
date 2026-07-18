@@ -352,6 +352,23 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
         return 'aminium'
 
     elif element == 'C':
+        # P-73.2.3.1 (BB 41623, PIN 'acetylium'/'cyclohexanecarbonylium'): an
+        # acyl cation R-C(+)=O (formally -OH removed AS HYDROXIDE from a
+        # carboxylic/-carboxylic acid) is 'acylium', NOT a carbenium 'ylium'.
+        # It must be neutralized by RECONSTRUCTING THE ACID (add -OH back),
+        # never the generic hydride-loss ('add H' -> aldehyde) path used for
+        # plain carbenium ylium -- emit_acylium (charged_router.py) owns it.
+        # SCOPE (deliberately narrow): only a DOUBLE bond to O. BB's rarer
+        # thio-/seleno-acid acylium variants (P-73.2.3.1 'pentanethioylium')
+        # and the DISTINCT P-73.2.3.2 N-ylium family (hydride loss from an
+        # amide/amine/imine NITROGEN, not this carbon-cation pattern) are a
+        # separate, unverified family this phase does not build -- they stay
+        # on the general 'ylium' path (which fails closed, never wrong).
+        for nb in atom.GetNeighbors():
+            b = mol.GetBondBetweenAtoms(atom_idx, nb.GetIdx())
+            if (nb.GetSymbol() == 'O' and b is not None
+                    and b.GetBondType() == Chem.BondType.DOUBLE):
+                return 'acylium'
         # Carbocation -> ylium (carbenium ion)
         return 'ylium'
 
