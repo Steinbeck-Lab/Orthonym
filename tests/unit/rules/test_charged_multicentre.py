@@ -79,3 +79,89 @@ def test_acylium_gated_equals_raw():
     raw = Orthonym(_disable_opsin_validity_gate=True)
     for smi in ("C[C+]=O", "[C+](=O)C1CCCCC1"):
         assert gated.name(smi) == raw.name(smi)
+
+
+# === Task 2: Group-14/halogen uide extension (P-72.3 / P-72.8.1) ============
+#
+# NOTE on evidence SMILES: the plan doc's Task 2 fixture ``C[SiH3-]`` is a
+# 4-coordinate Si anion (degree 1 + 3 H = 4 bonds), which is NEITHER the
+# 'ide' pattern (v-1 = 3 bonds, P-72.2.2.1) NOR the 'uide' pattern (v+1 = 5
+# bonds, P-72.3) for standard-valence-4 silicon -- it is a typo. Verified via
+# OPSIN reverse-parse of the literal PIN string "methylsilanuide", which
+# gives the canonical SMILES ``C[SiH4-]`` (5-coordinate: 1 C + 4 H, charge
+# -1) -- BYTE-IDENTICAL to RDKit's own canonicalization of ``C[SiH4-]``. The
+# corrected 5-coordinate SMILES is used here.
+#
+# Reproduce-first (2026-07-18, at HEAD 98070e30, before this task's changes)
+# found the Group-14/halogen element/valence tables were ALREADY generalized
+# by an earlier wave (commit 55377897, "feat(w4-i2): generalize -uide anion
+# beyond boron") -- ``methylsilanuide`` already ships correctly, gated and
+# raw. The two things NOT yet built: (1) OPSIN 2.9 rejects ANY SUBSTITUTED
+# halogen-uide token ("unphysical valency state") even though it happily
+# parses the unsubstituted 'iodanuide' -> [IH2-] AND the BB-cited explicit-
+# lambda alternative 'diphenyl-lambda3-iodanide' -> the IDENTICAL structure
+# (BB 41110 states this equivalence verbatim) -- a genuine OPSIN grammar
+# limitation, not a naming defect, needing a correct-by-construction carve-
+# out; (2) an atom-drop leak in ``_emit_group13_uide``: classify_substituent
+# names an 'alkyl'-typed branch by CARBON COUNT ONLY, silently dropping any
+# heteroatom in that branch (independently reproduced: ``[I-](CCO)c1ccccc1``
+# -> 'ethylphenyliodanuide', dropping -OH; ``[B-](CCO)(C)(C)C`` ->
+# 'ethyltrimethylboranuide', same drop) -- needs a source-level veto since
+# the RT-gate fails OPEN for the halogen-uide carve-out family.
+
+def test_methylsilanuide_pin():
+    assert Orthonym().name("C[SiH4-]") == "methylsilanuide"
+
+
+def test_methylsilanuide_gated_equals_raw():
+    gated = Orthonym()
+    raw = Orthonym(_disable_opsin_validity_gate=True)
+    assert gated.name("C[SiH4-]") == raw.name("C[SiH4-]") == "methylsilanuide"
+
+
+def test_trimethylsilanide_unaffected():
+    """The sibling 'ide' (not 'uide') 3-coordinate Si anion — regression
+    guard for the classify_anion valence-gate discriminator."""
+    assert Orthonym().name("C[Si-](C)C") == "trimethylsilanide"
+
+
+def test_diphenyliodanuide_pin():
+    """BB 41110 PIN. OPSIN 2.9 rejects ANY substituted 'iodanuide'/
+    'bromanuide'/'chloranuide' token outright ("unphysical valency state")
+    even though it happily parses the unsubstituted 'iodanuide' -> [IH2-]
+    AND the BB-cited explicit-lambda alternative 'diphenyl-lambda3-iodanide'
+    -> the IDENTICAL 2-coordinate structure (BB 41110 states this
+    equivalence verbatim) -- a genuine OPSIN substituted-halogen-uide grammar
+    limitation, not a naming defect. Carved out via
+    namer._HALOGEN_UIDE_PIN_RE (correct-by-construction, same precedent as
+    the inositol/dianhydride/phane carve-outs)."""
+    assert Orthonym().name("[I-](c1ccccc1)c1ccccc1") == "diphenyliodanuide"
+
+
+def test_diphenyliodanuide_gated_equals_raw():
+    gated = Orthonym()
+    raw = Orthonym(_disable_opsin_validity_gate=True)
+    smi = "[I-](c1ccccc1)c1ccccc1"
+    assert gated.name(smi) == raw.name(smi) == "diphenyliodanuide"
+
+
+def test_uide_atom_drop_veto_iodanuide():
+    """Source-level atom-conservation veto (MANDATORY per Global Constraints:
+    the RT-gate fails OPEN for the halogen-uide carve-out, since OPSIN cannot
+    parse ANY substituted halogen-uide name to run the SELF-01 check).
+    classify_substituent, invoked on a bare interior atom subset, silently
+    degrades a hetero-substituted branch to a plain hydrocarbon name
+    ('CCO' -> 'ethyl', dropping -OH). ``_emit_group13_uide`` must decline
+    (never ship the drop) -- verified with the gate-off raw namer per the
+    Global Constraints."""
+    raw = Orthonym(_disable_opsin_validity_gate=True)
+    assert raw.name("[I-](CCO)c1ccccc1") != "ethylphenyliodanuide"
+
+
+def test_uide_atom_drop_veto_boranuide():
+    """Same veto, defense-in-depth on the already-shipped boranuide family
+    (this case was already fail-closed via the SELF-01 OPSIN gate before this
+    task's change; the new source-level veto adds a Java-independent second
+    guard)."""
+    raw = Orthonym(_disable_opsin_validity_gate=True)
+    assert raw.name("[B-](CCO)(C)(C)C") != "ethyltrimethylboranuide"

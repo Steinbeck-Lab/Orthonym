@@ -374,6 +374,30 @@ _PHANE_PIN_RE = re.compile(
     r"(?:cyclo)?[a-z]*phane$"
 )
 
+# W8-P5 Task 2 (P-72.3/P-72.8.1, BB 41102-41110/41303): a SUBSTITUTED
+# halogen-uide anion ('diphenyliodanuide (PIN)' BB 41110, the Ph2I- hydride-
+# addition ate-complex) is correct-by-construction (emitted ONLY by the
+# hard-gated `rules.ions._emit_group13_uide` halogen branch, generalized
+# alongside the already-RT-clean silanuide/boranuide/phosphanuide siblings —
+# see `_UIDE_STEMS`/`_UIDE_STD_VALENCE` in `rules/ions.py`) but OPSIN 2.9
+# REJECTS it with "unphysical valency state" whenever the implicit-bonding-
+# number 'iodanuide'/'bromanuide'/'chloranuide' token is SUBSTITUTED
+# (verified 2026-07-18: bare 'iodanuide' parses fine to [IH2-]; the explicit-
+# lambda BB-cited alternative 'diphenyl-lambda3-iodanide' also parses fine to
+# the IDENTICAL structure [I-] with 2 phenyls -- the BB text itself states
+# this equivalence at 41110; 'methyliodanuide'/'diphenylbromanuide'/
+# 'diphenylchloranuide' error the same way -- an OPSIN grammar limitation on
+# SUBSTITUTED halogen-uide tokens, not a naming defect). Exactly the
+# inositol/dianhydride/phane OPSIN-coverage-gap situation. Scoped to the
+# HALOGEN uide stems only (iodan/broman/chloran) -- Si/B/P/Ge/Sn/Pb-uide
+# forms already round-trip cleanly and need no carve-out. This 'uide' suffix
+# string is emitted by no other code path (grep-verified: the only emitter
+# is `rules.ions._emit_group13_uide`, which carries its own source-level
+# atom-conservation veto since the RT-gate would otherwise fail OPEN).
+_HALOGEN_UIDE_PIN_RE = re.compile(
+    r"^[a-z][a-z0-9(),'-]*(?:iodan|broman|chloran)uide$"
+)
+
 # W8-P4 (P-65.7/P-67 atom-drop safety floor): source-level structural motifs
 # reproduced (2026-07-18) to make the RAW (no-Java, gate-OFF) namer silently
 # DROP atoms or emit a WRONG constitution, because no handler in this cycle's
@@ -699,6 +723,13 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # rules.phane.build_phane_pin (formula-conservation-vetoed), so OPSIN's
     # total lack of phane grammar must not suppress it.
     if _PHANE_PIN_RE.match(name):
+        return name
+    # W8-P5 Task 2 (P-72.3/P-72.8.1): substituted halogen-uide PIN carve-out
+    # ('diphenyliodanuide') — see _HALOGEN_UIDE_PIN_RE docstring above.
+    # Emitted ONLY by the hard-gated rules.ions._emit_group13_uide halogen
+    # branch (atom-conservation-vetoed), so OPSIN's substituted-uide grammar
+    # limitation must not suppress it.
+    if _HALOGEN_UIDE_PIN_RE.match(name):
         return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED

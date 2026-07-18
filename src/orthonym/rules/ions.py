@@ -2130,6 +2130,19 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
     _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
     parent_atoms = {center_idx}
     name_to_count: Dict[str, int] = {}
+    # W8-P5 Task 2 (source-level atom-drop veto): the RT-gate fails OPEN for
+    # the substituted-halogen-uide carve-out (OPSIN 2.9 cannot parse ANY
+    # substituted iodanuide/bromanuide/chloranuide token at all — see
+    # namer._HALOGEN_UIDE_PIN_RE — so SELF-01 never gets a chance to run for
+    # that family), and classify_substituent's 'alkyl' branch names a
+    # substituent by CARBON COUNT ONLY (perception/chains.py), silently
+    # ignoring any heteroatom in the branch — reproduced 2026-07-18:
+    # '[I-](CCO)c1ccccc1' -> 'ethylphenyliodanuide' (drops the -OH),
+    # '[B-](CCO)(C)(C)C' -> 'ethyltrimethylboranuide' (same drop). Track
+    # every heavy atom actually represented in the emitted name (centre +
+    # every ligand's full atom set) and veto (decline, never ship the drop)
+    # on any mismatch against the input's heavy-atom count.
+    covered_atoms = {center_idx}
     for nb in center.GetNeighbors():
         if nb.GetSymbol() == 'H':
             continue
@@ -2137,15 +2150,26 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
         # only names carbon groups, so map a single-atom halogen to its prefix here.
         if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
             sub_name = _HALOGEN_PREFIX[nb.GetSymbol()]
+            covered_atoms.add(nb.GetIdx())
         else:
             sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
             if sub_atoms is None:
                 return ''
             info = classify_substituent(mol, sorted(sub_atoms), parent_atoms)
             sub_name = info.get('name')
+            # An 'alkyl'-typed substituent whose atom set contains a
+            # heteroatom means classify_substituent silently swallowed it
+            # (the 'ethyl'-for-2-hydroxyethyl bug above) -> decline rather
+            # than ship the drop.
+            if info.get('type') == 'alkyl' and any(
+                    mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in sub_atoms):
+                return ''
+            covered_atoms |= set(sub_atoms)
         if not sub_name:
             return ''
         name_to_count[sub_name] = name_to_count.get(sub_name, 0) + 1
+    if len(covered_atoms) != mol.GetNumHeavyAtoms():
+        return ''
     suffix = f"{_elide_terminal_e(stem)}uide"
     if not name_to_count:
         return suffix  # bare boranuide (BH4-)
