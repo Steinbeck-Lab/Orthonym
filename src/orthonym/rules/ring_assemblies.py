@@ -151,15 +151,31 @@ def _system_signature(mol, system_atoms: Set[int]) -> Tuple:
     Compute a ring system signature for identity comparison.
 
     The signature includes sorted element symbols, sorted ring sizes that
-    are fully contained within the system, and aromaticity of the system.
-    Two systems are identical if and only if their signatures match.
+    are fully contained within the system, aromaticity of the system, and
+    the intra-system double/triple bond counts. Two systems are identical
+    if and only if their signatures match.
 
     Args:
         mol: RDKit Mol object
         system_atoms: Set of atom indices in the ring system
 
     Returns:
-        Tuple of (sorted_elements, sorted_ring_sizes, is_aromatic)
+        Tuple of (sorted_elements, sorted_ring_sizes, is_aromatic,
+        double_bond_count, triple_bond_count)
+
+    Note (W8-P11 leak fix): element/size/aromaticity alone cannot
+    distinguish e.g. cyclooctane from cyclooctene (both all-carbon,
+    ring_sizes=(8,), non-aromatic). Without a saturation check, a
+    cyclooctene+cyclooctane pair joined by a single bond falsely compared
+    EQUAL and was accepted as an identical-ring "bi-" assembly; the namer
+    then applied the FIRST ring's (unsaturated) name to BOTH components,
+    emitting e.g. "1,1'-bi(cyclooctene)" for a molecule where only one ring
+    actually has the double bond -- a wrong-structure name that only
+    OPSIN's SELF-01 self-consistency gate caught (which fails OPEN with no
+    Java available). Counting intra-system double/triple bonds makes
+    genuinely-identical rings compare equal (same connectivity -> same
+    bond-order multiset) while rejecting rings that merely share element
+    composition, size and aromaticity but differ in saturation.
     """
     elements = sorted(mol.GetAtomWithIdx(i).GetSymbol() for i in system_atoms)
 
@@ -171,7 +187,19 @@ def _system_signature(mol, system_atoms: Set[int]) -> Tuple:
 
     is_aromatic = all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in system_atoms)
 
-    return (tuple(elements), tuple(sorted(ring_sizes)), is_aromatic)
+    double_bonds = 0
+    triple_bonds = 0
+    for bond in mol.GetBonds():
+        a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a1 in system_atoms and a2 in system_atoms:
+            bt = bond.GetBondType()
+            if bt == rdchem.BondType.DOUBLE:
+                double_bonds += 1
+            elif bt == rdchem.BondType.TRIPLE:
+                triple_bonds += 1
+
+    return (tuple(elements), tuple(sorted(ring_sizes)), is_aromatic,
+            double_bonds, triple_bonds)
 
 
 # P-28.4.2 skeletal-replacement ring-assembly heteroatoms (element-seniority

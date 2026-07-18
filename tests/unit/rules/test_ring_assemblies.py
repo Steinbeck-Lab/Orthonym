@@ -102,6 +102,21 @@ class TestDetection:
         assert info is None
 
     @pytest.mark.unit
+    def test_cyclooctenyl_cyclooctane_not_assembly(self):
+        """W8-P11 leak fix: cyclooctene + cyclooctane (same ring size/
+        aromaticity but DIFFERENT saturation) is NOT an identical-ring
+        assembly. Pre-fix, ``_system_signature`` ignored ring double-bond
+        count, so this pair falsely matched and the namer emitted
+        '1,1'-bi(cyclooctene)' for a molecule where only ONE ring actually
+        has the double bond -- a wrong-structure name that OPSIN's SELF-01
+        gate caught (fails-OPEN without Java) but no source-level check did.
+        """
+        mol = Chem.MolFromSmiles(r"C1CCCCC/C=C\1C1CCCCCCC1")
+        rs = get_ring_systems(mol)
+        info = detect_ring_assembly(mol, rs)
+        assert info is None
+
+    @pytest.mark.unit
     def test_bifuran_detected(self):
         """Bifuran (two identical furan rings) is detected as assembly."""
         mol = Chem.MolFromSmiles("c1ccoc1-c1ccoc1")
