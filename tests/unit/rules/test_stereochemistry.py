@@ -762,3 +762,50 @@ class TestClusterFPseudoasymmetricSignResolution:
         cis = Chem.MolFromSmiles("O[C@@H]1C[C@H](O)C1")
         trans = Chem.MolFromSmiles("O[C@@H]1C[C@@H](O)C1")
         assert Chem.MolToSmiles(cis) != Chem.MolToSmiles(trans)
+
+
+class TestClusterBSpiroCipCeiling:
+    """Wave-8 P6 Cluster B reproduce-first (D-B1, load-bearing): does the CIP
+    engine (centres OR rdCIPLabeler) assign R/S to the ring CH-Cl carbons of
+    `Cl[C@H]1C[C@]2(C1)C[C@@H](Cl)C2` (2,6-dichlorospiro[3.3]heptane, BB
+    P-93.5.3.5 / BB L49267)?
+
+    Reproduced: NEITHER engine assigns a `_CIPCode` to either CH-Cl carbon
+    (both show a defined chiral tag / RDKit's ``FindMolChiralCenters``
+    reports them as 'Tet_CW' -- detected-but-unrankable -- not merely
+    'unassigned'). This is confirmed against the vendored `centres` jar
+    directly (``centres_label_mol`` returns True -- it ran -- but still sets
+    no ``_CIPCode`` on these atoms), so it is a genuine CIP-ceiling limitation
+    of BOTH available engines, not an integration bug. Per the accuracy-first
+    policy (a missing descriptor beats a wrong one), Cluster B is CIP-ceiling
+    fail-closed THIS CYCLE: no code change, no gold. The shipped name
+    ('2,6-dichlorospiro[3.3]heptane', stereo silently dropped, RT-MISMATCH
+    against the input) is the correct fail-closed behaviour, not a leak --
+    the constitution is right, only the descriptor is (honestly) missing.
+    """
+
+    @pytest.mark.unit
+    def test_spiro_ring_chcl_carbons_get_no_cip_from_either_engine(self):
+        from orthonym.perception.stereo import assign_stereochemistry
+        mol = Chem.MolFromSmiles("Cl[C@H]1C[C@]2(C1)C[C@@H](Cl)C2")
+        assign_stereochemistry(mol)  # production path: centres, then rdCIPLabeler fallback
+        ring_chcl_atoms = [
+            a.GetIdx() for a in mol.GetAtoms()
+            if a.GetSymbol() == 'C' and a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+            and any(n.GetSymbol() == 'Cl' for n in a.GetNeighbors())
+        ]
+        assert len(ring_chcl_atoms) == 2, f"expected 2 CH-Cl stereocentres, found {ring_chcl_atoms}"
+        for idx in ring_chcl_atoms:
+            assert not mol.GetAtomWithIdx(idx).HasProp('_CIPCode'), (
+                f"atom {idx}: CIP-ceiling premise changed -- engine NOW assigns "
+                f"a code; Cluster B should be revisited and built"
+            )
+
+    @pytest.mark.unit
+    def test_spiro_diol_e2e_fails_closed_not_wrong(self):
+        """The shipped name must be the correct CONSTITUTION with stereo
+        honestly omitted -- never a wrong skeleton."""
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        out = o.name("Cl[C@H]1C[C@]2(C1)C[C@@H](Cl)C2")
+        assert out == "2,6-dichlorospiro[3.3]heptane", f"got {out!r}"
