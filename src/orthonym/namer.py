@@ -2358,6 +2358,50 @@ class Orthonym:
             if _p4_oxoacid_anhydride_leak_motif(mol):
                 return _descriptive_fallback(smiles)
 
+        # ============================================================
+        # W8-P10: Tier-B structure-conservation vetoes (Java-free; the "E1
+        # atom-coverage certificate" from the cross-tool audit). Mirrors the
+        # organometallic/oxoacid vetoes above -- runs UNCONDITIONALLY (never
+        # gated by self._disable_opsin_validity_gate), so the raw/no-Java
+        # path gets the same protection the OPSIN SELF-01 gate gives the
+        # Java path (which fails OPEN without a JAR). See
+        # perception/structure_conservation.py for the full design record
+        # and the false-positive investigation behind each check's scope.
+        # ============================================================
+        # Scoped to TOP-LEVEL naming only (never a recursive substituent/
+        # fragment naming call -- e.g. name_fragment_recursively() names an
+        # isolated charged fragment such as the boron-anion piece of
+        # "trimethylboryl" as a standalone molecule up the call stack; that
+        # inner name is not the final shipped name and must not be
+        # suppressed here, or the fragment's "unknown organic compound"
+        # replacement gets spliced into the middle of the parent name).
+        from .assembly.fragment_naming import is_top_level_naming
+        if name and not is_failure_name(name) and is_top_level_naming():
+            from .perception.structure_conservation import (
+                charge_dropped, partial_sat_sp3_substituent_drop,
+            )
+            # Charge-conservation veto (P5-family leak: a substituted/
+            # hypervalent-at-the-charge-centre anion whose charge-aware
+            # route fails internally and falls through to a charge-blind
+            # path, e.g. `[I-](CCO)c1ccccc1`, `[B-](CCO)(C)(C)C`,
+            # `C[Si-](C)(C)[H]`). NOT gated on result.class_id -- a live
+            # probe showed CORRECT charged names ship through every class_id
+            # (including GENERAL/ORGANOMETALLIC), so class-based gating would
+            # over-veto; the charge is verified from the SHIPPED NAME's
+            # suffix shape instead (see charge_dropped docstring).
+            if charge_dropped(mol, name):
+                return _descriptive_fallback(smiles)
+            # R12-spillover veto: sp3-ring substituent silently dropped by
+            # the partially-saturated fused-carbocycle emitter's downstream
+            # enrichment hand-off (2,6-dimethyl-/2-amino-/2-hydroxy-
+            # tetrahydronaphthalene-class leaks). Scoped internally to the
+            # exact tetralin-class shape it is proven safe for (see
+            # partial_sat_sp3_substituent_drop docstring) -- no class_id
+            # gate needed since the check is a no-op unless
+            # name_partially_saturated_carbocycle(mol) itself fires.
+            if partial_sat_sp3_substituent_drop(mol, name):
+                return _descriptive_fallback(smiles)
+
         # Orthonym is deterministic-rules-only (ADR-21-01, v21): there is no
         # ML fallback. The rule-based pipeline output is the final name.
         return name
