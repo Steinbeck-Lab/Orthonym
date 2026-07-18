@@ -2174,6 +2174,30 @@ class Orthonym:
                             )
                             return decomp_name
 
+        # ============================================================
+        # W8-P9 Task 9.2: organometallic structure-loss veto (ACCURACY-
+        # CRITICAL, mandatory regardless of which other P-9 tasks land).
+        # ============================================================
+        # A covalent bond between a TRUE metal (Groups 1/2/3-12 -- see
+        # has_covalent_metal_carbon_bond) and a carbon atom means the
+        # compound IS a P-69 organometallic. If the ORGANOMETALLIC handler
+        # did not produce the winning name (result.class_id != ORGANOMETALLIC),
+        # the CFR cascade fell through to a class that has NO legitimate way
+        # to name a true-metal-carbon compound -- it can only have "won" by
+        # silently naming a DECOMPOSED SUB-FRAGMENT that drops the metal
+        # (`C[Ti](Cl)(Cl)Cl` -> 'methane'; `Cl[Pt]1(Cl)...` -> '...ole', both
+        # confirmed structure-loss leaks in the no-Java gate-off path, where
+        # the OPSIN validity/SELF-01 gate fails OPEN). Source-level veto: does
+        # NOT depend on OPSIN/Java. Never fires for a dot-separated IONIC
+        # metallocene/salt (has_covalent_metal_carbon_bond is False -- no bond
+        # crosses fragments) or for Group 13-16 metalloids (excluded from the
+        # predicate's scope; MONONUCLEAR_HYDRIDE / WSD-04 heterocycle defer /
+        # etc. are legitimate alternate paths for those, not leaks).
+        if name and result.class_id != StoutClass.ORGANOMETALLIC:
+            from .perception.metals import has_covalent_metal_carbon_bond
+            if has_covalent_metal_carbon_bond(mol):
+                return _descriptive_fallback(smiles)
+
         # Orthonym is deterministic-rules-only (ADR-21-01, v21): there is no
         # ML fallback. The rule-based pipeline output is the final name.
         return name

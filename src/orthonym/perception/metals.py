@@ -543,6 +543,76 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
     return 1
 
 
+# W8-P9 Task 9.2: the TRUE-METAL subset of METAL_ELEMENT_SYMBOLS used by
+# has_covalent_metal_carbon_bond — Groups 1, 2, and 3-12 (+ lanthanides/
+# actinides), per BB P-69.0's own three-way split: "(1) elements of Groups 1
+# and 2; (2) elements of Groups 3-12 (the transition metals); (3) elements
+# of Groups 13-16". Deliberately EXCLUDES the Group 13-16 metalloids (B, Al,
+# Ga, In, Tl, Si, Ge, Sn, Pb, As, Sb, Bi, Te, Po): those ALWAYS have a
+# legitimate alternate SUBSTITUTIVE nomenclature system (P-68) that correctly
+# names the WHOLE molecule via a different CFR class —
+# MONONUCLEAR_HYDRIDE (trimethylarsane/trimethylgallane/trimethylindigane/
+# trimethylthallane), the WSD-04 Hantzsch-Widman ring defer (silole/borole/
+# stannole), FREE_HOMONUCLEAR_G14_HYDRIDE, DINUCLEAR_HYDRIDE, etc. — so a
+# "class_id != organometallic" outcome for one of THOSE elements is not an
+# atom-drop leak; it is the correct alternate path. Restricting the veto's
+# metal scope to true metals (which have NO alternate substitutive system in
+# this codebase) makes the veto SAFE: a true-metal-carbon bond can only be
+# legitimately named via P-69 additive/coordination nomenclature, so any
+# other outcome for it genuinely is a structure-loss leak.
+_TRUE_METAL_SYMBOLS_FOR_VETO: FrozenSet[str] = METAL_ELEMENT_SYMBOLS - frozenset({
+    'B', 'Al', 'Ga', 'In', 'Tl',       # Group 13
+    'Si', 'Ge', 'Sn', 'Pb',            # Group 14
+    'As', 'Sb', 'Bi',                  # Group 15
+    'Te', 'Po',                        # Group 16
+})
+
+
+def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
+    """W8-P9 Task 9.2: True iff a TRUE metal atom (see
+    ``_TRUE_METAL_SYMBOLS_FOR_VETO``) shares a DIRECT bond with a carbon atom
+    (same connected fragment) — the structural definition of a P-69
+    organometallic compound (BB P-69.0: "Organometallic compounds are
+    compounds having at least one bond between one metal atom and one carbon
+    atom"), scoped to metals that have NO legitimate alternate substitutive
+    nomenclature system in this codebase.
+
+    Deliberately excludes dot-separated ionic topologies (e.g. ferrocene
+    `[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1`): RDKit ``GetBonds()`` only enumerates
+    bonds that exist in the graph, so a metal cation and an anionic Cp ring
+    in SEPARATE fragments (no bond between them) correctly return False here
+    — those compounds legitimately cascade to SALT@100 (ionic complex, no
+    covalent M-C bond) and must keep doing so.
+
+    Also deliberately excludes Group 13-16 metalloids (Si/Ge/Sn/Pb/B/As/Sb/
+    Bi/Ga/In/Tl/Te/Po) even though they ARE metals/semimetals per
+    ``is_metal_element`` — those have a legitimate alternate substitutive
+    path (P-68 / MONONUCLEAR_HYDRIDE / WSD-04 heterocycle defer) that names
+    the whole molecule via a DIFFERENT CFR class; flagging them here would
+    false-positive-suppress correct names like 'trimethylarsane',
+    'trimethylgallane', or '1-methyl-1H-silole'.
+
+    Used as a source-level (no-OPSIN-required) veto: any compound for which
+    this returns True IS a P-69 organometallic that must be named by the
+    organometallic handler or fail closed — never silently renamed from a
+    decomposed sub-fragment that drops the metal (the `C[Ti](Cl)(Cl)Cl` ->
+    'methane' / `Cl[Pt]1(Cl)...` -> '...ole' leaks).
+
+    PURE per CONTEXT D-12: read-only GetBonds/GetBeginAtom/GetEndAtom/
+    GetSymbol; no mol mutation.
+    """
+    if mol is None:
+        return False
+    for b in mol.GetBonds():
+        a1, a2 = b.GetBeginAtom(), b.GetEndAtom()
+        s1, s2 = a1.GetSymbol(), a2.GetSymbol()
+        if s1 == 'C' and s2 in _TRUE_METAL_SYMBOLS_FOR_VETO:
+            return True
+        if s2 == 'C' and s1 in _TRUE_METAL_SYMBOLS_FOR_VETO:
+            return True
+    return False
+
+
 def enumerate_metal_ligand_groups(mol: "Chem.Mol") -> Tuple[LigandGroup, ...]:
     """For each metal atom in mol, partition coordinated atoms into ligand groups.
 
@@ -570,4 +640,5 @@ __all__ = [
     'detect_metal_complex',
     'compute_hapticity',
     'enumerate_metal_ligand_groups',
+    'has_covalent_metal_carbon_bond',
 ]
