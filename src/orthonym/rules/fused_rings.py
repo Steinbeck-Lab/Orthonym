@@ -2175,6 +2175,14 @@ _FUSED_CARBOCYCLIC_PARENTS = {
     (6, 7): 'heptalene',
 }
 
+# Intrinsic indicated-hydrogen form for the fused carbocyclic parents above
+# that are not fully mancude (BlueBookV2.md:11317-11319: indene's PIN is
+# "1H-indene"). pentalene/naphthalene/azulene/heptalene are fully conjugated
+# mancude ring systems and carry no indicated hydrogen.
+_FUSED_CARBOCYCLIC_INTRINSIC_IH = {
+    'indene': '1H-indene',
+}
+
 # Numeric prefix for hydrogen count
 _SATURATION_PREFIXES = {
     2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta',
@@ -2260,7 +2268,20 @@ def _name_saturated_fused_carbocyclic(mol) -> Optional[str]:
     if prefix is None:
         return None
 
-    base = f"{prefix}hydro{parent}"
+    # P-31.1.4 / BlueBookV2.md:11317-11319: indene's PIN is '1H-indene' --
+    # the mancude parent is NOT fully conjugated (unlike naphthalene/
+    # pentalene/azulene/heptalene here, all of which need no indicated
+    # hydrogen), so it carries an intrinsic indicated-hydrogen locant that
+    # MUST be cited once the parent is modified (BlueBookV2.md:14609-14613:
+    # omission is permitted only for the bare, unsubstituted "indene", e.g.
+    # "1H-indene-3-carboxylic acid" once substituted) -- a hydro-prefixed
+    # name is such a modification, so "octahydro-1H-indene", not the bare
+    # "octahydroindene".
+    _intrinsic_ih = _FUSED_CARBOCYCLIC_INTRINSIC_IH.get(parent)
+    if _intrinsic_ih:
+        base = f"{prefix}hydro-{_intrinsic_ih}"
+    else:
+        base = f"{prefix}hydro{parent}"
 
     # P-93.5.4.1: ring-junction (bridgehead) stereodescriptors. The junction
     # carbons of a symmetric saturated fused parent hydride are PSEUDOASYMMETRIC
@@ -2272,28 +2293,53 @@ def _name_saturated_fused_carbocyclic(mol) -> Optional[str]:
     return f"{_saturated_fused_junction_prefix(mol)}{base}"
 
 
+# P-31.1.4.3.4(j) preference rank for the junction-locant tie-break in
+# _saturated_fused_junction_prefix: "the lower locant is assigned to CIP
+# stereodescriptors ... R ... and r (pseudoasymmetry) that are preferred
+# to ... S ... and s, respectively" (BlueBookV2.md:3346). Lower rank wins
+# the lower locant.
+_JUNCTION_CIP_RANK = {'R': 0, 'r': 1, 'S': 2, 's': 3}
+
+
 def _saturated_fused_junction_prefix(mol) -> str:
     """Accuracy- and determinism-safe ring-junction stereo prefix (P-93.5.4.1).
 
-    Returns a ``(4ar,8ar)-`` / ``(4as,8as)-`` style prefix for a saturated
-    fused bicyclic parent hydride, or ``''`` when emitting one would risk a
-    wrong or non-deterministic name. All of the following must hold, else ``''``:
+    Returns a ``(4ar,8ar)-`` / ``(4as,8as)-`` / ``(3aR,7aS)-`` style prefix
+    for a saturated fused bicyclic parent hydride, or ``''`` when emitting
+    one would risk a wrong or non-deterministic name. All of the following
+    must hold, else ``''``:
 
     * There are exactly two bridgehead (ring-junction) atoms, both carry a
       ``_CIPCode``, and they are the molecule's ONLY stereo-labelled atoms with
       no E/Z bond stereo. This guarantees we are not silently dropping any
       substituent stereocentre (a substituted decahydronaphthalene would have
       extra centres and is fail-closed here).
-    * Every junction descriptor is IDENTICAL (e.g. both ``r`` or both ``s``).
-      The junction-locant assignment keys on ``sorted(bridgehead_atoms)`` (atom
-      index), which is NOT canonical across SMILES orderings; requiring equal
-      descriptors makes the emitted ``(locX,locX)`` string invariant under which
-      physical junction maps to which ``a``-locant. Symmetric parents (decalin,
-      octahydropentalene) always satisfy this when chiral; asymmetric ones whose
-      junctions differ fail closed.
     * The junction-locant pair is one this module numbers correctly
       (naphthalene 4a/8a, pentalene 3a/6a, indene 3a/7a, azulene 3a/8a,
       heptalene 4a/9a — see get_junction_locants_for_fused_system).
+
+    Which physical bridgehead maps to the LOWER locant (4a/3a) vs the higher
+    one (8a/7a) is a genuine numbering CHOICE, not an arbitrary atom-index
+    order: the bare bicyclic skeleton (ignoring stereo) of every ortho-fused
+    parent supported here has a mirror automorphism swapping the two
+    bridgeheads (each ring's non-fusion atoms are symmetric about the
+    fusion-bond axis), so relabelling which bridgehead is "first" always
+    describes the identical constitution. Two cases:
+
+    * Symmetric-ring parents (5,5 / 6,6 -- pentalene/naphthalene): the two
+      bridgeheads sit in a truly equivalent chemical environment (a REAL
+      molecular symmetry of that specific stereoisomer, not just a skeletal
+      one), so they always get IDENTICAL descriptors when chiral (both r/r,
+      s/s, R/R, or S/S) -- the choice of which gets the lower locant is moot.
+    * Asymmetric-ring parents (5,6 indene / 5,7 azulene / 6,7 heptalene): the
+      two bridgeheads are chemically distinct and CAN carry genuinely
+      different descriptors (e.g. hydrindane's real R/S, not pseudoasymmetric
+      r/s). BB P-31.1.4.3.4(j) (BlueBookV2.md:3346) resolves the choice: the
+      lower locant goes to the PREFERRED descriptor (R over S, r over s).
+
+    A mixed family (one bridgehead R/S-type, the other r/s-type) is not an
+    expected/verified shape for this parent set and fails closed rather than
+    guessing an ordering.
     """
     assign_stereochemistry(mol)
 
@@ -2312,17 +2358,29 @@ def _saturated_fused_junction_prefix(mol) -> str:
     if ring_sizes == (0, 0):
         return ""
 
-    junction_locants = get_junction_locants_for_fused_system(
-        mol, bridgeheads, ring_sizes[0], ring_sizes[1]
-    )
-    descriptors = collect_ring_junction_stereo(mol, bridgeheads, junction_locants)
-    if len(descriptors) != 2:
+    cip_a = mol.GetAtomWithIdx(bridgeheads[0]).GetProp('_CIPCode')
+    cip_b = mol.GetAtomWithIdx(bridgeheads[1]).GetProp('_CIPCode')
+
+    if cip_a == cip_b:
+        # Symmetric case (decalin/pentalene-like): either physical ordering
+        # yields the identical descriptor pair.
+        ordered_bridgeheads = bridgeheads
+    elif {cip_a, cip_b} in ({'R', 'S'}, {'r', 's'}):
+        # P-31.1.4.3.4(j): the preferred descriptor gets the lower locant.
+        if _JUNCTION_CIP_RANK[cip_a] < _JUNCTION_CIP_RANK[cip_b]:
+            ordered_bridgeheads = [bridgeheads[0], bridgeheads[1]]
+        else:
+            ordered_bridgeheads = [bridgeheads[1], bridgeheads[0]]
+    else:
+        # Mixed descriptor family at chemically-equivalent bridgeheads is not
+        # a verified case -- fail closed rather than guess.
         return ""
 
-    # Determinism guard: emit only when both junction descriptors are identical,
-    # so the string does not depend on the bridgehead atom-index ordering.
-    cips = {cip for _loc, cip in descriptors}
-    if len(cips) != 1:
+    junction_locants = get_junction_locants_for_fused_system(
+        mol, ordered_bridgeheads, ring_sizes[0], ring_sizes[1]
+    )
+    descriptors = collect_ring_junction_stereo(mol, ordered_bridgeheads, junction_locants)
+    if len(descriptors) != 2:
         return ""
 
     return format_ring_junction_stereo(descriptors)

@@ -1048,3 +1048,100 @@ class TestTask60FusedNBicyclicLeakVeto:
         out = o.name("C1CC[C@@H]2CCCC[C@@H]2C1")  # cis-decalin
         assert "unknown" not in out
         assert "decahydronaphthalene" in out
+
+
+class TestClusterAJunctionGeneralization:
+    """Wave-8 P6 Cluster A: generalize the ring-junction stereo prefix beyond
+    decalin (P-91.2.1.2.1 / P-93.5.4.1).
+
+    The bare 5,6-fused saturated carbocyclic (hydrindane) has a REAL (not
+    pseudoasymmetric) pair of bridgehead stereocentres because the two rings
+    differ in size -- so the two junction descriptors can genuinely differ
+    (R vs S), unlike decalin/pentalene where the bridgeheads sit in truly
+    equivalent environments and always match. The bare bicyclic skeleton
+    (indene numbering 1,2,3,3a,4,5,6,7,7a) has a mirror automorphism that
+    swaps which physical bridgehead is '3a' vs '7a', so BB P-31.1.4.3.4(j)
+    ("lower locant assigned to R preferred to S, r preferred to s") decides
+    the assignment -- NOT an arbitrary atom-index order.
+    """
+
+    @pytest.mark.unit
+    def test_hydrindane_junction_stereo_r_gets_lower_locant(self):
+        from orthonym.rules.fused_rings import _saturated_fused_junction_prefix
+        mol = Chem.MolFromSmiles("C1CC[C@@H]2CCC[C@@H]2C1")
+        prefix = _saturated_fused_junction_prefix(mol)
+        # R (preferred) must land on the lower locant (3a); S on 7a.
+        assert prefix == "(3aR,7aS)-", f"got {prefix!r}"
+
+    @pytest.mark.unit
+    def test_hydrindane_e2e_name_has_1h_indicated_hydrogen(self):
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        out = o.name("C1CC[C@@H]2CCC[C@@H]2C1")
+        assert out == "(3aR,7aS)-octahydro-1H-indene", f"got {out!r}"
+
+    @pytest.mark.unit
+    def test_hydrindane_differing_descriptor_diastereomer_is_meso(self):
+        """The 'R,S'-bridgehead hydrindane diastereomer is MESO (achiral):
+        RDKit/InChI confirm `C1CC[C@@H]2CCC[C@@H]2C1` and its full-SMILES-
+        stereo-flip `C1CC[C@H]2CCC[C@H]2C1` are the SAME physical molecule
+        (identical canonical SMILES/InChI) -- the renumbering freedom this
+        cluster relies on is exactly why: 'R at 3a, S at 7a' and 'S at 3a,
+        R at 7a' describe the identical compound, so BOTH inputs correctly
+        collapse to the ONE canonical name via the R-preferred-at-lower-
+        locant tie-break (P-31.1.4.3.4(j)). This is NOT an enantiomer-name
+        collision -- there is only one physical compound in this diastereomer
+        (unlike the matching-descriptor S,S/R,R diastereomer, which IS a
+        genuine chiral pair and is correctly kept distinct -- see
+        test_hydrindane_matching_descriptor_diastereomer_is_chiral)."""
+        from orthonym.rules.fused_rings import _saturated_fused_junction_prefix
+        forward = Chem.MolFromSmiles("C1CC[C@@H]2CCC[C@@H]2C1")
+        flipped = Chem.MolFromSmiles("C1CC[C@H]2CCC[C@H]2C1")
+        assert Chem.MolToSmiles(forward) == Chem.MolToSmiles(flipped), (
+            "premise check: these must be the SAME (meso) molecule"
+        )
+        assert _saturated_fused_junction_prefix(forward) == "(3aR,7aS)-"
+        assert _saturated_fused_junction_prefix(flipped) == "(3aR,7aS)-"
+
+    @pytest.mark.unit
+    def test_hydrindane_matching_descriptor_diastereomer_is_chiral(self):
+        """Protect: the OTHER hydrindane diastereomer (matching bridgehead
+        descriptors, S,S or R,R) is genuinely CHIRAL (InChI /m0/s1 absolute-
+        stereo layer) -- its two enantiomers must stay distinct, never
+        collapse to the same name."""
+        from orthonym.rules.fused_rings import _saturated_fused_junction_prefix
+        s_s = Chem.MolFromSmiles("C1CC[C@@H]2CCCC[C@@H]12")  # existing gold
+        r_r = Chem.MolFromSmiles("C1CC[C@H]2CCCC[C@H]12")
+        assert Chem.MolToSmiles(s_s) != Chem.MolToSmiles(r_r), (
+            "premise check: these must be genuinely distinct enantiomers"
+        )
+        assert _saturated_fused_junction_prefix(s_s) == "(3aS,7aS)-"
+        assert _saturated_fused_junction_prefix(r_r) == "(3aR,7aR)-"
+
+    @pytest.mark.unit
+    def test_decalin_protect_symmetric_matching_descriptors(self):
+        """Protect: decalin (identical descriptors both bridgeheads) must be
+        byte-identical to the pre-Cluster-A output."""
+        from orthonym.rules.fused_rings import _saturated_fused_junction_prefix
+        cis = Chem.MolFromSmiles("C1CC[C@@H]2CCCC[C@@H]2C1")
+        assert _saturated_fused_junction_prefix(cis) == "(4as,8as)-"
+        trans = Chem.MolFromSmiles("C1CC[C@H]2CCCC[C@@H]2C1")
+        assert _saturated_fused_junction_prefix(trans) == "(4ar,8ar)-"
+
+    @pytest.mark.unit
+    def test_octahydropentalene_protect(self):
+        """Protect: the existing 5,5-fused gold (octahydropentalene, symmetric
+        parent -> matching lowercase r/s) must be unaffected."""
+        from orthonym.rules.fused_rings import _saturated_fused_junction_prefix
+        mol = Chem.MolFromSmiles("C1CC[C@H]2CCC[C@@H]12")
+        assert _saturated_fused_junction_prefix(mol) == "(3as,6as)-"
+
+    @pytest.mark.unit
+    def test_existing_gold_smiles_still_correct_with_1h_fix(self):
+        """The pre-existing gold_pins.json SMILES for octahydroindene
+        (matching S,S descriptors) must now include the '1H-' indicated
+        hydrogen (P-31.1.4 -- indene's PIN is 1H-indene; BlueBookV2.md:11317)."""
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        out = o.name("C1CC[C@@H]2CCCC[C@@H]12")
+        assert out == "(3aS,7aS)-octahydro-1H-indene", f"got {out!r}"
