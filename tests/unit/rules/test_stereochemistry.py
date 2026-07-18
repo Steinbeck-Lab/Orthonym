@@ -726,3 +726,39 @@ class TestPseudoasymmetricPreservation:
         cip = descriptors[0][1]
         # Should preserve whatever RDKit returned (R in this case)
         assert cip in ('R', 'S', 'r', 's'), f"CIP code should be valid: {cip}"
+
+
+class TestClusterFPseudoasymmetricSignResolution:
+    """Wave-8 P6 Cluster F reproduce-first (D-F1/D-F2/D-F3): the ledger's
+    'CIP-ceiling' alarm for cyclobutane-1,3-diol was a FALSE ALARM, not an
+    engine bug. `O[C@@H]1C[C@H](O)C1` (cis) and its BB-cited PIN counterpart
+    `O[C@@H]1C[C@@H](O)C1` (trans) are DIFFERENT diastereomers -- both
+    verified via 3D-embedding face check AND OPSIN cis-/trans- round-trip.
+    The centres/rdCIPLabeler engine (perception/stereo.py assign_stereo-
+    chemistry) is correct on BOTH. No `pseudoasymmetric_confident` gate was
+    needed this session since nothing built in this phase consumes it (see
+    Cluster A, which needed only the ordinary R/S branch for hydrindane, not
+    pseudoasymmetric r/s); if a future cluster needs a gate, build it then.
+    """
+
+    @pytest.mark.unit
+    def test_cyclobutane_diol_cis_is_lowercase_ss(self):
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        assert o.name("O[C@@H]1C[C@H](O)C1") == "(1s,3s)-cyclobutane-1,3-diol"
+
+    @pytest.mark.unit
+    def test_cyclobutane_diol_trans_matches_bb_verbatim_pin(self):
+        """BlueBookV2.md:45793 verbatim (PIN): '(1r,3r)-cyclobutane-1,3-diol'."""
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        assert o.name("O[C@@H]1C[C@@H](O)C1") == "(1r,3r)-cyclobutane-1,3-diol"
+
+    @pytest.mark.unit
+    def test_cis_trans_are_different_diastereomers(self):
+        """Premise check for the false-alarm resolution: the two SMILES are
+        genuinely different diastereomers (different canonical SMILES), not
+        the same molecule described two ways."""
+        cis = Chem.MolFromSmiles("O[C@@H]1C[C@H](O)C1")
+        trans = Chem.MolFromSmiles("O[C@@H]1C[C@@H](O)C1")
+        assert Chem.MolToSmiles(cis) != Chem.MolToSmiles(trans)
