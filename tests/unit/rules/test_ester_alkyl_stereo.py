@@ -97,3 +97,33 @@ class TestAcidSideStereoRegression:
         assert "2S" in name or "2R" in name, (
             f"Expected acid-side stereo with locant, got: {name}"
         )
+
+
+class TestClusterDPolyfunctionalEsterAlkylStereo:
+    """Wave-8 P6 Cluster D (P-93.4.1.3): the alkyl-side stereo descriptor was
+    dropped specifically on the POLYFUNCTIONAL-routed ester path (when the
+    acid side carries a JUNIOR functional group, e.g. -OH, alongside the
+    ester -- routing through name_polyfunctional_ester_via_acid instead of
+    the plain name_ester). The plain-ester STER-12 collector
+    (_collect_alkyl_fragment_stereo) already worked correctly (verified by
+    calling name_ester directly); the polyfunctional path simply never
+    called it. BB P-93.4.1.3: a stereodescriptor for a component cited as a
+    separate word/prefix is placed immediately before that component, not
+    hoisted to the front of the whole name.
+    """
+
+    def test_lactate_ester_both_components_carry_own_stereo(self):
+        """C[C@@H](O)C(=O)O[C@@H](C)CC -- both the acid (2-hydroxypropanoate)
+        and the alkyl (butan-2-yl) components are chiral; BOTH must carry
+        their own descriptor."""
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        name = o.name("C[C@@H](O)C(=O)O[C@@H](C)CC")
+        assert name == "(2S)-butan-2-yl (2R)-2-hydroxypropanoate", f"got {name!r}"
+
+    def test_gated_matches_raw(self):
+        from orthonym import Orthonym
+        o_raw = Orthonym(_disable_opsin_validity_gate=True)
+        o_gated = Orthonym()
+        smi = "C[C@@H](O)C(=O)O[C@@H](C)CC"
+        assert o_raw.name(smi) == o_gated.name(smi)

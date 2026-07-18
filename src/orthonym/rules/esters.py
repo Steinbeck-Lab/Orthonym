@@ -2145,6 +2145,20 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     if not alkyl_name:
         return None
 
+    # W8-P6 Cluster D (P-93.4.1.3): the alkyl (alcohol-side) component, cited
+    # as a separate word, must carry its OWN stereodescriptor immediately
+    # before it -- mirrors name_ester's STER-12 collector (:1094-1103), which
+    # this polyfunctional-routed path (taken whenever the acid side carries a
+    # junior functional group, e.g. -OH, alongside the ester) never called,
+    # silently dropping a chiral alkyl fragment's descriptor.
+    import re as _re_pf_alkyl
+    if not _re_pf_alkyl.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name):
+        alkyl_stereo = _collect_alkyl_fragment_stereo(mol, alkyl_atoms, ester_match)
+        alkyl_stereo = [(loc, cip) for loc, cip in alkyl_stereo if cip in ('R', 'S')]
+        if alkyl_stereo:
+            from .stereochemistry import format_stereodescriptor_string as _fmt_pf_alkyl
+            alkyl_name = f"{_fmt_pf_alkyl(alkyl_stereo)}{alkyl_name}"
+
     acid_mol = _build_diacid_from_diester(mol, [ester_match])
     if acid_mol is None:
         return None
