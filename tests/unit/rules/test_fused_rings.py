@@ -992,3 +992,59 @@ class TestHeritageBPrecedence:
             f"D-09 placement regression: pre-fix bug 'bi1H-indole' must "
             f"NOT appear; got {result!r}"
         )
+
+
+class TestTask60FusedNBicyclicLeakVeto:
+    """Wave-8 P6 Task 6.0: veto the atom-dropping '(3R,4R)-cyclohexane' leak.
+
+    `C1CC[C@@H]2CCCN[C@@H]2C1` is a piperidine-fused cyclohexane (10 heavy
+    atoms across 2 SSSR rings sharing 2 atoms). No handler currently names
+    this class correctly (octahydro-1H-indole-class saturated N-heterobicyclic
+    naming is out of Task 6.0's scope -- see cluster A/H), but the raw
+    (gate-off) namer must NEVER ship the atom-dropping '(3R,4R)-cyclohexane'
+    (a DIFFERENT, wrong molecule -- the whole piperidine ring is silently
+    dropped). Accuracy-first: fail-closed ('unknown organic compound') beats
+    a confidently wrong name.
+    """
+
+    @pytest.mark.unit
+    def test_fused_n_bicyclic_no_cyclohexane_leak(self):
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        out = o.name("C1CC[C@@H]2CCCN[C@@H]2C1")
+        assert "cyclohexane" not in out, (
+            f"atom-dropping leak: expected NOT 'cyclohexane' in output, got {out!r}"
+        )
+        assert out == "unknown organic compound" or "octahydro" in out, (
+            f"expected fail-closed or a real octahydro-N-heterobicyclic name, got {out!r}"
+        )
+
+    @pytest.mark.unit
+    def test_fused_ring_atom_drop_veto_function(self):
+        from rdkit import Chem
+        from orthonym.perception.structure_conservation import fused_ring_atom_drop
+
+        mol = Chem.MolFromSmiles("C1CC[C@@H]2CCCN[C@@H]2C1")
+        assert fused_ring_atom_drop(mol, "(3R,4R)-cyclohexane") is True
+        assert fused_ring_atom_drop(mol, "cyclohexane") is True
+        # Non-fused monocyclic molecule: veto must NOT fire.
+        mono = Chem.MolFromSmiles("C1CCCCC1")
+        assert fused_ring_atom_drop(mono, "cyclohexane") is False
+        # Decorated (substituent-carrying) name shape must NOT fire, even on
+        # a fused-ring molecule -- only the bare no-substituent shape is in
+        # scope for this veto.
+        assert fused_ring_atom_drop(mol, "4-methylcyclohexan-1-ol") is False
+        # Legitimate fused-system name (decahydronaphthalene-shaped) must not
+        # be caught by the bare-monocyclic regex.
+        decalin = Chem.MolFromSmiles("C1CCC2CCCCC2C1")
+        assert fused_ring_atom_drop(decalin, "decahydronaphthalene") is False
+
+    @pytest.mark.unit
+    def test_decalin_and_hydrindane_unaffected(self):
+        """Protect: the veto must never fire on the fused bicyclics this
+        phase's Cluster A generalizes (decalin / hydrindane)."""
+        from orthonym import Orthonym
+        o = Orthonym(_disable_opsin_validity_gate=True)
+        out = o.name("C1CC[C@@H]2CCCC[C@@H]2C1")  # cis-decalin
+        assert "unknown" not in out
+        assert "decahydronaphthalene" in out

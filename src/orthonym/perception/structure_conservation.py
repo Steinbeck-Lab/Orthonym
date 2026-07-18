@@ -310,6 +310,57 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     return bool(offring)
 
 
+# ---------------------------------------------------------------------------
+# Fused/bridged/spiro ring-system atom-drop veto (Wave-8 P6 Task 6.0)
+# ---------------------------------------------------------------------------
+# Closes the leak where a molecule whose ring atoms span TWO OR MORE SSSR
+# rings sharing at least one atom (ortho-fused, bridged, or spiro -- any
+# ring-junction topology) gets named by the "chain" handler as a BARE,
+# unsubstituted monocyclic cycloalkane/cycloalkene (optionally stereo-
+# prefixed), e.g. `C1CC[C@@H]2CCCN[C@@H]2C1` (a piperidine-fused
+# cyclohexane) -> raw `(3R,4R)-cyclohexane`. That name is structurally
+# impossible: a bare "cyclo<stem>ane" parent, by IUPAC construction, names
+# exactly ONE ring, so it can never simultaneously account for a second
+# ring's atoms. No name-shape/ring-size arithmetic is needed to prove the
+# drop -- the mere existence of >=2 ring-sharing SSSR rings on a molecule
+# whose shipped name has this exact bare shape is deterministic proof that
+# atoms are unaccounted for (there is no legitimate bare-monocyclic name for
+# any fused/bridged/spiro polycyclic).
+#
+# The bare-name regex intentionally matches ONLY the no-substituent shape
+# (an optional leading stereo-descriptor parenthetical, then
+# "cyclo<letters>e"): any real substituent or suffix token (a locant-
+# prefixed substituent, a principal-group suffix like "-ol"/"-oic acid",
+# ring-fusion terms like "bicyclo"/"spiro"/"decahydro") breaks the match, so
+# this never fires on a correctly-decorated or correctly fused/bridged/spiro
+# name -- only on the literal drop shape.
+_BARE_MONOCYCLIC_RE = re.compile(r'^(\([0-9A-Za-z,]+\)-)?cyclo[a-z]+e$')
+
+
+def fused_ring_atom_drop(mol: Chem.Mol, name: str) -> bool:
+    """True iff `name` is a bare (unsubstituted, optionally stereo-prefixed)
+    monocyclic cycloalkane/cycloalkene name for a molecule whose rings span
+    2+ SSSR rings sharing at least one atom (fused, bridged, or spiro).
+
+    Such a name is provably wrong: a single "cyclo<stem>ane" parent cannot
+    represent a second ring's atoms, regardless of what those atoms are
+    (carbocyclic or heteroatom-containing). See module-level comment above
+    for the full design record.
+    """
+    if not name:
+        return False
+    if not _BARE_MONOCYCLIC_RE.match(name):
+        return False
+    atom_rings = [set(r) for r in mol.GetRingInfo().AtomRings()]
+    if len(atom_rings) < 2:
+        return False
+    for i in range(len(atom_rings)):
+        for j in range(i + 1, len(atom_rings)):
+            if atom_rings[i] & atom_rings[j]:
+                return True
+    return False
+
+
 __all__ = [
     "input_invariants",
     "net_formal_charge",
@@ -317,4 +368,5 @@ __all__ = [
     "_has_main_group_charge_centre",
     "charge_dropped",
     "partial_sat_sp3_substituent_drop",
+    "fused_ring_atom_drop",
 ]

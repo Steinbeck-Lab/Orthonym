@@ -2379,6 +2379,7 @@ class Orthonym:
         if name and not is_failure_name(name) and is_top_level_naming():
             from .perception.structure_conservation import (
                 charge_dropped, partial_sat_sp3_substituent_drop,
+                fused_ring_atom_drop,
             )
             # Charge-conservation veto (P5-family leak: a substituted/
             # hypervalent-at-the-charge-centre anion whose charge-aware
@@ -2400,6 +2401,14 @@ class Orthonym:
             # gate needed since the check is a no-op unless
             # name_partially_saturated_carbocycle(mol) itself fires.
             if partial_sat_sp3_substituent_drop(mol, name):
+                return _descriptive_fallback(smiles)
+            # W8-P6 Task 6.0: bare-monocyclic-name atom-drop veto. A fused/
+            # bridged/spiro polycyclic (2+ SSSR rings sharing an atom) can
+            # never be correctly named by a bare "cyclo<stem>ane" parent
+            # (e.g. a piperidine-fused cyclohexane silently named
+            # '(3R,4R)-cyclohexane', dropping the whole N-ring). See
+            # fused_ring_atom_drop docstring.
+            if fused_ring_atom_drop(mol, name):
                 return _descriptive_fallback(smiles)
 
         # Orthonym is deterministic-rules-only (ADR-21-01, v21): there is no
