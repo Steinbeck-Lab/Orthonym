@@ -6615,6 +6615,104 @@ def _merge_connected_ring_groups(
     return multi_ring_fragments, single_ring_groups
 
 
+def _ring_sub_group_stereo_veto(features: Any, frag_atom_sets: List[frozenset]) -> bool:
+    """W8-P6 Cluster E (P-93.6 Ex6) fail-closed veto for a multiplicative
+    ring-substituent collapse (bis/tris/di/tri).
+
+    ``_generate_ring_substituent_prefixes`` groups ring substituents by their
+    GENERATED NAME STRING and merges same-name groups into one multiplicative
+    prefix. That merge silently asserts the merged occurrences are the
+    IDENTICAL substituent -- but per-substituent ring stereo is dropped when
+    the name string is generated (``get_ring_substituent_name`` /
+    ``_build_substituted_ring_name`` do not encode CIP descriptors into the
+    returned text), so two ring copies that are genuinely
+    stereo-DIFFERENT collapse to the same string and merge wrongly.
+
+    P-93.6 Ex6 (Blue Book) explicitly FORBIDS the multiplicative form when
+    the ligands differ by a stereodescriptor -- the correct PIN then needs a
+    per-substituent bracket-internal stereo block
+    (``(1r,4S)``/``(1s,4S)``-style) Orthonym does not yet construct. Rather
+    than emit a wrong (falsely-symmetric) stereoisomer name, decline the
+    collapse so the caller fails closed.
+
+    This is deliberately NARROW (Wave-4 W4-S2 "P-93.6 flagship" finding, not
+    a general per-substituent CIP engine): it fires ONLY when
+      (a) at least one of the merged ring fragments carries an explicit
+          tetrahedral chiral tag (the substituent itself is stereogenic --
+          an achiral ring like plain cyclohexyl/phenyl never trips this), AND
+      (b) somewhere OUTSIDE all the merged fragments' own atoms, some atom
+          had an explicit chiral tag (``@``/``@@``) IN THE ORIGINAL INPUT
+          SMILES that RDKit's default sanitize (``Chem.MolFromSmiles``,
+          which runs ``AssignStereochemistry(cleanIt=True)``) subsequently
+          ERASED -- the "CIP ceiling" signature. This is exactly the
+          flagship's signature: the central propan-2-ol carbon is written
+          ``[C@@H]`` in the input SMILES (BB wants it ``(2R)``), yet RDKit's
+          perception decides its two (ring-bearing) branches are
+          constitutionally-and-configurationally equivalent and strips the
+          tag entirely -- a known CIP-perception limit (~62% ceiling; W4-S2:
+          "RDKit gives no _CIPCode on the central propan-2-ol carbon...
+          DISAGREEING with the BB PIN"), not a fixable local bug. Detecting
+          "present pre-sanitize, absent post-sanitize" is a cheap, reliable,
+          LOCAL proxy for that global CIP-ceiling condition -- it needs no
+          recursive CIP computation, only a second parse of the same input
+          string with the stereo-cleanup step skipped.
+
+    Genuinely achiral / verifiably-identical multiplicative names (no chiral
+    tag anywhere in the merged fragments, e.g. 1,3-dicyclohexylpropan-2-ol,
+    1,3-dimethylbenzene) never enter condition (a) and are unaffected. A
+    chiral merged substituent whose surrounding molecule has no erased
+    stereo tag (condition (b) false) also proceeds unchanged.
+    """
+    if not frag_atom_sets or len(frag_atom_sets) < 2:
+        return False
+
+    from rdkit import Chem as _Chem
+
+    mol = features.mol
+
+    any_chiral_fragment = any(
+        any(
+            mol.GetAtomWithIdx(a).GetChiralTag() != _Chem.ChiralType.CHI_UNSPECIFIED
+            for a in atoms
+        )
+        for atoms in frag_atom_sets
+    )
+    if not any_chiral_fragment:
+        return False
+
+    excluded_atoms: set = set()
+    for atoms in frag_atom_sets:
+        excluded_atoms |= set(atoms)
+
+    # Re-parse the ORIGINAL input string with sanitize=False (preserves the
+    # literal @/@@ parity from the SMILES) then a generic SanitizeMol (which,
+    # unlike Chem.MolFromSmiles's default pipeline, does NOT run the
+    # stereo-perception cleanIt step that erases non-canonically-stereogenic
+    # tags). features.mol was built via ONE Chem.MolFromSmiles(features.smiles)
+    # call (namer.py:_perceive), so atom indices line up exactly -- both mols
+    # are parsed from the identical string, and SMILES atom numbering is
+    # string-order-determined independent of the sanitize flag.
+    try:
+        raw_mol = _Chem.MolFromSmiles(features.smiles, sanitize=False)
+        if raw_mol is None or raw_mol.GetNumAtoms() != mol.GetNumAtoms():
+            return False
+        _Chem.SanitizeMol(raw_mol)
+    except Exception:
+        return False
+
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        if idx in excluded_atoms:
+            continue
+        if atom.GetChiralTag() != _Chem.ChiralType.CHI_UNSPECIFIED:
+            continue  # already resolved/preserved post-sanitize -- not erased
+        raw_atom = raw_mol.GetAtomWithIdx(idx)
+        if raw_atom.GetChiralTag() != _Chem.ChiralType.CHI_UNSPECIFIED:
+            return True  # explicit in the input, erased by perception
+
+    return False
+
+
 def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for rings that are substituents on a chain parent.
@@ -6645,6 +6743,22 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
 
     # Group ring substituents by name for multiplier handling
     ring_sub_groups: Dict[str, List[int]] = defaultdict(list)
+    # W8-P6 Cluster E (P-93.6 Ex6 fail-closed guard): parallel tracking of the
+    # ATOMS behind each occurrence pushed into ring_sub_groups[name], so a
+    # count>1 (multiplicative bis/tris) collapse can be vetoed when the
+    # collapse would silently discard a genuine stereo difference between
+    # ring copies. Populated only by the single_ring_groups loop below (the
+    # multi-ring-fragment / fused-het insertion points leave this empty for
+    # their keys, so the guard is a no-op there — unchanged, narrowly scoped
+    # behaviour per the Wave-4 W4-S2 "P-93.6 flagship" CIP-ceiling finding:
+    # `C[C@H]1CC[C@@H](C[C@@H](O)C[C@@H]2CC[C@H](C)CC2)CC1` is CIP-engine-
+    # BLOCKED (RDKit assigns no _CIPCode to the central propan-2-ol carbon,
+    # yet both rings show the SAME 's' label — the multiplicative collapse
+    # asserts the two 4-methylcyclohexyl rings are IDENTICAL when the BB PIN
+    # (P-93.6 Ex1) requires DIFFERENT bracket-internal descriptors
+    # ((1r,4S) vs (1s,4S)) — a wrong-stereoisomer name Orthonym cannot yet
+    # construct correctly. See _ring_sub_group_stereo_veto below.
+    ring_sub_group_atoms: Dict[str, List[frozenset]] = defaultdict(list)
 
     chain_set = set(features.principal_chain)
 
@@ -6849,6 +6963,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
             sub_name = 'unknown'
 
         ring_sub_groups[sub_name].append(locant)
+        ring_sub_group_atoms[sub_name].append(frozenset(ring_atom_set))
 
     # Build prefix fragments
     # Wave2 T3a (P-14.3.4 Rule 1): a mononuclear (1-atom) chain parent has a
@@ -6862,6 +6977,17 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     for name, locants in ring_sub_groups.items():
         count = len(locants)
         sorted_locants = sorted(locants)
+
+        # W8-P6 Cluster E (P-93.6 Ex6): about to fold count>=2 occurrences of
+        # this ring-substituent name into ONE multiplicative (bis/tris/di/tri)
+        # prefix — i.e., assert they are the SAME substituent. Veto that
+        # assertion when it cannot be verified (CIP-ceiling case) rather than
+        # risk emitting a wrong (more-symmetric) stereoisomer.
+        if count > 1 and _ring_sub_group_stereo_veto(
+            features, ring_sub_group_atoms.get(name, [])
+        ):
+            from ..errors import unsupported_ring_system
+            raise unsupported_ring_system()
 
         if _omit_ring_sub_locants:
             formatted = format_substituent_prefix(name, [], count)
