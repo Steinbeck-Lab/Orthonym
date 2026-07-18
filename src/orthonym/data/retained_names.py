@@ -503,6 +503,14 @@ RETAINED_NAMES = {
     # saturated-oxa-dione path (oxolane-2,5-dione / oxane-2,6-dione).
     "O=C1C=CC(=O)O1": "furan-2,5-dione",
     "O=C1OC(=O)c2ccccc21": "2-benzofuran-1,3-dione",
+    # W8-P4 (P-65.7.7.3): the mancude (aromatic-benzo-fused) thio analogue of
+    # phthalic anhydride. BB verbatim gives the SATURATED benzo form
+    # "hexahydro-2-benzothiophene-1,3-dione (PIN)" (BB 32546); dropping
+    # "hexahydro" for this fully-aromatic ring is the direct BB-sanctioned
+    # extension (exactly mirroring furan-2,5-dione/2-benzofuran-1,3-dione
+    # above, S replacing O). OPSIN-2.9 RT-confirmed: name -> canonical SMILES
+    # matches this key exactly.
+    "O=C1SC(=O)c2ccccc21": "2-benzothiophene-1,3-dione",
 
     # === HETEROCYCLE DERIVATIVES (Phase 109 expansion) ===
     "O=c1ccc2ccccc2o1": "coumarin",       # 2H-chromen-2-one

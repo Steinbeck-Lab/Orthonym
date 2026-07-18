@@ -295,6 +295,18 @@ _DIANHYDRIDE_PIN_RE = re.compile(
     r"^(?:[a-z0-9][a-z0-9,()'\-]* ){2,}(?:di|tri|tetra|penta|hexa)anhydride$"
 )
 
+# W8-P4 (P-65.7.6.4.1): the chalcogen di-/poly-anhydride sibling of the above —
+# >=2 acid-like words then a 'bis(thioanhydride)'/'tris(selenoanhydride)'/...
+# class word (BB 32446 'diacetic butanedioic bis(thioanhydride) (PIN)').
+# OPSIN-2.9 has no grammar for the multiplied-and-parenthesised chalcogen-
+# anhydride class word (exactly the plain dianhydride gap above). Emitted ONLY
+# by the hard-gated rules.anhydrides._name_chalcogen_dianhydride (residue walk
+# reused from _name_dianhydride) -- correct by construction.
+_CHALCOGEN_DIANHYDRIDE_PIN_RE = re.compile(
+    r"^(?:[a-z0-9][a-z0-9,()'\-]* ){2,}"
+    r"(?:bis|tris|tetrakis)\((?:thio|seleno|telluro)anhydride\)$"
+)
+
 # W3-P07 (P-65.6.3.3.3.2 method (1)): the functional-class polyol polyester PIN —
 # a multivalent parent-group descriptor ('propane-1,2,3-triyl') followed by >=2
 # space-separated, locant-prefixed anion words each ending in '...ate'
@@ -361,6 +373,76 @@ _PHANE_PIN_RE = re.compile(
     r"(?:bis|tris|tetrakis)\([a-z0-9\[\],.]+\))"
     r"(?:cyclo)?[a-z]*phane$"
 )
+
+# W8-P4 (P-65.7/P-67 atom-drop safety floor): source-level structural motifs
+# reproduced (2026-07-18) to make the RAW (no-Java, gate-OFF) namer silently
+# DROP atoms or emit a WRONG constitution, because no handler in this cycle's
+# cascade claims them fully. Each is the EXACT verified-open shape from the
+# W8-P4 ledger reproduction -- never a general "any P/S/N present" heuristic.
+# See _p4_oxoacid_anhydride_leak_motif() below for the full per-motif citation.
+_P4_THIOPEROXY_ACID_PAT = Chem.MolFromSmarts("[CX3](=O)[OX2][SX2,SeX2]")
+_P4_NITRAMIDO_PAT = Chem.MolFromSmarts("[#6][NX3;H1][N+](=O)[O-]")
+# Ring-excluded: a CYCLIC 'naked carbonate' carbon (e.g. 1,3-dioxan-2-one) is
+# already correctly named via ring nomenclature -- only the ACYCLIC case
+# (embedded in a linear ester/anhydride-like chain) hits the mis-walk bug.
+_P4_NAKED_CARBONATE_PAT = Chem.MolFromSmarts("[CX3;!R](=O)([OX2])[OX2]")
+
+
+def _p4_oxoacid_anhydride_leak_motif(mol) -> bool:
+    """W8-P4 atom-drop safety floor (accuracy-critical phase; RT-gate fails
+    OPEN with no Java, so this check is INDEPENDENT of OPSIN/Java).
+
+    Each branch is a reproduced, gate-OFF WRONG/DROP leak with NO owning
+    handler built this cycle:
+      * acyl-O-[S,Se]H thio/seleno-peroxy acid (P-65.1.5.3) -- no peroxy-acid
+        base suffix exists this cycle (OQ-5); 'CC(=O)OS' raw -> 'ethane'
+        (drops S+O2).
+      * -NH-NO2 nitramido on carbon (P-67.1.4.3.2) -- substituent-prefix build
+        deferred; 'O=[N+]([O-])NCC(=O)O' raw -> 'ethanoic acid' (drops
+        -NH-NO2).
+      * an ACYCLIC 'naked carbonate' carbon -O-C(=O)-O- with NO carbon
+        substituent, embedded in a larger chain (P-67.3.1) -- the substitutive
+        nested-prefix engine ('{[(acetyloxy)carbonyl]oxy}formic acid') is not
+        built this cycle; 'CC(=O)OC(=O)OC(=O)O' raw -> a WRONG constitution
+        (parses to a smaller, different molecule -- confirmed via OPSIN RT of
+        the shipped string). Ring atoms excluded so a genuinely-handled cyclic
+        carbonate (1,3-dioxan-2-one) never fires.
+      * an unclaimed di-nuclear noncarbon-oxoacid (P/S/Se) backbone (P-67.2.5.2
+        partial ester / P-67.2.6 substituent-prefix on a senior acid) -- both
+        design-contract items deferred this cycle. Reuses the existing
+        perception-only ``_find_polyacid_backbone``, then confirms NO builder
+        (inorganic-acid table/FRN OR any of the sulfonic/chalcogen/peroxy
+        anhydride emitters) already claims the WHOLE molecule -- so a
+        genuinely-handled case (benzenesulfonic anhydride; a nucleoside
+        di/triphosphate, which never reaches GENERAL at all) is never
+        mis-vetoed.
+
+    The caller gates this on ``result.class_id == StoutClass.GENERAL``: every
+    dedicated handler that DOES own one of these shapes (nucleoside, the
+    inorganic-acid table, the anhydride bridge-variant emitters) runs at an
+    earlier CFR priority and never reaches GENERAL, so this never fires on an
+    already-correct name.
+    """
+    if (_P4_THIOPEROXY_ACID_PAT is not None
+            and mol.HasSubstructMatch(_P4_THIOPEROXY_ACID_PAT)):
+        return True
+    if (_P4_NITRAMIDO_PAT is not None
+            and mol.HasSubstructMatch(_P4_NITRAMIDO_PAT)):
+        return True
+    if (_P4_NAKED_CARBONATE_PAT is not None
+            and mol.HasSubstructMatch(_P4_NAKED_CARBONATE_PAT)):
+        return True
+    from .rules.inorganic_acids import _find_polyacid_backbone, name_inorganic_acid
+    if _find_polyacid_backbone(mol) is not None and name_inorganic_acid(mol) is None:
+        from .rules.anhydrides import (
+            _name_sulfonic_anhydride, _name_chalcogen_anhydride,
+            _name_peroxy_anhydride,
+        )
+        if (_name_sulfonic_anhydride(mol) is None
+                and _name_chalcogen_anhydride(mol) is None
+                and _name_peroxy_anhydride(mol) is None):
+            return True
+    return False
 
 
 def _validity_gate_jar_present() -> bool:
@@ -597,6 +679,10 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # thioperoxol/inositol OPSIN generation-grammar gap. The regex guard keeps the
     # carve-out tight: >=2 acid-like words followed by a multiplied '...anhydride'.
     if _DIANHYDRIDE_PIN_RE.match(name):
+        return name
+    # W8-P4 (P-65.7.6.4.1): chalcogen di-/poly-anhydride PIN carve-out — see
+    # _CHALCOGEN_DIANHYDRIDE_PIN_RE docstring above.
+    if _CHALCOGEN_DIANHYDRIDE_PIN_RE.match(name):
         return name
     # W3-P07 (P-65.6.3.3.3.2 method (1)): functional-class polyol polyester PIN
     # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate') — correct-by-construction
@@ -2221,6 +2307,24 @@ class Orthonym:
         if name and result.class_id != StoutClass.ORGANOMETALLIC:
             from .perception.metals import has_covalent_metal_carbon_bond
             if has_covalent_metal_carbon_bond(mol):
+                return _descriptive_fallback(smiles)
+
+        # ============================================================
+        # W8-P4: oxoacid/anhydride atom-drop safety floor (P-65.7/P-67).
+        # ============================================================
+        # Mirrors the organometallic veto above: when a WRONG/DROP structural
+        # motif (see _p4_oxoacid_anhydride_leak_motif docstring) is present and
+        # NO dedicated handler claimed the molecule (class_id fell all the way
+        # through to GENERAL), the GENERAL/legacy pipeline can only have
+        # "won" by silently naming a fragment that drops the motif's atoms
+        # ('ethane' for CC(=O)OS) or mis-perceiving the chain constitution
+        # ('1-(propanoyloxy)methanoic acid' for CC(=O)OC(=O)OC(=O)O). Source-
+        # level: independent of OPSIN/Java (the RT-gate fails OPEN with no
+        # Java). Scoped to class_id == GENERAL so a molecule any earlier CFR
+        # entry (nucleoside, inorganic-acid table, anhydride bridge variants)
+        # legitimately owns is never mis-vetoed.
+        if name and result.class_id == StoutClass.GENERAL:
+            if _p4_oxoacid_anhydride_leak_motif(mol):
                 return _descriptive_fallback(smiles)
 
         # Orthonym is deterministic-rules-only (ADR-21-01, v21): there is no

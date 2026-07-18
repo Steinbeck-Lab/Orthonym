@@ -531,6 +531,13 @@ _ANHYDRIDE_BRIDGE_SMARTS = {
     # The -O-O- bridge cannot match the single-O base core (no single O bonded to
     # both carbonyls), so this NEVER double-fires as a plain anhydride.
     "peroxy_anhydride": "[CX3](=O)[OX2][OX2][CX3](=O)",
+    # W8-P4 (P-65.7.2 / P-65.2.2): mixed organic/cyanic(-thio) acid anhydride
+    # R-CO-O-C#N / R-CO-S-C#N (BB 30979/32279 'CH3-CO-O-CN acetic cyanic
+    # anhydride (PIN)'). Neither side is a second carbonyl, so the base
+    # ANHYDRIDE_SMARTS never matches this; without folding it into 'anhydride'
+    # the molecule perceives as ester+cyanate/thiocyanate and mis-names.
+    "cyanic_anhydride": "[CX3](=O)[OX2][CX2]#[NX1]",
+    "thiocyanic_anhydride": "[CX3](=O)[SX2][CX2]#[NX1]",
 }
 _COMPILED_ANHYDRIDE_BRIDGE = {}
 for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
@@ -760,8 +767,12 @@ def _resolve_fg_collisions(results):
         # 'anhydride' also matches thio/seleno/telluro-ester (CO-X-CO); a peroxy
         # anhydride (CO-OO-CO) matches 'peroxide' on its bridge. Suppress those
         # sub-component reads (+ defensively ketone) so the whole bridge unit is
-        # owned by the anhydride handler.
-        ('anhydride', ['aldehyde', 'thioester', 'selenoester', 'telluroester', 'ketone', 'peroxide']),
+        # owned by the anhydride handler. W8-P4: the cyanic/thiocyanic mixed-
+        # anhydride fold also matches 'ester' (acyl-O-) and 'cyanate'/
+        # 'thiocyanate' (-O-C#N/-S-C#N) on the SAME atoms; suppress those too so
+        # 'acetic cyanic anhydride' (P-65.7.2) is not mis-perceived as an ester.
+        ('anhydride', ['aldehyde', 'thioester', 'selenoester', 'telluroester',
+                       'ketone', 'peroxide', 'ester', 'cyanate', 'thiocyanate']),
         ('acid_chloride', ['aldehyde']),
         ('acid_bromide', ['aldehyde']),
         ('acid_fluoride', ['aldehyde']),
