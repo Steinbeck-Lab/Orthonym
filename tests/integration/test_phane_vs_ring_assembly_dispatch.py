@@ -50,7 +50,14 @@ class TestPhaneVsRingAssemblyDispatch:
         ],
     )
     def test_cyclophane_routes_to_phane_handler(self, smiles, label) -> None:
-        """Cyclophane SMILES -> phane handler; multiplicative + ring_assembly decline."""
+        """Cyclophane SMILES -> phane handler; multiplicative + ring_assembly decline.
+
+        Wave-8 P8: `name_cyclophane` now emits the P-26 simplified-skeletal
+        PIN (`...phane`, e.g. `1,4(1,4)-dibenzenacyclohexaphane`) for this
+        class rather than the legacy semi-systematic bracket-prefix form
+        (`[2.2]paracyclophane`) -- assert the generic `...phane` suffix
+        (exact-string coverage lives in test_phane.py / test_phane_pin.py).
+        """
         mol = Chem.MolFromSmiles(smiles)
         assert mol is not None, label
 
@@ -58,8 +65,8 @@ class TestPhaneVsRingAssemblyDispatch:
         assert is_cyclophane(mol), f"is_cyclophane declined cyclophane {label}"
         phane_name = name_cyclophane(mol)
         assert phane_name is not None, f"name_cyclophane declined cyclophane {label}"
-        assert phane_name.endswith("cyclophane"), (
-            f"name_cyclophane({label}) returned non-cyclophane name {phane_name!r}"
+        assert phane_name.endswith("phane"), (
+            f"name_cyclophane({label}) returned non-phane name {phane_name!r}"
         )
 
         # Multiplicative MUST decline.
@@ -155,25 +162,27 @@ class TestPhaneVsRingAssemblyDispatch:
         )
 
     @pytest.mark.parametrize(
-        "smiles,expected_name_endswith,label",
+        "smiles,expected_pin,label",
         [
-            ("c1cc2ccc1CCc1ccc(cc1)CC2", "paracyclophane", "[2.2]paracyclophane via name_compound"),
-            ("c1cc2cc(c1)CCc1cccc(c1)CC2", "metacyclophane", "[2.2]metacyclophane via name_compound"),
+            ("c1cc2ccc1CCc1ccc(cc1)CC2", "1,4(1,4)-dibenzenacyclohexaphane",
+             "[2.2]paracyclophane via name_compound"),
+            ("c1cc2cc(c1)CCc1cccc(c1)CC2", "1,4(1,3)-dibenzenacyclohexaphane",
+             "[2.2]metacyclophane via name_compound"),
         ],
     )
     def test_name_compound_full_dispatch_lands_on_phane(
-        self, smiles, expected_name_endswith, label
+        self, smiles, expected_pin, label
     ) -> None:
-        """End-to-end name_compound REFUSES the phane name (Wave2 T6c).
+        """End-to-end name_compound EMITS the P-26 PIN (Wave-8 P8, Task 8.12).
 
-        The phane handler still classifies + composes (asserted above), but
-        production withholds the name: no phane form is OPSIN-parseable, so
-        emitting it is a guaranteed round-trip failure. The dispatch handler
-        raises the G0 UNSUPPORTED_RING_SYSTEM refusal -> 'unknown organic
-        compound'."""
+        The phane handler classifies + composes (asserted above); production
+        now ships the verified `build_phane_pin` PIN for the monocyclic
+        all-benzene-homophane class -- OPSIN still cannot parse ANY phane
+        form, but `_PHANE_PIN_RE` (namer.py) carves this correct-by-
+        construction, formula-veto-guarded PIN out of the validity gate
+        (see )."""
         result = name_compound(smiles)
-        assert result == "unknown organic compound", (
-            f"name_compound({label}) returned {result!r}; expected the T6c "
-            f"fail-closed 'unknown organic compound' (composed form ends with "
-            f"{expected_name_endswith!r})"
+        assert result == expected_pin, (
+            f"name_compound({label}) returned {result!r}; expected the "
+            f"Wave-8 P8 P-26 PIN {expected_pin!r}"
         )

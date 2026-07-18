@@ -343,6 +343,25 @@ _ORGANOMETALLIC_ADDITIVE_PIN_RE = re.compile(
     r"(?:\([0-9IVX+\-]+\))?$"
 )
 
+# W8-P8 (P-26.2/.3): the phane simplified-skeletal PIN
+# ('1,4(1,4)-dibenzenacyclohexaphane') -- superatom locants, a parenthesized
+# attachment-locant set, an amplification prefix ('...ena'/'...ina' etc,
+# possibly di/tri/bis-multiplied), and the 'phane' suffix. OPSIN 2.9.0 has NO
+# phane grammar whatsoever (verified 2026-07-16: neither this PIN form nor
+# the legacy bracket-prefix '[2.2]paracyclophane' parses), so there is no RT
+# oracle for ANY phane name. This PIN is emitted ONLY by the hard-gated
+# `rules.phane.build_phane_pin` (monocyclic all-benzene-homophane class,
+# correct by construction) and is guarded by a source-level formula-
+# conservation veto (`phane._phane_formula_veto`) since the RT-gate would
+# otherwise fail OPEN with no Java -- exactly the inositol/dianhydride/
+# organometallic carve-out precedent above.
+_PHANE_PIN_RE = re.compile(
+    r"^\d+(?:,\d+)*\([\d,]+\)-"
+    r"(?:[a-z]+|(?:di|tri|tetra|penta|hexa)[a-z]+|"
+    r"(?:bis|tris|tetrakis)\([a-z0-9\[\],.]+\))"
+    r"(?:cyclo)?[a-z]*phane$"
+)
+
 
 def _validity_gate_jar_present() -> bool:
     """JAR-presence PROBE for the SUB-03 fail-OPEN guard (D-13).
@@ -588,6 +607,12 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # W8-P9 Task 9.1 (P-69.2.3/.4/.6): additive/coordination organometallic
     # PIN carve-out — see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above.
     if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name):
+        return name
+    # W8-P8 Task 8.12 (P-26.2/.3): phane simplified-skeletal PIN carve-out —
+    # see _PHANE_PIN_RE docstring above. Emitted ONLY by the hard-gated
+    # rules.phane.build_phane_pin (formula-conservation-vetoed), so OPSIN's
+    # total lack of phane grammar must not suppress it.
+    if _PHANE_PIN_RE.match(name):
         return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED

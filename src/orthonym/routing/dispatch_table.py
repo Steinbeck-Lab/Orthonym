@@ -1111,17 +1111,28 @@ def _handle_cyclophane(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors namer.py:1111-1113.
 
-    Wave2 T6c fail-closed (P-26): OPSIN 2.9.0 cannot parse ANY phane name —
-    neither the bracket-prefix '[2.2]paracyclophane' nor the P-26.2.1
-    simplified-skeleton PIN '1,4(1,4)-dibenzenacyclohexaphane' — so the
-    composed name is a guaranteed round-trip failure with no oracle to verify
-    it. When the phane composer produces a name, refuse via the G0
-    UNSUPPORTED_RING_SYSTEM signal (jar-independent 'unknown') instead of
-    emitting it. The rules.phane composition machinery stays intact (and
-    unit-tested) for the future P-26 subsystem build; only this production
-    routing gate withholds its output.
+    Wave-8 P8 (Task 8.12): OPSIN 2.9.0 still cannot parse ANY phane name, so
+    there is no RT oracle -- but `rules.phane.build_phane_pin` now builds a
+    BB-name-exact, correct-by-construction P-26.2/.3 simplified-skeletal PIN
+    for the monocyclic all-benzene-homophane class (verified against the Blue
+    Book directly; guarded by `_phane_formula_veto`, a source-level atom-
+    conservation check, since the RT-gate would otherwise fail OPEN with no
+    Java). `_PHANE_PIN_RE` (namer.py) carves this PIN grammar out of the
+    OPSIN validity gate so it isn't suppressed to a descriptive fallback.
+
+    `name_cyclophane` falls back to the legacy semi-systematic bracket-prefix
+    composer (`[m.n]paracyclophane`) for `is_cyclophane`-positive topologies
+    `build_phane_pin` doesn't (yet) cover (heteroatom bridges, fused/hetero
+    amplificants, von Baeyer/spiro skeletons, mixed amplificants, substituted
+    phanes) -- that legacy form is UNVERIFIABLE (no BB-name-exact fixture, no
+    RT oracle), so it is still withheld here: raise the G0
+    UNSUPPORTED_RING_SYSTEM signal (jar-independent 'unknown') rather than
+    emit it. Only a genuine `build_phane_pin` PIN is emitted.
     """
-    from orthonym.rules.phane import name_cyclophane
+    from orthonym.rules.phane import build_phane_pin, name_cyclophane
+    pin = build_phane_pin(mol)
+    if pin is not None:
+        return pin
     if name_cyclophane(mol) is not None:
         from orthonym.errors import unsupported_ring_system
         raise unsupported_ring_system()

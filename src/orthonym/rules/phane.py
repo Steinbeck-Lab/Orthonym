@@ -36,9 +36,11 @@ Source:
 
 from __future__ import annotations
 
+import re
 from collections import deque
+from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
@@ -523,30 +525,654 @@ def _build_composite_locant(
 
 
 # ---------------------------------------------------------------------------
+# P-26 PIN subsystem (Wave-8 P8): simplification -> simplified-skeleton PIN
+# ---------------------------------------------------------------------------
+#
+# Replaces the semi-systematic bracket-prefix composer below (`[m.n]para-
+# cyclophane`) with the IUPAC P-26.2/.3/.4 "simplified skeletal name" PIN
+# (`1,4(1,4)-dibenzenacyclohexaphane`). Scope THIS PHASE (Task 8.7): monocyclic
+# skeleton, all amplificants IDENTICAL benzene rings, no substituents, no
+# skeletal ('a') heteroatom replacement, no indicated hydrogen. Every other
+# class (von Baeyer / spiro skeletons, mixed/different amplificants,
+# substituted phanes, heteroatom-replaced phanes) is a DESIGN CONTRACT this
+# phase -- the comparators/helpers exist and are unit-tested against the Blue
+# Book directly, but `build_phane_pin` FAILS CLOSED (returns None) for any
+# molecule outside the verified scope. OPSIN 2.9 cannot parse ANY phane name
+# (verified 2026-07-16) so there is no RT oracle; verification is BB-name-
+# exact fixtures + the `_phane_formula_veto` source-level atom-conservation
+# guard (Task 8.12) -- see 
+
+
+class SkeletonClass(Enum):
+    """P-26.2.1 simplified-skeleton structural class. Deliberately separate
+    from ``PhaneTopology`` (the legacy para/meta/ortho sub-class enum used by
+    the semi-systematic composer / `is_cyclophane` gate) to avoid churn in
+    `test_phane.py`."""
+
+    ACYCLIC = "acyclic"
+    MONOCYCLIC = "monocyclic"
+    VON_BAEYER = "von_baeyer"
+    SPIRO = "spiro"
+
+
+# ---------------------------------------------------------------------------
+# Task 8.2 -- amplification-prefix transform (P-26.2.2.1)
+# ---------------------------------------------------------------------------
+
+
+def _amplification_prefix(parent_name: str) -> str:
+    """P-26.2.2.1 (BlueBookV2.md:14894): final 'e' -> 'a', else append 'a'.
+    Bracketed locant prefixes (e.g. '[1,2]oxazole') keep their brackets
+    (P-26.4.2.2 note, :15048). ``parent_name`` is the OPSIN-parseable PIN
+    parent-hydride name of the amplificant ring/ring system."""
+    if parent_name.endswith("e"):
+        return parent_name[:-1] + "a"
+    return parent_name + "a"
+
+
+# ---------------------------------------------------------------------------
+# Task 8.3 -- simplified skeletal-name builder (P-26.2.1)
+# ---------------------------------------------------------------------------
+
+
+def _phane_node_multiplier(n: int) -> str:
+    """Multiplying affix for the TOTAL skeleton node count (superatoms +
+    bridge atoms), per P-26.2.1. Reuses the shared simple-multiplier table
+    (di..icosa) with the compositional `chain_names` fallback above 20 (BB
+    `cyclotetratriacontaphane`, P-26.5.2 example, :15165) -- no duplication."""
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+
+    if n in SIMPLE_MULTIPLIERS:
+        return SIMPLE_MULTIPLIERS[n]
+    from ..data.chain_names import get_chain_prefix
+
+    prefix = get_chain_prefix(n)
+    if not prefix.endswith("a"):
+        prefix += "a"
+    return prefix
+
+
+def _simplified_skeletal_name(n: int, skeleton_class: "SkeletonClass") -> Optional[str]:
+    """P-26.2.1 (BlueBookV2.md:14857): simplified-skeleton name = structure
+    prefix ('cyclo' for monocyclic; none for acyclic) + multiplying affix
+    (node count, INCLUDING superatoms) + 'phane'.
+
+    Returns None for VON_BAEYER / SPIRO (Task 8.10 -- no verified
+    canonicalizable BB fixture this phase; fail closed rather than guess the
+    `bicyclo[..]`/`spiro[..]` skeleton-descriptor grammar)."""
+    if skeleton_class is SkeletonClass.MONOCYCLIC:
+        return f"cyclo{_phane_node_multiplier(n)}phane"
+    if skeleton_class is SkeletonClass.ACYCLIC:
+        return f"{_phane_node_multiplier(n)}phane"
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Task 8.4 -- multiplicative amplificant term di/bis (P-26.2.3)
+# ---------------------------------------------------------------------------
+
+# A prefix "begins with a multiplying prefix" (P-26.2.3.2) if it starts with
+# a bracketed locant set (heterocycle, e.g. '[1,3]dioxola') or a von-Baeyer /
+# ring-assembly / spiro name component ('bicyclo', 'tricyclo', 'spiro', ...).
+# Fuzzy per the Blue Book's own "or a name component that could take one"
+# clause (Task 8.4 open question) -- every amplificant buildable THIS phase
+# is a bare benzene/pyridine-family prefix, so this never fires in practice;
+# it exists so the leaf unit test (bicyclo[2.2.1]heptana / [1,3]dioxola) is
+# real, not fabricated.
+_COMPLEX_AMPLIFICANT_PREFIX_RE = re.compile(r"^(?:\[|spiro|(?:bi|tri|tetra)cyclo)")
+
+
+def _multiplied_amplificant(prefix: str, count: int) -> Optional[str]:
+    """P-26.2.3: 'di'/'tri'/'tetra' before a SIMPLE amplification prefix
+    (P-26.2.3.1, :14930 -- 'dibenzena', 'tripyridina'); 'bis'/'tris' +
+    parenthesization when the prefix begins with a multiplying prefix or
+    bracketed locants (P-26.2.3.2, :14932 -- 'bis(bicyclo[2.2.1]heptana)',
+    'bis([1,3]dioxola)'). Returns None if ``count`` has no multiplier in the
+    reused tables (not reachable this phase)."""
+    if count <= 1:
+        return prefix
+    if _COMPLEX_AMPLIFICANT_PREFIX_RE.match(prefix):
+        from ..assembly.naming_utils import COMPLEX_MULTIPLIERS
+
+        mult = COMPLEX_MULTIPLIERS.get(count)
+        if mult is None:
+            return None
+        return f"{mult}({prefix})"
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+
+    mult = SIMPLE_MULTIPLIERS.get(count)
+    if mult is None:
+        return None
+    return f"{mult}{prefix}"
+
+
+# ---------------------------------------------------------------------------
+# Task 8.1 -- simplification engine (amplificant perception + skeleton graph)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Amplificant:
+    """One amplificant (ring/ring-system replacing a superatom) in a
+    simplified phane skeleton (P-26.1.4).
+
+    Attributes:
+      atoms: frozenset of atom indices making up the amplificant ring.
+      ring_atoms_ordered: the RDKit SSSR cyclic-order atom-index tuple for
+        this ring (needed for `_ring_distance` to compute the amplificant's
+        OWN attachment-locant set, P-26.3.2).
+      parent_name: the OPSIN-parseable PIN parent-hydride name of the
+        isolated ring (e.g. "benzene"). Task 8.1 scope this phase: benzene
+        only -- any other ring makes `_simplify` return None (fail closed;
+        the P-26.2.2.2.2 disallowed-parent gate is future-phase work once
+        more parent kinds are supported).
+      attachment_atoms: the (exactly 2, this phase) ring atom indices bonded
+        to a skeleton (bridge) neighbour.
+    """
+
+    atoms: FrozenSet[int]
+    ring_atoms_ordered: Tuple[int, ...]
+    parent_name: str
+    attachment_atoms: Tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class PhaneStructure:
+    """Simplified-skeleton structure produced by `_simplify` (Task 8.1)."""
+
+    mol: Chem.Mol
+    amplificants: Tuple[Amplificant, ...]
+    bridge_atoms: FrozenSet[int]
+    skeleton_class: "SkeletonClass"
+    # Ordered cyclic node walk (MONOCYCLIC only): each entry is ('amp', index
+    # into `amplificants`) or ('bridge', atom_idx). None for skeleton classes
+    # without a computed node walk (VON_BAEYER / SPIRO -- Task 8.10).
+    node_cycle: Optional[Tuple[Tuple[str, int], ...]]
+
+
+def _node_key_builder(bridge_atoms: Set[int], small_rings: List[Set[int]]):
+    """Return a fast atom_idx -> ('bridge', idx) | ('amp', ring_idx) | None
+    lookup closure."""
+    atom_to_ring: Dict[int, int] = {}
+    for ridx, r in enumerate(small_rings):
+        for a in r:
+            atom_to_ring[a] = ridx
+
+    def _key(atom_idx: int) -> Optional[Tuple[str, int]]:
+        if atom_idx in bridge_atoms:
+            return ("bridge", atom_idx)
+        if atom_idx in atom_to_ring:
+            return ("amp", atom_to_ring[atom_idx])
+        return None
+
+    return _key
+
+
+def _walk_cycle(
+    adjacency: Dict[Tuple[str, int], Set[Tuple[str, int]]],
+    start: Tuple[str, int],
+) -> Optional[Tuple[Tuple[str, int], ...]]:
+    """Walk a 2-regular graph as a single cycle starting at ``start``.
+
+    Returns the ordered node tuple, or None if ``start`` isn't 2-regular-
+    connected (defensive; `_simplify` already checks every node's degree).
+    """
+    neighbours = list(adjacency.get(start, ()))
+    if len(neighbours) != 2:
+        return None
+    order: List[Tuple[str, int]] = [start]
+    prev, cur = start, neighbours[0]
+    seen = {start}
+    while cur != start:
+        order.append(cur)
+        seen.add(cur)
+        candidates = [n for n in adjacency[cur] if n != prev]
+        if not candidates:
+            return None
+        prev, cur = cur, candidates[0]
+        if len(order) > len(adjacency) + 1:
+            return None  # safety valve against a malformed graph
+    return tuple(order)
+
+
+def _simplify(mol: Optional[Chem.Mol]) -> Optional["PhaneStructure"]:
+    """Task 8.1: perceive amplificants + build the simplified-skeleton graph.
+
+    BB rule: P-26.1.1-.1.6 (:14809-14837); allowed amplificant parents
+    P-26.2.2.2.1 (:14904) -- THIS PHASE restricted to benzene (mancude
+    carbocyclic 6-ring, all-carbon, aromatic); anything else fails closed
+    (heteroaryl/fused amplificants + the full P-26.2.2.2.2 disallowed-parent
+    gate are future-phase work once a general isolated-ring PIN namer is
+    wired in here).
+
+    Representative case: ``C1Cc2ccc(cc2)CCc2ccc1cc2`` -> 2 benzene
+    amplificants, 4 bridge CH2 atoms, 6-node monocyclic skeleton.
+
+    Returns None (fail closed) for: non-cyclophane topology; < 2 small
+    rings; any non-benzene small ring; fused/shared-atom small rings (P-26.1.4
+    fused-amplificant collapse -- future phase); a direct ring-to-ring bond
+    (0-atom bridge, ring-assembly territory); any skeleton node whose degree
+    != 2 (branch/substituent atoms, heteroatom bridges with extra valence,
+    von-Baeyer/spiro skeletons -- all future-phase / Task 8.9/8.10); any
+    amplificant with attachment-atom count != 2.
+    """
+    if mol is None or not is_cyclophane(mol):
+        return None
+
+    Chem.GetSSSR(mol)
+    sssr_rings_raw = [list(r) for r in mol.GetRingInfo().AtomRings()]
+    small_rings_raw = [r for r in sssr_rings_raw if len(r) <= _SMALL_RING_MAX_SIZE]
+    small_rings = [set(r) for r in small_rings_raw]
+
+    if len(small_rings) < 2:
+        return None
+    if not _all_linkers_are_carbocyclic_benzene(mol, small_rings):
+        return None  # Task 8.1 scope: benzene amplificants only this phase
+    for i in range(len(small_rings)):
+        for j in range(i + 1, len(small_rings)):
+            if small_rings[i] & small_rings[j]:
+                return None  # fused amplificants -- future phase (P-26.1.4)
+
+    all_small_atoms: Set[int] = set()
+    for r in small_rings:
+        all_small_atoms |= r
+    bridge_atoms: Set[int] = {
+        a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in all_small_atoms
+    }
+    # Task 8.9 safety net: skeletal heteroatom bridges ('a'-replacement) are a
+    # design contract this phase (unwired to emission) -- a non-carbon bridge
+    # atom must never be silently named as a plain hydrocarbon phane.
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != "C" for a in bridge_atoms):
+        return None
+
+    node_key = _node_key_builder(bridge_atoms, small_rings)
+    amp_attachment: List[Set[int]] = [set() for _ in small_rings]
+    skeleton_adj: Dict[Tuple[str, int], Set[Tuple[str, int]]] = {}
+
+    for bond in mol.GetBonds():
+        u, v = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        ku, kv = node_key(u), node_key(v)
+        if ku is None or kv is None:
+            continue
+        if ku[0] == "amp" and kv[0] == "amp":
+            if ku[1] != kv[1]:
+                return None  # direct ring-to-ring bond -- ring assembly, not phane
+            continue  # internal ring bond
+        if ku == kv:
+            continue
+        skeleton_adj.setdefault(ku, set()).add(kv)
+        skeleton_adj.setdefault(kv, set()).add(ku)
+        if ku[0] == "amp":
+            amp_attachment[ku[1]].add(u)
+        if kv[0] == "amp":
+            amp_attachment[kv[1]].add(v)
+
+    total_nodes = len(small_rings) + len(bridge_atoms)
+    if len(skeleton_adj) != total_nodes:
+        return None
+    for neighbours in skeleton_adj.values():
+        if len(neighbours) != 2:
+            return None  # not a simple cycle -- branch/substituent or von-Baeyer/spiro node
+    for ridx in range(len(small_rings)):
+        if len(amp_attachment[ridx]) != 2:
+            return None  # an amplificant must have exactly 2 attachment atoms this phase
+
+    amplificants: List[Amplificant] = []
+    for ridx, ordered in enumerate(small_rings_raw):
+        amplificants.append(
+            Amplificant(
+                atoms=frozenset(small_rings[ridx]),
+                ring_atoms_ordered=tuple(ordered),
+                parent_name="benzene",
+                attachment_atoms=tuple(sorted(amp_attachment[ridx])),
+            )
+        )
+
+    node_cycle = _walk_cycle(skeleton_adj, ("amp", 0))
+    if node_cycle is None or len(node_cycle) != total_nodes:
+        return None
+
+    return PhaneStructure(
+        mol=mol,
+        amplificants=tuple(amplificants),
+        bridge_atoms=frozenset(bridge_atoms),
+        skeleton_class=SkeletonClass.MONOCYCLIC,
+        node_cycle=node_cycle,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Task 8.5 -- skeleton numbering + superatom-locant assignment
+# ---------------------------------------------------------------------------
+
+
+def _number_skeleton(struct: "PhaneStructure") -> Optional[Dict[Tuple[str, int], int]]:
+    """P-26.3.1 (:14935) + P-26.4.1.1 (:14969): number the simplified
+    skeleton so superatoms get the LOWEST locant set.
+
+    MONOCYCLIC scope (Task 8.5): enumerate every (start-amplificant,
+    direction) pair -- optimal numbering always assigns locant 1 to SOME
+    amplificant (any set containing 1 beats any set that doesn't at the
+    first point of difference) -- and keep the candidate whose sorted
+    superatom-locant tuple is lexicographically lowest.
+
+    Representative case: 6-node monocycle, 2 superatoms 2 bridge atoms apart
+    -> numbers to {1,4} (not {1,3}/{2,5}).
+
+    Returns None for non-MONOCYCLIC structures (Task 8.10 fail-closed) or a
+    structure with no node_cycle.
+    """
+    if struct.skeleton_class is not SkeletonClass.MONOCYCLIC or struct.node_cycle is None:
+        return None
+    n = len(struct.node_cycle)
+    amp_positions = [i for i, node in enumerate(struct.node_cycle) if node[0] == "amp"]
+    if not amp_positions:
+        return None
+
+    best_locants: Optional[Dict[Tuple[str, int], int]] = None
+    best_key: Optional[Tuple[int, ...]] = None
+    for start_pos in amp_positions:
+        for direction in (1, -1):
+            locants: Dict[Tuple[str, int], int] = {}
+            for k in range(n):
+                pos = (start_pos + direction * k) % n
+                locants[struct.node_cycle[pos]] = k + 1
+            key = tuple(sorted(locants[struct.node_cycle[p]] for p in amp_positions))
+            if best_key is None or key < best_key:
+                best_key = key
+                best_locants = locants
+    return best_locants
+
+
+# ---------------------------------------------------------------------------
+# Task 8.6 -- attachment-locant perception + ordering
+# ---------------------------------------------------------------------------
+
+
+def _attachment_locants(
+    struct: "PhaneStructure",
+    skeleton_locants: Dict[Tuple[str, int], int],
+) -> Optional[List[Tuple[int, Tuple[int, int]]]]:
+    """P-26.3.2 (:14939) + P-26.3.2.2 (:14957): each amplificant's own
+    attachment-locant set, FIRST-cited locant adjacent to the LOWER skeleton
+    locant.
+
+    Benzene-only scope (Task 8.6): the isolated ring is fully symmetric, so
+    ANY attachment atom may be assigned ring-locant 1 -- we choose the one
+    adjacent (via its bridge) to the lower-numbered skeleton neighbour, then
+    the other attachment atom gets `1 + ring_distance` (para -> (1,4), meta
+    -> (1,3), ortho -> (1,2)).
+
+    Returns a list parallel to ``struct.amplificants``:
+    ``(superatom_locant, (attach_locant_1, attach_locant_2))``. None
+    (fail-closed) if the adjacency can't be resolved (defensive).
+    """
+    if struct.node_cycle is None:
+        return None
+    n = len(struct.node_cycle)
+    results: List[Tuple[int, Tuple[int, int]]] = []
+    for amp_idx, amp in enumerate(struct.amplificants):
+        node = ("amp", amp_idx)
+        if node not in skeleton_locants:
+            return None
+        superatom_locant = skeleton_locants[node]
+        pos = struct.node_cycle.index(node)
+        prev_node = struct.node_cycle[(pos - 1) % n]
+        next_node = struct.node_cycle[(pos + 1) % n]
+        prev_locant = skeleton_locants.get(prev_node)
+        next_locant = skeleton_locants.get(next_node)
+        if prev_locant is None or next_locant is None:
+            return None
+        lower_neighbor_node = prev_node if prev_locant < next_locant else next_node
+
+        atom_toward: Dict[int, Tuple[str, int]] = {}
+        for a in amp.attachment_atoms:
+            for nbr in struct.mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nbr.GetIdx()
+                if ni in struct.bridge_atoms:
+                    atom_toward[a] = ("bridge", ni)
+        atom_toward_lower = None
+        atom_toward_other = None
+        for a, nk in atom_toward.items():
+            if nk == lower_neighbor_node:
+                atom_toward_lower = a
+            else:
+                atom_toward_other = a
+        if atom_toward_lower is None or atom_toward_other is None:
+            return None
+
+        d = _ring_distance(list(amp.ring_atoms_ordered), atom_toward_lower, atom_toward_other)
+        if d is None:
+            return None
+        results.append((superatom_locant, (1, 1 + d)))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Task 8.12 -- source-level formula-conservation veto
+# ---------------------------------------------------------------------------
+
+
+def _phane_formula_veto(struct: Optional["PhaneStructure"], mol: Optional[Chem.Mol]) -> bool:
+    """The RT-gate FAILS OPEN with no Java (OPSIN cannot parse any phane
+    name), so this is the ONLY guard against a phane emission that silently
+    drops or mutates an atom (Task 8.12). Returns True iff every heavy atom
+    in ``mol`` is accounted for EXACTLY ONCE by ``struct`` (amplificant ring
+    atoms + bridge atoms), with matching element symbols."""
+    if struct is None or mol is None:
+        return False
+    accounted: Dict[int, str] = {}
+    for amp in struct.amplificants:
+        for a in amp.atoms:
+            if a in accounted:
+                return False  # double-counted atom
+            accounted[a] = mol.GetAtomWithIdx(a).GetSymbol()
+    for a in struct.bridge_atoms:
+        if a in accounted:
+            return False
+        accounted[a] = mol.GetAtomWithIdx(a).GetSymbol()
+    if len(accounted) != mol.GetNumAtoms():
+        return False
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        if idx not in accounted or accounted[idx] != atom.GetSymbol():
+            return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Task 8.7 -- assemble the monocyclic all-benzene homophane PIN (integration)
+# ---------------------------------------------------------------------------
+
+
+def build_phane_pin(mol: Optional[Chem.Mol]) -> Optional[str]:
+    """Assemble the P-26 simplified-skeletal PIN for ``mol``, or None.
+
+    Task 8.7 scope: MONOCYCLIC skeleton, all amplificants IDENTICAL benzene
+    rings sharing the SAME attachment-locant set (P-26.3.2.1 contraction).
+    Every other class (mixed amplificants, von Baeyer/spiro skeletons,
+    substituents, 'a'-replacement) is fail-closed this phase -- see the
+    module docstring above Task 8.1 and Tasks 8.9-8.11.
+
+    Source: BB P-26.2.1/.2.2.1/.2.3/.3.1/.3.2/.3.2.1/.4.1.1; anchor
+    `1,4(1,4)-dibenzenacyclohexaphane` (P-26.3.2.1, :14947); meta homolog
+    `1,4(1,3)-dibenzenacyclohexaphane` (P-26.4.1.4, :15024).
+    """
+    struct = _simplify(mol)
+    if struct is None:
+        return None
+    if struct.skeleton_class is not SkeletonClass.MONOCYCLIC:
+        return None
+    if any(a.parent_name != "benzene" for a in struct.amplificants):
+        return None  # Task 8.7 scope: all-benzene only this phase
+
+    skeleton_locants = _number_skeleton(struct)
+    if skeleton_locants is None:
+        return None
+    per_amp = _attachment_locants(struct, skeleton_locants)
+    if per_amp is None or len(per_amp) != len(struct.amplificants):
+        return None
+
+    attach_sets = {a[1] for a in per_amp}
+    if len(attach_sets) != 1:
+        # Different attachment patterns across amplificants -- the
+        # per-amplificant (non-contracted) citation form is P-26.3.2.2/
+        # Task 8.11 territory with no verified in-corpus fixture this phase.
+        return None
+    shared_attach = next(iter(attach_sets))
+
+    if not _phane_formula_veto(struct, mol):
+        return None
+
+    parent_name = struct.amplificants[0].parent_name
+    prefix = _amplification_prefix(parent_name)
+    n_amplificants = len(struct.amplificants)
+    multiplied_prefix = _multiplied_amplificant(prefix, n_amplificants)
+    if multiplied_prefix is None:
+        return None
+
+    total_nodes = len(struct.node_cycle)
+    skeletal_name = _simplified_skeletal_name(total_nodes, struct.skeleton_class)
+    if skeletal_name is None:
+        return None
+
+    superatom_locants = sorted(sup for sup, _ in per_amp)
+    superatom_str = ",".join(str(x) for x in superatom_locants)
+    attach_str = ",".join(str(x) for x in shared_attach)
+    return f"{superatom_str}({attach_str})-{multiplied_prefix}{skeletal_name}"
+
+
+# ---------------------------------------------------------------------------
+# Task 8.8 -- composite-locant citation ordering for substituted phanes
+# (DESIGN CONTRACT -- unwired to emission; no substituted-phane molecule is
+# buildable this phase. Pure comparator, unit-tested against the BB
+# heptachloro tuple directly per the plan's Task 8.8 verification bullet.)
+# ---------------------------------------------------------------------------
+
+
+def _composite_locant_sort_key(locant: str) -> Tuple[int, int]:
+    """P-26.4.3.2/.3.3 (:15093/:15101): composite-locant citation order --
+    primary (skeleton) locant first (ascending); a PLAIN locant (no
+    amplificant superscript) sorts before any composite locant sharing the
+    same primary; composite locants then sort by ascending superscript.
+
+    Accepts ASCII composite notation ``"N"`` (plain) or ``"N(k)"``
+    (composite, matching `_build_composite_locant(style='ascii')`).
+    """
+    m = re.match(r"^(\d+)(?:\((\d+)\))?$", locant)
+    if not m:
+        raise ValueError(f"Malformed composite locant: {locant!r}")
+    primary = int(m.group(1))
+    superscript = int(m.group(2)) if m.group(2) else 0
+    return (primary, superscript)
+
+
+# ---------------------------------------------------------------------------
+# Task 8.9 -- 'a'-replacement heterophanes (DESIGN CONTRACT -- unwired to
+# emission this phase; `_simplify` already fails closed on any non-carbon
+# bridge atom, Task 8.1's safety net above, so a heteroatom-bridge phane
+# never reaches a hydrocarbon-phane misname. Pure naming helper, unit-tested
+# against the BB trithia example directly.)
+# ---------------------------------------------------------------------------
+
+
+def _apply_skeletal_replacement(
+    heteroatom_locants: Dict[int, str],
+    base_name: str,
+) -> str:
+    """P-26.5.1 (:15155 `(PIN)`): nondetachable 'a'-replacement prefixes for
+    skeleton heteroatoms, cited by ascending locant then BB element order
+    (O>S>Se>Te>N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B>Al>Ga>In>Tl, P-26.5.4.2 :15228),
+    prepended to the hydrocarbon phane ``base_name``.
+
+    ``heteroatom_locants`` maps skeleton locant -> element symbol (e.g.
+    ``{2: "S", 4: "S", 6: "S"}``). Elements are grouped by their nondetachable
+    stem (thia/oxa/aza/...) via the shared `skeletal_replacement.REPLACEMENT_TERMS`
+    table (P-15.4 -- reused, not duplicated); a single element's locant list is
+    contracted with a multiplying prefix + hyphen, e.g. ``"2,4,6-trithia-"``.
+    Different-element groups cite in BB P-26.5.4.2 seniority order (reuses
+    `skeletal_replacement._A_CITATION_ORDER`).
+    """
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+    from .skeletal_replacement import REPLACEMENT_TERMS, _A_CITATION_ORDER
+
+    by_element: Dict[str, List[int]] = {}
+    for locant, element in heteroatom_locants.items():
+        by_element.setdefault(element, []).append(locant)
+
+    parts: List[str] = []
+    for element in _A_CITATION_ORDER:
+        if element not in by_element or element not in REPLACEMENT_TERMS:
+            continue
+        locants = sorted(by_element[element])
+        count = len(locants)
+        stem = REPLACEMENT_TERMS[element]
+        mult = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        loc_str = ",".join(str(x) for x in locants)
+        parts.append(f"{loc_str}-{mult}{stem}")
+    return "-".join(parts) + "-" + base_name
+
+
+# ---------------------------------------------------------------------------
+# Task 8.11 -- multi-different-amplificant seniority numbering (DESIGN
+# CONTRACT -- unwired; `build_phane_pin` fail-closes on any molecule with
+# differing amplificants, Task 8.7's `attach_sets` uniqueness check above /
+# the parent-name-uniqueness check. Pure comparator reusing the existing
+# P-44.2 ring_system_score, unit-tested against the BB worked-example order.)
+# ---------------------------------------------------------------------------
+
+
+def _phane_amplificant_seniority_key(
+    ring_score: tuple,
+    attachment_locants: Tuple[int, ...],
+) -> Tuple[tuple, Tuple[int, ...]]:
+    """P-26.4.1.3 (:14990) + P-26.4.2.2 (:15044): when >=2 DIFFERENT
+    amplificants compete for the lower superatom locant, the MOST SENIOR
+    ring (P-44.2, lower ``ring_system_score`` = more senior -- see
+    ``rules.ring_selection.ring_system_score``) gets the lower locant;
+    residual ties broken by the lower attachment-locant set.
+
+    Sorting a list of ``(ring_score, attachment_locants)`` ascending and
+    assigning superatom locants in that order reproduces the BB worked
+    example `1(8,5)-quinolina-4(1,4)-phenanthrena-7(1,4)-naphthalena-
+    cyclononaphane` (:14998): quinoline is N-heterocyclic (senior to any
+    carbocycle on P-44.2.1(a)/(b)) -> locant 1; phenanthrene (3 rings) is
+    senior to naphthalene (2 rings) on P-44.2.1(d) -> locant 4 vs 7.
+    """
+    return (ring_score, attachment_locants)
+
+
+# ---------------------------------------------------------------------------
 # name_cyclophane (top-level handler)
 # ---------------------------------------------------------------------------
 
 
 def name_cyclophane(mol: Optional[Chem.Mol]) -> Optional[str]:
-    """Emit the IUPAC PIN cyclophane name for ``mol``, or None.
+    """Emit the IUPAC P-26 simplified-skeletal PIN for ``mol``, or None.
 
-    Production output: bracket-prefix semi-systematic form
-    ``[m.n.<...>]paracyclophane`` (or metacyclophane / orthocyclophane /
-    cyclophane per the topology classification). Bridge lengths are listed in
-    non-ascending order per Blue Book P-26.4 convention.
+    Wave-8 P8: delegates to `build_phane_pin` (Task 8.7), which builds the
+    P-26.2/.3/.4 simplified-skeleton PIN (`1,4(1,4)-dibenzenacyclohexaphane`)
+    for the monocyclic all-benzene-homophane class. Falls back to the legacy
+    semi-systematic bracket-prefix composer (`[m.n]paracyclophane`) ONLY for
+    topologies `build_phane_pin` doesn't (yet) cover, so `is_cyclophane`-
+    positive molecules outside the P-26 PIN scope still get *some* name from
+    the pre-existing (production-withheld, unit-tested) composer rather than
+    silently returning None here -- the dispatch-level fail-closed decision
+    is made in `dispatch_table._handle_cyclophane` (Task 8.12), not here.
 
-    Returns None for None input, non-cyclophane topology, or for cyclophanes
-    with linker rings other than carbocyclic benzene (these are tagged
-    ``GENERIC_CYCLOPHANE`` and quarantined per 155-AUDIT-A.md §8 R3 -- the
-    ``is_cyclophane`` gate accepts them but the name composition is deferred
-    to v19 / Phase 156 grammar pre-validation).
+    Returns None for None input or non-cyclophane topology.
 
-    Source: 155-CONTEXT.md D-04 + D-05; 155-AUDIT-A.md §3 + §10.
+    Source: 155-CONTEXT.md D-04 + D-05; 155-AUDIT-A.md §3 + §10;
+     Task 8.7.
     """
     if mol is None:
         return None
     if not is_cyclophane(mol):
         return None  # mutual-exclusion gate (D-16)
+
+    pin = build_phane_pin(mol)
+    if pin is not None:
+        return pin
 
     topology = _classify_phane_topology(mol)
     if topology is PhaneTopology.GENERIC_CYCLOPHANE:

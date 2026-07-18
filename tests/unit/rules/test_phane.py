@@ -156,15 +156,30 @@ class TestBuildCompositeLocant:
 
 @pytest.mark.unit
 class TestNameCyclophane:
-    """Top-level handler per 155-CONTEXT.md D-04 + D-05 + 155-AUDIT-A.md §3."""
+    """Top-level handler per 155-CONTEXT.md D-04 + D-05 + 155-AUDIT-A.md §3.
+
+    Wave-8 P8: `name_cyclophane` now delegates to `build_phane_pin` (the
+    P-26.2/.3 simplified-skeletal PIN engine) for the monocyclic
+    all-benzene-homophane class, RETIRING the semi-systematic bracket-prefix
+    form for these cases (`[2.2]paracyclophane` -> P-26 PIN
+    `1,4(1,4)-dibenzenacyclohexaphane`). See
+     Task 8.7 +
+    tests/unit/rules/test_phane_pin.py for the full P-26 engine test suite;
+    these 4 cases stay here (pre-existing fixture SMILES) purely so this
+    file's own coverage of `name_cyclophane`'s public contract doesn't rot.
+    """
 
     @pytest.mark.parametrize(
         "smiles,expected_name,label",
         [
-            ("c1cc2ccc1CCc1ccc(cc1)CC2", "[2.2]paracyclophane", "[2.2]paracyclophane"),
-            ("c1cc2cc(c1)CCc1cccc(c1)CC2", "[2.2]metacyclophane", "[2.2]metacyclophane"),
-            ("c1cc2ccc1CCCc1ccc(cc1)CCC2", "[3.3]paracyclophane", "[3.3]paracyclophane"),
-            ("c1cc2ccc1CCCc1ccc(cc1)CC2", "[3.2]paracyclophane", "[3.2]paracyclophane"),
+            ("c1cc2ccc1CCc1ccc(cc1)CC2", "1,4(1,4)-dibenzenacyclohexaphane",
+             "[2.2]paracyclophane -> P-26 PIN (BB P-26.3.2.1 :14947 (PIN) verbatim)"),
+            ("c1cc2cc(c1)CCc1cccc(c1)CC2", "1,4(1,3)-dibenzenacyclohexaphane",
+             "[2.2]metacyclophane -> P-26 PIN (BB P-26.4.1.4 :15024 (PIN) verbatim)"),
+            ("c1cc2ccc1CCCc1ccc(cc1)CCC2", "1,5(1,4)-dibenzenacyclooctaphane",
+             "[3.3]paracyclophane -> P-26 PIN (rule-derived homolog)"),
+            ("c1cc2ccc1CCCc1ccc(cc1)CC2", "1,4(1,4)-dibenzenacycloheptaphane",
+             "[3.2]paracyclophane -> P-26 PIN (rule-derived homolog, asymmetric bridge)"),
         ],
     )
     def test_name_cyclophane_emits_blue_book_form(

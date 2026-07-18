@@ -119,12 +119,20 @@ def test_cyclophane_topology_gate(fixture):
     ids=[f["fixture_id"] for f in _ALL_FIXTURES],
 )
 def test_cyclophane_name_compound(fixture):
-    """name_compound(SMILES) must return the expected bracket-prefix name for
-    non-quarantined fixtures (carbocyclic-benzene linker rings).
+    """name_compound(SMILES) result for each fixture.
 
-    Heterocyclic-bridge / heterocyclic-linker fixtures (R3 quarantine flag) are
-    skipped here per 155-AUDIT-A.md S8 -- the topology gate accepts them but
-    the name composition is deferred to v19 / Phase 156 grammar pre-validation.
+    Wave-8 P8: fixtures carrying an ``expected_pin`` field (monocyclic
+    all-benzene-homophane class -- `build_phane_pin` verified BB-name-exact,
+    see  Task 8.7/8.12)
+    now EMIT that P-26 simplified-skeletal PIN in production. Every other
+    non-quarantined fixture (a topology `build_phane_pin` doesn't cover yet)
+    still hits the T6c fail-closed refusal ('unknown organic compound') --
+    OPSIN cannot parse any phane form, so an unverified composed name is
+    withheld rather than shipped.
+
+    Heterocyclic-bridge / heterocyclic-linker fixtures (R3 quarantine flag)
+    are skipped here per 155-AUDIT-A.md S8 -- the topology gate accepts them
+    but the name composition is deferred (still fail-closed in production).
     """
     if fixture.get("integration_quarantine"):
         pytest.skip(
@@ -133,19 +141,20 @@ def test_cyclophane_name_compound(fixture):
         )
 
     smi = fixture["smiles"]
-    expected = fixture["expected_name"]
-    # Wave2 T6c fail-closed (P-26): production REFUSES all phane names — OPSIN
-    # cannot parse any phane form (bracket-prefix or the P-26.2.1 PIN), so the
-    # composed name is a guaranteed non-round-tripping emission. The dispatch
-    # handler converts it to the G0 UNSUPPORTED_RING_SYSTEM 'unknown'. The
-    # composition machinery itself is still exercised by the name_cyclophane
-    # unit/fixture tests; this end-to-end test now pins the refusal.
+    expected_pin = fixture.get("expected_pin")
     actual = name_compound(smi)
-    assert actual == "unknown organic compound", (
-        f"name_compound({fixture['fixture_id']}, smiles={smi!r}) returned "
-        f"{actual!r}; expected the T6c fail-closed 'unknown organic compound' "
-        f"(composed form would have been {expected!r})"
-    )
+    if expected_pin is not None:
+        assert actual == expected_pin, (
+            f"name_compound({fixture['fixture_id']}, smiles={smi!r}) returned "
+            f"{actual!r}; expected the Wave-8 P8 P-26 PIN {expected_pin!r}"
+        )
+    else:
+        assert actual == "unknown organic compound", (
+            f"name_compound({fixture['fixture_id']}, smiles={smi!r}) returned "
+            f"{actual!r}; expected the T6c fail-closed 'unknown organic compound' "
+            f"(composed form would have been {fixture['expected_name']!r}; no "
+            f"verified P-26 PIN for this topology yet)"
+        )
 
 
 @pytest.mark.integration
