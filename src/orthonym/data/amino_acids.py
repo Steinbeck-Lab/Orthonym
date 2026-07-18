@@ -383,6 +383,50 @@ def get_amino_acid_acyl_name(trivial_name: str) -> Optional[str]:
     return AMINO_ACID_ACYL_NAMES.get(trivial_name)
 
 
+# v24 W8 P3 (P-103.2.6, BB 54595-54608): the ester 'ate' stem for the
+# single-alpha-stereocentre monocarboxylic standard amino acids + glycine.
+# "Esters of amino acids ... are formed ... using the 'ate' ending obtained by
+# replacing the 'ic acid' ending or the final letter 'e' of the retained name
+# (or adding the ending 'ate' to the name tryptophan)". Diacid AAs (aspartic /
+# glutamic -- need positional ester locants, e.g. `1-methyl L-aspartate`,
+# BB 54606) and 2-stereocentre AAs (threonine / isoleucine -- allo descriptor
+# entanglement) are deliberately OMITTED so the ester namer falls through to
+# the pre-existing systematic path for them (no regression).
+AMINO_ACID_ATE_STEMS: Dict[str, str] = {
+    "glycine": "glycinate",
+    "alanine": "alaninate",
+    "valine": "valinate",
+    "leucine": "leucinate",
+    "serine": "serinate",
+    "cysteine": "cysteinate",
+    "methionine": "methioninate",
+    "phenylalanine": "phenylalaninate",
+    "tyrosine": "tyrosinate",
+    "tryptophan": "tryptophanate",  # BB 54597: 'ate' ADDED to 'tryptophan'
+    "proline": "prolinate",
+    "arginine": "argininate",
+    "lysine": "lysinate",
+    "histidine": "histidinate",
+    "asparagine": "asparaginate",
+    "glutamine": "glutaminate",
+}
+
+
+def get_amino_acid_ate_stem(trivial_name: str) -> Optional[str]:
+    """Get the ester 'ate' stem for an in-scope amino acid (P-103.2.6).
+
+    Args:
+        trivial_name: Bare (stereo-free) trivial name of the amino acid, e.g.
+            "alanine" (NOT "L-alanine").
+
+    Returns:
+        The 'ate' stem (e.g. "alaninate") if in scope, None otherwise (defer
+        to the pre-existing systematic ester namer -- diacid / 2-stereocentre
+        AAs, and any non-standard amino acid, are never in this map).
+    """
+    return AMINO_ACID_ATE_STEMS.get(trivial_name)
+
+
 # --- Module-level integration (must run after all dicts are defined) ---
 # Integrate OPSIN simpleGroup entries at import time
 _opsin_simple = _integrate_opsin_simplegroup()

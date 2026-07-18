@@ -14,25 +14,36 @@ Built classes:
         MANDATED modifier of the retained name; threonine/isoleucine are PIN
         retained names, so their C-3 epimer's PIN is `allo-<name>`). The map also
         covers the D-/D-allo- forms (all 8 OPSIN-RT verified).
+  * 3.2 esters (P-103.2.6, BB 54595-54608): `methyl <descriptor><name>ate` for the
+        single-alpha-stereocentre monocarboxylic standard AAs + glycine. The
+        L-implicit-vs-explicit policy is now RESOLVED for esters: BB 54601 shows
+        `methyl L-alaninate` with an EXPLICIT descriptor (unlike the bare AA, which
+        suppresses implicit L) -- so the ester stem always cites L-/D- explicitly
+        (glycine, achiral, gets none). Diacid AAs (aspartic/glutamic -- need
+        positional ester locants) and 2-stereocentre AAs (threonine/isoleucine --
+        allo entanglement) are OUT of scope and fall through to the pre-existing
+        systematic ester name (no regression).
+  * 3.7 non-standard-AA zwitterion fail-closed veto (P-103.2.4.4, BB 54554-54569):
+        the P-103.2.4.1 "convenient neutral form" dispensation is licensed ONLY for
+        the monoamino monocarboxylic acids retained in Table 10.4 (the 20 canonical
+        STANDARD_AMINO_ACIDS) -- BB's own P-103.2.4.4 example (S-methyl-L-cysteine
+        zwitterion) shows a NON-standard (Table 10.5 / substituted) amino-acid
+        zwitterion's PIN is the Method-1 ionic form
+        `(2S)-2-azaniumyl-3-(methylsulfanyl)propanoate`, NOT the neutral
+        '...oic acid'. Orthonym cannot yet build the charged Method-1 engine, so a
+        non-standard zwitterion now fails closed (`unknown organic compound`)
+        instead of silently dropping the +/- charges and emitting a different
+        (neutral) structure. Standard-AA zwitterions (glycine/L-alanine/...) are
+        UNCHANGED.
 
 Deferred (documented, accuracy-first — do NOT emit a retained form where the PIN
 is uncertain, to avoid regressing a correct systematic name):
-  * 3.2 esters (`methyl L-alaninate`): the retained-stem is the PIN by the
-        `methyl acetate` functional-parent analogy, BUT the exact string is
-        entangled with the unresolved bare-AA stereo-descriptor policy (the
-        project emits bare `alanine` with L IMPLICIT, while BB 54601 shows explicit
-        `L-alaninate`; a "Stereo backstop" already flags bare `alanine` as
-        under-specified). Resolve the L-implicit-vs-explicit policy first.
   * 3.3-3.6 substituted-derivative retained forms (5-hydroxytryptophan,
         N6-acetyl-lysine, O-phospho-serine, hydroxyproline base): P-103 carries NO
         `(PIN)` markers, several P-103.2.3 examples list the systematic name FIRST,
         and the project's existing golds name substituted/non-standard AAs
         systematically (e.g. S-ethylcysteine -> 2-amino-3-(ethylsulfanyl)propanoic
         acid). Keeping the (already-correct) systematic avoids a wrong-PIN regression.
-  * 3.7 non-standard zwitterion: the current neutral-form output is SANCTIONED by
-        P-103.2.4.1 (naming the conventional neutral form of a monoamino
-        monocarboxylic acid) and passes the project's charge-normalized RT gate, so
-        it is a valid name, not a leak; failing it closed would regress it.
 """
 import pytest
 from orthonym.namer import Orthonym
@@ -40,6 +51,7 @@ from orthonym.namer import Orthonym
 pytestmark = pytest.mark.unit
 
 G = Orthonym()
+RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw namer
 
 
 # --- 3.1 allo diastereomers (P-103.1.3.2.2) -------------------------------
@@ -63,4 +75,56 @@ def test_allo_amino_acids(smiles, expected):
     ("CC[C@H](C)[C@@H](N)C(=O)O", "D-allo-isoleucine"),# D-allo-Ile (2R,3S)
 ])
 def test_thr_ile_stereoisomers(smiles, expected):
+    assert G.name(smiles) == expected
+
+
+# --- 3.2 amino-acid esters (P-103.2.6, BB 54595-54608) --------------------
+@pytest.mark.parametrize("smiles,expected", [
+    # BB 54601 verbatim example: explicit L- (unlike the bare AA's implicit L).
+    ("COC(=O)[C@H](C)N", "methyl L-alaninate"),
+    # Glycine is achiral -- no descriptor.
+    ("COC(=O)CN", "methyl glycinate"),
+    # Different R' (ethyl) -- reuses the existing alkyl namer, not hardcoded.
+    ("CCOC(=O)[C@H](C)N", "ethyl L-alaninate"),
+    # D- enantiomer (alpha-R): explicit D-.
+    ("COC(=O)[C@@H](C)N", "methyl D-alaninate"),
+])
+def test_amino_acid_esters(smiles, expected):
+    assert RAW.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles", [
+    # Diacid AAs (aspartic/glutamic) need positional ester locants
+    # (`1-methyl L-aspartate`) -- out of scope, must NOT regress to a wrong name.
+    "COC(=O)[C@@H](N)CC(=O)O",
+    # 2-stereocentre AAs (threonine/isoleucine) -- allo entanglement, deferred.
+    "COC(=O)[C@H](N)[C@@H](C)O",
+])
+def test_amino_acid_esters_out_of_scope_falls_through(smiles):
+    # Must not be "unknown" and must not silently drop atoms/charges -- the
+    # pre-existing systematic ester path still names it (no regression), it
+    # just doesn't get the retained-stem treatment.
+    name = RAW.name(smiles)
+    assert name is not None
+    assert "unknown" not in name
+
+
+# --- 3.7 non-standard-AA zwitterion fail-closed veto (P-103.2.4.4) --------
+def test_non_standard_zwitterion_fails_closed():
+    # S-methylcysteine-family zwitterion: BB's OWN example (S-methyl-L-cysteine
+    # zwitterion) requires the Method-1 ionic PIN, not the neutral form. Until
+    # that engine exists, this must fail closed rather than silently drop the
+    # +/- charges and emit a different (neutral) structure.
+    name = RAW.name("CSC[C@H]([NH3+])C(=O)[O-]")
+    assert name is None or "unknown" in name
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # Standard-AA zwitterions (Table 10.4, P-103.2.4.1 dispensation) are
+    # UNCHANGED by the veto.
+    ("[NH3+]CC(=O)[O-]", "glycine"),
+    ("C[C@H]([NH3+])C(=O)[O-]", "L-alanine"),
+])
+def test_standard_aa_zwitterion_unaffected(smiles, expected):
+    assert RAW.name(smiles) == expected
     assert G.name(smiles) == expected

@@ -805,6 +805,71 @@ def _find_acid_principal_chain(mol, acid_atoms: List[int]) -> Optional[List[int]
     return best_path
 
 
+def _name_amino_acid_ester(
+    mol, acid_atoms: List[int], alkyl_atoms: List[int], ester_match: tuple,
+) -> Optional[str]:
+    """P-103.2.6 (BB 54595-54608): name an amino-acid ester with the retained
+    '-ate' stem, e.g. 'methyl L-alaninate' (BB 54601).
+
+    Scope (accuracy-safe subset): the single-alpha-stereocentre monocarboxylic
+    standard amino acids + glycine (``AMINO_ACID_ATE_STEMS``). Returns None
+    (falls through to the pre-existing systematic ester name -- no
+    regression) for:
+      - diacid AAs (aspartic/glutamic -- need positional ester locants like
+        '1-methyl L-aspartate', BB 54606),
+      - 2-stereocentre AAs (threonine/isoleucine -- allo descriptor
+        entanglement),
+      - anything whose acid fragment does not reconstruct to a bare retained
+        amino acid.
+
+    Descriptor policy: the ester stem uses an EXPLICIT L-/D- descriptor (BB
+    54601 shows 'methyl L-alaninate', unlike the bare AA which suppresses
+    implicit L). Glycine (achiral) gets no descriptor.
+    """
+    carbonyl_c = ester_match[0]
+
+    # Reconstruct the acid fragment as a standalone carboxylic acid molecule
+    # (restore -OH on the carbonyl carbon) using the existing RWMol fragment
+    # helper -- preserves stereo, no hand-rolled SMILES surgery.
+    frag_smi = _extract_fragment_smiles(mol, set(acid_atoms), carbonyl_c, cap_element=8)
+    if not frag_smi:
+        return None
+
+    acid_mol = Chem.MolFromSmiles(frag_smi)
+    if acid_mol is None:
+        return None
+
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(acid_mol)
+
+    # Stereo-free canonical match against the retained amino-acid tables.
+    try:
+        nostereo_smi = Chem.MolToSmiles(acid_mol, isomericSmiles=False, canonical=True)
+    except Exception:
+        return None
+
+    from ..data.amino_acids import get_amino_acid_name, get_amino_acid_ate_stem
+    aa_name = get_amino_acid_name(nostereo_smi, mol=acid_mol, with_descriptor=False)
+    if aa_name is None:
+        return None  # acid fragment is not a bare retained amino acid
+
+    ate_stem = get_amino_acid_ate_stem(aa_name)
+    if ate_stem is None:
+        return None  # out of scope (diacid / 2-stereocentre / non-standard AA)
+
+    # Explicit alpha-carbon descriptor. Reuses the peptide stereo-prefix logic
+    # (already returns "L-"/"D-"/"" -- "" only for achiral glycine) -- no new
+    # CIP code.
+    from .peptides import _get_stereo_prefix
+    descriptor = _get_stereo_prefix(acid_mol, aa_name)
+
+    r_prime = get_alkyl_fragment_name(mol, alkyl_atoms)
+    if not r_prime:
+        return None
+
+    return f"{r_prime} {descriptor}{ate_stem}"
+
+
 def name_ester(mol, ester_match: tuple) -> Optional[str]:
     """
     Generate IUPAC name for an ester.
@@ -832,6 +897,16 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
 
     if not acid_atoms or not alkyl_atoms:
         return None  # Cannot determine fragments
+
+    # v24 W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters use the
+    # retained '-ate' stem (e.g. 'methyl L-alaninate') for the in-scope
+    # single-alpha-stereocentre monocarboxylic standard AAs + glycine. Tried
+    # BEFORE the normal alkanoate/ring-acid path; declines (returns None,
+    # falls through with no regression) for anything out of scope (diacid
+    # AAs, 2-stereocentre AAs, non-standard AAs, non-AA esters).
+    aa_ester_name = _name_amino_acid_ester(mol, acid_atoms, alkyl_atoms, ester_match)
+    if aa_ester_name is not None:
+        return aa_ester_name
 
     # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): a mono-ester of carbonic
     # acid whose OTHER acid function is an acyl HALIDE, X-C(=O)-O-R, is named as
@@ -2050,6 +2125,17 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     _acid_atoms, alkyl_atoms = parse_ester_fragments(mol, ester_match)
     if not alkyl_atoms:
         return None
+
+    # v24 W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters (the alpha-amino
+    # group is what routes a molecule like 'methyl alaninate' through this
+    # POLYFUNCTIONAL path rather than the plain single-FG name_ester) use the
+    # retained '-ate' stem (e.g. 'methyl L-alaninate'). Tried BEFORE the
+    # acid-analog/general-pipeline route below; declines (returns None, falls
+    # through with no regression) for anything out of scope.
+    aa_ester_name = _name_amino_acid_ester(mol, _acid_atoms, alkyl_atoms, ester_match)
+    if aa_ester_name is not None:
+        return aa_ester_name
+
     # The removed alkyl side must carry no other functional atoms (else the
     # acid analog would silently drop them -> a different molecule).
     for a in alkyl_atoms:

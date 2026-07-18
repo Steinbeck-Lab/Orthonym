@@ -560,6 +560,33 @@ def _name_amino_acid_zwitterion(mol, style: str) -> str:
         try:
             neutral_smiles = Chem.MolToSmiles(neutral_mol, canonical=True)
             if neutral_smiles:
+                # v24 W8 P3 (P-103.2.4.4) fail-closed veto: the P-103.2.4.1
+                # "convenient neutral form" dispensation is licensed ONLY for the
+                # monoamino monocarboxylic acids RETAINED IN TABLE 10.4 (the 20
+                # canonical STANDARD_AMINO_ACIDS). BB's own P-103.2.4.4 example
+                # (S-methyl-L-cysteine zwitterion) shows a non-standard /
+                # substituted amino acid's zwitterion PIN is the Method-1 ionic
+                # form '(2S)-2-azaniumyl-3-(methylsulfanyl)propanoate', NOT the
+                # neutral '...oic acid' -- naming it as the plain neutral acid
+                # here would silently DROP the ionization state and describe a
+                # different (neutral) species than the input. The charged
+                # Method-1 engine is a later phase; fail closed rather than emit
+                # that wrong-structure leak. Standard AAs (glycine/alanine/...)
+                # are unaffected -- their neutral skeleton IS the bare Table 10.4
+                # retained name, which P-103.2.4.1 explicitly sanctions.
+                from ..data.amino_acids import is_standard_amino_acid
+                nostereo_smi = Chem.MolToSmiles(
+                    neutral_mol, isomericSmiles=False, canonical=True
+                )
+                nostereo_mol = Chem.MolFromSmiles(nostereo_smi)
+                is_bare_standard_aa = nostereo_mol is not None and (
+                    is_standard_amino_acid(
+                        Chem.MolToSmiles(nostereo_mol, canonical=True)
+                    )
+                )
+                if not is_bare_standard_aa:
+                    return ''  # fail closed -- not a Table-10.4 retained AA
+
                 from ..assembly.fragment_naming import name_fragment_recursively
                 neutral_name = name_fragment_recursively(neutral_smiles)
                 if neutral_name and neutral_name != 'zwitterion':
