@@ -2298,10 +2298,10 @@ class Orthonym:
             # SELF-01 OPSIN-RT gate.
             # ============================================================
             if self._general_fallback and (not name or is_failure_name(name)):
-                from .assembly.general_engine import name_general_chain
+                from .assembly.general_engine import name_general
                 from .validation.e1_certificate import verify_certificate
                 try:
-                    _eng = name_general_chain(mol, features)
+                    _eng = name_general(mol, features)
                     if _eng is not None and verify_certificate(mol, _eng).ok:
                         name = _eng.name
                 except Exception as _e:  # fail-closed: an engine bug must
