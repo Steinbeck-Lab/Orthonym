@@ -110,3 +110,210 @@ def pool_candidates(mol, ring_systems, principal_chain,
                                   principal_group)
         pool.append(ParentCandidate('chain', ch, pg_n))
     return pool
+
+
+def _class_rank(mol, cand: ParentCandidate) -> int:
+    """P-44.1.2: rank of the most senior skeletal element in the candidate."""
+    return max((P44_CLASS_RANK.get(mol.GetAtomWithIdx(i).GetSymbol(), 0)
+                for i in cand.atoms), default=0)
+
+
+def _n_multiple_bonds(mol, atom_set) -> Tuple[int, int]:
+    """(multiple, double) bond counts within the candidate skeleton.
+
+    P-44.4.1.1: mancude (aromatic) bonds count as noncumulative double
+    bonds -- GetBondTypeAsDouble() returns 1.5 for aromatic, > 1.0 counts.
+    """
+    n_mult = n_dbl = 0
+    for b in mol.GetBonds():
+        if b.GetBeginAtomIdx() in atom_set and b.GetEndAtomIdx() in atom_set:
+            v = b.GetBondTypeAsDouble()
+            if v > 1.0:
+                n_mult += 1
+            if 1.5 <= v <= 2.0:
+                n_dbl += 1
+    return n_mult, n_dbl
+
+
+def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
+                       ring_info=None):
+    """Lowest-locant set for `target_atoms` on this candidate.
+
+    Chain: try both directions, keep the lower set (P-14.4 first point of
+    difference). Ring: use IUPAC locants from ring_info when available for
+    THIS ring system, else the deterministic sorted-position fallback
+    (`_build_ring_pos` -- same fallback the legacy cascade used).
+    """
+    from .locants import compare_locant_sets
+    from .parent_selection import _build_ring_pos
+
+    targets = set(target_atoms) & set(cand.atoms)
+    if not targets:
+        return []
+    if cand.kind == 'chain':
+        fwd = {a: i + 1 for i, a in enumerate(cand.atoms)}
+        rev = {a: i + 1 for i, a in enumerate(reversed(cand.atoms))}
+        lf = sorted(fwd[a] for a in targets)
+        lr = sorted(rev[a] for a in targets)
+        return lf if compare_locant_sets(lf, lr) <= 0 else lr
+    pos = None
+    if ring_info and ring_info.get('iupac_locants'):
+        iupac = ring_info['iupac_locants']
+        if all(a in iupac for a in cand.atoms):
+            pos = iupac
+    if pos is None:
+        pos = _build_ring_pos(set(cand.atoms), ring_info=ring_info)
+    return sorted(pos[a] for a in targets if a in pos)
+
+
+def _substituent_positions(mol, cand: ParentCandidate):
+    """Atoms of the candidate bearing >=1 external heavy substituent."""
+    cset = set(cand.atoms)
+    out = []
+    for i in cand.atoms:
+        for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
+            if nbr.GetIdx() not in cset and nbr.GetAtomicNum() > 1:
+                out.append(i)
+                break
+    return out
+
+
+def _ring_subrings(mol, atom_set) -> int:
+    ri = mol.GetRingInfo()
+    return sum(1 for ring in ri.AtomRings() if set(ring) <= atom_set)
+
+
+def _hetero_rank_vector(mol, atoms, rank_table):
+    """Descending rank vector of hetero skeletal atoms, for lexicographic
+    'more of the most senior heteroatom' comparison."""
+    ranks = sorted((rank_table.get(mol.GetAtomWithIdx(i).GetSymbol(), 0)
+                    for i in atoms
+                    if mol.GetAtomWithIdx(i).GetSymbol() != 'C'),
+                   reverse=True)
+    return tuple(ranks)
+
+
+def _cmp(x, y) -> int:
+    return (x > y) - (x < y)
+
+
+def compare_parent_candidates(mol, a: ParentCandidate, b: ParentCandidate, *,
+                              principal_group=None,
+                              principal_group_atoms=None,
+                              ring_info=None) -> int:
+    """Blue Book P-44 seniority: >0 a senior, <0 b senior, 0 tie."""
+    from .locants import compare_locant_sets
+    from .parent_selection import _pg_attachment_atoms
+
+    # P-44.1.1 -- more principal characteristic groups as suffix.
+    if a.pg_count != b.pg_count:
+        return _cmp(a.pg_count, b.pg_count)
+
+    # P-44.1.2 -- senior skeletal atom class (ring-vs-chain / class level).
+    r = _cmp(_class_rank(mol, a), _class_rank(mol, b))
+    if r:
+        return r
+
+    # P-44.1.2.2(1) -- same class: ring senior to chain.
+    if a.kind != b.kind:
+        return 1 if a.kind == 'ring' else -1
+
+    if a.kind == 'ring':
+        # P-44.2.1 (a)..(g)
+        sa = {mol.GetAtomWithIdx(i).GetSymbol() for i in a.atoms}
+        sb = {mol.GetAtomWithIdx(i).GetSymbol() for i in b.atoms}
+        r = _cmp(sa != {'C'}, sb != {'C'})                              # (a)
+        if r:
+            return r
+        r = _cmp('N' in sa, 'N' in sb)                                  # (b)
+        if r:
+            return r
+        ra = max((RING_HETERO_RANK.get(s, 0) for s in sa if s != 'C'), default=0)
+        rb = max((RING_HETERO_RANK.get(s, 0) for s in sb if s != 'C'), default=0)
+        r = _cmp(ra, rb)                                                # (c)
+        if r:
+            return r
+        r = _cmp(_ring_subrings(mol, set(a.atoms)),
+                 _ring_subrings(mol, set(b.atoms)))                     # (d)
+        if r:
+            return r
+        r = _cmp(len(a.atoms), len(b.atoms))                            # (e)
+        if r:
+            return r
+        ha = _hetero_rank_vector(mol, a.atoms, RING_HETERO_RANK)
+        hb = _hetero_rank_vector(mol, b.atoms, RING_HETERO_RANK)
+        r = _cmp(len(ha), len(hb))                                      # (f)
+        if r:
+            return r
+        r = _cmp(ha, hb)                                                # (g)
+        if r:
+            return r
+    else:
+        # P-44.3 (a)..(c)
+        ha = _hetero_rank_vector(mol, a.atoms, CHAIN_HETERO_RANK)
+        hb = _hetero_rank_vector(mol, b.atoms, CHAIN_HETERO_RANK)
+        r = _cmp(len(ha), len(hb))                                      # (a)
+        if r:
+            return r
+        r = _cmp(len(a.atoms), len(b.atoms))                            # (b)
+        if r:
+            return r
+        r = _cmp(ha, hb)                                                # (c)
+        if r:
+            return r
+
+    # P-44.4.1 shared tiebreaks.
+    ma, da = _n_multiple_bonds(mol, set(a.atoms))
+    mb, db = _n_multiple_bonds(mol, set(b.atoms))
+    r = _cmp(ma, mb)                                                    # (a)
+    if r:
+        return r
+    r = _cmp(da, db)                                                    # (b)
+    if r:
+        return r
+
+    # (h) lower locants for the suffix (PCG attachment atoms).
+    if principal_group_atoms:
+        att = set()
+        for match in principal_group_atoms:
+            att.update(_pg_attachment_atoms(principal_group, match))
+        la = _candidate_locants(mol, a, att, ring_info=ring_info)
+        lb = _candidate_locants(mol, b, att, ring_info=ring_info)
+        if la or lb:
+            r = -compare_locant_sets(la, lb)  # -1 == first-arg preferred
+            if r:
+                return r
+
+    # (j) lower locants for unsaturation.
+    def _unsat_atoms(cand):
+        cset = set(cand.atoms)
+        out = set()
+        for bnd in mol.GetBonds():
+            if (bnd.GetBeginAtomIdx() in cset and bnd.GetEndAtomIdx() in cset
+                    and bnd.GetBondTypeAsDouble() > 1.0):
+                out.update((bnd.GetBeginAtomIdx(), bnd.GetEndAtomIdx()))
+        return out
+
+    la = _candidate_locants(mol, a, _unsat_atoms(a), ring_info=ring_info)
+    lb = _candidate_locants(mol, b, _unsat_atoms(b), ring_info=ring_info)
+    if la or lb:
+        r = -compare_locant_sets(la, lb)
+        if r:
+            return r
+
+    # Legacy-preserved final criteria (P-44.1(h)/(i) of the staged cascade):
+    # more substituents, then lower substituent locants.
+    pa = _substituent_positions(mol, a)
+    pb = _substituent_positions(mol, b)
+    r = _cmp(len(pa), len(pb))
+    if r:
+        return r
+    la = _candidate_locants(mol, a, set(pa), ring_info=ring_info)
+    lb = _candidate_locants(mol, b, set(pb), ring_info=ring_info)
+    if la or lb:
+        r = -compare_locant_sets(la, lb)
+        if r:
+            return r
+
+    # Deterministic total order (never input-order-dependent).
+    return _cmp(tuple(sorted(b.atoms)), tuple(sorted(a.atoms)))
