@@ -134,3 +134,29 @@ class TestDispatcher:
         mol, feats = _features("C1CCc2ccccc2C1")
         res = name_general(mol, feats)
         assert res is not None and res.name.startswith("bicyclo")
+
+
+class TestEngineStereo:
+    def test_chain_stereocenter_descriptor(self):
+        # C[C@H](O)CC: O>Et>Me>H, @ from methyl -> S (rdCIPLabeler-verified)
+        res = _name("C[C@H](O)CC")
+        assert res.name == "(2S)-butan-2-ol"
+
+    def test_chain_stereocenter_descriptor_r(self):
+        res = _name("C[C@@H](O)CC")
+        assert res.name == "(2R)-butan-2-ol"
+
+    def test_chain_ez_descriptor(self):
+        res = _name("C/C=C/CO")      # (2E)-but-2-en-1-ol
+        assert res.name == "(2E)-but-2-en-1-ol"
+
+    def test_achiral_unchanged(self):
+        assert _name("CCO").name == "ethan-1-ol"
+
+    def test_ring_stereo_descriptor_present(self):
+        # trans-decalin-2-ol shape: engine cage name carries (..R/..S) block
+        mol, feats = _features("O[C@H]1CC[C@@H]2CCCC[C@H]2C1")
+        res = name_general_ring(mol, feats)
+        assert res is not None
+        assert res.name.startswith("(") and "bicyclo" in res.name
+        assert verify_certificate(mol, res).ok

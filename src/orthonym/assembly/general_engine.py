@@ -176,6 +176,16 @@ def _mult_prefix(n: int, name: str) -> Optional[str]:
             else f"{table[n]}{name}")
 
 
+def _stereo_prefix(mol, atom_to_locant) -> str:
+    """Parent-scope stereodescriptor block from STRUCTURE (rdCIPLabeler via
+    collect_stereodescriptors' idempotent guard). '' when achiral."""
+    from ..rules.stereochemistry import (
+        collect_stereodescriptors, format_stereodescriptor_string,
+    )
+    return format_stereodescriptor_string(
+        collect_stereodescriptors(mol, atom_to_locant))
+
+
 def _stem_block(mol, chain, atom_to_locant) -> Optional[Tuple[str, str]]:
     """(parent_token, hydride_block) e.g. ('but', 'but-2-ene') or
     ('hex', 'hexane'). None on an unsupported bond pattern."""
@@ -296,6 +306,10 @@ def _assemble(mol, features, chain, part) -> Optional[GeneralEngineResult]:
 
     # Prefix text abuts the stem directly ('3-ethyl-2,2-dimethylhexane').
     name = ('-'.join(prefix_parts) + body) if prefix_parts else body
+    # v25 G4: parent-scope stereo from structure (substituent-internal
+    # stereo is already handled inside name_substituent's stereo route).
+    name = _stereo_prefix(
+        mol, {a: atom_to_locant[a] for a in chain}) + name
     bindings.append(TokenBinding(tuple(chain), parent_token, 'parent'))
     return GeneralEngineResult(name=name, bindings=tuple(bindings))
 
@@ -428,6 +442,9 @@ def name_general_ring(mol, features) -> Optional[GeneralEngineResult]:
         name = joined + ('-' if head[:1].isdigit() else '') + core
     else:
         name = core
+
+    # v25 G4: parent-scope stereo from structure (VB locants).
+    name = _stereo_prefix(mol, atom_to_locant) + name
 
     bindings.append(TokenBinding(tuple(cage.cage_atoms), cage.descriptor,
                                  'parent'))
