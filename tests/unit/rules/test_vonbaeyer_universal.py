@@ -23,37 +23,37 @@ class TestSaturatedCages:
         assert len(cage.unsaturation["double_bonds"]) == 2
 
 
-class TestAromaticCages:
-    def test_naphthalene_five_enes(self):
-        cage = analyze_cage_universal(Chem.MolFromSmiles("c1ccc2ccccc2c1"))
-        assert cage is not None
-        assert cage.descriptor == "bicyclo[4.4.0]"
-        assert cage.total_atoms == 10
-        # kekulized naphthalene has exactly 5 ring double bonds
-        assert len(cage.unsaturation["double_bonds"]) == 5
+class TestMancudeRefused:
+    # v25 G5-A: von-Baeyer is non-PIN for mancude/aromatic systems; the engine
+    # fail-closes on them (their PIN is a fused/retained parent + added/indicated
+    # H, P-25/P-58.2.2, a future G5-B build). Emitting von-Baeyer polyene cages
+    # here ships non-PIN strings and — with oxo — invalid names (the caffeine
+    # oxo/ene valence-clash class).
+    @pytest.mark.parametrize("smi", [
+        "c1ccc2ccccc2c1",       # naphthalene
+        "c1ccc2[nH]cnc2c1",     # benzimidazole
+        "c1ccc2[nH]ccc2c1",     # indole
+        "C1CCc2ccccc2C1",       # tetralin (has an aromatic ring)
+        "O=c1cc2ccccc2[nH]1",   # a quinolinone-ish mancude oxo system
+    ])
+    def test_aromatic_cage_refused(self, smi):
+        assert analyze_cage_universal(Chem.MolFromSmiles(smi)) is None
 
-    def test_benzimidazole_diaza(self):
-        cage = analyze_cage_universal(Chem.MolFromSmiles("c1ccc2[nH]cnc2c1"))
-        assert cage is not None
-        assert cage.descriptor == "bicyclo[4.3.0]"
-        assert "diaza" in cage.hetero_prefix
-        # kekulized benzimidazole has 4 ring double bonds
-        assert len(cage.unsaturation["double_bonds"]) == 4
 
-    def test_indole_maps_to_original_indices(self):
-        mol = Chem.MolFromSmiles("c1ccc2[nH]ccc2c1")
+class TestSaturatedCageMappingDeterminism:
+    # index-mapping + determinism, exercised on a SATURATED cage (decalin) so it
+    # survives the G5-A mancude refusal above.
+    def test_decalin_maps_to_original_indices(self):
+        mol = Chem.MolFromSmiles("C1CCC2CCCCC2C1")
         cage = analyze_cage_universal(mol)
-        assert cage is not None
+        assert cage is not None and cage.is_mancude is False
         assert set(cage.cage_atoms) == set(range(mol.GetNumHeavyAtoms()))
         assert set(cage.atom_to_locant) == set(cage.cage_atoms)
         assert sorted(cage.atom_to_locant.values()) == list(
             range(1, len(cage.cage_atoms) + 1))
 
-
-class TestDeterminism:
     @pytest.mark.parametrize("spellings", [
-        ["c1ccc2ccccc2c1", "c1ccc2c(c1)cccc2", "C1=CC2=CC=CC=C2C=C1"],
-        ["c1ccc2[nH]cnc2c1", "c1nc2ccccc2[nH]1"],
+        ["C1CCC2CCCCC2C1", "C2CCC1CCCCC1C2", "C1CCC2CCCCC2C1"],
     ])
     def test_same_pieces_for_any_spelling(self, spellings):
         results = []

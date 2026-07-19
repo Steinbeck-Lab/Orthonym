@@ -36,6 +36,8 @@ class UniversalCage:
     cage_atoms: Tuple[int, ...]     # ORIGINAL mol indices
     atom_to_locant: Dict[int, int]  # ORIGINAL idx -> VB locant
     canon_match: Tuple[int, ...]    # canon idx -> orig idx
+    is_mancude: bool = False        # aromatic/mancude cage (always False here:
+                                    # mancude cages are refused, G5-A)
 
 
 def analyze_cage_universal(mol, cage_atoms=None) -> Optional[UniversalCage]:
@@ -105,6 +107,19 @@ def analyze_cage_universal(mol, cage_atoms=None) -> Optional[UniversalCage]:
 
     cage_orig = tuple(sorted(match[c] for c in cage_canon))
     atom_to_locant = {match[c]: loc for c, loc in desc.numbering.items()}
+
+    # v25 G5-A: von-Baeyer is the PIN only for genuinely SATURATED / non-mancude
+    # cages. A cage carrying an AROMATIC ring atom (original-mol perception) is
+    # mancude -- its PIN is a fused/retained parent (P-25) + added/indicated H
+    # (P-58.2.2), NOT a von-Baeyer polyene. Refuse (fail-closed); positive
+    # mancude naming is a future G5-B build. Isolated ring double bonds
+    # (norbornadiene) and saturated hetero cages (quinuclidine) are NOT aromatic
+    # -> still named. This is the whole-class fix for the caffeine oxo/ene
+    # valence-clash and the non-PIN-polyene defects (ledger SCOUT VERDICT).
+    if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in cage_orig):
+        logger.info("vonbaeyer_universal: mancude/aromatic cage -> refuse (G5-B)")
+        return None
+
     return UniversalCage(
         descriptor=desc.descriptor_string,
         total_atoms=desc.total_atoms,
