@@ -1874,6 +1874,11 @@ class Orthonym:
                     record_abstention(AbstentionCode.OTHER, detail=_limit.code)
                 if raise_on_limit and is_top_level_naming():
                     raise
+                # v25 G2 (opt-in): a raised limit bypassed the GENERAL-block
+                # engine wiring; give the engine its late, fully-gated shot.
+                _rec = self._try_general_engine_recovery(smiles)
+                if _rec is not None:
+                    return _rec
                 # Task 1.9: PIN fails closed; --trivial falls back to a
                 # general-only retained name when no PIN could be derived.
                 return self._apply_trivial_fallback(_limit.message, smiles)
@@ -1925,6 +1930,13 @@ class Orthonym:
             # is unchanged.
             if not (result and result.strip()):
                 result = _descriptive_fallback(smiles)
+            # v25 G2 (opt-in): a candidate suppressed by a downstream gate
+            # (SELF-01 / vetoes) left only the failure sentinel; give the
+            # engine its late, fully-gated shot before the failure ships.
+            if is_failure_name(result):
+                _rec = self._try_general_engine_recovery(smiles)
+                if _rec is not None:
+                    result = _rec
             # HYG-02: post-failure limit (opt-in). If naming produced no real
             # name, map the failure to a named code. Keyed off an actual failure
             # so it can never fire on a successfully-named compound.
@@ -1937,6 +1949,46 @@ class Orthonym:
             return self._apply_trivial_fallback(result, smiles)
         finally:
             end_naming_session()
+
+    def _try_general_engine_recovery(self, smiles: str) -> Optional[str]:
+        """v25 G2 (opt-in): late engine recovery for abstentions.
+
+        Covers the two flows the in-``_name_impl`` wiring cannot see:
+        (a) a handler raised a NamingLimit (e.g. UNSUPPORTED_RING_SYSTEM)
+        that bypassed the GENERAL block, and (b) a candidate name was
+        SUPPRESSED by a downstream gate (SELF-01 / vetoes) after
+        ``_name_impl`` returned. Re-perceives, runs the general engine,
+        and re-applies the SAME E1 + SELF-01 gates to the emission.
+        Returns a verified name or None; never raises (fail-closed).
+        Default OFF (``general_fallback=False``) -> byte-identical.
+        """
+        if not self._general_fallback:
+            return None
+        from .assembly.fragment_naming import is_top_level_naming
+        if not is_top_level_naming():
+            return None
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                return None
+            from .assembly.general_engine import name_general
+            from .validation.e1_certificate import verify_certificate
+            feats = self._perceive(
+                mol, smiles, Chem.MolToSmiles(mol, canonical=True))
+            self._classify(feats)
+            eng = name_general(mol, feats)
+            if eng is None or not verify_certificate(mol, eng).ok:
+                return None
+            cand = eng.name
+            if not self._disable_opsin_validity_gate:
+                cand = _final_opsin_validity_gate(
+                    cand, smiles, self._grammar_stats)
+            if cand and not is_failure_name(cand):
+                return cand
+        except Exception as e:  # fail-closed: keep the abstention
+            logger.info(
+                "general engine late recovery error (kept abstention): %s", e)
+        return None
 
     def _apply_trivial_fallback(self, result: str, smiles: str) -> str:
         """Task 1.9 (PIN-policy --trivial fallback).

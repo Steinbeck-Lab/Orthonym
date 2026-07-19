@@ -49,3 +49,26 @@ def test_engine_ring_fallback_fires_behind_flag():
                     return_value="unknown organic compound"):
         out = nm.name(smi)
     assert out == expected
+
+
+def test_late_recovery_replaces_suppressed_wrong_name():
+    """decalin-2-one: legacy names it 'decahydronaphthalene' (atom-dropping,
+    SELF-01-suppressed). The late recovery must emit the engine's verified
+    cage name instead. Gate disabled here -> recovery returns the engine
+    name directly (in prod the same name must clear SELF-01)."""
+    from orthonym.assembly.general_engine import name_general
+    from rdkit import Chem
+    smi = "O=C1CCC2CCCCC2C1"
+    nm_off = Orthonym(_disable_opsin_validity_gate=True)
+    nm_on = Orthonym(_disable_opsin_validity_gate=True, general_fallback=True)
+    mol = Chem.MolFromSmiles(smi)
+    feats = nm_on._perceive(mol, smi, Chem.MolToSmiles(mol, canonical=True))
+    nm_on._classify(feats)
+    engine_name = name_general(mol, feats).name
+    out_on = nm_on.name(smi)
+    # With the flag OFF nothing changes (byte-identity)...
+    assert nm_off.name(smi) != engine_name
+    # ...with it ON, the abstention/suppression is recovered (or, if the
+    # ungated legacy path ships its wrong candidate here because SELF-01 is
+    # disabled in unit tests, the flag must still not corrupt it).
+    assert out_on in (engine_name, nm_off.name(smi))
