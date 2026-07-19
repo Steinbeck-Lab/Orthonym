@@ -105,6 +105,26 @@ def analyze_cage_universal(mol, cage_atoms=None) -> Optional[UniversalCage]:
     hetero = get_heteroatom_replacement_prefix(kek, desc.numbering, cage_canon)
     unsat = get_polycyclic_unsaturation(kek, cage_canon, desc.numbering)
 
+    # v25 G5-A: cite each ring double bond with the von-Baeyer COMPOUND locant
+    # n(m) when its two atoms are NOT consecutively numbered (a fusion/bridge
+    # ene, e.g. octalin 1(6)); plain n when m == n+1. The bare min(n,m) model
+    # mislabels non-consecutive enes (and, adjacent to an oxo, fabricates the
+    # 5-bond-carbon valence clash). ``double_bond_pairs`` (raw (low,high) VB
+    # locants) is retained for the engine's valence guard. Scoped to THIS cage
+    # payload — the default polycyclic path is untouched (it uses ints directly).
+    _pairs = []
+    for _b in kek.GetBonds():
+        _i, _j = _b.GetBeginAtomIdx(), _b.GetEndAtomIdx()
+        if (_i in desc.numbering and _j in desc.numbering
+                and _b.GetBondTypeAsDouble() == 2.0):
+            _lo, _hi = sorted((desc.numbering[_i], desc.numbering[_j]))
+            _pairs.append((_lo, _hi))
+    _pairs.sort()
+    unsat['double_bond_pairs'] = _pairs
+    unsat['double_bonds'] = [
+        str(lo) if hi == lo + 1 else f"{lo}({hi})" for lo, hi in _pairs
+    ]
+
     cage_orig = tuple(sorted(match[c] for c in cage_canon))
     atom_to_locant = {match[c]: loc for c, loc in desc.numbering.items()}
 

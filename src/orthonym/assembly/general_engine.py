@@ -394,8 +394,10 @@ def name_general_ring(mol, features) -> Optional[GeneralEngineResult]:
     # (analyze_cage_universal), so this only guards a residual saturated
     # isolated-ene cage that also carries a ring ketone. Fail-closed.
     if suffix_core == 'one':
-        _ene = set(cage.unsaturation.get('double_bonds', ()))
-        if _ene & set(pg_locants):
+        # both endpoints of every ring double bond are termini a =O cannot share
+        _ene_termini = {loc for pair in cage.unsaturation.get('double_bond_pairs', ())
+                        for loc in pair}
+        if _ene_termini & set(pg_locants):
             return _refuse("ring ketone locant coincides with ring double bond "
                            "(valence)")
 

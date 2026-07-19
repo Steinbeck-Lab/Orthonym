@@ -76,3 +76,23 @@ class TestRefusals:
 
     def test_acyclic_refused(self):
         assert analyze_cage_universal(Chem.MolFromSmiles("CCCC")) is None
+
+
+class TestCompoundLocants:
+    # v25 G5-A: a ring double bond between non-consecutively-numbered atoms (a
+    # fusion/bridge ene, e.g. octalin's 1(6)) must be cited with the compound
+    # von-Baeyer locant n(m), NOT min(n,m) which mislabels it (and, next to an
+    # oxo, fabricates the caffeine-class valence clash).
+    def test_octalin_fusion_ene_compound_locant(self):
+        cage = analyze_cage_universal(Chem.MolFromSmiles("C1CCC2=C(C1)CCCC2"))
+        assert cage is not None
+        # emission label carries the compound locant
+        assert cage.unsaturation["double_bonds"] == ["1(6)"]
+        # the raw pair is available for the valence guard
+        assert cage.unsaturation["double_bond_pairs"] == [(1, 6)]
+
+    def test_consecutive_ene_plain_locant(self):
+        cage = analyze_cage_universal(Chem.MolFromSmiles("C1=CC2CCC1CC2"))
+        assert cage is not None
+        # bicyclo[2.2.2]oct-2-ene: 2-3 consecutive -> plain "2"
+        assert cage.unsaturation["double_bonds"] == ["2"]
