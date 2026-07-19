@@ -32,3 +32,16 @@ def test_engine_emission_is_t3_or_t4():
         assert row["tier"] in ("T3", "T4")
         assert row["is_pin"] is False
         assert "E1" in row["gates_passed"]
+
+
+def test_t5_row_carries_formula_and_reason():
+    nm = Orthonym(_disable_opsin_validity_gate=True)
+    row = nm.name_tiered("CC1C2C=CC1c1ccccc12")  # abstains with engine OFF
+    assert row["tier"] == "T5"
+    assert row["formula"] == "C12H12"
+    assert row["limit_code"]
+
+
+def test_non_t5_row_schema_stable():
+    row = Orthonym(_disable_opsin_validity_gate=True).name_tiered("CCO")
+    assert row["formula"] is None and row["limit_code"] is None

@@ -1991,9 +1991,22 @@ class Orthonym:
         source = prov["source"] or "pin_path"
         gate_active = (not self._disable_opsin_validity_gate
                        and _validity_gate_jar_present())
+        formula = None
+        limit_code = None
         if not name or is_failure_name(name):
             tier, is_pin, opsin = "T5", False, "n/a"
             source = prov["source"] or "abstain"
+            # v25 G4: descriptive last-resort row — the T5 residual is
+            # LABELED (formula + classified reason), never a bare unknown.
+            try:
+                _mol = Chem.MolFromSmiles(smiles)
+                if _mol is not None:
+                    from rdkit.Chem import rdMolDescriptors
+                    formula = rdMolDescriptors.CalcMolFormula(_mol)
+                    limit_code = classify_failure_limit(
+                        _mol, smiles=smiles).code
+            except Exception:
+                pass
         elif source == "general_engine":
             opsin = prov["opsin"] or ("verified" if gate_active
                                       else "unverified")
@@ -2011,7 +2024,8 @@ class Orthonym:
         if opsin == "verified":
             gates.append("SELF-01")
         return {"name": name, "tier": tier, "is_pin": is_pin,
-                "source": source, "opsin": opsin, "gates_passed": gates}
+                "source": source, "opsin": opsin, "gates_passed": gates,
+                "formula": formula, "limit_code": limit_code}
 
     def _try_general_engine_recovery(self, smiles: str) -> Optional[str]:
         """v25 G2 (opt-in): late engine recovery for abstentions.
