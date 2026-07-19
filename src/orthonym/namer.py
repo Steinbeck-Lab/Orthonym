@@ -1419,6 +1419,7 @@ class Orthonym:
                  enable_triviality_controller: bool = False,
                  enable_group_splitting: bool = False,
                  trivial_fallback: bool = False,
+                 general_fallback: bool = False,
                  _principal_group_override: Optional[str] = None):
         """
         Initialize namer.
@@ -1450,12 +1451,25 @@ class Orthonym:
                 (context resolution 3) this ALSO implies
                 ``enable_triviality_controller=True`` (one user intent:
                 "allow non-PIN trivial output").
+            general_fallback: v25 G1 opt-in. When True, a GENERAL-class
+                abstention is retried through the binding-carrying general
+                engine (assembly/general_engine.py), gated by the E1
+                certificate (validation/e1_certificate.py) and the existing
+                downstream moat (>15-HA gate, P10 vetoes, SELF-01). Default
+                False — default output byte-identical for existing callers.
         """
         self.style = style
         # Task 1.9 (PIN-policy): fallback-only opt-in. When True the name path
         # substitutes a general-only retained name for the "unknown organic
         # compound" failure signal; it never overrides a derived PIN.
         self._trivial_fallback: bool = trivial_fallback
+        # v25 G1: opt-in general-engine inline fallback (decision 3:
+        # PIN-strict default unchanged; lower tiers opt-in). When True, a
+        # GENERAL-class abstention is retried through the binding-carrying
+        # general engine (assembly/general_engine.py), gated by the E1
+        # certificate and the existing downstream moat. Default False ->
+        # default output byte-identical.
+        self._general_fallback: bool = general_fallback
         # SUB-03 (169.5): per-instance bypass for the OPSIN validity gate, used
         # by neutralize-recurse / fragment intermediate naming (those produce an
         # INTERMEDIATE name that is transformed downstream, not a final output,
@@ -2274,6 +2288,26 @@ class Orthonym:
                         confidence=1.0,
                         atom_to_locant=dict(features.atom_to_locant),
                     ))
+
+            # ============================================================
+            # v25 G1: general-engine inline fallback (OPT-IN, default OFF).
+            # Fires ONLY when the legacy GENERAL pipeline abstained, so the
+            # default PIN path stays byte-identical (v25 decision 3). An
+            # engine emission still re-enters the SAME downstream moat:
+            # the >15-HA coverage gate, the P10 source-vetoes, and the
+            # SELF-01 OPSIN-RT gate.
+            # ============================================================
+            if self._general_fallback and (not name or is_failure_name(name)):
+                from .assembly.general_engine import name_general_chain
+                from .validation.e1_certificate import verify_certificate
+                try:
+                    _eng = name_general_chain(mol, features)
+                    if _eng is not None and verify_certificate(mol, _eng).ok:
+                        name = _eng.name
+                except Exception as _e:  # fail-closed: an engine bug must
+                    # never turn an abstention into a crash or a wrong name.
+                    logger.info("general engine error (kept abstention): %s",
+                                _e)
 
         # ============================================================
         # Post-dispatch quality gates — preserved VERBATIM from v18
