@@ -87,21 +87,18 @@ from orthonym.assembly.general_engine import name_general, name_general_ring
 
 
 class TestRingNaming:
-    def test_tetralin_vonbaeyer_triene(self):
-        mol, feats = _features("C1CCc2ccccc2C1")
-        res = name_general_ring(mol, feats)
-        assert res is not None
-        assert res.name.startswith("bicyclo[4.4.0]deca-")
-        assert res.name.endswith("triene")
-        assert verify_certificate(mol, res).ok
-
-    def test_benzimidazole_diazabicyclo(self):
-        mol, feats = _features("c1ccc2[nH]cnc2c1")
-        res = name_general_ring(mol, feats)
-        assert res is not None
-        assert "diazabicyclo[4.3.0]nona-" in res.name
-        assert "tetraene" in res.name
-        assert verify_certificate(mol, res).ok
+    # v25 G5-A: mancude/aromatic ring systems fail-close (von-Baeyer is non-PIN
+    # for them; their PIN is a fused/retained parent + added/indicated H). This
+    # includes caffeine, whose von-Baeyer form was the OPSIN-invalid oxo/ene
+    # valence-clash name. Their real names come from the PIN path.
+    @pytest.mark.parametrize("smi", [
+        "C1CCc2ccccc2C1",                  # tetralin
+        "c1ccc2[nH]cnc2c1",                # benzimidazole
+        "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",    # caffeine (was invalid engine name)
+    ])
+    def test_mancude_ring_refused(self, smi):
+        mol, feats = _features(smi)
+        assert name_general_ring(mol, feats) is None
 
     def test_cage_with_suffix(self):
         # 2-decalone (bicyclo[4.4.0]decan-2-one shape): ring ketone
@@ -131,7 +128,7 @@ class TestDispatcher:
         assert name_general(mol, feats).name == "ethan-1-ol"
 
     def test_dispatch_ring(self):
-        mol, feats = _features("C1CCc2ccccc2C1")
+        mol, feats = _features("O=C1CCC2CCCCC2C1")  # decalinone: saturated cage
         res = name_general(mol, feats)
         assert res is not None and res.name.startswith("bicyclo")
 

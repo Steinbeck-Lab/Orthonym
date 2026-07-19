@@ -388,6 +388,17 @@ def name_general_ring(mol, features) -> Optional[GeneralEngineResult]:
                                 if i not in cage_set
                                 and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
 
+    # v25 G5-A defense-in-depth: a ring '-one' locant must never coincide with a
+    # ring double-bond locant -- that carbon would be both =ring and =O (the
+    # 5-bond-carbon / caffeine class). Mancude cages are already refused upstream
+    # (analyze_cage_universal), so this only guards a residual saturated
+    # isolated-ene cage that also carries a ring ketone. Fail-closed.
+    if suffix_core == 'one':
+        _ene = set(cage.unsaturation.get('double_bonds', ()))
+        if _ene & set(pg_locants):
+            return _refuse("ring ketone locant coincides with ring double bond "
+                           "(valence)")
+
     # --- substituent prefixes (generic ordered-atom discovery + recursion) ---
     ordered_cage = sorted(cage_set, key=lambda i: atom_to_locant[i])
     try:
