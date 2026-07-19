@@ -1420,6 +1420,7 @@ class Orthonym:
                  enable_group_splitting: bool = False,
                  trivial_fallback: bool = False,
                  general_fallback: bool = False,
+                 general_fallback_unverified: bool = False,
                  _principal_group_override: Optional[str] = None):
         """
         Initialize namer.
@@ -1470,6 +1471,10 @@ class Orthonym:
         # certificate and the existing downstream moat. Default False ->
         # default output byte-identical.
         self._general_fallback: bool = general_fallback
+        # v25 G3: T4 opt-in — ship an E1-passed engine name when OPSIN cannot
+        # verify it (absent jar / rejected / transient). A PARSED-but-
+        # MISMATCHED name is never shipped at any tier.
+        self._general_fallback_unverified: bool = general_fallback_unverified
         # SUB-03 (169.5): per-instance bypass for the OPSIN validity gate, used
         # by neutralize-recurse / fragment intermediate naming (those produce an
         # INTERMEDIATE name that is transformed downstream, not a final output,
@@ -1950,6 +1955,45 @@ class Orthonym:
         finally:
             end_naming_session()
 
+    def name_tiered(self, smiles: str) -> dict:
+        """v25 G3: name + honest tier/provenance labels (observation-only).
+
+        Returns ``{name, tier, is_pin, source, opsin, gates_passed}`` where
+        tier is T1 (PIN path) / T3 (engine or trivial-retained, RT-verified)
+        / T4 (engine, E1-only, unverified — requires the
+        ``general_fallback_unverified`` opt-in) / T5 (abstain). T2
+        (systematic-PIN certification) is reserved. Default construction
+        (no flags) keeps today's PIN-or-abstain behavior byte-identically.
+        """
+        from .metrics.provenance import clear_provenance, get_provenance
+        clear_provenance()
+        name = self.name(smiles)
+        prov = get_provenance()
+        source = prov["source"] or "pin_path"
+        gate_active = (not self._disable_opsin_validity_gate
+                       and _validity_gate_jar_present())
+        if not name or is_failure_name(name):
+            tier, is_pin, opsin = "T5", False, "n/a"
+            source = prov["source"] or "abstain"
+        elif source == "general_engine":
+            opsin = prov["opsin"] or ("verified" if gate_active
+                                      else "unverified")
+            tier = "T3" if opsin == "verified" else "T4"
+            is_pin = False
+        elif source == "trivial_retained":
+            tier, is_pin = "T3", False
+            opsin = "verified" if gate_active else "unverified"
+        else:
+            tier, is_pin = "T1", True
+            opsin = "verified" if gate_active else "unverified"
+        gates = []
+        if source == "general_engine":
+            gates.append("E1")
+        if opsin == "verified":
+            gates.append("SELF-01")
+        return {"name": name, "tier": tier, "is_pin": is_pin,
+                "source": source, "opsin": opsin, "gates_passed": gates}
+
     def _try_general_engine_recovery(self, smiles: str) -> Optional[str]:
         """v25 G2 (opt-in): late engine recovery for abstentions.
 
@@ -1980,10 +2024,32 @@ class Orthonym:
             if eng is None or not verify_certificate(mol, eng).ok:
                 return None
             cand = eng.name
-            if not self._disable_opsin_validity_gate:
-                cand = _final_opsin_validity_gate(
-                    cand, smiles, self._grammar_stats)
+            # v25 G3: explicit verification ladder. verified = OPSIN parsed
+            # the name AND it round-trips to the input structure. A parsed-
+            # but-MISMATCHED name is NEVER shipped, at any tier. Unverifiable
+            # (no jar / rejected / transient) ships ONLY behind the T4 opt-in.
+            opsin_status = "unverified"
+            if self._disable_opsin_validity_gate:
+                pass  # test/internal mode: ship unverified (G2 contract)
+            elif not _validity_gate_jar_present():
+                if not self._general_fallback_unverified:
+                    return None
+            else:
+                _opsin_smi = _validity_gate_name_to_smiles(cand)
+                if _opsin_smi is not None:
+                    try:
+                        _same = (Chem.CanonSmiles(_opsin_smi)
+                                 == Chem.CanonSmiles(smiles))
+                    except Exception:
+                        _same = False
+                    if not _same:
+                        return None  # wrong name: never ship
+                    opsin_status = "verified"
+                elif not self._general_fallback_unverified:
+                    return None  # rejected/transient without the T4 opt-in
             if cand and not is_failure_name(cand):
+                from .metrics.provenance import record_source
+                record_source("general_engine", opsin=opsin_status)
                 return cand
         except Exception as e:  # fail-closed: keep the abstention
             logger.info(
@@ -2015,7 +2081,11 @@ class Orthonym:
         from .data import get_general_retained_name
         canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
         trivial = get_general_retained_name(canonical_smiles)
-        return trivial if trivial else result
+        if trivial:
+            from .metrics.provenance import record_source
+            record_source("trivial_retained")
+            return trivial
+        return result
 
     def name_with_confidence(self, smiles: str) -> dict:
         """Generate IUPAC name with confidence metadata.
@@ -2356,6 +2426,10 @@ class Orthonym:
                     _eng = name_general(mol, features)
                     if _eng is not None and verify_certificate(mol, _eng).ok:
                         name = _eng.name
+                        # v25 G3: observation-only provenance (the emission
+                        # still flows through the normal downstream gates).
+                        from .metrics.provenance import record_source
+                        record_source("general_engine")
                 except Exception as _e:  # fail-closed: an engine bug must
                     # never turn an abstention into a crash or a wrong name.
                     logger.info("general engine error (kept abstention): %s",
