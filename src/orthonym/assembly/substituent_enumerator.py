@@ -708,6 +708,11 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
     try:
         _ri = mol.GetRingInfo()
         if any(_ri.NumAtomRings(a) > 0 for a in frag_atoms):
+            # v25 P0 Task 0.1: ring-bearing branch declined by every honest
+            # namer — the E2 recursive-namer census bucket.
+            from ..metrics.abstention import AbstentionCode, record_abstention
+            record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                              detail='enumerator_ring_fallback')
             return "substituent"
     except Exception:
         pass
@@ -827,6 +832,10 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
                     pass
 
     # Absolute last resort
+    # v25 P0 Task 0.1: no tier could express this branch.
+    from ..metrics.abstention import AbstentionCode, record_abstention
+    record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                      detail='enumerator_last_resort')
     return "substituent"
 
 

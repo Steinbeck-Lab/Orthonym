@@ -597,6 +597,9 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
         stats["self_consistency_suppressed"] = stats.get("self_consistency_suppressed", 0) + 1
     logger.warning("SELF-01 suppressed (different molecule): %r (opsin=%s)",
                    name[:80], opsin_smiles)
+    from .metrics.abstention import AbstentionCode, record_suppression
+    record_suppression(AbstentionCode.GATE_SUPPRESSED, detail='self01_mismatch',
+                       candidate=name)
     return _descriptive_fallback(smiles)
 
 
@@ -760,6 +763,9 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if stats is not None:
         stats["opsin_suppressed"] = stats.get("opsin_suppressed", 0) + 1
     logger.warning("OPSIN validity gate suppressed unparseable name: %r", name[:60])
+    from .metrics.abstention import AbstentionCode, record_suppression
+    record_suppression(AbstentionCode.GATE_SUPPRESSED, detail='opsin_unparseable',
+                       candidate=name)
     return _descriptive_fallback(smiles)
 
 
@@ -1771,6 +1777,14 @@ class Orthonym:
                 clear_pool()
             except Exception:
                 pass
+            # v25 P0 Task 0.1: reset the typed-abstention telemetry slot per
+            # top-level molecule (same invariant as the confidence/pool
+            # clears above). Side-effect-only — never changes a name.
+            try:
+                from .metrics.abstention import clear_abstention
+                clear_abstention()
+            except Exception:
+                pass
         # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
         # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
         # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
@@ -1791,6 +1805,9 @@ class Orthonym:
                     # silently dropped) — a wrong name the OPSIN validity gate cannot
                     # catch (it parses to the unlabeled structure; SELF-01 ignores
                     # isotopes). Accuracy-first: never emit a label-dropping name.
+                    from .metrics.abstention import AbstentionCode, record_abstention
+                    record_abstention(AbstentionCode.OTHER,
+                                      detail='isotope_decorator_failed')
                     end_naming_session()
                     return _descriptive_fallback(smiles)
         # --- W3-P09 (P-65.6.2.3.2): normalize a charge-imbalanced acid-salt
@@ -1828,6 +1845,19 @@ class Orthonym:
                 # signal propagated un-wrapped from the assembly layer.
                 if _limit.smiles is None:
                     _limit.smiles = smiles
+                # v25 P0 Task 0.1: a top-level ring-system refusal means the
+                # PARENT structure itself was declined (NO_PARENT); the same
+                # signal from a nested fragment frame is a BRANCH failure of
+                # the outer molecule. Other limit codes stay in the residual.
+                from .metrics.abstention import AbstentionCode, record_abstention
+                if _limit.code == 'UNSUPPORTED_RING_SYSTEM':
+                    record_abstention(
+                        AbstentionCode.NO_PARENT if is_top_level_naming()
+                        else AbstentionCode.BRANCH_UNNAMEABLE,
+                        detail=_limit.code,
+                    )
+                else:
+                    record_abstention(AbstentionCode.OTHER, detail=_limit.code)
                 if raise_on_limit and is_top_level_naming():
                     raise
                 # Task 1.9: PIN fails closed; --trivial falls back to a
@@ -1938,8 +1968,15 @@ class Orthonym:
         """
         from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
         from .assembly.coverage_scoring import retrieve_confidence, clear_confidence
+        from .metrics.abstention import (
+            AbstentionCode, abstention_code_for, clear_abstention,
+            record_abstention,
+        )
         start_naming_session()
         clear_confidence()
+        # v25 P0 Task 0.1: reset the typed-abstention slot (twin of name()).
+        if is_top_level_naming():
+            clear_abstention()
         try:
             try:
                 name = self._name_impl(smiles)
@@ -1948,14 +1985,26 @@ class Orthonym:
                 # descriptive-fallback name + the named limit code (no crash).
                 if _limit.smiles is None:
                     _limit.smiles = smiles
+                # v25 P0 Task 0.1: mirror name()'s classification of the
+                # limit signal (top-level ring refusal = NO_PARENT).
+                if _limit.code == 'UNSUPPORTED_RING_SYSTEM':
+                    record_abstention(
+                        AbstentionCode.NO_PARENT if is_top_level_naming()
+                        else AbstentionCode.BRANCH_UNNAMEABLE,
+                        detail=_limit.code,
+                    )
+                else:
+                    record_abstention(AbstentionCode.OTHER, detail=_limit.code)
                 # Task 1.9 (C8): apply trivial fallback here, mirroring name().
                 _fallback_name = self._apply_trivial_fallback(_limit.message, smiles)
+                _abst = abstention_code_for(_fallback_name)
                 return {
                     'name': _fallback_name,
                     'confidence': 0.0,
                     'factors': {},
                     'handler': 'fallback',
                     'limit': _limit.as_dict(),
+                    'abstention': _abst.value if _abst else None,
                 }
             # Universal stereo backstop (Phase 140, STER-16)
             if is_top_level_naming():
@@ -2013,6 +2062,11 @@ class Orthonym:
             # _apply_trivial_fallback is a no-op when trivial_fallback=False,
             # when called recursively, or when a real PIN was derived — safe.
             metadata['name'] = self._apply_trivial_fallback(metadata['name'], smiles)
+
+            # v25 P0 Task 0.1: typed abstention code (additive key; None for
+            # a successfully named molecule).
+            _abst = abstention_code_for(metadata['name'])
+            metadata['abstention'] = _abst.value if _abst else None
 
             return metadata
         finally:
@@ -2259,6 +2313,11 @@ class Orthonym:
                 is_garbled = True
 
             if is_garbled:
+                # v25 P0 Task 0.1: the downgrade machinery engaged — the
+                # assembled GENERAL name is being rejected (P2.1 bucket).
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.COVERAGE_DOWNGRADE,
+                                   detail='garbled', candidate=assembled)
                 from .decomposition import try_decompose
                 decomp_name = try_decompose(mol, style=self.style)
                 if decomp_name and decomp_name != assembled:
@@ -2283,6 +2342,10 @@ class Orthonym:
             if (conf_score is not None
                     and conf_handler != 'unknown'
                     and conf_score < _TRUNCATION_CONFIDENCE_THRESHOLD):
+                # v25 P0 Task 0.1: downgrade machinery engaged (P2.1 bucket).
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.COVERAGE_DOWNGRADE,
+                                   detail='low_confidence', candidate=assembled)
                 from .decomposition import try_decompose
                 decomp_name = try_decompose(mol, style=self.style)
                 if decomp_name and decomp_name != assembled:
@@ -2305,6 +2368,14 @@ class Orthonym:
                     # Verify molecule has cleavable bonds before triggering
                     from .decomposition.bond_cleavage import find_cleavable_bonds
                     if find_cleavable_bonds(mol):
+                        # v25 P0 Task 0.1: downgrade machinery engaged
+                        # (P2.1 bucket).
+                        from .metrics.abstention import (
+                            AbstentionCode, record_suppression,
+                        )
+                        record_suppression(AbstentionCode.COVERAGE_DOWNGRADE,
+                                           detail='low_atom_coverage',
+                                           candidate=assembled)
                         from .decomposition import try_decompose
                         decomp_name = try_decompose(mol, style=self.style)
                         if decomp_name and decomp_name != assembled:
@@ -2338,6 +2409,9 @@ class Orthonym:
         if name and result.class_id != StoutClass.ORGANOMETALLIC:
             from .perception.metals import has_covalent_metal_carbon_bond
             if has_covalent_metal_carbon_bond(mol):
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                                   detail='organometallic_veto', candidate=name)
                 return _descriptive_fallback(smiles)
 
         # ============================================================
@@ -2356,6 +2430,10 @@ class Orthonym:
         # legitimately owns is never mis-vetoed.
         if name and result.class_id == StoutClass.GENERAL:
             if _p4_oxoacid_anhydride_leak_motif(mol):
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                                   detail='oxoacid_anhydride_motif',
+                                   candidate=name)
                 return _descriptive_fallback(smiles)
 
         # ============================================================
@@ -2391,6 +2469,9 @@ class Orthonym:
             # over-veto; the charge is verified from the SHIPPED NAME's
             # suffix shape instead (see charge_dropped docstring).
             if charge_dropped(mol, name):
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                                   detail='charge_dropped', candidate=name)
                 return _descriptive_fallback(smiles)
             # R12-spillover veto: sp3-ring substituent silently dropped by
             # the partially-saturated fused-carbocycle emitter's downstream
@@ -2401,6 +2482,10 @@ class Orthonym:
             # gate needed since the check is a no-op unless
             # name_partially_saturated_carbocycle(mol) itself fires.
             if partial_sat_sp3_substituent_drop(mol, name):
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                                   detail='partial_sat_sp3_substituent_drop',
+                                   candidate=name)
                 return _descriptive_fallback(smiles)
             # W8-P6 Task 6.0: bare-monocyclic-name atom-drop veto. A fused/
             # bridged/spiro polycyclic (2+ SSSR rings sharing an atom) can
@@ -2409,6 +2494,10 @@ class Orthonym:
             # '(3R,4R)-cyclohexane', dropping the whole N-ring). See
             # fused_ring_atom_drop docstring.
             if fused_ring_atom_drop(mol, name):
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                                   detail='fused_ring_atom_drop',
+                                   candidate=name)
                 return _descriptive_fallback(smiles)
 
         # Orthonym is deterministic-rules-only (ADR-21-01, v21): there is no

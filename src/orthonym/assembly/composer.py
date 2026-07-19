@@ -6949,6 +6949,11 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # string assembly below — emit the honest fallback marker so the molecule
         # surfaces as unknown rather than crashing / dropping the ring.
         if base_name is None:
+            # v25 P0 Task 0.1: an unnameable ring BRANCH is the root cause of
+            # the eventual abstention (the E2 recursive-namer census bucket).
+            from ..metrics.abstention import AbstentionCode, record_abstention
+            record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                              detail='ring_substituent_unnameable')
             base_name = 'unknown'
 
         # Detect substituents on the ring itself
@@ -6960,6 +6965,11 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # molecule surfaces as unknown rather than dropping the branch atoms
         # (same convention as the unnameable-ring marker above).
         if sub_name is None:
+            # v25 P0 Task 0.1: decorated-ring branch the machinery cannot
+            # express — same census bucket as the unnameable-ring marker.
+            from ..metrics.abstention import AbstentionCode, record_abstention
+            record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                              detail='ring_substituent_branches_unnameable')
             sub_name = 'unknown'
 
         ring_sub_groups[sub_name].append(locant)

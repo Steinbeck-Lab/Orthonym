@@ -311,6 +311,10 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
             "CYCLE detected: smiles=%s already in visited set (size=%d)",
             smiles[:60], len(visited),
         )
+        # v25 P0 Task 0.1: fragment could not be named (cycle guard).
+        from ..metrics.abstention import AbstentionCode, record_abstention
+        record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                          detail='fragment_cycle')
         return None
 
     # Safety net: even without exact cycle, limit the recursion depth
@@ -327,6 +331,10 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
             if runtime_cache is not None:
                 runtime_cache[canonical] = fallback_name
             return fallback_name
+        # v25 P0 Task 0.1: fragment could not be named (depth safety net).
+        from ..metrics.abstention import AbstentionCode, record_abstention
+        record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                          detail='fragment_depth_limit')
         return None
 
     # Mark as in-progress, name it, then unmark
@@ -339,12 +347,20 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
             if runtime_cache is not None:
                 runtime_cache[canonical] = result
             return result
+        # v25 P0 Task 0.1: fragment could not be named (empty result).
+        from ..metrics.abstention import AbstentionCode, record_abstention
+        record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                          detail='fragment_failed')
         return None
     except Exception as e:
         logger.debug(
             "Fragment naming exception: smiles=%s error=%s",
             smiles[:60], e,
         )
+        # v25 P0 Task 0.1: fragment could not be named (exception).
+        from ..metrics.abstention import AbstentionCode, record_abstention
+        record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                          detail='fragment_exception')
         return None
     finally:
         visited.discard(canonical)
