@@ -60,26 +60,34 @@ def _refuse(reason: str) -> None:
     return None
 
 
+def _common_refusal(mol) -> Optional[str]:
+    """Engine-wide scope refusals shared by the chain and ring paths."""
+    if mol is None:
+        return "no mol"
+    if Chem.GetFormalCharge(mol) != 0:
+        return "net charge (G3 scope)"
+    if len(Chem.GetMolFrags(mol)) > 1:
+        return "multi-fragment (G3 scope)"
+    if any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return "radical"
+    if any(a.GetIsotope() for a in mol.GetAtoms()):
+        return "isotope"
+    return None
+
+
 def name_general_chain(mol, features) -> Optional[GeneralEngineResult]:
     """Name a chain-parented molecule with a full atom->token partition.
 
     Returns None on ANY condition outside the verified G1 scope.
     """
-    if mol is None:
-        return _refuse("no mol")
-    if Chem.GetFormalCharge(mol) != 0:
-        return _refuse("net charge (G3 scope)")
-    if len(Chem.GetMolFrags(mol)) > 1:
-        return _refuse("multi-fragment (G3 scope)")
-    if any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
-        return _refuse("radical")
-    if any(a.GetIsotope() for a in mol.GetAtoms()):
-        return _refuse("isotope")
+    reason = _common_refusal(mol)
+    if reason:
+        return _refuse(reason)
 
     ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
     chain = list(getattr(features, 'principal_chain', None) or ())
     if ring_atoms and not getattr(features, 'chain_is_parent', False):
-        return _refuse("ring parent (G2 scope)")
+        return _refuse("ring parent (ring path owns it)")
     if len(chain) < 2:
         return _refuse("chain too short")
     if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in chain):
@@ -290,3 +298,145 @@ def _assemble(mol, features, chain, part) -> Optional[GeneralEngineResult]:
     name = ('-'.join(prefix_parts) + body) if prefix_parts else body
     bindings.append(TokenBinding(tuple(chain), parent_token, 'parent'))
     return GeneralEngineResult(name=name, bindings=tuple(bindings))
+
+
+# Ring suffix forms (get_suffix(pg, is_ring=True) values) -- all carry locants
+# on a ring parent; 'appended' matches _build_parent_with_unsaturation types.
+_RING_SUFFIX_STYLES = {
+    'ol': 'inline', 'one': 'inline', 'amine': 'inline', 'thiol': 'inline',
+    'carboxylic acid': 'appended', 'carbaldehyde': 'appended',
+    'carbonitrile': 'appended', 'carboxamide': 'appended',
+}
+
+
+def name_general_ring(mol, features) -> Optional[GeneralEngineResult]:
+    """v25 G2: universal von-Baeyer ring-parent path (opt-in engine only)."""
+    from ..rules.vonbaeyer_universal import analyze_cage_universal
+    from ..rules.polycyclic import _build_parent_with_unsaturation
+    from ..rules.ring_selection import select_principal_ring_system
+    from ..rules.seniority import get_suffix
+    from .substituent_enumerator import discover_substituents, name_substituent
+
+    reason = _common_refusal(mol)
+    if reason:
+        return _refuse(reason)
+    ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    if not ring_atoms:
+        return _refuse("acyclic (chain path owns it)")
+    if getattr(features, 'chain_is_parent', False):
+        return _refuse("chain parent (chain path owns it)")
+
+    ring_systems = list(getattr(features, 'ring_systems', None) or [])
+    if ring_systems:
+        senior = select_principal_ring_system(mol, ring_systems)
+        cage_seed = set(senior) if senior else None
+    else:
+        cage_seed = None
+
+    cage = analyze_cage_universal(mol, cage_atoms=cage_seed)
+    if cage is None:
+        return _refuse("cage unanalyzable (monocycle/spiro/caps/kekulize)")
+
+    cage_set = set(cage.cage_atoms)
+    atom_to_locant = dict(cage.atom_to_locant)
+
+    # --- suffix (ring forms; every PG instance must touch the cage) ---
+    pg = getattr(features, 'principal_group', None)
+    pg_matches = list(getattr(features, 'principal_group_atoms', None) or [])
+    suffix_core = None
+    suffix_atoms: set = set()
+    pg_locants: List[int] = []
+    if pg:
+        suffix_core = get_suffix(pg, is_ring=True)
+        if suffix_core not in _RING_SUFFIX_STYLES:
+            return _refuse(f"unsupported ring suffix for pg={pg!r}")
+        seen = set()
+        for match in pg_matches:
+            key = tuple(sorted(match))
+            if key in seen:
+                continue
+            seen.add(key)
+            on_cage = [i for i in match if i in cage_set]
+            if on_cage:
+                loc = min(atom_to_locant[i] for i in on_cage)
+            else:
+                # appended suffix (e.g. -carboxylic acid): match sits fully
+                # off-cage; locant = the cage neighbor of any match atom.
+                nbrs = [n.GetIdx()
+                        for i in match
+                        for n in mol.GetAtomWithIdx(i).GetNeighbors()
+                        if n.GetIdx() in cage_set]
+                if not nbrs:
+                    return _refuse("PG instance not attached to cage")
+                loc = min(atom_to_locant[n] for n in nbrs)
+            pg_locants.append(loc)
+            suffix_atoms.update(i for i in match
+                                if i not in cage_set
+                                and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
+
+    # --- substituent prefixes (generic ordered-atom discovery + recursion) ---
+    ordered_cage = sorted(cage_set, key=lambda i: atom_to_locant[i])
+    try:
+        subs = discover_substituents(
+            mol, cage_set | suffix_atoms, parent_type='chain',
+            principal_chain=ordered_cage, atom_to_locant=atom_to_locant)
+    except AssertionError as e:
+        return _refuse(f"partition incomplete: {e}")
+
+    groups: Dict[str, List[int]] = {}
+    frag_bindings: List[TokenBinding] = []
+    for sub in subs:
+        frag = set(sub.frag_atoms)
+        attach_nbrs = [n.GetIdx() for n in
+                       mol.GetAtomWithIdx(sub.attach_mol_idx).GetNeighbors()
+                       if n.GetIdx() in frag]
+        if not attach_nbrs:
+            return _refuse("substituent without cage attachment")
+        prefix = name_substituent(mol, frag, attach_nbrs[0])
+        if not prefix or prefix == 'substituent':
+            return _refuse("branch unnameable (tier-5 fallback)")
+        groups.setdefault(prefix, []).append(sub.locant)
+        frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
+                                          'prefix'))
+
+    prefix_parts = []
+    for prefix in sorted(groups, key=_alpha_key):
+        locs = sorted(groups[prefix])
+        text = _mult_prefix(len(locs), prefix)
+        if text is None:
+            return _refuse("multiplicity beyond table")
+        prefix_parts.append(','.join(map(str, locs)) + '-' + text)
+
+    # --- parent block: hetero-prefix + descriptor + parent(+ene)(+suffix) ---
+    fg_suffix = None
+    bindings = frag_bindings
+    if suffix_core:
+        fg_suffix = {'suffix': suffix_core, 'locants': sorted(pg_locants),
+                     'type': _RING_SUFFIX_STYLES[suffix_core]}
+        if suffix_atoms:
+            bindings.append(TokenBinding(tuple(sorted(suffix_atoms)),
+                                         suffix_core, 'suffix'))
+    parent_block = _build_parent_with_unsaturation(
+        cage.total_atoms, cage.unsaturation, fg_suffix=fg_suffix)
+
+    # Hyphen glue (mirrors polycyclic.py:2830): a substituent prefix keeps its
+    # joining '-' only before a locant-initial hetero prefix.
+    core = cage.hetero_prefix + cage.descriptor + parent_block
+    if prefix_parts:
+        joined = '-'.join(prefix_parts)
+        head = cage.hetero_prefix or cage.descriptor
+        name = joined + ('-' if head[:1].isdigit() else '') + core
+    else:
+        name = core
+
+    bindings.append(TokenBinding(tuple(cage.cage_atoms), cage.descriptor,
+                                 'parent'))
+    return GeneralEngineResult(name=name, bindings=tuple(bindings))
+
+
+def name_general(mol, features) -> Optional[GeneralEngineResult]:
+    """v25 engine dispatcher: chain parent -> G1 path, ring parent -> G2 path."""
+    ring_atoms = any(a.IsInRing() for a in mol.GetAtoms()) if mol else False
+    if not ring_atoms or getattr(features, 'chain_is_parent', False):
+        return name_general_chain(mol, features)
+    return name_general_ring(mol, features)

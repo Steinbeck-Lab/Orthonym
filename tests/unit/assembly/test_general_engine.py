@@ -81,3 +81,56 @@ class TestChainNaming:
         res = _name("CC(Cl)CC")
         bound = sorted(i for b in res.bindings for i in b.atom_ids)
         assert bound == list(range(5))
+
+
+from orthonym.assembly.general_engine import name_general, name_general_ring
+
+
+class TestRingNaming:
+    def test_tetralin_vonbaeyer_triene(self):
+        mol, feats = _features("C1CCc2ccccc2C1")
+        res = name_general_ring(mol, feats)
+        assert res is not None
+        assert res.name.startswith("bicyclo[4.4.0]deca-")
+        assert res.name.endswith("triene")
+        assert verify_certificate(mol, res).ok
+
+    def test_benzimidazole_diazabicyclo(self):
+        mol, feats = _features("c1ccc2[nH]cnc2c1")
+        res = name_general_ring(mol, feats)
+        assert res is not None
+        assert "diazabicyclo[4.3.0]nona-" in res.name
+        assert "tetraene" in res.name
+        assert verify_certificate(mol, res).ok
+
+    def test_cage_with_suffix(self):
+        # 2-decalone (bicyclo[4.4.0]decan-2-one shape): ring ketone
+        mol, feats = _features("O=C1CCC2CCCCC2C1")
+        res = name_general_ring(mol, feats)
+        assert res is not None
+        assert "bicyclo[4.4.0]dec" in res.name
+        assert res.name.endswith("one")
+        assert verify_certificate(mol, res).ok
+
+    def test_cage_with_substituent_prefix(self):
+        # 2-methyldecalin
+        mol, feats = _features("CC1CCC2CCCCC2C1")
+        res = name_general_ring(mol, feats)
+        assert res is not None
+        assert "methylbicyclo[4.4.0]decane" in res.name
+        assert verify_certificate(mol, res).ok
+
+    def test_monocycle_refused(self):
+        mol, feats = _features("c1ccccc1")
+        assert name_general_ring(mol, feats) is None
+
+
+class TestDispatcher:
+    def test_dispatch_chain(self):
+        mol, feats = _features("CCO")
+        assert name_general(mol, feats).name == "ethan-1-ol"
+
+    def test_dispatch_ring(self):
+        mol, feats = _features("C1CCc2ccccc2C1")
+        res = name_general(mol, feats)
+        assert res is not None and res.name.startswith("bicyclo")
