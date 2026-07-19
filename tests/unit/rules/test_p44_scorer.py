@@ -143,3 +143,48 @@ class TestComparatorBlueBook:
         cmp = functools.cmp_to_key(
             lambda a, b: compare_parent_candidates(mol, a, b))
         assert sorted(pool, key=cmp) == sorted(sorted(pool, key=cmp), key=cmp)
+
+
+from orthonym.rules.p44_scorer import select_parent_unified
+
+
+class TestSelectParentUnified:
+    def test_signature_matches_legacy(self):
+        import inspect
+        from orthonym.rules.parent_selection import select_parent
+        assert (list(inspect.signature(select_parent_unified).parameters)
+                == list(inspect.signature(select_parent).parameters))
+
+    def test_heptylbenzene_ring_parent(self):
+        mol = Chem.MolFromSmiles("CCCCCCCc1ccccc1")
+        res = select_parent_unified(mol, _ring_systems(mol),
+                                    list(range(7)), None, [])
+        assert res.parent_type == "ring"
+        assert len(res.parent_atoms) == 6
+
+    def test_chain_pg_only_chain_parent_lists_ring_substituent(self):
+        mol = Chem.MolFromSmiles("OCCCc1ccccc1")
+        matches = list(mol.GetSubstructMatches(Chem.MolFromSmarts("[CX4][OX2H]")))
+        res = select_parent_unified(mol, _ring_systems(mol), [1, 2, 3],
+                                    "alcohol", matches)
+        assert res.parent_type == "chain"
+        assert len(res.substituent_rings) == 1
+
+    def test_single_carbon_ring_attached_stays_ring(self):
+        # benzaldehyde: PCG carbon bonded to ring -> ring parent (legacy rule)
+        mol = Chem.MolFromSmiles("O=Cc1ccccc1")
+        matches = list(mol.GetSubstructMatches(Chem.MolFromSmarts("[CX3H1]=O")))
+        res = select_parent_unified(mol, _ring_systems(mol), [1],
+                                    "aldehyde", matches)
+        assert res.parent_type == "ring"
+
+    def test_empty_chain_ring_parent(self):
+        mol = Chem.MolFromSmiles("c1ccccc1")
+        res = select_parent_unified(mol, _ring_systems(mol), [], None, [])
+        assert res.parent_type == "ring"
+
+    def test_reasoning_is_populated(self):
+        mol = Chem.MolFromSmiles("CCCCCCCc1ccccc1")
+        res = select_parent_unified(mol, _ring_systems(mol),
+                                    list(range(7)), None, [])
+        assert "P-44" in res.reasoning

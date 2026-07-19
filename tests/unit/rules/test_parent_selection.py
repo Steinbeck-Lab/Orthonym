@@ -1256,11 +1256,18 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # With skeletal chain integration, the 7-atom skeletal chain
-        # should beat the 6-atom ring via P-44.1(c)
-        assert result.parent_type == 'chain', (
-            f"Skeletal chain (7 atoms) should beat ring (6 atoms) via P-44.1(c). "
-            f"Got: {result.reasoning}"
+        # v25 G1 BB correction: the skeletal chain has only 2 bridging
+        # hetero units, below the P-51.4 replacement-nomenclature threshold
+        # (>= 4), so its heteroatoms are NOT expressible as skeleton and it
+        # ranks as a carbon chain. With PG counts tied and both skeletons
+        # carbon-class, P-44.1.2.2 (BB 19340; example BB 35011:
+        # 2-(7-oxoheptyl)cyclopentane-1-carbaldehyde PIN, ring 5 over
+        # chain 7) makes the RING senior regardless of length. The legacy
+        # length-first expectation (Phase 91.1) never produced an emitted
+        # name for this molecule (HEAD: OPSIN-unparseable -> suppressed).
+        assert result.parent_type == 'ring', (
+            f"P-44.1.2.2: ring senior on PG tie (sub-P-51.4 chain ranks as "
+            f"carbon). Got: {result.reasoning}"
         )
 
     def test_skeletal_chain_longer_with_more_heteroatoms(self):
@@ -1295,10 +1302,13 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # Skeletal chain (9) >> ring (6) -> chain should win
-        assert result.parent_type == 'chain', (
-            f"Skeletal chain (9 atoms) should beat ring (6 atoms). "
-            f"Got: {result.reasoning}"
+        # v25 G1 BB correction (see
+        # test_skeletal_chain_used_when_strictly_longer_and_contains_pg):
+        # 2 bridging hetero units < P-51.4 threshold -> carbon-class chain;
+        # PG tie -> P-44.1.2.2 ring senior regardless of length.
+        assert result.parent_type == 'ring', (
+            f"P-44.1.2.2: ring senior on PG tie (sub-P-51.4 chain ranks as "
+            f"carbon). Got: {result.reasoning}"
         )
 
     def test_skeletal_chain_ignored_when_pg_not_on_it(self):
@@ -1454,15 +1464,18 @@ class TestSkeletalChainCandidate:
             principal_group_atoms=pg_atoms
         )
 
-        # The reasoning should cite P-44.1 cascade, confirming it went
-        # through the cascade rather than a skeletal-chain shortcut.
-        assert result.parent_type == 'chain', (
-            f"Skeletal chain through cascade should select chain. "
-            f"Got: {result.reasoning}"
+        # v25 G1 BB correction: the skeletal candidate participates in the
+        # FULL unified P-44 comparison (no blind longer-chain shortcut --
+        # the Phase 91.1 lesson is preserved), and the comparison itself is
+        # now BB-faithful: sub-P-51.4 hetero chains rank as carbon, so the
+        # PG tie falls to P-44.1.2.2 ring seniority (BB 19340/35011).
+        assert result.parent_type == 'ring', (
+            f"P-44.1.2.2: ring senior on PG tie (sub-P-51.4 chain ranks as "
+            f"carbon). Got: {result.reasoning}"
         )
         assert 'P-44.1' in result.reasoning, (
-            f"Reasoning should cite P-44.1 cascade (not skeletal shortcut). "
-            f"Got: {result.reasoning}"
+            f"Reasoning should cite the P-44.1 comparator (not a skeletal "
+            f"shortcut). Got: {result.reasoning}"
         )
 
 
