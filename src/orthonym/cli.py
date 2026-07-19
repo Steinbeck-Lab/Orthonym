@@ -166,6 +166,17 @@ def main(args: List[str] = None) -> int:
             "instead of the bare name (v25 G3)."
         ),
     )
+    parser.add_argument(
+        "--engine-only",
+        dest="engine_only",
+        action="store_true",
+        default=False,
+        help=(
+            "DIAGNOSTIC (v25): bypass the PIN path and print the general "
+            "engine's raw emission (E1-audited, NOT OPSIN-RT-gated) or its "
+            "refusal reason. Never a PIN; for inspection/comparison only."
+        ),
+    )
 
     parsed = parser.parse_args(args)
 
@@ -266,6 +277,40 @@ def main(args: List[str] = None) -> int:
                 parsed, "enable_triviality_controller", False),
             "trivial_fallback": getattr(parsed, "trivial_fallback", False),
         }
+
+        # v25: --engine-only diagnostic branch (before the tier branch: a
+        # pure inspection surface, never a production emit path).
+        if getattr(parsed, "engine_only", False):
+            import json as _json
+            from rdkit import Chem as _Chem
+            from orthonym.namer import Orthonym
+            from orthonym.assembly.general_engine import name_general
+            from orthonym.validation.e1_certificate import verify_certificate
+            namer = Orthonym(style=parsed.style,
+                              _disable_opsin_validity_gate=True)
+            mol = _Chem.MolFromSmiles(parsed.smiles)
+            if mol is None:
+                print("Error: invalid SMILES", file=sys.stderr)
+                return 1
+            feats = namer._perceive(
+                mol, parsed.smiles, _Chem.MolToSmiles(mol, canonical=True))
+            namer._classify(feats)
+            res = name_general(mol, feats)
+            if res is None:
+                print(_json.dumps({
+                    "engine": "refused",
+                    "note": "fail-closed; see log for the refusal reason",
+                }))
+                return 0
+            verdict = verify_certificate(mol, res)
+            print(_json.dumps({
+                "engine": res.name,
+                "e1_ok": verdict.ok,
+                "e1_reason": verdict.reason,
+                "warning": "diagnostic output — E1-audited but NOT "
+                           "OPSIN-RT-gated; never a PIN",
+            }))
+            return 0
 
         # v25 G3: tiered-output branch. Constructs the namer directly (the
         # tier flags are namer-level), prints JSON with --provenance or the
