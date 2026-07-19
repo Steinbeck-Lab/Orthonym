@@ -74,19 +74,21 @@ def test_late_recovery_replaces_suppressed_wrong_name():
     assert out_on in (engine_name, nm_off.name(smi))
 
 
-def test_no_jar_requires_unverified_optin():
-    """methyl-benzonorbornadiene abstains even gate-free (UNSUPPORTED_RING_
-    SYSTEM raise); with the jar absent, T4 shipping needs the explicit
-    opt-in — plain general_fallback must keep the abstention."""
+def test_mancude_refused_regardless_of_optin_no_jar():
+    """Post-G5-A, an aromatic/mancude cage is refused by the engine, so neither
+    general_fallback nor general_fallback_unverified ships a von-Baeyer name for
+    it — even without the OPSIN jar (SELF-01 fails open). This is the safety win:
+    the invalid/non-PIN von-Baeyer polyene for aromatic systems no longer ships
+    in ANY mode. The real name comes from the PIN path."""
     from unittest import mock as _m
-    smi = "CC1C2C=CC1c1ccccc12"
+    smi = "CC1C2C=CC1c1ccccc12"  # methyl-benzonorbornadiene (aromatic ring)
     with _m.patch("orthonym.namer._validity_gate_jar_present",
                   return_value=False):
-        strict = Orthonym(general_fallback=True)
-        assert "tricyclo" not in (strict.name(smi) or "")
-        loose = Orthonym(general_fallback=True,
-                          general_fallback_unverified=True)
-        assert "tricyclo" in loose.name(smi)
+        for kw in ({"general_fallback": True},
+                   {"general_fallback": True,
+                    "general_fallback_unverified": True}):
+            out = Orthonym(**kw).name(smi) or ""
+            assert "tricyclo" not in out and "bicyclo" not in out
 
 
 def test_flag_propagates_into_recursion():
@@ -99,3 +101,34 @@ def test_flag_propagates_into_recursion():
     finally:
         general_fallback_ctx.reset(tok)
     assert "tricyclo" in out or out == "unknown organic compound"
+
+
+def test_best_effort_no_java_never_ships_valence_illegal():
+    """Even with the OPSIN jar absent (SELF-01 fails open) and best-effort ON,
+    a valence-illegal von-Baeyer name (a ring double-bond locant coinciding
+    with a dioxo/one locant -> 5-bond carbon, the caffeine class) must never
+    ship. Post-G5-A the engine already refuses the mancude entry; this asserts
+    the END-TO-END invariant holds via the Java-free source guard too."""
+    from unittest import mock as _m
+    smi = "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"  # caffeine
+    with _m.patch("orthonym.namer._validity_gate_jar_present",
+                  return_value=False):
+        out = Orthonym(general_fallback=True,
+                        general_fallback_unverified=True).name(smi)
+    bad = (out or "")
+    assert not ("bicyclo" in bad and "diene" in bad and "dioxo" in bad)
+
+
+def test_oxo_ene_valence_illegal_guard_unit():
+    from orthonym.perception.structure_conservation import (
+        oxo_ene_valence_illegal,
+    )
+    # caffeine-class: plain '1-ene' = bond 1-2, and 2-oxo -> C2 both =C and =O
+    assert oxo_ene_valence_illegal(
+        "2,4-dioxo-3,5,7,9-tetraazabicyclo[4.3.0]nona-1,7-diene") is True
+    # 2-oxo + 2-ene (bond 2-3): C2 both =O and =C
+    assert oxo_ene_valence_illegal("2-oxobicyclo[2.2.2]oct-2-ene") is True
+    # legal: oxo at 2, ene at 5(6) far away -> no shared carbon
+    assert oxo_ene_valence_illegal("2-oxobicyclo[4.4.0]dec-5(6)-ene") is False
+    assert oxo_ene_valence_illegal("bicyclo[4.4.0]decan-2-one") is False    # no ene
+    assert oxo_ene_valence_illegal("ethanol") is False

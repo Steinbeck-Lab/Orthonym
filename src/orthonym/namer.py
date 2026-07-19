@@ -2692,6 +2692,19 @@ class Orthonym:
                                    detail='fused_ring_atom_drop',
                                    candidate=name)
                 return _descriptive_fallback(smiles)
+            # v25 G5-A: Java-free valence guard — a von-Baeyer name that cites a
+            # ring carbon as BOTH a double-bond terminus AND an oxo/-one carbon
+            # is a 5-bond carbon (the caffeine oxo/ene class). SELF-01 catches it
+            # WITH a jar; this source-level check catches it WITHOUT one, so
+            # best-effort (T4) can never ship a valence-illegal name. Runs
+            # unconditionally (never gated on the jar), like the other P10 vetoes.
+            from .perception.structure_conservation import oxo_ene_valence_illegal
+            if oxo_ene_valence_illegal(name):
+                from .metrics.abstention import AbstentionCode, record_suppression
+                record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                                   detail='oxo_ene_valence_illegal',
+                                   candidate=name)
+                return _descriptive_fallback(smiles)
 
         # Orthonym is deterministic-rules-only (ADR-21-01, v21): there is no
         # ML fallback. The rule-based pipeline output is the final name.

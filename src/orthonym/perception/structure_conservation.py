@@ -361,6 +361,52 @@ def fused_ring_atom_drop(mol: Chem.Mol, name: str) -> bool:
     return False
 
 
+_ENE_RE = re.compile(r'-([0-9,()]+)-(?:di|tri|tetra|penta|hexa)?ene\b')
+# 'oxo' is a detachable prefix glued to the stem ('2-oxobicyclo…', '2,4-dioxo…'),
+# so there is NO word boundary after it -- match the multiplier + 'oxo', no \b.
+_OXO_PREFIX_RE = re.compile(r'\b([0-9,]+)-(?:di|tri|tetra|penta|hexa)?oxo')
+_ONE_SUFFIX_RE = re.compile(r'-([0-9,]+)-(?:di|tri|tetra|penta|hexa)?one\b')
+
+
+def _ene_termini(name: str) -> set:
+    """VB locants that carry a ring double bond in `name`. A plain locant ``n``
+    means the bond n=(n+1) -> termini {n, n+1}; a compound ``n(m)`` -> {n, m}."""
+    out: set = set()
+    for block in _ENE_RE.findall(name):
+        # block like "1,7" or "1(6),3" -- split on commas OUTSIDE parens
+        for tok in re.findall(r'\d+\(\d+\)|\d+', block):
+            m = re.match(r'(\d+)\((\d+)\)', tok)
+            if m:
+                out.update((int(m.group(1)), int(m.group(2))))
+            else:
+                n = int(tok)
+                out.update((n, n + 1))
+    return out
+
+
+def _oxo_locants(name: str) -> set:
+    out: set = set()
+    for block in _OXO_PREFIX_RE.findall(name) + _ONE_SUFFIX_RE.findall(name):
+        out.update(int(t) for t in re.findall(r'\d+', block))
+    return out
+
+
+def oxo_ene_valence_illegal(name: str) -> bool:
+    """v25 G5-A source-level (Java-free) valence guard.
+
+    True iff a ring carbon is cited as BOTH a ring double-bond terminus AND an
+    oxo/-one carbon -- a five-bond carbon (the caffeine-class
+    ``2,4-dioxo-...-1,7-diene`` invalid name). Pure string parse of the emitted
+    von-Baeyer locants; no RDKit/OPSIN. Runs unconditionally downstream so
+    best-effort is safe even when the OPSIN RT gate is unavailable (no jar).
+    Fail-closed on the cumulated-carbon edge (an oxo carbon truly cannot also
+    hold a ring double bond).
+    """
+    if not name or 'ene' not in name or ('oxo' not in name and 'one' not in name):
+        return False
+    return bool(_ene_termini(name) & _oxo_locants(name))
+
+
 __all__ = [
     "input_invariants",
     "net_formal_charge",
@@ -369,4 +415,5 @@ __all__ = [
     "charge_dropped",
     "partial_sat_sp3_substituent_drop",
     "fused_ring_atom_drop",
+    "oxo_ene_valence_illegal",
 ]
