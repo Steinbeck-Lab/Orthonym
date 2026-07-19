@@ -1993,6 +1993,50 @@ def name_ring_assembly(
     # branch, the P-28.3.1 citation-order tiebreak, and the prefix builder).
     substituent_list = _get_substituent_info(mol, ring_systems, connections)
 
+    # P-28.2.1 (connection/"free valence" locant) + P-31.1.4.3.4 (lowest
+    # locants to substituents): for a 2-component assembly, decide ONCE,
+    # deterministically, which physical ring system is UNPRIMED by
+    # first-point-of-difference on the COMBINED citation set the assembly
+    # actually uses -- connection locants first (tier 1, P-28.2.1), then
+    # substituent-prefix locants (tier 2, P-31.1.4.3.4). ``ring_systems``/
+    # ``connections`` order coming out of ``detect_ring_assembly`` is RDKit
+    # atom-index (SMILES-spelling) dependent, so without this the choice of
+    # which ring is "system 0" (unprimed) was non-deterministic AND, whenever
+    # a substituent broke the tie, sometimes wrong (a substituent on the ring
+    # that happened to land at index 1 was cited with a prime it should never
+    # carry -- "4'-chloro-1,1'-biphenyl" instead of the PIN
+    # "4-chloro-1,1'-biphenyl"). Mirrors the analogous heteroatom
+    # combined-locant-set tiebreak in ``_name_replacement_ring_assembly``
+    # (P-28.4.2), generalised from heteroatoms to substituents. Relabeling
+    # here -- BEFORE the connection string and substituent locants are built
+    # below -- keeps every downstream consumer (the connection-locant loop,
+    # the single-kind-suffix branch, the mixed prefix+suffix builder, and the
+    # plain substituent-prefix branch) automatically consistent: they all key
+    # off the same (now canonical) ``system_idx``.
+    if count == 2 and len(ring_systems) == 2:
+        def _combined_key(swap: bool):
+            conn_key = []
+            for a1, a2, s1, s2 in connections:
+                for atom, sys in ((a1, s1), (a2, s2)):
+                    eff_sys = (1 - sys) if swap else sys
+                    loc = _lookup_locant(
+                        per_system_locants, sys, atom, ring_systems[sys])
+                    conn_key.append((loc, eff_sys))
+            sub_key = []
+            for s in substituent_list:
+                eff_sys = (1 - s['system_idx']) if swap else s['system_idx']
+                sub_key.append((s['locant'], eff_sys))
+            return (sorted(conn_key), sorted(sub_key))
+
+        if _combined_key(True) < _combined_key(False):
+            ring_systems = [ring_systems[1], ring_systems[0]]
+            connections = [(a1, a2, 1 - s1, 1 - s2)
+                           for (a1, a2, s1, s2) in connections]
+            if per_system_locants is not None and len(per_system_locants) == 2:
+                per_system_locants = [per_system_locants[1], per_system_locants[0]]
+            for s in substituent_list:
+                s['system_idx'] = 1 - s['system_idx']
+
     # Sort connections by system indices to ensure consistent ordering.
     # For bi- assemblies: one connection -> "X,X'"
     # For ter- assemblies: two connections -> "X,X':X',X''"
@@ -2170,21 +2214,28 @@ def name_ring_assembly(
     # Sort substituents alphabetically by name
     substituent_list.sort(key=lambda s: alpha_sort_key(s['name']))
 
-    # Group identical substituents
-    sub_groups = {}
+    # Group identical substituents. Locant/prime pairs are collected as
+    # (locant, system_idx) keys -- NOT pre-formatted strings -- and sorted
+    # numerically (ascending locant, unprimed before primed at equal locant)
+    # before formatting. ``substituent_list`` iteration order upstream traces
+    # back to a Python-set walk over ring atoms in ``_get_substituent_info``,
+    # which is atom-index (SMILES-spelling) dependent; without this explicit
+    # sort, two chemically-identical substituents (e.g. both ring chloro
+    # atoms in 4,4'-dichlorobiphenyl) could be cited in either order,
+    # producing non-deterministic "4,4'-dichloro-..." vs "4',4-dichloro-..."
+    # output for the same molecule.
+    sub_groups: Dict[str, List[Tuple[int, int]]] = {}
     for sub in substituent_list:
         name = sub['name']
-        if name not in sub_groups:
-            sub_groups[name] = []
-        prime = _format_prime(sub['system_idx'])
-        sub_groups[name].append(f"{sub['locant']}{prime}")
+        sub_groups.setdefault(name, []).append((sub['locant'], sub['system_idx']))
 
     # Build prefix parts
     prefix_parts = []
     for name in sorted(sub_groups.keys(), key=alpha_sort_key):
-        locants = sub_groups[name]
-        n = len(locants)
-        locant_str = ",".join(str(l) for l in locants)
+        keys = sorted(sub_groups[name])
+        n = len(keys)
+        locant_str = ",".join(
+            f"{loc}{_format_prime(sys_idx)}" for loc, sys_idx in keys)
         if n > 1:
             mult = get_multiplier_prefix(n, name)
             prefix_parts.append(f"{locant_str}-{mult}{name}")
