@@ -1804,6 +1804,15 @@ class Orthonym:
                 clear_abstention()
             except Exception:
                 pass
+            # v25 G3: publish the engine flag so fragment/component recursion
+            # (name_compound builds FRESH namers) inherits it. Top-level only;
+            # reset in the finally below.
+            try:
+                from .metrics.provenance import general_fallback_ctx
+                self._gf_ctx_token = general_fallback_ctx.set(
+                    self._general_fallback)
+            except Exception:
+                self._gf_ctx_token = None
         # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
         # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
         # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
@@ -1953,6 +1962,16 @@ class Orthonym:
             # retained name when the systematic pipeline derived no PIN.
             return self._apply_trivial_fallback(result, smiles)
         finally:
+            # v25 G3: unwind the propagation ctx published above (top-level
+            # sessions only set a token; nested calls leave it None).
+            _tok = getattr(self, '_gf_ctx_token', None)
+            if _tok is not None:
+                try:
+                    from .metrics.provenance import general_fallback_ctx
+                    general_fallback_ctx.reset(_tok)
+                except Exception:
+                    pass
+                self._gf_ctx_token = None
             end_naming_session()
 
     def name_tiered(self, smiles: str) -> dict:
@@ -3583,6 +3602,8 @@ def name_compound(smiles: str, style: str = "pin",
                    enable_triviality_controller: bool = False,
                    enable_group_splitting: bool = False,
                    trivial_fallback: bool = False,
+                   general_fallback: Optional[bool] = None,
+                   general_fallback_unverified: bool = False,
                    raise_on_limit: bool = False):
     """
     Convenience function to generate IUPAC name from SMILES.
@@ -3616,11 +3637,23 @@ def name_compound(smiles: str, style: str = "pin",
         >>> name_compound("CCO", include_confidence=True)
         {'name': 'ethanol', 'confidence': 1.0, ...}
     """
+    # v25 G3: inherit the engine flag from the propagation ctx when the
+    # caller didn't say — fragment/component recursion re-enters through
+    # here with a FRESH namer, and the top-level opt-in must carry through.
+    if general_fallback is None:
+        try:
+            from .metrics.provenance import general_fallback_ctx
+            general_fallback = general_fallback_ctx.get()
+        except Exception:
+            general_fallback = False
+
     namer = Orthonym(
         style=style,
         enable_triviality_controller=enable_triviality_controller,
         enable_group_splitting=enable_group_splitting,
         trivial_fallback=trivial_fallback,
+        general_fallback=general_fallback,
+        general_fallback_unverified=general_fallback_unverified,
     )
 
     if include_confidence:

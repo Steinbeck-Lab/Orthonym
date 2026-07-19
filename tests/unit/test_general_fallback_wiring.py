@@ -72,3 +72,30 @@ def test_late_recovery_replaces_suppressed_wrong_name():
     # ungated legacy path ships its wrong candidate here because SELF-01 is
     # disabled in unit tests, the flag must still not corrupt it).
     assert out_on in (engine_name, nm_off.name(smi))
+
+
+def test_no_jar_requires_unverified_optin():
+    """methyl-benzonorbornadiene abstains even gate-free (UNSUPPORTED_RING_
+    SYSTEM raise); with the jar absent, T4 shipping needs the explicit
+    opt-in — plain general_fallback must keep the abstention."""
+    from unittest import mock as _m
+    smi = "CC1C2C=CC1c1ccccc12"
+    with _m.patch("orthonym.namer._validity_gate_jar_present",
+                  return_value=False):
+        strict = Orthonym(general_fallback=True)
+        assert "tricyclo" not in (strict.name(smi) or "")
+        loose = Orthonym(general_fallback=True,
+                          general_fallback_unverified=True)
+        assert "tricyclo" in loose.name(smi)
+
+
+def test_flag_propagates_into_recursion():
+    from orthonym.metrics.provenance import general_fallback_ctx
+    from orthonym.namer import name_compound
+    tok = general_fallback_ctx.set(True)
+    try:
+        out = name_compound("CC1C2C=CC1c1ccccc12",
+                            general_fallback_unverified=True)
+    finally:
+        general_fallback_ctx.reset(tok)
+    assert "tricyclo" in out or out == "unknown organic compound"

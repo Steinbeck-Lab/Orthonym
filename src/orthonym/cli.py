@@ -141,8 +141,34 @@ def main(args: List[str] = None) -> int:
         ),
     )
 
+    # v25 G3: confidence-tiered output surface. Default 'pin' is the
+    # existing PIN-or-abstain behavior byte-identically; 'valid' adds
+    # RT-verified general-engine names (T3); 'best-effort' additionally
+    # ships E1-certified names OPSIN could not verify (T4). No tier ever
+    # ships a name OPSIN parsed to a DIFFERENT structure.
+    parser.add_argument(
+        "--emit-tier",
+        dest="emit_tier",
+        choices=["pin", "valid", "best-effort"],
+        default="pin",
+        help=(
+            "Output tier (v25): pin (default, PIN-or-abstain), valid "
+            "(adds RT-verified general-engine names), best-effort (adds "
+            "E1-certified but OPSIN-unverified names)."
+        ),
+    )
+    parser.add_argument(
+        "--provenance",
+        action="store_true",
+        default=False,
+        help=(
+            "Emit {name,tier,is_pin,source,opsin,gates_passed} JSON "
+            "instead of the bare name (v25 G3)."
+        ),
+    )
+
     parsed = parser.parse_args(args)
-    
+
     # Batch processing mode
     if parsed.batch:
         return _process_batch(parsed.batch, parsed.output, parsed.style,
@@ -240,6 +266,30 @@ def main(args: List[str] = None) -> int:
                 parsed, "enable_triviality_controller", False),
             "trivial_fallback": getattr(parsed, "trivial_fallback", False),
         }
+
+        # v25 G3: tiered-output branch. Constructs the namer directly (the
+        # tier flags are namer-level), prints JSON with --provenance or the
+        # bare name otherwise. Dispatches before the legacy branches so the
+        # default (--emit-tier pin, no --provenance) path below stays
+        # byte-identical.
+        _emit_tier = getattr(parsed, "emit_tier", "pin")
+        if _emit_tier != "pin" or parsed.provenance:
+            import json as _json
+            from orthonym.namer import Orthonym
+            namer = Orthonym(
+                style=parsed.style,
+                enable_triviality_controller=name_kwargs[
+                    "enable_triviality_controller"],
+                trivial_fallback=name_kwargs["trivial_fallback"],
+                general_fallback=(_emit_tier != "pin"),
+                general_fallback_unverified=(_emit_tier == "best-effort"),
+            )
+            row = namer.name_tiered(parsed.smiles)
+            if parsed.provenance:
+                print(_json.dumps(row))
+            else:
+                print(row["name"])
+            return 0
 
         if parsed.confidence:
             result = name_compound(parsed.smiles, style=parsed.style,
