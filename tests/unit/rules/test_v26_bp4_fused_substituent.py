@@ -146,15 +146,20 @@ class TestBP4Phase2Polycomponent:
 
 
 class TestBP4Phase3PartialSaturation:
-    """Phase 3 slice: partially-saturated 2-component ortho-fused pairs named as
-    '<locants>-dihydro-<mancude parent>' (P-31.1.4). Even sp3-carbon count only;
-    the mancude-symmetry automorphism tie-break takes the lowest hydro locants
-    (P-31.1.4.3.4). Each PIN verified this session to OPSIN round-trip."""
+    """Phase 3 (full): partially-saturated 2-component ortho-fused pairs named as
+    '<hydro>-<indicatedH>-<mancude parent>' (P-25.7.1.1 / P-14.4 / P-58.2). The
+    maximum number of noncumulative double bonds is placed into the saturated
+    region (a maximum matching of the saturated-carbon subgraph); unmatched
+    carbons are indicated hydrogen, each matched pair is one unit of hydro. Covers
+    even counts (0 indicated H, byte-identical to the former slice), odd counts
+    (indicated-H + hydro mix), saturated ring chalcogens, and prefix substituents.
+    Each PIN verified this session to OPSIN round-trip."""
 
     @pytest.mark.parametrize("smiles,expected", [
+        # even sp3 count, 0 indicated H (byte-identical to the former slice):
         # symmetric mancude parent (furo[3,2-b]furan): 2,3 beats the RT-valid 5,6
         ("C1COc2ccoc21", "2,3-dihydrofuro[3,2-b]furan"),
-        ("C1Cc2ccoc2O1", "2,3-dihydrofuro[2,3-b]furan"),   # was `unknown` pre-Phase 3
+        ("C1Cc2ccoc2O1", "2,3-dihydrofuro[2,3-b]furan"),
         ("O1CCc2sccc21", "2,3-dihydrothieno[3,2-b]furan"),
         ("C1COc2ccsc21", "2,3-dihydrothieno[3,2-b]furan"),
     ])
@@ -162,19 +167,53 @@ class TestBP4Phase3PartialSaturation:
         mol = Chem.MolFromSmiles(smiles)
         assert _try_algorithmic_fusion_name(mol) == expected
 
-    @pytest.mark.parametrize("smiles", [
-        "C1CCc2ccoc2O1",   # 5-6 fused, ODD sp3 count -> indicated-H mix, deferred
-        "C1CCOc2ccoc21",
+    @pytest.mark.parametrize("smiles,expected", [
+        # case (a): ODD sp3 count = indicated-H (lowest locant, P-58.2.1.2) + hydro
+        ("C1CCc2ccoc2O1", "5,6-dihydro-4H-furo[2,3-b]pyran"),
+        ("C1CCOc2ccoc21", "6,7-dihydro-5H-furo[3,2-b]pyran"),
+        ("O1CCCc2ccoc21", "5,6-dihydro-4H-furo[2,3-b]pyran"),
+        ("O1CCCc2occc21", "6,7-dihydro-5H-furo[3,2-b]pyran"),
     ])
-    def test_odd_saturation_defers(self, smiles):
-        """An odd sp3 count implies the mancude parent carries indicated H
-        (2H + dihydro): the slice fails closed and the legacy path takes over
-        (never a wrong structure — SELF-01 suppresses any non-round-trip)."""
+    def test_odd_saturation_indicated_h_mix(self, smiles, expected):
+        assert _try_algorithmic_fusion_name(Chem.MolFromSmiles(smiles)) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # case (b): a saturated ring S/Se is an inherent ring atom, not a hydro pos
+        ("C1Cc2ccoc2S1", "4,5-dihydrothieno[2,3-b]furan"),
+        ("C1Cc2ccoc2[Se]1", "4,5-dihydroselenopheno[2,3-b]furan"),
+    ])
+    def test_saturated_chalcogen_ring(self, smiles, expected):
+        assert _try_algorithmic_fusion_name(Chem.MolFromSmiles(smiles)) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # case (c): prefix-substituted partial saturation
+        ("O1CCCc2cc(C)oc21", "2-methyl-5,6-dihydro-4H-furo[2,3-b]pyran"),
+        ("O1CC(C)Cc2ccoc21", "5-methyl-5,6-dihydro-4H-furo[2,3-b]pyran"),
+        ("CC1CCc2ccoc21", "6-methyl-5,6-dihydro-4H-cyclopenta[b]furan"),
+        ("Cc1cc2c(o1)CCC(C)O2", "2,5-dimethyl-6,7-dihydro-5H-furo[3,2-b]pyran"),
+    ])
+    def test_substituted_partial_saturation(self, smiles, expected):
+        assert _try_algorithmic_fusion_name(Chem.MolFromSmiles(smiles)) == expected
+
+    @pytest.mark.parametrize("smiles", [
+        "O=C1CCc2ccoc21",          # oxo suffix
+        "O1CCCc2cc(C(=O)O)oc21",   # carboxylic-acid suffix
+    ])
+    def test_suffix_group_fails_closed(self, smiles):
+        """A suffix-forming group needs P-58.2.2 added indicated H (out of scope):
+        _try_partial_saturation_name declines (the legacy path then owns it)."""
+        from orthonym.rules.fused_rings import (
+            _try_partial_saturation_name, get_shared_atoms,
+        )
+        from orthonym.rules.fusion_descriptors import (
+            generate_systematic_name_for_fused_pair,
+        )
         mol = Chem.MolFromSmiles(smiles)
-        # the dihydro slice itself declines
-        from orthonym.rules.fused_rings import _try_partial_saturation_name
-        ra = _ring_atoms(mol)
-        assert _try_partial_saturation_name(mol, ra, "furo[3,2-b]pyran") is None
+        r = mol.GetRingInfo().AtomRings()
+        desc = generate_systematic_name_for_fused_pair(
+            mol, list(r[0]), list(r[1]), get_shared_atoms(mol, r[0], r[1]))
+        assert _try_partial_saturation_name(
+            mol, set(r[0]) | set(r[1]), desc) is None
 
     def test_fully_aromatic_not_treated_as_partial(self):
         """A fully-mancude system must NOT enter the hydro path."""

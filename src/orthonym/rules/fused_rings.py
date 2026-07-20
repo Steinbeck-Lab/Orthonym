@@ -317,85 +317,187 @@ def _select_substituent_numbering(mol, ring_atom_set: Set[int]):
     return best[2], best[3]
 
 
+def _ring_double_bond(atom, ring_set) -> bool:
+    """True iff ``atom`` has a ring double bond to another ring atom."""
+    return any(
+        b.GetBondType() == Chem.BondType.DOUBLE
+        and b.GetOtherAtom(atom).GetIdx() in ring_set
+        for b in atom.GetBonds()
+    )
+
+
+def _perfect_matching(nodes: frozenset, adj) -> bool:
+    """True iff the induced subgraph on ``nodes`` has a perfect matching.
+    Recursive; ``nodes`` is the tiny saturated-carbon set of a 2-ring system."""
+    if not nodes:
+        return True
+    v = min(nodes)
+    for w in adj[v]:
+        if w in nodes and _perfect_matching(nodes - {v, w}, adj):
+            return True
+    return False
+
+
+def _saturation_indicated_h_sets(sat_atoms, adj):
+    """P-25.7.1.1: put the MAX number of noncumulative double bonds into the
+    saturated region (a maximum matching of the saturated-carbon subgraph). The
+    atoms left UNMATCHED are indicated hydrogen; each matched pair is one unit of
+    hydro. Returns every minimum-size unmatched-atom set (frozensets) so the
+    caller can pick the one giving the lowest indicated-H locants (P-58.2.1.2);
+    ``[]`` if the subgraph admits no matching at the required parity."""
+    from itertools import combinations
+    n = len(sat_atoms)
+    base = frozenset(sat_atoms)
+    for u in range(n % 2, n + 1, 2):          # u has the parity of n
+        good = [frozenset(S) for S in combinations(sat_atoms, u)
+                if _perfect_matching(base - set(S), adj)]
+        if good:
+            return good                        # first non-empty = min unmatched = max matching
+    return []
+
+
 def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: str):
-    """BP-4 Phase 3: name a partially-saturated 2-component ortho-fused mancude
-    system as ``<locants>-<multiplier>hydro-<mancude parent>`` (P-31.1.4).
+    """BP-4 Phase 3 (full): name a partially-saturated 2-component ortho-fused
+    mancude system as ``<hydro>-<indicatedH>-<mancude parent>`` (P-25.7.1.1 /
+    P-14.4 / P-58.2), bare or prefix-substituted.
 
     Returns the name or ``None`` (fail closed). On ``None`` the caller keeps its
     legacy indicated-H behaviour, so this can only ADD coverage or UPGRADE a
     round-trip-valid non-PIN name to the PIN — never regress.
 
-    Slice scope (everything else fails closed):
-      * every saturated (sp3) ring atom is a CARBON — heteroatom saturation
-        (e.g. an -NH- position) interacts with indicated hydrogen, deferred;
-      * an EVEN number of sp3 carbons — each ring double bond removed from the
-        mancude parent saturates a PAIR of atoms; an odd count implies the
-        mancude parent itself carries indicated hydrogen (e.g. 2H + dihydro),
-        deferred;
-      * BARE parent (no exocyclic substituents) — the hydro/substituent
-        low-locant + alphanumeric interplay is a later refinement;
+    Scope (everything else fails closed):
+      * saturated positions are sp3 ring CARBONS; a benign divalent ring
+        chalcogen (O/S/Se/Te, 2 ring bonds, 0 H, neutral, no ring double bond)
+        is an inherent ring atom, not a hydro position (unlocks the saturated
+        S/Se ring). A genuinely saturated sp3 NITROGEN or a charged/hypervalent
+        ring atom interacts with pyrrole-type indicated hydrogen -> deferred.
+      * The maximum number of noncumulative double bonds is placed into the
+        saturated region (a maximum matching of the saturated-carbon subgraph,
+        P-25.7.1.1); the UNMATCHED carbons are indicated hydrogen, each matched
+        pair is one unit of hydro. This covers even counts (0 indicated H,
+        BYTE-IDENTICAL to the former slice) and odd counts (indicated-H + hydro
+        mix, e.g. ``5,6-dihydro-4H-...``).
+      * Prefix-only substituents are placed via the Phase-1 machinery; a
+        SUFFIX-forming group (oxo/amino/acid/...) needs P-58.2.2 added indicated
+        hydrogen -> deferred.
       * ``compute_fused_numbering`` yields a determinate numbering.
 
-    Hydro locants take the lowest set consistent with the fixed P-25.3.3 ring
-    numbering (P-31.1.4.3.4) via the ring-system automorphism tie-break. If the
-    result is non-PIN (a symmetric mancude parent whose saturated ring lands on
-    the higher-locant side), it still round-trips and the SELF-01 gate keeps
-    accuracy intact.
+    Locants follow P-14.4: lowest to indicated H (b), then hydro/'ene' (e), then
+    detachable prefixes (f); ties broken over the mancude-skeleton automorphisms
+    (P-58.2.1.2 / P-31.1.4.3.4). A produced valid-but-non-PIN numbering still
+    round-trips and the SELF-01 gate keeps accuracy intact.
     """
-    sp3 = [
-        a for a in ring_atom_set
-        if not mol.GetAtomWithIdx(a).GetIsAromatic()
-        and mol.GetAtomWithIdx(a).GetHybridization() == Chem.HybridizationType.SP3
-    ]
-    if not sp3:
-        return None  # fully mancude -> not this path
-    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in sp3):
-        return None  # heteroatom saturation -> indicated-H interaction, defer
-    mult = {2: 'di', 4: 'tetra', 6: 'hexa', 8: 'octa', 10: 'deca'}.get(len(sp3))
-    if mult is None:
-        return None  # odd count (indicated-H mix) or >10 -> defer
-    # BARE only for this slice.
-    if any(a.GetIdx() not in ring_atom_set and a.GetAtomicNum() != 1
-           for a in mol.GetAtoms()):
+    if not mancude_parent:
+        return None
+
+    # --- 1. Saturated-carbon set + heteroatom validation (case b enabler) ---
+    SP3 = Chem.HybridizationType.SP3
+    sat = []
+    for a in ring_atom_set:
+        at = mol.GetAtomWithIdx(a)
+        if at.GetIsAromatic():
+            continue
+        if at.GetHybridization() != SP3:        # SP2/SP -> remaining unsaturation
+            continue
+        sym = at.GetSymbol()
+        if sym == 'C':
+            sat.append(a)
+            continue
+        ring_deg = sum(1 for b in at.GetBonds()
+                       if b.GetOtherAtom(at).GetIdx() in ring_atom_set)
+        if (sym in ('O', 'S', 'Se', 'Te') and ring_deg == 2
+                and at.GetTotalNumHs() == 0 and at.GetFormalCharge() == 0
+                and not _ring_double_bond(at, ring_atom_set)):
+            continue                            # benign divalent chalcogen -> not a hydro pos
+        return None                             # saturated N / charged / hypervalent -> defer
+    if not sat:
+        return None                             # fully mancude -> legacy/aromatic path
+
+    # --- 2. Max-double-bond partition: indicated H (unmatched) vs hydro (matched) ---
+    adj = {a: set() for a in sat}
+    for a in sat:
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() in adj:
+                adj[a].add(nb.GetIdx())
+    ih_sets = _saturation_indicated_h_sets(sat, adj)
+    if not ih_sets:
         return None
 
     from .fusion_numbering import compute_fused_numbering
     canonical = compute_fused_numbering(mol, ring_atom_set)
     if not canonical:
         return None
-    # Mancude-symmetry automorphisms (bond-order-agnostic): the saturated and
-    # unsaturated rings of a symmetric parent are interchangeable for numbering,
-    # so the PIN takes the lower hydro locants (P-31.1.4.3.4).
+
+    # --- 3. Substituents (case c). Suffix-forming groups need P-58.2.2 added
+    #        indicated-H -> out of scope. Prefix-only proceeds. ---
+    has_sub = any(at.GetIdx() not in ring_atom_set and at.GetAtomicNum() != 1
+                  for at in mol.GetAtoms())
+    if has_sub and not _exocyclic_atoms_accounted(mol, ring_atom_set):
+        return None
+
+    # --- 4. Enumerate mancude-symmetry numberings; pick lowest per P-14.4 ---
     perms = _ring_system_automorphisms(mol, ring_atom_set, ignore_bond_order=True)
     canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
     atoms_by_rank = sorted(ring_atom_set, key=lambda a: canon_rank[a])
 
-    best = None  # (hydro_key, signature, cand_map)
+    best = None  # (key, sig, cand, ih_set, substituents)
     for perm in perms:
         try:
-            cand = {
-                a: _fused_locant_to_output(canonical[perm[a]])
-                for a in ring_atom_set
-            }
+            cand = {a: _fused_locant_to_output(canonical[perm[a]])
+                    for a in ring_atom_set}
         except KeyError:
             continue
-        hydro_nums = sorted(_fused_locant_num(cand[a]) for a in sp3)
-        # sp3 carbons are non-fusion -> plain integer locants expected.
-        if any(t[1] != 0 for t in hydro_nums):
+        # sat carbons must map to plain-integer (non-fusion) locants
+        if any(_fused_locant_num(cand[a])[1] != 0 for a in sat):
             continue
-        key = tuple(hydro_nums)
+        # choose the ih-set giving lowest (ih_locants, hydro_locants) here
+        best_ih = None
+        for S in ih_sets:
+            ihl = tuple(sorted(_fused_locant_num(cand[a]) for a in S))
+            hyl = tuple(sorted(_fused_locant_num(cand[a]) for a in sat if a not in S))
+            if best_ih is None or (ihl, hyl) < (best_ih[0], best_ih[1]):
+                best_ih = (ihl, hyl, S)
+        if best_ih is None:
+            continue
+        if has_sub:
+            subs = get_fused_heterocycle_substituents(mol, cand)
+            if (subs['suffix_groups'] or subs['oxo_substituents']
+                    or subs['amino_substituents']):
+                return None                     # P-58.2.2 territory -> fail closed
+            prefix_key = _fused_substituent_citation_key(subs)[1]
+        else:
+            subs, prefix_key = None, ()
+        key = (best_ih[0], best_ih[1], prefix_key)
         sig = tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank)
         if best is None or (key, sig) < (best[0], best[1]):
-            best = (key, sig, cand)
+            best = (key, sig, cand, best_ih[2], subs)
     if best is None:
         return None
 
-    cand = best[2]
-    hydro_locs = sorted(cand[a] for a in sp3)
+    # --- 5. Assemble '<hydro>-<indicatedH>-<mancude parent>' (P-58.2.1.2) ---
+    _key, _sig, cand, ih_set, subs = best
+    hydro_atoms = [a for a in sat if a not in ih_set]
+    if not hydro_atoms:
+        return None                             # pure indicated H (no hydro) -> legacy path
+    mult = {2: 'di', 4: 'tetra', 6: 'hexa', 8: 'octa', 10: 'deca'}.get(len(hydro_atoms))
+    if mult is None:
+        return None                             # >10 hydro -> defer
+    hydro_locs = sorted((cand[a] for a in hydro_atoms), key=_fused_locant_num)
     hydro_prefix = f"{','.join(str(l) for l in hydro_locs)}-{mult}hydro"
-    if mancude_parent and mancude_parent[0].isalpha():
-        return f"{hydro_prefix}{mancude_parent}"
-    return f"{hydro_prefix}-{mancude_parent}"
+    if ih_set:
+        ih_prefix = ','.join(
+            f"{cand[a]}H"
+            for a in sorted(ih_set, key=lambda a: _fused_locant_num(cand[a]))
+        )
+        parent = f"{hydro_prefix}-{ih_prefix}-{mancude_parent}"
+    elif mancude_parent[0].isalpha():
+        parent = f"{hydro_prefix}{mancude_parent}"     # BYTE-IDENTICAL to the slice
+    else:
+        parent = f"{hydro_prefix}-{mancude_parent}"
+
+    if has_sub:
+        return _assemble_fused_heterocycle_name(mol, parent, subs, cand)
+    return parent
 
 
 def _try_algorithmic_fusion_name(mol) -> Optional[str]:
