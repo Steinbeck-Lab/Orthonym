@@ -1676,6 +1676,60 @@ def get_heterocycle_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
+            # v26 (P-63.2.2 / P-63.2.5): a heteroatom-rooted ETHER substituent on
+            # the ring -- -O-R / -S-R / -Se-R / -Te-R (carbon_count>0 because R has
+            # carbons) -- is an (R)oxy / (R)sulfanyl / (R)selanyl / (R)tellanyl
+            # prefix. classify_substituent below counts the arm carbons and DROPS
+            # the O/S/Se root (F-OXANE-DROP -> decline -> unknown; e.g. methoxy-/
+            # methylsulfanyl-pyridine). Name the arm recursively and carry the
+            # prefix as hetero_name. Fail-closed: only a clean single-bond ether
+            # root with exactly one carbon arm; any decline falls through.
+            _eth_root = mol.GetAtomWithIdx(nbr_idx)
+            _ETHER_SUFFIX = {'O': 'oxy', 'S': 'sulfanyl',
+                             'Se': 'selanyl', 'Te': 'tellanyl'}
+            if (carbon_count > 0 and not is_nitrogen
+                    and _eth_root.GetSymbol() in _ETHER_SUFFIX
+                    and _eth_root.GetFormalCharge() == 0
+                    and _eth_root.GetTotalNumHs() == 0
+                    and not _eth_root.GetIsAromatic()
+                    and all(b.GetBondTypeAsDouble() == 1.0
+                            for b in _eth_root.GetBonds())):
+                _eth_arm = [nb for nb in _eth_root.GetNeighbors()
+                            if nb.GetIdx() not in ring_set]
+                if len(_eth_arm) == 1 and _eth_arm[0].GetSymbol() == 'C':
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    from ..assembly.naming_utils import (
+                        is_complex_substituent, apply_enclosing_marks)
+                    if _eth_root.GetSymbol() == 'O':
+                        # O-ether: the fragment namer's O-attach path contracts the
+                        # PIN (methyl+oxy -> methoxy, ethyl -> ethoxy) and encloses
+                        # a complex arm itself -> pass the WHOLE -O-R fragment.
+                        _eth_name = name_substituent_fragment(
+                            mol, sub_atoms, nbr_idx, list(ring_set))
+                    else:
+                        # S/Se/Te: name the arm, append the chalcogen stem, enclose
+                        # a complex arm (P-63.2.5; e.g. (prop-2-en-1-yl)sulfanyl).
+                        _arm = name_substituent_fragment(
+                            mol, [a for a in sub_atoms if a != nbr_idx],
+                            _eth_arm[0].GetIdx(), list(ring_set | {nbr_idx}))
+                        _eth_name = None
+                        if _arm:
+                            if is_complex_substituent(_arm):
+                                _arm = apply_enclosing_marks(_arm, 0)
+                            _eth_name = \
+                                f"{_arm}{_ETHER_SUFFIX[_eth_root.GetSymbol()]}"
+                    if _eth_name:
+                        substituents.setdefault(locant, []).append({
+                            'atoms': sub_atoms,
+                            'is_on_nitrogen': False,
+                            'carbon_count': 0,
+                            'connecting_atom': ring_atom_idx,
+                            'is_ring': False,
+                            'ring_name': None,
+                            'hetero_name': _eth_name,
+                        })
+                        continue
+
             # Detect non-carbon functional substituents (amino, hydroxy, nitro, etc.)
             hetero_sub_name = None
             if carbon_count == 0:
