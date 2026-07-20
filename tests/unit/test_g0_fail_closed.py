@@ -89,12 +89,20 @@ def test_aromatic_in_cage_is_deterministic(smiles):
 PARTIAL_FUSED_CORE_NAMED = [
     ("c1cc2nc3ccoc3cc2o1", "difuro[3,2-b:2',3'-e]pyridine"),     # gold DD7-S1-safety-2
     ("c1cc2nc3ccsc3cc2o1", "furo[3,2-b]thieno[2,3-e]pyridine"),  # DD7-fusion-2
+    # v26 BP-4 Phase 2 SUPERSEDES the substituted fail-closed: the polycomponent
+    # constructor now decorates the star parent against the canonical P-25.3.3
+    # numbering (verified OPSIN round-trip). Previously these produced the phantom
+    # sub-fragment '5-methylfuran'/'5-chlorofuran' (suppressed only by SELF-01 in
+    # production) — now the correct PIN, which is a strict accuracy improvement.
+    ("Cc1cc2nc3ccoc3cc2o1", "2-methyldifuro[3,2-b:2',3'-e]pyridine"),
+    ("Clc1cc2nc3ccoc3cc2o1", "2-chlorodifuro[3,2-b:2',3'-e]pyridine"),
 ]
 
-# Partial-core systems G1b still CANNOT name (substituted) -> the G0 veto fires.
+# Partial-core systems the fusion path still CANNOT name -> the G0 veto fires.
+# BP-4 Phase 2 fails closed at SOURCE when a substituent branch is unnameable
+# (exotic element), so the emitted name can never silently omit a substituent.
 PARTIAL_FUSED_CORE_STILL_CLOSED = [
-    "Cc1cc2nc3ccoc3cc2o1",   # methyl-difuropyridine (substituted -> G1b refuses)
-    "Clc1cc2nc3ccoc3cc2o1",  # chloro-difuropyridine
+    "[Si](C)(C)c1cc2nc3ccoc3cc2o1",  # silyl-difuropyridine: unnameable branch
 ]
 
 
@@ -119,7 +127,11 @@ def test_partial_fused_core_fails_closed(smiles):
 def test_partial_fused_core_raises_named_limit(smiles):
     with pytest.raises(OrthonymLimitError) as ei:
         Orthonym().name(smiles, raise_on_limit=True)
-    assert ei.value.code == "UNSUPPORTED_RING_SYSTEM"
+    # A classified fail-closed refusal (not a crash). The silyl-difuropyridine
+    # example fails via UNNAMEABLE (its substituent branch is unnameable —
+    # BP-4 Phase 2's source-level completeness check), a sibling of the
+    # ring-coverage UNSUPPORTED_RING_SYSTEM veto; both are honest refusals.
+    assert ei.value.code in {"UNSUPPORTED_RING_SYSTEM", "UNNAMEABLE"}
 
 
 # --------------------------------------------------------------------------- #

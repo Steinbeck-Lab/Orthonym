@@ -697,14 +697,18 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
     if len(atom_rings) < 3:
         return None  # >=3 components only; 2-component handled by existing path
 
-    # Unsubstituted: every heavy atom is a ring atom (substituted/funct. systems
-    # need final-system peripheral numbering -> deferred, fail closed).
     ring_atom_set = set()
     for r in atom_rings:
         ring_atom_set.update(r)
-    for atom in mol.GetAtoms():
-        if atom.GetIdx() not in ring_atom_set and atom.GetAtomicNum() != 1:
-            return None
+    # BP-4 Phase 2 (P-25): a SUBSTITUTED star system is decorated below against
+    # the deterministic P-25.3.3 final-system numbering (was: hard-refused).
+    # Record whether any exocyclic heavy atom is present; the bare descriptor
+    # name is computed first (the `_pcf_*` path is substituent-agnostic — it
+    # walks ring cycles only), then substituents are attached.
+    has_substituents = any(
+        atom.GetIdx() not in ring_atom_set and atom.GetAtomicNum() != 1
+        for atom in mol.GetAtoms()
+    )
 
     # Cata-fused only: no atom shared by >=3 rings (no interior/peri atom).
     membership = defaultdict(int)
@@ -750,9 +754,27 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
         nm = _pcf_name_with_base(mol, comps, names, bidx)
         if nm:
             produced.add(nm)
-    if len(produced) == 1:
-        return next(iter(produced))
-    return None
+    if len(produced) != 1:
+        return None
+    bare_name = next(iter(produced))
+    if not has_substituents:
+        return bare_name
+
+    # BP-4 Phase 2 (P-25): decorate the bare star name with substituents against
+    # the canonical P-25.3.3 numbering, reusing the Phase-1 machinery. Fail
+    # closed at source: every exocyclic heavy atom must be an identifiable
+    # substituent, and the numbering engine must produce a determinate map,
+    # else return None (SELF-01 additionally suppresses any non-round-tripping
+    # emission).
+    if not _exocyclic_atoms_accounted(mol, ring_atom_set):
+        return None
+    selected = _select_substituent_numbering(mol, ring_atom_set)
+    if selected is None:
+        return None
+    atom_to_locant, substituents = selected
+    return _assemble_fused_heterocycle_name(
+        mol, bare_name, substituents, atom_to_locant
+    )
 
 
 def _core_covers_ring_system(mol, atom_mapping) -> bool:

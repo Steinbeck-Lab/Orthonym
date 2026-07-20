@@ -26,6 +26,7 @@ from rdkit import Chem
 
 from orthonym.rules.fused_rings import (
     _try_algorithmic_fusion_name,
+    _try_polycomponent_fusion_name,
     _exocyclic_atoms_accounted,
 )
 
@@ -112,3 +113,33 @@ class TestBP4Phase1FailClosed:
     def test_accounted_true_for_bare_system(self):
         mol = Chem.MolFromSmiles("c1cc2ccoc2o1")
         assert _exocyclic_atoms_accounted(mol, _ring_atoms(mol)) is True
+
+
+class TestBP4Phase2Polycomponent:
+    """Phase 2: substituent support for the 3+-component cata-fused star class
+    (single heteroring base + >=2 monocyclic children), reusing the identical
+    numbering + assembler machinery. Each PIN verified this session to OPSIN
+    round-trip via """
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("Cc1cc2nc3ccoc3cc2o1", "2-methyldifuro[3,2-b:2',3'-e]pyridine"),
+        ("Cc1coc2cc3occc3nc12", "3-methyldifuro[3,2-b:2',3'-e]pyridine"),
+        ("Cc1c2occc2nc2ccoc12", "8-methyldifuro[3,2-b:2',3'-e]pyridine"),
+        ("Clc1cc2nc3ccoc3cc2o1", "2-chlorodifuro[3,2-b:2',3'-e]pyridine"),
+    ])
+    def test_substituted_polycomponent_pin(self, smiles, expected):
+        mol = Chem.MolFromSmiles(smiles)
+        assert _try_polycomponent_fusion_name(mol) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("O1C=CC2=C1C=C1C(=N2)C=CO1", "difuro[3,2-b:2',3'-e]pyridine"),
+        ("O1C=CC2=NC3=C(C=C21)SC=C3", "furo[3,2-b]thieno[2,3-e]pyridine"),
+    ])
+    def test_bare_polycomponent_unchanged(self, smiles, expected):
+        mol = Chem.MolFromSmiles(smiles)
+        assert _try_polycomponent_fusion_name(mol) == expected
+
+    def test_unnameable_substituent_fails_closed(self):
+        mol = Chem.MolFromSmiles("[Si](C)(C)c1cc2nc3ccoc3cc2o1")
+        assert mol is not None
+        assert _try_polycomponent_fusion_name(mol) is None
