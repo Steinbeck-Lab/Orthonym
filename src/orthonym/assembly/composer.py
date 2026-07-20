@@ -2488,16 +2488,23 @@ def _build_n_substituted_name(tagged_subs: list, base_name: str) -> str:
         sub_locants[name].append(locant)
 
     # Build prefix parts, sorted alphabetically by substituent name
+    from .naming_utils import needs_brackets, apply_enclosing_marks
     prefix_parts = []
     for name in sorted(sub_locants.keys()):
         locants = sub_locants[name]
         count = len(locants)
         locant_str = ",".join(locants)
+        # v26 BP-2 RC-5 (P-16.3.3; BB 33336 'N-[1-cyano-3-(methylsulfanyl)propyl]
+        # -N'-methylurea (PIN)'): a COMPOUND N-substituent (its own locants /
+        # hyphens) is enclosed so a numeral never abuts the next N-locant; simple
+        # names (methyl, phenyl) are byte-identical (needs_brackets False). Sort
+        # + multiplier stay on the RAW name -> ordering unchanged.
+        enc = apply_enclosing_marks(name, -1) if needs_brackets(name) else name
         if count == 1:
-            prefix_parts.append(f"{locant_str}-{name}")
+            prefix_parts.append(f"{locant_str}-{enc}")
         else:
             mult = get_multiplier_prefix(count, name)
-            prefix_parts.append(f"{locant_str}-{mult}{name}")
+            prefix_parts.append(f"{locant_str}-{mult}{enc}")
 
     prefix = "-".join(prefix_parts)
     return _join_prefix_to_name(prefix, base_name)  # L2 (P-16.3.3)
