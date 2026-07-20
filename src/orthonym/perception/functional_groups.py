@@ -605,6 +605,58 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
     # Post-processing: remove generic FG matches that overlap with more-specific FGs
     results = _resolve_fg_collisions(results)
 
+    # BP-1 (P-64.7.1 + P-58.2.2): a ring-carbon exocyclic =O on a MANCUDE ring
+    # (residual unsaturation) is a heterone — the senior principal-characteristic
+    # group (P-64.7.1: "Ketones, pseudoketones and heterones ... are senior to
+    # ... amines, and imines in the seniority order of classes"). The ketone
+    # SMARTS "[#6][CX3](=O)[#6]" needs two C neighbours, so a ring c=O adjacent to
+    # a ring heteroatom (pyridinone/pyrimidinone/quinolinone/...) is missed and the
+    # amine wrongly wins the principal-group slot. Register it here (AFTER the
+    # collision resolver, so the resolver never strips it) so get_principal_group
+    # ranks it (ketone > amine, seniority.py) and the mancude-oxo namer
+    # partial_saturation.name_cyclic_oxo_compound fires with the retained ring name
+    # + parenthetical added-H. SCOPED to residual-unsaturation rings so fully
+    # saturated lactams/lactones/ketones (piperidin-2-one, oxolan-2-one,
+    # barbituric acid) are untouched — they route to their existing saturated
+    # handlers.
+    _ri = mol.GetRingInfo()
+    _ring_atoms = set(a for r in _ri.AtomRings() for a in r)
+    if _ring_atoms:
+        _het_matches = []
+        _carbonyl_cs = set()
+        for _a in _ring_atoms:
+            _at = mol.GetAtomWithIdx(_a)
+            if _at.GetSymbol() != 'C':
+                continue
+            for _b in _at.GetBonds():
+                _o = _b.GetOtherAtom(_at)
+                if (_o.GetIdx() not in _ring_atoms
+                        and _o.GetSymbol() == 'O'
+                        and _b.GetBondTypeAsDouble() == 2.0
+                        and _o.GetDegree() == 1):
+                    # tuple (carbonylC, carbonylC, O): index [1] is the principal
+                    # atom per PG_ATTACHMENT_INDICES['ketone'] == [1] (seniority.py:32).
+                    # carbonylC is used at both [0] and [1] to avoid the flanking-atom
+                    # locant misread (a heterone C is flanked by ring N, not C).
+                    _het_matches.append((_a, _a, _o.GetIdx()))
+                    _carbonyl_cs.add(_a)
+        if _het_matches:
+            # residual-unsaturation gate (mirrors name_cyclic_oxo_compound scope):
+            # aromatic ring, or a ring-internal C=C not part of a carbonyl.
+            _res = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in _ring_atoms)
+            if not _res:
+                for _b in mol.GetBonds():
+                    _i, _j = _b.GetBeginAtomIdx(), _b.GetEndAtomIdx()
+                    if (_b.GetBondTypeAsDouble() == 2.0
+                            and _i in _ring_atoms and _j in _ring_atoms
+                            and _i not in _carbonyl_cs and _j not in _carbonyl_cs):
+                        _res = True
+                        break
+            # Only supply the heterone when the SMARTS found no genuine 2-carbon
+            # ketone (never clobber a real acyclic ketone read).
+            if _res and 'ketone' not in results:
+                results['ketone'] = _het_matches
+
     return dict(results)
 
 

@@ -25,7 +25,9 @@ HETEROCYCLE_ACCURACY_CASES = [
     ("O=c1[nH]c(=O)c2[nH]cnc2[nH]1", "xanthine"),
     ("Nc1ncnc2[nH]cnc12", "adenine"),
     ("O=c1[nH]cnc2[nH]cnc12", "hypoxanthine"),
-    ("O=c1cc[nH]c(=O)[nH]1", "uracil"),
+    # v26 BP-1: uracil is NOT a BB retained name (0 grep hits) -> the PIN is the
+    # systematic pyrimidinedione; the retained 'uracil' is served only via --trivial.
+    ("O=c1cc[nH]c(=O)[nH]1", "pyrimidine-2,4(1H,3H)-dione"),
 
     # --- Guanine (both tautomeric input forms) ---
     ("Nc1nc2[nH]cnc2c(=O)[nH]1", "guanine"),
