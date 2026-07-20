@@ -46,7 +46,14 @@ _EXTRA_FG_SMARTS = [
     # emits the (alkylsulfanyl) prefix (2-amino-3-(ethylsulfanyl)propanoic acid).
     # Disulfides (S has an S neighbour) and ring S (rings already bail above) are
     # excluded by the two-carbon-neighbour requirement.
+    # v26 BP-3 C1 (P-63.1.5): the Se/Te ether analogues have the SAME defect — the
+    # carbon-count backbone walks through -Se-/-Te- and drops the chalcogen
+    # (C[Se]CC(N)C(=O)O was named '2-aminobutanoic acid', a different molecule).
+    # Bail so the polyfunctional pipeline emits the (methylselanyl)/(methyltellanyl)
+    # prefix (verified: 2-amino-3-(methylselanyl)propanoic acid).
     '[SX2]([#6])[#6]',           # Thioether C-S-C
+    '[SeX2]([#6])[#6]',          # Selenoether C-Se-C  (P-63.1.5 selanyl)
+    '[TeX2]([#6])[#6]',          # Telluroether C-Te-C (P-63.1.5 tellanyl)
     '[F,Cl,Br,I]',               # Halogen
     '[N+](=O)[O-]',              # Nitro
     '[CX3;!$([CX3](=O)[OX2H1]);!$([CX3](=O)[NX3])](=O)',  # Ketone C=O (excludes acid and amide C=O)
