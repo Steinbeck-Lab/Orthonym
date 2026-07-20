@@ -181,3 +181,58 @@ class TestBP4Phase3PartialSaturation:
         from orthonym.rules.fused_rings import _try_partial_saturation_name
         mol = Chem.MolFromSmiles("c1cc2ccoc2o1")
         assert _try_partial_saturation_name(mol, _ring_atoms(mol), "furo[2,3-b]furan") is None
+
+
+class TestBP3ClusterRDecoratedRingSubstituent:
+    """v26 BP-3 cluster R: a ring substituent that carries its OWN decorations
+    (rooted at a ring atom) now names via free-valence numbering + decoration
+    placement, and the pyrazole/imidazole R-bug is fixed on the substituent path.
+    Each PIN OPSIN round-trip verified this session via """
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # bare pyrazolyl — R-bug fix (was mis-id'd as imidazolyl -> unknown)
+        ("OC(=O)c1ccc(-c2cc[nH]n2)cc1", "4-(1H-pyrazol-3-yl)benzoic acid"),
+        ("OC(=O)c1ccc(-c2ccn[nH]2)cc1", "4-(1H-pyrazol-5-yl)benzoic acid"),
+        # decorated pyrazolyl — cluster R recursion
+        ("OC(=O)c1ccc(-c2cc(C)n(C)n2)cc1",
+         "4-(1,5-dimethylpyrazol-3-yl)benzoic acid"),
+        # genuine imidazole unchanged (non-adjacent N)
+        ("OC(=O)c1ccc(-c2cnc[nH]2)cc1", "4-(1H-imidazol-5-yl)benzoic acid"),
+        # bare pyridinyl unchanged
+        ("OC(=O)c1ccc(-c2cccnc2)cc1", "4-(pyridin-3-yl)benzoic acid"),
+    ])
+    def test_ring_substituent_pin(self, smiles, expected):
+        from orthonym import name_compound
+        assert name_compound(smiles) == expected
+
+    def test_decorated_helper_direct(self):
+        """The decorated-ring helper produces the numbered PIN substituent form."""
+        from orthonym.rules.ring_substituents import (
+            _decorated_heteroaryl_substituent_name,
+        )
+        # 5-hydroxy-1,3-dimethylpyrazol-4-yl fragment (ring + 2 Me + OH)
+        mol = Chem.MolFromSmiles("Cc1nn(C)c(O)c1C(=O)c1ccc(Cl)cc1Cl")
+        ri = mol.GetRingInfo()
+        pyr = next(r for r in ri.AtomRings()
+                   if len(r) == 5
+                   and sum(1 for a in r if mol.GetAtomWithIdx(a).GetSymbol() == 'N') == 2)
+        ringset = set(pyr)
+        attach = next(
+            a for a in pyr
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+            if nb.GetIdx() not in ringset and nb.GetSymbol() == 'C'
+            and any(b.GetBondTypeAsDouble() == 2 for b in nb.GetBonds())
+        )
+        frag = set(pyr)
+        for a in pyr:
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nb.GetIdx()
+                if ni in ringset:
+                    continue
+                if a == attach and nb.GetSymbol() == 'C' and any(
+                        b.GetBondTypeAsDouble() == 2 for b in nb.GetBonds()):
+                    continue
+                frag.add(ni)
+        assert _decorated_heteroaryl_substituent_name(
+            mol, tuple(frag), tuple(pyr), attach
+        ) == "5-hydroxy-1,3-dimethylpyrazol-4-yl"

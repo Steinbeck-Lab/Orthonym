@@ -423,16 +423,19 @@ def pin_heteroaryl_substituent_name(
     het_atoms = [i for i in ring_list
                  if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
 
-    # --- Guard: imidazole vs pyrazole ----------------------------------------
+    # --- imidazole vs pyrazole (R-bug fix) -----------------------------------
     # identify_ring_system() reports BOTH 5-membered N,N arenes as 'imidazole'.
     # Genuine imidazole has its two ring N's NON-adjacent (1,3); pyrazole has
-    # them adjacent (1,2). Refuse the adjacent-N case so we never emit an
-    # imidazol-*-yl name for a pyrazole.
+    # them adjacent (1,2). Retarget the adjacent-N case to the retained pyrazole
+    # stem (P-25.2.1) so a bare pyrazolyl names correctly instead of emitting an
+    # imidazol-*-yl name for a pyrazole (was: return None -> misid downstream).
     if ring_name == 'imidazole':
         n_idx = [i for i in het_atoms
                  if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
-        if len(n_idx) != 2 or mol.GetBondBetweenAtoms(n_idx[0], n_idx[1]) is not None:
+        if len(n_idx) != 2:
             return None
+        if mol.GetBondBetweenAtoms(n_idx[0], n_idx[1]) is not None:
+            stem = 'pyrazol'
 
     # --- Guard: no ring substituent other than the single attachment ---------
     for idx in ring_list:
@@ -503,6 +506,175 @@ def pin_heteroaryl_substituent_name(
     attach_locant, ih_locant = best
     prefix = f"{ih_locant}H-" if indicated_h_atom is not None else ""
     return f"{prefix}{stem}-{attach_locant}-yl"
+
+
+_DECO_MULT: Dict[int, str] = {
+    1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
+}
+
+
+def _decorated_heteroaryl_substituent_name(
+    mol,
+    frag_atoms,
+    ring_atoms: Tuple[int, ...],
+    attachment_atom: int,
+) -> Optional[str]:
+    """BP-3 cluster R: PIN substituent name for a monocyclic heteroaryl ring that
+    carries its OWN decorations, with the free valence on a ring atom — e.g.
+    ``5-hydroxy-1,3-dimethylpyrazol-4-yl``.
+
+    Extends the ``pin_heteroaryl_substituent_name`` free-valence numbering cascade
+    (P-31.1.4.3.4: heteroatoms as a set → element seniority → indicated H → free
+    valence) with a final P-59.2.3 lowest-decoration-locant term, then reads the
+    decorations off the winning numbering. Decorations are identified with the
+    same ``_identify_fused_substituent`` machinery the fused-ring path uses, so a
+    branch it cannot name → ``None`` (fail closed; the caller keeps the whole
+    name fail-closed rather than dropping a substituent).
+
+    Aromatic monocycle only for this slice; anything else returns None.
+    """
+    ring_list = list(ring_atoms)
+    ring_set = set(ring_list)
+    n = len(ring_list)
+    frag_set = set(frag_atoms)
+    if attachment_atom not in ring_set or n < 3:
+        return None
+
+    ring_name = identify_ring_system(mol, tuple(ring_list))
+    stem = _PIN_HETEROARYL_STEMS.get(ring_name)
+
+    het_atoms = [i for i in ring_list if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
+
+    # Aromatic simple monocycle: each ring atom has exactly two in-ring neighbours.
+    if not all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_list):
+        return None
+    ring_adj: Dict[int, List[int]] = {}
+    for idx in ring_list:
+        nbrs = [nb.GetIdx() for nb in mol.GetAtomWithIdx(idx).GetNeighbors()
+                if nb.GetIdx() in ring_set]
+        if len(nbrs) != 2:
+            return None  # fusion / spiro / not a simple monocycle
+        ring_adj[idx] = nbrs
+
+    # Pyrazole vs imidazole (R-bug): identify_ring_system reports BOTH N,N 5-rings
+    # as 'imidazole'; adjacent ring N's = pyrazole (retained stem, P-25.2.1).
+    if ring_name == 'imidazole':
+        n_idx = [i for i in het_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+        if len(n_idx) == 2 and mol.GetBondBetweenAtoms(n_idx[0], n_idx[1]) is not None:
+            stem = 'pyrazol'
+    if stem is None:
+        return None
+
+    # Indicated hydrogen: a ring NH (only when an actual H is present — an
+    # N-substituted position carries no indicated H and no nH prefix).
+    ih_candidates = [i for i in het_atoms
+                     if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+    if len(ih_candidates) > 1:
+        return None  # ambiguous indicated H; do not guess
+    indicated_h_atom = ih_candidates[0] if ih_candidates else None
+
+    # Collect + identify decorations (heavy exocyclic atoms in the fragment that
+    # hang off a ring atom). The attachment atom's parent bond leaves the
+    # fragment and is NOT a decoration.
+    from .fused_rings import _identify_fused_substituent
+    decorations = []  # (ring_atom_idx, substituent_name)
+    accounted: Set[int] = set()
+    has_parent_bond = False
+    for ra in ring_list:
+        for nb in mol.GetAtomWithIdx(ra).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in ring_set or nb.GetAtomicNum() <= 1:
+                continue
+            if ni not in frag_set:
+                # Bond leaving the fragment — only legal at the attachment atom.
+                if ra != attachment_atom:
+                    return None
+                has_parent_bond = True
+                continue
+            info = _identify_fused_substituent(mol, ni, ring_set)
+            if info is None:
+                return None  # unnameable decoration -> fail closed
+            nm = info.get('name')
+            if not nm or ' ' in nm:
+                return None
+            decorations.append((ra, nm))
+            accounted.update(
+                a for a in info.get('atoms', [])
+                if mol.GetAtomWithIdx(a).GetAtomicNum() > 1
+            )
+    if not has_parent_bond:
+        return None
+    if not decorations:
+        return None  # bare ring -> pin_heteroaryl_substituent_name handles it
+    exo = {a for a in frag_set
+           if a not in ring_set and mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if accounted != exo:
+        return None  # a heavy atom unaccounted -> fail closed
+
+    # Cyclic atom order.
+    order = [ring_list[0], ring_adj[ring_list[0]][0]]
+    while len(order) < n:
+        prev, curr = order[-2], order[-1]
+        nxt = [x for x in ring_adj[curr] if x != prev]
+        if not nxt:
+            return None
+        order.append(nxt[0])
+    if len(order) != n:
+        return None
+
+    deco_atoms = [ra for ra, _ in decorations]
+    best_key = None
+    best_pos = None
+    for start in range(n):
+        for direction in (1, -1):
+            atom_to_pos = {order[(start + direction * p) % n]: p + 1
+                           for p in range(n)}
+            het_locs = tuple(sorted(atom_to_pos[i] for i in het_atoms))
+            seniority_locs = tuple(
+                atom_to_pos[i] for i in sorted(
+                    het_atoms,
+                    key=lambda a: (_HETEROATOM_SENIORITY.get(
+                        mol.GetAtomWithIdx(a).GetSymbol(), 99), atom_to_pos[a]),
+                )
+            )
+            ih_loc = (atom_to_pos[indicated_h_atom]
+                      if indicated_h_atom is not None else 0)
+            fv_loc = atom_to_pos[attachment_atom]
+            deco_locs = tuple(sorted(atom_to_pos[ra] for ra in deco_atoms))
+            key = (het_locs, seniority_locs, ih_loc, fv_loc, deco_locs)
+            if best_key is None or key < best_key:
+                best_key = key
+                best_pos = atom_to_pos
+    if best_pos is None:
+        return None
+
+    attach_locant = best_pos[attachment_atom]
+    ih_locant = (best_pos[indicated_h_atom]
+                 if indicated_h_atom is not None else None)
+
+    # Group decorations by name; assemble alphabetised, multiplied prefixes.
+    from collections import defaultdict as _dd
+    from ..assembly.naming_utils import alpha_sort_key as _alpha
+    groups = _dd(list)
+    for ra, nm in decorations:
+        groups[nm].append(best_pos[ra])
+    prefix_parts = []  # (alpha_key, text)
+    for nm, locs in groups.items():
+        locs = sorted(locs)
+        mult = _DECO_MULT.get(len(locs))
+        if mult is None:
+            return None
+        text = f"{','.join(str(l) for l in locs)}-{mult}{nm}"
+        prefix_parts.append((_alpha(nm), text))
+    prefix_parts.sort(key=lambda x: x[0])
+    body = '-'.join(p[1] for p in prefix_parts)
+    ih = f"{ih_locant}H-" if indicated_h_atom is not None else ""
+    core = f"{ih}{stem}-{attach_locant}-yl"
+    # Hyphen between the last prefix and the stem only when the stem/indicated-H
+    # tail is digit-initial (e.g. '-1H-pyrazol...'); elide before a letter-initial
+    # stem ('dimethylpyrazol...').
+    sep = '-' if core[0].isdigit() else ''
+    return f"{body}{sep}{core}"
 
 
 # Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra...).
@@ -1152,6 +1324,20 @@ def name_ring_system_substituent(
     if frag_ring_atoms == frag_set and ring_info.NumAtomRings(attach_idx) > 0:
         try:
             name = get_ring_substituent_name(mol, tuple(frag_atoms), attach_idx)
+        except Exception:
+            name = None
+    elif (frag_ring_atoms and frag_ring_atoms < frag_set
+          and ring_info.NumAtomRings(attach_idx) > 0):
+        # BP-3 cluster R: a ring that carries its OWN decorations, rooted at a
+        # ring atom (proper subset: ring atoms + decoration atoms). Neither the
+        # bare-ring branch nor the ring-on-chain branch matched. Name it by
+        # recursing the free-valence numbering cascade over the decorated ring.
+        # Fail closed (None -> enumerator fallback -> DROP-24) on anything not
+        # provably correct, so this only ADDS successful emissions.
+        try:
+            name = _decorated_heteroaryl_substituent_name(
+                mol, frag_atoms, tuple(frag_ring_atoms), attach_idx
+            )
         except Exception:
             name = None
     elif frag_ring_atoms and ring_info.NumAtomRings(attach_idx) == 0:

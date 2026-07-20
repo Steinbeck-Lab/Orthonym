@@ -84,11 +84,14 @@ def test_pin_positive(smiles, expected):
 # ---------------------------------------------------------------------------
 # Guard cases — must return None (no wrong locant; caller keeps current form)
 # ---------------------------------------------------------------------------
-def test_guard_pyrazole_misclassified_as_imidazole():
-    # identify_ring_system() returns 'imidazole' for pyrazole (adjacent N's).
-    # Emitting an imidazol-*-yl name here would be a wrong name -> must guard.
-    mol, ring, attach = _ring_and_attach("Cc1cc[nH]n1")  # 3-methyl-1H-pyrazole
-    assert pin_heteroaryl_substituent_name(mol, ring, attach) is None
+def test_pyrazole_named_not_misclassified_as_imidazole():
+    # v26 BP-3 R-bug fix: identify_ring_system() returns 'imidazole' for BOTH
+    # N,N 5-rings; the adjacent-N case is pyrazole and is now NAMED with the
+    # retained pyrazol- stem (P-25.2.1) instead of refused (which previously fell
+    # through to a WRONG imidazol-*-yl name downstream). Attachment is the ring
+    # carbon adjacent to the =N- (locant 3). OPSIN round-trip verified.
+    mol, ring, attach = _ring_and_attach("Cc1cc[nH]n1")  # pyrazol-3-yl (C is the stub)
+    assert pin_heteroaryl_substituent_name(mol, ring, attach) == "1H-pyrazol-3-yl"
 
 
 def test_guard_benzene_not_heteroaryl():
