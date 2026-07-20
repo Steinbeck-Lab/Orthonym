@@ -1367,6 +1367,26 @@ def name_fused_heterocycle(mol):
     # Find substituents on the core
     substituents = get_fused_heterocycle_substituents(mol, atom_mapping)
 
+    # v26 P3 (fail-closed routing): get_fused_heterocycle_substituents silently
+    # skips any exocyclic branch _identify_fused_substituent cannot name
+    # (``sub_info is None -> continue``), so the assembled name can DROP a whole
+    # substituent and denote a DIFFERENT molecule (a boronate / methanesulfonyl /
+    # silyl group on quinoline collapses to bare 'quinoline'). On the PIN/default
+    # path that group-dropping name is caught only by the downstream OPSIN SELF-01
+    # gate, which FAILS OPEN when the jar is absent -> the wrong name ships. Under
+    # the general-engine tiers (valid / complete; general_fallback set) fail closed
+    # HERE: decline the catalog match so the namer's late-recovery re-routes the
+    # molecule through name_general (the universal never-None substituent
+    # recursion, SELF-01+E1 gated) instead of shipping — or being blocked by — a
+    # group-dropping catalog name. ``_exocyclic_atoms_accounted`` re-runs the same
+    # read-only traversal and returns False on any unnameable branch or unaccounted
+    # heavy atom. Gated on ``general_fallback_ctx`` so the PIN path is
+    # byte-identical (the check never runs when the flag is off).
+    from ..metrics.provenance import general_fallback_ctx
+    if general_fallback_ctx.get() and not _exocyclic_atoms_accounted(
+            mol, set(atom_mapping)):
+        return None
+
     if not substituents:
         return (core_name, ring_atoms, atom_mapping, True)
 

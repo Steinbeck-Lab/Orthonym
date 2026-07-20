@@ -398,9 +398,12 @@ def name_general_ring(
 
     # v25 G5-A defense-in-depth: a ring '-one' locant must never coincide with a
     # ring double-bond locant -- that carbon would be both =ring and =O (the
-    # 5-bond-carbon / caffeine class). Mancude cages are already refused upstream
-    # (analyze_cage_universal), so this only guards a residual saturated
-    # isolated-ene cage that also carries a ring ketone. Fail-closed.
+    # 5-bond-carbon / caffeine class). v26 P2 lifted the aromatic-cage refusal in
+    # analyze_cage_universal behind ``allow_mancude`` (--emit-tier complete), so
+    # mancude cages NOW reach this guard as well as saturated isolated-ene cages.
+    # The guard keys on ``double_bond_pairs`` (populated for BOTH the kekulized
+    # mancude polyene and the isolated ene), so it holds for both classes -- do
+    # not weaken it on the stale "mancude refused upstream" premise. Fail-closed.
     if suffix_core == 'one':
         # both endpoints of every ring double bond are termini a =O cannot share
         _ene_termini = {loc for pair in cage.unsaturation.get('double_bond_pairs', ())
