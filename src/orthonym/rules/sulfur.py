@@ -286,6 +286,89 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     return f"{acyl} {halide_word}"
 
 
+_OXIDE_ACID_SUFFIX = {"sulfinyl": "sulfinic acid", "sulfonyl": "sulfonic acid"}
+
+
+def _acid_stem_unsaturated_oxide_prefix(
+    mol, sub_carbon: int, sulfur_idx: int, oxide_kind: str,
+) -> Optional[str]:
+    """P-63.6 acid-stem prefix ('prop-2-ene-1-sulfinyl') for an arm that
+    ``_classify_oxide_side`` declines (unsaturated / branched / hetero).
+
+    Root-cause reuse (mirrors ``name_sulfonyl_halide``): isolate the arm + the
+    S(=O)x centre, cap S with a single ``-OH`` to form the parent sulfinic /
+    sulfonic acid, name THAT with the full engine (reusing all chain / ring
+    numbering + unsaturation locants), then rewrite the ``... sulfinic/sulfonic
+    acid`` suffix to ``...sulfinyl/sulfonyl``. Fail closed (None) on any shape
+    the acid namer does not return as a clean sulfinic/sulfonic acid, so a wrong
+    name is never emitted. Additive: fires only when ``_classify_oxide_side``
+    returned None, so all saturated-linear / benzene / cycloalkane outputs are
+    byte-identical.
+    """
+    acid_suffix = _OXIDE_ACID_SUFFIX.get(oxide_kind)
+    if acid_suffix is None:
+        return None
+    s_atom = mol.GetAtomWithIdx(sulfur_idx)
+    # Terminal =O oxo on S define sulfinyl (1) vs sulfonyl (2).
+    oxo = [
+        n.GetIdx() for n in s_atom.GetNeighbors()
+        if n.GetSymbol() == "O" and n.GetDegree() == 1
+        and mol.GetBondBetweenAtoms(
+            sulfur_idx, n.GetIdx()).GetBondTypeAsDouble() == 2.0
+    ]
+    if oxide_kind == "sulfinyl" and len(oxo) != 1:
+        return None
+    if oxide_kind == "sulfonyl" and len(oxo) != 2:
+        return None
+    # Arm side = component reachable from sub_carbon without crossing S.
+    arm = set()
+    q = deque([sub_carbon])
+    while q:
+        i = q.popleft()
+        if i in arm or i == sulfur_idx:
+            continue
+        arm.add(i)
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            j = nb.GetIdx()
+            if j not in arm and j != sulfur_idx:
+                q.append(j)
+    # The single parent-side C neighbour of S (the one we detach).
+    parent_c = [
+        n.GetIdx() for n in s_atom.GetNeighbors()
+        if n.GetSymbol() == "C" and n.GetIdx() not in arm
+    ]
+    if len(parent_c) != 1:
+        return None  # not the R-S(=O)x-R' shape we cap
+    rw = Chem.RWMol(mol)
+    oh = rw.AddAtom(Chem.Atom(8))
+    rw.AddBond(sulfur_idx, oh, Chem.BondType.SINGLE)
+    rw.RemoveBond(sulfur_idx, parent_c[0])
+    try:
+        frag = rw.GetMol()
+        Chem.SanitizeMol(frag)
+    except Exception:
+        return None
+    # Isolate the S-bearing fragment (the parent side is now disconnected).
+    try:
+        pieces = Chem.GetMolFrags(frag, asMols=True, sanitizeFrags=True)
+    except Exception:
+        return None
+    acid_smiles = None
+    for p in pieces:
+        if any(a.GetSymbol() == "S" for a in p.GetAtoms()):
+            acid_smiles = Chem.MolToSmiles(p)
+            break
+    if acid_smiles is None:
+        return None
+    from ..namer import Orthonym
+    acid_name = Orthonym(style="pin", _disable_opsin_validity_gate=True).name(
+        acid_smiles
+    )
+    if not isinstance(acid_name, str) or not acid_name.endswith(acid_suffix):
+        return None  # fail closed: not a clean sulfinic/sulfonic acid
+    return acid_name[: -len(acid_suffix)] + oxide_kind
+
+
 def _classify_oxide_side(mol, c_idx: int, sulfur_idx: int):
     """Classify one R side of R-S(=O)x-R' for substitutive P-63.6 naming.
 

@@ -559,10 +559,21 @@ def _acid_stem_oxide_prefix(
     (methanesulfinyl / benzenesulfonyl / cyclohexanesulfinyl) with the
     _classify_oxide_side constitution guard. None when the R' side is not an
     honestly-nameable shape."""
-    from ..rules.sulfur import _classify_oxide_side
+    from ..rules.sulfur import (
+        _classify_oxide_side,
+        _acid_stem_unsaturated_oxide_prefix,
+    )
     side = _classify_oxide_side(mol, sub_carbon, sulfur_idx)
     if side is None:
-        return None
+        # BP-3 C2-B (P-63.6): unsaturated / branched / hetero arm —
+        # _classify_oxide_side only handles saturated-linear / benzene /
+        # cycloalkane. Build the acid-stem PIN ('prop-2-ene-1-sulfinyl') by
+        # naming the arm-derived sulfinic/sulfonic acid with the full engine and
+        # rewriting the suffix. Returns None (fail closed) on anything that does
+        # not name as a clean '... sulfinic/sulfonic acid'.
+        return _acid_stem_unsaturated_oxide_prefix(
+            mol, sub_carbon, sulfur_idx, oxide_kind
+        )
     stem, _kind, _atoms = side
     return f"{stem}{oxide_kind}"
 
@@ -801,19 +812,35 @@ def get_sulfanyl_prefix(
             return None
         return f"{acyl}{suffix}"
 
-    # Count carbons in substituent fragment
-    carbon_count = _count_fragment_atoms(
-        mol, sub_carbon, {sulfur_idx}, carbons_only=True
-    )
-    if carbon_count == 0:
-        return None
+    # BP-3 C2-A (P-63.2.5 / P-63.1.5): name the arm RECURSIVELY as a substituent
+    # group instead of by carbon-count. The old get_alkyl_name(carbon_count)
+    # collapsed every arm to a saturated linear alkyl — allyl -> 'propyl',
+    # isobutyl -> 'butyl', 2-hydroxyethyl -> 'ethyl', phenyl -> 'hexyl' — all
+    # constitution-wrong (SELF-01-suppressed). name_substituent_fragment is the
+    # project's centralized substituent namer and returns None on any shape it
+    # cannot name, so this stays fail-closed.
+    from .substituent_naming import name_substituent_fragment
+    from .naming_utils import is_complex_substituent, apply_enclosing_marks
 
-    # Build compound prefix: methylsulfanyl / methylselanyl / methyltellanyl, etc.
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        return f"{alkyl}{suffix}"
-    except (ValueError, KeyError):
+    arm_atoms = _collect_fragment_atoms(mol, sub_carbon, {sulfur_idx})
+    if not arm_atoms:
         return None
+    arm = name_substituent_fragment(
+        mol, list(arm_atoms), sub_carbon, list(chain_set | {sulfur_idx})
+    )
+    if not arm:
+        return None  # fail closed: un-nameable arm -> caller drops -> SELF-01
+
+    # P-16.3.3: a COMPLEX arm (locants / compound: prop-2-en-1-yl, 2-methylpropyl,
+    # 2-hydroxyethyl, penta-1,4-dien-3-yl) is enclosed BEFORE the chalcogen stem
+    # (BB 25713 '(prop-2-en-1-yl)cyclohexane'; BB 27836 '[(penta-1,4-dien-3-yl)
+    # sulfanyl]cyclobutane'). A SIMPLE arm (methyl/ethyl/propyl/phenyl/cyclopentyl)
+    # stays bare -> 'methylsulfanyl' (byte-identical to the old plain-alkyl output;
+    # BB 27828). The caller (format_fg_prefix / composer) supplies the OUTER
+    # enclosure + locant and escalates '(...)sulfanyl' -> '[(...)sulfanyl]'.
+    if is_complex_substituent(arm):
+        arm = apply_enclosing_marks(arm, 0)
+    return f"{arm}{suffix}"
 
 
 def get_alkoxysulfinyl_prefix(
