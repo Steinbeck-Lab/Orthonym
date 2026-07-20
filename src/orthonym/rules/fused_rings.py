@@ -214,17 +214,27 @@ def _fused_substituent_citation_key(substituents: Dict):
     )
 
 
-def _ring_system_automorphisms(mol, ring_atoms: Set[int]) -> List[Dict[int, int]]:
+def _ring_system_automorphisms(
+    mol, ring_atoms: Set[int], ignore_bond_order: bool = False,
+) -> List[Dict[int, int]]:
     """Automorphisms of the BARE ring skeleton (substituents stripped), each a
     ``{orig_atom -> orig_atom}`` permutation.
 
     Once the P-25.3.3.1.2 ring criteria fix the numbering, the only residual
     freedom is the ring system's own symmetry (e.g. furo[2,3-b]furan is
-    symmetric: positions 2 and 5 are equivalent). P-59.2.3 breaks that tie by
-    lowest substituent locants, so the caller enumerates these permutations.
+    symmetric: positions 2 and 5 are equivalent). P-59.2.3 (substituents) /
+    P-31.1.4.3.4 (hydro) break that tie by lowest locants, so the caller
+    enumerates these permutations.
+
+    ``ignore_bond_order=True`` matches on element + topology only (all bonds
+    flattened to single), i.e. the symmetry of the MANCUDE parent — needed for
+    the hydro tie-break, where the saturated and unsaturated rings of a
+    symmetric parent (2,3- vs 5,6-dihydrofuro[3,2-b]furan) must be treated as
+    interchangeable so the PIN takes the lower hydro locants.
+
     Fail-safe: returns just the identity when the skeleton cannot be isolated
-    or sanitised (e.g. exocyclic-double-bond parents) — then no tie-break is
-    applied and the canonical numbering stands (still round-trips via SELF-01).
+    or sanitised — then no tie-break is applied and the canonical numbering
+    stands (still round-trips via SELF-01).
     """
     ring_atoms = set(ring_atoms)
     identity = {a: a for a in ring_atoms}
@@ -235,7 +245,23 @@ def _ring_system_automorphisms(mol, ring_atoms: Set[int]) -> List[Dict[int, int]
     amap: Dict[int, int] = {}
     try:
         sub = Chem.PathToSubmol(mol, bond_idx, atomMap=amap)
-        Chem.SanitizeMol(sub)
+        if ignore_bond_order:
+            sub = Chem.RWMol(sub)
+            for b in sub.GetBonds():
+                b.SetBondType(Chem.BondType.SINGLE)
+                b.SetIsAromatic(False)
+            for a in sub.GetAtoms():
+                a.SetIsAromatic(False)
+                a.SetNoImplicit(True)
+                a.SetNumExplicitHs(0)
+                a.SetFormalCharge(0)
+            sub = sub.GetMol()
+            Chem.SanitizeMol(
+                sub,
+                sanitizeOps=Chem.SanitizeFlags.SANITIZE_SYMMRINGS,
+            )
+        else:
+            Chem.SanitizeMol(sub)
     except Exception:
         return [identity]
     inv = {v: k for k, v in amap.items()}  # submol idx -> original idx
@@ -289,6 +315,87 @@ def _select_substituent_numbering(mol, ring_atom_set: Set[int]):
     if best is None:
         return None
     return best[2], best[3]
+
+
+def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: str):
+    """BP-4 Phase 3: name a partially-saturated 2-component ortho-fused mancude
+    system as ``<locants>-<multiplier>hydro-<mancude parent>`` (P-31.1.4).
+
+    Returns the name or ``None`` (fail closed). On ``None`` the caller keeps its
+    legacy indicated-H behaviour, so this can only ADD coverage or UPGRADE a
+    round-trip-valid non-PIN name to the PIN — never regress.
+
+    Slice scope (everything else fails closed):
+      * every saturated (sp3) ring atom is a CARBON — heteroatom saturation
+        (e.g. an -NH- position) interacts with indicated hydrogen, deferred;
+      * an EVEN number of sp3 carbons — each ring double bond removed from the
+        mancude parent saturates a PAIR of atoms; an odd count implies the
+        mancude parent itself carries indicated hydrogen (e.g. 2H + dihydro),
+        deferred;
+      * BARE parent (no exocyclic substituents) — the hydro/substituent
+        low-locant + alphanumeric interplay is a later refinement;
+      * ``compute_fused_numbering`` yields a determinate numbering.
+
+    Hydro locants take the lowest set consistent with the fixed P-25.3.3 ring
+    numbering (P-31.1.4.3.4) via the ring-system automorphism tie-break. If the
+    result is non-PIN (a symmetric mancude parent whose saturated ring lands on
+    the higher-locant side), it still round-trips and the SELF-01 gate keeps
+    accuracy intact.
+    """
+    sp3 = [
+        a for a in ring_atom_set
+        if not mol.GetAtomWithIdx(a).GetIsAromatic()
+        and mol.GetAtomWithIdx(a).GetHybridization() == Chem.HybridizationType.SP3
+    ]
+    if not sp3:
+        return None  # fully mancude -> not this path
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in sp3):
+        return None  # heteroatom saturation -> indicated-H interaction, defer
+    mult = {2: 'di', 4: 'tetra', 6: 'hexa', 8: 'octa', 10: 'deca'}.get(len(sp3))
+    if mult is None:
+        return None  # odd count (indicated-H mix) or >10 -> defer
+    # BARE only for this slice.
+    if any(a.GetIdx() not in ring_atom_set and a.GetAtomicNum() != 1
+           for a in mol.GetAtoms()):
+        return None
+
+    from .fusion_numbering import compute_fused_numbering
+    canonical = compute_fused_numbering(mol, ring_atom_set)
+    if not canonical:
+        return None
+    # Mancude-symmetry automorphisms (bond-order-agnostic): the saturated and
+    # unsaturated rings of a symmetric parent are interchangeable for numbering,
+    # so the PIN takes the lower hydro locants (P-31.1.4.3.4).
+    perms = _ring_system_automorphisms(mol, ring_atom_set, ignore_bond_order=True)
+    canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    atoms_by_rank = sorted(ring_atom_set, key=lambda a: canon_rank[a])
+
+    best = None  # (hydro_key, signature, cand_map)
+    for perm in perms:
+        try:
+            cand = {
+                a: _fused_locant_to_output(canonical[perm[a]])
+                for a in ring_atom_set
+            }
+        except KeyError:
+            continue
+        hydro_nums = sorted(_fused_locant_num(cand[a]) for a in sp3)
+        # sp3 carbons are non-fusion -> plain integer locants expected.
+        if any(t[1] != 0 for t in hydro_nums):
+            continue
+        key = tuple(hydro_nums)
+        sig = tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank)
+        if best is None or (key, sig) < (best[0], best[1]):
+            best = (key, sig, cand)
+    if best is None:
+        return None
+
+    cand = best[2]
+    hydro_locs = sorted(cand[a] for a in sp3)
+    hydro_prefix = f"{','.join(str(l) for l in hydro_locs)}-{mult}hydro"
+    if mancude_parent and mancude_parent[0].isalpha():
+        return f"{hydro_prefix}{mancude_parent}"
+    return f"{hydro_prefix}-{mancude_parent}"
 
 
 def _try_algorithmic_fusion_name(mol) -> Optional[str]:
@@ -386,6 +493,19 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
 
     if not name:
         return None
+
+    # BP-4 Phase 3 (P-31.1.4): a partially-saturated fused pair is named as
+    # '<locants>-<multiplier>hydro-<mancude parent>'. `name` here is the mancude
+    # descriptor (generate_systematic_name_for_fused_pair is aromaticity-
+    # agnostic). Try the dihydro path first; on None fall through to the legacy
+    # indicated-H behaviour so this can never regress a currently-valid name.
+    hydro_name = _try_partial_saturation_name(mol, ring_atom_set, name)
+    if hydro_name:
+        logger.debug(
+            "Partial-saturation fusion name for %s: %s",
+            Chem.MolToSmiles(mol), hydro_name,
+        )
+        return hydro_name
 
     # Compute indicated hydrogen for the algorithmic fused system
     parent_name, child_name, parent_ring, child_ring = identify_parent_and_child(

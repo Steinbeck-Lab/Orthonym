@@ -143,3 +143,41 @@ class TestBP4Phase2Polycomponent:
         mol = Chem.MolFromSmiles("[Si](C)(C)c1cc2nc3ccoc3cc2o1")
         assert mol is not None
         assert _try_polycomponent_fusion_name(mol) is None
+
+
+class TestBP4Phase3PartialSaturation:
+    """Phase 3 slice: partially-saturated 2-component ortho-fused pairs named as
+    '<locants>-dihydro-<mancude parent>' (P-31.1.4). Even sp3-carbon count only;
+    the mancude-symmetry automorphism tie-break takes the lowest hydro locants
+    (P-31.1.4.3.4). Each PIN verified this session to OPSIN round-trip."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # symmetric mancude parent (furo[3,2-b]furan): 2,3 beats the RT-valid 5,6
+        ("C1COc2ccoc21", "2,3-dihydrofuro[3,2-b]furan"),
+        ("C1Cc2ccoc2O1", "2,3-dihydrofuro[2,3-b]furan"),   # was `unknown` pre-Phase 3
+        ("O1CCc2sccc21", "2,3-dihydrothieno[3,2-b]furan"),
+        ("C1COc2ccsc21", "2,3-dihydrothieno[3,2-b]furan"),
+    ])
+    def test_partial_saturation_pin(self, smiles, expected):
+        mol = Chem.MolFromSmiles(smiles)
+        assert _try_algorithmic_fusion_name(mol) == expected
+
+    @pytest.mark.parametrize("smiles", [
+        "C1CCc2ccoc2O1",   # 5-6 fused, ODD sp3 count -> indicated-H mix, deferred
+        "C1CCOc2ccoc21",
+    ])
+    def test_odd_saturation_defers(self, smiles):
+        """An odd sp3 count implies the mancude parent carries indicated H
+        (2H + dihydro): the slice fails closed and the legacy path takes over
+        (never a wrong structure — SELF-01 suppresses any non-round-trip)."""
+        mol = Chem.MolFromSmiles(smiles)
+        # the dihydro slice itself declines
+        from orthonym.rules.fused_rings import _try_partial_saturation_name
+        ra = _ring_atoms(mol)
+        assert _try_partial_saturation_name(mol, ra, "furo[3,2-b]pyran") is None
+
+    def test_fully_aromatic_not_treated_as_partial(self):
+        """A fully-mancude system must NOT enter the hydro path."""
+        from orthonym.rules.fused_rings import _try_partial_saturation_name
+        mol = Chem.MolFromSmiles("c1cc2ccoc2o1")
+        assert _try_partial_saturation_name(mol, _ring_atoms(mol), "furo[2,3-b]furan") is None
