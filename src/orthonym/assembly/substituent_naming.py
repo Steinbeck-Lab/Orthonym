@@ -528,6 +528,110 @@ def _build_alkenyl_name(
     return name
 
 
+def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
+    """v26 BP-2 RC-3 (P-33 oxo / P-14.4): an ACYCLIC all-carbon substituent chain
+    that is UNSATURATED (>=1 C=C/C#C) and carries >=1 in-chain/terminal carbonyl
+    (aldehyde or ketone) -> the carbonyl is the detachable prefix 'oxo' on the
+    chain numbered from the free valence, e.g. -C(=CH2)-CHO -> '3-oxoprop-1-en-2-yl'.
+
+    The unsaturated analogue of the saturated oxo handling in
+    _name_polyfunctional_acyclic_substituent (which declines unsaturation and
+    internal attachment). Fail-closed (None) for: rings; any heteroatom other
+    than a terminal ketone/aldehyde =O; a branched or non-single-chain backbone;
+    no unsaturation (saturated tier owns it); no oxo (pure-alkenyl tier owns it);
+    or an oxo ON the free-valence carbon (that is an acyl group -C(=O)-R, owned
+    by the acyl tier — P-66 note (m) forbids the '1-oxo...yl' form).
+    """
+    if not sub_atoms or attach_idx is None or attach_idx not in set(sub_atoms):
+        return None
+    sub_set = set(sub_atoms)
+    ri = mol.GetRingInfo()
+    if any(ri.NumAtomRings(i) > 0 for i in sub_set):
+        return None
+    backbone = []
+    oxo_hosts = {}                      # host C idx -> count of =O
+    for idx in sub_set:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetFormalCharge() != 0:
+            return None
+        sym = a.GetSymbol()
+        if sym == 'C':
+            backbone.append(idx)
+        elif sym == 'O':
+            # only a terminal ketone/aldehyde =O (degree 1, 0 H, double to a C)
+            nb = list(a.GetNeighbors())
+            if len(nb) != 1 or a.GetTotalNumHs() != 0:
+                return None
+            b = mol.GetBondBetweenAtoms(idx, nb[0].GetIdx())
+            if b.GetBondType() != Chem.BondType.DOUBLE or nb[0].GetSymbol() != 'C':
+                return None
+            if nb[0].GetIdx() not in sub_set:
+                return None
+            oxo_hosts[nb[0].GetIdx()] = oxo_hosts.get(nb[0].GetIdx(), 0) + 1
+        else:
+            return None                 # any other heteroatom -> fail closed
+    bset = set(backbone)
+    if not backbone or not oxo_hosts:
+        return None
+    if any(h not in bset for h in oxo_hosts):
+        return None
+    # linear single chain: every backbone C has <=2 backbone-C neighbours
+    for idx in backbone:
+        if sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+               if n.GetIdx() in bset) > 2:
+            return None
+    # must be unsaturated within the backbone
+    has_unsat = any(
+        mol.GetBondBetweenAtoms(i, j.GetIdx()).GetBondTypeAsDouble() != 1.0
+        for i in backbone for j in mol.GetAtomWithIdx(i).GetNeighbors()
+        if j.GetIdx() in bset and j.GetIdx() > i)
+    if not has_unsat:
+        return None                     # saturated oxo -> polyfunctional tier owns it
+    # an oxo on the free-valence carbon = acyl -> decline (P-66 note (m))
+    if attach_idx in oxo_hosts:
+        return None
+    # trace the chain terminal -> terminal
+    term = next((i for i in backbone
+                 if sum(1 for n in mol.GetAtomWithIdx(i).GetNeighbors()
+                        if n.GetIdx() in bset) == 1), None)
+    if term is None:
+        return None
+    ordered, seen, cur = [term], {term}, term
+    while len(ordered) < len(backbone):
+        nxt = next((n.GetIdx() for n in mol.GetAtomWithIdx(cur).GetNeighbors()
+                    if n.GetIdx() in bset and n.GetIdx() not in seen), None)
+        if nxt is None:
+            break
+        ordered.append(nxt)
+        seen.add(nxt)
+        cur = nxt
+    if len(ordered) != len(backbone):
+        return None
+    n = len(backbone)
+    best = None                         # (key, name)
+    for chain in (ordered, list(reversed(ordered))):
+        fv = chain.index(attach_idx) + 1
+        dbl, trp = [], []
+        for i in range(n - 1):
+            bt = mol.GetBondBetweenAtoms(
+                chain[i], chain[i + 1]).GetBondTypeAsDouble()
+            if bt == 2.0:
+                dbl.append(i + 1)
+            elif bt == 3.0:
+                trp.append(i + 1)
+        pos = {idx: i + 1 for i, idx in enumerate(chain)}
+        oxo_locs = sorted(pos[h] for h in oxo_hosts for _ in range(oxo_hosts[h]))
+        unsat = sorted(dbl + trp)
+        # P-14.4: (c) free valence, (e) unsaturation, (f) detachable prefix oxo
+        key = (fv, unsat, oxo_locs)
+        if best is None or key < best[0]:
+            stem = _build_alkenyl_name(n, fv, dbl, trp)   # 'prop-1-en-2-yl'
+            _M = {1: "", 2: "di", 3: "tri", 4: "tetra"}
+            ostr = f"{','.join(map(str, oxo_locs))}-{_M.get(len(oxo_locs), '')}oxo"
+            best = (key, f"{ostr}{stem}")                 # '3-oxo' + 'prop-1-en-2-yl'
+    return best[1] if best else None
+
+
 _HALOGEN_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
 
 
@@ -3540,6 +3644,16 @@ def name_substituent_fragment(
     unsat_name = _name_unsaturated_chain(mol, sub_atoms, attach_idx, parent_set)
     if unsat_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, unsat_name, attach_idx=attach_idx)
+
+    # Step 2b-oxo (v26 BP-2 RC-3, P-33 / P-14.4): unsaturated all-carbon chain
+    # carrying an in-chain aldehyde/ketone -> oxo prefix numbered from the free
+    # valence (-C(=CH2)CHO -> '3-oxoprop-1-en-2-yl'). Sits between the pure-alkenyl
+    # namer (declines: =O is not C) and the saturated polyfunctional builder
+    # (declines: unsaturation + internal attachment). Fail-closed otherwise.
+    unsat_oxo = _name_unsaturated_oxo_substituent(
+        mol, sub_atoms, attach_idx, parent_set)
+    if unsat_oxo is not None:
+        return _add_substituent_stereo(mol, sub_atoms, unsat_oxo, attach_idx=attach_idx)
 
     # Step 2c (Phase 171 BBR-ASM, DEF-8 / P-46): saturated linear chain with halogen
     # substituents, numbered from the attachment point. MUST precede the recursive
