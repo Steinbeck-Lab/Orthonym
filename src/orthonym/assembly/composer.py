@@ -6926,6 +6926,42 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 if _ring_attach_atom is not None:
                     break
 
+        # BP-3 cluster R integration (P-29 / P-31.1.4.3.4 / P-59.2.3): a
+        # MONOCYCLIC ring substituent carrying its OWN decorations is named as
+        # ONE bracketed ring-yl prefix via the substituent chokepoint
+        # (name_ring_system_substituent, which numbers the free valence and
+        # places decorations), NOT as a bare ring name — the bare path has no
+        # home for a monocyclic ring's decorations (they are neither ring nor
+        # chain atoms, so a decorated heteroaryl substituent, e.g. a
+        # dimethylpyrazolyl on a diaryl methanone, could not be fully named) and
+        # additionally misidentifies pyrazole as imidazole. Fires only for a
+        # decorated monocycle where the chokepoint returns a complete numbered
+        # name; bare rings (no decorations) and chokepoint declines fall through
+        # to the existing paths unchanged -> additive, fail-closed.
+        if _ring_attach_atom is not None and len(ring_atom_set) == len(ring_atoms):
+            _rc_frag = set(ring_atoms)
+            _rc_stack = list(ring_atoms)
+            while _rc_stack:
+                _rc_cur = _rc_stack.pop()
+                for _rc_nb in features.mol.GetAtomWithIdx(_rc_cur).GetNeighbors():
+                    _rc_ni = _rc_nb.GetIdx()
+                    if (_rc_ni in _rc_frag or _rc_ni in chain_set
+                            or _rc_nb.GetAtomicNum() <= 1):
+                        continue
+                    _rc_frag.add(_rc_ni)
+                    _rc_stack.append(_rc_ni)
+            if _rc_frag != set(ring_atoms):  # the ring carries decorations
+                from ..rules.ring_substituents import (
+                    name_ring_system_substituent as _rc_nrss,
+                )
+                _rc_name = _rc_nrss(
+                    features.mol, sorted(_rc_frag), _ring_attach_atom
+                )
+                if (_rc_name and ' ' not in _rc_name
+                        and any(_ch.isdigit() for _ch in _rc_name)):
+                    ring_sub_groups[f'({_rc_name})'].append(locant)
+                    continue
+
         # Get base substituent name (phenyl, cyclohexyl, etc.)
         # For multi-ring systems, try the full fused system first for retained name
         # lookup (naphthalene, anthracene), but fall back to the SSSR ring if no

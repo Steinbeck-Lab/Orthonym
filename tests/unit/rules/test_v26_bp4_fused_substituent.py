@@ -205,6 +205,25 @@ class TestBP3ClusterRDecoratedRingSubstituent:
         from orthonym import name_compound
         assert name_compound(smiles) == expected
 
+    @pytest.mark.parametrize("smiles,expected", [
+        # diaryl-ketone flagship: decorated heteroaryl substituent on a methanone
+        # (routes through the composer ring-substituent-prefix path, now funneled
+        # to the chokepoint). Was `unknown`.
+        ("O=C(c1ccccc1)c1cc(C)n(C)n1",
+         "(1,5-dimethylpyrazol-3-yl)phenylmethanone"),
+        ("Cc1nn(C)c(O)c1C(=O)c1ccc(Cl)cc1Cl",
+         "(2,4-dichlorophenyl)(5-hydroxy-1,3-dimethylpyrazol-4-yl)methan-1-one"),
+        # bare heteroaryl methanones unchanged (regression guard)
+        ("O=C(c1ccccc1)c1ccncc1", "phenyl(pyridin-4-yl)methanone"),
+        ("O=C(c1ccccc1)c1cccnc1", "phenyl(pyridin-3-yl)methanone"),
+        # common decorated-aryl-on-chain unchanged (regression guard)
+        ("OC(=O)CCc1ccc(Cl)cc1", "3-(4-chlorophenyl)propanoic acid"),
+        ("OC(=O)CCc1ccc(C)cc1", "3-(4-methylphenyl)propanoic acid"),
+    ])
+    def test_ketone_and_chain_ring_substituent(self, smiles, expected):
+        from orthonym import name_compound
+        assert name_compound(smiles) == expected
+
     def test_decorated_helper_direct(self):
         """The decorated-ring helper produces the numbered PIN substituent form."""
         from orthonym.rules.ring_substituents import (
