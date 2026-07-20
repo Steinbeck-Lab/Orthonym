@@ -472,14 +472,325 @@ def name_general_ring(
     return GeneralEngineResult(name=name, bindings=tuple(bindings))
 
 
+def _ring_suffix_text(core: str, locants: List[int]) -> Optional[str]:
+    """Ring suffix WITHOUT the parent-elision decision: '-3-ol', '-2,5-diol',
+    '-2-carboxylic acid', '-1,3-dicarboxylic acid'. None on unsupported
+    multiplicity. The parent-'e' elision is applied by the caller from the
+    first alphabetic char of this string (mirrors chain ``_assemble``)."""
+    n = len(locants)
+    if n == 0:
+        return None
+    mult = '' if n == 1 else _MULT_SIMPLE.get(n)
+    if n > 1 and mult is None:
+        return None
+    return '-' + ','.join(map(str, sorted(locants))) + '-' + (mult or '') + core
+
+
+def _bond_ring_locant(la: int, lb: int, n: int) -> int:
+    """Ring-bond locant for a bond between ring positions ``la`` and ``lb``
+    (1..n): the lower endpoint, except the wraparound bond {n, 1} which is
+    cited as ``n`` (P-31.1.4.3 lowest-locant numbering already handled by the
+    orienter; this only formats the chosen orientation)."""
+    if {la, lb} == {1, n}:
+        return n
+    return min(la, lb)
+
+
+def _orient_carbocycle(mol, ring_order, sub_positions, pg_ring_atoms):
+    """Number an all-carbon monocycle by lowest locants to, in order:
+    principal group -> ring unsaturation -> substituents -> canonical rank
+    (P-14.4 / P-31.1.4). Returns (oriented_ring, atom_to_locant).
+
+    The canonical-rank final tier is a deterministic symmetry-breaker; among
+    orientations that tie on every IUPAC criterion the choice is round-trip
+    equivalent (SELF-01 is the downstream authority for the emitted string)."""
+    ring_list = list(ring_order)
+    n = len(ring_list)
+    canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    best_key = None
+    best_oriented = None
+    for start in range(n):
+        for direction in (1, -1):
+            oriented = [ring_list[(start + direction * k) % n] for k in range(n)]
+            loc = {a: i + 1 for i, a in enumerate(oriented)}
+            pg = sorted(loc[i] for i in pg_ring_atoms if i in loc)
+            uns = []
+            for i in range(n):
+                a, b = oriented[i], oriented[(i + 1) % n]
+                bond = mol.GetBondBetweenAtoms(a, b)
+                if bond is not None and bond.GetBondTypeAsDouble() in (2.0, 3.0):
+                    uns.append(_bond_ring_locant(loc[a], loc[b], n))
+            uns.sort()
+            sub = sorted(loc[i] for i in sub_positions if i in loc)
+            key = (pg, uns, sub, [canon[a] for a in oriented])
+            if best_key is None or key < best_key:
+                best_key = key
+                best_oriented = oriented
+    return best_oriented, {a: i + 1 for i, a in enumerate(best_oriented)}
+
+
+def _carbocycle_parent_name(mol, oriented, atom_to_locant) -> Optional[str]:
+    """Parent name for an all-carbon monocycle: 'benzene' (6-membered
+    aromatic), 'cyclohexane' (saturated), or 'cyclohex-1-ene' style
+    (unsaturated). None -> fail closed (aromatic non-6, unnameable stem)."""
+    from ..data.chain_names import get_chain_prefix
+    n = len(oriented)
+    ring_set = set(oriented)
+    if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in oriented):
+        return 'benzene' if n == 6 else None
+    base = get_chain_prefix(n)
+    if not base:
+        return None
+    ene, yne = [], []
+    for i in range(n):
+        a, b = oriented[i], oriented[(i + 1) % n]
+        bond = mol.GetBondBetweenAtoms(a, b)
+        if bond is None:
+            return None
+        order = bond.GetBondTypeAsDouble()
+        if order == 1.0:
+            continue
+        loc = _bond_ring_locant(atom_to_locant[a], atom_to_locant[b], n)
+        if order == 2.0:
+            ene.append(loc)
+        elif order == 3.0:
+            yne.append(loc)
+        else:
+            return None  # aromatic/dative bond in a non-aromatic ring: bail
+    ene.sort()
+    yne.sort()
+    if not ene and not yne:
+        return 'cyclo' + base + 'ane'
+    stem = 'cyclo' + base
+    if ene:
+        mult = _MULT_SIMPLE.get(len(ene), '') if len(ene) > 1 else ''
+        if len(ene) > 1:
+            stem += 'a'
+        stem += '-' + ','.join(map(str, ene)) + '-' + mult + 'ene'
+    if yne:
+        if ene:
+            stem = stem[:-1]  # 'ene' -> 'en' before '-N-yne'
+        mult = _MULT_SIMPLE.get(len(yne), '') if len(yne) > 1 else ''
+        if len(yne) > 1 and not ene:
+            stem += 'a'
+        stem += '-' + ','.join(map(str, yne)) + '-' + mult + 'yne'
+    return stem
+
+
+def name_general_monocycle(
+    mol, features, allow_aromatic_general: bool = False,
+) -> Optional[GeneralEngineResult]:
+    """v26 P1: general LONE-monocycle ring-parent path (opt-in engine only).
+
+    Names a molecule whose SENIOR ring system is a single (non-fused) ring
+    -- benzene, pyridine, thiophene, imidazole, ... -- with its substituents
+    coming from the never-None universal recursion
+    (``substituent_enumerator.name_substituent``) instead of the default
+    composer's finite per-class vocabulary. That is the root-cause fix for
+    "bare ring names, substituted form abstains."
+
+    The parent ring name + numbering come from the EXISTING lowest-locant
+    machinery (``name_heterocycle`` + ``orient_heterocycle_with_substituents``
+    for heterocycles; ``benzene``/cycloalkane for all-carbon). Fail-closed
+    (returns None) on anything outside this scope; the E1 atom-partition and
+    SELF-01 OPSIN round-trip are the downstream authorities.
+
+    Gated behind ``allow_aromatic_general`` -- inert (returns None) when the
+    flag is False, so the PIN/default path stays byte-identical.
+    """
+    if not allow_aromatic_general:
+        return None
+
+    from ..rules.ring_selection import select_principal_ring_system
+    from ..rules.seniority import get_suffix
+    from ..rules.heterocycles import (
+        name_heterocycle, orient_heterocycle_with_substituents,
+    )
+    from .substituent_enumerator import discover_substituents, name_substituent
+
+    reason = _common_refusal(mol)
+    if reason:
+        return _refuse(reason)
+    ring_info = mol.GetRingInfo()
+    if ring_info.NumRings() == 0:
+        return _refuse("acyclic (chain path owns it)")
+    if getattr(features, 'chain_is_parent', False):
+        return _refuse("chain parent (chain path owns it)")
+
+    # --- identify the parent monocycle: the SENIOR ring system must be a
+    #     single, non-fused ring (substituents MAY carry their own rings; the
+    #     universal recursion names them). ---
+    ring_systems = list(getattr(features, 'ring_systems', None) or [])
+    if ring_systems:
+        senior = select_principal_ring_system(mol, ring_systems)
+        senior_set = set(senior) if senior else None
+    else:
+        senior_set = None
+    atom_rings = [tuple(r) for r in ring_info.AtomRings()]
+    parent_ring = None
+    if senior_set is not None:
+        subrings = [r for r in atom_rings if set(r) <= senior_set]
+        if len(subrings) == 1 and set(subrings[0]) == senior_set:
+            parent_ring = subrings[0]
+    elif len(atom_rings) == 1:
+        parent_ring = atom_rings[0]
+    if parent_ring is None:
+        return _refuse("no lone monocycle parent (fused/cage or ambiguous)")
+
+    ring_set = set(parent_ring)
+
+    # --- suffix (ring forms; mirror name_general_ring) ---
+    pg = getattr(features, 'principal_group', None)
+    pg_matches = list(getattr(features, 'principal_group_atoms', None) or [])
+    suffix_core = None
+    suffix_atoms: set = set()
+    pg_locants: List[int] = []
+    pg_ring_atoms: set = set()
+    if pg:
+        suffix_core = get_suffix(pg, is_ring=True)
+        if suffix_core not in _RING_SUFFIX_STYLES:
+            return _refuse(f"unsupported ring suffix for pg={pg!r}")
+
+    # --- numbering (heteroatom/pg/substituent lowest-locant) + parent name ---
+    sub_positions: set = set()  # filled after suffix_atoms known; provisional below
+    # First pass: collect off-ring pg (suffix) atoms so they are excluded from
+    # the substituent set that drives numbering.
+    if pg:
+        seen = set()
+        for match in pg_matches:
+            key = tuple(sorted(match))
+            if key in seen:
+                continue
+            seen.add(key)
+            suffix_atoms.update(i for i in match
+                                if i not in ring_set
+                                and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
+            on_ring = [i for i in match if i in ring_set]
+            pg_ring_atoms.update(on_ring)
+    for i in ring_set:
+        for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+            j = nb.GetIdx()
+            if (j not in ring_set and j not in suffix_atoms
+                    and nb.GetAtomicNum() > 1):
+                sub_positions.add(i)
+                break
+
+    has_hetero = any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_set)
+    if has_hetero:
+        oriented, atom_to_locant = orient_heterocycle_with_substituents(
+            mol, parent_ring, sub_positions, pg_ring_atoms)
+        parent_name = name_heterocycle(mol, parent_ring)
+    else:
+        oriented, atom_to_locant = _orient_carbocycle(
+            mol, parent_ring, sub_positions, pg_ring_atoms)
+        parent_name = _carbocycle_parent_name(mol, oriented, atom_to_locant)
+    if not parent_name or 'unknown' in parent_name.lower():
+        return _refuse("monocycle parent name underivable")
+    if any(i not in atom_to_locant for i in ring_set):
+        return _refuse("ring atom missing from numbering")
+
+    # --- pg locants under the chosen numbering (mirror name_general_ring) ---
+    if pg:
+        seen = set()
+        for match in pg_matches:
+            key = tuple(sorted(match))
+            if key in seen:
+                continue
+            seen.add(key)
+            on_ring = [i for i in match if i in ring_set]
+            if on_ring:
+                loc = min(atom_to_locant[i] for i in on_ring)
+            else:
+                nbrs = [n.GetIdx()
+                        for i in match
+                        for n in mol.GetAtomWithIdx(i).GetNeighbors()
+                        if n.GetIdx() in ring_set]
+                if not nbrs:
+                    return _refuse("PG instance not attached to ring")
+                loc = min(atom_to_locant[n] for n in nbrs)
+            pg_locants.append(loc)
+
+    # A '-one' on an aromatic ring carbon needs added-hydrogen machinery this
+    # path does not build (pyridin-2(1H)-one); fail closed rather than emit an
+    # aromatic-carbon-with-=O impossibility.
+    if suffix_core == 'one' and any(
+            mol.GetAtomWithIdx(i).GetIsAromatic()
+            for m in pg_matches for i in m if i in ring_set):
+        return _refuse("ring ketone on aromatic carbon (added-H not built)")
+
+    # --- substituent prefixes (universal recursion; mirror name_general_ring) ---
+    ordered_ring = sorted(ring_set, key=lambda i: atom_to_locant[i])
+    try:
+        subs = discover_substituents(
+            mol, ring_set | suffix_atoms, parent_type='chain',
+            principal_chain=ordered_ring, atom_to_locant=atom_to_locant)
+    except AssertionError as e:
+        return _refuse(f"partition incomplete: {e}")
+
+    groups: Dict[str, List[int]] = {}
+    frag_bindings: List[TokenBinding] = []
+    for sub in subs:
+        frag = set(sub.frag_atoms)
+        attach_nbrs = [n.GetIdx() for n in
+                       mol.GetAtomWithIdx(sub.attach_mol_idx).GetNeighbors()
+                       if n.GetIdx() in frag]
+        if not attach_nbrs:
+            return _refuse("substituent without ring attachment")
+        prefix = name_substituent(mol, frag, attach_nbrs[0])
+        if not prefix or prefix == 'substituent':
+            return _refuse("branch unnameable (tier-5 fallback)")
+        groups.setdefault(prefix, []).append(sub.locant)
+        frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
+                                          'prefix'))
+
+    prefix_parts = []
+    for prefix in sorted(groups, key=_alpha_key):
+        locs = sorted(groups[prefix])
+        text = _mult_prefix(len(locs), prefix)
+        if text is None:
+            return _refuse("multiplicity beyond table")
+        prefix_parts.append(','.join(map(str, locs)) + '-' + text)
+
+    # --- suffix text + parent-'e' elision ---
+    bindings = frag_bindings
+    core = parent_name
+    if suffix_core:
+        suffix_text = _ring_suffix_text(suffix_core, pg_locants)
+        if suffix_text is None:
+            return _refuse("unsupported suffix multiplicity/placement")
+        first_alpha = next((c for c in suffix_text if c.isalpha()), '')
+        if core.endswith('e') and first_alpha in 'aeiouy':
+            core = core[:-1]
+        core = core + suffix_text
+        if suffix_atoms:
+            bindings.append(TokenBinding(tuple(sorted(suffix_atoms)),
+                                         suffix_core, 'suffix'))
+
+    # --- glue prefixes + core (mirror name_general_ring hyphen rule) ---
+    if prefix_parts:
+        joined = '-'.join(prefix_parts)
+        name = joined + ('-' if core[:1].isdigit() else '') + core
+    else:
+        name = core
+
+    # v25 G4: parent-scope stereo from structure (ring locants).
+    name = _stereo_prefix(mol, atom_to_locant) + name
+
+    # E1 parent binding: a stem guaranteed to survive suffix elision.
+    parent_token = parent_name[:-1] if parent_name.endswith('e') else parent_name
+    bindings.append(TokenBinding(tuple(sorted(ring_set)), parent_token, 'parent'))
+    return GeneralEngineResult(name=name, bindings=tuple(bindings))
+
+
 def name_general(
     mol, features, allow_aromatic_general: bool = False,
 ) -> Optional[GeneralEngineResult]:
     """v25 engine dispatcher: chain parent -> G1 path, ring parent -> G2 path.
 
-    v26 P0: ``allow_aromatic_general`` is plumbing-only here (threaded to
-    ``name_general_ring`` -> ``analyze_cage_universal``); default False ->
-    behavior byte-identical to pre-P0.
+    v26 P0/P1: ``allow_aromatic_general`` widens the ring producer -- it is
+    threaded to ``name_general_ring`` -> ``analyze_cage_universal`` (aromatic
+    cages) and enables the general lone-monocycle path
+    (``name_general_monocycle``). Default False -> byte-identical to pre-P0.
     """
     ring_atoms = any(a.IsInRing() for a in mol.GetAtoms()) if mol else False
     if not ring_atoms or getattr(features, 'chain_is_parent', False):
@@ -488,5 +799,5 @@ def name_general(
         mol, features, allow_aromatic_general=allow_aromatic_general)
     if cage_result is not None:
         return cage_result
-    # P1: name_general_monocycle(mol, features, allow_aromatic_general) goes here
-    return None
+    return name_general_monocycle(
+        mol, features, allow_aromatic_general=allow_aromatic_general)
