@@ -547,8 +547,9 @@ def ring_system_score(
     tiebreaker, applied only after P-44.2.2 type seniority (so e.g.
     spiro > phane > fused stays senior to a mere double-bond difference).
 
-    Tuple ordering (30 elements; Tasks 12-17 append P-44.2.2.2.x tiebreakers
-    AFTER the P-44.4.1 tier so they only break within-type ties):
+    Tuple ordering (39 elements; Tasks 12-17 + the P-44.2.2.2.4 pre-bridge
+    metrics append P-44.2.2.2.x tiebreakers AFTER the P-44.4.1 tier so they only
+    break within-type ties):
     - [0]  -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
     - [1]  -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
     - [2]  -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
@@ -568,6 +569,7 @@ def ring_system_score(
     - [33] fusion-descriptor numbers: P-44.2.2.2.3.4 lower numbers (nested tuple)
     - [34] P-25.8 component rank: P-44.2.2.2.3.5 senior component (nested tuple;
            het-locant set — quinoline<isoquinoline)
+    - [35..38] bridged-fused pre-bridge metrics (a,b,c,n): P-44.2.2.2.4
 
     The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary

@@ -168,21 +168,39 @@ class TestHeteroatomVarietyTermByTerm:
         assert score_pyr < score_benz
 
     def test_score_tuple_length(self):
-        """Score tuple should have the correct new length.
+        """Pin the P-44 score-tuple length (deliberate-change detector).
 
-        6 fixed fields + 20 variety fields + 1 type_rank + 2 unsaturation
-        (WS-A.1 S1, P-44.4.1) = 29.
+        Composition: 6 fixed (P-44.2.1 a-f) + 20 heteroatom-variety (g)
+        + type_rank (P-44.2.2) + 2 unsaturation (P-44.4.1) + spiro-fusions
+        + sat-monocyclic + 4 nested P-44.2.2.2.x tiebreakers (spiro-locants,
+        fusion letters, fusion numbers, P-25.8 component) + 4 pre-bridge
+        metrics (P-44.2.2.2.4) = 39. Derived from _HETEROATOM_VARIETY_ORDER so
+        it tracks the variety width; bump the +13 only when the P-44.2.2/P-44.4.1
+        tiebreaker set changes.
         """
-        mol = Chem.MolFromSmiles("c1ccncc1")
+        from orthonym.rules.ring_selection import _HETEROATOM_VARIETY_ORDER
         from orthonym.perception.rings import get_ring_systems
-        rs = get_ring_systems(mol)
-        score = ring_system_score(mol, rs[0])
-        # 6 fixed + 20 variety + 1 type_rank + 2 unsaturation (S1) = 29
-        assert len(score) == 29, f"Expected 29-element tuple, got {len(score)}"
+        mol = Chem.MolFromSmiles("c1ccncc1")
+        score = ring_system_score(mol, get_ring_systems(mol)[0])
+        expected = 6 + len(_HETEROATOM_VARIETY_ORDER) + 13
+        assert len(score) == expected == 39, (
+            f"Expected {expected}-element tuple, got {len(score)}"
+        )
 
-    def test_empty_system_sentinel_length(self):
-        """Empty system sentinel should match score tuple length (29)."""
-        mol = Chem.MolFromSmiles("C")
-        score = ring_system_score(mol, set())
-        # 6 fixed + 20 variety + 1 type_rank + 2 unsaturation (S1) = 29
-        assert len(score) == 29, f"Expected 29-element sentinel, got {len(score)}"
+    def test_empty_system_sentinel_matches_real_score(self):
+        """The empty-system sentinel MUST match a real score tuple in BOTH
+        length and nested-tuple positions — otherwise the min() parent-selection
+        comparison breaks (an int compared against a nested tuple at the same
+        index raises or mis-orders). This is the invariant that matters and it
+        stays valid as the P-44 cascade grows, as long as the sentinel is kept
+        in sync (which is exactly what this guards).
+        """
+        from orthonym.perception.rings import get_ring_systems
+        real_mol = Chem.MolFromSmiles("c1ccncc1")
+        real = ring_system_score(real_mol, get_ring_systems(real_mol)[0])
+        sentinel = ring_system_score(Chem.MolFromSmiles("C"), set())
+        assert len(sentinel) == len(real)
+        assert (
+            [i for i, v in enumerate(sentinel) if isinstance(v, tuple)]
+            == [i for i, v in enumerate(real) if isinstance(v, tuple)]
+        )
