@@ -2113,6 +2113,12 @@ def name_substituted_heterocycle(
     # C4: N-substituents carried on the amine ring-suffix (pyridin-4-amine ->
     # N-methyl/N-phenyl). Keyed by suffix_name; single-instance only in scope.
     suffix_n_substituents: Dict[str, List[str]] = {}
+    # v26 companion (P-62.2.2): for a MULTI-amine ring parent (triazine-2,4-diamine
+    # etc.) the N-substituents on each amine nitrogen must carry that nitrogen's
+    # RING locant as an italic-N superscript (N2-tert-butyl-N4-cyclopropyl-...),
+    # so track them per ring locant (not merged under the single 'amine' key,
+    # which collapsed them to one bare 'N-...' and dropped the others).
+    amine_n_by_locant: Dict[int, List[str]] = {}
     prefix_substituents: Dict[int, List[Dict]] = {}
 
     for locant, sub_list in substituents.items():
@@ -2132,6 +2138,8 @@ def name_substituted_heterocycle(
                     suffix_n_hydroxy.add(sname)
                 if sub_info.get('amine_n_substituents'):
                     suffix_n_substituents[sname] = sub_info['amine_n_substituents']
+                    if sname == 'amine':
+                        amine_n_by_locant[locant] = sub_info['amine_n_substituents']
             else:
                 if locant not in prefix_substituents:
                     prefix_substituents[locant] = []
@@ -2330,7 +2338,30 @@ def name_substituted_heterocycle(
         # (N-methyl / N-phenyl / N,N-dimethyl) to the ring-amine suffix name.
         # Wave2 T5d (P-66.1.1.3.4): same mechanism serves the N-substituted
         # ring carboxamide (N,N-diethylfuran-2-carboxamide).
-        if chosen_suffix in ('amine', 'carboxamide') \
+        if chosen_suffix == 'amine' and len(suffix_fg.get('amine', [])) > 1 \
+                and amine_n_by_locant:
+            # v26 companion (P-62.2.2): MULTI-amine ring -> each amine nitrogen's
+            # N-substituent(s) carry that nitrogen's RING locant as an italic-N
+            # superscript (N2-tert-butyl-N4-cyclopropyl-...). Cited in ring-locant
+            # order; the exocyclic order does not change the structure, so a
+            # non-PIN order still round-trips (SELF-01 accepts).
+            _parts = []
+            for _loc in sorted(amine_n_by_locant):
+                _subs = amine_n_by_locant[_loc]
+                if len(_subs) == 2 and _subs[0] == _subs[1]:
+                    _mp = get_multiplier_prefix(2, _subs[0])
+                    _parts.append(
+                        f"N{_loc},N{_loc}-{_mp}{_wrap_n_substituent(_subs[0])}")
+                else:
+                    for _s in _subs:
+                        _parts.append(f"N{_loc}-{_wrap_n_substituent(_s)}")
+            _n_prefix = "-".join(_parts)
+            if _n_prefix:
+                if combined and combined[0].isdigit():
+                    combined = f"{_n_prefix}-{combined}"
+                else:
+                    combined = f"{_n_prefix}{combined}"
+        elif chosen_suffix in ('amine', 'carboxamide') \
                 and chosen_suffix in suffix_n_substituents:
             _n_subs = suffix_n_substituents[chosen_suffix]
             _n_prefix = ""
