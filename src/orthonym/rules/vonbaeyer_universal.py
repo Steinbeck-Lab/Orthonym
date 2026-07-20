@@ -36,8 +36,58 @@ class UniversalCage:
     cage_atoms: Tuple[int, ...]     # ORIGINAL mol indices
     atom_to_locant: Dict[int, int]  # ORIGINAL idx -> VB locant
     canon_match: Tuple[int, ...]    # canon idx -> orig idx
-    is_mancude: bool = False        # aromatic/mancude cage (always False here:
-                                    # mancude cages are refused, G5-A)
+    is_mancude: bool = False        # aromatic/mancude cage; True only under the
+                                    # opt-in complete tier (allow_mancude), where
+                                    # the cage emits as a kekulized VB polyene
+
+
+def audit_von_baeyer_descriptor(
+    mol, cage_atoms, numbering: Dict[int, int], bridge_info_list,
+) -> bool:
+    """Java-free structural correctness floor for a von-Baeyer descriptor.
+
+    Reconstruct the EXACT set of ring/bridge bonds the descriptor + its
+    numbering ASSERTS -- every main-ring branch, the main bridge and each
+    secondary bridge is a numbered path ``start_bh -> atoms... -> end_bh``,
+    so the union of its consecutive-atom edges is precisely the skeleton the
+    emitted name encodes -- and require SET-EQUALITY with the actual
+    molecular-graph ring/bridge bond set over the cage. Any mismatch (a cage
+    bond the name fails to assert, or a numbering that breaks path adjacency)
+    -> ``False`` so the caller fails closed.
+
+    This is intentionally independent of OPSIN: the downstream SELF-01
+    (name->structure round-trip) fails OPEN when Java/OPSIN is unavailable, so
+    a structurally-wrong descriptor would otherwise ship unchecked. Every
+    bridge path is a real graph walk, so the asserted set is always a subset
+    of the graph set; equality therefore reduces to COMPLETE coverage of the
+    cage bonds (no ring bond silently dropped). Locant space is used on both
+    sides (relabelled through ``numbering``), which additionally rejects a
+    numbering that maps two graph-adjacent atoms to the same locant.
+    """
+    cage = set(cage_atoms)
+    asserted = set()
+    for bridge in bridge_info_list:
+        path = [bridge.start_bh] + list(bridge.atoms) + [bridge.end_bh]
+        for a, b in zip(path, path[1:]):
+            if a not in numbering or b not in numbering:
+                return False
+            la, lb = numbering[a], numbering[b]
+            if la == lb:
+                return False
+            # each asserted edge must be a REAL molecular bond (guards a
+            # bridge path that jumps a non-bonded pair)
+            if mol.GetBondBetweenAtoms(a, b) is None:
+                return False
+            asserted.add((min(la, lb), max(la, lb)))
+    actual = set()
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in cage and j in cage:
+            if i not in numbering or j not in numbering:
+                return False
+            li, lj = numbering[i], numbering[j]
+            actual.add((min(li, lj), max(li, lj)))
+    return asserted == actual
 
 
 def analyze_cage_universal(
@@ -45,9 +95,17 @@ def analyze_cage_universal(
 ) -> Optional[UniversalCage]:
     """Deterministic universal cage analysis; None on any refusal.
 
-    v26 P0: ``allow_mancude`` is accepted (plumbing only) and available at
-    the mancude-refusal site below; the refusal fires unconditionally in P0
-    regardless of its value. P2 will make the refusal conditional on it.
+    v26 P2: when ``allow_mancude`` is True the aromatic/mancude-cage refusal
+    below is LIFTED -- the cage is kekulized (already done above) and every
+    former-aromatic bond is emitted as an explicit von-Baeyer polyene ene
+    locant (P-23 unsaturation). When False (the default / PIN path) the
+    refusal fires exactly as before, so that path is byte-identical.
+
+    Every returned descriptor is put through ``audit_von_baeyer_descriptor``
+    (a Java-free skeleton edge-audit): the descriptor+numbering must assert
+    exactly the molecular-graph ring/bridge bond set or the cage is discarded
+    (fail-closed). This floor holds for the saturated/valid tier too and is
+    what makes the mancude polyene emission trustworthy independent of OPSIN.
     """
     from .polycyclic import (
         VonBaeyerAnalyzer, _get_largest_connected_ring_component,
@@ -108,6 +166,12 @@ def analyze_cage_universal(
     if set(desc.numbering.keys()) != set(cage_canon):
         logger.info("vonbaeyer_universal: numbering!=cage; refuse")
         return None
+    # AUDIT: descriptor+numbering must assert the exact molecular ring/bridge
+    # bond set (Java-free skeleton floor; SELF-01 fails open without Java).
+    if not audit_von_baeyer_descriptor(
+            kek, cage_canon, desc.numbering, desc.bridge_info_list):
+        logger.info("vonbaeyer_universal: descriptor edge-audit failed; refuse")
+        return None
 
     hetero = get_heteroatom_replacement_prefix(kek, desc.numbering, cage_canon)
     unsat = get_polycyclic_unsaturation(kek, cage_canon, desc.numbering)
@@ -135,17 +199,20 @@ def analyze_cage_universal(
     cage_orig = tuple(sorted(match[c] for c in cage_canon))
     atom_to_locant = {match[c]: loc for c, loc in desc.numbering.items()}
 
-    # v25 G5-A: von-Baeyer is the PIN only for genuinely SATURATED / non-mancude
-    # cages. A cage carrying an AROMATIC ring atom (original-mol perception) is
-    # mancude -- its PIN is a fused/retained parent (P-25) + added/indicated H
-    # (P-58.2.2), NOT a von-Baeyer polyene. Refuse (fail-closed); positive
-    # mancude naming is a future G5-B build. Isolated ring double bonds
+    # v25 G5-A / v26 P2: a cage carrying an AROMATIC ring atom (original-mol
+    # perception) is mancude. On the DEFAULT / PIN path (allow_mancude=False)
+    # its PIN is a fused/retained parent (P-25) + added/indicated H (P-58.2.2),
+    # NOT a von-Baeyer polyene, so we still refuse (fail-closed, byte-identical
+    # to pre-P2). Under the opt-in complete tier (allow_mancude=True) the cage
+    # was kekulized above and every former-aromatic bond is already captured in
+    # ``unsat`` as an explicit ene locant (P-23) -- express it as the kekulized
+    # von-Baeyer polyene instead of refusing. Isolated ring double bonds
     # (norbornadiene) and saturated hetero cages (quinuclidine) are NOT aromatic
-    # -> still named. This is the whole-class fix for the caffeine oxo/ene
-    # valence-clash and the non-PIN-polyene defects (ledger SCOUT VERDICT).
-    # P2: when allow_mancude, express as kekulized von-Baeyer polyene instead of refusing
-    if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in cage_orig):
-        logger.info("vonbaeyer_universal: mancude/aromatic cage -> refuse (G5-B)")
+    # -> named on both paths. The oxo/ene valence guard in the engine
+    # (general_engine.name_general_ring, suffix_core=='one') still fires.
+    is_mancude = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in cage_orig)
+    if is_mancude and not allow_mancude:
+        logger.info("vonbaeyer_universal: mancude/aromatic cage -> refuse (default path)")
         return None
 
     return UniversalCage(
@@ -156,4 +223,5 @@ def analyze_cage_universal(
         cage_atoms=cage_orig,
         atom_to_locant=atom_to_locant,
         canon_match=tuple(match),
+        is_mancude=is_mancude,
     )
