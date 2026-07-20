@@ -569,6 +569,14 @@ def get_amide_chain_length(mol, amide_atoms: tuple) -> int:
         if atom.GetSymbol() in _AMIDE_CHALCOGEN_ELEMENTS:
             exclude.add(idx)
 
+    # BP-5: the acyl parent chain is acyclic (P-44.3) — exclude every ring atom
+    # (except the acyl carbon itself, always acyclic on this path) so the walker
+    # never absorbs a substituent ring into the chain. Mirrors the general cyclic
+    # path in namer.py (find_principal_chain(exclude_atoms=all_ring_atoms)).
+    for atom in mol.GetAtoms():
+        if atom.IsInRing() and atom.GetIdx() != carbonyl_carbon_idx:
+            exclude.add(atom.GetIdx())
+
     chain = _find_longest_carbon_chain(mol, carbonyl_carbon_idx, exclude)
     return len(chain)
 
@@ -591,6 +599,14 @@ def _find_longest_carbon_chain(mol, start_idx: int, exclude: set) -> List[int]:
             if nbr_idx in visited or nbr_idx in exclude:
                 continue
             if neighbor.GetSymbol() != 'C':
+                continue
+            if neighbor.IsInRing():
+                # BP-5 (P-44.3 / P-44.1.2.2(1)): the acyclic acyl parent chain of
+                # an amide cannot traverse ring atoms — a ring is a separate
+                # parent/substituent (heptylbenzene, not a C13 chain). On this
+                # path the acyl carbon is guaranteed acyclic (ring-attached amides
+                # route through is_ring_attached_amide -> -carboxamide), so a ring
+                # atom reached here is always a substituent ring, never chain.
                 continue
 
             visited.add(nbr_idx)
