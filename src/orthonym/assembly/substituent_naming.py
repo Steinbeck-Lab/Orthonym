@@ -2403,6 +2403,26 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     if name.endswith('ine'):
         return name[:-1] + "yl"  # pyridine -> pyridinyl
 
+    # ---- RC-1 fail-closed guard (v26 BP-2) ----
+    # A FUNCTIONAL-PARENT name that reaches the terminal fallbacks below has NO
+    # valid '+yl' prefix — the correct prefix is a defined form (carboxy /
+    # alkoxycarbonyl / isothiocyanato / oxo ...), never '«acid»yl' / '«formate»yl'
+    # / '«enal»yl'. BB P-65.1.1 (acid-as-substituent is 'carboxy', never
+    # '«acid»yl') and P-66 note (p) ('1-oxopropyl'-type acyl strings are not
+    # preferred prefixes). The correct converters (retained-acyl, -oate->carboxy,
+    # -amide, -nitrile, -al saturated aldehyde, -one, -ol, -amine) all run ABOVE
+    # this point, so any residue reaching here is a class this string converter
+    # cannot express: DECLINE (return None) so the caller fails closed to the
+    # SELF-01 gate instead of fabricating an OPSIN-unparseable string. Every
+    # call site tolerates None (5 guard `if prefix:`; substituent_naming.py:3604
+    # -> _add_substituent_stereo returns None on a None name, line 3011). Class-
+    # specific to functional residues — never touches -ene/-yne/-ane/-ine/-yl.
+    if (' acid' in name
+            or name.endswith('ate')      # functional-class / residual ester (formate, carbamate, ...)
+            or name.endswith('urea')
+            or name.endswith('al')):     # unconverted (unsaturated) aldehyde residue (prop-2-enal)
+        return None
+
     # ---- Fallback: strip terminal -e if present, add -yl ----
     # Guard: names ending in -amide/-imide should NOT use naive -e stripping
     if name.endswith('e'):
@@ -3329,6 +3349,35 @@ def name_substituent_fragment(
         _g14 = _name_group14_substituent(mol, sub_atoms, attach_idx)
         if _g14:
             return _g14
+
+    # Step 1e (v26 BP-2 RC-2a, P-66.5.1.2 / BB 1710): the terminal pseudohalide
+    # groups -N=C=O, -N=C=S, -N#C and -S-C#N are ALWAYS cited as substituent
+    # prefixes (isocyanato / isothiocyanato / isocyano / thiocyanato) in PINs
+    # ("added to the list of characteristic groups that are always cited as
+    # prefixes ... in preferred IUPAC names"). The generic Step-3..5 recursion
+    # names them as a free acid ('isothiocyanic acid') then fabricates
+    # 'isothiocyanic acidyl' (OPSIN-unparseable -> SELF-01 -> unknown). Detect the
+    # group structurally and return the authoritative prefix from seniority.
+    # Only fires when the fragment is EXACTLY the pseudohalide group anchored at
+    # attach_idx (any extra decoration falls through -> fail closed).
+    _sub_set = set(sub_atoms)
+    if 2 <= len(_sub_set) <= 3:
+        _PSEUDOHALIDES = (
+            ('isothiocyanate', '[NX2]=[CX2]=[SX1]'),
+            ('isocyanate', '[NX2]=[CX2]=[OX1]'),
+            ('isocyanide', '[NX2]#[CX1]'),
+            ('thiocyanate', '[SX2][CX2]#[NX1]'),
+        )
+        from ..rules.seniority import get_prefix as _pseudo_get_prefix
+        for _fg, _sm in _PSEUDOHALIDES:
+            _pat = Chem.MolFromSmarts(_sm)
+            if _pat is None:
+                continue
+            for _m in mol.GetSubstructMatches(_pat):
+                if set(_m) == _sub_set and _m[0] == attach_idx:
+                    _pfx = _pseudo_get_prefix(_fg)
+                    if _pfx:
+                        return _pfx
 
     # W3-P02-2 (P-65.1.3.1.2(1), BB 30033 / acyl table 56178): a substituent
     # that is the imidic-acid carbon -C(=NH)-OH attached to a ring/ring-system
