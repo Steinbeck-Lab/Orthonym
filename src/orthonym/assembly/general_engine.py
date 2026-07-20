@@ -323,8 +323,15 @@ _RING_SUFFIX_STYLES = {
 }
 
 
-def name_general_ring(mol, features) -> Optional[GeneralEngineResult]:
-    """v25 G2: universal von-Baeyer ring-parent path (opt-in engine only)."""
+def name_general_ring(
+    mol, features, allow_aromatic_general: bool = False,
+) -> Optional[GeneralEngineResult]:
+    """v25 G2: universal von-Baeyer ring-parent path (opt-in engine only).
+
+    v26 P0: ``allow_aromatic_general`` is threaded to
+    ``analyze_cage_universal(..., allow_mancude=...)`` (plumbing only; the
+    mancude refusal there still fires unconditionally until P2).
+    """
     from ..rules.vonbaeyer_universal import analyze_cage_universal
     from ..rules.polycyclic import _build_parent_with_unsaturation
     from ..rules.ring_selection import select_principal_ring_system
@@ -347,7 +354,8 @@ def name_general_ring(mol, features) -> Optional[GeneralEngineResult]:
     else:
         cage_seed = None
 
-    cage = analyze_cage_universal(mol, cage_atoms=cage_seed)
+    cage = analyze_cage_universal(
+        mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general)
     if cage is None:
         return _refuse("cage unanalyzable (monocycle/spiro/caps/kekulize)")
 
@@ -464,9 +472,21 @@ def name_general_ring(mol, features) -> Optional[GeneralEngineResult]:
     return GeneralEngineResult(name=name, bindings=tuple(bindings))
 
 
-def name_general(mol, features) -> Optional[GeneralEngineResult]:
-    """v25 engine dispatcher: chain parent -> G1 path, ring parent -> G2 path."""
+def name_general(
+    mol, features, allow_aromatic_general: bool = False,
+) -> Optional[GeneralEngineResult]:
+    """v25 engine dispatcher: chain parent -> G1 path, ring parent -> G2 path.
+
+    v26 P0: ``allow_aromatic_general`` is plumbing-only here (threaded to
+    ``name_general_ring`` -> ``analyze_cage_universal``); default False ->
+    behavior byte-identical to pre-P0.
+    """
     ring_atoms = any(a.IsInRing() for a in mol.GetAtoms()) if mol else False
     if not ring_atoms or getattr(features, 'chain_is_parent', False):
         return name_general_chain(mol, features)
-    return name_general_ring(mol, features)
+    cage_result = name_general_ring(
+        mol, features, allow_aromatic_general=allow_aromatic_general)
+    if cage_result is not None:
+        return cage_result
+    # P1: name_general_monocycle(mol, features, allow_aromatic_general) goes here
+    return None

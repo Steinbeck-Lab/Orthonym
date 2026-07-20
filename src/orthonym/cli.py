@@ -149,12 +149,14 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--emit-tier",
         dest="emit_tier",
-        choices=["pin", "valid", "best-effort"],
+        choices=["pin", "valid", "complete", "best-effort"],
         default="pin",
         help=(
-            "Output tier (v25): pin (default, PIN-or-abstain), valid "
-            "(adds RT-verified general-engine names), best-effort (adds "
-            "E1-certified but OPSIN-unverified names)."
+            "Output tier: pin (default, PIN-or-abstain), valid "
+            "(adds RT-verified general-engine names), complete (v26; adds "
+            "RT-verified aggressive general aromatic/heterocyclic "
+            "fallbacks; non-PIN allowed), best-effort (adds E1-certified "
+            "but OPSIN-unverified names)."
         ),
     )
     parser.add_argument(
@@ -328,6 +330,7 @@ def main(args: List[str] = None) -> int:
                 trivial_fallback=name_kwargs["trivial_fallback"],
                 general_fallback=(_emit_tier != "pin"),
                 general_fallback_unverified=(_emit_tier == "best-effort"),
+                allow_aromatic_general=(_emit_tier == "complete"),
             )
             row = namer.name_tiered(parsed.smiles)
             if parsed.provenance:

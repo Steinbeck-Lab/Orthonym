@@ -1421,6 +1421,7 @@ class Orthonym:
                  trivial_fallback: bool = False,
                  general_fallback: bool = False,
                  general_fallback_unverified: bool = False,
+                 allow_aromatic_general: bool = False,
                  _principal_group_override: Optional[str] = None):
         """
         Initialize namer.
@@ -1458,6 +1459,12 @@ class Orthonym:
                 certificate (validation/e1_certificate.py) and the existing
                 downstream moat (>15-HA gate, P10 vetoes, SELF-01). Default
                 False — default output byte-identical for existing callers.
+            allow_aromatic_general: v26 P0 opt-in (plumbing only; inert
+                until P1/P2 land). When True, threaded down into
+                ``general_engine.name_general`` -> ``name_general_ring`` ->
+                ``vonbaeyer_universal.analyze_cage_universal`` as
+                ``allow_mancude``. Backs ``--emit-tier complete``. Default
+                False — default output byte-identical for existing callers.
         """
         self.style = style
         # Task 1.9 (PIN-policy): fallback-only opt-in. When True the name path
@@ -1475,6 +1482,11 @@ class Orthonym:
         # verify it (absent jar / rejected / transient). A PARSED-but-
         # MISMATCHED name is never shipped at any tier.
         self._general_fallback_unverified: bool = general_fallback_unverified
+        # v26 P0: plumbing-only opt-in (inert until P1/P2 consume it). When
+        # True, threaded into general_engine.name_general -> name_general_ring
+        # -> vonbaeyer_universal.analyze_cage_universal(allow_mancude=...).
+        # Default False -> default output byte-identical.
+        self._allow_aromatic_general: bool = allow_aromatic_general
         # SUB-03 (169.5): per-instance bypass for the OPSIN validity gate, used
         # by neutralize-recurse / fragment intermediate naming (those produce an
         # INTERMEDIATE name that is transformed downstream, not a final output,
@@ -2053,7 +2065,9 @@ class Orthonym:
             feats = self._perceive(
                 mol, smiles, Chem.MolToSmiles(mol, canonical=True))
             self._classify(feats)
-            eng = name_general(mol, feats)
+            eng = name_general(
+                mol, feats,
+                allow_aromatic_general=self._allow_aromatic_general)
             if eng is None or not verify_certificate(mol, eng).ok:
                 return None
             cand = eng.name
@@ -2456,7 +2470,9 @@ class Orthonym:
                 from .assembly.general_engine import name_general
                 from .validation.e1_certificate import verify_certificate
                 try:
-                    _eng = name_general(mol, features)
+                    _eng = name_general(
+                        mol, features,
+                        allow_aromatic_general=self._allow_aromatic_general)
                     if _eng is not None and verify_certificate(mol, _eng).ok:
                         name = _eng.name
                         # v25 G3: observation-only provenance (the emission

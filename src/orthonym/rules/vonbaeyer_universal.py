@@ -40,8 +40,15 @@ class UniversalCage:
                                     # mancude cages are refused, G5-A)
 
 
-def analyze_cage_universal(mol, cage_atoms=None) -> Optional[UniversalCage]:
-    """Deterministic universal cage analysis; None on any refusal."""
+def analyze_cage_universal(
+    mol, cage_atoms=None, allow_mancude: bool = False,
+) -> Optional[UniversalCage]:
+    """Deterministic universal cage analysis; None on any refusal.
+
+    v26 P0: ``allow_mancude`` is accepted (plumbing only) and available at
+    the mancude-refusal site below; the refusal fires unconditionally in P0
+    regardless of its value. P2 will make the refusal conditional on it.
+    """
     from .polycyclic import (
         VonBaeyerAnalyzer, _get_largest_connected_ring_component,
         get_heteroatom_replacement_prefix, get_polycyclic_unsaturation,
@@ -136,6 +143,7 @@ def analyze_cage_universal(mol, cage_atoms=None) -> Optional[UniversalCage]:
     # (norbornadiene) and saturated hetero cages (quinuclidine) are NOT aromatic
     # -> still named. This is the whole-class fix for the caffeine oxo/ene
     # valence-clash and the non-PIN-polyene defects (ledger SCOUT VERDICT).
+    # P2: when allow_mancude, express as kekulized von-Baeyer polyene instead of refusing
     if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in cage_orig):
         logger.info("vonbaeyer_universal: mancude/aromatic cage -> refuse (G5-B)")
         return None
