@@ -501,16 +501,21 @@ class TestNoRegressionExistingNP:
         assert name_compound(smi) == "beta-carotene"
 
     def test_flavone(self):
-        assert name_compound("O=c1cc(-c2ccccc2)oc2ccccc12") == "flavone"
+        # v26 BP-4 Ph4: de-headlined (general-only per P-102.6.1.4) -> systematic PIN
+        assert name_compound("O=c1cc(-c2ccccc2)oc2ccccc12") == \
+            "2-phenyl-4H-1-benzopyran-4-one"
 
     def test_flavanone(self):
-        assert name_compound("O=C1CC(c2ccccc2)Oc2ccccc21") == "flavanone"
+        assert name_compound("O=C1CC(c2ccccc2)Oc2ccccc21") == \
+            "2-phenyl-2,3-dihydro-4H-1-benzopyran-4-one"
 
     def test_isoflavone(self):
-        assert name_compound("O=c1c(-c2ccccc2)coc2ccccc12") == "isoflavone"
+        assert name_compound("O=c1c(-c2ccccc2)coc2ccccc12") == \
+            "3-phenyl-4H-1-benzopyran-4-one"
 
     def test_chromanone(self):
-        assert name_compound("O=C1CCOc2ccccc21") == "chromanone"
+        assert name_compound("O=C1CCOc2ccccc21") == \
+            "2,3-dihydro-4H-1-benzopyran-4-one"
 
     def test_chromone(self):
         # v23 IH-01f: chromone de-headlined to the PIN (1-benzopyran is the PIN ring

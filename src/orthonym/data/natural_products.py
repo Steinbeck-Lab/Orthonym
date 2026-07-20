@@ -352,12 +352,15 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "ceph-3-em",
 
     # ---- Flavonoid / chromene derivatives (Phase 89) ----
-    "O=c1cc(-c2ccccc2)oc2ccccc12":
-        "flavone",
-    "O=C1CC(c2ccccc2)Oc2ccccc21":
-        "flavanone",
-    "O=c1c(-c2ccccc2)coc2ccccc12":
-        "isoflavone",
+    # flavone / flavanone / isoflavone DE-HEADLINED (v26 BP-4 Phase 4): these are
+    # general-nomenclature trivial names only, not PINs (P-102.6.1.4 L53955 prints
+    # them in the general column; the PIN column is '...-4H-1-benzopyran-4-one').
+    # Removed from this dict + added pin:false to iupac_2013_pin_list.json, exactly
+    # as chromone/chromanone were -> the retained/NP dispatch misses and the
+    # cyclic-oxo engine (partial_saturation.name_cyclic_oxo_compound) emits the PIN
+    # ('2-phenyl-4H-1-benzopyran-4-one' etc.) and places substituents via the
+    # systematic 1-benzopyran numbering. 'flavone' stays in retained_names.py so
+    # --trivial still emits it via GENERAL_RETAINED_NAMES.
     # chromanone de-headlined (v23 IH-01h): PIN is 2,3-dihydro-4H-1-benzopyran-4-one
     # (P-64.2.2.2.2: the 4-one substitutes the 4H >CH2; chroman-4-one is the chromane-stem
     # acceptable name) -> emitted by the cyclic-oxo engine. Also pin:false in the PIN list.

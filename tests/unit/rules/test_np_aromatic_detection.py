@@ -81,14 +81,17 @@ class TestAromaticBondDetection:
 
 
 class TestFlavonoidScaffolds:
-    """RING-03: Verify flavonoid scaffolds produce correct retained names."""
+    """RING-03: flavonoid scaffolds. v26 BP-4 Ph4: flavone/flavanone are general-
+    nomenclature-only trivial names (P-102.6.1.4); the PIN is systematic."""
 
-    def test_flavone_retained_name(self):
-        """Flavone should produce retained name 'flavone'."""
+    def test_flavone_pin(self):
+        """Flavone -> systematic PIN 2-phenyl-4H-1-benzopyran-4-one."""
         from orthonym import name_compound
-        assert name_compound('O=c1cc(-c2ccccc2)oc2ccccc12') == 'flavone'
+        assert name_compound('O=c1cc(-c2ccccc2)oc2ccccc12') == \
+            '2-phenyl-4H-1-benzopyran-4-one'
 
-    def test_flavanone_retained_name(self):
-        """Flavanone should produce retained name 'flavanone'."""
+    def test_flavanone_pin(self):
+        """Flavanone -> systematic PIN."""
         from orthonym import name_compound
-        assert name_compound('O=C1CC(c2ccccc2)Oc2ccccc21') == 'flavanone'
+        assert name_compound('O=C1CC(c2ccccc2)Oc2ccccc21') == \
+            '2-phenyl-2,3-dihydro-4H-1-benzopyran-4-one'

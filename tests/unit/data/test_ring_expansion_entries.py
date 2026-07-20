@@ -179,20 +179,27 @@ class TestFlavonoidEntries:
     """Flavonoid / chromene derivative entries in NATURAL_PRODUCT_DERIVATIVES."""
 
     def test_flavone(self):
+        # v26 BP-4 Ph4: flavone de-headlined (general-only per P-102.6.1.4),
+        # removed from NATURAL_PRODUCT_DERIVATIVES so the cyclic-oxo engine emits
+        # the PIN 2-phenyl-4H-1-benzopyran-4-one (same pattern as chromone below).
         can = _canonical('O=c1cc(-c2ccccc2)oc2ccccc12')
-        assert NATURAL_PRODUCT_DERIVATIVES.get(can) == 'flavone'
+        assert NATURAL_PRODUCT_DERIVATIVES.get(can) is None
 
     def test_flavanone(self):
         can = _canonical('O=C1CC(c2ccccc2)Oc2ccccc21')
-        assert NATURAL_PRODUCT_DERIVATIVES.get(can) == 'flavanone'
+        assert NATURAL_PRODUCT_DERIVATIVES.get(can) is None
 
     def test_isoflavone(self):
         can = _canonical('O=c1c(-c2ccccc2)coc2ccccc12')
-        assert NATURAL_PRODUCT_DERIVATIVES.get(can) == 'isoflavone'
+        assert NATURAL_PRODUCT_DERIVATIVES.get(can) is None
 
     def test_chromanone(self):
+        # v23 IH-01h: chromanone de-headlined (removed from NATURAL_PRODUCT_DERIVATIVES)
+        # so the cyclic-oxo engine emits the PIN 2,3-dihydro-4H-1-benzopyran-4-one.
         can = _canonical('O=C1CCOc2ccccc21')
-        assert NATURAL_PRODUCT_DERIVATIVES.get(can) == 'chromanone'
+        assert NATURAL_PRODUCT_DERIVATIVES.get(can) is None
+        from orthonym import name_compound
+        assert name_compound('O=C1CCOc2ccccc21') == '2,3-dihydro-4H-1-benzopyran-4-one'
 
     def test_chromone(self):
         # v23 IH-01f: chromone de-headlined (removed from NATURAL_PRODUCT_DERIVATIVES)
