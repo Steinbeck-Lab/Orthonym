@@ -134,6 +134,163 @@ def _compute_general_indicated_h(mol, ring_atom_set: Set[int],
     return sorted(indicated, key=_sort_key)
 
 
+def _exocyclic_atoms_accounted(mol, core_atoms: Set[int]) -> bool:
+    """Source-level completeness check for algorithmic-path substituent naming.
+
+    ``get_fused_heterocycle_substituents`` silently ``continue``s past any
+    exocyclic branch it cannot identify (``sub_info is None``), so a name
+    assembled from its output can be MISSING a substituent — i.e. denote a
+    DIFFERENT molecule. The catalog path leans on the downstream SELF-01
+    round-trip gate to catch that; the fix methodology requires failing closed
+    at the source. This verifies that every exocyclic heavy atom is consumed by
+    exactly the set of substituents ``get_fused_heterocycle_substituents`` will
+    discover (it re-runs the same ``_identify_fused_substituent`` traversal, which
+    is read-only/idempotent). Returns False on any unidentifiable branch or any
+    heavy atom left unaccounted, so the caller returns None.
+    """
+    exocyclic = {
+        a.GetIdx() for a in mol.GetAtoms()
+        if a.GetIdx() not in core_atoms and a.GetAtomicNum() > 1
+    }
+    if not exocyclic:
+        return True
+    accounted: Set[int] = set()
+    for core_atom_idx in core_atoms:
+        core_atom = mol.GetAtomWithIdx(core_atom_idx)
+        for neighbor in core_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in core_atoms:
+                continue
+            sub_info = _identify_fused_substituent(mol, nbr_idx, core_atoms)
+            if sub_info is None:
+                return False  # unnameable branch -> fail closed
+            accounted.update(
+                a for a in sub_info.get('atoms', [])
+                if mol.GetAtomWithIdx(a).GetAtomicNum() > 1
+            )
+    return accounted == exocyclic
+
+
+def _fused_locant_to_output(loc):
+    """compute_fused_numbering _Locant -> the int/str form the substituent
+    machinery consumes: ``int`` stays int; ``(3, 'a')`` -> ``'3a'``."""
+    if isinstance(loc, tuple):
+        return f"{loc[0]}{loc[1]}"
+    return loc
+
+
+def _fused_locant_num(loc):
+    """Numeric comparison key for a locant (int, ``'3a'`` str, or ``(3,'a')``
+    tuple). Fusion-letter locants sort just after their integer."""
+    if isinstance(loc, tuple):
+        return (loc[0], 1)
+    if isinstance(loc, str) and loc and loc[-1].isalpha():
+        return (int(loc[:-1]), 1)
+    return (int(loc), 0)
+
+
+def _fused_substituent_citation_key(substituents: Dict):
+    """P-59.2.3 low-locant tie-break key ``(suffix_locants, prefix_locants)``.
+
+    Suffix-forming groups (the ``-one``/``-amine``/``-carboxylic acid`` family)
+    are assigned low locants BEFORE detachable prefixes (P-59.2.3.1, line 25354);
+    among prefixes, low locants together (line 25503). N-substituents carry no
+    ring locant and are excluded from the tie-break.
+    """
+    suffix = []
+    suffix += list(substituents.get('oxo_substituents', []))
+    suffix += list(substituents.get('amino_substituents', []))
+    for locs in substituents.get('suffix_groups', {}).values():
+        suffix += list(locs)
+    prefix = []
+    for locs in substituents.get('c_substituents', {}).values():
+        prefix += list(locs)
+    for other in substituents.get('other', []):
+        if 'locant' in other:
+            prefix.append(other['locant'])
+    return (
+        tuple(sorted(_fused_locant_num(l) for l in suffix)),
+        tuple(sorted(_fused_locant_num(l) for l in prefix)),
+    )
+
+
+def _ring_system_automorphisms(mol, ring_atoms: Set[int]) -> List[Dict[int, int]]:
+    """Automorphisms of the BARE ring skeleton (substituents stripped), each a
+    ``{orig_atom -> orig_atom}`` permutation.
+
+    Once the P-25.3.3.1.2 ring criteria fix the numbering, the only residual
+    freedom is the ring system's own symmetry (e.g. furo[2,3-b]furan is
+    symmetric: positions 2 and 5 are equivalent). P-59.2.3 breaks that tie by
+    lowest substituent locants, so the caller enumerates these permutations.
+    Fail-safe: returns just the identity when the skeleton cannot be isolated
+    or sanitised (e.g. exocyclic-double-bond parents) — then no tie-break is
+    applied and the canonical numbering stands (still round-trips via SELF-01).
+    """
+    ring_atoms = set(ring_atoms)
+    identity = {a: a for a in ring_atoms}
+    bond_idx = [
+        b.GetIdx() for b in mol.GetBonds()
+        if b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms
+    ]
+    amap: Dict[int, int] = {}
+    try:
+        sub = Chem.PathToSubmol(mol, bond_idx, atomMap=amap)
+        Chem.SanitizeMol(sub)
+    except Exception:
+        return [identity]
+    inv = {v: k for k, v in amap.items()}  # submol idx -> original idx
+    matches = sub.GetSubstructMatches(sub, uniquify=False, maxMatches=64)
+    if not matches:
+        return [identity]
+    perms: List[Dict[int, int]] = []
+    for mt in matches:
+        try:
+            perms.append({inv[i]: inv[img] for i, img in enumerate(mt)})
+        except KeyError:
+            continue
+    return perms or [identity]
+
+
+def _select_substituent_numbering(mol, ring_atom_set: Set[int]):
+    """Choose the peripheral numbering for a SUBSTITUTED 2-component ortho-fused
+    mancude ring system and discover its substituents against it.
+
+    Returns ``(atom_to_locant, substituents)`` or ``None`` (fail closed).
+
+    The ring numbering comes from the deterministic P-25.3.3 engine
+    (``compute_fused_numbering``); the legacy descriptor-order map does not
+    reproduce OPSIN's canonical numbering for substituent placement. The
+    P-59.2.3 substituent tie-break is applied over the ring-system
+    automorphisms, then a SMILES-order-independent canonical-rank signature
+    guarantees a single deterministic representative.
+    """
+    from .fusion_numbering import compute_fused_numbering
+    canonical = compute_fused_numbering(mol, ring_atom_set)
+    if not canonical:
+        return None  # engine declined -> cannot trust locants -> fail closed
+    perms = _ring_system_automorphisms(mol, ring_atom_set)
+    canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    atoms_by_rank = sorted(ring_atom_set, key=lambda a: canon_rank[a])
+
+    best = None  # (citation_key, signature, cand_map, substituents)
+    for perm in perms:
+        try:
+            cand = {
+                a: _fused_locant_to_output(canonical[perm[a]])
+                for a in ring_atom_set
+            }
+        except KeyError:
+            continue
+        subs = get_fused_heterocycle_substituents(mol, cand)
+        key = _fused_substituent_citation_key(subs)
+        sig = tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank)
+        if best is None or (key, sig) < (best[0], best[1]):
+            best = (key, sig, cand, subs)
+    if best is None:
+        return None
+    return best[2], best[3]
+
+
 def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     """
     Attempt systematic fusion naming for 2-component ortho-fused systems.
@@ -205,16 +362,16 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if not ring1_aromatic and not ring2_aromatic:
         return None
 
-    # Gate: molecule should be an unsubstituted fused ring system
-    # (all heavy atoms are ring atoms + no exocyclic substituents beyond H)
-    # Substituted fused systems need prefix/suffix handling that the
-    # algorithmic path does not yet support. Substituted molecules should
-    # fall through to the existing naming pipeline.
+    # BP-4 Phase 1 (P-25): a SUBSTITUTED 2-component ortho-fused mancude system
+    # is named by discovering substituents against the algorithmic locant map
+    # (the same machinery cataloged cores use), NOT refused. Record whether any
+    # exocyclic heavy atom is present; the substituted branch runs below, after
+    # the bare parent name + locant map + indicated-H/lambda are assembled.
     ring_atom_set = set(ring1) | set(ring2)
-    for atom in mol.GetAtoms():
-        idx = atom.GetIdx()
-        if idx not in ring_atom_set and atom.GetAtomicNum() != 1:
-            return None  # Has substituents
+    has_substituents = any(
+        atom.GetIdx() not in ring_atom_set and atom.GetAtomicNum() != 1
+        for atom in mol.GetAtoms()
+    )
 
     from .fusion_descriptors import (
         generate_systematic_name_for_fused_pair,
@@ -235,12 +392,28 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
         mol, set(ring1), set(ring2)
     )
 
-    # Build atom-to-locant mapping for indicated H computation
-    atom_to_locant = _build_algorithmic_locant_map(
-        mol, parent_ring, child_ring, shared, parent_name, child_name
-    )
+    # Build the atom->locant map that drives indicated-H, lambda, and (BP-4
+    # Phase 1) substituent placement.
+    #   - BARE systems keep the legacy descriptor-order map -> byte-identical
+    #     output, zero regression risk.
+    #   - SUBSTITUTED systems use the deterministic P-25.3.3 peripheral-numbering
+    #     engine (compute_fused_numbering) + the P-59.2.3 lowest-substituent-
+    #     locant tie-break; the legacy map does NOT reproduce OPSIN's canonical
+    #     numbering (it placed substituents on the wrong ring position). Fail
+    #     closed if the engine or the completeness check declines.
+    substituents = None
+    if has_substituents:
+        if not _exocyclic_atoms_accounted(mol, ring_atom_set):
+            return None
+        selected = _select_substituent_numbering(mol, ring_atom_set)
+        if selected is None:
+            return None
+        atom_to_locant, substituents = selected
+    else:
+        atom_to_locant = _build_algorithmic_locant_map(
+            mol, parent_ring, child_ring, shared, parent_name, child_name
+        )
 
-    ring_atom_set = set(ring1) | set(ring2)
     indicated_h = _compute_general_indicated_h(mol, ring_atom_set, atom_to_locant)
 
     # P-25.3.2.5.2: lambda (nonstandard bonding number) tokens follow the
@@ -273,6 +446,15 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
         name = f"{h_parts}-{lam_prefix}{name}"
     elif lam_prefix:
         name = f"{lam_prefix}{name}"
+
+    # BP-4 Phase 1 (P-25): attach the substituents discovered above against the
+    # canonical numbering, reusing the exact assembler the catalog path uses.
+    # The bare-parent `name` (with any indicated-H/lambda prefix already
+    # assembled) is the parent the assembler decorates.
+    if has_substituents:
+        name = _assemble_fused_heterocycle_name(
+            mol, name, substituents, atom_to_locant
+        )
 
     logger.debug(
         "Algorithmic fusion name for %s: %s",
