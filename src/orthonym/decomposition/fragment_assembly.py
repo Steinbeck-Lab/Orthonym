@@ -575,6 +575,22 @@ def _assemble_ester(fragment_names: Dict[str, str], style: str) -> Optional[str]
     if not acid_name or not alkyl_name:
         return None
 
+    # v26 BP-2 RC-2b (P-41 seniority / P-65.6.3.5): a mono-ester of a POLY-acid is
+    # a PARTIAL ester — the un-esterified free -COOH is the senior principal group
+    # (carboxylic acid > ester), so the ester functional-class 'alkyl ...dicarboxylate'
+    # is NOT the PIN. It also silently drops the 'hydrogen' the free acid needs, and
+    # OPSIN then reads the name as an anion (-> RT-MISMATCH: 'ethyl benzene-1,2-
+    # dicarboxylate' for ethyl hydrogen phthalate). Decline so the acid-senior path
+    # names it, matching the chain analogue that is already correct ('6-ethoxy-6-oxo-
+    # hexanoic acid'). A poly-acid fragment's systematic PIN name carries a multiplied
+    # '{di,tri,tetra,penta}carboxylic acid' / '{di,tri,tetra,penta}…oic acid' suffix.
+    _al = acid_name.lower()
+    if any(p in _al for p in (
+            "dicarboxylic acid", "tricarboxylic acid", "tetracarboxylic acid",
+            "pentacarboxylic acid", "dioic acid", "trioic acid", "tetraoic acid",
+            "pentaoic acid")):
+        return None
+
     ate_name = _acid_to_ate(acid_name)
     alkyl_prefix = _alcohol_to_alkyl(alkyl_name)
 
