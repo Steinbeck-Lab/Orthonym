@@ -88,6 +88,14 @@ FAIL_CLOSED = {
     "charged (pyridin-1-ium)": "C[n+]1ccccc1",
     "fused cage (naphthalene)": "c1ccc2ccccc2c1",
     "tier-5 ring-on-ring substituent": "c1ccc(cc1)C1CCC(CC1)C1CCCCC1",
+    # v26 P1 critical-defect fix: a spiro co-ring is perceived as a
+    # substituent that attaches to the parent ring's spiro atom at TWO
+    # points; naming it via name_substituent's single-attachment recursion
+    # silently drops the ring-closure bond and mis-names it as a linear
+    # alkyl chain (WRONG STRUCTURE). Must fail closed instead.
+    "spiro co-ring (1,4-dioxaspiro[4.4]nonane)": "C1CC2(CC1)OCCO2",
+    "spiro co-ring + carboxylic acid (spiro[5.5]undecane)":
+        "O=C(O)C1CCC2(CCCCC2)CC1",
 }
 
 # Already-working substituted forms: complete MUST equal pin (P1 only fires on
@@ -218,6 +226,17 @@ def test_complete_tier_abstains_on_tier5_substituent(production_gate):
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles("c1ccc(cc1)C1CCC(CC1)C1CCCCC1"))
+    assert (not out) or is_failure_name(out), f"expected abstention, got {out!r}"
+
+
+def test_complete_tier_abstains_on_spiro_multi_attach(production_gate):
+    """v26 P1 critical-defect regression: a substituted spiro compound whose
+    only monocycle path treats the co-ring as a >1-point-attached substituent
+    must ABSTAIN under complete -- never the wrong linear-alkyl mis-name
+    (was: '1-pentylcyclohexane-4-carboxylic acid' / '9-formyl...'-style)."""
+    comp = Orthonym(style="pin", general_fallback=True,
+                     allow_aromatic_general=True)
+    out = comp.name(Chem.CanonSmiles("O=C(O)C1CCC2(CCCCC2)CC1"))
     assert (not out) or is_failure_name(out), f"expected abstention, got {out!r}"
 
 

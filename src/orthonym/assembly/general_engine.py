@@ -736,6 +736,10 @@ def name_general_monocycle(
                        if n.GetIdx() in frag]
         if not attach_nbrs:
             return _refuse("substituent without ring attachment")
+        if len(attach_nbrs) != 1:
+            return _refuse(
+                "substituent attaches to parent ring at >1 point "
+                "(spiro/fused/bridge)")
         prefix = name_substituent(mol, frag, attach_nbrs[0])
         if not prefix or prefix == 'substituent':
             return _refuse("branch unnameable (tier-5 fallback)")
