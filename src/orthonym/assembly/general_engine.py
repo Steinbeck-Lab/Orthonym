@@ -462,7 +462,98 @@ _RING_SUFFIX_STYLES = {
     'carboxylic acid': 'appended', 'carbaldehyde': 'appended',
     'carbonitrile': 'appended', 'carboxamide': 'appended',
     'sulfonamide': 'appended', 'carboximidamide': 'appended',
+    # v27 P2 (P-65.6.3.2.1): ester ring PIN is the functional-class TWO-WORD
+    # `<R-yl> <ring>carboxylate`. The parent block is built with the 'appended'
+    # carboxylate suffix on the acid core; the alcoholic `R-yl ` word is
+    # prepended by name_general_ring (see _extract_ring_ester). Only the clean
+    # acyclic mono-ester is built here; lactones / aryl / poly-esters fail closed.
+    'carboxylate': 'appended',
 }
+
+
+def _extract_ring_ester(mol, pg_matches, ring_set, allow_mancude):
+    """v27 P2 (P-65.6.3.2.1): decompose a ring carboxylic-acid ESTER for the
+    functional-class two-word PIN ``<R-yl> <ring>carboxylate``.
+
+    Returns ``(r_word, r_frag_atoms, acid_core_atoms, ring_attach_atom)`` for
+    the single clean RING-ACID mono-ester with an ACYCLIC alcohol, or ``None``
+    (fail closed) for any of: more than one ester (polyester), a reverse/aryl
+    ester (the ring is on the alcohol side, so the acid C is not bonded to the
+    ring), a lactone / ring-bearing R, or an R the substituent namer declines.
+    Never guesses the acid side.
+    """
+    from .substituent_enumerator import name_substituent
+
+    seen: set = set()
+    matches = []
+    for m in pg_matches:
+        k = tuple(sorted(m))
+        if k in seen:
+            continue
+        seen.add(k)
+        matches.append(set(m))
+    if len(matches) != 1:
+        return None  # mono-ester only; polyester fails closed (Phase 4+)
+    match = matches[0]
+
+    # Identify the acid core: a match C bearing one =O and one single-bond O.
+    carbonyl_c = carbonyl_o = ester_o = None
+    for i in match:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetSymbol() != 'C':
+            continue
+        dbl_o = single_o = None
+        for b in a.GetBonds():
+            o = b.GetOtherAtom(a)
+            if o.GetSymbol() != 'O':
+                continue
+            if b.GetBondType() == Chem.BondType.DOUBLE:
+                dbl_o = o.GetIdx()
+            elif b.GetBondType() == Chem.BondType.SINGLE:
+                single_o = o.GetIdx()
+        if dbl_o is not None and single_o is not None:
+            carbonyl_c, carbonyl_o, ester_o = i, dbl_o, single_o
+            break
+    if carbonyl_c is None:
+        return None
+
+    # The acid carbon must attach to the ring (else the ring is the alcohol side
+    # -> reverse/aryl ester, deferred). Exactly one ring neighbour.
+    ring_nbrs = [n.GetIdx()
+                 for n in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
+                 if n.GetIdx() in ring_set]
+    if len(ring_nbrs) != 1:
+        return None
+    ring_attach = ring_nbrs[0]
+
+    # R (alcoholic component): the ester-O neighbour that is NOT the acid C.
+    r_starts = [n.GetIdx()
+                for n in mol.GetAtomWithIdx(ester_o).GetNeighbors()
+                if n.GetIdx() != carbonyl_c]
+    if len(r_starts) != 1:
+        return None
+    r_start = r_starts[0]
+    if mol.GetAtomWithIdx(r_start).IsInRing():
+        return None  # lactone / aryl ester -> fail closed (acyclic R only)
+
+    core = {carbonyl_c, carbonyl_o, ester_o}
+    r_frag: set = set()
+    stack = [r_start]
+    while stack:
+        x = stack.pop()
+        if x in r_frag or x in core:
+            continue
+        r_frag.add(x)
+        for n in mol.GetAtomWithIdx(x).GetNeighbors():
+            if n.GetIdx() not in r_frag and n.GetIdx() not in core:
+                stack.append(n.GetIdx())
+    if not r_frag or (r_frag & ring_set):
+        return None
+
+    r_word = name_substituent(mol, r_frag, r_start, allow_mancude=allow_mancude)
+    if not r_word or r_word == 'substituent':
+        return None
+    return r_word, r_frag, core, ring_attach
 
 
 def name_general_ring(
@@ -515,33 +606,47 @@ def name_general_ring(
     suffix_core = None
     suffix_atoms: set = set()
     pg_locants: List[int] = []
+    ester_r_word = None          # v27 P2: alcoholic `R-yl ` word (functional class)
+    ester_r_frag: set = set()    # v27 P2: R-alkyl atoms held out of discovery
     if pg:
         suffix_core = get_suffix(pg, is_ring=True)
         if suffix_core not in _RING_SUFFIX_STYLES:
             return _refuse(f"unsupported ring suffix for pg={pg!r}")
-        seen = set()
-        for match in pg_matches:
-            key = tuple(sorted(match))
-            if key in seen:
-                continue
-            seen.add(key)
-            on_cage = [i for i in match if i in cage_set]
-            if on_cage:
-                loc = min(atom_to_locant[i] for i in on_cage)
-            else:
-                # appended suffix (e.g. -carboxylic acid): match sits fully
-                # off-cage; locant = the cage neighbor of any match atom.
-                nbrs = [n.GetIdx()
-                        for i in match
-                        for n in mol.GetAtomWithIdx(i).GetNeighbors()
-                        if n.GetIdx() in cage_set]
-                if not nbrs:
-                    return _refuse("PG instance not attached to cage")
-                loc = min(atom_to_locant[n] for n in nbrs)
-            pg_locants.append(loc)
-            suffix_atoms.update(i for i in match
-                                if i not in cage_set
-                                and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
+        if suffix_core == 'carboxylate':
+            # v27 P2 (P-65.6.3.2.1): ring ester -> functional-class two-word.
+            # The acid core (C=O, ester O) becomes the appended 'carboxylate'
+            # suffix on the ring; the alcoholic R is prepended as a word.
+            er = _extract_ring_ester(
+                mol, pg_matches, cage_set, allow_aromatic_general)
+            if er is None:
+                return _refuse("ester not a clean acyclic ring-acid mono-ester")
+            ester_r_word, ester_r_frag, _acid_core, _ring_attach = er
+            suffix_atoms.update(_acid_core)
+            pg_locants.append(atom_to_locant[_ring_attach])
+        else:
+            seen = set()
+            for match in pg_matches:
+                key = tuple(sorted(match))
+                if key in seen:
+                    continue
+                seen.add(key)
+                on_cage = [i for i in match if i in cage_set]
+                if on_cage:
+                    loc = min(atom_to_locant[i] for i in on_cage)
+                else:
+                    # appended suffix (e.g. -carboxylic acid): match sits fully
+                    # off-cage; locant = the cage neighbor of any match atom.
+                    nbrs = [n.GetIdx()
+                            for i in match
+                            for n in mol.GetAtomWithIdx(i).GetNeighbors()
+                            if n.GetIdx() in cage_set]
+                    if not nbrs:
+                        return _refuse("PG instance not attached to cage")
+                    loc = min(atom_to_locant[n] for n in nbrs)
+                pg_locants.append(loc)
+                suffix_atoms.update(i for i in match
+                                    if i not in cage_set
+                                    and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
 
     # v25 G5-A defense-in-depth: a ring '-one' locant must never coincide with a
     # ring double-bond locant -- that carbon would be both =ring and =O (the
@@ -563,7 +668,7 @@ def name_general_ring(
     ordered_cage = sorted(cage_set, key=lambda i: atom_to_locant[i])
     try:
         subs = discover_substituents(
-            mol, cage_set | suffix_atoms, parent_type='chain',
+            mol, cage_set | suffix_atoms | ester_r_frag, parent_type='chain',
             principal_chain=ordered_cage, atom_to_locant=atom_to_locant)
     except AssertionError as e:
         return _refuse(f"partition incomplete: {e}")
@@ -628,6 +733,13 @@ def name_general_ring(
 
     # v25 G4: parent-scope stereo from structure (VB locants).
     name = _stereo_prefix(mol, atom_to_locant) + name
+
+    # v27 P2 (P-65.6.3.2.1): prepend the alcoholic component as a separate word
+    # -> `ethyl <ring>carboxylate` (functional-class ester two-word PIN).
+    if ester_r_word is not None:
+        name = ester_r_word + ' ' + name
+        bindings.append(TokenBinding(tuple(sorted(ester_r_frag)),
+                                     ester_r_word, 'prefix'))
 
     bindings.append(TokenBinding(tuple(cage.cage_atoms), cage.descriptor,
                                  'parent'))

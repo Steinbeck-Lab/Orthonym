@@ -146,6 +146,31 @@ def test_fused_methanesulfonyl_covered():
 
 
 # ---------------------------------------------------------------------------
+# Task 4 — ester as functional-class two-word on a (fused) ring parent (248 gap)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("smiles,r_word", [
+    ("CCOC(=O)c1ccc2ccccc2c1", "ethyl"),
+    ("COC(=O)c1ccc2ccccc2c1", "methyl"),
+    ("CC(C)OC(=O)c1ccc2ccccc2c1", "propan-2-yl"),
+])
+def test_fused_ester_functional_class(smiles, r_word):
+    name = _assert_covers(smiles)
+    assert name.startswith(r_word + " ")
+    assert name.endswith("carboxylate")
+
+
+def test_reverse_ester_fails_closed():
+    """A reverse/aryl ester (ring on the alcohol side) is deferred: the engine
+    must NOT guess the acid side -- it abstains."""
+    assert _engine_name("CC(=O)Oc1ccc2ccccc2c1") is None
+
+
+def test_lactone_and_polyester_fail_closed():
+    assert _engine_name("O=C(OCC)c1ccc2ccccc2c1OC(=O)CC") is None  # di-ester
+
+
+# ---------------------------------------------------------------------------
 # PIN default byte-identical: the widened styles are gated on the tier flag
 # ---------------------------------------------------------------------------
 
