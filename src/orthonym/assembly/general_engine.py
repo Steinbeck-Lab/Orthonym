@@ -713,6 +713,24 @@ def _emit_ring_from_analysis(
     cage_set = set(cage.cage_atoms)
     atom_to_locant = dict(cage.atom_to_locant)
 
+    # v27 P5 (P-25.3): PIN-quality fusion upgrade over the VB polyene for a BARE
+    # mancude FUSED parent (no suffix, no substituents). Fail-closed to the VB
+    # polyene: name_fusion_parent only returns a fusion word that is a vetted
+    # catalog exact-match (Java-free) or AFFIRMATIVE-RT-verified (rejects the
+    # orientation slips + any stereo the bare word cannot express -> 0-wrong in
+    # every environment). Skipped for spiro (not a fusion system).
+    if (allow_aromatic_general and getattr(cage, 'is_mancude', False)
+            and getattr(features, 'principal_group', None) is None
+            and not str(cage.descriptor).startswith(
+                ('spiro', 'dispiro', 'trispiro', 'tetraspiro', 'pentaspiro'))):
+        from .general_fusion import name_fusion_parent
+        _fusion_word = name_fusion_parent(mol, cage.cage_atoms)
+        if _fusion_word:
+            return GeneralEngineResult(
+                name=_fusion_word,
+                bindings=(TokenBinding(tuple(cage.cage_atoms),
+                                       _fusion_word, 'parent'),))
+
     # --- suffix (ring forms; every PG instance must touch the cage) ---
     pg = getattr(features, 'principal_group', None)
     pg_matches = list(getattr(features, 'principal_group_atoms', None) or [])
