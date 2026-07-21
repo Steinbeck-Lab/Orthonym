@@ -50,6 +50,11 @@ ACCEPT_CASES = [
      "4-silyl-4-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaen-4-ium"),
     ("[SiH3]C[CH-]C", "1-silylpropan-2-ide"),
     ("FC(F)(F)[CH-]C", "1,1,1-trifluoropropan-2-ide"),
+    # Multi-charge dication: the multiplied suffix ("-1,4-diium") begins with
+    # the consonant 'd' (di-), NOT a vowel -- P-16.3.3 requires the parent's
+    # terminal 'e' be RETAINED ("...diazine-1,4-diium", not "diazin-1,4-diium").
+    # Regression case for the elision-conditional fix in _append_charge_suffix.
+    ("C[n+]1cc[n+](C)cc1", "1,4-dimethyl-1,4-diazine-1,4-diium"),
 ]
 
 # FAIL-CLOSED: complete must ABSTAIN (never a wrong / charge-dropped name).

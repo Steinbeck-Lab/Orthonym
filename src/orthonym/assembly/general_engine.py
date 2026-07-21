@@ -162,19 +162,24 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
                           has_fg_suffix: bool) -> Optional[str]:
     """Splice the P5 charge suffix onto an assembled parent ``name`` (pre-stereo).
 
-    Elides a single trailing parent 'e' (``cyclohexane``->``cyclohexan-1-ide``,
+    Elides a single trailing parent 'e' only when the charge-suffix text
+    begins with a vowel (``cyclohexane``->``cyclohexan-1-ide``,
     ``1-methylpyridine``->``1-methylpyridin-1-ium``, ``...pentaene``->
-    ``...pentaen-4-ium``); the charge suffix always begins ``-<locant>-`` whose
-    first letter (i/u/y) is a vowel, so the terminal 'e' is always elided
-    (P-16.3.3). Returns the charged name, or None to FAIL CLOSED (a charge that
-    is not expressible, or a co-occurring FG suffix -- the cumulative FG+charge
-    construction is out of P5 scope)."""
+    ``...pentaen-4-ium``): the single-charge bases (``-ium``/``-ylium``/
+    ``-ide``/``-uide``) start with i/y/u. The MULTIPLIED forms
+    (``-1,4-diium``/``-1,4-diide``/...) begin with the consonant of the
+    multiplier (di/tri/...), so the terminal 'e' must be RETAINED
+    (P-16.3.3), e.g. ``1,4-diazine``->``1,4-diazine-1,4-diium`` (NOT
+    ``diazin-1,4-diium``). Returns the charged name, or None to FAIL CLOSED
+    (a charge that is not expressible, or a co-occurring FG suffix -- the
+    cumulative FG+charge construction is out of P5 scope)."""
     if has_fg_suffix:
         return None  # FG suffix + skeletal charge (cumulative) -> out of P5 scope
     cs = _charge_suffix_text(mol, atom_to_locant)
     if cs is None:
         return None
-    stem = name[:-1] if name.endswith('e') else name
+    first_alpha = next((c for c in cs if c.isalpha()), '')
+    stem = name[:-1] if name.endswith('e') and first_alpha in 'aeiouy' else name
     return stem + cs
 
 
