@@ -146,6 +146,37 @@ def test_fused_methanesulfonyl_covered():
 
 
 # ---------------------------------------------------------------------------
+# Task 2 — N-substituted amide / sulfonamide on a ring parent (amide 54% gap)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("smiles,n_block", [
+    ("CNC(=O)c1ccc2ccccc2c1", "N-methyl"),
+    ("CN(C)C(=O)c1ccc2ccccc2c1", "N,N-dimethyl"),
+    ("CCN(C)C(=O)c1ccc2ccccc2c1", "N-ethyl-N-methyl"),
+    ("CN(C)S(=O)(=O)c1ccc2ccccc2c1", "N,N-dimethyl"),
+    ("CNS(=O)(=O)c1ccc2ccccc2c1", "N-methyl"),
+    ("O=C(Nc1ccccc1)c1ccc2ccccc2c1", "N-phenyl"),
+])
+def test_n_substituted_amide_sulfonamide(smiles, n_block):
+    name = _assert_covers(smiles)
+    assert name.startswith(n_block)
+
+
+def test_n_substituent_interleaves_with_ring_substituent():
+    """Ring & N-substituents share one alphanumeric order (P-14.5.2): chloro (c)
+    before N-methyl (m)."""
+    name = _assert_covers("O=C(NC)c1ccc(Cl)c2ccccc12")
+    assert "chloro" in name and "N-methyl" in name
+    assert name.index("chloro") < name.index("N-methyl")
+
+
+def test_primary_amide_no_n_block():
+    """A primary carboxamide has no N-substituent -> no 'N-' token."""
+    name = _assert_covers("NC(=O)c1ccc2ccccc2c1")
+    assert "N-" not in name and name.endswith("carboxamide")
+
+
+# ---------------------------------------------------------------------------
 # Task 4 — ester as functional-class two-word on a (fused) ring parent (248 gap)
 # ---------------------------------------------------------------------------
 

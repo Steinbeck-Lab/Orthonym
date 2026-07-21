@@ -556,6 +556,98 @@ def _extract_ring_ester(mol, pg_matches, ring_set, allow_mancude):
     return r_word, r_frag, core, ring_attach
 
 
+def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
+    """v27 P2 (P-66.1.1.3.1 / P-65.3.1): collect and format N-substituents on a
+    ring carboxamide / sulfonamide.
+
+    The amide/sulfonamide nitrogen's non-H neighbours (other than the C=O / S
+    anchor) are N-substituents -- named by ``name_substituent`` and cited with
+    the italic ``N``/``N,N`` locant. Returns
+    ``(n_sub_atoms, prefix_entries, bindings)`` where ``n_sub_atoms`` is the set
+    of N-substituent fragment atoms to hold out of the ring-substituent set and
+    the appended-suffix atoms, and ``prefix_entries`` is a list of
+    ``(alpha_key, formatted_token)`` merged into the ring-substituent ordering by
+    the caller. Returns ``None`` (fail closed) if any N-substituent is
+    unnameable -- never drop it (that would ship a different constitution).
+    """
+    from .substituent_enumerator import name_substituent
+    from .naming_utils import (
+        _wrap_n_substituent, SIMPLE_MULTIPLIERS, is_complex_substituent,
+    )
+
+    n_sub_atoms: set = set()
+    name_counts: Dict[str, int] = {}
+    bindings: List[TokenBinding] = []
+    seen: set = set()
+    for match in pg_matches:
+        key = tuple(sorted(match))
+        if key in seen:
+            continue
+        seen.add(key)
+        match_set = set(match)
+        n_idxs = [i for i in match_set
+                  if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+        if len(n_idxs) != 1:
+            # >1 N (amidine / imide) -- N-substitution not handled here; the
+            # bare-suffix path (no N-subs) still applies if there are none.
+            continue
+        n_idx = n_idxs[0]
+        # The FG anchor is the sulfonamide S or the carbonyl C (=O) bonded to N
+        # -- NOT just any C neighbour (an N-alkyl carbon is also a C neighbour).
+        anchor = None
+        for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            if nb.GetIdx() not in match_set:
+                continue
+            if nb.GetSymbol() == 'S':
+                anchor = nb.GetIdx()
+                break
+            if nb.GetSymbol() == 'C' and any(
+                    b.GetBondType() == Chem.BondType.DOUBLE
+                    and b.GetOtherAtom(nb).GetSymbol() == 'O'
+                    for b in nb.GetBonds()):
+                anchor = nb.GetIdx()
+                break
+        if anchor is None:
+            return None  # can't locate the amide/sulfonamide anchor -> fail closed
+        exclude = {n_idx, anchor}
+        for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            j = nb.GetIdx()
+            if j in exclude or nb.GetAtomicNum() <= 1:
+                continue
+            frag: set = set()
+            stack = [j]
+            while stack:
+                x = stack.pop()
+                if x in frag or x in exclude:
+                    continue
+                frag.add(x)
+                for n2 in mol.GetAtomWithIdx(x).GetNeighbors():
+                    if n2.GetIdx() not in frag and n2.GetIdx() not in exclude:
+                        stack.append(n2.GetIdx())
+            nm = name_substituent(mol, frag, j, allow_mancude=allow_mancude)
+            if not nm or nm == 'substituent':
+                return None  # unnameable N-substituent -> fail closed
+            n_sub_atoms |= frag
+            name_counts[nm] = name_counts.get(nm, 0) + 1
+            bindings.append(TokenBinding(tuple(sorted(frag)), nm, 'prefix'))
+
+    entries: List = []
+    for nm, cnt in name_counts.items():
+        if is_complex_substituent(nm):
+            disp = _wrap_n_substituent(nm) if '(' in nm else f"({nm})"
+        else:
+            disp = _wrap_n_substituent(nm)
+        if cnt == 1:
+            token = f"N-{disp}"
+        else:
+            mult = SIMPLE_MULTIPLIERS.get(cnt)
+            if mult is None:
+                return None
+            token = f"{','.join(['N'] * cnt)}-{mult}{disp}"
+        entries.append((_alpha_key(nm), token))
+    return n_sub_atoms, entries, bindings
+
+
 def name_general_ring(
     mol, features, allow_aromatic_general: bool = False,
     allow_charged: bool = False,
@@ -608,6 +700,9 @@ def name_general_ring(
     pg_locants: List[int] = []
     ester_r_word = None          # v27 P2: alcoholic `R-yl ` word (functional class)
     ester_r_frag: set = set()    # v27 P2: R-alkyl atoms held out of discovery
+    n_sub_atoms: set = set()     # v27 P2: amide/sulfonamide N-substituent atoms
+    n_sub_entries: List = []     # v27 P2: (alpha_key, 'N-…' token)
+    n_sub_bindings: List[TokenBinding] = []
     if pg:
         suffix_core = get_suffix(pg, is_ring=True)
         if suffix_core not in _RING_SUFFIX_STYLES:
@@ -648,6 +743,18 @@ def name_general_ring(
                                     if i not in cage_set
                                     and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
 
+        # v27 P2: N-substituents on a ring carboxamide / sulfonamide. Held out
+        # of both the appended-suffix atoms and the ring-substituent set, cited
+        # with the italic N-locant. Fail closed if any is unnameable (never drop
+        # an N-substituent -> that would ship a different constitution).
+        if suffix_core in ('carboxamide', 'sulfonamide'):
+            n_res = _ring_amide_n_prefixes(
+                mol, pg_matches, allow_aromatic_general)
+            if n_res is None:
+                return _refuse("ring amide/sulfonamide N-substituent unnameable")
+            n_sub_atoms, n_sub_entries, n_sub_bindings = n_res
+            suffix_atoms -= n_sub_atoms
+
     # v25 G5-A defense-in-depth: a ring '-one' locant must never coincide with a
     # ring double-bond locant -- that carbon would be both =ring and =O (the
     # 5-bond-carbon / caffeine class). v26 P2 lifted the aromatic-cage refusal in
@@ -668,7 +775,8 @@ def name_general_ring(
     ordered_cage = sorted(cage_set, key=lambda i: atom_to_locant[i])
     try:
         subs = discover_substituents(
-            mol, cage_set | suffix_atoms | ester_r_frag, parent_type='chain',
+            mol, cage_set | suffix_atoms | ester_r_frag | n_sub_atoms,
+            parent_type='chain',
             principal_chain=ordered_cage, atom_to_locant=atom_to_locant)
     except AssertionError as e:
         return _refuse(f"partition incomplete: {e}")
@@ -694,17 +802,23 @@ def name_general_ring(
         frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
                                           'prefix'))
 
-    prefix_parts = []
-    for prefix in sorted(groups, key=_alpha_key):
+    # Ring substituents and N-substituents are detachable prefixes cited in one
+    # alphanumeric order (P-14.5.2); N-substituent tokens carry the italic N
+    # locant instead of a numeral but sort by the same substituent-name key.
+    prefix_entries: List = list(n_sub_entries)
+    for prefix in groups:
         locs = sorted(groups[prefix])
         text = _mult_prefix(len(locs), prefix)
         if text is None:
             return _refuse("multiplicity beyond table")
-        prefix_parts.append(','.join(map(str, locs)) + '-' + text)
+        prefix_entries.append(
+            (_alpha_key(prefix), ','.join(map(str, locs)) + '-' + text))
+    prefix_entries.sort(key=lambda t: t[0])
+    prefix_parts = [tok for _, tok in prefix_entries]
 
     # --- parent block: hetero-prefix + descriptor + parent(+ene)(+suffix) ---
     fg_suffix = None
-    bindings = frag_bindings
+    bindings = frag_bindings + n_sub_bindings
     if suffix_core:
         fg_suffix = {'suffix': suffix_core, 'locants': sorted(pg_locants),
                      'type': _RING_SUFFIX_STYLES[suffix_core]}
