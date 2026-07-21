@@ -2039,6 +2039,72 @@ class Orthonym:
                 "source": source, "opsin": opsin, "gates_passed": gates,
                 "formula": formula, "limit_code": limit_code}
 
+    def _retained_structural_preference(self, mol) -> Optional[str]:
+        """v26 P6 (Heritage A3): retained/fusion structural-recognizer
+        preference -- a PIN-QUALITY GUARDRAIL, not a naming path.
+
+        Runs the EXISTING retained-name recognizers on the WHOLE molecule
+        GRAPH (never string surgery, never a new catalog) so the general
+        engine's late-recovery can prefer a clean retained/fused-heterocycle
+        name over an ugly von-Baeyer/replacement emission, when one applies.
+        Tried in order (first hit wins; each is an exact whole-molecule
+        match -- none of these know about substituents, so this can only
+        ever match a BARE ring system):
+
+          1. ``data.fused_heterocycles.get_fused_heterocycle_name`` -- the
+             curated fused-ring catalog (quinazoline, indole, purine, ...).
+          2. ``data.retained_names.get_retained_name`` on the whole-molecule
+             canonical SMILES -- simple retained trivial names.
+          3. The ``heterocycles.py`` monocyclic retained lookup (reuses
+             ``get_ring_canonical_smiles`` + ``get_retained_name``),
+             restricted to a molecule that IS a single ring covering every
+             heavy atom (no exocyclic substituents) so the name recovered
+             cannot silently omit part of the structure.
+
+        (1) is tried before (2) deliberately: a v26 P6 reproduce-first data
+        audit found >=2 canonical-SMILES keys shared between the two tables
+        where ``get_retained_name`` carries a WRONG (non-isomeric) name for
+        a fused ring system that ``FUSED_HETEROCYCLE_DATA`` already has
+        correct -- e.g. benzo[f]quinoline's canonical SMILES also keys
+        ``ALL_RETAINED_NAMES`` to ``benzo[h]quinoline`` (a different
+        connectivity; OPSIN-verified NOT to round-trip), and quinolizidine's
+        key resolves to ``decahydroisoquinoline`` (also a different
+        connectivity). Checking (1) first means the caller's SELF-01 gate
+        never even has to catch these -- and it still would, since this
+        method never itself verifies its answer.
+
+        Returns the candidate name string or ``None`` (no recognizer
+        matched). The caller re-verifies whatever this returns through the
+        SAME OPSIN SELF-01 gate as the general name and keeps the general
+        name if the retained candidate does not independently round-trip
+        (fail-closed; e.g. a lambda-convention ring name that is only valid
+        embedded in a larger spiro PIN, not standalone).
+        """
+        try:
+            from .data.fused_heterocycles import get_fused_heterocycle_name
+            fused = get_fused_heterocycle_name(mol)
+            if fused and fused[0]:
+                return fused[0]
+            from .data.retained_names import get_retained_name
+            canonical = Chem.MolToSmiles(mol, canonical=True)
+            retained = get_retained_name(canonical)
+            if retained:
+                return retained
+            ring_info = mol.GetRingInfo()
+            atom_rings = ring_info.AtomRings()
+            if len(atom_rings) == 1 and len(atom_rings[0]) == mol.GetNumAtoms():
+                from .rules.heterocycles import get_ring_canonical_smiles
+                ring_smiles = get_ring_canonical_smiles(mol, atom_rings[0])
+                mono_retained = get_retained_name(ring_smiles)
+                if mono_retained:
+                    return mono_retained
+        except Exception as e:  # fail-closed: a recognizer bug must never
+            # turn a preference lookup into a crash; the caller keeps
+            # whatever general-engine candidate it already had.
+            logger.info(
+                "retained structural preference error (kept general): %s", e)
+        return None
+
     def _try_general_engine_recovery(self, smiles: str) -> Optional[str]:
         """v25 G2 (opt-in): late engine recovery for abstentions.
 
@@ -2090,6 +2156,36 @@ class Orthonym:
                         allow_charged=self._allow_aromatic_general).ok:
                     return None
                 cand = eng.name
+                # v26 P6: retained-name preference (PIN-quality guardrail,
+                # `complete` tier only). A structural recognizer is about to
+                # be OVERRULED by an ugly von-Baeyer/replacement name the
+                # general engine just built -- before that ships, see
+                # whether a retained/fused-heterocycle name applies to the
+                # WHOLE input molecule and prefer it, but ONLY if it
+                # independently round-trips. This is a preference over an
+                # emission that already exists, never a precondition to
+                # naming: if the recognizer finds nothing, or its candidate
+                # fails to verify, `cand` is untouched and the shared
+                # verification ladder below runs on the general name exactly
+                # as it did before this phase.
+                if self._allow_aromatic_general:
+                    _retained_cand = self._retained_structural_preference(mol)
+                    if _retained_cand and _retained_cand != cand:
+                        if self._disable_opsin_validity_gate:
+                            cand = _retained_cand  # test/internal mode
+                        elif _validity_gate_jar_present():
+                            _r_smi = _validity_gate_name_to_smiles(_retained_cand)
+                            _r_ok = False
+                            if _r_smi is not None:
+                                try:
+                                    _r_ok = (Chem.CanonSmiles(_r_smi)
+                                             == Chem.CanonSmiles(smiles))
+                                except Exception:
+                                    _r_ok = False
+                            if _r_ok:
+                                cand = _retained_cand
+                        # jar missing: fail-closed -- keep the general `cand`
+                        # rather than ship an unverified retained guess.
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
             # but-MISMATCHED name is NEVER shipped, at any tier. Unverifiable
