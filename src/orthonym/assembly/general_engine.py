@@ -447,10 +447,21 @@ def _assemble(mol, features, chain, part,
 
 # Ring suffix forms (get_suffix(pg, is_ring=True) values) -- all carry locants
 # on a ring parent; 'appended' matches _build_parent_with_unsaturation types.
+#
+# v27 P2: widened for the high-enrichment linker/suffix groups that previously
+# forced the ring engine to abstain. All are gated on the engine tier
+# (allow_aromatic_general) via name_general_ring/_monocycle, so the PIN default
+# is byte-identical; each emission is SELF-01-verified downstream.
+#   * 'sulfonamide' / 'carboximidamide' (amidine) attach directly to the ring
+#     carbon (like -carboxamide) -> 'appended' (P-65.3.1 / P-66.4.1).
+#   * 'imine' is the aza-'-one' (P-66.3) -> 'inline'; it shares the ketone
+#     valence guard (see the suffix_core in ('one','imine') check below).
 _RING_SUFFIX_STYLES = {
     'ol': 'inline', 'one': 'inline', 'amine': 'inline', 'thiol': 'inline',
+    'imine': 'inline',
     'carboxylic acid': 'appended', 'carbaldehyde': 'appended',
     'carbonitrile': 'appended', 'carboxamide': 'appended',
+    'sulfonamide': 'appended', 'carboximidamide': 'appended',
 }
 
 
