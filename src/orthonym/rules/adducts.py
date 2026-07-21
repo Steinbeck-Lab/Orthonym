@@ -66,7 +66,9 @@ def split_components(mol) -> Optional[List[Tuple[str, int]]]:
     return [(smi, counts[smi]) for smi in order]
 
 
-def _name_component(frag_smi: str, style: str) -> Optional[str]:
+def _name_component(frag_smi: str, style: str, *,
+                    general_fallback: bool = False,
+                    allow_aromatic_general: bool = False) -> Optional[str]:
     """Name ONE component fragment, or None (fail-closed).
 
     Single-heavy-atom fragments come ONLY from the P-14.8.2 table above.
@@ -74,6 +76,13 @@ def _name_component(frag_smi: str, style: str) -> Optional[str]:
     a FRESH Orthonym instance (audit §3.3 RL-4 fresh-instance pattern,
     same as routing/dispatch_table._handle_multi_component_neutral), so the
     per-fragment OPSIN validity gate stays ON in production.
+
+    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    byte-identical PIN behaviour) select the ``complete`` tier for the
+    per-component namer, so a component nameable only by the general engine
+    (e.g. a silyl-heteroarene, a von-Baeyer polyene cage) is named rather than
+    dropping the whole adduct to a fail-closed abstention. Charge/single-atom
+    scope is unchanged: a charged fragment still refuses here (P5 owns charged).
     """
     frag_mol = Chem.MolFromSmiles(frag_smi)
     if frag_mol is None:
@@ -85,7 +94,9 @@ def _name_component(frag_smi: str, style: str) -> Optional[str]:
             Chem.MolToSmiles(frag_mol, canonical=True))
     from orthonym.namer import Orthonym  # lazy: avoid import cycle
     try:
-        name = Orthonym(style=style).name(frag_smi)
+        name = Orthonym(
+            style=style, general_fallback=general_fallback,
+            allow_aromatic_general=allow_aromatic_general).name(frag_smi)
     except Exception:
         return None
     if not name or not isinstance(name, str) or name.startswith("unknown"):
@@ -199,7 +210,9 @@ def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
 
 
 def name_adduct(mol, canonical_smiles: Optional[str] = None,
-                style: str = "pin") -> Optional[str]:
+                style: str = "pin", *,
+                general_fallback: bool = False,
+                allow_aromatic_general: bool = False) -> Optional[str]:
     """Name an all-neutral multi-component input per P-14.8, or None.
 
     Fail-closed refusals (return None; the dispatch cascade then falls
@@ -211,6 +224,14 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         (bare metals -> organometallic routing, never swallowed here);
       * any charged fragment (salt/ion routing owns charged input);
       * ANY component the single-component pipeline cannot name.
+
+    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    byte-identical PIN output) select the ``complete`` tier for the
+    per-component namer (see :func:`_name_component`), so a multi-fragment
+    input whose only unnameable part was a general-engine-only component
+    (silyl-heteroarene, von-Baeyer polyene cage, ...) is named under
+    ``complete`` instead of abstaining. All other scope (charge / single-atom /
+    proportion assembly / P-14.8 ordering) is unchanged.
     """
     components = split_components(mol)
     if components is None or len(components) < 2:
@@ -229,7 +250,9 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     ordered = sorted(components, key=lambda t: component_sort_key(t[0]))
     named: List[Tuple[str, int]] = []
     for smi, count in ordered:
-        component_name = _name_component(smi, style)
+        component_name = _name_component(
+            smi, style, general_fallback=general_fallback,
+            allow_aromatic_general=allow_aromatic_general)
         if component_name is None:
             return None  # fail-closed: never drop or placeholder a component
         named.append((component_name, count))

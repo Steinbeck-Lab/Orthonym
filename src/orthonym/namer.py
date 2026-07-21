@@ -2062,15 +2062,29 @@ class Orthonym:
                 return None
             from .assembly.general_engine import name_general
             from .validation.e1_certificate import verify_certificate
-            feats = self._perceive(
-                mol, smiles, Chem.MolToSmiles(mol, canonical=True))
-            self._classify(feats)
-            eng = name_general(
-                mol, feats,
-                allow_aromatic_general=self._allow_aromatic_general)
-            if eng is None or not verify_certificate(mol, eng).ok:
-                return None
-            cand = eng.name
+            canonical = Chem.MolToSmiles(mol, canonical=True)
+            if len(Chem.GetMolFrags(mol)) > 1:
+                # v26 P4: multi-fragment split-name-join, complete tier ONLY.
+                # `name_general` (and every single-component handler) refuses a
+                # multi-fragment mol, so the recovery would otherwise abstain.
+                # Under `complete` (allow_aromatic_general), name each NEUTRAL
+                # component through the complete-tier single-component pipeline
+                # and re-assemble via the existing P-14.8.1 adduct namer
+                # (order/proportion/water-last preserved). Fail-closed if ANY
+                # component is unnameable OR charged (charged -> P5 scope). The
+                # whole-string SELF-01 gate below round-trips the joined name.
+                cand = self._name_multifragment_complete(mol, canonical)
+                if cand is None:
+                    return None
+            else:
+                feats = self._perceive(mol, smiles, canonical)
+                self._classify(feats)
+                eng = name_general(
+                    mol, feats,
+                    allow_aromatic_general=self._allow_aromatic_general)
+                if eng is None or not verify_certificate(mol, eng).ok:
+                    return None
+                cand = eng.name
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
             # but-MISMATCHED name is NEVER shipped, at any tier. Unverifiable
@@ -2102,6 +2116,29 @@ class Orthonym:
             logger.info(
                 "general engine late recovery error (kept abstention): %s", e)
         return None
+
+    def _name_multifragment_complete(self, mol, canonical_smiles: str) -> Optional[str]:
+        """v26 P4: name an all-neutral multi-fragment input under `complete`.
+
+        Delegates to the P-14.8.1 adduct assembler (``rules.adducts.name_adduct``)
+        with the per-component namer switched to the ``complete`` tier
+        (``general_fallback`` + ``allow_aromatic_general``). name_adduct handles
+        component ordering (P-14.8 seniority / water-last), proportion notation,
+        and — crucially — fails closed (returns None) if ANY component is
+        unnameable OR charged (charged multi-fragment is the salt/ion router's
+        and, when it too abstains, P5's scope). Returns the assembled name or
+        None; never raises. Fires ONLY under `complete` (the caller gates on a
+        multi-fragment mol + `allow_aromatic_general`)."""
+        if not self._allow_aromatic_general:
+            return None  # multi-fragment recovery is complete-tier only
+        try:
+            from .rules.adducts import name_adduct
+            return name_adduct(
+                mol, canonical_smiles, style=self.style,
+                general_fallback=True, allow_aromatic_general=True)
+        except Exception as e:
+            logger.info("P4 multi-fragment recovery error (kept abstention): %s", e)
+            return None
 
     def _apply_trivial_fallback(self, result: str, smiles: str) -> str:
         """Task 1.9 (PIN-policy --trivial fallback).
