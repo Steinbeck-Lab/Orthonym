@@ -229,15 +229,17 @@ def test_complete_tier_abstains_on_tier5_substituent(production_gate):
     assert (not out) or is_failure_name(out), f"expected abstention, got {out!r}"
 
 
-def test_complete_tier_abstains_on_spiro_multi_attach(production_gate):
-    """v26 P1 critical-defect regression: a substituted spiro compound whose
-    only monocycle path treats the co-ring as a >1-point-attached substituent
-    must ABSTAIN under complete -- never the wrong linear-alkyl mis-name
-    (was: '1-pentylcyclohexane-4-carboxylic acid' / '9-formyl...'-style)."""
+def test_complete_tier_names_spiro_acid(production_gate):
+    """v26 P1 critical-defect regression, UPDATED by v27 P3: a substituted spiro
+    compound must NEVER be the wrong linear-alkyl mis-name (was:
+    '1-pentylcyclohexane-4-carboxylic acid'). v26 P1 kept it abstaining; v27 P3's
+    general spiro engine now names it CORRECTLY -- assert the round-tripping PIN
+    (the intent 'never the mis-name' is satisfied even better)."""
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles("O=C(O)C1CCC2(CCCCC2)CC1"))
-    assert (not out) or is_failure_name(out), f"expected abstention, got {out!r}"
+    assert out == "spiro[5.5]undecane-3-carboxylic acid", (
+        f"expected the P3 spiro PIN, got {out!r}")
 
 
 # --------------------------------------------------------------------------

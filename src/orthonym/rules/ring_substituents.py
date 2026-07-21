@@ -1275,6 +1275,48 @@ def _universal_cage_substituent_name(
         return None
 
 
+def _universal_spiro_substituent_name(
+    sub, attach_sub, allow_mancude: bool = False
+) -> Optional[str]:
+    """v27 P3 (BB P-24.2 + P-29.3): name ANY spiro ring system as a
+    ``...-<loc>-yl`` substituent by routing the detached ring system through the
+    audited ``analyze_spiro_universal`` engine, then citing the free valence's
+    spiro locant.
+
+    Generalizes the narrow ``_spiro_substituent_name`` (carbocyclic monospiro
+    only) to HETERO spiro (``2-oxaspiro[4.5]decan-8-yl``), POLYSPIRO
+    (``dispiro[...]-yl``) and ring-unsaturated spiro. The free valence gets the
+    lowest locant AFTER the heteroatoms (P-24.2.4 fixes the heteroatom locants
+    first; ``get_spiro_numbering`` orders het < free-valence). Returns None on
+    any refusal — fail-closed, never a mis-numbered or coverage-incomplete `-yl`.
+    """
+    from .vonbaeyer_universal import analyze_spiro_universal
+    from .polycyclic import _build_parent_with_unsaturation
+    try:
+        ring_atoms = [a.GetIdx() for a in sub.GetAtoms() if a.IsInRing()]
+        if not ring_atoms or attach_sub not in ring_atoms:
+            return None
+        sp = analyze_spiro_universal(
+            sub, cage_atoms=None, allow_mancude=allow_mancude,
+            free_valence_atoms={attach_sub})
+        if sp is None:
+            return None
+        # coverage floor: numbering must cover EXACTLY the ring atoms
+        if set(sp.atom_to_locant) != set(ring_atoms):
+            return None
+        loc = sp.atom_to_locant.get(attach_sub)
+        if loc is None:
+            return None
+        parent_block = _build_parent_with_unsaturation(
+            sp.total_atoms, sp.unsaturation)
+        if not parent_block:
+            return None
+        stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
+        return f'{sp.hetero_prefix}{sp.descriptor}{stem}-{loc}-yl'
+    except Exception:
+        return None
+
+
 def _polycyclic_substituent_name(
     mol, ring_atoms: Tuple[int, ...], attachment_atom: Optional[int],
     allow_mancude: bool = False,
@@ -1305,15 +1347,17 @@ def _polycyclic_substituent_name(
         if name:
             return name
     if allow_mancude:
-        # v27 P1: the universal cage engine (tricyclo+/adamantane + mancude),
-        # complete-tier only. Fail-closed (None) on any refusal.
-        try:
-            name = _universal_cage_substituent_name(
-                sub, attach_sub, allow_mancude=allow_mancude)
-        except Exception:
-            name = None
-        if name:
-            return name
+        # v27 P1/P3: the universal cage + spiro engines (tricyclo+/adamantane +
+        # mancude cages; hetero/poly/unsaturated spiro), complete-tier only.
+        # Fail-closed (None) on any refusal.
+        for _uni in (_universal_cage_substituent_name,
+                     _universal_spiro_substituent_name):
+            try:
+                name = _uni(sub, attach_sub, allow_mancude=allow_mancude)
+            except Exception:
+                name = None
+            if name:
+                return name
     return None
 
 

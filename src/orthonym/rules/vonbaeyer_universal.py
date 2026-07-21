@@ -225,3 +225,273 @@ def analyze_cage_universal(
         canon_match=tuple(match),
         is_mancude=is_mancude,
     )
+
+
+# =====================================================================
+# v27 P3 (P-24.2): general SPIRO analysis — a sibling to the von-Baeyer
+# cage engine above. ``analyze_cage_universal`` deliberately refuses spiro
+# (``<2 bridgeheads`` at :156); this analyzer names monospiro / linear &
+# branched polyspiro / heterocyclic spiro ring SYSTEMS, returning the SAME
+# dataclass shape (``SpiroSystem`` mirrors ``UniversalCage``) so the general
+# engine's suffix+substituent+stereo emission tail consumes it unchanged.
+# It composes the audited building blocks in ``rules/spiro.py`` (do not
+# re-derive) and runs every result through ``audit_spiro_descriptor`` — the
+# mandatory Java-free structural floor (SELF-01 fails OPEN without Java).
+# =====================================================================
+
+
+@dataclass(frozen=True)
+class SpiroSystem:
+    """Same field shape as ``UniversalCage`` so ``_emit_ring_from_analysis``
+    (the shared general-engine ring tail) is analysis-form-agnostic."""
+    descriptor: str                 # e.g. "spiro[4.5]" / "dispiro[3.2.3.2]"
+    total_atoms: int
+    hetero_prefix: str              # "" | "6-oxa" | "2-oxa-6-thia" ...
+    unsaturation: dict              # {'double_bonds':[...], 'triple_bonds':[...],
+                                    #  'double_bond_pairs':[...]}
+    cage_atoms: Tuple[int, ...]     # ORIGINAL (input-mol) indices
+    atom_to_locant: Dict[int, int]  # ORIGINAL idx -> spiro locant
+    canon_match: Tuple[int, ...]    # canon idx -> orig idx (identity here)
+    is_mancude: bool = False
+
+
+def audit_spiro_descriptor(
+    mol, cage_atoms, numbering: Dict[int, int], spiro_atoms, descriptor: str,
+) -> bool:
+    """Java-free structural correctness floor for a spiro descriptor+numbering.
+
+    Mirrors ``audit_von_baeyer_descriptor``'s set-equality contract, adapted to
+    spiro topology. Fail-closed (``False``) on any of:
+      (bijection)  numbering is not a 1-1 map of the cage atoms onto {1..N}
+                   (rejects a numbering that maps two atoms to the same locant);
+      (coverage)   the SSSR rings contained in the cage do not union to exactly
+                   the cage atom set (a ring atom silently dropped);
+      (pure-spiro) two cage rings share >1 atom (fused/bridged mis-routed here),
+                   a shared atom is not a declared spiro atom, a spiro atom is
+                   not in exactly 2 cage rings, a non-spiro atom is not in
+                   exactly 1, or n_rings != n_spiro + 1;
+      (simple-cycle) any cage atom has != 2 ring-neighbours within one of its
+                   rings (a real bond the descriptor's cycle would assert is
+                   missing, or a bridge edge is present);
+      (arithmetic) the descriptor's segment integers + n_spiro != N (a wrong
+                   ring-size descriptor for the audited skeleton).
+    """
+    import re
+    cage = set(cage_atoms)
+    n = len(cage)
+    if n == 0:
+        return False
+    # (bijection)
+    if set(numbering.keys()) != cage:
+        return False
+    if sorted(numbering.values()) != list(range(1, n + 1)):
+        return False
+    ri = mol.GetRingInfo()
+    cage_rings = [set(r) for r in ri.AtomRings() if set(r) <= cage]
+    if not cage_rings:
+        return False
+    # (coverage)
+    union: set = set()
+    for r in cage_rings:
+        union |= r
+    if union != cage:
+        return False
+    spiro_set = set(spiro_atoms)
+    # (pure-spiro) pairwise ring intersections are single spiro atoms
+    for i in range(len(cage_rings)):
+        for j in range(i + 1, len(cage_rings)):
+            inter = cage_rings[i] & cage_rings[j]
+            if len(inter) > 1:
+                return False
+            if len(inter) == 1 and next(iter(inter)) not in spiro_set:
+                return False
+    ring_count: Dict[int, int] = {a: 0 for a in cage}
+    for r in cage_rings:
+        for a in r:
+            ring_count[a] += 1
+    for a in cage:
+        if a in spiro_set:
+            if ring_count[a] != 2:
+                return False
+        elif ring_count[a] != 1:
+            return False
+    if len(cage_rings) != len(spiro_set) + 1:
+        return False
+    # (simple-cycle) every atom has exactly 2 ring-neighbours inside each of
+    # its rings — the cycle edges the descriptor asserts are all real bonds.
+    for r in cage_rings:
+        for a in r:
+            nb = [x.GetIdx() for x in mol.GetAtomWithIdx(a).GetNeighbors()
+                  if x.GetIdx() in r]
+            if len(nb) != 2:
+                return False
+    # (arithmetic) descriptor segment sum + n_spiro == N
+    try:
+        body = descriptor[descriptor.index('[') + 1:descriptor.index(']')]
+    except ValueError:
+        return False
+    segs = []
+    for tok in body.split('.'):
+        m = re.match(r'^(\d+)', tok)
+        if not m:
+            return False
+        segs.append(int(m.group(1)))
+    if sum(segs) + len(spiro_set) != n:
+        return False
+    return True
+
+
+def _extract_spiro_submol(mol, cage_set):
+    """Build a standalone submol of exactly ``cage_set`` (ring atoms), bonds
+    among them preserved, broken parent/substituent bonds left as implicit H.
+    Returns ``(submol, submol_to_mol)`` where ``submol_to_mol[k]`` is the
+    original index of submol atom ``k`` — or ``(None, None)`` on failure.
+    Atoms are added in sorted-index order for determinism."""
+    order = sorted(cage_set)
+    mol_to_sub = {m: k for k, m in enumerate(order)}
+    rw = Chem.RWMol()
+    for m in order:
+        rw.AddAtom(Chem.Atom(mol.GetAtomWithIdx(m).GetAtomicNum()))
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in mol_to_sub and j in mol_to_sub:
+            rw.AddBond(mol_to_sub[i], mol_to_sub[j], b.GetBondType())
+    sub = rw.GetMol()
+    try:
+        Chem.SanitizeMol(sub)
+    except Exception:
+        return None, None
+    return sub, order
+
+
+def analyze_spiro_universal(
+    mol, cage_atoms=None, allow_mancude: bool = False, free_valence_atoms=None,
+) -> Optional[SpiroSystem]:
+    """Deterministic universal spiro analysis; None on any refusal.
+
+    ``cage_atoms`` selects the spiro ring system inside ``mol`` (defaults to all
+    ring atoms). ``free_valence_atoms`` (original indices) biases the monospiro
+    numbering to give the free valence the lowest locant (P-29.3, substituent
+    use). ``allow_mancude`` lifts the aromatic-spiro refusal, emitting the
+    kekulized ene-locant (P-23) form; when False an aromatic spiro fails closed
+    (deferring to the retained-ring-name PIN path). Every result is put through
+    ``audit_spiro_descriptor`` (fail-closed on any structural mismatch).
+    """
+    from ..perception.rings import get_spiro_atoms
+    from .spiro import (
+        generate_spiro_descriptor, get_spiro_numbering,
+        _get_polyspiro_numbering, _build_hetero_prefix,
+    )
+    from .polycyclic import _get_alkane_name  # noqa: F401 (parity import)
+
+    if mol is None:
+        return None
+
+    ring_atoms_mol = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    if not ring_atoms_mol:
+        return None
+    cage_set = set(cage_atoms) if cage_atoms is not None else set(ring_atoms_mol)
+    if not cage_set <= ring_atoms_mol:
+        return None
+    if len(cage_set) > MAX_CAGE_ATOMS:
+        return None
+
+    # cage-only submol (reuses the spiro.py blocks unchanged, isolated from any
+    # substituent rings on the parent).
+    sub, sub_to_mol = _extract_spiro_submol(mol, cage_set)
+    if sub is None:
+        return None
+    mol_to_sub = {m: k for k, m in enumerate(sub_to_mol)}
+
+    ri = sub.GetRingInfo()
+    n_rings = ri.NumRings()
+    if n_rings < 2 or n_rings > MAX_CAGE_RINGS:
+        return None
+    spiro_sub = get_spiro_atoms(sub)
+    if not spiro_sub:
+        return None
+    # pure spiro: n_spiro + 1 rings, and every ring-ring share is a spiro atom
+    if n_rings != len(spiro_sub) + 1:
+        return None
+
+    descriptor = generate_spiro_descriptor(sub)
+    if not descriptor:
+        return None
+
+    fv_sub = None
+    if free_valence_atoms:
+        fv_sub = {mol_to_sub[a] for a in free_valence_atoms if a in mol_to_sub}
+
+    if len(spiro_sub) == 1:
+        center = next(iter(spiro_sub))
+        numbering = get_spiro_numbering(
+            sub, center, suffix_ring_atoms=fv_sub)
+    else:
+        numbering = _get_polyspiro_numbering(sub, spiro_sub)
+    # numbering must cover exactly the (ring-only) submol atoms
+    if not numbering or set(numbering.keys()) != set(range(sub.GetNumAtoms())):
+        return None
+
+    if not audit_spiro_descriptor(
+            sub, set(range(sub.GetNumAtoms())), numbering, spiro_sub, descriptor):
+        logger.info("analyze_spiro_universal: descriptor audit failed; refuse")
+        return None
+
+    # --- unsaturation (ene/yne locants on the fixed spiro numbering) ---
+    is_mancude = any(sub.GetAtomWithIdx(i).GetIsAromatic()
+                     for i in range(sub.GetNumAtoms()))
+    if is_mancude and not allow_mancude:
+        return None
+    kek = Chem.RWMol(sub)
+    if is_mancude:
+        try:
+            Chem.Kekulize(kek, clearAromaticFlags=True)
+        except Exception:
+            return None
+    dbl_pairs: list = []
+    triple_locs: list = []
+    for b in kek.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i not in numbering or j not in numbering:
+            continue
+        bt = b.GetBondType()
+        lo, hi = sorted((numbering[i], numbering[j]))
+        if bt == Chem.BondType.DOUBLE:
+            dbl_pairs.append((lo, hi))
+        elif bt == Chem.BondType.TRIPLE:
+            if hi != lo + 1:
+                return None  # non-consecutive yne needs compound locant: refuse
+            triple_locs.append(lo)
+    dbl_pairs.sort()
+    triple_locs.sort()
+    unsat = {
+        'double_bond_pairs': dbl_pairs,
+        'double_bonds': [str(lo) if hi == lo + 1 else f"{lo}({hi})"
+                         for lo, hi in dbl_pairs],
+        'triple_bonds': [str(t) for t in triple_locs],
+    }
+
+    # --- heteroatom skeletal-replacement prefix (P-24.2.4) ---
+    hetero_prefix = ""
+    if any(sub.GetAtomWithIdx(i).GetSymbol() != 'C'
+           for i in range(sub.GetNumAtoms())):
+        hp = _build_hetero_prefix(
+            sub, set(spiro_sub), set(range(sub.GetNumAtoms())))
+        if not hp:
+            return None  # hetero present but prefix underivable -> fail closed
+        hetero_prefix = hp
+
+    total_atoms = sub.GetNumAtoms()
+    cage_orig = tuple(sorted(cage_set))
+    atom_to_locant = {sub_to_mol[k]: loc for k, loc in numbering.items()}
+
+    return SpiroSystem(
+        descriptor=descriptor,
+        total_atoms=total_atoms,
+        hetero_prefix=hetero_prefix,
+        unsaturation=unsat,
+        cage_atoms=cage_orig,
+        atom_to_locant=atom_to_locant,
+        canon_match=tuple(cage_orig),
+        is_mancude=is_mancude,
+    )

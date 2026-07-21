@@ -689,6 +689,27 @@ def name_general_ring(
     if cage is None:
         return _refuse("cage unanalyzable (monocycle/spiro/caps/kekulize)")
 
+    return _emit_ring_from_analysis(
+        mol, features, cage, allow_aromatic_general, allow_charged)
+
+
+def _emit_ring_from_analysis(
+    mol, features, cage, allow_aromatic_general: bool, allow_charged: bool,
+) -> Optional[GeneralEngineResult]:
+    """v27 P3: shared ring-emission tail — ring suffix (P-6x) + substituent
+    recursion (P-29.2) + charge suffix + parent-scope stereo — for a
+    ``UniversalCage`` OR ``SpiroSystem`` analysis (identical field shape).
+
+    Extracted verbatim from ``name_general_ring`` so the spiro parent producer
+    (``name_general_spiro``) reuses the whole tail — ``_RING_SUFFIX_STYLES``,
+    the ester functional-class two-word, amide/sulfonamide N-substituents, the
+    enone valence guard, substituent recursion, charge and stereo — with zero
+    duplication. Keys only on ``cage.{cage_atoms,atom_to_locant,unsaturation,
+    total_atoms,hetero_prefix,descriptor}`` so it is analysis-form-agnostic."""
+    from ..rules.polycyclic import _build_parent_with_unsaturation
+    from ..rules.seniority import get_suffix
+    from .substituent_enumerator import discover_substituents, name_substituent
+
     cage_set = set(cage.cage_atoms)
     atom_to_locant = dict(cage.atom_to_locant)
 
@@ -1189,6 +1210,70 @@ def name_general_monocycle(
     return GeneralEngineResult(name=name, bindings=tuple(bindings))
 
 
+def name_general_spiro(
+    mol, features, allow_aromatic_general: bool = False,
+    allow_charged: bool = False,
+) -> Optional[GeneralEngineResult]:
+    """v27 P3 (P-24.2): general SPIRO ring-parent path (opt-in engine only).
+
+    The von-Baeyer cage engine refuses spiro (``<2 bridgeheads``), so a spiro
+    ring system that the default per-class handlers abstain on (functionalized /
+    mancude / suffix-form PIN) dies at ``name_general_ring``'s cage refusal.
+    This sibling routes the senior spiro ring system through
+    ``analyze_spiro_universal`` (audited) and reuses the SAME
+    ``_emit_ring_from_analysis`` tail as the cage path. Fail-closed (None) on any
+    non-spiro / unaudited system; the SELF-01 round-trip is the downstream gate.
+    """
+    from ..rules.vonbaeyer_universal import analyze_spiro_universal
+    from ..rules.ring_selection import select_principal_ring_system
+
+    reason = _common_refusal(mol, allow_charged=allow_charged)
+    if reason:
+        return _refuse(reason)
+    ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    if not ring_atoms:
+        return _refuse("acyclic (chain path owns it)")
+    if getattr(features, 'chain_is_parent', False):
+        return _refuse("chain parent (chain path owns it)")
+
+    # A spiro system is perceived as SEPARATE ring systems (its rings share only
+    # a single atom, not a fused edge), so the senior component is just one ring.
+    # The spiro PARENT is the whole cluster of rings joined through spiro atoms:
+    # grow the senior component across shared-atom junctions, then hand the full
+    # cluster to analyze_spiro_universal (which fail-closes if it is not pure
+    # spiro — e.g. a fused/bridged cluster).
+    ring_systems = list(getattr(features, 'ring_systems', None) or [])
+    if not ring_systems:
+        return _refuse("no ring systems perceived")
+    senior = select_principal_ring_system(mol, ring_systems)
+    if not senior:
+        return _refuse("no senior ring system")
+    clusters = [set(s) for s in ring_systems]
+    _merged = True
+    while _merged:
+        _merged = False
+        for _i in range(len(clusters)):
+            for _j in range(_i + 1, len(clusters)):
+                if clusters[_i] & clusters[_j]:
+                    clusters[_i] |= clusters[_j]
+                    clusters.pop(_j)
+                    _merged = True
+                    break
+            if _merged:
+                break
+    cage_seed = next((c for c in clusters if set(senior) <= c), None)
+    if cage_seed is None:
+        return _refuse("senior ring system not in any cluster")
+
+    spiro = analyze_spiro_universal(
+        mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general)
+    if spiro is None:
+        return _refuse("not an analyzable spiro ring system")
+
+    return _emit_ring_from_analysis(
+        mol, features, spiro, allow_aromatic_general, allow_charged)
+
+
 def name_general(
     mol, features, allow_aromatic_general: bool = False,
 ) -> Optional[GeneralEngineResult]:
@@ -1215,6 +1300,14 @@ def name_general(
         allow_charged=allow_charged)
     if cage_result is not None:
         return cage_result
+    # v27 P3: spiro producer sibling — the cage engine refuses spiro, so this
+    # runs before the lone-monocycle fallback. Inert unless the senior ring
+    # system is an analyzable spiro (else fail-closed None -> monocycle path).
+    spiro_result = name_general_spiro(
+        mol, features, allow_aromatic_general=allow_aromatic_general,
+        allow_charged=allow_charged)
+    if spiro_result is not None:
+        return spiro_result
     return name_general_monocycle(
         mol, features, allow_aromatic_general=allow_aromatic_general,
         allow_charged=allow_charged)
