@@ -16,6 +16,7 @@ from rdkit import Chem
 
 from orthonym.namer import Orthonym
 from orthonym.assembly import general_engine as ge
+from orthonym.assembly.substituent_enumerator import name_substituent
 from orthonym.validation.opsin_roundtrip import opsin_parse
 
 
@@ -87,6 +88,61 @@ def test_fused_imine_covered():
 def test_monocycle_imine_unchanged():
     """cyclohexan-1-imine already worked on monocycles — must stay byte-exact."""
     assert _engine_name("N=C1CCCCC1") == "cyclohexan-1-imine"
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — sulfinyl/sulfonyl substituent-branch namer (sulfone/sulfoxide 6.81×)
+# ---------------------------------------------------------------------------
+
+def _s_branch(smiles, allow_mancude):
+    """Name the ring-borne S(=O)_n-R branch as a substituent prefix."""
+    mol = Chem.MolFromSmiles(smiles)
+    ring = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    for a in mol.GetAtoms():
+        if a.GetSymbol() != 'S':
+            continue
+        ring_nb = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() in ring]
+        if not ring_nb:
+            continue
+        seen, stack, frag = {ring_nb[0]}, [a.GetIdx()], set()
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            frag.add(x)
+            for n in mol.GetAtomWithIdx(x).GetNeighbors():
+                if n.GetIdx() not in seen:
+                    stack.append(n.GetIdx())
+        return name_substituent(mol, frag, a.GetIdx(), allow_mancude=allow_mancude)
+    return None
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("CS(=O)(=O)c1ccccc1", "methanesulfonyl"),
+    ("CS(=O)c1ccccc1", "methanesulfinyl"),
+    ("CCS(=O)(=O)c1ccccc1", "ethanesulfonyl"),
+    ("c1ccccc1S(=O)(=O)c1ccccc1", "benzenesulfonyl"),
+    ("FC(F)(F)S(=O)(=O)c1ccccc1", "trifluoromethanesulfonyl"),
+])
+def test_sulfinyl_sulfonyl_branch_complete_tier(smiles, expected):
+    """Complete tier: the S-attached sulfone/sulfoxide branch is named
+    (R)sulfonyl/(R)sulfinyl -- never dropping the S or its =O (CR-01)."""
+    assert _s_branch(smiles, allow_mancude=True) == expected
+
+
+def test_sulfonyl_branch_never_drops_oxygens_default():
+    """PIN default (allow_mancude=False): unchanged -- the pre-existing route
+    owns S-attached branches; the new complete-tier guard does not fire, so the
+    branch namer must NOT return a =O-dropping 'methyl'/'ethyl'."""
+    # byte-identical to pre-P2 default (the ring engine that would drop it is
+    # tier-gated and never runs at the default tier).
+    assert _s_branch("CS(=O)(=O)c1ccccc1", allow_mancude=False) == "methyl"
+
+
+def test_fused_methanesulfonyl_covered():
+    name = _assert_covers("CS(=O)(=O)c1ccc2ccccc2c1")
+    assert "methanesulfonyl" in name
 
 
 # ---------------------------------------------------------------------------

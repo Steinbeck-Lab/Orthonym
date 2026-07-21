@@ -344,8 +344,14 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # for FG-bearing fragments, eliminating the 'methyl formatyl' /
     # 'hydroxymethyl' bug per RESEARCH §3 root-cause fix.
     try:
+        # v27 P2 (P-63.6): allow_mancude (complete/best-effort tier) also lifts
+        # the S-attached sulfoxide/sulfone prefix-form guard so a ring-borne
+        # -S(=O)(=O)-R / -S(=O)-R substituent is named (R)sulfonyl / (R)sulfinyl
+        # instead of dropping the S and its =O. Gated so the PIN default path is
+        # byte-identical (the pre-existing polyfunctional route still owns it).
         prefix_form = _check_substituent_prefix_form(
-            mol, frag_atoms_set, attach_idx
+            mol, frag_atoms_set, attach_idx,
+            allow_higher_sulfur=allow_mancude,
         )
         if prefix_form is not None:
             return _stereo_route(prefix_form)

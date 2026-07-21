@@ -1637,6 +1637,7 @@ def _check_substituent_prefix_form(
     mol,
     frag_atoms_set: Set[int],
     attach_idx: int,
+    allow_higher_sulfur: bool = False,
 ) -> Optional[str]:
     """Tier-0.5 prefix-form check for FG-bearing substituent fragments.
 
@@ -1715,6 +1716,43 @@ def _check_substituent_prefix_form(
                     if branch_b is not None:
                         return branch_b
             # --- End CR-01 fix ---
+            # v27 P2 (P-63.6): a sulfoxide/sulfone SUBSTITUENT attaches through
+            # its SULFUR, so the SMARTS' *other* carbon (R' on the parent side)
+            # lives OUTSIDE the fragment. The strict match_set==frag_atoms_set
+            # test below would then reject the match and the fragment would fall
+            # through to a lower tier that DROPS the S and its =O atoms (naming a
+            # bare 'methyl' for -S(=O)(=O)-CH3 -> a DIFFERENT molecule, CR-01
+            # class). Accept the match when the S is the attach atom and every
+            # match atom except that single parent-side carbon is inside the
+            # fragment; name it (R)sulfinyl / (R)sulfonyl with the parent carbon
+            # marked as the "chain" so the builder picks the in-fragment R.
+            if (fg_name in ("sulfoxide", "sulfone")
+                    and allow_higher_sulfur
+                    and attach_idx is not None
+                    and len(match) >= 4
+                    and match[0] == attach_idx):
+                s_atom = mol.GetAtomWithIdx(match[0])
+                c_nbrs = [n.GetIdx() for n in s_atom.GetNeighbors()
+                          if n.GetSymbol() == "C"]
+                parent_cs = [c for c in c_nbrs if c not in frag_atoms_set]
+                sub_cs = [c for c in c_nbrs if c in frag_atoms_set]
+                # The =O atoms (SMARTS positions after S) must be part of the
+                # substituent fragment; only the single parent-side carbon may
+                # sit outside it. (Containment, not equality: the R' side may be
+                # multi-atom -- ethyl, phenyl -- so match captures just its first
+                # carbon while the fragment holds the whole R'.)
+                o_atoms = [i for i in match
+                           if mol.GetAtomWithIdx(i).GetSymbol() == "O"]
+                if (len(parent_cs) == 1 and len(sub_cs) >= 1
+                        and match[0] in frag_atoms_set
+                        and all(o in frag_atoms_set for o in o_atoms)):
+                    prefix = get_substituent_prefix_form(
+                        fg_name, mol, tuple(match),
+                        principal_chain=[parent_cs[0]],
+                    )
+                    if prefix is not None:
+                        return prefix
+                continue
             # FG must EQUAL the fragment (no extra atoms). This is the
             # IUPAC P-65/P-66 prefix-form precondition: the substituent
             # fragment must be the FG itself, not a larger group containing
