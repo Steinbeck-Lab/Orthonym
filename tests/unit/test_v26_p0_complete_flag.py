@@ -76,11 +76,18 @@ class TestEngineSignaturesAcceptNewParam:
         # P0: inert -- identical result regardless of the flag's value.
         assert cage_false.descriptor == cage_true.descriptor == "bicyclo[2.2.1]"
 
-    def test_analyze_cage_universal_mancude_still_refused_in_p0(self):
-        # P0 explicitly does NOT lift the refusal (P2 will).
+    def test_analyze_cage_universal_mancude_default_refused_p2_lifts(self):
+        # allow_mancude=False (the default / PIN path) STILL refuses an
+        # aromatic cage -> byte-identity preserved. v26 P2 (commit ba2b8ae7)
+        # lifted the refusal under allow_mancude=True: an aromatic cage is now
+        # expressed as a kekulized von-Baeyer polyene, so naphthalene analyzes
+        # as a bicyclo[4.4.0] cage. (Reconciled 2026-07-21: this superseded the
+        # P0-era inertness assertion once P2 landed.)
         mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         assert analyze_cage_universal(mol, allow_mancude=False) is None
-        assert analyze_cage_universal(mol, allow_mancude=True) is None
+        cage = analyze_cage_universal(mol, allow_mancude=True)
+        assert cage is not None
+        assert cage.descriptor.startswith("bicyclo[4.4.0]")
 
     def test_name_general_ring_accepts_param(self):
         mol, feats = self._features("C1CC2CCC1C2")  # norbornane
