@@ -2186,6 +2186,21 @@ class Orthonym:
                                 cand = _retained_cand
                         # jar missing: fail-closed -- keep the general `cand`
                         # rather than ship an unverified retained guess.
+            # v26 P7 FIX 2: fail closed on DROPPED stereo (general-engine path).
+            # The SELF-01 ladder below is CONSTITUTIONAL (atoms+bonds+charge,
+            # stereo-blind), so a general emission that omits E/Z or R/S the
+            # input carries would pass SELF-01 and ship a WRONG stereoisomer
+            # specification. The universal stereo backstop is LOG-ONLY for the
+            # handler='unknown' cohort that general emissions arrive as (no
+            # authoritative parent locant map), so it cannot suppress this. Any
+            # stereo the engine DOES express (parent-scope _stereo_prefix or
+            # substituent-internal name_substituent) makes needs_stereo_injection
+            # False, so genuinely-expressed cases still ship WITH stereo -- only
+            # genuinely-dropped-stereo emissions abstain here.
+            if cand:
+                from .rules.stereochemistry import needs_stereo_injection
+                if needs_stereo_injection(mol, cand):
+                    return None
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
             # but-MISMATCHED name is NEVER shipped, at any tier. Unverifiable
@@ -2614,11 +2629,40 @@ class Orthonym:
                     if _eng is not None and verify_certificate(
                             mol, _eng,
                             allow_charged=self._allow_aromatic_general).ok:
-                        name = _eng.name
-                        # v25 G3: observation-only provenance (the emission
-                        # still flows through the normal downstream gates).
-                        from .metrics.provenance import record_source
-                        record_source("general_engine")
+                        # v26 P7 FIX 1: complete-tier abstain-without-Java
+                        # contract. E1 does NOT verify ring numbering/locants,
+                        # and the downstream _final_opsin_validity_gate FAILS
+                        # OPEN with no OPSIN jar -- so under `complete`
+                        # (allow_aromatic_general) accepting this E1-only name
+                        # with no jar would ship an UNVERIFIED name from the NEW
+                        # aggressive producers (P1/P2/P5). Mirror the
+                        # late-recovery jar guard: keep the abstention. Scoped to
+                        # allow_aromatic_general so valid/best-effort/pre-v26
+                        # behavior is unchanged. (best-effort opts in via
+                        # _general_fallback_unverified; test/internal mode via
+                        # _disable_opsin_validity_gate.)
+                        _no_jar_abstain = (
+                            self._allow_aromatic_general
+                            and not self._general_fallback_unverified
+                            and not self._disable_opsin_validity_gate
+                            and not _validity_gate_jar_present()
+                        )
+                        # v26 P7 FIX 2: fail closed on DROPPED stereo. SELF-01 is
+                        # constitutional (stereo-blind) and the universal stereo
+                        # backstop is LOG-ONLY for the handler='unknown' cohort
+                        # general emissions arrive as -- so a general name that
+                        # omits E/Z or R/S the input carries would otherwise
+                        # ship a WRONG stereoisomer. Expressed stereo (parent
+                        # _stereo_prefix / substituent-internal name_substituent)
+                        # makes the predicate False -> no over-abstention.
+                        from .rules.stereochemistry import needs_stereo_injection
+                        _drops_stereo = needs_stereo_injection(mol, _eng.name)
+                        if not _no_jar_abstain and not _drops_stereo:
+                            name = _eng.name
+                            # v25 G3: observation-only provenance (the emission
+                            # still flows through the normal downstream gates).
+                            from .metrics.provenance import record_source
+                            record_source("general_engine")
                 except Exception as _e:  # fail-closed: an engine bug must
                     # never turn an abstention into a crash or a wrong name.
                     logger.info("general engine error (kept abstention): %s",

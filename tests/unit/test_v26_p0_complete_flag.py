@@ -32,8 +32,11 @@ class TestCLIParserAcceptsComplete:
         assert exc.value.code == 0
         out = capsys.readouterr().out
         assert "complete" in out
-        # ladder order per the brief: pin, valid, complete, best-effort
-        assert "pin, valid, complete" in out or "complete" in out
+        # argparse renders the --emit-tier choices as a brace list with NO
+        # spaces; assert the exact rendering so `complete` is present as a real
+        # tier choice (not merely a substring of some other help text) and the
+        # full ladder is offered.
+        assert "{pin,valid,complete,best-effort}" in out
 
     def test_emit_tier_complete_runs_benzene(self, capsys):
         rc = cli_main(["c1ccccc1", "--emit-tier", "complete"])
