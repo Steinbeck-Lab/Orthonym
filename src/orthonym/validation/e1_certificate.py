@@ -20,7 +20,15 @@ class E1Verdict:
     reason: str
 
 
-def verify_certificate(mol, result) -> E1Verdict:
+def verify_certificate(mol, result, allow_charged: bool = False) -> E1Verdict:
+    """Atom-partition certificate for a GeneralEngineResult.
+
+    v26 P5: ``allow_charged`` (set only under ``complete``) lifts the
+    net-formal-charge refusal -- the charge is expressed as a
+    ``-ylium``/``-ide``/``-uide``/``-ium`` suffix on an already-bound skeletal
+    atom, so it introduces NO new atom and the partition is still complete.
+    Default False -> byte-identical (the G1 neutral-scope guard still fires).
+    """
     heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     seen = {}
     for binding in result.bindings:
@@ -39,6 +47,6 @@ def verify_certificate(mol, result) -> E1Verdict:
     for binding in result.bindings:
         if binding.token and binding.token not in result.name:
             return E1Verdict(False, f"token {binding.token!r} not in name")
-    if Chem.GetFormalCharge(mol) != 0:
+    if not allow_charged and Chem.GetFormalCharge(mol) != 0:
         return E1Verdict(False, "net formal charge nonzero (G1 charge scope)")
     return E1Verdict(True, "ok")

@@ -2082,7 +2082,12 @@ class Orthonym:
                 eng = name_general(
                     mol, feats,
                     allow_aromatic_general=self._allow_aromatic_general)
-                if eng is None or not verify_certificate(mol, eng).ok:
+                # v26 P5: charge is lifted only under complete
+                # (allow_aromatic_general); the E1 cert must accept the charged
+                # partition there too (the charge is a suffix on a bound atom).
+                if eng is None or not verify_certificate(
+                        mol, eng,
+                        allow_charged=self._allow_aromatic_general).ok:
                     return None
                 cand = eng.name
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
@@ -2510,7 +2515,9 @@ class Orthonym:
                     _eng = name_general(
                         mol, features,
                         allow_aromatic_general=self._allow_aromatic_general)
-                    if _eng is not None and verify_certificate(mol, _eng).ok:
+                    if _eng is not None and verify_certificate(
+                            mol, _eng,
+                            allow_charged=self._allow_aromatic_general).ok:
                         name = _eng.name
                         # v25 G3: observation-only provenance (the emission
                         # still flows through the normal downstream gates).

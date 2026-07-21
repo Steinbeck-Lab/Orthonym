@@ -60,11 +60,19 @@ def _refuse(reason: str) -> None:
     return None
 
 
-def _common_refusal(mol) -> Optional[str]:
-    """Engine-wide scope refusals shared by the chain and ring paths."""
+def _common_refusal(mol, allow_charged: bool = False) -> Optional[str]:
+    """Engine-wide scope refusals shared by the chain and ring paths.
+
+    v26 P5: ``allow_charged`` (set only under ``complete`` /
+    ``allow_aromatic_general``) lifts the net-charge refusal so the charged
+    general path can emit a ``-ylium``/``-ide``/``-uide``/``-ium`` suffix on the
+    numbered parent (``_charge_suffix_text`` + fail-closed). The multi-fragment,
+    radical (radical-cation) and isotope refusals STAY even when charge is
+    allowed -- those remain out of scope for ``complete``.
+    """
     if mol is None:
         return "no mol"
-    if Chem.GetFormalCharge(mol) != 0:
+    if not allow_charged and Chem.GetFormalCharge(mol) != 0:
         return "net charge (G3 scope)"
     if len(Chem.GetMolFrags(mol)) > 1:
         return "multi-fragment (G3 scope)"
@@ -75,12 +83,114 @@ def _common_refusal(mol) -> Optional[str]:
     return None
 
 
-def name_general_chain(mol, features) -> Optional[GeneralEngineResult]:
+def _charge_suffix_text(mol, atom_to_locant) -> Optional[str]:
+    """v26 P5 (BB P-73 cations / P-74 anions): the charge-suffix string for
+    skeletal charge(s) on the ALREADY-NUMBERED general parent --
+    ``-1-ium`` / ``-2-ylium`` / ``-1-ide`` / ``-1-uide`` (or the multiplied
+    ``-1,4-diium`` / ``-1,2-diylium`` / ``-1,4-diide`` forms).
+
+    The locant is the ACTUAL charged atom's parent locant, so the emitted
+    descriptor is structurally faithful on its own (SELF-01 is only the
+    backstop, which fails OPEN without Java). Reuses the proven ion perception
+    (``get_ion_sites``) + classifiers (``classify_cation`` / ``classify_anion``)
+    rather than reinventing charge typing.
+
+    FAIL CLOSED (return None -> the caller abstains, never a wrong/neutral name)
+    on any charge that cannot be faithfully expressed as a suffix on THIS parent:
+      * a charge on a SUBSTITUENT atom (not in the parent numbering);
+      * an FG-anchored anion (alkoxide/thiolate/carboxylate/sulfonate/...) whose
+        charge sits on an off-parent oxygen -- the PIN charged path owns those;
+      * diazonium / acylium cations -- the PIN path owns those;
+      * a multiply-charged single atom, mixed sign centres, mixed suffix kinds,
+        an internal-only (P-59 nitro/azide/N-oxide/diazo) charge, or a
+        multiplicity beyond the simple table.
+    """
+    from ..perception.ions import get_ion_sites
+    from ..rules.ions import classify_cation, classify_anion
+
+    sites = get_ion_sites(mol)  # excludes internal P-59 charges
+    anions = list(sites.get('anions') or [])
+    cations = list(sites.get('cations') or [])
+    if bool(anions) == bool(cations):
+        # neither (internal-only net charge) or BOTH (mixed-sign) -> out of scope
+        return None
+    charged = anions or cations
+    negative = bool(anions)
+    parent_atoms = set(atom_to_locant)
+
+    per_locant_base: List[Tuple[int, str]] = []
+    for site in charged:
+        idx = site['atom_idx']
+        if idx not in parent_atoms:
+            return None  # charge on a substituent -> not a parent suffix
+        if abs(int(site.get('charge', 0))) != 1:
+            return None  # multiply-charged single atom -> tight scope
+        if negative:
+            acls = classify_anion(mol, site)
+            if acls in ('carbanion', 'heteroatom_hydride_anion'):
+                base = 'ide'          # P-72.2.2.1: loss of H+ from a skeletal atom
+            elif acls == 'uide_anion':
+                base = 'uide'         # P-72.3: hydride ADDED to a skeletal atom
+            else:
+                return None           # FG anion -> PIN path owns it
+        else:
+            ccls = classify_cation(mol, site)
+            if ccls == 'ylium':
+                base = 'ylium'        # P-73.2.2.1.1: loss of H- from a skeletal C
+            elif ccls in ('aminium', 'onium', 'quaternary'):
+                base = 'ium'          # P-73.1: protonated / substituted skeletal heteroatom
+            else:
+                return None           # diazonium / acylium -> PIN path owns it
+        per_locant_base.append((atom_to_locant[idx], base))
+
+    bases = {b for _, b in per_locant_base}
+    if len(bases) != 1:
+        return None                   # mixed suffix kinds on one parent
+    base = next(iter(bases))
+    locants = sorted(loc for loc, _ in per_locant_base)
+    n = len(locants)
+    if n == 1:
+        mult = ''
+    else:
+        mult = _MULT_SIMPLE.get(n)
+        if mult is None:
+            return None
+    return '-' + ','.join(map(str, locants)) + '-' + mult + base
+
+
+def _append_charge_suffix(name: str, mol, atom_to_locant,
+                          has_fg_suffix: bool) -> Optional[str]:
+    """Splice the P5 charge suffix onto an assembled parent ``name`` (pre-stereo).
+
+    Elides a single trailing parent 'e' (``cyclohexane``->``cyclohexan-1-ide``,
+    ``1-methylpyridine``->``1-methylpyridin-1-ium``, ``...pentaene``->
+    ``...pentaen-4-ium``); the charge suffix always begins ``-<locant>-`` whose
+    first letter (i/u/y) is a vowel, so the terminal 'e' is always elided
+    (P-16.3.3). Returns the charged name, or None to FAIL CLOSED (a charge that
+    is not expressible, or a co-occurring FG suffix -- the cumulative FG+charge
+    construction is out of P5 scope)."""
+    if has_fg_suffix:
+        return None  # FG suffix + skeletal charge (cumulative) -> out of P5 scope
+    cs = _charge_suffix_text(mol, atom_to_locant)
+    if cs is None:
+        return None
+    stem = name[:-1] if name.endswith('e') else name
+    return stem + cs
+
+
+def name_general_chain(
+    mol, features, allow_charged: bool = False,
+) -> Optional[GeneralEngineResult]:
     """Name a chain-parented molecule with a full atom->token partition.
 
     Returns None on ANY condition outside the verified G1 scope.
+
+    v26 P5: ``allow_charged`` (only under ``complete``) lifts the net-charge
+    refusal and emits a ``-ide``/``-ylium``/``-ium``/``-uide`` suffix on the
+    numbered chain parent when the charge sits on a chain skeletal atom
+    (fail-closed otherwise).
     """
-    reason = _common_refusal(mol)
+    reason = _common_refusal(mol, allow_charged=allow_charged)
     if reason:
         return _refuse(reason)
 
@@ -96,7 +206,7 @@ def name_general_chain(mol, features) -> Optional[GeneralEngineResult]:
     part = _partition(mol, features, chain)
     if part is None:
         return None
-    return _assemble(mol, features, chain, part)
+    return _assemble(mol, features, chain, part, allow_charged=allow_charged)
 
 
 def _partition(mol, features, chain) -> Optional[dict]:
@@ -248,7 +358,8 @@ def _suffix_block(style: str, core: str, locants: List[int]) -> Optional[str]:
     return '-' + ','.join(map(str, sorted(locants))) + '-' + (mult or '') + core
 
 
-def _assemble(mol, features, chain, part) -> Optional[GeneralEngineResult]:
+def _assemble(mol, features, chain, part,
+              allow_charged: bool = False) -> Optional[GeneralEngineResult]:
     from .substituent_enumerator import name_substituent
 
     atom_to_locant = part['atom_to_locant']
@@ -306,6 +417,13 @@ def _assemble(mol, features, chain, part) -> Optional[GeneralEngineResult]:
 
     # Prefix text abuts the stem directly ('3-ethyl-2,2-dimethylhexane').
     name = ('-'.join(prefix_parts) + body) if prefix_parts else body
+    # v26 P5: charge suffix on a chain skeletal atom (fail closed otherwise).
+    if allow_charged and Chem.GetFormalCharge(mol) != 0:
+        name = _append_charge_suffix(
+            name, mol, {a: atom_to_locant[a] for a in chain},
+            has_fg_suffix=bool(part['suffix_core']))
+        if name is None:
+            return _refuse("charge not expressible as a chain-parent suffix")
     # v25 G4: parent-scope stereo from structure (substituent-internal
     # stereo is already handled inside name_substituent's stereo route).
     name = _stereo_prefix(
@@ -325,12 +443,17 @@ _RING_SUFFIX_STYLES = {
 
 def name_general_ring(
     mol, features, allow_aromatic_general: bool = False,
+    allow_charged: bool = False,
 ) -> Optional[GeneralEngineResult]:
     """v25 G2: universal von-Baeyer ring-parent path (opt-in engine only).
 
     v26 P0: ``allow_aromatic_general`` is threaded to
     ``analyze_cage_universal(..., allow_mancude=...)`` (plumbing only; the
     mancude refusal there still fires unconditionally until P2).
+
+    v26 P5: ``allow_charged`` (only under ``complete``) lifts the net-charge
+    refusal and emits a charge suffix on a von-Baeyer cage skeletal atom
+    (``...pentaen-4-ium``); fail-closed otherwise.
     """
     from ..rules.vonbaeyer_universal import analyze_cage_universal
     from ..rules.polycyclic import _build_parent_with_unsaturation
@@ -338,7 +461,7 @@ def name_general_ring(
     from ..rules.seniority import get_suffix
     from .substituent_enumerator import discover_substituents, name_substituent
 
-    reason = _common_refusal(mol)
+    reason = _common_refusal(mol, allow_charged=allow_charged)
     if reason:
         return _refuse(reason)
     ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
@@ -467,6 +590,13 @@ def name_general_ring(
     else:
         name = core
 
+    # v26 P5: charge suffix on a cage skeletal atom (fail closed otherwise).
+    if allow_charged and Chem.GetFormalCharge(mol) != 0:
+        name = _append_charge_suffix(name, mol, atom_to_locant,
+                                     has_fg_suffix=bool(suffix_core))
+        if name is None:
+            return _refuse("charge not expressible as a cage-parent suffix")
+
     # v25 G4: parent-scope stereo from structure (VB locants).
     name = _stereo_prefix(mol, atom_to_locant) + name
 
@@ -582,6 +712,7 @@ def _carbocycle_parent_name(mol, oriented, atom_to_locant) -> Optional[str]:
 
 def name_general_monocycle(
     mol, features, allow_aromatic_general: bool = False,
+    allow_charged: bool = False,
 ) -> Optional[GeneralEngineResult]:
     """v26 P1: general LONE-monocycle ring-parent path (opt-in engine only).
 
@@ -611,7 +742,7 @@ def name_general_monocycle(
     )
     from .substituent_enumerator import discover_substituents, name_substituent
 
-    reason = _common_refusal(mol)
+    reason = _common_refusal(mol, allow_charged=allow_charged)
     if reason:
         return _refuse(reason)
     ring_info = mol.GetRingInfo()
@@ -780,6 +911,13 @@ def name_general_monocycle(
     else:
         name = core
 
+    # v26 P5: charge suffix on a ring skeletal atom (fail closed otherwise).
+    if allow_charged and Chem.GetFormalCharge(mol) != 0:
+        name = _append_charge_suffix(name, mol, atom_to_locant,
+                                     has_fg_suffix=bool(suffix_core))
+        if name is None:
+            return _refuse("charge not expressible as a monocycle-parent suffix")
+
     # v25 G4: parent-scope stereo from structure (ring locants).
     name = _stereo_prefix(mol, atom_to_locant) + name
 
@@ -798,13 +936,22 @@ def name_general(
     threaded to ``name_general_ring`` -> ``analyze_cage_universal`` (aromatic
     cages) and enables the general lone-monocycle path
     (``name_general_monocycle``). Default False -> byte-identical to pre-P0.
+
+    v26 P5: net charge is lifted ONLY under ``complete`` (``allow_charged`` ==
+    ``allow_aromatic_general``); the charge becomes a ``-ylium``/``-ide``/
+    ``-uide``/``-ium`` suffix on the numbered parent (fail-closed). Under
+    ``valid`` / the PIN default (``allow_aromatic_general`` False) charge is
+    still refused -> byte-identical to pre-P5.
     """
+    allow_charged = allow_aromatic_general
     ring_atoms = any(a.IsInRing() for a in mol.GetAtoms()) if mol else False
     if not ring_atoms or getattr(features, 'chain_is_parent', False):
-        return name_general_chain(mol, features)
+        return name_general_chain(mol, features, allow_charged=allow_charged)
     cage_result = name_general_ring(
-        mol, features, allow_aromatic_general=allow_aromatic_general)
+        mol, features, allow_aromatic_general=allow_aromatic_general,
+        allow_charged=allow_charged)
     if cage_result is not None:
         return cage_result
     return name_general_monocycle(
-        mol, features, allow_aromatic_general=allow_aromatic_general)
+        mol, features, allow_aromatic_general=allow_aromatic_general,
+        allow_charged=allow_charged)
