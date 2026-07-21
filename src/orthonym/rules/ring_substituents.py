@@ -1084,7 +1084,18 @@ def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
             a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
             if a1 not in numbering or a2 not in numbering:
                 return None
-            ene.append(min(numbering[a1], numbering[a2]))
+            l1, l2 = numbering[a1], numbering[a2]
+            # v27 P1: the consecutive-locant `-n-ene` infix can only express a
+            # double bond between adjacently-numbered atoms. A bridgehead/bridge
+            # ene (non-consecutive locants, e.g. 8=15) needs the `-n(m)-ene`
+            # form, which this narrow namer does not build -- it used to cite the
+            # lower locant alone (`-8-ene`), an OPSIN-unparseable / ambiguous name
+            # that never round-tripped (SELF-01 then suppressed it to unknown).
+            # Fail closed so the universal von-Baeyer cage namer (which cites the
+            # `n(m)` form correctly, under the complete tier) takes over.
+            if abs(l1 - l2) != 1:
+                return None
+            ene.append(min(l1, l2))
         ene.sort()
 
         if ene:
@@ -1210,14 +1221,75 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
         return None
 
 
+def _universal_cage_substituent_name(
+    sub, attach_sub, allow_mancude: bool = False
+) -> Optional[str]:
+    """v27 P1 (BB P-29.2 / P-29.3.3-5): name ANY von-Baeyer cage as a
+    ``...-<loc>-yl`` substituent by routing the detached ring system through the
+    SAME audited ``analyze_cage_universal`` engine that ``name_general_ring``
+    uses for the PARENT, then citing the free valence's P-23 locant.
+
+    Restores parent<->substituent symmetry: the narrow ``_vonbaeyer_substituent_name``
+    only handles a 2-bridgehead ``is_bicyclo_system`` carbocycle, so tricyclo+/
+    adamantane cages (and, under ``allow_mancude``, aromatic/mancude fused
+    systems emitted as kekulized von-Baeyer polyenes) previously failed closed.
+
+    ``sub`` is the detached ring-only submol (from ``_extract_ring_submol``);
+    ``attach_sub`` is the free-valence atom index within it. Returns None on any
+    refusal (spiro / >40 atoms / kekulize failure / mancude-with-flag-off /
+    numbering that does not cover exactly the ring atoms) — fail-closed, never a
+    wrong or coverage-incomplete cage. The free-valence locant is the primary
+    P-23 numbering ``analyze_cage_universal`` assigns (a valid numbering ->
+    SELF-01-safe); P-29.3.3 free-valence-lowest refinement is Task 5.
+    """
+    from .vonbaeyer_universal import analyze_cage_universal
+    from .polycyclic import _build_parent_with_unsaturation
+    try:
+        cage_atoms = [a.GetIdx() for a in sub.GetAtoms() if a.IsInRing()]
+        if not cage_atoms or attach_sub not in cage_atoms:
+            return None
+        cage = analyze_cage_universal(
+            sub, cage_atoms=set(cage_atoms), allow_mancude=allow_mancude)
+        if cage is None:
+            return None
+        # Coverage floor: the audited numbering must cover EXACTLY the ring
+        # atoms (never drop/add one) — a cage `-yl` that omits a ring atom would
+        # be a different constitution. analyze_cage_universal already runs its
+        # own skeleton edge-audit; this is the substituent-side belt.
+        if set(cage.atom_to_locant) != set(cage_atoms):
+            return None
+        loc = cage.atom_to_locant.get(attach_sub)
+        if loc is None:
+            return None
+        parent_block = _build_parent_with_unsaturation(
+            cage.total_atoms, cage.unsaturation)
+        if not parent_block:
+            return None
+        # P-29.2 suffix elision: elide the terminal 'e' of the parent stem
+        # before '-<loc>-yl' (octane -> octan-3-yl; pentadec-1(15)-ene ->
+        # pentadec-1(15)-en-8-yl). _build_parent_with_unsaturation always
+        # returns an 'e'-terminal stem (…ane / …ene / …yne / …diene).
+        stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
+        return f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
+    except Exception:
+        return None
+
+
 def _polycyclic_substituent_name(
-    mol, ring_atoms: Tuple[int, ...], attachment_atom: Optional[int]
+    mol, ring_atoms: Tuple[int, ...], attachment_atom: Optional[int],
+    allow_mancude: bool = False,
 ) -> Optional[str]:
     """Name a MULTI-RING substituent (von-Baeyer, spiro, or partially hydro fused
     carbocycle) by routing the detached ring system through the existing parent
     namers with free-valence numbering. Returns the ``...-<loc>-yl`` name, or None
     (fail-closed) for any polycyclic the routed namers cannot number — never a
-    monocycle size-guess (the old ``cyclo{N}yl`` corruption)."""
+    monocycle size-guess (the old ``cyclo{N}yl`` corruption).
+
+    v27 P1: when ``allow_mancude`` is set (complete/best-effort engine tier only)
+    the universal cage namer is appended AFTER the narrow PIN namers, so their
+    existing emissions are untouched and the new capability only ADDS coverage
+    (tricyclo+/adamantane, and mancude fused-aromatic cages as polyenes). Default
+    False keeps the PIN path byte-identical."""
     if attachment_atom is None or attachment_atom not in set(ring_atoms):
         return None
     sub, attach_sub = _extract_ring_submol(mol, ring_atoms, attachment_atom)
@@ -1228,6 +1300,16 @@ def _polycyclic_substituent_name(
                   _fused_hydro_substituent_name):
         try:
             name = namer(sub, attach_sub)
+        except Exception:
+            name = None
+        if name:
+            return name
+    if allow_mancude:
+        # v27 P1: the universal cage engine (tricyclo+/adamantane + mancude),
+        # complete-tier only. Fail-closed (None) on any refusal.
+        try:
+            name = _universal_cage_substituent_name(
+                sub, attach_sub, allow_mancude=allow_mancude)
         except Exception:
             name = None
         if name:
@@ -1275,6 +1357,7 @@ def name_ring_system_substituent(
     frag_atoms,
     attach_idx: int,
     allow_enumerator_fallback: bool = True,
+    allow_mancude: bool = False,
 ) -> Optional[str]:
     """Name a RING-CONTAINING substituent fragment (WS-A task 9 chokepoint).
 
@@ -1323,7 +1406,8 @@ def name_ring_system_substituent(
     frag_ring_atoms = {a for a in frag_atoms if ring_info.NumAtomRings(a) > 0}
     if frag_ring_atoms == frag_set and ring_info.NumAtomRings(attach_idx) > 0:
         try:
-            name = get_ring_substituent_name(mol, tuple(frag_atoms), attach_idx)
+            name = get_ring_substituent_name(mol, tuple(frag_atoms), attach_idx,
+                                             allow_mancude=allow_mancude)
         except Exception:
             name = None
     elif (frag_ring_atoms and frag_ring_atoms < frag_set
@@ -1582,7 +1666,8 @@ def _compound_ring_on_chain_substituent(
 def get_ring_substituent_name(
     mol,
     ring_atoms: Tuple[int, ...],
-    attachment_point: Optional[int] = None
+    attachment_point: Optional[int] = None,
+    allow_mancude: bool = False,
 ) -> Optional[str]:
     """
     Get the substituent name for a ring when it becomes a substituent on a chain.
@@ -1594,6 +1679,12 @@ def get_ring_substituent_name(
         ring_atoms: Tuple of atom indices in the ring
         attachment_point: Optional ring atom index where the ring attaches to chain.
                          Used for position-specific names (e.g., 2-pyridyl vs 4-pyridyl).
+        allow_mancude: v27 P1 opt-in (complete/best-effort engine tier only).
+                       When True, an unretained multi-ring cage the narrow PIN
+                       namers decline (tricyclo+/adamantane, and mancude
+                       fused-aromatic systems) is named via the universal
+                       von-Baeyer cage engine as a ``...-<loc>-yl`` polyene.
+                       Default False keeps every existing caller byte-identical.
 
     Returns:
         Substituent name string (e.g., 'phenyl', 'cyclohexyl', '2-pyridyl'), or
@@ -1653,8 +1744,11 @@ def get_ring_substituent_name(
         # Phase 4 SUBST-01: multi-ring substituent with no retained name —
         # route the detached system through the von-Baeyer / spiro / partial-hydro
         # parent namers with free-valence numbering (bicyclo[2.2.1]heptan-2-yl,
-        # 5,6,7,8-tetrahydronaphthalen-1-yl, spiro[4.5]decan-2-yl).
-        poly = _polycyclic_substituent_name(mol, ring_atoms, attachment_point)
+        # 5,6,7,8-tetrahydronaphthalen-1-yl, spiro[4.5]decan-2-yl). v27 P1:
+        # under the complete tier (allow_mancude) this also reaches the
+        # universal cage engine (tricyclo+/adamantane, mancude polyenes).
+        poly = _polycyclic_substituent_name(
+            mol, ring_atoms, attachment_point, allow_mancude=allow_mancude)
         if poly:
             return poly
 

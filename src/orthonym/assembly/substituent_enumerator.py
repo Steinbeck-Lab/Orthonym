@@ -256,7 +256,7 @@ def _verify_completeness(mol, parent_atoms, substituents):
 # ============================================================================
 
 
-def name_substituent(mol, frag_atoms, attach_idx):
+def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     """Name any substituent fragment. Never returns None.
 
     Five-tier naming cascade:
@@ -270,6 +270,11 @@ def name_substituent(mol, frag_atoms, attach_idx):
         mol: RDKit Mol of the full molecule.
         frag_atoms: Set/list of atom indices belonging to the substituent.
         attach_idx: Atom index WITHIN frag_atoms that bonds to the parent.
+        allow_mancude: v27 P1 opt-in (complete/best-effort engine tier only).
+            Threaded to the ring chokepoint so a multi-ring cage substituent the
+            narrow PIN namers decline (tricyclo+/adamantane, mancude fused
+            aromatics) is named via the universal von-Baeyer cage engine instead
+            of failing closed. Default False -> PIN-default byte-identical.
 
     Returns:
         str: IUPAC prefix name (always non-None, always non-empty).
@@ -576,6 +581,7 @@ def name_substituent(mol, frag_atoms, attach_idx):
                 _ring_nm = name_ring_system_substituent(
                     mol, sorted(frag_atoms_set), attach_idx,
                     allow_enumerator_fallback=False,
+                    allow_mancude=allow_mancude,
                 )
                 if _ring_nm:
                     return _stereo_route(_ring_nm)

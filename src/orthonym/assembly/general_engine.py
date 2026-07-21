@@ -184,7 +184,7 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
 
 
 def name_general_chain(
-    mol, features, allow_charged: bool = False,
+    mol, features, allow_charged: bool = False, allow_mancude: bool = False,
 ) -> Optional[GeneralEngineResult]:
     """Name a chain-parented molecule with a full atom->token partition.
 
@@ -194,6 +194,10 @@ def name_general_chain(
     refusal and emits a ``-ide``/``-ylium``/``-ium``/``-uide`` suffix on the
     numbered chain parent when the charge sits on a chain skeletal atom
     (fail-closed otherwise).
+
+    v27 P1: ``allow_mancude`` (complete/best-effort tier only) lets a multi-ring
+    cage SUBSTITUENT on the chain be named via the universal von-Baeyer engine
+    (parent<->substituent symmetry). Default False -> PIN path byte-identical.
     """
     reason = _common_refusal(mol, allow_charged=allow_charged)
     if reason:
@@ -211,7 +215,8 @@ def name_general_chain(
     part = _partition(mol, features, chain)
     if part is None:
         return None
-    return _assemble(mol, features, chain, part, allow_charged=allow_charged)
+    return _assemble(mol, features, chain, part, allow_charged=allow_charged,
+                     allow_mancude=allow_mancude)
 
 
 def _partition(mol, features, chain) -> Optional[dict]:
@@ -364,7 +369,8 @@ def _suffix_block(style: str, core: str, locants: List[int]) -> Optional[str]:
 
 
 def _assemble(mol, features, chain, part,
-              allow_charged: bool = False) -> Optional[GeneralEngineResult]:
+              allow_charged: bool = False,
+              allow_mancude: bool = False) -> Optional[GeneralEngineResult]:
     from .substituent_enumerator import name_substituent
 
     atom_to_locant = part['atom_to_locant']
@@ -384,7 +390,9 @@ def _assemble(mol, features, chain, part,
                        if n.GetIdx() in frag]
         if not attach_nbrs:
             return _refuse("substituent without chain attachment")
-        prefix = name_substituent(mol, frag, attach_nbrs[0])
+        # v27 P1: complete-tier cage substituent recursion (see name_general_ring).
+        prefix = name_substituent(mol, frag, attach_nbrs[0],
+                                  allow_mancude=allow_mancude)
         if not prefix or prefix == 'substituent':
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
@@ -558,7 +566,12 @@ def name_general_ring(
                        if n.GetIdx() in frag]
         if not attach_nbrs:
             return _refuse("substituent without cage attachment")
-        prefix = name_substituent(mol, frag, attach_nbrs[0])
+        # v27 P1: under the complete/best-effort tier (allow_aromatic_general),
+        # a multi-ring cage substituent is named via the universal von-Baeyer
+        # engine (parent<->substituent symmetry). PIN default (flag off) is
+        # byte-identical — name_substituent's allow_mancude defaults False.
+        prefix = name_substituent(mol, frag, attach_nbrs[0],
+                                  allow_mancude=allow_aromatic_general)
         if not prefix or prefix == 'substituent':
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
@@ -879,7 +892,9 @@ def name_general_monocycle(
             return _refuse(
                 "substituent attaches to parent ring at >1 point "
                 "(spiro/fused/bridge)")
-        prefix = name_substituent(mol, frag, attach_nbrs[0])
+        # v27 P1: complete-tier cage substituent recursion (see name_general_ring).
+        prefix = name_substituent(mol, frag, attach_nbrs[0],
+                                  allow_mancude=allow_aromatic_general)
         if not prefix or prefix == 'substituent':
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
@@ -951,7 +966,8 @@ def name_general(
     allow_charged = allow_aromatic_general
     ring_atoms = any(a.IsInRing() for a in mol.GetAtoms()) if mol else False
     if not ring_atoms or getattr(features, 'chain_is_parent', False):
-        return name_general_chain(mol, features, allow_charged=allow_charged)
+        return name_general_chain(mol, features, allow_charged=allow_charged,
+                                  allow_mancude=allow_aromatic_general)
     cage_result = name_general_ring(
         mol, features, allow_aromatic_general=allow_aromatic_general,
         allow_charged=allow_charged)
