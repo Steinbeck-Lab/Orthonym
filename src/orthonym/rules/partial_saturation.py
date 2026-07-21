@@ -1231,6 +1231,30 @@ def _ring_imine_carbons(mol, ring_set: Set[int]) -> List[int]:
     return out
 
 
+def _ring_chalcogenone_carbons(mol, ring_set: Set[int], symbol: str) -> List[int]:
+    """v27 P4: ring carbons bearing an exocyclic ketone-type ``=S``/``=Se``
+    (thione / selone), the heavier-chalcogen analogues of the ``-one`` ketone
+    suffix (P-64.2 chalcogen replacement; e.g. ``pyridine-2(1H)-thione``,
+    ``pyrimidine-2,4(1H,3H)-dithione``). Mirrors ``_ring_carbonyl_carbons``
+    exactly but for ``symbol`` in {'S','Se'} (and 'O' for parity); the exocyclic
+    chalcogen must be terminal (degree 1) so a RING sulfur (thiophene) or a
+    substituent-bearing =S(R) is never mistaken for a thione suffix."""
+    out: List[int] = []
+    for idx in ring_set:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C':
+            continue
+        for bond in atom.GetBonds():
+            o = bond.GetOtherAtom(atom)
+            if (bond.GetBondType() == Chem.BondType.DOUBLE
+                    and o.GetSymbol() == symbol
+                    and o.GetIdx() not in ring_set
+                    and o.GetDegree() == 1):
+                out.append(idx)
+                break
+    return out
+
+
 def _fused_ring_system_atoms(rings, seed_atoms) -> Set[int]:
     """Return the atoms of the single FUSED ring system that contains a seed atom.
 
@@ -1566,6 +1590,26 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     suffix_hetero_name = 'oxo'
     all_carbonyls = set(_ring_carbonyl_carbons(mol, all_ring_atoms))
     if not all_carbonyls:
+        # v27 P4: heavier-chalcogen ketone analogues (P-64.2 replacement) — thione
+        # (=S), then selone (=Se) — are senior to imine and take the -thione /
+        # -selone suffix with the SAME added-indicated-H numbering as -one (the
+        # engine is suffix-agnostic). Previously these fell through to the
+        # substitutive 'sulfanylidene'/'selanylidene' PREFIX (a non-PIN form:
+        # `2-sulfanylidene-1H-pyridine` instead of the PIN `pyridine-2(1H)-thione`).
+        for _sym, _tab, _hn in (
+            ('S', {1: 'thione', 2: 'dithione', 3: 'trithione', 4: 'tetrathione'},
+             'sulfanylidene'),
+            ('Se', {1: 'selone', 2: 'diselone', 3: 'triselone', 4: 'tetraselone'},
+             'selanylidene'),
+        ):
+            _cs = set(_ring_chalcogenone_carbons(mol, all_ring_atoms, _sym))
+            if _cs:
+                all_carbonyls = _cs
+                suffix_symbol = _sym
+                suffix_table = _tab
+                suffix_hetero_name = _hn
+                break
+    if not all_carbonyls:
         all_carbonyls = set(_ring_imine_carbons(mol, all_ring_atoms))
         if not all_carbonyls:
             return None
@@ -1574,8 +1618,11 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         suffix_hetero_name = 'imino'
 
     def _suffix_carbons(rs):
-        return (_ring_carbonyl_carbons(mol, rs) if suffix_symbol == 'O'
-                else _ring_imine_carbons(mol, rs))
+        if suffix_symbol == 'O':
+            return _ring_carbonyl_carbons(mol, rs)
+        if suffix_symbol == 'N':
+            return _ring_imine_carbons(mol, rs)
+        return _ring_chalcogenone_carbons(mol, rs, suffix_symbol)
 
     ring_set: Set[int] = _fused_ring_system_atoms(rings, all_carbonyls)
     if not ring_set:
