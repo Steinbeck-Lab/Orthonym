@@ -315,3 +315,26 @@ def test_general_substituent_never_returns_sentinel_when_decomposable():
 
     # End-to-end: the general engine (not the PIN path) wins this molecule.
     assert _be().name_tiered(smi)["source"] == "general_engine"
+
+
+# ============================================================================
+# v28 Composer1 Task 5: discover_substituents partition robustness
+# (substituents off suffix/FG atoms)
+# ============================================================================
+#
+# T0 case-5 molecule: an N-aryl amide anilide (the 3-fluorophenyl hangs off the
+# amide nitrogen -- a SUFFIX/FG atom, unreachable from the parent-chain walk) PLUS
+# a piperidine-borne fused-heterocycle ring that no honest namer can express. The
+# general-engine chain path partitions parent = chain | suffix and the N-aryl ring
+# atoms land unassigned. Under the general-fallback context this must FAIL CLOSED
+# to a clean abstain (never a wrong name that drops the fluorophenyl, never a hard
+# crash) -- the pipeline must NOT raise; either it names the whole molecule via the
+# engine (unreachable here -- the piperidine substituent is unnameable, multi-
+# blocked on Composer #2) OR it abstains cleanly (no name surfaced).
+
+
+def test_substituent_off_amide_nitrogen_is_partitioned():
+    smi = "CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1"
+    row = _be().name_tiered(smi)     # must NOT raise; source==general_engine OR clean abstain (multi-blocked)
+    assert row is not None
+    assert (row["source"] == "general_engine") or (not row.get("name"))  # named via engine OR cleanly abstained

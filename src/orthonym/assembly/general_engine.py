@@ -262,9 +262,15 @@ def _partition(mol, features, chain) -> Optional[dict]:
     try:
         subs = discover_substituents(
             mol, chain_set | suffix_atoms, parent_type='chain',
-            principal_chain=chain, atom_to_locant=atom_to_locant)
+            principal_chain=chain, atom_to_locant=atom_to_locant,
+            general_fallback=True)
     except AssertionError as e:
         return _refuse(f"partition incomplete: {e}")
+    if subs is None:
+        # v28 Composer1 Task 5: substituent off a suffix/FG atom the chain walk
+        # cannot reach (e.g. the N-aryl ring of an amide anilide). Fail closed —
+        # never drop it (wrong constitution).
+        return _refuse("partition incomplete: unassigned atoms off suffix/FG")
 
     return {
         'suffix_core': suffix_core,
@@ -829,9 +835,14 @@ def _emit_ring_from_analysis(
         subs = discover_substituents(
             mol, cage_set | suffix_atoms | ester_r_frag | n_sub_atoms,
             parent_type='chain',
-            principal_chain=ordered_cage, atom_to_locant=atom_to_locant)
+            principal_chain=ordered_cage, atom_to_locant=atom_to_locant,
+            general_fallback=True)
     except AssertionError as e:
         return _refuse(f"partition incomplete: {e}")
+    if subs is None:
+        # v28 Composer1 Task 5: unassigned atom off a suffix/FG atom -> fail
+        # closed (never drop it).
+        return _refuse("partition incomplete: unassigned atoms off suffix/FG")
 
     groups: Dict[str, List[int]] = {}
     frag_bindings: List[TokenBinding] = []
@@ -1164,9 +1175,14 @@ def name_general_monocycle(
     try:
         subs = discover_substituents(
             mol, ring_set | suffix_atoms, parent_type='chain',
-            principal_chain=ordered_ring, atom_to_locant=atom_to_locant)
+            principal_chain=ordered_ring, atom_to_locant=atom_to_locant,
+            general_fallback=True)
     except AssertionError as e:
         return _refuse(f"partition incomplete: {e}")
+    if subs is None:
+        # v28 Composer1 Task 5: unassigned atom off a suffix/FG atom -> fail
+        # closed (never drop it).
+        return _refuse("partition incomplete: unassigned atoms off suffix/FG")
 
     groups: Dict[str, List[int]] = {}
     frag_bindings: List[TokenBinding] = []

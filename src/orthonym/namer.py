@@ -2023,6 +2023,17 @@ class Orthonym:
                         _mol, smiles=smiles).code
             except Exception:
                 pass
+            # v28 Composer1 Task 5: best-effort clean-abstain contract. In the
+            # general-fallback tier the honest outcome for a molecule neither the
+            # PIN path nor the general engine can name is a CLEAN abstain — no
+            # name. Surfacing the PIN always-emit descriptive residual here (e.g.
+            # a partial '…-unknown-…' string, or 'unknown organic compound') would
+            # masquerade a non-name as a name for a T5 row that is already fully
+            # LABELED by (tier=T5, source=abstain, limit_code, formula). Scoped to
+            # ``self._general_fallback`` so the PIN-default path (and its always-
+            # emit ``name()``) is byte-identical; ``name()`` itself is untouched.
+            if self._general_fallback:
+                name = None
         elif source == "general_engine":
             opsin = prov["opsin"] or ("verified" if gate_active
                                       else "unverified")

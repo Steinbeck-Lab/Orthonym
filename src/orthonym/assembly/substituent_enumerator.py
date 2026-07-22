@@ -73,6 +73,7 @@ def discover_substituents(
     oriented_ring=None,
     principal_chain=None,
     atom_to_locant=None,
+    general_fallback=False,
 ):
     """Discover ALL substituents on a parent structure.
 
@@ -87,9 +88,27 @@ def discover_substituents(
         oriented_ring: Ring atom indices in IUPAC order (required for ring parents).
         principal_chain: Chain atom indices in order (required for chain parents).
         atom_to_locant: Optional mapping of atom idx -> IUPAC locant.
+        general_fallback: v28 Composer1 Task 5 gating flag. Passed ``True`` ONLY
+            from the general-engine (complete/best-effort) call sites. Controls
+            the failure mode when a non-parent heavy atom cannot be assigned to
+            any substituent fragment — e.g. a substituent hanging off a SUFFIX/FG
+            heteroatom (the N-aryl ring of an amide anilide), which the parent-
+            chain/ring walk cannot reach:
+
+              * ``False`` (PIN default): ``_verify_completeness`` HARD-asserts on
+                the unassigned atoms exactly as before (byte-identical). The
+                narrow PIN handlers own these molecules; a partition gap there is
+                a genuine invariant violation the PIN callers already catch.
+              * ``True`` (general fallback): FAIL CLOSED to a clean sentinel —
+                return ``None`` instead of raising, and NEVER silently drop the
+                unassigned atoms (dropping them would ship a name of the wrong
+                constitution). The general caller converts the ``None`` to a
+                clean ``_refuse`` -> the engine abstains, no exception.
 
     Returns:
-        List[SubstituentInfo] with one entry per substituent fragment.
+        List[SubstituentInfo] with one entry per substituent fragment, or
+        ``None`` when ``general_fallback=True`` and the partition is incomplete
+        (unassigned / overlapping atoms) — signalling the caller to fail closed.
     """
     parent_set = set(parent_atoms)
 
@@ -105,7 +124,14 @@ def discover_substituents(
             mol, parent_set, principal_chain, atom_to_locant
         )
 
-    _verify_completeness(mol, parent_set, results)
+    complete = _verify_completeness(
+        mol, parent_set, results, general_fallback=general_fallback
+    )
+    if general_fallback and not complete:
+        # Partition gap under the general-fallback context (e.g. a substituent
+        # off a suffix/FG heteroatom the walk cannot reach). Fail closed to a
+        # sentinel the general caller handles; never drop the atoms.
+        return None
 
     return results
 
@@ -217,27 +243,48 @@ def _bfs_collect_fragment(mol, start_idx, parent_set, already_assigned):
     return visited
 
 
-def _verify_completeness(mol, parent_atoms, substituents):
-    """Assert that all non-parent heavy atoms are accounted for.
+def _verify_completeness(mol, parent_atoms, substituents,
+                         general_fallback=False):
+    """Verify that all non-parent heavy atoms are accounted for.
 
     Every non-parent, non-hydrogen atom must be assigned to exactly one
-    SubstituentInfo. Reports double-assigned and missed atoms via assert.
+    SubstituentInfo. Detects double-assigned, missed, and extra atoms.
 
     Args:
         mol: RDKit Mol object.
         parent_atoms: Set of parent atom indices.
         substituents: List of SubstituentInfo namedtuples.
+        general_fallback: v28 Composer1 Task 5 gating flag (see
+            ``discover_substituents``). Selects the failure mode:
+
+              * ``False`` (PIN default): a partition violation HARD-asserts
+                exactly as before — byte-identical raise + message. This path
+                is unchanged for every PIN-context caller.
+              * ``True`` (general fallback): NO exception — a partition
+                violation returns ``False`` (incomplete) so the general caller
+                can fail closed to a clean abstain instead of crashing.
+
+    Returns:
+        bool: ``True`` if the partition is complete (every non-parent heavy
+        atom assigned exactly once), else ``False`` (only reachable under
+        ``general_fallback=True``; otherwise an ``AssertionError`` is raised
+        before returning).
 
     Raises:
-        AssertionError: If atoms are double-assigned or missed.
+        AssertionError: If ``general_fallback=False`` and atoms are
+            double-assigned, missed, or extra (byte-identical to the prior
+            behavior).
     """
     parent_set = set(parent_atoms)
     all_sub_atoms = set()
     for sub in substituents:
         overlap = all_sub_atoms & set(sub.frag_atoms)
-        assert not overlap, (
-            f"Double-assigned atoms: {overlap}"
-        )
+        if overlap:
+            if general_fallback:
+                return False
+            assert not overlap, (
+                f"Double-assigned atoms: {overlap}"
+            )
         all_sub_atoms.update(sub.frag_atoms)
 
     expected = set()
@@ -246,9 +293,16 @@ def _verify_completeness(mol, parent_atoms, substituents):
             expected.add(atom.GetIdx())
 
     missed = expected - all_sub_atoms
-    assert not missed, f"Unassigned atoms: {missed}"
+    if missed:
+        if general_fallback:
+            return False
+        assert not missed, f"Unassigned atoms: {missed}"
     extra = all_sub_atoms - expected
-    assert not extra, f"Extra atoms not in molecule: {extra}"
+    if extra:
+        if general_fallback:
+            return False
+        assert not extra, f"Extra atoms not in molecule: {extra}"
+    return True
 
 
 # ============================================================================
