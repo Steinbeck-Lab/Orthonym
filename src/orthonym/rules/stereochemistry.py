@@ -505,6 +505,89 @@ def needs_stereo_injection(mol, name: str) -> bool:
     return has_atom_stereo or has_bond_stereo
 
 
+def count_defined_stereo_elements(mol) -> int:
+    """Count the DEFINED CIP stereogenic units on *mol* (v27 Phase S Task 1).
+
+    Counts, after idempotent CIP assignment:
+      * every atom with ``_CIPCode`` (R/S/r/s tetrahedral + pseudoasymmetric);
+      * every bond with ``_CIPCode`` EXCEPT ring bonds whose smallest ring is
+        <8 (ring-strain-fixed geometry — not a free stereogenic unit; the SAME
+        exclusion ``collect_stereodescriptors`` applies, so what is *counted*
+        as defined matches exactly what CAN be expressed, P-31.1.3);
+      * every detected axial element with a determined CIP label.
+
+    Read-only. Used by ``general_engine_stereo_complete`` for the all-or-nothing
+    completeness gate on general-engine emissions.
+    """
+    if mol is None:
+        return 0
+    assign_stereochemistry(mol)
+    n = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
+    ri = mol.GetRingInfo()
+    for b in mol.GetBonds():
+        if not b.HasProp('_CIPCode'):
+            continue
+        if b.IsInRing():
+            min_ring = min((len(r) for r in ri.BondRings()
+                            if b.GetIdx() in r), default=99)
+            if min_ring < 8:
+                continue  # ring-strain-fixed; matches the collector's skip
+        n += 1
+    try:
+        for el in detect_axial_chirality(mol):
+            if el.get('cip') is not None:
+                n += 1
+    except Exception:
+        pass
+    return n
+
+
+def count_expressed_stereo_descriptors(name: str) -> int:
+    """Count the stereodescriptor TOKENS the *name* actually carries.
+
+    Sums the comma-separated descriptors across every ``(...)`` stereo block
+    (leading, embedded, or nested substituent blocks), using the same block
+    grammar as ``_STEREO_EMBEDDED_RE`` (R/S/r/s/E/Z with optional composite
+    locants like ``7a``). Axial ``Ra``/``Sa``/``M``/``P`` blocks fall outside
+    that grammar and are NOT counted — which only ever UNDER-counts, so the
+    completeness gate fails CLOSED (the safe direction) rather than over-claim.
+    """
+    if not name:
+        return 0
+    total = 0
+    for m in _STEREO_EMBEDDED_RE.finditer(name):
+        inner = m.group(0).strip('()-')
+        total += len([t for t in inner.split(',') if t])
+    return total
+
+
+def general_engine_stereo_complete(mol, name: str) -> bool:
+    """v27 Phase S Task 1 (accuracy keystone): all-or-nothing stereo
+    completeness for GENERAL-ENGINE emissions.
+
+    Returns True iff *name* expresses EXACTLY every defined CIP stereo element
+    *mol* carries (descriptor count == defined count). This REPLACES the coarse
+    name-side boolean (``not needs_stereo_injection``) at the general-engine
+    emission sites, closing the verified hole where a PARTIAL-stereo name (some
+    elements expressed, others dropped) matched Pattern A and shipped as if
+    fully specified — invisible to the stereo-blind SELF-01 (P-91.2.1: a PIN
+    must specify every stereogenic unit).
+
+    The exact ``==`` (not ``>=``) ALSO fail-closes on OVER-expression (a
+    spurious / double-counted descriptor, e.g. the nested-block double-apply
+    bug) — a name that cites MORE stereo than the structure defines is an
+    attribution error and must not ship as complete. Any mismatch -> False
+    (fail-closed; best-effort then ships the flagged constitution-superset name,
+    complete abstains). Axial ``Ra``/``Sa`` tokens are not countable, so a name
+    expressing axial chirality fails closed here (safe; axial detection is out
+    of Phase S scope).
+    """
+    if mol is None or not name:
+        return False
+    return (count_expressed_stereo_descriptors(name)
+            == count_defined_stereo_elements(mol))
+
+
 def inject_stereo_from_locant_map(
     name: str,
     mol,

@@ -724,8 +724,16 @@ def _emit_ring_from_analysis(
             and not str(cage.descriptor).startswith(
                 ('spiro', 'dispiro', 'trispiro', 'tetraspiro', 'pentaspiro'))):
         from .general_fusion import name_fusion_parent
+        from ..rules.stereochemistry import general_engine_stereo_complete
         _fusion_word = name_fusion_parent(mol, cage.cage_atoms)
-        if _fusion_word:
+        # v27 Phase S Task 2: the bare fusion word carries NO stereo block, so
+        # take this early-return ONLY when the parent has no defined stereo
+        # element (all-or-nothing, PS-1). If a mancude fused parent DID carry a
+        # ring stereocentre / ring-bond E/Z, fall through to the VB polyene tail
+        # (line ~893) whose _stereo_prefix expresses it — never ship a stereo-
+        # dropping fusion word past the stereo-blind SELF-01. For the common
+        # achiral aromatic parent (the P5 win) this is byte-identical (nd == 0).
+        if _fusion_word and general_engine_stereo_complete(mol, _fusion_word):
             return GeneralEngineResult(
                 name=_fusion_word,
                 bindings=(TokenBinding(tuple(cage.cage_atoms),

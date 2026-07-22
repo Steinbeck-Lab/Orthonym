@@ -2005,6 +2005,10 @@ class Orthonym:
                        and _validity_gate_jar_present())
         formula = None
         limit_code = None
+        # v27 P6 T6.4: only surface stereo_unexpressed when a general-engine
+        # name actually shipped (the contextvar could be set by an emission the
+        # downstream constitutional gate later suppressed -> failure row).
+        stereo_unexpressed = False
         if not name or is_failure_name(name):
             tier, is_pin, opsin = "T5", False, "n/a"
             source = prov["source"] or "abstain"
@@ -2024,6 +2028,7 @@ class Orthonym:
                                       else "unverified")
             tier = "T3" if opsin == "verified" else "T4"
             is_pin = False
+            stereo_unexpressed = bool(prov.get("stereo_unexpressed"))
         elif source == "trivial_retained":
             tier, is_pin = "T3", False
             opsin = "verified" if gate_active else "unverified"
@@ -2037,7 +2042,8 @@ class Orthonym:
             gates.append("SELF-01")
         return {"name": name, "tier": tier, "is_pin": is_pin,
                 "source": source, "opsin": opsin, "gates_passed": gates,
-                "formula": formula, "limit_code": limit_code}
+                "formula": formula, "limit_code": limit_code,
+                "stereo_unexpressed": stereo_unexpressed}
 
     def _retained_structural_preference(self, mol) -> Optional[str]:
         """v26 P6 (Heritage A3): retained/fusion structural-recognizer
@@ -2104,6 +2110,75 @@ class Orthonym:
             logger.info(
                 "retained structural preference error (kept general): %s", e)
         return None
+
+    def _stereo_emit_decision(self, mol, cand):
+        """v27 P6 T6.2: ONE shared stereo-policy decision for BOTH general-
+        engine emission sites (the inline G1 fallback in ``_name_impl`` and the
+        late-recovery ladder in ``_try_general_engine_recovery``).
+
+        Returns ``(permitted, flagged)``:
+          * ``(True, False)``  — the name already expresses every stereo element
+            the input carries (or the input has none) -> ship as-is, no flag.
+          * ``(True, True)``   — best-effort (``_general_fallback_unverified``):
+            ship a CONSTITUTION-ONLY name and mark it ``stereo_unexpressed``.
+            This is honest and NOT a wrong stereoisomer — it names a superset
+            (BB P-91.2.2 sanctions omitting stereodescriptors for exactly the
+            von-Baeyer/spiro/fused polycyclic classes best-effort emits;
+            P-91.3: descriptors are an additive layer over a complete name).
+          * ``(False, False)`` — pin/valid/complete: ABSTAIN on dropped stereo.
+            SELF-01 is stereo-blind, so a stereo-dropped name would pass it and
+            could ship a WRONG stereoisomer under the PIN contract (P-91.2.1:
+            PINs must specify every stereogenic unit). Fail-closed is correct.
+
+        Root-cause: replaces the two inline ``needs_stereo_injection`` branches
+        that previously fail-closed at both sites, so best-effort no longer
+        inherits the complete-tier fail-close (roadmap Phase 6 stereo policy).
+
+        v27 Phase S Task 1 (accuracy keystone): uses the per-element
+        ``general_engine_stereo_complete`` predicate — NOT the coarse
+        ``needs_stereo_injection`` name-side boolean — so a PARTIAL-stereo name
+        (some elements expressed, one dropped) is treated as INCOMPLETE and
+        never ships in complete (all-or-nothing; P-91.2.1). This closes the
+        verified partial-stereo wrong-ship hole (the old boolean returned False
+        on any name with a stereo block, shipping partials past SELF-01).
+        """
+        from .rules.stereochemistry import general_engine_stereo_complete
+        if general_engine_stereo_complete(mol, cand):
+            return (True, False)
+        if self._general_fallback_unverified:
+            return (True, True)
+        return (False, False)
+
+    @staticmethod
+    def _rt_match(input_smiles: str, opsin_smiles: str,
+                  stereo_flagged: bool) -> bool:
+        """v27 P6 T6.3: SELF-01 round-trip compare at the granularity the name
+        asserts.
+
+        For a ``stereo_unexpressed``-flagged (constitution-only) emission the
+        name makes NO stereo claim, so an isomeric compare would wrongly reject
+        a correct constitution -> compare stereo-STRIPPED canonical SMILES on
+        BOTH sides (identical granularity to
+        ``coverage_metrics.strict_match``'s stereo-insensitive constitutional
+        key). A name with no stereo tokens cannot make OPSIN invent a specific
+        wrong stereoisomer (the parse is stereo-less), so the compare is exact
+        at the granularity asserted — never crediting a stereo-bearing parse.
+
+        For every other emission use the EXACT isomeric comparison (byte-
+        identical to the pre-P6 ``Chem.CanonSmiles`` == ``Chem.CanonSmiles``).
+        Any exception -> False (fail-closed; matches the prior ladder).
+        """
+        try:
+            if stereo_flagged:
+                _o = Chem.MolFromSmiles(opsin_smiles)
+                _i = Chem.MolFromSmiles(input_smiles)
+                if _o is None or _i is None:
+                    return False
+                return (Chem.MolToSmiles(_o, isomericSmiles=False)
+                        == Chem.MolToSmiles(_i, isomericSmiles=False))
+            return Chem.CanonSmiles(opsin_smiles) == Chem.CanonSmiles(input_smiles)
+        except Exception:
+            return False
 
     def _try_general_engine_recovery(self, smiles: str) -> Optional[str]:
         """v25 G2 (opt-in): late engine recovery for abstentions.
@@ -2197,9 +2272,16 @@ class Orthonym:
             # substituent-internal name_substituent) makes needs_stereo_injection
             # False, so genuinely-expressed cases still ship WITH stereo -- only
             # genuinely-dropped-stereo emissions abstain here.
+            # v27 P6 T6.2: shared stereo-emit policy (was an inline
+            # needs_stereo_injection fail-close). complete/valid abstain on
+            # dropped stereo; best-effort ships a constitution-only name flagged
+            # stereo_unexpressed (0-wrong: names a superset, never a wrong
+            # stereoisomer).
+            _stereo_flagged = False
             if cand:
-                from .rules.stereochemistry import needs_stereo_injection
-                if needs_stereo_injection(mol, cand):
+                _permitted, _stereo_flagged = self._stereo_emit_decision(
+                    mol, cand)
+                if not _permitted:
                     return None
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
@@ -2214,19 +2296,19 @@ class Orthonym:
             else:
                 _opsin_smi = _validity_gate_name_to_smiles(cand)
                 if _opsin_smi is not None:
-                    try:
-                        _same = (Chem.CanonSmiles(_opsin_smi)
-                                 == Chem.CanonSmiles(smiles))
-                    except Exception:
-                        _same = False
-                    if not _same:
+                    # v27 P6 T6.3: compare at the granularity the name asserts
+                    # -- constitution-only for a flagged emission, exact
+                    # isomeric otherwise.
+                    if not self._rt_match(smiles, _opsin_smi, _stereo_flagged):
                         return None  # wrong name: never ship
                     opsin_status = "verified"
                 elif not self._general_fallback_unverified:
                     return None  # rejected/transient without the T4 opt-in
             if cand and not is_failure_name(cand):
-                from .metrics.provenance import record_source
+                from .metrics.provenance import (
+                    record_source, record_stereo_unexpressed)
                 record_source("general_engine", opsin=opsin_status)
+                record_stereo_unexpressed(_stereo_flagged)
                 return cand
         except Exception as e:  # fail-closed: keep the abstention
             logger.info(
@@ -2655,14 +2737,25 @@ class Orthonym:
                         # ship a WRONG stereoisomer. Expressed stereo (parent
                         # _stereo_prefix / substituent-internal name_substituent)
                         # makes the predicate False -> no over-abstention.
-                        from .rules.stereochemistry import needs_stereo_injection
-                        _drops_stereo = needs_stereo_injection(mol, _eng.name)
-                        if not _no_jar_abstain and not _drops_stereo:
+                        # v27 P6 T6.2: shared stereo-emit policy (same helper as
+                        # the late-recovery site). complete/valid abstain on
+                        # dropped stereo; best-effort ships a constitution-only
+                        # name flagged stereo_unexpressed. The downstream
+                        # _final_opsin_validity_gate is already CONSTITUTIONAL
+                        # (InChIKey skeleton + charge, stereo-insensitive), so a
+                        # flagged emission verifies at the granularity it asserts
+                        # there; jar-absent best-effort rides the existing T4
+                        # unverified contract (fail-OPEN gate).
+                        _permitted, _stereo_flagged = self._stereo_emit_decision(
+                            mol, _eng.name)
+                        if not _no_jar_abstain and _permitted:
                             name = _eng.name
                             # v25 G3: observation-only provenance (the emission
                             # still flows through the normal downstream gates).
-                            from .metrics.provenance import record_source
+                            from .metrics.provenance import (
+                                record_source, record_stereo_unexpressed)
                             record_source("general_engine")
+                            record_stereo_unexpressed(_stereo_flagged)
                 except Exception as _e:  # fail-closed: an engine bug must
                     # never turn an abstention into a crash or a wrong name.
                     logger.info("general engine error (kept abstention): %s",

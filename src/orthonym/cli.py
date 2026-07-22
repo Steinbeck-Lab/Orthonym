@@ -14,6 +14,33 @@ from typing import List
 from . import name_compound, __version__
 
 
+def _emit_tier_flags(emit_tier: str) -> dict:
+    """Map a ``--emit-tier`` value to the Orthonym general-engine flag triple.
+
+    Single source of truth for the tier -> namer-flag contract (v27 Phase 6
+    T6.1). Both the CLI (``main``) and ``tests/unit/test_emit_tier_flags.py``
+    read this so the invariant table cannot silently drift.
+
+    Invariant table (0-wrong-critical):
+      pin         -> gf=F, gfu=F, aag=F   (PIN-or-abstain; byte-identical default)
+      valid       -> gf=T, gfu=F, aag=F   (RT-verified general-engine names)
+      complete    -> gf=T, gfu=F, aag=T   (RT-verified aggressive aromatic/hetero)
+      best-effort -> gf=T, gfu=T, aag=T   (complete's production PLUS the T4
+                                           OPSIN-unverified opt-in)
+
+    ``general_fallback_unverified`` (gfu) is the UNIQUE best-effort
+    discriminator; ``allow_aromatic_general`` (aag) is True for BOTH complete
+    and best-effort so best-effort candidate production is a superset of
+    complete's (the T6.1 fix — previously aag was complete-only, making
+    best-effort under-cover the P1 cage machinery).
+    """
+    return {
+        "general_fallback": emit_tier != "pin",
+        "general_fallback_unverified": emit_tier == "best-effort",
+        "allow_aromatic_general": emit_tier in ("complete", "best-effort"),
+    }
+
+
 def main(args: List[str] = None) -> int:
     """Main entry point for CLI."""
     parser = argparse.ArgumentParser(
@@ -323,14 +350,16 @@ def main(args: List[str] = None) -> int:
         if _emit_tier != "pin" or parsed.provenance:
             import json as _json
             from orthonym.namer import Orthonym
+            _tier_flags = _emit_tier_flags(_emit_tier)
             namer = Orthonym(
                 style=parsed.style,
                 enable_triviality_controller=name_kwargs[
                     "enable_triviality_controller"],
                 trivial_fallback=name_kwargs["trivial_fallback"],
-                general_fallback=(_emit_tier != "pin"),
-                general_fallback_unverified=(_emit_tier == "best-effort"),
-                allow_aromatic_general=(_emit_tier == "complete"),
+                general_fallback=_tier_flags["general_fallback"],
+                general_fallback_unverified=_tier_flags[
+                    "general_fallback_unverified"],
+                allow_aromatic_general=_tier_flags["allow_aromatic_general"],
             )
             row = namer.name_tiered(parsed.smiles)
             if parsed.provenance:

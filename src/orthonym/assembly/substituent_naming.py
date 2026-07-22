@@ -3155,6 +3155,18 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
     if not stereo_atoms:
         return name
 
+    # v27 Phase S Task 3: double-apply guard for NESTED descriptor blocks.
+    # The _stereo_route re.match guard only catches a LEADING "(...)" block, so
+    # a substituent whose stereocentre is already expressed inside a nested
+    # sub-substituent block (e.g. "2-[(1R)-1-hydroxyethyl]cyclohexyl") would
+    # otherwise get a SPURIOUS bare "(R)-" prepended here — double-counting the
+    # SAME centre and shipping a wrong/over-specified stereoisomer. If the name
+    # already carries at least as many descriptor tokens as the fragment has
+    # defined stereo elements, the stereo is already expressed -> leave it.
+    from ..rules.stereochemistry import count_expressed_stereo_descriptors
+    if count_expressed_stereo_descriptors(name) >= len(stereo_atoms):
+        return name
+
     if len(stereo_atoms) == 1:
         # Single stereocenter.
         s_idx, cip = stereo_atoms[0]
