@@ -631,6 +631,47 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
         except Exception:
             pass
 
+    # ---- Tier 1.97 (v28 Composer1, P-63.2.5): chalcogen-rooted sulfanyl ----
+    # A monovalent substituent attached VIA a divalent sulfur (-S-R) is the
+    # (R)sulfanyl prefix. name_substituent_fragment's chalcogen-ether handler
+    # (Step 1b) covers -Se-R/-Te-R but OMITS S, so an S-rooted -S-R reaching
+    # the Tier-4 recursive path is mis-named (a bare -S-CH3 becomes the garbage
+    # 'hydroxymethanethiyl' — a spaceless token that would slip past the caller
+    # guard). This is the substituent-decoration analog of the ring/chain
+    # (R)sulfanyl the parent-anchored paths already emit; the recursive
+    # composer (Tier 5) re-enters name_substituent for every decoration, so a
+    # -S-R decoration must resolve here. GATED on allow_mancude (complete/
+    # best-effort tier) -> PIN default byte-identical; fail-closed (falls
+    # through) for any non-monovalent / non-carbon-flanked / higher-valence S.
+    if (allow_mancude and attach_idx is not None
+            and attach_idx in frag_atoms_set):
+        _sa = mol.GetAtomWithIdx(attach_idx)
+        if (_sa.GetSymbol() == 'S' and _sa.GetFormalCharge() == 0
+                and _sa.GetTotalNumHs() == 0
+                and _sa.GetNumRadicalElectrons() == 0
+                and all(b.GetBondTypeAsDouble() == 1.0 for b in _sa.GetBonds())):
+            _s_in = [n.GetIdx() for n in _sa.GetNeighbors()
+                     if n.GetIdx() in frag_atoms_set and n.GetAtomicNum() > 1]
+            _s_ext = [n.GetIdx() for n in _sa.GetNeighbors()
+                      if n.GetIdx() not in frag_atoms_set]
+            # Monovalent -S-R: exactly one heavy (carbon) neighbour inside the
+            # fragment (the R group) and exactly one bond leaving to the parent
+            # (also a carbon, so get_sulfanyl_prefix's two-carbon SMARTS holds).
+            if (len(_s_in) == 1 and len(_s_ext) == 1
+                    and mol.GetAtomWithIdx(_s_in[0]).GetSymbol() == 'C'
+                    and mol.GetAtomWithIdx(_s_ext[0]).GetSymbol() == 'C'):
+                try:
+                    from .substituent_prefix_forms import get_sulfanyl_prefix
+                    _parent_side = sorted(
+                        set(range(mol.GetNumAtoms())) - frag_atoms_set)
+                    _sf = get_sulfanyl_prefix(
+                        mol, (attach_idx, _s_in[0], _s_ext[0]),
+                        principal_chain=_parent_side, suffix='sulfanyl')
+                    if _sf and _sf != 'substituent' and ' ' not in _sf:
+                        return _stereo_route(_sf)
+                except Exception:
+                    pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))
@@ -688,6 +729,28 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 return result
         except Exception:
             pass
+
+    # ---- Tier 4.5 (v28 Composer1 Task 2): recursive decoration composition --
+    # Every narrow producer has declined. Under the general-fallback context
+    # (allow_mancude, threaded from the complete/best-effort engine) the
+    # recursive composer partitions a ring-bearing fragment into its ring CORE
+    # (named via the general ring engine) + DECORATIONS (each named by
+    # RE-ENTERING name_substituent on a strictly-smaller atom set) and
+    # assembles one hyphenated `-yl` token, so a decorated ring stops abstaining
+    # instead of collapsing to the 'substituent' sentinel. If it cannot
+    # decompose the fragment it returns None; we then de-mask the descriptive
+    # 'substituent' sentinel to a clean None (a ring-bearing fragment no honest
+    # namer could express) while STILL letting the descriptive fallback name a
+    # simple non-ring fragment (hydroxy / amino / methyl / halogen). The PIN
+    # default (allow_mancude False) keeps the EXACT existing sentinel behavior
+    # -> byte-identical.
+    if allow_mancude:
+        _rec = _recursive_fragment_substituent_name(
+            mol, frag_atoms_set, attach_idx, allow_mancude=True)
+        if _rec is not None:
+            return _rec
+        _desc = _descriptive_fallback(mol, frag_atoms_set, attach_idx)
+        return None if _desc == 'substituent' else _desc
 
     # ---- Tier 5: Descriptive fallback (guaranteed non-None) ----
     return _descriptive_fallback(mol, frag_atoms_set, attach_idx)
@@ -922,6 +985,265 @@ def _detach_and_name_ring_substituent(mol, frag_atoms, attach_idx,
     if not name or name == 'substituent' or ' ' in name:
         return None
     return name
+
+
+# ============================================================================
+# v28 Composer1 Task 2: recursive decoration composition
+# ============================================================================
+
+
+def _ring_system_core_atoms(mol, attach_idx, frag_set, ring_info):
+    """Ring-system atoms (within ``frag_set``) connected to ``attach_idx``
+    through shared-ring membership (the fused component containing the
+    attachment). Returns a ``set`` of atom indices, or ``None`` if the
+    attachment is not a ring atom of the fragment."""
+    if ring_info.NumAtomRings(attach_idx) == 0:
+        return None
+    frag_ring = {a for a in frag_set if ring_info.NumAtomRings(a) > 0}
+    if attach_idx not in frag_ring:
+        return None
+    core = {attach_idx}
+    changed = True
+    while changed:
+        changed = False
+        for ring in ring_info.AtomRings():
+            rs = set(ring)
+            if not rs <= frag_ring:
+                continue
+            if (rs & core) and not (rs <= core):
+                core |= rs
+                changed = True
+    return core
+
+
+def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
+    """P-14.4 / P-31.1.4.3.4 free-valence numbering of a SIMPLE monocyclic
+    ring ``core``. Returns ``{atom_idx: locant}`` for the winning numbering, or
+    ``None`` for anything that is not a simple monocycle (fused / spiro /
+    bridged atom, broken cycle). Key order (lowest wins): heteroatom locant set
+    -> heteroatom element-seniority locants -> indicated-H locant -> free
+    valence locant -> decoration-carrier locant set. This mirrors the validated
+    numbering of ``ring_substituents._decorated_heteroaryl_substituent_name``.
+    """
+    from ..rules.ring_substituents import _HETEROATOM_SENIORITY
+    core = list(core)
+    n = len(core)
+    core_set = set(core)
+    adj = {}
+    for i in core:
+        if ring_info.NumAtomRings(i) != 1:
+            return None  # fused / spiro / bridged -> not a simple monocycle
+        nb = [x.GetIdx() for x in mol.GetAtomWithIdx(i).GetNeighbors()
+              if x.GetIdx() in core_set]
+        if len(nb) != 2:
+            return None
+        adj[i] = nb
+    # Walk the cyclic order.
+    order = [core[0], adj[core[0]][0]]
+    while len(order) < n:
+        prev, cur = order[-2], order[-1]
+        nxt = [x for x in adj[cur] if x != prev]
+        if not nxt:
+            return None
+        order.append(nxt[0])
+    if len(order) != n or order[0] not in adj[order[-1]]:
+        return None  # not a single closed cycle
+    het = [i for i in core if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
+    ih = [i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+    if len(ih) > 1:
+        return None  # ambiguous indicated hydrogen -> do not guess
+    ih_atom = ih[0] if ih else None
+    deco_set = set(deco_carriers)
+    best_key = None
+    best = None
+    for start in range(n):
+        for direction in (1, -1):
+            a2p = {order[(start + direction * p) % n]: p + 1 for p in range(n)}
+            het_locs = tuple(sorted(a2p[i] for i in het))
+            sen_locs = tuple(a2p[i] for i in sorted(
+                het, key=lambda a: (_HETEROATOM_SENIORITY.get(
+                    mol.GetAtomWithIdx(a).GetSymbol(), 99), a2p[a])))
+            ih_loc = a2p[ih_atom] if ih_atom is not None else 0
+            fv_loc = a2p[attach_idx]
+            deco_locs = tuple(sorted(a2p[c] for c in deco_set))
+            key = (het_locs, sen_locs, ih_loc, fv_loc, deco_locs)
+            if best_key is None or key < best_key:
+                best_key = key
+                best = a2p
+    return best
+
+
+def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
+    """Build the bare monocyclic ring-substituent tail (``phenyl`` /
+    ``pyridin-3-yl`` / ``cyclohexyl`` / ``1H-pyrrol-2-yl`` ...) using the PIN
+    stem tables, with the free-valence locant taken from ``pos``. Fail-closed
+    (``None``) for a ring that is not a confidently-PIN monocyclic stem
+    (partially unsaturated, ambiguous indicated H, or stem not in the table).
+    Carbocyclic aromatic-6 / saturated forms cite the free valence implicitly
+    at position 1 (``phenyl`` / ``cyclohexyl``), so those require
+    ``pos[attach] == 1``.
+    """
+    from ..rules.ring_substituents import (
+        identify_ring_system, _PIN_HETEROARYL_STEMS)
+    from ..data.chain_names import get_chain_prefix
+    core_set = set(core)
+    het = [i for i in core if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
+    aromatic = all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in core)
+
+    def _all_single_ring_bonds():
+        for a in core:
+            for b in mol.GetAtomWithIdx(a).GetNeighbors():
+                if b.GetIdx() in core_set and a < b.GetIdx():
+                    bd = mol.GetBondBetweenAtoms(a, b.GetIdx())
+                    if bd.GetIsAromatic() or bd.GetBondTypeAsDouble() != 1.0:
+                        return False
+        return True
+
+    if not het:
+        if aromatic and len(core) == 6:
+            return 'phenyl' if pos[attach_idx] == 1 else None
+        if _all_single_ring_bonds():
+            if pos[attach_idx] != 1:
+                return None
+            return f'cyclo{get_chain_prefix(len(core))}yl'
+        return None  # mixed-saturation carbocycle -> ene locants needed
+
+    # Heterocycle: aromatic OR fully saturated only (mixed -> ene-locants).
+    if not aromatic and not _all_single_ring_bonds():
+        return None
+    ring_name = identify_ring_system(mol, tuple(sorted(core)))
+    stem = _PIN_HETEROARYL_STEMS.get(ring_name)
+    # Pyrazole vs imidazole: identify_ring_system reports both N,N 5-rings as
+    # 'imidazole'; adjacent ring nitrogens => pyrazole (P-25.2.1).
+    if ring_name == 'imidazole':
+        n_idx = [i for i in het if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+        if len(n_idx) == 2 and mol.GetBondBetweenAtoms(
+                n_idx[0], n_idx[1]) is not None:
+            stem = 'pyrazol'
+    if stem is None:
+        return None
+    ih = [i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+    if len(ih) > 1:
+        return None
+    ih_prefix = f'{pos[ih[0]]}H-' if ih else ''
+    return f'{ih_prefix}{stem}-{pos[attach_idx]}-yl'
+
+
+def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
+                                          allow_mancude: bool = False):
+    """General recursive composer: name a ring-bearing substituent fragment as
+    ``{decorations}{ring-core}-yl`` by partitioning it into a ring CORE + its
+    DECORATIONS and recursing.
+
+    v28 always-emit keystone (Composer #1, Task 2). Reached from
+    ``name_substituent`` ONLY under the general-fallback context
+    (``allow_mancude=True``) after every narrow tier declines, so the PIN
+    default path is byte-identical. Algorithm:
+
+    1. CORE = the (fused) ring system within ``frag_atoms`` containing the
+       attachment. (``attach_idx`` must be a ring atom; a chain-rooted or
+       ring-on-chain fragment returns ``None`` -> Task 3 / Composer #2.)
+    2. DECORATIONS = each maximal branch hanging off a core atom, collected
+       with the shared ``_bfs_collect_fragment`` walk (boundary = the core).
+       Every non-core heavy atom MUST land in exactly one decoration
+       (COMPOSITION-CONTRACT coverage check) or we fail closed.
+    3. Number the core (simple monocycle: free-valence P-14.4 enumeration;
+       fused/spiro cores are out of this task -> ``None``).
+    4. Name each decoration by RE-ENTERING ``name_substituent`` on a STRICTLY
+       SMALLER atom set (termination invariant asserted); a decoration the
+       recursion cannot name (or a multi-word / sentinel token) -> fail closed.
+    5. Assemble one hyphenated ``-yl`` substituent token: alphabetized,
+       multiplied, enclosing-marked decoration prefixes + the bare core tail.
+
+    Returns the composed token, or ``None`` (clean abstain) when the core is
+    unnameable, the coverage/termination invariant is violated, or any
+    decoration cannot be named. NEVER returns the ``'substituent'`` sentinel
+    and NEVER a multi-word token.
+    """
+    if not allow_mancude:
+        return None
+    frag_set = set(frag_atoms)
+    if not frag_set or attach_idx is None or attach_idx not in frag_set:
+        return None
+
+    ring_info = mol.GetRingInfo()
+    core = _ring_system_core_atoms(mol, attach_idx, frag_set, ring_info)
+    if not core or attach_idx not in core:
+        return None
+
+    # ---- Step 2: enumerate decorations (shared fragment walk) --------------
+    assigned = set(core)
+    decorations = []  # (carrier_core_atom, decoration_attach_atom, atom_set)
+    for ra in core:
+        for nb in mol.GetAtomWithIdx(ra).GetNeighbors():
+            ni = nb.GetIdx()
+            if (ni in core or ni not in frag_set or nb.GetAtomicNum() <= 1
+                    or ni in assigned):
+                continue
+            branch = _bfs_collect_fragment(mol, ni, core, assigned)
+            if not branch:
+                continue
+            assigned |= branch
+            decorations.append((ra, ni, branch))
+
+    # COMPOSITION CONTRACT: every non-core heavy fragment atom must be covered
+    # by exactly one decoration (the shared walk already prevents overlap).
+    heavy = {a for a in frag_set if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    covered = set(core) | {a for _, _, branch in decorations for a in branch}
+    if covered != heavy:
+        return None  # an unaccounted heavy atom -> fail closed
+
+    # ---- Step 3: number the core -------------------------------------------
+    deco_carriers = [ra for ra, _, _ in decorations]
+    pos = _monocycle_position_map(
+        mol, core, attach_idx, deco_carriers, ring_info)
+    if pos is None:
+        return None  # fused/spiro/bridged core -> deferred (clean abstain)
+
+    core_tail = _monocycle_core_tail(mol, core, attach_idx, pos, ring_info)
+    if not core_tail or ' ' in core_tail:
+        return None
+
+    # No decorations: the bare-core tail IS the answer (earlier tiers normally
+    # own this, but stay correct if we reach here for a bare ring).
+    if not decorations:
+        return core_tail
+
+    # ---- Step 4: name each decoration by recursion -------------------------
+    from collections import defaultdict
+    from .naming_utils import (
+        apply_enclosing_marks, is_complex_substituent, get_multiplier_prefix,
+        alpha_sort_key)
+    groups = defaultdict(list)
+    for ra, ni, branch in decorations:
+        # Termination invariant: recurse only on a STRICTLY SMALLER atom set.
+        if not len(branch) < len(frag_set):
+            return None
+        dname = name_substituent(
+            mol, sorted(branch), ni, allow_mancude=allow_mancude)
+        if (not dname or dname == 'substituent' or ' ' in dname
+                or 'unknown' in dname.lower()):
+            return None  # unnameable decoration -> fail closed
+        groups[dname].append(pos[ra])
+
+    # ---- Step 5: assemble one hyphenated token -----------------------------
+    parts = []  # (alpha_key, text)
+    for dname, locs in groups.items():
+        locs = sorted(locs)
+        token = (apply_enclosing_marks(dname, -1)
+                 if is_complex_substituent(dname) else dname)
+        mult = get_multiplier_prefix(len(locs), dname)
+        text = f"{','.join(str(l) for l in locs)}-{mult}{token}"
+        parts.append((alpha_sort_key(dname), text))
+    parts.sort(key=lambda x: x[0])
+    body = '-'.join(p[1] for p in parts)
+    # Hyphen before the tail only when the tail is digit-initial (indicated H,
+    # e.g. '2-methyl-1H-pyrrol-2-yl'); elide before a letter-initial stem.
+    sep = '-' if core_tail[0].isdigit() else ''
+    result = f"{body}{sep}{core_tail}"
+    if ' ' in result or result == 'substituent':
+        return None
+    return result
 
 
 # ============================================================================
