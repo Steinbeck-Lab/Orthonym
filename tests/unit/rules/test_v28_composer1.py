@@ -267,3 +267,51 @@ def test_ring_on_chain_amino_carrier_direct_composer():
     assert " " not in name
     assert "amino" in name
     assert name.endswith("methyl")
+
+
+# ============================================================================
+# v28 Composer1 Task 4: wire the composer into name_substituent + de-mask
+# ============================================================================
+#
+# The core wiring (Task 2, commit bcbb6745) already routes a ring-bearing
+# fragment declined by every narrow namer through
+# ``_recursive_fragment_substituent_name`` under ``allow_mancude=True``, and
+# de-masks the ``'substituent'`` sentinel to a clean ``None`` when the
+# composer also declines. This is the always-emit contract test: the general
+# path must never leak the raw sentinel (or any space-bearing token) past
+# ``name_substituent``.
+
+
+def test_general_substituent_never_returns_sentinel_when_decomposable():
+    """adamantyl-acetic-acid: the adamantane ring-substituent fragment is
+    declined by every PIN-tier namer (PIN-only ``name_tiered`` abstains
+    entirely -- 'unknown organic compound', source=='abstain' -- verified
+    offline) but the general-fallback recursive composer names it as a real
+    von-Baeyer cage -yl token. Primary assertion is the direct call (no
+    OPSIN needed); the end-to-end provenance assertion also holds here
+    because this molecule's PIN path genuinely fails closed rather than
+    pre-empting the general engine (verified out-of-band: PIN-only
+    ``name_tiered`` returns source=='abstain', not 'pin_path', and the
+    composed name round-trips via ``diagnose.py --complete``:
+    '2-(tricyclo[3.3.1.1^3,7]decan-3-yl)ethanoic acid')."""
+    from orthonym.assembly.substituent_enumerator import name_substituent
+    smi = "OC(=O)CC12CC3CC(CC(C3)C1)C2"  # adamantyl-acetic-acid
+    mol = Chem.MolFromSmiles(smi)
+    ring_atoms = [a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()]
+    attach = next(i for i in ring_atoms
+                  if any((not mol.GetAtomWithIdx(n.GetIdx()).IsInRing())
+                         for n in mol.GetAtomWithIdx(i).GetNeighbors()))
+
+    # PIN default (allow_mancude=False) MUST keep the exact pre-existing
+    # sentinel behavior -> byte-identity guard.
+    pin_name = name_substituent(mol, ring_atoms, attach, allow_mancude=False)
+    assert pin_name == "substituent"
+
+    # General path: a real name or a clean None -- NEVER the sentinel, NEVER
+    # a space-bearing token.
+    name = name_substituent(mol, ring_atoms, attach, allow_mancude=True)
+    assert name is None or (name != "substituent" and " " not in name)
+    assert name == "tricyclo[3.3.1.1^3,7]decan-3-yl", name
+
+    # End-to-end: the general engine (not the PIN path) wins this molecule.
+    assert _be().name_tiered(smi)["source"] == "general_engine"
