@@ -1471,6 +1471,83 @@ def _cage_core_numbering(mol, ring_atoms, attach):
     return pos, tail
 
 
+def _fused_heterocycle_core_numbering(mol, ring_atoms, attach, deco_carriers):
+    """v28 Task 2c helper: full ``{orig_idx: int_locant}`` numbering + bare
+    ``...-<fv>-yl`` tail for a retained fused-HETEROCYCLE core (1H-indole /
+    quinoline / 1H-benzimidazole / 1-benzothiophene / purine ...).
+
+    Reuses the FIXED IUPAC numbering catalogued in ``data.fused_heterocycles``
+    (the ``iupac_locants`` map — canonical-SMILES atom index -> peripheral
+    locant — and the retained ``name`` that already embeds the indicated
+    hydrogen). ONE canonical numbering is read for BOTH the free valence AND
+    every decoration carrier, so they are mutually consistent -> any single
+    valid numbering is SELF-01-safe. The indicated H is taken VERBATIM from the
+    catalog name (a fused-heterocycle pitfall — never guessed); the production
+    OPSIN round-trip gate arbitrates any residual indicated-H uncertainty.
+
+    Returns ``(pos, tail)`` or ``None`` (clean abstain) when the core is not a
+    cataloged fused heterocycle, or when the free valence / a decoration carrier
+    has no plain-integer peripheral locant (e.g. it lands on a fusion atom).
+    """
+    from rdkit import Chem
+    from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+    ring_list = list(ring_atoms)
+    frag_smi = Chem.MolFragmentToSmiles(mol, ring_list, canonical=True)
+    if not frag_smi:
+        return None
+    entry = FUSED_HETEROCYCLE_DATA.get(frag_smi)
+    if entry is None:
+        # MolFragmentToSmiles can differ subtly from the whole-mol canonical
+        # SMILES the catalog is keyed by; re-canonicalise once and retry.
+        rc = Chem.MolFromSmiles(frag_smi)
+        if rc is not None:
+            frag_smi = Chem.MolToSmiles(rc)
+            entry = FUSED_HETEROCYCLE_DATA.get(frag_smi)
+    if entry is None:
+        return None
+    iupac_locants = entry.get('iupac_locants') or {}
+    name = entry.get('name')
+    if not iupac_locants or not name:
+        return None
+    # ``iupac_locants`` is keyed by the ENTRY reference SMILES' atom indices, so
+    # rebuild the reference from the (matched) catalog key and translate onto
+    # THIS ring system by substructure match (P-29.2: minimise the free-valence
+    # locant over automorphic matches; asymmetric cores have a single match).
+    ref = Chem.MolFromSmiles(frag_smi)
+    if ref is None:
+        return None
+    ring_atom_set = set(ring_list)
+    needed = [attach] + list(deco_carriers)
+    best_key = None
+    best_pos: Optional[Dict[int, int]] = None
+    for match in mol.GetSubstructMatches(ref, uniquify=False):
+        if set(match) != ring_atom_set:
+            continue
+        pos: Dict[int, int] = {}
+        for ref_idx, mol_idx in enumerate(match):
+            loc = iupac_locants.get(ref_idx)
+            if isinstance(loc, int):
+                pos[mol_idx] = loc
+        # every free-valence / decoration-carrier atom needs a plain-int
+        # peripheral locant (fusion atoms carry no substituent -> never here).
+        if any(a not in pos for a in needed):
+            continue
+        key = (pos[attach], tuple(sorted(pos[a] for a in deco_carriers)))
+        if best_key is None or key < best_key:
+            best_key = key
+            best_pos = pos
+    if best_pos is None:
+        return None
+    fv = best_pos[attach]
+    # bare tail: the retained name embeds the indicated H (e.g. '1H-indole');
+    # drop a trailing 'e' for the substituent stem, then '-<fv>-yl'.
+    stem = name[:-1] if name.endswith('e') else name
+    tail = f'{stem}-{fv}-yl'
+    if ' ' in tail:
+        return None
+    return best_pos, tail
+
+
 def polycyclic_core_numbering(
     mol, ring_atoms: Tuple[int, ...], attachment_atom: int,
     deco_carriers, allow_mancude: bool = False,
@@ -1487,10 +1564,13 @@ def polycyclic_core_numbering(
     covered candidate rather than fail-closing on numbering uncertainty.
 
     Covered classes: retained fused CARBOCYCLIC aromatics (naphthalene,
-    anthracene, phenanthrene, pyrene ...) and von-Baeyer CAGES (adamantane /
-    tricyclo+ ...). Returns ``None`` (clean abstain) for every other polycyclic
-    core class — fused-heterocycle decorated cores, spiro, partial-hydro fused —
-    which stay deferred (the composer then fails closed, never a wrong locant).
+    anthracene, phenanthrene, pyrene ...), von-Baeyer CAGES (adamantane /
+    tricyclo+ ...) and — v28 Task 2c — retained fused HETEROCYCLES (indole,
+    quinoline, benzimidazole, benzothiophene, purine ...) via the
+    ``data.fused_heterocycles`` catalog numbering. Returns ``None`` (clean
+    abstain) for every other polycyclic core class — spiro, partial-hydro fused,
+    non-cataloged fusions — which stay deferred (the composer then fails closed,
+    never a wrong locant).
     """
     if attachment_atom not in set(ring_atoms):
         return None
@@ -1498,6 +1578,18 @@ def polycyclic_core_numbering(
     if res is not None:
         return res
     if allow_mancude:
+        # v28 Task 2c: retained fused-HETEROCYCLE core (indole / quinoline /
+        # benzimidazole / benzothiophene / purine ...) — tried BEFORE the
+        # general von-Baeyer cage numberer, which would otherwise name these
+        # mancude fused aromatics as (valid but non-preferred) aza-bicyclo
+        # polyenes. The retained name is the preferred emission. Gated on
+        # allow_mancude so the PIN-default path stays byte-identical.
+        res = _fused_heterocycle_core_numbering(
+            mol, ring_atoms, attachment_atom, deco_carriers)
+        if res is not None:
+            return res
+        # von-Baeyer / bridged CAGE fallback (adamantane / tricyclo+ ..., and
+        # any non-cataloged mancude fused system as a polyene).
         res = _cage_core_numbering(mol, ring_atoms, attachment_atom)
         if res is not None:
             return res
