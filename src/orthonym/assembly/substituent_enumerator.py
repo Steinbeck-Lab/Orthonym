@@ -852,6 +852,79 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
 
 
 # ============================================================================
+# v28 Composer1 Task 1: detach-and-name ring-substituent primitive
+# ============================================================================
+
+
+def _detach_and_name_ring_substituent(mol, frag_atoms, attach_idx,
+                                       allow_mancude: bool = False):
+    """Name the RING-SYSTEM CORE of a substituent fragment as a ``-yl`` token.
+
+    Reusable FIRST primitive for the v28 always-emit recursive substituent
+    composer: locates the ring atoms within ``frag_atoms`` and routes them
+    through the existing detached-submol von-Baeyer/spiro/cage/monocycle
+    engine (``ring_substituents.get_ring_substituent_name``, which itself
+    dispatches to ``_polycyclic_substituent_name`` ->
+    ``_universal_cage_substituent_name`` / ``_universal_spiro_substituent_name``
+    under ``allow_mancude``, and to the monocyclic/mancude-heteromonocyclic
+    producers otherwise). The detachment itself (submol construction with the
+    broken bond left as an implicit-H valence cap, NOT raw atom-index copying)
+    is performed by that existing, already-audited machinery via
+    ``ring_substituents._extract_ring_submol`` — this primitive does not
+    duplicate it.
+
+    Does NOT reimplement von-Baeyer/spiro/cage naming; does NOT walk
+    substituents hanging off the ring core (that recursion is later v28
+    composer tasks). Not wired into ``name_substituent`` yet (v28 Task 4) —
+    PIN-default (``allow_mancude=False`` callers) is unaffected by this
+    addition.
+
+    Args:
+        mol: RDKit Mol of the full molecule.
+        frag_atoms: Iterable of atom indices belonging to the substituent
+            fragment (may include non-ring decoration atoms; only the atoms
+            that are IN A RING are used as the ring core).
+        attach_idx: Atom index (must be one of ``frag_atoms``, and must be a
+            ring atom) marking the open-valence attachment point.
+        allow_mancude: v27/v28 opt-in (complete/best-effort engine tier
+            only) threaded straight to ``get_ring_substituent_name`` so a
+            cage (tricyclo+/adamantane) or mancude fused-aromatic ring core
+            is named instead of failing closed. Default False.
+
+    Returns:
+        str: A ``...-<loc>-yl`` (or ``-ylidene``) substituent token for the
+            ring core, or ``None`` (fail-closed) if the fragment has no
+            nameable ring core -- attach_idx is not a ring atom within
+            frag_atoms, or every ring namer declines.
+    """
+    from ..rules.ring_substituents import get_ring_substituent_name
+
+    frag_set = set(frag_atoms)
+    if attach_idx is None or attach_idx not in frag_set:
+        return None
+
+    ring_info = mol.GetRingInfo()
+    ring_atoms = tuple(sorted(
+        a for a in frag_set if ring_info.NumAtomRings(a) > 0
+    ))
+    if not ring_atoms or attach_idx not in ring_atoms:
+        # No ring core in this fragment, or the attachment point itself is
+        # not part of the ring core -- nothing for this primitive to name.
+        return None
+
+    try:
+        name = get_ring_substituent_name(
+            mol, ring_atoms, attach_idx, allow_mancude=allow_mancude
+        )
+    except Exception:
+        name = None
+
+    if not name or name == 'substituent' or ' ' in name:
+        return None
+    return name
+
+
+# ============================================================================
 # Halogen Name Map (for fg_only classification)
 # ============================================================================
 
