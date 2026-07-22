@@ -1836,7 +1836,18 @@ def _compound_ring_on_chain_substituent(
                     or atom.GetNumRadicalElectrons() != 0
                     or atom.GetIsAromatic()
                     or atom.GetDegree() != 2
-                    or atom.GetTotalNumHs() != 0
+                    # O/S: a neutral degree-2 bridging atom always has 0
+                    # implicit H (divalent ether/thioether). N differs: a
+                    # neutral degree-2 bridging N is the ordinary -NH-
+                    # secondary amine and ALWAYS carries exactly 1 implicit
+                    # H -- requiring ==0 here made the 'amino' connective
+                    # branch below permanently unreachable dead code. Admit
+                    # <=1 for N: the 0-H degree-2 N cases (imine =N-,
+                    # charged) are already excluded above by the bond-order
+                    # check below and the charge guard, so <=1 admits
+                    # exactly the -NH- carrier and nothing richer.
+                    or (atom.GetSymbol() == 'N' and atom.GetTotalNumHs() > 1)
+                    or (atom.GetSymbol() != 'N' and atom.GetTotalNumHs() != 0)
                     or hetero_carrier_atom is not None):
                 return None
             hetero_carrier_atom = a

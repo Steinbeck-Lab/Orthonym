@@ -156,6 +156,7 @@ def test_fused_heterocycle_decorated_substituent_composes_via_engine(
 def test_fused_heterocycle_decorated_substituent_emits_via_engine(smi):
     row = _be().name_tiered(smi)
     assert row["source"] == "general_engine", row
+    assert row["name"] and "unknown" not in row["name"] and " substituent" not in row["name"]
 
 
 # ============================================================================
@@ -222,4 +223,47 @@ def test_ring_on_chain_sulfanyl_carrier_direct_composer():
     assert name is not None and name != "substituent", name
     assert " " not in name
     assert "sulfanyl" in name
+    assert name.endswith("methyl")
+
+
+def test_ring_on_chain_amino_carrier_direct_composer():
+    """Mirrors ``test_ring_on_chain_sulfanyl_carrier_direct_composer`` above
+    but for the N (amino) connective: an ordinary ``-CH2-NH-(ring)`` secondary
+    amine carrier. Reviewer finding (T3 fix): a neutral, non-aromatic,
+    degree-2 bridging N ALWAYS carries exactly 1 implicit H (unlike O/S,
+    which carry 0), so the original ``GetTotalNumHs() == 0`` guard applied
+    uniformly to S/O/N made the 'amino' connective branch permanently
+    unreachable dead code. PIN default (allow_mancude=False) MUST decline ->
+    byte-identity guard; allow_mancude=True must emit a real linker name
+    (never None, never the 'substituent' sentinel, never a space-bearing
+    token) that carries BOTH the amino connective and the recursively-composed
+    ring-yl core."""
+    from orthonym.rules.ring_substituents import (
+        _compound_ring_on_chain_substituent)
+    # 2-[(carrier)]butanoic acid parent with a -CH2-NH-(5-chloro-1H-indol-3-yl)
+    # carrier (an N analog of the shipped -CH2-S- case above).
+    smi = "CCC(CNc1c[nH]c2ccc(Cl)cc12)C(=O)O"
+    mol = Chem.MolFromSmiles(smi)
+    # atom 3 = the CH2 carrier carbon (parent-side attach is atom 2); atom 4 =
+    # the carrier nitrogen; atoms 5-14 = the decorated 5-chloroindol-3-yl core.
+    attach_idx = 3
+    frag_atoms = list(range(3, 15))
+    frag_set = set(frag_atoms)
+    ring_info = mol.GetRingInfo()
+    frag_ring_atoms = {a for a in frag_atoms if ring_info.NumAtomRings(a) > 0}
+
+    # PIN default MUST decline (byte-identity guard): the nitrogen carrier is
+    # rejected exactly as before this fix.
+    assert _compound_ring_on_chain_substituent(
+        mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info,
+        allow_mancude=False,
+    ) is None
+
+    name = _compound_ring_on_chain_substituent(
+        mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info,
+        allow_mancude=True,
+    )
+    assert name is not None and name != "substituent", name
+    assert " " not in name
+    assert "amino" in name
     assert name.endswith("methyl")
