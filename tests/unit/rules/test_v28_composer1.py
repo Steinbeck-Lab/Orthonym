@@ -338,3 +338,47 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
     row = _be().name_tiered(smi)     # must NOT raise; source==general_engine OR clean abstain (multi-blocked)
     assert row is not None
     assert (row["source"] == "general_engine") or (not row.get("name"))  # named via engine OR cleanly abstained
+
+
+# ============================================================================
+# v28 Composer1 Task C1-T6: assembly-robustness instrument smoke test
+# ============================================================================
+#
+# TINY shape-only smoke test for `` -- the
+# offline, hang-safe per-fragment naming-success measurement instrument (NOT
+# gated production; see the module docstring there for the decomposition
+# method + success criterion). This test only asserts the returned dict's
+# SHAPE (keys present, n correct, rates in [0, 1]) -- it does NOT assert any
+# specific rate, since the proxy parent-selection heuristic is deliberately
+# simplified (see that module's docstring) and the exact numbers are not a
+# contract of this task.
+
+
+def test_asm_robustness_instrument_smoke():
+    import importlib.util
+    from pathlib import Path
+
+    import sys
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    spec = importlib.util.spec_from_file_location(
+        "asm_robustness", str(project_root / "" / "asm_robustness.py"))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod  # dataclass decorator needs the module registered
+    spec.loader.exec_module(mod)
+
+    # 5 SMILES already used above (T2 / T2b / T4 cases).
+    smiles = [
+        "C[C@@H](N)c1ccc(OCc2ccc(Cl)cc2)nc1",       # T2
+        "CC(C)(C)Sc1ccc(-c2nc3ccccc3c(=O)[nH]2)cc1", # T2
+        "OC(=O)Cc1ccc2cc(Cl)ccc2c1",                 # T2b
+        "OC(=O)CC12CC3CC(O)(CC(C3)C1)C2",            # T2b
+        "OC(=O)CC12CC3CC(CC(C3)C1)C2",                # T4 (adamantyl-acetic acid)
+    ]
+
+    result = mod.measure_assembly_robustness(smiles)
+
+    assert set(result.keys()) == {"fragment_p", "mol_all_named", "n"}
+    assert result["n"] == 5
+    assert 0.0 <= result["fragment_p"] <= 1.0
+    assert 0.0 <= result["mol_all_named"] <= 1.0
