@@ -1361,6 +1361,149 @@ def _polycyclic_substituent_name(
     return None
 
 
+def _pah_core_numbering(mol, ring_atoms, attach, deco_carriers):
+    """v28 Task 2b helper: full ``{orig_idx: int_locant}`` numbering + bare
+    ``...-<fv>-yl`` tail for a retained fused CARBOCYCLIC aromatic core
+    (naphthalene / anthracene / phenanthrene / pyrene ...). Reuses the fixed-PAH
+    numbering machinery (``get_polycyclic_iupac_locants``) which already runs the
+    automorphism minimization; the free valence takes the lowest locant (routed
+    through the ``pcg`` tier), then the decorations. Returns ``(pos, tail)`` or
+    ``None`` (not a cataloged PAH, or a needed locant is a fusion-atom string)."""
+    from rdkit import Chem
+    frag_smi = Chem.MolFragmentToSmiles(mol, list(ring_atoms), canonical=True)
+    if not frag_smi:
+        return None
+    from ..data import get_retained_name
+    ring_name = get_retained_name(frag_smi)
+    if not ring_name:
+        return None
+    from .polycyclics import POLYCYCLIC_DATA, get_polycyclic_iupac_locants
+    if ring_name not in POLYCYCLIC_DATA:
+        return None  # fused-heterocycle / non-cataloged fused core -> abstain
+    sub_atoms = {attach} | set(deco_carriers)
+    try:
+        pos = get_polycyclic_iupac_locants(
+            mol, ring_name, substituent_atoms=sub_atoms, pcg_atoms={attach})
+    except Exception:
+        return None
+    if not pos:
+        return None
+    # Every free-valence / decoration-carrier locant must be a plain int
+    # peripheral locant (fusion carbons carry no substituent -> never here).
+    needed = [attach] + list(deco_carriers)
+    if any(a not in pos or not isinstance(pos[a], int) for a in needed):
+        return None
+    stem = ring_name[:-1] if ring_name.endswith('e') else ring_name
+    tail = f'{stem}-{pos[attach]}-yl'
+    if ' ' in tail:
+        return None
+    return pos, tail
+
+
+def _cage_core_numbering(mol, ring_atoms, attach):
+    """v28 Task 2b helper: full ``{orig_idx: int_locant}`` numbering + bare
+    ``...-<fv>-yl`` tail for a von-Baeyer / bridged CAGE core (adamantane /
+    tricyclo+ ...). Detaches the ring-only submol (property-tagged so the
+    submol->orig index map is preserved) and routes it through the SAME
+    audited ``analyze_cage_universal`` engine ``_universal_cage_substituent_name``
+    uses, then reads BOTH the free-valence locant and every ring-atom locant off
+    the single P-23 numbering (mutually consistent -> SELF-01-safe). Returns
+    ``(pos, tail)`` or ``None`` on any refusal (spiro / >MAX / kekulize /
+    numbering that does not cover exactly the ring atoms)."""
+    from rdkit import Chem
+    from .vonbaeyer_universal import analyze_cage_universal
+    from .polycyclic import _build_parent_with_unsaturation
+    keep = set(ring_atoms)
+    if attach not in keep:
+        return None
+    try:
+        rw = Chem.RWMol(mol)
+        for a in rw.GetAtoms():
+            a.SetIntProp('_o28', a.GetIdx())
+        for idx in sorted((a.GetIdx() for a in mol.GetAtoms()
+                           if a.GetIdx() not in keep), reverse=True):
+            rw.RemoveAtom(idx)
+        sub = rw.GetMol()
+        Chem.SanitizeMol(sub)
+    except Exception:
+        return None
+    sub_to_orig: Dict[int, int] = {}
+    attach_sub = None
+    for a in sub.GetAtoms():
+        try:
+            o = a.GetIntProp('_o28')
+        except KeyError:
+            return None
+        sub_to_orig[a.GetIdx()] = o
+        if o == attach:
+            attach_sub = a.GetIdx()
+    if attach_sub is None:
+        return None
+    cage_atoms = [a.GetIdx() for a in sub.GetAtoms() if a.IsInRing()]
+    if attach_sub not in cage_atoms:
+        return None
+    try:
+        cage = analyze_cage_universal(
+            sub, cage_atoms=set(cage_atoms), allow_mancude=True)
+    except Exception:
+        cage = None
+    if cage is None:
+        return None
+    if set(cage.atom_to_locant) != set(cage_atoms):
+        return None  # coverage floor: numbering must cover exactly the ring
+    loc = cage.atom_to_locant.get(attach_sub)
+    if not isinstance(loc, int):
+        return None
+    parent_block = _build_parent_with_unsaturation(
+        cage.total_atoms, cage.unsaturation)
+    if not parent_block:
+        return None
+    stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
+    tail = f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
+    if ' ' in tail:
+        return None
+    pos: Dict[int, int] = {}
+    for s_idx, lc in cage.atom_to_locant.items():
+        if s_idx in sub_to_orig and isinstance(lc, int):
+            pos[sub_to_orig[s_idx]] = lc
+    if attach not in pos:
+        return None
+    return pos, tail
+
+
+def polycyclic_core_numbering(
+    mol, ring_atoms: Tuple[int, ...], attachment_atom: int,
+    deco_carriers, allow_mancude: bool = False,
+) -> Optional[Tuple[Dict[int, int], str]]:
+    """v28 Task 2b: return ``(pos_map, bare_tail)`` for a POLYCYCLIC ring core so
+    the recursive substituent composer can place decoration locants on a
+    fused / bridged / cage core (the biggest drug-like breadth lever).
+
+    ``pos_map`` is ``{orig_atom_idx: int_locant}`` and ``bare_tail`` the
+    ``...-<fv>-yl`` core token — BOTH derived from ONE numbering, so the free
+    valence and every decoration locant are mutually consistent. Any single
+    VALID numbering is SELF-01-safe: a wrong-locant name is suppressed by the
+    production OPSIN round-trip gate, never shipped, so the composer ATTEMPTS a
+    covered candidate rather than fail-closing on numbering uncertainty.
+
+    Covered classes: retained fused CARBOCYCLIC aromatics (naphthalene,
+    anthracene, phenanthrene, pyrene ...) and von-Baeyer CAGES (adamantane /
+    tricyclo+ ...). Returns ``None`` (clean abstain) for every other polycyclic
+    core class — fused-heterocycle decorated cores, spiro, partial-hydro fused —
+    which stay deferred (the composer then fails closed, never a wrong locant).
+    """
+    if attachment_atom not in set(ring_atoms):
+        return None
+    res = _pah_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
+    if res is not None:
+        return res
+    if allow_mancude:
+        res = _cage_core_numbering(mol, ring_atoms, attachment_atom)
+        if res is not None:
+            return res
+    return None
+
+
 def _phthalimido_substituent_name(mol, frag_set: Set[int],
                                   attach_idx: int) -> Optional[str]:
     """P-66.2.2 (BB 33859/55900): the phthalimido fragment

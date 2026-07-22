@@ -1197,12 +1197,27 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     deco_carriers = [ra for ra, _, _ in decorations]
     pos = _monocycle_position_map(
         mol, core, attach_idx, deco_carriers, ring_info)
-    if pos is None:
-        return None  # fused/spiro/bridged core -> deferred (clean abstain)
-
-    core_tail = _monocycle_core_tail(mol, core, attach_idx, pos, ring_info)
-    if not core_tail or ' ' in core_tail:
-        return None
+    if pos is not None:
+        core_tail = _monocycle_core_tail(mol, core, attach_idx, pos, ring_info)
+        if not core_tail or ' ' in core_tail:
+            return None
+    else:
+        # v28 Task 2b: POLYCYCLIC (fused / bridged / cage) decorated core. The
+        # monocycle numberer declined, so route the core through the shared
+        # polycyclic numberer, which returns ONE consistent {atom: locant} map +
+        # the bare `...-<fv>-yl` tail (fused-carbocyclic PAH + von-Baeyer cage;
+        # other polycyclic classes stay deferred -> None -> fail closed). ATTEMPT
+        # a covered candidate; SELF-01 (the production RT gate) arbitrates any
+        # uncertain locant so 0-wrong holds without proving numbering perfect.
+        from ..rules.ring_substituents import polycyclic_core_numbering
+        _poly = polycyclic_core_numbering(
+            mol, tuple(sorted(core)), attach_idx, deco_carriers,
+            allow_mancude=allow_mancude)
+        if _poly is None:
+            return None  # un-numberable polycyclic core -> clean abstain
+        pos, core_tail = _poly
+        if not core_tail or ' ' in core_tail:
+            return None
 
     # No decorations: the bare-core tail IS the answer (earlier tiers normally
     # own this, but stay correct if we reach here for a bare ring).

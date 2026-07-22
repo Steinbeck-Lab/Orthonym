@@ -63,3 +63,18 @@ def test_decorated_ring_substituent_emits_via_engine(smi):
     row = _be().name_tiered(smi)
     assert row["source"] == "general_engine", row
     assert row["name"] and "unknown" not in row["name"] and " substituent" not in row["name"]
+
+
+# ============================================================================
+# v28 Composer1 Task 2b: polycyclic (fused / bridged) decorated-core composition
+# ============================================================================
+
+
+@pytest.mark.parametrize("smi", [
+    "OC(=O)Cc1ccc2cc(Cl)ccc2c1",              # (6-chloronaphthalen-2-yl)acetic acid — FUSED decorated core
+    "OC(=O)CC12CC3CC(O)(CC(C3)C1)C2",         # (3-hydroxyadamantan-1-yl)acetic acid — BRIDGED decorated core
+])
+def test_polycyclic_decorated_substituent_emits_via_engine(smi):
+    row = _be().name_tiered(smi)
+    assert row["source"] == "general_engine", row
+    assert row["name"] and "unknown" not in row["name"] and " substituent" not in row["name"]
