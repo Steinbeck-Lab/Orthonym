@@ -364,8 +364,16 @@ def main(args: List[str] = None) -> int:
             row = namer.name_tiered(parsed.smiles)
             if parsed.provenance:
                 print(_json.dumps(row))
-            else:
+            elif row["name"]:
                 print(row["name"])
+            else:
+                # v28 Composer1 Task 5 fix: a clean T5 abstain has
+                # name=None by design (honest "no name" contract — see
+                # name_tiered's v28 Composer1 Task 5 comment). Printing
+                # bare `None` to stdout would be confusing/broken output
+                # for this documented flag; print a labeled abstention
+                # indicator instead. Never fabricates a name.
+                print(f"(no name — {row['limit_code'] or row['tier']})")
             return 0
 
         if parsed.confidence:

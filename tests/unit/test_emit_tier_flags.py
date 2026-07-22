@@ -57,3 +57,43 @@ def test_best_effort_superset_of_complete_candidate_production():
     # every production-gating flag complete sets, best-effort also sets
     for key in ("general_fallback", "allow_aromatic_general"):
         assert be[key] or not comp[key], key
+
+
+# v28 Composer1 Task 5 regression: name_tiered's honest T5 "clean abstain"
+# contract (name=None under general_fallback, see namer.name_tiered) was
+# shipped without updating cli.main's plain-text print branch, which did
+# `print(row["name"])` unconditionally -> printed the literal string
+# "None" to stdout for an abstaining molecule under a non-pin --emit-tier.
+# Drives the CLI end-to-end (in-process; the conftest autouse fixture
+# disables the OPSIN validity gate for the whole test suite, so this
+# does not spawn an OPSIN subprocess/JVM).
+_ABSTAINING_SMILES = (
+    "CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1"
+)
+
+
+def test_cli_best_effort_abstain_does_not_print_bare_none(capsys):
+    from orthonym.cli import main
+
+    rc = main([_ABSTAINING_SMILES, "--emit-tier", "best-effort"])
+
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    assert out != "None"
+    assert "None" not in out.split()  # no bare-None token in the printed line
+    assert out  # must print SOMETHING, not an empty line
+    assert "no name" in out.lower()
+
+
+def test_cli_best_effort_abstain_provenance_json_keeps_null(capsys):
+    """The --provenance JSON branch is untouched: name:null stays well-defined
+    JSON, only the plain-text branch gets the display guard."""
+    from orthonym.cli import main
+
+    rc = main([
+        _ABSTAINING_SMILES, "--emit-tier", "best-effort", "--provenance",
+    ])
+
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    assert '"name": null' in out
