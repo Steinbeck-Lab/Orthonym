@@ -1400,7 +1400,7 @@ def _pah_core_numbering(mol, ring_atoms, attach, deco_carriers):
     return pos, tail
 
 
-def _cage_core_numbering(mol, ring_atoms, attach):
+def _cage_core_numbering(mol, ring_atoms, attach, deco_carriers=()):
     """v28 Task 2b helper: full ``{orig_idx: int_locant}`` numbering + bare
     ``...-<fv>-yl`` tail for a von-Baeyer / bridged CAGE core (adamantane /
     tricyclo+ ...). Detaches the ring-only submol (property-tagged so the
@@ -1409,7 +1409,11 @@ def _cage_core_numbering(mol, ring_atoms, attach):
     uses, then reads BOTH the free-valence locant and every ring-atom locant off
     the single P-23 numbering (mutually consistent -> SELF-01-safe). Returns
     ``(pos, tail)`` or ``None`` on any refusal (spiro / >MAX / kekulize /
-    numbering that does not cover exactly the ring atoms)."""
+    numbering that does not cover exactly the ring atoms, or -- mirroring
+    ``_pah_core_numbering`` / ``_fused_heterocycle_core_numbering`` -- any of
+    ``[attach] + deco_carriers`` lacking a plain-int locant). Von-Baeyer
+    numbering maps every skeletal ring atom, so this guard is currently
+    latent-safe; added for defensive symmetry with the sibling numberers."""
     from rdkit import Chem
     from .vonbaeyer_universal import analyze_cage_universal
     from .polycyclic import _build_parent_with_unsaturation
@@ -1466,7 +1470,11 @@ def _cage_core_numbering(mol, ring_atoms, attach):
     for s_idx, lc in cage.atom_to_locant.items():
         if s_idx in sub_to_orig and isinstance(lc, int):
             pos[sub_to_orig[s_idx]] = lc
-    if attach not in pos:
+    # Coverage guard (M2, defensive symmetry with the PAH / fused-heterocycle
+    # numberers): every free-valence / decoration-carrier atom the composer
+    # will look up must carry a plain-int locant, else fail closed.
+    needed = [attach] + list(deco_carriers)
+    if any(a not in pos for a in needed):
         return None
     return pos, tail
 
@@ -1571,13 +1579,20 @@ def polycyclic_core_numbering(
     abstain) for every other polycyclic core class — spiro, partial-hydro fused,
     non-cataloged fusions — which stay deferred (the composer then fails closed,
     never a wrong locant).
+
+    Precondition (M3, v28 Composer #1 final review): complete/best-effort
+    tier only. The sole production caller (the recursive decoration composer
+    in ``substituent_enumerator.py``) is itself gated on ``allow_mancude`` and
+    never reaches this function with ``allow_mancude=False``; a hypothetical
+    future caller passing ``allow_mancude=False`` gets a clean ``None`` from
+    every branch below rather than a PAH numbering it did not ask for.
     """
     if attachment_atom not in set(ring_atoms):
         return None
-    res = _pah_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
-    if res is not None:
-        return res
     if allow_mancude:
+        res = _pah_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
+        if res is not None:
+            return res
         # v28 Task 2c: retained fused-HETEROCYCLE core (indole / quinoline /
         # benzimidazole / benzothiophene / purine ...) — tried BEFORE the
         # general von-Baeyer cage numberer, which would otherwise name these
@@ -1590,7 +1605,7 @@ def polycyclic_core_numbering(
             return res
         # von-Baeyer / bridged CAGE fallback (adamantane / tricyclo+ ..., and
         # any non-cataloged mancude fused system as a polyene).
-        res = _cage_core_numbering(mol, ring_atoms, attachment_atom)
+        res = _cage_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
         if res is not None:
             return res
     return None

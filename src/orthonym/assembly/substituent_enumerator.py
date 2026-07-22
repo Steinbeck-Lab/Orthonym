@@ -311,7 +311,7 @@ def _verify_completeness(mol, parent_atoms, substituents,
 
 
 def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
-    """Name any substituent fragment. Never returns None.
+    """Name any substituent fragment.
 
     Five-tier naming cascade:
       1. Retained substituent names (isopropyl, phenyl, etc.) -- IUPAC preferred
@@ -331,7 +331,16 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             of failing closed. Default False -> PIN-default byte-identical.
 
     Returns:
-        str: IUPAC prefix name (always non-None, always non-empty).
+        str: IUPAC prefix name. Under the PIN-default path
+            (``allow_mancude=False``) always non-None, always non-empty --
+            the five-tier cascade guarantees Tier 5's descriptive fallback as
+            the terminal case. Under ``allow_mancude=True`` (v28 Composer #1,
+            Tier 4.5) may return ``None``: a clean abstention when the
+            recursive decoration composer also declines and the fragment is
+            ring-bearing with no honest systematic name available -- the
+            'substituent' sentinel is de-masked to ``None`` rather than
+            shipped. Simple non-ring fragments still resolve via the
+            descriptive fallback even under ``allow_mancude=True``.
 
     References:
         IUPAC 2013 P-31.1 (detachable prefixes)
@@ -976,6 +985,14 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
 def _detach_and_name_ring_substituent(mol, frag_atoms, attach_idx,
                                        allow_mancude: bool = False):
     """Name the RING-SYSTEM CORE of a substituent fragment as a ``-yl`` token.
+
+    NOTE (v28 Composer #1 final review, I2): retained as a tested T1
+    primitive (see ``tests/unit/rules/test_v28_composer1.py``) but SUPERSEDED
+    in production by ``_recursive_fragment_substituent_name``'s own core
+    numbering (``_monocycle_position_map`` / ``polycyclic_core_numbering``),
+    which can place a DECORATION locant on the core -- something this
+    primitive's conjoined ``-yl`` token cannot carry. Not on any production
+    call path today; kept for reuse/testing.
 
     Reusable FIRST primitive for the v28 always-emit recursive substituent
     composer: locates the ring atoms within ``frag_atoms`` and routes them
