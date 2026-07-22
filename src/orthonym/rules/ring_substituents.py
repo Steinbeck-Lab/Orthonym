@@ -1711,26 +1711,47 @@ def name_ring_system_substituent(
         # carrier+ring form here under tight guards; anything more complex
         # falls through to the universal producer (status quo).
         name = _compound_ring_on_chain_substituent(
-            mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info
+            mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info,
+            allow_mancude=allow_mancude,
         )
     if not name and allow_enumerator_fallback:
         # Recursion guard: the public ``name_substituent`` cascade routes
         # ring-bearing fragments back here (Tier 1.95). When called from there,
         # the caller passes allow_enumerator_fallback=False so a decline returns
         # None instead of re-entering the cascade (no infinite loop).
+        # v28 Composer1 Task 3: thread allow_mancude so a decorated/fused core
+        # this function's own narrow producers decline (BP-3 et al.) still
+        # reaches the recursive decoration composer
+        # (``_recursive_fragment_substituent_name``) through the full cascade,
+        # instead of silently dropping back to allow_mancude=False here. Every
+        # PRE-EXISTING call site passes allow_mancude=False (or omits it), so
+        # this is a no-op for them -> byte-identical.
         from ..assembly.substituent_enumerator import name_substituent
-        name = name_substituent(mol, frag_atoms, attach_idx)
+        name = name_substituent(
+            mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
     if name and name != 'substituent' and ' ' not in name:
         return name
     return None
 
 
 def _compound_ring_on_chain_substituent(
-    mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info
+    mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info,
+    allow_mancude: bool = False,
 ) -> Optional[str]:
-    """Build '(ring-yl)alkyl' for an unbranched all-carbon carrier rooted at
-    the attachment with exactly ONE ring system hanging off it. Returns None
-    (caller falls back) whenever any guard fails — never guesses."""
+    """Build '(ring-yl)alkyl' for an unbranched carrier rooted at the
+    attachment with exactly ONE ring system hanging off it. Returns None
+    (caller falls back) whenever any guard fails — never guesses.
+
+    v28 Composer1 Task 3: when ``allow_mancude`` is True (complete/
+    best-effort engine tier only) the carrier may ALSO admit exactly ONE
+    simple, neutral, non-aromatic, divalent S/O/N atom bridging the carbon
+    carrier directly to the ring (the RING-ON-CHAIN heteroatom-carrier case,
+    e.g. ``-CH2-S-Ar`` -> ``'(arylsulfanyl)methyl'``). The ring-yl is named by
+    recursing through ``name_ring_system_substituent`` (which — with
+    ``allow_mancude`` threaded — reaches the general recursive decorated-core
+    composer for a fused/decorated ring the narrow producers decline).
+    Default False keeps every existing caller byte-identical.
+    """
     # P-29.6.2.1 (BB 16304): a substituent ON the ring (e.g. -Cl at para of a
     # benzyl's phenyl) belongs to the ring-yl name '(4-chlorophenyl)', NOT to
     # the carrier. Fold single non-H heavy atoms that hang off a ring atom (and
@@ -1800,10 +1821,25 @@ def _compound_ring_on_chain_substituent(
     # emitted as 'propyl', RT True->False).
     if attach_idx not in carrier:
         return None
+    # v28 Composer1 Task 3: admit exactly ONE simple, neutral, non-aromatic,
+    # divalent S/O/N carrier atom under allow_mancude (the PIN default keeps
+    # the ORIGINAL all-carbon-only rejection byte-identical). Anything richer
+    # (sulfoxide/sulfone O, charged/H-bearing/aromatic heteroatom, a SECOND
+    # heteroatom) is a different, richer shape and stays fail-closed here —
+    # not yet built, never guessed.
+    hetero_carrier_atom = None
     for a in carrier:
         atom = mol.GetAtomWithIdx(a)
         if atom.GetSymbol() != 'C':
-            return None
+            if (not allow_mancude or atom.GetSymbol() not in ('S', 'O', 'N')
+                    or atom.GetFormalCharge() != 0
+                    or atom.GetNumRadicalElectrons() != 0
+                    or atom.GetIsAromatic()
+                    or atom.GetDegree() != 2
+                    or atom.GetTotalNumHs() != 0
+                    or hetero_carrier_atom is not None):
+                return None
+            hetero_carrier_atom = a
         for b in atom.GetBonds():
             if (b.GetOtherAtom(atom).GetIdx() in frag_set
                     and b.GetBondTypeAsDouble() != 1.0):
@@ -1864,10 +1900,74 @@ def _compound_ring_on_chain_substituent(
         except Exception:
             return None
     ring_name = name_ring_system_substituent(
-        mol, sorted(frag_ring_atoms), ring_side_atoms[0]
+        mol, sorted(frag_ring_atoms), ring_side_atoms[0],
+        allow_mancude=allow_mancude,
     )
     if not ring_name:
         return None
+    if hetero_carrier_atom is not None:
+        # v28 Composer1 Task 3: the heteroatom-carrier shape is handled by a
+        # SEPARATE assembly path (the '{ring-yl}{connective}' compound prefix
+        # replaces what would otherwise be a bare ring-yl decoration on the
+        # carbon carrier) -- it never reaches the α-halogen citation branch or
+        # the plain-ring-yl branch below.
+        if decorations:
+            # Combined α-halogen decoration + heteroatom carrier: not this
+            # narrow class (no OPSIN-verified precedent) -> fail closed.
+            return None
+        if (ring_attach_positions[0] != len(path)
+                or path[-1] != hetero_carrier_atom):
+            # Heteroatom not directly ring-bonded (mid-chain ether/thioether)
+            # -> a different, richer shape -> fail closed.
+            return None
+        carbon_path = path[:-1]
+        if not carbon_path:
+            # Bare heteroatom directly on the parent (no methylene carrier) —
+            # a different substituent shape owned by other tiers.
+            return None
+        try:
+            from ..assembly.naming_utils import get_alkyl_name
+            hetero_alkyl = get_alkyl_name(len(carbon_path))
+        except Exception:
+            return None
+        if not hetero_alkyl:
+            return None
+        connective = {'S': 'sulfanyl', 'O': 'oxy', 'N': 'amino'}[
+            mol.GetAtomWithIdx(hetero_carrier_atom).GetSymbol()
+        ]
+        from ..assembly.naming_utils import (
+            is_complex_substituent, apply_enclosing_marks, _is_fully_enclosed,
+        )
+        if connective == 'oxy':
+            # P-63.2.1: the retained contraction 'phenoxy' for a BARE phenyl
+            # ring-yl; every other ring-yl (retained or systematic) uses the
+            # general uncontracted '{ring-yl}oxy' form (P-63.2.2.2), enclosed
+            # as a unit only if the ring-yl itself left un-self-enclosed marks
+            # inside the concatenation (mirrors
+            # ``_name_ether_substituted_chain``'s O-branch, the established
+            # convention for this exact shape elsewhere in the codebase).
+            if ring_name == 'phenyl':
+                group = 'phenoxy'
+            else:
+                _inner = (f'({ring_name})' if is_complex_substituent(ring_name)
+                          else ring_name)
+                group = f'{_inner}oxy'
+                if ('(' in group or '[' in group) and not _is_fully_enclosed(group):
+                    group = apply_enclosing_marks(group, -1)
+        else:
+            # P-16.3.3/P-29.5.2: an '{ring-yl}sulfanyl'/'{ring-yl}amino'
+            # compound prefix is ALWAYS enclosed as a unit before
+            # concatenating the carbon-carrier stem (mirrors
+            # ``_name_ether_substituted_chain``'s S-branch: '(benzylsulfanyl)',
+            # '[(methoxymethyl)sulfanyl]').
+            _inner = (apply_enclosing_marks(ring_name, -1)
+                      if is_complex_substituent(ring_name) else ring_name)
+            group = apply_enclosing_marks(f'{_inner}{connective}', -1)
+        if not group or ' ' in group:
+            return None
+        if len(carbon_path) == 1:
+            return f'{group}methyl'
+        return f'{len(carbon_path)}-{group}{hetero_alkyl}'
     try:
         from ..assembly.naming_utils import get_alkyl_name
         alkyl = get_alkyl_name(len(path))
