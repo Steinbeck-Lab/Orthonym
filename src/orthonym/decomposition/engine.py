@@ -110,7 +110,12 @@ _RETAINED_CORE_NAMES = frozenset({
     '1h-indole',
     # Phase 099 additions: fused heterocycles and polycyclics
     'flavone', 'chromone', 'coumarin', 'pteridine', 'phenazine',
-    'carbazole', 'phenanthridine', 'dibenzofuran', 'dibenzothiophene',
+    'carbazole', 'phenanthridine',
+    # v28 Cluster B: the PIN forms carry the [b,d] fusion descriptor; the exact
+    # match at :377/:425 needs them so a >25-heavy-atom core still passes the
+    # quality gate. Bare forms kept (harmless) for any legacy path.
+    'dibenzo[b,d]furan', 'dibenzo[b,d]thiophene',
+    'dibenzofuran', 'dibenzothiophene',
     'fluorene', 'fluorenone',
     'anthracene', 'phenanthrene', 'chrysene',
 })

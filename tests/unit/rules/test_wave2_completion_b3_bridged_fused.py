@@ -103,8 +103,8 @@ class TestProductionEndToEnd:
         ("c1ccc2ccccc2c1", "naphthalene"),
         ("C1Cc2cccc3cccc1c23", "acenaphthene"),
         ("c1ccc2c(c1)Cc1ccccc12", "fluorene"),
-        ("c1ccc2c(c1)oc1ccccc12", "dibenzofuran"),
-        ("c1ccc2c(c1)sc1ccccc12", "dibenzothiophene"),
+        ("c1ccc2c(c1)oc1ccccc12", "dibenzo[b,d]furan"),
+        ("c1ccc2c(c1)sc1ccccc12", "dibenzo[b,d]thiophene"),
     ])
     def test_pah_and_heterocycle_protections(self, smiles, expected):
         # The coverage-veto + aromatic-skip changes must not disturb the

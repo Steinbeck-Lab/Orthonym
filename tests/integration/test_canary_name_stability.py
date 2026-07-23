@@ -722,15 +722,15 @@ NAME_STABILITY_CANARY = [
         "CC(=O)OCC1OC(OC(=O)C)C(OC(C)=O)C(OC(C)=O)C1OC(C)=O",
         "1,2,3,4-tetrakis(acetyloxy)oxane",
     ),
-    # FIX-10: fused ring dictionary (dibenzofuran)
+    # FIX-10: fused ring dictionary (dibenzo[b,d]furan)
     (
         "c1ccc2c(c1)oc1ccccc12",
-        "dibenzofuran",
+        "dibenzo[b,d]furan",
     ),
-    # FIX-10: fused ring dictionary (dibenzothiophene)
+    # FIX-10: fused ring dictionary (dibenzo[b,d]thiophene)
     (
         "c1ccc2c(c1)sc1ccccc12",
-        "dibenzothiophene",
+        "dibenzo[b,d]thiophene",
     ),
     # FIX-10: fused ring dictionary (9H-carbazole)
     (

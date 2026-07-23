@@ -24,8 +24,8 @@ from orthonym.namer import name_compound
 @pytest.mark.unit
 class TestRingChalcogenOxide:
     @pytest.mark.parametrize("smiles,expected", [
-        ("O=S1c2ccccc2-c2ccccc21", "dibenzothiophene 5-oxide"),
-        ("O=S1(=O)c2ccccc2-c2ccccc21", "dibenzothiophene 5,5-dioxide"),
+        ("O=S1c2ccccc2-c2ccccc21", "dibenzo[b,d]thiophene 5-oxide"),
+        ("O=S1(=O)c2ccccc2-c2ccccc21", "dibenzo[b,d]thiophene 5,5-dioxide"),
         ("O=S1CCCC1", "thiolane 1-oxide"),
         ("O=S1(=O)CCCC1", "thiolane 1,1-dioxide"),
     ])
@@ -35,7 +35,7 @@ class TestRingChalcogenOxide:
     @pytest.mark.parametrize("smiles,expected", [
         ("CS(C)=O", "(methanesulfinyl)methane"),      # acyclic sulfoxide
         ("CS(C)(=O)=O", "(methanesulfonyl)methane"),  # acyclic sulfone
-        ("c1ccc2c(c1)sc1ccccc12", "dibenzothiophene"),  # bare parent
+        ("c1ccc2c(c1)sc1ccccc12", "dibenzo[b,d]thiophene"),  # bare parent (PIN descriptor)
     ])
     def test_protections(self, smiles, expected):
         assert name_compound(smiles) == expected

@@ -1276,15 +1276,15 @@ CANARY_COMPOUNDS = [
         "(2S)-1-(decanoyloxy)-3-(docosanoyloxy)propan-2-ol",
     ),
     # --- Phase 107-02 RT canary compounds ---
-    # FIX-10: fused ring dictionary (dibenzofuran) - RT validated
+    # FIX-10: fused ring dictionary (dibenzo[b,d]furan) - RT validated
     (
         "c1ccc2c(c1)oc1ccccc12",
-        "dibenzofuran",
+        "dibenzo[b,d]furan",
     ),
-    # FIX-10: fused ring dictionary (dibenzothiophene) - RT validated
+    # FIX-10: fused ring dictionary (dibenzo[b,d]thiophene) - RT validated
     (
         "c1ccc2c(c1)sc1ccccc12",
-        "dibenzothiophene",
+        "dibenzo[b,d]thiophene",
     ),
     # FIX-10: fused ring dictionary (9H-carbazole) - RT validated
     (

@@ -770,15 +770,23 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # rings (2,8-dimethyl) emerged shifted (2,7) and SELF-01-suppressed. Re-derived
     # from OPSIN extendedsmi (independently reproduced).
     'c1ccc2c(c1)oc1ccccc12': {
-        'name': 'dibenzofuran',
+        # PIN requires the fusion-locant descriptor [b,d] (P-25.3.1.3); bare
+        # 'dibenzofuran' is general/retained-style. dibenzofuran is NOT in
+        # Table 2.8 retained heterocycles, so PIN style needs the descriptor.
+        # BB verbatim: 'dibenzo[b,d]furan-1-yl (PIN)' (line 7475, 'not
+        # ...dibenzofuran'). The fixed skeleton always fuses on sides b (2,3)
+        # and d (4,5), so [b,d] is a constant of this entry.
+        'name': 'dibenzo[b,d]furan',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,
         'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9b', 4: '4a', 5: 4, 6: 5, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a'},
     },
-    # dibenzothiophene  (same skeleton, S substitutes for O at idx 6 -> identical grid)
+    # dibenzo[b,d]thiophene  (same skeleton, S substitutes for O at idx 6 -> identical grid)
+    # PIN needs the [b,d] descriptor (P-25.3.1.3); not in Table 2.8. BB verbatim
+    # 'dibenzo[b,d]thiophene] (PIN)' (line 11250).
     'c1ccc2c(c1)sc1ccccc12': {
-        'name': 'dibenzothiophene',
+        'name': 'dibenzo[b,d]thiophene',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 13,

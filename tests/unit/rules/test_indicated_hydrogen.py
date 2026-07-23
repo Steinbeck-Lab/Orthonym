@@ -35,7 +35,8 @@ class TestNewFusedHeterocycleEntries:
             f"Dibenzofuran ({can}) should be in FUSED_HETEROCYCLE_DATA"
         )
         entry = FUSED_HETEROCYCLE_DATA[can]
-        assert "dibenzofuran" in entry["name"].lower()
+        # PIN carries the fusion descriptor (v28 Cluster B, P-25.3.1.3).
+        assert entry["name"] == "dibenzo[b,d]furan"
 
     @pytest.mark.unit
     def test_dibenzothiophene_in_dictionary(self):
@@ -46,7 +47,8 @@ class TestNewFusedHeterocycleEntries:
             f"Dibenzothiophene ({can}) should be in FUSED_HETEROCYCLE_DATA"
         )
         entry = FUSED_HETEROCYCLE_DATA[can]
-        assert "dibenzothiophene" in entry["name"].lower()
+        # PIN carries the fusion descriptor (v28 Cluster B, P-25.3.1.3).
+        assert entry["name"] == "dibenzo[b,d]thiophene"
 
     @pytest.mark.unit
     def test_benzo_f_quinoline_in_dictionary(self):
