@@ -165,3 +165,44 @@ def test_uide_atom_drop_veto_boranuide():
     guard)."""
     raw = Orthonym(_disable_opsin_validity_gate=True)
     assert raw.name("[B-](CCO)(C)(C)C") != "ethyltrimethylboranuide"
+
+
+# === v28 Cluster A Fix 1: azido/diazo are NOT cumulative zwitterions =========
+# P-61.7: the -N=[N+]=[N-] azide group is a NEUTRAL internal-charge (P-59
+# Table 5.1) prefix group named 'azido' by substitutive nomenclature — NOT a
+# P-74.1.1 same-parent '-ium…-ide' zwitterion. emit_cumulative_ium_ide must
+# decline (return None) for any azide/diazo so dispatch cascades to the neutral
+# azido-prefix / acyl-azide handlers, while genuine cumulative zwitterions
+# (single-bond hydrazinium/triazenium, dioxidane) still name.
+
+from orthonym.rules.ions import emit_cumulative_ium_ide  # noqa: E402
+
+
+class TestAzidoNotCumulativeZwitterion:
+    @pytest.mark.parametrize("smi", [
+        "[N-]=[N+]=Nc1ccccc1",  # azidobenzene
+        "CN=[N+]=[N-]",          # azidomethane
+        "CCCC(=O)N=[N+]=[N-]",   # butanoyl azide (acyl azide)
+        "C=[N+]=[N-]",           # diazomethane (diazo, also internal-charge)
+    ])
+    def test_azide_declines_emitter(self, smi):
+        # The +/- pair belongs to a neutral internal-charge group -> decline.
+        assert emit_cumulative_ium_ide(Chem.MolFromSmiles(smi)) is None
+
+    @pytest.mark.parametrize("smi", [
+        "C[N-][N+](C)(C)C",   # 1,2,2,2-tetramethylhydrazin-2-ium-1-ide (N-N single)
+        "C[N+]([N-]C)=NC",    # 1,2,3-trimethyltriaz-2-en-2-ium-1-ide
+        "C[N-][N+](=C)C",     # 1,2-dimethyl-2-methylidenehydrazin-2-ium-1-ide
+        "CC(C)=[O+][O-]",     # 2-(propan-2-ylidene)dioxidan-2-ium-1-ide (O chain)
+    ])
+    def test_genuine_zwitterion_still_emitted(self, smi):
+        # These are NOT internal-charge groups -> the emitter still fires.
+        assert emit_cumulative_ium_ide(Chem.MolFromSmiles(smi)) is not None
+
+    @pytest.mark.parametrize("smi,expected", [
+        ("[N-]=[N+]=Nc1ccccc1", "azidobenzene"),   # P-61.7 (PIN)
+        ("CN=[N+]=[N-]", "azidomethane"),           # P-66.4.1
+        ("CCCC(=O)N=[N+]=[N-]", "butanoyl azide"),  # P-65.5.2.1 acyl azide
+    ])
+    def test_azide_full_name(self, smi, expected):
+        assert Orthonym().name(smi) == expected

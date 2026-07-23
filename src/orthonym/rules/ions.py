@@ -3975,6 +3975,19 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
     if element != an.GetSymbol() or element not in _HETEROCHAIN_ELEMENTS:
         return None
 
+    # P-61.7 / P-59 Table 5.1: when the +/- pair belongs to a NEUTRAL
+    # internal-charge prefix group (azide -N=[N+]=[N-], diazo, nitro, N-oxide),
+    # the charges are bonding features, NOT a P-74.1.1 cumulative same-parent
+    # zwitterion. Decline so dispatch cascades to the neutral substitutive path
+    # (azido prefix / acyl-azide functional-class). Without this, an azide's
+    # central N+ / terminal N- were mis-read as a triaz-…-ium-…-ide zwitterion
+    # ('3-phenyltriaz-1,2-dien-2-ium-1-ide' for azidobenzene). Local import
+    # avoids a rules.ions <-> perception.ions load-order cycle.
+    from ..perception.ions import _get_internal_charge_atoms
+    _internal = _get_internal_charge_atoms(mol)
+    if cat.GetIdx() in _internal or an.GetIdx() in _internal:
+        return None
+
     # --- Build the homogeneous parent-hydride chain (all `element` atoms linked
     # by element-element bonds, reachable from the cation). ---
     chain_set = set()
