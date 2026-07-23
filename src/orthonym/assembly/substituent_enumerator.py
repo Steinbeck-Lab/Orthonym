@@ -1144,6 +1144,31 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
     return best
 
 
+def _borrow_heteroarene_stem(mol, core, attach_idx):
+    """v28 tranche T1: extract the numbering-INDEPENDENT ring-skeleton stem
+    (e.g. ``'1,2-oxazol'``) from the authoritative ``get_ring_substituent_name``
+    output for the BARE core, or ``None``.
+
+    Only the stem is borrowed; the free-valence and decoration locants are
+    (re)cited by the caller on the recursion's own numbering. Used when the small
+    ``_PIN_HETEROARYL_STEMS`` table lacks a systematic azole that the dispatcher
+    can name (isoxazole/oxazole/thiazole/triazole...). Fail-closed (``None``) for
+    a multi-word or non ``{stem}-<loc>-yl`` shape.
+    """
+    import re
+    from ..rules.ring_substituents import get_ring_substituent_name
+    try:
+        bare = get_ring_substituent_name(mol, tuple(sorted(core)), attach_idx)
+    except Exception:
+        return None
+    if not bare or ' ' in bare:
+        return None
+    m = re.match(r'^(?:\d+H-)?(?P<stem>.+?)-\d+-yl$', bare)
+    if not m:
+        return None
+    return m.group('stem')
+
+
 def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
     """Build the bare monocyclic ring-substituent tail (``phenyl`` /
     ``pyridin-3-yl`` / ``cyclohexyl`` / ``1H-pyrrol-2-yl`` ...) using the PIN
@@ -1191,6 +1216,18 @@ def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
         if len(n_idx) == 2 and mol.GetBondBetweenAtoms(
                 n_idx[0], n_idx[1]) is not None:
             stem = 'pyrazol'
+    if stem is None:
+        # v28 tranche T1 (resolves Composer #1 I1 duplication): the small
+        # `_PIN_HETEROARYL_STEMS` table does not cover the systematic azoles
+        # (isoxazole/oxazole/thiazole/triazole...) that `identify_ring_system`
+        # reports as None. The authoritative dispatcher `get_ring_substituent_name`
+        # names those via its retained/Hantzsch-Widman path. Borrow its
+        # numbering-INDEPENDENT ring-skeleton stem here and re-cite the free
+        # valence (+ the caller's decorations) on THIS recursion's own numbering.
+        # This function is reached ONLY from the allow_mancude-gated
+        # `_recursive_fragment_substituent_name`, so the PIN default is byte-
+        # identical; a wrong stem is caught downstream by SELF-01.
+        stem = _borrow_heteroarene_stem(mol, core, attach_idx)
     if stem is None:
         return None
     ih = [i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
