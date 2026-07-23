@@ -117,7 +117,19 @@ RETAINED_NAMES = {
     "c1cnsc1": "1,2-thiazole",  # PIN (was 'isothiazole')
     "c1ccsn1": "1,2-thiazole",  # Alternate input form
     "c1nnn[nH]1": "1H-tetrazole",  # this tautomer = 1H- (OPSIN-RT verified)
-    
+    # 5-membered heteroarenes with THREE heteroatoms (>=1 N): Hantzsch-Widman
+    # PINs (P-25.2.1; furazan is general-only, PIN = 1,2,5-oxadiazole per
+    # P-31.1.4.2.4 / BlueBookV2 line 14717). No indicated H (all ring N are
+    # pyridine-type). Each key is canonical(OPSIN(name)) => bare name AND the
+    # free-valence substituent locant round-trip (v28 T2, OPSIN-RT verified).
+    "c1ncon1": "1,2,4-oxadiazole",
+    "c1nnco1": "1,3,4-oxadiazole",
+    "c1cnon1": "1,2,5-oxadiazole",
+    "c1csnn1": "1,2,3-thiadiazole",
+    "c1ncsn1": "1,2,4-thiadiazole",
+    "c1cnsn1": "1,2,5-thiadiazole",
+    "c1nncs1": "1,3,4-thiadiazole",
+
     # === 6-MEMBERED AROMATIC HETEROCYCLES ===
     "c1ccncc1": "pyridine",
     "c1ccnnc1": "pyridazine",

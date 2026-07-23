@@ -2392,8 +2392,8 @@ def _get_polycyclic_attachment_locant(
             return path
 
         neighbors_of_start = ring_adj[start_atom]
-        best_path = None
         best_het_locants = None
+        best_attach_locant = None
 
         for next_atom in neighbors_of_start:
             path = _traverse_ring(start_atom, next_atom, ring_adj, len(ring_atoms))
@@ -2403,12 +2403,27 @@ def _get_polycyclic_attachment_locant(
             het_locs = tuple(sorted(
                 path.index(hi) + 1 for hi in het_indices if hi != start_atom
             ))
-            if best_het_locants is None or het_locs < best_het_locants:
+            if attachment_atom not in path:
+                continue
+            attach_locant = path.index(attachment_atom) + 1  # 1-indexed
+            # Lowest heteroatom locants fix the ring numbering; among numberings
+            # TIED on that (a symmetric ring has two equivalent directions), the
+            # free valence takes the LOWEST locant it can (P-31.1.4.3.4 free-
+            # valence lowest-locant rule). Previously the first tied direction
+            # won, yielding a non-lowest locant for symmetric heteroarenes
+            # (1,3,4-oxadiazol-5-yl instead of -2-yl). Because all tied
+            # numberings describe the SAME atom equivalences, choosing the lower
+            # attachment locant can never change the constitution — it only
+            # lowers a locant, never mis-places the free valence.
+            if (best_het_locants is None
+                    or het_locs < best_het_locants
+                    or (het_locs == best_het_locants
+                        and attach_locant < best_attach_locant)):
                 best_het_locants = het_locs
-                best_path = path
+                best_attach_locant = attach_locant
 
-        if best_path and attachment_atom in best_path:
-            return best_path.index(attachment_atom) + 1  # 1-indexed
+        if best_attach_locant is not None:
+            return best_attach_locant
 
     # Fallback: canonical atom order within the ring system. ONLY valid for
     # monocyclic fragments (any rotation is a legal numbering start there up
