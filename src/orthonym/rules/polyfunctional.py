@@ -361,12 +361,27 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
             or multiplier.endswith("kis"))
 
     if not locants:
-        # No locants - just return prefix with multiplier if needed
+        # No locants (mononuclear parent, locant '1' omitted per P-14.3.4.2) —
+        # a COMPOUND prefix must STILL be enclosed per P-16.3.3, else the name
+        # is ambiguous ('methoxy(methylsulfanyl)methane', NOT the run-together
+        # 'methoxymethylsulfanylmethane'). Mirror the locant path's compound
+        # detection; simple prefixes (methoxy/methyl/chloro) stay bare -> the
+        # single-simple-prefix case is byte-identical.
+        _partially_enclosed = (
+            (')' in prefix_form or ']' in prefix_form)
+            and not (prefix_form.startswith(('(', '['))
+                     and prefix_form.endswith((')', ']')))
+        )
+        _compound_nl = needs_brackets(prefix_form) or _partially_enclosed
         if count > 1:
             multiplier = get_multiplier_prefix(count, prefix_form)
             if _is_derived(multiplier) and not prefix_form.startswith(("(", "[")):
                 return f"{multiplier}({prefix_form})"
+            if _compound_nl:
+                return f"{multiplier}{apply_enclosing_marks(prefix_form, -1)}"
             return f"{multiplier}{prefix_form}"
+        if _compound_nl:
+            return apply_enclosing_marks(prefix_form, -1)
         return prefix_form
 
     # Format locants
