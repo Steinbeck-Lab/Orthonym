@@ -149,6 +149,13 @@ class TestDemoteNonPinTrivials:
         carbonyl dichloride (P-65.5.5.1)."""
         assert name_compound("ClC(=O)Cl", style="pin") == "carbonyl dichloride"
 
+    def test_picric_acid_is_trinitrophenol_pin(self):
+        """'picric acid' is retained for general nomenclature only and only when
+        unsubstituted (P-63.1.1.2); the PIN is the systematic 2,4,6-trinitrophenol.
+        styphnic acid (a different structure) is unaffected by the name-keyed deny."""
+        assert (name_compound("Oc1c([N+](=O)[O-])cc([N+](=O)[O-])cc1[N+](=O)[O-]",
+                              style="pin") == "2,4,6-trinitrophenol")
+
 
 @pytest.mark.unit
 class TestDemotedTrivialsAreDenied:
@@ -162,6 +169,7 @@ class TestDemotedTrivialsAreDenied:
             "glycerol", "allyl alcohol", "chloroform", "phosgene",
             "catechol", "nicotinic acid", "dihydroxalate",
             "dihydrotartrate", "glyoxal",
+            "picric acid",  # v28 Cluster B (P-63.1.1.2): PIN is 2,4,6-trinitrophenol
         }
         present = {v for v in ALL_RETAINED_NAMES.values()
                    if v.lower() in demoted}
