@@ -2731,10 +2731,11 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
     partially-decorated name would be structurally wrong).
 
     v1 table (per the WS-A.2 flip-population scope — covers the head of the
-    distribution): oxo, cyano, halogen, hydroxy, methoxy/simple n-alkoxy,
-    amino (-NH2), nitro, unbranched pure alkyl. Deliberately NOT supported
-    (guard out): esters/amides/acyl, sulfonyl, nested ring substituents,
-    branched alkyl, anything charged or exotic.
+    distribution): oxo, cyano, carboxy, halogen, hydroxy, methoxy/simple
+    n-alkoxy, amino (-NH2), nitro, unbranched pure alkyl, and (v28 Cluster D,
+    P-65.6.3) simple alkyl esters -> alkoxycarbonyl prefix. Deliberately NOT
+    supported (guard out): amides/acyl, aryl/branched-alkyl esters, sulfonyl,
+    nested ring substituents, branched alkyl, anything charged or exotic.
     """
     _HAL = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
     _ALKYL = {1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl',

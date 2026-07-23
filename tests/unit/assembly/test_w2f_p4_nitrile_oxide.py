@@ -5,11 +5,11 @@ BB P-66.5.4.1 (BlueBookV2.md:34864): R-C#NO 'nitrile oxides' are named by method
 Examples: 'benzonitrile oxide' (34876), 'acetonitrile oxide' (43285). Nitrile
 oxides are classed with zwitterions, so they are senior to esters/acids.
 
-FAIL-CLOSED (v1): the BB ester PIN '4-(methoxycarbonyl)benzonitrile oxide' (34893)
-needs the aromatic-benzene forced-nitrile fix AND enclosing marks for the
-'(methoxycarbonyl)' compound prefix (P-16.3.3) — general follow-ons. The handler
-declines (never a wrong name); production SELF-01 suppresses the residual to
-'unknown organic compound'.
+v28 Cluster D: the BB ester PIN '4-(methoxycarbonyl)benzonitrile oxide' (34893)
+is now BUILT — the aromatic-benzene forced-nitrile fix (_assemble_ring_nitrile_name
+delegates aromatic benzene rings to the benzonitrile assembler) plus the
+'(methoxycarbonyl)' enclosing marks (P-16.3.3) landed. The acid variant still
+fails closed (the forced-nitrile override does not demote carboxylic_acid).
 
 Under pytest the OPSIN validity gate is disabled (conftest autouse); the positive
 cases below emit the correct name regardless (verified RT-clean with the gate ON),
@@ -57,17 +57,14 @@ class TestNitrileOxide:
     def test_fused_arene(self):
         assert orthonym.name_compound("c1ccc2cc(C#[N+][O-])ccc2c1", style="pin") == "naphthalene-2-carbonitrile oxide"
 
-    def test_ester_fails_closed(self):
-        # BB PIN 4-(methoxycarbonyl)benzonitrile oxide is a buildable follow-on
-        # (aromatic-benzene forced-nitrile fix + (methoxycarbonyl) enclosing marks).
-        # The predicate matches (it IS a nitrile oxide) but the handler DECLINES
-        # (aromatic benzene ring mis-named as cyclohexane) -> no wrong name.
+    def test_ester_names_correctly(self):
+        # v28 Cluster D: BB:34893 verbatim PIN. The senior nitrile oxide demotes
+        # the ester to the '(methoxycarbonyl)' prefix (P-65.6.3, enclosed P-16.3.3);
+        # the aromatic benzene ring is named as a benzonitrile, not cyclohexane.
         mol = Chem.MolFromSmiles("COC(=O)C1=CC=C(C#[N+][O-])C=C1")
-        feat = _Feat(mol)
-        assert _is_nitrile_oxide(feat) is True
-        assert name_nitrile_oxide(feat, mol=mol) is None
-        out = orthonym.name_compound("COC(=O)C1=CC=C(C#[N+][O-])C=C1", style="pin")
-        assert "oxide" not in (out or "")
+        assert _is_nitrile_oxide(_Feat(mol)) is True
+        assert (orthonym.name_compound("COC(=O)C1=CC=C(C#[N+][O-])C=C1", style="pin")
+                == "4-(methoxycarbonyl)benzonitrile oxide")
 
     def test_acid_fails_closed(self):
         # nitrile oxide is senior to the acid, but the forced-nitrile override does

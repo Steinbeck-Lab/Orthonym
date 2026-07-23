@@ -85,3 +85,23 @@ class TestD3RingEsterAlkoxycarbonyl:
     ])
     def test_ring_substituent_regressions(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+class TestD4AromaticNitrileOxide:
+    """A neutral aromatic nitrile oxide bearing a co-substituent is named by
+    functional-class method (1): '<benzonitrile> oxide' (P-66.5.4.2), with the
+    senior nitrile oxide demoting a co-present ester to the methoxycarbonyl
+    prefix (P-65.6.3), enclosed per P-16.3.3."""
+
+    def test_methoxycarbonyl_benzonitrile_oxide(self):
+        # BB:34893 verbatim PIN (rejects 'methyl 4-...benzoate').
+        assert (name_compound("COC(=O)C1=CC=C(C#[N+][O-])C=C1")
+                == "4-(methoxycarbonyl)benzonitrile oxide")
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # unsubstituted / simple nitrile oxides must be UNCHANGED.
+        ("[O-][N+]#Cc1ccccc1", "benzonitrile oxide"),
+        ("CC#[N+][O-]", "acetonitrile oxide"),
+    ])
+    def test_simple_nitrile_oxides_unchanged(self, smiles, expected):
+        assert name_compound(smiles) == expected

@@ -6115,6 +6115,63 @@ def _assemble_polyamine_name(
     return f"{prefix_part}{base_name}"
 
 
+def _assemble_aromatic_benzonitrile(mol, principal_ring, nitrile_atoms):
+    """v28 Cluster D (P-66.5.4.2): name an aromatic benzene ring bearing a nitrile
+    as a substituted benzonitrile ('benzonitrile', '4-methylbenzonitrile',
+    '4-(methoxycarbonyl)benzonitrile'), delegating to the benzene assembler.
+
+    Returns the name, or None (fail closed) if the nitrile ring-carbon cannot be
+    located or ANY ring substituent is outside the supported table — the caller
+    then falls back to the saturated cyclo path (which itself fails closed).
+    """
+    from ..rules.benzene import _name_substituted_benzonitrile
+    from ..rules.ring_substituents import _ring_atom_simple_substituents
+    from .naming_utils import apply_enclosing_marks
+
+    ring_set = set(principal_ring)
+    nitrile_set = set(nitrile_atoms)
+    # The nitrile carbon (the C of C#N) is the group atom bonded to a ring atom;
+    # the ring atom it attaches to is position 1 of the benzonitrile.
+    nitrile_rc = None
+    for na in nitrile_atoms:
+        for nb in mol.GetAtomWithIdx(na).GetNeighbors():
+            if nb.GetIdx() in ring_set:
+                nitrile_rc = nb.GetIdx()
+                break
+        if nitrile_rc is not None:
+            break
+    if nitrile_rc is None:
+        return None
+
+    oriented_ring = list(principal_ring)
+    atom_to_locant = {atom: i + 1 for i, atom in enumerate(oriented_ring)}
+
+    def _is_compound_prefix(nm: str) -> bool:
+        # A compound substituent prefix (formed by substitution, e.g. the
+        # alkoxycarbonyl family) is enclosed even as a bare word (P-16.3.3);
+        # simple table prefixes (methyl/chloro/methoxy/nitro/...) are not.
+        return nm.endswith('oxycarbonyl') or any(c in nm for c in '-()[]0123456789')
+
+    substituent_groups: Dict[str, List[int]] = defaultdict(list)
+    for ra in principal_ring:
+        if ra == nitrile_rc:
+            continue  # the nitrile itself is the parent group, not a prefix
+        found = _ring_atom_simple_substituents(mol, ra, ring_set, nitrile_set)
+        if found is None:
+            return None  # unsupported exocyclic group -> fail closed
+        prefixes, _covered = found
+        for p in prefixes:
+            rendered = apply_enclosing_marks(p, -1) if _is_compound_prefix(p) else p
+            substituent_groups[rendered].append(atom_to_locant[ra])
+
+    if not substituent_groups:
+        return "benzonitrile"
+    return _name_substituted_benzonitrile(
+        dict(substituent_groups), atom_to_locant[nitrile_rc],
+        atom_to_locant, oriented_ring,
+    )
+
+
 def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
     """
     Assemble name for ring-attached nitriles (use -carbonitrile suffix).
@@ -6142,6 +6199,33 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
 
     ring_size = len(principal_ring)
 
+    # Get nitrile atoms to exclude from substituent discovery
+    nitrile_atoms = None
+    exclude_atoms = set()
+    if features.principal_group_atoms:
+        nitrile_atoms = features.principal_group_atoms[0]
+        if nitrile_atoms:
+            exclude_atoms = set(nitrile_atoms)
+
+    # v28 Cluster D (P-66.5.4.2): an AROMATIC benzene principal ring bearing a
+    # (forced) nitrile is a BENZONITRILE, not a saturated cyclohexanecarbonitrile.
+    # This path is reached via the polyfunctional forced-nitrile route (e.g. the
+    # nitrile_oxide handler re-entry on '4-(methoxycarbonyl)benzonitrile oxide',
+    # where a co-present ester makes the molecule polyfunctional and bypasses the
+    # benzene handler). Delegate to the benzene substituted-nitrile assembler so
+    # the parent, the nitrile=1 renumbering, and any compound prefix
+    # (methoxycarbonyl, enclosed per P-16.3.3) are correct. Fail closed to the
+    # saturated cyclo path when any ring substituent is not fully nameable.
+    if (ring_size == 6 and nitrile_atoms
+            and all(features.mol.GetAtomWithIdx(a).GetIsAromatic()
+                    and features.mol.GetAtomWithIdx(a).GetAtomicNum() == 6
+                    for a in principal_ring)):
+        _benzo = _assemble_aromatic_benzonitrile(
+            features.mol, principal_ring, nitrile_atoms
+        )
+        if _benzo is not None:
+            return _benzo
+
     try:
         stem = get_chain_prefix(ring_size)
     except (ValueError, KeyError):
@@ -6151,14 +6235,6 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
         return "carbonitrile"  # Guard against empty stem producing 'cycloane'
 
     parent_name = f"cyclo{stem}ane"
-
-    # Get nitrile atoms to exclude from substituent discovery
-    nitrile_atoms = None
-    exclude_atoms = set()
-    if features.principal_group_atoms:
-        nitrile_atoms = features.principal_group_atoms[0]
-        if nitrile_atoms:
-            exclude_atoms = set(nitrile_atoms)
 
     # Build the base nitrile name (ring + carbonitrile)
     if nitrile_atoms:
