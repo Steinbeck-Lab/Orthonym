@@ -336,6 +336,21 @@ def get_anion_name(smiles: str, pin: bool = False) -> Optional[str]:
     return None
 
 
+# v28 Cluster C (P-73.1.2.1): the alkyl/dialkyl/trialkyl(/tetraalkyl)-ammonium
+# retained names are GENERAL nomenclature only, NOT preferred IUPAC names -- the
+# PIN is the substitutive aminium (methylammonium -> methanaminium; dimethyl-
+# ammonium -> N-methylmethanaminium; tetramethylammonium -> N,N,N-trimethyl-
+# methanaminium). BB: line 26672 'methanaminium chloride (PIN)' over 'methyl-
+# azanium'; line 41354 '(CH3)4N+ ... N,N,N-trimethylmethanaminium (PIN)' over
+# 'tetramethylammonium'. On the PIN path these keys are denied so the systematic
+# route_charged aminium name wins; they remain available for general/common style.
+# 'ammonium' (NH4+) IS a genuine retained PIN and is deliberately NOT listed.
+PIN_NONPREFERRED_CATIONS = frozenset({
+    'C[NH3+]', 'CC[NH3+]', 'CCC[NH3+]', 'C[NH2+]C', 'CC[NH2+]CC',
+    'C[NH+](C)C', 'C[N+](C)(C)C', 'CC[N+](CC)(CC)CC',
+})
+
+
 def get_cation_name(smiles: str) -> Optional[str]:
     """
     Look up retained name for a cation by its SMILES.

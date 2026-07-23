@@ -206,3 +206,23 @@ class TestAzidoNotCumulativeZwitterion:
     ])
     def test_azide_full_name(self, smi, expected):
         assert Orthonym().name(smi) == expected
+
+
+class TestAlkylammoniumAminiumPIN:
+    """v28 Cluster C (P-73.1.2.1): protonated/alkylated amine cations take the
+    substitutive '-aminium' PIN, NOT the general 'alkylammonium' retained name.
+    BB: 'methanaminium chloride (PIN)' (26672), 'N,N,N-trimethylmethanaminium
+    (PIN)' over 'tetramethylammonium' (41354). NH4+ stays the retained PIN
+    'ammonium'."""
+
+    @pytest.mark.parametrize("smi,expected", [
+        ("C[NH3+]", "methanaminium"),
+        ("CC[NH3+]", "ethanaminium"),
+        ("CCC[NH3+]", "propan-1-aminium"),
+        ("C[NH2+]C", "N-methylmethanaminium"),
+        ("C[NH+](C)C", "N,N-dimethylmethanaminium"),
+        ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),
+        ("[NH4+]", "ammonium"),  # genuine retained PIN, not denied
+    ])
+    def test_aminium_pin(self, smi, expected):
+        assert Orthonym().name(smi) == expected

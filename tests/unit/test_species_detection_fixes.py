@@ -134,11 +134,12 @@ class TestNoSuitableAtomGuard:
         assert 'ammonium' in result
 
     def test_methylammonium_cation(self):
-        """Methylamine cation should return name with 'ammonium'."""
+        """Methylamine cation names successfully. v28 Cluster C: the PIN is the
+        substitutive 'methanaminium' (P-73.1.2.1); the 'ammonium' retained form
+        is general/common style only."""
         mol = Chem.MolFromSmiles('C[NH3+]')
-        result = name_cation(mol)
-        assert result
-        assert 'ammonium' in result
+        assert name_cation(mol) == 'methanaminium'
+        assert 'ammonium' in name_cation(mol, style='common')
 
     def test_non_amine_cation_no_crash(self):
         """Non-amine cation naming should not crash."""

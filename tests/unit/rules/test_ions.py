@@ -243,23 +243,31 @@ class TestNameCation:
         name = name_cation(mol)
         assert name == 'ammonium'
 
-    def test_methylammonium_retained(self):
-        """Methylammonium should use retained name."""
+    def test_methylammonium_pin_is_methanaminium(self):
+        """v28 Cluster C (P-73.1.2.1): 'methylammonium' is general nomenclature
+        only; the PIN is the substitutive 'methanaminium' (BB line 26672). The
+        retained name stays available for general/common style."""
         mol = Chem.MolFromSmiles('C[NH3+]')
-        name = name_cation(mol)
-        assert name == 'methylammonium'
+        assert name_cation(mol) == 'methanaminium'            # default = pin
+        assert name_cation(mol, style='common') == 'methylammonium'
 
-    def test_tetramethylammonium_retained(self):
-        """Tetramethylammonium should use retained name."""
+    def test_tetramethylammonium_pin_is_trimethylmethanaminium(self):
+        """(CH3)4N+ PIN is N,N,N-trimethylmethanaminium (BB line 41354);
+        'tetramethylammonium' is general only."""
         mol = Chem.MolFromSmiles('C[N+](C)(C)C')
-        name = name_cation(mol)
-        assert name == 'tetramethylammonium'
+        assert name_cation(mol) == 'N,N,N-trimethylmethanaminium'
+        assert name_cation(mol, style='common') == 'tetramethylammonium'
 
-    def test_ethylammonium_retained(self):
-        """Ethylammonium should use retained name."""
+    def test_ammonium_stays_retained_pin(self):
+        """NH4+ 'ammonium' IS a genuine retained PIN -- not denied."""
+        assert name_cation(Chem.MolFromSmiles('[NH4+]')) == 'ammonium'
+
+    def test_ethylammonium_pin_is_ethanaminium(self):
+        """v28 Cluster C: PIN is 'ethanaminium' (P-73.1.2.1); the general
+        'ethylammonium' retained name stays for common style."""
         mol = Chem.MolFromSmiles('CC[NH3+]')
-        name = name_cation(mol)
-        assert name == 'ethylammonium'
+        assert name_cation(mol) == 'ethanaminium'
+        assert name_cation(mol, style='common') == 'ethylammonium'
 
     def test_methylium_retained(self):
         """Methylium should use retained name."""
@@ -763,12 +771,12 @@ class TestSUB01ChargeAwareNaming:
         # RESEARCH gotcha: phenylmethylium, NOT benzylium, NOT heptylium.
         assert name == "phenylmethylium"
 
-    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): 'methylammonium' is RT-correct general nomenclature; the PIN 'methanaminium' needs fragment-namer (name_fragment_recursively 'methylamine'->'methanamine') changes outside SUB-01 charge scope.", strict=False)
     def test_methanaminium(self):
-        name = name_compound("C[NH3+]")
-        # P-73 PIN: methanaminium (from methanamine). 'methylammonium' is the
-        # RT-correct general-nomenclature form Orthonym emits today.
-        assert "methanaminium" in name
+        # RESOLVED v28 Cluster C (was xfail): the general-only 'methylammonium'
+        # retained name is denied on the PIN path (P-73.1.2.1) so the systematic
+        # aminium PIN 'methanaminium' is emitted. 'methylammonium' stays for
+        # general/common style.
+        assert name_compound("C[NH3+]") == "methanaminium"
 
     def test_azide_keeps_azido_prefix(self):
         # SUB-01/C2 Plan 02: azido SMARTS fixed -> the azide is no longer dropped.

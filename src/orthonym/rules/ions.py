@@ -21,7 +21,9 @@ from typing import Dict, List, Optional, Any, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
-from ..data.ion_retained_names import get_anion_name, get_cation_name
+from ..data.ion_retained_names import (
+    get_anion_name, get_cation_name, PIN_NONPREFERRED_CATIONS,
+)
 from ..perception.ions import get_ion_sites
 
 
@@ -952,10 +954,15 @@ def name_cation(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = 
     # Get canonical SMILES for lookup
     canonical = Chem.MolToSmiles(mol, canonical=True)
 
-    # Check retained names first (unless systematic requested)
+    # Check retained names first (unless systematic requested). v28 Cluster C
+    # (P-73.1.2.1): on the PIN path skip the general-only alkylammonium retained
+    # names so the systematic aminium PIN (methanaminium, ...) from route_charged
+    # wins; they stay available for general/common style. 'ammonium' (NH4+) is a
+    # genuine retained PIN and is not in PIN_NONPREFERRED_CATIONS.
     if style != 'systematic':
         retained = get_cation_name(canonical)
-        if retained:
+        if retained and not (style == 'pin'
+                             and canonical in PIN_NONPREFERRED_CATIONS):
             return retained
 
     # If only checking retained names, return None to signal fall-through
