@@ -739,6 +739,11 @@ class TestHeteroarenePCGLowestLocant:
         # two fixed heteroatoms (isoxazole O=1,N=2): numbering fully fixed,
         # PCG tie never arises -> unchanged
         ("Cc1cc(no1)C(=O)O", "5-methyl-1,2-oxazole-3-carboxylic acid"),
+        # protect W6B-LOCK: an exocyclic -CH2OH is a (hydroxymethyl) PREFIX, NOT
+        # a ring-appended -ol suffix -> CASE A must NOT anchor its sp3 ring carbon,
+        # so the ring -ol pentol keeps the lowest locants {2,3,4,5,6}. (The CASE-A
+        # anchor is gated on a characteristic C=O/C#N multiple bond.)
+        ("OCC1OC(O)C(O)C(O)C(O)C1O", "7-(hydroxymethyl)oxepane-2,3,4,5,6-pentol"),
     ])
     def test_no_regression(self, smiles, expected):
         assert name_compound(smiles) == expected

@@ -3589,9 +3589,30 @@ class Orthonym:
                                     # unifying this with the cycloalkane twin +
                                     # general_engine + parent-selection is a
                                     # tracked follow-up.)
+                                    # NARROW (protect W6B-LOCK): anchor ONLY a
+                                    # genuine C-APPENDED suffix -- the ring-bonded
+                                    # match carbon must carry a characteristic
+                                    # MULTIPLE bond to a non-carbon match atom
+                                    # (C=O aldehyde/acid/amide, C#N nitrile). The
+                                    # SEN-03 same-prefix union also admits an
+                                    # exocyclic -CH2OH / -CH2NH2 whose ring-bonded
+                                    # carbon is sp3 single-bonded: that is a
+                                    # (hydroxymethyl)/(aminomethyl) PREFIX, not a
+                                    # ring-appended -ol/-amine suffix, so it must
+                                    # NOT be anchored (else the oxepane pentol
+                                    # loses the lowest locants to the hydroxymethyl
+                                    # carbon -- protect W6B-LOCK regression).
                                     for atom_idx in match:
                                         atom = features.mol.GetAtomWithIdx(atom_idx)
                                         if atom.GetSymbol() != 'C':
+                                            continue
+                                        _is_suffix_c = any(
+                                            b.GetBondTypeAsDouble() > 1.0
+                                            and b.GetOtherAtom(atom).GetIdx() in match_set
+                                            and b.GetOtherAtom(atom).GetSymbol() != 'C'
+                                            for b in atom.GetBonds()
+                                        )
+                                        if not _is_suffix_c:
                                             continue
                                         for nbr in atom.GetNeighbors():
                                             if nbr.GetIdx() in ring_set:
