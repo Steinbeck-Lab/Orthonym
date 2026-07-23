@@ -3564,6 +3564,39 @@ class Orthonym:
                                 continue
                             for match in _matches:
                                 match_set = set(match)
+                                if not (match_set & ring_set):
+                                    # CASE A (twin of the cycloalkane branch
+                                    # below, ~3627): a WHOLLY-EXOCYCLIC appended
+                                    # suffix (-carboxylic acid, -carbaldehyde,
+                                    # -carbonitrile, -carboxamide, ...). The
+                                    # entire FG match lies OFF the ring, so the
+                                    # CASE-B ring-C-bonded-heteroatom test never
+                                    # fires and pg_ring_atoms stayed empty --
+                                    # the ring-direction tie for a symmetric-
+                                    # heteroatom ring (furan/thiophene/pyrrole)
+                                    # was then broken arbitrarily by canonical
+                                    # rank, giving the suffix the HIGHER locant
+                                    # (2-methylfuran-5-carboxylic acid). The
+                                    # expressed-suffix ANCHOR is the ring atom
+                                    # bonded to the match carbon; per P-14.4(c)
+                                    # it takes the lowest locant BEFORE the
+                                    # detachable prefix (5-methylfuran-2-
+                                    # carboxylic acid). Same-prefix (SEN-03)
+                                    # scoping is inherited from the enclosing
+                                    # loop, so only principal-group-class
+                                    # suffixes are anchored. (A shared helper
+                                    # unifying this with the cycloalkane twin +
+                                    # general_engine + parent-selection is a
+                                    # tracked follow-up.)
+                                    for atom_idx in match:
+                                        atom = features.mol.GetAtomWithIdx(atom_idx)
+                                        if atom.GetSymbol() != 'C':
+                                            continue
+                                        for nbr in atom.GetNeighbors():
+                                            if nbr.GetIdx() in ring_set:
+                                                pg_ring_atoms.add(nbr.GetIdx())
+                                                break
+                                    continue
                                 for atom_idx in match:
                                     if atom_idx not in ring_set:
                                         continue

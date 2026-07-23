@@ -709,3 +709,36 @@ class TestC6bBuildHWNameLocants:
     def test_mixed_heteroatom_locants_and_stem(self, heteroatoms, ring_size, expected):
         result = build_hw_name(heteroatoms, ring_size, True, False)
         assert result == expected
+
+
+class TestHeteroarenePCGLowestLocant:
+    """v28 Cluster A Fix 5 (P-14.4(c)): on a monocyclic heteroarene whose single
+    heteroatom fixes locant 1 but leaves a CW/CCW choice, the principal
+    characteristic group expressed as a WHOLLY-EXOCYCLIC appended suffix
+    (-carboxylic acid, -carbaldehyde, -carbonitrile, ...) must receive the
+    lowest locant BEFORE detachable substituent prefixes. Previously the
+    heterocyclic pg-anchor extraction handled only ring-C-bonded heteroatom
+    suffixes (-ol/-one/-amine), never the appended suffix, so the tie was broken
+    arbitrarily by canonical rank -> the suffix got the higher locant.
+    """
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # target (PIN backlog): COOH is PCG -> locant 2, cyano prefix -> 5
+        ("N#Cc1ccc(o1)C(=O)O", "5-cyanofuran-2-carboxylic acid"),
+        # root-cause reproduction: methyl + COOH furan
+        ("Cc1ccc(o1)C(=O)O", "5-methylfuran-2-carboxylic acid"),
+        # thiophene appended-aldehyde analogue
+        ("Cc1ccc(s1)C=O", "5-methylthiophene-2-carbaldehyde"),
+    ])
+    def test_pcg_takes_lowest_locant(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # no second substituent: single suffix already wins lowest locant
+        ("c1ccc(o1)C(=O)O", "furan-2-carboxylic acid"),
+        # two fixed heteroatoms (isoxazole O=1,N=2): numbering fully fixed,
+        # PCG tie never arises -> unchanged
+        ("Cc1cc(no1)C(=O)O", "5-methyl-1,2-oxazole-3-carboxylic acid"),
+    ])
+    def test_no_regression(self, smiles, expected):
+        assert name_compound(smiles) == expected
