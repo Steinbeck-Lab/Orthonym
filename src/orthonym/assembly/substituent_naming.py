@@ -528,6 +528,168 @@ def _build_alkenyl_name(
     return name
 
 
+def _name_branched_alkenyl_substituent(mol, sub_atoms, attach_idx):
+    """P-29.2 / P-31.1.4.3 / P-32.1.1: a BRANCHED acyclic ALL-CARBON substituent
+    bearing >=1 C=C/C#C, named by its own principal chain THROUGH the free valence
+    with the free-valence locant explicitly cited (P-32.1.1(1): free valences have
+    priority for low locants and locant '1' MUST be cited for acyclic groups).
+
+    The linear ``_name_unsaturated_chain`` declines branched fragments (its
+    ``c_nbrs > 2`` guard), so before this handler they fell through to the free-
+    molecule recursion + ``parent_to_prefix``, whose ``-e``->``-yl`` fallback DROPS
+    the free-valence locant (``2-methylprop-1-enyl`` instead of ``2-methylprop-1-
+    en-1-yl``) or emits a wrong-connectivity name (SELF-01 -> ``unknown`` for prenyl).
+
+    Scope (fail-closed -> next handler / recursion otherwise): acyclic, all-carbon,
+    uncharged, has unsaturation AND branching. Reuses the existing
+    ``_build_alkenyl_name`` for the stem and ``name_substituent`` for off-chain
+    branches. Returns the raw prefix name (no enclosing marks) or None.
+    """
+    if attach_idx is None or len(sub_atoms) < 3:
+        return None
+    sub_set = set(sub_atoms)
+    if attach_idx not in sub_set:
+        return None
+    ring_info = mol.GetRingInfo()
+    for idx in sub_set:
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetSymbol() != 'C' or a.GetFormalCharge() != 0:
+            return None
+        if ring_info.NumAtomRings(idx) > 0:
+            return None
+
+    # Require BOTH unsaturation and branching (the linear namer owns the rest).
+    has_unsat = False
+    branched = False
+    for idx in sub_set:
+        c_nbrs = 0
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in sub_set:
+                c_nbrs += 1
+                bond = mol.GetBondBetweenAtoms(idx, ni)
+                if bond and bond.GetBondTypeAsDouble() != 1.0:
+                    has_unsat = True
+        if c_nbrs > 2:
+            branched = True
+    if not (has_unsat and branched):
+        return None
+
+    # Principal chain = longest simple path THROUGH the free valence, tie-broken
+    # by MAX on-chain unsaturation (P-31.1.4.3.4). The fragment is an acyclic tree,
+    # so the path between any two atoms is unique; enumerate atom pairs (bounded:
+    # substituents are small) and keep the best chain that contains attach_idx.
+    from collections import deque
+
+    def _tree_path(a, b):
+        prev = {a: None}
+        dq = deque([a])
+        while dq:
+            x = dq.popleft()
+            if x == b:
+                break
+            for nbr in mol.GetAtomWithIdx(x).GetNeighbors():
+                ni = nbr.GetIdx()
+                if ni in sub_set and ni not in prev:
+                    prev[ni] = x
+                    dq.append(ni)
+        if b not in prev:
+            return None
+        path = []
+        cur = b
+        while cur is not None:
+            path.append(cur)
+            cur = prev[cur]
+        return list(reversed(path))
+
+    def _onchain_unsat(chain):
+        n = 0
+        for i in range(len(chain) - 1):
+            bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+            if bond and bond.GetBondTypeAsDouble() != 1.0:
+                n += 1
+        return n
+
+    atoms = sorted(sub_set)  # deterministic order for tie-breaking
+    best = None  # ((length, unsat), chain)
+    for i in range(len(atoms)):
+        for j in range(i + 1, len(atoms)):
+            p = _tree_path(atoms[i], atoms[j])
+            if not p or attach_idx not in p:
+                continue
+            key = (len(p), _onchain_unsat(p))
+            if best is None or key > best[0]:
+                best = (key, p)
+    if best is None:
+        return None
+    chain = best[1]
+
+    def _dir_key(ch):
+        k = ch.index(attach_idx) + 1
+        unsat = []
+        for i in range(len(ch) - 1):
+            bond = mol.GetBondBetweenAtoms(ch[i], ch[i + 1])
+            bt = bond.GetBondTypeAsDouble() if bond else 1.0
+            if bt in (2.0, 3.0):
+                unsat.append(i + 1)
+        # P-32.1.1(1): free valence lowest first, then unsaturation lowest.
+        return (k, sorted(unsat))
+
+    fwd = chain
+    rev = list(reversed(chain))
+    chain = fwd if _dir_key(fwd) <= _dir_key(rev) else rev
+
+    k = chain.index(attach_idx) + 1
+    chain_set_c = set(chain)
+    chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+    double_locs, triple_locs = [], []
+    for i in range(len(chain) - 1):
+        bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
+        bt = bond.GetBondTypeAsDouble() if bond else 1.0
+        if bt == 2.0:
+            double_locs.append(i + 1)
+        elif bt == 3.0:
+            triple_locs.append(i + 1)
+
+    # Off-chain branches -> the substituent's own substituents (P-46.1.12),
+    # named recursively and located on this chain (mirror _located_acyclic_alkyl_name).
+    from collections import defaultdict
+    from .substituent_enumerator import name_substituent
+    branch_groups: dict = defaultdict(list)
+    for chain_atom in chain:
+        for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in chain_set_c or nidx not in sub_set:
+                continue
+            frag = []
+            seen = set(chain_set_c)
+            stack = [nidx]
+            while stack:
+                cur = stack.pop()
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                frag.append(cur)
+                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
+                        stack.append(nn.GetIdx())
+            try:
+                bname = name_substituent(mol, frag, nidx)
+            except Exception as exc:  # noqa: BLE001 — missing beats wrong
+                logger.debug("branched-alkenyl branch naming failed: %s", exc)
+                return None
+            if not bname or bname == "substituent":
+                return None
+            branch_groups[bname].append(chain_pos[chain_atom])
+
+    core = _build_alkenyl_name(len(chain), k, double_locs, triple_locs)
+    if not branch_groups:
+        return core  # no off-chain branch after all -> plain alkenyl
+    from .composer import _format_prefix_groups
+    prefix = _format_prefix_groups(branch_groups)
+    return f"{prefix}{core}"
+
+
 def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
     """v26 BP-2 RC-3 (P-33 oxo / P-14.4): an ACYCLIC all-carbon substituent chain
     that is UNSATURATED (>=1 C=C/C#C) and carries >=1 in-chain/terminal carbonyl
@@ -3656,6 +3818,14 @@ def name_substituent_fragment(
     unsat_name = _name_unsaturated_chain(mol, sub_atoms, attach_idx, parent_set)
     if unsat_name is not None:
         return _add_substituent_stereo(mol, sub_atoms, unsat_name, attach_idx=attach_idx)
+
+    # Step 2b-branched (v28 Cluster A Fix 4, P-32.1.1(1)): a BRANCHED acyclic
+    # all-carbon alkenyl/alkynyl substituent. The linear namer above declines
+    # branching; without this the recursion + parent_to_prefix drop the free-
+    # valence locant ('2-methylprop-1-enyl') or mis-name the connectivity.
+    branched_unsat = _name_branched_alkenyl_substituent(mol, sub_atoms, attach_idx)
+    if branched_unsat is not None:
+        return _add_substituent_stereo(mol, sub_atoms, branched_unsat, attach_idx=attach_idx)
 
     # Step 2b-oxo (v26 BP-2 RC-3, P-33 / P-14.4): unsaturated all-carbon chain
     # carrying an in-chain aldehyde/ketone -> oxo prefix numbered from the free

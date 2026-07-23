@@ -118,3 +118,35 @@ class TestAlkenylCIRegression:
         )
         assert "prop-1-en-2-yl" in result.lower()
         assert "15-isopropyl" not in result.lower()
+
+
+class TestBranchedAlkenylPrefix:
+    """v28 Cluster A Fix 4 (P-32.1.1(1)): a BRANCHED acyclic alkenyl substituent
+    must cite the free-valence locant ('-1-yl'), not the locant-dropped '-enyl'
+    the recursive parent_to_prefix fallback produced. The principal chain runs
+    through the free valence (longest, then max unsaturation)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # -CH=C(CH3)2 on benzene
+        ("CC(C)=Cc1ccccc1", "(2-methylprop-1-en-1-yl)benzene"),
+        # prenyl -CH2-CH=C(CH3)2 on benzene (was mis-named -> unknown)
+        ("CC(C)=CCc1ccccc1", "(3-methylbut-2-en-1-yl)benzene"),
+    ])
+    def test_branched_alkenyl_on_benzene(self, smiles, expected):
+        assert name_compound(smiles) == expected
+
+    def test_target_hepta_diene(self):
+        # The PIN-backlog target: 4-(2-methylprop-1-en-1-yl) branch.
+        assert (name_compound("C=CCC(C=C(C)C)C(C)=CC")
+                == "5-methyl-4-(2-methylprop-1-en-1-yl)hepta-1,5-diene")
+
+    @pytest.mark.parametrize("smiles,frag", [
+        # Regression: UNBRANCHED alkenyl substituents (handled by the linear
+        # namer) must stay byte-identical -- the branched namer must NOT fire.
+        ("C=CCc1ccccc1", "prop-2-en-1-yl"),
+        ("CC=Cc1ccccc1", "prop-1-en-1-yl"),
+        ("C=C(C)c1ccccc1", "prop-1-en-2-yl"),
+        ("C=Cc1ccccc1", "ethenyl"),
+    ])
+    def test_unbranched_alkenyl_unchanged(self, smiles, frag):
+        assert frag in name_compound(smiles)
