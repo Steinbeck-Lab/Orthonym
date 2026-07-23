@@ -275,3 +275,42 @@ class TestTerminalFGTypes:
         (peroxy_acid/imidic_acid, P-43.1/P-65.1.3.1) + 1 W3-P02
         (hydrazonic_acid, P-65.1.3.2) = 33 entries."""
         assert len(TERMINAL_FG_TYPES) == 33
+
+
+# ============================================================================
+# End-to-end: mononuclear (single-carbon 'methane') parent locant omission in
+# the polyfunctional path.  P-14.3.4.2(a) / P-14.3.4.4: on a one-carbon parent
+# every position is trivially locant '1', so BOTH prefix and suffix locants are
+# omitted.  BB verbatim: 'chloromethanol' (Cl-CH2-OH, line 5110) — a methane
+# parent with a chloro prefix AND an -ol suffix, neither carrying a '1'.
+# ============================================================================
+
+
+class TestMononuclearPolyfunctionalNaming:
+    """Cluster A Fix 3: a methane parent with a principal-group suffix AND a
+    substituent prefix must omit the trivially-'1' locants on both."""
+
+    @pytest.mark.parametrize("smiles", ["COCNC", "CNCOC"])
+    def test_methoxy_n_methyl_methanamine(self, smiles):
+        # CH3-O-CH2-NH-CH3: amine principal (suffix), methoxy substituent, both
+        # on the single carbon -> 'methoxy-N-methylmethanamine' (not
+        # '1-methoxy-N-methylmethan-1-amine'). Also a determinism pair.
+        from orthonym import name_compound
+        assert name_compound(smiles, style="pin") == "methoxy-N-methylmethanamine"
+
+    def test_aminomethanol(self):
+        # HO-CH2-NH2: alcohol principal (senior to amine) + amino prefix on the
+        # single carbon -> 'aminomethanol' (not '1-aminomethan-1-ol').
+        from orthonym import name_compound
+        assert name_compound("OCN", style="pin") == "aminomethanol"
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("OCCl", "chloromethanol"),       # BB line 5110 — must stay correct
+        ("ClCCl", "dichloromethane"),     # simple-halide path, must not regress
+        ("CN", "methanamine"),            # single suffix, already correct
+        ("CO", "methanol"),               # single suffix, already correct
+        ("COCSC", "methoxy(methylsulfanyl)methane"),  # no-suffix ether path
+    ])
+    def test_mononuclear_regressions(self, smiles, expected):
+        from orthonym import name_compound
+        assert name_compound(smiles, style="pin") == expected

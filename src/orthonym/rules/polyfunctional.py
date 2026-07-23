@@ -1265,6 +1265,24 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     chain_set = set(principal_chain)
     ring_fg_groups = defaultdict(list)  # FGs on ring atoms, for ring substituent naming
 
+    # P-14.3.4.2(a) / P-14.3.4.4: on a MONONUCLEAR (single-carbon 'methane')
+    # CHAIN parent every substitutable position is trivially locant '1', so both
+    # prefix and suffix locants are omitted (BB verbatim 'chloromethanol', line
+    # 5110 — a methane parent with a chloro prefix AND an -ol suffix, neither
+    # carrying a '1'). Route the decision through the shared should_omit_locant_one
+    # chokepoint. Gated to a chain parent so a ring parent whose principal_chain
+    # happens to be one atom does not trigger it.
+    from ..assembly.naming_utils import should_omit_locant_one as _should_omit_l1
+    _mononuclear_chain_parent = (
+        len(principal_chain) == 1
+        and not (getattr(features, 'is_cyclic', False)
+                 and not getattr(features, 'chain_is_parent', True))
+    )
+    _omit_mononuclear_locants = (
+        _mononuclear_chain_parent
+        and _should_omit_l1(context="prefix", chain_length=len(principal_chain))
+    )
+
     # Collect substituent branch atoms for FG-on-branch filtering (BUG-B).
     # FGs located entirely on a substituent branch are already named by the
     # substituent naming path (e.g., hydroxymethyl), so skip them here.
@@ -1966,8 +1984,12 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 mol, _anchored, principal_chain, atom_to_locant, fg_name
             )
             for comp in components:
+                _comp_locants = comp.locants or split_locants
                 all_prefixes.append(
-                    format_fg_prefix(comp.prefix_form, comp.locants or split_locants, comp.count)
+                    format_fg_prefix(
+                        comp.prefix_form,
+                        [] if _omit_mononuclear_locants else _comp_locants,
+                        comp.count)
                 )
             continue
 
@@ -1989,8 +2011,11 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             return None
         count = len(locants)
 
-        # Format the prefix
-        formatted = format_fg_prefix(prefix_form, locants, count)
+        # Format the prefix (mononuclear parent -> omit the trivially-'1' locant)
+        formatted = format_fg_prefix(
+            prefix_form,
+            [] if _omit_mononuclear_locants else locants,
+            count)
         all_prefixes.append(formatted)
 
     # --- Generate ring substituent prefixes (when chain is parent) ---
@@ -2096,9 +2121,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # Deduplicate locants (overlapping SMARTS can produce duplicates)
         suffix_locants = sorted(set(suffix_locants))
 
-    # For terminal groups (acid, aldehyde), locant is implicit
+    # For terminal groups (acid, aldehyde), locant is implicit; and on a
+    # mononuclear (single-carbon) parent the suffix locant is trivially '1'
+    # (P-14.3.4.2(a)) — pass chain_length so Rule 1 fires ('methanamine', not
+    # 'methan-1-amine').
     from ..assembly.naming_utils import should_omit_locant_one
-    if should_omit_locant_one(context="suffix", fg_type=principal_group):
+    if should_omit_locant_one(context="suffix", fg_type=principal_group,
+                              chain_length=chain_length):
         suffix_locants = []
 
     # Determine multiplier for multiple principal groups

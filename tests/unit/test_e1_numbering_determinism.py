@@ -141,10 +141,13 @@ class TestSkeletalReplacementSeniority:
     @pytest.mark.parametrize("smiles", ["COCNC", "CNCOC"])
     def test_oxa_aza_senior_oxygen_low_locant(self, namer, smiles):
         # P-62.2.2: amine Gate 2c blocks '2-oxa-4-azapentane' (skeletal replacement).
-        # The N is bonded only to C atoms → substitutive naming produces
-        # '1-methoxy-N-methylmethan-1-amine' instead. Determinism is maintained
-        # (both SMILES spellings give the same substitutive name).
-        assert _name(namer, smiles) == "1-methoxy-N-methylmethan-1-amine"
+        # The N is bonded only to C atoms → substitutive naming on the carbon
+        # parent. Per P-14.3.4.2(a) / P-14.3.4.4 a single-carbon (mononuclear
+        # 'methane') parent omits ALL trivially-'1' locants (cf. BB 'chloromethanol',
+        # line 5110), so the PIN is 'methoxy-N-methylmethanamine' (no '1' on the
+        # methoxy prefix or the amine suffix). Determinism is maintained (both
+        # SMILES spellings give the same substitutive name).
+        assert _name(namer, smiles) == "methoxy-N-methylmethanamine"
 
     def test_distinct_positional_set_protect(self, namer):
         # Distinct positional set -> the element tier never fires (byte-identical).
