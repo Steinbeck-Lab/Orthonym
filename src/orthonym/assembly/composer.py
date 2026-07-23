@@ -2807,7 +2807,10 @@ def _assemble_polycyclic_name(features: Any, style: str) -> str:
         return pah_name
 
     # Generate systematic name with substituents
-    return name_substituted_polycyclic(features.mol, pah_name, substituents)
+    return name_substituted_polycyclic(
+        features.mol, pah_name, substituents,
+        principal_group=getattr(features, 'principal_group', None),
+    )
 
 
 def _try_partially_saturated_carbocycle(mol) -> Optional[str]:

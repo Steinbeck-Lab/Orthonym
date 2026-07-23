@@ -3301,7 +3301,8 @@ class Orthonym:
             if pah_name:
                 features.polycyclic_name = pah_name
                 features.polycyclic_substituents = get_polycyclic_substituents(
-                    features.mol, pah_name
+                    features.mol, pah_name,
+                    principal_group=features.principal_group,
                 )
                 # Set ring type for consistency
                 features.ring_type = 'aromatic'

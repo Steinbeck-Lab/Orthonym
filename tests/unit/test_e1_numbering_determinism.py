@@ -166,12 +166,13 @@ class TestPolycyclicAutomorphismMin:
         assert _name(namer, "Cc1ccc2cc3ccccc3cc2c1") == "2-methylanthracene"
 
     def test_anthracene_amine_locant(self, namer):
-        # Locant fixed to 2 (the DD4/H1 defect). Prefix-vs-suffix style (PIN
-        # anthracen-2-amine) is a separate P-66.1 expression concern out of E1.
-        assert _name(namer, "Nc1ccc2cc3ccccc3cc2c1") == "2-aminoanthracene"
+        # v28 Cluster A Fix 2 (P-62.2.1.2 / P-14.4(c) / P-16.7.1(a)): the primary
+        # amine is the molecular principal group -> '-amine' SUFFIX with the
+        # automorphism-min PCG locant, not the 'amino' prefix.
+        assert _name(namer, "Nc1ccc2cc3ccccc3cc2c1") == "anthracen-2-amine"
 
     def test_phenanthrene_amine_locant(self, namer):
-        assert _name(namer, "Nc1ccc2ccc3ccccc3c2c1") == "3-aminophenanthrene"
+        assert _name(namer, "Nc1ccc2ccc3ccccc3c2c1") == "phenanthren-3-amine"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("Cc1ccc2ccccc2c1", "2-methylnaphthalene"),
@@ -195,6 +196,27 @@ class TestPolycyclicAutomorphismMin:
     ])
     def test_deterministic_across_respellings(self, namer, smiles):
         assert len(_respell_names(namer, smiles)) == 1
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("Nc1ccc2ccccc2c1", "naphthalen-2-amine"),
+        ("Nc1cccc2ccccc12", "naphthalen-1-amine"),
+    ])
+    def test_pah_primary_amine_suffix(self, namer, smiles, expected):
+        # Fix 2 extension: primary amine as principal group on naphthalene ->
+        # '-amine' suffix, automorphism-min locant (P-62.2.1.2 / P-14.4(c)).
+        assert _name(namer, smiles) == expected
+
+    def test_pah_amine_stays_prefix_when_acid_senior(self, namer):
+        # A senior suffix (carboxylic acid) present -> amine demotes to the
+        # 'amino' PREFIX; the acid keeps the '-carboxylic acid' suffix (P-41).
+        assert _name(namer, "Nc1ccc2cc(C(=O)O)ccc2c1") == "6-aminonaphthalene-2-carboxylic acid"
+
+    def test_pah_amine_not_promoted_over_hydroxy(self, namer):
+        # -OH is senior to -NH2 (P-41). polycyclics.py does not yet promote -OH
+        # to the '-ol' suffix, so the amine must NOT be promoted either (else it
+        # would wrongly outrank the alcohol) -- fail closed to the prior
+        # (non-PIN, but not wrong-structure) double-prefix form.
+        assert _name(namer, "Nc1ccc2cc(O)ccc2c1") == "2-amino-6-hydroxynaphthalene"
 
     def test_populated_pahs_never_use_naphthalene_heuristic(self, monkeypatch):
         # DD4 regression guard: cataloged PAHs with populated iupac_numbering must

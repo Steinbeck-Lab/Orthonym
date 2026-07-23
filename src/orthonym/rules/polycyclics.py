@@ -166,13 +166,29 @@ def get_polycyclic_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
     return None
 
 
-def get_polycyclic_substituents(mol, pah_name: str) -> Dict[int, List[Dict]]:
+# v28 Cluster A Fix 2: FG keys for which a primary amine (-NH2) on a PAH is the
+# molecule-level principal characteristic group. When the seniority layer has
+# already chosen one of these as features.principal_group, no group senior to
+# the amine is present, so the amine is expressed as the '-amine' SUFFIX
+# (anthracen-2-amine) and its ring carbon claims the lowest locant via the PCG
+# tier (P-62.2.1.2 / P-14.4(c)). Using the authoritative principal_group avoids
+# re-deriving seniority here and is fail-safe: any senior group (acid/-ol/...)
+# makes principal_group != amine, so the amine stays the 'amino' prefix.
+_PAH_AMINE_PRINCIPAL_KEYS = frozenset({'aromatic_amine', 'primary_amine'})
+
+
+def get_polycyclic_substituents(mol, pah_name: str,
+                                principal_group: Optional[str] = None
+                                ) -> Dict[int, List[Dict]]:
     """
     Find substituents attached to a polycyclic aromatic core.
 
     Args:
         mol: RDKit Mol object
         pah_name: Name of the PAH (e.g., 'naphthalene')
+        principal_group: the molecule-level principal group (features.principal_group);
+            when it is a primary amine the amine's ring carbon is treated as the
+            PCG anchor for lowest-locant numbering (Fix 2).
 
     Returns:
         Dict mapping IUPAC locant (1-indexed) to list of substituent info dicts.
@@ -208,6 +224,7 @@ def get_polycyclic_substituents(mol, pah_name: str) -> Dict[int, List[Dict]]:
     # principal-characteristic-group suffix (carboxylic acid/aldehyde/amide/
     # nitrile) is tracked separately so it can claim the lowest locant FIRST
     # (P-14.4(c)) — the WR-01 PCG-anchor.
+    _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
     attach_atoms = set()
     suffix_atoms = set()
     for idx in core_atoms:
@@ -219,6 +236,12 @@ def get_polycyclic_substituents(mol, pah_name: str) -> Dict[int, List[Dict]]:
             is_attach = True
             sub = _identify_pah_substituent(mol, nb.GetIdx(), core_atoms)
             if sub and sub.get('is_suffix'):
+                is_pcg = True
+            # Fix 2: a bare -NH2 that IS the molecular principal group is the
+            # PCG -> its ring carbon takes the lowest locant (P-14.4(c)) even
+            # though it is not tagged is_suffix (kept a prefix candidate so the
+            # senior-group cases stay byte-identical).
+            elif _amine_pcg and sub and sub.get('name') == 'amino':
                 is_pcg = True
         if is_attach:
             attach_atoms.add(idx)
@@ -1046,7 +1069,8 @@ def _identify_pah_functionalized_chain(
 def name_substituted_polycyclic(
     mol,
     pah_name: str,
-    substituents: Dict[int, List[Dict]]
+    substituents: Dict[int, List[Dict]],
+    principal_group: Optional[str] = None,
 ) -> str:
     """
     Generate IUPAC name for a substituted polycyclic aromatic.
@@ -1091,6 +1115,7 @@ def name_substituted_polycyclic(
             # Mirror get_polycyclic_substituents EXACTLY (incl. the WR-01 PCG
             # subset) so the stereodescriptor numbering cannot desync from the
             # substituent numbering (WR-03).
+            _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
             attach_atoms = set()
             suffix_atoms = set()
             for idx in core_set:
@@ -1103,6 +1128,8 @@ def name_substituted_polycyclic(
                     sub = _identify_pah_substituent(mol, nb.GetIdx(), core_set)
                     if sub and sub.get('is_suffix'):
                         is_pcg = True
+                    elif _amine_pcg and sub and sub.get('name') == 'amino':
+                        is_pcg = True  # Fix 2: amine-as-principal PCG anchor (WR-03 mirror)
                 if is_attach:
                     attach_atoms.add(idx)
                 if is_pcg:
@@ -1126,6 +1153,18 @@ def name_substituted_polycyclic(
                 suffix_groups[sub_info['name']].append(position)
             else:
                 prefix_substituent_groups[sub_info['name']].append(position)
+
+    # v28 Cluster A Fix 2 (P-62.2.1.1.1 / P-41, mirror of benzene.py C4): when a
+    # primary amine IS the molecule-level principal group (no senior suffix, no
+    # -OH -> principal_group is an amine key), reclassify it from the 'amino'
+    # PREFIX to the '-amine' SUFFIX. Guarded by `not suffix_groups` so any senior
+    # suffix keeps the amine as a prefix (aminonaphthalenecarboxylic acid); the
+    # authoritative principal_group already encodes "-OH senior to amine", so an
+    # amino+ol PAH is not promoted (fails closed to the prior double-prefix).
+    if (principal_group in _PAH_AMINE_PRINCIPAL_KEYS
+            and 'amino' in prefix_substituent_groups
+            and not suffix_groups):
+        suffix_groups['amine'] = prefix_substituent_groups.pop('amino')
 
     # Sort locants within each group
     for name in prefix_substituent_groups:
@@ -1151,6 +1190,8 @@ def name_substituted_polycyclic(
         _SUFFIX_PRIORITY = [
             'carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile',
             'carbaldehyde',
+            'amine',  # Fix 2: amine is the lowest suffix (P-41); only chosen when
+                      # promoted (i.e. no senior suffix present).
         ]
         chosen_suffix = None
         chosen_locants = []
@@ -1181,6 +1222,7 @@ def name_substituted_polycyclic(
             'carbaldehyde': 'formyl',
             'carboxamide': 'carbamoyl',
             'carbonitrile': 'cyano',
+            'amine': 'amino',  # Fix 2: demote cleanly if a senior suffix coexists
         }
         for suf_name, suf_locants in suffix_groups.items():
             if suf_name == chosen_suffix:
@@ -1196,6 +1238,15 @@ def name_substituted_polycyclic(
         # return keeps the retained short form ('fluorene').
         _ih = POLYCYCLIC_DATA.get(pah_name, {}).get('indicated_h')
         _stem = f"{_ih}-{pah_name}" if _ih else pah_name
+        # P-16.7.1(a): elide the parent stem's terminal 'e' before a suffix that
+        # begins with a vowel. The suffix as written is '-<locant>-<mult><suffix>',
+        # so the decisive letter is the first of (multiplier + chosen_suffix):
+        # 'amine' (vowel) -> anthracene -> 'anthracen-2-amine'; 'diamine'/'carboxylic
+        # acid'/'carbaldehyde' (consonant) -> keep the 'e' (naphthalene-2,6-diamine,
+        # anthracene-2-carboxylic acid). Byte-identical for all pre-Fix-2 suffixes.
+        _suffix_head = f"{multiplier}{chosen_suffix}"[:1].lower()
+        if _stem.endswith('e') and _suffix_head in 'aeiouy':
+            _stem = _stem[:-1]
         # A locant (digit) starting the parent stem must be set off from a
         # letter-ending substituent prefix by a hyphen (P-16.3.3): '9-methyl-9H-
         # fluorene', '2-methyl-9,10-dihydroanthracene', '1-methyl-12,19:13,18-
