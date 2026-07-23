@@ -598,7 +598,30 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
     # re-detects the bridge type). Run BEFORE the collision resolver so the
     # ('anhydride', [...]) suppression rule clears the sub-component reads
     # (thioester/peroxide/ketone) on the folded atoms.
+    #
+    # v28 Cluster D (P-41): a chalcogen-bridge anhydride (-CO-S/Se/Te-CO-) that
+    # is SUBORDINATE to a senior principal characteristic group (e.g. a free
+    # carboxylic acid — ranked above 'anhydride' in SENIORITY_ORDER) is NOT a
+    # 'carboxylic anhydride': the senior acid owns the suffix and the linkage is
+    # expressed substitutively (in-chain acyl C -> oxo, acyl-S -> acylsulfanyl,
+    # P-35.5.1). So SKIP the chalcogen-anhydride fold when a senior-to-anhydride
+    # group is present; the underlying thio/seleno/telluro-ester base FG then
+    # survives the (atom-scoped) collision resolver and the existing thioester
+    # group-split emits e.g. '9-(acetylsulfanyl)-9-oxononanoic acid'. Genuine
+    # anhydrides (no senior co-group) fold exactly as before -> byte-identical.
+    # Scoped to the chalcogen bridge (its substitutive ester read + oxo/acyl-
+    # sulfanyl split are already built); the O/peroxy/cyanic bridges keep folding
+    # unconditionally (their subordinate substitutive path is not wired -> they
+    # stay fail-closed, never wrong).
+    from orthonym.rules.seniority import SENIORITY_ORDER as _SEN_ORDER
+    _anh_rank = _SEN_ORDER.index("anhydride")
+    _senior_to_anh_present = any(
+        fg in _SEN_ORDER and _SEN_ORDER.index(fg) < _anh_rank for fg in results
+    )
+    _SUBSTITUTIVE_BRIDGE = {"chalcogen_anhydride"}
     for _bk, _bpat in _COMPILED_ANHYDRIDE_BRIDGE.items():
+        if _bk in _SUBSTITUTIVE_BRIDGE and _senior_to_anh_present:
+            continue  # subordinate chalcogen-anhydride -> keep substitutive read
         for _bm in mol.GetSubstructMatches(_bpat, uniquify=True):
             results["anhydride"].append(_bm)
 
