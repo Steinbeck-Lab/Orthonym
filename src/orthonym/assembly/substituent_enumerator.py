@@ -1120,7 +1120,14 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
     if len(order) != n or order[0] not in adj[order[-1]]:
         return None  # not a single closed cycle
     het = [i for i in core if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
-    ih = [i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+    # v28 tranche T3: indicated hydrogen is a mancude-ring concept — a fully
+    # SATURATED ring has none, so its ring N-H atoms must NOT be read as
+    # ambiguous indicated H (this was declining piperazine's two N-H, blocking
+    # every decorated saturated N/O-heterocycle substituent). Account for
+    # indicated H only on an aromatic/mancude core.
+    aromatic = all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in core)
+    ih = ([i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+          if aromatic else [])
     if len(ih) > 1:
         return None  # ambiguous indicated hydrogen -> do not guess
     ih_atom = ih[0] if ih else None
@@ -1230,7 +1237,10 @@ def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
         stem = _borrow_heteroarene_stem(mol, core, attach_idx)
     if stem is None:
         return None
-    ih = [i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+    # v28 tranche T3: indicated H only on an aromatic/mancude core (a saturated
+    # heterocycle's N-H is not indicated H) — mirrors _monocycle_position_map.
+    ih = ([i for i in het if mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1]
+          if aromatic else [])
     if len(ih) > 1:
         return None
     ih_prefix = f'{pos[ih[0]]}H-' if ih else ''
