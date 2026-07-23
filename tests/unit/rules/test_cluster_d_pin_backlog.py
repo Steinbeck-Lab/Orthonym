@@ -36,3 +36,32 @@ class TestD1SubordinateThioanhydride:
     ])
     def test_genuine_anhydrides_and_thioesters_unchanged(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+class TestD2NoPcgPolyfunctional:
+    """A polyfunctional parent bearing ONLY prefix-cited groups (no principal
+    characteristic group) still names substitutively, with no suffix
+    (P-41 worked example BB:18282; P-63.6).
+
+    DEFERRED (v28 Cluster D): the research (wf_bebb8a05) proposed a contained
+    'no-suffix arm at polyfunctional.py:2108', but tracing shows that is NOT the
+    reachable path. For CSCCS(=O)C the clean polyfunctional path (which builds
+    'methanesulfinyl' via get_sulfinyl_prefix) is never reached — composer.
+    assemble_name is not even called — and a general/skeletal-replacement engine
+    path emits the WRONG '1,2-bis(methylsulfanyl)-1-sulfinylethane' (mis-splitting
+    CH3-S(=O)- into methylsulfanyl + bare sulfinyl). Production fail-closes safely
+    (SELF-01 round-trips to CSCC(SC)=S=O, a different molecule -> 'unknown'), so
+    NO wrong name ships. The correct fix is a real no-PCG substitutive-parent
+    build (route no-PCG polyfunctional acyclics through the polyfunctional prefix
+    assembler and make it win over the skeletal path), not a one-liner. Deferred
+    to avoid a half-mapped change to the core engine; re-scope before building.
+    """
+
+    @pytest.mark.xfail(reason="v28 Cluster D deferred: no-PCG substitutive-parent "
+                              "build (research under-scoped); fails closed today",
+                       strict=True)
+    def test_sulfinyl_sulfanyl_ethane(self):
+        # CH3-S-CH2-CH2-S(=O)-CH3 ; BB P-41 verbatim PIN. Note: CH3-S(=O)- is
+        # 'methanesulfinyl' (Table 5.1 -S(O)-R -> alkanesulfinyl), not 'methylsulfinyl'.
+        assert (name_compound("CSCCS(=O)C")
+                == "1-(methanesulfinyl)-2-(methylsulfanyl)ethane")
