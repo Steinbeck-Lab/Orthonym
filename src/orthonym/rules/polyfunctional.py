@@ -2095,6 +2095,40 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # tie-break for identical-letter prefixes.
     all_prefixes.sort(key=prefix_citation_sort_key)
 
+    # v28 Cluster D (P-41 / P-63.6): a polyfunctional parent with NO principal
+    # characteristic group (every group is prefix-only, e.g. sulfoxide +
+    # thioether -> '1-(methanesulfinyl)-2-(methylsulfanyl)ethane') takes a
+    # SUBSTITUTIVE name with no suffix. All prefixes are already built by the FG
+    # loop above via the correct producers (get_sulfinyl_prefix ->
+    # 'methanesulfinyl', get_sulfanyl_prefix -> 'methylsulfanyl') and carry their
+    # chain locants. First cut: SATURATED acyclic (chain) parents only; fail
+    # closed (return None -> deferred handlers / SELF-01) on unsaturation, rings,
+    # or any unresolved prefix so no wrong name can ship.
+    if principal_group is None:
+        from ..data.chain_names import get_chain_prefix as _gcp
+        if (features.double_bonds or features.triple_bonds
+                or not all_prefixes
+                or (getattr(features, 'is_cyclic', False)
+                    and not getattr(features, 'chain_is_parent', False))):
+            return None
+        _stem = _gcp(len(principal_chain))
+        if not _stem:
+            return None
+        _parent = f"{_stem}ane"
+        _pfx = _join_prefixes(all_prefixes)
+        if _pfx and _pfx[-1].isalpha() and _parent[0].isdigit():
+            _name = f"{_pfx}-{_parent}"
+        else:
+            _name = f"{_pfx}{_parent}"
+        if features.stereocenters or getattr(features, 'double_bond_stereo', None):
+            from .stereochemistry import (
+                collect_stereodescriptors, format_stereodescriptor_string,
+            )
+            _desc = collect_stereodescriptors(mol, atom_to_locant)
+            if _desc:
+                _name = f"{format_stereodescriptor_string(_desc)}{_name}"
+        return _name
+
     # --- Build the name ---
     from ..data.chain_names import get_chain_prefix
 

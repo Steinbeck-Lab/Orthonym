@@ -87,6 +87,41 @@ def _is_ester_family(features: Any) -> bool:
         ):
             return True
 
+        # v28 Cluster D (P-41 / P-63.6): no-PCG polyfunctional on a SATURATED
+        # acyclic (chain) parent — every group is prefix-only (pg is None), so
+        # name_polyfunctional's no-suffix arm builds the substitutive name
+        # ('1-(methanesulfinyl)-2-(methylsulfanyl)ethane'). Mirror that arm's
+        # success gate exactly (saturated chain, prefixes resolvable) so the
+        # predicate fires ONLY when the handler will succeed; this wins @1500
+        # over the generic substitutive fallback that mis-splits the sulfoxide.
+        if (
+            pg is None
+            and getattr(features, 'is_polyfunctional', False)
+            and getattr(features, 'principal_chain', None)
+            and getattr(features, 'atom_to_locant', None)
+            and not getattr(features, 'double_bonds', None)
+            and not getattr(features, 'triple_bonds', None)
+            and (not getattr(features, 'is_cyclic', False)
+                 or getattr(features, 'chain_is_parent', False))
+        ):
+            # Every non-principal group must resolve to a prefix (else the arm
+            # fails closed): mirror name_polyfunctional so we never dispatch to a
+            # decline (which would fall to a wrong-name fallback anyway).
+            from ...rules.polyfunctional import get_non_principal_groups
+            from ..substituent_prefix_forms import get_substituent_prefix_form
+            mol = getattr(features, 'mol', None)
+            chain = getattr(features, 'principal_chain', None)
+            npg = get_non_principal_groups(
+                getattr(features, 'functional_groups', {}) or {}, None
+            )
+            if mol is not None and npg and all(
+                matches and all(
+                    get_substituent_prefix_form(fg, mol, m, chain) for m in matches
+                )
+                for fg, matches in npg.items()
+            ):
+                return True
+
         # Ring-as-parent polyfunctional (rules/polyfunctional.py:1083-1129):
         # name_polyfunctional handles this when cyclic + ring-parent + has
         # principal_group + single saturated non-aromatic ring + ring is
