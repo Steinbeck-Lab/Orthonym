@@ -65,3 +65,23 @@ class TestD2NoPcgPolyfunctional:
         # 'methanesulfinyl' (Table 5.1 -S(O)-R -> alkanesulfinyl), not 'methylsulfinyl'.
         assert (name_compound("CSCCS(=O)C")
                 == "1-(methanesulfinyl)-2-(methylsulfanyl)ethane")
+
+
+class TestD3RingEsterAlkoxycarbonyl:
+    """A monocyclic ring substituent carrying an alkyl-ester decoration is
+    expressed with the alkoxycarbonyl prefix (P-65.6.3), enclosed per P-16.3.3
+    because it is a compound substituent prefix."""
+
+    def test_methoxycarbonyl_cyclohexyl_butanoic_acid(self):
+        # senior acid parent (butanoic acid); ring demoted; ester -> methoxycarbonyl
+        assert (name_compound("COC(=O)C1CCCCC1CCCC(=O)O")
+                == "4-[2-(methoxycarbonyl)cyclohexyl]butanoic acid")
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # simple alkyl ring substituent unchanged (no enclosure).
+        ("CC1CCCCC1CCCC(=O)O", "4-(2-methylcyclohexyl)butanoic acid"),
+        # ethyl ester -> ethoxycarbonyl (class generalises beyond methyl).
+        ("CCOC(=O)C1CCCCC1CCCC(=O)O", "4-[2-(ethoxycarbonyl)cyclohexyl]butanoic acid"),
+    ])
+    def test_ring_substituent_regressions(self, smiles, expected):
+        assert name_compound(smiles) == expected

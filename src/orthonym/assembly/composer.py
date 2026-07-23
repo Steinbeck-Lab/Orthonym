@@ -6969,7 +6969,15 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 )
                 if (_rc_name and ' ' not in _rc_name
                         and any(_ch.isdigit() for _ch in _rc_name)):
-                    ring_sub_groups[f'({_rc_name})'].append(locant)
+                    # P-16.3.3 nested enclosure: a decorated ring name that
+                    # itself contains parentheses (e.g. '2-(methoxycarbonyl)-
+                    # cyclohexyl') must be enclosed in the NEXT bracket level
+                    # ([...]), not another pair of parens. apply_enclosing_marks
+                    # (-1) auto-detects the depth from the name's own brackets,
+                    # so a plain decorated name ('2-methylcyclohexyl') still
+                    # gets (...) — byte-identical for the undecorated-paren case.
+                    from ..assembly.naming_utils import apply_enclosing_marks as _aem
+                    ring_sub_groups[_aem(_rc_name, -1)].append(locant)
                     continue
 
         # Get base substituent name (phenyl, cyclohexyl, etc.)

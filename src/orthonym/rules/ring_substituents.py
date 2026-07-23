@@ -2861,6 +2861,52 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                     covered.add(ni)
                     covered.update(x.GetIdx() for x in c_nbrs)
                     continue
+                # v28 Cluster D (P-65.6.3): an ALKYL-ESTER decoration -C(=O)-O-R
+                # (the second O has NO H and is bonded onward to a carbon) is
+                # expressed as the alkoxycarbonyl prefix (methoxycarbonyl, ...).
+                # Reuse the canonical producer; principal_chain=None makes it use
+                # SMARTS-based alkyl-side discrimination and skip the chain-
+                # orientation guard. Fail closed (return None) for aryl/branched/
+                # oversized R (the producer returns None) so no partial name leaks.
+                ester_o = next(
+                    (x for x in c_nbrs
+                     if x.GetDegree() == 2 and x.GetTotalNumHs() == 0
+                     and x.GetFormalCharge() == 0
+                     and mol.GetBondBetweenAtoms(ni, x.GetIdx()).GetBondTypeAsDouble() == 1.0
+                     and any(nn.GetSymbol() == 'C' and nn.GetIdx() != ni
+                             for nn in x.GetNeighbors())),
+                    None)
+                if has_carbonyl_O and ester_o is not None:
+                    carbonyl_o = next(x for x in c_nbrs if x.GetIdx() != ester_o.GetIdx())
+                    alkyl_c = next(nn for nn in ester_o.GetNeighbors()
+                                   if nn.GetIdx() != ni)
+                    from ..assembly.substituent_prefix_forms import (
+                        get_alkoxycarbonyl_prefix,
+                    )
+                    prefix = get_alkoxycarbonyl_prefix(
+                        mol,
+                        (ni, carbonyl_o.GetIdx(), ester_o.GetIdx(), alkyl_c.GetIdx()),
+                        None,
+                    )
+                    if prefix:
+                        # Cover the whole ester unit: carbonyl C, both O, and the
+                        # entire R alkyl fragment (so the exact-coverage check that
+                        # gates this substituent name accounts for every atom).
+                        prefixes.append(prefix)
+                        covered.add(ni)
+                        covered.update(x.GetIdx() for x in c_nbrs)
+                        _seen = {ni, ester_o.GetIdx()}
+                        _stack = [alkyl_c.GetIdx()]
+                        while _stack:
+                            _a = _stack.pop()
+                            if _a in _seen:
+                                continue
+                            _seen.add(_a)
+                            covered.add(_a)
+                            for _nn in mol.GetAtomWithIdx(_a).GetNeighbors():
+                                if _nn.GetIdx() not in _seen:
+                                    _stack.append(_nn.GetIdx())
+                        continue
                 return None
             chain = _linear_carbon_chain(ni, ring_atom_set)
             if chain is not None and chain in _ALKYL:
@@ -3071,6 +3117,12 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     def _is_complex_prefix(nm: str) -> bool:
         # simple v1-table prefixes are bare lowercase words; a branched/stereo
         # substituent name carries a locant, hyphen, or enclosing mark.
+        # v28 Cluster D (P-16.3.3): a COMPOUND substituent prefix (formed by
+        # substitution, e.g. the alkoxycarbonyl family methoxycarbonyl/
+        # ethoxycarbonyl/phenoxycarbonyl) is enclosed even though it is a bare
+        # lowercase word -> '2-(methoxycarbonyl)cyclohexyl', not '2-methoxy...'.
+        if nm.endswith('oxycarbonyl'):
+            return True
         return any(c in nm for c in '-()[]0123456789')
 
     if not any(_is_complex_prefix(nm) for nm in groups):
