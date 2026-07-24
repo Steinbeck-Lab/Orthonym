@@ -85,27 +85,24 @@ class TestRingAlcoholEster:
     tropate ester that meant 'tropane' with the whole ester dropped, which the
     SELF-01 gate correctly suppressed to 'unknown'."""
 
-    @pytest.mark.xfail(reason=(
-        "WSC-02 tropane ester: KNOWN GAP (0-wrong -- fails closed to 'unknown'). "
-        "FULLY DIAGNOSED 2026-07-24. TWO layers: (1) the natural-products handler "
-        "recognizes the tropane scaffold and, finding no decoration it can express, "
-        "returns bare 'tropane' (drops the ester). Making it decline on low coverage "
-        "(<0.50, no decoration) lets the pipeline fall through -- BUT that then hits "
-        "(2) the generic name_ester, which LINEARIZES the tropic acid to 'nonanoate' "
-        "(a constitutionally-wrong C9 acid), and because the stereo-bicyclic name "
-        "'(1R,3r,5S)-tropan-3-yl nonanoate' evades OPSIN (parse-fail-open), SELF-01 "
-        "SHIPS the wrong name -- a 0-wrong violation. So the NP-decline alone is "
-        "unsafe. The decomposition engine (try_decompose) DOES produce the correct "
-        "acid '3-hydroxy-2-phenylpropanoate', but name_ester wins before it. Safe "
-        "build needs a name_ester acid-side structure-conservation guard (fail "
-        "closed when the acid would linearize a ring/branch) OR a dispatch reorder "
-        "so try_decompose precedes name_ester -- both HIGH blast radius (~280 corpus "
-        "esters route through name_ester). Dedicated gated effort. (The alkyl-side "
-        "'tropan-3-yl' half is now correct via the _alcohol_to_alkyl locant fix.)"
-    ), strict=False)
-    def test_tropine_tropate_ester_names_bicyclic_ring_alcohol(self):
-        # WSC-02: tropine (8-methyl-8-azabicyclo[3.2.1]octan-3-ol) ester of tropic
-        # acid. Target = the accept_also form (1R,3r,5S)-tropan-3-yl ... propanoate.
+    def test_tropine_tropate_ester_names_bicyclic_ring_alcohol(self, monkeypatch):
+        # WSC-02 (BUILT v28): tropine (8-methyl-8-azabicyclo[3.2.1]octan-3-ol)
+        # ester of tropic acid. The natural-products handler claims the tropane
+        # scaffold and emits bare 'tropane' (drops the ester); SELF-01 suppresses
+        # that structure-dropping name to the failure sentinel. A last-resort
+        # decomposition pass (namer.py, before abstaining) then names it via the
+        # engine that already produces the correct acid + '-yl' alcohol component,
+        # routed through the SAME SELF-01 gate -- which ships it via the
+        # stereo-strip carve-out (raw stereo name evades OPSIN, but the
+        # stereo-stripped constitution 'tropan-3-yl 3-hydroxy-2-phenylpropanoate'
+        # round-trips). Target = the accept_also form.
+        #
+        # This mechanism ONLY engages in PRODUCTION (validity gate ON): the gate
+        # must suppress 'tropane' to the failure sentinel for the last-resort
+        # decomposition to fire. The suite's autouse fixture disables the gate,
+        # so re-enable it here (mirrors test_opsin_validity_gate.py). Spawns OPSIN.
+        import orthonym.namer as _namer
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False)
         name = name_compound("CN1[C@@H]2CC[C@H]1C[C@H](C2)OC(=O)C(CO)c1ccccc1")
         assert name == "(1R,3r,5S)-tropan-3-yl 3-hydroxy-2-phenylpropanoate", f"got {name!r}"
 

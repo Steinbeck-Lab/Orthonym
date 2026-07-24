@@ -1963,6 +1963,31 @@ class Orthonym:
                 _rec = self._try_general_engine_recovery(smiles)
                 if _rec is not None:
                     result = _rec
+            # v28 (WSC-02): last-resort DECOMPOSITION before abstaining. A
+            # NON-GENERAL handler (e.g. natural_products on a tropane scaffold)
+            # can claim a molecule and emit a structure-DROPPING name (`tropane`,
+            # dropping an ester) that SELF-01 then suppresses to the failure
+            # sentinel — bypassing the GENERAL-only decomposition fallback inside
+            # _name_impl. Give the decomposition engine a final, FULLY-GATED shot
+            # here. This is purely additive: it runs ONLY when we are about to
+            # ship a failure, so it can turn an 'unknown' into a valid name but
+            # can NEVER alter a currently-passing name (0 gold regression by
+            # construction). The candidate is routed through the SAME SELF-01
+            # validity gate (incl. the stereo-strip carve-out for names whose
+            # only OPSIN-narrow layer is stereo, P-91/P-93), so 0-wrong holds:
+            # a decomposition name whose constitution does not reproduce the
+            # input is suppressed right back to the failure sentinel.
+            if (is_top_level_naming() and is_failure_name(result)
+                    and not self._disable_opsin_validity_gate):
+                _dprobe = Chem.MolFromSmiles(smiles)
+                if _dprobe is not None:
+                    from .decomposition import try_decompose
+                    _dname = try_decompose(_dprobe, style=self.style)
+                    if _dname and not is_failure_name(_dname):
+                        _dgated = _final_opsin_validity_gate(
+                            _dname, smiles, self._grammar_stats)
+                        if not is_failure_name(_dgated):
+                            result = _dgated
             # HYG-02: post-failure limit (opt-in). If naming produced no real
             # name, map the failure to a named code. Keyed off an actual failure
             # so it can never fire on a successfully-named compound.
