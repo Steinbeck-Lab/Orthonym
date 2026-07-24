@@ -299,6 +299,25 @@ def test_aggregate_nulls_per_fragment_fields_when_components_not_measured():
     assert out["context_loss"] is None
 
 
+def test_aggregate_counts_tautomer_differences_apart_from_wrong_structures():
+    """A tautomer difference is NOT a wrong structure and must never inflate T3.
+
+    The first v29 baseline reported structure_wrong=2; both were mobile-H
+    tautomers (a benzimidazole NH hop and a guanidine), adjudicated as correct
+    names. Mobile-H is ubiquitous, so folding tautomers into T3 would manufacture
+    phantom 0-wrong violations on the project's #1 invariant.
+    """
+    rows = [
+        {"outcome": "EMIT", "tier": "T1", "structure_wrong": False,
+         "tautomer_differs": True, "n_components": 1, "n_components_named": 1},
+        {"outcome": "EMIT", "tier": "T1", "structure_wrong": True,
+         "n_components": 1, "n_components_named": 1},
+    ]
+    out = aggregate(rows)
+    assert out["structure_wrong"] == 1
+    assert out["tautomer_differs"] == 1
+
+
 def test_aggregate_counts_opsin_unparseable_emissions_for_t6():
     rows = [{"outcome": "EMIT", "tier": "T4", "opsin_unparseable": True,
              "n_components": 1, "n_components_named": 1},

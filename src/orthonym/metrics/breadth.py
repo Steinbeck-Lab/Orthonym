@@ -185,7 +185,7 @@ def aggregate(rows: Sequence[Dict[str, Any]],
     if n == 0:
         return {
             "n": 0, "emit_rate": 0.0, "tiers": {}, "structure_wrong": 0,
-            "opsin_unparseable": 0,
+            "opsin_unparseable": 0, "tautomer_differs": 0,
             "refusal_census": {}, "refusal_census_abstain": {},
             "per_fragment_p": 0.0, "mean_components": 0.0,
             "projected_emit_independent": 0.0, "context_loss": 0.0,
@@ -234,6 +234,11 @@ def aggregate(rows: Sequence[Dict[str, Any]],
         "structure_wrong": sum(1 for r in rows if r.get("structure_wrong")),
         # T6: emitted names OPSIN could not parse at all.
         "opsin_unparseable": sum(1 for r in rows if r.get("opsin_unparseable")),
+        # Tracked APART from structure_wrong: a mobile-H tautomer difference is
+        # not a wrong structure. The first v29 baseline reported 2 "wrong"
+        # names that were both tautomers (benzimidazole NH, guanidine); folding
+        # those into T3 would manufacture phantom 0-wrong violations.
+        "tautomer_differs": sum(1 for r in rows if r.get("tautomer_differs")),
         "refusal_census": dict(census.most_common()),
         "refusal_census_abstain": dict(census_abstain.most_common()),
         "per_fragment_p": p,
