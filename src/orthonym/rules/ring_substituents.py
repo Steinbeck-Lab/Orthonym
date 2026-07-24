@@ -2931,6 +2931,33 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                     covered.update(frag)
                     continue
             return None
+        # pnictogen substituent (-As/-Sb/-Bi bearing organyl/H) -> arsanyl /
+        # stibanyl / bismuthanyl prefix (P-67.1.5.1 / P-68.3). Collect the
+        # pnictogen subgraph (the As/Sb/Bi + everything hanging off it, NOT
+        # re-entering the ring) and reuse the general pnictogen-yl namer. This
+        # is what lets a benzene ring bearing -Sb(C6H5)2 name AS a substituent
+        # -> '4-(diphenylstibanyl)phenyl' (the P-69.5.2 organomercurial ligand).
+        # Fail closed (return None) if the pnictogen namer declines.
+        if sym in ('As', 'Sb', 'Bi') and order == 1.0 and charge == 0:
+            pnic_frag: Set[int] = set()
+            _seen_p = set(ring_atom_set) | {ring_atom_idx}
+            _stack_p = [ni]
+            while _stack_p:
+                _a = _stack_p.pop()
+                if _a in _seen_p:
+                    continue
+                _seen_p.add(_a)
+                pnic_frag.add(_a)
+                for _nn in mol.GetAtomWithIdx(_a).GetNeighbors():
+                    if _nn.GetIdx() not in _seen_p:
+                        _stack_p.append(_nn.GetIdx())
+            from ..rules.mononuclear_hydrides import name_arsanyl_substituent
+            pnic_name = name_arsanyl_substituent(mol, list(pnic_frag), ni)
+            if pnic_name:
+                prefixes.append(pnic_name)
+                covered.update(pnic_frag)
+                continue
+            return None
         # anything else exocyclic -> unsupported
         return None
     return prefixes, covered
@@ -3124,6 +3151,15 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         # lowercase word -> '2-(methoxycarbonyl)cyclohexyl', not '2-methoxy...'.
         if nm.endswith('oxycarbonyl'):
             return True
+        # P-16.3.3: a SUBSTITUTED pnictogen-yl (diphenylstibanyl / dimethylarsanyl
+        # / ...bismuthanyl) is a compound prefix requiring enclosing marks, even
+        # though it is a bare lowercase word; the bare parent-hydride-yl
+        # ('arsanyl'/'stibanyl'/'bismuthanyl') stays simple (cf. naming_utils
+        # .is_complex_substituent). Narrowly scoped so simple alkyl/aryl (methyl,
+        # phenyl) keep the byte-identical legacy path.
+        for _pn in ('arsanyl', 'stibanyl', 'bismuthanyl'):
+            if nm.endswith(_pn) and nm != _pn:
+                return True
         return any(c in nm for c in '-()[]0123456789')
 
     if not any(_is_complex_prefix(nm) for nm in groups):

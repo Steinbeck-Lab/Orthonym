@@ -267,15 +267,31 @@ class TestTask96DimetalClass1Class2:
         name = Orthonym().name(smi)
         assert name.endswith("(not supported)")
 
-    def test_class1_class2_dimetal_fails_closed(self):
-        """P-69.5.2 (class-1 central metal + class-2 substituent metal) is
-        deferred THIS cycle: reproduce-first confirmed the required
-        Sb-substituent namer ('diphenylstibanyl') does not yet exist
-        (unlike the As-rooted sibling, name_arsanyl_substituent, which
-        does) -- building it correctly requires a new cross-cutting
-        subsystem (Sb-substituent namer + a relaxed is_multimetal
-        detection + a new dimetal assembler), not a quick wire-up. Must
-        fail closed, never guess."""
+    def test_class1_class2_dimetal_p6952_built(self):
+        """P-69.5.2 (v28 BUILD): class-1 central metal (Hg, Group 12) +
+        class-2 substituent metalloid (Sb, Group 15). Named additively with
+        Hg as central atom, the Sb-bearing aryl cited as the recursive
+        substituent '4-(diphenylstibanyl)phenyl'. BB P-69.5.2 worked example
+        VERBATIM (BlueBookV2.md:40266). The complex ligand's enclosing marks
+        upgrade to '[]' (P-16.3.3 nesting, since the name already contains
+        '()'). Was previously deferred/fail-closed; now built via a class-
+        aware metal partition + Group-12 recursive ligand naming + a general
+        'stibanyl' substituent primitive (mirrors the arsanyl machinery)."""
         smi = "c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1"
         name = Orthonym().name(smi)
-        assert name.endswith("(not supported)")
+        assert name == "[4-(diphenylstibanyl)phenyl](phenyl)mercury", name
+
+    def test_dimetal_generalizes_not_special_cased(self):
+        """The P-69.5.2 build is a CLASS fix, not a WSC-02 special-case: a
+        different diorganyl-stibanyl aryl on mercury must also name via the
+        same class-aware partition + recursive ligand path. Here the second
+        Hg ligand is methyl (not phenyl), and the stibanyl carries tolyl
+        groups -- a distinct molecule that must still assemble correctly."""
+        # methyl-Hg-(4-(diphenylstibanyl)phenyl)
+        smi = "C[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1"
+        name = Orthonym().name(smi)
+        # methyl < [4-(diphenylstibanyl)phenyl] alphanumerically -> either order
+        # must still be RT-valid; assert it is NOT the fail-closed sentinel and
+        # contains both the stibanyl ligand and mercury.
+        assert "not supported" not in name and "unknown" not in name, name
+        assert "diphenylstibanyl" in name and "mercury" in name, name

@@ -69,6 +69,23 @@ METAL_ELEMENT_SYMBOLS: FrozenSet[str] = frozenset({
 _GROUP_14_13_RING_DEFER: FrozenSet[str] = frozenset({'Si', 'Ge', 'Sn', 'Pb', 'B'})
 
 
+# P-69.5 metal classification for mixed-metal covalent compounds:
+#   (1) metals of Groups 1 through 12  -> central-atom eligible;
+#   (2) metals of Groups 13 through 16 -> cited as a substituent group.
+# When exactly ONE class-1 metal and >=1 class-2 metalloid are present in a single
+# covalent component, the class-1 metal is the central atom and the class-2
+# metalloid sits inside a ligand (P-69.5.2: e.g. C6H5-Hg-C6H4-Sb(C6H5)2 ->
+# [4-(diphenylstibanyl)phenyl](phenyl)mercury). _CLASS_2 = Groups 13-16 metals/
+# metalloids; _CLASS_1 = every other (Groups 1-12) metal in METAL_ELEMENT_SYMBOLS.
+_CLASS_2_METALLOIDS: FrozenSet[str] = frozenset({
+    'B', 'Al', 'Ga', 'In', 'Tl',        # Group 13
+    'Si', 'Ge', 'Sn', 'Pb',             # Group 14
+    'As', 'Sb', 'Bi',                   # Group 15
+    'Te', 'Po',                         # Group 16
+})
+_CLASS_1_METALS: FrozenSet[str] = METAL_ELEMENT_SYMBOLS - _CLASS_2_METALLOIDS
+
+
 @dataclass(frozen=True)
 class LigandGroup:
     """A contiguous set of ligand atoms coordinated to a single metal."""
@@ -143,13 +160,31 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     if not metal_atom_indices:
         return None
 
-    # Phase 161.3 deferred: multinuclear bridged complexes
-    is_multimetal = len(metal_atom_indices) > 1
-
     # === Tier-1 / Tier-2 topology: dot-separated multi-component ===
     # Frags structure: 1 metal frag (single atom) + N ligand frags
     # (Cp anions for Tier-1, CO ligands for Tier-2).
     frags = Chem.GetMolFrags(mol, asMols=False)
+
+    # P-69.5.2 mixed-class single-centred complex: EXACTLY ONE class-1 (Groups 1-12)
+    # central metal + >=1 class-2 (Groups 13-16) metalloid, all in ONE covalent
+    # component. The class-1 metal is the sole central atom; the class-2 metalloid
+    # is named as a substituent inside a ligand. This is NOT a multinuclear bridge
+    # (Phase 161.3 deferred). class-2/class-2 catenated hydrides (0 class-1 metals)
+    # and ionic dot-separated salts (len(frags) > 1) are excluded by construction.
+    _class1 = [i for i in metal_atom_indices
+               if mol.GetAtomWithIdx(i).GetSymbol() in _CLASS_1_METALS]
+    _class2 = [i for i in metal_atom_indices
+               if mol.GetAtomWithIdx(i).GetSymbol() in _CLASS_2_METALLOIDS]
+    _mixed_class_central = (
+        len(frags) == 1
+        and len(metal_atom_indices) >= 2
+        and len(_class1) == 1
+        and len(_class1) + len(_class2) == len(metal_atom_indices)
+    )
+
+    # Phase 161.3 deferred: multinuclear bridged complexes (but NOT the mixed-class
+    # single-centred case above, which is genuinely single-centred).
+    is_multimetal = len(metal_atom_indices) > 1 and not _mixed_class_central
     if len(frags) >= 2 and not is_multimetal:
         metal_idx = metal_atom_indices[0]
         # Find metal frag and ligand frags
@@ -216,7 +251,18 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     # 1 metal atom + N alkyl/aryl ligand atoms directly bonded (single bonds);
     # Grignard topology: 1 organic ligand + 1 halide ligand.
     if len(frags) == 1 and not is_multimetal:
-        metal_idx = metal_atom_indices[0]
+        # For a P-69.5.2 mixed-class compound the class-1 metal is the sole central
+        # atom and the class-2 metalloid(s) are walked THROUGH into a ligand; for
+        # the ordinary single-metal case behaviour is unchanged.
+        if _mixed_class_central:
+            metal_idx = _class1[0]
+            central_indices = (_class1[0],)
+            walk_through = frozenset(
+                mol.GetAtomWithIdx(i).GetSymbol() for i in _class2)
+        else:
+            metal_idx = metal_atom_indices[0]
+            central_indices = tuple(metal_atom_indices)
+            walk_through = frozenset()
         # WSD-04 (RING-06): a single ring-member Group-14/13 metalloid
         # (Si/Ge/Sn/Pb/B) in a covalent heterocycle is NOT an organometallic
         # complex — it is a Hantzsch-Widman ring parent (silolane / silole /
@@ -225,18 +271,21 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
         # Scope: Si/Ge/Sn/Pb/B only (NOT P; NOT Al/Ga/In/Tl, which stay claimed).
         # Cp sandwiches are dot-separated (handled by Tier-1/4 above) and their
         # metal is NOT a ring atom, so this never mis-defers a real complex.
+        # Check the CENTRAL metal(s) only — a class-2 ring metalloid inside a
+        # ligand does not disqualify a genuine class-1 central complex.
         if all(
             mol.GetAtomWithIdx(i).GetSymbol() in _GROUP_14_13_RING_DEFER
             and mol.GetAtomWithIdx(i).IsInRing()
-            for i in metal_atom_indices
+            for i in central_indices
         ):
             return None
-        sigma_groups = _build_sigma_ligand_groups(mol, metal_idx)
+        sigma_groups = _build_sigma_ligand_groups(mol, metal_idx, walk_through)
         if sigma_groups is not None:
             return MetalComplex(
-                metal_atom_indices=tuple(metal_atom_indices),
+                metal_atom_indices=central_indices,
                 ligand_groups=tuple(sigma_groups),
-                formal_charges=tuple(formal_charges),
+                formal_charges=tuple(
+                    mol.GetAtomWithIdx(i).GetFormalCharge() for i in central_indices),
                 is_multimetal=False,
             )
 
@@ -251,7 +300,9 @@ _HALIDE_SMARTS_KEYS: FrozenSet[str] = frozenset({
 
 
 def _build_sigma_ligand_groups(mol: "Chem.Mol",
-                               metal_idx: int) -> Optional[Tuple[LigandGroup, ...]]:
+                               metal_idx: int,
+                               walk_through: "FrozenSet[str]" = frozenset(),
+                               ) -> Optional[Tuple[LigandGroup, ...]]:
     """Build LigandGroups for a σ-bonded single-component organometallic.
 
     For each direct neighbor of the metal atom, walk the connected non-metal
@@ -296,8 +347,11 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
         if neighbor_bond.GetBondTypeAsDouble() > 1.5:
             return None
 
-        # Walk the organic ligand subgraph via BFS, not crossing the metal
-        ligand_atoms = _collect_organic_component(mol, neighbor_idx, metal_idx)
+        # Walk the organic ligand subgraph via BFS, not crossing the central
+        # metal; class-2 metalloids in ``walk_through`` are traversed (they are
+        # part of this ligand, e.g. the Sb of a diphenylstibanyl-phenyl ligand).
+        ligand_atoms = _collect_organic_component(
+            mol, neighbor_idx, metal_idx, walk_through)
         # Refuse to collect atoms already in another ligand (e.g., a bridging
         # carbon would belong to two metals — Phase 161.3 territory)
         if any(a in seen_atoms for a in ligand_atoms):
@@ -318,8 +372,14 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
 
 
 def _collect_organic_component(mol: "Chem.Mol", start_idx: int,
-                                metal_idx: int) -> List[int]:
-    """BFS over non-metal atoms reachable from start_idx, not crossing metal."""
+                                metal_idx: int,
+                                walk_through: "FrozenSet[str]" = frozenset(),
+                                ) -> List[int]:
+    """BFS over non-metal atoms reachable from start_idx, not crossing the central
+    metal. Metals whose symbol is in ``walk_through`` (class-2 metalloids that are
+    ligand-internal substituents, e.g. an Sb in a diphenylstibanyl group) ARE
+    traversed and included; every other metal atom stops the walk (a separate
+    coordination centre)."""
     visited = {start_idx}
     queue = [start_idx]
     while queue:
@@ -332,7 +392,8 @@ def _collect_organic_component(mol: "Chem.Mol", start_idx: int,
             if other_idx in visited:
                 continue
             other_atom = mol.GetAtomWithIdx(other_idx)
-            if is_metal_element(other_atom.GetSymbol()):
+            if (other_atom.GetSymbol() not in walk_through
+                    and is_metal_element(other_atom.GetSymbol())):
                 continue
             visited.add(other_idx)
             queue.append(other_idx)

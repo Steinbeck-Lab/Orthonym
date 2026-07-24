@@ -330,25 +330,34 @@ def _assemble(prefix_block: str, lam: Optional[int], stem: str) -> str:
     return f"{prefix_block}-lambda{lam}-{stem}"
 
 
+_PNICTOGEN_YL_STEM = {'As': 'arsanyl', 'Sb': 'stibanyl', 'Bi': 'bismuthanyl'}
+
+
 def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
-    """P-67.1.5.1 / P-68.3: an arsenic-rooted substituent named on the parent
-    hydride arsane -> ``{prefixes}arsanyl``.
+    """P-67.1.5.1 / P-68.3: a pnictogen-rooted substituent (As/Sb/Bi) named on the
+    parent hydride arsane/stibane/bismuthane -> ``{prefixes}{arsanyl|stibanyl|bismuthanyl}``.
 
-        -As(OH)2 -> dihydroxyarsanyl   (P-67.1.5.1: -COOH is senior to -As(OH)2,
+        -As(OH)2  -> dihydroxyarsanyl  (P-67.1.5.1: -COOH is senior to -As(OH)2,
                                         so the arsonic acid is cited as a prefix)
-        -AsH2    -> arsanyl
+        -AsH2     -> arsanyl
         -As(CH3)2 -> dimethylarsanyl
+        -Sb(C6H5)2 -> diphenylstibanyl  (P-68.3.2.3.2.2: stibanyl preselected prefix)
+        -BiH2     -> bismuthanyl
 
-    Fail-closed (returns ``None``) for a non-As attachment, a charge / radical, any
-    multiple bond on As, or a substituent that is neither a terminal ``-OH`` nor a
-    simple unbranched-alkyl / phenyl-naphthyl organyl. Pure: no mol mutation."""
+    Named for the historical As-only origin; now general over the whole Group-15
+    (pnictogen) family As/Sb/Bi (Bi added for symmetry; all share the '-anyl' stem).
+    Fail-closed (returns ``None``) for a non-pnictogen attachment, a charge / radical,
+    any multiple bond on the pnictogen, or a substituent that is neither a terminal
+    ``-OH`` nor a simple unbranched-alkyl / phenyl-naphthyl organyl. Pure: no mol
+    mutation."""
     if attach_idx is None:
         return None
     frag_set = set(frag_atoms)
     if attach_idx not in frag_set:
         return None
     a = mol.GetAtomWithIdx(attach_idx)
-    if (a.GetSymbol() != 'As' or a.GetFormalCharge() != 0
+    _stem = _PNICTOGEN_YL_STEM.get(a.GetSymbol())
+    if (_stem is None or a.GetFormalCharge() != 0
             or a.GetNumRadicalElectrons() != 0):
         return None
     from .substituent_purity import pure_organyl_prefix_name
@@ -372,8 +381,8 @@ def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
         else:
             return None
     if not prefixes:
-        return 'arsanyl'                              # bare -AsH2
-    return f"{_build_substituent_string(prefixes)}arsanyl"
+        return _stem                                  # bare -AsH2/-SbH2/-BiH2
+    return f"{_build_substituent_string(prefixes)}{_stem}"
 
 
 def name_mononuclear_hydride(mol) -> Optional[str]:

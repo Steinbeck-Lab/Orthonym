@@ -607,7 +607,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # sentinel for a lone As and fails the whole molecule closed. Fail-closed
     # (falls through) for any non-As / decorated-As shape.
     if attach_idx is not None and attach_idx in frag_atoms_set:
-        if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'As':
+        if mol.GetAtomWithIdx(attach_idx).GetSymbol() in ('As', 'Sb', 'Bi'):
             try:
                 from ..rules.mononuclear_hydrides import name_arsanyl_substituent
                 _as = name_arsanyl_substituent(

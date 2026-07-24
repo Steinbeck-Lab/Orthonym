@@ -1028,7 +1028,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     # had no 'As' branch, so the whole As unit fell through unnamed and the molecule
     # failed closed to 'inorganic compound (not supported)'. Fail-closed (falls
     # through) for any decorated-As shape the arsanyl namer declines.
-    if symbol == 'As':
+    if symbol in ('As', 'Sb', 'Bi'):
         from ..rules.mononuclear_hydrides import name_arsanyl_substituent
         sub_atoms = _bfs_substituent_atoms(mol, start_idx, ring_atoms)
         as_name = name_arsanyl_substituent(mol, sub_atoms, start_idx)

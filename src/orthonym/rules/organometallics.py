@@ -518,15 +518,14 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             simple = _ligand_name_from_atoms(mol, lg.ligand_atom_indices)
             if simple is not None:
                 return simple
-            if not is_group14 or naming_system != 'hydride_parent':
-                return None
             atoms = list(lg.ligand_atom_indices)
-            attach = mol.GetAtomWithIdx(atoms[0]) if atoms else None
-            # find the metal-bonded ligand atom
-            metal_z = {14, 32, 50, 82}
+            if not atoms:
+                return None
+            # find the ligand atom sigma-bonded to the central metal atom
+            _central = set(metal_complex.metal_atom_indices)
             attach_idx = None
             for a in atoms:
-                if any(nb.GetAtomicNum() in metal_z
+                if any(nb.GetIdx() in _central
                        for nb in mol.GetAtomWithIdx(a).GetNeighbors()):
                     attach_idx = a
                     break
@@ -534,7 +533,9 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 return None
             from ..assembly.substituent_enumerator import name_substituent
             a0 = mol.GetAtomWithIdx(attach_idx)
-            if (a0.GetSymbol() == 'O' and a0.GetFormalCharge() == 0
+            # (a) Group-14 hydride-parent R-O-[Si] -> R-oxy (unchanged scope).
+            if (is_group14 and naming_system == 'hydride_parent'
+                    and a0.GetSymbol() == 'O' and a0.GetFormalCharge() == 0
                     and a0.GetTotalNumHs() == 0):
                 inner = [i for i in atoms if i != attach_idx]
                 c_start = [n.GetIdx() for n in a0.GetNeighbors()
@@ -546,7 +547,28 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 if not nm or nm == 'substituent' or not nm.endswith('yl'):
                     return None
                 return nm[:-2] + 'oxy'
-            if all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in atoms):
+            # (b) a carbon-attached ligand the simple table rejects -> the general
+            # substituent composer. TWO distinct scopes, deliberately asymmetric:
+            #  - Group-14 hydride-parent (Si/Ge/Sn/Pb): require the WHOLE ligand to
+            #    be all-carbon (tert-butyl). This is the ORIGINAL guard, restored:
+            #    a ligand carrying a heteroatom senior group (e.g. -CH2-COOH on Si)
+            #    must NOT be claimed here — the senior carboxylic acid parent wins
+            #    (protect: (trimethylsilyl)acetic acid, NOT carboxymethyl...silane).
+            #  - Group-12 metal-direct (Zn/Cd/Hg): the P-69.5.2 mixed-class ligand
+            #    may contain a WALKED-THROUGH class-2 metalloid (the Sb of a
+            #    4-(diphenylstibanyl)phenyl ligand), so allow non-carbon atoms ONLY
+            #    when every one is itself a metal/metalloid (never an O/N/S senior
+            #    heteroatom). Gate on the sigma-attach atom being carbon.
+            from ..perception.metals import is_metal_element
+            _syms = [mol.GetAtomWithIdx(a).GetSymbol() for a in atoms]
+            _g14_allcarbon = (
+                is_group14 and naming_system == 'hydride_parent'
+                and all(s == 'C' for s in _syms))
+            _g12_metalloid_ok = (
+                naming_system == 'metal_direct'
+                and metal_symbol in ('Zn', 'Cd', 'Hg')
+                and all(s == 'C' or is_metal_element(s) for s in _syms))
+            if a0.GetSymbol() == 'C' and (_g14_allcarbon or _g12_metalloid_ok):
                 nm = name_substituent(mol, set(atoms), attach_idx)
                 if not nm or nm == 'substituent':
                     return None
@@ -718,6 +740,39 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                                  class_id='organometallic_ligand'),
                 ]
                 return (full_name, metal_name_part, ligand_tree_nodes)
+
+            # P-69.5.2 mixed / complex σ-organic ligands (e.g.
+            # [4-(diphenylstibanyl)phenyl](phenyl)mercury). The simple multiplied
+            # form (diphenylmercury / dimethylzinc) applies only when the ligands
+            # are ALL identical AND simple. Otherwise cite each ligand separately
+            # in alphanumerical order, each enclosed — parentheses upgraded to
+            # square brackets when the ligand name already contains enclosing
+            # marks (P-16.3.3 nesting). Neutral Group-12 metal -> no Stock number.
+            from ..assembly.naming_utils import (
+                is_complex_substituent as _is_cx, apply_enclosing_marks as _encl,
+                alpha_sort_key as _ask,
+            )
+            _distinct = set(organic_names)
+            _any_complex = any(
+                _is_cx(nm) or any(c in nm for c in '()[]-') for nm in organic_names)
+            if (len(_distinct) > 1 or _any_complex) and not include_stock:
+                def _enclose_ligand(nm: str) -> str:
+                    # P-16.3.3 enclosure nesting: a ligand name that ALREADY
+                    # contains enclosing marks must be wrapped at the next level
+                    # up (depth 1 = square brackets), e.g.
+                    # '4-(diphenylstibanyl)phenyl' -> '[4-(diphenylstibanyl)phenyl]'.
+                    # apply_enclosing_marks(depth=0) gives '()', depth=1 '[]'.
+                    if any(c in nm for c in '()[]'):
+                        return _encl(nm, 1)       # nested -> bracket upgrade
+                    return f"({nm})"
+                ordered = sorted(organic_names, key=lambda nm: (_ask(nm), nm))
+                ligand_prefix = ''.join(_enclose_ligand(nm) for nm in ordered)
+                full_name = f"{ligand_prefix}{metal_name}"
+                ligand_tree_nodes = [
+                    NameTreeNode(parent_stem=nm, class_id='organometallic_ligand')
+                    for nm in ordered
+                ]
+                return (full_name, metal_name, ligand_tree_nodes)
 
             # Single-component multi-alkyl (dimethylzinc, trimethylaluminum, etc.)
             grouped = _group_ligand_counts(organic_names)
