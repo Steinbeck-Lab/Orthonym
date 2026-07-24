@@ -2083,10 +2083,20 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
         # "propan-1-ol" -> remove "-1-ol" -> "propan" -> "propyl"
         # Find the base: everything before the first locant-ol
         import re
-        # Match pattern: base-N-ol or baseol
-        match = re.match(r'^(.+?)(?:-\d+)?-ol$', name)
+        # Match pattern: base-N-ol or baseol, CAPTURING the locant.
+        match = re.match(r'^(.+?)(?:-(\d+))?-ol$', name)
         if match:
             base = match.group(1)
+            locant = match.group(2)
+            # A NON-omittable locant (>1) must be PRESERVED and the stem kept
+            # intact: 'tropan-3-ol' -> 'tropan-3-yl' (NOT 'tropyl' -- dropping
+            # the '-3-' AND eliding the retained ring stem 'tropan'->'trop'
+            # would be a different/invalid substituent). Also fixes acyclic
+            # secondary alcohols, e.g. 'heptan-3-ol' -> 'heptan-3-yl'. Locant
+            # '1' (or absent) keeps the classic contracted elision below
+            # (propan-1-ol -> propyl) to stay byte-identical on chains.
+            if locant is not None and locant != "1":
+                return f"{base}-{locant}-yl"
             # Convert "-an" ending to "-yl" (propan -> propyl)
             if base.endswith("an"):
                 return base[:-2] + "yl"

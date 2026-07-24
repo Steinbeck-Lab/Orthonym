@@ -87,13 +87,21 @@ class TestRingAlcoholEster:
 
     @pytest.mark.xfail(reason=(
         "WSC-02 tropane ester: KNOWN GAP (0-wrong -- fails closed to 'unknown'). "
-        "Root cause is NOT get_alkyl_fragment_name (that path isn't selected): a "
-        "substitutive ring handler wins over the ester functional-class handler "
-        "for a cyclic alcohol component, naming the ester as an acyloxy prefix "
-        "(acetyloxycyclohexane) or dropping it (tropane -> ester lost). P-65.6.3.2.1 "
-        "makes the functional-class ester name the PIN, so the fix is a handler-"
-        "PRIORITY change (ester functional-class must win for cyclic alcohols) -- "
-        "high blast radius, needs a dedicated gated build. Diagnosed 2026-07-24."
+        "FULLY DIAGNOSED 2026-07-24. TWO layers: (1) the natural-products handler "
+        "recognizes the tropane scaffold and, finding no decoration it can express, "
+        "returns bare 'tropane' (drops the ester). Making it decline on low coverage "
+        "(<0.50, no decoration) lets the pipeline fall through -- BUT that then hits "
+        "(2) the generic name_ester, which LINEARIZES the tropic acid to 'nonanoate' "
+        "(a constitutionally-wrong C9 acid), and because the stereo-bicyclic name "
+        "'(1R,3r,5S)-tropan-3-yl nonanoate' evades OPSIN (parse-fail-open), SELF-01 "
+        "SHIPS the wrong name -- a 0-wrong violation. So the NP-decline alone is "
+        "unsafe. The decomposition engine (try_decompose) DOES produce the correct "
+        "acid '3-hydroxy-2-phenylpropanoate', but name_ester wins before it. Safe "
+        "build needs a name_ester acid-side structure-conservation guard (fail "
+        "closed when the acid would linearize a ring/branch) OR a dispatch reorder "
+        "so try_decompose precedes name_ester -- both HIGH blast radius (~280 corpus "
+        "esters route through name_ester). Dedicated gated effort. (The alkyl-side "
+        "'tropan-3-yl' half is now correct via the _alcohol_to_alkyl locant fix.)"
     ), strict=False)
     def test_tropine_tropate_ester_names_bicyclic_ring_alcohol(self):
         # WSC-02: tropine (8-methyl-8-azabicyclo[3.2.1]octan-3-ol) ester of tropic
