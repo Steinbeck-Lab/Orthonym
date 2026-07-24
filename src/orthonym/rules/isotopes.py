@@ -166,6 +166,126 @@ def _p4542_p4543_key(groups) -> tuple:
     return tuple(key)
 
 
+def _decorate_demultiplied(skeleton, keys, original, stripped) -> Optional[str]:
+    """Generalized P-82.2.2.1 de-multiplication (single OR mixed nuclides).
+
+    Split a leading-locant simple multiplier (e.g. ``1,2-dimethoxyethane``) and
+    scope a DISTINCT nuclide descriptor to each labeled copy, leaving at most one
+    copy bare. Handles both:
+      * single-group  — one labeled copy among bare copies
+                        (P-82.2.2.1 + P-45.4.1, e.g. 1-(13C1)methoxy-2-methoxyethane)
+      * mixed         — DISTINCT nuclides on DISTINCT copies, where — because the
+                        parent is symmetric — BOTH numbering directions round-trip
+                        and P-45.4.2/.4.3 must choose (e.g.
+                        1-(18O1)methoxy-2-(13C1)methoxyethane: 18O Z=8 > 13C Z=6).
+
+    Every candidate is OPSIN-RT gated with isotopes retained; among the
+    round-trippers, P-45.4.1 (lowest locants to the modified copies) then
+    P-45.4.2/.4.3 (higher atomic number then higher mass number at the lower
+    locant) selects deterministically. The single-combined-descriptor enumeration
+    in decorate_isotopic_name CANNOT place distinct nuclides on distinct copies,
+    and would exhaust its JVM-per-candidate search fruitlessly on a de-mult
+    skeleton, so this runs FIRST and that enumeration is the fall-through.
+
+    Fail-closed (None) — never a wrong OR non-PIN separated name — when: the
+    skeleton is not a simple-multiplier form; locants repeat (gem copies, which a
+    locant-keyed map cannot tell apart); more than one copy is left bare or a
+    nuclide repeats across copies (the unmodified/identical copies must stay
+    grouped under a reduced multiplier — a DIFFERENT name shape, not this split,
+    e.g. `3,5-dimethyl` not `3-methyl-5-methyl`; NOT built here); the candidate
+    budget would blow up; or nothing round-trips. This is a DELIBERATE PIN-safe
+    scope, not a superset of the single-group-only fallback it replaces (that
+    fallback exploded every copy — non-PIN for >1 bare copy).
+    """
+    import re
+    from itertools import combinations, permutations
+    from math import comb, factorial
+
+    m = re.match(
+        r"^(?P<locs>\d+(?:,\d+)+)-(?P<mult>di|tri|tetra|penta|hexa)(?P<tail>[a-z].+)$",
+        skeleton,
+    )
+    if not m:
+        return None
+    mult_count = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}[m.group("mult")]
+    locs = sorted(int(x) for x in m.group("locs").split(","))
+    if len(locs) != mult_count:
+        return None
+    if len(set(locs)) != len(locs):
+        # Repeated locants (gem-disubstitution, e.g. 1,1,2-...): a locant-keyed
+        # copy map (loc_to_label below) cannot distinguish two copies sharing a
+        # locant, so a single labeled gem-copy is not constructible -> fail closed.
+        return None
+    tail = m.group("tail")
+
+    # One nuclide instance per labeled copy (count 1 each).
+    labels = []
+    for (mass, el), count in keys:
+        labels.extend([(mass, el)] * count)
+    # Scope (PIN-safe de-multiplication): every labeled copy carries a DISTINCT
+    # nuclide and AT MOST ONE copy is left bare. Then no two copies share a
+    # descriptor, so nothing needs re-multiplying and the split is a genuine PIN
+    # de-multiplication. Repeated identical labels / >1 bare copy would require
+    # re-collecting copies under a multiplier (a different name shape) -> fail
+    # closed rather than emit a non-PIN separated form.
+    if (not labels
+            or len(set(labels)) != len(labels)
+            or (mult_count - len(labels)) not in (0, 1)):
+        return None
+    # Cost cap (bounded oracle budget): the assignment search is
+    # C(mult_count, len(labels)) * len(labels)! candidates, EACH OPSIN-RT gated
+    # via a fresh JVM (~1.5-2s). Reject the combinatorial blow-up of high
+    # multipliers with many distinct nuclides (penta/hexa reach 720) -> fail
+    # closed rather than spend minutes; 24 covers di/tri/tetra, the verified
+    # target being di.
+    if comb(mult_count, len(labels)) * factorial(len(labels)) > 24:
+        return None
+
+    # Find the substituent/parent split point(s) against the UNLABELED skeleton
+    # FIRST (bounded: <= len(tail) probes). A non-de-mult skeleton or a
+    # parent-labeled skeleton exits here cheaply instead of exhausting the oracle.
+    valid_ks = []
+    for k in range(1, len(tail)):
+        base = tail[:k]
+        bare = "-".join(f"{L}-{base}" for L in locs) + tail[k:]
+        if _isotope_round_trips(bare, stripped):
+            valid_ks.append(k)
+    if not valid_ks:
+        return None
+
+    winners = []  # (p4541_key, p4542_key, k, candidate)
+    # labels are all distinct (guard above), so permutations yields no duplicates
+    # and need not be de-duped; iteration order does not affect the RESULT because
+    # the final sort key ends in the candidate string (see the sort comment).
+    for chosen in combinations(locs, len(labels)):
+        for perm in permutations(labels):
+            loc_to_label = dict(zip(chosen, perm))
+            for k in valid_ks:
+                base, parent = tail[:k], tail[k:]
+                segs = []
+                for L in locs:
+                    if L in loc_to_label:
+                        mass, el = loc_to_label[L]
+                        desc = format_isotope_descriptor([(None, mass, el, 1)])
+                        segs.append(f"{L}-{desc}{base}")
+                    else:
+                        segs.append(f"{L}-{base}")
+                cand = "-".join(segs) + parent
+                if _isotope_round_trips(cand, original):
+                    groups = [(L, loc_to_label[L][0], loc_to_label[L][1], 1)
+                              for L in sorted(loc_to_label)]
+                    p4541 = tuple(sorted(loc_to_label))
+                    winners.append((p4541, _p4542_p4543_key(groups), k, cand))
+    if not winners:
+        return None
+    # P-45.4.1 (lowest locants to modified copies) then P-45.4.2/.4.3; the
+    # trailing candidate STRING term (w[3]) makes the winner fully deterministic
+    # regardless of assignment-iteration order -- it is load-bearing, not a
+    # decorative tiebreak. Do not drop it.
+    winners.sort(key=lambda w: (w[0], w[1], w[2], w[3]))
+    return winners[0][3]
+
+
 def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     """Fail-closed isotopic-substitution PIN (P-82.2.1 + P-45.4).
 
@@ -203,6 +323,17 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
 
     # Alphabetical by element then mass (P-82.2.1 citation order).
     keys = sorted(by_key.items(), key=lambda kv: (kv[0][1], kv[0][0]))
+
+    # P-82.2.2.1 de-multiplication FIRST (single OR mixed nuclides). This is the
+    # ONLY path that can place DISTINCT nuclides on DISTINCT copies of a
+    # de-multiplied substituent (the mixed 18O/13C case), and it is bounded, so
+    # routing it ahead of the single-combined-descriptor enumeration below both
+    # (a) fixes that case and (b) avoids the fruitless JVM-per-candidate
+    # exhaustion that enumeration performs on a de-mult skeleton. Fail-through to
+    # the enumeration when the skeleton is not a de-mult form.
+    demux = _decorate_demultiplied(skeleton, keys, original, stripped)
+    if demux is not None:
+        return demux
 
     def _descriptor(locant):
         groups = [(locant, mass, el, count) for (mass, el), count in keys]
@@ -247,38 +378,9 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
             # do not consider higher-locant forms once a lower one succeeds.
             break
     if not winners:
-        # P-82.2.2.1 de-multiplication (offset enumerator found nothing). When the
-        # skeleton is a leading-locanted simple-multiplier form (1,2-dimethoxy…)
-        # and there is ONE (mass,element) group modifying exactly ONE of the
-        # identical copies, the 'di'/'tri' multiplier must be SPLIT and the
-        # descriptor scoped to a single copy (P-82.2.2.1:
-        # 2-(13C)methyl-3-methylpyridine [not 2,3-(2-13C)dimethylpyridine]). Each
-        # candidate is OPSIN-round-trip-gated WITH isotopes; P-45.4.1 (lowest
-        # locant to the modified substituent group) breaks the symmetric tie.
-        import re
-        m = re.match(
-            r"^(?P<locs>\d+(?:,\d+)+)-(?P<mult>di|tri|tetra|penta|hexa)(?P<tail>[a-z].+)$",
-            skeleton,
-        )
-        if m and len(keys) == 1:                       # single (mass,element) group only (v1 scope)
-            mult_count = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}[m.group("mult")]
-            locs = [int(x) for x in m.group("locs").split(",")]
-            (mass, el), total = keys[0]
-            if len(locs) == mult_count and total == 1:  # exactly one labeled copy (v1 scope)
-                desc = format_isotope_descriptor([(None, mass, el, total)])   # e.g. (13C1)
-                tail = m.group("tail")
-                demux = []                              # (Lk, k, candidate)
-                for Lk in locs:
-                    for k in range(1, len(tail)):
-                        base, parent = tail[:k], tail[k:]
-                        segs = [f"{L}-{desc}{base}" if L == Lk else f"{L}-{base}"
-                                for L in sorted(locs)]
-                        cand = "-".join(segs) + parent
-                        if _isotope_round_trips(cand, original):
-                            demux.append((Lk, k, cand))
-                if demux:
-                    demux.sort(key=lambda t: (t[0], t[1], t[2]))  # P-45.4.1 lowest labeled locant
-                    return demux[0][2]
+        # De-multiplication (single AND mixed nuclides) was already attempted
+        # ahead of this enumeration by _decorate_demultiplied; nothing else to
+        # try -> fail closed (never a wrong labeled name).
         return None
     # Among equally-low-locant round-trippers, P-45.4.2/.4.3 then front-first.
     winners.sort(key=lambda w: (w[0], w[1], w[2]))

@@ -181,6 +181,16 @@ class TestDeMultiplicationP4542:
         got = name_compound("[13CH3]OCCOC", style="pin")
         assert got.startswith("1-(13C1)methoxy"), got
 
+    def test_mixed_two_nuclide_demux_p4542(self):
+        # W2F-P5-11: TWO DIFFERENT nuclides (18O and 13C), one per identical
+        # methoxy copy. The parent (1,2-dimethoxyethane) is symmetric, so BOTH
+        # numbering directions round-trip in OPSIN — the oracle cannot choose.
+        # P-45.4.2 governs: the HIGHER atomic number gets the LOWER locant, so
+        # 18O (Z=8) > 13C (Z=6) => 18O-methoxy at locant 1. Gold OPSIN-RT verified.
+        from orthonym.namer import name_compound
+        got = name_compound("C[18O]CCO[13CH3]", style="pin")
+        assert got == "1-(18O1)methoxy-2-(13C1)methoxyethane", f"got {got!r}"
+
     @pytest.mark.parametrize("smiles,expected", [
         # PROTECT: existing shipped isotope golds unaffected (skeletons carry no
         # LEADING locanted simple multiplier -> de-mult branch inert)
@@ -198,18 +208,62 @@ class TestDeMultiplicationP4542:
             or name_compound(smiles, style="pin") == expected
 
 
+class TestDeMultScopeGuards:
+    """Fail-closed scope guards in _decorate_demultiplied (OPSIN-free: each case
+    returns None BEFORE the oracle loop, so these are fast and deterministic).
+
+    These lock the PIN-safe / cost-safe boundaries hardened after code review:
+    repeated locants, repeated nuclides, >1 bare copy, and combinatorial blow-up
+    all fail closed rather than emit a non-PIN separated name or exhaust the
+    JVM-per-candidate oracle.
+    """
+    def _call(self, skeleton, keys):
+        from orthonym.rules.isotopes import _decorate_demultiplied
+        # original/stripped are untouched when a guard fires before the oracle.
+        return _decorate_demultiplied(skeleton, keys, None, None)
+
+    def test_not_a_demult_form_returns_none(self):
+        assert self._call("ethan-1-ol", [((13, "C"), 1)]) is None
+
+    def test_repeated_locants_gem_copies_fail_closed(self):
+        # 1,1,2-... : a locant-keyed copy map cannot tell the two locant-1 copies
+        # apart -> fail closed (never a mis-labeled candidate).
+        assert self._call("1,1,2-trimethylbenzene", [((13, "C"), 1)]) is None
+
+    def test_repeated_nuclide_across_copies_fail_closed(self):
+        # both copies 13C: identical copies must stay grouped under a multiplier
+        # (a different name shape), not be separated -> fail closed.
+        assert self._call("1,2-dimethylbenzene", [((13, "C"), 2)]) is None
+
+    def test_more_than_one_bare_copy_fail_closed(self):
+        # one 13C among THREE methyl copies: the two unmodified copies must be
+        # re-multiplied (3,5-dimethyl), not exploded -> out of scope, fail closed.
+        assert self._call("1,2,3-trimethylbenzene", [((13, "C"), 1)]) is None
+
+    def test_combinatorial_blowup_capped(self):
+        # hexa with 5 distinct nuclides = C(6,5)*5! = 720 candidates -> reject
+        # rather than spend minutes of fresh-JVM OPSIN calls.
+        keys = [((13, "C"), 1), ((14, "C"), 1), ((15, "N"), 1),
+                ((17, "O"), 1), ((18, "O"), 1)]
+        assert self._call("1,2,3,4,5,6-hexamethylbenzene", keys) is None
+
+
 class TestRefuseOnUndecoratablePolicy:
-    def test_mixed_two_label_construct_refuses(self):
-        # mixed 18O/13C two-copy: two DIFFERENT (mass,el) groups -> de-mult inert
-        # (single-group only) and the combined single-token candidate does NOT RT
-        # -> decorator None -> REFUSE, never the label-dropping '1,2-dimethoxyethane'.
+    def test_mixed_two_label_now_decorated(self):
+        # HISTORY: the mixed 18O/13C two-copy case used to fail closed (v1 de-mult
+        # was single-group only). The multi-nuclide de-mult extension now names it;
+        # it must emit the P-45.4.2 PIN, NEVER the label-dropping unlabeled skeleton.
         from orthonym.namer import name_compound
-        assert name_compound("C[18O]CCO[13CH3]", style="pin") == "unknown organic compound"
+        assert name_compound("C[18O]CCO[13CH3]", style="pin") == \
+            "1-(18O1)methoxy-2-(13C1)methoxyethane"
 
     def test_labeled_molecule_never_drops_label(self):
         from orthonym.namer import name_compound
         out = name_compound("C[18O]CCO[13CH3]", style="pin")
-        assert "dimethoxyethane" not in out   # the unlabeled skeleton is NOT emitted
+        # the unlabeled skeleton '1,2-dimethoxyethane' must NOT be emitted, and
+        # BOTH nuclide labels must appear in the name.
+        assert "dimethoxyethane" not in out
+        assert "18O" in out and "13C" in out
 
     def test_unlabeled_corpus_byte_identical(self):
         # the has_isotopes gate keeps the new policy inert on unlabeled input
