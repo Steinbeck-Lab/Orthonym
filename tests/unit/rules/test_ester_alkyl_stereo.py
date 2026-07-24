@@ -76,6 +76,32 @@ class TestAlkylSideStereoAbsent:
         )
 
 
+class TestRingAlcoholEster:
+    """WSC-02 (P-65.6.3): esters whose ALCOHOL component is a NON-benzene ring
+    (cyclohexyl, oxolanyl, a bicyclic tropane, ...) must name the ring fragment,
+    not linearize it. Before: get_alkyl_fragment_name's has_ring branch handled
+    only benzene, then fell through to the carbon-count chain namer -> a
+    constitutionally-wrong chain (dropping the ring/heteroatoms). For the tropine
+    tropate ester that meant 'tropane' with the whole ester dropped, which the
+    SELF-01 gate correctly suppressed to 'unknown'."""
+
+    @pytest.mark.xfail(reason=(
+        "WSC-02 tropane ester: KNOWN GAP (0-wrong -- fails closed to 'unknown'). "
+        "Root cause is NOT get_alkyl_fragment_name (that path isn't selected): a "
+        "substitutive ring handler wins over the ester functional-class handler "
+        "for a cyclic alcohol component, naming the ester as an acyloxy prefix "
+        "(acetyloxycyclohexane) or dropping it (tropane -> ester lost). P-65.6.3.2.1 "
+        "makes the functional-class ester name the PIN, so the fix is a handler-"
+        "PRIORITY change (ester functional-class must win for cyclic alcohols) -- "
+        "high blast radius, needs a dedicated gated build. Diagnosed 2026-07-24."
+    ), strict=False)
+    def test_tropine_tropate_ester_names_bicyclic_ring_alcohol(self):
+        # WSC-02: tropine (8-methyl-8-azabicyclo[3.2.1]octan-3-ol) ester of tropic
+        # acid. Target = the accept_also form (1R,3r,5S)-tropan-3-yl ... propanoate.
+        name = name_compound("CN1[C@@H]2CC[C@H]1C[C@H](C2)OC(=O)C(CO)c1ccccc1")
+        assert name == "(1R,3r,5S)-tropan-3-yl 3-hydroxy-2-phenylpropanoate", f"got {name!r}"
+
+
 class TestAcidSideStereoRegression:
     """Acid-side stereo must continue to work after alkyl-side changes."""
 
