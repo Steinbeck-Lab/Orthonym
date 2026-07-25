@@ -279,7 +279,9 @@ def test_p2_is_skipped_when_p1_fails():
     # often what explains the P1 failure; P5 needs P4's spans to be meaningful,
     # which a non-partitioning token set does not give.
     assert p.stats["p5_skipped"] is True
-    assert p.stats["proofs"] == ("P1", "P3", "P4", "P6")
+    # P7, like P4 and P6, reads each binding against the graph on its own and
+    # needs nothing from the partition, so it still runs when P1 has failed.
+    assert p.stats["proofs"] == ("P1", "P3", "P4", "P6", "P7")
     assert "bonds_total" not in p.stats
     assert "residue_runs" not in p.stats
 

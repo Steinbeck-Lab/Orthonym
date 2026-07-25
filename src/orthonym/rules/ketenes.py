@@ -84,17 +84,20 @@ def name_ketene(mol) -> Optional[str]:
     # Branch 3 (P-64.5(3) oxomethylidene on a ring): terminal C is a RING
     # atom (spiro-exocyclic cumulene) -> '<ring-ylidene>methanone'
     # (cyclohexylidenemethanone). Ring must be a plain cycloalkane fragment
-    # nameable as a '-yl' substituent; else fail closed.
+    # nameable as an '-ylidene' substituent; else fail closed.
     if terminal_c.IsInRing():
         ring_atoms = ({a.GetIdx() for a in mol.GetAtoms()}
                       - {sp_carbon.GetIdx(), oxygen.GetIdx()})
-        from ..assembly.substituent_enumerator import name_substituent
-        base = name_substituent(mol, ring_atoms, terminal_c.GetIdx())
-        if not base or not base.endswith("yl"):
+        from ..assembly.substituent_enumerator import name_ylidene_substituent
+        # The ring is DOUBLE-bonded to the sp carbon, so the pipeline returns
+        # the '-ylidene' already formed; appending 'idene' to a '-yl' token
+        # here would be the morphology decided twice.
+        base = name_ylidene_substituent(mol, ring_atoms, terminal_c.GetIdx())
+        if base is None:
             return None
         if mol.GetNumHeavyAtoms() != len(ring_atoms) + 2:
             return None
-        return f"{base}idene" + "methanone"
+        return f"{base}methanone"
 
     # Branch 2 (P-64.2.2.4): BOTH substituents identical ARYL groups, zero H
     # on the terminal C -> '<di><name>ethenone' (BB/scope-decision verbatim:

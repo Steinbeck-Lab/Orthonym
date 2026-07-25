@@ -306,11 +306,312 @@ def _verify_completeness(mol, parent_atoms, substituents,
 
 
 # ============================================================================
+# P-29.2 free-valence morphology (Phase 1b)
+# ============================================================================
+#
+# IUPAC 2013 P-29.2 fixes a substituent prefix's ENDING by the number of free
+# valences on the attachment atom:
+#
+#     one   -> -yl       (methyl,      single bond to the parent)
+#     two   -> -ylidene  (methylidene, double bond to the parent)
+#     three -> -ylidyne  (methylidyne, triple bond to the parent)
+#
+# That number is a property of the ATTACHMENT BOND, not of the fragment's
+# composition and not of its hydrogen count. Every tier of the naming cascade
+# below builds its token from the fragment alone, so none of them can know it;
+# ``name_substituent`` is the only place that holds the fragment AND the
+# attachment atom together, which is why the morphology is decided here, once,
+# for every tier.
+#
+# P-29.2 also settles the spelling: ``methylidene`` is the PIN for =CH2 as a
+# prefix. ``methylene`` is the retained/general form and is NOT the PIN, so it
+# is never emitted.
+
+#: P-29.2 free-valence count -> suffix morpheme.
+_FREE_VALENCE_SUFFIX = {1: 'yl', 2: 'ylidene', 3: 'ylidyne'}
+
+#: Bond order -> free-valence count. Aromatic and dative bonds are absent on
+#: purpose: they carry no integer free valence, so no morphology can be
+#: asserted for them and the caller must treat them as undecidable.
+_BOND_FREE_VALENCE = {
+    Chem.BondType.SINGLE: 1,
+    Chem.BondType.DOUBLE: 2,
+    Chem.BondType.TRIPLE: 3,
+}
+
+
+def _free_valence_at_attachment(mol, frag_atoms, attach_idx):
+    """How many free valences the fragment's attachment atom carries.
+
+    Reads the ACTUAL bond order of the single bond leaving the fragment, per
+    P-29.2. Deliberately not the hydrogen count: H count merely correlates with
+    bond order (``-CH3`` vs ``=CH2``), and a correlation is what produced the
+    ``methyl``-for-``=CH2`` defect in the first place.
+
+    Args:
+        mol: RDKit Mol of the FULL molecule.
+        frag_atoms: Iterable of atom indices forming the substituent fragment.
+        attach_idx: The fragment atom bonded to the enclosing parent. Note this
+            is an atom OF the fragment, so the linkage bond is the one from it
+            to a neighbour OUTSIDE ``frag_atoms``.
+
+    Returns:
+        1, 2 or 3 -- or ``None`` when the shape is outside the P-29.2
+        single-attachment-atom case: the fragment touches the parent at more
+        than one bond (a bridge/spiro, P-25 rather than a prefix), the linkage
+        is aromatic or dative (no integer order), or there is no linkage at
+        all. ``None`` means UNDECIDABLE and must never be read as 1.
+    """
+    frag = set(frag_atoms)
+    if attach_idx not in frag:
+        return None
+    linkage = []
+    for idx in frag:
+        atom = mol.GetAtomWithIdx(idx)
+        for bond in atom.GetBonds():
+            other = bond.GetOtherAtomIdx(idx)
+            if other in frag:
+                continue
+            if mol.GetAtomWithIdx(other).GetAtomicNum() <= 1:
+                continue  # explicit H is part of the fragment's own saturation
+            linkage.append((idx, bond))
+    # Exactly one bond out of the fragment is what a -yl/-ylidene/-ylidyne
+    # prefix describes. Two or more is a bridge (P-25), whatever their orders.
+    if len(linkage) != 1:
+        return None
+    src, bond = linkage[0]
+    if src != attach_idx:
+        return None
+    return _BOND_FREE_VALENCE.get(bond.GetBondType())
+
+
+def _token_asserts_single_free_valence(token):
+    """True when ``token``'s own text CONFIDENTLY spells one free valence.
+
+    A valence-conservation guard, never a producer: a token this returns True
+    for may not be emitted for a double or triple attachment, because it names
+    a different molecule.
+
+    Delegates to the shared P-29.2 text oracle so the producer and the proof
+    spine's P7 cannot drift apart about what a token asserts. Anything the
+    oracle refuses (``oxo``, ``hydroxy``, a multiplied ``-diyl`` ending) is not
+    claimed here, so the guard never suppresses a prefix on a reading it could
+    not defend.
+    """
+    from ..validation.name_morphemes import free_valence_morphology
+    estimate = free_valence_morphology(token)
+    return bool(estimate.confident and estimate.free_valences == 1)
+
+
+def _carbon_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
+    """P-29.2 ``-ylidene`` / ``-ylidyne`` prefix for a CARBON free valence.
+
+    Builds the token from the structure -- the parent hydride the fragment IS,
+    plus the P-29.2 morpheme -- for two shapes:
+
+    *Acyclic*: the chain running through the attachment atom, numbered so the
+    free valence takes the lowest locant it can (P-29.3.2).
+
+        =CH2                -> methylidene
+        CH3-CH=             -> ethylidene
+        CH3-CH2-CH=         -> propylidene       (P-29.6.2.3 retained stem)
+        (CH3)2C=            -> propan-2-ylidene
+        CH3-C(triple)       -> ethylidyne
+
+    *Monocyclic*: an unsubstituted saturated carbocycle, whose free valence is
+    on a ring atom and needs no locant (P-29.3.3 -- every ring atom of an
+    otherwise-bare cycloalkane is equivalent).
+
+        -(CH2)5C=           -> cyclohexylidene
+
+    Fails closed (``None``) on everything else -- a heteroatom attachment,
+    unsaturation or a charge inside the fragment, a branch hanging off the
+    chain, a decorated or polycyclic ring, or any CIP stereo the ``-yl`` stereo
+    emitter would have to describe. Callers must NOT degrade a ``None`` into a
+    ``-yl`` token.
+    """
+    suffix = _FREE_VALENCE_SUFFIX.get(free_valence)
+    if suffix is None or free_valence == 1:
+        return None
+    frag = set(frag_atoms)
+    if attach_idx not in frag:
+        return None
+
+    from ..data.chain_names import get_chain_prefix
+
+    # -- fragment must be neutral, saturated, all-carbon, stereo-free --
+    ring_info = mol.GetRingInfo()
+    in_ring = 0
+    for idx in frag:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetAtomicNum() != 6:
+            return None
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons():
+            return None
+        if atom.GetIsotope():
+            return None
+        if atom.HasProp('_CIPCode'):
+            return None
+        if atom.IsInRing():
+            in_ring += 1
+            # A ring atom in more than one ring is a fused/spiro/bridged
+            # system, whose parent hydride this constructor does not build.
+            if ring_info.NumAtomRings(idx) != 1:
+                return None
+    for bond in mol.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in frag and j in frag:
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            if bond.HasProp('_CIPCode'):
+                return None
+
+    # -- monocyclic branch: a bare saturated carbocycle --
+    if in_ring:
+        # Every fragment atom must be in the SAME single ring: a ring carrying
+        # any substituent would need that substituent's own prefix and locant.
+        if in_ring != len(frag):
+            return None
+        rings = [r for r in ring_info.AtomRings() if attach_idx in r]
+        if len(rings) != 1 or set(rings[0]) != frag:
+            return None
+        stem = get_chain_prefix(len(frag))
+        return f"cyclo{stem}{suffix}" if stem else None
+
+    # -- longest chain through the attachment atom, free valence lowest --
+    # Depth of each branch leaving the attachment atom (the fragment is a tree,
+    # so a plain DFS depth is the longest simple path into that branch).
+    def _depth(start, banned):
+        best, stack = 0, [(start, banned, 1)]
+        while stack:
+            cur, seen, dist = stack.pop()
+            best = max(best, dist)
+            for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                k = nb.GetIdx()
+                if k in frag and k not in seen:
+                    stack.append((k, seen | {k}, dist + 1))
+        return best
+
+    branches = sorted(
+        (_depth(nb.GetIdx(), {attach_idx, nb.GetIdx()})
+         for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+         if nb.GetIdx() in frag),
+        reverse=True)
+    longest = branches[0] if branches else 0
+    second = branches[1] if len(branches) > 1 else 0
+    chain_len = 1 + longest + second
+    # Numbering from the SHORTER side gives the free valence its lowest locant.
+    locant = second + 1
+
+    # The chain must BE the fragment. A branch hanging off it would need its
+    # own prefix and locant, which is a different construction than the one
+    # built here -- fail closed rather than lose it.
+    if chain_len != len(frag):
+        return None
+
+    from ..data.chain_names import get_chain_prefix
+    stem = get_chain_prefix(chain_len)
+    if not stem:
+        return None
+    if locant == 1:
+        # Retained unbranched form: methylidene / ethylidene / propylidene.
+        return f"{stem}{suffix}"
+    return f"{stem}an-{locant}-{suffix}"
+
+
+# ============================================================================
 # Universal Substituent Naming (Phase 85)
 # ============================================================================
 
 
 def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
+    """Name a substituent fragment with the free-valence morphology P-29.2 requires.
+
+    Thin P-29.2 gate over :func:`_name_substituent_cascade`, which holds the
+    five-tier naming logic. The split exists because the cascade's tiers all
+    build their token from the FRAGMENT alone -- they never see the attachment
+    bond -- so none of them can know whether the free valence is single
+    (``-yl``), double (``-ylidene``) or triple (``-ylidyne``). This function is
+    the one place that holds the fragment and the attachment atom together, so
+    the morphology is decided here, once, for every tier.
+
+    Behaviour by free valence:
+
+    * **one** (or undecidable -- a bridge, an aromatic linkage): the cascade
+      runs and its answer is returned untouched. This is the overwhelmingly
+      common case and is byte-identical to the pre-P-29.2 behaviour.
+    * **two or three**: the carbon ylidene/ylidyne constructor gets first
+      refusal; if it declines, the cascade runs and its answer is accepted ONLY
+      if the token does not spell a single free valence. A ``-yl`` token on a
+      doubly-bonded free valence names a DIFFERENT molecule, so it is refused
+      rather than shipped -- ``None`` under ``allow_mancude`` (the Tier-4.5
+      de-masking convention) and the ``'substituent'`` unnameable sentinel
+      otherwise, both of which fail closed downstream.
+
+    The correct multivalent heteroatom prefixes (``oxo``, ``sulfanylidene``,
+    ``imino``, ...) spell no ``-yl`` morpheme, so they pass the guard untouched.
+
+    References:
+        IUPAC 2013 P-29.2 (free-valence morphology), P-29.3.2 (lowest locant
+        for the free valence).
+    """
+    frag_atoms_set = set(frag_atoms)
+    free_valence = _free_valence_at_attachment(mol, frag_atoms_set, attach_idx)
+
+    if free_valence in (2, 3):
+        ylidene = _carbon_ylidene_prefix(
+            mol, frag_atoms_set, attach_idx, free_valence)
+        if ylidene:
+            return ylidene
+
+    token = _name_substituent_cascade(
+        mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
+
+    if free_valence in (2, 3) and _token_asserts_single_free_valence(token):
+        from ..metrics.abstention import AbstentionCode, record_abstention
+        record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                          detail='p29_2_free_valence_morphology')
+        logger.debug(
+            "P-29.2 guard: refused %r for a free valence of %d at atom %d",
+            token, free_valence, attach_idx)
+        return None if allow_mancude else "substituent"
+
+    return token
+
+
+def name_ylidene_substituent(mol, frag_atoms, attach_idx):
+    """Name a fragment whose bond to its parent is DOUBLE, or ``None``.
+
+    The shared entry point for the namers that cite a doubly-bonded fragment --
+    hydrazone, semicarbazone, azine, the cumulative ium/ide chain, the P-64.5(3)
+    ketene branch. Each of them used to spell the morphology itself::
+
+        yl = name_substituent(mol, frag, c)
+        if not yl.endswith("yl"):
+            return None
+        ... f"{yl}idene" ...
+
+    which decided the free valence a second time, in the consumer, by rewriting
+    a token. It only worked while the pipeline was returning the WRONG
+    single-valence token for a double bond; correcting the pipeline made every
+    such consumer reject its own correct input.
+
+    Here the producer owns the morphology and the consumer VERIFIES it: the
+    token comes back from ``name_substituent`` already carrying the P-29.2
+    ending its attachment bond earned, and is returned only if its own text
+    confirms the two free valences. Nothing is appended, so there is no second
+    place for the two to disagree.
+    """
+    from ..validation.name_morphemes import free_valence_morphology
+    token = name_substituent(mol, frag_atoms, attach_idx)
+    estimate = free_valence_morphology(token)
+    if estimate.confident and estimate.free_valences == 2:
+        return token
+    return None
+
+
+def _name_substituent_cascade(mol, frag_atoms, attach_idx,
+                              allow_mancude: bool = False):
     """Name any substituent fragment.
 
     Five-tier naming cascade:
@@ -893,9 +1194,21 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
         # Sulfur
         if sym == 'S':
             return 'sulfanyl' if total_hs >= 1 else 'sulfanylidene'
-        # Single carbon
+        # Single carbon -- P-29.2: the morphology follows the ATTACHMENT BOND
+        # ORDER, not the hydrogen count. The neighbouring branches above
+        # discriminate on H count, which merely correlates; that correlation is
+        # what made this branch emit 'methyl' unconditionally and name an
+        # exocyclic =CH2 as a singly-bonded methyl -- a wrong STRUCTURE.
         if sym == 'C':
-            return 'methyl'
+            free_valence = _free_valence_at_attachment(
+                mol, frag_atoms, attach_idx)
+            suffix = _FREE_VALENCE_SUFFIX.get(free_valence)
+            if suffix is None:
+                # Undecidable shape (bridge, aromatic linkage). Naming it
+                # 'methyl' would assert a single free valence this function
+                # cannot see; abstain instead.
+                return "substituent"
+            return f"meth{suffix}"
 
     # Carbon-only fragments: use alkyl names
     if carbons > 0 and not heteroatoms:

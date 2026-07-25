@@ -2068,7 +2068,7 @@ def _try_name_semicarbazone(features: Any) -> Optional[str]:
     Fail-closed: exactly one motif; the terminal carboxamide N and the
     bridge N must be UNSUBSTITUTED (the SMARTS [NX3H2]/[NX3H1] enforces
     this — N-methyl variants need N-locant machinery not built here); the
-    ylidene fragment must name via the substituent pipeline as a '-yl'."""
+    ylidene fragment must name via the substituent pipeline as an '-ylidene'."""
     from rdkit import Chem
     mol = features.mol
     patt = Chem.MolFromSmarts("[CX3](=[NX2][NX3H1][CX3](=[OX1])[NX3H2])")
@@ -2095,11 +2095,35 @@ def _try_name_semicarbazone(features: Any) -> Optional[str]:
             if nb.GetIdx() not in frag]
     if _ext != [n2]:
         return None
-    from .substituent_enumerator import name_substituent
-    yl = name_substituent(mol, frag, c)
-    if not yl or not yl.endswith("yl"):
+    # The substituent pipeline emits the P-29.2 morphology for the attachment
+    # bond it is given, and this attachment IS the C=N double bond, so the
+    # '-ylidene' comes back already formed. It used to be spelled here by
+    # appending 'idene' to a '-yl' token; that duplicated the morphology
+    # decision in a second place and only worked because the pipeline was
+    # returning the WRONG (single-valence) token for a double bond.
+    ylidene = _double_bonded_carbon_prefix(mol, frag, c)
+    if ylidene is None:
         return None
-    return f"2-({yl}idene)hydrazine-1-carboxamide"
+    return f"2-({ylidene})hydrazine-1-carboxamide"
+
+
+def _double_bonded_carbon_prefix(mol, frag, c) -> Optional[str]:
+    """The P-29.2 ``-ylidene`` prefix for fragment ``frag`` double-bonded to
+    the rest of the molecule at its carbon ``c``, or ``None``.
+
+    Shared by the semicarbazone and hydrazone namers, which differ only in the
+    tail they cite it on. The morphology is verified rather than assumed: the
+    substituent pipeline is the single producer, and the returned token is
+    accepted only if its own text spells the two free valences the C=N bond
+    actually has.
+    """
+    from .substituent_enumerator import name_substituent
+    from ..validation.name_morphemes import free_valence_morphology
+    token = name_substituent(mol, frag, c)
+    morphology = free_valence_morphology(token)
+    if morphology.confident and morphology.free_valences == 2:
+        return token
+    return None
 
 
 def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
@@ -2109,8 +2133,9 @@ def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
 
     Mirrors ``_try_name_semicarbazone`` minus the carboxamide tail: match the
     bare hydrazone motif R2C=N-NH2, BFS the ylidene fragment from the sp2 C
-    (never crossing the =N), name it via the substituent pipeline ('-yl' ->
-    '-ylidene'), and cite it on 'hydrazine'. A LONE ylidene on the symmetric
+    (never crossing the =N), name it via the substituent pipeline -- which
+    emits the '-ylidene' directly, off the C=N bond order -- and cite it on
+    'hydrazine'. A LONE ylidene on the symmetric
     hydrazine takes no position locant (P-14.3.4.2: unambiguous); a complex
     ylidene name is enclosed in parentheses.
 
@@ -2118,8 +2143,8 @@ def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
     motif; the terminal N MUST be an unsubstituted -NH2 (the [NX3H2] guard) and
     the imino N must bear only the =C and the -NH2 (no N-substituent — that is
     the 1,1-/1,2-disubstituted-hydrazine class, N-locant machinery not built
-    here); the ylidene fragment must name via the substituent pipeline as a
-    '-yl'; and it must account for every non-core atom."""
+    here); the ylidene fragment must name via the substituent pipeline as an
+    '-ylidene'; and it must account for every non-core atom."""
     from rdkit import Chem
     mol = features.mol
     patt = Chem.MolFromSmarts("[CX3]=[NX2][NX3H2]")
@@ -2150,12 +2175,10 @@ def _try_name_hydrazone_substitutive(features: Any) -> Optional[str]:
             if nb.GetIdx() not in frag]
     if _ext != [n2]:
         return None
-    from .substituent_enumerator import name_substituent
     from .naming_utils import is_complex_substituent
-    yl = name_substituent(mol, frag, c)
-    if not yl or not yl.endswith("yl"):
+    ylidene = _double_bonded_carbon_prefix(mol, frag, c)
+    if ylidene is None:
         return None
-    ylidene = f"{yl}idene"
     if is_complex_substituent(ylidene):
         ylidene = f"({ylidene})"
     return f"{ylidene}hydrazine"
@@ -9278,24 +9301,25 @@ def _pure_linear_alkyl_len(mol, start_idx: int, exclude: set) -> Optional[int]:
 
 
 def _convert_yl_to_ylidene(name: str) -> str:
-    """Convert an alkyl substituent name to its ylidene form.
+    """Give a ring substituent's name the P-29.2 double-valence morphology.
 
-    IUPAC P-31.1.3.1: Substituents attached to a parent by a double bond
-    use the suffix -ylidene instead of -yl.
+    IUPAC P-29.2 / P-31.1.3.1: a substituent joined to its parent by a double
+    bond ends in ``-ylidene``, not ``-yl``.
 
-    Examples:
-        methyl   -> methylidene
-        ethyl    -> ethylidene
-        propyl   -> propylidene
-        isopropyl -> isopropylidene
-        phenyl   -> phenylid (not applicable for ring exocyclic, but handled)
-        vinyl    -> vinylidene
+    IDEMPOTENT, and that is the point. The substituent pipeline now reads the
+    attachment bond order itself and hands back ``methylidene`` already formed,
+    so a token that already spells two free valences is returned untouched --
+    only a token that confidently spells ONE is given the ending it is missing.
+    Anything the morphology oracle cannot read (``oxo``, a ``-diyl``) is left
+    alone rather than rewritten on a guess.
 
-    If the name doesn't end in -yl, returns the name with 'idene' appended
-    (handles edge cases like retained names).
+    The rewrite survives for the ``get_alkyl_name(carbon_count)`` fallback at
+    the two call sites, which counts carbons and can only produce the ``-yl``
+    form. Retiring it belongs with retiring that fallback.
     """
-    if name.endswith('yl'):
-        # methyl -> methylidene, ethyl -> ethylidene
+    from ..validation.name_morphemes import free_valence_morphology
+    estimate = free_valence_morphology(name)
+    if estimate.confident and estimate.free_valences == 1:
         return name + 'idene'
     return name
 

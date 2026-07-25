@@ -98,7 +98,8 @@ def _is_azine(features: Any) -> bool:
 
 def _ylidene_arm(mol, c_idx: int, n_idx: int) -> Optional[Tuple[str, Set[int]]]:
     """BFS the ylidene fragment rooted at ``c_idx`` (never crossing the imino
-    ``n_idx``), name it via the substituent pipeline ('-yl' -> '-ylidene').
+    ``n_idx``) and name it via the substituent pipeline, which emits the
+    P-29.2 '-ylidene' directly from the C=N bond order.
     Return ``(ylidene_name, fragment_atom_set)`` or None."""
     frag: Set[int] = {c_idx}
     stack = [c_idx]
@@ -114,11 +115,11 @@ def _ylidene_arm(mol, c_idx: int, n_idx: int) -> Optional[Tuple[str, Set[int]]]:
     ext = [nb.GetIdx() for nb in c_atom.GetNeighbors() if nb.GetIdx() not in frag]
     if ext != [n_idx]:
         return None
-    from ..substituent_enumerator import name_substituent
-    yl = name_substituent(mol, frag, c_idx)
-    if not yl or not yl.endswith("yl"):
+    from ..substituent_enumerator import name_ylidene_substituent
+    ylidene = name_ylidene_substituent(mol, frag, c_idx)
+    if ylidene is None:
         return None
-    return f"{yl}idene", frag
+    return ylidene, frag
 
 
 def name_azine(

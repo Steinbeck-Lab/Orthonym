@@ -2158,10 +2158,50 @@ def get_polycyclic_substituents(
             if exclude_atoms and nbr_idx in exclude_atoms:
                 continue
 
-            # Check bond type - skip exocyclic double bonds (=O, =S for suffixes)
+            # ---- exocyclic double bond ----
+            # This used to be a blanket skip for ALL of them, justified by
+            # "=O, =S are handled as suffixes". That premise holds only for the
+            # chalcogens -- and the recognised ones have in any case already
+            # been removed by the exclude_atoms check above, which carries
+            # _detect_ring_functional_groups' fg_atoms. It is FALSE for carbon:
+            # no suffix path exists for an exocyclic =CH2, so the atom simply
+            # vanished from the name. A name that omits an atom is a wrong
+            # STRUCTURE, and only the downstream OPSIN round-trip caught it,
+            # which means with no JVM present the wrong name shipped.
+            #
+            # Carbon is therefore named here as the P-29.2 free-valence prefix
+            # it is (methylidene / ethylidene / propan-2-ylidene / ...), and
+            # the whole ring system fails closed when it cannot be. Non-carbon
+            # keeps the existing skip: promoting an unrecognised ring C=O to an
+            # 'oxo' prefix would ship a non-PIN name where the code correctly
+            # abstains today, which is a different phase's decision to make.
             bond = mol.GetBondBetweenAtoms(ring_idx, nbr_idx)
             if bond and bond.GetBondTypeAsDouble() == 2.0:
-                # This is an exocyclic double bond, handle as suffix not substituent
+                if neighbor.GetAtomicNum() != 6:
+                    continue
+                from ..assembly.substituent_enumerator import name_substituent
+                from ..validation.name_morphemes import free_valence_morphology
+                ylidene_atoms = _trace_substituent_branch(
+                    mol, nbr_idx, ring_atoms)
+                ylidene_name = name_substituent(mol, ylidene_atoms, nbr_idx)
+                # Accept only a token that SPELLS the two free valences the
+                # bond actually has. Anything else -- an abstention, or a
+                # prefix whose morphology says something different -- would
+                # misdescribe this attachment, so refuse the ring system
+                # rather than drop the atom or name it wrongly.
+                morphology = free_valence_morphology(ylidene_name)
+                if not (morphology.confident and morphology.free_valences == 2):
+                    from ..errors import unsupported_ring_system
+                    logger.debug(
+                        "exocyclic =C at locant %s: no P-29.2 ylidene prefix "
+                        "(%r, %s) — failing closed",
+                        locant, ylidene_name, morphology.basis)
+                    raise unsupported_ring_system()
+                substituents.append({
+                    'locant': locant,
+                    'name': ylidene_name,
+                    'atom_indices': ylidene_atoms,
+                })
                 continue
 
             # Trace the substituent branch

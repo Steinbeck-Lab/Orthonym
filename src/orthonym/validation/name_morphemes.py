@@ -968,3 +968,77 @@ def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
 def lexicon_size(include_suffixes: bool = False) -> int:
     """Number of morphemes the oracle knows. For measurement passes."""
     return len(_lexicon(include_suffixes))
+
+
+# ---------------------------------------------------------------------------
+# P-29.2 free-valence morphology (Phase 1b)
+# ---------------------------------------------------------------------------
+#
+# A second, much smaller text oracle with the same contract as ``token_arity``:
+# it reads a prefix token's ENDING and reports how many free valences that text
+# asserts. IUPAC 2013 P-29.2:
+#
+#     -yl       one free valence
+#     -ylidene  two on the same skeletal atom
+#     -ylidyne  three on the same skeletal atom
+#
+# It lives here, next to ``token_arity``, because it is pure text analysis with
+# no knowledge of any graph, and because it is SHARED: the substituent producer
+# uses it to refuse emitting a single-valence token for a multi-order
+# attachment, and the spine's P7 uses it to refuse certifying one. Deriving it
+# once is what keeps those two from drifting apart.
+#
+# Refusals dominate by design. Most prefixes (``oxo``, ``hydroxy``, ``chloro``)
+# spell no free-valence morpheme at all, and a multiplied ending (``-diyl``,
+# ``-triyl``) distributes its valences over several atoms, where the
+# single-attachment reading does not apply. Both are refused rather than
+# guessed: a confident wrong answer would suppress a correct name on the
+# producer side and certify an incorrect one on the proof side.
+
+#: Endings that settle the count. They are mutually exclusive as suffixes --
+#: ``-ylidene`` and ``-ylidyne`` do not themselves end in ``yl`` -- so the
+#: order below is for reading, not for correctness.
+_FREE_VALENCE_ENDINGS: Tuple[Tuple[str, int], ...] = (
+    ("ylidyne", 3),
+    ("ylidene", 2),
+    ("yl", 1),
+)
+
+#: A multiplier immediately in front of the ending means several free valences
+#: on several atoms (``ethane-1,2-diyl``), which this oracle does not judge.
+_MULTIPLIED_FREE_VALENCE = re.compile(
+    r"(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|kis)"
+    r"(?:ylidyne|ylidene|yl)$")
+
+
+@dataclass(frozen=True)
+class FreeValenceEstimate:
+    """How many free valences a token's text asserts, or an explicit refusal.
+
+    Mirrors :class:`ArityEstimate`: ``confident`` is the only field a caller
+    may branch on, ``free_valences`` is meaningful ONLY when it is True and is
+    ``None`` otherwise, and ``basis`` always explains the answer.
+    """
+
+    free_valences: Optional[int]
+    confident: bool
+    basis: str
+
+
+def free_valence_morphology(token: object) -> FreeValenceEstimate:
+    """Read the P-29.2 free-valence count that ``token``'s own text asserts."""
+    if not isinstance(token, str):
+        return FreeValenceEstimate(None, False, "not a string")
+    text = token.strip().lower()
+    if not text:
+        return FreeValenceEstimate(None, False, "empty token")
+    if _MULTIPLIED_FREE_VALENCE.search(text):
+        return FreeValenceEstimate(
+            None, False,
+            "multiplied free-valence ending: several valences on several "
+            "atoms, which a single attachment bond cannot decide")
+    for ending, count in _FREE_VALENCE_ENDINGS:
+        if text.endswith(ending):
+            return FreeValenceEstimate(count, True, f"-{ending} (P-29.2)")
+    return FreeValenceEstimate(
+        None, False, "token spells no P-29.2 free-valence ending")

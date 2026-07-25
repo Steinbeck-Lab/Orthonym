@@ -29,12 +29,32 @@ class TestTier05PlacementBeforeTier1:
     """Tier-0.5 must fire BEFORE Tier-1 retained-name check."""
 
     def test_tier05_block_present_in_source(self):
-        """Tier-0.5 block is present in name_substituent source."""
+        """Tier-0.5 block is present in the substituent-naming cascade.
+
+        v29 Phase 1b split ``name_substituent`` into a thin P-29.2
+        free-valence gate over ``_name_substituent_cascade``, which now holds
+        the five tiers. The invariant this test protects is unchanged -- only
+        the function that carries it moved -- so the assertion follows the
+        delegation instead of assuming the tiers are inlined in the entry
+        point. The delegation itself is asserted too, so this cannot pass
+        against a cascade the entry point no longer calls.
+        """
         import inspect
-        src = inspect.getsource(name_substituent)
-        assert "Tier 0.5" in src, "Tier-0.5 comment missing from name_substituent"
+        from orthonym.assembly.substituent_enumerator import (
+            _name_substituent_cascade,
+        )
+
+        gate_src = inspect.getsource(name_substituent)
+        assert "_name_substituent_cascade" in gate_src, (
+            "name_substituent must delegate to the tiered cascade"
+        )
+
+        src = inspect.getsource(_name_substituent_cascade)
+        assert "Tier 0.5" in src, (
+            "Tier-0.5 comment missing from the substituent-naming cascade"
+        )
         assert "_check_substituent_prefix_form" in src, (
-            "_check_substituent_prefix_form call missing from name_substituent"
+            "_check_substituent_prefix_form call missing from the cascade"
         )
 
     def test_tier05_precedes_tier1_in_source(self):

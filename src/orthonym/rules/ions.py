@@ -4057,14 +4057,20 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
                     if kj not in frag and kj not in chain_set:
                         frag.add(kj)
                         sst.append(kj)
-            yl = name_substituent(mol, frag, j)
-            if not yl:
-                return None
             if bt == Chem.BondType.DOUBLE:
-                if not yl.endswith('yl'):
+                # The substituent pipeline reads the attachment bond order and
+                # emits the P-29.2 '-ylidene' itself; rebuilding it here from a
+                # '-yl' token would decide the free valence a second time.
+                from ..assembly.substituent_enumerator import (
+                    name_ylidene_substituent)
+                ylidene = name_ylidene_substituent(mol, frag, j)
+                if ylidene is None:
                     return None
-                atom_subs[i].append(yl + 'idene')  # methyl -> methylidene
+                atom_subs[i].append(ylidene)
             else:
+                yl = name_substituent(mol, frag, j)
+                if not yl:
+                    return None
                 atom_subs[i].append(yl)
 
     # --- In-chain double bonds (element=element), as (posA, posB) atom pairs. ---

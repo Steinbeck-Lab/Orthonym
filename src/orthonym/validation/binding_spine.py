@@ -99,7 +99,10 @@ from enum import Enum
 from typing import (Any, Dict, Iterable, Iterator, List, Literal, NamedTuple,
                     Optional, Sequence, Tuple)
 
-from orthonym.validation.name_morphemes import token_arity
+from rdkit import Chem
+
+from orthonym.validation.name_morphemes import (free_valence_morphology,
+                                                 token_arity)
 
 # --------------------------------------------------------------------------
 # Finding codes. Each constant's value equals its name so a code can be
@@ -128,6 +131,9 @@ UNBOUND_MORPHEME = "UNBOUND_MORPHEME"
 # P6 -- independent arity check
 ARITY_MISMATCH = "ARITY_MISMATCH"
 ARITY_UNVERIFIED = "ARITY_UNVERIFIED"
+# P7 -- free-valence morphology vs the real linkage bond order
+FREE_VALENCE_MISMATCH = "FREE_VALENCE_MISMATCH"
+FREE_VALENCE_UNVERIFIED = "FREE_VALENCE_UNVERIFIED"
 # Whole-proof residual, raised from P6's confidence bookkeeping: nothing the
 # spine claims was independently corroborated, so the proofs that ran have
 # established nothing about what the name spells.
@@ -1135,6 +1141,109 @@ def _p6_arity(spine, mode, findings, stats) -> None:
             "error" if mode == "strict" else "warn"))
 
 
+#: Linkage bond order -> the number of free valences it represents. Aromatic
+#: and dative bonds are absent on purpose: they carry no integer order, so no
+#: morphology can be checked against them.
+_LINKAGE_FREE_VALENCE = {
+    Chem.BondType.SINGLE: 1,
+    Chem.BondType.DOUBLE: 2,
+    Chem.BondType.TRIPLE: 3,
+}
+
+
+def _p7_free_valence(mol, spine, findings, stats) -> None:
+    """P7: a prefix token's free-valence morphology vs the real bond order.
+
+    P2 proves every bond is CLAIMED exactly once. It never reads a bond's
+    ORDER, so a spine that binds ``methyl`` to a carbon DOUBLE-bonded to the
+    ring is, to P1-P6, entirely well formed: the atom partition is total, the
+    bonds are all claimed, the token is spelled in the name and its arity
+    matches. It is still a wrong STRUCTURE, and it is the exact defect the
+    carbon-ylidene phase exists to stop, so the proof has to be able to see it.
+
+    IUPAC P-29.2 makes that visible in the TEXT: ``-yl`` asserts one free
+    valence, ``-ylidene`` two on the same atom, ``-ylidyne`` three. So the
+    check is a comparison between two independent things -- the morphology the
+    token's own morphemes assert, read by ``free_valence_morphology``, and the
+    order of the bond that actually leaves the binding's subtree, read from the
+    graph. Neither is the producer's bookkeeping, which is what makes their
+    agreement evidence rather than tautology (the same argument P6 rests on).
+
+    Scope is PREFIX bindings. A parent has no free valence at all, and a
+    suffix's endings are a different lexicon in which ``-yl`` does not mean
+    what it means here.
+
+    The confidence discipline is ``token_arity``'s, for the same reason: a
+    confident verdict must be correct, because this one can BLOCK a name. Three
+    things are therefore reported ``"info"`` and never as errors:
+
+      * the token spells no P-29.2 ending (``oxo``, ``hydroxy``, ``chloro`` are
+        correct prefixes for their attachments and simply say nothing here);
+      * the subtree touches the rest of the molecule through more than one
+        bond -- a bridge or spiro shape (P-25), where the single-attachment
+        reading does not apply whatever the token says;
+      * the linkage is aromatic or dative, so it has no integer order.
+
+    Only a confidently-read morphology that DISAGREES with a single, integer-
+    ordered linkage bond is an error.
+    """
+    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    confident = 0
+    unverified = 0
+    for binding in spine.walk():
+        if binding.kind != BindingKind.PREFIX:
+            continue
+        subtree = set(binding.subtree_atoms()) & heavy
+        if not subtree:
+            continue
+        estimate = free_valence_morphology(binding.token)
+        if not estimate.confident:
+            unverified += 1
+            findings.append(Finding(
+                FREE_VALENCE_UNVERIFIED,
+                f"token {binding.token!r} free valence not decidable: "
+                f"{estimate.basis}",
+                "info"))
+            continue
+        linkage = [
+            bond for bond in mol.GetBonds()
+            if (bond.GetBeginAtomIdx() in heavy
+                and bond.GetEndAtomIdx() in heavy
+                and (bond.GetBeginAtomIdx() in subtree)
+                != (bond.GetEndAtomIdx() in subtree))
+        ]
+        if len(linkage) != 1:
+            unverified += 1
+            findings.append(Finding(
+                FREE_VALENCE_UNVERIFIED,
+                f"token {binding.token!r} asserts {estimate.free_valences} "
+                f"free valence(s) but its subtree leaves the rest of the "
+                f"molecule through {len(linkage)} bond(s); the P-29.2 "
+                f"single-attachment reading does not apply",
+                "info"))
+            continue
+        order = _LINKAGE_FREE_VALENCE.get(linkage[0].GetBondType())
+        if order is None:
+            unverified += 1
+            findings.append(Finding(
+                FREE_VALENCE_UNVERIFIED,
+                f"token {binding.token!r} linkage bond is "
+                f"{linkage[0].GetBondType()}, which carries no integer free "
+                f"valence to compare",
+                "info"))
+            continue
+        confident += 1
+        if order != estimate.free_valences:
+            findings.append(Finding(
+                FREE_VALENCE_MISMATCH,
+                f"token {binding.token!r} asserts {estimate.free_valences} "
+                f"free valence(s) ({estimate.basis}) but its attachment bond "
+                f"has order {order}; the name describes a different molecule",
+                "error"))
+    stats["free_valence_confident"] = confident
+    stats["free_valence_unverified"] = unverified
+
+
 def verify_spine(mol, spine: BindingSpine, name: str, *,
                  mode: str = "audit", allow_charged: bool = False) -> SpineProof:
     """Prove that ``spine`` binds ``name`` to exactly the graph of ``mol``.
@@ -1190,6 +1299,12 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
 
     _p6_arity(spine, mode, findings, stats)
     proofs.append("P6")
+
+    # P7 reads each prefix binding's own subtree against the graph, so like P4
+    # and P6 it needs nothing from the global partition and still runs when P1
+    # has failed -- a broken partition is often exactly a valence error.
+    _p7_free_valence(mol, spine, findings, stats)
+    proofs.append("P7")
     stats["proofs"] = tuple(proofs)
     return SpineProof(
         ok=not any(f.severity == "error" for f in findings),
