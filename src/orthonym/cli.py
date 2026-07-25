@@ -227,7 +227,8 @@ def main(args: List[str] = None) -> int:
     if parsed.batch:
         return _process_batch(parsed.batch, parsed.output, parsed.style,
                               parsed.verbose, parsed.confidence,
-                              getattr(parsed, 'trivial_fallback', False))
+                              getattr(parsed, 'trivial_fallback', False),
+                              getattr(parsed, 'binding_proof', 'off'))
 
     # Single SMILES mode
     if not parsed.smiles:
@@ -428,8 +429,19 @@ def main(args: List[str] = None) -> int:
 
 def _process_batch(input_file: str, output_file: str, style: str,
                     verbose: bool, confidence: bool = False,
-                    trivial_fallback: bool = False) -> int:
-    """Process multiple SMILES from a file."""
+                    trivial_fallback: bool = False,
+                    binding_proof: str = "off") -> int:
+    """Process multiple SMILES from a file.
+
+    ``binding_proof`` is honoured here exactly as on the single-SMILES path:
+    without it ``--binding-proof audit --batch f.txt`` parsed cleanly and did
+    no proof work at all, which is the one failure mode an audit flag must
+    not have. Validated ONCE up front rather than per row -- the per-row
+    ``except Exception`` below would otherwise turn a typo'd mode into a
+    silent "ERROR:" line and a zero-proof run.
+    """
+    from .namer import validate_binding_proof
+    validate_binding_proof(binding_proof)
     try:
         with open(input_file, 'r') as f:
             smiles_list = [line.strip() for line in f if line.strip()]
@@ -448,14 +460,16 @@ def _process_batch(input_file: str, output_file: str, style: str,
             if confidence:
                 result = name_compound(smiles, style=style,
                                        include_confidence=True,
-                                       trivial_fallback=trivial_fallback)
+                                       trivial_fallback=trivial_fallback,
+                                       binding_proof=binding_proof)
                 results.append(
                     f"{smiles}\t{result['name']}\t"
                     f"{result['confidence']:.4f}\t{result['handler']}"
                 )
             else:
                 nm = name_compound(smiles, style=style,
-                                   trivial_fallback=trivial_fallback)
+                                   trivial_fallback=trivial_fallback,
+                                   binding_proof=binding_proof)
                 results.append(f"{smiles}\t{nm}")
         except Exception as e:
             results.append(f"{smiles}\tERROR: {e}")

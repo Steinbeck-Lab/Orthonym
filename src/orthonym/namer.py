@@ -1395,6 +1395,27 @@ def _build_ring_info_for_parent_selection(features):
 # catastrophically incomplete names without false positives on correct names.
 _TRUNCATION_CONFIDENCE_THRESHOLD = 0.30
 
+#: v29 P1: the accepted values of the binding-proof flag.
+BINDING_PROOF_MODES = ("off", "audit", "enforce")
+
+
+def validate_binding_proof(value: str) -> str:
+    """Single source of truth for the v29 P1 binding-proof mode check.
+
+    Shared by ``Orthonym.__init__`` and every surface that accepts the flag
+    (notably the CLI's ``--batch`` path, which builds its namers lazily inside
+    a per-row ``except Exception`` and would otherwise degrade a typo into a
+    row-level "ERROR:" line). Validate eagerly and identically everywhere: a
+    misspelled mode that silently degraded to "off" would present as a clean
+    run with the proof never executing -- the one failure mode an audit flag
+    must not have.
+    """
+    if value not in BINDING_PROOF_MODES:
+        raise ValueError(
+            f"binding_proof must be 'off', 'audit' or 'enforce', "
+            f"got {value!r}")
+    return value
+
 
 class Orthonym:
     """
@@ -1484,11 +1505,7 @@ class Orthonym:
         # v29 P1: validate eagerly. A misspelled mode that silently degraded to
         # "off" would present as a clean run with the proof never executing --
         # the one failure mode an audit flag must not have.
-        if binding_proof not in ("off", "audit", "enforce"):
-            raise ValueError(
-                f"binding_proof must be 'off', 'audit' or 'enforce', "
-                f"got {binding_proof!r}")
-        self._binding_proof: str = binding_proof
+        self._binding_proof: str = validate_binding_proof(binding_proof)
         self.style = style
         # Task 1.9 (PIN-policy): fallback-only opt-in. When True the name path
         # substitutes a general-only retained name for the "unknown organic
@@ -1870,8 +1887,17 @@ class Orthonym:
                 if has_isotopes(_iso_probe):
                     _iso_name = decorate_isotopic_name(smiles, self.style, self)
                     if _iso_name is not None:
-                        end_naming_session()
-                        return _iso_name
+                        # v29 P1 (fix wave 1): every exit of name() goes
+                        # through _finish. This one lives OUTSIDE the
+                        # try/finally below, so it owns its own session
+                        # teardown -- try/finally keeps the ordering
+                        # identical to the hooked exits (proof asserted
+                        # while the session is still live, session ended
+                        # before the value is handed back).
+                        try:
+                            return self._finish(_iso_name, smiles)
+                        finally:
+                            end_naming_session()
                     # Decorator failed closed on an isotope-labeled molecule: REFUSE.
                     # Falling through would emit the UNLABELED skeleton name (label
                     # silently dropped) — a wrong name the OPSIN validity gate cannot
@@ -1880,8 +1906,11 @@ class Orthonym:
                     from .metrics.abstention import AbstentionCode, record_abstention
                     record_abstention(AbstentionCode.OTHER,
                                       detail='isotope_decorator_failed')
-                    end_naming_session()
-                    return _descriptive_fallback(smiles)
+                    try:
+                        return self._finish(_descriptive_fallback(smiles),
+                                            smiles)
+                    finally:
+                        end_naming_session()
         # --- W3-P09 (P-65.6.2.3.2): normalize a charge-imbalanced acid-salt
         # notation. A metal cation + a NEUTRAL polybasic inorganic oxoacid written
         # without the balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1) is a
@@ -1936,18 +1965,21 @@ class Orthonym:
                 # engine wiring; give the engine its late, fully-gated shot.
                 _rec = self._try_general_engine_recovery(smiles)
                 if _rec is not None:
-                    # v29 P1: name() has TWO exits. This early one bypasses even
-                    # _apply_trivial_fallback, and it is the LATE-RECOVERY path
-                    # -- precisely the one carrying the known stale-certificate
+                    # v29 P1: an early exit that bypasses even
+                    # _apply_trivial_fallback, and the LATE-RECOVERY path --
+                    # precisely the one carrying the known stale-certificate
                     # hazard (_retained_structural_preference can replace the
                     # whole name after verify_certificate passed). Leaving it
                     # unhooked would hide the finding this audit exists to see.
-                    if self._binding_proof != "off" and is_top_level_naming():
-                        _rec = self._apply_binding_proof(_rec, smiles)
-                    return _rec
+                    return self._finish(_rec, smiles)
                 # Task 1.9: PIN fails closed; --trivial falls back to a
                 # general-only retained name when no PIN could be derived.
-                return self._apply_trivial_fallback(_limit.message, smiles)
+                # v29 P1 (fix wave 1): --trivial is a real opt-in and this
+                # swap ships a GENUINE retained name (is_failure_name False),
+                # so the exit must be audited like any other.
+                return self._finish(
+                    self._apply_trivial_fallback(_limit.message, smiles),
+                    smiles)
             # Universal stereo backstop (Phase 140, STER-16)
             # Only apply at top level -- decomposition fragments handle stereo
             # through their own naming paths.
@@ -2037,15 +2069,14 @@ class Orthonym:
                     raise classify_failure_limit(_probe, smiles=smiles)
             # Task 1.9: PIN fails closed; --trivial falls back to a general-only
             # retained name when the systematic pipeline derived no PIN.
-            _final = self._apply_trivial_fallback(result, smiles)
+            #
             # v29 P1: the MAIN exit. Everything that can rewrite the producer's
             # string -- stereo backstop, grammar repair, the OPSIN validity
             # gate, decomposition retry, trivial fallback -- has now run, so
             # this is the first point at which the proof can be asserted on
             # what the caller actually receives.
-            if self._binding_proof != "off" and is_top_level_naming():
-                _final = self._apply_binding_proof(_final, smiles)
-            return _final
+            return self._finish(
+                self._apply_trivial_fallback(result, smiles), smiles)
         finally:
             # v25 G3: unwind the propagation ctx published above (top-level
             # sessions only set a token; nested calls leave it None).
@@ -2325,18 +2356,8 @@ class Orthonym:
                 # independently OPSIN-RT-gated, so it is not a wrongness bug
                 # today; what is missing is bindings for the substituted
                 # name), and it must not be papered over by recording later.
-                if self._binding_proof != "off":
-                    try:
-                        from .validation.binding_spine import BindingSpine
-                        from .validation.proof_ledger import record_spine
-                        record_spine(
-                            mol, BindingSpine.from_token_bindings(eng.bindings),
-                            stage="general_engine_recovery",
-                            name_at_record=eng.name,
-                            allow_charged=self._allow_aromatic_general)
-                    except Exception as _pe:
-                        logger.info(
-                            "binding-proof record failed (ignored): %s", _pe)
+                self._record_binding_proof(
+                    mol, eng, stage="general_engine_recovery")
                 # v26 P6: retained-name preference (PIN-quality guardrail,
                 # `complete` tier only). A structural recognizer is about to
                 # be OVERRULED by an ugly von-Baeyer/replacement name the
@@ -2443,6 +2464,74 @@ class Orthonym:
         except Exception as e:
             logger.info("P4 multi-fragment recovery error (kept abstention): %s", e)
             return None
+
+    def _finish(self, name: str, smiles: str) -> str:
+        """v29 P1 (fix wave 1): THE single exit of :meth:`name`.
+
+        ``name()`` has five ``return`` statements -- the isotope decorator
+        exit, the isotope refusal, the late-recovery exit, the limit /
+        ``--trivial`` fallback exit and the main exit. Hooking the
+        binding-proof step at individual call sites left three of them
+        unaudited (two of which ship a real, non-failure name), so every
+        future exit would silently reopen the same hole. They all funnel
+        through here instead, and
+        ``tests/unit/validation/test_name_exits_are_audited.py`` parses the
+        AST to keep it that way.
+
+        Contract:
+
+        * ``off`` mode is a byte-for-byte pass-through, established by the
+          first branch below -- not by careful matching.
+        * ``audit`` mode never changes the returned string (that is
+          ``_apply_binding_proof``'s contract, unit-pinned).
+        * This method NEVER raises. A bug in the audit must not turn a
+          successful naming into a crash, exactly as ``_apply_binding_proof``
+          and ``proof_ledger.finalize`` already guarantee internally; the
+          belt-and-braces guard here also covers the ``is_top_level_naming``
+          import, which the isotope exit reaches after its session ended.
+
+        It deliberately depends on NOTHING the ``try:`` block in ``name()``
+        sets up -- only on ``self._binding_proof``, the naming depth and the
+        two arguments -- so the isotope exit (which sits before that block)
+        can route through it unchanged.
+        """
+        try:
+            if self._binding_proof == "off":
+                return name
+            from .assembly.fragment_naming import is_top_level_naming
+            if not is_top_level_naming():
+                return name
+            return self._apply_binding_proof(name, smiles)
+        except Exception as _fe:      # pragma: no cover - defensive
+            logger.info("binding-proof finish failed (ignored): %s", _fe)
+            return name
+
+    def _record_binding_proof(self, mol, eng, stage: str) -> None:
+        """v29 P1: record a certified general-engine spine on the ledger.
+
+        Shared by the two producer sites (the inline general-engine fallback
+        and the late recovery) so the record block exists once. No-op unless
+        the proof flag is on, and every failure is swallowed: recording is
+        observation, and a bug in it must never break naming.
+
+        The imports stay lazy and inside the body on purpose --
+        ``tests/unit/test_stereo_tier_policy.py`` monkeypatches the
+        ``general_engine`` / ``e1_certificate`` modules and the surrounding
+        call sites only tolerate that because nothing here is imported at
+        module scope.
+        """
+        if self._binding_proof == "off":
+            return
+        try:
+            from .validation.binding_spine import BindingSpine
+            from .validation.proof_ledger import record_spine
+            record_spine(
+                mol, BindingSpine.from_token_bindings(eng.bindings),
+                stage=stage,
+                name_at_record=eng.name,
+                allow_charged=self._allow_aromatic_general)
+        except Exception as _pe:
+            logger.info("binding-proof record failed (ignored): %s", _pe)
 
     def _apply_binding_proof(self, name: str, smiles: str) -> str:
         """v29 Phase 1: assert the recorded binding spine on the FINAL name.
@@ -2869,21 +2958,8 @@ class Orthonym:
                         # -- the stereo backstop, the grammar repair backstop
                         # and the OPSIN validity gate -- may rewrite the string
                         # the certificate was computed on.
-                        if self._binding_proof != "off":
-                            try:
-                                from .validation.binding_spine import BindingSpine
-                                from .validation.proof_ledger import record_spine
-                                record_spine(
-                                    mol,
-                                    BindingSpine.from_token_bindings(
-                                        _eng.bindings),
-                                    stage="general_engine",
-                                    name_at_record=_eng.name,
-                                    allow_charged=self._allow_aromatic_general)
-                            except Exception as _pe:
-                                logger.info(
-                                    "binding-proof record failed (ignored): %s",
-                                    _pe)
+                        self._record_binding_proof(
+                            mol, _eng, stage="general_engine")
                         # v26 P7 FIX 1: complete-tier abstain-without-Java
                         # contract. E1 does NOT verify ring numbering/locants,
                         # and the downstream _final_opsin_validity_gate FAILS
@@ -4152,7 +4228,8 @@ def name_compound(smiles: str, style: str = "pin",
                    trivial_fallback: bool = False,
                    general_fallback: Optional[bool] = None,
                    general_fallback_unverified: bool = False,
-                   raise_on_limit: bool = False):
+                   raise_on_limit: bool = False,
+                   binding_proof: str = "off"):
     """
     Convenience function to generate IUPAC name from SMILES.
 
@@ -4165,6 +4242,9 @@ def name_compound(smiles: str, style: str = "pin",
             - "cas": CAS-style naming
         include_confidence: If True, return dict with confidence metadata
             instead of plain str
+        binding_proof: v29 P1 proof mode forwarded to ``Orthonym`` -- see
+            that constructor. Default "off" keeps every existing caller
+            byte-identical; an invalid value raises ValueError there.
 
     Returns:
         str: IUPAC systematic name (default)
@@ -4202,6 +4282,7 @@ def name_compound(smiles: str, style: str = "pin",
         trivial_fallback=trivial_fallback,
         general_fallback=general_fallback,
         general_fallback_unverified=general_fallback_unverified,
+        binding_proof=binding_proof,
     )
 
     if include_confidence:
