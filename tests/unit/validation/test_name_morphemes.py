@@ -125,3 +125,18 @@ def test_multiplier_scope_is_never_confidently_wrong(token, truth):
     assert (not est.confident) or est.heavy_atoms == truth, (
         f"{token}: confidently answered {est.heavy_atoms}, truth {truth} "
         f"({est.basis})")
+
+
+def test_stereo_descriptor_regex_does_not_swallow_a_parenthesised_substituent():
+    """Regression guard for the NARROWNESS of ``_STEREO_GROUP``.
+
+    Stripping stereo descriptors is safe only while the pattern matches the
+    descriptor grammar exactly. A permissive character class would strip
+    ``(chloro)`` as if it were ``(R)``, deleting a real substituent's atom and
+    answering a CONFIDENT UNDERCOUNT -- the one failure mode this oracle may
+    never have, because P6 would then reject a CORRECT name. The hardening
+    that prevents it had no test; this is it.
+    """
+    est = token_arity("(chloro)methyl", BindingKind.PREFIX)
+    assert est.confident, est.basis
+    assert est.heavy_atoms == 2      # Cl + C, the '(chloro)' NOT stripped

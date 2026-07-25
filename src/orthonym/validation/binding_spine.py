@@ -29,10 +29,21 @@ Scope and status (Phase 1)
 AUDIT-ONLY and PURE. This module is wired into no naming path, gates
 nothing, and changes no emitted name. ``verify_spine`` runs proofs **P1**
 (atom partition: exactly-once, no unbound, no phantom), **P2** (bond
-totality: every bond claimed exactly once) and **P3** (charge totality);
-later phases append P4 name-span anchoring on the final post-processed
-name and P5 an independent arity check -- each appending to the SAME
-``findings`` list, so the proof object grows without changing shape.
+totality: every bond claimed exactly once), **P3** (charge totality),
+**P4** (every token anchored to real spans of the FINAL name, with
+multiplicity), **P5** (name morphemes no binding accounts for -- the dual
+of P1's atom coverage) and **P6** (each token's claimed atom count checked
+against an INDEPENDENT estimate of what its text spells). Each appends to
+the SAME ``findings`` list, so the proof object grows without changing
+shape.
+
+P1-P3 all take the producer at its word about WHICH atoms a token covers:
+they check the claims are mutually consistent and total, never that the
+token's TEXT says those atoms. P4 and P6 are the two halves of closing
+that: P4 proves the token is spelled in the name at all (and the right
+number of times), P6 proves the number of atoms it claims is the number
+its morphemes spell. P6 is the falsifier -- it is what makes a token
+unable to claim atoms it does not say.
 
 Atom coverage alone is not structure: a name can spell exactly the right
 atom set while describing the wrong bonds (``propylpropane`` and
@@ -61,7 +72,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import (Any, Dict, Iterable, Iterator, List, Literal, NamedTuple,
-                    Optional, Tuple)
+                    Optional, Sequence, Tuple)
+
+from orthonym.validation.name_morphemes import token_arity
 
 # --------------------------------------------------------------------------
 # Finding codes. Each constant's value equals its name so a code can be
@@ -618,21 +631,401 @@ def _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats):
             "error"))
 
 
+# --------------------------------------------------------------------------
+# P4/P5 morpheme lexicons.
+#
+# These are BOUNDARY evidence, not a nomenclature model. A name is a single
+# unspaced string, so "is this token actually spelled here?" reduces to "does
+# the token start and end at a morpheme boundary?", and the only cheap
+# evidence for a boundary is that what sits against it is itself a recognised
+# morpheme. The lists are therefore deliberately generous: a missing entry
+# costs a FALSE ERROR on a correct name, which is the one outcome this
+# milestone cannot ship, while a superfluous entry only costs a missed
+# detection that P5/P6 may still catch.
+#
+# The four groupings below record where each morpheme came from and what it
+# does in a name; they are NOT four different rules. Both boundary sides and
+# the P5 residue scan all consult their union, ``_GLUE_MORPHEMES`` -- see
+# ``_left_ok`` for why filing a morpheme as "left" or "right" turned out to be
+# a source of false errors rather than a source of evidence.
+# --------------------------------------------------------------------------
+_MULTIPLIER_WORDS = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6,
+                     "hepta": 7, "octa": 8, "nona": 9, "deca": 10,
+                     "undeca": 11, "dodeca": 12,
+                     "bis": 2, "tris": 3, "tetrakis": 4, "pentakis": 5,
+                     "hexakis": 6}
+# P-16.3.3: a multiplying prefix drops its terminal vowel before a
+# vowel-initial suffix -- "butane-1,2,3,4-tetraol" is written "...-tetrol",
+# "...-pentaol" is written "...-pentol". The elided spelling is the SAME
+# morpheme with the same value, so it is DERIVED here rather than listed:
+# hand-listing would invite the two tables to drift apart.
+_MULTIPLIERS = {**_MULTIPLIER_WORDS,
+                **{word[:-1]: value
+                   for word, value in _MULTIPLIER_WORDS.items()
+                   if word.endswith("a")}}
+_LEFT_GLUE = frozenset(_MULTIPLIERS) | {
+    "cyclo", "bicyclo", "tricyclo", "spiro", "iso", "neo", "sec", "tert",
+    "bi", "ter", "o", "a", "n", "hydro"}
+_RIGHT_GLUE = frozenset({
+    "yl", "ylidene", "ylidyne", "oxy", "thio", "sulfanyl", "amino", "imino",
+    "an", "ane", "en", "ene", "yn", "yne", "e", "ol", "one", "al", "oic",
+    "ic", "ate", "amide", "amine", "nitrile", "ium", "ide", "ylium", "uide",
+    "carbo", "sulfo", "sulfon", "phosph", "o", "a", "idene", "hydro"})
+_STEREO_WORDS = frozenset({"r", "s", "e", "z", "rel", "rac", "cis", "trans",
+                           "endo", "exo", "syn", "anti", "alpha", "beta",
+                           "seqcis", "seqtrans"})
+_CONNECTIVES = frozenset({"acid", "ester", "ether", "anhydride", "oxide",
+                          "hydrate", "and", "of", "yl", "ylidene"})
+_GLUE_MORPHEMES = _LEFT_GLUE | _RIGHT_GLUE | _STEREO_WORDS | _CONNECTIVES
+
+
+def _is_letter(char: str) -> bool:
+    """ASCII letter. Non-ASCII name characters (primes, italics) are not."""
+    return char.isascii() and char.isalpha()
+
+
+def _ends_with_any(text: str, words: Iterable[str]) -> bool:
+    return any(text.endswith(word) for word in words)
+
+
+def _starts_with_any(text: str, words: Iterable[str]) -> bool:
+    return any(text.startswith(word) for word in words)
+
+
+def _left_ok(lowered: str, i: int, token: str, tokens: Iterable[str]) -> bool:
+    """Is position ``i`` a left morpheme boundary?
+
+    Four ways to be one: nothing precedes; what precedes is not a letter; the
+    TOKEN'S OWN first character is not a letter; or the text before ends with
+    a recognised morpheme or with ANOTHER BINDING'S TOKEN.
+
+    Both sides consult the SAME lexicon (``_GLUE_MORPHEMES``). Splitting it
+    into a left list and a right list treats "which side of a token this
+    morpheme usually sits on" as evidence about boundaries, which it is not:
+    the saturation endings were filed as right-glue only, so every suffix
+    sitting after one ('propan|amide', 'octadec-9-yne|nitrile') was refused
+    ``TOKEN_SUBSTRING_ONLY`` -- the third distinct class of false error the
+    asymmetry produced. A boundary is evidenced by a KNOWN MORPHEME abutting
+    it, full stop.
+
+    The other-token clause mirrors the right-hand rule and is load-bearing,
+    not a convenience: in ``methylbenzene`` the parent token ``benzene`` is
+    preceded by the prefix token ``methyl``, whose spelling ends in no glue
+    morpheme. Without it every parent that follows a substituent prefix --
+    very nearly every real emission -- would be reported
+    ``TOKEN_SUBSTRING_ONLY``, a confidently WRONG error on a correct name.
+    Four already-shipped P2 tests assert ``ok`` on exactly that name.
+
+    The non-letter-token-edge clause exists because the rule is about a
+    token's letters BLEEDING into a longer word. A token that itself begins
+    with ``(`` or ends with ``]`` -- every von Baeyer parent the producers
+    emit -- has no letters at that edge to bleed, so no glue evidence is
+    needed there and demanding some was refusing correct names outright
+    (measured: 5 of 24 real emissions).
+    """
+    if (i == 0 or not _is_letter(lowered[i - 1])
+            or not _is_letter(token[0])):
+        return True
+    head = lowered[:i]
+    return _ends_with_any(head, _GLUE_MORPHEMES) or _ends_with_any(head, tokens)
+
+
+def _right_ok(lowered: str, j: int, token: str, tokens: Iterable[str]) -> bool:
+    """Is position ``j`` a right morpheme boundary? (mirror of ``_left_ok``)"""
+    if (j == len(lowered) or not _is_letter(lowered[j])
+            or not _is_letter(token[-1])):
+        return True
+    tail = lowered[j:]
+    return (_starts_with_any(tail, _GLUE_MORPHEMES)
+            or _starts_with_any(tail, tokens))
+
+
+def _occurrence_weight(lowered: str, i: int) -> int:
+    """How many bindings one occurrence at ``i`` can be spelling.
+
+    ``dimethylbenzene`` writes ``methyl`` ONCE for TWO bindings, so an
+    occurrence is worth the multiplier immediately in front of it. The
+    longest matching multiplier wins, so ``undeca`` reads 11 rather than the
+    ``deca`` (10) it ends with.
+
+    Enclosing marks are stepped over first because that is where the
+    COMPLEX multiplicative prefixes live: ``bis``/``tris``/``tetrakis`` are
+    by convention (P-16.3.2) always followed by enclosing marks, so the
+    alphabetic run immediately against the token is empty and a naive scan
+    scores every ``bis(...)`` prefix as a single occurrence -- measured as a
+    false ``MULTIPLICITY_MISMATCH`` on real emissions.
+    """
+    end = i
+    while end > 0 and lowered[end - 1] in "([{":
+        end -= 1
+    start = end
+    while start > 0 and _is_letter(lowered[start - 1]):
+        start -= 1
+    run = lowered[start:end]
+    if not run:
+        return 1
+    best = max((word for word in _MULTIPLIERS if run.endswith(word)),
+               key=len, default=None)
+    return _MULTIPLIERS[best] if best else 1
+
+
+def _overlaps(span: Tuple[int, int], taken: Sequence[Tuple[int, int]]) -> bool:
+    start, end = span
+    return any(start < other_end and other_start < end
+               for other_start, other_end in taken)
+
+
+def _p4_token_spans(spine, name, findings, stats) -> List[Tuple[int, int, str]]:
+    """P4: every token anchored to real spans of the FINAL name.
+
+    P1-P3 never look at the name, so a spine whose tokens spell something
+    else entirely passes all three. P4 is the first proof that reads the
+    string, and it asks two questions per token: is it SPELLED here (at a
+    morpheme boundary, not merely present as a substring), and is it spelled
+    the right NUMBER of times?
+
+    Multiplicity is the half that is easy to miss. ``k`` bindings sharing one
+    token text need not produce ``k`` occurrences: the name writes
+    ``dimethyl`` once and the multiplier says it twice. So an occurrence
+    carries a WEIGHT (its preceding multiplier's value, else 1) and the group
+    is satisfied when the accumulated weight reaches ``k``. Three methyl
+    bindings against a ``di`` therefore fail, which is a claim about the graph
+    no atom-level proof can make.
+
+    Groups are processed longest-token-first so that a token which is a
+    prefix of another (``meth`` vs ``methyl``) cannot steal the longer one's
+    span; a group left short only because its occurrences were already taken
+    reports ``TOKEN_SPAN_OVERLAP`` rather than a multiplicity finding, since
+    the name may well spell it and the collision is what blocked the proof.
+
+    Matching is case-insensitive: names carry italic capitals (``N,N-``,
+    ``O-``) that no producer puts in a token. That is a WIDENING -- it can
+    only remove false ``TOKEN_ABSENT`` errors, never manufacture one.
+
+    Empty-token bindings are skipped (counted in ``stats["empty_tokens"]``):
+    ``CHARGE``/``HYDRO`` kinds may legitimately carry no text of their own,
+    and an empty string matches everywhere.
+
+    Spans chosen before a finding is raised are still recorded, so P5 does not
+    then re-report the same text as unexplained.
+    """
+    lowered = (name or "").lower()
+    counts: Dict[str, int] = {}
+    empty = 0
+    for binding in spine.walk():
+        token = binding.token.strip().lower()
+        if not token:
+            empty += 1
+            continue
+        counts[token] = counts.get(token, 0) + 1
+    stats["empty_tokens"] = empty
+    tokens = frozenset(counts)
+
+    assigned: List[Tuple[int, int, str]] = []
+    taken: List[Tuple[int, int]] = []
+
+    # Longest token first, then alphabetical: the outcome must not depend on
+    # spine order.
+    for token in sorted(counts, key=lambda t: (-len(t), t)):
+        wanted = counts[token]
+        occurrences: List[Tuple[int, int]] = []
+        at = lowered.find(token)
+        while at >= 0:
+            end = at + len(token)
+            if (_left_ok(lowered, at, token, tokens)
+                    and _right_ok(lowered, end, token, tokens)):
+                occurrences.append((at, end))
+            at = lowered.find(token, at + 1)
+
+        blocked = [span for span in occurrences if _overlaps(span, taken)]
+        chosen: List[Tuple[int, int]] = []
+        weight = 0
+        for span in occurrences:
+            if weight >= wanted:
+                break
+            if _overlaps(span, taken) or _overlaps(span, chosen):
+                continue
+            chosen.append(span)
+            weight += _occurrence_weight(lowered, span[0])
+        for start, end in chosen:
+            taken.append((start, end))
+            assigned.append((start, end, token))
+
+        if weight == wanted:
+            continue
+        if not occurrences:
+            if token in lowered:
+                findings.append(Finding(
+                    TOKEN_SUBSTRING_ONLY,
+                    f"token {token!r} occurs in the name only inside a larger "
+                    f"morpheme, never at a morpheme boundary",
+                    "error"))
+            else:
+                findings.append(Finding(
+                    TOKEN_ABSENT,
+                    f"token {token!r} does not occur in the name at all",
+                    "error"))
+        elif weight > wanted:
+            findings.append(Finding(
+                MULTIPLICITY_MISMATCH,
+                f"the name spells token {token!r} {weight} times "
+                f"(counting multiplier prefixes) but {wanted} binding(s) "
+                f"claim it",
+                "error"))
+        elif blocked:
+            findings.append(Finding(
+                TOKEN_SPAN_OVERLAP,
+                f"token {token!r} is claimed by {wanted} binding(s) but only "
+                f"{weight} occurrence(s) are free; {len(blocked)} overlap a "
+                f"span already assigned to another token",
+                "error"))
+        else:
+            findings.append(Finding(
+                MULTIPLICITY_MISMATCH,
+                f"the name spells token {token!r} {weight} times "
+                f"(counting multiplier prefixes) but {wanted} binding(s) "
+                f"claim it",
+                "error"))
+
+    assigned.sort()
+    stats["spans"] = tuple(assigned)
+    return assigned
+
+
+def _longest_glue(text: str) -> int:
+    """Length of the longest glue morpheme at position 0, or 0 if none."""
+    best = 0
+    for word in _GLUE_MORPHEMES:
+        if len(word) > best and text.startswith(word):
+            best = len(word)
+    return best
+
+
+def _p5_name_residue(name, spans, mode, findings, stats) -> None:
+    """P5: name text that no binding accounts for -- the dual of P1.
+
+    P1 asks whether every ATOM is spelled by some token. P5 asks the mirror
+    question: is every MORPHEME backed by some binding? A name can partition
+    the graph perfectly and still carry a whole extra functional suffix that
+    no token claims, and only this direction sees it.
+
+    Each maximal run of ASCII letters left uncovered by P4's spans is consumed
+    greedily longest-match against ``_GLUE_MORPHEMES``; whatever cannot be
+    consumed is reported. Severity is ``"warn"`` in ``mode="audit"`` and
+    ``"error"`` in ``"strict"``, exactly as P3 escalates ``CHARGE_UNVERIFIED``:
+    unexplained text is missing evidence rather than a proved disagreement,
+    because the glue lexicon is a finite hand-list and an unlisted connective
+    is a gap in the LEXICON, not in the name.
+
+    KNOWN BLIND SPOT, deliberate: ``_GLUE_MORPHEMES`` includes the whole of
+    ``_RIGHT_GLUE``, which carries atom-bearing morphemes (``sulfon``, ``ol``,
+    ``amide``). An unclaimed sulfonic acid therefore consumes as glue and goes
+    unreported here. Splitting the boundary lexicon from the residue lexicon
+    would tighten this, at the price of false errors on every name whose
+    connective morphemes are not yet listed -- the wrong trade for a proof
+    that must never be confidently wrong. P6 covers part of the same ground
+    from the atom side.
+    """
+    covered = bytearray(len(name))
+    for start, end, _token in spans:
+        for position in range(start, min(end, len(name))):
+            covered[position] = 1
+
+    remainders: List[str] = []
+    index = 0
+    while index < len(name):
+        if not _is_letter(name[index]) or covered[index]:
+            index += 1
+            continue
+        end = index
+        while (end < len(name) and _is_letter(name[end])
+               and not covered[end]):
+            end += 1
+        rest = name[index:end].lower()
+        while rest:
+            step = _longest_glue(rest)
+            if not step:
+                break
+            rest = rest[step:]
+        if rest:
+            remainders.append(rest)
+            findings.append(Finding(
+                UNBOUND_MORPHEME,
+                f"name text no binding accounts for: {rest!r}",
+                "error" if mode == "strict" else "warn"))
+        index = end
+
+    stats["residue_runs"] = tuple(remainders)
+
+
+def _p6_arity(spine, findings, stats) -> None:
+    """P6: what a token CLAIMS, checked against what its text SPELLS.
+
+    ``token_arity`` reads the token string against the project's own naming
+    tables and knows nothing of the graph, the binding, or the producer that
+    made either; ``len(binding.atom_ids)`` is the producer's bookkeeping.
+    Their agreement is therefore evidence rather than tautology, and their
+    disagreement means the name does not say what the spine claims it says.
+
+    The comparison is against ``atom_ids``, the EXCLUSIVE claim, never
+    ``subtree_atoms()``: a token's morphemes spell its own atoms, and its
+    children's morphemes spell theirs. That is precisely how "``phenyl``
+    claiming eight atoms" is caught while "``benzene`` with two nested
+    ``methyl`` children" passes.
+
+    The oracle is sound but partial -- it refuses anything it cannot decide,
+    and on real production tokens it is confident about three quarters of
+    them (von Baeyer descriptors dominate the refusals). ``ARITY_UNVERIFIED``
+    is therefore COMMON and must never be an error: an unconfident estimate
+    is the absence of evidence, and failing on it would refuse correct names
+    wholesale.
+    """
+    confident = 0
+    unverified = 0
+    for binding in spine.walk():
+        if not binding.token.strip():
+            continue
+        estimate = token_arity(binding.token, binding.kind)
+        if estimate.confident:
+            confident += 1
+            claimed = len(binding.atom_ids)
+            if estimate.heavy_atoms != claimed:
+                findings.append(Finding(
+                    ARITY_MISMATCH,
+                    f"token {binding.token!r} claims {claimed} heavy atom(s) "
+                    f"but its morphemes spell {estimate.heavy_atoms} "
+                    f"({estimate.basis})",
+                    "error"))
+        else:
+            unverified += 1
+            findings.append(Finding(
+                ARITY_UNVERIFIED,
+                f"token {binding.token!r} arity not decidable: "
+                f"{estimate.basis}",
+                "info"))
+    stats["arity_confident"] = confident
+    stats["arity_unverified"] = unverified
+
+
 def verify_spine(mol, spine: BindingSpine, name: str, *,
                  mode: str = "audit", allow_charged: bool = False) -> SpineProof:
     """Prove that ``spine`` binds ``name`` to exactly the graph of ``mol``.
 
-    Runs P1 (atom partition), P2 (bond totality) and P3 (charge totality);
-    ``name`` is accepted but not yet inspected, because token-span anchoring
-    must run against the FINAL post-processed name and is built in a later
-    phase. ``mode`` selects P2's linkage policy: ``"audit"`` infers a unique
-    undeclared cross-subtree bond as an attachment (what today's producers
-    actually emit), ``"strict"`` requires every bond to be declared or
-    internal.
+    Runs P1 (atom partition), P2 (bond totality), P3 (charge totality),
+    P4 (token spans on ``name``), P5 (name residue) and P6 (token arity).
+    ``name`` must be the FINAL post-processed string, since that is what P4
+    and P5 read. ``mode`` selects P2's linkage policy and the severity of the
+    two unproven-not-disproven codes: ``"audit"`` infers a unique undeclared
+    cross-subtree bond as an attachment (what today's producers actually
+    emit) and warns on unexplained name text, ``"strict"`` requires every
+    bond to be declared or internal and leaves nothing unproven.
 
     ``stats["proofs"]`` lists the proofs that actually ran, so ``ok`` is never
-    mistaken for a stronger guarantee than was computed -- P2 drops out of
-    that tuple when a failed P1 makes bond ownership undecidable.
+    mistaken for a stronger guarantee than was computed. A failed P1 drops
+    both P2 (bond ownership becomes undecidable) and P5 (a token set that
+    does not partition the graph makes the span map unreliable, so uncovered
+    text says nothing). P4 and P6 read only the name and the tokens, so they
+    still run -- and are often exactly what explains the P1 failure.
     """
     findings: list = []
     stats: Dict[str, Any] = {
@@ -657,6 +1050,17 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
 
     _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats)
     proofs.append("P3")
+
+    spans = _p4_token_spans(spine, name or "", findings, stats)
+    proofs.append("P4")
+
+    stats["p5_skipped"] = p1_failed
+    if not p1_failed:
+        _p5_name_residue(name or "", spans, mode, findings, stats)
+        proofs.append("P5")
+
+    _p6_arity(spine, findings, stats)
+    proofs.append("P6")
     stats["proofs"] = tuple(proofs)
     return SpineProof(
         ok=not any(f.severity == "error" for f in findings),
