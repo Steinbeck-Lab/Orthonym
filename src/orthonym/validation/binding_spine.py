@@ -60,8 +60,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import (Any, Dict, Iterator, List, Literal, NamedTuple, Optional,
-                    Tuple)
+from typing import (Any, Dict, Iterable, Iterator, List, Literal, NamedTuple,
+                    Optional, Tuple)
 
 # --------------------------------------------------------------------------
 # Finding codes. Each constant's value equals its name so a code can be
@@ -77,6 +77,7 @@ BOND_DOUBLE_CLAIMED = "BOND_DOUBLE_CLAIMED"
 BOND_AMBIGUOUS_LINKAGE = "BOND_AMBIGUOUS_LINKAGE"
 # P3 -- charge totality
 CHARGE_UNCLAIMED = "CHARGE_UNCLAIMED"
+CHARGE_UNVERIFIED = "CHARGE_UNVERIFIED"
 CHARGE_DOUBLE_CLAIMED = "CHARGE_DOUBLE_CLAIMED"
 NET_CHARGE_OUT_OF_SCOPE = "NET_CHARGE_OUT_OF_SCOPE"
 # P4 -- name-span anchoring
@@ -126,8 +127,10 @@ class SpineBinding:
     ``atom_ids`` is EXCLUSIVE: atoms spelled by a nested token belong to
     that child, not here. ``bond_ids`` and ``charge_atom_ids`` follow the
     same exclusivity and stay empty until P2/P3 populate them.
-    ``attachment`` is the atom index this fragment bonds to in its parent
-    (``None`` for a parent/root token).
+    ``attachment`` is an atom OF THIS FRAGMENT -- a member of this binding's
+    own ``atom_ids`` -- namely the one bonded to the enclosing token. It is
+    NOT the atom on the parent/enclosing side of that bond (``None`` for a
+    parent/root token, which has no enclosing token to attach to).
     """
 
     token: str
@@ -347,8 +350,8 @@ def _piece_of_atom(in_scope: Dict[int, Tuple[int, int]],
 class _Merges:
     """Union-find over contracted pieces; ``join`` reports cycle closure."""
 
-    def __init__(self, ids):
-        self._parent = {i: i for i in ids}
+    def __init__(self, ids: Iterable[int]) -> None:
+        self._parent: Dict[int, int] = {i: i for i in ids}
 
     def _find(self, x: int) -> int:
         root = x
@@ -528,27 +531,53 @@ def _p2_bond_totality(mol, spine, mode, findings, stats):
     stats["linkages_inferred"] = linkages_inferred
 
 
-def _p3_charge_totality(mol, spine, allow_charged, findings, stats):
+def _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats):
     """P3: every formal charge claimed by exactly one token, plus E1 parity.
 
-    Two independent statements, kept as separate codes on purpose:
+    Three independent statements, kept as separate codes on purpose:
 
-    * A charged atom the name does not account for means the name is not
-      spelling this species -- ``CHARGE_UNCLAIMED`` (or
-      ``CHARGE_DOUBLE_CLAIMED`` when two tokens both claim it).
+    * A charged atom the name does not account for, where SOME binding in
+      the spine does declare at least one charge claim (just not one that
+      covers this atom), means the name provably is not spelling this
+      species -- ``CHARGE_UNCLAIMED`` (or ``CHARGE_DOUBLE_CLAIMED`` when two
+      tokens both claim it).
+    * A charged atom the name does not account for, where NO binding
+      anywhere in the spine declares any ``charge_atom_ids`` at all, is a
+      different, weaker statement: the 12 legacy production binding
+      producers (``from_token_bindings``) structurally cannot populate
+      ``charge_atom_ids`` -- they never emit charge claims -- so this shape
+      is indistinguishable from "the producer never wires charge evidence
+      through" rather than "the token failed to claim a charge it should
+      have". Reporting it as an ``error`` would be confidently wrong: it
+      would make P3 refuse every charged legacy-adapted spine even when the
+      name is correct. So it gets its own code, ``CHARGE_UNVERIFIED``, at
+      ``"warn"`` severity in ``mode="audit"`` (unproven, not disproven) and
+      ``"error"`` in ``mode="strict"`` (nothing may be left unproven).
     * ``allow_charged=False`` is a SCOPE limit, not a spine defect. It
       reproduces the legacy E1 net-charge refusal exactly, under its own
       code ``NET_CHARGE_OUT_OF_SCOPE``, so a caller can tell "we decline to
       name ions here" from "this spine is wrong".
 
+    Only HEAVY atoms are in scope for the charge-claim check, matching P1's
+    and P2's heavy-atom scoping (documented at the top of ``_p2_bond_totality``
+    and ``_p1_atom_partition``): under the EXCLUSIVE CLAIM invariant a binding
+    can only ever legitimately claim a heavy atom, so a charged explicit
+    hydrogen could never be claimed by any token and would be permanently
+    unverifiable if counted here. The net charge total below is deliberately
+    NOT scoped this way -- it must sum every atom's formal charge regardless
+    of heaviness to reproduce the true net charge of the species.
+
     The net charge is summed over the graph's atoms rather than read via
     ``Chem.GetFormalCharge``, which is the same number by definition and
     keeps this module free of an RDKit import (``mol`` stays duck-typed).
     """
-    charged = {a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge() != 0}
+    charged = {a.GetIdx() for a in mol.GetAtoms()
+               if a.GetAtomicNum() > 1 and a.GetFormalCharge() != 0}
     owner: Dict[int, str] = {}
+    declared_count = 0
     for binding in spine.walk():
         for atom_idx in binding.charge_atom_ids:
+            declared_count += 1
             if atom_idx in owner:
                 findings.append(Finding(
                     CHARGE_DOUBLE_CLAIMED,
@@ -557,12 +586,23 @@ def _p3_charge_totality(mol, spine, allow_charged, findings, stats):
                     "error"))
             else:
                 owner[atom_idx] = binding.token
+    stats["charge_claims_declared"] = declared_count
     unclaimed = sorted(charged - set(owner))
     if unclaimed:
-        findings.append(Finding(
-            CHARGE_UNCLAIMED,
-            f"formally charged atoms claimed by no token: {unclaimed}",
-            "error"))
+        if declared_count == 0:
+            # No binding anywhere even attempted a charge claim -- see the
+            # CHARGE_UNVERIFIED docstring section above. Not a provable
+            # disagreement, so it must never reach "error" in audit mode.
+            findings.append(Finding(
+                CHARGE_UNVERIFIED,
+                f"formally charged atoms present but no binding in the "
+                f"spine declares any charge_atom_ids: {unclaimed}",
+                "error" if mode == "strict" else "warn"))
+        else:
+            findings.append(Finding(
+                CHARGE_UNCLAIMED,
+                f"formally charged atoms claimed by no token: {unclaimed}",
+                "error"))
     # Claims on uncharged atoms cannot make the name wrong about a charge
     # that is not there; counted, not raised (P3 has no code for it).
     stats["charges_claimed_uncharged"] = len(set(owner) - charged)
@@ -601,7 +641,6 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
         "name_len": len(name or ""),
         "bindings": sum(1 for _ in spine.walk()),
         "legacy_role_coerced": tuple(spine.legacy_role_coerced),
-        "proofs": ("P1",),
     }
     _p1_atom_partition(mol, spine, allow_charged, findings, stats)
     proofs = ["P1"]
@@ -616,7 +655,7 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
         _p2_bond_totality(mol, spine, mode, findings, stats)
         proofs.append("P2")
 
-    _p3_charge_totality(mol, spine, allow_charged, findings, stats)
+    _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats)
     proofs.append("P3")
     stats["proofs"] = tuple(proofs)
     return SpineProof(

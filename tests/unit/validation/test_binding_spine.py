@@ -316,14 +316,67 @@ def test_p3_double_claimed_charge_is_error():
     assert bs.CHARGE_DOUBLE_CLAIMED in p.codes()
 
 
-def test_p3_unclaimed_charge_is_error():
+def test_p3_no_charge_claims_anywhere_is_unverified_not_disproven():
+    """A spine that declares NO charge claims at all is missing EVIDENCE, not
+    contradicting the graph. The 12 legacy production producers structurally
+    cannot populate charge_atom_ids, so calling this an error would make P3
+    refuse every charged legacy-adapted spine even when the name is right."""
     mol = Chem.MolFromSmiles("CC[O-]")
     p = bs.verify_spine(mol, _spine(
         _b("eth", bs.BindingKind.PARENT, [0, 1]),
         _b("olate", bs.BindingKind.SUFFIX, [2]),
     ), "ethanolate", allow_charged=True)
+    assert bs.CHARGE_UNVERIFIED in p.codes()
+    assert bs.CHARGE_UNCLAIMED not in p.codes()
+    assert p.ok, p.findings          # unproven does not fail the audit
+    assert p.stats["charge_claims_declared"] == 0
+
+
+def test_p3_no_charge_claims_is_an_error_in_strict_mode():
+    """strict leaves nothing unproven -- the same spine must fail there.
+
+    Asserts the SEVERITY of the CHARGE_UNVERIFIED finding itself, not merely
+    ``not p.ok``: strict mode also raises BOND_UNCLAIMED on this spine's
+    undeclared linkage, so an ``ok``-only assertion would pass even if the
+    charge severity never escalated (verified by mutation)."""
+    mol = Chem.MolFromSmiles("CC[O-]")
+    p = bs.verify_spine(mol, _spine(
+        _b("eth", bs.BindingKind.PARENT, [0, 1]),
+        _b("olate", bs.BindingKind.SUFFIX, [2]),
+    ), "ethanolate", mode="strict", allow_charged=True)
+    charge_findings = [f for f in p.findings if f.code == bs.CHARGE_UNVERIFIED]
+    assert len(charge_findings) == 1
+    assert charge_findings[0].severity == "error"
     assert not p.ok
+
+
+def test_p3_partial_charge_claims_leave_a_real_unclaimed_charge():
+    """Once SOME binding declares a charge claim, an uncovered charged atom is
+    a provable disagreement, not missing evidence -- CHARGE_UNCLAIMED, error."""
+    mol = Chem.MolFromSmiles("[NH3+]CC[NH3+]")  # atoms 0 and 3 both charged
+    charged = [a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge()]
+    assert charged == [0, 3]
+    p = bs.verify_spine(mol, _spine(
+        _b("ethane", bs.BindingKind.PARENT, [1, 2]),
+        _b("azanium", bs.BindingKind.SUFFIX, [0],
+           charge_atom_ids=frozenset([0])),
+        _b("amine", bs.BindingKind.SUFFIX, [3]),   # claims the atom, not its charge
+    ), "ethane-1,2-diazanium", allow_charged=True)
     assert bs.CHARGE_UNCLAIMED in p.codes()
+    assert bs.CHARGE_UNVERIFIED not in p.codes()
+    assert not p.ok
+    assert p.stats["charge_claims_declared"] == 1
+
+
+def test_attachment_is_an_atom_of_the_fragment_itself():
+    """Pins the semantics of SpineBinding.attachment against the reading that
+    it names the PARENT-side atom. For toluene's methyl, attachment is atom 0
+    (the methyl's own carbon); atom 1 (the ring carbon it bonds to) would be
+    the other, wrong reading."""
+    methyl = _b("methyl", bs.BindingKind.PREFIX, [0], attachment=0)
+    assert methyl.attachment in methyl.atom_ids
+    ring = _b("benzene", bs.BindingKind.PARENT, [1, 2, 3, 4, 5, 6])
+    assert methyl.attachment not in ring.atom_ids
 
 
 def test_p3_claimed_charge_passes_under_allow_charged():
