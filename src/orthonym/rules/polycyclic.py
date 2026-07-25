@@ -2175,31 +2175,30 @@ def get_polycyclic_substituents(
             # keeps the existing skip: promoting an unrecognised ring C=O to an
             # 'oxo' prefix would ship a non-PIN name where the code correctly
             # abstains today, which is a different phase's decision to make.
+            #
+            # The verdict itself comes from the shared P-29.2 primitive rather
+            # than being re-derived here: this file was the second place to
+            # read an attachment bond order, and every further copy is another
+            # detector that can drift.
             bond = mol.GetBondBetweenAtoms(ring_idx, nbr_idx)
             if bond and bond.GetBondTypeAsDouble() == 2.0:
                 if neighbor.GetAtomicNum() != 6:
                     continue
-                from ..assembly.substituent_enumerator import name_substituent
-                from ..validation.name_morphemes import free_valence_morphology
+                from ..assembly.substituent_enumerator import (
+                    carbon_free_valence_prefix)
                 ylidene_atoms = _trace_substituent_branch(
                     mol, nbr_idx, ring_atoms)
-                ylidene_name = name_substituent(mol, ylidene_atoms, nbr_idx)
-                # Accept only a token that SPELLS the two free valences the
-                # bond actually has. Anything else -- an abstention, or a
-                # prefix whose morphology says something different -- would
-                # misdescribe this attachment, so refuse the ring system
-                # rather than drop the atom or name it wrongly.
-                morphology = free_valence_morphology(ylidene_name)
-                if not (morphology.confident and morphology.free_valences == 2):
+                verdict = carbon_free_valence_prefix(
+                    mol, ylidene_atoms, nbr_idx)
+                if verdict.prefix is None:
                     from ..errors import unsupported_ring_system
                     logger.debug(
-                        "exocyclic =C at locant %s: no P-29.2 ylidene prefix "
-                        "(%r, %s) — failing closed",
-                        locant, ylidene_name, morphology.basis)
+                        "exocyclic =C at locant %s: %s — failing closed",
+                        locant, verdict.basis)
                     raise unsupported_ring_system()
                 substituents.append({
                     'locant': locant,
-                    'name': ylidene_name,
+                    'name': verdict.prefix,
                     'atom_indices': ylidene_atoms,
                 })
                 continue

@@ -1442,6 +1442,19 @@ def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
     from ..assembly.naming_utils import get_alkyl_name
     from ..data.chain_names import get_chain_prefix
 
+    # P-29.2 free-valence gate. Every route below names the fragment from its
+    # ATOM COUNT, which cannot distinguish -CH3 from =CH2:
+    # 'C=C1CCC(C2CCCCC2)CC1' came out as 4-methyl-1,1'-bi(cyclohexane), a
+    # different molecule. Shared primitive, same three-way contract as the two
+    # general chokepoints; a single bond defers and changes nothing.
+    from ..assembly.substituent_enumerator import carbon_free_valence_prefix
+
+    _fv = carbon_free_valence_prefix(mol, sub_atoms, attachment_atom)
+    if _fv.prefix is not None:
+        return _fv.prefix
+    if _fv.must_fail_closed:
+        return None
+
     if len(sub_atoms) == 1:
         atom = mol.GetAtomWithIdx(sub_atoms[0])
         symbol = atom.GetSymbol()
@@ -2201,6 +2214,12 @@ def name_ring_assembly(
         _a = _s['sub_atoms'][0]
         if (_is_formyl_substituent(mol, _s['sub_atoms'], _a)
                 or _is_cyano_substituent(mol, _s['sub_atoms'], _a)):
+            return None
+        # P-29.2: _name_substituent returns None when the attachment bond is
+        # double/triple and no prefix spells that free valence. Refuse for the
+        # same reason as the two cases above -- a name built around a missing
+        # or single-valence token describes a different molecule.
+        if not _s.get('name'):
             return None
 
     # Build substituent prefix

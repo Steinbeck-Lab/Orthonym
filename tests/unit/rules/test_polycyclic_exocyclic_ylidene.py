@@ -107,10 +107,17 @@ class TestExocyclicCarbonIsNotDropped:
 class TestFailsClosedInsteadOfDropping:
 
     def test_unnameable_exocyclic_carbon_raises(self):
-        """A branched exocyclic ylidene is outside the built class. The handler
-        must refuse the whole ring system rather than lose the atom."""
-        # 2-methylpropylidene on norbornane -- branched, not in the class.
-        mol = _mol("CC(C)C=C1CC2CCC1C2")
+        """An exocyclic ylidene outside the built class. The handler must refuse
+        the whole ring system rather than lose the atom.
+
+        The example moved for the same reason as the sibling assertion in
+        tests/unit/assembly/test_carbon_ylidene_prefix.py: the branched
+        2-methylpropylidene this used to cite is now NAMED
+        (2-(2-methylpropylidene)bicyclo[2.2.1]heptane, OPSIN round-trips the
+        exact input), so it no longer demonstrates a refusal. A boronic-acid
+        ylidene still does.
+        """
+        mol = _mol("OB(O)C=C1CC2CCC1C2")
         desc = analyze_polycyclic(mol)
         assert desc is not None
         with pytest.raises(OrthonymLimitError):

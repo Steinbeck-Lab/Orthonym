@@ -2096,6 +2096,23 @@ def get_ring_substituent_name(
         None when the ring system cannot be named by a provable rule (Phase 4
         SUBST-01: fail-closed — never a monocycle size-guess for a polycyclic).
     """
+    # P-29.2 free-valence gate. Every stem below ('cyclohexyl', 'phenyl', a
+    # retained fused name + '-yl') spells ONE free valence, chosen from the ring
+    # system's identity alone -- the attachment BOND is never read. So a ring
+    # joined to its parent by a double bond was named '-yl' and the double bond
+    # silently became single: 'OCC=C1CCCCC1' was named 2-cyclohexylethan-1-ol.
+    # Same shared primitive as the two general chokepoints; a single bond (and a
+    # two-point attachment, which is a fusion rather than a prefix) defers and
+    # leaves every existing name byte-identical.
+    if attachment_point is not None:
+        from ..assembly.substituent_enumerator import carbon_free_valence_prefix
+
+        _fv = carbon_free_valence_prefix(mol, ring_atoms, attachment_point)
+        if _fv.prefix is not None:
+            return _fv.prefix
+        if _fv.must_fail_closed:
+            return None
+
     # Identify the ring system
     ring_name = identify_ring_system(mol, ring_atoms)
 

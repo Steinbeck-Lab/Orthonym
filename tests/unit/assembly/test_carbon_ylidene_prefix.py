@@ -236,7 +236,17 @@ class TestFailsClosedOutsideTheClass:
 
     def test_mancude_tier_abstains_with_none(self):
         """Under the best-effort tier the abstention is a clean None, matching
-        the Tier-4.5 de-masking convention."""
-        mol = _mol("CC(C)C=C1CCCCC1")
+        the Tier-4.5 de-masking convention.
+
+        The example moved. This used to use the branched 2-methylpropylidene
+        shape, which the class did not cover when it was written; the decorated
+        constructor now names it ((2-methylpropylidene)cyclohexane, OPSIN
+        round-trips the exact input), so it is no longer an abstention and
+        cannot demonstrate one. The boronic-acid ylidene below still is: the
+        recursive namer produces no readable single-valence reading for it, so
+        the gate has nothing to give the P-29.2 morpheme to.
+        """
+        mol = _mol("OB(O)C=C1CCCCC1")
+        assert _free_valence_at_attachment(mol, {0, 1, 2, 3}, 3) == 2
         assert name_substituent(mol, {0, 1, 2, 3}, 3,
                                 allow_mancude=True) is None

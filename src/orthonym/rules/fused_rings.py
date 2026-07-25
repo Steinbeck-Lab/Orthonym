@@ -2697,6 +2697,24 @@ def _name_saturated_fused_carbocyclic(mol) -> Optional[str]:
         from .partial_saturation import name_hydrogenated_fused_carbocycle
         return name_hydrogenated_fused_carbocycle(mol)
 
+    # The name built below is the BARE parent hydride and carries no locants,
+    # so it can only ever describe the ring system itself -- the caller says as
+    # much ("saturated fused carbocyclics do NOT discover substituents") and
+    # returns substituents_included=False. Nothing verified that premise,
+    # though, so any exocyclic heavy atom was simply left out of the name:
+    # 'CC1CCC2CCCCC2C1' and 'OC1CCC2CCCCC2C1' both came out as the bare
+    # 'decahydronaphthalene'. Naming 10 of 11 atoms is a wrong STRUCTURE, and
+    # for the exocyclic '=CH2' of 'C=C1CCC2CCCCC2C1' it is the same P-29.2
+    # free-valence loss the sibling ring detectors carried -- reached by
+    # dropping the atom instead of by mis-spelling it.
+    #
+    # Fail closed: this producer declines, another candidate may still name the
+    # molecule, and no name that omits an atom is emitted. (Expressing the
+    # substituent instead needs fusion-parent NUMBERING, which this fallback
+    # does not do and must not fake.)
+    if any(atom.GetIdx() not in ring_atoms for atom in mol.GetAtoms()):
+        return None
+
     # Get ring sizes (sorted smallest first for lookup)
     size1 = len(atom_rings[0])
     size2 = len(atom_rings[1])

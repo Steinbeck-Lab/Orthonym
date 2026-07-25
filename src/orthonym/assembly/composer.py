@@ -3954,6 +3954,12 @@ def _assemble_complete_bicyclo_name(mol, features):
     sub_prefix = _build_bicyclo_substituent_prefix(
         mol, substituents, atom_to_locant, fg_prefixes=fg_info.get('prefixes')
     )
+    if sub_prefix is None:
+        # P-29.2 fail-closed: a substituent whose free valence this parent
+        # cannot express. Declining lets another candidate producer try, and
+        # SELF-01 never sees a name that describes the wrong molecule.
+        logging.debug("Bicyclo naming declined: unnameable free valence")
+        return None
 
     # WSD-01: principal characteristic group suffix for ANY ring FG
     # (-one/-ol/-amine inline; -carboxylic acid/-carbaldehyde/-carbonitrile
@@ -4109,11 +4115,18 @@ def _build_bicyclo_substituent_prefix(
     substituents: Dict[int, List[Dict]],
     atom_to_locant: Dict[int, int],
     fg_prefixes: Optional[List[Dict]] = None,
-) -> str:
+) -> Optional[str]:
     """
     Build substituent prefix string for bicyclo naming.
 
     Groups substituents by name, adds locants and multipliers.
+
+    Returns ``None`` -- distinct from ``""`` -- when a substituent carries the
+    P-29.2 ``unnameable`` verdict from ``get_bicyclo_substituents``: its free
+    valence is double or triple and no correct prefix exists for it. The caller
+    must decline the whole bicyclo parent. Emitting the ``-yl`` form would name
+    a different molecule and returning ``""`` would drop the atom, which names
+    a different molecule too.
 
     Args:
         mol: RDKit Mol object
@@ -4139,6 +4152,16 @@ def _build_bicyclo_substituent_prefix(
             continue
 
         for sub_info in sub_list:
+            # P-29.2 verdict recorded by get_bicyclo_substituents, which is the
+            # only place that saw the attachment BOND. carbon_count below is a
+            # count of atoms and can never recover it.
+            if sub_info.get('unnameable'):
+                return None
+            prefix_name = sub_info.get('prefix_name')
+            if prefix_name:
+                sub_groups[prefix_name].append(locant)
+                continue
+
             carbon_count = sub_info.get('carbon_count', 0)
             if carbon_count == 0:
                 # Name non-carbon substituents directly (halogens, hydroxy, amino)

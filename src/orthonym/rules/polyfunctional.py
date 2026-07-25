@@ -2046,6 +2046,10 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             features, skip_acyloxy=_esters_demoted,
             exclude_branch_atoms=_amidine_excluded_n,
         )
+        if alkyl_prefixes is None:
+            # P-29.2 fail-closed (see the free-valence gate in that function):
+            # a branch whose double/triple attachment has no correct prefix.
+            return None
         all_prefixes.extend(alkyl_prefixes)
 
     # --- HYG-04 site#2: N-substituent prefixes for a PRINCIPAL amine ---
@@ -2367,7 +2371,7 @@ def _enumerate_pure_c_branch_name(mol, sub_atoms, features, position):
 def _generate_alkyl_prefixes_for_polyfunctional(
     features: Any, skip_acyloxy: bool = False,
     exclude_branch_atoms: Optional[Set[int]] = None,
-) -> List[str]:
+) -> Optional[List[str]]:
     """
     Generate alkyl substituent prefixes for polyfunctional compounds.
 
@@ -2634,6 +2638,32 @@ def _generate_alkyl_prefixes_for_polyfunctional(
             # Keep get_alkyl_name for linear-terminal (zero change); route non-linear to
             # the Tier-4 enumerator (verified: propan-2-yl). Fail-closed if it declines.
             chain_set = set(features.principal_chain) if features.principal_chain else set()
+
+            # P-29.2 free-valence gate. _is_linear_terminal_pure_c_branch reads
+            # the branch's SHAPE (degrees, terminality) but never the order of
+            # the bond joining it to the chain, so an exocyclic '=CH2' passed
+            # as "linear terminal" and became 'methyl': itaconamic acid
+            # 'OC(=O)C(=C)CC(N)=O' was named 4-amino-2-methyl-4-oxobutanoic
+            # acid, a different molecule. Shared primitive; a single bond
+            # defers and leaves both branches below untouched.
+            _fv_attach = next(
+                (si for si in sub_atoms
+                 if any(nb.GetIdx() in chain_set
+                        for nb in mol.GetAtomWithIdx(si).GetNeighbors())),
+                None)
+            if _fv_attach is not None:
+                from ..assembly.substituent_enumerator import (
+                    carbon_free_valence_prefix)
+                _fv = carbon_free_valence_prefix(mol, sub_atoms, _fv_attach)
+                if _fv.prefix is not None:
+                    substituent_groups[_fv.prefix].append(position)
+                    continue
+                if _fv.must_fail_closed:
+                    # Fail closed: this producer declines the whole molecule
+                    # rather than cite a single-valence prefix for a double
+                    # attachment or drop the branch.
+                    return None
+
             if _is_linear_terminal_pure_c_branch(mol, sub_atoms, chain_set):
                 try:
                     alkyl_name = get_alkyl_name(carbon_count)

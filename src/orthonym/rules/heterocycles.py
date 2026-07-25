@@ -1598,6 +1598,48 @@ def get_heterocycle_substituents(
             # BFS to find full substituent
             sub_atoms = _bfs_substituent(mol, nbr_idx, ring_set)
 
+            # ---- P-29.2 free-valence morphology, decided ONCE, up front ----
+            # Every branch below eventually names this fragment from its CARBON
+            # COUNT (directly, or via classify_substituent's ring name), and a
+            # count cannot tell -CH3 from =CH2: 'C=C1CCNCC1' was named
+            # '4-methylpiperidine', which is a different molecule. The
+            # attachment BOND is the only thing that settles it, and it is read
+            # here -- before the specialised branches -- so that all of them
+            # inherit the answer instead of each needing its own copy.
+            #
+            # The shared primitive DEFERS for a single bond and for any
+            # non-carbon attachment, so the exocyclic =O/=S/=N machinery below
+            # (hetero_name -> 'oxo', the '-one'/'-thione' ring suffixes) is
+            # untouched: those multivalent heteroatom prefixes are a separate,
+            # already-correct class.
+            from ..assembly.substituent_enumerator import (
+                carbon_free_valence_prefix)
+            _fv = carbon_free_valence_prefix(mol, sub_atoms, nbr_idx)
+            if not _fv.defers:
+                _entry = {
+                    'atoms': sub_atoms,
+                    'is_on_nitrogen': is_nitrogen,
+                    'carbon_count': sum(
+                        1 for i in sub_atoms
+                        if mol.GetAtomWithIdx(i).GetSymbol() == 'C'),
+                    'connecting_atom': ring_atom_idx,
+                    'is_ring': False,
+                    'ring_name': None,
+                }
+                if _fv.prefix is not None:
+                    _entry['prefix_name'] = _fv.prefix
+                else:
+                    # Fail closed: the whole heterocycle candidate declines
+                    # (name_substituted_heterocycle returns None on this flag),
+                    # so another producer may still name the molecule and none
+                    # of them ships a wrong structure.
+                    _entry['unnameable'] = True
+                    logger.debug(
+                        "heterocycle substituent at locant %s: %s",
+                        locant, _fv.basis)
+                substituents.setdefault(locant, []).append(_entry)
+                continue
+
             # WS-A task 9 (P-66.6.3): an ACYL group on a ring NITROGEN is an
             # AMIDE — the amide machinery names it ('-oyl' forms / parent
             # ketone), never this collector (which produced garbled
@@ -2211,7 +2253,15 @@ def name_substituted_heterocycle(
             is_ring = sub_info.get('is_ring', False)
             ring_name = sub_info.get('ring_name')
 
-            if is_ring and ring_name:
+            if 'prefix_name' in sub_info:
+                # P-29.2: the attachment bond is double or triple, and
+                # get_heterocycle_substituents already built the only prefix
+                # that spells that free valence (methylidene, ethylidene, ...).
+                # Checked FIRST because every branch below would re-derive the
+                # name from the carbon count, which is exactly the reading that
+                # cannot see the bond order.
+                sub_name = sub_info['prefix_name']
+            elif is_ring and ring_name:
                 # Use ring substituent name (piperidinyl, phenyl, etc.)
                 sub_name = ring_name
             elif 'hetero_name' in sub_info:

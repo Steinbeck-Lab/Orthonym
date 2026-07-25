@@ -3546,6 +3546,32 @@ def name_substituent_fragment(
     if not sub_atoms:
         return None
 
+    # ---- P-29.2 free-valence gate (the SAME gate name_substituent carries) ----
+    # This is the project's OTHER general substituent chokepoint: it takes
+    # attach_idx but every route below builds its token from the fragment
+    # ALONE, so none of them can see whether the free valence is single
+    # (-yl), double (-ylidene) or triple (-ylidyne). It reached the fused-ring
+    # detectors, which is how 'C=C1Cc2ccccc2C1' was named '2-methylindane' --
+    # a different molecule -- long after the sibling chokepoint was fixed.
+    #
+    # Same shared primitive, same three-way contract: a no-op for single bonds
+    # (so every existing name stays byte-identical), the constructed prefix for
+    # a double/triple carbon attachment, and fail closed rather than hand back
+    # a -yl token that names something else.
+    from .substituent_enumerator import (
+        carbon_free_valence_prefix, _gate_is_reentrant)
+
+    # When the gate itself is the caller it wants this function's ordinary
+    # single-valence reading, which it will then give the right morpheme.
+    # Consulting the gate again here is what would not terminate.
+    if not _gate_is_reentrant():
+        _fv = carbon_free_valence_prefix(mol, sub_atoms, attach_idx)
+        if _fv.prefix is not None:
+            return _fv.prefix
+        if _fv.must_fail_closed:
+            logger.debug("P-29.2 gate (fragment namer): %s", _fv.basis)
+            return None
+
     parent_set = set(parent_chain) if parent_chain else set()
 
     # Step 0 (Wave-2 C2, P-63.2.2): an O-ATTACHED fragment is an R-oxy prefix.

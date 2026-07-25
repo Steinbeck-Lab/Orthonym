@@ -22,7 +22,10 @@ References:
 """
 
 import logging
+import threading
 from collections import deque, namedtuple
+from dataclasses import dataclass
+from typing import Optional
 
 # Phase 160.2 Plan-04-02 WR-04 closure: removed unused
 # ``from typing import List, Optional, Set, Dict`` — none of the four
@@ -519,6 +522,213 @@ def _carbon_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
     return f"{stem}an-{locant}-{suffix}"
 
 
+# ---------------------------------------------------------------------------
+# The ONE P-29.2 verdict every substituent detector asks for
+# ---------------------------------------------------------------------------
+#
+# Six ring-substituent detectors independently walk from a parent atom to an
+# exocyclic neighbour, trace the fragment, count its carbons and mint a ``-yl``
+# prefix from the count alone. The count cannot distinguish ``-CH3`` from
+# ``=CH2``, so every one of them named a different molecule the moment the
+# attachment bond was double -- and each fix written detector-by-detector was
+# another private copy of "read the bond order here". The copies are the defect:
+# a detector added tomorrow starts out without one.
+#
+# So the bond-order read (``_free_valence_at_attachment``), the constructor
+# (``_carbon_ylidene_prefix``) and the text check (``free_valence_morphology``)
+# are composed ONCE, here, into a single three-way verdict that a detector
+# consumes without re-deriving anything:
+#
+#   defers           -> single (or undecidable) free valence. The caller's own
+#                       existing ``-yl`` naming is P-29.2-correct; carry on
+#                       unchanged. This is the overwhelmingly common case and
+#                       is what keeps every existing name byte-identical.
+#   prefix is set    -> two or three free valences AND a prefix whose own text
+#                       spells exactly that many. Use it verbatim.
+#   must_fail_closed -> two or three free valences and no such prefix. The
+#                       caller MUST abstain. Emitting ``-yl`` here names a
+#                       different molecule, and dropping the fragment names a
+#                       different molecule too.
+
+
+#: Re-entrancy flag for the P-29.2 gate.
+#:
+#: ``_ylidene_from_substituent_name`` below asks the ordinary fragment namer for
+#: the fragment's SINGLE-valence reading, and that namer's first act is to
+#: consult this gate -- which would ask again, forever. The flag says "the gate
+#: is already being applied by an outer frame; give me the plain -yl name". It
+#: is thread-local because naming runs per-thread in the corpus harnesses.
+_GATE_REENTRY = threading.local()
+
+
+def _gate_is_reentrant() -> bool:
+    """True while the gate is asking a namer for a fragment's ``-yl`` reading."""
+    return getattr(_GATE_REENTRY, "active", False)
+
+
+@dataclass(frozen=True)
+class FreeValencePrefix:
+    """The P-29.2 verdict for one substituent fragment's attachment bond.
+
+    ``free_valence`` is always the TRUE bond order at the attachment (1/2/3),
+    or ``None`` when the shape is outside the single-attachment-atom case a
+    free-valence prefix describes at all (a bridge, an aromatic linkage).
+    ``in_class`` is False when the attachment atom is not carbon, where the
+    P-29.2 carbon morphology does not apply and the caller's own heteroatom
+    machinery owns the naming.
+
+    Callers branch on the two PROPERTIES, never on the fields: reading the
+    fields directly is how a caller re-invents the policy this class holds --
+    and getting ``in_class`` wrong turns every ring ketone into an abstention.
+    """
+
+    free_valence: Optional[int]
+    prefix: Optional[str]
+    basis: str
+    in_class: bool = True
+
+    @property
+    def defers(self) -> bool:
+        """True when the caller's own existing naming path is P-29.2-correct."""
+        return (not self.in_class
+                or self.free_valence is None
+                or self.free_valence == 1)
+
+    @property
+    def must_fail_closed(self) -> bool:
+        """True when P-29.2 needs a multivalent prefix and none could be built."""
+        return not self.defers and self.prefix is None
+
+
+def _ylidene_from_substituent_name(mol, frag_atoms, attach_idx, free_valence):
+    """``-ylidene``/``-ylidyne`` for a DECORATED fragment, or ``None``.
+
+    ``_carbon_ylidene_prefix`` builds the token from scratch and so is limited to
+    bare shapes -- a plain chain, a bare cycloalkane. A great many real free
+    valences sit on a decorated carbon: the diketopiperazine natural product
+    ``O=C1NC(Cc2c[nH]c3ccccc23)C(=O)N/C1=C/c1cnc[nH]1`` carries an exocyclic
+    ``=CH-`` bearing an imidazole, whose prefix is
+    ``(1H-imidazol-5-yl)methylidene``. Refusing those would fail closed on a
+    large and entirely nameable part of the class.
+
+    P-29.2 says the free-valence morpheme is a SUFFIX on the fragment's parent
+    hydride, and the parent hydride does not depend on how many valences are
+    free. So the fragment's own ``-yl`` name -- which the project's recursive
+    substituent namer already builds correctly, decorations and all -- is the
+    same name this needs, with one morpheme exchanged.
+
+    That exchange is guarded on both sides, which is what keeps it a derivation
+    rather than a string edit:
+
+    * the ``-yl`` reading must CONFIDENTLY spell exactly one free valence (the
+      shared morpheme oracle decides, not a string test), so a token whose
+      ending cannot be read -- ``oxo``, a multiplied ``-diyl`` -- is refused;
+    * only that trailing morpheme is replaced, and the caller re-reads the
+      RESULT through the same oracle and requires it to spell the bond's actual
+      order.
+
+    Returns ``None`` for anything the namer declines or the oracle cannot read,
+    so the caller still fails closed.
+    """
+    suffix = _FREE_VALENCE_SUFFIX.get(free_valence)
+    if suffix is None or free_valence == 1:
+        return None
+    # An outer frame is already inside the gate; recursing would not terminate.
+    if _gate_is_reentrant():
+        return None
+
+    from ..validation.name_morphemes import free_valence_morphology
+
+    _GATE_REENTRY.active = True
+    try:
+        base = name_substituent_fragment(
+            mol, sorted(frag_atoms), attach_idx, [])
+    except Exception:  # noqa: BLE001 - a namer failure is an abstention
+        return None
+    finally:
+        _GATE_REENTRY.active = False
+
+    estimate = free_valence_morphology(base)
+    if not (estimate.confident and estimate.free_valences == 1):
+        return None
+    # The '-yl' the oracle just confirmed is the token's own ending.
+    return f"{base[:-2]}{suffix}"
+
+
+def carbon_free_valence_prefix(mol, frag_atoms, attach_idx) -> FreeValencePrefix:
+    """P-29.2 verdict for a CARBON-attached substituent fragment.
+
+    The shared entry point for every substituent detector -- monocyclic,
+    heterocyclic, bicyclo, von Baeyer polycyclic, spiro, fused. Use it wherever
+    a fragment is about to be named from its carbon count::
+
+        verdict = carbon_free_valence_prefix(mol, sub_atoms, first_atom)
+        if verdict.prefix:
+            name = verdict.prefix
+        elif verdict.must_fail_closed:
+            ...abstain...        # never get_alkyl_name(carbon_count)
+        else:
+            name = get_alkyl_name(carbon_count)   # unchanged legacy path
+
+    Args:
+        mol: RDKit Mol of the FULL molecule.
+        frag_atoms: Atom indices of the substituent fragment.
+        attach_idx: The FRAGMENT atom bonded to the parent (not the parent
+            atom -- the linkage bond runs from this atom OUT of the fragment).
+
+    Scope -- deliberately CARBON only. The multivalent heteroatom prefixes
+    (``oxo``, ``sulfanylidene``, ``imino``) are a separate class that the
+    detectors' own heteroatom machinery already names correctly, and their
+    tokens spell no P-29.2 morpheme at all, so the text check below cannot
+    confirm them. Including them would turn every ring ketone into a
+    fail-closed abstention. A non-carbon attachment therefore DEFERS, leaving
+    the existing chalcogen/nitrogen paths untouched.
+
+    The prefix is accepted only when its own TEXT spells the number of free
+    valences the BOND has. The two facts come from independent places -- the
+    count from the molecular graph, the reading from the shared morpheme oracle
+    that the proof spine's P7 also uses -- so their agreement is evidence, and a
+    future constructor change that quietly emitted a ``-yl`` token would be
+    caught here rather than shipped.
+
+    Deliberately calls the CONSTRUCTOR, not the full naming cascade. Two
+    reasons: no cascade tier mints a carbon ``-ylidene`` token (they all build
+    single-valence prefixes, which the check would reject anyway), and this
+    function is called FROM inside the cascade's own chokepoints, so routing it
+    back through them would recurse without terminating.
+
+    References: IUPAC 2013 P-29.2, P-29.3.2, P-29.3.3.
+    """
+    from ..validation.name_morphemes import free_valence_morphology
+
+    frag = set(frag_atoms)
+    free_valence = _free_valence_at_attachment(mol, frag, attach_idx)
+    if free_valence is None or free_valence == 1:
+        return FreeValencePrefix(
+            free_valence, None,
+            "single or undecidable free valence: caller's own naming applies")
+
+    if attach_idx is None or mol.GetAtomWithIdx(attach_idx).GetAtomicNum() != 6:
+        # Out of the P-29.2 CARBON class (see the scope note above).
+        return FreeValencePrefix(
+            free_valence, None,
+            "non-carbon attachment: heteroatom multivalent prefixes are a "
+            "separate class, deferred to the caller",
+            in_class=False)
+
+    token = _carbon_ylidene_prefix(mol, frag, attach_idx, free_valence)
+    if token is None:
+        token = _ylidene_from_substituent_name(
+            mol, frag, attach_idx, free_valence)
+    morphology = free_valence_morphology(token)
+    if morphology.confident and morphology.free_valences == free_valence:
+        return FreeValencePrefix(free_valence, token, morphology.basis)
+    return FreeValencePrefix(
+        free_valence, None,
+        f"no P-29.2 prefix for a free valence of {free_valence}: "
+        f"{token!r} ({morphology.basis})")
+
+
 # ============================================================================
 # Universal Substituent Naming (Phase 85)
 # ============================================================================
@@ -555,14 +765,18 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
         IUPAC 2013 P-29.2 (free-valence morphology), P-29.3.2 (lowest locant
         for the free valence).
     """
+    # The bond-order read and the ylidene construction come from the SHARED
+    # primitive, not from a private copy here -- this function and
+    # carbon_free_valence_prefix used to hold the same two calls, which is the
+    # duplication the class is meant to remove. ``free_valence`` below is the
+    # TRUE bond order even for a non-carbon attachment (the primitive only
+    # declines to CONSTRUCT for those), so the heteroatom guard further down is
+    # unchanged.
     frag_atoms_set = set(frag_atoms)
-    free_valence = _free_valence_at_attachment(mol, frag_atoms_set, attach_idx)
-
-    if free_valence in (2, 3):
-        ylidene = _carbon_ylidene_prefix(
-            mol, frag_atoms_set, attach_idx, free_valence)
-        if ylidene:
-            return ylidene
+    verdict = carbon_free_valence_prefix(mol, frag_atoms_set, attach_idx)
+    if verdict.prefix is not None:
+        return verdict.prefix
+    free_valence = verdict.free_valence
 
     token = _name_substituent_cascade(
         mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
@@ -2749,6 +2963,15 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
                 if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
                     stack_c.append(n.GetIdx())
         if carbon_count > 0 and not has_hetero and not has_ring:
+            # P-29.2: the branch's bond to the nitrogen may be DOUBLE
+            # (-N=CH-CH3), where the prefix is 'ethylideneamino'. The carbon
+            # walk above crosses that bond without noticing it, so 'CC=NCC(=O)O'
+            # was named (ethylamino)iminoacetic acid -- a different molecule.
+            _fv = carbon_free_valence_prefix(mol, visited, branches[0])
+            if _fv.prefix is not None:
+                return f"{_fv.prefix}amino"
+            if _fv.must_fail_closed:
+                return None
             try:
                 alkyl_name = get_alkyl_name(carbon_count)
                 return f"{alkyl_name}amino"
@@ -2791,6 +3014,14 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
                     if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
                         stack_c.append(n.GetIdx())
             if carbon_count <= 0 or has_hetero or has_ring:
+                all_pure = False
+                break
+            # P-29.2, same reasoning as the single-branch case above.
+            _fv = carbon_free_valence_prefix(mol, visited, branch_start)
+            if _fv.prefix is not None:
+                branch_names.append(_fv.prefix)
+                continue
+            if _fv.must_fail_closed:
                 all_pure = False
                 break
             try:

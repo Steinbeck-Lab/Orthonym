@@ -16,6 +16,7 @@ Examples:
 - Bicyclo[2.2.2]octane (bridges: 2, 2, 2; total: 8 carbons)
 """
 
+import logging
 from typing import List, Optional, Set, Tuple, Dict
 from collections import deque
 from functools import cmp_to_key
@@ -25,6 +26,8 @@ from rdkit.Chem import BondType
 
 from ..perception.rings import get_bridgehead_atoms, get_spiro_atoms, find_ring_bridgeheads
 from .locants import compare_locant_sets
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -655,6 +658,17 @@ def get_bicyclo_substituents(mol, ring_atoms: Set[int]) -> Dict[int, List[Dict]]
         - 'carbon_count': number of carbons in substituent
         - 'attachment': ring atom index where substituent attaches
         - 'first_atom': first atom of substituent (directly bonded to ring)
+        and, when the attachment bond is NOT single (P-29.2), exactly one of:
+        - 'prefix_name': the ``-ylidene``/``-ylidyne`` prefix to use verbatim
+        - 'unnameable': True -- the consumer MUST decline the whole parent
+
+    P-29.2 note. ``carbon_count`` alone cannot tell ``-CH3`` from ``=CH2``, so a
+    consumer that builds a prefix from it names a different molecule whenever the
+    attachment bond is double: ``C=C1CC2CCC1C2`` came out as
+    ``2-methylbicyclo[2.2.1]heptane``, which is C8H14 for a C8H12 input. The bond
+    order is therefore read HERE, once, through the shared primitive, and the
+    verdict is carried in the dict so every consumer inherits it rather than
+    re-deriving it (or forgetting to).
 
     Examples:
         >>> mol = Chem.MolFromSmiles('CC1CC2CCC1C2')  # methylnorbornane
@@ -662,6 +676,8 @@ def get_bicyclo_substituents(mol, ring_atoms: Set[int]) -> Dict[int, List[Dict]]
         >>> subs = get_bicyclo_substituents(mol, ring_atoms)
         >>> # Should find methyl substituent
     """
+    from ..assembly.substituent_enumerator import carbon_free_valence_prefix
+
     substituents: Dict[int, List[Dict]] = {}
 
     for ring_idx in ring_atoms:
@@ -690,6 +706,19 @@ def get_bicyclo_substituents(mol, ring_atoms: Set[int]) -> Dict[int, List[Dict]]
                 'attachment': ring_idx,
                 'first_atom': nbr_idx,
             }
+
+            # P-29.2 free-valence morphology. Deferral is the common case and
+            # leaves the dict exactly as it has always been.
+            verdict = carbon_free_valence_prefix(mol, sub_atoms, nbr_idx)
+            if not verdict.defers:
+                if verdict.prefix is not None:
+                    sub_info['prefix_name'] = verdict.prefix
+                else:
+                    sub_info['unnameable'] = True
+                    logger.debug(
+                        "bicyclo substituent at ring atom %d: %s",
+                        ring_idx, verdict.basis)
+
             subs_for_atom.append(sub_info)
 
         if subs_for_atom:
