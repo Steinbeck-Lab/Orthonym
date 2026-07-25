@@ -1422,7 +1422,8 @@ class Orthonym:
                  general_fallback: bool = False,
                  general_fallback_unverified: bool = False,
                  allow_aromatic_general: bool = False,
-                 _principal_group_override: Optional[str] = None):
+                 _principal_group_override: Optional[str] = None,
+                 binding_proof: str = "off"):
         """
         Initialize namer.
 
@@ -1465,7 +1466,29 @@ class Orthonym:
                 ``vonbaeyer_universal.analyze_cage_universal`` as
                 ``allow_mancude``. Backs ``--emit-tier complete``. Default
                 False — default output byte-identical for existing callers.
+            binding_proof: v29 Phase 1 opt-in. One of:
+                - "off" (default): no proof work at all. The only cost on the
+                  default path is one string comparison, so PIN output is
+                  byte-identical BY CONSTRUCTION, not by careful matching.
+                - "audit": record the general engine's binding spine and
+                  re-assert it (validation/proof_ledger.py) against the string
+                  ``name()`` actually returns. OBSERVE-ONLY — the name is never
+                  altered, findings go to ``logger.info`` and the ledger.
+                - "enforce": additionally ABSTAIN (fail closed) when the
+                  re-anchored proof fails. Implemented and unit-tested here but
+                  set by NO default path in this phase; it exists for the later
+                  phases that produce bindings for post-processed names.
+                Anything else raises ValueError: a typo must not silently
+                disable the proof.
         """
+        # v29 P1: validate eagerly. A misspelled mode that silently degraded to
+        # "off" would present as a clean run with the proof never executing --
+        # the one failure mode an audit flag must not have.
+        if binding_proof not in ("off", "audit", "enforce"):
+            raise ValueError(
+                f"binding_proof must be 'off', 'audit' or 'enforce', "
+                f"got {binding_proof!r}")
+        self._binding_proof: str = binding_proof
         self.style = style
         # Task 1.9 (PIN-policy): fallback-only opt-in. When True the name path
         # substitutes a general-only retained name for the "unknown organic
@@ -1816,6 +1839,15 @@ class Orthonym:
                 clear_abstention()
             except Exception:
                 pass
+            # v29 P1: reset the binding-proof ledger per top-level molecule,
+            # for the same reason as the three clears above. Without it a
+            # molecule that records no spine would finalize against the
+            # PREVIOUS molecule's record and report its verdict.
+            try:
+                from .validation.proof_ledger import clear_ledger
+                clear_ledger()
+            except Exception:
+                pass
             # v25 G3: publish the engine flag so fragment/component recursion
             # (name_compound builds FRESH namers) inherits it. Top-level only;
             # reset in the finally below.
@@ -1904,6 +1936,14 @@ class Orthonym:
                 # engine wiring; give the engine its late, fully-gated shot.
                 _rec = self._try_general_engine_recovery(smiles)
                 if _rec is not None:
+                    # v29 P1: name() has TWO exits. This early one bypasses even
+                    # _apply_trivial_fallback, and it is the LATE-RECOVERY path
+                    # -- precisely the one carrying the known stale-certificate
+                    # hazard (_retained_structural_preference can replace the
+                    # whole name after verify_certificate passed). Leaving it
+                    # unhooked would hide the finding this audit exists to see.
+                    if self._binding_proof != "off" and is_top_level_naming():
+                        _rec = self._apply_binding_proof(_rec, smiles)
                     return _rec
                 # Task 1.9: PIN fails closed; --trivial falls back to a
                 # general-only retained name when no PIN could be derived.
@@ -1997,7 +2037,15 @@ class Orthonym:
                     raise classify_failure_limit(_probe, smiles=smiles)
             # Task 1.9: PIN fails closed; --trivial falls back to a general-only
             # retained name when the systematic pipeline derived no PIN.
-            return self._apply_trivial_fallback(result, smiles)
+            _final = self._apply_trivial_fallback(result, smiles)
+            # v29 P1: the MAIN exit. Everything that can rewrite the producer's
+            # string -- stereo backstop, grammar repair, the OPSIN validity
+            # gate, decomposition retry, trivial fallback -- has now run, so
+            # this is the first point at which the proof can be asserted on
+            # what the caller actually receives.
+            if self._binding_proof != "off" and is_top_level_naming():
+                _final = self._apply_binding_proof(_final, smiles)
+            return _final
         finally:
             # v25 G3: unwind the propagation ctx published above (top-level
             # sessions only set a token; nested calls leave it None).
@@ -2267,6 +2315,28 @@ class Orthonym:
                         allow_charged=self._allow_aromatic_general).ok:
                     return None
                 cand = eng.name
+                # v29 P1 (audit-only): record the spine the certificate just
+                # accepted, so the exit of name() can re-assert it on the
+                # FINAL string. Deliberately placed BEFORE the retained-name
+                # preference below: when that swap fires, `eng.bindings`
+                # describe a name that is no longer shipped and the re-anchor
+                # is SUPPOSED to report TOKEN_ABSENT. That is a true positive
+                # about a real gap in today's proof coverage (the swap is
+                # independently OPSIN-RT-gated, so it is not a wrongness bug
+                # today; what is missing is bindings for the substituted
+                # name), and it must not be papered over by recording later.
+                if self._binding_proof != "off":
+                    try:
+                        from .validation.binding_spine import BindingSpine
+                        from .validation.proof_ledger import record_spine
+                        record_spine(
+                            mol, BindingSpine.from_token_bindings(eng.bindings),
+                            stage="general_engine_recovery",
+                            name_at_record=eng.name,
+                            allow_charged=self._allow_aromatic_general)
+                    except Exception as _pe:
+                        logger.info(
+                            "binding-proof record failed (ignored): %s", _pe)
                 # v26 P6: retained-name preference (PIN-quality guardrail,
                 # `complete` tier only). A structural recognizer is about to
                 # be OVERRULED by an ugly von-Baeyer/replacement name the
@@ -2373,6 +2443,52 @@ class Orthonym:
         except Exception as e:
             logger.info("P4 multi-fragment recovery error (kept abstention): %s", e)
             return None
+
+    def _apply_binding_proof(self, name: str, smiles: str) -> str:
+        """v29 Phase 1: assert the recorded binding spine on the FINAL name.
+
+        audit  -> observe and log only (the name is returned unchanged).
+        enforce-> a failed proof abstains (fail closed). No default path sets
+                  enforce in v29 Phase 1.
+
+        ``finalize`` is always called with ``mode="audit"``, including under
+        enforce: strict mode escalates the three UNPROVEN-not-disproven codes
+        (CHARGE_UNVERIFIED / UNBOUND_MORPHEME / PROOF_UNSUBSTANTIATED) to
+        errors, and abstaining on missing evidence rather than on a proved
+        disagreement would refuse correct names wholesale.
+
+        Every failure mode here returns ``name`` untouched: a bug in the audit
+        must never turn a successful naming into a crash or an abstention.
+
+        An ABSTENTION is not finalized at all. When a producer recorded a
+        spine but a downstream gate then suppressed the emission, the string
+        reaching this point is the failure sentinel, not a name -- and
+        asserting a spine against 'unknown organic compound' reports
+        TOKEN_ABSENT for every token while saying nothing about proof
+        coverage. The proof answers "does the SHIPPED NAME spell the graph?";
+        with nothing shipped the question does not arise. Measured on 250
+        corpus rows: this artefact was 9 of 15 recorded spines, i.e. it would
+        have been the majority of the Task 7 census. The record is left on the
+        ledger unfinalized (``ok is None``), which is the honest state --
+        "recorded, never shipped" -- and is distinguishable from a real
+        failure (``ok is False``).
+        """
+        if is_failure_name(name):
+            return name
+        try:
+            from .validation.proof_ledger import finalize
+            proof = finalize(name, mode="audit")
+        except Exception as _pe:
+            logger.info("binding-proof finalize failed (ignored): %s", _pe)
+            return name
+        if proof is None:
+            return name
+        if not proof.ok:
+            logger.info("binding-proof findings for %s: %s", smiles,
+                        proof.codes())
+            if self._binding_proof == "enforce":
+                return _descriptive_fallback(smiles)
+        return name
 
     def _apply_trivial_fallback(self, result: str, smiles: str) -> str:
         """Task 1.9 (PIN-policy --trivial fallback).
@@ -2747,6 +2863,27 @@ class Orthonym:
                     if _eng is not None and verify_certificate(
                             mol, _eng,
                             allow_charged=self._allow_aromatic_general).ok:
+                        # v29 P1 (audit-only): record the certified spine here,
+                        # at the inline site, for re-assertion at the exit of
+                        # name(). Everything between this point and the return
+                        # -- the stereo backstop, the grammar repair backstop
+                        # and the OPSIN validity gate -- may rewrite the string
+                        # the certificate was computed on.
+                        if self._binding_proof != "off":
+                            try:
+                                from .validation.binding_spine import BindingSpine
+                                from .validation.proof_ledger import record_spine
+                                record_spine(
+                                    mol,
+                                    BindingSpine.from_token_bindings(
+                                        _eng.bindings),
+                                    stage="general_engine",
+                                    name_at_record=_eng.name,
+                                    allow_charged=self._allow_aromatic_general)
+                            except Exception as _pe:
+                                logger.info(
+                                    "binding-proof record failed (ignored): %s",
+                                    _pe)
                         # v26 P7 FIX 1: complete-tier abstain-without-Java
                         # contract. E1 does NOT verify ring numbering/locants,
                         # and the downstream _final_opsin_validity_gate FAILS

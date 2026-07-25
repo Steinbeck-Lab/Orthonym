@@ -207,6 +207,20 @@ def main(args: List[str] = None) -> int:
         ),
     )
 
+    parser.add_argument(
+        "--binding-proof",
+        dest="binding_proof",
+        choices=["off", "audit", "enforce"],
+        default="off",
+        help=(
+            "v29 P1 name<->graph binding proof: off (default, no proof work "
+            "at all), audit (re-assert the producer's binding spine against "
+            "the FINAL returned name and log the findings; the name is never "
+            "changed), enforce (additionally abstain when that proof fails). "
+            "Applies to the tiered emit surface."
+        ),
+    )
+
     parsed = parser.parse_args(args)
 
     # Batch processing mode
@@ -347,7 +361,13 @@ def main(args: List[str] = None) -> int:
         # default (--emit-tier pin, no --provenance) path below stays
         # byte-identical.
         _emit_tier = getattr(parsed, "emit_tier", "pin")
-        if _emit_tier != "pin" or parsed.provenance:
+        # v29 P1: --binding-proof also selects this branch, because it is the
+        # only single-SMILES surface that constructs the namer directly (the
+        # default path goes through name_compound). Without it the flag would
+        # parse and then silently do nothing -- the same failure mode the
+        # ValueError in Orthonym.__init__ exists to prevent.
+        _binding_proof = getattr(parsed, "binding_proof", "off")
+        if _emit_tier != "pin" or parsed.provenance or _binding_proof != "off":
             import json as _json
             from orthonym.namer import Orthonym
             _tier_flags = _emit_tier_flags(_emit_tier)
@@ -360,6 +380,7 @@ def main(args: List[str] = None) -> int:
                 general_fallback_unverified=_tier_flags[
                     "general_fallback_unverified"],
                 allow_aromatic_general=_tier_flags["allow_aromatic_general"],
+                binding_proof=_binding_proof,
             )
             row = namer.name_tiered(parsed.smiles)
             if parsed.provenance:
