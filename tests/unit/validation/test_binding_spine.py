@@ -586,6 +586,12 @@ def test_p4_a_non_letter_token_edge_is_itself_a_boundary():
     assert bs.TOKEN_SUBSTRING_ONLY not in p.codes(), p.findings
     assert p.stats["spans"] == ((0, 14, "bicyclo[4.3.0]"),)
     assert p.ok, p.findings
+    # This molecule alone does not ISOLATE the clause: 'nonane' also happens to
+    # start with the multiplier 'nona', which is right-glue in its own right.
+    # Pin the clause on a tail that no lexicon can explain, or a mutation that
+    # deletes it survives here (measured -- it did).
+    assert bs._right_ok("bicyclo[4.3.0]quux", 14, "bicyclo[4.3.0]",
+                        frozenset())
 
 
 def test_p4_complex_multiplier_counts_through_its_enclosing_mark():
@@ -728,6 +734,119 @@ def test_occurrence_weight_reads_the_longest_multiplier_and_sees_past_brackets()
     assert bs._occurrence_weight("bis(ethyl)", 4) == 2
     assert bs._occurrence_weight("4-methyl", 2) == 1      # locant, not a count
     assert bs._occurrence_weight("methyl", 0) == 1        # nothing precedes
+
+
+def test_a_right_side_elision_vowel_is_not_evidence_of_a_left_boundary():
+    """The boundary lexicons must be DIRECTIONAL, or P4 passes a fabrication.
+
+    '_RIGHT_GLUE' has to carry the single-letter elision vowels ('e', 'a', 'o')
+    or every '...an-1-ol' is refused. But a lone letter sitting before an
+    ARBITRARY cut point evidences nothing, so if the same list is consulted on
+    the left, the fabricated token 'than' anchors inside 'ethan-1-ol' -- its
+    'evidence' being the 'e' in front of it -- and the whole spine passes with
+    ok=True. Which side a morpheme is observed on is what makes it evidence.
+    """
+    p = bs.verify_spine(ETHANOL, _spine(
+        _b("than", bs.BindingKind.PARENT, [0, 1]),
+        _b("ol", bs.BindingKind.SUFFIX, [2]),
+    ), "ethan-1-ol")
+    assert bs.TOKEN_SUBSTRING_ONLY in p.codes(), p.findings
+    assert not p.ok
+
+
+def test_the_boundary_lexicons_are_directional_in_both_directions():
+    """Each side admits only the morphemes observed on THAT side.
+
+    Tested on the helpers directly: a whole-spine fixture cannot isolate one
+    side, and the two failure directions need different names to exhibit.
+    """
+    # A right-only morpheme ('e', an elision vowel) is not left evidence...
+    assert not bs._left_ok("ethan-1-ol", 1, "than", frozenset({"than"}))
+    # ...while on the right it must still hold, or 'phen|anthrene' and every
+    # '...an-1-ol' would be refused.
+    assert bs._right_ok("phenanthrene", 4, "phen", frozenset({"phen"}))
+    # And the mirror: a left-only morpheme ('cyclo' opens a ring name, it never
+    # trails one) is not right evidence.
+    assert not bs._right_ok("benzenecyclohexane", 7, "benzene", frozenset())
+    assert bs._left_ok("cyclohexane", 5, "hexane", frozenset())
+
+
+def test_p6_a_spine_with_nothing_arity_confident_is_proof_unsubstantiated():
+    """The residual P4 structurally cannot close, made explicit.
+
+    'bu'+'tane' over butane: two fabricated tokens, each the other's boundary
+    evidence. No boundary rule can separate 'bu|tane' from 'but|ane' -- both cut
+    the string in the same two places -- so P4 rightly passes both, and the
+    oracle refuses both as morphemes. The proof has therefore established
+    NOTHING about what the name spells, and must say so rather than report a
+    bare ok=True.
+    """
+    butane = Chem.MolFromSmiles("CCCC")
+    p = bs.verify_spine(butane, _spine(
+        _b("bu", bs.BindingKind.PARENT, [0, 1]),
+        _b("tane", bs.BindingKind.PARENT, [2, 3]),
+    ), "butane")
+    assert bs.TOKEN_SUBSTRING_ONLY not in p.codes()      # P4 cannot call it
+    assert p.stats["arity_confident"] == 0
+    assert p.stats["arity_confident_atom_frac"] == 0.0
+    assert bs.PROOF_UNSUBSTANTIATED in p.codes()
+    assert [f.severity for f in p.findings
+            if f.code == bs.PROOF_UNSUBSTANTIATED] == ["warn"]
+
+
+def test_p6_proof_unsubstantiated_is_an_error_in_strict_mode():
+    """Mirrors how P3 and P5 escalate: audit warns, strict refuses.
+
+    Asserts the SEVERITY of the finding itself -- strict also raises
+    BOND_UNCLAIMED on this spine's undeclared linkage, so an ``ok``-only
+    assertion would pass even if the severity never escalated.
+    """
+    butane = Chem.MolFromSmiles("CCCC")
+    spine = _spine(
+        _b("bu", bs.BindingKind.PARENT, [0, 1]),
+        _b("tane", bs.BindingKind.PARENT, [2, 3]),
+    )
+    strict = bs.verify_spine(butane, spine, "butane", mode="strict")
+    assert [f.severity for f in strict.findings
+            if f.code == bs.PROOF_UNSUBSTANTIATED] == ["error"]
+    assert not strict.ok
+
+
+def test_p6_a_corroborated_spine_is_not_reported_unsubstantiated():
+    """The other direction: the residual must not fire on a normal spine.
+
+    'eth' is a chain stem the oracle knows, so its 2 atoms ARE independently
+    corroborated and the fraction is 1.0. A finding that fired here would make
+    every correct emission look unproven.
+    """
+    p = bs.verify_spine(ETHANOL, _spine(
+        _b("eth", bs.BindingKind.PARENT, [0, 1]),
+        _b("ol", bs.BindingKind.SUFFIX, [2]),
+    ), "ethan-1-ol")
+    assert p.stats["arity_confident_atom_frac"] == 1.0
+    assert p.stats["arity_confident_atoms"] == 3
+    assert p.stats["arity_claimed_atoms"] == 3
+    assert bs.PROOF_UNSUBSTANTIATED not in p.codes()
+    assert p.ok, p.findings
+
+
+def test_p6_partial_corroboration_does_not_raise_the_residual():
+    """Zero is the line, and it is the ONLY line this phase can defend.
+
+    One confident token among unconfident ones is not "mostly unproven" that a
+    threshold could grade -- it is one independent statement the producer did
+    not make, which is qualitatively more than none. Any cut above zero would
+    be a tuning knob no measurement supports, so this pins that a partially
+    corroborated spine stays quiet.
+    """
+    p = bs.verify_spine(ETHANOL, _spine(
+        _b("quuxyl", bs.BindingKind.PREFIX, [0]),   # oracle refuses it
+        _b("eth", bs.BindingKind.PARENT, [1]),      # 1 of 3 claimed atoms
+        _b("ol", bs.BindingKind.SUFFIX, [2]),
+    ), "quuxylethan-1-ol")
+    assert p.stats["arity_unverified"] >= 1
+    assert 0.0 < p.stats["arity_confident_atom_frac"] < 1.0
+    assert bs.PROOF_UNSUBSTANTIATED not in p.codes()
 
 
 def test_the_two_boundary_evidence_clauses_are_independently_load_bearing():

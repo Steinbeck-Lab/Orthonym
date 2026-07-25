@@ -51,6 +51,29 @@ atom set while describing the wrong bonds (``propylpropane`` and
 refinement of P1 but the other half of it -- P1 fixes *which* atoms the
 name accounts for, P2 fixes *how they are joined*.
 
+What P4 cannot decide, and how the residual is surfaced
+-------------------------------------------------------
+P4 is a BOUNDARY proof, and no boundary proof can choose between two morpheme
+partitions of the same string: ``bu|tane`` and ``but|ane`` cut ``butane`` in
+exactly the same two places, so a rule about what abuts a cut cannot prefer
+either. The evidence is even mutual -- each fabricated half is the other's
+"another binding's token" -- and that clause cannot simply be dropped, since
+it is what anchors the parent in every real ``methyl|benzene``. Tightening P4
+here would buy one missed detection at the price of false errors on correct
+names, which is the wrong trade for a proof that must never be confidently
+wrong.
+
+The lexicon-level question -- "is this string a morpheme at all?" -- belongs
+to P6, whose oracle answers "unconfident" for both halves of ``bu|tane``. So
+the real residual is not that P4 is wrong but that a spine in which NOTHING is
+arity-confident has had nothing corroborated by anything independent of the
+producer, and used to report ``ok=True`` while saying so nowhere.
+``PROOF_UNSUBSTANTIATED`` closes that: ``stats["arity_confident_atom_frac"]``
+is the share of claimed heavy atoms sitting under an arity-confident token,
+and the finding is raised when it is 0.0 -- not one token independently
+corroborated. Zero is the defensible line; any threshold above it is a tuning
+knob no measurement supports yet.
+
 It SUPERSEDES NOTHING yet: ``e1_certificate.py`` is untouched and remains
 the production emission gate for this phase.
 
@@ -58,10 +81,12 @@ Fail-closed discipline
 ----------------------
 A proof must never be confidently wrong. A finding is an ``"error"`` only
 when the spine and the graph provably disagree; anything the current proofs
-cannot decide is reported as its own code (``*_UNVERIFIED``) or not claimed
-at all -- never silently folded into ``ok``. ``ok`` means "no error-severity
-finding was raised by the proofs that actually ran", so callers that need a
-stronger guarantee must check which proofs ran (``stats["proofs"]``).
+cannot decide is reported as its own code (``*_UNVERIFIED``,
+``PROOF_UNSUBSTANTIATED``) or not claimed at all -- never silently folded into
+``ok``. ``ok`` means "no error-severity finding was raised by the proofs that
+actually ran", so callers that need a stronger guarantee must check which
+proofs ran (``stats["proofs"]``) and how much those proofs actually
+corroborated (``stats["arity_confident_atom_frac"]``).
 
 ``verify_spine`` requires a real RDKit ``mol``; it raises rather than
 returning a verdict when handed ``None``, because a crash is safe and a
@@ -98,10 +123,15 @@ TOKEN_ABSENT = "TOKEN_ABSENT"
 TOKEN_SPAN_OVERLAP = "TOKEN_SPAN_OVERLAP"
 TOKEN_SUBSTRING_ONLY = "TOKEN_SUBSTRING_ONLY"
 MULTIPLICITY_MISMATCH = "MULTIPLICITY_MISMATCH"
+# P5 -- name residue
 UNBOUND_MORPHEME = "UNBOUND_MORPHEME"
-# P5 -- independent arity check
+# P6 -- independent arity check
 ARITY_MISMATCH = "ARITY_MISMATCH"
 ARITY_UNVERIFIED = "ARITY_UNVERIFIED"
+# Whole-proof residual, raised from P6's confidence bookkeeping: nothing the
+# spine claims was independently corroborated, so the proofs that ran have
+# established nothing about what the name spells.
+PROOF_UNSUBSTANTIATED = "PROOF_UNSUBSTANTIATED"
 
 
 class BindingKind(str, Enum):
@@ -632,22 +662,32 @@ def _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats):
 
 
 # --------------------------------------------------------------------------
-# P4/P5 morpheme lexicons.
+# P4 boundary lexicons (DIRECTIONAL) and the P5 residue lexicon (their union).
 #
 # These are BOUNDARY evidence, not a nomenclature model. A name is a single
 # unspaced string, so "is this token actually spelled here?" reduces to "does
 # the token start and end at a morpheme boundary?", and the only cheap
 # evidence for a boundary is that what sits against it is itself a recognised
-# morpheme. The lists are therefore deliberately generous: a missing entry
-# costs a FALSE ERROR on a correct name, which is the one outcome this
-# milestone cannot ship, while a superfluous entry only costs a missed
-# detection that P5/P6 may still catch.
+# morpheme.
 #
-# The four groupings below record where each morpheme came from and what it
-# does in a name; they are NOT four different rules. Both boundary sides and
-# the P5 residue scan all consult their union, ``_GLUE_MORPHEMES`` -- see
-# ``_left_ok`` for why filing a morpheme as "left" or "right" turned out to be
-# a source of false errors rather than a source of evidence.
+# The two lists are DIRECTIONAL and that direction is load-bearing: a morpheme
+# that may legitimately PRECEDE a token is not automatically one that may
+# FOLLOW it. Merging them is not a harmless widening. ``_RIGHT_GLUE`` must
+# carry the single-letter elision vowels ("e", "a", "o") or every "...an-1-ol"
+# is refused -- but a single letter sitting before an ARBITRARY cut point is
+# evidence of nothing, so admitting them on the left lets the fabricated token
+# "than" anchor inside "ethan-1-ol" (its "evidence" being the "e" in front of
+# it) and P4 then passes a spine it has not established. Every entry below is
+# filed on the side it is actually observed on, with the evidence for it.
+#
+# WITHIN a side the lists stay deliberately generous: a missing entry costs a
+# FALSE ERROR on a correct name, which is the one outcome this milestone cannot
+# ship, while a superfluous entry only costs a missed detection that P5/P6 may
+# still catch.
+#
+# ``_GLUE_MORPHEMES`` is the union, and it is consulted ONLY by P5's residue
+# scan -- a different question ("is this text accounted for?") for which side
+# is meaningless. It is NOT boundary evidence.
 # --------------------------------------------------------------------------
 _MULTIPLIER_WORDS = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6,
                      "hepta": 7, "octa": 8, "nona": 9, "deca": 10,
@@ -663,19 +703,50 @@ _MULTIPLIERS = {**_MULTIPLIER_WORDS,
                 **{word[:-1]: value
                    for word, value in _MULTIPLIER_WORDS.items()
                    if word.endswith("a")}}
+# Morphemes that may legitimately PRECEDE a token (consulted by _left_ok).
+# The multipliers are here in BOTH spellings: the elided form is what sits
+# against a vowel-initial suffix, "...-tetr|ol" (P-16.3.3), and dropping it
+# was the last false TOKEN_SUBSTRING_ONLY left on real data.
 _LEFT_GLUE = frozenset(_MULTIPLIERS) | {
+    # Ring-assembly and retained-shape prefixes: "bicyclo|hexane", "iso|butyl".
     "cyclo", "bicyclo", "tricyclo", "spiro", "iso", "neo", "sec", "tert",
-    "bi", "ter", "o", "a", "n", "hydro"}
-_RIGHT_GLUE = frozenset({
+    "bi", "ter", "hydro",
+    # Connecting/elision vowels and the "n" of an elided saturation ending:
+    # "benz|o|thiophene", "propan|amide". Single letters are admissible HERE
+    # only because a name's connective vowel genuinely precedes the next
+    # morpheme; the right-hand elision vowels are a different set (see below).
+    "o", "a", "n",
+    # Saturation/unsaturation endings. This is the morpheme that most often
+    # precedes a SUFFIX token -- "propane|nitrile", "octadec-9-yne|nitrile" --
+    # and it was measured as a false TOKEN_SUBSTRING_ONLY on real emissions
+    # when the endings were filed as right-side-only.
+    "ane", "an", "ene", "en", "yne", "yn"}
+
+# Morphemes that may legitimately FOLLOW a token (consulted by _right_ok).
+# The unelided multipliers are here because a multiplier genuinely follows a
+# parent stem ("propane|diamide", "benzene|dicarboxylic acid"). The ELIDED
+# forms are not: elision only happens against a vowel-initial suffix, which is
+# reached across a locant hyphen ("butane-1,2,3,4-tetrol"), and a hyphen is
+# already a boundary by the non-letter clause.
+_RIGHT_GLUE = frozenset(_MULTIPLIER_WORDS) | frozenset({
     "yl", "ylidene", "ylidyne", "oxy", "thio", "sulfanyl", "amino", "imino",
     "an", "ane", "en", "ene", "yn", "yne", "e", "ol", "one", "al", "oic",
     "ic", "ate", "amide", "amine", "nitrile", "ium", "ide", "ylium", "uide",
     "carbo", "sulfo", "sulfon", "phosph", "o", "a", "idene", "hydro"})
+# Stereo descriptors and functional words are RESIDUE morphemes only: they are
+# never boundary evidence, because a name always separates them from the next
+# morpheme with a hyphen, an enclosing mark or a space -- all non-letters, so
+# the non-letter clause in _left_ok/_right_ok already grants the boundary. That
+# matters here: _STEREO_WORDS carries the bare letters "r"/"s"/"e"/"z", and
+# admitting those as boundary evidence would re-open exactly the hole the
+# directional split closes.
 _STEREO_WORDS = frozenset({"r", "s", "e", "z", "rel", "rac", "cis", "trans",
                            "endo", "exo", "syn", "anti", "alpha", "beta",
                            "seqcis", "seqtrans"})
 _CONNECTIVES = frozenset({"acid", "ester", "ether", "anhydride", "oxide",
                           "hydrate", "and", "of", "yl", "ylidene"})
+
+# P5's residue lexicon ONLY. Never consulted for a boundary -- see the header.
 _GLUE_MORPHEMES = _LEFT_GLUE | _RIGHT_GLUE | _STEREO_WORDS | _CONNECTIVES
 
 
@@ -696,17 +767,18 @@ def _left_ok(lowered: str, i: int, token: str, tokens: Iterable[str]) -> bool:
     """Is position ``i`` a left morpheme boundary?
 
     Four ways to be one: nothing precedes; what precedes is not a letter; the
-    TOKEN'S OWN first character is not a letter; or the text before ends with
-    a recognised morpheme or with ANOTHER BINDING'S TOKEN.
+    TOKEN'S OWN first character is not a letter; or the text before ends with a
+    morpheme that may PRECEDE a token (``_LEFT_GLUE``) or with ANOTHER
+    BINDING'S TOKEN.
 
-    Both sides consult the SAME lexicon (``_GLUE_MORPHEMES``). Splitting it
-    into a left list and a right list treats "which side of a token this
-    morpheme usually sits on" as evidence about boundaries, which it is not:
-    the saturation endings were filed as right-glue only, so every suffix
-    sitting after one ('propan|amide', 'octadec-9-yne|nitrile') was refused
-    ``TOKEN_SUBSTRING_ONLY`` -- the third distinct class of false error the
-    asymmetry produced. A boundary is evidenced by a KNOWN MORPHEME abutting
-    it, full stop.
+    The lexicon is the LEFT one, never the union. ``_RIGHT_GLUE`` has to carry
+    the single-letter elision vowels, and a lone letter before an arbitrary cut
+    point evidences nothing: under the union the fabricated token ``"than"``
+    anchors inside ``ethan-1-ol`` -- its "evidence" being the ``"e"`` in front
+    of it -- and the whole spine passes. Which side a morpheme sits on is not
+    cosmetic bookkeeping; it is what makes the evidence evidence. The morphemes
+    that genuinely precede a token (the saturation endings before a suffix, the
+    multipliers, the connecting vowels) are filed on this side explicitly.
 
     The other-token clause mirrors the right-hand rule and is load-bearing,
     not a convenience: in ``methylbenzene`` the parent token ``benzene`` is
@@ -715,6 +787,13 @@ def _left_ok(lowered: str, i: int, token: str, tokens: Iterable[str]) -> bool:
     very nearly every real emission -- would be reported
     ``TOKEN_SUBSTRING_ONLY``, a confidently WRONG error on a correct name.
     Four already-shipped P2 tests assert ``ok`` on exactly that name.
+
+    That clause is also what lets two ADJACENT fabricated tokens vouch for each
+    other (``bu``+``tane`` over ``butane``). That is not fixable here and is not
+    a defect in this predicate -- no boundary rule can separate ``bu|tane`` from
+    ``but|ane``, since both cut the string in the same places. See the module
+    docstring: the lexicon-level question is P6's, and the residual is reported
+    as ``PROOF_UNSUBSTANTIATED`` rather than passed in silence.
 
     The non-letter-token-edge clause exists because the rule is about a
     token's letters BLEEDING into a longer word. A token that itself begins
@@ -727,16 +806,21 @@ def _left_ok(lowered: str, i: int, token: str, tokens: Iterable[str]) -> bool:
             or not _is_letter(token[0])):
         return True
     head = lowered[:i]
-    return _ends_with_any(head, _GLUE_MORPHEMES) or _ends_with_any(head, tokens)
+    return _ends_with_any(head, _LEFT_GLUE) or _ends_with_any(head, tokens)
 
 
 def _right_ok(lowered: str, j: int, token: str, tokens: Iterable[str]) -> bool:
-    """Is position ``j`` a right morpheme boundary? (mirror of ``_left_ok``)"""
+    """Is position ``j`` a right morpheme boundary?
+
+    The mirror of ``_left_ok``, against the morphemes that may FOLLOW a token
+    (``_RIGHT_GLUE``) -- the suffix particles, the attachment affixes, the
+    elision vowels and the unelided multipliers.
+    """
     if (j == len(lowered) or not _is_letter(lowered[j])
             or not _is_letter(token[-1])):
         return True
     tail = lowered[j:]
-    return (_starts_with_any(tail, _GLUE_MORPHEMES)
+    return (_starts_with_any(tail, _RIGHT_GLUE)
             or _starts_with_any(tail, tokens))
 
 
@@ -958,7 +1042,7 @@ def _p5_name_residue(name, spans, mode, findings, stats) -> None:
     stats["residue_runs"] = tuple(remainders)
 
 
-def _p6_arity(spine, findings, stats) -> None:
+def _p6_arity(spine, mode, findings, stats) -> None:
     """P6: what a token CLAIMS, checked against what its text SPELLS.
 
     ``token_arity`` reads the token string against the project's own naming
@@ -979,16 +1063,42 @@ def _p6_arity(spine, findings, stats) -> None:
     is therefore COMMON and must never be an error: an unconfident estimate
     is the absence of evidence, and failing on it would refuse correct names
     wholesale.
+
+    Common is not the same as universal, though, and the case where it IS
+    universal is a statement about the whole proof rather than about any one
+    token. P4 anchors a token to a span of the name but cannot choose between
+    two morpheme partitions of that span (``bu|tane`` vs ``but|ane`` cut the
+    string identically), so if no token's arity is decidable either, then
+    nothing the spine claims has been corroborated by anything independent of
+    the producer -- P1-P3 only checked the producer's claims against each
+    other. ``arity_confident_atom_frac`` measures that: the share of CLAIMED
+    HEAVY ATOMS sitting under an arity-confident token, over the bindings that
+    carry text at all. At 0.0 the proof has established nothing about what the
+    name spells, and ``PROOF_UNSUBSTANTIATED`` says so out loud instead of
+    letting ``ok`` imply otherwise. Severity follows P3 and P5: unproven, not
+    disproven, so ``"warn"`` in ``mode="audit"`` and ``"error"`` in
+    ``mode="strict"``.
+
+    Zero is the ONLY line this phase can defend. A confident-but-mismatched
+    token still counts toward the numerator -- the check ran and returned a
+    verdict, which is corroboration attempted, and its disagreement is already
+    an ``ARITY_MISMATCH`` error. Any threshold above zero would be a tuning
+    knob no measurement supports yet; raising it belongs to whichever phase
+    first has a census of the fraction.
     """
     confident = 0
     unverified = 0
+    confident_atoms = 0
+    claimed_atoms = 0
     for binding in spine.walk():
         if not binding.token.strip():
             continue
+        claimed = len(binding.atom_ids)
+        claimed_atoms += claimed
         estimate = token_arity(binding.token, binding.kind)
         if estimate.confident:
             confident += 1
-            claimed = len(binding.atom_ids)
+            confident_atoms += claimed
             if estimate.heavy_atoms != claimed:
                 findings.append(Finding(
                     ARITY_MISMATCH,
@@ -1005,6 +1115,24 @@ def _p6_arity(spine, findings, stats) -> None:
                 "info"))
     stats["arity_confident"] = confident
     stats["arity_unverified"] = unverified
+    stats["arity_confident_atoms"] = confident_atoms
+    stats["arity_claimed_atoms"] = claimed_atoms
+    # No claimed atoms under any textual token is the same statement as no
+    # corroborated ones -- there is nothing for an independent oracle to have
+    # agreed with -- so it takes the same 0.0 and the same finding.
+    fraction = (confident_atoms / claimed_atoms) if claimed_atoms else 0.0
+    stats["arity_confident_atom_frac"] = fraction
+    if fraction == 0.0:
+        findings.append(Finding(
+            PROOF_UNSUBSTANTIATED,
+            f"no token's atom count is independently corroborated: "
+            f"{confident} of {confident + unverified} textual token(s) are "
+            f"arity-confident, covering 0 of {claimed_atoms} claimed heavy "
+            f"atom(s). P4 proves only that the tokens sit at morpheme "
+            f"boundaries, which cannot tell one morpheme partition of the "
+            f"name from another, so nothing here establishes what the name "
+            f"spells",
+            "error" if mode == "strict" else "warn"))
 
 
 def verify_spine(mol, spine: BindingSpine, name: str, *,
@@ -1015,10 +1143,11 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     P4 (token spans on ``name``), P5 (name residue) and P6 (token arity).
     ``name`` must be the FINAL post-processed string, since that is what P4
     and P5 read. ``mode`` selects P2's linkage policy and the severity of the
-    two unproven-not-disproven codes: ``"audit"`` infers a unique undeclared
-    cross-subtree bond as an attachment (what today's producers actually
-    emit) and warns on unexplained name text, ``"strict"`` requires every
-    bond to be declared or internal and leaves nothing unproven.
+    three unproven-not-disproven codes (``CHARGE_UNVERIFIED``,
+    ``UNBOUND_MORPHEME``, ``PROOF_UNSUBSTANTIATED``): ``"audit"`` infers a
+    unique undeclared cross-subtree bond as an attachment (what today's
+    producers actually emit) and warns on the unproven, ``"strict"`` requires
+    every bond to be declared or internal and leaves nothing unproven.
 
     ``stats["proofs"]`` lists the proofs that actually ran, so ``ok`` is never
     mistaken for a stronger guarantee than was computed. A failed P1 drops
@@ -1059,7 +1188,7 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
         _p5_name_residue(name or "", spans, mode, findings, stats)
         proofs.append("P5")
 
-    _p6_arity(spine, findings, stats)
+    _p6_arity(spine, mode, findings, stats)
     proofs.append("P6")
     stats["proofs"] = tuple(proofs)
     return SpineProof(
