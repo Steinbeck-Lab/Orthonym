@@ -127,6 +127,14 @@ SENIORITY_ORDER = [
     "tellurinic_acid",
     "phosphonic_acid",
     "phosphinic_acid",
+    # P-67 organo-oxoacids of the heavier pnictogens, ranked immediately after
+    # their phosphorus analogues per the P-41 element order (P > As > Sb) and
+    # -onic before -inic within each element. Additive, so the byte-positions of
+    # every row above are unchanged.
+    "arsonic_acid",
+    "arsinic_acid",
+    "stibonic_acid",
+    "stibinic_acid",
     "boronic_acid",    # P-68.3 boron acid
     # BBR-PERC (169.7): free inorganic oxoacids — P-67 functional parents. Ranked in
     # the acid tier so they win PCG when perceived; NAMING is P-67 (downstream). Listed
@@ -490,6 +498,10 @@ SUFFIX_FORMS = {
     "tellurinic_acid": ("tellurinic acid", "tellurinic acid"),
     "phosphonic_acid": ("phosphonic acid", "phosphonic acid"),
     "phosphinic_acid": ("phosphinic acid", "phosphinic acid"),
+    "arsonic_acid": ("arsonic acid", "arsonic acid"),
+    "arsinic_acid": ("arsinic acid", "arsinic acid"),
+    "stibonic_acid": ("stibonic acid", "stibonic acid"),
+    "stibinic_acid": ("stibinic acid", "stibinic acid"),
     "anhydride": ("oic anhydride", "carboxylic anhydride"),
     "ester": ("oate", "carboxylate"),
     "acid_chloride": ("oyl chloride", "carbonyl chloride"),
@@ -805,6 +817,13 @@ PREFIX_FORMS = {
     # Phosphorus compounds
     "phosphonic_acid": "phosphono",
     "phosphinic_acid": "phosphino",
+    # P-67 heavier-pnictogen analogues. BB L36030-36031 gives -As(O)(OH)2 ->
+    # 'arsono' and -Sb(O)(OH)2 -> 'stibono' as PRESELECTED prefixes; BB L15858
+    # admits 'arsino'/'stibino' alongside 'phosphino'.
+    "arsonic_acid": "arsono",
+    "arsinic_acid": "arsino",
+    "stibonic_acid": "stibono",
+    "stibinic_acid": "stibino",
     # Phosphine oxide and phosphates use functional class naming
     "phosphine_oxide": None,
     "phosphate_triester": None,

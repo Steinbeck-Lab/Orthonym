@@ -268,6 +268,124 @@ def name_phosphine_oxide(mol, phosphine_oxide_atoms: Tuple[int, ...]) -> Optiona
     return f"{prefix}phosphane oxide"
 
 
+# P-67 organo-oxoacid stems for the pnictogens, keyed by central element:
+#   symbol -> (-onic stem, -inic stem)
+# BB L36051-36054 gives all six as PRESELECTED names. Bismuth has no oxoacid
+# analogue in the Blue Book, so the family stops at Sb. This table is what makes
+# the two namers below element-generic instead of phosphorus-only -- an arsonic
+# acid is a P-67 oxoacid, never a P-69 organometallic.
+_PNICTOGEN_OXOACID_STEMS = {
+    'P':  ('phosphonic', 'phosphinic'),
+    'As': ('arsonic', 'arsinic'),
+    'Sb': ('stibonic', 'stibinic'),
+}
+
+
+def _find_central_atom(mol, atoms: Tuple[int, ...], symbol: str) -> Optional[int]:
+    """Index of the first ``symbol`` atom in a SMARTS match, else None."""
+    for idx in atoms:
+        if mol.GetAtomWithIdx(idx).GetSymbol() == symbol:
+            return idx
+    return None
+
+
+def _name_pnictogen_onic_acid(
+    mol, match_atoms: Tuple[int, ...], symbol: str,
+) -> Optional[str]:
+    """R-E(=O)(OH)2 -> ``{R-yl}{stem} acid`` for E in {P, As, Sb}.
+
+    The single shared implementation behind :func:`name_phosphonic_acid` and its
+    arsenic/antimony analogues. Fail-closed (``None``) unless the one organyl is
+    a clean simple alkyl/aryl, so a complex substituent defers to the generic
+    path rather than risking a wrong name.
+    """
+    from .substituent_purity import pure_organyl_prefix_name  # lazy: avoid import cycle
+
+    stem = _PNICTOGEN_OXOACID_STEMS.get(symbol, (None, None))[0]
+    if stem is None:
+        return None
+
+    central_idx = _find_central_atom(mol, match_atoms, symbol)
+    if central_idx is None:
+        return None
+
+    central = mol.GetAtomWithIdx(central_idx)
+    carbons = [n for n in central.GetNeighbors() if n.GetSymbol() == 'C']
+    if len(carbons) != 1:               # an -onic acid has exactly one C-E bond
+        return None
+
+    prefix = pure_organyl_prefix_name(mol, carbons[0].GetIdx(), central_idx)
+    if prefix is None:
+        return None                     # complex organyl -> defer (fail-closed)
+    return f"{prefix}{stem} acid"
+
+
+def _name_pnictogen_inic_acid(
+    mol, match_atoms: Tuple[int, ...], symbol: str,
+) -> Optional[str]:
+    """R2E(=O)OH -> ``{R-yl}{R-yl}{stem} acid`` for E in {P, As, Sb}.
+
+    Shared implementation behind :func:`name_phosphinic_acid` and its
+    arsenic/antimony analogues. Mixed substituents get the P-16.5.1.3 enclosing
+    marks from :func:`_build_substituent_string`, which yields the BB L36066
+    verbatim PIN ``methyl(phenyl)arsinic acid`` for C6H5-As(CH3)(O)OH.
+
+    ACCURACY FIX (Phase B): each substituent goes through
+    ``pure_organyl_prefix_name``, the same purity gate the -onic path already
+    used, instead of calling ``_characterize_substituent`` raw.
+    ``_characterize_substituent`` counts the carbons of a non-aromatic subtree
+    as a LINEAR chain, so a cyclic substituent was silently renamed --
+    benzyl(methyl)phosphinic acid came back as 'heptyl(methyl)phosphinic acid'
+    and cyclohexyl(methyl) as 'hexyl(methyl)', both a WRONG CONSTITUTION.  Those
+    strings were caught downstream by the SELF-01 OPSIN check, but that gate
+    fails OPEN when no JRE is present, so the refusal has to happen here.  Fixed
+    for P, As and Sb together since all three share this code path.
+    """
+    from .substituent_purity import pure_organyl_prefix_name  # lazy: avoid import cycle
+
+    stem = _PNICTOGEN_OXOACID_STEMS.get(symbol, (None, None))[1]
+    if stem is None:
+        return None
+
+    central_idx = _find_central_atom(mol, match_atoms, symbol)
+    if central_idx is None:
+        return None
+
+    central = mol.GetAtomWithIdx(central_idx)
+    neighbors = [n for n in central.GetNeighbors() if n.GetSymbol() == 'C']
+    if len(neighbors) != 2:             # an -inic acid has exactly two C-E bonds
+        return None
+
+    sub_names = []
+    for neighbor in neighbors:
+        name = pure_organyl_prefix_name(mol, neighbor.GetIdx(), central_idx)
+        if name is None:
+            return None                 # complex organyl -> defer (fail-closed)
+        sub_names.append(name)
+
+    return f"{_build_substituent_string(sub_names)}{stem} acid"
+
+
+def name_arsonic_acid(mol, match_atoms: Tuple[int, ...]) -> Optional[str]:
+    """R-As(=O)(OH)2 -> ``methylarsonic acid`` (BB L36051 preselected name)."""
+    return _name_pnictogen_onic_acid(mol, match_atoms, 'As')
+
+
+def name_arsinic_acid(mol, match_atoms: Tuple[int, ...]) -> Optional[str]:
+    """R2As(=O)OH -> ``dimethylarsinic acid`` (BB L36052 preselected name)."""
+    return _name_pnictogen_inic_acid(mol, match_atoms, 'As')
+
+
+def name_stibonic_acid(mol, match_atoms: Tuple[int, ...]) -> Optional[str]:
+    """R-Sb(=O)(OH)2 -> ``methylstibonic acid`` (BB L36054 preselected name)."""
+    return _name_pnictogen_onic_acid(mol, match_atoms, 'Sb')
+
+
+def name_stibinic_acid(mol, match_atoms: Tuple[int, ...]) -> Optional[str]:
+    """R2Sb(=O)OH -> ``dimethylstibinic acid`` (BB L36054 preselected name)."""
+    return _name_pnictogen_inic_acid(mol, match_atoms, 'Sb')
+
+
 def name_phosphonic_acid(mol, phosphonic_atoms: Tuple[int, ...]) -> Optional[str]:
     """Name an organyl phosphonic acid in substituent-prefix mode (IUPAC PIN).
 
@@ -282,26 +400,11 @@ def name_phosphonic_acid(mol, phosphonic_atoms: Tuple[int, ...]) -> Optional[str
     Mirrors :func:`name_phosphinic_acid`. Returns ``None`` (fail-closed) when the
     single organyl substituent is not a clean simple alkyl / aryl — the caller
     then defers to the generic path (no regression for complex parents).
+
+    Thin wrapper over the element-generic :func:`_name_pnictogen_onic_acid`,
+    which the arsenic/antimony analogues share.
     """
-    from .substituent_purity import pure_organyl_prefix_name  # lazy: avoid import cycle
-
-    phosphorus_idx = None
-    for idx in phosphonic_atoms:
-        if mol.GetAtomWithIdx(idx).GetSymbol() == 'P':
-            phosphorus_idx = idx
-            break
-    if phosphorus_idx is None:
-        return None
-
-    phosphorus = mol.GetAtomWithIdx(phosphorus_idx)
-    carbons = [n for n in phosphorus.GetNeighbors() if n.GetSymbol() == 'C']
-    if len(carbons) != 1:                       # phosphonic acid has exactly one C-P bond
-        return None
-
-    prefix = pure_organyl_prefix_name(mol, carbons[0].GetIdx(), phosphorus_idx)
-    if prefix is None:
-        return None                             # complex organyl -> defer (fail-closed)
-    return f"{prefix}phosphonic acid"
+    return _name_pnictogen_onic_acid(mol, phosphonic_atoms, 'P')
 
 
 def name_acyloxy_phosphonic_acid(mol) -> Optional[str]:
@@ -493,37 +596,11 @@ def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str
 
     Returns:
         Name like "dimethylphosphinic acid", or None if not simple
+
+    Thin wrapper over the element-generic :func:`_name_pnictogen_inic_acid`,
+    which the arsenic/antimony analogues share.
     """
-    # Find the phosphorus atom
-    phosphorus_idx = None
-    for idx in phosphinic_atoms:
-        atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() == 'P':
-            phosphorus_idx = idx
-            break
-
-    if phosphorus_idx is None:
-        return None
-
-    phosphorus = mol.GetAtomWithIdx(phosphorus_idx)
-
-    # Get carbon neighbors (should be exactly 2)
-    neighbors = [n for n in phosphorus.GetNeighbors() if n.GetSymbol() == 'C']
-    if len(neighbors) != 2:
-        return None
-
-    # Characterize each substituent
-    sub_names = []
-    for neighbor in neighbors:
-        result = _characterize_substituent(mol, neighbor.GetIdx(), {phosphorus_idx})
-        if result is None:
-            return None
-        _, name = result
-        sub_names.append(name)
-
-    # Build substituent string with multipliers and alphabetical ordering
-    prefix = _build_substituent_string(sub_names)
-    return f"{prefix}phosphinic acid"
+    return _name_pnictogen_inic_acid(mol, phosphinic_atoms, 'P')
 
 
 def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:

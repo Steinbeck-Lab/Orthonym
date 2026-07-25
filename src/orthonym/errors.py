@@ -50,6 +50,14 @@ _METAL_NAMES = {
     'Ru': 'ruthenium', 'Rh': 'rhodium', 'Pd': 'palladium', 'Ag': 'silver',
     'Cd': 'cadmium', 'W': 'tungsten', 'Re': 'rhenium', 'Os': 'osmium',
     'Ir': 'iridium', 'Pt': 'platinum', 'Au': 'gold', 'Hg': 'mercury',
+    # Phase B honesty fix: 'As' and 'Ge' were the two p-block metalloids missing
+    # from this table, so an UNNAMEABLE arsenic input fell through to the generic
+    # 'inorganic compound (not supported)' message -- factually wrong for a
+    # carbon-bearing organoarsenic compound such as C7H9AsO3. Their row-mates
+    # (Sn, Pb, Sb, Bi, Te) were already present, which is why antimony reported
+    # correctly and arsenic did not. Affects FAILURE DIAGNOSTICS only: this table
+    # is consulted after naming has already failed, so no successful name moves.
+    'As': 'arsenic', 'Ge': 'germanium',
     'Sb': 'antimony', 'Te': 'tellurium', 'Yb': 'ytterbium', 'La': 'lanthanum',
     'Ce': 'cerium', 'Nd': 'neodymium', 'Sm': 'samarium', 'Eu': 'europium',
     'Gd': 'gadolinium', 'Tb': 'terbium', 'Dy': 'dysprosium', 'Ho': 'holmium',

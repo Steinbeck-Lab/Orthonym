@@ -814,6 +814,38 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Phase B: the P-67 organo-oxoacids of As and Sb (BB L36051-36054), exact
+#     analogues of phosphonic/phosphinic above and registered immediately after
+#     them so an organyl As/Sb oxoacid reaches the ACID suffix path. These are
+#     P-67 oxoacids, NOT P-69 organometallics. Fail-closed (None -> cascade-
+#     continuation) for a complex organyl, same as the phosphorus siblings.
+from .handlers.pnictogen_oxoacid import (  # noqa: E402
+    _is_arsonic_acid, name_arsonic_acid,
+    _is_arsinic_acid, name_arsinic_acid,
+    _is_stibonic_acid, name_stibonic_acid,
+    _is_stibinic_acid, name_stibinic_acid,
+)
+
+for _pn_priority, _pn_id, _pn_pred, _pn_handler in (
+    (2352, "arsonic_acid", _is_arsonic_acid, name_arsonic_acid),
+    (2354, "arsinic_acid", _is_arsinic_acid, name_arsinic_acid),
+    (2356, "stibonic_acid", _is_stibonic_acid, name_stibonic_acid),
+    (2358, "stibinic_acid", _is_stibinic_acid, name_stibinic_acid),
+):
+    _register_inner(
+        handler_id=_pn_id,
+        priority=_pn_priority,
+        predicate=_pn_pred,
+        handler=_pn_handler,
+        iupac_section="P-67.1.1.2",
+        description=(
+            f"{_pn_id.replace('_', ' ')} functional class naming "
+            "(substituent-prefix PIN, direct-return)"
+        ),
+        side_effect_inventory=(),
+    )
+del _pn_priority, _pn_id, _pn_pred, _pn_handler
+
 # --- Plan-02 commit 02-21: phosphinic_acid (Tier-1.5 SHIM; audit § 1 + § 2.25;
 #     direct-return; pool.add() + _inject_stereo_if_missing).
 from .handlers.phosphinic_acid import (  # noqa: E402

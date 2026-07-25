@@ -200,8 +200,13 @@ class TestFailClosedBoundary:
         # refused upstream at dispatch (never reaches the new code) — pins
         # that name_substituent_fragment's atom-dropping 'propynyl' can
         # never surface (research §1.D row 3).
+        # Phase B: the fallback label is now 'arsenic compound (not supported)'.
+        # This molecule is a carbon-bearing ORGANOarsenic compound, so the old
+        # 'inorganic' wording was factually wrong; 'As' was the only p-block
+        # metalloid missing from errors._METAL_NAMES. The REFUSAL itself (the
+        # point of this test -- 'propynyl' must never surface) is unchanged.
         out = name_compound("[AsH2]C#CCNCCCCCCCC(=O)O")
-        assert out in (UNKNOWN, "inorganic compound (not supported)")
+        assert out in (UNKNOWN, "arsenic compound (not supported)")
 
 
 @pytest.mark.unit

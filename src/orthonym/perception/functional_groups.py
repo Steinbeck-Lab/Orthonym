@@ -98,6 +98,20 @@ FUNCTIONAL_GROUP_SMARTS = {
     "phosphonic_acid": "[PX4;$([PX4][#6])](=O)([OX2H1])[OX2H1]",
     # Phosphinic acid: R2P(=O)(OH) - two C attached to P
     "phosphinic_acid": "[PX4](=O)([OX2H1])([#6])[#6]",
+    # --- P-67 organo-oxoacids of the heavier pnictogens (As, Sb) -------------
+    # Exact analogues of the two phosphorus patterns above. BB L36051-36054
+    # gives all four as PRESELECTED names:
+    #   AsH(O)(OH)2 arsonic acid   AsH2(O)OH arsinic acid
+    #   SbH(O)(OH)2 stibonic acid  SbH2(O)OH stibinic acid
+    # These are NOT organometallics -- P-69 never applies to them. The
+    # `$([...][#6])` carbon guard mirrors phosphonic_acid and is what keeps the
+    # FREE inorganic oxoacids (arsoric acid As(O)(OH)3 / stiboric acid, which
+    # are separate preselected names) out of the organo-acid class.
+    # Bismuth has NO oxoacid analogue in the BB, so the family stops at Sb.
+    "arsonic_acid": "[AsX4;$([AsX4][#6])](=O)([OX2H1])[OX2H1]",
+    "arsinic_acid": "[AsX4](=O)([OX2H1])([#6])[#6]",
+    "stibonic_acid": "[SbX4;$([SbX4][#6])](=O)([OX2H1])[OX2H1]",
+    "stibinic_acid": "[SbX4](=O)([OX2H1])([#6])[#6]",
     # === FREE INORGANIC OXOACIDS (BBR-PERC/DEF-2, 169.7: P-67 functional parents) ===
     # Perceived so they are NOT silently dropped or mis-cast as carbon acids (the old
     # `OP(=O)(O)O → trihydrophosphate` malformed bug; now blocked by the [#6]-tightened
