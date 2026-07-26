@@ -1943,6 +1943,29 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 continue
             matches = _c_attached
 
+        # P-63.3.1 (BB 27858-27860): a peroxide / disulfide bridge R-XX-R' whose
+        # far side is a walked substituent branch is named by method (1) --
+        # substitutively, ONE MONOVALENT prefix ('tert-butylperoxy',
+        # 'tert-butyldisulfanyl'), which the substituent walk builds whole from
+        # the shared cascade. PREFIX_FORMS['disulfide'] holds 'disulfanediyl',
+        # which is method (3): the MULTIPLICATIVE divalent bridge -SS-, licensed
+        # only when both ends are parent structures. Emitting it here for a
+        # single attachment both double-counted the S-S -- the walk already named
+        # it, giving '2-disulfanediyl-2-(tert-butyldisulfanyl)ethan-1-ol' -- and
+        # cited a divalent prefix for a monovalent group. Hand the class to the
+        # walk. Nothing is dropped by doing so: a branch the walk cannot name
+        # now fails the whole molecule closed there (see the FAILCLOSED-POLY-SUB
+        # refusal in _generate_alkyl_prefixes_for_polyfunctional).
+        if fg_name in _CHALCOGEN_BRIDGE_FGS and features.substituents:
+            _bridge_kept = [
+                _m for _m in matches
+                if not _bridge_far_side_is_walked_branch(
+                    mol, _m, chain_set, features)
+            ]
+            if not _bridge_kept:
+                continue
+            matches = _bridge_kept
+
         # Get prefix form for this FG
         prefix_form = get_fg_prefix_form(
             fg_name, mol, matches[0], principal_chain
@@ -2316,6 +2339,44 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     return name
 
 
+# P-63.3.1 (BB 27858): the divalent-chalcogen BRIDGE functional groups, whose
+# SMARTS span a carbon on each side of the two chalcogens ('peroxide'
+# [#6][OX2][OX2][#6], 'disulfide' [#6][SX2][SX2][#6]). Their branch-side PIN is
+# the monovalent method-(1) prefix, so the substituent walk owns them, not the
+# FG-prefix loop.
+_CHALCOGEN_BRIDGE_FGS = frozenset({'peroxide', 'disulfide'})
+
+
+def _bridge_far_side_is_walked_branch(mol, match, chain_set, features) -> bool:
+    """True when a P-63.3.1 bridge ``match`` (C, X, X, C) has exactly one carbon
+    on the parent chain and its ENTIRE far side -- both chalcogens and the far
+    carbon -- inside ONE walked substituent branch.
+
+    That is exactly the condition under which the substituent walk sees the whole
+    bridge and can name it with a single monovalent prefix. When it does not hold
+    (both carbons on the chain, an in-chain bridge, a bridge split across
+    branches) this returns False and the FG-prefix loop keeps the match, so no
+    caller can mistake "the walk owns it" for "nobody owns it".
+    """
+    if not match or len(match) < 4 or not features.substituents:
+        return False
+    carbons = [a for a in match
+               if mol.GetAtomWithIdx(a).GetSymbol() == 'C']
+    chalcogens = [a for a in match
+                  if mol.GetAtomWithIdx(a).GetSymbol() in ('O', 'S', 'Se', 'Te')]
+    if len(carbons) != 2 or len(chalcogens) != 2:
+        return False
+    in_chain = [a for a in carbons if a in chain_set]
+    if len(in_chain) != 1:
+        return False  # in-chain or off-chain bridge -> not a branch prefix
+    far_side = set(chalcogens) | (set(carbons) - set(in_chain))
+    for _sub_list in features.substituents.values():
+        for _sub_atoms in _sub_list:
+            if far_side <= set(_sub_atoms):
+                return True
+    return False
+
+
 def _is_linear_terminal_pure_c_branch(mol, sub_atoms, chain_set) -> bool:
     """True iff `sub_atoms` is an all-carbon acyclic branch attached at a terminus
     (attach has <=1 in-branch carbon neighbour, every branch carbon <=2), so
@@ -2611,12 +2672,39 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                                     break
                             if _skip_s_branch:
                                 break
-                    if not sub_has_ring and _attach_sym != 'O' and not _skip_s_branch:
+                    # OWNERSHIP, NOT ELEMENT. This veto used to read
+                    # `_attach_sym != 'O'`, justified as "Ethers (O-attached) are
+                    # handled by the FG prefix system". That holds only for a MONO
+                    # ether oxygen: the 'ether' SMARTS [OX2]([#6])[#6] demands a
+                    # CARBON on both sides, and get_alkoxy_prefix then names that
+                    # whole branch ('tert-butoxy'). When the attachment O's
+                    # in-branch neighbour is a second chalcogen the branch is a
+                    # P-63.3.1 peroxide (or P-63.3.2 mixed bridge): no ether match
+                    # exists, PREFIX_FORMS['peroxide'] is None, so the FG loop
+                    # emits nothing -- and this veto made the substituent walk
+                    # decline too. BOTH owners declined and the branch VANISHED:
+                    # 'CC(C)(C)OOCCO' (9 heavy atoms) was named 'ethan-1-ol'
+                    # (3 heavy atoms), and 'CC(C)OOCCO' -- a different molecule --
+                    # got the same name. Veto only the oxygen the FG prefix system
+                    # really owns; the dichalcogen bridge goes to the walk, whose
+                    # shared cascade names the class whole ('tert-butylperoxy',
+                    # '(propan-2-yl)peroxy', 'tert-butyldisulfanyl').
+                    _o_owned_by_fg_prefix = False
+                    if _attach is not None and _attach_sym == 'O':
+                        from ..assembly.substituent_enumerator import (
+                            is_dichalcogen_bridge_attach,
+                        )
+                        _o_owned_by_fg_prefix = not is_dichalcogen_bridge_attach(
+                            mol, _attach, set(sub_atoms))
+                    if (not sub_has_ring and not _o_owned_by_fg_prefix
+                            and not _skip_s_branch):
                         from ..assembly.substituent_enumerator import (
                             SubstituentInfo,
                             classify_and_name_fragment,
                         )
-                        from ..assembly.naming_utils import needs_brackets
+                        from ..assembly.naming_utils import (
+                            apply_enclosing_marks, needs_brackets,
+                        )
                         chain_set = set(features.principal_chain) if features.principal_chain else set()
                         frag_info = SubstituentInfo(
                             frag_mol=None,
@@ -2626,10 +2714,51 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         )
                         het_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
                         if het_name and needs_brackets(het_name):
-                            het_name = f"({het_name})"
+                            # P-16.3.3 nesting: the marks go ()->[]->{} outward, so
+                            # a prefix that ALREADY carries parentheses must be
+                            # wrapped in SQUARE brackets. The literal f"({...})"
+                            # here produced the doubled-paren
+                            # '2-((propan-2-yl)peroxy)ethan-1-ol' where the PIN is
+                            # '2-[(propan-2-yl)peroxy]ethan-1-ol' (BB 27876 spells
+                            # the analogue '1-[(propan-2-yl)diselanyl]propane
+                            # (PIN)'). apply_enclosing_marks is the shared primitive
+                            # that picks the right level; depth=-1 = "one level
+                            # outside whatever is already there".
+                            het_name = apply_enclosing_marks(het_name, depth=-1)
                 if het_name:
                     substituent_groups[het_name].append(position)
-                continue
+                    continue
+                # An UNNAMED branch is either an ownership handoff or structure
+                # loss, and the two must not be conflated.
+                #
+                # Handoff: the branch is named by the FG-prefix loop in
+                # name_polyfunctional, which runs BEFORE this walk -- a mono ether
+                # oxygen ('tert-butoxy') or an S in a sulfoxide/sulfone/thioether
+                # match. The walk is *supposed* to decline; the atoms are already
+                # spoken for, so skip as before. Failing closed here instead
+                # abstained on every ether-bearing polyfunctional molecule and let
+                # a weaker downstream handler name them, which is how
+                # 'CC(C)(C)OCCO' turned from the BB-correct '2-tert-butoxyethan-
+                # 1-ol' into '2-(tert-butyloxy)ethan-1-ol' (BB 27679: "not
+                # tert-butyloxy").
+                #
+                # Loss: nobody named it. The old code `continue`d here too and went
+                # on to name the REST of the molecule, so the atoms silently
+                # vanished -- 'CC(C)(C)OOCCO' (9 heavy atoms) shipped as
+                # 'ethan-1-ol' (3 heavy), and 'CC(C)OOCCO', a DIFFERENT molecule,
+                # shipped the same name. A name describing fewer atoms than were
+                # drawn is the worst failure this system has and is worse than no
+                # name, so refuse the whole handler: the caller returns None and the
+                # namer falls through to another handler or abstains.
+                if _o_owned_by_fg_prefix or _skip_s_branch:
+                    continue
+                logger.debug(
+                    "FAILCLOSED-POLY-SUB: unnameable heteroatom branch "
+                    "atoms=%s attach=%s attach_sym=%s ring=%s smiles=%s",
+                    sorted(sub_atoms), _attach, _attach_sym, sub_has_ring,
+                    getattr(features, 'canonical_smiles', '?'),
+                )
+                return None
 
             # W2F-P3 (defect b-pure-C, P-29.2): get_alkyl_name(carbon_count) is
             # correct ONLY for a linear terminal branch. A branched / secondary pure-C

@@ -1012,6 +1012,117 @@ def composed_alkoxy_prefix(token):
     return f"{token}oxy"
 
 
+# P-63.3.2 (BB 27914) / P-63.6: the free valence each NON-oxygen divalent
+# chalcogen contributes to a composed prefix. Oxygen is absent on purpose --
+# its morphology is the CONTRACTED one and is spelled by the BB-cited
+# `composed_alkoxy_prefix` above, never by appending a bare 'oxy' here.
+_CHALCOGEN_YL_SUFFIX = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}
+
+
+def composed_chalcogen_group_prefix(mol, frag_atoms, chalcogen_idx, boundary):
+    """The PIN prefix token for a MONO-chalcogen-rooted group ``-X-R``, or None.
+
+    ``chalcogen_idx`` is a divalent O/S/Se/Te whose single continuation inside
+    ``frag_atoms`` (not crossing ``boundary``) is an ORGANYL group. The Blue
+    Book spells both morphologies verbatim:
+
+      * ``-O-CH3``      -> ``methoxy``          (P-63.2.2.2, BB 27671)
+      * ``-O-C(CH3)3``  -> ``tert-butoxy``      (BB 27679, "not tert-butyloxy")
+      * ``-O-CH(CH3)2`` -> ``(propan-2-yl)oxy`` (BB 27683)
+      * ``-S-CH3``      -> ``methylsulfanyl``   (BB 27651, BB 25021)
+      * ``-Se-CH3``     -> ``methylselanyl``    (P-63.6)
+
+    THIS IS THE PRIMITIVE THE GENERIC CASCADE CANNOT SUPPLY. Handed a chalcogen
+    attachment, :func:`name_substituent` RE-ROOTS the fragment at a carbon and
+    names the chalcogen as a hydroxy/sulfanyl SUBSTITUENT on that carbon, so
+    ``tert-Bu-O-`` came back as ``2-hydroxy-2-methylpropyl`` -- a different
+    CONSTITUTION, not merely a different spelling. Any caller holding a
+    chalcogen attachment must come here rather than guess with the cascade.
+
+    Scope is deliberately the MONO chalcogen. A second chalcogen beyond
+    ``chalcogen_idx`` is the P-63.3.1 peroxy / disulfanyl class, which the
+    cascade already names correctly and whole ('methylperoxy',
+    'tert-butyldisulfanyl'); this returns None there so the caller keeps that
+    working path.
+
+    Fails closed (``None``) when the atom is not a divalent chalcogen, has other
+    than exactly one in-fragment continuation, that continuation is not carbon,
+    or the organyl half cannot be named as a single prefix token.
+    """
+    frag_set = set(frag_atoms)
+    if chalcogen_idx not in frag_set:
+        return None
+    hub = mol.GetAtomWithIdx(chalcogen_idx)
+    sym = hub.GetSymbol()
+    if sym != 'O' and sym not in _CHALCOGEN_YL_SUFFIX:
+        return None
+    if not _is_divalent_chalcogen_atom(hub):
+        return None
+
+    _bound = set(boundary) | {chalcogen_idx}
+    onward = [n.GetIdx() for n in hub.GetNeighbors()
+              if n.GetIdx() in frag_set and n.GetIdx() not in _bound]
+    if len(onward) != 1:
+        return None  # terminal (-OH/-SH) or a branched hub -> fail closed
+    r_start = onward[0]
+    if mol.GetAtomWithIdx(r_start).GetSymbol() != 'C':
+        return None  # P-63.3.1 di-chalcogen: the cascade owns that class
+
+    # The organyl half, bounded so the walk can never re-enter the hub.
+    r_atoms = set()
+    stack = [r_start]
+    while stack:
+        idx = stack.pop()
+        if idx in r_atoms or idx in _bound or idx not in frag_set:
+            continue
+        r_atoms.add(idx)
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx not in r_atoms and nidx not in _bound:
+                stack.append(nidx)
+    if not r_atoms:
+        return None
+
+    token = composed_prefix_organyl_name(mol, sorted(r_atoms), r_start)
+    if not token:
+        return None
+    if sym == 'O':
+        # The contracted R-O- morphology, spelled by the BB-cited primitive.
+        return composed_alkoxy_prefix(token)
+    cited = cite_organyl_in_composed_prefix(token)
+    if not cited:
+        return None
+    return f"{cited}{_CHALCOGEN_YL_SUFFIX[sym]}"
+
+
+def is_dichalcogen_bridge_attach(mol, attach_idx, frag_atoms_set,
+                                 require_different: bool = False):
+    """True when ``attach_idx`` is a divalent chalcogen bonded, inside the
+    fragment, to a second divalent chalcogen -- the P-63.3.1 / P-63.3.2 bridge
+    shapes ``-OO-``, ``-SS-``, ``-OS-``, ``-SO-``, ``-OSe-`` ...
+
+    ``require_different=True`` narrows it to the MIXED bridge only (the two
+    chalcogens are different elements), which is the shape the generic
+    substituent tiers must never be allowed to mangle.
+
+    One walker for both questions on purpose: the two predicates differ by a
+    single element comparison, and spelling them separately is how this class
+    regrew a site at a time before.
+    """
+    _CHALCOGENS = ('O', 'S', 'Se', 'Te')
+    a = mol.GetAtomWithIdx(attach_idx)
+    sym = a.GetSymbol()
+    if sym not in _CHALCOGENS or not _is_divalent_chalcogen_atom(a):
+        return False
+    return any(
+        n.GetIdx() in frag_atoms_set
+        and n.GetSymbol() in _CHALCOGENS
+        and (n.GetSymbol() != sym if require_different else True)
+        and _is_divalent_chalcogen_atom(n)
+        for n in a.GetNeighbors()
+    )
+
+
 def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                               allow_mancude: bool = False):
     """Name any substituent fragment.
@@ -3499,7 +3610,7 @@ def _name_mixed_chalcogen_branch(mol, frag_atoms, attach_idx, parent_atoms):
     # inner neighbour is a DIFFERENT divalent chalcogen (so -S-S-R disulfanyl and
     # -S-C alkylsulfanyl never reach here); name the whole R group beyond the hub
     # via the shared cascade and enclose a compound R.
-    _CHALCOGEN_YL = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}
+    _CHALCOGEN_YL = _CHALCOGEN_YL_SUFFIX
     if attach_sym in _CHALCOGEN_YL:
         r_start = None
         for nbr in a1.GetNeighbors():
@@ -3511,6 +3622,35 @@ def _name_mixed_chalcogen_branch(mol, frag_atoms, attach_idx, parent_atoms):
             r_start = nbr_idx
         if r_start is None:
             return None
+        # P-63.3.2 (BB 27914): when the inner chalcogen is a MONO one -- its own
+        # continuation is a carbon -- the R side is an -O-R / -S-R group whose PIN
+        # morphology is the CONTRACTED one: '(methoxysulfanyl)cyclohexane (PIN)'
+        # for C6H11-S-O-CH3 is 'methoxy' + 'sulfanyl'. The generic cascade cannot
+        # name that half: handed the chalcogen it re-roots at a carbon and returns
+        # a HYDROXYALKYL, which turned tert-Bu-O-S- into
+        # '(2-hydroxy-2-methylpropyl)sulfanyl' -- the O-S bridge rewritten as a
+        # C-S bond, a different molecule that still round-tripped as *a* valid
+        # name. Route the mono-chalcogen R side to the shared composed primitive.
+        # A DI-chalcogen inner (-S-O-O-R) is NOT redirected: the cascade names
+        # that class correctly and whole ('(methylperoxy)sulfanyl').
+        _mono = composed_chalcogen_group_prefix(
+            mol, sorted(frag_set), r_start, {attach_idx})
+        if _mono:
+            # P-16.3.3: this concatenated compound prefix takes enclosing marks --
+            # BB 27914 spells the PIN '(methoxysulfanyl)cyclohexane', not
+            # 'methoxysulfanylcyclohexane'. Marked HERE so the producer is correct
+            # on its own rather than relying on a caller to recognise the shape;
+            # bare, '<alkoxy>sulfanyl' is not merely non-PIN but ambiguous, and the
+            # aryl sibling '<aryl>disulfanyl' re-parses as a different molecule.
+            # This does not double-enclose when the shared root rule in
+            # naming_utils.needs_brackets also covers the token: that predicate
+            # returns False for an already-enclosed name, so no caller adds a
+            # second level (verified for all four morphologies below).
+            # The pre-existing cascade path further down is deliberately NOT
+            # re-marked -- it already returns shapes its callers escalate
+            # correctly ('(methylperoxy)sulfanyl' -> '[...]').
+            from .naming_utils import apply_enclosing_marks as _aem
+            return _aem(f"{_mono}{_CHALCOGEN_YL[attach_sym]}", depth=-1)
         r_name = name_substituent(mol, sorted(frag_set - {attach_idx}), r_start)
         if not r_name:
             return None
@@ -3525,19 +3665,13 @@ def _name_mixed_chalcogen_branch(mol, frag_atoms, attach_idx, parent_atoms):
 def _is_mixed_chalcogen_bridge_attach(mol, attach_idx, frag_atoms_set):
     """True when ``attach_idx`` is a divalent chalcogen whose in-fragment
     neighbor is a DIFFERENT divalent chalcogen — the P-63.3.2 mixed-bridge
-    shape the generic substituent tiers must never be allowed to mangle."""
-    _CHALCOGENS = ('O', 'S', 'Se', 'Te')
-    a = mol.GetAtomWithIdx(attach_idx)
-    sym = a.GetSymbol()
-    if sym not in _CHALCOGENS or not _is_divalent_chalcogen_atom(a):
-        return False
-    return any(
-        n.GetIdx() in frag_atoms_set
-        and n.GetSymbol() in _CHALCOGENS
-        and n.GetSymbol() != sym
-        and _is_divalent_chalcogen_atom(n)
-        for n in a.GetNeighbors()
-    )
+    shape the generic substituent tiers must never be allowed to mangle.
+
+    The MIXED case of the shared :func:`is_dichalcogen_bridge_attach` walker;
+    kept as a named predicate for its call sites, never as a second walker.
+    """
+    return is_dichalcogen_bridge_attach(
+        mol, attach_idx, frag_atoms_set, require_different=True)
 
 
 def _find_attach_atom_in_frag(mol, frag_atoms, parent_atoms):
