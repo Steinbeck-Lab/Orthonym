@@ -402,12 +402,21 @@ def main(args: List[str] = None) -> int:
             result = name_compound(parsed.smiles, style=parsed.style,
                                    include_confidence=True, **name_kwargs)
             print(f"Name:       {result['name']}")
-            print(f"Confidence: {result['confidence']:.4f}")
+            # v29 C4-D: an UNMEASURED candidate reports confidence None /
+            # factors {} rather than a fabricated 1.0 (the old behaviour scored
+            # a name that dropped two thirds of the molecule as perfect). Print
+            # the honest verdict; never format None as a number.
+            _conf = result.get('confidence')
+            if _conf is None:
+                print("Confidence: unverified (no coverage measurement was taken)")
+            else:
+                print(f"Confidence: {_conf:.4f}")
             print(f"Handler:    {result['handler']}")
             if result.get('factors'):
                 print("Factors:")
                 for k, v in result['factors'].items():
-                    print(f"  {k}: {v:.4f}")
+                    print(f"  {k}: {v:.4f}" if isinstance(v, (int, float))
+                          else f"  {k}: {v}")
         elif parsed.verbose:
             name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
             print(f"SMILES: {parsed.smiles}")
@@ -462,9 +471,14 @@ def _process_batch(input_file: str, output_file: str, style: str,
                                        include_confidence=True,
                                        trivial_fallback=trivial_fallback,
                                        binding_proof=binding_proof)
+                # v29 C4-D: None means UNMEASURED, not zero — emit the token
+                # 'unverified' rather than formatting None or implying 0.0000.
+                _conf = result.get('confidence')
+                _conf_col = ('unverified' if _conf is None
+                             else f"{_conf:.4f}")
                 results.append(
                     f"{smiles}\t{result['name']}\t"
-                    f"{result['confidence']:.4f}\t{result['handler']}"
+                    f"{_conf_col}\t{result['handler']}"
                 )
             else:
                 nm = name_compound(smiles, style=style,
