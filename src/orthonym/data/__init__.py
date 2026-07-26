@@ -237,14 +237,29 @@ _OPSIN_NON_PIN_EXCLUSIONS = _PIN_DENY
 #
 # The literal reading of ``is_pin: False`` -- "no entry on this surface may be a
 # headline PIN unless the curated allow-list says so" -- is implemented below and
-# gated behind ORTHONYM_GOVERN_OPSIN_SIMPLE_GROUPS=1. It is OFF by default
-# because the measured blast radius over  is large
-# and, critically, is NOT uniformly an improvement: withdrawing a trivial name
-# only helps when the systematic engine derives the correct PIN in its place, and
-# the PA1 R2/R3 work proved that assumption false in 8 of 11 cases (deny-only
-# produced "methane" for N=C=N, "methanamine" for thiuram monosulfide, and a
-# 1,2,3-triol for pentaerythritol). Flipping 423 entries blind would therefore
-# trade a bounded set of non-PIN names for an unbounded set of wrong ones.
+# gated behind ORTHONYM_GOVERN_OPSIN_SIMPLE_GROUPS=1.
+#
+# MEASURED BLAST RADIUS (why it ships OFF).
+#   * Withdraws 272 headline keys: ALL_RETAINED_NAMES 867 -> 595, with all 272
+#     demoted to --trivial (GENERAL_RETAINED_NAMES 117 -> 403), not deleted.
+#   * , exact whole-molecule hits: 0 of 2000. No
+#     molecule in that corpus IS one of the withdrawn entries.
+#   * A/B naming run, 300-molecule random sample (seed 1234) of the same corpus:
+#     1 of 300 emitted names changed (0.33%), 0 became "unknown".
+#
+# The blast radius is therefore SMALL -- but the single change is a REGRESSION,
+# which is the actual reason this is off:
+#     cid 5313963, withdrawing the trivial "choline"
+#       OFF: choline 3-[(hexadec-1-en-1-yl)oxy]1-phosphonooxypropan-2-yl oleate
+#       ON : 3-[(hexadec-1-en-1-yl)oxy]propane-1,2-diyl oleate ethyl phosphatium
+#     The ON name silently loses the trimethylammonium group entirely.
+#
+# That is the same failure mode the PA1 R2/R3 tranche measured 8 times over:
+# withdrawing a trivial name only helps when the systematic engine derives the
+# correct PIN in its place, and deny-only produced "methane" for N=C=N,
+# "methanamine" for thiuram monosulfide, and a 1,2,3-triol for pentaerythritol.
+# So the evidence is consistent across both experiments: flipping 423 entries
+# blind trades a bounded set of non-PIN names for an unbounded set of wrong ones.
 # The individually-adjudicated denies live in iupac_2013_pin_list.json, which is
 # the correct granularity: each carries a Blue Book citation AND a verified
 # replacement. This switch exists so the class can be measured and so the
