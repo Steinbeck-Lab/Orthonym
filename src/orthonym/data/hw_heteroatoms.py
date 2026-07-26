@@ -15,11 +15,14 @@ Priority ordering: Used to determine which heteroatom gets position 1 in
 ring numbering when multiple different heteroatoms are present. Lower
 priority number = higher priority = gets position 1 or lower locant.
 
-IUPAC priority (Group 16 > Group 15 > Group 14 > Group 13):
-  O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B
+IUPAC priority, Table 2.4's own "decreasing order of seniority" [BBv2:8236]:
+  F > Cl > Br > I > O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb
+    > B > Al > Ga > In > Tl
 
-Reference: IUPAC 2013 Blue Book, Table 2.3 and Section P-22.2.2.1
-Source: Derived from OPSIN hwHeteroAtoms.xml
+Reference: IUPAC 2013 Blue Book, **Table 2.4** (P-22.2.2.1.1) [BBv2:8234-8250].
+    Earlier revisions of this docstring cited "Table 2.3"; that table is the
+    retained-name morpholine entry, not the Hantzsch-Widman prefix table.
+    Corrected against the book.
 """
 
 from typing import Dict, Optional
@@ -55,8 +58,21 @@ HW_PREFIXES: Dict[str, str] = {
     'Sn': 'stanna',
     'Pb': 'plumba',
 
-    # Group 13
+    # Group 13. Al/Ga/In/Tl are the four elements P-22.2.2 [BBv2:8218] ADDED to
+    # the recommended Hantzsch-Widman system. Their Table 2.4 spellings are
+    # transcribed verbatim from [BBv2:8244-8248] and TWO of them deliberately
+    # differ from Table 1.5: the book prints ``aluminium | 3 | aluma`` with the
+    # parenthetical "(not alumina)" and ``indium | 3 | indiga`` with "(not
+    # inda)", under footnote 1 "Compare with Table 1.5" [BBv2:8250]. Ga and Tl
+    # are spelled the same in both tables. The divergence is a Blue Book
+    # requirement -- a caller in a Table-1.5 context (von Baeyer, spiro, chain,
+    # ring > 10) must NOT read these; it reads
+    # ``rules/ring_replacement.HETEROATOM_PREFIXES``.
     'B': 'bora',
+    'Al': 'aluma',
+    'Ga': 'galla',
+    'In': 'indiga',
+    'Tl': 'thalla',
 
     # NOTE: mercury is deliberately ABSENT. P-22.2.2 [BBv2:8218]: "The elements
     # aluminium, gallium, indium, and thallium are now included in the recommended
@@ -68,17 +84,18 @@ HW_PREFIXES: Dict[str, str] = {
     # legitimate home of Hg/Zn/Cd and is untouched by this removal.
     #
     # Al/Ga/In/Tl -- which P-22.2.2 ADDED to Hantzsch-Widman in the same sentence
-    # -- are not listed yet either. Their Table 2.4 spellings are ``aluma``,
-    # ``galla``, ``indiga``, ``thalla`` and they differ from the Table 1.5 forms
-    # (``alumina``, ``galla``, ``inda``, ``thalla``) for Al and In, so adding them
-    # is a context-keyed change that must be verified per element; until then the
-    # consumers fail closed on the missing prefix rather than dropping the atom.
+    # -- are now listed above, per element against [BBv2:8244-8248].
 }
 
 
 # Heteroatom priority for ring numbering
 # Lower number = higher priority (gets position 1)
-# IUPAC order: F > Cl > Br > I > O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B
+# Table 2.4 order [BBv2:8236]: F > Cl > Br > I > O > S > Se > Te > N > P > As
+#   > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl. Identical, element for
+#   element, to P-23.3.1's von Baeyer citation order [BBv2:9765] -- which is why
+#   the Table-1.5 spiro sites that sort with this table have never disagreed with
+#   ``ring_replacement.HETEROATOM_PREFIXES``'s ranks. Only the SPELLINGS diverge
+#   (aluma/indiga), and those come from HW_PREFIXES above, never from here.
 # Phase 151-04 WR-01: halogens included per IUPAC P-25.3.1.3 (skeletal
 # replacement nomenclature priority). Negative values keep them strictly
 # more senior than O without renumbering downstream callers that depend
@@ -109,13 +126,27 @@ HETEROATOM_PRIORITY: Dict[str, int] = {
     'Sn': 12,
     'Pb': 13,
 
-    # Group 13 (lowest priority)
+    # Group 13 (lowest priority). In and Tl complete Table 2.4's order, whose
+    # last four entries are Al > Ga > In > Tl [BBv2:8244-8248]. They were MISSING
+    # while B..Ga were present, so ``get_heteroatom_priority`` fell through to 999
+    # for both -- which made every In/Tl pair a TIE. ``sort_heteroatoms_by_priority``
+    # is a stable sort over a list built by iterating a ``set`` of ring atoms, so a
+    # tie there produced a citation order that depended on set iteration: a
+    # nondeterministic name. Reachable as soon as either element can be spelled at
+    # all, which it now can (Table 2.4 above, and Table 1.5 in ``ring_replacement``).
     'B': 14,
     'Al': 15,
     'Ga': 16,
+    'In': 17,
+    'Tl': 18,
 
-    # Additional
-    'Hg': 17,
+    # NOT a replacement-seniority position: Hg has no prefix in Table 1.5 OR
+    # Table 2.4 (P-22.2.2 deleted it), so no name can ever cite it from here and
+    # this rank is unreachable in every replacement path. Kept only so the value
+    # stays defined for the P-69 organometallic consumers, and moved past In/Tl so
+    # those two could take their real Table 2.4 positions. Do not read it as
+    # sanctioning ``mercura`` in replacement nomenclature -- see HW_PREFIXES.
+    'Hg': 19,
 }
 
 

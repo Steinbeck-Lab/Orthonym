@@ -1158,11 +1158,18 @@ def name_heterocycle(mol, ring_atoms) -> Optional[str]:
         if macro_het is None:
             # Could not enumerate -> fall back to the heteroatom-only orientation.
             macro_het, double_locants = heteroatom_locants, None
+        # ``bare_ring``: the molecule IS this ring, so no substituent, suffix or
+        # unsaturation locant can be cited alongside the heteroatom's -- the only
+        # condition under which P-22.2.3.2.1's omission of the sole heteroatom
+        # locant is provably unambiguous. Anything exocyclic (a ring ketone, an
+        # ``-ol``, a substituent) leaves this False and the locant is kept, which
+        # is what the gold ``1-selenacyclotridecan-3-one`` requires.
         return _build_replacement_name(
             macro_het,
             ring_size,
             info['is_saturated'],
             double_locants=double_locants,
+            bare_ring=(mol.GetNumHeavyAtoms() == ring_size),
         )
 
     hw_name = build_hw_name(
@@ -1429,6 +1436,7 @@ def _build_replacement_name(
     ring_size: int,
     is_saturated: bool,
     double_locants: Optional[List[int]] = None,
+    bare_ring: bool = False,
 ) -> Optional[str]:
     """
     Build replacement ("a") nomenclature name for macrocyclic heterocycles.
@@ -1473,15 +1481,56 @@ def _build_replacement_name(
         key=lambda e: HETEROATOM_PRIORITY.get(e, 999)
     )
 
+    # P-22.2.3.2.1: the sole heteroatom's locant '1' is omitted -- but ONLY when NO
+    # OTHER locant is cited anywhere in the final name, which is the whole reason
+    # the rule is safe: with nothing else numbered, the origin cannot be ambiguous.
+    # Scoped by measurement, not by reading:
+    #   * the Blue Book KEEPS the locant on the unsaturated forms
+    #     ``1-oxacycloundeca-2,4,6,8,10-pentaene`` (PIN) and
+    #     ``1-azacyclotetradeca-1,3,5,7,9,11,13-heptaene`` (PIN) [BBv2:8488-8490],
+    #     where unsaturation locants are cited -> hence ``_saturated_ring``;
+    #   * and the shipped gold target ``1-selenacyclotridecan-3-one``
+    #     (W2-RINGKET-SELENA-PROTECT) keeps it too, because a SUFFIX locant is
+    #     cited. That name is assembled by this builder's CALLER, which appends
+    #     ``-3-one`` to the ``...ane`` parent returned here -- so this function
+    #     cannot see it, and an omission decided from the arguments alone
+    #     regressed that target (measured, not hypothesised).
+    # ``bare_ring`` is therefore required: the caller asserts the molecule IS the
+    # ring, so there is provably no substituent, suffix or unsaturation locant to
+    # collide with. That is the exact condition covering the book's
+    # ``thiacyclododecane`` (PIN) and the ``thiacyclododecane`` /
+    # ``azacyclotridecane`` gold targets, and nothing wider.
+    _saturated_ring = (not double_locants if double_locants is not None
+                       else bool(is_saturated))
+    _omit_sole_heteroatom_locant = (
+        len(heteroatoms) == 1 and _saturated_ring and bare_ring)
+
     prefix_parts = []
     for elem in elements_by_priority:
-        # Rings LARGER than 10 are general skeletal replacement, i.e. a
-        # **Table 1.5** context (P-15.4.1.1 lists "rings > 10" explicitly), not
-        # Hantzsch-Widman. Spell from the Table-1.5 source accordingly. The two
-        # tables agree on all 14 elements this path can reach, so this is
-        # byte-identical today; they diverge for Al (``alumina`` vs ``aluma``)
-        # and In (``inda`` vs ``indiga``), where reading the HW table from here
-        # would have produced the wrong one of the two.
+        # Rings of ELEVEN or more members are named by skeletal replacement
+        # (P-22.2.3 [BBv2:8482]: "For monocyclic rings with eleven and more ring
+        # members, skeletal replacement ('a') nomenclature (see P-15.4) is
+        # used"), and we spell them from the Table-1.5 source.
+        #
+        # NOT ESTABLISHED -- which table governs HERE is genuinely ambiguous in
+        # the book, and it matters for exactly two elements:
+        #   * P-22.2.3 points at P-15.4, i.e. Table 1.5;
+        #   * but P-22.2.3.1 [BBv2:8484] says the prefixes come from "(see
+        #     Table 2.4)" -- the Hantzsch-Widman table -- in the same sentence
+        #     that quotes Table 2.4's 22-element seniority order. (That
+        #     cross-reference may simply be reaching for the ORDER, which
+        #     Table 1.5 does not print at all.)
+        # The two tables agree on 16 of the elements this path can reach, so the
+        # question only bites for Al (``alumina`` vs ``aluma``) and In (``inda``
+        # vs ``indiga``). Table 1.5 is kept because the Table 2.4 reading is
+        # unverifiable downstream: ``alumacyclotridecane`` and
+        # ``indigacyclotridecane`` are REJECTED by the round-trip parser
+        # ("cyclotridecane ... not parseable" after an HW prefix) while
+        # ``aluminacyclotridecane`` and ``indacyclotridecane`` parse back to the
+        # right structure. Switching would trade a verified name for an
+        # unverifiable one, and SELF-01 fails OPEN on an unparseable name -- so
+        # it must not be switched on the strength of a parenthetical alone.
+        # Resolve against the printed Blue Book before changing this.
         hw_prefix = _table_1_5_prefix(elem)
         if not hw_prefix:
             # FAIL CLOSED -- see ``build_hw_name``: skipping here dropped the
@@ -1495,6 +1544,20 @@ def _build_replacement_name(
         if count > 1:
             multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
             prefix_parts.append(f"{locant_str}-{multiplier}{hw_prefix}")
+        elif _omit_sole_heteroatom_locant:
+            # P-22.2.3.2.1 [BBv2:8494]: "When a single heteroatom is present in
+            # the ring, it is assigned the locant '1', which is OMITTED in the
+            # name" -- the BB's own saturated example is ``thiacyclododecane
+            # (PIN)`` [BBv2:8488], and ``thiacyclododecane`` /
+            # ``azacyclotridecane`` are shipped gold targets carrying exactly
+            # this citation. This builder emitted the locant for EVERY element;
+            # O/S/N/Si never reach it (an earlier producer, which already omits
+            # the locant, handles them) so the defect only surfaced for an
+            # element that falls through to here -- which Al and In began doing
+            # when v29 P2-T2b made them spellable. Without this the two new rows
+            # would have shipped the non-PIN ``1-aluminacyclotridecane`` while
+            # oxygen shipped ``oxacyclotridecane``.
+            prefix_parts.append(hw_prefix)
         else:
             prefix_parts.append(f"{locant_str}-{hw_prefix}")
 

@@ -46,8 +46,11 @@ The two tables are deliberately DIFFERENT -- do not unify them
 So the prefix is a function of *(element, nomenclature context)*, never of the
 element alone. A prefix source is therefore correct only relative to its
 context, and a von Baeyer/spiro path that reaches into the HW table is a latent
-context bug even when today's spellings happen to coincide (they coincide for
-all 14 elements both tables share).
+context bug even when today's spellings happen to coincide. Since v29 P2-T2b the
+divergence is LIVE, not merely latent: both tables now carry Al and In, so the HW
+table really does answer ``aluma``/``indiga`` where the Table-1.5 source answers
+``alumina``/``inda``. (Of the 18 elements the emitting Table-1.5 set and the
+22-row HW table share, 16 coincide and those two do not.)
 
 Mercury is not merely absent, it is DELETED
 -------------------------------------------
@@ -190,21 +193,23 @@ REPRODUCER = 'C1C[AlH]CC2(C1)CCCCC2'
 def test_reproducer_does_not_ship_the_fabricated_ala_prefix(namer):
     """``2-alaspiro[5.5]undecane`` -- ``ala`` is not a Blue Book term.
 
-    Aluminium IS in Table 1.5 (``alumina``) and in Table 2.4 (``aluma``), but
-    ``ring_replacement.HETEROATOM_PREFIXES`` -- the Table-1.5 source this spiro
-    path spells from -- deliberately carries only its 14 verified rows, so the
-    correct behaviour here is a REFUSAL, not a renamed prefix. Refusing is the
-    sound end state for a closed table: a wrong table row ships a wrong name.
+    When T2a landed, the correct behaviour here was a REFUSAL: aluminium is in
+    Table 1.5 (``alumina``) and Table 2.4 (``aluma``), but the Table-1.5 source
+    carried only its 14 verified rows. v29 P2-T2b added the four Group-13 rows
+    against their citations, so the correct behaviour is now the Table-1.5
+    SPELLING. Either way the invariant this test exists for is unchanged: never
+    the fabricated ``ala``, and never a silent drop.
     """
     name = namer.name(REPRODUCER)
     assert not cites_morpheme(name, 'ala'), (
         f"fabricated morpheme 'ala' still shipped: {name!r}"
     )
-    # And it must not have silently dropped the aluminium either: a bare
-    # hydrocarbon spiro name for an aluminium ring is the other wrong answer.
-    assert is_refusal(name) or not cites_morpheme(name, 'spiro'), (
-        f"aluminium neither spelled nor refused: {name!r}"
-    )
+    # Post-T2b this is a NAME, and it must be the Table-1.5 spelling: reading
+    # ``aluma`` from the Hantzsch-Widman table in a spiro (Table 1.5) context is
+    # the latent context bug this suite also guards.
+    # Byte-exact: this simultaneously pins the spelling (``alumina``, not the HW
+    # ``aluma``), the locant, and the absence of a stray hyphen (P-23.3.1).
+    assert name == '2-aluminaspiro[5.5]undecane', name
 
 
 # ---------------------------------------------------------------------------
@@ -227,17 +232,44 @@ def test_root_fabricator_returns_none_off_table(symbol):
     )
 
 
-@pytest.mark.parametrize('symbol', ['Fe', 'U', 'Xx', 'Zn', 'Cd', 'Hg', 'Al'])
+# Elements ``get_heteroatom_prefix`` must refuse, for TWO different reasons:
+#   * Fe/U/Xx/Zn/Cd/Hg -- in NO replacement table at all.
+#   * At/Po/C/F/Cl/Br/I -- Table 1.5 rows that P-23.3.1 and/or P-23.3.2.2 do not
+#     rank, so there is no sanctioned von Baeyer citation position or numbering
+#     rank for them (v29 P2-T2b; see ``ring_replacement.VB_INADMISSIBLE``).
+# ``Al`` was in this list until T2b: it is now spelled (``alumina``), because
+# P-23.3.1 AND P-23.3.2.2 both rank it.
+@pytest.mark.parametrize('symbol', ['Fe', 'U', 'Xx', 'Zn', 'Cd', 'Hg',
+                                    'At', 'Po', 'C', 'F', 'Cl', 'Br', 'I'])
 def test_root_fabricator_fails_closed_for_everything_off_table(symbol):
     from orthonym.rules.polycyclic_bridged import get_heteroatom_prefix
     assert get_heteroatom_prefix(symbol) is None
+
+
+@pytest.mark.parametrize('symbol,expected', [
+    ('Al', 'alumina'), ('Ga', 'galla'), ('In', 'inda'), ('Tl', 'thalla'),
+])
+def test_root_fabricator_spells_the_group_13_rows_t2b_added(symbol, expected):
+    """The four Table 1.5 rows T2b made emittable, in their TABLE 1.5 spelling.
+
+    P-22.2.2 [BBv2:8218] added Al/Ga/In/Tl to Hantzsch-Widman in the same
+    sentence that deleted mercury, and P-23.3.1/P-23.3.2.2 both rank all four, so
+    they have a citation position AND a numbering rank -- unlike the halogens.
+    ``alumina``/``inda`` here and NOT ``aluma``/``indiga``: this accessor serves
+    the Table-1.5 (von Baeyer / spiro) context.
+    """
+    from orthonym.rules.polycyclic_bridged import get_heteroatom_prefix
+    assert get_heteroatom_prefix(symbol) == expected
 
 
 @pytest.mark.parametrize('symbol,expected', sorted(
     (s, p) for s, (p, _k) in HETEROATOM_PREFIXES.items()
 ))
 def test_root_fabricator_still_spells_every_in_table_element(symbol, expected):
-    """Byte-identity floor: the 14 Table-1.5 rows keep their exact spelling.
+    """Byte-identity floor: every emittable Table-1.5 row keeps its exact spelling.
+
+    Parametrized off ``HETEROATOM_PREFIXES`` itself, so it grew from 14 rows to 18
+    when v29 P2-T2b added Al/Ga/In/Tl and will track any future row.
 
     The retired 7-entry local dict (O N S Se P Si B) is a strict subset of the
     canonical table with identical spellings, so routing through the canonical
@@ -319,7 +351,11 @@ def test_spiro_prefix_builder_fails_closed_at_function_level():
     """
     from orthonym.rules.spiro import _build_hetero_prefix
     from orthonym.perception.rings import get_spiro_atoms
-    for symbol in ('Al', 'Zn', 'Hg', 'Fe'):
+    # ``Al`` was here until v29 P2-T2b made it emittable (``alumina``). Replaced
+    # by elements that are still unspellable for BOTH reasons: Zn/Hg/Fe are in no
+    # replacement table, while I/At/Po are Table 1.5 rows the von Baeyer rules do
+    # not rank (``ring_replacement.VB_INADMISSIBLE``).
+    for symbol in ('Zn', 'Hg', 'Fe', 'I', 'At', 'Po'):
         mol = Chem.MolFromSmiles(f'C1C[{symbol}H]CC2(C1)CCCCC2')
         assert mol is not None
         spiro_atoms = set(get_spiro_atoms(mol))
@@ -376,10 +412,14 @@ def test_spiro_vonbaeyer_a_prefix_fails_closed_off_table():
     not safe, it is undetected.
     """
     from orthonym.rules.spiro import _spiro_vb_a_prefix
-    mol = Chem.MolFromSmiles('C1CC2([AlH]C1)CCCCC2')
+    # Was ``[AlH]``; Al became emittable in v29 P2-T2b. ``[PoH]`` keeps the test's
+    # intent exactly: polonium HAS a Table 1.5 morpheme (``polona``) yet no
+    # P-23.3.1 citation position, so spelling it would be inventing a rule --
+    # the same shape of defect as the retired fabrication, one table row over.
+    mol = Chem.MolFromSmiles('C1CC2([PoH]C1)CCCCC2')
     assert mol is not None
     ring = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
-    hetero = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == 'Al']
+    hetero = [i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == 'Po']
     unprimed = {i: n + 1 for n, i in enumerate(sorted(ring))}
     got = _spiro_vb_a_prefix(mol, set(hetero), -1, unprimed, {})
     assert got is None, f"off-table element spelled as {got!r}"
@@ -497,7 +537,10 @@ def test_polycyclic_wrapper_returns_empty_string_for_a_carbocycle():
 # ---------------------------------------------------------------------------
 # 8. The higher-polycyclo (von Baeyer) speller, site 3.
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize('symbol', ['Al', 'Zn', 'Hg', 'Fe'])
+# ``Al`` moved out of this list in v29 P2-T2b (now spelled ``alumina``); I/At/Po
+# replace it and additionally cover the new "has a morpheme, has no von Baeyer
+# rank" refusal class.
+@pytest.mark.parametrize('symbol', ['Zn', 'Hg', 'Fe', 'I', 'At', 'Po'])
 def test_tricyclo_prefix_generator_fails_closed_off_table(symbol):
     """``tricyclo._generate_heteroatom_prefix`` was a third implementation.
 
@@ -542,7 +585,10 @@ def test_both_universal_analyzers_honour_the_unexpressed_contract():
     )
     cage = Chem.MolFromSmiles('C1CC2CC[Hg]C2C1')
     assert analyze_cage_universal(cage) is None
-    spiro = Chem.MolFromSmiles('C1C[AlH]CC2(C1)CCCCC2')
+    # Was ``[AlH]`` (emittable since v29 P2-T2b); ``[PoH]`` is the inadmissible
+    # Table 1.5 row, so the pair still covers both siblings AND both refusal
+    # reasons -- no morpheme at all (Hg) vs no von Baeyer rank (Po).
+    spiro = Chem.MolFromSmiles('C1C[PoH]CC2(C1)CCCCC2')
     assert analyze_spiro_universal(spiro) is None
 
 

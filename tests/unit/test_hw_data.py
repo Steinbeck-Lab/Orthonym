@@ -108,7 +108,20 @@ class TestHeteroatomPriority:
         ('B', 14),
         ('Al', 15),   # ERRATA-01: added per P-18(b) expansion
         ('Ga', 16),   # ERRATA-01: added per P-18(b) expansion
-        ('Hg', 17),   # Renumbered after Al/Ga insertion
+        # v29 P2-T2b: In and Tl complete Table 2.4's own seniority order, whose
+        # last four entries are Al > Ga > In > Tl [BBv2:8244-8248]. They were
+        # missing while B..Ga were present, so both fell through to 999 and TIED
+        # with each other -- and ``sort_heteroatoms_by_priority`` is a stable sort
+        # over a list built by iterating a set, so the tie made the citation
+        # order depend on set iteration. Now reachable, since Table 2.4 spells
+        # both.
+        ('In', 17),
+        ('Tl', 18),
+        # Hg moved 17 -> 19 to free In/Tl's real Table 2.4 positions. This is NOT
+        # a replacement-seniority position: P-22.2.2 deleted mercury, so Hg has
+        # no prefix in Table 1.5 or Table 2.4 and no name can cite it from here.
+        # The value stays defined only for the P-69 organometallic consumers.
+        ('Hg', 19),
     ])
     def test_heteroatom_priority_lookup(self, element, expected_priority):
         """Test priority value for each heteroatom."""

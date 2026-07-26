@@ -34,27 +34,63 @@ spiro path *invented* a morpheme for it (``polycyclic_bridged``'s
 
 The table is CLOSED, so fail-closed is the only sound design
 -----------------------------------------------------------
-The Blue Book's replacement-prefix set (P-22.2.1 / Table 2.8) is a fixed list, not
-a generative rule: there is no way to derive a prefix for an arbitrary element, so
-"element-blind" is genuinely unachievable and refusing off-table elements is the
-correct end state rather than a temporary limitation.
+The Blue Book's replacement-prefix set is Table 1.5 (P-15.4.1.1, [BBv2:6436-6443])
+and it is a fixed list, not a generative rule. P-15.4.1.1 verbatim: *"Nondetachable
+prefixes, called 'a' prefixes, are used to designate the replacing skeletal atoms
+with their standard bonding number. Those related to these recommendations are
+listed in Table 1.5."* The wording is restrictive, so there is no way to derive a
+prefix for an arbitrary element: "element-blind" replacement is genuinely
+unachievable and refusing off-table elements is the correct end state rather than a
+temporary limitation.
+
+(Earlier revisions of this docstring cited "P-22.2.1 / Table 2.8" for the
+replacement set. Table 2.8 is *"Retained names of heterocyclic parent ring
+components"* [BBv2:11511] -- an unrelated table. Corrected against the book.)
 
 In particular **Zn, Cd and Hg appear in NO replacement table** -- mercury was
 explicitly DELETED by P-22.2.2 -- and such rings are named by P-69 organometallic
 nomenclature instead. So the mercury cage refusing here is right; do NOT add a
-``mercura`` prefix to make it name. (``data/hw_heteroatoms.HW_PREFIXES`` does carry
-``Hg: 'mercura'``, which is how the spiro sibling used to spell it. That path now
-refuses via this table.)
+``mercura`` prefix to make it name. (``data/organometallics.METALLACYCLE_A_PREFIX``
+is the legitimate home of Hg/Zn/Cd.)
 
-``HETEROATOM_PREFIXES`` is deliberately left at the 14 entries it had; the
-remaining genuinely-cited Table 2.8 rows are added against their citations as a
-separate change, because a wrong table entry ships a wrong NAME. Extension is
-data-only -- add ``symbol: (stem, seniority_key)`` rows and nothing else in this
-module moves.
+Three orders, three different element SETS -- do not borrow across them
+----------------------------------------------------------------------
+This is the trap that governs which of Table 1.5's 25 rows this module may emit.
+The Blue Book gives three seniority orders over 'a'-prefix elements and they do
+NOT cover the same elements:
+
+===============  ===========================================  ========  ==========
+rule             governs                                      elements  citation
+===============  ===========================================  ========  ==========
+P-15.4.1.2       general / chains, "naming and numbering"      **25**   [BBv2:6446]
+P-23.3.1         citation order INSIDE a von Baeyer name       **22**   [BBv2:9765]
+P-23.3.2.2       numbering seniority when there is a CHOICE    **18**   [BBv2:9789]
+===============  ===========================================  ========  ==========
+
+P-23.3.1 drops ``At``, ``Po`` and ``C``; P-23.3.2.2 drops those three **and** the
+four halogens. Emitting a replacement prefix needs BOTH a citation position and a
+numbering rank, so the set this module may spell is the intersection --
+P-23.3.2.2's 18 elements, which is exactly ``HETEROATOM_PREFIXES`` below. The
+remaining seven rows of Table 1.5 stay in ``TABLE_1_5`` (the book's table is
+recorded whole) but are listed in ``VB_INADMISSIBLE`` with the reason, and they
+fail closed through the ordinary ``unexpressed`` contract. Borrowing a P-15.4.1.2
+position for an element the von Baeyer rules never rank would be inventing a rule.
 
 Relationship to ``rules/skeletal_replacement.py``: that module is the ACYCLIC
 P-15.4 chain namer (``2,5,8-trioxanonane``). Same nomenclature family, different
-parent class and a different numbering source; they share no state.
+parent class and a different numbering source; they share no state. Its own
+element table is deliberately NOT extended alongside this one: whether skeletal
+replacement or the substitutive parent hydride (``alumane`` / ``gallane`` /
+``indigane`` / ``thallane``, Table 2.1 [BBv2:7924-7930]) is the PIN for a
+Group-13 atom embedded in a CHAIN is a P-51.4 selection question this module does
+not answer, and the chain path fails closed until it is answered.
+
+Relationship to ``data/hw_heteroatoms.py``: that is **Table 2.4**
+(P-22.2.2.1.1), the Hantzsch-Widman monocycle context, which spells two of the
+same elements DIFFERENTLY on purpose -- ``aluma`` "(not alumina)" [BBv2:8245] and
+``indiga`` "(not inda)", under a footnote reading "Compare with Table 1.5"
+[BBv2:8250]. A prefix is therefore a function of *(element, nomenclature
+context)*, never of the element alone. Do not unify the two tables.
 """
 from __future__ import annotations
 
@@ -64,34 +100,108 @@ from typing import Dict, List, Optional, Set, Tuple
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 
 
-# Skeletal-replacement ('a') prefixes for von Baeyer / spiro ring systems, in
-# IUPAC 2013 Table 2.8 / P-31.1.4.3.4 seniority order (the order heteroatoms are
-# CITED in the name and the order they receive lowest locants):
-# F>Cl>Br>I>O>S>Se>Te>N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B. The integer is a relative sort
-# key only; the strings are the replacement stems and are OPSIN-round-trip
-# verified (e.g. heptasilabicyclo[2.2.1]heptane, heptagermabicyclo[2.2.1]heptane).
-# Group-14/15 + B added in v23 Phase 5 so an all-heteroatom von Baeyer system is
-# named via its hydride-replacement stem instead of silently dropping the
-# heteroatoms (structure-loss safety).
+# ---------------------------------------------------------------------------
+# Blue Book Table 1.5, COMPLETE -- element -> (prefix, STANDARD bonding number).
 #
-# Halogens are absent on purpose: a standard-valence halogen cannot be a skeletal
-# ring atom, and the lambda-convention cases (P-22.2.7.1 ``1lambda3-iodinane``)
-# are monocycles handled by the Hantzsch-Widman path, not by this builder.
+# Transcribed verbatim from [BBv2:6436-6443]. The table is printed as a 5x5 grid
+# whose column headers ARE the standard bonding numbers, so each row below carries
+# the number from its own column -- the second value is Blue Book data, never a
+# periodic-table default. P-15.4.1.1: 'a' prefixes designate the replacing
+# skeletal atoms "with their standard bonding number", which is what makes an
+# atom whose actual bonding number differs need the lambda convention
+# (P-15.4.1.3, e.g. the PIN ``6lambda5-phosphaspiro[4.5]decane`` [BBv2:6452]).
+#
+# This constant is the BOOK'S TABLE, not the set this module may emit -- see
+# ``HETEROATOM_PREFIXES``. It exists so every one of the 25 rows has an explicit,
+# cited disposition instead of being silently absent.
+TABLE_1_5: Dict[str, Tuple[str, int]] = {
+    # bonding number 1
+    'F': ('fluora', 1), 'Cl': ('chlora', 1), 'Br': ('broma', 1),
+    'I': ('ioda', 1), 'At': ('astata', 1),
+    # bonding number 2
+    'O': ('oxa', 2), 'S': ('thia', 2), 'Se': ('selena', 2),
+    'Te': ('tellura', 2), 'Po': ('polona', 2),
+    # bonding number 3
+    'N': ('aza', 3), 'P': ('phospha', 3), 'As': ('arsa', 3),
+    'Sb': ('stiba', 3), 'Bi': ('bisma', 3),
+    # bonding number 4
+    'C': ('carba', 4), 'Si': ('sila', 4), 'Ge': ('germa', 4),
+    'Sn': ('stanna', 4), 'Pb': ('plumba', 4),
+    # bonding number 3
+    'B': ('bora', 3), 'Al': ('alumina', 3), 'Ga': ('galla', 3),
+    'In': ('inda', 3), 'Tl': ('thalla', 3),
+}
+
+# P-23.3.1 [BBv2:9765], verbatim: the replacement prefixes are "cited in the
+# order: F > Cl > Br > I > O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn >
+# Pb > B > Al > Ga > In > Tl". TWENTY-TWO elements -- At, Po and C have no von
+# Baeyer citation position at all. (Cross-check: Table 2.4, the Hantzsch-Widman
+# table [BBv2:8236-8248], is "in decreasing order of seniority" over the SAME 22
+# elements in the SAME sequence, which is why the HW-ordered spiro sites agree
+# with this one for every element either can reach.)
+VB_CITATION_ORDER: Tuple[str, ...] = (
+    'F', 'Cl', 'Br', 'I',
+    'O', 'S', 'Se', 'Te',
+    'N', 'P', 'As', 'Sb', 'Bi',
+    'Si', 'Ge', 'Sn', 'Pb',
+    'B', 'Al', 'Ga', 'In', 'Tl',
+)
+
+# P-23.3.2.2 [BBv2:9789], verbatim: "If there is still a choice, low locants are
+# assigned in accord with the decreasing seniority order of heteroatoms O > S >
+# Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl."
+# EIGHTEEN elements: the four halogens are absent here even though P-23.3.1 ranks
+# them for citation, so a halogen replacement has no sanctioned numbering rank.
+# This sequence is ``VB_CITATION_ORDER`` minus the halogens, so ONE integer key
+# can serve both the citation order and the numbering rank.
+VB_NUMBERING_SENIORITY: Tuple[str, ...] = VB_CITATION_ORDER[4:]
+
+# Why the other seven Table 1.5 rows are NOT emitted in a ring context. Each is a
+# missing Blue Book rule, not an unimplemented feature: spelling one would mean
+# choosing a citation position or a numbering rank the book does not give.
+VB_INADMISSIBLE: Dict[str, str] = {
+    'At': "no P-23.3.1 citation position and no P-23.3.2.2 numbering rank; "
+          "'astata' appears only in Table 1.5, Appendix 1 and a mononuclear-"
+          "hydride aside [BBv2:7915] -- there is no ring example in the book",
+    'Po': "no P-23.3.1 citation position and no P-23.3.2.2 numbering rank; "
+          "'polona' likewise has no ring example anywhere in the book",
+    'C': "no P-23.3.1 citation position and no P-23.3.2.2 numbering rank, and "
+         "P-21.1.1.1 [BBv2:7915] rules the morpheme out directly: \"The name "
+         "'carbane' has never been used in place of methane; it is not "
+         "recommended.\" Replacing a skeletal carbon by carbon is also a no-op "
+         "in a hydrocarbon ring; 'carba' belongs to carbaborane nomenclature",
+    'F': "P-23.3.1 gives a citation position but P-23.3.2.2 gives NO numbering "
+         "rank, so a numbering choice between a halogen and anything else is "
+         "unsanctioned. Independently, a skeletal RING halogen always has a "
+         "nonstandard bonding number (standard is 1, ring degree is >= 2), so "
+         "P-15.4.1.3 makes its lambda mandatory -- and the ring lambda helper "
+         "below suppresses exactly that connectivity-forced case, so every "
+         "emission would misstate the bonding number. See NOT ESTABLISHED below",
+    'Cl': "see 'F'", 'Br': "see 'F'", 'I': "see 'F'",
+}
+
+# NOT ESTABLISHED (do not paper over): the four halogens are a genuine PARTIAL
+# gap, not an absence. We know WHERE to cite them (P-23.3.1 ranks them ahead of
+# O, and ``VB_CITATION_ORDER`` records that) but not how to number them against
+# another heteroatom, and we cannot currently spell their mandatory lambda. The
+# Blue Book's only skeletal-halogen replacement examples are lambda-convention
+# monocycles and fused systems -- ``lambda3-iodane`` [BBv2:7968, :23561] and
+# ``3H-3lambda3,2,4-benziodadioxepine`` (PIN) [BBv2:14557] -- both outside this
+# builder. Closing this needs (a) a sanctioned numbering rule for halogens and
+# (b) the ring lambda question resolved; until then they fail closed like any
+# off-table element, through ``unexpressed``.
+
+# The elements this module MAY spell: P-23.3.1 (citation) INTERSECT P-23.3.2.2
+# (numbering) = P-23.3.2.2's eighteen. The integer is a relative sort key that
+# doubles as both orders (see ``VB_NUMBERING_SENIORITY``); the strings come from
+# ``TABLE_1_5`` so a spelling cannot drift from the book. The O..B rows keep the
+# keys 1..14 they have always had, so extending the table did not renumber -- and
+# could not reorder -- any citation that already shipped. Stems are OPSIN
+# round-trip verified (heptasilabicyclo[2.2.1]heptane,
+# heptagermabicyclo[2.2.1]heptane, 2-aluminaspiro[5.5]undecane).
 HETEROATOM_PREFIXES: Dict[str, Tuple[str, int]] = {
-    'O': ('oxa', 1),
-    'S': ('thia', 2),
-    'Se': ('selena', 3),
-    'Te': ('tellura', 4),
-    'N': ('aza', 5),
-    'P': ('phospha', 6),
-    'As': ('arsa', 7),
-    'Sb': ('stiba', 8),
-    'Bi': ('bisma', 9),
-    'Si': ('sila', 10),
-    'Ge': ('germa', 11),
-    'Sn': ('stanna', 12),
-    'Pb': ('plumba', 13),
-    'B': ('bora', 14),
+    element: (TABLE_1_5[element][0], rank)
+    for rank, element in enumerate(VB_NUMBERING_SENIORITY, start=1)
 }
 
 
@@ -195,8 +305,12 @@ def build_replacement_prefix(
         if symbol == 'C':
             continue
         if symbol not in HETEROATOM_PREFIXES:
-            # Off-table skeletal element: no morpheme exists to spell it, and the
-            # ring stem counts it regardless -> the caller must refuse.
+            # Not spellable in a ring context: either genuinely off Table 1.5 (no
+            # morpheme exists at all -- Zn/Cd/Hg/Fe/...) or one of the seven
+            # Table 1.5 rows in ``VB_INADMISSIBLE``, which have a morpheme but no
+            # von Baeyer citation position and/or no numbering rank. Both are the
+            # same failure from the caller's side: the ring stem counts the atom
+            # regardless, so the caller must refuse.
             unexpressed.append(atom_idx)
             continue
         if atom_idx not in numbering:
@@ -215,7 +329,7 @@ def build_replacement_prefix(
 
     parts: List[str] = []
     per_atom: List[Tuple[int, str]] = []
-    # Cite elements in Table-2.8 seniority order, NOT ascending locant order
+    # Cite elements in P-23.3.1 seniority order, NOT ascending locant order
     # (``5-oxa-3-sila``: oxa precedes sila although sila holds the lower locant).
     for element in sorted(by_element, key=lambda s: HETEROATOM_PREFIXES[s][1]):
         entries = sorted(by_element[element], key=lambda e: e[0])

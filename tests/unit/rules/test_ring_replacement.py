@@ -135,19 +135,32 @@ LAMBDA_SUPPRESSED = [
 
 # Skeletal elements the table cannot spell. Each is a real von-Baeyer cage
 # (bicyclo[3.3.0]) whose stem counts 8 atoms.
+#
+# Two DIFFERENT reasons to refuse, both covered here (v29 P2-T2b):
+#   * Hg/Zn/Fe -- in no replacement table at all; no morpheme exists.
+#   * I/At/Po  -- Table 1.5 rows with a real morpheme (``ioda``/``astata``/
+#     ``polona``) that P-23.3.1 and/or P-23.3.2.2 do not rank, so there is no
+#     sanctioned von Baeyer citation position or numbering rank. See
+#     ``ring_replacement.VB_INADMISSIBLE``.
+# ``[AlH]`` was in this list until T2b, which made Al emittable (``alumina``);
+# the Al cases now assert the SPELLING, in test_v29_table_1_5_completion.
 OFF_TABLE_CAGES = [
     "C1CC2CC[Hg]C2C1",
-    "C1CC2CC[AlH]C2C1",
     "C1CC2CC[Zn]C2C1",
     "C1CC2CC[Fe]C2C1",
+    "C1CC2CC[IH]C2C1",
+    "C1CC2CC[AtH]C2C1",
+    "C1CC2CC[PoH]C2C1",
 ]
 
-# The same off-table elements in a spiro system (the sibling analyzer).
+# The same unspellable elements in a spiro system (the sibling analyzer).
 OFF_TABLE_SPIRO = [
     "C1CCC2(CC1)CC[Hg]CC2",
     "C1CCC2(CC1)CC[Zn]CC2",
     "C1CCC2(CC1)CC[Fe]CC2",
-    "C1CCC2(CC1)CC[AlH]CC2",
+    "C1CCC2(CC1)CC[IH]CC2",
+    "C1CCC2(CC1)CC[AtH]CC2",
+    "C1CCC2(CC1)CC[PoH]CC2",
 ]
 
 

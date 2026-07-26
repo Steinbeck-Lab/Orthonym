@@ -13,8 +13,9 @@ halogen namers all share one fail-closed implementation rather than each
 re-deriving Table 2.8.
 
 References:
-    IUPAC 2013 Blue Book, P-31.1.4.2     (λ-convention, ring skeletal atoms)
-    IUPAC 2013 Blue Book, P-31.1.4.2.4   (Table 2.8 standard bonding numbers)
+    IUPAC 2013 Blue Book, P-14.1.2/3     (standard / nonstandard bonding number)
+    IUPAC 2013 Blue Book, P-15.4.1.3     (λ placement: after the locant, no hyphen)
+    IUPAC 2013 Blue Book, Table 1.5      (standard bonding numbers) [BBv2:6436]
     IUPAC 2013 Blue Book, P-21.2.4       (λ in chains / replacement nomenclature)
     IUPAC 2013 Blue Book, P-68 / P-69    (mononuclear hydrides bearing λ)
 
@@ -27,11 +28,27 @@ value. Charged atoms and elements absent from the table are treated as standard
 from typing import Optional
 
 
-# IUPAC standard bonding numbers for skeletal-replacement ('a') atoms
-# (P-31.1.4.2.4, Table 2.8). A skeletal heteroatom whose ACTUAL bonding number
-# differs from its standard value carries the lambda convention (P-31.1.4.2):
-# e.g. a tetravalent sulfur -> "lambda4". Elements absent from this table are
-# treated as standard (no lambda) — fail-closed, never a spurious lambda.
+# IUPAC standard bonding numbers for skeletal-replacement ('a') atoms. The values
+# are the column headers of **Table 1.5** (P-15.4.1.1) [BBv2:6436-6443], which
+# prints each 'a' prefix under its standard bonding number; Table 2.4
+# (P-22.2.2.1.1) [BBv2:8236-8248] repeats them in a "Bonding Number (Valence)"
+# column and agrees on every shared element. (Earlier revisions cited
+# "P-31.1.4.2.4, Table 2.8"; Table 2.8 is the retained heterocyclic-parent name
+# table [BBv2:11511] and has no bonding numbers. Corrected against the book;
+# ``rules/ring_replacement.TABLE_1_5`` now carries the same numbers as data and a
+# test locks the two against each other.)
+#
+# A skeletal heteroatom whose ACTUAL bonding number differs from its standard
+# value carries the lambda convention (P-15.4.1.3): e.g. a tetravalent sulfur ->
+# "lambda4". Elements absent from this table are treated as standard (no lambda)
+# — fail-closed, never a spurious lambda.
+#
+# Table 1.5 has 25 rows; this table deliberately carries 23. **C and At are
+# omitted on purpose.** Neither is emittable as a ring 'a' prefix (both are in
+# ``ring_replacement.VB_INADMISSIBLE``) so an entry would buy nothing, while
+# adding ``'C': 4`` would let every neutral carbon this helper is ever handed --
+# a radical carbon has total valence 3 -- acquire a spurious ``lambda3``. Adding
+# a row here is therefore NOT a documentation change; it changes emitted names.
 STANDARD_BONDING_NUMBER = {
     'O': 2, 'S': 2, 'Se': 2, 'Te': 2, 'Po': 2,
     'N': 3, 'P': 3, 'As': 3, 'Sb': 3, 'Bi': 3,
