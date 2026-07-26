@@ -27,26 +27,60 @@ Everything unrecognised, ambiguous, or only partially parsed returns
 ``ArityEstimate(None, False, "<why>")``. Coverage is grown later by
 measurement, never by guessing.
 
-Three specific refusals follow from that contract, and each is deliberate:
+Four specific refusals follow from that contract, and each is deliberate:
 
 * **Ambiguity is refusal, not a tie-break.** The scanner enumerates EVERY
   morpheme decomposition of a token rather than committing to the greedy
   longest match, then requires them all to agree on the total. ``"tridecyl"``
   reads as ``tridec|yl`` (13) or as ``tri|dec|yl`` (10); a greedy scan would
   confidently answer one of them, so this module answers neither.
-* **Position-sensitive morphemes are segregated.** ``"ol"`` is an alcohol
-  suffix (1 O) in suffix position and part of a ring stem elsewhere, so it
-  lives in a suffix-only table consulted only for ``kind == SUFFIX``. The
-  general table carries only position-independent morphemes.
+* **A morphotactically impossible reading refuses the WHOLE token** -- see
+  "WHY AGREEMENT IS NOT ENOUGH" below. This is the repair of the soundness
+  argument itself, not an extra heuristic.
+* **Position-sensitive morphemes are flagged, not hidden.** ``"ol"`` is an
+  alcohol suffix (1 O) in suffix position and part of a ring stem elsewhere.
+  Both readings are always enumerated and the suffix reading carries a
+  ``suffix_only`` flag that the positional rules police; the *lexicon* is
+  never narrowed by ``kind``, because narrowing it can only manufacture false
+  confidence (again, see below).
 * **Whole classes are refused rather than approximated.** The lambda
-  (hypervalence) convention is out of scope for Phase 1.
+  (hypervalence) convention and fusion nomenclature are out of scope: fused
+  components SHARE their fusion atoms, so a fusion prefix's atoms cannot be
+  summed with the base component's at all.
+
+WHY AGREEMENT IS NOT ENOUGH (the v29 confident-wrong defect)
+------------------------------------------------------------
+"Enumerate every decomposition and require agreement" is sound only if the
+correct decomposition is among those enumerated. When a morpheme is MISSING
+from the lexicon, a token can still tile -- uniquely -- into a reading that is
+structurally impossible, and unanimity over a set of one then certifies it.
+That is not a hypothetical: ``benzoyl`` had no ``benz`` acyl stem, so its only
+tiling was the *fusion prefix* ``benzo`` plus ``yl``, and the oracle answered a
+CONFIDENT 6 for an 8-atom acyl group. ``diazenyl`` had no ``diazen`` parent
+hydride, so its only tiling was ``di|az|en|yl`` -- a multiplier, a skeletal
+replacement prefix qualifying nothing, and two bond-order endings -- and the
+oracle answered a CONFIDENT 0 for two nitrogens. Both would make P6 reject a
+Blue Book PIN.
+
+The repair is ``_well_formed``: a small set of morphotactic rules, each read
+off an IUPAC construction rule, that say when a tiling cannot describe any
+molecule (a replacement prefix that qualifies no skeleton, a suffix that
+attaches to no parent hydride, two skeletons juxtaposed with no attachment
+affix between them, a fusion prefix, a multiplier governing nothing). A
+violation is evidence that the scanner matched across a boundary the lexicon
+cannot see -- i.e. that the lexicon is INCOMPLETE FOR THIS TOKEN -- and once
+that is known, "all readings agree" no longer implies "the reading is right".
+So a violation refuses the whole token rather than pruning the offending
+reading: pruning would leave exactly the surviving-but-wrong reading that
+caused the defect.
 
 WHAT IT REFUSES TO GUESS
 ------------------------
-Unknown morphemes, lambda convention, von Baeyer/spiro tokens whose bracket
-descriptor is missing or does not agree with the chain stem beside it, tokens
-whose multiplied group cannot be delimited, and any token admitting two
-decompositions with different totals.
+Unknown morphemes, lambda convention, fusion prefixes, von Baeyer/spiro tokens
+whose bracket descriptor is missing or does not agree with the chain stem
+beside it, tokens whose multiplied group cannot be delimited, any token
+admitting two decompositions with different totals, and any token admitting a
+morphotactically impossible decomposition.
 
 COMPOSITE TOKENS ARE THE COMMON CASE
 ------------------------------------
@@ -81,6 +115,8 @@ fusion prefixes (benzo-)     ``data.fusion_components`` ``ring_size``
 Hantzsch-Widman stems        ``data.hw_stems.HW_STEMS`` (inverted)
 replacement prefixes (aza-)  ``rules.skeletal_replacement``
 multipliers (di-, bis-)      ``assembly.naming_utils`` (inverted)
+elided stems (thiazol-)      terminal-'e' elision (P-16.3.3) of the
+                             skeletons the tables above agreed on
 ===========================  =========================================
 
 Only morphemes that NO shipped table covers are written by hand, in
@@ -88,8 +124,18 @@ Only morphemes that NO shipped table covers are written by hand, in
 derivable. They are all zero-atom skeletal markers, where "contributes no
 atoms" is a definition rather than a measurement.
 
-Scope and status (Phase 1): PURE and AUDIT-ONLY. Nothing imports this yet; it
-gates nothing and changes no emitted name.
+Being a view over shipped data also means a table entry whose SMILES does not
+describe the fragment its name spells would propagate straight through. Four
+derivation screens reject exactly that shape, each pointing at a contradiction
+inside the entry rather than second-guessing either half of it: a disconnected
+SMILES and an all-hydrogen SMILES (both in ``_heavy_atoms``), and a name
+asserting an isotope or a Hantzsch-Widman ring the SMILES does not carry (both
+in ``_entry_atoms``).
+
+Scope and status: PURE and side-effect-free. ``token_arity`` gates nothing and
+changes no emitted name -- P6 consumes it in audit mode only. (The separate
+``free_valence_morphology`` at the foot of the module IS consulted by the
+substituent producers; ``token_arity`` is not.)
 """
 from __future__ import annotations
 
@@ -109,17 +155,34 @@ SUBST = "subst"      # a COMPLETE simple substituent (chloro, hydroxy, nitro)
 ATTACH = "attach"    # an affix that creates an attachment point (yl, oxy)
 AFFIX = "affix"      # a non-terminating affix (ane, ene, hydro, cyclo)
 REPL = "repl"        # skeletal replacement prefix (aza, oxa) -- 0 net atoms
+FUSE = "fuse"        # attached-component fusion prefix (benzo, pyrido)
 OPEN = "open"        # '(' structural marker
 CLOSE = "close"      # ')' structural marker
 MULT = "mult"        # multiplying prefix; `atoms` field carries multiplicity
 
 # SUBST and ATTACH both END a simple substituent group, which is what lets an
-# unenclosed multiplier's scope be delimited without guessing.
+# unenclosed multiplier's scope be delimited without guessing. A suffix
+# morpheme ends one too: "hexanedioic acid" multiplies '-oic acid', and the
+# suffix is the last thing in the token by construction (see _well_formed R3).
 _GROUP_TERMINATORS = (SUBST, ATTACH)
+
+# Roles inside _STRUCTURAL_AFFIXES. The split is load-bearing for _well_formed
+# R4: a marker that PRECEDES the skeleton it qualifies ("cyclohexane",
+# "dihydronaphthalene") may legally sit in front of a stem, whereas a bond-order
+# ENDING closes a stem and nothing skeletal may follow it without an
+# intervening attachment affix.
+ENDING = "ending"
+PREMARK = "premark"
 
 # Chain stems are inverted out of get_chain_prefix() up to this length. Beyond
 # it a token simply goes unrecognised (safe) rather than wrong.
 _MAX_CHAIN = 60
+
+# Minimum length of an ELIDED stem spelling. A shorter one is not distinctive:
+# it matches inside unrelated words and manufactures readings the lexicon cannot
+# contradict. This is the same discipline _Lexicon.add applies to every other
+# morpheme, applied to the two elision paths that bypass it.
+_MIN_ELIDED = 4
 
 # Search caps. A token that needs more work than this returns unconfident
 # rather than risking a partial exploration being mistaken for "unambiguous".
@@ -173,24 +236,46 @@ _SUPERSCRIPTS = str.maketrans("", "", "⁰¹²³⁴"
 # no shipped table covers, with the reason it is not derivable. Nothing that
 # contributes atoms may be added here -- an atom count must come from a table.
 # --------------------------------------------------------------------------
-_STRUCTURAL_AFFIXES: Dict[str, Tuple[int, str]] = {
+_STRUCTURAL_AFFIXES: Dict[str, Tuple[int, str, str]] = {
     # Saturation endings. Not derivable: OPSIN applies saturation with its
     # unsaturator (a bond-order edit), so no suffix rule and no SMILES exists
     # for them. They state bond order, never atoms -- 0 by definition. The
     # elided forms (an/en/yn) appear before a following suffix ("propan-1-ol").
-    "ane": (0, "saturation ending, states bond order not atoms"),
-    "an": (0, "elided saturation ending before a suffix"),
-    "ene": (0, "unsaturation ending, states bond order not atoms"),
-    "en": (0, "elided unsaturation ending before a suffix"),
-    "yne": (0, "unsaturation ending, states bond order not atoms"),
-    "yn": (0, "elided unsaturation ending before a suffix"),
+    "ane": (0, ENDING, "saturation ending, states bond order not atoms"),
+    "an": (0, ENDING, "elided saturation ending before a suffix"),
+    "ene": (0, ENDING, "unsaturation ending, states bond order not atoms"),
+    "en": (0, ENDING, "elided unsaturation ending before a suffix"),
+    "yne": (0, ENDING, "unsaturation ending, states bond order not atoms"),
+    "yn": (0, ENDING, "elided unsaturation ending before a suffix"),
     # Ring-formation marker: says the stem's atoms close a ring, adds none.
     # Not derivable: it is a topology statement, so no table gives it a SMILES.
-    "cyclo": (0, "ring-closure marker, adds no atoms"),
+    "cyclo": (0, PREMARK, "ring-closure marker, adds no atoms"),
     # Added/indicated hydrogen. Hydrogen is not a heavy atom, so 0 by the
     # heavy-atom scoping this module shares with P1-P3.
-    "hydro": (0, "added hydrogen is not a heavy atom"),
+    "hydro": (0, PREMARK, "added hydrogen is not a heavy atom"),
 }
+
+#: The subset of the above that may legally stand in front of a skeleton.
+_PREMARKS = frozenset(
+    key for key, (_atoms, role, _why) in _STRUCTURAL_AFFIXES.items()
+    if role == PREMARK)
+
+#: Hydrogen-isotope morphemes. A SMILES with no isotope label cannot state the
+#: atom count of a name that asserts one, because RDKit merges unlabelled
+#: hydrogens into the implicit count while it KEEPS labelled ones as atoms --
+#: so 'borodeuteride' paired with '[BH4-]' loses exactly the four atoms the
+#: name spells. Named as a class (P-82 isotopic modification), not per token.
+_ISOTOPE_MORPHEMES = re.compile(r"deuter|triti|proti")
+
+#: HW stems distinctive enough to be a reliable ring assertion in a name's
+#: ENDING. The short ones ('ane', 'ene', 'ine', 'ole', 'ete') double as chain
+#: endings and name fragments ('glycine', 'butane'), so they are excluded: this
+#: screen must fire on a contradiction, never on an ordinary acyclic name.
+_HW_RING_ENDINGS = frozenset({
+    "irane", "irene", "irine", "iridine", "etane", "etidine", "olane",
+    "olidine", "inane", "inine", "epine", "epane", "ocine", "ocane",
+    "onine", "onane", "ecine", "ecane",
+})
 
 # Surface spellings whose ATOM COUNT is derived from an OPSIN suffix rule but
 # whose written form the applicability table does not carry, because OPSIN
@@ -240,10 +325,20 @@ class ArityEstimate:
 
 @dataclass(frozen=True)
 class _Morph:
-    """One lexicon entry: what it contributes and how it behaves."""
+    """One lexicon entry: what it contributes and how it behaves.
+
+    ``suffix_only`` marks a principal-characteristic-group suffix particle
+    (``-ol``, ``-oic acid``, ``-amide``). It is a FLAG rather than a separate
+    table because a reading that is removed from the enumeration can no longer
+    contradict a wrong one -- see "WHY AGREEMENT IS NOT ENOUGH".
+    """
 
     atoms: int
     category: str
+    suffix_only: bool = False
+    hydride: bool = False
+    chain: bool = False
+    chain_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -253,6 +348,10 @@ class _Seg:
     text: str
     atoms: int
     category: str
+    suffix_only: bool = False
+    hydride: bool = False
+    chain: bool = False
+    chain_only: bool = False
 
 
 # --------------------------------------------------------------------------
@@ -262,15 +361,100 @@ class _Seg:
 def _heavy_atoms(smiles: str) -> Optional[int]:
     """Heavy atoms in a SMILES, ignoring any ``[*]`` attachment wildcard.
 
-    Returns None when RDKit cannot parse it, so an unreadable table entry
-    drops out of the lexicon instead of contributing a wrong count.
+    The count is deliberately RDKit's own surviving-atom count, because that is
+    what a producer's ``binding.atom_ids`` is counted against: RDKit merges
+    unlabelled hydrogens into the implicit count and keeps everything else, so
+    counting what it kept is what makes the two numbers comparable.
+
+    Returns None -- dropping the entry out of the lexicon rather than letting it
+    contribute a wrong count -- when RDKit cannot parse the SMILES, and for two
+    shapes that cannot state ONE morpheme's atom count at all:
+
+    * **more than one fragment.** A ``.`` means the entry describes several
+      disconnected species; their total is not the arity of a single morpheme.
+      (``inosinylyl`` shipped as ``O=PO.OC[C@H]1...`` and summed to 22 for a
+      19-atom group.)
+    * **nothing but hydrogen.** A purely hydrogen fragment has no heavy atoms;
+      its apparent count of 1 is only RDKit declining to merge a lone ``[H]``.
     """
     from rdkit import Chem
 
     mol = Chem.MolFromSmiles(smiles.replace("[*]", "*"))
     if mol is None:
         return None
-    return sum(1 for atom in mol.GetAtoms() if atom.GetAtomicNum() > 0)
+    atoms = [atom for atom in mol.GetAtoms() if atom.GetAtomicNum() > 0]
+    if not atoms:
+        return None
+    if len(Chem.GetMolFrags(mol)) > 1:
+        return None
+    if all(atom.GetAtomicNum() == 1 for atom in atoms):
+        return None
+    return len(atoms)
+
+
+def _hydride_flags(smiles: str) -> Tuple[bool, bool]:
+    """``(is_parent_hydride, is_chain_hydride)`` for a table entry's SMILES.
+
+    A **parent hydride** is a bare skeleton carrying no characteristic group.
+    Every non-carbon atom being a RING atom is the whole test, and it is enough
+    for the one question ``_well_formed`` R3 asks: a characteristic-group suffix
+    attaches to a parent hydride (P-14.2), never to a molecule that already
+    carries its own characteristic group. ``benzene``, ``cyclohexane``,
+    ``pyridine`` and ``1,3-thiazole`` pass; ``phosphoramid`` (whose SMILES
+    already holds the acid oxygens that ``-ic acid`` would add again, giving 7
+    for a 5-atom acid) and ``nitroform`` (a whole molecule, not a stem) do not.
+
+    A **chain hydride** is one with no ring, which is what R3c needs: the bare
+    ``-oic acid``/``-al``/``-amide`` forms count the acid carbon as part of the
+    chain, so they belong on a chain and a ring takes the carb- form instead.
+    Deriving this from the SMILES rather than from the registration source is
+    what keeps ``propane``/``hexane`` (retained names, not chain-stem entries)
+    from being mistaken for rings, which refused every ``propanoic acid``.
+
+    Chain stems and Hantzsch-Widman stems carry no SMILES and are hydrides by
+    construction, so they are flagged at their own registration sites.
+    """
+    from rdkit import Chem
+
+    mol = Chem.MolFromSmiles(smiles.replace("[*]", "*"))
+    if mol is None:
+        return False, False
+    hydride = all(atom.GetAtomicNum() == 6 or atom.IsInRing()
+                  for atom in mol.GetAtoms() if atom.GetAtomicNum() > 1)
+    return hydride, hydride and not mol.GetRingInfo().NumRings()
+
+
+def _entry_atoms(name: str, smiles: str) -> Optional[int]:
+    """``_heavy_atoms``, refused when the NAME contradicts its own SMILES.
+
+    Both screens compare two statements the shipped entry makes about itself,
+    so neither guesses at a structure:
+
+    * an **isotope** the name asserts and the SMILES does not carry -- the atoms
+      would be invisible in the implicit hydrogen count (``borodeuteride`` /
+      ``[BH4-]``: the name spells B + 4 D, the SMILES counts 1);
+    * a **ring** the name's Hantzsch-Widman ending asserts and the SMILES does
+      not close (``aluminane`` / ``[AlH]``, ``iodinane`` / ``[IH3]``: the name
+      spells a six-membered ring, the SMILES is one atom).
+
+    Either way the entry is self-inconsistent, so no count can be read off it.
+    """
+    from rdkit import Chem
+
+    count = _heavy_atoms(smiles)
+    if count is None:
+        return None
+    mol = Chem.MolFromSmiles(smiles.replace("[*]", "*"))
+    if mol is None:
+        return None
+    lowered = name.strip().lower()
+    if _ISOTOPE_MORPHEMES.search(lowered) and not any(
+            atom.GetIsotope() for atom in mol.GetAtoms()):
+        return None
+    if not mol.GetRingInfo().NumRings() and any(
+            lowered.endswith(ending) for ending in _HW_RING_ENDINGS):
+        return None
+    return count
 
 
 class _Lexicon:
@@ -286,7 +470,19 @@ class _Lexicon:
         self.table: Dict[str, _Morph] = {}
         self.dropped: Set[str] = set()
 
-    def add(self, key: str, atoms: Optional[int], category: str) -> None:
+    def add(self, key: str, atoms: Optional[int], category: str, *,
+            suffix_only: bool = False, override: bool = False,
+            hydride: bool = False, chain: bool = False,
+            chain_only: bool = False) -> None:
+        """Register ``key``, or refuse it when two sources disagree.
+
+        ``override`` re-categorises an already-registered key. It exists for one
+        purpose: a fusion prefix must be recognisable AS a fusion prefix even
+        when some other table already spelled the same letters, because the
+        FUSE category is what makes ``_well_formed`` refuse the token. Losing
+        that categorisation would silently restore the confident-wrong reading,
+        so the refusing category has to win.
+        """
         if atoms is None or atoms < 0:
             return
         key = key.strip().lower()
@@ -298,17 +494,21 @@ class _Lexicon:
             return
         existing = self.table.get(key)
         if existing is None:
-            self.table[key] = _Morph(atoms, category)
+            self.table[key] = _Morph(atoms, category, suffix_only, hydride,
+                                     chain, chain_only)
         elif existing.atoms != atoms:
             # Genuine disagreement between sources -> refuse the morpheme.
             del self.table[key]
             self.dropped.add(key)
+        elif override:
+            self.table[key] = _Morph(atoms, category, suffix_only, hydride,
+                                     chain, chain_only)
         # Same count, different category: keep the first registration. The
         # registration order below runs most-specific-first, so the structural
         # reading of a morpheme wins over an incidental catalog entry.
 
 
-def _add_suffix_morphemes(general: _Lexicon, suffix_only: _Lexicon) -> None:
+def _add_suffix_morphemes(general: _Lexicon) -> None:
     """Suffix particles, bridged surface -> rule -> SMILES.
 
     ``OPSIN_SUFFIX_APPLICABILITY`` rows carry the surface morpheme in
@@ -320,11 +520,12 @@ def _add_suffix_morphemes(general: _Lexicon, suffix_only: _Lexicon) -> None:
     spell 2 atoms while ``-carboxylic acid`` spells 3.
 
     An ATTACH suffix is one whose rule creates an attachment point
-    (``setOutAtom`` or ``outIDs``) -- that is read off the rule, not assumed.
-    Those go in the GENERAL table because they legitimately occur inside a
-    substituent prefix token ("methoxymethyl"). The rest are principal
-    characteristic group suffixes and are position-sensitive, so they go in
-    the suffix-only table.
+    (``setOutAtom`` or ``outIDs``) -- that is read off the rule, not assumed --
+    and legitimately occurs inside a substituent prefix token
+    ("methoxymethyl"). The rest are principal characteristic group suffixes,
+    which are position-sensitive: they are registered with ``suffix_only=True``
+    so ``_well_formed`` can require them to be final and to attach to a parent
+    hydride, rather than being hidden from the enumeration.
     """
     from orthonym.data.opsin_imports.suffix_rules import (
         OPSIN_SUFFIX_APPLICABILITY, OPSIN_SUFFIX_RULES)
@@ -376,20 +577,28 @@ def _add_suffix_morphemes(general: _Lexicon, suffix_only: _Lexicon) -> None:
             continue
         chain_atoms = chains.pop()
         attaches = any(s[2] for s in scored)
-        target = general if attaches else suffix_only
-        target.add(surface, chain_atoms, ATTACH if attaches else AFFIX)
+        # A rule with a cyclic-extra atom states TWO different accountings:
+        # the bare surface's count is the CHAIN one, valid only when the acid
+        # carbon belongs to the chain. On a ring the carb- form is required
+        # (P-65.1.1, P-66.1), so the bare surface is chain-only.
+        general.add(surface, chain_atoms, ATTACH if attaches else AFFIX,
+                    suffix_only=not attaches,
+                    chain_only=bool(any(s[1] for s in scored)) and not attaches)
 
     # Surface spellings the applicability table does not carry, counts still
     # derived from the rules above.
     for surface, rule in _ACID_WORD_SURFACES.items():
         scored = score(rule)
         if scored is not None:
-            suffix_only.add(surface, scored[0], AFFIX)
+            general.add(surface, scored[0], AFFIX, suffix_only=True,
+                        chain_only=bool(scored[1]))
     for surface, rule in _CARB_FORM_SURFACES.items():
         scored = score(rule)
         if scored is not None:
-            # chain form + the carbon the rule adds for a ring parent
-            suffix_only.add(surface, scored[0] + scored[1], AFFIX)
+            # chain form + the carbon the rule adds for a ring parent. This IS
+            # the ring form, so it is deliberately NOT chain_only.
+            general.add(surface, scored[0] + scored[1], AFFIX,
+                        suffix_only=True)
 
 
 def _add_group_tables(general: _Lexicon) -> None:
@@ -423,11 +632,10 @@ def _add_group_tables(general: _Lexicon) -> None:
             smiles = record.get("smiles", key)
             if "||" in smiles:
                 continue
-            count = _heavy_atoms(smiles)
-            if count is None:
-                continue
+            hydride, chain = _hydride_flags(smiles)
             for name in record.get("names", ()):
-                general.add(name, count, category)
+                general.add(name, _entry_atoms(name, smiles), category,
+                            hydride=hydride, chain=chain)
 
 
 def _add_retained_names(general: _Lexicon) -> None:
@@ -444,7 +652,9 @@ def _add_retained_names(general: _Lexicon) -> None:
         name = name.strip().lower()
         if not name.isalpha() or len(name) < 4:
             continue
-        general.add(name, _heavy_atoms(smiles), STEM)
+        hydride, chain = _hydride_flags(smiles)
+        general.add(name, _entry_atoms(name, smiles), STEM,
+                    hydride=hydride, chain=chain)
 
     # data/iupac_2013_pin_list.json ships name+smiles side by side, but the
     # data package loader keeps only the name allow/deny sets, so the SMILES
@@ -461,7 +671,9 @@ def _add_retained_names(general: _Lexicon) -> None:
         name = (entry.get("name") or "").strip().lower()
         smiles = entry.get("smiles")
         if name and smiles and name.isalpha() and len(name) >= 4:
-            general.add(name, _heavy_atoms(smiles), STEM)
+            hydride, chain = _hydride_flags(smiles)
+            general.add(name, _entry_atoms(name, smiles), STEM,
+                        hydride=hydride, chain=chain)
 
 
 def _add_ring_derived(general: _Lexicon) -> None:
@@ -480,10 +692,23 @@ def _add_ring_derived(general: _Lexicon) -> None:
     for ring_name, substituent_name in RING_SUBSTITUENT_NAMES.items():
         parent = general.table.get(ring_name.strip().lower())
         if parent is not None:
-            general.add(substituent_name, parent.atoms, STEM)
+            general.add(substituent_name, parent.atoms, STEM,
+                        hydride=parent.hydride, chain=parent.chain)
 
-    # Fusion prefixes: a mancude monocyclic component's heavy-atom count is
-    # its ring size (every ring position is one heavy atom).
+    # Fusion prefixes. A mancude monocyclic component's heavy-atom count is its
+    # ring size, but that count may NOT be summed with the base component's:
+    # ortho-fusion SHARES the two atoms of the fusion bond, so
+    # benzo(6)+pyran(6) spells 10 atoms, not 12. They are registered so the
+    # morpheme is RECOGNISED -- and categorised FUSE so ``_well_formed`` refuses
+    # any token containing one, which is the same "whole class out of scope"
+    # refusal the lambda convention gets.
+    #
+    # Recognising them is not optional: this is where the benzoyl defect lived.
+    # ``benzoyl`` has no ``benz`` acyl stem in any shipped table, so its ONLY
+    # tiling was benzo+yl -- a fusion prefix in a position where nothing is
+    # being fused -- and the oracle certified 6 atoms for an 8-atom group.
+    # ``override=True`` because the refusing category has to win over any
+    # coincidental same-count registration from another table.
     try:
         from orthonym.data.fusion_components import MONOCYCLIC_COMPONENTS
     except ImportError:
@@ -492,7 +717,7 @@ def _add_ring_derived(general: _Lexicon) -> None:
         prefix = component.get("prefix")
         ring_size = component.get("ring_size")
         if prefix and isinstance(ring_size, int):
-            general.add(prefix, ring_size, STEM)
+            general.add(prefix, ring_size, FUSE, override=True)
 
 
 def _add_chain_stems(general: _Lexicon) -> None:
@@ -510,7 +735,29 @@ def _add_chain_stems(general: _Lexicon) -> None:
         except Exception:
             continue
         if stem:
-            general.add(stem, n, STEM)
+            general.add(stem, n, STEM, hydride=True, chain=True)
+
+
+def _add_elided_stems(general: _Lexicon) -> None:
+    """Terminal-'e' elision of the NAMED skeletons (P-16.3.3).
+
+    A parent hydride drops its final 'e' before a suffix or a locant:
+    "1,3-thiazole" but "1,3-thiazol-5-yl", "pyridine" but "pyridin-2-yl". The
+    elided spelling denotes the same skeleton, so the count carries across
+    unchanged -- derived, not asserted.
+
+    Runs LAST, so it only ever adds a spelling for a skeleton the tables have
+    already agreed on. ``_MIN_ELIDED + 1`` keeps the elided form itself at least
+    ``_MIN_ELIDED`` characters, i.e. distinctive: a short elision matches inside
+    unrelated words and manufactures readings (see ``_hw_stems``).
+    """
+    for key, morph in list(general.table.items()):
+        if morph.category != STEM or not key.endswith("e"):
+            continue
+        if len(key) < _MIN_ELIDED + 1 or " " in key:
+            continue
+        general.add(key[:-1], morph.atoms, STEM, hydride=morph.hydride,
+                    chain=morph.chain)
 
 
 def _add_replacement_prefixes(general: _Lexicon) -> None:
@@ -537,8 +784,7 @@ def _hw_stems() -> Dict[str, int]:
     Kept OUT of the general lexicon and consulted only immediately after a
     replacement prefix. Without that gate the HW reading of ``ane`` (a
     six-membered ring, 6 atoms) would collide with the saturation ending
-    ``ane`` (0 atoms) and make every ``cyclohexane`` ambiguous. With it,
-    ``oxane`` reads ox+ane = 6 and ``cyclohexane`` reads cyclo+hex+ane = 6.
+    ``ane`` (0 atoms) and make every ``cyclohexane`` ambiguous.
     A stem claimed by two different ring sizes is dropped.
     """
     try:
@@ -555,13 +801,30 @@ def _hw_stems() -> Dict[str, int]:
             stem = stem.strip().lower()
             sizes.setdefault(stem, set()).add(ring_size)
             # ELIDED form. A HW stem drops its terminal 'e' before a following
-            # suffix: "oxane" but "oxan-4-yl". Registering only the full form
-            # made 'oxan' parse uniquely as ox+an (replacement + saturation
-            # ending) = 0 atoms and answer CONFIDENTLY 0 for a 6-atom ring --
-            # found by auditing real production tokens. With the elided form
-            # present the token reads 0 or 6, the two disagree, and it is
-            # refused instead of being confidently wrong.
-            if stem.endswith("e") and len(stem) > 2:
+            # suffix: "oxane" but "oxan-4-yl".
+            #
+            # ``_MIN_ELIDED``: this injection path bypasses ``_Lexicon.add``
+            # entirely -- no length screen, no cross-source conflict refusal --
+            # and an elided spelling is DERIVED rather than shipped, so it
+            # carries the higher bar. It matters: the 2-character elision of
+            # 'ine' gave a bare 'in' that matched inside four Blue Book acid
+            # names and planted a spurious six-membered ring in each --
+            # "benzeneseleninic acid" read as benzene+selen+IN+ic acid and
+            # answered a CONFIDENT 14 for a 9-atom acid.
+            #
+            # HONEST SCOPE: with R3c (a chain-form suffix needs a chain parent)
+            # in place, the swept corpus shows 0 confident-wrong at a floor of 2
+            # as well, because R3c catches that whole family by a second route.
+            # This is defence in depth against the demonstrated mechanism, not
+            # the only barrier in front of it, and
+            # ``test_elided_hw_stems_stay_distinctive`` pins it directly so it
+            # cannot rot into an untested rule.
+            #
+            # The elided forms that real ring names need come from
+            # ``_add_elided_stems`` instead, which elides the NAMED ring
+            # morphemes ('thiazole' -> 'thiazol') where a distinctive stem
+            # anchors the reading.
+            if stem.endswith("e") and len(stem[:-1]) >= _MIN_ELIDED:
                 sizes.setdefault(stem[:-1], set()).add(ring_size)
     return {stem: next(iter(s)) for stem, s in sizes.items() if len(s) == 1}
 
@@ -582,9 +845,17 @@ def _multipliers() -> Dict[str, int]:
     return result
 
 
-@lru_cache(maxsize=2)
-def _lexicon(include_suffixes: bool) -> Dict[str, _Morph]:
-    """The morpheme table for one binding kind.
+@lru_cache(maxsize=1)
+def _lexicon() -> Dict[str, _Morph]:
+    """The one morpheme table, used for every binding kind.
+
+    There is deliberately only ONE. An earlier revision consulted a narrowed
+    table for non-suffix kinds, which made the prefix path LESS safe than the
+    suffix path: removing the ``-ol`` suffix reading of ``ethaneselenol`` left
+    only the spurious Hantzsch-Widman ``selen|ol`` ring reading, and unanimity
+    over that single reading certified 7 atoms for a 3-atom group. Dropping
+    candidate readings can only manufacture false confidence, so every reading
+    is always enumerated and position is policed by ``_well_formed`` instead.
 
     Registration order is most-specific-first so that a structural reading of
     a morpheme wins the CATEGORY over an incidental catalog entry with the
@@ -595,37 +866,26 @@ def _lexicon(include_suffixes: bool) -> Dict[str, _Morph]:
     RDLogger.DisableLog("rdApp.*")
     try:
         general = _Lexicon()
-        suffix_only = _Lexicon()
 
-        for key, (atoms, _why) in _STRUCTURAL_AFFIXES.items():
+        for key, (atoms, _role, _why) in _STRUCTURAL_AFFIXES.items():
             general.add(key, atoms, AFFIX)
-        _add_suffix_morphemes(general, suffix_only)
+        _add_suffix_morphemes(general)
         _add_replacement_prefixes(general)
         _add_chain_stems(general)
         _add_group_tables(general)
         _add_retained_names(general)
         _add_ring_derived(general)
-
-        table = dict(general.table)
-        if include_suffixes:
-            for key, morph in suffix_only.table.items():
-                # A suffix reading may not silently overrule a general
-                # morpheme of the same spelling; conflicts are refused.
-                existing = table.get(key)
-                if existing is None:
-                    table[key] = morph
-                elif existing.atoms != morph.atoms:
-                    del table[key]
-        return table
+        _add_elided_stems(general)
+        return dict(general.table)
     finally:
         RDLogger.EnableLog("rdApp.*")
 
 
-@lru_cache(maxsize=2)
-def _by_first_char(include_suffixes: bool) -> Dict[str, List[str]]:
+@lru_cache(maxsize=1)
+def _by_first_char() -> Dict[str, List[str]]:
     """Morpheme keys bucketed by first character, longest first."""
     buckets: Dict[str, List[str]] = {}
-    for key in _lexicon(include_suffixes):
+    for key in _lexicon():
         buckets.setdefault(key[0], []).append(key)
     for keys in buckets.values():
         keys.sort(key=len, reverse=True)
@@ -713,7 +973,7 @@ def _VB_REFUSAL(reason: str):
 
 def _longest_stem(text: str) -> Optional[Tuple[str, int]]:
     """Longest chain stem at position 0 of ``text``, with its length."""
-    table = _lexicon(False)
+    table = _lexicon()
     for size in range(min(len(text), 20), 1, -1):
         candidate = text[:size]
         morph = table.get(candidate)
@@ -726,16 +986,15 @@ def _longest_stem(text: str) -> Optional[Tuple[str, int]]:
 # Parsing: enumerate EVERY decomposition, then require agreement.
 # --------------------------------------------------------------------------
 
-def _parse_all(text: str, include_suffixes: bool
-               ) -> Tuple[List[List[_Seg]], int, bool]:
+def _parse_all(text: str) -> Tuple[List[List[_Seg]], int, bool]:
     """All morpheme tilings of ``text``.
 
     Returns (parses, furthest position reached, hit_cap). Enumerating every
     tiling rather than taking the greedy longest match is what lets ambiguity
     be DETECTED instead of silently resolved.
     """
-    table = _lexicon(include_suffixes)
-    buckets = _by_first_char(include_suffixes)
+    table = _lexicon()
+    buckets = _by_first_char()
     multipliers = _multipliers()
     hw = _hw_stems()
 
@@ -779,14 +1038,17 @@ def _parse_all(text: str, include_suffixes: bool
         if previous is not None and previous.category == REPL:
             for stem, ring_size in hw.items():
                 if text.startswith(stem, pos):
-                    acc.append(_Seg(stem, ring_size, STEM))
+                    # A HW stem is a parent hydride by construction.
+                    acc.append(_Seg(stem, ring_size, STEM, hydride=True))
                     walk(pos + len(stem), acc)
                     acc.pop()
 
         for key in buckets.get(char, ()):
             if text.startswith(key, pos):
                 morph = table[key]
-                acc.append(_Seg(key, morph.atoms, morph.category))
+                acc.append(_Seg(key, morph.atoms, morph.category,
+                                morph.suffix_only, morph.hydride,
+                                morph.chain, morph.chain_only))
                 walk(pos + len(key), acc)
                 acc.pop()
 
@@ -800,6 +1062,125 @@ def _parse_all(text: str, include_suffixes: bool
     return parses, furthest, hit_cap
 
 
+def _content(segments: List[_Seg]) -> List[_Seg]:
+    """``segments`` without the enclosing marks, which carry no morphology."""
+    return [s for s in segments if s.category not in (OPEN, CLOSE)]
+
+
+def _ends_free_valence(text: str) -> bool:
+    """Does ``text`` end in a P-29.2 free-valence affix?
+
+    A morpheme that does is a SUBSTITUENT form ("phenyl", "cyclohexyl") and may
+    legally be followed by the skeleton it is attached to, which a bare stem may
+    not. Shares ``_FREE_VALENCE_ENDINGS`` with ``free_valence_morphology`` at the
+    foot of this module so the two readings of ``-yl`` cannot drift apart.
+    """
+    return any(text.endswith(ending) for ending, _n in _FREE_VALENCE_ENDINGS)
+
+
+def _well_formed(segments: List[_Seg], kind_name: str,
+                 total: Optional[int]) -> Optional[str]:
+    """Why this tiling cannot describe any molecule, or None if it can.
+
+    Each rule is one IUPAC construction rule read in reverse. A violation means
+    the scanner matched morphemes across a boundary the lexicon cannot see, so
+    the caller refuses the WHOLE token rather than dropping this tiling -- see
+    "WHY AGREEMENT IS NOT ENOUGH" in the module docstring.
+    """
+    content = _content(segments)
+    for index, segment in enumerate(content):
+        previous = content[index - 1] if index else None
+
+        # R1. Fusion is not addition (P-25.3.1): the components share the atoms
+        # of every fusion bond, so no sum over a fusion prefix is a count.
+        if segment.category == FUSE:
+            return (f"fusion prefix {segment.text!r}: fused components share "
+                    f"their fusion atoms, so their arities cannot be summed")
+
+        # R2. A skeletal replacement prefix REPLACES an atom of a skeleton
+        # (P-15.4), so it contributes 0 only because some stem beside it already
+        # counted that atom. With no stem to qualify, the 0 counts nothing --
+        # this is the 'diazenyl' = di|az|en|yl = 0 defect.
+        if segment.category == REPL:
+            ahead = index + 1
+            while ahead < len(content):
+                nxt = content[ahead]
+                if nxt.category in (REPL, MULT) or nxt.text in _PREMARKS:
+                    ahead += 1
+                    continue
+                break
+            if ahead >= len(content) or content[ahead].category != STEM:
+                return (f"replacement prefix {segment.text!r} qualifies no "
+                        f"skeleton, so its zero atoms replace nothing")
+
+        # R3. A characteristic-group suffix attaches to a parent hydride and
+        # closes the name (P-14.2, P-15.1). It may not float in the middle of a
+        # token ('alanylalanine' read as al|an|yl|alanine) and it may not hang
+        # off a substituent prefix ('imido|hydrazide' -- where the true
+        # accounting is functional REPLACEMENT, P-25.3, not addition).
+        if segment.suffix_only:
+            if any(not s.suffix_only for s in content[index + 1:]):
+                return (f"suffix morpheme {segment.text!r} is not final, so it "
+                        f"is not the suffix of anything")
+            if previous is None:
+                # Legitimate for a SUFFIX binding, whose parent is a DIFFERENT
+                # binding: the token really is just "-oic acid".
+                if kind_name != "suffix":
+                    return (f"suffix morpheme {segment.text!r} opens a "
+                            f"{kind_name} token, attaching to no parent hydride")
+            elif not ((previous.category == STEM and previous.hydride)
+                      or previous.category == MULT
+                      or (previous.category == AFFIX and not previous.suffix_only)
+                      or previous.suffix_only):
+                return (f"suffix morpheme {segment.text!r} follows "
+                        f"{previous.text!r}, which is no parent hydride")
+
+            # R3c. The bare chain form of an acid/amide/nitrile suffix counts the
+            # acid carbon as part of the CHAIN. On a ring parent the carb- form
+            # is required instead (P-65.1.1, P-66.1) and spells one atom more, so
+            # the bare form beside a ring stem is a mis-tiling:
+            # "ethylideneazinic acid" read as eth|ylidene|azin|IC ACID and
+            # answered a CONFIDENT 10 for a 5-atom acid.
+            if segment.chain_only:
+                back = index - 1
+                while back >= 0 and (
+                        content[back].category == MULT
+                        or (content[back].category == AFFIX
+                            and not content[back].suffix_only)):
+                    back -= 1
+                host = content[back] if back >= 0 else None
+                if host is None:
+                    if kind_name != "suffix":
+                        return (f"suffix morpheme {segment.text!r} names no "
+                                f"chain for its acid carbon to belong to")
+                elif not (host.category == STEM and host.chain):
+                    return (f"chain-form suffix {segment.text!r} sits on "
+                            f"{host.text!r}, which is no chain parent hydride "
+                            f"(a ring parent takes the carb- form)")
+
+        # R4. Two skeletons cannot be juxtaposed: a name joins them with an
+        # attachment affix ("cyclohexylmethane") or a linking prefix. A stem
+        # sitting straight on a bond-order ending or on another stem is the
+        # signature of a missing morpheme ('cyclohexane|carbohydrazide',
+        # 'eth|an|eth|io|amide').
+        if segment.category == STEM and previous is not None:
+            joined = (previous.category in (MULT, REPL, ATTACH, SUBST)
+                      or previous.text in _PREMARKS
+                      or _ends_free_valence(previous.text))
+            if not joined:
+                return (f"skeleton {segment.text!r} is juxtaposed on "
+                        f"{previous.text!r} with no attachment affix between "
+                        f"them")
+
+    # R5. A multiplier that ends up multiplying nothing at all, in a token that
+    # spells no atoms, is not a reading of anything: 'heptaene' tiled as
+    # hepta|ene and totalled 0 for a seven-carbon chain.
+    if total == 0 and any(s.category == MULT for s in content):
+        return ("token spells no atoms yet carries a multiplier, so its "
+                "multiplied group was never identified")
+    return None
+
+
 def _evaluate(segments: List[_Seg]) -> Optional[int]:
     """Total heavy atoms for one parse, or None if its multipliers are unclear.
 
@@ -808,23 +1189,32 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
     unenclosed, while ``bis-``/``tris-`` multiply a COMPLEX one and are always
     followed by enclosing marks. So an enclosed group's extent is read from the
     brackets, and an unenclosed one ends at the first morpheme that completes a
-    simple substituent (an attachment affix such as ``-yl``/``-oxy``, or a
-    complete substituent prefix such as ``chloro``).
+    simple substituent (an attachment affix such as ``-yl``/``-oxy``, a complete
+    substituent prefix such as ``chloro``, or a characteristic-group suffix,
+    which R3 has already established is the end of the token).
 
-    A leading multiplier whose group is the WHOLE token is a statement about
-    how many times this substituent occurs, not about how big it is: the token
-    ``"dimethyl"`` spells one methyl. That multiplicity belongs to the
-    multiplicity proof, not to arity, so it is ignored here. A multiplier with
-    a skeletal head after it ("dimethylphenyl") genuinely multiplies an inner
-    group and IS applied.
+    A multiplier at the very START of a token, governing the whole of it, is a
+    statement about how many times this substituent occurs, not about how big it
+    is: the token ``"dimethyl"`` spells one methyl. That multiplicity belongs to
+    the multiplicity proof, not to arity, so it is ignored here. Anywhere else
+    the multiplier is INTERNAL to the substituent's own name and genuinely
+    multiplies an inner group -- whether something follows it
+    ("dimethylphenyl") or something precedes it ("butanedioyl" = butane + TWO
+    -oyl = 6, which was under-counted as 5 while only the following side was
+    checked).
     """
     total = 0
     index = 0
     count = len(segments)
+    # Content before the multiplier under consideration. A multiplier is a
+    # token-level occurrence count only when it opens the token.
+    seen_content = False
 
     while index < count:
         segment = segments[index]
         if segment.category != MULT:
+            if segment.category not in (OPEN, CLOSE):
+                seen_content = True
             total += segment.atoms
             index += 1
             continue
@@ -873,22 +1263,31 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
                     break
                 group_atoms += current.atoms
                 end += 1
-                if current.category in _GROUP_TERMINATORS:
+                # A whole-word substituent morpheme ends the group just as an
+                # attachment affix does: 'phenyl' IS a complete simple
+                # substituent, so "diphenylmethanone" multiplies the phenyl and
+                # not everything after 'di'. Reading it as the whole tail is how
+                # this under-counted 14 atoms as 8.
+                if (current.category in _GROUP_TERMINATORS
+                        or current.suffix_only
+                        or _ends_free_valence(current.text)):
                     terminated = True
                     break
             if not terminated:
                 return None  # cannot delimit the multiplied group
             index = end
 
-        # Does anything at all follow the multiplied group? If not, the group
-        # IS the token and the multiplier counts how many times that whole
-        # substituent occurs -- multiplicity, not arity. If something follows,
-        # the multiplied group is an inner part of a larger token and the
-        # multiplier genuinely applies. What follows need not be skeletal:
-        # "dimethylamino" is 2 methyls on a nitrogen (3), so testing for a
-        # STEM specifically would under-count every N,N-dialkyl token.
+        # Is the multiplied group the WHOLE token? If so the multiplier counts
+        # how many times that whole substituent occurs -- multiplicity, not
+        # arity. If anything precedes or follows it, the multiplied group is an
+        # inner part of a larger token and the multiplier genuinely applies.
+        # What follows need not be skeletal: "dimethylamino" is 2 methyls on a
+        # nitrogen (3), so testing for a STEM specifically would under-count
+        # every N,N-dialkyl token.
         tail = [s for s in segments[index:] if s.category not in (OPEN, CLOSE)]
-        total += group_atoms * multiplicity if tail else group_atoms
+        internal = seen_content or bool(tail)
+        total += group_atoms * multiplicity if internal else group_atoms
+        seen_content = True
 
     return total
 
@@ -898,10 +1297,13 @@ def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
     """How many heavy atoms does ``token`` spell?
 
     ``kind`` may be a :class:`~orthonym.validation.binding_spine.BindingKind`
-    or the equivalent plain string. It selects the lexicon: ``SUFFIX`` adds the
-    position-sensitive suffix morphemes (``-ol`` is 1 oxygen in suffix position
-    and nothing of the sort elsewhere), every other kind uses the general
-    table only.
+    or the equivalent plain string. It does NOT select a lexicon -- there is one
+    lexicon and every reading is always enumerated (see ``_lexicon``). It settles
+    one positional question only: whether a characteristic-group suffix may open
+    the token. For a ``SUFFIX`` binding it may, because the parent hydride it
+    attaches to is a different binding and the token really is just
+    ``"-oic acid"``; for any other kind a leading suffix morpheme is a
+    mis-tiling.
 
     A confident answer is guaranteed correct; an unconfident one carries a
     ``basis`` explaining the refusal. See the module docstring.
@@ -913,7 +1315,6 @@ def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
                              f"token longer than {_MAX_TOKEN_LEN} characters")
 
     kind_name = str(getattr(kind, "value", kind)).strip().lower()
-    include_suffixes = kind_name == "suffix"
 
     text = _normalise(token)
     if not text:
@@ -933,7 +1334,7 @@ def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
         if not text.strip():
             return ArityEstimate(base, True, basis_prefix.rstrip("; "))
 
-    parses, furthest, hit_cap = _parse_all(text, include_suffixes)
+    parses, furthest, hit_cap = _parse_all(text)
     if hit_cap:
         return ArityEstimate(None, False,
                              "too many decompositions to decide")
@@ -950,6 +1351,16 @@ def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
                 None, False,
                 f"{basis_prefix}multiplier scope not resolvable in "
                 f"{'+'.join(s.text for s in parse)!r}")
+        # A morphotactically impossible reading refuses the whole token: it is
+        # evidence the lexicon is incomplete HERE, and once that is known,
+        # unanimity among the readings that DID tile proves nothing. See "WHY
+        # AGREEMENT IS NOT ENOUGH".
+        violation = _well_formed(parse, kind_name, value)
+        if violation is not None:
+            return ArityEstimate(
+                None, False,
+                f"{basis_prefix}{'+'.join(s.text for s in _content(parse))!r} "
+                f"is not constructible: {violation}")
         totals.add(value)
 
     if len(totals) != 1:
@@ -965,9 +1376,48 @@ def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
                                 if s.category not in (OPEN, CLOSE)))
 
 
-def lexicon_size(include_suffixes: bool = False) -> int:
-    """Number of morphemes the oracle knows. For measurement passes."""
-    return len(_lexicon(include_suffixes))
+def lexicon_size(include_suffixes: bool = True) -> int:
+    """Number of morphemes the oracle knows. For measurement passes.
+
+    ``include_suffixes`` is accepted and ignored: there is now one lexicon for
+    every binding kind (see ``_lexicon``), so both answers are the same number.
+    """
+    return len(_lexicon())
+
+
+def lexicon_entries() -> Dict[str, Tuple[int, str, bool]]:
+    """``{morpheme: (atoms, category, suffix_only)}`` -- the whole lexicon.
+
+    Exposed for the arity sweep and the tripwire test: a morpheme that reaches
+    the table without arity data, or a NEW morpheme class nobody has swept
+    against an independent structure, is exactly what this module must not
+    answer confidently about.
+    """
+    return {key: (morph.atoms, morph.category, morph.suffix_only)
+            for key, morph in _lexicon().items()}
+
+
+#: Pinned by ``test_lexicon_sources_are_pinned``: see ``lexicon_sources``.
+_LEXICON_SOURCES: Tuple[str, ...] = (
+    "_STRUCTURAL_AFFIXES",
+    "_add_suffix_morphemes",
+    "_add_replacement_prefixes",
+    "_add_chain_stems",
+    "_add_group_tables",
+    "_add_retained_names",
+    "_add_ring_derived",
+    "_add_elided_stems",
+)
+
+
+def lexicon_sources() -> Tuple[str, ...]:
+    """Names of the derivation steps ``_lexicon`` runs, in order.
+
+    Pinned by a tripwire test: a NEW morpheme source has not been swept against
+    an independent structure oracle, and its entries have not been checked
+    against ``_entry_atoms``' screens, so it must not slip in unnoticed.
+    """
+    return _LEXICON_SOURCES
 
 
 # ---------------------------------------------------------------------------
