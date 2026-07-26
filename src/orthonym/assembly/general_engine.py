@@ -21,6 +21,8 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..errors import is_refusal_sentinel
+
 logger = logging.getLogger(__name__)
 
 # Suffix support keyed by the SUFFIX STRING (robust to fg-name spelling):
@@ -420,7 +422,7 @@ def _assemble(mol, features, chain, part,
         # v27 P1: complete-tier cage substituent recursion (see name_general_ring).
         prefix = name_substituent(mol, frag, attach_nbrs[0],
                                   allow_mancude=allow_mancude)
-        if not prefix or prefix == 'substituent':
+        if is_refusal_sentinel(prefix):
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
         frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
@@ -578,7 +580,7 @@ def _extract_ring_ester(mol, pg_matches, ring_set, allow_mancude):
         return None
 
     r_word = name_substituent(mol, r_frag, r_start, allow_mancude=allow_mancude)
-    if not r_word or r_word == 'substituent':
+    if is_refusal_sentinel(r_word):
         return None
     return r_word, r_frag, core, ring_attach
 
@@ -652,7 +654,7 @@ def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
                     if n2.GetIdx() not in frag and n2.GetIdx() not in exclude:
                         stack.append(n2.GetIdx())
             nm = name_substituent(mol, frag, j, allow_mancude=allow_mancude)
-            if not nm or nm == 'substituent':
+            if is_refusal_sentinel(nm):
                 return None  # unnameable N-substituent -> fail closed
             n_sub_atoms |= frag
             name_counts[nm] = name_counts.get(nm, 0) + 1
@@ -880,7 +882,7 @@ def _emit_ring_from_analysis(
         # byte-identical — name_substituent's allow_mancude defaults False.
         prefix = name_substituent(mol, frag, attach_nbrs[0],
                                   allow_mancude=allow_aromatic_general)
-        if not prefix or prefix == 'substituent':
+        if is_refusal_sentinel(prefix):
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
         frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
@@ -1221,7 +1223,7 @@ def name_general_monocycle(
         # v27 P1: complete-tier cage substituent recursion (see name_general_ring).
         prefix = name_substituent(mol, frag, attach_nbrs[0],
                                   allow_mancude=allow_aromatic_general)
-        if not prefix or prefix == 'substituent':
+        if is_refusal_sentinel(prefix):
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
         frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,

@@ -325,9 +325,10 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
             "DEPTH safety net: visited set size=%d >= %d, smiles=%s -- trying pipeline fallback",
             len(visited), _MAX_VISITED_SIZE, smiles[:60],
         )
+        from ..errors import is_refusal_sentinel
         from ..namer import name_pipeline_only
         fallback_name = name_pipeline_only(canonical)
-        if fallback_name and "unknown" not in fallback_name.lower():
+        if not is_refusal_sentinel(fallback_name):
             if runtime_cache is not None:
                 runtime_cache[canonical] = fallback_name
             return fallback_name
@@ -340,8 +341,23 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
     # Mark as in-progress, name it, then unmark
     visited.add(canonical)
     try:
+        from ..errors import is_refusal_sentinel
         from ..namer import name_compound
         result = name_compound(canonical)
+        # THE chokepoint where a WHOLE-MOLECULE naming becomes a NAME COMPONENT.
+        # `name_compound` is always-emit: when it cannot name the input it returns
+        # a refusal sentinel STRING ('zinc compound (not supported)',
+        # 'unknown organic compound', ...), not None. Returning that string to a
+        # caller that only asks "is it non-empty?" is how a sentinel got welded
+        # into a name -- CCS[Zn]SCC -> 'zinc compound (not supported)ylethane'.
+        # Every one of this function's ~40 call sites consumes the result as a
+        # component, so the test belongs HERE, once, not at each of them; the
+        # shared predicate is the same one the slot filters use.
+        if is_refusal_sentinel(result):
+            from ..metrics.abstention import AbstentionCode, record_abstention
+            record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                              detail='fragment_refusal_sentinel')
+            return None
         if result:
             # Populate runtime cache with successful result
             if runtime_cache is not None:

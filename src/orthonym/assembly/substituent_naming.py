@@ -3517,6 +3517,44 @@ def _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx):
     return f"{chain_len}-{core}{alkyl}"
 
 
+def fragment_is_linear_terminal_alkyl(mol, sub_atoms, attach_idx: int) -> bool:
+    """Is ``get_alkyl_name(carbon_count)`` an HONEST name for this fragment?
+
+    ``get_alkyl_name(n)`` can only ever spell an unbranched saturated acyclic
+    chain attached at a terminus ('propyl'). The two carbon-count fallbacks below
+    used to call it for ANY fragment whose carbon count was non-zero, so a
+    fragment they could not name recursively was renamed by counting its carbons
+    and DISCARDING everything else: ``CCS[Zn]SCC`` came out ``'ethylethane'`` and
+    ``CCO[Zn]OCC`` came out ``'oxylethane'``. A name must never claim atoms it
+    dropped, so the fallback is now gated on the fragment actually being the one
+    shape the function can spell.
+
+    Requires: every atom carbon, none in a ring, every internal bond single, the
+    induced subgraph a simple path, and ``attach_idx`` one of its two ends.
+    """
+    frag = set(sub_atoms)
+    if attach_idx not in frag:
+        return False
+    for idx in frag:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
+            return False
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return False
+        degree = 0
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() not in frag:
+                continue
+            degree += 1
+            bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
+            if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+                return False
+        limit = 1 if idx == attach_idx else 2
+        if degree > limit:
+            return False
+    return True
+
+
 def name_substituent_fragment(
     mol,
     sub_atoms: List[int],
@@ -3932,12 +3970,12 @@ def name_substituent_fragment(
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)
     if frag_smiles is None:
-        # Fallback: try simple carbon count for pure-carbon substituents
-        carbon_count = sum(
-            1 for i in sub_atoms
-            if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
-        )
-        if carbon_count > 0:
+        # Fallback: simple carbon count — ONLY when that name is honest for this
+        # fragment (see fragment_is_linear_terminal_alkyl); otherwise fail closed
+        # rather than drop the atoms the count ignores.
+        carbon_count = len(sub_atoms)
+        if (carbon_count > 0
+                and fragment_is_linear_terminal_alkyl(mol, sub_atoms, attach_idx)):
             try:
                 return get_alkyl_name(carbon_count)
             except (ValueError, KeyError):
@@ -3951,12 +3989,14 @@ def name_substituent_fragment(
     # Step 4: Recursive naming via name_fragment_recursively()
     parent_name = name_fragment_recursively(frag_smiles)
     if parent_name is None:
-        # Recursion depth limit or naming failure: fallback to carbon count
-        carbon_count = sum(
-            1 for i in sub_atoms
-            if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
-        )
-        if carbon_count > 0:
+        # Recursion depth limit, cycle guard, or a REFUSAL SENTINEL from the
+        # recursive namer. Fall back to the carbon count ONLY when an unbranched
+        # terminal alkyl name is honest for this fragment: this line is what turned
+        # the CCS[Zn]SCC sentinel refusal into the structurally WRONG 'ethylethane'
+        # once the sentinel stopped leaking through as a string.
+        carbon_count = len(sub_atoms)
+        if (carbon_count > 0
+                and fragment_is_linear_terminal_alkyl(mol, sub_atoms, attach_idx)):
             try:
                 return get_alkyl_name(carbon_count)
             except (ValueError, KeyError):

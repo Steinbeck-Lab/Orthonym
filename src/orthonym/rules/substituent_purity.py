@@ -65,11 +65,14 @@ logger = logging.getLogger(__name__)
 # demand a suffix and can never outrank the hub's principal characteristic group.
 _PREFIX_ONLY_ELEMENTS = frozenset({'F', 'Cl', 'Br', 'I', 'At'})
 
-# Rejected chokepoint answers.  ``'substituent'`` is the cascade's unnameable
-# sentinel; a space or an 'unknown'/'not supported' phrase means a descriptive
-# fallback leaked out instead of a prefix.  Mirrors the filter the general-engine
-# prefix loci apply (``general_engine.py`` `_assemble` / `name_general_monocycle`).
-_REJECTED_TOKENS = ('unknown', 'not supported')
+# Rejected chokepoint answers.  A space means a multi-word functional-class name
+# leaked out where a single prefix TOKEN is required; the refusal sentinels
+# themselves are recognised by the shared ``errors.is_refusal_sentinel``.
+#
+# v29 P3B: this module's own ``('unknown', 'not supported')`` tuple was the
+# FULLEST of the private copies of the refusal predicate — which is exactly why it
+# had to go: being the most complete copy made it the one most likely to be
+# mistaken for the definition. The sentinel families are now named in one place.
 
 
 def _fragment_atoms(mol, start_idx: int, exclude_idx: int) -> Optional[List[int]]:
@@ -142,10 +145,10 @@ def organyl_prefix_name(mol, start_idx: int, exclude_idx: int) -> Optional[str]:
     name = name_substituent(mol, frag, start_idx, allow_mancude=False)
 
     # Strict acceptance filter: only a single prefix TOKEN is usable here.
-    if not name or name == 'substituent':
+    from ..errors import is_refusal_sentinel
+    if is_refusal_sentinel(name):
         return None
-    low = name.lower()
-    if ' ' in name or any(tok in low for tok in _REJECTED_TOKENS):
+    if ' ' in name:
         return None
     return name
 

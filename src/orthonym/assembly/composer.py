@@ -7858,17 +7858,38 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         # Name via the universal classify-and-name pipeline
         name = classify_and_name_fragment(mol, sub_info, chain_set, features)
         if name is None:
-            # Fallback: try simple carbon-count alkyl naming
-            carbon_count = sum(
-                1 for idx in sub_info.frag_atoms
-                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
-            )
-            if carbon_count > 0:
+            # Fallback: simple carbon-count alkyl naming -- but ONLY when that name
+            # is honest for this fragment. Counting carbons and spelling an alkyl
+            # DISCARDS every other atom, so this line renamed the unnameable
+            # -S-Zn-S-CH2CH3 branch of CCS[Zn]SCC 'ethyl' and shipped
+            # 'ethylethane', a different molecule. It was masked while the branch
+            # namer still leaked the refusal sentinel through as a string
+            # ('zinc compound (not supported)ylethane'): visibly broken, so nobody
+            # reached this line. Shared guard, not a fourth private copy.
+            from .substituent_naming import fragment_is_linear_terminal_alkyl
+            _frag_attach = next(
+                (i for i in sub_info.frag_atoms
+                 if mol.GetBondBetweenAtoms(attach_idx, i) is not None), None)
+            carbon_count = len(sub_info.frag_atoms)
+            if (carbon_count > 0 and _frag_attach is not None
+                    and fragment_is_linear_terminal_alkyl(
+                        mol, sub_info.frag_atoms, _frag_attach)):
                 try:
                     name = get_alkyl_name(carbon_count)
                 except (ValueError, KeyError):
                     pass
             if name is None:
+                # Fail closed rather than SKIP, when the branch we cannot name
+                # carries an element outside the organic set: dropping it emits a
+                # name for a different molecule, and unlike the sentinel-bearing
+                # string it replaced, 'ethane' for CCS[Zn]SCC is plausible enough
+                # that no failure predicate can flag it. Same mid-assembly refusal
+                # channel as unsupported_ring_system(), caught once in name().
+                from ..errors import _ORGANIC_ELEMENTS, unsupported_element_branch
+                for _idx in sub_info.frag_atoms:
+                    _sym = mol.GetAtomWithIdx(_idx).GetSymbol()
+                    if _sym not in _ORGANIC_ELEMENTS:
+                        raise unsupported_element_branch(_sym)
                 logger.warning(
                     "DROP-09 substituent_skip: reason=universal_pipeline_unnameable locant=%d",
                     sub_info.locant,

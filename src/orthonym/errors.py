@@ -176,6 +176,29 @@ def unsupported_ring_system(smiles: Optional[str] = None) -> OrthonymLimitError:
     return _make('UNSUPPORTED_RING_SYSTEM', smiles=smiles)
 
 
+def unsupported_element_branch(symbol: str,
+                               smiles: Optional[str] = None
+                               ) -> OrthonymLimitError:
+    """Fail-closed refusal for a substituent branch that Orthonym cannot name
+    and that carries an element outside ``_ORGANIC_ELEMENTS``.
+
+    Raised mid-assembly and caught at the single ``Orthonym.name`` catch point,
+    exactly like ``unsupported_ring_system``. It exists because SKIPPING such a
+    branch is not a smaller error than mis-naming it — it ships a name for a
+    DIFFERENT molecule: with the refusal sentinel no longer leaking through as a
+    string, ``CCS[Zn]SCC`` went from the visibly-broken
+    'zinc compound (not supported)ylethane' to the plausible and therefore far
+    more dangerous 'ethane', which no failure predicate can flag.
+
+    The message names the element when known, so the refusal stays as
+    informative as the descriptive fallback it mirrors.
+    """
+    metal = _METAL_NAMES.get(symbol)
+    message = (f'{metal} compound (not supported)' if metal
+               else LIMIT_CATALOG['UNSUPPORTED_ELEMENT']['message'])
+    return _make('UNSUPPORTED_ELEMENT', message=message, smiles=smiles)
+
+
 def is_failure_name(name: Optional[str]) -> bool:
     """True if ``name`` is Orthonym's failure signal (empty or contains 'unknown').
 
@@ -195,6 +218,37 @@ def is_failure_name(name: Optional[str]) -> bool:
     # never fired; the trivial fallback never triggered).
     low = name.lower()
     return 'unknown' in low or '(not supported)' in low
+
+
+# The substituent cascade's placeholder. `assembly.substituent_enumerator`'s
+# tiers return this bare word as an absolute last resort, meaning "there is a
+# substituent here and I could not name it". It is a REFUSAL, not a name, but it
+# is not a descriptive fallback either, so `is_failure_name` does not see it.
+CASCADE_PLACEHOLDER = 'substituent'
+
+
+def is_refusal_sentinel(name: Optional[str]) -> bool:
+    """True if ``name`` is any refusal sentinel and so must never be CONSUMED
+    as a name component (a substituent prefix, a parent stem, an ester word...).
+
+    This is the slot-level predicate. It is deliberately built ON TOP of
+    ``is_failure_name`` rather than beside it: that function already recognises
+    three of the four sentinel families exactly (empty, ``'unknown ...'``, and the
+    ``'... (not supported)'`` descriptive fallbacks), and duplicating them is how
+    this class of bug reached six copies in the first place. What it does NOT
+    recognise is the substituent cascade's bare ``'substituent'`` placeholder,
+    because that string is not a whole-molecule failure signal — a caller asking
+    "did naming fail?" of a finished name must not be told yes merely because the
+    word appears. Hence one extra leg here, and no re-implementation.
+
+    The failure this closes: a sentinel accepted into a substituent slot is
+    silently welded into a name — ``CCS[Zn]SCC`` produced
+    ``'zinc compound (not supported)ylethane'``, which every "did I get a
+    non-empty string?" caller reads as success.
+    """
+    if is_failure_name(name):
+        return True
+    return name.strip().lower() == CASCADE_PLACEHOLDER
 
 
 def classify_scope_limit(mol: Chem.Mol) -> Optional[OrthonymLimitError]:
