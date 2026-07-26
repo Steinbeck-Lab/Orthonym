@@ -1772,70 +1772,27 @@ def is_polycyclic_system(mol) -> bool:
 # Heteroatom Replacement Prefix (Placeholder for Plan 16-02)
 # ============================================================================
 
-# Heteroatom priority based on Hantzsch-Widman seniority
-# Skeletal-replacement ("a") prefixes for von Baeyer / ring systems, in IUPAC
-# 2013 Table 2.8 / P-31.1.4.3.4 seniority order (the order heteroatoms are cited
-# and the order they receive lowest locants): F>Cl>Br>I>O>S>Se>Te>N>P>As>Sb>Bi>
-# Si>Ge>Sn>Pb>B. The integer is a relative sort key only (used at call sites to
-# order multi-element prefixes); the strings are the replacement stems and are
-# OPSIN-round-trip verified (e.g. heptasilabicyclo[2.2.1]heptane,
-# heptagermabicyclo[2.2.1]heptane). Group-14/15 + B added in v23 Phase 5 so an
-# all-heteroatom von Baeyer system is named via its hydride-replacement stem
-# instead of silently dropping the heteroatoms (structure-loss safety).
-HETEROATOM_PREFIXES = {
-    'O': ('oxa', 1),
-    'S': ('thia', 2),
-    'Se': ('selena', 3),
-    'Te': ('tellura', 4),
-    'N': ('aza', 5),
-    'P': ('phospha', 6),
-    'As': ('arsa', 7),
-    'Sb': ('stiba', 8),
-    'Bi': ('bisma', 9),
-    'Si': ('sila', 10),
-    'Ge': ('germa', 11),
-    'Sn': ('stanna', 12),
-    'Pb': ('plumba', 13),
-    'B': ('bora', 14),
-}
-
-
-def _vb_lambda_for_atom(mol, atom_idx: int) -> Optional[int]:
-    """λ bonding number (P-31.1.4.2) for a von-Baeyer ring 'a'-prefix atom, or
-    None. Refines the shared ``nonstandard_bonding_number`` with the SKELETAL-
-    DEGREE rule that governs ring replacement nomenclature: when OPSIN parses an
-    'a'-replacement name it assigns each skeletal atom the LOWEST valid valence
-    >= its skeletal degree. So a high-degree (bridgehead) heteroatom whose actual
-    valence EQUALS that connectivity-forced value needs NO λ — OPSIN infers it,
-    and an explicit λ there is redundant AND OPSIN-rejected (e.g. the bridgehead
-    Te in heptatellurabicyclo[2.2.1]heptane has degree 3 and valence 4 = the
-    lowest Te valence >= 3, so it must NOT carry λ4). λ IS cited only when the
-    valence EXCEEDS the connectivity-forced value (the heteroatom carries extra
-    hydrogen), e.g. a degree-2 ring S(IV): OPSIN would default it to S(II)
-    without the λ4 — a different molecule. This is intentionally LOCAL to the VB
-    'a'-prefix path; the shared ``nonstandard_bonding_number`` stays standard-
-    valence-relative for the parent-hydride/chain namers (SF6 -> lambda6-sulfane
-    needs λ even though its degree forces valence 6)."""
-    from .lambda_convention import nonstandard_bonding_number
-    lam = nonstandard_bonding_number(mol, atom_idx)
-    if lam is None:
-        return None
-    from rdkit.Chem import GetPeriodicTable
-    atom = mol.GetAtomWithIdx(atom_idx)
-    valences = [v for v in GetPeriodicTable().GetValenceList(atom.GetAtomicNum()) if v > 0]
-    degree = atom.GetDegree()
-    forced = min((v for v in valences if v >= degree), default=None)
-    if forced is not None and lam == forced:
-        return None  # connectivity-forced valence; OPSIN infers it (no spurious λ)
-    return lam
+# v29 Phase 2 T2a: the replacement-prefix table and its λ helper moved to
+# ``rules/ring_replacement.py`` (the single source of truth, so extending the
+# element table is a data-only change in one place). Re-exported here because the
+# name ``polycyclic.HETEROATOM_PREFIXES`` is part of this module's surface.
+from .ring_replacement import (  # noqa: E402,F401  (re-export)
+    HETEROATOM_PREFIXES,
+    build_replacement_prefix as _build_ring_replacement_prefix,
+    vb_lambda_for_atom as _vb_lambda_for_atom,
+)
 
 
 def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms: Set[int]) -> str:
     """
-    Generate 'a' replacement nomenclature prefix for ring heteroatoms.
+    Generate the 'a' replacement-nomenclature prefix for ring heteroatoms.
 
-    Scans ring atoms for non-carbon elements and generates the appropriate
-    prefix string with locants (e.g., "7-oxa-" or "2,5-dioxa-7-aza-").
+    Thin wrapper over ``rules/ring_replacement.build_replacement_prefix``, which
+    owns the construction (element table, Table-2.8 citation order, λ tokens,
+    multiplying prefixes, the no-trailing-hyphen rule of P-23.3.1). The string
+    returned here is byte-identical to what this function built inline before
+    v29 Phase 2 — the three PIN callers (``name_polycyclic_complete``,
+    ``bicyclo.py``) see no change.
 
     Args:
         mol: RDKit Mol object
@@ -1843,60 +1800,16 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
         ring_atoms: Set of atom indices in the ring system
 
     Returns:
-        Formatted prefix string (e.g., "7-oxa-") or empty string if no heteroatoms
+        Formatted prefix string (e.g. "7-oxa"), or "" if no heteroatom is
+        expressed.
 
-    Note:
-        This is a placeholder for Plan 16-02 implementation. Currently returns
-        empty string.
+    NOTE: this signature CANNOT report an atom it failed to express, which is how
+    an off-table skeletal element used to be dropped from the name while still
+    counting toward the ring stem. Any caller that must fail closed (i.e. every
+    general-tier caller) has to use ``build_replacement_prefix`` directly and
+    check ``.unexpressed``.
     """
-    # Group heteroatoms by element type. Each entry is (locant, lambda) where
-    # lambda is the non-standard bonding number (P-31.1.4.2) or None — e.g. a
-    # tetravalent ring sulfur at locant 3 -> (3, 4) -> "3lambda4-thia". Uses the
-    # degree-aware _vb_lambda_for_atom (NOT the raw shared check) so a
-    # connectivity-forced bridgehead valence is not over-cited (see that helper).
-    from .lambda_convention import format_lambda_token
-
-    heteroatoms: Dict[str, List[tuple]] = {}
-
-    for atom_idx in ring_atoms:
-        atom = mol.GetAtomWithIdx(atom_idx)
-        symbol = atom.GetSymbol()
-        if symbol != 'C' and symbol in HETEROATOM_PREFIXES:
-            if atom_idx in numbering:
-                locant = numbering[atom_idx]
-                lam = _vb_lambda_for_atom(mol, atom_idx)
-                if symbol not in heteroatoms:
-                    heteroatoms[symbol] = []
-                heteroatoms[symbol].append((locant, lam))
-
-    if not heteroatoms:
-        return ""
-
-    # Sort elements by HW priority
-    sorted_elements = sorted(heteroatoms.keys(), key=lambda s: HETEROATOM_PREFIXES.get(s, (s, 99))[1])
-
-    # Use shared multipliers from naming_utils
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-
-    parts = []
-    for element in sorted_elements:
-        entries = sorted(heteroatoms[element])  # by locant (lambda follows it)
-        prefix_name = HETEROATOM_PREFIXES[element][0]
-
-        locant_str = ','.join(format_lambda_token(loc, lam) for loc, lam in entries)
-        count = len(entries)
-
-        if count > 1:
-            mult = SIMPLE_MULTIPLIERS.get(count, str(count))
-            parts.append(f"{locant_str}-{mult}{prefix_name}")
-        else:
-            parts.append(f"{locant_str}-{prefix_name}")
-
-    # S1 (v24): the replacement 'a'-prefix attaches DIRECTLY to the von-Baeyer
-    # descriptor (P-23.3.1: `2-oxabicyclo[2.2.2]octane`, not `2-oxa-bicyclo…`).
-    # The internal '-' between multiple replacement terms is kept by the join;
-    # emit NO trailing '-' (the callers concatenate prefix+descriptor directly).
-    return '-'.join(parts) if parts else ""
+    return _build_ring_replacement_prefix(mol, numbering, ring_atoms).prefix
 
 
 def _is_purely_fused(mol, ring_atoms: Set[int], bridgeheads: Set[int]) -> bool:

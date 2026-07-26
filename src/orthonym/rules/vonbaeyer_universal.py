@@ -109,8 +109,9 @@ def analyze_cage_universal(
     """
     from .polycyclic import (
         VonBaeyerAnalyzer, _get_largest_connected_ring_component,
-        get_heteroatom_replacement_prefix, get_polycyclic_unsaturation,
     )
+    from .ring_replacement import build_replacement_prefix
+    from .ring_unsaturation import render_ring_unsaturation
 
     if mol is None:
         return None
@@ -173,28 +174,45 @@ def analyze_cage_universal(
         logger.info("vonbaeyer_universal: descriptor edge-audit failed; refuse")
         return None
 
-    hetero = get_heteroatom_replacement_prefix(kek, desc.numbering, cage_canon)
-    unsat = get_polycyclic_unsaturation(kek, cage_canon, desc.numbering)
+    # v29 Phase 2 T2a: skeletal-replacement TOTALITY. The prefix builder can only
+    # spell the elements in its table; every other skeletal ring atom used to be
+    # skipped while the stem kept counting it, so ``C1CC2CC[Hg]C2C1`` named as
+    # ``bicyclo[3.3.0]octane`` — a hydrocarbon name for a mercury ring. SELF-01
+    # fails OPEN with no OPSIN jar (a supported mode), so nothing downstream
+    # caught it. Refuse whenever a skeletal atom is left unexpressed: never a
+    # ring stem that counts an atom no morpheme in the name spells.
+    replacement = build_replacement_prefix(kek, desc.numbering, cage_canon)
+    if replacement.unexpressed:
+        logger.info(
+            "vonbaeyer_universal: %d skeletal atom(s) unexpressible by the "
+            "replacement-prefix table; refuse", len(replacement.unexpressed))
+        return None
+    hetero = replacement.prefix
 
-    # v25 G5-A: cite each ring double bond with the von-Baeyer COMPOUND locant
-    # n(m) when its two atoms are NOT consecutively numbered (a fusion/bridge
-    # ene, e.g. octalin 1(6)); plain n when m == n+1. The bare min(n,m) model
-    # mislabels non-consecutive enes (and, adjacent to an oxo, fabricates the
-    # 5-bond-carbon valence clash). ``double_bond_pairs`` (raw (low,high) VB
-    # locants) is retained for the engine's valence guard. Scoped to THIS cage
-    # payload — the default polycyclic path is untouched (it uses ints directly).
-    _pairs = []
-    for _b in kek.GetBonds():
-        _i, _j = _b.GetBeginAtomIdx(), _b.GetEndAtomIdx()
-        if (_i in desc.numbering and _j in desc.numbering
-                and _b.GetBondTypeAsDouble() == 2.0):
-            _lo, _hi = sorted((desc.numbering[_i], desc.numbering[_j]))
-            _pairs.append((_lo, _hi))
-    _pairs.sort()
-    unsat['double_bond_pairs'] = _pairs
-    unsat['double_bonds'] = [
-        str(lo) if hi == lo + 1 else f"{lo}({hi})" for lo, hi in _pairs
-    ]
+    # v25 G5-A / v29 Phase 2 T1: cite each ring double bond with the von-Baeyer
+    # COMPOUND locant n(m) when its two atoms are NOT consecutively numbered (a
+    # fusion/bridge ene, e.g. octalin 1(6)); plain n when m == n+1. The bare
+    # min(n,m) model mislabels non-consecutive enes (and, adjacent to an oxo,
+    # fabricates the 5-bond-carbon valence clash). ``double_bond_pairs`` (raw
+    # (low,high) VB locants) is retained for the engine's valence guard.
+    #
+    # T1 moved this to ``rules/ring_unsaturation.py`` so it covers BOTH bond
+    # orders. Before T1 the triple-bond locants came straight from
+    # ``get_polycyclic_unsaturation``'s ``min(loc1, loc2)`` — a bare locant with
+    # no composite form and NO GUARD, i.e. a wrong-bond citation waiting for a
+    # non-consecutively-numbered yne. The primitive fails closed on that state
+    # instead (it is unreachable for standard bonding numbers, so reaching it
+    # means the NUMBERING is wrong). Scoped to THIS cage payload — the default
+    # polycyclic path is untouched (it uses ints directly).
+    ring_unsat = render_ring_unsaturation(kek, desc.numbering)
+    if ring_unsat is None:
+        logger.info("vonbaeyer_universal: ring unsaturation not citable; refuse")
+        return None
+    unsat = {
+        'double_bonds': list(ring_unsat.double_locants),
+        'double_bond_pairs': list(ring_unsat.double_pairs),
+        'triple_bonds': list(ring_unsat.triple_locants),
+    }
 
     cage_orig = tuple(sorted(match[c] for c in cage_canon))
     atom_to_locant = {match[c]: loc for c, loc in desc.numbering.items()}
@@ -448,33 +466,45 @@ def analyze_spiro_universal(
             Chem.Kekulize(kek, clearAromaticFlags=True)
         except Exception:
             return None
-    dbl_pairs: list = []
-    triple_locs: list = []
-    for b in kek.GetBonds():
-        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
-        if i not in numbering or j not in numbering:
-            continue
-        bt = b.GetBondType()
-        lo, hi = sorted((numbering[i], numbering[j]))
-        if bt == Chem.BondType.DOUBLE:
-            dbl_pairs.append((lo, hi))
-        elif bt == Chem.BondType.TRIPLE:
-            if hi != lo + 1:
-                return None  # non-consecutive yne needs compound locant: refuse
-            triple_locs.append(lo)
-    dbl_pairs.sort()
-    triple_locs.sort()
+    # v29 Phase 2 T1: one shared producer for both bond orders (this block and the
+    # cage sibling's computed the same thing twice, and only this copy guarded the
+    # yne). The blanket non-consecutive-yne refusal that used to live here is now
+    # the primitive's, so both paths refuse identically.
+    from .ring_unsaturation import render_ring_unsaturation
+    ring_unsat = render_ring_unsaturation(kek, numbering)
+    if ring_unsat is None:
+        logger.info("analyze_spiro_universal: ring unsaturation not citable; "
+                    "refuse")
+        return None
     unsat = {
-        'double_bond_pairs': dbl_pairs,
-        'double_bonds': [str(lo) if hi == lo + 1 else f"{lo}({hi})"
-                         for lo, hi in dbl_pairs],
-        'triple_bonds': [str(t) for t in triple_locs],
+        'double_bond_pairs': list(ring_unsat.double_pairs),
+        'double_bonds': list(ring_unsat.double_locants),
+        'triple_bonds': list(ring_unsat.triple_locants),
     }
 
     # --- heteroatom skeletal-replacement prefix (P-24.2.4) ---
     hetero_prefix = ""
     if any(sub.GetAtomWithIdx(i).GetSymbol() != 'C'
            for i in range(sub.GetNumAtoms())):
+        # v29 Phase 2 T2a: the SAME skeletal-replacement totality rule the cage
+        # sibling applies. ``_build_hetero_prefix`` was NOT fail-closed here: it
+        # reaches ``polycyclic_bridged.get_heteroatom_prefix``, whose fallback is
+        # ``symbol.lower() + 'a'``, so an off-table skeletal element got an
+        # INVENTED morpheme (``3-znaspiro[5.5]undecane``, ``3-feaspiro[…]``,
+        # ``3-alaspiro[…]``) rather than being refused. ``build_replacement_prefix``
+        # is consulted for ``.unexpressed`` ONLY — the spelling stays with
+        # ``_build_hetero_prefix`` so this path's strings are byte-identical for
+        # the in-table elements (the two builders differ in their λ source and
+        # their >20-multiplier handling).
+        from .ring_replacement import build_replacement_prefix
+        totality = build_replacement_prefix(
+            sub, numbering, set(range(sub.GetNumAtoms())))
+        if totality.unexpressed:
+            logger.info(
+                "analyze_spiro_universal: %d skeletal atom(s) unexpressible by "
+                "the replacement-prefix table; refuse",
+                len(totality.unexpressed))
+            return None
         hp = _build_hetero_prefix(
             sub, set(spiro_sub), set(range(sub.GetNumAtoms())))
         if not hp:
