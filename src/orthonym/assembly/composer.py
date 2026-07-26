@@ -4289,6 +4289,11 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
 
     # Get the heterocycle parent name
     parent_name = name_heterocycle(features.mol, features.principal_ring)
+    if parent_name is None:
+        # A ring heteroatom has no replacement prefix in the governing table, so
+        # the parent cannot be spelled. Refuse before decorating it with
+        # substituents (which would concatenate onto a missing parent).
+        return None
 
     # Check for substituents
     substituents = getattr(features, 'heterocycle_substituents', None)

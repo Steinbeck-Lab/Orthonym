@@ -58,8 +58,21 @@ HW_PREFIXES: Dict[str, str] = {
     # Group 13
     'B': 'bora',
 
-    # Additional elements (less common)
-    'Hg': 'mercura',
+    # NOTE: mercury is deliberately ABSENT. P-22.2.2 [BBv2:8218]: "The elements
+    # aluminium, gallium, indium, and thallium are now included in the recommended
+    # Hantzsch-Widman system and mercury has been deleted." Hg appears in neither
+    # Table 1.5 nor Table 2.4 (only in the Appendix 1 *seniority* list), so
+    # offering ``mercura`` here spelled a prefix the replacement system does not
+    # have. Organomercury is named by P-69 organometallic nomenclature, which
+    # keeps its own ``data/organometallics.METALLACYCLE_A_PREFIX`` -- that is the
+    # legitimate home of Hg/Zn/Cd and is untouched by this removal.
+    #
+    # Al/Ga/In/Tl -- which P-22.2.2 ADDED to Hantzsch-Widman in the same sentence
+    # -- are not listed yet either. Their Table 2.4 spellings are ``aluma``,
+    # ``galla``, ``indiga``, ``thalla`` and they differ from the Table 1.5 forms
+    # (``alumina``, ``galla``, ``inda``, ``thalla``) for Al and In, so adding them
+    # is a context-keyed change that must be verified per element; until then the
+    # consumers fail closed on the missing prefix rather than dropping the atom.
 }
 
 
@@ -114,7 +127,20 @@ def get_hw_prefix(element: str) -> Optional[str]:
         element: Element symbol (e.g., 'O', 'N', 'S')
 
     Returns:
-        HW prefix string (e.g., 'oxa', 'aza', 'thia'), or None if not found
+        HW prefix string (e.g., 'oxa', 'aza', 'thia'), or None if not found.
+
+    ``None`` means the Hantzsch-Widman system has no prefix for this element, so
+    **the caller must refuse** -- it must not skip the atom and emit the ring stem
+    anyway. Skipping is what produced ``inane`` / ``epane`` / ``olane`` for
+    aluminium rings: the heteroatom vanished from the name while the HW stem still
+    counted it toward the ring size.
+
+    This is Table 2.4 (P-22.2.2.1.1), the Hantzsch-Widman context only. General
+    skeletal replacement -- von Baeyer, spiro, chains, rings > 10 -- uses
+    Table 1.5 via ``rules/ring_replacement.HETEROATOM_PREFIXES``, which spells Al
+    and In differently on purpose (``alumina``/``inda`` vs ``aluma``/``indiga``,
+    [BBv2:8245] printing ``aluma`` with an explicit "(not alumina)"). The two
+    tables must not be merged.
 
     Examples:
         >>> get_hw_prefix('O')
@@ -122,6 +148,8 @@ def get_hw_prefix(element: str) -> Optional[str]:
         >>> get_hw_prefix('N')
         'aza'
         >>> get_hw_prefix('C')  # Carbon has no HW prefix
+        None
+        >>> get_hw_prefix('Hg')  # deleted from HW by P-22.2.2
         None
     """
     return HW_PREFIXES.get(element)

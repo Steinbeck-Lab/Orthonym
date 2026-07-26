@@ -497,9 +497,12 @@ def build_hw_name(
     is_saturated: bool,
     is_aromatic: bool,
     lambda_by_locant: Optional[Dict[int, int]] = None,
-) -> str:
+) -> Optional[str]:
     """
     Build Hantzsch-Widman systematic name for a heterocycle.
+
+    Returns ``None`` -- fail closed -- when any heteroatom has no Table 2.4
+    prefix. ``""`` still means "no heteroatoms supplied" and stays distinct.
 
     Assembles a systematic HW name from heteroatom prefixes and ring stem:
     1. Group heteroatoms by element
@@ -580,7 +583,13 @@ def build_hw_name(
     for elem in elements_by_priority:
         hw_prefix = get_hw_prefix(elem)
         if not hw_prefix:
-            continue
+            # FAIL CLOSED. This used to ``continue``, which dropped the
+            # heteroatom from the name while ``ring_size`` still counted it
+            # toward the HW stem -- an aluminium ring came back as the bare stem
+            # ``inane`` (6-membered), ``epane`` (7) or ``olane`` (5), i.e. a
+            # carbocycle's name for a metallacycle. P-22.2.2 has no prefix for
+            # Hg/Zn/Cd at all, so refusing is the only sound answer here.
+            return None
         count = len(element_locants[elem])
         if count > 1:
             multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
@@ -1073,9 +1082,12 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     return ih_prefix + hw
 
 
-def name_heterocycle(mol, ring_atoms) -> str:
+def name_heterocycle(mol, ring_atoms) -> Optional[str]:
     """
     Generate IUPAC name for a heterocyclic ring.
+
+    Returns ``None`` when a ring heteroatom has no replacement prefix in the
+    governing table, so no name can express it (see ``build_hw_name``).
 
     Naming priority:
     1. Check retained names FIRST (pyridine, furan, morpholine, etc.)
@@ -1159,6 +1171,10 @@ def name_heterocycle(mol, ring_atoms) -> str:
         info['is_saturated'],
         info['is_aromatic']
     )
+    if hw_name is None:
+        # A ring heteroatom has no Table 2.4 prefix -> refuse. Returning early
+        # also keeps the indicated-hydrogen step below from doing ``ih + None``.
+        return None
 
     # Post-process: replace OPSIN-incompatible HW stems with the IUPAC-
     # preferred retained STEMS. "oxine"/"thiine" (6-membered unsaturated
@@ -1398,12 +1414,22 @@ def _orient_macrocycle_for_replacement(
     return heteroatom_locants, dbl
 
 
+def _table_1_5_prefix(element: str) -> Optional[str]:
+    """Table-1.5 skeletal replacement prefix (P-15.4.1.1), or None to refuse.
+
+    The single Table-1.5 source, for the ring sizes that are NOT Hantzsch-Widman.
+    """
+    from .ring_replacement import HETEROATOM_PREFIXES
+    entry = HETEROATOM_PREFIXES.get(element)
+    return entry[0] if entry is not None else None
+
+
 def _build_replacement_name(
     heteroatoms: List[Tuple[int, str]],
     ring_size: int,
     is_saturated: bool,
     double_locants: Optional[List[int]] = None,
-) -> str:
+) -> Optional[str]:
     """
     Build replacement ("a") nomenclature name for macrocyclic heterocycles.
 
@@ -1449,9 +1475,18 @@ def _build_replacement_name(
 
     prefix_parts = []
     for elem in elements_by_priority:
-        hw_prefix = get_hw_prefix(elem)
+        # Rings LARGER than 10 are general skeletal replacement, i.e. a
+        # **Table 1.5** context (P-15.4.1.1 lists "rings > 10" explicitly), not
+        # Hantzsch-Widman. Spell from the Table-1.5 source accordingly. The two
+        # tables agree on all 14 elements this path can reach, so this is
+        # byte-identical today; they diverge for Al (``alumina`` vs ``aluma``)
+        # and In (``inda`` vs ``indiga``), where reading the HW table from here
+        # would have produced the wrong one of the two.
+        hw_prefix = _table_1_5_prefix(elem)
         if not hw_prefix:
-            continue
+            # FAIL CLOSED -- see ``build_hw_name``: skipping here dropped the
+            # atom while ``ring_size`` still counted it.
+            return None
 
         locants = sorted(element_locants[elem])
         count = len(locants)

@@ -49,12 +49,27 @@ class TestHWPrefixes:
         ('Sn', 'stanna'),
         ('Pb', 'plumba'),
         ('B', 'bora'),
-        ('Hg', 'mercura'),
     ])
     def test_hw_prefix_lookup(self, element, expected_prefix):
         """Test HW prefix for each supported heteroatom."""
         assert get_hw_prefix(element) == expected_prefix
         assert HW_PREFIXES[element] == expected_prefix
+
+    @pytest.mark.unit
+    def test_mercury_is_deleted_from_hantzsch_widman(self):
+        """P-22.2.2 [BBv2:8218]: "... and mercury has been deleted."
+
+        This case used to assert ``get_hw_prefix('Hg') == 'mercura'``. The Blue
+        Book removed mercury from the Hantzsch-Widman system, and Hg is in
+        neither Table 1.5 nor Table 2.4 -- it appears only in the Appendix 1
+        *seniority* list, which is not a source of 'a' prefixes. Offering
+        ``mercura`` here let a mercury ring be named by replacement nomenclature,
+        which P-22.2.2 forbids; organomercury is named by P-69 organometallic
+        nomenclature, whose own ``data/organometallics.METALLACYCLE_A_PREFIX``
+        retains ``mercura`` for that purpose.
+        """
+        assert get_hw_prefix('Hg') is None
+        assert 'Hg' not in HW_PREFIXES
 
     @pytest.mark.unit
     def test_hw_prefix_unknown_element(self):
