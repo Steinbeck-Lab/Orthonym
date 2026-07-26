@@ -29,13 +29,30 @@ class TestNameWithConfidence:
         assert 'factors' in result
         assert 'handler' in result
 
-    def test_ethanol_high_confidence(self):
-        """Ethanol (retained name) should get high confidence."""
+    def test_ethanol_is_named_correctly_and_reports_unverified(self):
+        """Ethanol takes an early return, so NOTHING scores its coverage.
+
+        v29 C4 re-derivation. This test used to assert
+        ``result['confidence'] == 1.0`` with the comment "Early return path
+        for retained names -> confidence 1.0". That was asserting a
+        FABRICATION, not a behaviour: ``namer.py:2693-2699`` built a metadata
+        record with ``confidence=1.0`` and all four factors at ``1.0``
+        whenever no candidate had been scored, on the reasoning that "Early
+        return paths are high confidence". The same code path certified
+        ``CC(C)(C)OOCCO`` (9 heavy atoms) -> ``'ethan-1-ol'`` (3 heavy atoms)
+        at ``atom_coverage=1.0``.
+
+        "Early return" means nothing measured, not high confidence. The
+        valuable half of this test -- that ethanol is named 'ethanol' -- is
+        kept and strengthened; the fabricated 1.0 is replaced by the honest
+        record. Contract: tests/unit/test_coverage_contract.py.
+        """
         namer = Orthonym()
         result = namer.name_with_confidence("CCO")
         assert result['name'] == "ethanol"
-        # Early return path for retained names -> confidence 1.0
-        assert result['confidence'] == 1.0
+        assert result['confidence'] is None
+        assert result['verification'] == 'unverified'
+        assert result['factors'] == {}
 
     def test_invalid_smiles_raises(self):
         """Invalid SMILES raises ValueError."""
@@ -93,8 +110,20 @@ class TestNameCompoundConfidence:
         ]
         for smi in test_smiles:
             result = name_compound(smi, include_confidence=True)
-            assert 0.0 <= result['confidence'] <= 1.0, \
-                f"confidence out of range for {smi}: {result['confidence']}"
+            # v29 C4: confidence is None when nothing scored the candidate --
+            # the honest third state, not a number out of range. Previously
+            # every one of these molecules reported a FABRICATED 1.0 from
+            # namer.py:2693-2699, so this range check could never fail and
+            # never told us anything. It still forbids an out-of-range float;
+            # it now additionally forbids None from being a lazy escape hatch,
+            # by requiring the unmeasured record to be internally consistent.
+            conf = result['confidence']
+            if conf is None:
+                assert result['verification'] == 'unverified', smi
+                assert result['factors'] == {}, smi
+            else:
+                assert 0.0 <= conf <= 1.0, \
+                    f"confidence out of range for {smi}: {conf}"
             for k, v in result.get('factors', {}).items():
                 assert 0.0 <= v <= 1.0, \
                     f"factor {k} out of range for {smi}: {v}"

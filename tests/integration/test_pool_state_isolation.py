@@ -54,19 +54,55 @@ class TestPoolStateIsolation:
         )
 
     def test_name_with_confidence_after_pool_refactor(self):
-        """Risk 3: store_confidence(pool.best()) preserved at the new
-        return site. name_with_confidence() must still return all 4 keys
-        with non-empty values for a non-trivial molecule."""
+        """Risk 3: store_confidence(pool.best()) preserved at the new return site.
+
+        v29 C4 -- THIS TEST WAS PASSING FOR A FABRICATED REASON, and that is
+        the interesting part. It asserted a non-empty `factors` dict and
+        `handler != 'unknown'` as its detector for a Risk-3 violation (the
+        pool's best candidate not being stored). It was green. But the
+        molecule it used, CCCCCCCCCc1cc(=O)c2ccccc2n1C, does NOT route through
+        candidate scoring any more -- it returns ZERO factors. The test only
+        went green because namer.py:2693-2699 fabricated a record with
+        `handler='direct'` and four 1.0 factors whenever nothing had been
+        scored, which satisfied both assertions while proving nothing.
+
+        So the fabrication was masking this test's own detector: for this
+        molecule the Risk-3 property has not actually been verified for some
+        time. The quinoline's routing drift is PRE-EXISTING (confirmed by
+        head_ab.sh: this file's other failure, test_drift_aryl_*, fails at
+        HEAD too) and is out of scope here.
+
+        Re-derived so the detector works again: assert the Risk-3 property on
+        molecules that provably DO route through the pool, and assert the
+        honest unmeasured contract on the quinoline rather than a fabricated
+        pass. Contract: tests/unit/test_coverage_contract.py.
+        """
         namer = Orthonym()
+
+        # Risk-3 detector, on molecules that really are pool-scored.
+        for smi in ("Nc1ncnc2nc[nH]c12",              # adenine
+                    "Cn1c(=O)c2c(ncn2C)n(C)c1=O"):   # caffeine
+            result = namer.name_with_confidence(smi)
+            assert isinstance(result, dict)
+            assert result.get('name'), f"name missing or empty for {smi}"
+            assert result['factors'], (
+                f"factors empty for {smi} — store_confidence(best) likely "
+                f"missing at the pool-refactor return site (Risk 3 violation)."
+            )
+            assert result['handler'] not in ('unknown', 'unmeasured'), (
+                f"handler={result['handler']!r} for {smi} — the pool's best "
+                f"candidate was not stored (Risk 3 violation)."
+            )
+            assert result['confidence'] is not None, smi
+
+        # The quinoline: still named, and now HONEST about having no
+        # measurement instead of reporting a fabricated perfect score.
         result = namer.name_with_confidence("CCCCCCCCCc1cc(=O)c2ccccc2n1C")
-        assert isinstance(result, dict)
-        assert 'name' in result and result['name'], "name missing or empty"
+        assert result.get('name'), "name missing or empty"
         assert 'confidence' in result, "confidence missing"
-        assert 'factors' in result and result['factors'], "factors empty"
-        assert 'handler' in result and result['handler'] != 'unknown', (
-            "handler defaulted to 'unknown' — store_confidence(best) likely "
-            "missing at the pool-refactor return site (Risk 3 violation)."
-        )
+        if result['confidence'] is None:
+            assert result['verification'] == 'unverified'
+            assert result['factors'] == {}
 
     def test_no_pool_state_leak_across_many_calls(self):
         """Hammer test: 100 sequential name() calls, no growth."""

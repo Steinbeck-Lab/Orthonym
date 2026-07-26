@@ -57,19 +57,38 @@ class TestConfidenceMetadata:
     These tests validate the full API after Task 3 completes.
     """
 
-    def test_benzene_with_confidence(self):
+    # v29 C4 re-derivation of the two tests below.
+    #
+    # Both used to assert `result['confidence'] > 0`. Benzene and pyridine
+    # both take an early return, so no candidate is ever scored for them --
+    # the positive number they were checking came from the fabricated record
+    # at namer.py:2693-2699 (confidence=1.0, all four factors 1.0, emitted
+    # whenever nothing had been scored). The assertion therefore held for a
+    # reason unrelated to what it claimed to test.
+    #
+    # The honest assertion is that an unmeasured candidate SAYS it is
+    # unmeasured. Note that test_caffeine_with_confidence below still asserts
+    # a positive confidence and still passes: caffeine really does route
+    # through candidate scoring, so it is the genuine positive-signal case in
+    # this class. Contract: tests/unit/test_coverage_contract.py.
+
+    def test_benzene_reports_the_shape_and_an_honest_verdict(self):
         result = name_compound("c1ccccc1", include_confidence=True)
         assert isinstance(result, dict)
         assert 'name' in result
         assert 'confidence' in result
         assert 'factors' in result
         assert 'handler' in result
-        assert result['confidence'] > 0
+        assert result['name'] == 'benzene'
+        assert result['confidence'] is None
+        assert result['verification'] == 'unverified'
 
-    def test_pyridine_with_confidence(self):
+    def test_pyridine_reports_the_shape_and_an_honest_verdict(self):
         result = name_compound("c1ccncc1", include_confidence=True)
         assert isinstance(result, dict)
-        assert result['confidence'] > 0
+        assert result['name'] == 'pyridine'
+        assert result['confidence'] is None
+        assert result['verification'] == 'unverified'
 
     def test_caffeine_with_confidence(self):
         result = name_compound("Cn1c(=O)c2c(ncn2C)n(C)c1=O",

@@ -9,11 +9,31 @@ ever discarded.
 Four scoring factors:
   1. ratio         -- name-length / heavy-atom-count heuristic (normalised 0-1)
   2. atom_coverage -- fraction of heavy atoms covered by the parent structure
+     ONLY when ``compute_confidence`` is given ``parent_atom_indices``.  See
+     the PROVENANCE WARNING below: in the production path it never is.
   3. fg_recognition -- fraction of detected FGs with known naming forms
   4. substituent_completeness -- fraction of substituents reflected in the name
 
 Thread-local confidence store allows callers to retrieve metadata after
 assemble_name() returns without changing its str return type.
+
+PROVENANCE WARNING (v29 C4) -- ``factors['atom_coverage']`` is NOT a coverage
+measurement in the production path.  ``CandidatePool.add()``
+(``candidate_pool.py``, "Risk 1" mitigation) deliberately calls
+``compute_confidence`` WITHOUT ``parent_atom_indices`` in order to keep
+confidence byte-identical, and attaches ``parent_atom_indices`` to the
+CandidateName only POST-HOC.  Consequently ``atom_coverage`` is either
+
+  * ``ratio_score`` -- a pure name-LENGTH proxy, numerically identical to
+    ``factors['ratio']`` (provenance ``estimated_name_length``), or
+  * a hard ``1.0`` from the retained-name boost (provenance
+    ``retained_name_boost``).
+
+It is a real fraction-of-atoms measurement (provenance ``measured``) only when
+a caller passes ``parent_atom_indices`` -- which no production caller does.
+Every record therefore carries ``coverage_provenance`` so that no consumer can
+mistake the estimate for a measurement.  Do not remove that field, and do not
+present ``atom_coverage`` as verified coverage without checking it.
 """
 
 import logging
@@ -28,6 +48,53 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only import (avoids runtime cycle
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Verification tri-state and coverage provenance (v29 C4)
+# ---------------------------------------------------------------------------
+# Project invariant: a proof must never be CONFIDENTLY WRONG. Insufficient
+# evidence => 'unverified', never 'verified' and never 'refuted'. Applied here
+# to atom coverage: a record that measured nothing must say so, rather than
+# reporting a number (1.0 OR 0.0) that implies a verdict was reached.
+VERIFICATION_VERIFIED = 'verified'
+VERIFICATION_UNVERIFIED = 'unverified'
+VERIFICATION_REFUTED = 'refuted'
+
+# Where factors['atom_coverage'] came from. See the module PROVENANCE WARNING.
+COVERAGE_MEASURED = 'measured'                        # real |parent| / |heavy|
+COVERAGE_ESTIMATED_NAME_LENGTH = 'estimated_name_length'  # name-length proxy
+COVERAGE_RETAINED_NAME_BOOST = 'retained_name_boost'      # hard-set to 1.0
+
+# Handler sentinel for "no candidate was ever scored". Distinct from 'unknown'
+# (the store's never-written state) so the two can be told apart, and NOT a
+# real handler id -- 'direct' was, which let an unmeasured record masquerade
+# as a scored one.
+HANDLER_UNMEASURED = 'unmeasured'
+
+
+def unmeasured_confidence(name: str = '', handler: str = HANDLER_UNMEASURED) -> dict:
+    """The single honest record for "nothing measured this name's coverage".
+
+    One shared constructor so the ``name()`` path and the
+    ``name_with_confidence()`` path cannot disagree (they did: ``name()``
+    reported ``handler='unknown', confidence=0.0``; ``name_with_confidence()``
+    fabricated ``handler='direct', confidence=1.0`` with all four factors at
+    ``1.0``, i.e. a perfect score on a name nothing had scored).
+
+    ``confidence`` is ``None`` -- not ``1.0`` (a fabricated pass) and not
+    ``0.0`` (a fabricated fail). ``factors`` is empty so no consumer can read
+    an ``atom_coverage`` that was never computed.
+    """
+    return {
+        'name': name,
+        'confidence': None,
+        'verification': VERIFICATION_UNVERIFIED,
+        'factors': {},
+        'coverage_provenance': None,
+        'handler': handler,
+        'atom_to_locant': None,
+        'is_phenol_benzene': None,
+    }
+
 
 # ---------------------------------------------------------------------------
 # CandidateName dataclass
@@ -39,10 +106,21 @@ class CandidateName:
 
     name: str
     handler: str  # 'complex_ring', 'heterocycle', 'benzene', 'chain'
-    confidence: float = 0.0  # 0.0-1.0 aggregate score
+    # 0.0-1.0 aggregate score, or None for "nothing scored this candidate"
+    # (v29 C4). None is NOT a low score -- consumers must branch on it, never
+    # coerce it to 0.0 (a fabricated FAIL) or 1.0 (a fabricated PASS).
+    confidence: Optional[float] = 0.0
     factors: Dict[str, float] = field(default_factory=dict)
     # factors keys: 'ratio', 'atom_coverage', 'fg_recognition',
     #               'substituent_completeness'
+    # v29 C4: provenance of factors['atom_coverage'] -- one of
+    # COVERAGE_MEASURED / COVERAGE_ESTIMATED_NAME_LENGTH /
+    # COVERAGE_RETAINED_NAME_BOOST, or None when factors is empty. Set by
+    # compute_confidence(); purely descriptive, so it cannot perturb the
+    # weighted sum (byte-identical safe). Consumers MUST check it before
+    # treating atom_coverage as a coverage measurement -- in the production
+    # path it is never COVERAGE_MEASURED (see module PROVENANCE WARNING).
+    coverage_provenance: Optional[str] = None
     # New in Phase 145.1: parent atom indices populated POST-HOC by
     # CandidatePool.add() (see candidate_pool.py). Used by
     # ParentCorrectnessScorer to compare against OPSIN-extracted
@@ -459,11 +537,17 @@ def compute_confidence(
     ratio_raw = len(name) / max(total_heavy, 1)
     ratio_score = min(ratio_raw / 1.5, 1.0)
 
-    # Factor 2: heavy atom coverage
+    # Factor 2: heavy atom coverage.
+    # v29 C4: record WHICH of the three things this number actually is. No
+    # production caller passes parent_atom_indices (candidate_pool.add()
+    # withholds it as its "Risk 1" byte-identical mitigation), so in practice
+    # this is the name-length proxy, numerically equal to ratio_score.
     if parent_atom_indices is not None:
         atom_cov = len(parent_atom_indices) / max(total_heavy, 1)
+        coverage_provenance = COVERAGE_MEASURED
     else:
-        atom_cov = ratio_score  # fallback: estimate from name length
+        atom_cov = ratio_score  # fallback: ESTIMATE from name length
+        coverage_provenance = COVERAGE_ESTIMATED_NAME_LENGTH
 
     # Retained name confidence boost (general rule):
     # If the candidate name matches a recognised scaffold name, set all
@@ -485,6 +569,9 @@ def compute_confidence(
         atom_cov = 1.0
         fg_recognition = 1.0
         sub_completeness = 1.0
+        # v29 C4: this 1.0 is an assertion about the NAME being a recognised
+        # scaffold, not a count of covered atoms. Never report it as measured.
+        coverage_provenance = COVERAGE_RETAINED_NAME_BOOST
     else:
         # Factor 3: functional group recognition rate
         fg_recognition = _compute_fg_recognition(features)
@@ -526,6 +613,9 @@ def compute_confidence(
         handler=handler,
         confidence=confidence,
         factors=factors,
+        # v29 C4: descriptive only -- assigned AFTER the weighted sum above,
+        # and never a FACTOR_WEIGHTS key, so confidence stays byte-identical.
+        coverage_provenance=coverage_provenance,
     )
 
 
@@ -617,23 +707,38 @@ def store_confidence(candidate: CandidateName) -> None:
 def retrieve_confidence() -> dict:
     """Retrieve stored confidence metadata as a dict.
 
-    Returns a dict with keys: name, confidence, factors, handler.
-    If no metadata has been stored, returns a default dict with empty values.
+    Returns a dict with keys: name, confidence, verification, factors,
+    coverage_provenance, handler (plus atom_to_locant / is_phenol_benzene).
+
+    When no metadata has been stored the record is the shared honest
+    "unmeasured" record (v29 C4): ``confidence=None``,
+    ``verification='unverified'``, ``factors={}``. ``handler`` stays
+    ``'unknown'`` for that case because the ``name()`` quality gates use
+    ``handler != 'unknown'`` as their "was anything actually scored?" guard.
+
+    ``confidence`` was previously ``0.0`` here. That is a fabricated FAIL --
+    the project invariant is that insufficient evidence yields 'unverified',
+    never a verdict in either direction -- so it is now ``None``. Every
+    production consumer already guards with ``is not None``
+    (``namer.py`` quality gates) or ``.get(..., default)``.
     """
     candidate = getattr(_confidence_store, 'last_candidate', None)
     if candidate is None:
-        return {
-            'name': '',
-            'confidence': 0.0,
-            'factors': {},
-            'handler': 'unknown',
-            'atom_to_locant': None,
-            'is_phenol_benzene': None,
-        }
+        return unmeasured_confidence(name='', handler='unknown')
+    provenance = getattr(candidate, 'coverage_provenance', None)
     return {
         'name': candidate.name,
         'confidence': candidate.confidence,
+        # v29 C4: a scored candidate is only 'verified' with respect to atom
+        # coverage when the coverage number was actually MEASURED. In the
+        # production path it never is (see module PROVENANCE WARNING), so
+        # 'unverified' is the normal -- and honest -- outcome here.
+        'verification': (
+            VERIFICATION_VERIFIED if provenance == COVERAGE_MEASURED
+            else VERIFICATION_UNVERIFIED
+        ),
         'factors': dict(candidate.factors),
+        'coverage_provenance': provenance,
         'handler': candidate.handler,
         # Phase 177 WSB-01 (D-04): surface the POST-HOC authoritative parent
         # locant map + phenol flag for the namer backstop.

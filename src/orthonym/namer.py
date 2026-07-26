@@ -2626,7 +2626,9 @@ class Orthonym:
             ValueError: If SMILES is invalid
         """
         from .assembly.fragment_naming import start_naming_session, end_naming_session, is_top_level_naming
-        from .assembly.coverage_scoring import retrieve_confidence, clear_confidence
+        from .assembly.coverage_scoring import (
+            clear_confidence, retrieve_confidence, unmeasured_confidence,
+        )
         from .metrics.abstention import (
             AbstentionCode, abstention_code_for, clear_abstention,
             record_abstention,
@@ -2657,14 +2659,16 @@ class Orthonym:
                 # Task 1.9 (C8): apply trivial fallback here, mirroring name().
                 _fallback_name = self._apply_trivial_fallback(_limit.message, smiles)
                 _abst = abstention_code_for(_fallback_name)
-                return {
-                    'name': _fallback_name,
-                    'confidence': 0.0,
-                    'factors': {},
-                    'handler': 'fallback',
-                    'limit': _limit.as_dict(),
-                    'abstention': _abst.value if _abst else None,
-                }
+                # v29 C4: nothing scored this either, so report the shared
+                # unmeasured record rather than a fabricated 0.0 (a verdict of
+                # FAIL is as unfounded as a verdict of PASS when no measurement
+                # happened). The 'limit'/'abstention' keys already carry the
+                # out-of-scope signal a consumer needs.
+                _md = unmeasured_confidence(name=_fallback_name,
+                                            handler='fallback')
+                _md['limit'] = _limit.as_dict()
+                _md['abstention'] = _abst.value if _abst else None
+                return _md
             # Universal stereo backstop (Phase 140, STER-16)
             if is_top_level_naming():
                 mol = Chem.MolFromSmiles(smiles)
@@ -2689,16 +2693,22 @@ class Orthonym:
                             name, smiles, self._grammar_stats,
                         )
             metadata = retrieve_confidence()
-            # If no candidate was scored (early return path), build minimal metadata
+            # v29 C4: no candidate was scored (early-return path). This used to
+            # fabricate confidence=1.0 with all four factors at 1.0 and
+            # handler='direct' -- "Early return paths are high confidence" --
+            # so the PUBLIC API reported PERFECT confidence and PERFECT atom
+            # coverage for a name that nothing had scored. Demonstrated defect:
+            # CC(C)(C)OOCCO (9 heavy atoms) emits 'ethan-1-ol' (3 heavy atoms)
+            # and this path certified it at atom_coverage=1.0.
+            #
+            # "Early return" does not mean "high confidence"; it means NOTHING
+            # MEASURED. The honest record says exactly that: confidence=None,
+            # verification='unverified', factors={} (so no consumer can read an
+            # atom_coverage that was never computed), handler='unmeasured'.
+            # Shared with the name() path via one constructor so the two can no
+            # longer disagree.
             if not metadata['name']:
-                metadata = {
-                    'name': name,
-                    'confidence': 1.0,  # Early return paths are high confidence
-                    'factors': {'ratio': 1.0, 'atom_coverage': 1.0,
-                                'fg_recognition': 1.0,
-                                'substituent_completeness': 1.0},
-                    'handler': 'direct',
-                }
+                metadata = unmeasured_confidence(name=name)
             else:
                 # Ensure name matches (the stored candidate should match
                 # what was returned)
@@ -2927,10 +2937,20 @@ class Orthonym:
                 # Only publish when no richer candidate was already stored for
                 # this call (e.g. a ring/Tier-A candidate) — never clobber it.
                 if not _existing.get('name'):
+                    # v29 C4: this candidate exists ONLY to publish
+                    # atom_to_locant to the stereo backstop -- nothing scored
+                    # it, and it carries no factors. It previously claimed
+                    # confidence=1.0, which (a) is a fabricated pass and
+                    # (b) fed the D-01 coverage gate below a handler that is
+                    # neither 'unknown' nor 'retained_name' together with an
+                    # EMPTY factors dict, so the gate's missing-measurement
+                    # default silently read as perfect coverage. confidence
+                    # is None: the gate's `is not None` guard then skips it
+                    # for the same reason it skipped 1.0, but honestly.
                     store_confidence(CandidateName(
                         name=name,
                         handler='chain',
-                        confidence=1.0,
+                        confidence=None,
                         atom_to_locant=dict(features.atom_to_locant),
                     ))
 
@@ -3032,11 +3052,39 @@ class Orthonym:
         # CONTEXT D-29: the fix is upstream (gate scope), NOT a
         # threshold relaxation or postprocessor band-aid.
         # ============================================================
+        # v29 C4 -- the `> 15` size term was REMOVED from this entry test, so
+        # small molecules are no longer excluded from the quality gates
+        # wholesale. Previously a 9-heavy-atom molecule could not reach any
+        # gate at all: the reference defect CC(C)(C)OOCCO -> 'ethan-1-ol'
+        # (six atoms silently dropped) was excluded here, several lines
+        # BEFORE the `conf_handler != 'unknown'` check people assumed was
+        # responsible.
+        #
+        # MEASURED before changing ( widen probe, the
+        # COMPLETE affected population -- all 714 rows of
+        #  with heavy_atoms <= 15, 0 timeouts):
+        #   593 molecules are newly admitted (class GENERAL, HA <= 15)
+        #   garbled token         : 0 fire
+        #   len(name) < 6         : 0 fire
+        #   confidence < 0.30     : 0 fire
+        #   atom_coverage < 0.55  : 0 fire
+        #   => 0 emitted names change. Confirmed by a full A/B naming run
+        #      over the same 714 rows (0 diffs).
+        #
+        # So this widening is behaviour-neutral TODAY and is a reachability
+        # fix only. It does NOT catch the reference defect, and no threshold
+        # tweak here could: nothing stores a candidate for it
+        # (handler='unknown' fails both gates) and the atom_coverage number
+        # is a name-length proxy scoring 'ethan-1-ol' at 0.74, above the 0.55
+        # cut-off, where its REAL coverage is 3/9 = 0.33. The gates become
+        # useful for small molecules only once producer-side atom-coverage
+        # records exist; this removes the size exclusion that would otherwise
+        # still hide them at that point.
         if (not _skip_decomposition
                 and name
-                and result.class_id == StoutClass.GENERAL
-                and mol.GetNumHeavyAtoms() > 15):
+                and result.class_id == StoutClass.GENERAL):
             assembled = name  # local alias for v18-byte-identical body
+            _heavy = mol.GetNumHeavyAtoms()
             _GARBLED_TOKENS = ('cycloane', 'anedicarboxamide', 'aneyl')
             assembled_lower = assembled.lower()
             is_garbled = any(tok in assembled_lower for tok in _GARBLED_TOKENS)
@@ -3044,7 +3092,18 @@ class Orthonym:
             # Also detect stub-only names: when the parent text is empty,
             # the assembly may produce just a bare suffix like "ane" or "ol".
             # A name shorter than 6 chars for a 15+ atom molecule is garbled.
-            if not is_garbled and len(assembled) < 6:
+            #
+            # v29 C4: the `_heavy > 15` term is retained HERE deliberately. The
+            # justification for this heuristic is explicitly size-based (a
+            # 5-char name is damning for a 15+ atom molecule, unremarkable for
+            # a small one), so it is kept inside its stated domain rather than
+            # extended past it. Legitimate short PINs do exist -- 'furan' (5),
+            # 'urea' (4), 'oxane' (5) -- and although those happen to route as
+            # StoutClass.RETAINED_NAME today and so never reach this block,
+            # relying on that would make a size-justified heuristic depend on
+            # an unrelated routing accident. Measured: 0 of the 593 newly
+            # admitted molecules have len(name) < 6 either way.
+            if not is_garbled and _heavy > 15 and len(assembled) < 6:
                 is_garbled = True
 
             if is_garbled:
@@ -3095,11 +3154,46 @@ class Orthonym:
             # positives where retained ring names inflate character-based
             # confidence but atom coverage reveals only partial molecule
             # description.
+            #
+            # v29 C4 -- READ BEFORE TRUSTING THIS GATE. Two facts:
+            #
+            # (1) `atom_cov` here is NOT a coverage measurement. No production
+            #     caller passes parent_atom_indices into compute_confidence
+            #     (candidate_pool.add()'s "Risk 1" byte-identical mitigation),
+            #     so this value is the name-LENGTH proxy -- numerically equal
+            #     to factors['ratio'] -- or a retained-name 1.0. Its
+            #     provenance is published as conf_data['coverage_provenance'].
+            #     The gate is retained AS IS (removing it would un-suppress
+            #     names it currently rejects, which is the unsafe direction),
+            #     but it must not be described as verified coverage, and it
+            #     cannot be relied on to catch atom drops: the reference
+            #     defect CC(C)(C)OOCCO -> 'ethan-1-ol' scores 10/9/1.5 = 0.74
+            #     on this proxy and so passes, while its REAL coverage is
+            #     3/9 = 0.33. A sound gate needs producer-side atom records.
+            #
+            # (2) the missing-measurement default used to be 1.0, i.e. "no
+            #     measurement" read as "perfect coverage" -- fail-open. It is
+            #     LIVE, not latent: the chain-parent path above publishes a
+            #     candidate with handler='chain' and an EMPTY factors dict,
+            #     which clears both guards on this branch and then defaults to
+            #     1.0. Missing is now None and handled explicitly. The gate
+            #     abstains on None (same control flow as the old 1.0, so no
+            #     emitted name changes) because it has nothing sound to gate
+            #     on -- an abstention, not a pass. Making it fail CLOSED here
+            #     would be a suppression change and needs measuring first.
             if (conf_score is not None
                     and conf_handler != 'unknown'
                     and conf_handler != 'retained_name'):
-                atom_cov = conf_data.get('factors', {}).get('atom_coverage', 1.0)
-                if atom_cov < 0.55:
+                _factors = conf_data.get('factors') or {}
+                atom_cov = _factors.get('atom_coverage')
+                if atom_cov is None:
+                    logger.info(
+                        "Atom coverage gate: ABSTAIN (unverified) -- no "
+                        "atom_coverage was measured for handler=%s; not "
+                        "reading a missing measurement as perfect coverage",
+                        conf_handler,
+                    )
+                elif atom_cov < 0.55:
                     # Verify molecule has cleavable bonds before triggering
                     from .decomposition.bond_cleavage import find_cleavable_bonds
                     if find_cleavable_bonds(mol):
@@ -4292,12 +4386,17 @@ def name_compound(smiles: str, style: str = "pin",
             raise
         except Exception as e:
             logger.warning("name_with_confidence failed: %s", e)
-            return {
-                'name': _descriptive_fallback(smiles),
-                'confidence': 0.0,
-                'factors': {},
-                'handler': 'fallback',
-            }
+            # v29 C4: naming raised, so nothing measured anything. Use the one
+            # shared unmeasured record (confidence=None,
+            # verification='unverified') instead of a fabricated 0.0, and
+            # include the 'limit'/'abstention' keys the happy path always sets
+            # so consumers see one stable shape.
+            from .assembly.coverage_scoring import unmeasured_confidence
+            _md = unmeasured_confidence(name=_descriptive_fallback(smiles),
+                                        handler='fallback')
+            _md['limit'] = None
+            _md['abstention'] = None
+            return _md
 
     try:
         result = namer.name(smiles, raise_on_limit=raise_on_limit)

@@ -208,7 +208,17 @@ def test_thread_local_store_clear():
     clear_confidence()
     result = retrieve_confidence()
     assert result['name'] == ''
-    assert result['confidence'] == 0.0
+    # v29 C4: was `== 0.0`. An empty store measured NOTHING, so it now reports
+    # confidence=None / verification='unverified' rather than 0.0 -- which was
+    # a fabricated FAIL, just as the old name_with_confidence() 1.0 was a
+    # fabricated PASS. The project invariant admits no verdict either way on
+    # insufficient evidence. Contract locked by
+    # tests/unit/test_coverage_contract.py.
+    assert result['confidence'] is None
+    assert result['verification'] == 'unverified'
+    assert result['factors'] == {}
+    # 'unknown' is preserved deliberately: the namer quality gates use
+    # handler != 'unknown' as their "was anything actually scored?" guard.
     assert result['handler'] == 'unknown'
 
 

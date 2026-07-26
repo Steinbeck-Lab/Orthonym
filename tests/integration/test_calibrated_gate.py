@@ -125,25 +125,77 @@ DIVERSE_SMILES = [
 
 @pytest.mark.integration
 def test_confidence_range_diverse_molecules():
-    """Confidence scores for diverse molecules must be in [0.0, 1.0]."""
+    """Confidence is either an in-range float or an explicit 'unverified'.
+
+    v29 C4: previously `0.0 <= conf <= 1.0`, which TypeErrors on the honest
+    None and — more importantly — could never fail, because every molecule
+    that took an early return reported a fabricated 1.0 from
+    namer.py:2693-2699. Out-of-range floats are still rejected.
+    """
     for smi in DIVERSE_SMILES:
         result = name_compound(smi, include_confidence=True)
         assert isinstance(result, dict), f"Expected dict for {smi}"
         conf = result.get('confidence', -1)
-        assert 0.0 <= conf <= 1.0, (
-            f"Confidence {conf} out of range for {smi}"
-        )
+        if conf is None:
+            assert result['verification'] == 'unverified', smi
+            assert result['factors'] == {}, smi
+        else:
+            assert 0.0 <= conf <= 1.0, (
+                f"Confidence {conf} out of range for {smi}"
+            )
 
 
 @pytest.mark.integration
-def test_simple_molecules_high_confidence():
-    """Simple molecules (ethane, propane, ethanol, acetic acid) should get confidence >= 0.7."""
-    simple = ["CC", "CCC", "CCO", "CC(=O)O"]
-    for smi in simple:
+def test_simple_molecules_report_unmeasured_not_a_high_score():
+    """v29 C4 re-derivation: this test used to ENCODE THE DEFECT.
+
+    It asserted `conf >= 0.7` for CC / CCC / CCO / CC(=O)O. All four take an
+    early return, so nothing scores them; the >= 0.7 was satisfied purely by
+    the fabricated confidence=1.0 built at namer.py:2693-2699 whenever no
+    candidate had been scored. The same fabrication certified
+    CC(C)(C)OOCCO -> 'ethan-1-ol' -- six of nine heavy atoms dropped -- at
+    atom_coverage=1.0. A test demanding a high score from that machinery was
+    requiring the system to keep fabricating.
+
+    What is actually true, and worth locking: these molecules are named
+    correctly, and the API admits it has no coverage measurement for them.
+    See test_measured_candidate_scores_well below for the other half -- that
+    a candidate which IS scored still scores well.
+    """
+    simple = {"CC": "ethane", "CCC": "propane",
+              "CCO": "ethanol", "CC(=O)O": "acetic acid"}
+    for smi, expected in simple.items():
         result = name_compound(smi, include_confidence=True)
-        conf = result.get('confidence', 0)
-        assert conf >= 0.7, (
-            f"Simple molecule {smi} has confidence {conf}, expected >= 0.7"
+        assert result['name'] == expected, smi
+        assert result['confidence'] is None, (
+            f"{smi} reported confidence {result['confidence']!r}; nothing "
+            f"scored it, so no number is warranted"
+        )
+        assert result['verification'] == 'unverified', smi
+        assert result['factors'] == {}, smi
+
+
+@pytest.mark.integration
+def test_measured_candidate_scores_well():
+    """The other half of the re-derivation above.
+
+    Replacing a fabricated high score with 'unverified' must not lose the
+    ability to detect a real scoring regression. Caffeine and adenine DO route
+    through candidate scoring, so they carry a populated factors dict and a
+    real aggregate confidence -- and it should be high for molecules this
+    well-handled. This is the assertion the old test was trying to make, on a
+    molecule where it is actually meaningful.
+    """
+    for smi in ("Cn1c(=O)c2c(ncn2C)n(C)c1=O", "Nc1ncnc2nc[nH]c12"):
+        result = name_compound(smi, include_confidence=True)
+        assert result['confidence'] is not None, (
+            f"{smi} no longer routes through candidate scoring -- if that is "
+            f"intended, move it to the unmeasured test above; if not, this is "
+            f"the scoring regression this test exists to catch"
+        )
+        assert result['factors'], smi
+        assert result['confidence'] >= 0.7, (
+            f"{smi} scored {result['confidence']}, expected >= 0.7"
         )
 
 
