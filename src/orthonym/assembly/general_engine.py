@@ -1009,7 +1009,21 @@ def _ring_parent_bindings(cage, name: str, parent_block: str
         return single
 
     bindings = [TokenBinding(cage_atoms, parent_token, 'parent')]
-    for _atom_idx, morpheme in tuple(getattr(cage, 'hetero_per_atom', ()) or ()):
+    hetero_per_atom = tuple(getattr(cage, 'hetero_per_atom', ()) or ())
+    if cage.hetero_prefix and not hetero_per_atom:
+        # Defence-in-depth, not a hard access: ``RingAnalysis`` makes this
+        # unreachable for the two forms that exist today (both inherit the
+        # field, neither can omit it), so this is deliberately a warning, not
+        # a raise -- a future third analysis form that inherits the field but
+        # never populates it degrades to the pre-af0d7262 audit finding
+        # (UNBOUND_MORPHEME) rather than a wrong name, and a crash on a naming
+        # path is worse than a silent audit gap. This turns that gap noisy.
+        logger.warning(
+            "_ring_parent_bindings: hetero_prefix=%r but hetero_per_atom is "
+            "empty on %s; no replacement binding will be emitted for this "
+            "morpheme (falls back to the P5 UNBOUND_MORPHEME audit finding)",
+            cage.hetero_prefix, type(cage).__name__)
+    for _atom_idx, morpheme in hetero_per_atom:
         if morpheme not in name:
             continue
         bindings.append(TokenBinding((), morpheme, 'replacement'))

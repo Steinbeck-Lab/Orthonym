@@ -123,7 +123,18 @@ class ReplacementPrefix:
 
 
 def vb_lambda_for_atom(mol, atom_idx: int) -> Optional[int]:
-    """λ bonding number (P-31.1.4.2) for a ring 'a'-prefix atom, or None.
+    """λ bonding number (P-14.1.2 / P-14.1.3; placement P-15.4.1.3; per-topology
+    P-21.2.4 / P-22.2.7 / P-23.6 / P-24.8) for a ring 'a'-prefix atom, or None.
+
+    Correction: earlier comments in this fix's history cited P-31.1.4.2 for the
+    λ-convention itself. That section heading is "If there is a choice of names
+    and numbering..." (BB:16633) -- it governs CHOICE, not the λ symbol. The
+    nonstandard-bonding-number concept is P-14.1.2 (standard) / P-14.1.3
+    (nonstandard); the symbol's placement (immediately after the locant, no
+    hyphen) is P-15.4.1.3; and each parent-hydride topology has its own
+    governing subsection: P-21.2.4 (acyclic), P-22.2.7 (monocyclic), P-23.6
+    (von Baeyer ring 'a'-prefix -- the context THIS function serves), P-24.8
+    (spiro).
 
     Refines the shared ``nonstandard_bonding_number`` with the SKELETAL-DEGREE
     rule that governs ring replacement nomenclature: when an 'a'-replacement name

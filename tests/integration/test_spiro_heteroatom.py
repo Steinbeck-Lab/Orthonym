@@ -156,8 +156,12 @@ def test_hetero_spiro_priority_order_in_existing_helper():
     mol = Chem.MolFromSmiles("C1CC2(CCO1)CCSCC2")
     assert mol is not None
     ring = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
-    prefix = _build_hetero_prefix(mol, set(get_spiro_atoms(mol)), ring)
-    assert prefix is not None, "in-table hetero spiro must still build"
+    result = _build_hetero_prefix(mol, set(get_spiro_atoms(mol)), ring)
+    assert result is not None, "in-table hetero spiro must still build"
+    # ``_build_hetero_prefix`` returns the shared ``ReplacementPrefix`` (a
+    # per-atom decomposition riding alongside the string, af0d7262); unwrap
+    # ``.prefix`` to get the plain string this test asserts ordering on.
+    prefix = result.prefix
     assert prefix.index("oxa") < prefix.index("thia"), (
         f"O must be cited before S (P-25.2 seniority): {prefix!r}"
     )
@@ -168,8 +172,9 @@ def test_hetero_spiro_priority_order_in_existing_helper():
     mol2 = Chem.MolFromSmiles("C1CC2(CCS1)CCOCC2")
     assert mol2 is not None
     ring2 = {a.GetIdx() for a in mol2.GetAtoms() if a.IsInRing()}
-    prefix2 = _build_hetero_prefix(mol2, set(get_spiro_atoms(mol2)), ring2)
-    assert prefix2 is not None
+    result2 = _build_hetero_prefix(mol2, set(get_spiro_atoms(mol2)), ring2)
+    assert result2 is not None
+    prefix2 = result2.prefix
     assert prefix2.index("oxa") < prefix2.index("thia"), (
         f"O must be cited before S regardless of locants: {prefix2!r}"
     )

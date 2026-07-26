@@ -30,6 +30,7 @@ import dataclasses
 import pytest
 from rdkit import Chem
 
+import orthonym.assembly.general_engine as general_engine
 from orthonym.assembly.general_engine import (name_general_ring,
                                                name_general_spiro)
 from orthonym.namer import Orthonym
@@ -96,6 +97,9 @@ SPIRO_CARBO = "C1CCC2(C1)CCCCC2"  # spiro[4.5]decane (carbocyclic control)
 # + 1) and is the only fixture shape under which an unmapped index is visible.
 SUBST_OXA_SPIRO = "CC1CCC2(C1)OCCCC2"     # 2-methyl-6-oxaspiro[4.5]decane
 SUBST_OXA_THIA_SPIRO = "CC1COC2(CSCC2)C1"  # 3-methyl-1-oxa-7-thiaspiro[4.4]nonane
+# The nitrogen twin of DIOXA_SPIRO, same skeleton, same locants -- the CANARY
+# subject below (P5's aza blind spot: see that section).
+DIAZA_SPIRO = "N1CCC2(C1)CNCC2"   # 2,7-diazaspiro[4.4]nonane
 
 
 # --------------------------------------------------------------------------
@@ -383,6 +387,90 @@ def test_spiro_no_longer_reports_unbound_replacement_morpheme(smiles, residues):
 
 
 # ==========================================================================
+# CANARY: P5's aza blind spot, pinned as it is TODAY.
+#
+# ``af0d7262`` recorded (as a comment only, above at DIAZA_CAGE) that this
+# defect class is invisible for nitrogen: P5's glue lexicon lets 'aza' strip
+# cleanly ('a' + 'z' + 'a', all three in ``_GLUE_MORPHEMES`` -- 'a' is
+# left/right connective glue, 'z' rides in on ``_STEREO_WORDS``), so an
+# aza-only fixture reports zero findings whether or not the replacement
+# binding exists. A comment is not a test: nobody would notice if a future
+# change to ``_STEREO_WORDS`` or the lexicon silently widened or closed this
+# hole. These two tests turn the comment into a living assertion.
+#
+# ``test_canary_*`` deliberately REMOVES the 'aza' replacement bindings the
+# real producer emits (reproducing the exact T5 pre-fix shape -- a parent
+# claiming every atom with NO binding corroborating the replacement morpheme)
+# and asserts P5 stays silent. If a lexicon change ever makes this fail, that
+# is GOOD NEWS (the blind spot closed) -- re-derive the test against the new
+# behaviour, do not just delete it or loosen the assertion back to green.
+#
+# ``test_contrast_*`` is the same mutilation on the oxygen twin of the exact
+# same skeleton and locants (``DIOXA_SPIRO``/``DIAZA_SPIRO`` differ only in
+# element), and IS caught -- P5 reports ``UNBOUND_MORPHEME`` for the leftover
+# 'xa'. The contrast is the point: identical defect shape, element-dependent
+# detectability, because the oracle's blind spot is lexical (which residue
+# letters happen to be glue words) and not structural.
+# ==========================================================================
+def test_canary_aza_replacement_binding_omission_is_invisible_to_p5():
+    """PINS the known blind spot: an unbound 'aza' morpheme raises nothing.
+
+    Do not "fix" this test by making it pass some other way if a real aza
+    spiro regresses -- that is the false-negative this test exists to record.
+    It should only ever fail because the LEXICON changed, in which case
+    re-derive it (and celebrate: the blind spot just closed).
+    """
+    mol, res = _emit_spiro(DIAZA_SPIRO)
+    assert res is not None
+    assert res.name == "2,7-diazaspiro[4.4]nonane"
+    reps = _roles(res, 'replacement')
+    assert [b.token for b in reps] == ["aza", "aza"]
+
+    # Deliberately drop the replacement bindings -- the exact T5 pre-fix
+    # shape (parent-only spine) reproduced by construction, not by reverting
+    # source. The parent alone still claims every atom, so P1/P2/P3/P7 stay
+    # clean; only P5 (name residue) is under test here.
+    parent_only = [b for b in res.bindings if b.role != 'replacement']
+    spine = BindingSpine.from_token_bindings(parent_only)
+    proof = verify_spine(mol, spine, res.name, mode='audit')
+    loud = [(f.code, f.detail) for f in proof.findings
+            if f.severity in ('error', 'warn')]
+    assert loud == [], (
+        "canary tripped: P5 now sees the unbound 'aza' -- the lexicon "
+        f"changed and this test must be re-derived, not silenced: {loud}"
+    )
+    assert "UNBOUND_MORPHEME" not in {f.code for f in proof.findings}
+
+
+def test_contrast_oxa_replacement_binding_omission_IS_visible_to_p5():
+    """The oxygen twin of the canary above: the SAME mutilation IS caught.
+
+    Same skeleton, same locants (``DIOXA_SPIRO`` vs ``DIAZA_SPIRO`` differ
+    only in element), same removed-bindings construction. 'oxa' does not
+    strip through the glue lexicon the way 'aza' does ('o' consumes as a
+    connective vowel, but the trailing 'xa' matches no glue morpheme), so P5
+    reports the leftover -- proving the canary's silence above is a genuine
+    lexicon accident, not a broken test harness.
+    """
+    mol, res = _emit_spiro(DIOXA_SPIRO)
+    assert res is not None
+    assert res.name == "2,7-dioxaspiro[4.4]nonane"
+    reps = _roles(res, 'replacement')
+    assert [b.token for b in reps] == ["oxa", "oxa"]
+
+    parent_only = [b for b in res.bindings if b.role != 'replacement']
+    spine = BindingSpine.from_token_bindings(parent_only)
+    proof = verify_spine(mol, spine, res.name, mode='audit')
+    codes = {f.code for f in proof.findings}
+    assert "UNBOUND_MORPHEME" in codes, (
+        "expected the visible half of the contrast to trip -- if it no "
+        "longer does, the glue lexicon widened enough to swallow 'xa' too, "
+        "and the canary above needs re-checking against the same change"
+    )
+    assert 'xa' in proof.stats["residue_runs"], proof.stats
+
+
+# ==========================================================================
 # Anti-drift: the contract, and the requirement that each form FILLS it.
 #
 # ``RingAnalysis`` makes the field list impossible to diverge (both forms
@@ -437,3 +525,71 @@ def test_every_ring_analysis_form_decomposes_its_replacement_prefix(
     assert {idx for idx, _m in analysis.hetero_per_atom} == hetero_atoms
     for idx, morpheme in analysis.hetero_per_atom:
         assert morpheme in analysis.hetero_prefix, (idx, morpheme)
+
+
+# ==========================================================================
+# Defence-in-depth: ``_ring_parent_bindings`` reads ``hetero_per_atom`` via
+# ``getattr(cage, 'hetero_per_atom', ())`` rather than a hard attribute
+# access. The review verdict: sufficient for present scope (``RingAnalysis``
+# makes the field un-omittable by either real form, and the failure mode
+# degrades to the pre-af0d7262 audit finding, never a wrong name), but a
+# THIRD analysis form that inherits the field and never populates it should
+# be noisy, not silent. These tests exercise that ``logger.warning``.
+# ==========================================================================
+def test_ring_parent_bindings_warns_when_hetero_prefix_outruns_hetero_per_atom(
+        caplog):
+    """Simulate the un-reachable-today gap and confirm it is now LOGGED.
+
+    Neither ``UniversalCage`` nor ``SpiroSystem`` can produce this state (see
+    ``test_every_ring_analysis_form_decomposes_its_replacement_prefix``
+    above), so it is manufactured with ``dataclasses.replace`` on a REAL
+    ``SpiroSystem`` -- same type, ``hetero_per_atom`` forced back to ``()``
+    -- which is exactly "inherits the field, never fills it". ``name`` and
+    ``parent_block`` are captured from the actual production call via a spy
+    rather than reconstructed by hand, so this exercises the real argument
+    shapes, not a guess at them.
+    """
+    captured = {}
+    original = general_engine._ring_parent_bindings
+
+    def _spy(cage, name, parent_block):
+        captured['cage'] = cage
+        captured['name'] = name
+        captured['parent_block'] = parent_block
+        return original(cage, name, parent_block)
+
+    general_engine._ring_parent_bindings = _spy
+    try:
+        mol, res = _emit_spiro(OXA_SPIRO)
+    finally:
+        general_engine._ring_parent_bindings = original
+    assert res is not None
+    assert captured['cage'].hetero_prefix, "OXA_SPIRO must exercise the hetero path"
+
+    starved = dataclasses.replace(captured['cage'], hetero_per_atom=())
+
+    with caplog.at_level("WARNING", logger="orthonym.assembly.general_engine"):
+        bindings = general_engine._ring_parent_bindings(
+            starved, captured['name'], captured['parent_block'])
+
+    warnings = [r.getMessage() for r in caplog.records
+                if r.levelname == "WARNING"]
+    assert any("hetero_per_atom" in msg and "hetero_prefix" in msg
+               for msg in warnings), warnings
+    # Degrades to the pre-fix audit gap (no replacement binding) -- never a
+    # crash, never a fabricated binding.
+    assert [b.role for b in bindings] == ['parent']
+
+
+def test_ring_parent_bindings_stays_silent_when_the_fields_agree(caplog):
+    """Contrast: the real (unstarved) producer path must NOT warn.
+
+    Guards against the warning test above passing vacuously because the
+    warning fires unconditionally rather than on the specific mismatch.
+    """
+    with caplog.at_level("WARNING", logger="orthonym.assembly.general_engine"):
+        mol, res = _emit_spiro(OXA_SPIRO)
+    assert res is not None
+    warnings = [r.getMessage() for r in caplog.records
+                if r.levelname == "WARNING"]
+    assert not any("hetero_per_atom" in msg for msg in warnings), warnings
