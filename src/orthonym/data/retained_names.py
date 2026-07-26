@@ -173,7 +173,13 @@ RETAINED_NAMES = {
     "C1CCSCC1": "thiane",
     "C1COCCN1": "morpholine",
     "C1CNCCN1": "piperazine",
-    "O=C1CNCC(=O)N1": "piperazine-2,5-dione",  # Diketopiperazine (IUPAC P-31.1.2)
+    # PA1 sweep: the row `"O=C1CNCC(=O)N1": "piperazine-2,5-dione"` was DELETED.
+    # WRONG STRUCTURE: in that SMILES both carbonyls sit adjacent to the SAME ring
+    # nitrogen, i.e. it is piperazine-2,6-dione (InChIKey CYJAWBVQRMVFEO).
+    # Piperazine-2,5-dione (glycine anhydride) is O=C1CNC(=O)CN1
+    # (BXRNXXXXHLBUKK), verified by independent hand-construction from the ring
+    # definition. It WAS live: O=C1CNCC(=O)N1 emitted "piperazine-2,5-dione".
+    # The true 2,5-dione is named correctly by another path and is unaffected.
 
     # === CYCLOALKANES ===
     "C1CC1": "cyclopropane",
@@ -215,6 +221,68 @@ RETAINED_NAMES = {
     # exact-SMILES retained PIN supplies it; trivial 'carbodiazone' denied in
     # iupac_2013_pin_list.json (--trivial). Canonical key of N=NC(=O)N=N.
     "N=NC(=O)N=N": "bis(diazenyl)methanone",
+
+    # === PA1 R2/R3/R4/R8: PIN word-forms for the deprecated-trivial replacements
+    # (phosgene model). Each trivial name below is denied in
+    # iupac_2013_pin_list.json with its verbatim Blue Book citation. REPRODUCE-
+    # FIRST FINDING that made these entries mandatory rather than optional:
+    # denying the trivial name ALONE does not fail closed here -- it unmasks
+    # pre-existing generators that emit a WRONG name, several of which silently
+    # DROP atoms. Measured, deny-only, before these rows were added:
+    #     N=C=N                  -> "methane"                       (loses N2!)
+    #     [C-]#[N+]O             -> "methane"                       (loses N,O!)
+    #     NC(=S)SC(N)=S          -> "methanamine"                   (loses most of it!)
+    #     OCC(CO)(CO)CO          -> "2,2-di(hydroxymethyl)propane-1,2,3-triol"
+    #                                                               (a 5-OH structure)
+    #     CC(=O)N(C(C)=O)C(C)=O  -> "N-acetyl-1-acetamidoethan-1-imide"
+    #     N=C(N)NC(=N)NC(=N)N    -> "N-guanidinomethaniminylguanidine"
+    #     N=C(N)S                -> "sulfanylmethanimidamide"  (right structure,
+    #                                                            not the PIN)
+    #     NC(=S)SSC(N)=S         -> "1-aminosulfanylidenemethyldisulfanyl
+    #                                 disulfanediylmethanamine"
+    # So a deny-only change would have replaced 8 deprecated names with 8 names
+    # that are worse. Supplying the PIN word-form is the root-cause fix; the
+    # underlying generator defects are logged separately as their own work items.
+    # (fulminic acid, diacetamide and pinacol are NOT listed here -- their
+    # systematic engines already derive the correct PIN unaided, verified.)
+    #
+    # P-66.5.4.1 / P-61.10 -- HO-N=C: ; BB:26052 'N-hydroxy-λ2-methanamine (PIN)'
+    # for the structure drawn at BB:26050. The trivial 'isofulminic acid' is
+    # state (c) NOT ACCEPTABLE (BB:26038). The λ-superscript is rendered with a
+    # plain digit exactly as the on-disk Blue Book renders it in running text
+    # ('λ2 -methylidenehydroxylamine'); this is the first λ descriptor in an
+    # emitted name, and validation/name_morphemes.py already recognises both
+    # 'lambda' and 'λ'. InChI normalises the charge-separated [C-]#[N+]O and the
+    # neutral [C]=NO to one key (OTXBWGUYZNKPMG), so this key IS the BB's HO-N=C:.
+    "[C-]#[N+]O": "N-hydroxy-λ2-methanamine",
+    # P-66.1.6.1.3.2 -- BB:33462 'carbamimidothioic acid (PIN)' / '(not
+    # isothiourea)'; BB:30808 'H2N-C(=NH)-SH carbamimidothioic acid (PIN)'.
+    "N=C(N)S": "carbamimidothioic acid",
+    # P-66.1.6.3 -- BB:33553 "1,2,3-trithiodicarbonic diamide (PIN) (not
+    # 'thiuram monosulfide')".
+    "NC(=S)SC(N)=S": "1,2,3-trithiodicarbonic diamide",
+    # P-66.1.6.3 -- BB:33555 "2-dithioperoxy-1,3-dithiodicarbonic diamide (PIN)
+    # (not 'thiuram disulfide')".
+    "NC(=S)SSC(N)=S": "2-dithioperoxy-1,3-dithiodicarbonic diamide",
+    # P-66.4.1.2.1 -- BB:34298 'The names biguanide, triguanide, etc., are no
+    # longer recommended ... named systematically as the diamides of
+    # imidodicarbonimidic acid, diimidotricarbonimidic acid, and
+    # triimidotetracarbonimidic acid.' triguanide is n=3. The sibling n=2
+    # (N=C(N)NC(=N)N) already emits 'imidodicarbonimidic diamide' unaided, which
+    # is why only the n=3 homologue needs a word-form here.
+    "N=C(N)NC(=N)NC(=N)N": "diimidotricarbonimidic diamide",
+    # P-66.1.2.1 -- BB:33095 condemns 'triacetamide'; the (R-CO)3N shape is named
+    # N,N-diacyl + parent carboxamide per BB:33115, and BB:33119
+    # 'N-acetyl-N-cyclopentylacetamide (PIN)' fixes the acetyl skeleton.
+    "CC(=O)N(C(C)=O)C(C)=O": "N,N-diacetylacetamide",
+    # P-63.1.1.2 -- BB:26782 'pentaerythritol / 2,2-bis(hydroxymethyl)propane-
+    # 1,3-diol (PIN)'. Note the deny-only fallback named it a 1,2,3-TRIOL, i.e. a
+    # different structure, so this row is a correctness fix and not cosmetic.
+    "OCC(CO)(CO)CO": "2,2-bis(hydroxymethyl)propane-1,3-diol",
+    # P-31.1.2.1 -- BB:16523 'The name carbodiimide, for HN=C=NH, is retained but
+    # only for general nomenclature ... The systematic name, methanediimine, is
+    # the preferred IUPAC name.'
+    "N=C=N": "methanediimine",
 
     # === COMMON SOLVENTS AND REAGENTS ===
     "ClCCl": "dichloromethane",
@@ -373,7 +441,15 @@ RETAINED_NAMES = {
     "C1C[Te]CCN1": "telluromorpholine", # Te-for-O morpholine (PIN)
     "C1CN2CCC1CC2": "quinuclidine",
     "C1CCC2NCCCC2C1": "decahydroquinoline",
-    "C1CCN2CCCCC2C1": "decahydroisoquinoline",
+    # PA1 sweep: the row `"C1CCN2CCCCC2C1": "decahydroisoquinoline"` was DELETED.
+    # WRONG STRUCTURE: that SMILES puts the nitrogen at a RING-FUSION atom, which
+    # makes it quinolizidine / octahydro-2H-quinolizine (InChIKey LJPZHJUSICYOIX).
+    # Decahydroisoquinoline has N at position 2, not at a fusion position:
+    # C1CCC2CNCCC2C1 (NENLYAQPNATJSU), verified by independent hand-construction.
+    # It WAS live: C1CCN2CCCCC2C1 emitted "decahydroisoquinoline". Deleted rather
+    # than re-keyed to the true structure, because adding a NEW retained-name
+    # emission is a separate decision (the 2013 PIN would carry the full hydro
+    # locant set, P-31.1.4.2) and this change must not smuggle one in.
 
     # === FATTY ACIDS (Phase 8 expansion) ===
     "CCCCC(=O)O": "pentanoic acid",
@@ -399,7 +475,18 @@ RETAINED_NAMES = {
     "CC=CC=O": "crotonaldehyde",
 
     # === KETONES (Phase 8 expansion) ===
-    "CC(=O)CC(C)(C)C": "pinacolone",
+    # PA1 sweep: the row `"CC(=O)CC(C)(C)C": "pinacolone"` was DELETED. WRONG
+    # STRUCTURE, and unambiguously so -- the formulae differ: that key is C7H14O
+    # (4,4-dimethylpentan-2-one, AZASWMGVGQEVCS), while pinacolone is C6H12O
+    # (3,3-dimethylbutan-2-one, CC(=O)C(C)(C)C, PJGSXYOJTGTZAV). One CH2 too many.
+    # It WAS live: CC(=O)CC(C)(C)C emitted "pinacolone". CORRECTION TO THE PA1
+    # AUDIT, which recorded pinacolone as "currently moot: the molecule names as
+    # 'unknown organic compound' (fail-closed), so nothing wrong ships" -- it did
+    # ship. Deleted rather than re-keyed: 'pinacolone' does not occur anywhere in
+    # the Blue Book, so its PIN status is unestablished and it must not be newly
+    # promoted onto the correct structure. True pinacolone keeps the name it
+    # already gets from the OPSIN-import surface; 4,4-dimethylpentan-2-one now
+    # gets its systematic name.
     "CC(=O)C=C(C)C": "mesityl oxide",
 
     # === DIOLS AND POLYOLS (Phase 8 expansion) ===

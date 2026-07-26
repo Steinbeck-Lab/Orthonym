@@ -6,6 +6,7 @@ Hand-curated entries always take precedence over OPSIN imports on conflict.
 """
 
 import logging
+import os
 from typing import Optional, Dict
 
 from .retained_names import RETAINED_NAMES as _HAND_CURATED_NAMES
@@ -223,10 +224,63 @@ def _is_promotable(smiles: str, name: str) -> bool:
 _OPSIN_NON_PIN_EXCLUSIONS = _PIN_DENY
 
 
+# --- PA1 R5: governing the SECOND retained-name surface -----------------------
+# `opsin_imports/simple_groups.py` carries 423 entries that EVERY ONE tag with
+# ``'is_pin': False``. That flag is a uniform generator default (see
+# , which hard-codes False) and therefore carries zero
+# per-entry information -- and nothing reads it. Two existing tests
+# (tests/unit/data/test_opsin_imports.py, test_opsin_merge_layer.py) actually
+# ASSERT the uniformity, which confirms it is a structural default rather than a
+# curated judgement. The consequence measured by the PA1 audit: 222 of 420
+# nameable entries emit their own trivial name as the headline, with no PIN
+# authority consulted, and 11 of the 12 known non-PIN emissions came from here.
+#
+# The literal reading of ``is_pin: False`` -- "no entry on this surface may be a
+# headline PIN unless the curated allow-list says so" -- is implemented below and
+# gated behind ORTHONYM_GOVERN_OPSIN_SIMPLE_GROUPS=1. It is OFF by default
+# because the measured blast radius over  is large
+# and, critically, is NOT uniformly an improvement: withdrawing a trivial name
+# only helps when the systematic engine derives the correct PIN in its place, and
+# the PA1 R2/R3 work proved that assumption false in 8 of 11 cases (deny-only
+# produced "methane" for N=C=N, "methanamine" for thiuram monosulfide, and a
+# 1,2,3-triol for pentaerythritol). Flipping 423 entries blind would therefore
+# trade a bounded set of non-PIN names for an unbounded set of wrong ones.
+# The individually-adjudicated denies live in iupac_2013_pin_list.json, which is
+# the correct granularity: each carries a Blue Book citation AND a verified
+# replacement. This switch exists so the class can be measured and so the
+# remaining entries can be adjudicated in batches behind a real gate.
+_GOVERN_OPSIN_SIMPLE = (
+    os.environ.get("ORTHONYM_GOVERN_OPSIN_SIMPLE_GROUPS", "").strip() == "1"
+)
+
+try:
+    from .opsin_imports.simple_groups import OPSIN_SIMPLE_GROUPS as _SIMPLE_RAW
+except ImportError:
+    _SIMPLE_RAW = {}
+
+# SMILES keys whose ONLY provenance is the ungoverned simple_groups surface.
+_SIMPLE_GROUP_KEYS = frozenset(_SIMPLE_RAW)
+
+
+def _governed_out(smiles: str, name: str) -> bool:
+    """True iff R5 governance withdraws this OPSIN candidate as a headline name.
+
+    Applies only to the ``simple_groups`` surface, and only to names the curated
+    PIN allow-list does not positively affirm (``pin: true``). Entries already
+    carrying an explicit ``pin: false`` deny are handled by ``_is_promotable``
+    and are unaffected by this switch.
+    """
+    if not _GOVERN_OPSIN_SIMPLE:
+        return False
+    if smiles not in _SIMPLE_GROUP_KEYS:
+        return False
+    return name.lower().strip() not in _PIN_ALLOW
+
+
 # Phase 150 D-02: REFACTORED _OPSIN_NAMES filter (single-signal -> 3-signal AND).
 _OPSIN_NAMES: Dict[str, str] = {
     smi: name for smi, name in _OPSIN_NAMES_RAW.items()
-    if _is_promotable(smi, name)
+    if _is_promotable(smi, name) and not _governed_out(smi, name)
 }
 
 _stem_count = len(_OPSIN_NAMES_RAW) - len(_OPSIN_NAMES)
@@ -292,6 +346,11 @@ def _opsin_blocked_solely_by_deny(smiles: str, name: str) -> bool:
 _GENERAL_OPSIN: Dict[str, str] = {
     smi: name for smi, name in _OPSIN_NAMES_RAW.items()
     if _opsin_blocked_solely_by_deny(smi, name)
+    # PA1 R5: a name withdrawn from the PIN headline by the governance switch is
+    # still a legitimate general-nomenclature name, so it must remain reachable
+    # via --trivial -- exactly as the explicit pin:false denies are. Without this
+    # the switch would delete names outright instead of demoting them.
+    or (_governed_out(smi, name) and _is_promotable(smi, name))
 }
 _GENERAL_HAND_CURATED: Dict[str, str] = {
     smi: name for smi, name in _HAND_CURATED_NAMES.items()

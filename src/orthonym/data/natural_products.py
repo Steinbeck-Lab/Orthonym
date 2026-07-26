@@ -298,14 +298,24 @@ NATURAL_PRODUCT_DERIVATIVES = {
         "limonene",
     "CC1=CCC2CC1C2(C)C":
         "alpha-pinene",
-    "CC1(C)C2=CCC1CC2":
-        "beta-pinene",
+    # PA1 sweep: the row `"CC1(C)C2=CCC1CC2": "beta-pinene"` was DELETED. WRONG
+    # STRUCTURE, unambiguous by formula: that key is C9H14, while beta-pinene is
+    # C10H16 (6,6-dimethyl-2-methylidenebicyclo[3.1.1]heptane) -- a whole carbon
+    # is missing, and the key's alkene is endocyclic where beta-pinene's is the
+    # exocyclic methylidene. It WAS live: this SMILES emitted "beta-pinene".
+    # NATURAL_PRODUCT_DERIVATIVES is an exact-canonical-SMILES lookup (see
+    # namer.py), not a scaffold matcher, so a wrong key is a wrong name, not a
+    # loose pattern. The sibling "alpha-pinene" key is C10H16 and verifies clean.
     "CC1=CCC(C(C)(C)O)CC1":
         "alpha-terpineol",
     "C=C(C)C1CCC(C)(O)CC1":
         "beta-terpineol",
-    "C=CCC(O)CC=C(C)C":
-        "gamma-terpineol",
+    # PA1 sweep: the row `"C=CCC(O)CC=C(C)C": "gamma-terpineol"` was DELETED.
+    # WRONG STRUCTURE, unambiguous by formula AND by ring count: that key is an
+    # ACYCLIC C9H16O, while gamma-terpineol is a monocyclic C10H18O. It WAS live:
+    # this SMILES emitted "gamma-terpineol". The CORRECT gamma-terpineol key
+    # already exists a few rows below ("CC(C)=C1CCC(C)(O)CC1"), which verifies
+    # clean, so deleting this stale duplicate loses no coverage.
     # 4-terpineol (OPSIN)
     "CC1=CCC(O)(C(C)C)CC1":
         "4-terpineol",

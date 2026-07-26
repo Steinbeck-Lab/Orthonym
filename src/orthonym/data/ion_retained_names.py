@@ -147,7 +147,16 @@ RETAINED_CATIONS = {
     '[CH2+]C': 'ethylium',
     '[CH2+]CC': 'propylium',
     '[CH2+]C(C)C': 'isobutylium',
-    'C[C+](C)C': 'isopropylium',  # Secondary carbocation (tert-butyl cation)
+    # PA1 sweep: the row `'C[C+](C)C': 'isopropylium'` was DELETED. WRONG
+    # STRUCTURE, as its own former comment ("tert-butyl cation") conceded:
+    # C[C+](C)C is the 2-methylpropan-2-ylium / tert-butyl cation, C4H9+, a
+    # TERTIARY cation. isopropylium is the propan-2-yl cation C[CH+]C, C3H7+.
+    # The formulae differ, so this is not an isomer mix-up but a different
+    # compound, and it WAS live: C[C+](C)C emitted "isopropylium". Deleted rather
+    # than re-keyed, because 'isopropylium' is itself a non-PIN form (the
+    # substitutive PIN is propan-2-ylium, P-73), so re-keying would trade a
+    # wrong-structure emission for a non-PIN one. Now falls through to the
+    # systematic cation namer.
     '[CH2+]C(C)(C)C': 'neopentylium',  # Primary carbocation adjacent to tert-butyl
 
     # Aromatic cations
@@ -241,7 +250,15 @@ INORGANIC_ANIONS = {
     # Oxygen-containing anions (canonical forms)
     'O=[N+]([O-])[O-]': 'nitrate',
     'O=[N+][O-]': 'nitrite',
-    'O=[SH](=O)[O-]': 'sulfate',  # Note: RDKit canonical form
+    # PA1 sweep: the row `'O=[SH](=O)[O-]': 'sulfate'` was DELETED. WRONG
+    # STRUCTURE: that key is HO3S- (hydrogensulfite / bisulfite, HSO3-), not
+    # sulfate (O4S2-). The formulae differ by a whole oxygen. The WS-E.3 fix
+    # already diagnosed this key as broken -- see the _canonicalize_anion_table
+    # comment below, which names it as "the WS-E.3 sulfate-key bug" -- and added
+    # the correct dianion key immediately after, but left the wrong key in place.
+    # It was NOT merely dead: 'O=[SH](=O)[O-]' is RDKit-canonical and did match,
+    # so bisulfite emitted "sulfate". Removed; the correct sulfate key below, and
+    # the distinct 'sulfite'/'hydrogensulfate' rows, are unaffected.
     # SO4(2-) bare dianion of sulfuric acid (P-12.2 / BlueBookV2.md:35449); the
     # legacy 'O=[SH](=O)[O-]' key above was a -1 [SH] form that never matched the
     # real fully-deprotonated dianion '[O-]S(=O)(=O)[O-]' (canonical O=S(=O)([O-])[O-]).
