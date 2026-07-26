@@ -242,6 +242,17 @@ _COMPOUND_S_SUFFIXES_COMPLEX = (
     'disulfanyl',
 )
 
+# v29 C4-C: roots that are NOT a substituent group — a chalcogen suffix carrying
+# only one of these is still a SIMPLE prefix and must stay bare. 'disulfanyl' is
+# 'di' + 'sulfanyl' (terminal -S-SH), 'trisulfanyl' is 'tri' + 'sulfanyl', and
+# so on: the leading morpheme multiplies the chalcogen chain rather than naming a
+# substituent on it. Without this carve-out the general rule below would enclose
+# a bare '(disulfanyl)'.
+_MULTIPLYING_PREFIX_ROOTS = frozenset({
+    'di', 'tri', 'tetra', 'penta', 'hexa', 'hepta', 'octa',
+    'bis', 'tris', 'tetrakis',
+})
+
 # Functional group prefixes that, when fused with alkyl roots, form compound
 # substituents requiring enclosing marks per IUPAC P-14.5.2.
 # Hoisted to module level for performance (was recreated inside needs_brackets).
@@ -805,6 +816,30 @@ def needs_brackets(name: str) -> bool:
         if name_lower.endswith(s_suffix):
             acyl = name_lower[: -len(s_suffix)]
             if acyl and (acyl.endswith("oyl") or acyl in ("acetyl", "formyl")):
+                return True
+
+    # v29 C4-C (P-16.3.3): ANY substituent root carrying a chalcogen suffix is a
+    # compound prefix, not just the alkyl/hydride-stem roots enumerated above.
+    # The root loop at :792 is keyed on _ALKYL_ROOTS_FULL + _HYDRIDE_STEM_ROOTS,
+    # so aryl ('phenyl'), cycloalkyl ('cyclohexyl') and alkoxy ('methoxy',
+    # 'tert-butoxy') roots all fell through and shipped UNENCLOSED. That is a
+    # wrong-structure defect, not a style one: '2-phenyldisulfanylethan-1-ol'
+    # reparses as 2-phenyl + disulfanyl (OPSIN -> CC(O)SSc1ccccc1, a DIFFERENT
+    # molecule), which is why SELF-01 suppressed it.
+    # The Blue Book requires the marks for exactly these roots:
+    #   '4-(phenylsulfanyl)piperidine (PIN)'        BB 27832
+    #   '(methoxysulfanyl)cyclohexane (PIN)'        BB 27914
+    #   '[(methoxysulfanyl)oxy]methane (PIN)'       BB 39479
+    #   'methyl 4-[(phenylsulfanyl)sulfonyl]naphthalene-1-carboxylate (PIN)' BB 31717
+    # Stated as a RULE over the root rather than a longer list, because every
+    # extension of that list has leaked the next root (this is the third such
+    # gap found in this predicate family). A bare chalcogen prefix keeps its
+    # simple status: the root must be non-empty and must not be a mere
+    # multiplying prefix ('disulfanyl' itself, 'trisulfanyl').
+    for s_suffix in _COMPOUND_S_SUFFIXES_COMPLEX:
+        if name_lower.endswith(s_suffix):
+            root = name_lower[: -len(s_suffix)]
+            if root and root not in _MULTIPLYING_PREFIX_ROOTS:
                 return True
 
     # W2F-P2 (P-16.3.3): benzyl-based oxy/chalcogen prefixes (benzyloxy,
