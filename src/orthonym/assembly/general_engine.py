@@ -730,7 +730,9 @@ def _emit_ring_from_analysis(
 ) -> Optional[GeneralEngineResult]:
     """v27 P3: shared ring-emission tail — ring suffix (P-6x) + substituent
     recursion (P-29.2) + charge suffix + parent-scope stereo — for a
-    ``UniversalCage`` OR ``SpiroSystem`` analysis (identical field shape).
+    ``UniversalCage`` OR ``SpiroSystem`` analysis -- two forms of the ONE field
+    contract declared in ``rules/vonbaeyer_universal.RingAnalysis`` (they inherit
+    it and add nothing, so a field added there reaches both by construction).
 
     Extracted verbatim from ``name_general_ring`` so the spiro parent producer
     (``name_general_spiro``) reuses the whole tail — ``_RING_SUFFIX_STYLES``,

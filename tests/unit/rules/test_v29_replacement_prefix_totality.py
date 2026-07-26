@@ -330,12 +330,23 @@ def test_spiro_prefix_builder_fails_closed_at_function_level():
 
 
 def test_spiro_prefix_builder_still_builds_in_table():
+    """The string is unchanged, and now arrives with its per-atom decomposition.
+
+    The builder returns the shared ``ReplacementPrefix`` so the atom each morpheme
+    spells comes from the loop that spelled it -- the spiro half of the
+    ``hetero_per_atom`` contract (``vonbaeyer_universal.RingAnalysis``).
+    """
     from orthonym.rules.spiro import _build_hetero_prefix
     from orthonym.perception.rings import get_spiro_atoms
     mol = Chem.MolFromSmiles('C1CCC2(CC1)CCOCC2')
     spiro_atoms = set(get_spiro_atoms(mol))
     ring = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
-    assert _build_hetero_prefix(mol, spiro_atoms, ring) == '3-oxa'
+    result = _build_hetero_prefix(mol, spiro_atoms, ring)
+    assert result.prefix == '3-oxa'
+    oxygen = next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'O')
+    assert result.per_atom == ((oxygen, 'oxa'),)
+    # This builder refuses instead of reporting an inexpressible atom.
+    assert result.unexpressed == ()
 
 
 def test_spiro_prefix_builder_refuses_unlocated_heteroatom():

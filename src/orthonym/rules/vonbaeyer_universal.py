@@ -28,25 +28,62 @@ MAX_CAGE_RINGS = 8
 
 
 @dataclass(frozen=True)
-class UniversalCage:
-    descriptor: str                 # e.g. "bicyclo[2.2.1]"
+class RingAnalysis:
+    """The ONE field contract ``_emit_ring_from_analysis`` consumes.
+
+    Why this base exists (v29 Phase 2 T5 follow-up)
+    -----------------------------------------------
+    ``UniversalCage`` (von Baeyer) and ``SpiroSystem`` (spiro) are two ring
+    analysis forms feeding ONE shared emission tail, so the tail is written
+    against a field shape rather than a class. That shape used to be stated
+    TWICE -- ``SpiroSystem`` re-declared ``UniversalCage``'s fields by hand --
+    and the two copies drifted every time either producer was touched:
+
+    * ``4e0a13d1``: the skeletal-replacement TOTALITY gate was added to the
+      spiro analyzer only, so a mercury von-Baeyer ring shipped as
+      ``bicyclo[3.3.0]octane`` -- a hydrocarbon name;
+    * ``c931432a``: ``hetero_per_atom`` was added to the cage only, so the
+      spiro sibling kept the ``UNBOUND_MORPHEME`` finding that commit existed
+      to remove.
+
+    Opposite directions, same cause: a contract maintained in parallel. It is
+    declared here ONCE. The subclasses add NO fields -- they exist for their
+    names (repr, ``isinstance``, per-form docs), not to extend the shape -- so
+    a field added to the emission contract reaches BOTH producers by
+    construction. Declaring a field is not populating it, so the other half of
+    the guarantee is a test asserting each form actually fills it
+    (``tests/unit/validation/test_v29_p2_ring_parent_bindings.py``).
+    """
+
+    descriptor: str                 # e.g. "bicyclo[2.2.1]" / "spiro[4.5]"
     total_atoms: int
     hetero_prefix: str              # "" | "7-oxa" | "2,5-diaza" ...
     unsaturation: dict              # {'double_bonds': [...], 'triple_bonds': [...]}
-    cage_atoms: Tuple[int, ...]     # ORIGINAL mol indices
-    atom_to_locant: Dict[int, int]  # ORIGINAL idx -> VB locant
-    canon_match: Tuple[int, ...]    # canon idx -> orig idx
-    is_mancude: bool = False        # aromatic/mancude cage; True only under the
-                                    # opt-in complete tier (allow_mancude), where
-                                    # the cage emits as a kekulized VB polyene
+    cage_atoms: Tuple[int, ...]     # ORIGINAL (input-mol) indices
+    atom_to_locant: Dict[int, int]  # ORIGINAL idx -> ring locant
+    canon_match: Tuple[int, ...]    # index map back to ORIGINAL indices
+    is_mancude: bool = False        # aromatic/mancude ring system; True only
+                                    # under the opt-in complete tier
+                                    # (allow_mancude), where it emits as a
+                                    # kekulized polyene
     # v29 Phase 2 T5: which ORIGINAL atom each morpheme of ``hetero_prefix``
     # spells -- (orig idx, morpheme), e.g. ((6, 'oxa'),). Carried so a consumer
     # can bind one token per replacement morpheme instead of letting the parent
-    # token over-claim the heteroatoms it does not spell. Defaults to () so a
-    # hand-built or differently-shaped cage stays valid; () means "not reported"
-    # and consumers must fall back to whole-cage attribution, NOT assume the
-    # cage is all-carbon.
+    # token over-claim the heteroatoms it does not spell. MUST come from the
+    # same builder that spelled ``hetero_prefix`` (never a second, differently
+    # -spelling one) so the decomposition agrees with the string by
+    # construction. Defaults to () so a hand-built or foreign-shaped analysis
+    # stays valid; () means "not reported" and consumers must fall back to
+    # whole-parent attribution, NOT assume the ring is all-carbon.
     hetero_per_atom: Tuple[Tuple[int, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class UniversalCage(RingAnalysis):
+    """von Baeyer polycyclic analysis. Adds no field to ``RingAnalysis``.
+
+    ``canon_match`` here is the canonical-copy index map: canon idx -> orig idx.
+    """
 
 
 def audit_von_baeyer_descriptor(
@@ -275,18 +312,15 @@ def analyze_cage_universal(
 
 
 @dataclass(frozen=True)
-class SpiroSystem:
-    """Same field shape as ``UniversalCage`` so ``_emit_ring_from_analysis``
-    (the shared general-engine ring tail) is analysis-form-agnostic."""
-    descriptor: str                 # e.g. "spiro[4.5]" / "dispiro[3.2.3.2]"
-    total_atoms: int
-    hetero_prefix: str              # "" | "6-oxa" | "2-oxa-6-thia" ...
-    unsaturation: dict              # {'double_bonds':[...], 'triple_bonds':[...],
-                                    #  'double_bond_pairs':[...]}
-    cage_atoms: Tuple[int, ...]     # ORIGINAL (input-mol) indices
-    atom_to_locant: Dict[int, int]  # ORIGINAL idx -> spiro locant
-    canon_match: Tuple[int, ...]    # canon idx -> orig idx (identity here)
-    is_mancude: bool = False
+class SpiroSystem(RingAnalysis):
+    """Spiro ring-system analysis. Adds no field to ``RingAnalysis``.
+
+    The field shape is INHERITED, not re-declared: this class used to restate
+    ``UniversalCage``'s fields by hand and the two lists drifted twice (see
+    ``RingAnalysis``). ``descriptor`` is ``"spiro[4.5]"`` / ``"dispiro[3.2.3.2]"``
+    and ``canon_match`` is the sorted original cage-atom tuple (the analysis
+    works on a ring-only submol, so there is no separate canonical copy to map).
+    """
 
 
 def audit_spiro_descriptor(
@@ -500,6 +534,7 @@ def analyze_spiro_universal(
 
     # --- heteroatom skeletal-replacement prefix (P-24.2.4) ---
     hetero_prefix = ""
+    hetero_per_atom: Tuple[Tuple[int, str], ...] = ()
     if any(sub.GetAtomWithIdx(i).GetSymbol() != 'C'
            for i in range(sub.GetNumAtoms())):
         # v29 Phase 2 T2a: the SAME skeletal-replacement totality rule the cage
@@ -529,9 +564,17 @@ def analyze_spiro_universal(
             return None
         hp = _build_hetero_prefix(
             sub, set(spiro_sub), set(range(sub.GetNumAtoms())))
-        if not hp:
+        if hp is None:
             return None  # hetero present but prefix underivable -> fail closed
-        hetero_prefix = hp
+        hetero_prefix = hp.prefix
+        # v29 Phase 2 T5 (sibling completion): the per-morpheme decomposition of
+        # the prefix, in ORIGINAL indices -- the same field, from the same
+        # builder-that-spelled-it discipline, as the cage sibling above. Without
+        # it the shared emission tail binds no token to ``oxa``/``thia`` and P5
+        # reports the morpheme as name text nothing accounts for, which is the
+        # exact finding T5 removed on the cage while leaving it live here.
+        hetero_per_atom = tuple(sorted(
+            (sub_to_mol[k], morpheme) for k, morpheme in hp.per_atom))
 
     total_atoms = sub.GetNumAtoms()
     cage_orig = tuple(sorted(cage_set))
@@ -546,4 +589,5 @@ def analyze_spiro_universal(
         atom_to_locant=atom_to_locant,
         canon_match=tuple(cage_orig),
         is_mancude=is_mancude,
+        hetero_per_atom=hetero_per_atom,
     )

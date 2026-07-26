@@ -25,9 +25,13 @@ Examples:
     dispiro[2.1.2.1]octane - three rings sharing two spiro centers
 """
 
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
+
+if TYPE_CHECKING:  # ``_build_hetero_prefix``'s return type. Import-time-free:
+    # the runtime import stays function-local, matching this module's habit.
+    from .ring_replacement import ReplacementPrefix
 
 from ..perception.rings import get_spiro_atoms
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
@@ -1152,8 +1156,9 @@ def name_spiro_system(mol):
     )
 
     if has_heteroatoms:
-        hetero_prefix = _build_hetero_prefix(mol, spiro_atoms_set, ring_atoms_to_check)
-        if not hetero_prefix:
+        replacement = _build_hetero_prefix(
+            mol, spiro_atoms_set, ring_atoms_to_check)
+        if replacement is None:
             # FAIL CLOSED. Falling through to the bare ``descriptor + parent``
             # below would emit a HYDROCARBON name for a heteroatom-containing
             # spiro system -- ``spiro[5.5]undecane`` for an Sc/V/Tl/Po ring --
@@ -1161,7 +1166,7 @@ def name_spiro_system(mol):
             # morpheme spells the heteroatom. That is the same wrong-structure
             # shape as the invented ``ala`` prefix, just silent instead of loud.
             return None
-        name = f"{hetero_prefix}{descriptor}{parent_name}"
+        name = f"{replacement.prefix}{descriptor}{parent_name}"
         return (name, ring_atoms_to_check, atom_to_locant, False)
 
     name = f"{descriptor}{parent_name}"
@@ -1172,7 +1177,7 @@ def _build_hetero_prefix(
     mol,
     spiro_atoms_set: Set[int],
     ring_atoms: Set[int],
-) -> Optional[str]:
+) -> Optional['ReplacementPrefix']:
     """
     Build the skeletal replacement 'a' prefix for heterospiro compounds.
 
@@ -1181,6 +1186,25 @@ def _build_hetero_prefix(
 
     Returns ``None`` -- fail closed -- whenever any skeletal non-carbon ring atom
     cannot be expressed, so the caller emits no name at all.
+
+    Returns the shared ``ring_replacement.ReplacementPrefix``: ``.prefix`` is the
+    string (byte-identical to what this builder always returned) and ``.per_atom``
+    is ``(atom_idx, morpheme)`` for every heteroatom that string spells, built in
+    the SAME loop that spells it. ``.unexpressed`` is always ``()`` -- this builder
+    REFUSES rather than reporting an inexpressible atom, and the totality gate
+    below is what guarantees that.
+
+    Why the decomposition is returned and not re-derived by callers
+    --------------------------------------------------------------
+    A consumer that needs to know which atom each morpheme spells (the binding
+    spine binds one token per replacement morpheme) previously had no source for
+    it on this path, and the spiro analyzer simply reported none -- the
+    ``UNBOUND_MORPHEME`` half of the ``c931432a`` sibling drift. The available
+    shortcut -- read ``build_replacement_prefix(...).per_atom`` instead -- would
+    take the STRING from this builder and the DECOMPOSITION from a different one:
+    the two agree on all 14 Table-1.5 stems today, but "two tables that agree
+    today" is exactly the latent wrong-prefix bug documented below for Al/In. A
+    decomposition must come from the speller, so the speller returns it.
 
     Why the totality gate is HERE and not only in the callers
     --------------------------------------------------------
@@ -1195,7 +1219,7 @@ def _build_hetero_prefix(
     caller safe by construction, which is what the sibling-drift that caused this
     defect actually calls for.
     """
-    from .ring_replacement import build_replacement_prefix
+    from .ring_replacement import ReplacementPrefix, build_replacement_prefix
 
     n_spiro = len(spiro_atoms_set)
 
@@ -1235,19 +1259,26 @@ def _build_hetero_prefix(
     if not heteroatom_info:
         return None
 
-    # Group each element's (locant, lambda) records. The lambda bonding
-    # number (P-31.1.4.2) is None for standard-valence atoms.
-    by_element: Dict[str, List[Tuple[int, Optional[int]]]] = {}
+    # Group each element's (locant, lambda, atom_idx) records. The lambda bonding
+    # number (P-31.1.4.2) is None for standard-valence atoms. ``atom_idx`` is
+    # carried through so the per-atom decomposition below is produced by the loop
+    # that spells the morpheme, not reconstructed from the locants afterwards.
+    by_element: Dict[str, List[Tuple[int, Optional[int], int]]] = {}
     for locant, symbol, atom_idx in heteroatom_info:
         lam = _nonstandard_bonding_number(mol, atom_idx)
-        by_element.setdefault(symbol, []).append((locant, lam))
+        by_element.setdefault(symbol, []).append((locant, lam, atom_idx))
 
     # Cite elements in skeletal-replacement seniority order
     # (P-25.3.1.3 / hw_heteroatoms: O > S > Se > Te > N > P > ... > Si > B),
     # replacing the old hard-coded list (which omitted Te/Ge/As/Sb).
     prefix_parts = []
+    per_atom: List[Tuple[int, str]] = []
     for element in sort_heteroatoms_by_priority(list(by_element.keys())):
-        entries = sorted(by_element[element])  # by locant, then lambda
+        # Sort on the LOCANT only. A numbering is a bijection, so no two atoms of
+        # one element share a locant and nothing below the first key is ever
+        # compared -- but the old bare ``sorted()`` would have compared a
+        # ``lambda`` of ``None`` against an ``int`` and raised if one ever did.
+        entries = sorted(by_element[element], key=lambda e: e[0])
         # Spiro replacement is a **Table 1.5** context (P-24.2.4), so the prefix
         # comes from the Table-1.5 source only. This line used to read
         # ``get_hw_prefix(element) or get_heteroatom_prefix(element)``, consulting
@@ -1267,17 +1298,29 @@ def _build_hetero_prefix(
         mult = get_multiplier_prefix(count, prefix_name)
         locant_tokens = [
             (f"{loc}lambda{lam}" if lam is not None else str(loc))
-            for loc, lam in entries
+            for loc, lam, _idx in entries
         ]
         locant_str = ','.join(locant_tokens)
         prefix_parts.append(f"{locant_str}-{mult}{prefix_name}")
+        # One entry per HETEROATOM (not per distinct morpheme): a multiplied
+        # morpheme -- ``dioxa`` -- is written once but spells ``oxa`` once per
+        # multiplicand, so a consumer binding one token per entry matches what
+        # the name says. ``prefix_name`` is the exact stem just spelled above.
+        per_atom.extend((idx, prefix_name) for _loc, _lam, idx in entries)
 
     if not prefix_parts:
         return None
 
     # Join parts with hyphens; no trailing hyphen -- the last 'a' prefix
     # connects directly to the spiro descriptor (e.g., "2-oxa-6-thiaspiro")
-    return '-'.join(prefix_parts)
+    return ReplacementPrefix(
+        prefix='-'.join(prefix_parts),
+        per_atom=tuple(sorted(per_atom)),
+        # This builder refuses (returns None) instead of reporting an
+        # inexpressible atom -- the totality gate above is what makes that true,
+        # so every atom it reaches is in ``per_atom``.
+        unexpressed=(),
+    )
 
 
 def get_rings_from_spiro_center(
