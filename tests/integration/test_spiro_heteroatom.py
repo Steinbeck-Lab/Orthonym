@@ -137,13 +137,41 @@ def test_hetero_spiro_no_new_prefix_builder():
 @pytest.mark.integration
 def test_hetero_spiro_priority_order_in_existing_helper():
     """IUPAC P-25.2 priority order O > S > Se > N > P > Si > B is honored
-    by the existing _build_hetero_prefix function."""
-    import inspect
+    by the existing _build_hetero_prefix function.
+
+    Asserted BEHAVIOURALLY. This test used to grep the function's source for the
+    literal list ``['O', 'S', 'Se', 'N', 'P', 'Si', 'B']`` (or merely for the
+    substrings ``'O'`` and ``'N'``). That hard-coded list is gone: ordering is
+    delegated to ``hw_heteroatoms.sort_heteroatoms_by_priority``, the canonical
+    seniority source, which also covers the Te/Ge/As/Sb/Bi/Sn/Pb rows the literal
+    list omitted. A substring lock cannot tell correct delegation from a
+    regression, and it fails on any refactor that improves the code; citing the
+    prefixes in the wrong order is what actually matters, so test that.
+    """
+    from orthonym.perception.rings import get_spiro_atoms
     from orthonym.rules.spiro import _build_hetero_prefix
-    src = inspect.getsource(_build_hetero_prefix)
-    assert "['O', 'S', 'Se', 'N', 'P', 'Si', 'B']" in src or \
-           "'O'" in src and "'N'" in src, (
-        "_build_hetero_prefix must encode IUPAC priority order"
+
+    # 3-oxa / 9-thia on a spiro[5.5]undecane: O must be cited BEFORE S even
+    # though this places them on ascending locants anyway ...
+    mol = Chem.MolFromSmiles("C1CC2(CCO1)CCSCC2")
+    assert mol is not None
+    ring = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    prefix = _build_hetero_prefix(mol, set(get_spiro_atoms(mol)), ring)
+    assert prefix is not None, "in-table hetero spiro must still build"
+    assert prefix.index("oxa") < prefix.index("thia"), (
+        f"O must be cited before S (P-25.2 seniority): {prefix!r}"
+    )
+
+    # ... and the seniority order must NOT be an artefact of locant order: here
+    # the senior O carries the HIGHER locant, so a locant-sorted implementation
+    # would cite thia first.
+    mol2 = Chem.MolFromSmiles("C1CC2(CCS1)CCOCC2")
+    assert mol2 is not None
+    ring2 = {a.GetIdx() for a in mol2.GetAtoms() if a.IsInRing()}
+    prefix2 = _build_hetero_prefix(mol2, set(get_spiro_atoms(mol2)), ring2)
+    assert prefix2 is not None
+    assert prefix2.index("oxa") < prefix2.index("thia"), (
+        f"O must be cited before S regardless of locants: {prefix2!r}"
     )
 
 

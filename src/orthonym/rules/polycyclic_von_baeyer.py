@@ -180,6 +180,12 @@ def name_higher_polycyclo(mol) -> Optional[str]:
             prefix = _generate_heteroatom_prefix(
                 mol, heteroatoms, ring_atoms, numbering=numbering
             )
+            if prefix is None:
+                # A skeletal atom has no Table-1.5 replacement prefix (or no
+                # locant). Interpolating None here would literally spell
+                # "Nonetetracyclo[...]"; emitting the bare descriptor would name
+                # a cage whose stem counts an atom no morpheme spells. Refuse.
+                return None
             return f"{prefix}{descriptor}{parent_name}"
         return f"{descriptor}{parent_name}"
     except (ValueError, KeyError, IndexError) as e:

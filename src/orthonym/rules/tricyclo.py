@@ -688,6 +688,11 @@ def _name_higher_polycyclo_system(mol, classification: str) -> Optional[str]:
 
     if heteroatoms:
         prefix = _generate_heteroatom_prefix(mol, heteroatoms, ring_atoms, numbering=numbering)
+        if prefix is None:
+            # A skeletal atom is unexpressible: emitting ``descriptor+parent``
+            # here would name a cage whose stem counts an atom no morpheme in the
+            # name spells (a wrong structure, not a coverage gap).
+            return None
         return f"{prefix}{descriptor}{parent_name}"
 
     return f"{descriptor}{parent_name}"
@@ -698,21 +703,51 @@ def _generate_heteroatom_prefix(
     heteroatoms: List[Tuple[int, str]],
     ring_atoms: Set[int],
     numbering: Optional[Dict[int, int]] = None
-) -> str:
+) -> Optional[str]:
     """
-    Generate IUPAC heteroatom replacement prefix.
+    Generate the IUPAC heteroatom replacement prefix for a higher-polycyclo cage.
 
-    Format: "2,5-dioxa-8-aza-" etc.
+    Format: "2,5-dioxa-8-aza" (no trailing hyphen -- P-23.3.1 attaches the
+    'a' prefix directly to the descriptor).
+
+    Returns ``None`` -- fail closed -- when any skeletal non-carbon atom cannot be
+    expressed. ``""`` means "nothing to express" (a carbocyclic cage) and stays
+    distinct from ``None``.
+
+    Why this delegates instead of building its own prefix
+    ---------------------------------------------------
+    This was a third independent implementation of Table-1.5 replacement, and it
+    disagreed with the canonical one in four separate ways, each a wrong-name
+    generator:
+
+    * its ``priority_order`` listed only ``O S Se N P Si B``, so Te/As/Sb/Bi/Ge/
+      Sn/Pb fell through to a trailing "remaining elements" loop and were cited
+      OUT of Table-1.5 seniority order;
+    * that loop called ``get_heteroatom_prefix`` when it still fabricated
+      ``symbol.lower() + 'a'``, so a Te cage produced ``7-tea...`` rather than
+      ``tellura``;
+    * ``numbering.get(idx, idx + 1)`` INVENTED a locant when the numbering did
+      not reach the atom;
+    * the multiplier fell back to ``f"{count}-"`` past penta, spelling
+      ``1,2,3,4,5,6-6-oxa``.
+
+    ``ring_replacement.build_replacement_prefix`` is the single Table-1.5 source
+    and already handles seniority order, λ tokens, multiplying prefixes and the
+    no-trailing-hyphen rule, and it reports ``unexpressed`` so this path can
+    refuse instead of guessing.
 
     Args:
         mol: RDKit Mol object
-        heteroatoms: List of (atom_idx, symbol) tuples
+        heteroatoms: List of (atom_idx, symbol) tuples. Retained for the existing
+            call signature; the primitive re-derives them from ``ring_atoms``,
+            which is what makes an atom missing from this list impossible to drop.
         ring_atoms: Set of ring atom indices
         numbering: Optional VB numbering map (atom_idx -> IUPAC locant).
                    If None, generates numbering via VonBaeyerAnalyzer.
 
     Returns:
-        Prefix string or empty string
+        Prefix string, ``""`` when there is nothing to express, or ``None`` to
+        refuse.
     """
     if not heteroatoms:
         return ""
@@ -727,65 +762,14 @@ def _generate_heteroatom_prefix(
         except Exception:
             numbering = {}
 
-    from .polycyclic_bridged import get_heteroatom_prefix
+    from .ring_replacement import build_replacement_prefix
 
-    # Group by element, using VB numbering for locants
-    by_element: Dict[str, List[int]] = {}
-    for idx, symbol in heteroatoms:
-        if symbol not in by_element:
-            by_element[symbol] = []
-        # Use VB numbering locant, fall back to idx+1 if not in map
-        locant = numbering.get(idx, idx + 1)
-        by_element[symbol].append(locant)
-
-    # Generate prefix parts
-    prefix_parts = []
-
-    # Priority order for heteroatoms: O, S, Se, N, P, Si, B
-    priority_order = ['O', 'S', 'Se', 'N', 'P', 'Si', 'B']
-
-    for element in priority_order:
-        if element in by_element:
-            locants = sorted(by_element[element])
-            locant_strs = [str(loc) for loc in locants]
-
-            prefix_name = get_heteroatom_prefix(element)
-
-            # Multiplier prefix
-            count = len(locants)
-            if count == 1:
-                mult = ""
-            elif count == 2:
-                mult = "di"
-            elif count == 3:
-                mult = "tri"
-            elif count == 4:
-                mult = "tetra"
-            elif count == 5:
-                mult = "penta"
-            else:
-                mult = f"{count}-"
-
-            locant_str = ",".join(locant_strs)
-            prefix_parts.append(f"{locant_str}-{mult}{prefix_name}")
-
-    # Handle any remaining elements not in priority order
-    for element in by_element:
-        if element not in priority_order:
-            locants = sorted(by_element[element])
-            prefix_name = get_heteroatom_prefix(element)
-            count = len(locants)
-            mult = "" if count == 1 else ("di" if count == 2 else ("tri" if count == 3 else f"{count}-"))
-            prefix_parts.append(f"{','.join(str(loc) for loc in locants)}-{mult}{prefix_name}")
-
-    if prefix_parts:
-        # S1 (v24): replacement 'a'-prefix attaches directly to the descriptor
-        # (P-23.3.1) — no trailing hyphen. (This higher-polycyclo path is currently
-        # unreachable from production, but fix the latent class-bug twin so it can
-        # never surface if wired up; its callers concatenate prefix+descriptor.)
-        return "-".join(prefix_parts)
-
-    return ""
+    replacement = build_replacement_prefix(mol, numbering, set(ring_atoms))
+    if replacement.unexpressed:
+        # Off-table element, or an atom the numbering does not reach: no locant
+        # and no morpheme, while the cage stem still counts it.
+        return None
+    return replacement.prefix
 
 
 # ============================================================================

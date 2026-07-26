@@ -487,15 +487,21 @@ def analyze_spiro_universal(
     if any(sub.GetAtomWithIdx(i).GetSymbol() != 'C'
            for i in range(sub.GetNumAtoms())):
         # v29 Phase 2 T2a: the SAME skeletal-replacement totality rule the cage
-        # sibling applies. ``_build_hetero_prefix`` was NOT fail-closed here: it
-        # reaches ``polycyclic_bridged.get_heteroatom_prefix``, whose fallback is
-        # ``symbol.lower() + 'a'``, so an off-table skeletal element got an
-        # INVENTED morpheme (``3-znaspiro[5.5]undecane``, ``3-feaspiro[…]``,
-        # ``3-alaspiro[…]``) rather than being refused. ``build_replacement_prefix``
-        # is consulted for ``.unexpressed`` ONLY — the spelling stays with
-        # ``_build_hetero_prefix`` so this path's strings are byte-identical for
-        # the in-table elements (the two builders differ in their λ source and
-        # their >20-multiplier handling).
+        # sibling applies. ``build_replacement_prefix`` is consulted for
+        # ``.unexpressed`` ONLY — the spelling stays with ``_build_hetero_prefix``
+        # so this path's strings are byte-identical for the in-table elements (the
+        # two builders differ in their λ source and their >20-multiplier handling).
+        #
+        # ``_build_hetero_prefix`` now applies this same gate INTERNALLY, so this
+        # block is no longer the only thing standing between an off-table element
+        # and an invented morpheme (it previously was, which is why the OTHER
+        # caller — the PIN ``name_spiro_system`` — shipped ``3-alaspiro[…]``).
+        # It is kept deliberately: the gate here runs against the numbering THIS
+        # function computed (which may carry a free-valence bias via
+        # ``suffix_ring_atoms``), whereas the builder re-derives its own numbering
+        # unbiased. The two agree on element membership but not necessarily on
+        # which atoms the numbering reaches, so keeping both makes the refusal
+        # independent of that difference.
         from .ring_replacement import build_replacement_prefix
         totality = build_replacement_prefix(
             sub, numbering, set(range(sub.GetNumAtoms())))

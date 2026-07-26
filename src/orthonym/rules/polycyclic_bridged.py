@@ -526,23 +526,46 @@ def get_ring_heteroatoms(mol, ring_atoms: Set[int]) -> List[Tuple[int, str]]:
     return heteroatoms
 
 
-def get_heteroatom_prefix(symbol: str) -> str:
+def get_heteroatom_prefix(symbol: str) -> Optional[str]:
     """
-    Get the IUPAC replacement prefix for a heteroatom.
-    
+    Get the Table-1.5 skeletal replacement ('a') prefix for a heteroatom.
+
+    Returns ``None`` for any element the table does not carry. **Callers must
+    fail closed on ``None``** -- never substitute a derived string.
+
+    Why there is no fallback
+    -----------------------
+    This function used to end ``return prefixes.get(symbol, symbol.lower()+'a')``
+    over a local 7-entry dict, i.e. it *generated* a prefix for every element it
+    did not know. The Blue Book's 'a'-prefix set is a CLOSED list (P-15.4.1.1:
+    "Those related to these recommendations are listed in Table 1.5"), not a
+    derivation rule, so a generated prefix is fabricated nomenclature. It is not
+    even close for the elements that matter: the fallback spelled ``asa``,
+    ``sba``, ``bia``, ``sna``, ``pba``, ``gea``, ``tea`` where the Blue Book has
+    ``arsa``, ``stiba``, ``bisma``, ``stanna``, ``plumba``, ``germa``,
+    ``tellura``, and ``ala`` for aluminium (``alumina`` in Table 1.5). That
+    shipped ``2-alaspiro[5.5]undecane`` -- a plausible-looking wrong name rather
+    than an honest refusal.
+
+    The table itself is not duplicated here: it is
+    ``ring_replacement.HETEROATOM_PREFIXES``, the single Table-1.5 source. The
+    retired local dict (O N S Se P Si B) was a strict subset of it with identical
+    spellings, so this is byte-identical for those seven elements and correctly
+    spells the seven it was missing (Te As Sb Bi Ge Sn Pb) instead of inventing
+    them.
+
+    This is the von Baeyer / spiro (Table 1.5) context. Hantzsch-Widman
+    monocycles use Table 2.4, which deliberately differs for Al and In
+    (``aluma``/``indiga`` vs ``alumina``/``inda``); see ``data/hw_heteroatoms``.
+    Do not merge the two.
+
     Args:
-        symbol: Element symbol (O, N, S, etc.)
-        
+        symbol: Element symbol (O, N, S, ...)
+
     Returns:
-        IUPAC prefix (oxa, aza, thia, etc.)
+        The IUPAC replacement prefix (oxa, aza, thia, ...), or ``None`` when the
+        element is off-table and the caller must refuse.
     """
-    prefixes = {
-        'O': 'oxa',
-        'N': 'aza',
-        'S': 'thia',
-        'Se': 'selena',
-        'P': 'phospha',
-        'Si': 'sila',
-        'B': 'bora',
-    }
-    return prefixes.get(symbol, symbol.lower() + 'a')
+    from .ring_replacement import HETEROATOM_PREFIXES
+    entry = HETEROATOM_PREFIXES.get(symbol)
+    return entry[0] if entry is not None else None

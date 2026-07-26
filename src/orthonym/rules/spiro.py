@@ -32,11 +32,18 @@ from rdkit import Chem
 from ..perception.rings import get_spiro_atoms
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
 # Phase 151-04 WR-01: shared IUPAC P-25.3.1.3 heteroatom priority (halogen-aware).
-# v22 G4: get_hw_prefix (clean 'a'-prefix table; get_heteroatom_prefix has typos
-# like Te->'tea') + sort_heteroatoms_by_priority for skeletal-replacement order.
+# ``sort_heteroatoms_by_priority`` supplies the skeletal-replacement CITATION
+# order. The 'a'-prefix SPELLING comes from ``get_heteroatom_prefix`` above, i.e.
+# from Table 1.5 -- the correct table for the spiro/von Baeyer contexts in this
+# module. ``get_hw_prefix`` (Table 2.4, Hantzsch-Widman monocycles) used to be
+# consulted first here and is deliberately no longer imported: the two tables
+# disagree by design for Al and In (``aluma``/``indiga`` vs ``alumina``/``inda``),
+# so reaching into the HW table from a non-HW context is a wrong-prefix bug. The
+# v22 G4 note this comment replaced justified the HW-first order by saying
+# ``get_heteroatom_prefix`` "has typos like Te->'tea'" -- that was not a typo but
+# its ``symbol.lower() + 'a'`` fabrication fallback, which is now removed.
 from ..data.hw_heteroatoms import (
     get_heteroatom_priority,
-    get_hw_prefix,
     sort_heteroatoms_by_priority,
 )
 # Phase 151-02 D-11/D-20: locant comparator reuse — no parallel comparator
@@ -1146,9 +1153,16 @@ def name_spiro_system(mol):
 
     if has_heteroatoms:
         hetero_prefix = _build_hetero_prefix(mol, spiro_atoms_set, ring_atoms_to_check)
-        if hetero_prefix:
-            name = f"{hetero_prefix}{descriptor}{parent_name}"
-            return (name, ring_atoms_to_check, atom_to_locant, False)
+        if not hetero_prefix:
+            # FAIL CLOSED. Falling through to the bare ``descriptor + parent``
+            # below would emit a HYDROCARBON name for a heteroatom-containing
+            # spiro system -- ``spiro[5.5]undecane`` for an Sc/V/Tl/Po ring --
+            # because ``parent_name`` counts every skeletal atom while no
+            # morpheme spells the heteroatom. That is the same wrong-structure
+            # shape as the invented ``ala`` prefix, just silent instead of loud.
+            return None
+        name = f"{hetero_prefix}{descriptor}{parent_name}"
+        return (name, ring_atoms_to_check, atom_to_locant, False)
 
     name = f"{descriptor}{parent_name}"
     return (name, ring_atoms_to_check, atom_to_locant, False)
@@ -1164,7 +1178,25 @@ def _build_hetero_prefix(
 
     Generates prefix strings like "2,8-dioxa", "2-oxa-6-thia" using
     spiro numbering locants and IUPAC priority ordering.
+
+    Returns ``None`` -- fail closed -- whenever any skeletal non-carbon ring atom
+    cannot be expressed, so the caller emits no name at all.
+
+    Why the totality gate is HERE and not only in the callers
+    --------------------------------------------------------
+    P-24.2.4 spiro replacement is a Table-1.5 context, and that table is a CLOSED
+    list. This builder has two callers: ``name_spiro_system`` (the PIN spiro
+    dispatch, tried BEFORE the general engine) and
+    ``vonbaeyer_universal.analyze_spiro_universal``. Only the second one checked
+    ``build_replacement_prefix(...).unexpressed``, so the PIN path reached
+    ``polycyclic_bridged.get_heteroatom_prefix``'s ``symbol.lower() + 'a'``
+    fallback and shipped ``2-alaspiro[5.5]undecane`` -- ``ala`` is not a Blue Book
+    term. Gating inside the builder makes both callers safe, and any future third
+    caller safe by construction, which is what the sibling-drift that caused this
+    defect actually calls for.
     """
+    from .ring_replacement import build_replacement_prefix
+
     n_spiro = len(spiro_atoms_set)
 
     if n_spiro == 1:
@@ -1176,6 +1208,15 @@ def _build_hetero_prefix(
     if not numbering:
         return None
 
+    # TOTALITY GATE (P-23.3.1 / P-24.2.4). The shared primitive owns the
+    # Table-1.5 element set and reports every skeletal atom it cannot spell:
+    # an off-table element, or an in-table one the numbering does not reach (no
+    # locant to cite). Refuse before spelling anything -- a ring stem must never
+    # count an atom that no morpheme in the name spells.
+    totality = build_replacement_prefix(mol, numbering, set(ring_atoms))
+    if totality.unexpressed:
+        return None
+
     from ..assembly.naming_utils import get_multiplier_prefix
 
     heteroatom_info = []
@@ -1184,8 +1225,12 @@ def _build_hetero_prefix(
         symbol = atom.GetSymbol()
         if symbol != 'C':
             locant = numbering.get(atom_idx)
-            if locant is not None:
-                heteroatom_info.append((locant, symbol, atom_idx))
+            if locant is None:
+                # Unreachable: the gate above already reported this atom as
+                # unexpressed. Kept as an assertion of the invariant rather than
+                # the silent ``continue`` that used to drop the atom here.
+                return None
+            heteroatom_info.append((locant, symbol, atom_idx))
 
     if not heteroatom_info:
         return None
@@ -1203,7 +1248,18 @@ def _build_hetero_prefix(
     prefix_parts = []
     for element in sort_heteroatoms_by_priority(list(by_element.keys())):
         entries = sorted(by_element[element])  # by locant, then lambda
-        prefix_name = get_hw_prefix(element) or get_heteroatom_prefix(element)
+        # Spiro replacement is a **Table 1.5** context (P-24.2.4), so the prefix
+        # comes from the Table-1.5 source only. This line used to read
+        # ``get_hw_prefix(element) or get_heteroatom_prefix(element)``, consulting
+        # the Hantzsch-Widman table (Table 2.4) FIRST from a non-HW context. The
+        # two tables agree on all 14 elements this path can reach, so dropping the
+        # HW consultation is byte-identical today -- but they disagree by design
+        # for Al (``aluma`` vs ``alumina``) and In (``indiga`` vs ``inda``), which
+        # made the HW-first order a latent wrong-prefix bug the moment either
+        # table gained a metal. The gate above already refused anything off-table.
+        prefix_name = get_heteroatom_prefix(element)
+        if prefix_name is None:
+            return None  # unreachable past the gate; never fabricate
         count = len(entries)
         # Shared multiplying-prefix generator (di/tri/.../hexa/hepta/octa...)
         # — replaces the old penta-capped dict that emitted the malformed
@@ -3642,6 +3698,8 @@ def _hw_bracket_name(heteroatoms: List[Tuple[int, str]], ring_size: int) -> str:
     # locant prefix into square brackets with element-citation order.
     from ..data.hw_heteroatoms import HETEROATOM_PRIORITY as _HP
     plain = build_hw_name(heteroatoms, ring_size, True, False)
+    if not plain:
+        return None  # HW has no prefix for one of these elements -> refuse
     # Strip the leading 'x,y-' locant prefix build_hw_name emits.
     import re as _re
     m = _re.match(r'^[\d,]+-(.+)$', plain)
@@ -3750,6 +3808,8 @@ def _name_hw_monocycle_component(
         # then apply the bracket convention.
         from .heterocycles import build_hw_name
         plain = build_hw_name(numbered_het, ring_size, False, True)
+        if not plain:
+            return None  # HW has no prefix for one of these elements -> refuse
         if len(numbered_het) > 1:
             import re as _re
             m = _re.match(r'^[\d,]+-(.+)$', plain)
@@ -4019,7 +4079,19 @@ def _spiro_vb_a_prefix(
     heteroatoms of a von-Baeyer CAGE component, cited before 'spiro'. Returns the
     prefix string ('' when there are no heteroatoms), or None (fail-closed) if a
     heteroatom is the spiro atom, has a nonstandard bonding number (λ family),
-    or cannot be located deterministically."""
+    is off the Table-1.5 replacement list, or cannot be located deterministically.
+
+    This is the THIRD spiro-context speller in the tree (with
+    ``_build_hetero_prefix`` and the shared ``build_replacement_prefix``) and it
+    carried the same ``get_hw_prefix(...) or get_heteroatom_prefix(...)`` line,
+    hence the same ``symbol.lower() + 'a'`` fabrication. It is gated by element
+    membership rather than by the shared primitive because its locants come from
+    a primed/unprimed component pair, not from one flat ``numbering`` map, so the
+    primitive's signature does not apply here -- the closed-table membership test
+    is the part that must not diverge.
+    """
+    from .ring_replacement import HETEROATOM_PREFIXES
+
     hetero = [
         a for a in a_expressible
         if mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6)
@@ -4036,6 +4108,8 @@ def _spiro_vb_a_prefix(
         if _nonstandard_bonding_number(mol, a) is not None:
             return None  # λ heteroatom -> Tasks 8-11
         sym = mol.GetAtomWithIdx(a).GetSymbol()
+        if sym not in HETEROATOM_PREFIXES:
+            return None  # off Table 1.5: no morpheme exists -> refuse
         if a in unprimed_map:
             loc = unprimed_map[a]
             token = str(loc)
@@ -4050,7 +4124,11 @@ def _spiro_vb_a_prefix(
     parts = []
     for element in sort_heteroatoms_by_priority(list(by_element.keys())):
         entries = sorted(by_element[element], key=lambda t: t[1])
-        prefix_name = get_hw_prefix(element) or get_heteroatom_prefix(element)
+        # Table 1.5 context (P-24.5.2), as in ``_build_hetero_prefix``: do not
+        # consult the Hantzsch-Widman table from here.
+        prefix_name = get_heteroatom_prefix(element)
+        if prefix_name is None:
+            return None  # unreachable past the membership gate; never fabricate
         mult = get_multiplier_prefix(len(entries), prefix_name)
         locs = ','.join(t[0] for t in entries)
         parts.append(f"{locs}-{mult}{prefix_name}")
