@@ -291,15 +291,26 @@ SILA22_LEGACY_PREFIX = (
 
 
 def test_multiplicity_past_the_table_is_unexpressed_but_prefix_unchanged():
-    """``prefix`` must keep the legacy (malformed) string: three PIN callers
-    concatenate it, and withholding the part there would turn a malformed name
-    into one that silently drops 22 skeletal atoms. The atoms are reported
-    ``unexpressed`` instead, so the general tier refuses."""
+    """``prefix`` must keep the legacy (malformed) string, and the WRAPPER must
+    now refuse outright.
+
+    The primitive's ``prefix`` contract is unchanged: it still reports the legacy
+    ``22sila`` string, because that field is defined as byte-identical to what the
+    retired inline builder produced for every input.
+
+    ``get_heteroatom_replacement_prefix`` no longer passes that string on. This
+    test used to assert that it did, on the reasoning that "withholding the part
+    there would turn a malformed name into one that silently drops 22 skeletal
+    atoms" -- true only while the wrapper's ``-> str`` signature gave its three
+    PIN callers no way to refuse. Now that it returns ``Optional[str]`` and the
+    callers refuse on ``None``, refusing is strictly better than emitting a name
+    containing ``22sila``: both alternatives were wrong, and only this one emits
+    nothing.
+    """
     mol, numbering, ring_atoms = _vb(SILA22)
     res = build_replacement_prefix(mol, numbering, ring_atoms)
     assert res.prefix == SILA22_LEGACY_PREFIX
-    assert get_heteroatom_replacement_prefix(
-        mol, numbering, ring_atoms) == SILA22_LEGACY_PREFIX
+    assert get_heteroatom_replacement_prefix(mol, numbering, ring_atoms) is None
     assert res.unexpressed == tuple(sorted(ring_atoms))
     assert res.per_atom == ()
 

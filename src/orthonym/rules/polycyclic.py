@@ -1783,7 +1783,9 @@ from .ring_replacement import (  # noqa: E402,F401  (re-export)
 )
 
 
-def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms: Set[int]) -> str:
+def get_heteroatom_replacement_prefix(
+    mol, numbering: Dict[int, int], ring_atoms: Set[int],
+) -> Optional[str]:
     """
     Generate the 'a' replacement-nomenclature prefix for ring heteroatoms.
 
@@ -1800,16 +1802,25 @@ def get_heteroatom_replacement_prefix(mol, numbering: Dict[int, int], ring_atoms
         ring_atoms: Set of atom indices in the ring system
 
     Returns:
-        Formatted prefix string (e.g. "7-oxa"), or "" if no heteroatom is
-        expressed.
+        Formatted prefix string (e.g. "7-oxa"); ``""`` when there is no
+        heteroatom to express; or ``None`` when some skeletal atom CANNOT be
+        expressed, in which case **the caller must refuse**.
 
-    NOTE: this signature CANNOT report an atom it failed to express, which is how
-    an off-table skeletal element used to be dropped from the name while still
-    counting toward the ring stem. Any caller that must fail closed (i.e. every
-    general-tier caller) has to use ``build_replacement_prefix`` directly and
-    check ``.unexpressed``.
+    The ``None`` case is the fix for what this docstring used to concede: the old
+    ``-> str`` signature could not report an atom it failed to express, so an
+    off-table skeletal element was dropped from the name while the ring stem kept
+    counting it. Its three PIN von Baeyer callers
+    (``name_polycyclic_with_heteroatoms``, ``name_polycyclic_complete``,
+    ``bicyclo.get_complete_bicyclo_data``) rested on an unverified assumption that
+    such an element never reaches them; they now get the signal instead of the
+    proof obligation. ``""`` and ``None`` are deliberately distinct -- ``if not
+    prefix`` would conflate "carbocycle" with "refuse", so callers test
+    ``is None``.
     """
-    return _build_ring_replacement_prefix(mol, numbering, ring_atoms).prefix
+    replacement = _build_ring_replacement_prefix(mol, numbering, ring_atoms)
+    if replacement.unexpressed:
+        return None
+    return replacement.prefix
 
 
 def _is_purely_fused(mol, ring_atoms: Set[int], bridgeheads: Set[int]) -> bool:
@@ -1969,6 +1980,8 @@ def name_polycyclic_with_heteroatoms(mol) -> Optional[str]:
 
     # Get heteroatom replacement prefix
     hetero_prefix = get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
+    if hetero_prefix is None:
+        return None  # a skeletal atom is unexpressible -> never name the cage
 
     # Check for polycyclic lactone
     lactone_info = detect_polycyclic_lactone(mol, ring_atoms)
@@ -2761,6 +2774,8 @@ def name_polycyclic_complete(mol, features=None):
 
     # 5. Get heteroatom replacement prefix
     hetero_prefix = get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
+    if hetero_prefix is None:
+        return None  # a skeletal atom is unexpressible -> never name the cage
 
     # 6. Assemble substituent prefix (alkyl + FG prefixes combined)
     fg_prefixes = fg_info.get('prefixes', [])

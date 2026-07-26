@@ -878,6 +878,11 @@ def get_complete_bicyclo_data(mol, suffix_ring_atoms: Optional[Set[int]] = None)
         heteroatom_prefix = get_heteroatom_replacement_prefix(
             mol, atom_to_locant, ring_atoms
         )
+        if heteroatom_prefix is None:
+            # A skeletal ring atom has no replacement prefix, so no name built
+            # from this descriptor can express it while ``total_ring_atoms``
+            # keeps counting it. Refuse rather than emit a hydrocarbon stem.
+            return None
 
     # Check for retained name
     from ..data.bicyclo_systems import get_retained_bicyclo_name
