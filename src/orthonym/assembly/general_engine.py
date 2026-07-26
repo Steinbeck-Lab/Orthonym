@@ -283,23 +283,44 @@ def _partition(mol, features, chain) -> Optional[dict]:
 
 def _alpha_key(prefix: str) -> str:
     """Alphabetization key: letters only; sec-/tert- excluded, iso/neo/cyclo
-    included (IUPAC P-14.5.2)."""
-    p = prefix
-    for skip in ('tert-', 'sec-'):
-        if p.startswith(skip):
-            p = p[len(skip):]
-    return re.sub(r"[^a-z]", "", p.lower())
+    included (IUPAC P-14.5.2).
+
+    v29: the italicized-prefix strip is the shared primitive, not a re-derived
+    copy of the literal tuple (this loop form is one of the two the v29 P3
+    tripwire's `startswith((...))` regex could not see).
+    """
+    from .naming_utils import strip_italicized_structural_prefix
+    remainder, _ = strip_italicized_structural_prefix(prefix)
+    return re.sub(r"[^a-z]", "", remainder.lower())
+
+
+def _is_complex_prefix(name: str) -> bool:
+    """Does ``name`` need bis/tris + enclosure (as opposed to di/tri, bare)?
+
+    ``_COMPLEX_PREFIX_RE`` includes a hyphen in its character class, which made
+    this a copy of the compound predicate carrying no P-16.3.4 carve-out — and
+    because ONE regex drives both the enclosure choice and the di-vs-bis choice
+    here, a 'tert-butyl' got BOTH wrong at once ('bis(tert-butyl)' where the Blue
+    Book writes 'di-tert-butyl'). The carve-out is the shared primitive.
+    """
+    from .naming_utils import italicized_prefix_is_bare
+    if italicized_prefix_is_bare(name):
+        return False
+    return bool(_COMPLEX_PREFIX_RE.search(name))
 
 
 def _mult_prefix(n: int, name: str) -> Optional[str]:
     """'2,2-' + this -> 'dimethyl' / 'bis(2-chloroethyl)'. None if n too big."""
     if n == 1:
-        return f"({name})" if _COMPLEX_PREFIX_RE.search(name) else name
-    table = _MULT_COMPLEX if _COMPLEX_PREFIX_RE.search(name) else _MULT_SIMPLE
+        return f"({name})" if _is_complex_prefix(name) else name
+    table = _MULT_COMPLEX if _is_complex_prefix(name) else _MULT_SIMPLE
     if n not in table:
         return None
-    return (f"{table[n]}({name})" if table is _MULT_COMPLEX
-            else f"{table[n]}{name}")
+    if table is _MULT_COMPLEX:
+        return f"{table[n]}({name})"
+    # P-16.3.4 second leg: 'di-tert-butyl', never 'ditert-butyl'.
+    from .naming_utils import multiplier_needs_hyphen
+    return f"{table[n]}{'-' if multiplier_needs_hyphen(name) else ''}{name}"
 
 
 def _stereo_prefix(mol, atom_to_locant) -> str:

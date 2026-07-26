@@ -25,6 +25,7 @@ from collections import deque
 from typing import Any, List, Optional, Set, Tuple
 
 from ..name_tree import NameTreeNode, NamingResult
+from ..naming_utils import strip_italicized_structural_prefix
 
 logger = logging.getLogger(__name__)
 
@@ -192,9 +193,26 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
     return out
 
 
+# P-63.2.2.2 verbatim, the complete retained R-O– contraction list ("Some
+# contracted names are retained for R-O– substituent groups ... they are used both
+# as preferred IUPAC prefixes"): methoxy, ethoxy, propoxy, butoxy, phenoxy, and
+#
+#     (CH3)3C-O–   *tert*-butoxy (preferred prefix) (no substitution)
+#
+# so the (CH3)3C-O– prefix is 'tert-butoxy', NOT 'tert-butyloxy' (the index at
+# BlueBookV2.md:55662 spells the rejection out: "tert-butoxy* (unsubstituted) =
+# (2-methylpropan-2-yl)oxy = 1,1-dimethylethoxy (not tert-butyloxy)", and :55671
+# "tert-butyloxy: see tert-butoxy*"), and certainly not the over-enclosed
+# '(tert-butyl)oxy' this module used to emit.
+#
+# Every key is matched EXACTLY and every value is P-63.2.2.2's "no substitution" /
+# fully-substitutable form as cited, so a substituted R (which arrives spelled with
+# locants, e.g. '2-methylpropan-2-yl') can never reach a contraction it is not
+# entitled to.
 _CONTRACTED_ALKOXY = {
     "methyl": "methoxy", "ethyl": "ethoxy", "propyl": "propoxy",
     "butyl": "butoxy", "phenyl": "phenoxy",
+    "tert-butyl": "tert-butoxy",
 }
 
 
@@ -209,6 +227,22 @@ def _alkoxy_prefix(mol, o_idx: int, r_c_idx: int) -> Optional[str]:
         return None
     if alkyl in _CONTRACTED_ALKOXY:
         return _CONTRACTED_ALKOXY[alkyl]
+    # P-16.3.4 / P-29.6.1 carve-out, via the SHARED primitive rather than the raw
+    # `"-" in alkyl` this line used to carry: the hyphen of a leading italicized
+    # structural prefix is not a compound boundary, so it must not draw enclosing
+    # marks. But P-63.2.2.2 grants a retained -oxy contraction to exactly the six
+    # groups in _CONTRACTED_ALKOXY above and REVOKES the others by name —
+    # "The prefixes '*sec*-butoxy' and 'isobutoxy' are no longer recommended", with
+    # the PIN being '(butan-2-yl)oxy'. So an italicized-led R that is NOT in the
+    # table has no spelling this function is entitled to emit ('sec-butyloxy' is
+    # rejected verbatim at BlueBookV2.md:55646) and the only correct one,
+    # '(butan-2-yl)oxy', requires a different name for R than the one handed in.
+    # Fail closed rather than invent a rejected contraction; in practice the
+    # substituent namer already returns the locanted 'butan-2-yl', which falls
+    # through to the enclosed form below and is the PIN.
+    _, _had_italicized = strip_italicized_structural_prefix(alkyl)
+    if _had_italicized:
+        return None
     if any(ch.isdigit() for ch in alkyl) or "-" in alkyl or "(" in alkyl:
         return f"({alkyl})oxy"
     return f"{alkyl}oxy"

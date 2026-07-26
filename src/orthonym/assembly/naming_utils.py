@@ -155,6 +155,67 @@ def has_structural_hyphen(name: str) -> bool:
     return "-" in remainder
 
 
+def multiplier_needs_hyphen(name: str) -> bool:
+    """Does a SIMPLE multiplier joined to ``name`` keep a hyphen boundary?
+
+    P-16.3.4: ``di-tert-butyl`` (never ``ditert-butyl``), ``di-sec-butyl``. This
+    is the SECOND leg of the italicized-prefix rule — the first
+    (``has_structural_hyphen``) withholds enclosing marks, this one inserts the
+    hyphen — and it shares the one detection primitive so the two legs can never
+    disagree about what an italicized prefix is.
+
+    Examples:
+        >>> multiplier_needs_hyphen("tert-butyl")
+        True
+        >>> multiplier_needs_hyphen("methyl")
+        False
+    """
+    _, had_prefix = strip_italicized_structural_prefix(name)
+    return had_prefix
+
+
+def italicized_prefix_is_bare(name: str) -> bool:
+    """Must ``name`` be cited BARE because its only hyphen is an italicized one?
+
+    ``True`` only when ``name`` leads with an italicized structural prefix AND
+    the remainder is itself simple — ``tert-butyl`` / ``sec-butyl`` (BB 16286
+    cites ``*tert*-butyldi(methyl)phosphane`` (PIN) with the group bare).
+    ``False`` for everything else, including a compound remainder
+    (``tert-butylsulfanyl`` keeps its P-16.3.3 marks) and any name that does not
+    lead with such a prefix.
+
+    This is the form a site with its OWN compound test should call: because it
+    returns ``False`` for every non-italicized name, dropping it in front of an
+    existing raw ``'-' in name`` test changes that site's behaviour for
+    italicized-led names ONLY, and never widens or narrows it for anything else.
+
+    The remainder is judged by the SAME union ``enclose_if_compound`` uses
+    (``needs_brackets`` OR ``is_complex_substituent``), because neither is
+    complete alone: ``needs_brackets`` misses the bare two-prefix compound
+    ``butylamino``, so using it by itself made this predicate call
+    ``tert-butylamino`` bare while the canonical path enclosed it. Erring toward
+    "compound" is the safe direction — it can only keep marks, never drop them.
+
+    Examples:
+        >>> italicized_prefix_is_bare("tert-butyl")
+        True
+        >>> italicized_prefix_is_bare("tert-butylsulfanyl")
+        False
+        >>> italicized_prefix_is_bare("tert-butylamino")
+        False
+        >>> italicized_prefix_is_bare("2-methylpropyl")
+        False
+        >>> italicized_prefix_is_bare("methyl")
+        False
+    """
+    remainder, had_prefix = strip_italicized_structural_prefix(name)
+    if not had_prefix:
+        return False
+    if has_structural_hyphen(remainder) or any(ch.isdigit() for ch in remainder):
+        return False
+    return not (needs_brackets(remainder) or is_complex_substituent(remainder))
+
+
 # Shared C1-C20 alkyl roots used by needs_brackets(), is_complex_substituent(),
 # and regex patterns. Extends coverage beyond the original C1-C10 lists.
 _ALKYL_ROOTS_FULL = (
@@ -979,6 +1040,17 @@ def is_complex_substituent(name: str) -> bool:
     # Check for digits (indicates locants within the substituent name)
     if any(ch.isdigit() for ch in name):
         return True
+    # P-16.3.4 / P-29.6.1: decide on the REMAINDER after an italicized structural
+    # prefix, the way needs_brackets already does. Using the carve-out only as an
+    # early-exit gate (which is what has_structural_hyphen below is) left every
+    # suffix rule further down anchored to the RAW name, so the predicate
+    # disagreed with itself: 'butylamino' was complex but 'tert-butylamino' was
+    # not, because _ALKYLAMINO_RE is anchored with '^' and 'tert-' pushed the
+    # alkyl root off the anchor. Recursing makes the whole function decide on
+    # 'butylamino', so the italicized prefix changes nothing but the spelling.
+    _remainder, _had_italicized = strip_italicized_structural_prefix(name)
+    if _had_italicized:
+        return is_complex_substituent(_remainder)
     # Check for hyphens (indicates compound substituent) — EXCEPT a leading
     # italicized 'sec-'/'tert-' detachable prefix on an otherwise-simple retained
     # name (tert-butyl, sec-butyl). IUPAC P-16.3.4 treats these as SIMPLE for
@@ -1393,9 +1465,11 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # never start with 'tert-'/'sec-', so the bis/tris path is unaffected.
     # v29 P3: a DIFFERENT rule from the enclosure carve-out (this one inserts a
     # hyphen, that one withholds marks) but the same DETECTION, so it shares the
-    # one primitive rather than open-coding a fifth startswith().
-    _, _leads_with_italicized = strip_italicized_structural_prefix(formatted_name)
-    if multiplier and _leads_with_italicized:
+    # one primitive rather than open-coding a fifth startswith(). The leg now has
+    # its own named primitive (multiplier_needs_hyphen) because a SECOND producer
+    # -- organometallics._ligand_token -- needed it and was shipping the
+    # malformed 'ditert-butyl' for want of it.
+    if multiplier and multiplier_needs_hyphen(formatted_name):
         multiplier = f"{multiplier}-"
 
     # Assemble: locants-multiplier+name. An empty locant list (elided per
@@ -1496,10 +1570,14 @@ def alpha_sort_key(substituent_name: str) -> str:
     # e.g., "N,N-dimethylamino" -> "dimethylamino" -> "amino" (after multi-prefix strip)
     text = _N_LOCANT_PREFIX_RE.sub('', text)
 
-    # Handle hyphenated detachable prefixes: sec- and tert-
-    for prefix in ("sec-", "tert-"):
-        if text.startswith(prefix):
-            return text[len(prefix):]
+    # Handle hyphenated detachable prefixes: sec- and tert- (P-14.5.2 — the
+    # italicized prefix is ignored, so 'tert-butyl' sorts at 'b'). A DIFFERENT
+    # rule from the enclosure carve-out, but the same DETECTION, so it calls the
+    # one primitive instead of re-deriving the literal tuple 1400 lines below the
+    # constant (this was the copy the v29 P3 tripwire's regex shape could not see).
+    _text_remainder, _text_had_italicized = strip_italicized_structural_prefix(text)
+    if _text_had_italicized:
+        return _text_remainder
 
     # Handle non-hyphenated multiplicative prefixes (di-, tri-, ...): for a
     # SIMPLE prefix these are ignored (P-14.5.1). Sort by longest prefix first

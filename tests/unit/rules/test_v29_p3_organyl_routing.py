@@ -422,6 +422,14 @@ def test_the_italicized_prefix_carve_out_lives_in_exactly_one_place():
     marks vs. inserting a hyphen -- they just may not re-derive the test.
 
     This test found the fifth copy when it was first written.
+
+    SUPERSEDED (v29 P3B): it searches for ONE syntactic shape and was therefore
+    blind to every copy a later review found — three raw ``'-' in t`` tests, a
+    single-argument ``startswith('tert-')``, two ``for x in ('tert-', 'sec-')``
+    loops, three character-set tests and a second hand-written carve-out list. The
+    complete check is the allowlist tripwire
+    ``test_v29_p3b_shared_predicates.test_no_unreviewed_copy_of_the_italicized_prefix_decision``;
+    this one is kept as a cheap fast-fail on the shape it does cover.
     """
     import re
     from pathlib import Path

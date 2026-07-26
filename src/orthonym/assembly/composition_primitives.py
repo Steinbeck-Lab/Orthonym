@@ -25,7 +25,9 @@ from __future__ import annotations
 import re
 from typing import List, Optional, Tuple
 
-from .naming_utils import SIMPLE_MULTIPLIERS, should_omit_locant_one
+from .naming_utils import (
+    SIMPLE_MULTIPLIERS, italicized_prefix_is_bare, should_omit_locant_one,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -442,7 +444,10 @@ def apply_mononuclear_enclosing(
     prefixes are left bare/unenclosed — the common-PIN form
     ``bromodichlorofluoromethane`` (the PROTECT case ``C(Br)(Cl)(Cl)F``).
 
-    Verbatim from ``_handler_shared.py:1059-1078``; pure (returns a new list).
+    THE single implementation of this rule: ``_handler_shared._assemble_fragments``
+    used to carry a second, near-identical inline copy (differing only in two
+    comment words) and therefore a second copy of the compound-hyphen test; it now
+    calls this function.
     """
     if not (is_mononuclear and len(prefix_texts) >= 2):
         return prefix_texts
@@ -453,7 +458,17 @@ def apply_mononuclear_enclosing(
         # A locant-bearing first substituent already routes through the
         # `re.match(r'^\d', ...)` path in the caller and is excluded here (the
         # Blue Book exempts only the locant-bearing first prefix from this rule).
-        if (re.match(r'^\d', t) or '(' in t or '[' in t or '-' in t):
+        #
+        # The italicized-prefix carve-out is the SHARED primitive, never a raw
+        # `'-' in t`: P-16.3.4 / P-29.6.1 make the hyphen of a leading italicized
+        # structural prefix part of a SIMPLE retained name (BB 16286 cites
+        # '*tert*-butyldi(methyl)phosphane' (PIN) with the group BARE). A raw test
+        # classed 'tert-butyl' as compound, which flipped `all(...)` below to False
+        # and so silently switched OFF the first-bare/rest-enclosed transform for
+        # EVERY prefix in the name, not merely the tert- one.
+        _ital_bare = italicized_prefix_is_bare(t)     # GUARD: P-16.3.4 carve-out
+        if (re.match(r'^\d', t) or '(' in t or '[' in t
+                or ('-' in t and not _ital_bare)):
             return False
         if any(t.startswith(mp) for mp in _MULTIPLIER_PREFIXES):
             return False

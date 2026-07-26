@@ -599,9 +599,20 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # unless multiplied next to a compound neighbour.
             def _ligand_token(count, name):
                 from ..assembly.naming_utils import (
-                    has_structural_hyphen, needs_p1634_marks,
+                    has_structural_hyphen, multiplier_needs_hyphen,
+                    needs_p1634_marks,
                 )
                 mult = _multiplicative_prefix(count)
+                # P-16.3.4, SECOND leg of the same rule: a simple multiplier
+                # joined to an italicized-prefix-led name keeps the hyphen
+                # boundary — 'di-tert-butyl', never the malformed 'ditert-butyl'
+                # this site shipped ('ditert-butylmethylsilane' for
+                # CC(C)(C)[SiH](C)C(C)(C)C). naming_utils.format_substituent_prefix
+                # already had this leg; fixing only the marks leg here in v29 P3
+                # left the two producers disagreeing, so both now call the one
+                # primitive (multiplier_needs_hyphen).
+                if mult and multiplier_needs_hyphen(name):
+                    mult = f'{mult}-'
                 # W3-P03-7 (P-16.3.4(c)/(d), BB 38222): a multiplied alkyl ligand
                 # whose NAME begins with a numeric-multiplier syllable (decyl /
                 # dodecyl..nonadecyl) takes enclosing marks so the multiplier is
@@ -767,8 +778,16 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 alpha_sort_key as _ask,
             )
             _distinct = set(organic_names)
+            # The `-` leg of the old char-set test was a SIXTH copy of the compound
+            # predicate and it re-opened, in this same file, the exact defect the
+            # sibling `_compound_ligand` above was fixed for: 'tert-butyl' matched
+            # `-`, so two IDENTICAL SIMPLE ligands were routed away from the
+            # multiplied form and came back as '(tert-butyl)(tert-butyl)zinc'
+            # instead of P-16.3.4's 'di-tert-butylzinc'. `_is_cx` already carries
+            # the correct hyphen semantics (it calls has_structural_hyphen), so the
+            # raw leg is dropped and only the enclosing-mark characters remain.
             _any_complex = any(
-                _is_cx(nm) or any(c in nm for c in '()[]-') for nm in organic_names)
+                _is_cx(nm) or any(c in nm for c in '()[]') for nm in organic_names)
             if (len(_distinct) > 1 or _any_complex) and not include_stock:
                 def _enclose_ligand(nm: str) -> str:
                     # P-16.3.3 enclosure nesting: a ligand name that ALREADY
@@ -791,9 +810,22 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # Single-component multi-alkyl (dimethylzinc, trimethylaluminum, etc.)
             grouped = _group_ligand_counts(organic_names)
             sorted_groups = _alphabetize_simple_ligands(grouped)
+            # P-16.3.4 second leg, the THIRD multiplier-join site in this file:
+            # 'di-tert-butylzinc', never the malformed 'ditert-butylzinc'. All three
+            # call the one primitive (multiplier_needs_hyphen) so they cannot
+            # disagree — fixing only _ligand_token would have left this path
+            # emitting the malformed form for exactly the inputs the sibling fix
+            # newly routed here.
+            from ..assembly.naming_utils import multiplier_needs_hyphen as _mnh
+
+            def _join_mult(count: int, name: str) -> str:
+                mult = _multiplicative_prefix(count)
+                if mult and _mnh(name):
+                    return f'{mult}-{name}'
+                return f'{mult}{name}'
+
             ligand_prefix = ''.join(
-                _multiplicative_prefix(count) + name
-                for count, name in sorted_groups
+                _join_mult(count, name) for count, name in sorted_groups
             )
 
             if include_stock:
@@ -1192,11 +1224,15 @@ def _alphabetize_simple_ligands(
     Multiplicative prefixes (di-, tri-, tetra-) are IGNORED — alphabetize
     by the ligand name itself (the input here is already stripped).
     """
-    # Wave-2 C2: alphabetize on the real first letter — the italic 'tert-'
-    # multiplying-style prefix is ignored (P-14.5.2: tert-butyl sorts at 'b').
+    # Wave-2 C2: alphabetize on the real first letter — the italicized structural
+    # prefix is ignored (P-14.5.2: tert-butyl sorts at 'b'). v29: this open-coded
+    # `name[5:] if name.startswith('tert-')`, which handled 'tert-' and silently
+    # MISSED 'sec-' (sec-butyl sorted at 's'), so it shares the one primitive.
+    from ..assembly.naming_utils import strip_italicized_structural_prefix
+
     def _alpha_key(entry):
-        name = entry[1]
-        return name[5:] if name.startswith('tert-') else name
+        remainder, _ = strip_italicized_structural_prefix(entry[1])
+        return remainder
 
     return sorted(grouped, key=_alpha_key)
 

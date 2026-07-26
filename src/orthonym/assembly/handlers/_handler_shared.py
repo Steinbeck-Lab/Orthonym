@@ -1262,26 +1262,14 @@ def _assemble_fragments(
     # refinement (enclose the simple stem while excluding the multiplier from the
     # marks) is explicitly deferred; the PROTECT gold row `C(Br)(Cl)(Cl)F` ->
     # `bromodichlorofluoromethane` enforces this branch.
-    _MULTIPLIER_PREFIXES = (
-        'di', 'tri', 'tetra', 'penta', 'hexa', 'hepta', 'octa', 'nona', 'deca',
-    )
-    if is_mononuclear_parent and len(prefix_texts) >= 2:
-        def _is_simple_prefix(t: str) -> bool:
-            # simple = no locant prefix, no existing enclosing marks, no compound
-            # hyphen, no multiplicative prefix; bromo/chloro/fluoro/iodo/nitro etc.
-            # A locant-bearing first substituent already routes through the
-            # `re.match(r'^\d', ...)` path above and is excluded here (the Blue
-            # Book exempts only the locant-bearing first prefix from this rule).
-            if (re.match(r'^\d', t) or '(' in t or '[' in t or '-' in t):
-                return False
-            if any(t.startswith(mp) for mp in _MULTIPLIER_PREFIXES):
-                return False
-            return True
-        if all(_is_simple_prefix(t) for t in prefix_texts):
-            # FIRST cited bare; SECOND AND FURTHER each enclosed (P-16.5.1.3.1).
-            prefix_texts = [prefix_texts[0]] + [
-                f"({t})" for t in prefix_texts[1:]
-            ]
+    # v29: this used to be a SECOND inline copy of the rule (and so a second copy
+    # of the compound-hyphen test), differing from composition_primitives.
+    # apply_mononuclear_enclosing only in two comment words. Both were live —
+    # this legacy assembler and the lifted serializer — so the P-16.3.4
+    # italicized-prefix carve-out had to be applied twice or not at all. It is now
+    # applied ONCE, there.
+    from ..composition_primitives import apply_mononuclear_enclosing
+    prefix_texts = apply_mononuclear_enclosing(prefix_texts, is_mononuclear_parent)
 
     prefix_str = _join_prefixes(prefix_texts)
 

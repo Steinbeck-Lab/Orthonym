@@ -3177,6 +3177,13 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         for _pn in ('arsanyl', 'stibanyl', 'bismuthanyl'):
             if nm.endswith(_pn) and nm != _pn:
                 return True
+        # The hyphen in the character class made this a copy of the compound
+        # predicate; the P-16.3.4 carve-out is the shared primitive, so
+        # 'tert-butyl' is simple (BB 16286 cites it bare) while
+        # 'tert-butylsulfanyl' stays compound.
+        from ..assembly.naming_utils import italicized_prefix_is_bare
+        if italicized_prefix_is_bare(nm):
+            return False
         return any(c in nm for c in '-()[]0123456789')
 
     if not any(_is_complex_prefix(nm) for nm in groups):

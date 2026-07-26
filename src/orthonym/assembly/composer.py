@@ -1873,9 +1873,18 @@ def _name_boronic_acid(features: Any) -> Optional[str]:
     # Check if R name needs parentheses (contains locants/hyphens/spaces)
     # Simple names like "methyl", "phenyl" don't need parens
     # Complex names like "4-methylphenyl" do
-    needs_parens = any(c in r_name for c in '-,') and r_name not in (
-        'tert-butyl', 'sec-butyl'
-    )
+    #
+    # v29: the carve-out used to be a hand-written `r_name not in ('tert-butyl',
+    # 'sec-butyl')` exception list — the only OTHER site in the tree that spelled
+    # the rule out itself, and therefore the one guaranteed to drift from the
+    # primitive. It was enumerated by NAME, so it silently failed for any other
+    # member of the class ('tert-pentyl', a capitalized spelling) and equally
+    # silently suppressed the marks on 'tert-butylsulfanyl', which is compound
+    # under P-16.3.3 and must keep them. The primitive decides on the REMAINDER,
+    # so it gets both right.
+    from .naming_utils import italicized_prefix_is_bare
+    needs_parens = (any(c in r_name for c in '-,')
+                    and not italicized_prefix_is_bare(r_name))
 
     if needs_parens:
         return f"({r_name})boronic acid"
@@ -6201,6 +6210,11 @@ def _assemble_aromatic_benzonitrile(mol, principal_ring, nitrile_atoms):
         # A compound substituent prefix (formed by substitution, e.g. the
         # alkoxycarbonyl family) is enclosed even as a bare word (P-16.3.3);
         # simple table prefixes (methyl/chloro/methoxy/nitro/...) are not.
+        # The hyphen in the character class made this a copy of the compound
+        # predicate; the P-16.3.4 carve-out is the shared primitive.
+        from .naming_utils import italicized_prefix_is_bare
+        if italicized_prefix_is_bare(nm):
+            return False
         return nm.endswith('oxycarbonyl') or any(c in nm for c in '-()[]0123456789')
 
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
