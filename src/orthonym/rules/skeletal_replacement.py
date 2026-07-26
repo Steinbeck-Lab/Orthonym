@@ -955,6 +955,38 @@ def _dichalcogen_bond_set(mol: Chem.Mol) -> set:
     return bonds
 
 
+def _skeletal_atoms_all_expressible(mol: Chem.Mol, atoms: List[int]) -> bool:
+    """Is every non-carbon skeletal atom in ``atoms`` spellable as an 'a' prefix?
+
+    The Table-1.5 replacement set is CLOSED (P-15.4.1.1), so an element outside
+    ``REPLACEMENT_TERMS`` has no morpheme at all. This module's collect loops all
+    filter on ``symbol in REPLACEMENT_TERMS``, which SKIPS such an atom -- while
+    ``chain_length``/``ring_size`` keep counting it, so the parent stem renames it
+    as a CARBON. That is a wrong structure, not a coverage gap:
+
+        ``CC[Tl]CCSCC``            -> ``3-thiaoctane``   (C6STl named as C7S)
+        ``CCS[Zn]SCC``             -> ``3,5-dithiaheptane``
+        ``C1CCOCCOCC[Tl]CCOCC1``   -> ``1,4,10-trioxacyclopentadecane``
+        ``CC[Tl]CC[Tl]CCSCC``      -> ``3-thiaundecane``  (TWO atoms absorbed)
+
+    ``_find_replacement_chain`` builds its adjacency over every heavy atom with no
+    element filter, so the off-table atom enters the backbone freely, and the
+    terminator gate (P-51.4.1.4) only inspects the two chain ENDS. Gating here --
+    on the whole skeleton, at the point the skeleton is chosen -- is what makes the
+    refusal total rather than end-relative.
+
+    Note this is reachable only in the configuration where SELF-01 cannot run (no
+    OPSIN jar / gate disabled), because the round trip otherwise suppresses these
+    to an honest ``"<element> compound (not supported)"``. That is precisely the
+    supported fail-OPEN mode, so it needs a Java-free source-level refusal.
+    """
+    for idx in atoms:
+        symbol = mol.GetAtomWithIdx(idx).GetSymbol()
+        if symbol != 'C' and symbol not in REPLACEMENT_TERMS:
+            return False
+    return True
+
+
 def _find_replacement_chain(
     mol: Chem.Mol, exclude_atoms: Optional[set] = None,
 ) -> Optional[List[int]]:
@@ -1021,6 +1053,11 @@ def _find_replacement_chain(
     path = _find_path_bfs(adj, farthest, other_end, num_atoms)
 
     if path is None or len(path) < 3:
+        return None
+
+    # TOTALITY: refuse a backbone carrying a skeletal atom no 'a' prefix spells,
+    # rather than letting the collect loops skip it into the carbon stem.
+    if not _skeletal_atoms_all_expressible(mol, path):
         return None
 
     return path
@@ -1469,6 +1506,11 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
 
     # Collect heteroatom positions in the ring
     ring_atoms = list(ring)
+    # TOTALITY: same rule as the acyclic backbone. The loop below filters on
+    # ``symbol in REPLACEMENT_TERMS``, so an off-table ring atom would be skipped
+    # while ``ring_size`` still counted it into the cycloalkane stem.
+    if not _skeletal_atoms_all_expressible(mol, ring_atoms):
+        return None
     heteroatoms = []
     for i, atom_idx in enumerate(ring_atoms):
         atom = mol.GetAtomWithIdx(atom_idx)
