@@ -588,12 +588,72 @@ class TestCycloPrefixesExtended:
             )
 
     @pytest.mark.unit
-    def test_fallback_for_ring_count_above_20(self):
-        """Ring count > 20 falls back to numeric prefix."""
-        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+    def test_ring_count_above_20_is_composed_not_numeric(self):
+        """Ring count > 20 COMPOSES a real word (P-23.1.9 + P-14.2.1.2).
+
+        This test previously asserted the malformed ``"25cyclo"`` that the old
+        f-string fallback produced. That was never a word, and it shipped: the
+        PIN path caps nothing above ``ring_count < 2``.
+        """
+        from orthonym.rules.polycyclic import (CYCLO_PREFIXES,
+                                                cyclo_ring_count_word)
         assert 25 not in CYCLO_PREFIXES
-        fallback = CYCLO_PREFIXES.get(25, f"{25}cyclo")
-        assert fallback == "25cyclo"
+        assert cyclo_ring_count_word(25) == "pentacosacyclo"
+        # 21 is 'henicosa' (BlueBookV2.md:2820), NOT the CAS variant 'heneicosa'
+        assert cyclo_ring_count_word(21) == "henicosacyclo"
+        assert cyclo_ring_count_word(22) == "docosacyclo"
+        assert cyclo_ring_count_word(30) == "triacontacyclo"
+        assert cyclo_ring_count_word(31) == "hentriacontacyclo"
+        # No emitted ring-count word may be a bare integer + 'cyclo'.
+        for n in range(2, 200):
+            word = cyclo_ring_count_word(n)
+            assert word is not None
+            assert not word[0].isdigit(), f"n={n} -> {word!r}"
+
+    @pytest.mark.unit
+    def test_bicyclo_not_dicyclo(self):
+        """P-23.1.9 (BlueBookV2.md:9558): 'bicyclo' (not dicyclo)."""
+        from orthonym.rules.polycyclic import cyclo_ring_count_word
+        assert cyclo_ring_count_word(2) == "bicyclo"
+
+    @pytest.mark.unit
+    def test_table_agrees_with_composition(self):
+        """``CYCLO_PREFIXES`` is a cache of the rule, not a rival definition.
+
+        Every tabulated entry except 2 (the 'bi'/'di' irregularity) must equal
+        ``simple_multiplier_word(n) + 'cyclo'``. If they ever diverge the table
+        is wrong, because P-23.1.9 states the composition and tabulates nothing.
+        """
+        from orthonym.assembly.naming_utils import simple_multiplier_word
+        from orthonym.rules.polycyclic import CYCLO_PREFIXES
+        for n, tabulated in CYCLO_PREFIXES.items():
+            if n == 2:
+                assert tabulated == "bicyclo"
+                assert simple_multiplier_word(n) + "cyclo" == "dicyclo"
+                continue
+            assert tabulated == simple_multiplier_word(n) + "cyclo", n
+
+    @pytest.mark.unit
+    def test_no_word_fails_closed(self):
+        """Counts the composition cannot spell return None, never a non-word."""
+        from orthonym.rules.polycyclic import cyclo_ring_count_word
+        assert cyclo_ring_count_word(10000) is None
+        assert cyclo_ring_count_word(1) is None
+        assert cyclo_ring_count_word(0) is None
+        assert cyclo_ring_count_word(-3) is None
+
+    @pytest.mark.unit
+    def test_descriptor_refuses_when_no_word_exists(self):
+        """``_build_descriptor`` fails closed instead of emitting '10000cyclo'."""
+        from orthonym.errors import OrthonymLimitError
+        from orthonym.rules.polycyclic import VonBaeyerAnalyzer
+        analyzer = VonBaeyerAnalyzer()
+        # A formable count still builds normally...
+        assert analyzer._build_descriptor(21, [3, 2, 1], [], {}) == (
+            "henicosacyclo[3.2.1]")
+        # ...and an unformable one refuses the molecule.
+        with pytest.raises(OrthonymLimitError):
+            analyzer._build_descriptor(10000, [3, 2, 1], [], {})
 
 
 # ============================================================================

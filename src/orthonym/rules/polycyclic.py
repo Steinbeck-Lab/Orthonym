@@ -71,6 +71,44 @@ _ALKANE_NAMES = {
 }
 
 
+def cyclo_ring_count_word(ring_count: int) -> Optional[str]:
+    """The von Baeyer ring-count term for ``ring_count`` rings, or ``None``.
+
+    P-23.1.9 (``BlueBookV2.md:9558``): "The number of rings is indicated by the
+    nondetachable prefix 'bicyclo' (not dicyclo), 'tricyclo', 'tetracyclo',
+    etc." -- restated at P-23.2.6.1.1 (``:9645``). Both sentences end in "etc.":
+    the series is OPEN-ENDED and the Blue Book prints **no table** of these
+    words (the highest one attested anywhere in the text is ``hexacyclo``,
+    ``:9731``). The term is therefore COMPUTED -- simple multiplying prefix
+    (Table 1.4, P-14.2.1) + ``cyclo`` -- with the single irregularity that 2 is
+    ``bi``, not ``di``. No vowel elision applies: ``cyclo`` starts with a
+    consonant.
+
+    ``CYCLO_PREFIXES`` is consulted first purely as a fast, human-auditable
+    path; it agrees with the composition at every entry it holds (asserted by
+    ``test_table_agrees_with_composition``), so it is a cache of the rule and
+    not a second, competing definition of it.
+
+    Returns ``None`` when no word can be formed, so callers FAIL CLOSED rather
+    than emit the non-word the previous f-string fallback produced (``"21cyclo"``
+    for 21 rings). That fallback was NOT latent: the PIN path
+    (``name_polycyclic_complete``) caps nothing above ``ring_count < 2``, and a
+    21-ring cage really did emit ``21cyclo[...]tetratetracontane``. The
+    ``MAX_CAGE_RINGS = 8`` ceiling guards only the opt-in general-engine path in
+    ``vonbaeyer_universal``, which is a different caller.
+    """
+    if ring_count == 2:
+        return "bicyclo"  # P-23.1.9: 'bicyclo', explicitly NOT 'dicyclo'
+    word = CYCLO_PREFIXES.get(ring_count)
+    if word is not None:
+        return word
+    from ..assembly.naming_utils import simple_multiplier_word
+    multiplier = simple_multiplier_word(ring_count)
+    if multiplier is None:
+        return None
+    return multiplier + "cyclo"
+
+
 def _get_alkane_name(carbon_count: int) -> str:
     """Get the alkane parent name for a given carbon count."""
     if carbon_count in _ALKANE_NAMES:
@@ -1479,7 +1517,19 @@ class VonBaeyerAnalyzer:
         Returns:
             Descriptor string like "tricyclo[3.3.1.1(3,7)]"
         """
-        prefix = CYCLO_PREFIXES.get(ring_count, f"{ring_count}cyclo")
+        prefix = cyclo_ring_count_word(ring_count)
+        if prefix is None:
+            # No ring-count word exists for this count -> refuse the whole
+            # molecule rather than ship a non-word. Raising (not returning a
+            # sentinel) is this module's established fail-closed idiom: the
+            # limit is caught once at ``Orthonym.name``, so the molecule
+            # reports 'unknown organic compound' instead of cascading into a
+            # fragment namer that would name a single sub-ring.
+            from ..errors import unsupported_ring_system
+            logger.info(
+                "no von Baeyer ring-count word for ring_count=%s; refuse",
+                ring_count)
+            raise unsupported_ring_system()
 
         # Primary bridge lengths (sorted descending)
         parts = [str(l) for l in sorted(primary_lengths, reverse=True)]

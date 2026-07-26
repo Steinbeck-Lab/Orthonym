@@ -48,7 +48,10 @@ class TokenBinding:
     """Atoms expressed by one emitted name token."""
     atom_ids: Tuple[int, ...]
     token: str
-    role: str  # 'parent' | 'prefix' | 'suffix'
+    # 'parent' | 'prefix' | 'suffix' | 'replacement'. Every value here must be a
+    # key of ``binding_spine._LEGACY_ROLE_KINDS``, or the flat adapter coerces it
+    # to PREFIX and records it in ``legacy_role_coerced``.
+    role: str
 
 
 @dataclass(frozen=True)
@@ -941,9 +944,74 @@ def _emit_ring_from_analysis(
         bindings.append(TokenBinding(tuple(sorted(ester_r_frag)),
                                      ester_r_word, 'prefix'))
 
-    bindings.append(TokenBinding(tuple(cage.cage_atoms), cage.descriptor,
-                                 'parent'))
+    bindings.extend(_ring_parent_bindings(cage, name, parent_block))
     return GeneralEngineResult(name=name, bindings=tuple(bindings))
+
+
+def _ring_parent_bindings(cage, name: str, parent_block: str
+                          ) -> List[TokenBinding]:
+    """v29 Phase 2 T5: bind the ring parent as the tokens that SPELL it.
+
+    The spelled parent word is ``hetero_prefix + descriptor + stem +
+    (ene/yne block) (+ suffix)``. This used to be a single binding whose token
+    was ``cage.descriptor`` ALONE -- ``'bicyclo[2.2.1]'`` -- claiming every cage
+    atom. Two things were wrong with that, and both showed up in audit mode:
+
+    * the token carried no stem, so the arity oracle could not decide what it
+      spells (``ARITY_UNVERIFIED``, and with no other token on the molecule,
+      ``PROOF_UNSUBSTANTIATED``: nothing about the name was corroborated); and
+    * the replacement morphemes were bound to nothing, so P5 reported the
+      leftover ``'xa'`` of ``7-oxa`` as name text no binding accounts for.
+
+    Who claims the heteroatom is decided by the oracle, not by preference.
+    ``token_arity('bicyclo[2.2.1]hept')`` is confidently **7** -- the descriptor
+    arithmetic and the stem independently agree on 7 SKELETAL POSITIONS, and a
+    replacement prefix does not change that count. The oracle's verdict on the
+    morpheme itself is the other half: ``'oxa'`` "qualifies no skeleton, so its
+    ZERO atoms replace nothing". A replacement prefix says which ELEMENT sits at
+    a position the stem has already counted; it contributes no atom of its own.
+
+    So the parent keeps the WHOLE cage (anything less is an ``ARITY_MISMATCH``
+    error against a correct name -- the exact false alarm this task exists to
+    remove) and each replacement morpheme binds ZERO atoms. That satisfies
+    EXCLUSIVE CLAIM trivially, and P-24.2 agrees: the prefix replaces, the stem
+    counts.
+
+    One binding per HETEROATOM, not per distinct morpheme. ``'7,8-diaza…'``
+    writes ``aza`` once and expresses the count with the multiplier ``di``, but
+    P4 counts a multiplied morpheme as spelled once PER multiplicand, so it
+    reads that name as spelling ``aza`` twice. Collapsing the two nitrogens into
+    a single ``'aza'`` binding therefore trades the old over-claim for the
+    mirror-image ``MULTIPLICITY_MISMATCH`` ("spelled 2 times but 1 binding
+    claims it") -- measured, not predicted.
+
+    The unsaturation block is deliberately left out of every token here: it
+    spells BONDS, not atoms, so it binds nothing and the parent token stops at
+    the stem rather than swallowing it.
+    """
+    cage_atoms = tuple(cage.cage_atoms)
+    descriptor = str(cage.descriptor)
+    single = [TokenBinding(cage_atoms, descriptor, 'parent')]
+
+    from ..data.chain_names import get_chain_prefix
+    try:
+        stem = get_chain_prefix(cage.total_atoms)
+    except ValueError:
+        return single
+    parent_token = descriptor + stem
+    # Only claim a token the FINAL name really spells: P4 anchors tokens to
+    # spans, so an unlocatable token would be a fresh TOKEN_ABSENT. The
+    # ``parent_block`` check keeps this honest about the stem specifically
+    # (spiro/other analysis shapes may not open with this stem at all).
+    if not parent_block.startswith(stem) or parent_token not in name:
+        return single
+
+    bindings = [TokenBinding(cage_atoms, parent_token, 'parent')]
+    for _atom_idx, morpheme in tuple(getattr(cage, 'hetero_per_atom', ()) or ()):
+        if morpheme not in name:
+            continue
+        bindings.append(TokenBinding((), morpheme, 'replacement'))
+    return bindings
 
 
 def _ring_suffix_text(core: str, locants: List[int]) -> Optional[str]:

@@ -14,7 +14,7 @@ The mapping from atom indices to locants is handled elsewhere.
 """
 
 import re
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 # ============================================================================
@@ -693,6 +693,40 @@ COMPLEX_MULTIPLIERS = {
 }
 
 
+def simple_multiplier_word(n: int) -> Optional[str]:
+    """The simple multiplying prefix for ``n`` (P-14.2.1), or ``None`` when no
+    word can be formed.
+
+    ``SIMPLE_MULTIPLIERS`` is only the BASIC-term table (Table 1.4, P-14.2.1,
+    ``BlueBookV2.md:2790``) and stops at ``20: icosa``. Everything above 20 is
+    not tabulated but COMPOSED, per P-14.2.1.2 (``BlueBookV2.md:2813``): the
+    basic terms are cited "in the order opposite to that of the constituent
+    digits in the arabic numbers", joined without hyphens -- 21 ``henicosa``,
+    22 ``docosa``, 31 ``hentriaconta`` (verbatim examples at ``:2820``-``:2821``).
+    ``data.chain_names.get_chain_prefix`` already implements exactly that
+    composition for chain stems, so the multiplier is its stem plus the
+    terminal ``a``; this function is the single place that states the rule.
+
+    Returns ``None`` -- never a bare integer -- for any ``n`` the composition
+    cannot spell (``n < 2``, or outside ``get_chain_prefix``'s 1-9999 range),
+    so callers FAIL CLOSED instead of emitting a non-word such as ``"21oxa"``
+    or ``"21cyclo"``. Note ``n == 1`` has no multiplying prefix at all (the
+    unmultiplied form is used), which is why it is ``None`` and not ``""``:
+    a caller that wants the empty string must say so itself.
+    """
+    if n < 2:
+        return None
+    if n in SIMPLE_MULTIPLIERS:
+        return SIMPLE_MULTIPLIERS[n]
+    from ..data.chain_names import get_chain_prefix
+    try:
+        prefix = get_chain_prefix(n)
+    except ValueError:
+        # Outside the composition's supported range -> no word exists to emit.
+        return None
+    return prefix if prefix.endswith("a") else prefix + "a"
+
+
 def needs_brackets(name: str) -> bool:
     """Determine if a substituent name is a compound substituent needing parentheses.
 
@@ -1269,15 +1303,15 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
             prefix += "a"
         return prefix + "kis"
     else:
-        if count in SIMPLE_MULTIPLIERS:
-            return SIMPLE_MULTIPLIERS[count]
-        # For counts > 20, build compositional multiplier using chain_names
-        from ..data.chain_names import get_chain_prefix
-        prefix = get_chain_prefix(count)
-        # Simple multipliers use trailing 'a' (e.g., "henicosa", "docosa")
-        if not prefix.endswith("a"):
-            prefix += "a"
-        return prefix
+        # Single source of the P-14.2.1/P-14.2.1.2 simple-multiplier rule.
+        # ``count <= 1`` already returned above, so ``None`` here can only mean
+        # "outside the composition's range" -- the same ValueError the inlined
+        # ``get_chain_prefix`` call used to raise.
+        word = simple_multiplier_word(count)
+        if word is None:
+            raise ValueError(
+                f"no simple multiplying prefix can be formed for {count}")
+        return word
 
 
 # ============================================================================

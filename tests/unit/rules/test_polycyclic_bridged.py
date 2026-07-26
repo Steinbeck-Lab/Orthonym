@@ -119,6 +119,29 @@ class TestClassifyBridgedSystem:
         """Bicyclo[2.2.2]octane classifies as bicyclo."""
         assert classify_bridged_system(bicyclo_222_octane) == "bicyclo"
 
+    @pytest.mark.unit
+    def test_ring_count_above_the_old_table_is_a_real_word(self):
+        """An 11-ring cage must classify as 'undecacyclo', never '11cyclo'.
+
+        The local prefix table this function used to carry stopped at 10 and
+        then fell through to ``f'{ring_count}cyclo'``, so every system with 11+
+        rings was labelled with a non-word. Both counts below are past that old
+        ceiling; 21 is additionally past ``CYCLO_PREFIXES``' ceiling of 20, so
+        it exercises the P-14.2.1.2 composition ('henicosa') too.
+        """
+        # [12]-ladderane: two 12-carbon rails joined by 12 rungs -> 11 rings.
+        # [22]-ladderane, same construction -> 21 rings.
+        ladder_11 = ("C1CC2C1C1C2C2C1C1C2C2C1C1C3C4C5C6CCC6C5C4C3C21")
+        ladder_21 = ("C1CC2C1C1C2C2C1C1C2C2C1C1C2C2C1C1C2C2C1C1C2C2C3C4C5C6C7C8"
+                     "C9C%10C%11CCC%11C%10C9C8C7C6C5C4C3C12")
+        mol_11 = Chem.MolFromSmiles(ladder_11)
+        mol_21 = Chem.MolFromSmiles(ladder_21)
+        assert mol_11 is not None and mol_21 is not None
+        assert get_ring_count(mol_11) == 11
+        assert get_ring_count(mol_21) == 21
+        assert classify_bridged_system(mol_11) == "undecacyclo"
+        assert classify_bridged_system(mol_21) == "henicosacyclo"
+
 
 # ============================================================================
 # Tests for is_tricyclo_system()

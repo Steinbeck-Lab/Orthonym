@@ -148,19 +148,15 @@ def classify_bridged_system(mol) -> Optional[str]:
     if len(bridgeheads) < 2:
         return None
     
-    prefixes = {
-        2: 'bicyclo',
-        3: 'tricyclo',
-        4: 'tetracyclo',
-        5: 'pentacyclo',
-        6: 'hexacyclo',
-        7: 'heptacyclo',
-        8: 'octacyclo',
-        9: 'nonacyclo',
-        10: 'decacyclo',
-    }
-    
-    return prefixes.get(ring_count, f'{ring_count}cyclo')
+    # Sibling of ``polycyclic.py:_build_descriptor``: the ring-count word is one
+    # rule (P-23.1.9), so it has one implementation. The local table this
+    # replaced stopped at 10 and then fell through to ``f'{ring_count}cyclo'``,
+    # so an 11-ring system was classified as the non-word ``'11cyclo'``.
+    # ``None`` (this function's existing fail-closed channel, already returned
+    # for a non-bridged system) whenever no word can be formed.
+    from .polycyclic import cyclo_ring_count_word
+
+    return cyclo_ring_count_word(ring_count)
 
 
 def is_tricyclo_system(mol) -> bool:

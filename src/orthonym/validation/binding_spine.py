@@ -162,10 +162,19 @@ class BindingKind(str, Enum):
 # Legacy ``TokenBinding.role`` -> kind. Anything absent coerces to PREFIX
 # (the only role a substituent-shaped token can safely be assumed to play)
 # and is recorded, never silently absorbed.
+#
+# v29 Phase 2 T5: ``replacement`` joined the map when the ring producer began
+# emitting one binding per skeletal-replacement morpheme ('oxa', 'aza', ...).
+# Only roles a producer actually emits are listed: an entry for a kind nobody
+# emits would turn this map from "what the legacy producers say" into a mirror
+# of ``BindingKind``, and a future producer's typo would then be indistinguish-
+# able from a deliberate role. FUSION/CHARGE/HYDRO are therefore still absent
+# on purpose, and still land in ``legacy_role_coerced`` if they appear.
 _LEGACY_ROLE_KINDS: Dict[str, BindingKind] = {
     "parent": BindingKind.PARENT,
     "suffix": BindingKind.SUFFIX,
     "prefix": BindingKind.PREFIX,
+    "replacement": BindingKind.REPLACEMENT,
 }
 
 

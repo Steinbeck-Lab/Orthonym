@@ -31,7 +31,7 @@ MAX_CAGE_RINGS = 8
 class UniversalCage:
     descriptor: str                 # e.g. "bicyclo[2.2.1]"
     total_atoms: int
-    hetero_prefix: str              # "" | "7-oxa-" | "2,5-diaza-" ...
+    hetero_prefix: str              # "" | "7-oxa" | "2,5-diaza" ...
     unsaturation: dict              # {'double_bonds': [...], 'triple_bonds': [...]}
     cage_atoms: Tuple[int, ...]     # ORIGINAL mol indices
     atom_to_locant: Dict[int, int]  # ORIGINAL idx -> VB locant
@@ -39,6 +39,14 @@ class UniversalCage:
     is_mancude: bool = False        # aromatic/mancude cage; True only under the
                                     # opt-in complete tier (allow_mancude), where
                                     # the cage emits as a kekulized VB polyene
+    # v29 Phase 2 T5: which ORIGINAL atom each morpheme of ``hetero_prefix``
+    # spells -- (orig idx, morpheme), e.g. ((6, 'oxa'),). Carried so a consumer
+    # can bind one token per replacement morpheme instead of letting the parent
+    # token over-claim the heteroatoms it does not spell. Defaults to () so a
+    # hand-built or differently-shaped cage stays valid; () means "not reported"
+    # and consumers must fall back to whole-cage attribution, NOT assume the
+    # cage is all-carbon.
+    hetero_per_atom: Tuple[Tuple[int, str], ...] = ()
 
 
 def audit_von_baeyer_descriptor(
@@ -242,6 +250,14 @@ def analyze_cage_universal(
         atom_to_locant=atom_to_locant,
         canon_match=tuple(match),
         is_mancude=is_mancude,
+        # ``build_replacement_prefix`` reports per_atom in the CANONICAL indices
+        # it was handed (``kek``/``cage_canon``); ``match`` maps those back to
+        # original indices, the space every other field on this dataclass uses.
+        # These morphemes come from the SAME builder that produced
+        # ``hetero_prefix`` above, so the decomposition is consistent with the
+        # string by construction -- not re-derived and hoped to agree.
+        hetero_per_atom=tuple(sorted(
+            (match[c], morpheme) for c, morpheme in replacement.per_atom)),
     )
 
 
