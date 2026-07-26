@@ -294,31 +294,23 @@ def get_alkoxy_prefix(
             return apply_enclosing_marks(_r_oxy, 0)
         return None  # un-nameable ether-bearing R -> fail closed (never drop a hetero)
 
-    # Count carbons in the substituent fragment
-    carbon_count = _count_fragment_atoms(
-        mol, sub_carbon, {oxygen_idx}, carbons_only=True
+    # Name the R group by its CONSTITUTION, then apply the P-63.2.2.2 alkoxy
+    # morphology.
+    #
+    # This used to be `ALKOXY_NAMES[carbon_count]` / `get_alkyl_name(count)` -- a
+    # pure carbon COUNT with no branching test. A count cannot distinguish the
+    # four C4H9 groups, so (CH3)3C-O-, (CH3)2CH-CH2-O-, CH3-CH2-CH(CH3)-O- and
+    # CH3-[CH2]3-O- were ALL named 'butoxy': one string for four different
+    # molecules. The Blue Book gives each its own preferred prefix
+    # (P-63.2.2.2, BB 27665-27691) and composed_alkoxy_prefix spells that table.
+    from .substituent_enumerator import (
+        composed_alkoxy_prefix,
+        composed_prefix_organyl_name,
     )
-
-    # Get alkoxy name
-    if carbon_count in ALKOXY_NAMES:
-        return ALKOXY_NAMES[carbon_count]
-
-    # For larger groups, build name from alkyl
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        # Remove 'yl' and add 'yloxy' for larger alkoxy groups
-        if alkyl.endswith("yl"):
-            return alkyl[:-2] + "yloxy"
-        return alkyl + "oxy"
-    except (ValueError, KeyError):
-        # get_alkyl_name failed; try get_chain_prefix for arbitrary counts
-        try:
-            from ..data.chain_names import get_chain_prefix
-
-            prefix = get_chain_prefix(carbon_count)
-            return f"{prefix}yloxy"
-        except (ValueError, KeyError):
-            return None  # Not "alkoxy" -- let caller handle absence
+    _alkyl = composed_prefix_organyl_name(mol, r_atoms, sub_carbon)
+    if _alkyl is None:
+        return None  # un-nameable R -> fail closed (never a count-based guess)
+    return composed_alkoxy_prefix(_alkyl)
 
 
 def get_alkoxycarbonyl_prefix(

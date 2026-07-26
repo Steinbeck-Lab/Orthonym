@@ -22,6 +22,7 @@ References:
 """
 
 import logging
+import re
 import threading
 from collections import deque, namedtuple
 from dataclasses import dataclass
@@ -822,6 +823,193 @@ def name_ylidene_substituent(mol, frag_atoms, attach_idx):
     if estimate.confident and estimate.free_valences == 2:
         return token
     return None
+
+
+# ---------------------------------------------------------------------------
+# The COMPOSED-PREFIX organyl chokepoint
+#
+# A composed heteroatom prefix -- alkyl+amino, alkyl+oxy, alkyl+sulfanyl,
+# alkyl+peroxy, ... -- has an organyl half and a composing half. Every producer
+# of such a prefix used to name the organyl half by COUNTING ITS CARBONS and
+# indexing an alkyl-stem table (``get_alkyl_name(n)`` / ``ALKOXY_NAMES[n]``).
+#
+# A carbon count is not a constitution. butyl, 2-methylpropyl, butan-2-yl and
+# tert-butyl are FOUR different C4H9 groups; counting carbons named all four
+# 'butyl', so three of the four names described a molecule other than the one
+# that was drawn. The three functions below are the one place the organyl half
+# is named, cited and multiplied, so the class cannot regrow one site at a time.
+# ---------------------------------------------------------------------------
+
+# P-63.2.2.2 (BB 27667-27691): the retained CONTRACTED alkoxy prefixes. These
+# are the only alkyl stems whose 'yl' contracts with 'oxy'; C5+ keeps the alkyl
+# name whole ('pentyloxy'). 'tert-butoxy' is listed separately because it is a
+# retained name in its own right and is explicitly NOT 'tert-butyloxy'
+# (BB 55662 "tert-butoxy* (unsubstituted) ... (not tert-butyloxy)").
+_ALKOXY_CONTRACTED_STEMS = {
+    'methyl': 'methoxy',
+    'ethyl': 'ethoxy',
+    'propyl': 'propoxy',
+    'butyl': 'butoxy',
+}
+
+# A free valence that carries an EXPLICIT locant ('propan-2-yl', 'butan-2-yl',
+# 'hex-5-en-2-yl'). Such a name is cited WHOLE inside enclosing marks with the
+# composing suffix outside them -- '(propan-2-yl)oxy' -- because contracting it
+# would bury the locant that identifies the attachment carbon.
+_LOCANT_BEARING_YL_RE = re.compile(r'-\d+(?:,\d+)*-yl$')
+
+
+def composed_prefix_organyl_name(mol, frag_atoms, attach_idx):
+    """The PIN substituent-prefix token for an organyl fragment, or ``None``.
+
+    THE organyl-naming step for every composed heteroatom prefix, and the
+    root-cause replacement for ``get_alkyl_name(carbon_count)`` at those sites.
+    The fragment is routed through the shared audited cascade
+    (:func:`name_substituent`), which PERCEIVES the branching a count erases.
+
+    Strict acceptance filter, following the Phase-3
+    ``substituent_purity.organyl_prefix_name`` pattern: a single prefix TOKEN or
+    nothing. Every refusal sentinel is recognised by the ONE shared
+    :func:`errors.is_refusal_sentinel` predicate -- a sentinel welded into a
+    prefix slot becomes part of a name that reads as success -- and a multi-word
+    result is refused too, because a composed prefix must never be assembled
+    around a whole compound name.
+
+    Pure: no mol mutation.
+    """
+    if not frag_atoms:
+        return None
+    name = name_substituent(mol, sorted(frag_atoms), attach_idx,
+                            allow_mancude=False)
+    from ..errors import is_refusal_sentinel
+    if is_refusal_sentinel(name) or ' ' in name:
+        return None
+    return name
+
+
+def cite_organyl_in_composed_prefix(token):
+    """Cite ``token`` inside a composed prefix with its P-16.3.3 enclosing marks.
+
+    A SIMPLE prefix is cited BARE: 'butylamino' and 'methylsulfanyl'
+    (BB 18089 "-NH-CH3 methylamino (preferred prefix)"; BB 27651 "CH3-S-
+    methylsulfanyl (preferred prefix)"). A retained ITALICISED prefix is simple
+    too -- 'tert-butyl' is a preferred prefix cited bare in
+    'tert-butyldi(methyl)phosphane (PIN)' (P-29.6.1, BB 16286).
+
+    A COMPOUND prefix takes enclosing marks with the composing suffix OUTSIDE
+    them: '(propan-2-yl)oxy' and '(butan-2-yl)oxy' are the preferred prefixes
+    (P-63.2.2.2, BB 27683/27687) and '(chloromethyl)amino' likewise (BB 18112).
+    The marks go around the ORGANYL, never around the whole composed prefix.
+
+    The italicised-prefix carve-out is decided by the ONE shared
+    :func:`naming_utils.italicized_prefix_is_bare`, never re-spelled here.
+    """
+    if not token:
+        return None
+    from .naming_utils import enclose_if_compound, italicized_prefix_is_bare
+    # The retained italicised prefixes are simple and cited bare ('tert-butyl');
+    # the primitive judges the REMAINDER, so 'tert-butylsulfanyl' still encloses.
+    if italicized_prefix_is_bare(token):
+        return token
+    # The compound test is the SHARED enclose_if_compound, which already unions
+    # needs_brackets with is_complex_substituent. Neither is complete alone --
+    # is_complex_substituent('hydroxymethyl') is False while needs_brackets is
+    # True -- and spelling a private union here is how this class regrew before.
+    return enclose_if_compound(token)
+
+
+def _is_bare_locant_bearing_alkyl(token):
+    """True iff ``token`` is an UNSUBSTITUTED chain alkyl whose free valence
+    carries an explicit locant -- 'propan-2-yl', 'butan-2-yl', 'hex-5-en-2-yl'.
+
+    Grounded in the real chain-stem table rather than a morphological guess: the
+    token must begin with a tabulated stem ('prop', 'but', ...) immediately
+    followed by its 'an'/'en'/'yn' saturation syllable, so a decorated name like
+    '2-chloropropan-2-yl' (which begins with a locant) can never match.
+
+    This is the P-16.3.4(b) class -- a simple prefix that merely has a locant --
+    as distinct from the P-16.3.5(a) compound class.
+    """
+    if not token or not _LOCANT_BEARING_YL_RE.search(token):
+        return False
+    from ..data.chain_names import get_chain_prefix
+    for n in range(1, 31):
+        stem = get_chain_prefix(n)
+        # 'propan-2-yl'      = prop + an              + -2-yl
+        # 'prop-1-en-2-yl'   = prop +      -1-en      + -2-yl  (BB 7104 'di(...)')
+        # 'hex-5-en-2-yl'    = hex  +      -5-en      + -2-yl
+        if re.fullmatch(
+            rf'{stem}(?:an)?(?:-\d+(?:,\d+)*-(?:en|yn))*-\d+(?:,\d+)*-yl',
+            token,
+        ):
+            return True
+    return False
+
+
+def composed_prefix_multiplier(token, count):
+    """The multiplicative prefix for ``count`` copies of ``token``, or ``None``.
+
+    P-16.3.4(b) / P-16.3.5(a). A SIMPLE substituent prefix -- including one that
+    merely carries a locant -- takes 'di'/'tri': BB 25719
+    '1,4-di(propan-2-yl)cyclohexane (PIN)' and BB 28170
+    '2-[di(butan-2-yl)amino]butan-2-ol (PIN)'. A COMPOUND (substituted) prefix
+    takes 'bis'/'tris': BB 41118 'bis(2-methylpropyl)', BB 40703
+    'bis(chloromethyl)aminoxyl (PIN)' and BB 7104
+    'bis(2-chloropropan-2-yl) (preferred prefix)'.
+
+    ``None`` when the multiplicity has no tabulated prefix -- the caller must
+    then fail closed rather than invent one.
+    """
+    from .naming_utils import COMPLEX_MULTIPLIERS
+    if count < 2:
+        return ''
+    # Derived from the CITATION decision, not re-tested here, so the marks and
+    # the multiplier can never disagree about whether a prefix is compound.
+    marked = cite_organyl_in_composed_prefix(token)
+    compound = marked is not None and marked != token
+    if compound and _is_bare_locant_bearing_alkyl(token):
+        compound = False
+    table = COMPLEX_MULTIPLIERS if compound else SIMPLE_MULTIPLIERS
+    return table.get(count)
+
+
+def composed_alkoxy_prefix(token):
+    """Turn an organyl ``token`` into its P-63.2.2.2 alkoxy prefix, or ``None``.
+
+    The Blue Book tabulates this morphology verbatim (BB 27667-27691):
+
+      * ``CH3-[CH2]3-O-`` **butoxy** -- the retained CONTRACTED prefixes
+        (methoxy, ethoxy, propoxy, butoxy) are simple and cited bare;
+      * ``(CH3)3C-O-`` ***tert*-butoxy** "(preferred prefix) (no substitution)",
+        explicitly NOT 'tert-butyloxy' (BB 55662);
+      * ``(CH3)2CH-O-`` **(propan-2-yl)oxy** and ``CH3-CH2-CH(CH3)-O-``
+        **(butan-2-yl)oxy** -- a locant-bearing free valence keeps the alkyl
+        name whole inside marks, suffix outside;
+      * ``(CH3)2CH-CH2-O-`` **2-methylpropoxy** "(preferred prefix) (not
+        isobutoxy)" -- a free valence at position 1 CONTRACTS even when the
+        chain is branched, and is cited bare.
+
+    ``None`` when the token is not an alkyl the table covers, so the caller
+    fails closed instead of guessing a morphology.
+    """
+    if not token:
+        return None
+    if token == 'tert-butyl':
+        return 'tert-butoxy'
+    # An explicit free-valence locant -> cite the alkyl whole inside marks.
+    if _LOCANT_BEARING_YL_RE.search(token):
+        cited = cite_organyl_in_composed_prefix(token)
+        return f"{cited}oxy" if cited else None
+    if not token.endswith('yl'):
+        return None
+    for stem, contracted in _ALKOXY_CONTRACTED_STEMS.items():
+        if token == stem:
+            return contracted
+        if token.endswith(stem):
+            # '2-methylpropyl' -> '2-methyl' + 'propoxy' = '2-methylpropoxy'
+            return token[:-len(stem)] + contracted
+    # C5+ keeps the alkyl name whole ('pentyloxy', '3-methylpentyloxy').
+    return f"{token}oxy"
 
 
 def _name_substituent_cascade(mol, frag_atoms, attach_idx,

@@ -8130,54 +8130,86 @@ def _name_decorated_amino_branch(
     return name
 
 
-def _assemble_decorated_amino_prefix(branch_entries) -> Optional[str]:
-    """Assemble the P-35.4.1 compound amino prefix from named N-branches.
+def _composed_amino_branch_name(mol, branch_atoms, branch_start) -> Optional[str]:
+    """Name ONE pure-carbon N-branch by its CONSTITUTION, or None (fail closed).
 
-    ``branch_entries``: list of ``(raw_branch_name, decorated: bool)``. At
-    least one entry is decorated — the pure-alkyl fast path never calls this
-    (byte-stability contract for '(methylamino)'/'(dimethylamino)').
+    The replacement for ``get_alkyl_name(_count_carbon_chain(...))`` at both
+    chain-parent amino sites. A carbon COUNT named butyl, 2-methylpropyl,
+    butan-2-yl and tert-butyl all 'butyl' — four C4H9 constitutions collapsed
+    onto one string, so three of every four such names described a molecule
+    other than the one drawn. The shared composed-prefix chokepoint perceives
+    the branching the count erased.
+
+    Returns the RAW branch name WITHOUT enclosing marks, exactly like
+    :func:`_name_decorated_amino_branch`; the marks are
+    ``_assemble_decorated_amino_prefix``'s job.
+    """
+    from .substituent_enumerator import composed_prefix_organyl_name
+    return composed_prefix_organyl_name(mol, branch_atoms, branch_start)
+
+
+def _assemble_decorated_amino_prefix(branch_entries) -> Optional[str]:
+    """Assemble the amino prefix from named N-branches — the ONE assembler.
+
+    ``branch_entries``: list of ``(raw_branch_name, decorated: bool)``. The
+    ``decorated`` flag is now vestigial for GRAMMAR: whether a branch needs
+    enclosing marks is decided from the NAME by the shared
+    ``cite_organyl_in_composed_prefix``, so a decorated branch and a branched
+    plain alkyl ('butan-2-yl') cannot be punctuated by two different rules.
+    Every branch reaches this function, including the pure-alkyl ones that used
+    to be assembled inline — the simple cases stay byte-identical
+    ('(methylamino)', '(dimethylamino)', '(butylamino)').
 
     Grammar (Blue-Book-cited in  §1.C/§1.E):
-      * decorated branch names are ALWAYS parenthesized (P-16.5.1.1: parens
-        around ALL compound prefixes): '(chloromethyl)';
-      * k identical decorated branches take bis/tris OUTSIDE the parens
-        (P-16.5.1.10; BB 40703 'bis(chloromethyl)aminoxyl (PIN)');
+      * a COMPOUND branch name is always parenthesized (P-16.5.1.1):
+        '(chloromethyl)', '(butan-2-yl)', '(2-methylpropyl)';
+      * a SIMPLE branch is bare when FIRST-cited, parenthesized after
+        (P-16.5.1.3.1; BB 26308 '3-[methyl(phenyl)amino]phenol');
+      * k identical branches take their multiplier OUTSIDE the parens, chosen by
+        ``composed_prefix_multiplier`` — 'bis' for a compound prefix (BB 40703
+        'bis(chloromethyl)aminoxyl (PIN)') but 'di' for a simple prefix that
+        merely carries a locant (BB 28170
+        '2-[di(butan-2-yl)amino]butan-2-ol (PIN)');
       * distinct branches cite in alphanumerical order via alpha_sort_key
         (letters-only: '2-hydroxyethyl' sorts at 'h' — NEVER raw sorted());
-      * a simple-alkyl branch is bare when FIRST-cited, parenthesized after
-        (P-16.5.1.3.1; BB 26308 '3-[methyl(phenyl)amino]phenol');
       * the whole prefix takes the outer mark ESCALATED via
         apply_enclosing_marks(-1) (P-16.5.2.4): '[(chloromethyl)amino]',
         cited verbatim by the composer prefix-joiner like the legacy
         '(methylamino)' convention.
     """
     from collections import Counter
-    from .naming_utils import (
-        COMPLEX_MULTIPLIERS,
-        SIMPLE_MULTIPLIERS,
-        alpha_sort_key,
-        apply_enclosing_marks,
+    from .naming_utils import alpha_sort_key, apply_enclosing_marks
+    from .substituent_enumerator import (
+        cite_organyl_in_composed_prefix,
+        composed_prefix_multiplier,
     )
     counts = Counter(branch_entries)
     cited = []
     ordered = sorted(counts.items(), key=lambda kv: alpha_sort_key(kv[0][0]))
-    for i, ((bname, decorated), k) in enumerate(ordered):
-        if decorated:
-            if k == 1:
-                cited.append(f"({bname})")
+    for i, ((bname, _decorated), k) in enumerate(ordered):
+        marked = cite_organyl_in_composed_prefix(bname)
+        if marked is None:
+            return None
+        # The caller's ``decorated`` flag is OR-ed in, never relied on alone: a
+        # decorated branch was ALWAYS parenthesized before, so honouring the flag
+        # guarantees this rewrite can only add marks, never drop a pair.
+        compound = marked != bname or _decorated
+        if compound and marked == bname:
+            from .naming_utils import apply_enclosing_marks
+            marked = apply_enclosing_marks(bname, -1)
+        if k == 1:
+            if compound:
+                cited.append(marked)
             else:
-                mult = COMPLEX_MULTIPLIERS.get(k)
-                if mult is None:
-                    return None
-                cited.append(f"{mult}({bname})")
-        else:
-            if k == 1:
                 cited.append(bname if i == 0 else f"({bname})")
-            else:
-                mult = SIMPLE_MULTIPLIERS.get(k)
-                if mult is None:
-                    return None
-                cited.append(f"{mult}{bname}" if i == 0 else f"{mult}({bname})")
+            continue
+        mult = composed_prefix_multiplier(bname, k)
+        if not mult:
+            return None
+        if compound:
+            cited.append(f"{mult}{marked}")
+        else:
+            cited.append(f"{mult}{bname}" if i == 0 else f"{mult}({bname})")
     return apply_enclosing_marks("".join(cited) + "amino", -1)
 
 
@@ -8384,37 +8416,28 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                         else:
                             _branch_entries.append((_bname, True))
                         continue
-                    _bc = _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {idx})
-                    if _bc <= 0:
+                    # PURE-CARBON branch. This used to be
+                    # get_alkyl_name(_count_carbon_chain(...)) -- a carbon COUNT,
+                    # which cannot tell butyl from 2-methylpropyl, butan-2-yl or
+                    # tert-butyl, so all four C4H9 constitutions were named
+                    # '(butylamino)'. The shared chokepoint perceives the
+                    # branching; an unnameable branch fails closed rather than
+                    # shipping a truncated name.
+                    if not _batoms:
                         continue
-                    try:
-                        _branch_entries.append((get_alkyl_name(_bc), False))
-                    except (ValueError, KeyError):
+                    _bname = _composed_amino_branch_name(
+                        mol, _batoms, nbr.GetIdx())
+                    if _bname is None:
                         _branch_impure = True
-            if _decorated_failed:
+                        continue
+                    _branch_entries.append((_bname, False))
+            if _decorated_failed or _branch_impure:
                 # P-35.4.1 fail-closed: never the truncated alkyl name, never
                 # a branch-dropping 'amino'. (The chain-bonded N is unique per
                 # substituent, so no later iteration can re-emit this amino.)
                 return None
-            if any(_d for _n, _d in _branch_entries):
-                if _branch_impure:
-                    return None
+            if _branch_entries:
                 return _assemble_decorated_amino_prefix(_branch_entries)
-            _branch_alkyls = [_n for _n, _d in _branch_entries]
-            if _branch_alkyls and not _branch_impure:
-                if len(_branch_alkyls) == 1:
-                    return f"({_branch_alkyls[0]}amino)"
-                from collections import Counter as _Counter
-
-                _counts = _Counter(_branch_alkyls)
-                _parts = []
-                for _nm in sorted(_counts.keys()):
-                    _c = _counts[_nm]
-                    _parts.append(
-                        _nm if _c == 1
-                        else f"{SIMPLE_MULTIPLIERS.get(_c, str(_c))}{_nm}"
-                    )
-                return f"({''.join(_parts)}amino)"
             continue
 
         # Found carbonyl: identify the C=O oxygen
@@ -8904,33 +8927,24 @@ def _name_n_attached_substituent_fallback(
                     return None  # P-35.4.1 fail-closed
                 branch_entries.append((_bname, True))
                 continue
-            bc = _count_carbon_chain(mol, nbr.GetIdx(), chain_set | {attach_atom})
-            if bc <= 0:
+            # PURE-CARBON branch: named by CONSTITUTION, not by carbon count
+            # (see _composed_amino_branch_name for the four-C4H9 collapse).
+            if not _batoms:
                 continue
-            try:
-                branch_entries.append((get_alkyl_name(bc), False))
-            except (ValueError, KeyError):
+            _bname = _composed_amino_branch_name(mol, _batoms, nbr.GetIdx())
+            if _bname is None:
                 branch_impure = True
+                continue
+            branch_entries.append((_bname, False))
 
-    if any(_d for _n, _d in branch_entries):
-        if branch_impure:
-            return None  # decorated + un-nameable sibling -> fail closed
-        return _assemble_decorated_amino_prefix(branch_entries)
-    branch_alkyls = [_n for _n, _d in branch_entries]
-    if not branch_alkyls or branch_impure:
+    if branch_impure:
+        # A carbon branch EXISTS but could not be named. Returning the bare
+        # 'amino' here would drop it silently and name a different molecule,
+        # so fail closed. (The no-branch -NH2 case never sets this flag.)
+        return None
+    if not branch_entries:
         return "amino"
-    if len(branch_alkyls) == 1:
-        # Single N-alkyl: exact legacy form (byte-identical).
-        return f"({branch_alkyls[0]}amino)"
-    # N,N-dialkyl(+): multiplicity prefix, e.g. -N(CH3)2 -> (dimethylamino).
-    from collections import Counter as _Counter
-
-    _counts = _Counter(branch_alkyls)
-    _parts = []
-    for _nm in sorted(_counts.keys()):
-        _c = _counts[_nm]
-        _parts.append(_nm if _c == 1 else f"{SIMPLE_MULTIPLIERS.get(_c, str(_c))}{_nm}")
-    return f"({''.join(_parts)}amino)"
+    return _assemble_decorated_amino_prefix(branch_entries)
 
 
 def _name_c_attached_ring_substituent_fallback(
