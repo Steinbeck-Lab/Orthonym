@@ -598,7 +598,9 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # yl)methoxy]silane' BB-style); simple methyl/ethyl stay bare
             # unless multiplied next to a compound neighbour.
             def _ligand_token(count, name):
-                from ..assembly.naming_utils import needs_p1634_marks
+                from ..assembly.naming_utils import (
+                    has_structural_hyphen, needs_p1634_marks,
+                )
                 mult = _multiplicative_prefix(count)
                 # W3-P03-7 (P-16.3.4(c)/(d), BB 38222): a multiplied alkyl ligand
                 # whose NAME begins with a numeric-multiplier syllable (decyl /
@@ -608,13 +610,25 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 # complex, so it is NOT switched to bis). Gated on count > 1.
                 if count > 1 and needs_p1634_marks(name):
                     return f'{mult}({name})'
-                complex_name = ('-' in name or '(' in name
-                                or _is_complex_ligand_oxy(name))
-                if complex_name:
+                # v29 P3 (P-16.3.4 / P-29.6.1): the hyphen test is the SHARED
+                # has_structural_hyphen, not a raw `'-' in name`. A leading
+                # italicized 'tert-'/'sec-' is part of a SIMPLE retained prefix and
+                # takes NO marks -- BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN)
+                # cites tert-butyl bare, and P-16.3.4 spells out 'N-tert-butyl' NOT
+                # 'N-(tert-butyl)'. The raw hyphen test made this site the FOURTH
+                # divergent copy of the compound predicate and emitted the non-PIN
+                # '(tert-butyl)di(methyl)(oxiranylmethoxy)silane' -- the very form
+                # the comment above quotes the Blue Book as writing bare.
+                # 'tert-butyl-dimethylsilyl' still has a structural hyphen and is
+                # still complex.
+                def _compound_ligand(nm):
+                    return (has_structural_hyphen(nm) or '(' in nm
+                            or _is_complex_ligand_oxy(nm))
+
+                if _compound_ligand(name):
                     inner = f'({name})' if '(' not in name else f'[{name}]'
                     return f'{mult}{inner}' if not mult else f'{mult}{inner}'
-                if mult and any('-' in n or '(' in n or _is_complex_ligand_oxy(n)
-                                for _c, n in sorted_groups):
+                if mult and any(_compound_ligand(n) for _c, n in sorted_groups):
                     return f'{mult}({name})'
                 return f'{mult}{name}'
 

@@ -10,6 +10,7 @@ Handles:
 - Phosphanyl prefix for P as substituent (e.g., diphenylphosphanyl)
 """
 
+import re
 from typing import Optional, Tuple, List
 from collections import deque, Counter
 from rdkit import Chem
@@ -162,26 +163,42 @@ def _build_substituent_string(names: List[str]) -> str:
         ["methyl", "phenyl", "phenyl"] -> "methyl(diphenyl)"
 
     Note: IUPAC alphabetical ordering ignores multiplicative prefixes (di, tri).
+
+    v29 P3: two corrections that only became REACHABLE when the organyl guard
+    started admitting compound prefixes (``benzyl``, ``cyclohexylmethyl``,
+    ``(4-bromophenyl)methyl``):
+
+    * the order is the P-14.5.2 alphanumerical one (letters only, sec-/tert-
+      excluded), not raw string order -- raw order sorts ``(4-bromophenyl)methyl``
+      on its leading ``(``;
+    * the enclosing marks escalate ( -> [ -> { for a name that already carries
+      brackets (P-16.5.4.1), and the FIRST cited group is enclosed too when it is
+      itself a compound prefix (P-16.3.3), since P-16.5.1.3's "first group bare"
+      only removes the marks that separate the groups from each other.
     """
+    from ..assembly.naming_utils import (alpha_sort_key, apply_enclosing_marks,
+                                         enclose_if_compound)
+
     counts = Counter(names)
     multiplier_map = {1: "", 2: "di", 3: "tri", 4: "tetra"}
 
-    # Sort unique names alphabetically
-    sorted_unique = sorted(counts.keys())
+    def _alnum_key(name: str) -> str:
+        return re.sub(r"[^a-z]", "", alpha_sort_key(name))
+
+    sorted_unique = sorted(counts.keys(), key=_alnum_key)
 
     parts = []
     for i, name in enumerate(sorted_unique):
         count = counts[name]
         multiplier = multiplier_map.get(count, "")
         if len(sorted_unique) >= 2 and i > 0:
-            # P-16.5.1.3: second+ different substituents get parentheses
-            if count > 1:
-                parts.append(f"({multiplier}{name})")
-            else:
-                parts.append(f"({name})")
-        else:
-            # First substituent or only unique substituent: no enclosing marks
+            # P-16.5.1.3: second+ different substituents get enclosing marks.
+            parts.append(apply_enclosing_marks(f"{multiplier}{name}", -1))
+        elif count > 1:
             parts.append(f"{multiplier}{name}")
+        else:
+            # First (or only) group: bare unless it is itself compound/complex.
+            parts.append(enclose_if_compound(name))
 
     return "".join(parts)
 
@@ -295,11 +312,20 @@ def _name_pnictogen_onic_acid(
     """R-E(=O)(OH)2 -> ``{R-yl}{stem} acid`` for E in {P, As, Sb}.
 
     The single shared implementation behind :func:`name_phosphonic_acid` and its
-    arsenic/antimony analogues. Fail-closed (``None``) unless the one organyl is
-    a clean simple alkyl/aryl, so a complex substituent defers to the generic
-    path rather than risking a wrong name.
+    arsenic/antimony analogues. Fail-closed (``None``) unless the one organyl can
+    be named as a detachable prefix, so an unprovable substituent defers to the
+    generic path rather than risking a wrong name.
+
+    v29 P3: the organyl goes through :func:`organyl_prefix_name`, which routes to
+    the shared substituent chokepoint, so a ring-bearing / branched / unsaturated
+    organyl is NAMED instead of refused -- ``benzylphosphonic acid`` with the
+    P-29.6.1 retained preferred prefix (BB ``2-benzylpyridine`` PIN), and
+    ``[(4-bromophenyl)methyl]phosphonic acid`` for the substituted benzyl that
+    P-29.6.1 forbids spelling as a benzyl (BB ``2-[(4-bromophenyl)methyl]-
+    pyridine`` PIN). A compound or complex prefix takes P-16.3.3 enclosing marks.
     """
-    from .substituent_purity import pure_organyl_prefix_name  # lazy: avoid import cycle
+    from .substituent_purity import organyl_prefix_name  # lazy: avoid import cycle
+    from ..assembly.naming_utils import enclose_if_compound
 
     stem = _PNICTOGEN_OXOACID_STEMS.get(symbol, (None, None))[0]
     if stem is None:
@@ -314,10 +340,10 @@ def _name_pnictogen_onic_acid(
     if len(carbons) != 1:               # an -onic acid has exactly one C-E bond
         return None
 
-    prefix = pure_organyl_prefix_name(mol, carbons[0].GetIdx(), central_idx)
+    prefix = organyl_prefix_name(mol, carbons[0].GetIdx(), central_idx)
     if prefix is None:
-        return None                     # complex organyl -> defer (fail-closed)
-    return f"{prefix}{stem} acid"
+        return None                     # unprovable organyl -> defer (fail-closed)
+    return f"{enclose_if_compound(prefix)}{stem} acid"
 
 
 def _name_pnictogen_inic_acid(
@@ -330,9 +356,8 @@ def _name_pnictogen_inic_acid(
     marks from :func:`_build_substituent_string`, which yields the BB L36066
     verbatim PIN ``methyl(phenyl)arsinic acid`` for C6H5-As(CH3)(O)OH.
 
-    ACCURACY FIX (Phase B): each substituent goes through
-    ``pure_organyl_prefix_name``, the same purity gate the -onic path already
-    used, instead of calling ``_characterize_substituent`` raw.
+    ACCURACY FIX (Phase B): each substituent goes through the shared organyl
+    guard instead of calling ``_characterize_substituent`` raw.
     ``_characterize_substituent`` counts the carbons of a non-aromatic subtree
     as a LINEAR chain, so a cyclic substituent was silently renamed --
     benzyl(methyl)phosphinic acid came back as 'heptyl(methyl)phosphinic acid'
@@ -340,8 +365,12 @@ def _name_pnictogen_inic_acid(
     strings were caught downstream by the SELF-01 OPSIN check, but that gate
     fails OPEN when no JRE is present, so the refusal has to happen here.  Fixed
     for P, As and Sb together since all three share this code path.
+
+    v29 P3: that guard is now :func:`organyl_prefix_name`, which routes to the
+    shared substituent chokepoint, so the cyclic substituent is NAMED rather than
+    refused -- ``benzyl(methyl)phosphinic acid``.
     """
-    from .substituent_purity import pure_organyl_prefix_name  # lazy: avoid import cycle
+    from .substituent_purity import organyl_prefix_name  # lazy: avoid import cycle
 
     stem = _PNICTOGEN_OXOACID_STEMS.get(symbol, (None, None))[1]
     if stem is None:
@@ -358,9 +387,9 @@ def _name_pnictogen_inic_acid(
 
     sub_names = []
     for neighbor in neighbors:
-        name = pure_organyl_prefix_name(mol, neighbor.GetIdx(), central_idx)
+        name = organyl_prefix_name(mol, neighbor.GetIdx(), central_idx)
         if name is None:
-            return None                 # complex organyl -> defer (fail-closed)
+            return None                 # unprovable organyl -> defer (fail-closed)
         sub_names.append(name)
 
     return f"{_build_substituent_string(sub_names)}{stem} acid"

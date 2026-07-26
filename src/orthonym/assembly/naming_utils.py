@@ -14,7 +14,7 @@ The mapping from atom indices to locants is handled elsewhere.
 """
 
 import re
-from typing import List
+from typing import List, Tuple
 
 
 # ============================================================================
@@ -85,6 +85,75 @@ BRANCH_HANDLED_FGS: frozenset = frozenset({
     'fluoro', 'chloro', 'bromo', 'iodo',  # -> "fluoromethyl" etc.
     'nitro',              # W2F-P3 -> "nitromethyl", "1,2-dinitropropyl"
 })
+
+# ---------------------------------------------------------------------------
+# P-16.3.4 / P-29.6.1: the italicized STRUCTURAL prefixes that are written with a
+# hyphen and are nevertheless part of a SIMPLE retained prefix name.
+#
+# 'tert-butyl' is a retained *preferred* prefix (P-29.6.1, BB 16270) and the Blue
+# Book cites it BARE, hyphen and all:  BB 16286  ***tert*-butyldi(methyl)phosphane
+# (PIN)** -- no enclosing marks on the first cited group. BB 16282 adds that the
+# retained name "has never been recommended for further substitution ... Acceptable
+# locants have never been adopted for this name", so the hyphen can never be a
+# locant boundary. P-16.3.4 states the consequence for both marks and multipliers:
+# 'di-tert-butyl' (NOT 'bis(tert-butyl)'), 'N-tert-butyl' (NOT 'N-(tert-butyl)').
+# 'sec-' behaves identically ('sec-butyl', general nomenclature).
+#
+# THE ONE definition of this carve-out. Do not re-derive it inline: before v29 P3
+# it existed as three divergent copies (is_complex_substituent's inline strip,
+# format_substituent_prefix's startswith() open-code, organometallics'
+# `'-' in name`) and was MISSING from needs_brackets, so the predicates disagreed
+# and the union of them over-enclosed 'tert-butyl' -> '(tert-butyl)arsonic acid'.
+_ITALICIZED_STRUCTURAL_PREFIXES = ("sec-", "tert-")
+
+
+def strip_italicized_structural_prefix(name: str) -> Tuple[str, bool]:
+    """Split a leading italicized structural prefix (``sec-`` / ``tert-``) off a
+    substituent name.
+
+    Returns ``(remainder, had_prefix)``. The hyphen of such a prefix is part of a
+    SIMPLE retained name (P-16.3.4 / P-29.6.1, BB 16282/16286) and must therefore
+    not be read as evidence that the name is a compound substituent.
+
+    The remainder is what decides: ``tert-butyl`` reduces to the simple ``butyl``
+    and is cited bare, while ``tert-butylsulfanyl`` reduces to the still-compound
+    ``butylsulfanyl`` and keeps its enclosing marks.
+
+    Examples:
+        >>> strip_italicized_structural_prefix("tert-butyl")
+        ('butyl', True)
+        >>> strip_italicized_structural_prefix("sec-butyl")
+        ('butyl', True)
+        >>> strip_italicized_structural_prefix("2-methylpropyl")
+        ('2-methylpropyl', False)
+    """
+    if not name:
+        return name, False
+    lowered = name.lower()
+    for prefix in _ITALICIZED_STRUCTURAL_PREFIXES:
+        if lowered.startswith(prefix):
+            return name[len(prefix):], True
+    return name, False
+
+
+def has_structural_hyphen(name: str) -> bool:
+    """Does ``name`` carry a hyphen that makes it a COMPOUND substituent?
+
+    True for every hyphen except a leading italicized structural prefix
+    (P-16.3.4: ``tert-butyl`` / ``sec-butyl`` are simple; ``2-methylpropyl`` and
+    ``tert-butyl-dimethylsilyl`` are compound).
+
+    Examples:
+        >>> has_structural_hyphen("tert-butyl")
+        False
+        >>> has_structural_hyphen("2-methylpropyl")
+        True
+        >>> has_structural_hyphen("methyl")
+        False
+    """
+    remainder, _ = strip_italicized_structural_prefix(name)
+    return "-" in remainder
+
 
 # Shared C1-C20 alkyl roots used by needs_brackets(), is_complex_substituent(),
 # and regex patterns. Extends coverage beyond the original C1-C10 lists.
@@ -590,6 +659,10 @@ def needs_brackets(name: str) -> bool:
         False
         >>> needs_brackets("methoxy")
         False
+        >>> needs_brackets("tert-butyl")
+        False
+        >>> needs_brackets("tert-butylsulfanyl")
+        True
     """
     if not name:
         return False
@@ -598,6 +671,16 @@ def needs_brackets(name: str) -> bool:
     if (name.startswith('(') and name.endswith(')')) or \
        (name.startswith('[') and name.endswith(']')):
         return False
+
+    # P-16.3.4 / P-29.6.1 (BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN), cited
+    # BARE): a leading italicized structural prefix is part of a SIMPLE retained
+    # name, so it must not trip the hyphen rule below. Decide on the REMAINDER --
+    # 'tert-butyl' -> 'butyl' (simple, bare) but 'tert-butylsulfanyl' ->
+    # 'butylsulfanyl' (still compound by the chalcogen rule, keeps its marks).
+    # THE single carve-out site; see strip_italicized_structural_prefix.
+    _remainder, _had_italicized = strip_italicized_structural_prefix(name)
+    if _had_italicized:
+        return needs_brackets(_remainder)
 
     # Contains a digit (has locants): definitely compound
     if any(ch.isdigit() for ch in name):
@@ -827,6 +910,40 @@ def apply_enclosing_marks(name: str, depth: int = 0) -> str:
     return f"{open_mark}{name}{close_mark}"
 
 
+def enclose_if_compound(name: str) -> str:
+    """Enclose a substituent prefix in P-16.3.3 marks iff it is compound/complex.
+
+    A SIMPLE prefix (``methyl``, ``phenyl``, ``cyclohexyl``, and the retained
+    ``benzyl``) is cited bare — BB ``2-benzylpyridine`` (PIN), P-29.6.1. A
+    COMPOUND or COMPLEX prefix takes enclosing marks, escalating ( -> [ -> {
+    when the name already carries brackets — BB
+    ``2-[(4-bromophenyl)methyl]pyridine`` (PIN), P-29.6.1 / P-16.5.4.1.
+
+    The compound test is the union of the two existing predicates because
+    neither is complete on its own: ``needs_brackets`` catches a locant, a
+    hyphen and a fused functional prefix (``bromomethyl``) but not a bare
+    two-prefix compound; ``is_complex_substituent`` catches the two-prefix
+    compound (``cyclohexylmethyl``) but not the fused functional prefix.
+
+    Idempotent: an already fully-enclosed token is returned untouched.
+
+    Examples:
+        >>> enclose_if_compound("benzyl")
+        'benzyl'
+        >>> enclose_if_compound("cyclohexylmethyl")
+        '(cyclohexylmethyl)'
+        >>> enclose_if_compound("(4-bromophenyl)methyl")
+        '[(4-bromophenyl)methyl]'
+        >>> enclose_if_compound("(2-chloroethyl)")
+        '(2-chloroethyl)'
+    """
+    if not name or _is_fully_enclosed(name):
+        return name
+    if needs_brackets(name) or is_complex_substituent(name):
+        return apply_enclosing_marks(name, -1)
+    return name
+
+
 def is_complex_substituent(name: str) -> bool:
     """Determine if a substituent name is complex.
 
@@ -869,12 +986,8 @@ def is_complex_substituent(name: str) -> bool:
     # in marks (N-tert-butyl, NOT N-(tert-butyl)). Phase 171 BBR-ASM: without this,
     # coupling the paren/bis decision to is_complex_substituent over-parenthesised
     # tert-butyl. The leading-digit case above still catches genuine compounds.
-    _hyphen_probe = name.lower()
-    for _retained_prefix in ("sec-", "tert-"):
-        if _hyphen_probe.startswith(_retained_prefix):
-            _hyphen_probe = _hyphen_probe[len(_retained_prefix):]
-            break
-    if "-" in _hyphen_probe:
+    # v29 P3: the strip is the SHARED primitive, not an inline copy.
+    if has_structural_hyphen(name):
         return True
     # Check for embedded multiplier + substituent name patterns (IUPAC P-14.5.2)
     if _MULT_SUBSTITUENT_RE.match(name):
@@ -1228,11 +1341,16 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # aminomethyl, ...) are digit-less/hyphen-less COMPOUND substituents that
     # is_complex_substituent misses but needs_brackets flags (BB '3-(carboxymethyl)
     # heptanedioic acid'). Fold needs_brackets in here — the ONE canonical
-    # enclosing-mark predicate the docstring mandates. Preserve is_complex's
-    # deliberate tert-/sec- carve-out (P-16.3.4: di-tert-butyl, never bis/(tert-
-    # butyl)) by NOT letting the needs_brackets hyphen rule re-wrap those retained
-    # forms; is_complex already flags every other hyphen/digit compound.
-    if needs_brackets(name) and not name.lower().startswith(("tert-", "sec-")):
+    # enclosing-mark predicate the docstring mandates.
+    #
+    # v29 P3: this used to carry a FOURTH copy of the P-16.3.4 tert-/sec- carve-out
+    # (`and not name.lower().startswith(("tert-", "sec-"))`), because needs_brackets
+    # lacked it. needs_brackets now owns the carve-out (via
+    # strip_italicized_structural_prefix), so the open-code is gone. It was also
+    # strictly BROADER than the rule: it suppressed the marks on 'tert-butyl' (right,
+    # P-16.3.4) but equally on 'tert-butylsulfanyl' (wrong — a compound chalcogen
+    # prefix takes marks under P-16.3.3, exactly as '(methylsulfanyl)' does).
+    if needs_brackets(name):
         complex = True
     # W3-P03-7 (P-16.3.4(c)/(d)): a multiplied alkyl name beginning with a numeric-
     # multiplier syllable (decyl / dodecyl..nonadecyl) takes enclosing marks —
@@ -1273,7 +1391,11 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # keeps the hyphen boundary: '1,2-di-tert-butylbenzene' (PIN, BB
     # P-25.7.1.x example list), never 'ditert-butyl'.  Parenthesized names
     # never start with 'tert-'/'sec-', so the bis/tris path is unaffected.
-    if multiplier and formatted_name.startswith(("tert-", "sec-")):
+    # v29 P3: a DIFFERENT rule from the enclosure carve-out (this one inserts a
+    # hyphen, that one withholds marks) but the same DETECTION, so it shares the
+    # one primitive rather than open-coding a fifth startswith().
+    _, _leads_with_italicized = strip_italicized_structural_prefix(formatted_name)
+    if multiplier and _leads_with_italicized:
         multiplier = f"{multiplier}-"
 
     # Assemble: locants-multiplier+name. An empty locant list (elided per
