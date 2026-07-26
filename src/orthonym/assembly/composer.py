@@ -8148,8 +8148,13 @@ def _composed_amino_branch_name(mol, branch_atoms, branch_start) -> Optional[str
     return composed_prefix_organyl_name(mol, branch_atoms, branch_start)
 
 
-def _assemble_decorated_amino_prefix(branch_entries) -> Optional[str]:
+def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True) -> Optional[str]:
     """Assemble the amino prefix from named N-branches — the ONE assembler.
+
+    ``enclose=False`` returns the CORE ('methyl(propanoyl)amino') without the
+    outer P-16.5.2.4 mark pair, for the one caller whose own caller applies
+    those marks. Every ordering and per-branch marking decision is unchanged, so
+    the default path stays byte-identical.
 
     ``branch_entries``: list of ``(raw_branch_name, decorated: bool)``. The
     ``decorated`` flag is now vestigial for GRAMMAR: whether a branch needs
@@ -8210,7 +8215,8 @@ def _assemble_decorated_amino_prefix(branch_entries) -> Optional[str]:
             cited.append(f"{mult}{marked}")
         else:
             cited.append(f"{mult}{bname}" if i == 0 else f"{mult}({bname})")
-    return apply_enclosing_marks("".join(cited) + "amino", -1)
+    core = "".join(cited) + "amino"
+    return apply_enclosing_marks(core, -1) if enclose else core
 
 
 def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
@@ -8538,14 +8544,43 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
         if _amido_nm:
             return _amido_nm
 
+        # C4d (P-35.4.2 concatenation): an acyl rooted on a CHALCOGEN rather
+        # than on carbon -- the carbamate/urethane class R-X-CO-NH-, which
+        # covers every alkoxycarbonyl (Boc, Cbz, methoxycarbonyl, ...) -- has
+        # no hydrocarbyl acyl name for the count below to find. Build the
+        # concatenated prefix from the chalcogen group via the ONE shared
+        # primitive. This branch NEVER falls through: once the acyl is
+        # chalcogen-rooted the count is meaningless, so an unspellable one
+        # fails closed.
+        from .substituent_enumerator import (
+            ACYL_CHALCOGEN_UNNAMEABLE as _ACYL_X_FAIL,
+            chalcogen_rooted_acyl_amino_core as _acyl_x_core,
+        )
+        _cg = _acyl_x_core(mol, carbonyl_c, idx, sub_set)
+        if _cg is _ACYL_X_FAIL:
+            return None
+        if _cg is not None:
+            from .naming_utils import apply_enclosing_marks as _aem
+            return _aem(_cg, -1)
+
         # Count carbons from carbonyl C through C-C bonds only
         # (don't traverse through N to reach other peptide fragments)
         exclude = chain_set | {idx}  # exclude chain and the N
         if carbonyl_o is not None:
             exclude.add(carbonyl_o)  # exclude the C=O oxygen
+
+        # C4d soundness gate. What follows spells a COUNT as an unbranched
+        # saturated stem, so it is only faithful when the acyl really is an
+        # unbranched, acyclic, saturated, all-carbon chain. Without this test
+        # it renamed isobutyryl 'butanoylamino' (n-butyryl), pivaloyl
+        # 'pentanoylamino' and acryloyl 'propanoylamino' -- each a
+        # constitutionally DIFFERENT acyl, not merely a different spelling.
+        # ``_pure_linear_alkyl_len`` is the existing shared predicate for
+        # exactly that shape, so the faithful cases stay byte-identical.
+        if _pure_linear_alkyl_len(mol, carbonyl_c, exclude) is None:
+            return None
+
         acyl_carbons = _count_carbon_chain(mol, carbonyl_c, exclude)
-        if acyl_carbons == 0:
-            acyl_carbons = 1  # at minimum the carbonyl C
 
         # Legacy fallback (method (2), non-preferred): (prefixanoylamino)
         # with enclosing parens — kept only for branches the strict amido

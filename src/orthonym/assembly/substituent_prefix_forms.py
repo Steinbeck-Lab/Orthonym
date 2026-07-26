@@ -1008,20 +1008,27 @@ def _alkoxy_name_for_branch(
             if nbr_idx not in visited and nbr_idx not in exclude:
                 queue.append(nbr_idx)
 
-    carbon_count = _count_fragment_atoms(
-        mol, alkyl_atom, exclude, carbons_only=True
+    # C4d: a carbon COUNT cannot describe this branch, and the ALKOXY_NAMES
+    # lookup it fed spelled five of six real Boc-family branches as a different
+    # group: tert-butyl read as 4 carbons became n-'butoxy', benzyl as 7 became
+    # 'heptyloxy' (a straight chain for a ring), phenyl as 6 became 'hexyloxy',
+    # allyl as 3 became saturated 'propoxy' (losing the double bond), and
+    # propan-2-yl became n-'propoxy'. Only methyl was right, and only by
+    # coincidence. PERCEIVE the branch instead, through the same BB-cited
+    # primitives the rest of the composed-prefix system uses -- P-63.2.2.2
+    # tabulates the morphology (BB 27667-27691) and composed_alkoxy_prefix
+    # spells it, including the retained contraction tert-butoxy (BB 27679,
+    # "not tert-butyloxy").
+    if not visited:
+        return None
+    from .substituent_enumerator import (
+        composed_alkoxy_prefix,
+        composed_prefix_organyl_name,
     )
-    if carbon_count == 0:
+    token = composed_prefix_organyl_name(mol, sorted(visited), alkyl_atom)
+    if not token:
         return None
-    if carbon_count in ALKOXY_NAMES:
-        return ALKOXY_NAMES[carbon_count]
-    try:
-        alkyl = get_alkyl_name(carbon_count)
-        if alkyl.endswith("yl"):
-            return alkyl[:-2] + "yloxy"
-        return alkyl + "oxy"
-    except (ValueError, KeyError):
-        return None
+    return composed_alkoxy_prefix(token)
 
 
 def _name_alkyl_branch_from_atom(

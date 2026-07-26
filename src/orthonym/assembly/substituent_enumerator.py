@@ -996,6 +996,15 @@ def composed_alkoxy_prefix(token):
         return None
     if token == 'tert-butyl':
         return 'tert-butoxy'
+    # 'phenoxy' is retained as the PREFERRED prefix, so C6H5-O- never spells out
+    # as 'phenyloxy': BB 17796 "phenoxy (preferred prefix) (full substitution;
+    # see P-63.2.2.2)" and BB 24567 "phenoxy (preferred prefix) (a retained
+    # simple prefix derived from phenol; substitution allowed)". Only the BARE
+    # ring contracts -- BB 24607 gives "([1,1'-biphenyl]-4-yl)oxy (preferred
+    # prefix) (not 4-phenylphenoxy)", so a token that merely ENDS in 'phenyl'
+    # must not be contracted here.
+    if token == 'phenyl':
+        return 'phenoxy'
     # An explicit free-valence locant -> cite the alkyl whole inside marks.
     if _LOCANT_BEARING_YL_RE.search(token):
         cited = cite_organyl_in_composed_prefix(token)
@@ -1093,6 +1102,158 @@ def composed_chalcogen_group_prefix(mol, frag_atoms, chalcogen_idx, boundary):
     if not cited:
         return None
     return f"{cited}{_CHALCOGEN_YL_SUFFIX[sym]}"
+
+
+# C4d: the sentinel separating "not the chalcogen-rooted acyl class" from "that
+# class, and it must FAIL CLOSED". Returning None for both lets a caller's
+# carbon-count fallback spell a carbamate as 'methanoylamino' -- a formyl C-H
+# the molecule does not have.
+ACYL_CHALCOGEN_UNNAMEABLE = object()
+
+
+def chalcogen_rooted_acyl_amino_core(mol, carbonyl_c, n_idx, frag_atoms):
+    """The prefix core for a CHALCOGEN-rooted acyl on nitrogen, ``R-X-CO-NH-``.
+
+    Returns ``'(tert-butoxycarbonyl)amino'`` and friends WITHOUT the outer
+    enclosing marks (each caller applies its own, since the two call sites wrap
+    at different depths), ``None`` when the acyl is not chalcogen-rooted so the
+    caller keeps its carbon path, or :data:`ACYL_CHALCOGEN_UNNAMEABLE` when it
+    IS this class but cannot be spelled -- the caller must then fail closed.
+
+    THE CLASS THE COUNTS CANNOT REACH. ``R-O-CO-`` is an ester of carbamic acid
+    (Boc, Cbz, Fmoc, methoxycarbonyl, ...), not an acyl of a carboxylic acid, so
+    no carbon count describes it. Both count-based callers proved that: one
+    stops at the heteroatom and counts only the carbonyl carbon, returning 1 for
+    a true formyl ``H-CO-NH-`` and for ``(CH3)3C-O-CO-NH-`` alike; the other
+    WALKS ACROSS the heteroatom and counts the organyl beyond it as if it were
+    acyl carbon. The first spelled Boc 'methanoylamino', the second spelled
+    ``CH3-S-CO-NH-`` 'ethanoylamino'.
+
+    The Blue Book builds this prefix by P-35.4.2 CONCATENATION onto the
+    chalcogen-group prefix, verbatim::
+
+        -CO-O-CH2-C6H5   (benzyloxy)carbonyl (preferred prefix)       [BB 18116]
+        CH3-CO-S-CO-     (acetylsulfanyl)carbonyl (preferred prefix)  [BB 18128]
+
+    and P-65.6.3.2.3 (BB 31698) names ``-CO-OR'`` 'alkoxycarbonyl'. Whether the
+    chalcogen prefix is cited BARE or in marks is the P-63.2.2.1.1 /
+    P-63.2.2.2 simple-vs-compound distinction -- the retained contractions are
+    SIMPLE (BB 27667 "considered as simple prefixes"), so *tert*-butoxy
+    concatenates bare, BB 54417 ``N2-(tert-butoxycarbonyl)-L-lysine``, while a
+    concatenated ``benzyloxy`` is COMPOUND (BB 27633) and takes its marks,
+    BB 54422 ``N5-acetyl-N2-[(benzyloxy)carbonyl]-L-glutamine`` (both P-103.2.1).
+    That decision is NOT re-spelled here: it is the ONE shared
+    ``enclose_if_compound``, so these marks cannot drift from the rest of the
+    system.
+
+    ``amino`` is the P-62.2.3 morpheme (BB 26314); with the caller's marks the
+    result is the Blue Book's own ``[(acyl)amino]acetic acid`` shape, BB 33213
+    ``[(methanesulfinothioyl)amino]acetic acid (PIN)``.
+
+    Pure: no mol mutation.
+    """
+    from .naming_utils import apply_enclosing_marks, enclose_if_compound
+
+    frag_set = set(frag_atoms)
+    if carbonyl_c not in frag_set or n_idx not in frag_set:
+        return None
+    c_at = mol.GetAtomWithIdx(carbonyl_c)
+
+    # The carbonyl's own doubly-bonded O, inside the fragment.
+    carbonyl_o = None
+    for nb in c_at.GetNeighbors():
+        if (nb.GetSymbol() == 'O' and nb.GetIdx() in frag_set
+                and mol.GetBondBetweenAtoms(
+                    carbonyl_c, nb.GetIdx()).GetBondTypeAsDouble() == 2.0):
+            carbonyl_o = nb.GetIdx()
+            break
+    if carbonyl_o is None:
+        return None
+
+    # Exactly one heavy neighbour besides the amide N and that O, and it must
+    # lie inside the fragment -- an acyl reaching outside is not describable here.
+    rest = [nb.GetIdx() for nb in c_at.GetNeighbors()
+            if nb.GetIdx() not in (n_idx, carbonyl_o) and nb.GetAtomicNum() > 1]
+    if len(rest) != 1:
+        return None
+    x_idx = rest[0]
+    if x_idx not in frag_set:
+        return None
+    if mol.GetAtomWithIdx(x_idx).GetSymbol() not in ('O', 'S', 'Se', 'Te'):
+        return None  # a carbon acyl -- the caller's own paths own that class
+
+    # From here the class is CLAIMED: every exit below fails closed.
+    # The nitrogen carries the attachment, this acyl, and at most ONE further
+    # organyl. That extra branch is cited alongside the acyl by P-66.1.1.4.3
+    # method (2) -- BB 33042 ``2-[methyl(propanoyl)amino]benzene-1-sulfonic
+    # acid`` -- which is the only method available here, since a carbamate has
+    # no amide name for method (1) to alter. Failing closed instead is NOT the
+    # safe choice: the caller's fallback then drops the whole branch and still
+    # emits, so an N-methyl Boc came back as bare '3-fluoropropanoic acid'.
+    n_at = mol.GetAtomWithIdx(n_idx)
+    if n_at.GetFormalCharge() != 0:
+        return ACYL_CHALCOGEN_UNNAMEABLE
+    n_heavy = [nb.GetIdx() for nb in n_at.GetNeighbors() if nb.GetAtomicNum() > 1]
+    if carbonyl_c not in n_heavy or len(n_heavy) - 1 != len(
+            [i for i in n_heavy if i in frag_set]):
+        return ACYL_CHALCOGEN_UNNAMEABLE  # not exactly one attachment outside
+    n_extra = [i for i in n_heavy if i in frag_set and i != carbonyl_c]
+    if len(n_extra) > 1:
+        return ACYL_CHALCOGEN_UNNAMEABLE
+
+    # The organyl half, walked from the chalcogen and bounded by the carbonyl.
+    organyl = set()
+    stack = [x_idx]
+    while stack:
+        a = stack.pop()
+        if a in organyl or a == carbonyl_c or a not in frag_set:
+            continue
+        organyl.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() not in organyl and nb.GetIdx() != carbonyl_c:
+                stack.append(nb.GetIdx())
+    if n_idx in organyl:
+        return ACYL_CHALCOGEN_UNNAMEABLE  # cyclic carbamate -- ring handler's
+
+    # The N-substituent branch, walked from the nitrogen.
+    extra = set()
+    for e in n_extra:
+        stack = [e]
+        while stack:
+            a = stack.pop()
+            if a in extra or a == n_idx or a not in frag_set:
+                continue
+            extra.add(a)
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nb.GetIdx() not in extra and nb.GetIdx() != n_idx:
+                    stack.append(nb.GetIdx())
+    if extra & (organyl | {carbonyl_c, carbonyl_o}):
+        return ACYL_CHALCOGEN_UNNAMEABLE  # fused back into the acyl -- cyclic
+
+    # The prefix must claim EVERY atom of the fragment, or it would read as a
+    # complete description of a branch it silently truncated.
+    if organyl | extra | {carbonyl_c, carbonyl_o, n_idx} != frag_set:
+        return ACYL_CHALCOGEN_UNNAMEABLE
+
+    token = composed_chalcogen_group_prefix(mol, sorted(organyl), x_idx,
+                                           {carbonyl_c})
+    if not token:
+        return ACYL_CHALCOGEN_UNNAMEABLE
+    acyl_core = f"{enclose_if_compound(token)}carbonyl"
+
+    if not n_extra:
+        return f"{apply_enclosing_marks(acyl_core, -1)}amino"
+
+    # An N-substituted carbamate: cite both N-substituents through the ONE
+    # shared assembler, so their alphanumerical order (P-14.5.2) and their
+    # per-branch marks are the same decisions the rest of the system makes.
+    branch = composed_prefix_organyl_name(mol, sorted(extra), n_extra[0])
+    if not branch:
+        return ACYL_CHALCOGEN_UNNAMEABLE
+    from .composer import _assemble_decorated_amino_prefix
+    core = _assemble_decorated_amino_prefix(
+        [(branch, False), (acyl_core, True)], enclose=False)
+    return core if core else ACYL_CHALCOGEN_UNNAMEABLE
 
 
 def is_dichalcogen_bridge_attach(mol, attach_idx, frag_atoms_set,
@@ -3194,29 +3355,44 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             if amido_name:
                 return amido_name
 
-            # Count carbons in the acyl R-group (excluding the carbonyl C and =O)
-            acyl_carbons = 0
-            visited = set()
-            stack_c = [branch_start]
-            while stack_c:
-                idx = stack_c.pop()
-                if idx in visited or idx == attach_idx:
-                    continue
-                if idx not in frag_set:
-                    continue
-                visited.add(idx)
-                atom = mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() == 'C':
-                    acyl_carbons += 1
-                for n in atom.GetNeighbors():
-                    if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
-                        stack_c.append(n.GetIdx())
-            if acyl_carbons >= 1:
-                # acyl_carbons includes the carbonyl C
-                # Legacy fallback (method (2), non-preferred):
-                # chain_prefix + "anoyl" + "amino"
-                acyl_name = get_chain_prefix(acyl_carbons) + "anoylamino"
-                return acyl_name
+            # C4d (P-35.4.2): an acyl rooted on a CHALCOGEN -- the carbamate
+            # class R-X-CO-NH- covering every alkoxycarbonyl -- has no
+            # hydrocarbyl acyl name. The count below cannot express it and,
+            # worse, WALKS ACROSS the heteroatom (it traverses every fragment
+            # atom and counts the carbons), so it spelled CH3-S-CO-NH- as
+            # 'ethanoylamino' and tBuO-CO-NH- as a 5-carbon acyl. Route to the
+            # ONE shared primitive; never fall through once the class is
+            # claimed.
+            _cg = chalcogen_rooted_acyl_amino_core(
+                mol, branch_start, attach_idx, frag_atoms)
+            if _cg is ACYL_CHALCOGEN_UNNAMEABLE:
+                return None
+            if _cg is not None:
+                return _cg
+
+            # C4d soundness gate. What follows spells a COUNT as an unbranched
+            # saturated stem, so it is faithful only when the acyl really is an
+            # unbranched, acyclic, saturated, all-carbon chain. Without it,
+            # acryloyl became 'propanoylamino' (saturated) and isobutyryl
+            # 'butanoylamino' (n-butyryl) -- constitutionally DIFFERENT acyls.
+            # The carbonyl's own =O must be excluded, or the predicate reads it
+            # as a hetero decoration and refuses every acyl.
+            _co = next(
+                (nb.GetIdx() for nb in branch_atom.GetNeighbors()
+                 if nb.GetSymbol() == 'O'
+                 and mol.GetBondBetweenAtoms(
+                     branch_start, nb.GetIdx()).GetBondTypeAsDouble() == 2.0),
+                None,
+            )
+            if _co is None:
+                return None
+            from .composer import _pure_linear_alkyl_len
+            _n = _pure_linear_alkyl_len(
+                mol, branch_start, set(parent_atoms) | {attach_idx, _co})
+            if _n is None:
+                return None
+            # The count includes the carbonyl C, which is the stem's C1.
+            return get_chain_prefix(_n) + "anoylamino"
 
     # Check for anilino: -NH-phenyl (isolated benzene ring directly on N)
     for branch_start in branches:
