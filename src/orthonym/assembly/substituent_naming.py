@@ -25,7 +25,7 @@ References:
 
 import re
 import logging
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry
@@ -424,6 +424,7 @@ def _name_unsaturated_chain(
 
     best_name = None
     best_key = None
+    best_chain = None
 
     for chain in [fwd, rev]:
         try:
@@ -450,12 +451,72 @@ def _name_unsaturated_chain(
 
         if best_key is None or key < best_key:
             best_key = key
+            best_chain = chain
             # Build the name for this direction
             best_name = _build_alkenyl_name(
                 carbon_count, a_locant, double_locs, triple_locs
             )
 
-    return best_name
+    if best_name is None or best_chain is None:
+        return None
+
+    # v29 P3-FIX Item 1: the located stereodescriptor block. This producer is the
+    # ONLY place that holds this substituent's own numbering, so it is the only
+    # place that can put a locant on a descriptor -- and P-91.2.1.2.1 makes the
+    # locant mandatory. `_add_substituent_stereo` (the generic emitter the caller
+    # runs next) reads only ATOM _CIPCode, so without this the E/Z geometry was
+    # dropped in silence and both isomers shipped one name.
+    #
+    # The fragment is unbranched and all-carbon by the guards above, so every
+    # fragment atom lies on `best_chain`: the block is COMPLETE by construction
+    # and needs no fail-closed branch here.
+    return _located_stereo_block(
+        mol, {a: i + 1 for i, a in enumerate(best_chain)}) + best_name
+
+
+def _located_stereo_block(mol, locant_of: Dict[int, int]) -> str:
+    """The ``(2R,3E)-`` stereodescriptor block for a substituent whose OWN
+    numbering is ``locant_of`` (atom index -> substituent locant), or ``''``.
+
+    Covers both kinds of stereogenic unit in one block, which is what the Blue
+    Book does: under ``## **P-46.3** PRINCIPAL SUBSTITUENT CHAINS IN COMPOUNDS
+    WITH STEREOGENIC CENTERS`` (``BlueBookV2.md:23014``) the preferred name is
+    ``[(2Z,4R,5E)-4-methylhepta-2,5-dien-4-yl]siline (PIN)`` -- R/S and E/Z
+    interleaved in ONE parenthesis and cited in LOCANT order (2, 4, 5), not
+    grouped by kind. ``### P-91.2.1.2.1 Stereodescriptors used in substitutive
+    nomenclature`` (``BlueBookV2.md:44624``) supplies the locant requirement:
+    "*In preferred IUPAC names, stereodescriptors, preceded by a locant, must be
+    cited to specify each stereogenic unit*".
+
+    A double bond is located at the LOWER of its two atoms' locants, the same
+    convention ``_build_alkenyl_name`` uses for the ``-en-`` locant itself, so
+    the descriptor locant and the ene locant always agree -- ``(1E)-prop-1-en-1-yl``
+    (``BlueBookV2.md:44686``, ``## **P-91.3** NAMING OF STEREOISOMERS``) and
+    ``(2E)-but-2-en-1-yl`` (``:45437``) are the verbatim PIN tokens.
+
+    Only DEFINED elements are cited: an undefined centre carries no ``_CIPCode``
+    and a PIN may not invent a configuration the structure does not specify.
+    Only atoms/bonds inside ``locant_of`` are considered, so a stereo element
+    elsewhere in the molecule can never leak into a substituent's block.
+
+    Pure: no mol mutation beyond the idempotent CIP assignment.
+    """
+    from ..perception.stereo import assign_stereochemistry, get_double_bond_stereo
+    assign_stereochemistry(mol)
+
+    terms: List[Tuple[int, str]] = []
+    for idx, loc in locant_of.items():
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.HasProp('_CIPCode'):
+            terms.append((loc, atom.GetProp('_CIPCode')))
+    for sb in get_double_bond_stereo(mol):
+        a, b = sb['atoms']
+        if a in locant_of and b in locant_of:
+            terms.append((min(locant_of[a], locant_of[b]), sb['stereo']))
+    if not terms:
+        return ''
+    terms.sort()
+    return '(' + ','.join(f'{loc}{code}' for loc, code in terms) + ')-'
 
 
 def _build_alkenyl_name(
@@ -684,10 +745,19 @@ def _name_branched_alkenyl_substituent(mol, sub_atoms, attach_idx):
 
     core = _build_alkenyl_name(len(chain), k, double_locs, triple_locs)
     if not branch_groups:
-        return core  # no off-chain branch after all -> plain alkenyl
-    from .composer import _format_prefix_groups
-    prefix = _format_prefix_groups(branch_groups)
-    return f"{prefix}{core}"
+        body = core  # no off-chain branch after all -> plain alkenyl
+    else:
+        from .composer import _format_prefix_groups
+        prefix = _format_prefix_groups(branch_groups)
+        body = f"{prefix}{core}"
+
+    # v29 P3-FIX Item 1: the located stereodescriptor block, from the SAME
+    # `chain_pos` numbering the name was built with -- see `_located_stereo_block`
+    # for the citations. Only CHAIN-borne elements are cited here; a stereocentre
+    # inside an off-chain branch is expressed by that branch's own recursive
+    # `name_substituent` call (nested block), so the two together cover the whole
+    # fragment without either fabricating a locant it does not own.
+    return _located_stereo_block(mol, chain_pos) + body
 
 
 def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
@@ -818,11 +888,29 @@ def _name_saturated_substituted_chain(
     not a LINEAR all-carbon backbone + terminal halogens with a TERMINAL (primary)
     attachment — branched backbones, other heteroatoms, rings, and secondary
     attachment keep their existing naming.
+
+    v29 P3-FIX Item 1: ...and anything UNSATURATED. The docstring said "saturated"
+    from the start but nothing enforced it, so a fragment carrying a C=C was named
+    by the alkane stem and the double bond vanished: ``-CH2-CH=CH-Cl`` came back
+    ``3-chloropropyl`` (an alkane) instead of ``3-chloroprop-2-en-1-yl``, and
+    ``-CH=CH-Cl`` came back ``2-chloroethyl``. Those name a DIFFERENT COMPOUND, not
+    merely a stereo-underspecified one, so this is a constitution guard rather than
+    a stereo one. Surfaced by the stereo-expression obligation in
+    ``rules.substituent_purity.organyl_prefix_name``: a dropped double bond drops
+    its geometry too, so the count identity there failed and led here. The
+    unsaturated cases belong to ``_name_unsaturated_chain`` /
+    ``_name_branched_alkenyl_substituent``, which is where declining sends them.
     """
     if not sub_atoms:
         return None
     sub_set = set(sub_atoms)
     ring_info = mol.GetRingInfo()
+
+    # SATURATED is in this function's name and contract: decline otherwise.
+    for _b in mol.GetBonds():
+        if (_b.GetBeginAtomIdx() in sub_set and _b.GetEndAtomIdx() in sub_set
+                and _b.GetBondTypeAsDouble() != 1.0):
+            return None
 
     backbone = []                # carbon backbone atom indices
     halogens = []                # (halogen_idx, attached_carbon_idx)

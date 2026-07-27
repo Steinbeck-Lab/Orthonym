@@ -59,6 +59,36 @@ constraint, not a walker artefact:
 
 Extending the class to heteroatom organyls needs that per-family seniority
 comparison; until it exists those fragments keep failing closed.
+
+The stereo-expression obligation (v29 P3-FIX Item 1)
+----------------------------------------------------
+Widening the class widened it to STEREOGENIC fragments, and the chokepoint's
+generic stereo emitter (``assembly.substituent_naming._add_substituent_stereo``)
+reads only **atom** ``_CIPCode`` — never **bond** ``_CIPCode``, as its own sibling
+states verbatim at ``substituent_naming.py:150-152``. So ``C/C=C/[AsH2]`` and
+``C/C=C\\[AsH2]`` — two different compounds — both came back ``prop-1-en-1-yl``
+and both shipped ``(prop-1-en-1-yl)arsane``. Nothing downstream could catch it:
+SELF-01 compares the InChIKey **skeleton** block, which excludes stereochemistry
+by construction, and ``namer._final_stereo_check``'s backstop is log-only for
+these handlers (it printed the correct diagnosis and returned the name anyway).
+
+The repair has two halves, and both are needed:
+
+1. **Express what is locatable.** ``substituent_naming._name_unsaturated_chain``
+   is the one producer that holds the substituent's own numbering, so it now
+   emits the full located block via ``_located_stereo_block`` —
+   ``(1E)-prop-1-en-1-yl``, ``(2E)-but-2-en-1-yl``, ``(2R,3E)-pent-3-en-2-yl``.
+   All three shapes are verbatim Blue Book PIN tokens; see that function's
+   docstring for the citations and their section headings.
+2. **Prove the rest and fail closed.** ``organyl_prefix_name`` requires the name
+   to express EXACTLY as many descriptor tokens as the fragment defines stereo
+   elements. What that still refuses is the multi-centre acyclic case
+   (``CC[C@@H](C)[C@@H](C)[As](C)C``), where ``### P-91.2.1.2.1`` demands a
+   locant per descriptor and D-09 forbids fabricating one — so the two
+   diastereomers now refuse instead of colliding on ``3-methylpentan-2-yl``.
+
+Ring stereo needed no work: the ring path already emitted
+``(2S,5R)-2,5-dimethylcyclohexyl`` and the obligation confirms it.
 """
 import logging
 from typing import List, Optional
@@ -155,6 +185,26 @@ def organyl_prefix_name(mol, start_idx: int, exclude_idx: int) -> Optional[str]:
     if is_refusal_sentinel(name):
         return None
     if ' ' in name:
+        return None
+
+    # v29 P3-FIX Item 1: the STEREO-EXPRESSION obligation (see the module
+    # docstring section below). The chokepoint's generic stereo emitter reads
+    # only ATOM _CIPCode, so a fragment whose geometry or whose multi-centre
+    # configuration it cannot locate comes back spelled as if achiral -- and a
+    # stereo-stripped prefix names a DIFFERENT compound. SELF-01 cannot see it
+    # (it compares the InChIKey SKELETON block, which excludes stereo by
+    # construction), so the proof has to be made here.
+    #
+    # An identity, not an inequality: `<` would ship a partial-stereo name and
+    # `>` an over-attributed one, and both name something other than the input.
+    from .stereochemistry import (
+        count_defined_stereo_in_fragment, count_expressed_stereo_descriptors)
+    defined = count_defined_stereo_in_fragment(mol, frag)
+    if defined and count_expressed_stereo_descriptors(name) != defined:
+        logger.debug(
+            "organyl_prefix_name: fail-closed on unexpressed stereo -- %r "
+            "expresses %d of the fragment's %d defined stereo elements",
+            name, count_expressed_stereo_descriptors(name), defined)
         return None
     return name
 

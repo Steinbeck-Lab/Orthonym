@@ -542,6 +542,54 @@ def count_defined_stereo_elements(mol) -> int:
     return n
 
 
+def count_defined_stereo_in_fragment(mol, frag_atoms) -> int:
+    """Count the DEFINED CIP stereogenic units that lie INSIDE ``frag_atoms``.
+
+    The fragment-scoped twin of :func:`count_defined_stereo_elements`, for the
+    substituent-prefix producers: a prefix names only its own fragment, so only
+    the stereo elements inside that fragment are its obligation to express.
+
+    Same three membership rules as the whole-molecule counter, so the two agree
+    on any fragment that happens to be the whole molecule:
+
+      * every fragment atom carrying ``_CIPCode``;
+      * every bond with ``_CIPCode`` whose BOTH ends are in the fragment, EXCEPT
+        a ring bond whose smallest ring is <8 — ``### **P-91.2.2** Omission of
+        stereodescriptors`` (``BlueBookV2.md:44635``) recommends omitting the
+        descriptor for "*three- through seven-membered unsaturated alicyclic
+        compounds where any double bond has a fixed configuration*", so such a
+        bond is not an expressible unit and must not be demanded of the name;
+      * axial elements are NOT counted. ``count_expressed_stereo_descriptors``
+        cannot count an ``Ra``/``Sa`` token either, so counting them here would
+        make a correctly-axial name look INCOMPLETE. Both sides omit them, which
+        keeps the identity honest instead of biased.
+
+    A bond with exactly ONE end in the fragment is deliberately excluded: its
+    geometry is expressed by whoever names the atom on the other side (the
+    parent), not by this prefix.
+
+    Read-only apart from the idempotent CIP assignment.
+    """
+    if mol is None or not frag_atoms:
+        return 0
+    assign_stereochemistry(mol)
+    frag = set(frag_atoms)
+    n = sum(1 for i in frag if mol.GetAtomWithIdx(i).HasProp('_CIPCode'))
+    ri = mol.GetRingInfo()
+    for b in mol.GetBonds():
+        if not b.HasProp('_CIPCode'):
+            continue
+        if b.GetBeginAtomIdx() not in frag or b.GetEndAtomIdx() not in frag:
+            continue
+        if b.IsInRing():
+            min_ring = min((len(r) for r in ri.BondRings()
+                            if b.GetIdx() in r), default=99)
+            if min_ring < 8:
+                continue  # P-91.2.2 ring-strain-fixed; not an expressible unit
+        n += 1
+    return n
+
+
 def count_expressed_stereo_descriptors(name: str) -> int:
     """Count the stereodescriptor TOKENS the *name* actually carries.
 

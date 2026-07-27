@@ -113,11 +113,39 @@ def test_predicate_false_for_expressed_stereo(smiles, name):
 # FIX 2 integration (real OPSIN gate): dropped stereo -> abstain; expressed
 # stereo -> still ships WITH the descriptor.
 # --------------------------------------------------------------------------
-def test_trienyl_resorcinol_abstains_under_complete(production_gate):
+def test_trienyl_resorcinol_no_longer_drops_its_stereo_under_complete(
+        production_gate):
+    """v29 P3-FIX Item 1 re-baseline: this witness now SHIPS, stereo-complete.
+
+    FIX 2's guard is unchanged and still correct — what changed is that this
+    molecule no longer triggers it. The reason the descriptors were dropped was
+    that ``_add_substituent_stereo`` reads only ATOM ``_CIPCode``, so an E/Z bond
+    inside a substituent fragment was invisible; the alkenyl producer
+    (``substituent_naming._name_unsaturated_chain``) now emits the located block
+    itself via ``_located_stereo_block``, so all three Z descriptors are present
+    and ``needs_stereo_injection`` is correctly False.
+
+    Abstaining here would now be OVER-abstention — precisely what this file's own
+    header warns against ("Stereo the engine DOES express ... still ship WITH
+    their stereo -- no over-abstention"). The emitted name round-trips EXACTLY:
+    fed to the OPSIN jar it returns
+    ``CCCCC/C=C\\C/C=C\\C/C=C\\CCCCc1cc(O)cc(O)c1``, the canonical input.
+
+    ``### P-91.2.1.2.1 Stereodescriptors used in substitutive nomenclature``
+    (``BlueBookV2.md:44624``): "*In preferred IUPAC names, stereodescriptors,
+    preceded by a locant, must be cited to specify each stereogenic unit*" — the
+    three located ``5Z,8Z,11Z`` descriptors are what that requires.
+    """
     out = _complete().name(Chem.CanonSmiles(TRIENYL))
-    assert is_failure_name(out), (
-        f"complete must FAIL CLOSED on dropped stereo, got {out!r}")
+    # The descriptor-less spelling is the actual defect and must never return.
     assert out != TRIENYL_DROPPED_NAME
+    assert not is_failure_name(out), (
+        f"complete must no longer over-abstain on this witness, got {out!r}")
+    # All three stereogenic double bonds expressed, in locant order.
+    assert "5Z,8Z,11Z" in out, out
+    # ...and the guard is still armed: the OLD name would still trip it.
+    assert needs_stereo_injection(
+        Chem.MolFromSmiles(TRIENYL), TRIENYL_DROPPED_NAME) is True
 
 
 @pytest.mark.parametrize("smiles,expected", STEREO_EXPRESSED)
