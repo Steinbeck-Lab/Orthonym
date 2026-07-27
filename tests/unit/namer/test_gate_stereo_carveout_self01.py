@@ -266,3 +266,98 @@ def test_constitutional_defect_without_stereo_still_suppressed(monkeypatch):
                                         "O[C@H]1CC[C@@H](O)CC1", stats)
     assert out == nm._descriptive_fallback("O[C@H]1CC[C@@H](O)CC1")
     assert stats.get("opsin_suppressed") == 1
+
+
+# ---------------------------------------------------------------------------
+# 8. ARCH-2-FOLLOWUP: the STRIPPED probe is three-valued too. `unavailable`
+#    means OPSIN could not be consulted -- it is NOT evidence against the name,
+#    so it must fail OPEN exactly as the primary probe already does
+#    (namer.py:660-661, CR-01). Lumping it with `rejected` suppressed a name the
+#    carve-out exists to rescue, on nothing but a subprocess hiccup.
+#
+#    WHY THE EXISTING `test_transient_unavailable_still_fails_open` DOES NOT
+#    COVER THIS: it stubs `_validity_gate_status` to "unavailable" for EVERY
+#    name, so the PRIMARY probe's fail-OPEN at namer.py:660 returns first and the
+#    stripped probe is never reached. The stub below is asymmetric on purpose --
+#    the primary name is DEFINITIVELY rejected (as real OPSIN rejects these
+#    stereo forms) and only the STRIPPED probe hiccups.
+# ---------------------------------------------------------------------------
+def _stub_opsin_3valued(monkeypatch, status_map, smiles_map=None):
+    """Enable the gate with SELF-01 ON and a HOSTILE THREE-VALUED OPSIN stub.
+
+    ``status_map``: name -> ``"parsed"``/``"rejected"``/``"unavailable"``; any name
+    NOT listed is ``"rejected"``. ``smiles_map``: name -> the SMILES OPSIN emits;
+    any name NOT listed yields ``None``.
+
+    Hostile by construction: nothing is rescued unless this test says so. The real
+    oracle must never be reachable here -- on the previous task a guard-deletion
+    mutation survived because the unstubbed real OPSIN rescued the name anyway and
+    the test passed vacuously.
+    """
+    smiles_map = smiles_map or {}
+    monkeypatch.setattr(nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
+    monkeypatch.setattr(nm, "_SC_MODE", "on", raising=False)
+    monkeypatch.setattr(nm, "_validity_gate_jar_present", lambda: True, raising=False)
+    monkeypatch.setattr(nm, "_validity_gate_status",
+                        lambda n: status_map.get(n, "rejected"), raising=False)
+    monkeypatch.setattr(nm, "_validity_gate_name_to_smiles",
+                        lambda n: smiles_map.get(n), raising=False)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("name,smiles,stripped", [(p[0], p[1], p[2]) for p in PROTECTED],
+                         ids=["cyclohexanediol", "decalin", "tropane-ester"])
+def test_stripped_probe_unavailable_ships_full_stereo_name(monkeypatch, name,
+                                                           smiles, stripped):
+    """Primary probe DEFINITIVELY rejected + stripped probe merely UNAVAILABLE ->
+    the FULL stereo name ships unchanged.
+
+    Invariant 11 -- assert the exact string that ships, not just that the fallback
+    is absent: fail-OPEN must ship the name WITH its stereo descriptors, never the
+    stripped constitutional form (which would silently drop stereochemistry) and
+    never a fallback.
+    """
+    _stub_opsin_3valued(monkeypatch, {name: "rejected", stripped: "unavailable"})
+    stats = {}
+    out = nm._final_opsin_validity_gate(name, smiles, stats)
+    assert out == name, "suppressed/altered on a comparison that could not be made"
+    assert out != stripped, "shipped the stereo-STRIPPED form -- stereo silently dropped"
+    assert out != nm._descriptive_fallback(smiles)
+    assert stats.get("gate_stereo_unavailable") == 1
+    # It was NOT verified, so it must not be counted as a verified ship, and
+    # nothing may be recorded as suppressed.
+    assert "gate_stereo_kept" not in stats
+    assert "gate_stereo_unverifiable" not in stats
+    assert "opsin_suppressed" not in stats
+    assert "self_consistency_suppressed" not in stats
+
+
+@pytest.mark.unit
+def test_stripped_probe_rejected_still_suppressed(monkeypatch):
+    """Regression guard on the narrowing: widening `unavailable` must NOT widen
+    `rejected`. A stripped form OPSIN DEFINITIVELY rejects is a genuine
+    constitutional defect and stays suppressed to the honest fallback."""
+    name, smiles, stripped = PROTECTED[0][0], PROTECTED[0][1], PROTECTED[0][2]
+    _stub_opsin_3valued(monkeypatch, {name: "rejected", stripped: "rejected"})
+    stats = {}
+    out = nm._final_opsin_validity_gate(name, smiles, stats)
+    assert out == nm._descriptive_fallback(smiles), (
+        "a DEFINITIVELY rejected stripped form must stay suppressed")
+    assert stats.get("opsin_suppressed") == 1
+    assert "gate_stereo_unavailable" not in stats
+
+
+@pytest.mark.unit
+def test_carveout_suppression_has_its_own_counter(monkeypatch):
+    """Telemetry: the carve-out's SELF-01 suppression must be distinguishable from
+    the primary parsed path's, which shares `self_consistency_suppressed`."""
+    _stub_opsin_3valued(
+        monkeypatch,
+        {WITNESS_BAD_NAME: "rejected", "methyl N-octylcarbamate": "parsed"},
+        {"methyl N-octylcarbamate": WITNESS_STRIPPED_OPSIN_SMILES})
+    stats = {}
+    out = nm._final_opsin_validity_gate(WITNESS_BAD_NAME, WITNESS_SMILES, stats)
+    assert out == nm._descriptive_fallback(WITNESS_SMILES)
+    assert stats.get("gate_stereo_mismatch") == 1
+    assert stats.get("self_consistency_suppressed") == 1  # shared counter still moves
+    assert "gate_stereo_kept" not in stats

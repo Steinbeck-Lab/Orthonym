@@ -763,27 +763,57 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # FULL stereo name (fail-OPEN on any comparison that could not be made).
     from .rules.stereochemistry import strip_stereo
     _stripped = strip_stereo(name)
-    if _stripped != name and _validity_gate_status(_stripped) == "parsed":
-        _stripped_smiles = _validity_gate_name_to_smiles(_stripped)
-        if _stripped_smiles is not None:
-            _decided = _self_consistency_decision(name, smiles, _stripped_smiles, stats)
-            if _decided != name:
-                return _decided  # SELF-01 PROVED a different molecule -> suppressed
+    if _stripped != name:
+        _stripped_status = _validity_gate_status(_stripped)
+        # ARCH-2-FOLLOWUP: _validity_gate_status is THREE-valued, and the stripped
+        # probe is a second, independent OPSIN consultation that can hiccup on its
+        # own. 'unavailable' (subprocess timeout / OSError on a loaded host) means
+        # OPSIN was never consulted — it is NOT evidence against the name — so it
+        # must fail OPEN, exactly as the primary probe already does at CR-01 above.
+        # Testing `== "parsed"` alone lumped it with 'rejected' and let a transient
+        # hiccup suppress the very names this carve-out exists to rescue (the
+        # verbatim BB PIN `(1s,4s)-cyclohexane-1,4-diol` -> `unknown`), contradicting
+        # the promise made three paragraphs up. Note this is NOT a blanket escape
+        # hatch: a PERSISTENTLY unavailable OPSIN (JAR genuinely missing) is already
+        # caught by the _validity_gate_jar_present() probe above, which fails the
+        # whole gate open — so the two behaviours agree rather than compete.
+        if _stripped_status == "unavailable":
             if stats is not None:
-                stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
-            return name  # only the stereo layer is OPSIN-narrow -> ship it whole
-        # 'parsed' but NO usable SMILES: OPSIN accepted the stripped name and then
-        # emitted a structure RDKit cannot canonicalise (an impossible valence) —
-        # the identical situation the non-stereo path already settled above, where
-        # only 'unavailable' fails OPEN and 'parsed'-but-uncanonicalisable is
-        # UNVERIFIABLE and suppressed. It is not merely an unmade measurement: it
-        # is positive evidence that the name denotes a structure RDKit rejects as
-        # impossible. A stereo layer must not lower the burden of proof, so fall
-        # through to the honest fallback exactly as that path does. Measured: 1
-        # corpus row, 0 gold rows, and that row's name is independently wrong.
-        if stats is not None:
-            stats["gate_stereo_unverifiable"] = (
-                stats.get("gate_stereo_unverifiable", 0) + 1)
+                stats["gate_stereo_unavailable"] = (
+                    stats.get("gate_stereo_unavailable", 0) + 1)
+            return name  # transient -> fail-OPEN, with the stereo layer intact
+        # 'rejected' is unchanged: a stripped form OPSIN DEFINITIVELY rejects is a
+        # genuine constitutional defect and falls through to the fallback below.
+        if _stripped_status == "parsed":
+            _stripped_smiles = _validity_gate_name_to_smiles(_stripped)
+            if _stripped_smiles is not None:
+                _decided = _self_consistency_decision(name, smiles, _stripped_smiles,
+                                                      stats)
+                if _decided != name:
+                    # Own counter: _self_consistency_decision bumps the SHARED
+                    # self_consistency_{mismatch,suppressed} counters for both the
+                    # primary parsed path and this carve-out, so telemetry cannot
+                    # otherwise tell the two apart.
+                    if stats is not None:
+                        stats["gate_stereo_mismatch"] = (
+                            stats.get("gate_stereo_mismatch", 0) + 1)
+                    return _decided  # SELF-01 PROVED a different molecule -> suppress
+                if stats is not None:
+                    stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
+                return name  # only the stereo layer is OPSIN-narrow -> ship it whole
+            # 'parsed' but NO usable SMILES: OPSIN accepted the stripped name and
+            # then emitted a structure RDKit cannot canonicalise (an impossible
+            # valence) — the identical situation the non-stereo path already settled
+            # above, where only 'unavailable' fails OPEN and
+            # 'parsed'-but-uncanonicalisable is UNVERIFIABLE and suppressed. It is
+            # not merely an unmade measurement: it is positive evidence that the name
+            # denotes a structure RDKit rejects as impossible. A stereo layer must
+            # not lower the burden of proof, so fall through to the honest fallback
+            # exactly as that path does. Measured: 1 corpus row, 0 gold rows, and
+            # that row's name is independently wrong.
+            if stats is not None:
+                stats["gate_stereo_unverifiable"] = (
+                    stats.get("gate_stereo_unverifiable", 0) + 1)
     # NOTE (D-06, resolved): radical names now ship normally. The validity gate's
     # primary probe runs the OpsinOracle WITH `-r` (retained_substitution.py), so
     # a well-formed radical name parses -> SELF-01 constitutional compare -> ships.
