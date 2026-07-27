@@ -30,7 +30,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import apply_vowel_elision
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
-from .substituent_purity import pure_organyl_prefix_name
+from .substituent_purity import organyl_prefix_name
 
 # Chalcogen element -> parent-hydride stem (P-21.1 / P-21.2.2).
 _CHALCOGEN_STEMS = {'O': 'oxidane', 'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane'}
@@ -102,7 +102,7 @@ def _terminal_substituents(mol, chain: List[int]
             continue
         if not is_terminal or len(heavy_nonchain) != 1:
             return None                   # internal substituent / >1 organyl
-        name = pure_organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
+        name = organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
         if name is None:
             return None
         subs.append((pos, name))
@@ -112,23 +112,70 @@ def _terminal_substituents(mol, chain: List[int]
 def _format_substituents(subs: List[Tuple[int, str]], n: int) -> str:
     """Build the locant + alphabetised multiplied substituent prefix string,
     choosing the chain orientation that gives the lowest locant set."""
-    # Two orientations: position p or (n-1-p). Pick the lower locant multiset.
-    def locants(flip):
-        return sorted((n - 1 - p if flip else p) + 1 for p, _ in subs)
-    forward, reverse = locants(False), locants(True)
-    flip = reverse < forward
+    # Two orientations: position p or (n-1-p). Pick the lower locant multiset,
+    # then break a TIE by P-14.4 (g) (BB 3307): "lowest locants for the
+    # substituent cited first as a prefix in the name" -- BB 29956
+    # `1-hydroxy-3-oxopropane-1,2,3-tricarboxylic acid` (PIN) [not
+    # `3-hydroxy-1-oxo...`; lowest locants are attributed to prefixes that are
+    # cited first, see P-14.4 (g)].
+    #
+    # Without the tie-break the orientation fell through to RDKit atom order, so
+    # `1-ethyl-3-methyltrisulfane` and `3-ethyl-1-methyltrisulfane` were both
+    # reachable for the same compound depending on how its SMILES was written.
+    def orientation_key(flip):
+        placed = [((n - 1 - p if flip else p) + 1, name) for p, name in subs]
+        grouped: dict = {}
+        for loc, name in placed:
+            grouped.setdefault(name, []).append(loc)
+        return (sorted(loc for loc, _ in placed),
+                [sorted(grouped[nm]) for nm in _cited_order(grouped)])
+    flip = orientation_key(True) < orientation_key(False)
     placed = [((n - 1 - p if flip else p) + 1, name) for p, name in subs]
-    # Group identical substituents -> "1,3-dimethyl"; alphabetise by name.
+    # Group identical substituents -> "1,3-dimethyl"; cite in P-14.5.2 order.
     by_name: dict = {}
     for loc, name in placed:
         by_name.setdefault(name, []).append(loc)
+    return _cite_locanted_prefixes(by_name)
+
+
+def _cited_order(by_name: dict) -> List[str]:
+    """The prefix names of ``by_name`` in P-14.5.2/P-14.5.4 citation order."""
+    from ..assembly.naming_utils import prefix_citation_sort_key
+    return sorted(by_name, key=prefix_citation_sort_key)
+
+
+def _cite_locanted_prefixes(by_name: dict) -> str:
+    """Join ``{prefix_name: [locants]}`` into one locanted prefix block.
+
+    THE single implementation for this module's two prefix blocks (the chain
+    parent and the polysulfoxide/sulfone), each of which used to open-code it.
+
+    * P-14.5.2/P-14.5.4 citation order via ``prefix_citation_sort_key``. The old
+      code cited in ascending FIRST-LOCANT order with the comment "matches alpha
+      here", which held only for the letters-only class the retired narrow walker
+      could return. BB 21649 ``3-ethyl-2-methylhexane`` (PIN) shows the order is
+      alphanumerical even when its locants then descend.
+    * Segments are joined by a HYPHEN. The old code joined with '' and emitted
+      ``1-ethyl3-methyltrisulfane``; BB 21649's ``3-ethyl-2-methylhexane`` (PIN)
+      is the witness for the separator.
+    * P-16.3.3 marks for a compound prefix and the P-16.3.4 italicized carve-out
+      come from the shared primitives, so ``propan-2-yl`` is cited
+      ``1,3-di(propan-2-yl)`` (BB 25719 ``1,4-di(propan-2-yl)cyclohexane`` (PIN):
+      SIMPLE multiplier OUTSIDE the marks) and ``tert-butyl`` keeps its hyphen.
+    """
+    from ..assembly.naming_utils import (enclose_if_compound,
+                                         multiplier_needs_hyphen)
     parts = []
-    for name in sorted(by_name):
+    for name in _cited_order(by_name):
         locs = sorted(by_name[name])
         mult = _SUB_MULTIPLIER.get(len(locs), '')
-        parts.append((min(locs), f"{','.join(str(l) for l in locs)}-{mult}{name}"))
-    parts.sort()  # cite in ascending first-locant order (matches alpha here)
-    return ''.join(p[1] for p in parts)
+        marked = enclose_if_compound(name)
+        loc_str = ','.join(str(l) for l in locs)
+        if mult and marked == name and multiplier_needs_hyphen(name):
+            parts.append(f"{loc_str}-{mult}-{marked}")     # 1,3-di-tert-butyl
+        else:
+            parts.append(f"{loc_str}-{mult}{marked}")
+    return '-'.join(parts)
 
 
 # P-63.1.2 / P-63.4 chalcogen functional-group suffixes for the P-68.4.2.2/.3
@@ -256,7 +303,7 @@ def _name_chalcogen_chain_with_suffix(mol) -> Optional[str]:
             continue
         if not is_terminal or len(heavy_nonchain) != 1:
             return None
-        name = pure_organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
+        name = organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
         if name is None:
             return None
         subs.append(name)
@@ -270,7 +317,13 @@ def _name_chalcogen_chain_with_suffix(mol) -> Optional[str]:
     else:
         return None
     core = apply_vowel_elision(parent, _CHALCOGEN_SUFFIX_NAME[suffix_elem])
-    return f"{subs[0]}{core}" if subs else core
+    if not subs:
+        return core
+    # The single organyl is cited with no locant (its terminal position on the
+    # symmetric parent is unambiguous), so a compound prefix takes its P-16.3.3
+    # marks here or it would run straight into the parent stem.
+    from ..assembly.naming_utils import enclose_if_compound
+    return f"{enclose_if_compound(subs[0])}{core}"
 
 
 def name_chalcogen_chain(mol) -> Optional[str]:
@@ -442,7 +495,7 @@ def name_polysulfoxide_sulfone(mol) -> Optional[str]:
                 n_oxo += 1
                 oxo_idxs.add(nbr.GetIdx())
             elif sym == 'C' and bt == Chem.BondType.SINGLE:
-                name = pure_organyl_prefix_name(mol, nbr.GetIdx(), idx)
+                name = organyl_prefix_name(mol, nbr.GetIdx(), idx)
                 if name is None:
                     return None
                 organyls.append(name)
@@ -464,13 +517,23 @@ def name_polysulfoxide_sulfone(mol) -> Optional[str]:
     def locant(pos, flip):
         return (n - 1 - pos) + 1 if flip else pos + 1
 
+    def _sub_tie(flip):
+        """P-14.4 (g) (BB 3307) tie-break: lowest locants to the prefix cited
+        FIRST alphanumerically, once the lambda, oxo and substituent locant sets
+        have all tied. Without it the orientation fell through to atom order."""
+        grouped: dict = {}
+        for p, names in sub_by_pos.items():
+            for nm in names:
+                grouped.setdefault(nm, []).append(locant(p, flip))
+        return [sorted(grouped[nm]) for nm in _cited_order(grouped)]
+
     def descriptor(flip):
         lam_key = sorted((locant(p, flip), -lam_by_pos[p]) for p in lam_by_pos)
         oxo_key = sorted(locant(p, flip)
                          for p in oxo_by_pos for _ in range(oxo_by_pos[p]))
         sub_key = sorted(locant(p, flip)
                          for p in sub_by_pos for _ in sub_by_pos[p])
-        return (lam_key, oxo_key, sub_key)
+        return (lam_key, oxo_key, sub_key, _sub_tie(flip))
 
     flip = descriptor(True) < descriptor(False)
 
@@ -498,16 +561,9 @@ def name_polysulfoxide_sulfone(mol) -> Optional[str]:
     for pos, names in sub_by_pos.items():
         for nm in names:
             by_name.setdefault(nm, []).append(locant(pos, flip))
-    sub_parts = []
-    for nm in sorted(by_name):
-        locs = sorted(by_name[nm])
-        mult = _SUB_MULTIPLIER.get(len(locs))
-        if mult is None:
-            return None
-        sub_parts.append((min(locs),
-                          f"{','.join(str(l) for l in locs)}-{mult}{nm}"))
-    sub_parts.sort()
-    sub_block = ''.join(p[1] for p in sub_parts)
+    if any(_SUB_MULTIPLIER.get(len(locs)) is None for locs in by_name.values()):
+        return None                       # more substituents than the table covers
+    sub_block = _cite_locanted_prefixes(by_name)
 
     core = f"{lam_block}-{base}{oxo_suffix}"
     return f"{sub_block}-{core}" if sub_block else core

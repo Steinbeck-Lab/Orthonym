@@ -973,3 +973,183 @@ def test_f5_other_guards_still_fail_closed(smiles, why):
     a plain phosphonic acid must keep routing to the suffix path (which names it
     `propan-2-ylphosphonic acid`), not be captured as an FRN acid."""
     assert _f5(smiles) is None, why
+
+
+# ==========================================================================
+# FAMILY 6 -- rules/polychalcogen (3 sites, all NAMING)
+#
+#   line 105  `_terminal_substituents` -> the chain-parent prefix block
+#   line 259  the P-68.4.2.2/.3 parent+suffix layer (`methyldisulfanol`)
+#   line 445  `name_polysulfoxide_sulfone` -> the lambda/oxo prefix block
+#
+# Both locanted prefix blocks were open-coded and are now ONE helper,
+# `_cite_locanted_prefixes`, because the widening exposed three defects in them:
+#
+#  1. segments were joined by '' -> `1-ethyl3-methyltrisulfane`.  BB 21649
+#     `3-ethyl-2-methylhexane` (PIN) is the witness for the HYPHEN separator --
+#     and for citing alphanumerically even when the locants then DESCEND, which
+#     the old "ascending first-locant order (matches alpha here)" only got right
+#     for the letters-only class the narrow walker could return.
+#  2. no P-16.3.3 marks, so a locanted prefix ran into the stem.
+#  3. no P-16.3.4 carve-out, so `tert-butyl` lost its multiplier hyphen.
+#
+# The widening also changes WHICH nomenclature claims two molecules, and the Blue
+# Book says the new one is preferred -- BB 23385, verbatim:
+#
+#   1,1'-(ethane-1,2-diyl)bis(3-methyltrisulfane) (PIN) (not
+#   2,3,4,7,8,9-hexathiadecane; trisulfane, HS-S-SH, is a parent hydride and is
+#   NOT ALLOWED TO BE A HETEROUNIT)
+#
+# so the skeletal-replacement `trithia` spelling is the explicitly rejected form.
+# Before this migration the choice between the two was decided by nothing more
+# than whether the narrow walker happened to accept the substituent: `CSSSC` got
+# the trisulfane name, its dodecyl analogue got `2,3,4-trithiahexadecane`.
+#
+# The 2-chalcogen chains stay excluded (BB 27864: substituted `disulfane` names
+# "are not recommended"; BB 2979 `(bromodisulfanyl)methane` (PIN) `not
+# 1-bromo-2-methyldisulfane`) -- this module already requires n>=3, and only the
+# lambda-oxidised sulfoxide/sulfone layer uses a locanted disulfane, which BB
+# 29415 `1-methyl-2-phenyl-1lambda6,2lambda6-disulfane-1,1,2,2-tetrone` (PIN)
+# confirms.
+# ==========================================================================
+
+@pytest.mark.parametrize("smiles,expected", [
+    # site 105 -- chain parent
+    ("CC(C)SSSC(C)C",           "1,3-di(propan-2-yl)trisulfane"),
+    ("CC(C)SSSC",               "1-methyl-3-(propan-2-yl)trisulfane"),
+    ("CC(C)(C)SSSC(C)(C)C",     "1,3-di-tert-butyltrisulfane"),
+    # site 259 -- parent + -ol/-thiol suffix layer
+    ("CC(C)SSO",                "(propan-2-yl)disulfanol"),
+    ("CC(C)SSSO",               "(propan-2-yl)trisulfanol"),
+    # site 445 -- polysulfoxide / sulfone
+    ("CC(C)S(=O)S(=O)C(C)C",
+     "1,2-di(propan-2-yl)-1lambda4,2lambda4-disulfane-1,2-dione"),
+    ("CC(C)S(=O)S(=O)C",
+     "1-methyl-2-(propan-2-yl)-1lambda4,2lambda4-disulfane-1,2-dione"),
+])
+def test_f6_polychalcogen_previously_refused_organyl_is_now_named(
+    ungated_namer, smiles, expected,
+):
+    assert ungated_namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("CC(C)(C)SSSC",   "1-tert-butyl-3-methyltrisulfane"),
+    ("CC(C)(C)SSSCC",  "1-tert-butyl-3-ethyltrisulfane"),
+    ("CC(C)(C)S(=O)S(=O)C",
+     "1-tert-butyl-2-methyl-1lambda4,2lambda4-disulfane-1,2-dione"),
+])
+def test_f6_citation_order_ignores_the_italicized_prefix(
+    ungated_namer, smiles, expected,
+):
+    """P-14.5.2 keys on the LETTERS, so `tert-butyl` sorts under 'butyl'.
+
+    These are the rows that distinguish the shared citation key from a raw string
+    sort: raw order puts 'methyl'/'ethyl' before 'tert-butyl' (on 'm'/'e' < 't'),
+    while P-14.5.2 compares 'butyl' < 'ethyl' < 'methyl' and cites tert-butyl
+    FIRST -- which then also takes locant 1 under P-14.4 (g).  Without a row like
+    this the raw-sort mutant survives, because every other witness here happens to
+    sort identically both ways.
+    """
+    assert ungated_namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,before,after", [
+    ("CSSSCC",   "1-ethyl3-methyltrisulfane",   "1-ethyl-3-methyltrisulfane"),
+    ("CSSSSSCC", "1-ethyl5-methylpentasulfane", "1-ethyl-5-methylpentasulfane"),
+])
+def test_f6_prefix_segments_are_hyphen_separated(ungated_namer, smiles, before, after):
+    """A malformed name that SHIPPED is repaired.
+
+    Two different simple organyls both pass the retired narrow walker, so
+    `1-ethyl3-methyltrisulfane` was reachable and emitted before this migration --
+    OPSIN even parses it.  BB 21649 `3-ethyl-2-methylhexane` (PIN) is the witness
+    for the hyphen.  Recorded with both strings so the gate attributes the move to
+    the separator fix and not to the widening.
+    """
+    name = ungated_namer.name(smiles)
+    assert name == after
+    assert name != before
+
+
+@pytest.mark.parametrize("smiles,before,after", [
+    ("CCCCCCCCCCCCSSSC", "2,3,4-trithiahexadecane",
+                         "1-dodecyl-3-methyltrisulfane"),
+    ("C=CSSSC=C",        "3,4,5-trithiahepta-1,6-diene",
+                         "1,3-diethenyltrisulfane"),
+])
+def test_f6_polysulfane_parent_beats_skeletal_replacement(
+    ungated_namer, smiles, before, after,
+):
+    """The widening changes WHICH nomenclature claims the molecule, toward the PIN.
+
+    BB 23385 verbatim: `1,1'-(ethane-1,2-diyl)bis(3-methyltrisulfane)` (PIN) `(not
+    2,3,4,7,8,9-hexathiadecane; trisulfane, HS-S-SH, is a parent hydride and is
+    not allowed to be a heterounit)`.  The `trithia` replacement spelling is
+    therefore the rejected form, and these two molecules were only getting it
+    because the narrow walker refused their substituents (dodecyl was longer than
+    its chain table; ethenyl carried a double bond), which made this handler
+    decline and let skeletal replacement win.  `CSSSC` already took the trisulfane
+    name, so the old behaviour was inconsistent within one structural class.
+    """
+    name = ungated_namer.name(smiles)
+    assert name == after
+    assert name != before
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("SSS",               "trisulfane"),
+    ("CSSS",              "1-methyltrisulfane"),
+    ("CSSSC",             "1,3-dimethyltrisulfane"),
+    ("CSSSSC",            "1,4-dimethyltetrasulfane"),
+    ("CSSSSSC",           "1,5-dimethylpentasulfane"),
+    ("CSSO",              "methyldisulfanol"),
+    ("CSSSO",             "methyltrisulfanol"),
+    ("CS(=O)S(=O)C",      "1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione"),
+    ("CS(=O)S(=O)S(=O)C",
+     "1,3-dimethyl-1lambda4,2lambda4,3lambda4-trisulfane-1,2,3-trione"),
+])
+def test_f6_polychalcogen_existing_names_are_byte_identical(
+    ungated_namer, smiles, expected,
+):
+    """PROTECT rows across all three sites."""
+    assert ungated_namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,forbidden", [
+    # BB 27864 / BB 2979: substituted 2-chalcogen chains are NOT named as
+    # `disulfane`; this module requires n>=3 and that guard is untouched.
+    ("CC(C)SSC(C)C", "disulfane"),
+    ("CSSC",         "disulfane"),
+    ("CSSc1ccccc1",  "disulfane"),
+])
+def test_f6_two_chalcogen_chains_are_still_not_named_as_disulfane(
+    ungated_namer, smiles, forbidden,
+):
+    """TRIPWIRE.  BB 2979 `(bromodisulfanyl)methane` (PIN) `(not
+    bromo(methyl)disulfane ...; not 1-bromo-2-methyldisulfane)`.  The widening must
+    not pull the n==2 disulfides into the parent-hydride path -- only the
+    lambda-oxidised sulfoxide/sulfone layer may use a locanted disulfane."""
+    assert forbidden not in ungated_namer.name(smiles)
+
+
+@pytest.mark.parametrize("smiles", [
+    "CSSSCC", "CCSSSC", "CSSSSSCC", "CC(C)SSSC", "CSSSC",
+    "CC(C)S(=O)S(=O)C", "CS(=O)S(=O)C",
+])
+def test_f6_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
+    """P-14.4 (g) (BB 3307) makes the chain orientation DETERMINISTIC.
+
+    Both prefix blocks chose the orientation by comparing only the locant
+    multiset; on a tie (the common case for a symmetric chain, e.g. {1,3} either
+    way) the choice fell through to RDKit atom order, so the same compound got
+    `1-ethyl-3-methyltrisulfane` or `3-ethyl-1-methyltrisulfane` depending on how
+    its SMILES happened to be written.  BB 3307 P-14.4 (g) supplies the missing
+    criterion -- "lowest locants for the substituent cited first as a prefix in
+    the name" -- witnessed verbatim by BB 29956
+    `1-hydroxy-3-oxopropane-1,2,3-tricarboxylic acid` (PIN) [not
+    `3-hydroxy-1-oxo...`].  Naming the raw SMILES and its canonical form must now
+    agree.
+    """
+    from rdkit import Chem
+    assert ungated_namer.name(smiles) == ungated_namer.name(Chem.CanonSmiles(smiles))
