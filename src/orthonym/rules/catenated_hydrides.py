@@ -30,7 +30,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
-from .substituent_purity import pure_organyl_prefix_name
+from .substituent_purity import organyl_prefix_name
 
 _GROUP14_STEM = {'Si': 'sil', 'Ge': 'germ', 'Sn': 'stann', 'Pb': 'plumb'}
 _BRIDGE_SUFFIX = {
@@ -308,7 +308,7 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
             continue
         if not is_terminal or len(heavy_nonchain) != 1:
             return None                          # internal / >1 organyl -> decline
-        name = pure_organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
+        name = organyl_prefix_name(mol, heavy_nonchain[0].GetIdx(), idx)
         if name is None:
             return None
         subs.append(name)
@@ -325,17 +325,43 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
 
     # Terminal organyls: no locants (the terminal positions are symmetric — BB
     # methyldithioxane / dimethyldithioxane / methyl(phenyl)dithioxane).
+    #
+    # v29 P3: the organyl guard above is now the shared chokepoint, so a prefix
+    # reaching here may carry LOCANTS ('propan-2-yl'), a retained italicized
+    # prefix ('tert-butyl') or its own enclosing marks ('(4-bromophenyl)methyl').
+    # Raw `sorted()` + bare concatenation was correct only for the letters-only
+    # class the retired narrow walker could return, so ordering and marks are
+    # delegated to the shared primitives — no local copy of either decision:
+    #   * P-14.5.2/P-14.5.4 `prefix_citation_sort_key` — alphanumerical citation
+    #     order, which ignores enclosing marks and the italicized prefix;
+    #   * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) — a compound prefix is
+    #     enclosed and the SIMPLE multiplier sits OUTSIDE the marks;
+    #   * BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN) + P-16.3.4 — a retained
+    #     italicized prefix is cited bare and keeps its hyphen under a multiplier
+    #     ('di-tert-butyl', never 'ditert-butyl').
     from collections import Counter
+
+    from ..assembly.naming_utils import (apply_enclosing_marks,
+                                         enclose_if_compound,
+                                         multiplier_needs_hyphen,
+                                         prefix_citation_sort_key)
     counts = Counter(subs)
-    uniq = sorted(counts)
+    uniq = sorted(counts, key=prefix_citation_sort_key)
     parts = []
     for i, nm in enumerate(uniq):
         m = _SUB_MULT_ABA.get(counts[nm])
         if m is None:
             return None
-        token = f"{m}{nm}"
-        if len(uniq) >= 2 and i > 0:
-            token = f"({token})"                 # P-16.5.1.3 second+ unique in marks
+        # Both mark rules are "enclose unless already enclosed", so ask the
+        # shared compound test (P-16.3.3) first and only force marks when it
+        # declined and P-16.5.1.3 still needs a separator.
+        marked = enclose_if_compound(nm)
+        if len(uniq) >= 2 and i > 0 and marked == nm:
+            marked = apply_enclosing_marks(nm, -1)
+        if m and marked == nm and multiplier_needs_hyphen(nm):
+            token = f"{m}-{marked}"              # P-16.3.4 di-tert-butyl
+        else:
+            token = f"{m}{marked}"
         parts.append(token)
     return f"{''.join(parts)}{parent}"
 

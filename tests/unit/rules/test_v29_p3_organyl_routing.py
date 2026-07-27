@@ -490,3 +490,89 @@ def test_already_correct_tert_butyl_names_are_unchanged(ungated_namer, smiles, e
     '1,2-di-tert-butylbenzene' (PIN)); both were correct before the carve-out
     moved and must stay byte-identical."""
     assert ungated_namer.name(smiles) == expected
+
+
+# ==========================================================================
+# FAMILY 2 -- rules/catenated_hydrides.name_heterochalcogen_aba (1 site)
+#
+# The a[ba]n pure-chalcogen parent hydride (P-68.4.2.1 / P-21.2.3.1):
+# HS-O-SH -> `dithioxane`, and a terminal chalcogen may bear ONE organyl.
+# The organyl guard was the narrow walker, so every branched / unsaturated /
+# long terminal organyl was refused (`unknown organic compound`).
+#
+# Widening the guard also puts prefixes carrying LOCANTS and HYPHENS through
+# this handler's own prefix-composition block for the first time.  That block
+# open-coded `sorted(counts)` + bare concatenation, which is correct only for
+# the letters-only simple prefixes the narrow walker could return.  It now uses
+# the shared primitives, so:
+#
+#   BB 25719   `1,4-di(propan-2-yl)cyclohexane` (PIN)  -> the compound prefix is
+#              enclosed and the SIMPLE multiplier sits OUTSIDE the marks
+#   BB 16286   `*tert*-butyldi(methyl)phosphane` (PIN) -> a retained italicized
+#              prefix is cited BARE, and P-16.3.4 keeps its hyphen under a
+#              multiplier (`di-tert-butyl`, never `ditert-butyl`)
+#   P-14.5.2   alphanumerical order ignores the italicized prefix and the marks
+# ==========================================================================
+
+def _aba(smiles):
+    from orthonym.rules.catenated_hydrides import name_heterochalcogen_aba
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, smiles
+    return name_heterochalcogen_aba(mol)
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # branched: the narrow walker refused an INTERNAL attachment outright
+    ("CC(C)SOS",             "(propan-2-yl)dithioxane"),
+    ("CC(C)(C)SOS",          "tert-butyldithioxane"),
+    # unsaturated: the narrow walker refused every non-single bond
+    ("C=CSOS",               "ethenyldithioxane"),
+    # longer than the private walker's chain table
+    ("CCCCCCCCCCCCSOS",      "dodecyldithioxane"),
+    # two identical compound organyls -> di OUTSIDE the marks (BB 25719)
+    ("CC(C)SOSC(C)C",        "di(propan-2-yl)dithioxane"),
+    # P-16.3.4: the italicized prefix keeps its hyphen under the multiplier
+    ("CC(C)(C)SOSC(C)(C)C",  "di-tert-butyldithioxane"),
+    # two DIFFERENT organyls: P-14.5.2 order ('methyl' < 'propanyl'), and
+    # P-16.5.1.3 encloses the second cited group
+    ("CSOSC(C)C",            "methyl(propan-2-yl)dithioxane"),
+])
+def test_f2_catenated_aba_previously_refused_organyl_is_now_named(smiles, expected):
+    assert _aba(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("SOS",         "dithioxane"),
+    ("CSOS",        "methyldithioxane"),
+    ("CSOSC",       "dimethyldithioxane"),
+    ("CCSOS",       "ethyldithioxane"),
+    ("CSOSCC",      "ethyl(methyl)dithioxane"),
+    ("SOSOS",       "trithioxane"),
+    ("CSOSOS",      "methyltrithioxane"),
+    ("CSOSOSC",     "dimethyltrithioxane"),
+])
+def test_f2_catenated_aba_existing_names_are_byte_identical(smiles, expected):
+    """PROTECT rows.  Every name this handler already emitted must be unchanged:
+    the widening must add emissions, never re-spell one.  ``ethyl(methyl)``
+    also pins that the switch from raw string order to P-14.5.2 alphanumerical
+    order is a no-op on the letters-only class the narrow walker allowed."""
+    assert _aba(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,why", [
+    ("c1ccccc1SOS",   "ring: the handler's own whole-molecule ring guard"),
+    ("C1CCCCC1SOS",   "ring: the handler's own whole-molecule ring guard"),
+    ("c1ccccc1CSOS",  "ring: the handler's own whole-molecule ring guard"),
+    ("BrCSOS",        "halogen: the handler's own C-or-chalcogen-only scan"),
+    ("OCCSOS",        "heteroatom organyl: P-41 seniority, guard keeps it closed"),
+])
+def test_f2_catenated_aba_other_guards_still_fail_closed(smiles, why):
+    """TRIPWIRE.  The migration widens ONE guard, not the handler's scope.
+
+    ``name_heterochalcogen_aba`` carries two further whole-molecule guards --
+    ``NumRings() > 0`` and "every heavy atom is a chalcogen or a carbon" -- that
+    independently refuse ring-bearing and halogenated organyls.  They are NOT in
+    this task's scope, so those classes must still fail closed here; if one of
+    them starts emitting, the migration reached further than the call site.
+    """
+    assert _aba(smiles) is None, why
