@@ -775,7 +775,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # are ALL identical AND simple. Otherwise cite each ligand separately
             # in alphanumerical order, each enclosed — parentheses upgraded to
             # square brackets when the ligand name already contains enclosing
-            # marks (P-16.5.1.1 nesting). Neutral Group-12 metal -> no Stock number.
+            # marks (P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232)). Neutral Group-12 metal -> no Stock number.
             from ..assembly.naming_utils import (
                 is_complex_substituent as _is_cx, apply_enclosing_marks as _encl,
                 alpha_sort_key as _ask,
@@ -793,7 +793,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 _is_cx(nm) or any(c in nm for c in '()[]') for nm in organic_names)
             if (len(_distinct) > 1 or _any_complex) and not include_stock:
                 def _enclose_ligand(nm: str) -> str:
-                    # P-16.5.1.1 enclosure nesting: a ligand name that ALREADY
+                    # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): a ligand name that ALREADY
                     # contains enclosing marks must be wrapped at the next level
                     # up (depth 1 = square brackets), e.g.
                     # '4-(diphenylstibanyl)phenyl' -> '[4-(diphenylstibanyl)phenyl]'.

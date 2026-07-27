@@ -2689,7 +2689,8 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
     Multiple same: 2,4-dimethyl
 
     Per IUPAC P-16.5.1.1, compound substituent names are parenthesized.
-    Per IUPAC P-16.5.1.1, enclosing marks nest: (...), [...], {...}.
+    Enclosing marks are required by P-16.5.1.1 (BB 7232); their ORDER
+    (...), [...], {...} is P-16.5.4 (BB 7444), escalating per P-16.5.4.1.5 (BB 7509).
     Names already containing parentheses use square brackets.
     """
     locant_str = ",".join(str(loc) for loc in locants)
@@ -2713,7 +2714,7 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
         # which take a SIMPLE multiplier but STILL require parentheses
         # (the benzene path's '1,3,5-tri(hydroxymethyl)benzene' convention).
         if '(' in name:
-            # P-16.5.1.1 nesting: a name already containing parentheses is
+            # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): a name already containing parentheses is
             # enclosed in the next mark up ([(naphthalen-2-yl)methyl]).
             display_name = f'[{name}]'
         else:

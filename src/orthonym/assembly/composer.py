@@ -7110,7 +7110,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 )
                 if (_rc_name and ' ' not in _rc_name
                         and any(_ch.isdigit() for _ch in _rc_name)):
-                    # P-16.5.1.1 nested enclosure: a decorated ring name that
+                    # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): a decorated ring name that
                     # itself contains parentheses (e.g. '2-(methoxycarbonyl)-
                     # cyclohexyl') must be enclosed in the NEXT bracket level
                     # ([...]), not another pair of parens. apply_enclosing_marks
@@ -7951,7 +7951,16 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                                 and sorted_locants == [1]),
         ) and (total_substituents == 1 or _prefix_chain_len == 1):
             # A complex/compound substituent still needs enclosing marks even when
-            # its locant is elided (P-16.7.1(a)): '(methylperoxy)ethane',
+            # its locant is elided (P-16.5.1.1, BB 7232: "*Parentheses are used
+            # around compound ... and complex ... prefixes*").  v29 P3-FINAL m3:
+            # this cited P-16.7.1(a), which a citation sweep chose on the word
+            # "elided" -- but `### P-16.7 ELISION OF VOWELS` (BB 7591) /
+            # `**P-16.7.1** Vowels are systematically elided as follows:` (BB 7593)
+            # is about the terminal 'e' of a parent hydride, and locant OMISSION is
+            # P-14.3.4.2.  Neither reading rescues it.  The guard is live and this
+            # comment is load-bearing: BB 7236 `(chloromethyl)silane [PIN; ...
+            # chloro(methyl)silane would describe ClGSiH2GCH3]`.
+            # '(methylperoxy)ethane',
             # '(methyldisulfanyl)methane'. Mirrors the ring-prefix path. The bare
             # name passes through apply_enclosing_marks (correct ()->[]->{} nesting
             # + leading-stereo escalation; avoids the double-enclose hazard).

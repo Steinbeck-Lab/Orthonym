@@ -442,7 +442,7 @@ def format_n_substitution(substituents: List[Dict]) -> str:
         is_complex = is_complex_substituent(name)
         from ..assembly.naming_utils import _wrap_n_substituent
         if is_complex:
-            # P-16.5.1.1 bracket escalation: if the substituent ALREADY carries an
+            # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): if the substituent ALREADY carries an
             # inner "(...)" (e.g. a "(2S)-" stereo descriptor), the outer
             # enclosure must escalate to square brackets — "[(2S)-butan-2-yl]",
             # NOT "((2S)-butan-2-yl)". _wrap_n_substituent picks [] when an inner

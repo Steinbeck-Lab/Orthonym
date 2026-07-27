@@ -3059,7 +3059,7 @@ def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:
     (-> the aglycone methyl ether, which Orthonym names natively), require the
     aglycone to carry a senior-group suffix (else it is a simple glycoside ->
     fail-closed for the glycoside path), then swap the single ``methoxy`` token for
-    ``(<glycosyloxy>)`` and escalate its enclosing marks (P-16.5.1.1).  Fail-closed on
+    ``(<glycosyloxy>)`` and escalate its enclosing marks (P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232)).  Fail-closed on
     >1 sugar ring, a free/undefined anomeric, a non-senior aglycone, or an RT-fail.
     """
     if mol is None:

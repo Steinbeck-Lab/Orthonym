@@ -418,7 +418,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
                 or is_substituted_substituent(prefix_form))
 
     def _enclose(_p: str) -> str:
-        # Auto-detect nesting depth (P-16.5.1.1): no inner marks -> '(p)';
+        # Auto-detect nesting depth (P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232)): no inner marks -> '(p)';
         # already contains '()' -> '[p]'. Byte-identical to the previous
         # hard-coded '(p)' for prefixes without inner enclosing marks.
         return apply_enclosing_marks(_p, -1)
@@ -2736,7 +2736,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         )
                         het_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
                         if het_name and needs_brackets(het_name):
-                            # P-16.5.1.1 nesting: the marks go ()->[]->{} outward, so
+                            # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): the marks go ()->[]->{} outward, so
                             # a prefix that ALREADY carries parentheses must be
                             # wrapped in SQUARE brackets. The literal f"({...})"
                             # here produced the doubled-paren

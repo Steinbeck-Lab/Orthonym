@@ -985,7 +985,7 @@ def compute_nesting_depth(name: str) -> int:
 
 
 def apply_enclosing_marks(name: str, depth: int = 0) -> str:
-    """Apply IUPAC P-16.5.1.1 enclosing marks at the correct nesting depth.
+    """Apply the IUPAC P-16.5.1.1 enclosing marks at the P-16.5.4 nesting depth.
 
     Nesting order: ( ) -> [ ] -> { } -> ( ) again
     Depth 0: parentheses
@@ -2276,7 +2276,7 @@ def _has_stereo_prefix(name: str) -> bool:
 
 
 def _wrap_n_substituent(name: str) -> str:
-    """Apply IUPAC P-16.5.1.1 bracket escalation to an N-substituent name.
+    """Apply IUPAC P-16.5.4.1.5 bracket escalation to an N-substituent name.
 
     When an N-substituent already contains parentheses (from stereo
     descriptors or compound substituent names), the outer enclosure must
@@ -2327,7 +2327,7 @@ def _wrap_n_substituent(name: str) -> str:
                 # The opening paren matches the closing paren at the end
                 return name
     # Contains parentheses (stereo prefix, compound sub-substituent, etc.)
-    # -> escalate to square brackets per P-16.5.1.1
+    # -> escalate to square brackets per P-16.5.4.1.5 (BB 7509)
     if '(' in name:
         return f"[{name}]"
     return name
@@ -2456,7 +2456,7 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         complex = True
     if _has_stereo_prefix(name):
         # Name has a CIP stereo descriptor prefix (e.g., "(R)-sec-butyl"):
-        # use square brackets per IUPAC P-16.5.1.1 nesting rules
+        # use square brackets per the IUPAC P-16.5.4 nesting order (BB 7444)
         formatted_name = f"[{name}]"
     elif ('(' in name or '[' in name) and not _is_fully_enclosed(name):
         # P-16.5.4.1 (W2E-P1FC Task 8, generalized by w2f p1 per
