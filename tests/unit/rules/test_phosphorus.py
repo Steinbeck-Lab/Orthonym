@@ -56,12 +56,34 @@ class TestPhosphineNaming:
         assert result == "ethyl(methyl)phosphane"
 
     def test_dimethylethylphosphane(self):
-        """CCP(C)C -> ethyl(dimethyl)phosphane (asymmetric tertiary, with multiplier)
+        """CCP(C)C -> ethyldi(methyl)phosphane (asymmetric tertiary, with multiplier)
+        v29 P3-FIX Item 3 re-baseline: the multiplicative prefix goes OUTSIDE the
+        parentheses.  ``### **P-16.5.1.3** Parentheses are placed also around
+        prefixes denoting simple substituent groups qualified by locants``
+        (``BlueBookV2.md:7270``) -> ``**P-16.5.1.3.1**`` (``:7272``), whose scope
+        sentence is "*For mononuclear parent hydrides with two or more
+        substituents the first cited substituent never has enclosing marks unless
+        it includes a locant. The second and further substituents are each
+        enclosed with parentheses even for simple substituents. When the simple
+        substituent groups are accompanied by multiplicative prefixes such as
+        'di' and 'tri', the multiplicative prefixes are not included in the
+        parentheses.*"  The verbatim PIN example is ``ethyldi(methyl)phosphane``
+        (``:7290``); for the aryl form, ``### **P-68.3.2.3.2.1** Substitution of
+        phosphanes, arsanes, and stibanes by organyl groups`` gives
+        ``(arsanylmethyl)di(phenyl)phosphane (PIN)`` (``:39224``), and ``:42468``
+        carries ``methyldi(phenyl)phosphaniumyl`` inside a PIN.  The first cited
+        group here is ``ethyl``/``methyl`` -- simple and locant-free -- so it is
+        correctly BARE, satisfying the first-cited clause above.
+        The gold set already agrees (`
+        characteristic_groups.json`` ships ``tert-butyldi(methyl)(oxiranyl-
+        methoxy)silane``), so these 7 unit assertions were the only stale copy.
+        DO NOT "fix" these back to ``X(diY)``.
+
         Per P-16.5.1.3 errata: first substituent no marks, second+ in parens."""
         mol = Chem.MolFromSmiles("CCP(C)C")
         result = name_phosphine(mol, 2)
         # Alphabetical: ethyl + dimethyl (multiplier for identical groups)
-        assert result == "ethyl(dimethyl)phosphane"
+        assert result == "ethyldi(methyl)phosphane"
 
     def test_parent_phosphane(self):
         """Pure phosphane (PH3)"""
@@ -97,7 +119,7 @@ class TestPhosphineOxideNaming:
         result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
         # Two methyl + one ethyl: ethyldimethylphosphane oxide (with multiplier)
         assert "phosphane oxide" in result
-        assert result == "ethyl(dimethyl)phosphane oxide"
+        assert result == "ethyldi(methyl)phosphane oxide"
 
 
 class TestPhosphonicAcidNaming:
@@ -438,7 +460,7 @@ class TestArylPhosphineNaming:
         # "methyl" vs "phenyl": m < p, so methyl first.
         assert "methyl" in result
         assert "phenyl" in result
-        assert result == "methyl(diphenyl)phosphane"
+        assert result == "methyldi(phenyl)phosphane"
 
     def test_phenylphosphane(self):
         """PhPH2 -> phenylphosphane (primary phosphine with phenyl)"""
@@ -471,7 +493,7 @@ class TestArylPhosphineNaming:
                 p_idx = i
                 break
         result = name_phosphine(mol, p_idx)
-        assert result == "ethyl(diphenyl)phosphane"
+        assert result == "ethyldi(phenyl)phosphane"
 
 
 class TestArylPhosphineOxideNaming:
@@ -490,13 +512,13 @@ class TestArylPhosphineOxideNaming:
         assert "methyl" in result
         assert "phenyl" in result
         assert "phosphane oxide" in result
-        assert result == "methyl(diphenyl)phosphane oxide"
+        assert result == "methyldi(phenyl)phosphane oxide"
 
     def test_ethyldiphenylphosphane_oxide(self):
         """O=P(Et)Ph2 -> ethyldiphenylphosphane oxide"""
         mol = Chem.MolFromSmiles("O=P(CC)(c1ccccc1)c2ccccc2")
         result = name_phosphine_oxide(mol, tuple(range(mol.GetNumAtoms())))
-        assert result == "ethyl(diphenyl)phosphane oxide"
+        assert result == "ethyldi(phenyl)phosphane oxide"
 
 
 class TestArylPhosphinicAcid:
@@ -582,4 +604,4 @@ class TestPhosphanylPrefix:
                 p_idx = i
                 break
         result = get_phosphanyl_prefix(mol, p_idx)
-        assert result == "methyl(diphenyl)phosphanyl"
+        assert result == "methyldi(phenyl)phosphanyl"
