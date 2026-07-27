@@ -120,10 +120,6 @@ class TestFailClosedDecline:
         ("FS(F)(F)(F)(F)S(F)(F)(F)(F)F", "S2F10: two hubs (di-nuclear)"),
         ("CP(C)C", "trimethylphosphane: organyl P -> name_phosphine owns it"),
         ("CSC", "dimethyl sulfide: organyl chalcogen is not in the organyl regime"),
-        ("CC(C)[As](C(C)C)C(C)C", "triisopropylarsane: branched/internal attachment"),
-        ("C1CCCCC1[As](C1CCCCC1)C1CCCCC1", "tricyclohexylarsane: cyclic alkyl"),
-        ("c1ccccc1C[As](Cc1ccccc1)Cc1ccccc1", "tribenzylarsane: benzyl mislabel risk"),
-        ("C=C[As](C=C)C=C", "trivinylarsane: unsaturated alkyl"),
         ("c1cc[as]c1", "arsole: As is a ring member, not a parent hydride"),
     ])
     def test_declines(self, smiles, why):
@@ -132,6 +128,43 @@ class TestFailClosedDecline:
         if mol is None:
             pytest.skip(f"RDKit rejects SMILES ({why})")
         assert name_mononuclear_hydride(mol) is None, why
+
+    @pytest.mark.parametrize("smiles,expected,fabricated", [
+        ("CC(C)[As](C(C)C)C(C)C",            "tri(propan-2-yl)arsane",
+         "tripropylarsane"),
+        ("C1CCCCC1[As](C1CCCCC1)C1CCCCC1",   "tricyclohexylarsane",
+         "trihexylarsane"),
+        ("c1ccccc1C[As](Cc1ccccc1)Cc1ccccc1", "tribenzylarsane",
+         "triheptylarsane"),
+        ("C=C[As](C=C)C=C",                  "triethenylarsane",
+         "triethylarsane"),
+    ])
+    def test_branched_cyclic_and_unsaturated_organyls_are_now_NAMED(
+        self, smiles, expected, fabricated,
+    ):
+        """These four were `test_declines` rows until v29 Phase 3.
+
+        Their stated reasons -- "branched/internal attachment", "cyclic alkyl",
+        "benzyl mislabel risk", "unsaturated alkyl" -- were artefacts of the
+        private carbon-skeleton walker behind the old organyl guard, which
+        miscounted a ring or branch as a linear chain (cyclohexyl -> 'hexyl',
+        benzyl -> 'heptyl', propan-2-yl -> 'propyl').  Refusing was the correct
+        response to THAT walker; the four refusals were never nomenclature.
+
+        The guard now routes to the audited shared chokepoint
+        (`rules.substituent_purity.organyl_prefix_name` ->
+        `assembly.substituent_enumerator.name_substituent`), which spells all four
+        classes correctly, so the class is NAMED instead of declined.  The
+        underlying safety property is unchanged and is asserted positively here:
+        no fabricated linear chain may appear.  All four names are OPSIN-exact
+        against the input structure.
+        """
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, smiles
+        name = name_mononuclear_hydride(mol)
+        assert name == expected
+        # the exact WRONG-CONSTITUTION name the old walker would have fabricated
+        assert name != fabricated
 
     def test_charged_declines(self):
         assert _name("F[S+](F)(F)F") is None

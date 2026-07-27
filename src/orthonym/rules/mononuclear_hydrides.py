@@ -64,7 +64,7 @@ from rdkit import Chem
 from ..assembly.naming_utils import get_multiplier_prefix
 from .lambda_convention import nonstandard_bonding_number
 from .phosphorus import _build_substituent_string
-from .substituent_purity import pure_organyl_prefix_name
+from .substituent_purity import organyl_prefix_name
 
 # Hub element -> parent-hydride stem (P-68 / P-21.1 substitutive parent hydrides).
 _HUB_STEMS = {
@@ -227,7 +227,7 @@ def _classify_organyls(mol, hub) -> Optional[List[str]]:
             continue
         if nbr.GetSymbol() in _HALOGENS:
             return None  # mixed halo+organyl -> fail-closed
-        name = pure_organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+        name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
         if name is None:
             return None
         names.append(name)
@@ -270,7 +270,7 @@ def _classify_mixed_halo_organyl(mol, hub) -> Optional[List[str]]:
             halo_nbr_idxs.add(nbr.GetIdx())
             n_halo += 1
         elif sym == 'C':
-            name = pure_organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+            name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
             if name is None:
                 return None
             names.append(name)
@@ -280,7 +280,7 @@ def _classify_mixed_halo_organyl(mol, hub) -> Optional[List[str]]:
     if n_halo == 0 or n_org == 0:
         return None  # not mixed -> a dedicated pure regime handles it
     # Full coverage: every heavy atom is the hub, a counted terminal halogen, or a
-    # carbon inside a pure-hydrocarbyl organyl (pure_organyl_prefix_name rejected
+    # carbon inside a verified organyl (organyl_prefix_name rejected
     # any internal heteroatom). No stray heteroatom remains.
     for a in mol.GetAtoms():
         if a.GetSymbol() == 'H':
@@ -305,18 +305,38 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
 
     Returns None if a multiplicity exceeds the supported multiplier table."""
     from collections import Counter
+
+    from ..assembly.naming_utils import (apply_enclosing_marks,
+                                         enclose_if_compound,
+                                         multiplier_needs_hyphen,
+                                         prefix_citation_sort_key)
     _MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra',
              5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa'}
     counts = Counter(names)
     parts = []
-    for i, name in enumerate(sorted(counts)):
+    # v29 P3: the organyl guard feeding this is the shared chokepoint, so a prefix
+    # may now carry a locant, a retained italicized prefix, or its own marks. Raw
+    # `sorted()` keyed `tert-butyl` on its 't'; P-14.5.2/P-14.5.4 keys on the
+    # letters ('butyl'), which is also what decides whether the compound prefix
+    # lands in the unmarked FIRST slot.
+    for i, name in enumerate(sorted(counts, key=prefix_citation_sort_key)):
         mult = _MULT.get(counts[name])
         if mult is None:
             return None
         if i == 0:
-            parts.append(f"{mult}{name}")            # first unique: no marks
+            # First unique: P-16.5.1.3.1 withholds only the marks that SEPARATE
+            # the groups, so a compound prefix still takes its own P-16.3.3 marks
+            # (`(cyclohexylmethyl)di(methyl)silane`), and the P-16.3.4 italicized
+            # carve-out keeps `di-tert-butyl` hyphenated rather than `ditert-`.
+            marked = enclose_if_compound(name)
+            if mult and marked == name and multiplier_needs_hyphen(name):
+                parts.append(f"{mult}-{marked}")
+            else:
+                parts.append(f"{mult}{marked}")
         else:
-            parts.append(f"{mult}({name})")          # subsequent: marks, mult OUTSIDE
+            # Subsequent: marks always, multiplier OUTSIDE them (BB 25866
+            # 'chlorodi(methyl)'), escalating ( -> [ over an inner pair.
+            parts.append(f"{mult}{apply_enclosing_marks(name, -1)}")
     return ''.join(parts)
 
 
@@ -360,7 +380,7 @@ def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
     if (_stem is None or a.GetFormalCharge() != 0
             or a.GetNumRadicalElectrons() != 0):
         return None
-    from .substituent_purity import pure_organyl_prefix_name
+    from .substituent_purity import organyl_prefix_name
     from .phosphorus import _build_substituent_string
     prefixes = []
     for b in a.GetBonds():
@@ -374,7 +394,7 @@ def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
                 and nb.GetTotalNumHs() == 1):
             prefixes.append('hydroxy')
         elif sym == 'C':
-            nm = pure_organyl_prefix_name(mol, nb.GetIdx(), attach_idx)
+            nm = organyl_prefix_name(mol, nb.GetIdx(), attach_idx)
             if nm is None:
                 return None
             prefixes.append(nm)
@@ -496,7 +516,7 @@ def _classify_phosphane_subs(mol, hub) -> Optional[List[str]]:
                 return None
             names.append('silyl')
             continue
-        name = pure_organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+        name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
         if name is None:
             return None
         names.append(name)
@@ -534,12 +554,12 @@ def name_heterone(mol) -> Optional[str]:
     oxo = doubles[0].GetOtherAtom(hub)
     if oxo.GetSymbol() != 'O' or oxo.GetDegree() != 1:
         return None
-    from .substituent_purity import pure_organyl_prefix_name
+    from .substituent_purity import organyl_prefix_name
     prefixes = []
     for nb in hub.GetNeighbors():
         if nb.GetIdx() == oxo.GetIdx():
             continue
-        name = pure_organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
+        name = organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
         if name is None:
             return None
         prefixes.append(name)
@@ -597,7 +617,7 @@ def name_heteroimine(mol) -> Optional[str]:
             continue
         if nb.GetSymbol() == 'H':
             continue
-        name = pure_organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
+        name = organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
         if name is None:
             return None
         organyls.append(name)
@@ -610,7 +630,11 @@ def name_heteroimine(mol) -> Optional[str]:
         return f"{stem}imine"
     if len(organyls) != 1:
         return None      # multi-organyl locant assembly not built here
-    return f"1-{organyls[0]}{stem}imine"
+    # The organyl follows a locant + hyphen, so a compound prefix takes its
+    # P-16.3.3 marks (`1-(propan-2-yl)phosphanimine`) while the retained
+    # italicized prefix stays bare (P-16.3.4).
+    from ..assembly.naming_utils import enclose_if_compound
+    return f"1-{enclose_if_compound(organyls[0])}{stem}imine"
 
 
 _PHOSPHANIMINE_STEMS = {'P': 'phosphan', 'As': 'arsan', 'Sb': 'stiban'}
@@ -668,18 +692,19 @@ def name_lambda5_phosphanimine(mol) -> Optional[str]:
     for nb in hub.GetNeighbors():
         if nb.GetIdx() == n_atom.GetIdx() or nb.GetSymbol() == 'H':
             continue
-        name = pure_organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
+        name = organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
         if name is None:
             return None
         hub_subs.append(name)
     # The imine-N substituent (if any): cited with the 'N' locant.
     n_sub = None
     if n_heavy:
-        n_sub = pure_organyl_prefix_name(mol, n_heavy[0].GetIdx(), n_atom.GetIdx())
+        n_sub = organyl_prefix_name(mol, n_heavy[0].GetIdx(), n_atom.GetIdx())
         if n_sub is None:
             return None
 
-    from ..assembly.naming_utils import alpha_sort_key, is_complex_substituent
+    from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
+                                         multiplier_needs_hyphen)
     locant = 'P' if hub.GetSymbol() == 'P' else hub.GetSymbol()[0].upper()
     from collections import Counter
 
@@ -689,10 +714,14 @@ def name_lambda5_phosphanimine(mol) -> Optional[str]:
         if mult is None:
             return None
         loc_str = ','.join(locants)
-        if is_complex_substituent(name):
-            body = f"{mult}({name})" if count > 1 else f"({name})"
+        # `enclose_if_compound` replaces the raw `f"({name})"`: it ESCALATES over
+        # an inner pair (P-16.5.4.1) and carries the P-16.3.4 carve-out, so
+        # `tert-butyl` is cited bare and keeps its hyphen under a multiplier.
+        marked = enclose_if_compound(name)
+        if mult and marked == name and multiplier_needs_hyphen(name):
+            body = f"{mult}-{marked}"
         else:
-            body = f"{mult}{name}"
+            body = f"{mult}{marked}"
         return f"{loc_str}-{body}"
 
     prefix_items = []  # (alpha_key, block_text)
@@ -744,17 +773,36 @@ def _compose_io_prefixes(items) -> Optional[str]:
         [('ethyl',False),('methyl',False)]            -> 'ethyl(methyl)'
     """
     from collections import Counter
+
+    from ..assembly.naming_utils import (apply_enclosing_marks,
+                                         enclose_if_compound,
+                                         multiplier_needs_hyphen,
+                                         prefix_citation_sort_key)
     names = [n for n, _ in items]
     complex_names = {n for n, c in items if c}
     counts = Counter(names)
     parts = []
-    for i, name in enumerate(sorted(counts)):
+    # v29 P3: the S-organyls now come from the shared chokepoint, so a prefix here
+    # may carry a locant or a retained italicized prefix. Two consequences:
+    #   * order by P-14.5.2/P-14.5.4, not raw string order;
+    #   * the multiplier goes OUTSIDE the marks. BB 7272 (P-16.5.1.3.1) verbatim:
+    #     "When the simple substituent groups are accompanied by multiplicative
+    #     prefixes such as 'di' and 'tri', the multiplicative prefixes are NOT
+    #     included in the parentheses" -- BB 16286 spells the resulting shape,
+    #     `tert-butyldi(methyl)phosphane` (PIN). The old `f"({mult}{name})"` put
+    #     them inside and produced `imino(dimethyl)` and, once widened, the
+    #     ambiguous `imino(dipropan-2-yl)`.
+    for i, name in enumerate(sorted(counts, key=prefix_citation_sort_key)):
         mult = _IO_PREFIX_MULT.get(counts[name])
         if mult is None:
             return None
-        needs_marks = (i > 0) or (name in complex_names)
-        frag = f"{mult}{name}"
-        parts.append(f"({frag})" if needs_marks else frag)
+        marked = enclose_if_compound(name)
+        if marked == name and ((i > 0) or (name in complex_names)):
+            marked = apply_enclosing_marks(name, -1)
+        if mult and marked == name and multiplier_needs_hyphen(name):
+            parts.append(f"{mult}-{marked}")          # P-16.3.4 di-tert-butyl
+        else:
+            parts.append(f"{mult}{marked}")
     return ''.join(parts)
 
 
@@ -835,7 +883,7 @@ def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:
         elif bt == Chem.BondType.SINGLE:
             if sym != 'C':
                 return None  # single-bonded heteroatom on hub — not this family
-            name = pure_organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+            name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
             if name is None:
                 return None
             s_organyls.append(name)
@@ -865,7 +913,7 @@ def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:
             continue         # =NH
         if len(heavy_other) != 1 or heavy_other[0].GetSymbol() != 'C':
             return None
-        name = pure_organyl_prefix_name(mol, heavy_other[0].GetIdx(), n.GetIdx())
+        name = organyl_prefix_name(mol, heavy_other[0].GetIdx(), n.GetIdx())
         if name is None:
             return None
         n_substituents.append(name)

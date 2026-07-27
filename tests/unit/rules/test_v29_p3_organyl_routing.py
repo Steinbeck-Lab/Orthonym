@@ -1322,3 +1322,216 @@ def test_f7_other_guards_still_fail_closed(smiles, why):
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, smiles
     assert _name_azoxy(mol) is None, why
+
+
+# ==========================================================================
+# FAMILY 8 -- rules/mononuclear_hydrides (10 sites, all NAMING)
+#
+# The largest family: `_classify_organyls`, `_classify_mixed_halo_organyl`,
+# `name_arsanyl_substituent`, `_classify_phosphane_subs`, `name_heterone`,
+# `name_heteroimine`, the phosphanimine hub/N pair, and the lambda-sulfane
+# imine/oxide hub/N pair.
+#
+# ** What the refusal was actually doing (invariant 11, ungated probe) **
+# A `None` here does not fail closed -- it hands the molecule to generators that
+# DROP the heteroatom.  With the SELF-01 gate disabled the producers emitted
+# `propane` for CC(C)[AsH2] (the arsenic simply gone), `cyclohexane` for
+# C1CCCCC1[AsH2], `(methylmethyl)methane` for C[Si](C)(C)N=P, and `propylsilane`
+# / `tetrapropylsilane` (propan-2-yl spelled propyl) for the silanes.
+# At DEFAULT settings the gate suppressed all of those, so they were NOT shipped
+# names -- they emitted `unknown organic compound` / `<element> compound (not
+# supported)`.  The shipped effect of this migration is therefore
+# REFUSAL -> CORRECT NAME; the fabrications were a producer defect that the gate
+# caught, and this phase removes the defect rather than relying on the gate.
+#
+# Four composers are repaired: `_build_mixed_substituent_string`,
+# `_compose_io_prefixes`, the phosphanimine `_block`, and `name_heteroimine`'s
+# single-organyl join -- plus `phosphorus._build_substituent_string`, which family
+# 8 feeds and which produced `dipropan-2-yl`, `ditert-butyl` and
+# `tert-butyl(dimethyl)`.  BB 7272 (P-16.5.1.3.1) is verbatim on the last one:
+# "When the simple substituent groups are accompanied by multiplicative prefixes
+# such as 'di' and 'tri', the multiplicative prefixes are NOT included in the
+# parentheses" -- BB 16286 `tert-butyldi(methyl)phosphane` (PIN) is the shape.
+# ==========================================================================
+
+@pytest.mark.parametrize("smiles,expected", [
+    # pnictogen hydrides -- these are the atom-drop cases
+    ("CC(C)[AsH2]",       "(propan-2-yl)arsane"),
+    ("CC(C)[As](C)C",     "dimethyl(propan-2-yl)arsane"),
+    ("C1CCCCC1[AsH2]",    "cyclohexylarsane"),
+    ("CC(C)[SbH2]",       "(propan-2-yl)stibane"),
+    ("CC(C)[BiH2]",       "(propan-2-yl)bismuthane"),
+    # heterone
+    ("CC(C)[Si](C(C)C)=O", "di(propan-2-yl)silanone"),
+    # heteroimine + phosphanimine hub/N
+    ("CC(C)P=N",          "1-(propan-2-yl)phosphanimine"),
+    ("CC(C)P(C(C)C)(C(C)C)=N",
+     "P,P,P-tri(propan-2-yl)-lambda5-phosphanimine"),
+    ("CC(C)P(C)(C)=NC(C)C",
+     "P,P-dimethyl-P-(propan-2-yl)-N-(propan-2-yl)-lambda5-phosphanimine"),
+    # lambda-sulfane imine/oxide
+    ("CC(C)S(=N)(=O)C(C)C", "iminodi(propan-2-yl)-lambda6-sulfanone"),
+    ("CS(=N)(=O)C(C)C",     "imino(methyl)(propan-2-yl)-lambda6-sulfanone"),
+    # phosphane with a silyl co-substituent
+    ("CC(C)P([SiH3])C",   "methyl(propan-2-yl)(silyl)phosphane"),
+    # mixed halo+organyl with the COMPOUND prefix in the FIRST (unmarked) slot:
+    # P-14.5.2 puts 'cyclohexylmethyl'/'butanyl' before 'fluoro', and
+    # P-16.5.1.3.1 withholds only the SEPARATING marks, so the compound prefix
+    # still takes its own P-16.3.3 marks there.
+    ("C1CCCCC1C[Si](F)(F)F", "(cyclohexylmethyl)tri(fluoro)silane"),
+    ("CCC(C)[Si](F)(F)F",    "(butan-2-yl)tri(fluoro)silane"),
+    ("CC(C)[Si](F)(F)F",     "trifluoro(propan-2-yl)silane"),
+])
+def test_f8_mononuclear_previously_refused_organyl_is_now_named(
+    ungated_namer, smiles, expected,
+):
+    assert ungated_namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,dropped_element", [
+    ("CC(C)[AsH2]",    "As"),
+    ("C1CCCCC1[AsH2]", "As"),
+    ("CC(C)[SbH2]",    "Sb"),
+    ("CC(C)[BiH2]",    "Bi"),
+    ("CC(C)P=N",       "P"),
+])
+def test_f8_the_hub_element_is_never_dropped_from_the_name(
+    ungated_namer, smiles, dropped_element,
+):
+    """REGRESSION guard for the invariant-11 failure this family carried.
+
+    With the guard refusing, the fallback generators emitted `propane` for
+    CC(C)[AsH2] and `cyclohexane` for C1CCCCC1[AsH2] -- the hub element silently
+    GONE, a wrong constitution that only the OPSIN gate stopped.  The emitted name
+    must now carry the hub's parent-hydride stem, and this runs UNGATED so nothing
+    downstream can rescue it.
+    """
+    stem = {"As": "arsane", "Sb": "stibane", "Bi": "bismuthane",
+            "P": "phosphan"}[dropped_element]
+    name = ungated_namer.name(smiles)
+    assert stem in name, name
+    assert name not in ("propane", "cyclohexane"), name
+
+
+@pytest.mark.parametrize("smiles,before,after", [
+    # BB 1776 class seniority: Si is senior to C, so the SILANE is the parent
+    ("Cl[Si](C)(C)C(C)C",    "2-(chlorodimethylsilyl)propane",
+                             "chlorodi(methyl)(propan-2-yl)silane"),
+    ("Cl[Si](C)(C)C(C)(C)C", "2-(chlorodimethylsilyl)-2-methylpropane",
+                             "tert-butyl(chloro)di(methyl)silane"),
+    ("CC(C)[Si](Cl)(Cl)Cl",  "2-(trichlorosilyl)propane",
+                             "trichloro(propan-2-yl)silane"),
+    ("CC(C)[Si](C)=O",       "2-methylsilanonylpropane",
+                             "methyl(propan-2-yl)silanone"),
+])
+def test_f8_silicon_is_the_senior_parent_over_carbon(
+    ungated_namer, smiles, before, after,
+):
+    """Four names move from a CARBON parent to the SILANE parent, toward the PIN.
+
+    BB 1776 gives the class seniority order `N > P > As > Sb > Bi > Si > Ge > Sn >
+    Pb > B > ... > O > S > Se > Te > C` -- silicon BEFORE carbon.  The codebase
+    already emitted `methylsilane`, `cyclohexylsilane`, `trichloro(methyl)silane`
+    and `chlorotri(methyl)silane` on the silane parent, so the old behaviour split
+    one class on nothing but whether the narrow walker accepted the substituent.
+    All four new names are OPSIN-exact.
+    """
+    name = ungated_namer.name(smiles)
+    assert name == after
+    assert name != before
+
+
+def test_f8_multiplier_sits_outside_the_enclosing_marks(ungated_namer):
+    """BB 7272 verbatim: "the multiplicative prefixes are NOT included in the
+    parentheses".  `imino(dimethyl)-lambda6-sulfanone` put `di` inside them; the
+    shape BB 16286 spells is `tert-butyldi(methyl)phosphane` (PIN)."""
+    name = ungated_namer.name("CS(=N)(=O)C")
+    assert name == "iminodi(methyl)-lambda6-sulfanone"
+    assert name != "imino(dimethyl)-lambda6-sulfanone"
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[SiH3]",                 "methylsilane"),
+    ("C[Si](C)(C)C",            "tetramethylsilane"),
+    ("c1ccccc1[SiH3]",          "phenylsilane"),
+    ("CC(C)(C)[SiH3]",          "tert-butylsilane"),
+    ("C1CCCCC1[SiH3]",          "cyclohexylsilane"),
+    ("C=C[SiH3]",               "ethenylsilane"),
+    ("C[AsH2]",                 "methylarsane"),
+    ("C[As](C)C",               "trimethylarsane"),
+    ("C[SbH2]",                 "methylstibane"),
+    ("C[BiH2]",                 "methylbismuthane"),
+    ("Cl[Si](C)(C)C",           "chlorotri(methyl)silane"),
+    ("Cl[Si](Cl)(C)C",          "dichlorodi(methyl)silane"),
+    ("Cl[Si](Cl)(Cl)C",         "trichloro(methyl)silane"),
+    ("C[Si](C)=O",              "dimethylsilanone"),
+    ("CP=N",                    "1-methylphosphanimine"),
+    ("CP(C)(C)=N",              "P,P,P-trimethyl-lambda5-phosphanimine"),
+    ("CP(C)(C)=NC",             "P,P,P-trimethyl-N-methyl-lambda5-phosphanimine"),
+    ("C[PH2]",                  "methylphosphane"),
+    ("C[P](C)C",                "trimethylphosphane"),
+    ("[SiH3]P([SiH3])[SiH3]",   "trisilylphosphane"),
+    ("CP([SiH3])C",             "dimethyl(silyl)phosphane"),
+])
+def test_f8_mononuclear_existing_names_are_byte_identical(
+    ungated_namer, smiles, expected,
+):
+    """PROTECT rows across all ten sites and four composers.
+
+    `chlorotri(methyl)silane` / `dichlorodi(methyl)silane` /
+    `trichloro(methyl)silane` are the BB-cited mixed halo+organyl forms (BB 35754 /
+    39668 / 25866) and pin that the multiplier stayed outside the marks and the
+    first group unmarked.  `tert-butylsilane` pins the P-14.5.2 letters-only key.
+    """
+    assert ungated_namer.name(smiles) == expected
+
+
+def test_f8_shared_phosphorus_composer_matches_the_bb_shapes():
+    """`phosphorus._build_substituent_string` is shared with family 1, so its
+    three widened-input defects are pinned directly.
+
+    * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) -- marks kept, SIMPLE
+      multiplier outside  (was `dipropan-2-yl`)
+    * P-16.3.4 -- the italicized hyphen survives multiplication
+      (was `ditert-butyl`)
+    * BB 16286 `tert-butyldi(methyl)phosphane` (PIN) -- multiplier OUTSIDE the
+      marks of the SECOND cited group  (was `tert-butyl(dimethyl)`)
+    """
+    from orthonym.rules.phosphorus import _build_substituent_string as b
+    assert b(["propan-2-yl", "propan-2-yl"]) == "di(propan-2-yl)"
+    assert b(["tert-butyl", "tert-butyl"]) == "di-tert-butyl"
+    assert b(["tert-butyl", "methyl", "methyl"]) == "tert-butyldi(methyl)"
+    # protect: the shapes family 1 already shipped must not move
+    assert b(["methyl", "methyl", "methyl"]) == "trimethyl"
+    assert b(["methyl", "propan-2-yl"]) == "methyl(propan-2-yl)"
+    assert b(["methyl", "phenyl"]) == "methyl(phenyl)"
+    assert b(["benzyl", "methyl"]) == "benzyl(methyl)"
+    assert b(["cyclohexyl", "cyclohexyl"]) == "dicyclohexyl"
+
+
+def test_f8_io_prefix_composer_keeps_its_documented_cases():
+    """`_compose_io_prefixes`' own docstring examples must be byte-identical after
+    moving the multiplier outside the marks (BB 7272)."""
+    from orthonym.rules.mononuclear_hydrides import _compose_io_prefixes as c
+    assert c([("methylimino", True)]) == "(methylimino)"
+    assert c([("methyl", False), ("methyl", False),
+              ("phenylimino", True)]) == "dimethyl(phenylimino)"
+    assert c([("phenyl", False), ("phenyl", False)]) == "diphenyl"
+    assert c([("ethyl", False), ("methyl", False)]) == "ethyl(methyl)"
+    # widened: the multiplier leaves the marks instead of hiding inside them
+    assert c([("propan-2-yl", False), ("propan-2-yl", False),
+              ("imino", False)]) == "iminodi(propan-2-yl)"
+
+
+@pytest.mark.parametrize("smiles,why", [
+    ("OCC[SiH3]",       "heteroatom organyl: P-41 seniority keeps it closed"),
+    ("CO[Si](C)(C)C",   "a single-bonded heteroatom on the hub is not this family"),
+])
+def test_f8_other_guards_still_fail_closed(smiles, why):
+    """TRIPWIRE.  `_classify_organyls` refuses any stray heteroatom and
+    `_classify_mixed_halo_organyl` refuses a non-halogen heteroatom on the hub;
+    widening the organyl namer must not enlarge either."""
+    from orthonym.rules.mononuclear_hydrides import name_mononuclear_hydride
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, smiles
+    assert name_mononuclear_hydride(mol) is None, why
