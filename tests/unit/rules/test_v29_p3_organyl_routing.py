@@ -576,3 +576,123 @@ def test_f2_catenated_aba_other_guards_still_fail_closed(smiles, why):
     them starts emitting, the migration reached further than the call site.
     """
     assert _aba(smiles) is None, why
+
+
+# ==========================================================================
+# FAMILY 3 -- rules/pseudoketones.name_acyl_hetero_pseudoketone (1 site)
+#
+# An acyl group on a P/As hub is a pseudoketone: the carbonyl is the parent
+# (`-one`) and the hub is a `phosphanyl`/`arsanyl` substituent carrying its own
+# organyls.  The organyl guard was the narrow walker, so a branched, cyclic,
+# unsaturated or long organyl on the hub refused the WHOLE handler.
+#
+# Widening it also puts compound prefixes through this handler's own hub-prefix
+# composition for the first time, which was raw `sorted()` + bare concatenation
+# + an unconditional `f"({hubyl})"`.  Two Blue Book rules govern that block and
+# BOTH are quoted with their headings, because one of them makes a
+# previously-emitted name change:
+#
+#   BB 7272  **P-16.5.1.3.1** "For mononuclear parent hydrides with two or more
+#            substituents the first cited substituent never has enclosing marks
+#            unless it includes a locant.  The second and further substituents
+#            are each enclosed with parentheses EVEN FOR SIMPLE SUBSTITUENTS.
+#            When the simple substituent groups are accompanied by
+#            multiplicative prefixes such as 'di' and 'tri', the multiplicative
+#            prefixes are NOT included in the parentheses."
+#            -> `ethyl(methyl)(propyl)phosphane` (PIN), BB 7282
+#   BB 39228 `4-[ethyl(methyl)phosphanyl]-1*H*-imidazole` (PIN)
+#            -> the rule holds for the SUBSTITUENT-PREFIX form too, which is the
+#            shape this handler emits, and the outer marks ESCALATE to square
+#            brackets over the inner parentheses (P-16.5.4.1).
+#            The silyl analogue is `3-[amino(methyl)silyl]...` (PIN), BB 3545.
+#
+# So `1-(ethylmethylphosphanyl)propan-1-one` was NON-PIN: it dropped the
+# P-16.5.1.3.1 marks.  Its correction is a wrong-name -> better-name change, not
+# a refusal -> emission, and it is pinned separately below so the gate can
+# attribute it.
+# ==========================================================================
+
+def _pk(smiles):
+    from orthonym.rules.pseudoketones import name_acyl_hetero_pseudoketone
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, smiles
+    return name_acyl_hetero_pseudoketone(mol)
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # branched -- the narrow walker refused an internal attachment
+    ("CCC(=O)P(C(C)C)C(C)C",       "1-[di(propan-2-yl)phosphanyl]propan-1-one"),
+    ("CCC(=O)P(C(C)C)C",           "1-[methyl(propan-2-yl)phosphanyl]propan-1-one"),
+    # P-16.3.4 retained italicized prefix: bare, hyphen kept under 'di'
+    ("CCC(=O)P(C(C)(C)C)C(C)(C)C", "1-(di-tert-butylphosphanyl)propan-1-one"),
+    # ring-bearing -- the walker miscounted these as linear chains
+    ("CCC(=O)P(C1CCCCC1)C1CCCCC1", "1-(dicyclohexylphosphanyl)propan-1-one"),
+    ("CCC(=O)P(Cc1ccccc1)Cc1ccccc1", "1-(dibenzylphosphanyl)propan-1-one"),
+    # unsaturated
+    ("CCC(=O)P(C=C)C=C",           "1-(diethenylphosphanyl)propan-1-one"),
+    # longer than the private walker's chain table, + P-16.5.1.3.1 marks
+    ("CCC(=O)P(CCCCCCCCCCCC)C",    "1-[dodecyl(methyl)phosphanyl]propan-1-one"),
+    # the As hub shares the code path
+    ("CCC(=O)[As](C(C)C)C",        "1-[methyl(propan-2-yl)arsanyl]propan-1-one"),
+])
+def test_f3_pseudoketone_previously_refused_hub_organyl_is_now_named(smiles, expected):
+    assert _pk(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,before,after", [
+    ("CCC(=O)P(C)CC",        "1-(ethylmethylphosphanyl)propan-1-one",
+                             "1-[ethyl(methyl)phosphanyl]propan-1-one"),
+    ("CCC(=O)P(c1ccccc1)C",  "1-(methylphenylphosphanyl)propan-1-one",
+                             "1-[methyl(phenyl)phosphanyl]propan-1-one"),
+])
+def test_f3_pseudoketone_two_different_organyls_gain_the_p1651331_marks(
+    smiles, before, after,
+):
+    """A WRONG-name -> BETTER-name change, recorded with both strings.
+
+    BB 7272 requires the second and further substituents of a mononuclear hub to
+    be enclosed "even for simple substituents", and BB 39228
+    `4-[ethyl(methyl)phosphanyl]-1*H*-imidazole` (PIN) shows the rule applying to
+    exactly this substituent-prefix shape.  The bare-concatenated form was
+    reachable before this migration (two SIMPLE organyls pass the narrow walker),
+    so it is called out separately from the refusal -> emission rows: the gate
+    must attribute this one string move to P-16.5.1.3.1 and not to the widening.
+    """
+    assert _pk(smiles) == after
+    assert _pk(smiles) != before
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # ONE distinct group -> first-cited is bare, so no marks and the SIMPLE
+    # multiplier stays attached (BB 7272: multipliers sit outside the marks).
+    ("CCC(=O)P(C)C",            "1-(dimethylphosphanyl)propan-1-one"),
+    ("CCC(=O)PC",               "1-(methylphosphanyl)propan-1-one"),
+    ("CCC(=O)P(c1ccccc1)c1ccccc1", "1-(diphenylphosphanyl)propan-1-one"),
+    ("CCC(=O)[As](C)C",         "1-(dimethylarsanyl)propan-1-one"),
+    ("CC(=O)P(C)C",             "1-(dimethylphosphanyl)ethan-1-one"),
+    ("CCCC(=O)P(C)C",           "1-(dimethylphosphanyl)butan-1-one"),
+    # the UNSUBSTITUTED hub keeps its bare retained prefix (a gold target:
+    # `1-phosphanylbutan-1-one` is in )
+    ("CCC(=O)P",                "1-phosphanylpropan-1-one"),
+    # the Si/Ge branch is a DIFFERENT producer and must be untouched
+    ("CCC(=O)[Si](C)(C)C",      "1-(trimethylsilyl)propan-1-one"),
+])
+def test_f3_pseudoketone_existing_names_are_byte_identical(smiles, expected):
+    """PROTECT rows.  Every other name this handler emitted must be unchanged."""
+    assert _pk(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,why", [
+    ("CCC(=O)P(CO)C",   "heteroatom organyl on the hub: P-41 seniority"),
+    ("CCC(=O)P(CCl)C",  "the handler's own carbon-only hub_frag scan"),
+    ("CCC(=O)SC",       "plain carbon on a chalcogen hub: thioester, must decline"),
+])
+def test_f3_pseudoketone_other_guards_still_fail_closed(smiles, why):
+    """TRIPWIRE.  The widening must not enlarge the handler's scope.
+
+    The hub-scope guard ("every hub_frag atom is carbon") and the chalcogen-hub
+    thioester carve-out are independent of the organyl guard and must keep
+    refusing; the thioester row in particular protects a SENIOR class that
+    another handler owns.
+    """
+    assert _pk(smiles) is None, why

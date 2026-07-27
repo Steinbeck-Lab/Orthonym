@@ -333,29 +333,62 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             if len(hub_frag) == 1:
                 hubyl = base
         else:
-            from .substituent_purity import pure_organyl_prefix_name
+            # v29 P3: the organyl guard is the shared chokepoint, so a hub organyl
+            # may now be cyclic, branched, unsaturated or long — and its prefix may
+            # carry locants, a retained italicized prefix, or its own marks.  The
+            # hub is a MONONUCLEAR skeleton, so composition follows P-16.5.1.3.1
+            # (BB 7272, verbatim): "the first cited substituent never has enclosing
+            # marks unless it includes a locant.  The second and further
+            # substituents are each enclosed with parentheses even for simple
+            # substituents.  When the simple substituent groups are accompanied by
+            # multiplicative prefixes such as 'di' and 'tri', the multiplicative
+            # prefixes are not included in the parentheses."  BB 39228
+            # `4-[ethyl(methyl)phosphanyl]-1H-imidazole` (PIN) shows the rule
+            # holding for this SUBSTITUENT-PREFIX shape (silyl analogue: BB 3545
+            # `3-[amino(methyl)silyl]...` (PIN)), which is why the bare-concatenated
+            # `ethylmethylphosphanyl` this block used to emit was non-PIN.
+            #
+            # Every decision below is a shared primitive: citation order
+            # (P-14.5.2/P-14.5.4), the compound test (P-16.3.3), the italicized
+            # carve-out (P-16.3.4) and the mark escalation (P-16.5.4.1).
             from collections import Counter
+
+            from ..assembly.naming_utils import (apply_enclosing_marks,
+                                                 enclose_if_compound,
+                                                 multiplier_needs_hyphen,
+                                                 prefix_citation_sort_key)
+            from .substituent_purity import organyl_prefix_name
             names = []
             for n in organyls:
-                nm = pure_organyl_prefix_name(mol, n.GetIdx(), hub.GetIdx())
+                nm = organyl_prefix_name(mol, n.GetIdx(), hub.GetIdx())
                 if nm is None:
                     return None
                 names.append(nm)
             counts = Counter(names)
             _MULT = {1: '', 2: 'di', 3: 'tri'}
             parts = []
-            for nm in sorted(counts):
+            for i, nm in enumerate(sorted(counts, key=prefix_citation_sort_key)):
                 m = _MULT.get(counts[nm])
                 if m is None:
                     return None
-                parts.append(f"{m}{nm}")
+                marked = enclose_if_compound(nm)
+                if i > 0 and marked == nm:
+                    marked = apply_enclosing_marks(nm, -1)   # P-16.5.1.3.1
+                if m and marked == nm and multiplier_needs_hyphen(nm):
+                    parts.append(f"{m}-{marked}")            # P-16.3.4
+                else:
+                    parts.append(f"{m}{marked}")             # multiplier outside
             hubyl = ''.join(parts) + base
     if not hubyl:
         return None
     # Compound hub names take enclosing marks (1-(trimethylsilyl)propan-2-one
-    # engine precedent); the bare silyl/phosphanyl forms stay unmarked.
+    # engine precedent); the bare silyl/phosphanyl forms stay unmarked.  The marks
+    # ESCALATE ( -> [ over an inner pair (P-16.5.4.1), which a raw f"({hubyl})"
+    # could not do: BB 39228 writes `[ethyl(methyl)phosphanyl]`, never
+    # `(ethyl(methyl)phosphanyl)`.
+    from ..assembly.naming_utils import apply_enclosing_marks as _marks
     token = hubyl if hubyl in ('silyl', 'germyl', 'phosphanyl', 'arsanyl') \
-        else f"({hubyl})"
+        else _marks(hubyl, -1)
 
     length = len(chain)
     base_name = f"{get_chain_prefix(length)}an"
