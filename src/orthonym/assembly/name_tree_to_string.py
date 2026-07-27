@@ -196,7 +196,9 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
         is_ring_parent_name,
         _MONONUCLEAR_STEMS,
     )
-    from .naming_utils import format_suffix_with_locants, get_multiplier_prefix
+    from .naming_utils import (format_suffix_with_locants,
+                               get_multiplier_prefix,
+                               get_suffix_multiplier_prefix)
 
     stem = node.parent_stem
 
@@ -283,7 +285,7 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
                 multiplier = node.multiplicative_prefix
             else:
                 count = len(suffix_locants)
-                multiplier = get_multiplier_prefix(count, suffix_text) if count > 1 else ""
+                multiplier = get_suffix_multiplier_prefix(count, suffix_text) if count > 1 else ""
             # gap #6: unsaturation infix (en/yn + euphonic-a) feeds the grammar.
             unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)
             # gap #5: full suffix grammar (multiplier + P-16.7.1 vowel elision).
@@ -314,7 +316,7 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
                 multiplier = node.multiplicative_prefix
             else:
                 count = len(suffix_locants)
-                multiplier = get_multiplier_prefix(count, node.suffix) if count > 1 else ""
+                multiplier = get_suffix_multiplier_prefix(count, node.suffix) if count > 1 else ""
             name = format_suffix_with_locants(
                 stem, "", node.suffix, suffix_locants, multiplier,
             )

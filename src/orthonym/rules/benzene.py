@@ -26,6 +26,7 @@ from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
 from ..assembly.naming_utils import (
     get_alkyl_name,
     get_multiplier_prefix,
+    get_suffix_multiplier_prefix,
     format_substituent_prefix,
     alpha_sort_key,
     prefix_citation_sort_key,
@@ -3275,7 +3276,7 @@ def _assemble_benzene_with_suffix(
 
     # General suffix assembly for multi-suffix or non-retained cases
     # Build suffix part: benzene-{locants}-{multiplier}{suffix}
-    multiplier = get_multiplier_prefix(chosen_count, chosen_suffix) if chosen_count > 1 else ""
+    multiplier = get_suffix_multiplier_prefix(chosen_count, chosen_suffix) if chosen_count > 1 else ""
     locant_str = ",".join(str(loc) for loc in chosen_locants)
 
     # Build prefix part from remaining groups.

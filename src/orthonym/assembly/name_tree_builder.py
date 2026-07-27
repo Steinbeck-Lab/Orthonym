@@ -132,8 +132,8 @@ def fragments_to_tree(
             len(suffix_frag.locants or ()), getattr(suffix_frag, "count", 1)
         )
         if _suffix_count > 1:
-            from .naming_utils import get_multiplier_prefix
-            suffix_multiplier = get_multiplier_prefix(_suffix_count, suffix_frag.text)
+            from .naming_utils import get_suffix_multiplier_prefix
+            suffix_multiplier = get_suffix_multiplier_prefix(_suffix_count, suffix_frag.text)
 
     # Phase 179 (WSA-03) production flip: for a class in
     # SERIALIZER_PRODUCTION_CLASSES the str carrier is DROPPED (fragment_legacy

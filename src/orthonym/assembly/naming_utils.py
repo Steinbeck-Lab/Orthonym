@@ -1133,8 +1133,11 @@ def is_complex_substituent(name: str) -> bool:
     # name (tert-butyl, sec-butyl). IUPAC P-16.3.3(b) (BB 7070, verbatim
     # `di-*tert*-butyl`) treats these as SIMPLE for multiplication (di-tert-butyl,
     # NOT bis(tert-butyl)) and BB 3465 cites the prefix bare straight after a
-    # locant. (NOT P-16.3.3(b)/P-16.2.4.1(d), the parentheses rule; and 'N-tert-butyl' is not a
-    # Blue Book example -- verified absent.) Phase 171 BBR-ASM: without this,
+    # locant. (NOT P-16.3.4, the parentheses rule -- verbatim at BB 7085,
+    # "*Parentheses (round brackets) ... are used to enclose multiplied components
+    # that are: (a) simple substituent prefixes having locants*"; and
+    # 'N-tert-butyl' is not a Blue Book example -- verified absent.)
+    # Phase 171 BBR-ASM: without this,
     # coupling the paren/bis decision to is_complex_substituent over-parenthesised
     # tert-butyl. The leading-digit case above still catches genuine compounds.
     # v29 P3: the strip is the SHARED primitive, not an inline copy.
@@ -1244,55 +1247,258 @@ def is_complex_substituent(name: str) -> bool:
 # "*UNSUBSTITUTED prefixes, such as ethyl or tert-butyl ... are multiplied by
 # the multiplicative prefixes 'di', 'tri', etc.*"
 #
-# WHY THIS IS NOT DECIDED FROM THE GRAPH.  A pure graph test ("does the
-# substituent's skeleton carry anything off its own parent hydride?") is
-# REFUTED by the Blue Book on two retained prefixes: `tert-butyl` and `benzyl`
-# are branched in the graph yet P-16.3.2(a) lists `tert-butyl` verbatim among
-# the UNSUBSTITUTED prefixes taking `di`, and `benzyl` is a retained preferred
-# prefix (P-29.6.1).  Worse, one graph has two valid names on opposite sides of
-# the rule: the retained `tert-butyl` takes `di-` while its systematic synonym
-# `2-methylpropan-2-yl` is a substituted prefix taking `bis`.  Substituted-ness
-# is therefore a property of the NAME AS SPELLED — of the derivation the
-# producer chose — not of the connection table.  This function reconstructs that
-# derivation by asking whether a DETACHABLE SUBSTITUENT PREFIX sits in front of
-# the prefix's own parent core, using the same morpheme tables the producers
-# used to build the name, so it is the inverse of the construction rather than a
-# shape heuristic.
+# WHAT THE GRAPH CAN AND CANNOT DECIDE.  The rule is a property of the SKELETON
+# ("does the prefix's own parent hydride bear a substituent?"), so the graph is
+# the primary authority and `_fragment_bears_substituent` below implements it.
+# But the graph alone is REFUTED by the Blue Book in two independent ways, and
+# both refutations are load-bearing, so the graph is consulted only when a caller
+# can supply it and the two name-level carve-outs are applied on top:
+#
+#   1. RETAINED SPELLINGS.  `tert-butyl` is branched in the graph, yet
+#      P-16.3.2(a) (`:7033`) lists it verbatim among the "*unsubstituted
+#      prefixes, such as ethyl or tert-butyl*" taking `di` — `di-*tert*-butyl`
+#      (`:7070`), `1,2-di-*tert*-butylbenzene (PIN)` (`:25717`).  One connection
+#      table therefore has two valid names on OPPOSITE sides of the rule: the
+#      retained `tert-butyl` takes `di-`, its systematic synonym
+#      `2-methylpropan-2-yl` takes `bis`.  `benzyl` is the same case
+#      (`### **P-29.6.1** Retained prefixes that are preferred prefixes`,
+#      `:16272`; `dibenzyl` inside a PIN at `:23258`) and is even simpler,
+#      because `:24420` forbids substituting it at all, so P-16.3.5(a) can never
+#      fire on the spelling.
+#   2. WHICH ATOM IS THE PARENT.  The same O-CH3 fragment is `methoxy` (a simple
+#      retained contracted prefix, `di`) when the oxygen is the attachment, and
+#      the `methoxy` half of `methoxymethyl` (compound, `bis`) when a carbon is.
+#      Nothing in the connection table of the WHOLE prefix says which parse the
+#      producer chose.
+#
+# So: graph when available, and a WHOLE-TOKEN vocabulary reconstruction of the
+# producer's own derivation otherwise.  The reconstruction differs from the
+# morpheme-peel it replaces in the two ways that made the peel wrong in both
+# directions:
+#
+#   * a split requires BOTH sides to be RECOGNISED units.  The old tail test
+#     accepted any remainder "ending in a group-shaped letter", so `nitroso`
+#     split as `nitro` + `so` (bare `'o'` was an accepted ending) and
+#     `oxolan-2-yl` split as `oxo` + `lan-2-yl`.  Both shipped a wrong `bis`.
+#   * the vocabulary is DERIVED FROM THE PRODUCERS' OWN TABLES rather than
+#     hand-listed, so it cannot be wrong on its complement the way the closed
+#     hand-list was: `methoxymethyl` was simply absent from it and silently read
+#     as simple.
 
-# The prefix morphemes that can be DETACHED from the front of a substituent
-# name.  Derived from the shared tables wherever one exists so the set cannot
-# desynchronise from the producers.
-_SUBSTITUENT_PREFIX_MORPHEMES: frozenset = frozenset(
-    # alkyl carriers — the one shared C1-C20 table
-    set(_ALKYL_ROOTS_FULL)
-    | {
-        # aryl / cycloalkyl carriers (P-29.6.1 retained preferred prefixes and
-        # the ring-yl forms)
-        'phenyl', 'benzyl', 'naphthyl', 'tolyl', 'xylyl', 'trityl',
-        'cyclopropyl', 'cyclobutyl', 'cyclopentyl', 'cyclohexyl',
-        'cycloheptyl', 'cyclooctyl',
-        # characteristic-group prefixes (P-14.4 detachable prefixes)
-        'hydroxy', 'oxo', 'carboxy', 'amino', 'imino', 'nitro', 'nitroso',
-        'cyano', 'isocyano', 'azido', 'diazo', 'formyl', 'acetyl', 'benzoyl',
-        'sulfo', 'sulfino', 'mercapto', 'oxido', 'hydroperoxy', 'carbamoyl',
-        'carbonyl', 'thioxo', 'selanylidene', 'hydrazino', 'hydrazinyl',
-        'fluoro', 'chloro', 'bromo', 'iodo',
-        # heteroatom-hydride-yl carriers that can head a compound prefix
-        'silyl', 'germyl', 'stannyl', 'boryl', 'sulfanyl', 'selanyl',
-        'tellanyl', 'phosphanyl', 'arsanyl', 'stibanyl', 'diazenyl',
-        'sulfinyl', 'sulfonyl', 'phosphoryl',
-    }
+# --- vocabulary 1: characteristic-group prefixes, straight from the producer ---
+# `rules/seniority.PREFIX_FORMS` is the table the namer itself uses to spell a
+# characteristic group as a prefix.  Cycle-free: `rules/seniority` imports
+# nothing from `orthonym`, and `rules/__init__` imports only from it.
+#
+# `**P"16.3.3**`(b) (`:7067`, continuing at `:7094`) puts these on the BASIC
+# multiplier: "*simple substituent prefixes, including parent hydrides with 'ene'
+# and 'yne' endings (without locants), and characteristic groups*" — verbatim
+# `diimino` (`:7072`), `dibromo` (`:7073`), and `1,4-dinitrosobenzene (PIN)`
+# under `## **P-61.5.1** Nitro and nitroso compounds` (`:25943`).
+#
+# Some entries in the table are themselves CONCATENATED compound prefixes
+# (`phosphonooxy`, `carbamoyloxy`, `nitrooxy`, `aminooxy`, `sulfanyloxy`,
+# `carbamoylamino`, `hydroxyimino`, `sulfanylcarbonyl`, ...).  They are NOT
+# filtered by hand: each one decomposes into two units of this same vocabulary,
+# so the split test below classifies them correctly on its own.
+from ..rules.seniority import PREFIX_FORMS as _SENIORITY_PREFIX_FORMS  # noqa: E402
+
+_FG_PREFIX_SPELLINGS: frozenset = frozenset(
+    v.lower() for v in _SENIORITY_PREFIX_FORMS.values() if isinstance(v, str) and v
 )
 
-# Endings that mark the surviving REMAINDER as itself a group name rather than
-# a stray syllable.  Without this, `methylene` would decompose as `methyl` +
-# `ene` and be called substituted; `bis(methylene)`'s bis comes from the
-# P-16.3.2(d) ambiguity leg, not from substitution.
-_GROUP_NAME_ENDINGS = (
-    'yl', 'ylidene', 'ylidyne', 'ylium', 'ylio', 'yliden',
-    'oxy', 'amino', 'imino', 'ino', 'ium',
-    'o',
+# --- vocabulary 2: the SIX retained contracted alkoxy prefixes ------------
+# `### **P-63.2.2.2** Retained names` (`:27665`), verbatim at `:27667`: "*Some
+# contracted names are retained for R-O– substituent groups ... and are
+# considered as simple prefixes requiring the numerical prefixes 'di', 'tri',
+# etc. They are:*" — and the list that follows is exactly these six, each
+# "(preferred prefix)".  Confirmed in a PIN: `1,2-dimethoxybenzene (PIN)`
+# (`:27705`), `1,1-dimethoxypropane (PIN)` (`:5098`).
+#
+# The list is CLOSED.  Every OTHER `<R>oxy` prefix is formed by concatenation and
+# takes the DERIVED multiplier — `**P-63.2.2.1.1**` (`:27633`), verbatim:
+# "*Substituent prefix names for R′-O– groups are formed by concatenation, i.e.,
+# by adding the prefix 'oxy' to the substituent prefix name for the group R′.
+# These compound prefixes require the numerical multiplying prefixes 'bis',
+# 'tris', etc.*", first example `pentyloxy (preferred prefix)` (`:27637`).
+#
+# So a predicate that keys on the SHAPE "ends in -oxy" is wrong whichever answer
+# it gives; only membership decides.  `tert-butoxy` reaches this set through the
+# italicized-prefix carve-out, which strips `tert-` first.
+_RETAINED_CONTRACTED_ALKOXY: frozenset = frozenset({
+    'methoxy', 'ethoxy', 'propoxy', 'butoxy', 'phenoxy', 'butoxy',
+})
+
+# --- vocabulary 3: retained hydrocarbyl and divalent prefixes -------------
+# `### **P-29.6.1** Retained prefixes that are preferred prefixes` (`:16270`),
+# `:16272`: "*The traditional prefixes benzyl, benzylidene, benzylidyne are
+# retained preferred prefixes, but are not to be substituted*"; `:24414`
+# `C6H5-CH2– benzyl (preferred prefix)`.  `dibenzyl` appears inside a PIN at
+# `:23258`, `dibenzylphosphinite (PIN)` at `:40975`.
+#
+# `methylene`/`ethylene` are here because they must NOT be classed substituted:
+# their `bis` comes from the separate P-16.3.6(b) ambiguity rule (`:7162`
+# `bis(methylene)` "*whereas dimethylene might be used to define the –CH2-CH2–
+# group*"), which is `CATENATION_AMBIGUOUS_PREFIXES`, not substitution.
+_RETAINED_HYDROCARBYL: frozenset = frozenset({
+    'phenyl', 'benzyl', 'benzylidene', 'benzylidyne', 'trityl',
+    'tolyl', 'xylyl', 'naphthyl', 'mesityl', 'styryl', 'cinnamyl',
+    'vinyl', 'allyl', 'phenylene', 'methylene', 'ethylene', 'propylene',
+    'methylidene', 'ethylidene', 'methylidyne', 'ethylidyne',
+    'carbonyl', 'oxalyl', 'malonyl', 'succinyl', 'glutaryl', 'adipoyl',
+    'phthaloyl', 'isophthaloyl', 'terephthaloyl',
+})
+
+# --- vocabulary 4: mononuclear hydride -yl / -ylidene carriers ------------
+# The `-yl` forms of the preselected mononuclear parent hydrides (P-21.1.1 /
+# P-29.3.2).  Bare, these are simple prefixes; several additionally take `bis`
+# via P-16.3.6(a) (`:7140` `bis(sulfanyl) (preferred prefix)` "*whereas
+# disulfanyl defines the –SSH group*"), which is the separate ambiguity leg.
+_HYDRIDE_YL_CARRIERS: frozenset = frozenset({
+    'silyl', 'germyl', 'stannyl', 'plumbyl', 'boryl', 'alumanyl',
+    'oxidanyl', 'sulfanyl', 'selanyl', 'tellanyl', 'polonanyl',
+    'azanyl', 'phosphanyl', 'arsanyl', 'stibanyl', 'bismuthanyl',
+    'azanylidene', 'sulfanylidene', 'selanylidene', 'tellanylidene',
+    'diazenyl', 'sulfinyl', 'sulfonyl', 'phosphoryl', 'phosphanylidene',
+    'oxy', 'thio', 'seleno', 'telluro', 'imino', 'amino', 'hydrazino',
+    'silylidene', 'germylidene', 'stannylidene',
+})
+
+# --- vocabulary 5: divalent BRIDGE prefixes (P-25.4) ---------------------
+# `di(metheno)` appears inside a PIN: `12,19:13,18-di(metheno)dinaphtho[...]
+# pentaphene (PIN)` (`:14527`, `:23818`).
+_BRIDGE_PREFIXES: frozenset = frozenset({
+    'metheno', 'etheno', 'ethano', 'propano', 'butano', 'benzeno',
+    'epoxy', 'epithio', 'epimino', 'episeleno', 'epitelluro',
+    'nitrilo', 'furano', 'naphtho', 'phospho',
+})
+
+# The union: a WHOLE token that is one of these is ONE component, hence simple.
+_SIMPLE_PREFIX_VOCABULARY: frozenset = (
+    frozenset(_ALKYL_ROOTS_FULL)
+    | frozenset(f'cyclo{p}yl' for p in ('prop', 'but', 'pent', 'hex', 'hept',
+                                        'oct', 'non', 'dec'))
+    | _FG_PREFIX_SPELLINGS
+    | _RETAINED_CONTRACTED_ALKOXY
+    | _RETAINED_HYDROCARBYL
+    | _HYDRIDE_YL_CARRIERS
+    | _BRIDGE_PREFIXES
 )
+
+# The units that may be DETACHED from the FRONT of a compound prefix.  This is
+# the same vocabulary: a compound prefix is built by concatenating units, so any
+# unit can lead.  Sorted longest-first so `carbamoyloxy` peels `carbamoyl`, not
+# a shorter accidental match.
+_FRONT_PREFIX_UNITS: Tuple[str, ...] = tuple(
+    sorted(_SIMPLE_PREFIX_VOCABULARY, key=len, reverse=True)
+)
+
+# --- vocabulary 6: parent-hydride STEMS ----------------------------------
+# Used ONLY as a negative filter: a stem that splits into
+# `<front unit> + <recognised stem>` is substituted (`chloropropan-2-yl`), and
+# one that does not is a bare hydride (`oxolan-2-yl` -> `oxo` + `lan`, and `lan`
+# is no stem).  Incompleteness here is fail-soft toward "simple", i.e. toward the
+# pre-existing behaviour, never toward a newly-wrong `bis`.
+_CHAIN_STEM_ROOTS: Tuple[str, ...] = (
+    'meth', 'eth', 'prop', 'but', 'pent', 'hex', 'hept', 'oct', 'non',
+    'dec', 'undec', 'dodec', 'tridec', 'tetradec', 'pentadec', 'hexadec',
+    'heptadec', 'octadec', 'nonadec', 'icos',
+)
+
+
+def _build_hydride_stems() -> frozenset:
+    """Parent-hydride stems, derived from the producers' own name tables."""
+    stems = set()
+    for root in _CHAIN_STEM_ROOTS:
+        stems.add(root)
+        for tail in ('an', 'en', 'yn', 'ane', 'ene', 'yne'):
+            stems.add(root + tail)
+        stems.add('cyclo' + root)
+        for tail in ('an', 'en', 'ane', 'ene'):
+            stems.add('cyclo' + root + tail)
+    # Hantzsch-Widman ring stems, from the producers' own two tables: the
+    # heteroatom prefix (`oxa`, `thia`, `aza`, ...) loses its terminal 'a' before
+    # a vowel-initial HW stem, giving `oxolan`, `oxan`, `oxocan`, `thiolan`,
+    # `azolidin`, and the multiplied forms `dioxolan`, `trioxan`.  Needed because
+    # a stem is the NEGATIVE filter on a split: without `oxolan` here,
+    # `oxolan-2-ylmethyl` cannot be recognised as ring-yl + alkyl.
+    try:
+        from ..data.hw_heteroatoms import HW_PREFIXES
+        from ..data.hw_stems import HW_STEMS
+        hetero = sorted({p.lower() for p in HW_PREFIXES.values() if p})
+        hw_tails = set()
+        for entry in HW_STEMS.values():
+            if isinstance(entry, dict):
+                hw_tails.update(str(v).lower() for v in entry.values() if v)
+            elif entry:
+                hw_tails.add(str(entry).lower())
+        for pre in hetero:
+            base = pre[:-1] if pre.endswith('a') else pre
+            for tail in hw_tails:
+                if not tail:
+                    continue
+                joined = (base if tail[0] in 'aeiouy' else pre) + tail
+                stems.add(joined)
+                if joined.endswith('e'):
+                    stems.add(joined[:-1])
+                for mult in ('di', 'tri', 'tetra'):
+                    stems.add(mult + joined)
+                    if joined.endswith('e'):
+                        stems.add(mult + joined[:-1])
+    except Exception:  # pragma: no cover - tables are always importable in-tree
+        pass
+    try:
+        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_PREFIX_STEMS
+        for value in FUSED_HETEROCYCLE_PREFIX_STEMS.values():
+            if isinstance(value, str) and value:
+                stems.add(value.strip().lower())
+    except Exception:  # pragma: no cover
+        pass
+    try:
+        from ..data.retained_names import RETAINED_NAMES
+        for value in RETAINED_NAMES.values():
+            if not isinstance(value, str):
+                continue
+            token = value.strip().lower()
+            if not token or not token.replace('-', '').isalpha():
+                continue
+            stems.add(token)
+            # the substituent-prefix stem drops a trailing 'e' ('benzene' ->
+            # 'benzen-1-yl', 'naphthalene' -> 'naphthalen-2-yl')
+            if token.endswith('e'):
+                stems.add(token[:-1])
+    except Exception:  # pragma: no cover - table is always importable in-tree
+        pass
+    return frozenset(stems)
+
+
+_HYDRIDE_STEMS: frozenset = _build_hydride_stems()
+
+# Yl-type endings that terminate a parent-hydride-derived substituent prefix.
+_YL_TYPE_ENDINGS: Tuple[str, ...] = (
+    'ylidenes', 'ylidene', 'ylidyne', 'ylium', 'ylidyn', 'yliden',
+    'ylo', 'yl', 'ide', 'uide', 'ium', 'ylia',
+)
+
+# `<stem>` then any number of `-<locants>-<infix>` groups then `-<locants>-<yl>`:
+# `propan-2-yl`, `prop-1-en-2-yl`, `bicyclo[3.2.1]octan-3-yl`,
+# `[1,2,4]triazolo[1,5-a]pyrimidin-2-yl`, `1H-imidazol-1-yl`.
+_HYDRIDE_YL_SHAPE_RE = re.compile(
+    r"^(?P<head>[^-]*?[a-z])"          # stem, possibly bracket-bearing
+    r"(?:-\d[\d,'′]*-[a-z]{2,7})*"  # -1-en- / -2-yn- unsaturation infixes
+    r"-\d[\d,'′]*-"                # the attachment locant set
+    r"(?P<end>[a-z]+)$"                 # the yl-type ending
+)
+
+# Bracketed descriptors that belong to a STEM, not to a substituent: fusion
+# locants `[1,5-a]`, von Baeyer/spiro descriptors `[3.2.1]`, isotope descriptors
+# `[4-2H]`, and leading heteroatom-position sets `[1,2,4]`.  P-16.3.4 clause (f)
+# is verbatim that these keep the BASIC multiplier: `di(bicyclo[3.2.1]octanG3Gyl)
+# !(preferred!prefix)`, `di([4G2H]benzoyl)!(preferred!prefix)`,
+# `8,8′Goxydi(spiro[4.5]decane)!(PIN)`.
+_STEM_BRACKET_RE = re.compile(r"\[[^\[\]]*\]")
+# A leading indicated-hydrogen descriptor: `1H-`, `2H-`, `4H-`.
+_INDICATED_H_RE = re.compile(r"^\d+[hH]-")
 
 # P-16.3.3 clause (a) (BlueBookV2.md:7040): "*The basic numerical prefixes 'di',
 # 'tri', 'tetra', etc. are used to indicate a multiplicity of: (a) functional and
@@ -1311,18 +1517,112 @@ _FUNCTIONAL_SUFFIX_TAILS = (
     'carbaldehyde', 'carboxylate', 'sulfonate', 'oate', 'carboxy',
 )
 
-# P-16.3.5 clause (b) (`:7104`): 'thioic acid' and 'dithioic acid' suffixes and
-# their Se/Te analogues are the EXPLICIT EXCEPTION to P-16.3.3 -- BB
-# `bis(thioic!acid)![multiple!preferred!suffix ...]`, "*whereas dithioic acid
-# describes a -CSSH suffix*", and "*not didithoic acid*".
-_BIS_SUFFIX_EXCEPTIONS = (
+# P-16.3.5 clause (b) (`:7104`), verbatim: "*'thioic acid' and 'dithioic acid'
+# suffixes, and their Se and Te analogues, as exceptions to suffixes described in
+# P-16.3.3 and P-16.3.4*" -- `bis(thioic!acid)![multiple!preferred!suffix ...
+# whereas!dithioic!acid!describes!a!–CSSH!suffix]` (`:7106`) and
+# `bis(dithioic!acid) ... not!didithoic!acid` (`:7108`).
+#
+# ⚠ MATCHED AS A WHOLE TOKEN, never with `endswith`.  `'carbodithioic
+# acid'.endswith('dithioic acid')` is True, and the Blue Book puts the two on
+# OPPOSITE sides four lines apart, both PINs, under `### **P-65.1.5.1**
+# Functional replacement in systematic names of carboxylic acids`:
+#     `benzene-1,2-dicarbodithioic acid (PIN) (not tetrathiophthalic acid)`  :30313
+#     `ethanebis(dithioic acid) (PIN) (not tetrathiooxalic acid)`            :30317
+# The `endswith` form shipped `cyclohexane-1,2-biscarbodithioic acid`.
+_BIS_SUFFIX_EXCEPTION_TOKENS: frozenset = frozenset({
     'thioic acid', 'dithioic acid',
     'selenoic acid', 'diselenoic acid',
     'telluroic acid', 'ditelluroic acid',
-)
+})
 
-# A leading locant set on a substituent prefix: `2-`, `2,2-`, `1,3-`, `2'-`.
-_LEADING_LOCANT_RE = re.compile(r"^\d[\d,'′]*-")
+# Backwards-compatible alias: several sibling modules and tests import this name.
+_BIS_SUFFIX_EXCEPTIONS = tuple(sorted(_BIS_SUFFIX_EXCEPTION_TOKENS))
+
+# `### **P-65.1.5.1**` (`:30215`) spells the same suffixes with an ITALIC
+# CHALCOGEN LOCANT (`thioic O-acid`, `dithioic S-acid`, `selenoic Se-acid`) and
+# notes the locants are "normally ... omitted".  Keying the exception on the
+# locant-free spelling ALONE made the whole `<alkane>bis(thioic O-acid)` family
+# abstain: `OC(=S)CCC(O)=S` fell from `butanebisthioic O-acid` to
+# `unknown organic compound`, and the candidate the build then offered was
+# `butanedithioic S-acid` -- a single -CSSH, which is precisely the collision
+# P-16.3.5(b) exists to prevent.  So the infix is stripped before the lookup.
+_CHALCOGEN_LOCANT_INFIX_RE = re.compile(
+    r"\b(?:Se|Te|As|[OSNP])(?:'|′)*-(?=acid\b)", re.IGNORECASE)
+
+
+def _normalise_suffix_token(suffix: str) -> str:
+    """Lower-case a suffix token and drop any italic chalcogen locant infix.
+
+    ``'thioic O-acid'`` -> ``'thioic acid'``; ``'dithioic S-acid'`` ->
+    ``'dithioic acid'``.  Leaves everything else untouched.
+    """
+    token = ' '.join(suffix.strip().split())
+    token = _CHALCOGEN_LOCANT_INFIX_RE.sub('', token)
+    return ' '.join(token.split()).lower()
+
+
+def suffix_takes_derived_multiplier(suffix_name: str) -> bool:
+    """P-16.3.3(a) vs P-16.3.5(b): does this SUFFIX take bis/tris, not di/tri?
+
+    `**P"16.3.3**` (`:7038`): "*The basic numerical prefixes 'di', 'tri',
+    'tetra', etc. are used to indicate a multiplicity of: (a) functional and
+    cumulative suffixes, basic or modified by functional replacement, **with the
+    exception of 'thioic acid' and 'dithioic acid' described in P-16.3.5 (b)***".
+
+    So the answer is False for every suffix except that one closed family.  A
+    suffix is NEVER decomposed for substituted-ness -- doing so read
+    `carboxylic acid` as `carboxy` + `lic acid` and broke 10 gold rows.
+
+    Examples:
+        >>> suffix_takes_derived_multiplier("carboxylic acid")
+        False
+        >>> suffix_takes_derived_multiplier("carbodithioic acid")
+        False
+        >>> suffix_takes_derived_multiplier("dithioic acid")
+        True
+        >>> suffix_takes_derived_multiplier("dithioic O-acid")
+        True
+    """
+    if not suffix_name:
+        return False
+    return _normalise_suffix_token(suffix_name) in _BIS_SUFFIX_EXCEPTION_TOKENS
+
+
+def get_suffix_multiplier_prefix(count: int, suffix_name: str) -> str:
+    """The multiplier for a FUNCTIONAL or CUMULATIVE SUFFIX (P-16.3.3(a)).
+
+    A separate entry point from :func:`get_multiplier_prefix` because the two
+    callers are asking different questions and the substituent answer is not the
+    suffix answer.  Sharing one function meant a suffix could be handed to a
+    substituent decomposition -- the mechanism behind
+    `benzene-1,4-biscarboxylic acid`.
+    """
+    if count <= 1:
+        return ""
+    if suffix_takes_derived_multiplier(suffix_name):
+        if count in COMPLEX_MULTIPLIERS:
+            return COMPLEX_MULTIPLIERS[count]
+        from ..data.chain_names import get_chain_prefix
+        prefix = get_chain_prefix(count)
+        if not prefix.endswith("a"):
+            prefix += "a"
+        return prefix + "kis"
+    word = simple_multiplier_word(count)
+    if word is None:
+        raise ValueError(
+            f"no simple multiplying prefix can be formed for {count}")
+    return word
+
+
+# A leading locant set on a substituent prefix: `2-`, `2,2-`, `1,3-`, `2'-`, and
+# -- widened in v29 P3-FINAL -- the ITALIC LETTER locants `N-`, `N,N'-`, `O-`,
+# `S-`, `N2-`.  Without the letter forms, `N-pentylcarbamoyl` never had its
+# locant peeled, so the prefix unit behind it was unreachable and the whole
+# `N-`-substituted-carbamoyl class read as simple.
+_LEADING_LOCANT_RE = re.compile(
+    r"^(?:\d[\d,'′]*|[NOSP](?:\d+)?(?:['′])*(?:,[NOSP](?:\d+)?(?:['′])*)*)-",
+    re.IGNORECASE)
 
 # Multiplicative syllables that may precede a repeated substituent morpheme
 # (`trimethylsilyl`, `difluoromethyl`).  Only ever peeled when a real morpheme
@@ -1334,14 +1634,134 @@ _LEADING_MULTIPLIER_SYLLABLES = (
 )
 
 
-def _looks_like_group_name(text: str) -> bool:
-    """Is ``text`` a plausible substituent/parent group name, not a syllable?"""
-    if len(text) < 2:
+def _strip_stem_decorations(stem: str) -> str:
+    """Reduce a hydride stem to its bare alphabetic run.
+
+    Drops bracketed fusion/von-Baeyer/isotope descriptors, a leading
+    indicated-hydrogen descriptor and any leading locant set, so
+    ``[1,2,4]triazolo[1,5-a]pyrimidin`` -> ``triazolopyrimidin`` and
+    ``1H-imidazol`` -> ``imidazol``.
+    """
+    out = _STEM_BRACKET_RE.sub('', stem)
+    out = _INDICATED_H_RE.sub('', out)
+    m = _LEADING_LOCANT_RE.match(out)
+    if m:
+        out = out[m.end():]
+    return out
+
+
+def _stem_splits_into_prefix_plus_stem(stem: str) -> bool:
+    """Does an alphabetic hydride stem decompose as `<prefix unit><stem>`?
+
+    ``chloropropan`` -> ``chloro`` + ``propan`` (a recognised stem) -> True, so
+    the prefix is substituted.  ``oxolan`` -> ``oxo`` + ``lan``, and ``lan`` is
+    no stem, so False and the prefix stays simple.  This is the exact test the
+    old code lacked: it accepted any remainder "ending in a group-shaped letter",
+    which `lan-2-yl` satisfies.
+    """
+    for mult in ('',) + _LEADING_MULTIPLIER_SYLLABLES:
+        if mult and not stem.startswith(mult):
+            continue
+        rest = stem[len(mult):]
+        if not rest:
+            continue
+        for unit in _FRONT_PREFIX_UNITS:
+            if not rest.startswith(unit) or len(rest) == len(unit):
+                continue
+            tail = rest[len(unit):].lstrip('-')
+            if tail in _HYDRIDE_STEMS or tail in _SIMPLE_PREFIX_VOCABULARY:
+                return True
+    return False
+
+
+def _is_bare_hydride_yl(token: str, require_known_stem: bool = False) -> bool:
+    """Is ``token`` an UNSUBSTITUTED parent hydride carrying only its own
+    attachment (and unsaturation) locants?
+
+    These are simple by P-16.3.2(a) and parenthesised by P-16.3.4(a) -- two
+    different rules, which is the whole point:
+    `di(propanG2Gyl)!(preferred!prefix)` (`:7087`),
+    `tetra(naphthalenG2Gyl)` (`:7090`), and clause (f)
+    `di(bicyclo[3.2.1]octanG3Gyl)`.  Verbatim PIN witnesses for the ring case:
+    `1,2-di(furan-2-yl)-2-hydroxyethan-1-one (PIN)` (`:29677`),
+    `di(1*H*-imidazol-1-yl)methanethione (PIN)` (`:29544`),
+    `di(naphthalen-2-yl)ethanedione (PIN)` (`:28380`),
+    `2,6-di(tetraphen-1-yl)pyridine (PIN)` (`:25762`).
+    """
+    m = _HYDRIDE_YL_SHAPE_RE.match(token)
+    if m is None:
         return False
-    return text.endswith(_GROUP_NAME_ENDINGS)
+    if m.group('end') not in _YL_TYPE_ENDINGS:
+        return False
+    stem = _strip_stem_decorations(m.group('head'))
+    if not stem or not stem.isalpha():
+        return False
+    if require_known_stem:
+        # STRICTER role: as one HALF of a split, the stem must be a stem we
+        # actually know.  Without this asymmetry `oxolan-2-yl` splits into `oxo`
+        # + `lan-2-yl`, because `lan` is alphabetic and does not itself split --
+        # exactly the I2 defect, reintroduced from the other side.  Being strict
+        # here makes an incomplete stem table fail toward "SIMPLE", i.e. toward
+        # the pre-existing behaviour, never toward a newly-wrong `bis`.
+        return stem in _HYDRIDE_STEMS
+    return not _stem_splits_into_prefix_plus_stem(stem)
 
 
-def is_substituted_substituent(name: Optional[str]) -> bool:
+def _is_single_simple_unit(token: str) -> bool:
+    """Is ``token`` ONE simple nomenclatural component (P-16.3.2(a))?"""
+    if not token:
+        return False
+    if token in _SIMPLE_PREFIX_VOCABULARY:
+        return True
+    return _is_bare_hydride_yl(token)
+
+
+def _enclosed_leader_is_a_substituent(work: str) -> bool:
+    """Does ``work`` open with an enclosed SUBSTITUENT followed by more name?
+
+    `(4-methylphenyl)methyl` -> yes, a detached prefix by construction.
+    `[1,2,4]triazolo[...]pyrimidin-2-yl` -> NO: `[1,2,4]` is a locant list, and
+    P-16.3.4(f) is verbatim that bracket-bearing simple components keep the BASIC
+    multiplier (`di([4G2H]benzoyl)!(preferred!prefix)`).  Reading a leading
+    fusion/isotope bracket as a substituent is what made every bracket-leading
+    fused heterocyclyl take `bis`.
+    """
+    if work[:1] not in '([{':
+        return False
+    pairs = {'(': ')', '[': ']', '{': '}'}
+    opener = work[0]
+    closer = pairs[opener]
+    depth = 0
+    for i, ch in enumerate(work):
+        if ch == opener:
+            depth += 1
+        elif ch == closer:
+            depth -= 1
+            if depth == 0:
+                inner = work[1:i]
+                trailing = work[i + 1:]
+                if not trailing:
+                    return False
+                # A descriptor, not a substituent: only digits, commas, dots,
+                # primes, hyphens and a bare element/italic letter (`1,2,4`,
+                # `3.2.1`, `1,5-a`, `4-2H`).  Anything with a real name in it
+                # (`4-methylphenyl`) is a detached prefix.
+                if not any(
+                    ch2.isalpha() and inner[j + 1:j + 2].isalpha()
+                    for j, ch2 in enumerate(inner)
+                ):
+                    return False
+                return True
+    return False
+
+
+def is_substituted_substituent(
+    name: Optional[str],
+    *,
+    mol=None,
+    atoms=None,
+    attachment: Optional[int] = None,
+) -> bool:
     """Is this substituent prefix SUBSTITUTED, per P-16.3.2(c) / P-16.3.5(a)?
 
     ``True`` -> the derived multipliers ``bis``/``tris``/``tetrakis``.
@@ -1376,95 +1796,259 @@ def is_substituted_substituent(name: Optional[str]) -> bool:
 
     # P-16.3.2(a) names `tert-butyl` among the UNSUBSTITUTED prefixes, and
     # `sec-` behaves identically.  Decide on the remainder, via THE shared
-    # primitive, so this leg cannot drift from the enclosure legs.
+    # primitive, so this leg cannot drift from the enclosure legs.  This runs
+    # FIRST, before the graph, because it is precisely the case where the
+    # SPELLING overrides the connection table.
     remainder, had_italicized = strip_italicized_structural_prefix(name)
     if had_italicized:
         # `tert-butyl` -> `butyl`, simple.  `tert-butylsulfanyl` ->
         # `butylsulfanyl`, still a compound prefix.
-        return is_substituted_substituent(remainder)
+        return is_substituted_substituent(remainder, mol=mol, atoms=atoms,
+                                          attachment=attachment)
 
     work = name.strip()
 
     # A fully enclosed token is a single component: decide on its interior
     # (`(2-chloroethyl)` is substituted, `(propan-2-yl)` is not).
     if _is_fully_enclosed(work):
-        return is_substituted_substituent(work[1:-1])
+        return is_substituted_substituent(work[1:-1], mol=mol, atoms=atoms,
+                                          attachment=attachment)
 
     lowered = work.lower()
 
-    # P-16.3.5(b): the thioic/dithioic-acid suffix exception comes FIRST, since
-    # it is an exception to the P-16.3.3(a) rule immediately below.
-    if lowered.endswith(_BIS_SUFFIX_EXCEPTIONS):
-        return True
+    # GRAPH-PRIMARY.  When a caller supplies the fragment, P-16.3.2(c) is a
+    # question about the skeleton and the graph answers it directly; the name is
+    # then consulted only for the two carve-outs above and below, which are
+    # spelling facts the graph cannot see.
+    if mol is not None and atoms is not None:
+        graph_verdict = _fragment_bears_substituent(mol, atoms, attachment)
+        if graph_verdict is not None:
+            if lowered in _SIMPLE_PREFIX_VOCABULARY:
+                return False
+            return graph_verdict
 
-    # P-16.3.3(a): a functional or cumulative SUFFIX takes the basic di/tri and
-    # is never decomposed for substituted-ness.
+    # A SUFFIX, not a substituent prefix.  Suffix tokens are multi-word
+    # (`carboxylic acid`, `dithioic O-acid`); a substituent prefix never is.
+    # The routed callers use `get_suffix_multiplier_prefix`, and this is the
+    # backstop for any that were missed -- without it, the fail-safe below would
+    # turn every unrecognised suffix into `bis`.
+    if ' ' in lowered:
+        # `work`, not `lowered`: the italic chalcogen locant is upper-case
+        # (`thioic O-acid`), and the normaliser strips it case-insensitively.
+        return suffix_takes_derived_multiplier(work)
     if lowered.endswith(_FUNCTIONAL_SUFFIX_TAILS):
         return False
 
-    # P-16.3.4(c)/(d): an unbranched chain root that merely BEGINS with a
-    # multiplier syllable is a single simple prefix — `tridecyl` is C13, not
-    # `tri` + `decyl`; BB `di(tridecyl)`, `tri(decyl)` (:25715 "not
-    # 1,3,5-tris(decyl)cyclohexane").  Tested BEFORE any peeling, which is what
-    # keeps the multiplier peel below safe.
-    # (`needs_p1634_marks` is NOT also consulted here: its stem set is a strict
-    # subset of `_ALKYL_ROOTS_FULL`, verified, so the extra call was dead code
-    # and a mutation of it survived undetected.)
-    if lowered in _ALKYL_ROOTS_FULL:
+    # A CONCATENATED unit is substituted even when the producers' table carries
+    # it as one spelling.  `PREFIX_FORMS` contains both kinds -- `nitroso` and
+    # `hydroperoxy` are single units, while `phosphonooxy`, `nitrooxy`,
+    # `carbamoyloxy`, `aminooxy`, `sulfanyloxy` and `hydroxyimino` are
+    # concatenations of two -- so this split is tested BEFORE whole-token
+    # membership, or the table's own compound entries would short-circuit to
+    # "simple".  The Blue Book files them under sections literally titled
+    # `**P-67.1.4.1.3** Compound and complex substituent groups` (`:36327`,
+    # which Appendix 2's row `:56614` cites for `phosphonooxy*`) and
+    # `### **P-65.3.2.3** Substituent groups formed by concatenation` (`:31276`,
+    # for `sulfooxy`), and `**P-67.1.4.4.2**` (`:36484`) says outright they are
+    # "*formed by concatenation or substitution (see P-35.4)*".
+    #
+    # NO multiplier syllable is peeled here -- that is what keeps `disulfanyl`
+    # (-S-SH, a single preselected prefix) from splitting into `di` + `sulfanyl`.
+    if _splits_at_a_unit_boundary(lowered, allow_multiplier=False):
+        return True
+
+    # ONE recognised component -> simple (P-16.3.2(a)).  Tested on the WHOLE
+    # token before any multiplier peeling, which is what makes `nitroso`,
+    # `tridecyl`, `disulfanyl` and `hydroperoxy` safe: each is itself a listed
+    # prefix, so it is never decomposed into a prefix plus a syllable.
+    if _is_single_simple_unit(lowered):
         return False
 
     # An acyloxy prefix is a compound (acyl + oxy) prefix: BB `bis(acetyloxy)`,
     # `tetrakis(acetyloxy)`, and this repo's `bis(hexadecanoyloxy)` gold rows.
-    # A bare alkoxy (`methoxy`, `phenoxy`) has no `yl` before the `oxy`.
+    # A bare alkoxy has no `yl` before the `oxy` -- and the six RETAINED
+    # contracted alkoxy prefixes (P-63.2.2.2) were already accepted as single
+    # units above, so this cannot misfire on them.
     if lowered.endswith('yloxy') and len(lowered) > 5:
         return True
 
-    # A leading substituent prefix enclosed in marks — `(4-methylphenyl)methyl`
-    # — is a detached prefix by construction.
-    if work[:1] in '([{':
-        _pairs = {'(': ')', '[': ']', '{': '}'}
-        _open = work[0]
-        _close = _pairs[_open]
-        _depth = 0
-        for _i, _ch in enumerate(work):
-            if _ch == _open:
-                _depth += 1
-            elif _ch == _close:
-                _depth -= 1
-                if _depth == 0:
-                    # Anything after the closing mark is a second component, so
-                    # the enclosed leader is a detached substituent prefix.
-                    if work[_i + 1:]:
-                        return True
-                    break
+    # `acetamido`, `benzamido`, `formamido` -- the contracted spelling of
+    # `<acyl>ylamino`, i.e. a concatenation of two units, so `bis` per
+    # P-16.3.5(a).  Cf. `### **P-66.1.1.4.3** Substituents of the types
+    # -NH-CO-R and -NH-SO2-R` (`:32991`).  The bare `amido` has an empty head and
+    # is not caught.
+    if lowered.endswith('amido') and len(lowered) > 5:
+        return True
 
-    # Peel an optional leading locant set: the locants of a DETACHED prefix
-    # (`2-methylbutyl`).  A locant belonging to the core's own attachment or
-    # unsaturation sits AFTER the stem (`propan-2-yl`) and is never peeled here.
+    # An enclosed SUBSTITUENT leader followed by more name is a detached prefix
+    # by construction -- but a leading bracketed DESCRIPTOR is not.
+    if _enclosed_leader_is_a_substituent(work):
+        return True
+
+    # Peel an optional leading locant set -- the locants of a DETACHED prefix
+    # (`2-methylbutyl`, `N-pentylcarbamoyl`).  A locant belonging to the core's
+    # own attachment or unsaturation sits AFTER the stem (`propan-2-yl`) and was
+    # already handled by `_is_single_simple_unit`.
+    #
+    # ORDER MATTERS, and getting it wrong shipped a regression: the enclosed-
+    # leader test used to run on the RAW name, so a leading locant blocked it
+    # permanently and `3-(4-methylphenyl)propyl` read as simple while
+    # `(4-methylphenyl)propyl` read as substituted.  Hence the peel is repeated
+    # here and the leader test re-run on the peeled body.
     body = lowered
     m = _LEADING_LOCANT_RE.match(body)
     if m:
         body = body[m.end():]
+        if _enclosed_leader_is_a_substituent(body):
+            return True
+        if _is_single_simple_unit(body):
+            return False
 
-    # Now: does a detachable substituent morpheme occupy the front, leaving a
-    # remainder that is itself a group name?  Optionally preceded by a
-    # multiplicative syllable (`trimethylsilyl`, `difluoromethyl`).
-    for mult in ('',) + _LEADING_MULTIPLIER_SYLLABLES:
+    return _splits_into_two_units(body)
+
+
+def _is_recognised_prefix_component(token: str) -> bool:
+    """One complete substituent-prefix component of any recognised kind.
+
+    A vocabulary unit, a bare parent-hydride-yl, or a concatenated acyl form
+    (`acetamido`, `hexadecanoyloxy`).  A bare parent-hydride STEM (`benzene`,
+    `propan`) is deliberately NOT a component: a stem is not a prefix, and
+    accepting one would split the simple `benzenesulfinyl` -- P-16.3.2(a)'s
+    "*functionalized parent hydrides*" class, verbatim
+    `di(benzenesulfinyl)acetic!acid!(PIN)` (`:7324`) -- into two units.
+    """
+    if not token:
+        return False
+    if token in _SIMPLE_PREFIX_VOCABULARY:
+        return True
+    if _is_bare_hydride_yl(token, require_known_stem=True):
+        return True
+    if len(token) > 5 and token.endswith('yloxy'):
+        return True
+    # `acetamido`, `benzamido`, `formamido`: an acyl stem concatenated with
+    # `amido`, i.e. the contracted spelling of `<acyl>ylamino`.  Compound by
+    # P-16.3.5(a); cf. `### **P-66.1.1.4.3** Substituents of the types
+    # -NH-CO-R and -NH-SO2-R` (`:32991`) and its `bis(cyanomethyl)oxamide (PIN)`
+    # (`:33087`).
+    if len(token) > 5 and token.endswith('amido'):
+        return True
+    return False
+
+
+def _splits_at_a_unit_boundary(body: str, allow_multiplier: bool = True,
+                               _depth: int = 0) -> bool:
+    """Does ``body`` need TWO OR MORE units of the producers' vocabulary?
+
+    That is the operative form of P-16.3.2(c) / P-16.3.5(a): a compound prefix is
+    one built by concatenating units, and **both** sides of the split must be
+    recognised.  Requiring only the front to be recognised and testing the tail
+    by SHAPE is what produced `bis(nitroso)` (`nitro` + `so`, where `so` merely
+    ended in a group-shaped letter) and `bis(oxolan-2-yl)` (`oxo` + `lan-2-yl`).
+
+    Split is attempted from both ends, because either side may be the
+    multi-character one: `methoxy|methyl` is found from the front,
+    `pyridin-2-yl|methyl` and `acetamido|phenyl` only from the back.
+    """
+    if _depth > 4 or not body:
+        return False
+
+    mults = ('',) + _LEADING_MULTIPLIER_SYLLABLES if allow_multiplier else ('',)
+
+    # front-anchored: <optional multiplier><unit><recognised remainder>
+    for mult in mults:
         if mult and not body.startswith(mult):
             continue
         rest = body[len(mult):]
         if not rest:
             continue
-        for morpheme in _SUBSTITUENT_PREFIX_MORPHEMES:
-            if rest.startswith(morpheme):
-                tail = rest[len(morpheme):]
-                if tail and _looks_like_group_name(tail):
-                    return True
-        # A locant may also sit between the multiplier and the morpheme
-        # (`2,2-dimethylpropyl` is handled above; `di(2-...)` never reaches
-        # here).  No further peeling: anything else is a simple parent core.
+        for unit in _FRONT_PREFIX_UNITS:
+            if not rest.startswith(unit) or len(rest) == len(unit):
+                continue
+            tail = rest[len(unit):].lstrip('-')
+            if not tail:
+                continue
+            m = _LEADING_LOCANT_RE.match(tail)
+            if m:
+                tail = tail[m.end():]
+            if not tail:
+                continue
+            if _is_recognised_prefix_component(tail):
+                return True
+            if _splits_at_a_unit_boundary(tail, allow_multiplier, _depth + 1):
+                return True
 
+    # back-anchored: <recognised head><unit>
+    for unit in _FRONT_PREFIX_UNITS:
+        if not body.endswith(unit) or len(body) == len(unit):
+            continue
+        head = body[:-len(unit)].rstrip('-')
+        if not head:
+            continue
+        m = _LEADING_LOCANT_RE.match(head)
+        if m:
+            head = head[m.end():]
+        if head and _is_recognised_prefix_component(head):
+            return True
     return False
+
+
+# Kept as the historical name used by the front-anchored call site above.
+_splits_into_two_units = _splits_at_a_unit_boundary
+
+
+def _fragment_bears_substituent(mol, atoms, attachment: Optional[int]):
+    """GRAPH form of P-16.3.2(c): does the fragment's own parent hydride bear a
+    substituent?
+
+    Returns ``True``/``False``, or ``None`` when the graph cannot decide and the
+    caller must fall back to the name (an empty/mis-specified fragment, or a
+    fragment whose parent-hydride choice is genuinely name-dependent).
+
+    The test: walk the skeleton reachable from ``attachment`` through atoms of the
+    attachment atom's own element, plus any ring system it belongs to.  Anything
+    hanging off that skeleton is a substituent.
+
+    NOTE the deliberate asymmetry with the name path.  This is consulted only
+    when a caller supplies a fragment, and today NO caller can -- every one of
+    the ~88 `get_multiplier_prefix` call sites has already reduced its fragment
+    to a string by the time the multiplier is chosen.  That is reported as a
+    finding rather than papered over: threading the graph to all of them is a
+    separate, larger refactor, and the name path above is not a fallback but the
+    primary implementation, because P-16.3.2 is decided by the DERIVATION the
+    producer chose (see the `tert-butyl` / `2-methylpropan-2-yl` and
+    `methoxy` / `methoxymethyl` refutations above).
+    """
+    try:
+        idxs = set(int(a) for a in atoms)
+    except Exception:
+        return None
+    if not idxs:
+        return None
+    if attachment is None or int(attachment) not in idxs:
+        return None
+    anchor = int(attachment)
+    try:
+        anchor_atom = mol.GetAtomWithIdx(anchor)
+        ring_info = mol.GetRingInfo()
+    except Exception:
+        return None
+    element = anchor_atom.GetAtomicNum()
+
+    # The fragment's own parent hydride: atoms reachable from the anchor through
+    # same-element bonds, unioned with every ring the anchor sits in.
+    skeleton = {anchor}
+    frontier = [anchor]
+    while frontier:
+        cur = frontier.pop()
+        for nbr in mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nbr.GetIdx()
+            if j not in idxs or j in skeleton:
+                continue
+            same_ring = any(cur in r and j in r for r in ring_info.AtomRings())
+            if nbr.GetAtomicNum() == element or same_ring:
+                skeleton.add(j)
+                frontier.append(j)
+    return bool(idxs - skeleton)
 
 
 # W3-P03-7 (P-16.3.4(c)/(d), BB 38222/L7104): unbranched primary-alkyl prefixes
@@ -2006,7 +2590,15 @@ def alpha_sort_key(substituent_name: str) -> str:
     text = substituent_name.lower()
 
     # Leading positional descriptors are ALWAYS ignored for alphabetization
-    # (P-14.3.5): a parent locant ('3-'), a compound locant set ('2,4-'), and
+    # (P-14.5.2, under `### **P-14.5** ALPHANUMERICAL ORDER` at BB 3436:
+    # "*The name of a prefix for a substituent is considered to begin with the
+    # first letter of its complete name*", BB 3477, example
+    # `7-(1,2-difluorobutyl)-5-ethyltridecane (PIN)`; a locant is not a letter.
+    # NOT P-14.3.5, whose heading is `## **P-14.3.5** Lowest set of locants`
+    # (BB 3189) and which carries no alphabetization content at all -- the one
+    # site in src/ where a citation sweep misfired on the word "locant". Line
+    # 2018 below, in this same function, always cited P-14.5.2 for the same
+    # subject.): a parent locant ('3-'), a compound locant set ('2,4-'), and
     # the italic indicated-hydrogen descriptor ('1H-'). Strip them up front so
     # the enclosed-vs-simple decision below sees the bare substituent name —
     # this is what makes '3-(1H-imidazol-5-yl)' and '(1H-imidazol-5-yl)' yield

@@ -2282,6 +2282,7 @@ def name_substituted_heterocycle(
         get_alkyl_name,
         alpha_sort_key,
         get_multiplier_prefix,
+        get_suffix_multiplier_prefix,
         _join_multiplied_suffix,  # P-63.1.2/P-64.2.2.1 multiplier-'a' elision (tetraol->tetrol)
         _wrap_n_substituent,  # C4: italic-N substituent wrapping for amine suffix
     )
@@ -2507,7 +2508,7 @@ def name_substituted_heterocycle(
             chosen_locants = sorted(suffix_fg[chosen_suffix])
 
         count = len(chosen_locants)
-        multiplier = get_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
+        multiplier = get_suffix_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
         locant_str = ",".join(str(loc) for loc in chosen_locants)
         # P-63.1.2/P-64.2.2.1: elide the multiplier's terminal 'a' before a
         # vowel-initial suffix ('tetra'+'ol' -> 'tetrol', not 'tetraol').

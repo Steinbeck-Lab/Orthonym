@@ -46,6 +46,7 @@ from ..assembly.naming_utils import (
     format_substituent_prefix,
     alpha_sort_key,
     get_multiplier_prefix,
+    get_suffix_multiplier_prefix,
 )
 from ..perception.rings import (
     get_ring_info,
@@ -1208,7 +1209,7 @@ def name_substituted_polycyclic(
         # Build suffix with locant(s)
         from ..assembly.naming_utils import get_multiplier_prefix
         count = len(chosen_locants)
-        multiplier = get_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
+        multiplier = get_suffix_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
         locant_str = ",".join(str(loc) for loc in chosen_locants)
 
         # Assemble: prefix-part + parent-locant-suffix

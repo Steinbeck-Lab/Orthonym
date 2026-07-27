@@ -1241,7 +1241,8 @@ def _build_hetero_prefix(
     if totality.unexpressed:
         return None
 
-    from ..assembly.naming_utils import get_multiplier_prefix
+    from ..assembly.naming_utils import (get_multiplier_prefix,
+                                         get_suffix_multiplier_prefix)
 
     heteroatom_info = []
     for atom_idx in ring_atoms:
@@ -4100,14 +4101,15 @@ def _spiro_vb_unsaturation_suffix(
     if not doubles:
         return ''
     doubles.sort(key=_locant_sort_key)
-    from ..assembly.naming_utils import get_multiplier_prefix
+    from ..assembly.naming_utils import (get_multiplier_prefix,
+                                         get_suffix_multiplier_prefix)
     tokens = []
     for loc in doubles:
         if isinstance(loc, tuple):
             tokens.append(f"{loc[0]}{loc[1]}")
         else:
             tokens.append(str(loc))
-    mult = get_multiplier_prefix(len(doubles), 'ene')
+    mult = get_suffix_multiplier_prefix(len(doubles), 'ene')
     return f"-{','.join(tokens)}-{mult}ene"
 
 
@@ -4141,7 +4143,8 @@ def _spiro_vb_a_prefix(
     ]
     if not hetero:
         return ''
-    from ..assembly.naming_utils import get_multiplier_prefix
+    from ..assembly.naming_utils import (get_multiplier_prefix,
+                                         get_suffix_multiplier_prefix)
     # element -> list of (locant_token, sort_key). Prime the token if the atom
     # is in the primed component.
     by_element: Dict[str, List[Tuple[str, Tuple]]] = {}

@@ -20,7 +20,7 @@ import re
 from typing import Dict, List, Optional, Any, Tuple
 from rdkit import Chem
 
-from ..assembly.naming_utils import get_alkyl_name
+from ..assembly.naming_utils import get_alkyl_name, get_suffix_multiplier_prefix
 from ..data.ion_retained_names import (
     get_anion_name, get_cation_name, PIN_NONPREFERRED_CATIONS,
 )
@@ -1564,11 +1564,11 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
         d_locs = sorted(_bond_locant(b) for b in double_bonds)
         t_locs = sorted(_bond_locant(b) for b in triple_bonds)
         if d_locs:
-            dmult = get_multiplier_prefix(len(d_locs), 'ene') or ''
+            dmult = get_suffix_multiplier_prefix(len(d_locs), 'ene') or ''
             joiner = 'a' if dmult else ''
             unsat_endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
         if t_locs:
-            tmult = get_multiplier_prefix(len(t_locs), 'yne') or ''
+            tmult = get_suffix_multiplier_prefix(len(t_locs), 'yne') or ''
             joiner = 'a' if tmult else ''
             unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
 
@@ -1891,11 +1891,11 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
         d_locs = sorted(_bond_locant(b) for b in double_bonds)
         t_locs = sorted(_bond_locant(b) for b in triple_bonds)
         if d_locs:
-            dmult = get_multiplier_prefix(len(d_locs), 'ene') or ''
+            dmult = get_suffix_multiplier_prefix(len(d_locs), 'ene') or ''
             joiner = 'a' if dmult else ''
             unsat_endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
         if t_locs:
-            tmult = get_multiplier_prefix(len(t_locs), 'yne') or ''
+            tmult = get_suffix_multiplier_prefix(len(t_locs), 'yne') or ''
             joiner = 'a' if tmult else ''
             unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
 
@@ -2023,18 +2023,18 @@ def emit_poly_carbanion_ide(mol, centers: List[int]) -> str:
     d_locs = sorted(_bl(b) for b in double_bonds)
     t_locs = sorted(_bl(b) for b in triple_bonds)
     if d_locs:
-        dmult = get_multiplier_prefix(len(d_locs), 'ene') or ''
+        dmult = get_suffix_multiplier_prefix(len(d_locs), 'ene') or ''
         joiner = 'a' if dmult else ''
         locpart = '' if elide_unsat_locant else f"-{','.join(map(str, d_locs))}-"
         unsat += f"{joiner}{locpart if locpart else '-'}{dmult}en" if not elide_unsat_locant else f"{dmult}en"
     if t_locs:
-        tmult = get_multiplier_prefix(len(t_locs), 'yne') or ''
+        tmult = get_suffix_multiplier_prefix(len(t_locs), 'yne') or ''
         joiner = 'a' if tmult else ''
         locpart = '' if elide_unsat_locant else f"-{','.join(map(str, t_locs))}-"
         unsat += f"{joiner}{locpart}{tmult}yn" if not elide_unsat_locant else f"{tmult}yn"
 
     ide_locs = sorted(loc_map[i] for i in centers)
-    mult = get_multiplier_prefix(len(ide_locs), 'ide') or ''
+    mult = get_suffix_multiplier_prefix(len(ide_locs), 'ide') or ''
     # Elide the anionic locants when they cover EVERY carbon (unambiguous single
     # placement): ethyne->ethynediide, ethane->ethanediide.
     cover_all = (ide_locs == list(range(1, chain_len + 1)))
@@ -2472,7 +2472,7 @@ def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
         stem = get_chain_prefix(n)
     except ValueError:
         return ''
-    mult = get_multiplier_prefix(n_double, 'ene') or ''
+    mult = get_suffix_multiplier_prefix(n_double, 'ene') or ''
     loc_str = ','.join(str(l) for l in dbl_locs)
     # P-16.3.3: the linking 'a' precedes a consonant-initial multiplied suffix
     # (…a-2,4-dien…); a single vowel-initial 'ene' takes no 'a' (…-2-en…).

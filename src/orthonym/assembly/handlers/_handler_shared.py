@@ -82,6 +82,7 @@ from ..naming_utils import (
     alpha_sort_key,
     format_suffix_with_locants,
     get_multiplier_prefix,
+    get_suffix_multiplier_prefix,
     should_omit_locant_one,
 )
 from ...data.chain_names import get_chain_prefix
@@ -1325,7 +1326,7 @@ def _assemble_fragments(
         # Use suffix_frag.count (set by _generate_suffix) which includes terminal
         # groups like diacids where locants are omitted but multiplier is needed
         count = max(len(suffix_locants), getattr(suffix_frag, 'count', 1))
-        multiplier = get_multiplier_prefix(count, suffix_text) if count > 1 else ""
+        multiplier = get_suffix_multiplier_prefix(count, suffix_text) if count > 1 else ""
 
         # Build unsaturation infix with locants for compounds with functional groups
         unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)

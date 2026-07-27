@@ -19,6 +19,7 @@ from ..assembly.naming_utils import (
     alpha_sort_key,
     prefix_citation_sort_key,
     get_multiplier_prefix,
+    get_suffix_multiplier_prefix,
     format_suffix_with_locants,
     get_alkyl_name,
     ALKYL_NAMES,
@@ -350,6 +351,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     """
     from ..assembly.naming_utils import (
         needs_brackets, COMPLEX_MULTIPLIERS, apply_enclosing_marks,
+        is_substituted_substituent,
     )
 
     def _is_derived(multiplier: str) -> bool:
@@ -372,7 +374,19 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
             and not (prefix_form.startswith(('(', '['))
                      and prefix_form.endswith((')', ']')))
         )
-        _compound_nl = needs_brackets(prefix_form) or _partially_enclosed
+        # v29 P3-FINAL I13: `is_substituted_substituent` is consulted TOO, so the
+        # enclosing marks are no longer held by the multiplier WORD.  Before this,
+        # `needs_brackets('phosphonooxy')` was False and the marks survived only
+        # because the multiplier happened to be derived; the moment the multiplier
+        # became basic, `1,3-bis(phosphonooxy)propan-2-ol` collapsed to
+        # `1,3-diphosphonooxypropan-2-ol`, and `format_fg_prefix('methoxymethyl',
+        # [1,3], 2)` gave `1,3-dimethoxymethyl` -- a string that reads as
+        # -CH(OMe)2, a DIFFERENT GROUP.  BB :36333 carries the marks even at count
+        # 1: `(phosphonooxy)acetic acid (PIN)`.  Enclosure (P-16.3.4 / P-16.5.1.1)
+        # and multiplier choice (P-16.3.2/P-16.3.5) are different questions and
+        # must not be coupled in EITHER direction.
+        _compound_nl = (needs_brackets(prefix_form) or _partially_enclosed
+                        or is_substituted_substituent(prefix_form))
         if count > 1:
             multiplier = get_multiplier_prefix(count, prefix_form)
             if _is_derived(multiplier) and not prefix_form.startswith(("(", "[")):
@@ -397,7 +411,11 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
         and not (prefix_form.startswith(('(', '['))
                  and prefix_form.endswith((')', ']')))
     )
-    compound = needs_brackets(prefix_form) or _partially_enclosed
+    # v29 P3-FINAL I13 (see the no-locant branch above for the full reasoning):
+    # ask the substituted predicate as well, so the marks are not held by the
+    # multiplier word.
+    compound = (needs_brackets(prefix_form) or _partially_enclosed
+                or is_substituted_substituent(prefix_form))
 
     def _enclose(_p: str) -> str:
         # Auto-detect nesting depth (P-16.5.1.1): no inner marks -> '(p)';
@@ -764,7 +782,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
 
     # Determine multiplier for multiple principal groups
     count = len(suffix_locants) if suffix_locants else 1
-    multiplier = get_multiplier_prefix(count, suffix) if count > 1 else ""
+    multiplier = get_suffix_multiplier_prefix(count, suffix) if count > 1 else ""
 
     # --- Step 5: Generate non-principal FG prefixes with ring locants ---
     all_prefixes = []
@@ -2219,7 +2237,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # If we have unique locants, use those as the count (more reliable)
     if suffix_locants:
         count = len(suffix_locants)
-    multiplier = get_multiplier_prefix(count, suffix) if count > 1 else ""
+    multiplier = get_suffix_multiplier_prefix(count, suffix) if count > 1 else ""
 
     # Build unsaturation infix
     from ..assembly.composer import _build_unsaturation_infix

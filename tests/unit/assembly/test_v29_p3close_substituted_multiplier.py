@@ -315,3 +315,336 @@ def test_a_chain_root_beginning_with_a_multiplier_is_not_substituted():
     assert get_multiplier_prefix(2, "tridecyl") == "di"
     # contrast: `trimethylsilyl` really is a multiplied substituent prefix
     assert is_substituted_substituent("trimethylsilyl") is True
+
+
+# ===========================================================================
+# v29 P3-FINAL — the classes NO oracle row covered, which is why four
+# OPSIN-clean wrong PINs shipped through a full PASSING gate.
+#
+# Every row below carries its Blue Book authority WITH the section heading.
+# The OCR of chapter P-16 mangles hyphen->`G` and space->`!`, so quotations from
+# it are de-garbled; quotations from chapters P-35/P-61/P-63/P-65 are literal.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# (1) CHARACTERISTIC-GROUP prefixes are SIMPLE -> basic `di`.
+#
+# `**P"16.3.3**` (BB 7038) "*The basic numerical prefixes 'di', 'tri', 'tetra',
+# etc. are used to indicate a multiplicity of:*" clause **(b)** (BB 7067,
+# continuing at BB 7094) "*simple substituent prefixes, including parent hydrides
+# with 'ene' and 'yne' endings (without locants), and characteristic groups*",
+# with the verbatim examples `diimino` (BB 7072) and `dibromo` (BB 7073).
+#
+# THE REGRESSION THIS PINS: `nitroso` was decomposed as `nitro` + `so`, and `so`
+# passed a tail test that accepted any remainder ending in a group-shaped letter
+# (bare `'o'` was in `_GROUP_NAME_ENDINGS`).  Result: `1,4-bis(nitroso)benzene`,
+# OPSIN-clean, against the verbatim PIN.
+#   `## **P-61.5.1** Nitro and nitroso compounds` (BB 25933) ->
+#   `1,4-dinitrosobenzene (PIN)` (BB 25943).
+# ---------------------------------------------------------------------------
+BB_SIMPLE_CHARACTERISTIC_GROUP = [
+    # verbatim-attested multiplied forms
+    "nitroso",   # BB 25943 `1,4-dinitrosobenzene (PIN)`
+    "nitro",     # BB 25947 `2-methyl-1,3,5-trinitrobenzene (PIN)`
+    "cyano",     # BB 40908 `tricyanomethanide (PIN)`
+    "azido",     # BB 53968 `2,3-diazido-6-bromo-...`
+    "imino",     # BB 7072 `diimino` (P-16.3.3(b) example)
+    "bromo",     # BB 7073 `dibromo` (P-16.3.3(b) example)
+    "chloro", "fluoro", "iodo",
+    # simple by rule (P-16.3.3(b) "characteristic groups"); the Blue Book
+    # happens to print no multiplied instance of these four, so they are a
+    # SOUND INFERENCE from the clause, not verbatim examples.
+    "hydroxy", "oxo", "amino", "carboxy",
+    "carbamoyl", "sulfamoyl", "hydroperoxy", "hydrazinyl",
+    "sulfo", "sulfino", "isocyano", "isocyanato", "guanidino",
+    "carbamimidoyl", "sulfanylidene", "selanylidene", "thioxo",
+    "diazenyl", "hydrazinylidene", "phosphono", "phosphino", "borono",
+]
+
+# ---------------------------------------------------------------------------
+# (2) The SIX retained contracted alkoxy prefixes are SIMPLE -> `di`, and every
+# OTHER `<R>oxy` prefix is a concatenated COMPOUND prefix -> `bis`.
+#
+# This is the sharpest boundary in the whole predicate and the Blue Book states
+# BOTH halves outright, three lines apart in the same section:
+#
+#   `### **P-63.2.2.2** Retained names` (BB 27665), BB 27667: "*Some contracted
+#   names are retained for R-O– substituent groups. ... they are fully
+#   substitutable (with the exception of tert-butoxy) and are **considered as
+#   simple prefixes requiring the numerical prefixes 'di', 'tri', etc.** They
+#   are:*" -> `methoxy`, `ethoxy`, `propoxy`, `butoxy`, `phenoxy`,
+#   `tert-butoxy` (all "(preferred prefix)").  Confirmed in a PIN at BB 27705:
+#   `1,2-dimethoxybenzene (PIN)`.
+#
+#   `### **P-63.2.2.1** Systematic names` (BB 27631) -> `**P-63.2.2.1.1**`
+#   (BB 27633): "*Substituent prefix names for R′-O– groups are formed by
+#   concatenation, i.e., by adding the prefix 'oxy' to the substituent prefix
+#   name for the group R′. **These compound prefixes require the numerical
+#   multiplying prefixes 'bis', 'tris', etc.**\*" -> first example
+#   `pentyloxy (preferred prefix)`.
+#
+# So the list is CLOSED at six, and membership — not spelling shape — decides.
+# ---------------------------------------------------------------------------
+BB_SIMPLE_RETAINED_ALKOXY = ["methoxy", "ethoxy", "propoxy", "butoxy", "phenoxy"]
+
+BB_SUBSTITUTED_CONCATENATED_OXY = [
+    "pentyloxy",        # BB 27637, the rule's own first example
+    "hexyloxy", "benzyloxy",
+    # concatenated hetero-oxy prefixes.  `phosphonooxy` is filed by the Blue
+    # Book under `**P-67.1.4.1.3** Compound and complex substituent groups`
+    # (BB 36327; Appendix 2 row BB 56614 cites that same rule), and `sulfooxy`
+    # under `### **P-65.3.2.3** Substituent groups formed by concatenation`
+    # (BB 31276).  Neither is ever printed multiplied, so `bis` follows from
+    # P-16.3.5(a) + P-35.1 rather than from a verbatim example — but the
+    # CLASSIFICATION is verbatim.
+    "phosphonooxy", "sulfooxy", "nitrooxy", "carbamoyloxy", "aminooxy",
+    "sulfanyloxy",
+    # BB 31346 `sulfonylbis(sulfanediyl) (preselected prefix)` and BB 31348
+    # `sulfinobis(oxy) (preselected prefix)` are the sibling witnesses.
+]
+
+# ---------------------------------------------------------------------------
+# (3) ALKOXY-ALKYL and every other two-unit compound prefix -> `bis`.
+#
+# `**P"16.3.5**`(a) (BB 7104): "*The numerical prefixes 'bis', 'tris',
+# 'tetrakis', etc. are used to indicate a multiplicity of: (a) compound or
+# complex (i.e. substituted) prefixes (see P-35.3 and P-35.4)*", with the
+# verbatim example `bis(bromomethyl) (preferred prefix)`.
+#
+# `### **P-35.1** GENERAL METHODOLOGY` (BB 17950), BB 17954: "*Compound and
+# mixed substituent prefixes require the derived multiplying terms 'bis', 'tris',
+# 'tetrakis', etc., to designate their multiplicity in substitutive
+# nomenclature.*"
+#
+# THE REGRESSION THIS PINS: `methoxymethyl` was absent from a closed hand-list
+# of prefix morphemes, so it read as SIMPLE and shipped
+# `1,4-di(methoxymethyl)benzene` where the identically-shaped `bromomethyl`
+# correctly gave `1,4-bis(bromomethyl)benzene`.  A closed spelling table cannot
+# be the class boundary: the class is open, so the table is wrong on its
+# complement.
+# ---------------------------------------------------------------------------
+BB_SUBSTITUTED_TWO_UNIT = [
+    # alkoxy + carrier — the class that shipped wrong
+    "methoxymethyl", "2-methoxyethyl", "3-methoxypropyl", "2-ethoxyethyl",
+    "4-methoxyphenyl", "2-methoxy-2-oxoethyl", "2-hydroxyethoxy",
+    # amido / sulfamoyl on a ring carrier
+    "4-acetamidophenyl", "4-sulfamoylphenyl", "acetamido",
+    # heteroaryl carrier + alkyl  (`pyridin-2-yl` + `methyl`)
+    "pyridin-2-ylmethyl", "oxolan-2-ylmethyl", "furan-2-ylmethyl",
+    # carbamoyl carrying its own substituent.  NB the Blue Book spells this
+    # WITHOUT an italic locant: `4-(dimethylcarbamoyl)benzoic acid (PIN)`
+    # (BB 30382, `## **P-65.1.6.1** Amic acids`), and BB 24611
+    # `(dimethylcarbamoyl)hydrazinylidene (preferred prefix)`.
+    "dimethylcarbamoyl", "methylcarbamoyl",
+    # ...and the italic-letter-locant spelling must reach the same verdict.
+    # `di(*N*-...` occurs ZERO times in the book; `bis(*N*-...` occurs 5 times
+    # (e.g. BB 6198 `...bis(*N*-methylacetamide) (PIN)`), always earned by the
+    # substitution rather than by the locant.
+    "N-pentylcarbamoyl", "N-methylcarbamoyl", "N,N-dimethylcarbamoyl",
+    # enclosed leader then a carrier — the C3 class
+    "3-(4-methylphenyl)propyl", "2-(4-chlorophenyl)ethyl",
+    "(4-methylphenyl)methyl",
+    # verbatim `bis` witnesses
+    "1-methylpropyl",      # BB 28170 `2-[bis(1-methylpropyl)amino]butan-2-ol`
+    "cyanomethyl",         # BB 33087 `...bis(cyanomethyl)oxamide (PIN)`
+    "methylsulfanyl",      # BB 35344 `1,1-bis(methylsulfanyl)pentane (PIN)`
+    "2-chloropropan-2-yl",  # BB 7104 / BB 25793
+]
+
+# ---------------------------------------------------------------------------
+# (4) An UNSUBSTITUTED ring-yl carrying only its own attachment locant is
+# SIMPLE -> `di(...)`: the BASIC multiplier, WITH parentheses.  The parentheses
+# come from a different rule than the multiplier, and conflating them is the
+# original sin this whole task exists to undo.
+#
+#   `P"16.3.4 Parentheses (round brackets) ... are used to enclose multiplied
+#   components that are:` (BB 7085) clause **(a)** "*simple substituent prefixes
+#   having locants*" -> `di(propanG2Gyl) (preferred prefix)` (BB 7087),
+#   `tetra(naphthalenG2Gyl) (preferred prefix)` (BB 7090); clause **(f)**
+#   "*simple components containing brackets*" -> `di(bicyclo[3.2.1]octanG3Gyl)
+#   (preferred prefix)` and `di([4G2H]benzoyl) (preferred prefix)`.
+#
+#   `**P"16.5.1.1**` (BB 7232) says the same from the marks side: parentheses
+#   enclose "*a multiplied substituent prefix **even though preceded by a basic
+#   numerical prefix, such as 'di', 'tri', etc.***"
+#
+# Verbatim PIN witnesses for the bare-ring-yl class:
+#   `1,2-di(furan-2-yl)-2-hydroxyethan-1-one (PIN)`  BB 29677 (`## **P-64.8**
+#     ACYLOINS`, BB 29661)
+#   `di(1*H*-imidazol-1-yl)methanethione (PIN)`      BB 29544
+#   `di(naphthalen-2-yl)ethanedione (PIN)`           BB 28380
+#   `1,3-di(naphthalen-2-yl)triaz-1-ene (PIN)`       BB 39047
+#   `2,6-di(tetraphen-1-yl)pyridine (PIN)`           BB 25762
+#   `2-[di(butan-2-yl)amino]butan-2-ol (PIN)`        BB 28170
+#
+# THE DEFECTS THIS PINS: `oxolan-2-yl` peeled as `oxo` + `lan-2-yl` and shipped
+# the live `bis(oxolan-2-yl)methanol`; `triphenylen-2-yl` peeled as `tri` +
+# `phenyl` + `en-2-yl`; and a leading bracketed FUSION descriptor was misread as
+# an enclosed substituent, so `[1,2,4]triazolo[1,5-a]pyrimidin-2-yl` and
+# `[4-2H]benzoyl` were called substituted against the verbatim P-16.3.4(f).
+# ---------------------------------------------------------------------------
+BB_SIMPLE_BARE_RING_YL = [
+    "oxolan-2-yl", "oxan-4-yl", "oxocan-2-yl", "oxonan-2-yl",
+    "1,3-dioxolan-2-yl", "1,3-dioxan-2-yl",
+    "triphenylen-2-yl", "pyridin-2-yl", "thiophen-2-yl",
+    "1H-imidazol-1-yl", "piperidin-1-yl", "pyrrolidin-1-yl",
+    "cyclohexen-1-yl", "isoxazol-3-yl",
+    # bracket-leading FUSION descriptors — P-16.3.4(f), verbatim `di([4G2H]benzoyl)`
+    "[1,2,4]triazolo[1,5-a]pyrimidin-2-yl", "[1,3]oxazolo[4,5-b]pyridin-2-yl",
+    "[1,2,4]triazin-3-yl", "[1,3]oxazol-2-yl", "[4-2H]benzoyl",
+    # retained hydrocarbyls: BB 23258 `...(2,2-dibenzylpropane-1,3-diyl)...
+    # (PIN)` uses the BASIC `di` on `benzyl`, and BB 24420 says `benzyl` "cannot
+    # be substituted" in a preferred name, so P-16.3.5(a) can never fire on it.
+    "benzyl", "benzylidene",
+    # BB 7324 `di(benzenesulfinyl)acetic acid (PIN)`
+    "benzenesulfinyl",
+]
+
+
+@pytest.mark.parametrize("name", BB_SIMPLE_CHARACTERISTIC_GROUP
+                         + BB_SIMPLE_RETAINED_ALKOXY
+                         + BB_SIMPLE_BARE_RING_YL)
+def test_p3final_simple_class_takes_the_basic_multiplier(name):
+    assert is_substituted_substituent(name) is False, (
+        f"{name!r} is an unsubstituted/simple prefix and must take di/tri"
+    )
+    assert get_multiplier_prefix(2, name).rstrip("-") == "di"
+    assert get_multiplier_prefix(3, name).rstrip("-") == "tri"
+
+
+@pytest.mark.parametrize("name", BB_SUBSTITUTED_CONCATENATED_OXY
+                         + BB_SUBSTITUTED_TWO_UNIT)
+def test_p3final_substituted_class_takes_the_derived_multiplier(name):
+    assert is_substituted_substituent(name) is True, (
+        f"{name!r} is a compound/complex (substituted) prefix "
+        f"(P-16.3.5(a)) and must take bis/tris"
+    )
+    assert get_multiplier_prefix(2, name) == "bis"
+    assert get_multiplier_prefix(3, name) == "tris"
+
+
+def test_the_four_shipped_wrong_pins_as_one_executable_statement():
+    """The exact four CRITICAL emissions, at the predicate level."""
+    # C1 — BB 25943 `1,4-dinitrosobenzene (PIN)`
+    assert get_multiplier_prefix(2, "nitroso") == "di"
+    # C4 — P-16.3.5(a); cf. verbatim `bis(bromomethyl)`
+    assert get_multiplier_prefix(2, "methoxymethyl") == "bis"
+    assert get_multiplier_prefix(2, "bromomethyl") == "bis"
+    # C3 — BB 25729 `1,2,4-tris[3-(4-methylphenyl)propyl]benzene`
+    assert get_multiplier_prefix(3, "3-(4-methylphenyl)propyl") == "tris"
+    # C2 — BB 30313 `benzene-1,2-dicarbodithioic acid (PIN)`
+    assert get_multiplier_prefix(2, "carbodithioic acid") == "di"
+
+
+def test_the_locant_peel_runs_before_the_enclosed_leader_test():
+    """C3's mechanism, isolated.
+
+    `is_substituted_substituent('3-(4-methylphenyl)propyl')` returned False
+    while `('(4-methylphenyl)propyl')` returned True — the enclosed-leader test
+    ran on the RAW name, so a leading locant blocked it permanently and the
+    morpheme loop could never match a body starting with `(`.
+    """
+    assert is_substituted_substituent("(4-methylphenyl)propyl") is True
+    assert is_substituted_substituent("3-(4-methylphenyl)propyl") is True
+
+
+def test_a_leading_bracketed_fusion_descriptor_is_not_an_enclosed_prefix():
+    """m1.  `[1,2,4]` is a locant list, not a substituent.
+
+    P-16.3.4 clause (f) "*simple components containing brackets*" is verbatim on
+    this: `di([4G2H]benzoyl) (preferred prefix)` and
+    `8,8′Goxydi(spiro[4.5]decane) (PIN)` — bracket-leading prefixes with the
+    BASIC multiplier.
+    """
+    for nm in ("[1,2,4]triazolo[1,5-a]pyrimidin-2-yl", "[4-2H]benzoyl",
+               "spiro[4.5]decan-2-yl"):
+        assert is_substituted_substituent(nm) is False, nm
+    # ...while a bracketed SUBSTITUENT leader still counts.
+    assert is_substituted_substituent("[4-(methoxy)phenyl]methyl") is True
+
+
+def test_a_ring_stem_is_never_peeled_as_a_characteristic_group_prefix():
+    """I2.  `oxolan-2-yl` is not `oxo` + `lan-2-yl`.
+
+    The old tail test accepted any remainder ending in a group-shaped letter, so
+    `lan-2-yl` looked like a group name and the live emission was
+    `bis(oxolan-2-yl)methanol` where BB 29677's `di(furan-2-yl)` class requires
+    `di(oxolan-2-yl)methanol`.  The negative-control list it relied on covered
+    only the 20 acyclic alkyl roots, so no ring name could ever be protected.
+    """
+    for nm in ("oxolan-2-yl", "oxocan-2-yl", "oxonan-2-yl",
+               "1,3-dioxolan-2-yl", "triphenylen-2-yl"):
+        assert is_substituted_substituent(nm) is False, nm
+    # and the siblings that were already right stay right
+    for nm in ("oxan-4-yl", "1,3-dioxan-2-yl"):
+        assert is_substituted_substituent(nm) is False, nm
+
+
+def test_the_retained_alkoxy_list_is_closed_at_six():
+    """P-63.2.2.2 vs P-63.2.2.1.1 — membership decides, not spelling shape.
+
+    Both halves are verbatim, and they are three lines apart in the book, so a
+    predicate that keys on "ends in -oxy" is wrong whichever answer it gives.
+    """
+    for simple in ("methoxy", "ethoxy", "propoxy", "butoxy", "phenoxy"):
+        assert is_substituted_substituent(simple) is False, simple
+    for compound in ("pentyloxy", "hexyloxy", "benzyloxy", "phosphonooxy"):
+        assert is_substituted_substituent(compound) is True, compound
+
+
+# ---------------------------------------------------------------------------
+# (5) SUFFIXES.  `get_multiplier_prefix` is asked BOTH questions by different
+# callers, and the suffix answer is not the substituent answer.
+#
+# `**P"16.3.3**` (BB 7038) clause (a) (BB 7040): "*functional and cumulative
+# suffixes, basic or modified by functional replacement, **with the exception of
+# 'thioic acid' and 'dithioic acid' described in P-16.3.5(b)***".
+#
+# `**P"16.3.5**`(b) (BB 7104): "*'thioic acid' and 'dithioic acid' suffixes, and
+# their Se and Te analogues, as exceptions to suffixes described in P-16.3.3 and
+# P-16.3.4*".
+#
+# The Blue Book prints the decisive boundary pair four lines apart under
+# `### **P-65.1.5.1** Functional replacement in systematic names of carboxylic
+# acids`:
+#     `benzene-1,2-dicarbodithioic acid (PIN) (not tetrathiophthalic acid)`  BB 30313
+#     `ethanebis(dithioic acid) (PIN) (not tetrathiooxalic acid)`            BB 30317
+#
+# THE REGRESSION THIS PINS: the exception was matched with
+# `endswith('dithioic acid')`, and `'carbodithioic acid'.endswith('dithioic
+# acid')` is True — so the ring form shipped as
+# `cyclohexane-1,2-biscarbodithioic acid`.  The exception must match the WHOLE
+# suffix token.
+# ---------------------------------------------------------------------------
+BB_BASIC_SUFFIXES = [
+    "carbodithioic acid", "carbothioic acid", "carboxylic acid",
+    "sulfonic acid", "carboxamide", "carbonitrile", "carbaldehyde", "ol",
+]
+
+BB_BIS_SUFFIXES = [
+    "thioic acid", "dithioic acid",
+    "selenoic acid", "diselenoic acid", "telluroic acid", "ditelluroic acid",
+    # I1 — the italic-locant spellings of the SAME suffixes.  P-65.1.5.1
+    # (BB 30215) confirms the `O-`/`S-` forms and that the locants are "normally
+    # omitted", so keying the exception on the locant-free spelling alone made
+    # the whole `<alkane>bis(thioic O-acid)` family abstain.
+    "thioic O-acid", "thioic S-acid", "dithioic O-acid", "dithioic S-acid",
+    "selenoic Se-acid",
+]
+
+
+@pytest.mark.parametrize("suffix", BB_BASIC_SUFFIXES)
+def test_p3final_a_suffix_takes_the_basic_multiplier(suffix):
+    assert get_multiplier_prefix(2, suffix) == "di", suffix
+    assert get_multiplier_prefix(3, suffix) == "tri", suffix
+
+
+@pytest.mark.parametrize("suffix", BB_BIS_SUFFIXES)
+def test_p3final_the_p1635b_suffix_exception_takes_bis(suffix):
+    assert get_multiplier_prefix(2, suffix) == "bis", suffix
+
+
+def test_the_carbodithioic_boundary_pair():
+    """BB 30313 vs BB 30317, both PINs, four lines apart."""
+    assert get_multiplier_prefix(2, "carbodithioic acid") == "di"
+    assert get_multiplier_prefix(2, "dithioic acid") == "bis"
