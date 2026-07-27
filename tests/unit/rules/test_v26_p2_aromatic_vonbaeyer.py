@@ -88,8 +88,23 @@ FAIL_CLOSED_ENGINE = {
     "charged aromatic fused (acridinium)": "C[n+]1c2ccccc2cc2ccccc21",
     "spiro co-ring (1,4-dioxaspiro[4.4]nonane)": "C1CC2(CC1)OCCO2",
     "lone monocycle (benzene, not a cage)": "c1ccccc1",
-    "peri-fused > cap (coronene)": "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61",
-    ">40-scope peri-fused (ovalene)":
+    # v29 Phase 2 T3b re-derived these two. Both expectations stand -- the engine
+    # must refuse -- but the reasons recorded here were wrong on the numbers:
+    # coronene is 24 cage atoms / 7 rings and ovalene 34 cage atoms / 10 rings,
+    # so NEITHER exceeds MAX_CAGE_ATOMS = 40 and coronene does not exceed
+    # MAX_CAGE_RINGS = 8 either. The Blue Book reason they must refuse is that
+    # both are RETAINED fused-ring hydrocarbon parent components -- P-25.1
+    # Table 2.7 "Retained names for hydrocarbon parent ring components", with
+    # "coronene (PIN)" at BlueBookV2.md:11346 and both listed at P-25.8.2
+    # (":14776") -- so the retained fusion name IS the PIN and a von-Baeyer
+    # polyene construction can never be preferred for them.
+    # The operative code cause is the structural floor, not a cap: both fail
+    # audit_von_baeyer_descriptor ("descriptor edge-audit failed; refuse"), and
+    # they still refuse with both caps set to 200. Ovalene's ring count (10) does
+    # trip the ring cap first, but its refusal is over-determined.
+    "retained fusion PIN; fails the descriptor edge-audit (coronene)":
+        "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61",
+    "retained fusion PIN; 10 rings > cap AND fails the edge-audit (ovalene)":
         "c1cc2ccc3ccc4ccc5ccc6ccc7ccc8ccc1c1c2c3c4c2c5c6c7c8c12",
 }
 

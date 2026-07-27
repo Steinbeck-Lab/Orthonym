@@ -23,6 +23,26 @@ from rdkit import Chem
 
 logger = logging.getLogger(__name__)
 
+#: Implementation ceilings on the cage this module will analyse. The Blue Book
+#: sets NO upper size limit on von Baeyer nomenclature (P-23 is construction
+#: rules only), so both numbers are ours, not nomenclature's. They guard only
+#: this module -- the default PIN path (``polycyclic.name_polycyclic_complete``)
+#: caps nothing above ``ring_count < 2``.
+#:
+#: v29 Phase 2 T3b measured what raising them buys, over the 1203 ring molecules
+#: of ``, and the answer is NOTHING: with both caps
+#: set to 200 the emitted name is byte-identical for every molecule the caps
+#: touch. So the VALUES stay and the fix went to what was being COUNTED --
+#: ``MAX_CAGE_RINGS`` was compared against RDKit's symmetrized ring-set
+#: cardinality instead of the P-23.1.9 ring number (see
+#: ``polycyclic.von_baeyer_ring_count``), which made this cap refuse *heptacyclo*
+#: cages for being "more than 8 rings".
+#:
+#: Do not raise ``MAX_CAGE_RINGS`` without first fixing P-23.2.4 main-bridge
+#: selection: ``_find_main_ring`` only ever offers a 0- or 1-atom main bridge, so
+#: 7 of 19 Blue Book von Baeyer PIN descriptors come back with a non-preferred
+#: main bridge (locked in ``tests/unit/rules/test_v29_p2_vb_ring_count.py``).
+#: Raising the cap would broaden that class, not add PIN coverage.
 MAX_CAGE_ATOMS = 40
 MAX_CAGE_RINGS = 8
 
@@ -154,6 +174,7 @@ def analyze_cage_universal(
     """
     from .polycyclic import (
         VonBaeyerAnalyzer, _get_largest_connected_ring_component,
+        von_baeyer_ring_count,
     )
     from .ring_replacement import build_replacement_prefix
     from .ring_unsaturation import render_ring_unsaturation
@@ -194,8 +215,13 @@ def analyze_cage_universal(
 
     if len(cage_canon) > MAX_CAGE_ATOMS:
         return None
-    n_rings = sum(1 for ring in ri.AtomRings() if set(ring) <= cage_canon)
-    if n_rings < 2 or n_rings > MAX_CAGE_RINGS:
+    # v29 Phase 2 T3b: count rings the way P-23.1.9 defines them (minimum
+    # scissions to reach an acyclic skeleton = circuit rank), NOT the count of
+    # RDKit's symmetrized ring set. The symmetrized count over-counts symmetric
+    # cages (adamantane 4 vs 3, cubane 6 vs 5), so this cap used to refuse
+    # heptacyclo cages as "> 8 rings". See von_baeyer_ring_count.
+    n_rings = von_baeyer_ring_count(kek, cage_canon)
+    if n_rings is None or n_rings < 2 or n_rings > MAX_CAGE_RINGS:
         return None
 
     analyzer = VonBaeyerAnalyzer()
@@ -450,7 +476,9 @@ def analyze_spiro_universal(
         generate_spiro_descriptor, get_spiro_numbering,
         _get_polyspiro_numbering, _build_hetero_prefix,
     )
-    from .polycyclic import _get_alkane_name  # noqa: F401 (parity import)
+    from .polycyclic import (  # noqa: F401 (_get_alkane_name = parity import)
+        _get_alkane_name, von_baeyer_ring_count,
+    )
 
     if mol is None:
         return None
@@ -473,7 +501,15 @@ def analyze_spiro_universal(
 
     ri = sub.GetRingInfo()
     n_rings = ri.NumRings()
-    if n_rings < 2 or n_rings > MAX_CAGE_RINGS:
+    # v29 Phase 2 T3b: the CAP is on the P-23.1.9 ring count (circuit rank), not
+    # on the symmetrized ring-set cardinality -- same fix as the cage sibling.
+    # ``n_rings`` itself is left as the symmetrized count because the pure-spiro
+    # identity check below (n_rings == n_spiro + 1) is written against that
+    # enumeration; for a pure spiro system the two agree anyway (no bridge means
+    # no symmetry-degenerate smallest rings), so this only stops a bridged
+    # candidate from being rejected for the wrong reason before that check runs.
+    vb_rings = von_baeyer_ring_count(sub, set(range(sub.GetNumAtoms())))
+    if vb_rings is None or vb_rings < 2 or vb_rings > MAX_CAGE_RINGS:
         return None
     spiro_sub = get_spiro_atoms(sub)
     if not spiro_sub:

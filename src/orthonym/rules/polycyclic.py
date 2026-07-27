@@ -71,6 +71,77 @@ _ALKANE_NAMES = {
 }
 
 
+def von_baeyer_ring_count(mol, cage_atoms) -> Optional[int]:
+    """The number of rings P-23 counts over ``cage_atoms``, or ``None``.
+
+    P-23.1.9 (``BlueBookV2.md:9558``) DEFINES the quantity: "A 'polycyclic
+    system' contains a number of rings equal to the **minimum number of
+    scissions required to convert the system into an acyclic skeleton**." Restated
+    at P-23.2.6.1.1 (``:9645``): "The number of rings is equal to the number of
+    bond cuts necessary to transform the polycyclic system into an acyclic
+    skeleton." That is the graph's circuit rank, ``E - V + C`` over the induced
+    cage subgraph (``C`` = connected components), and it is exactly the number
+    ``cyclo_ring_count_word`` spells -- the two are the count and its word, so
+    they live together here.
+
+    Why this is NOT ``GetRingInfo().NumRings()`` (v29 Phase 2 T3b)
+    -------------------------------------------------------------
+    RDKit's ring info is the **symmetrized** SSSR, which deliberately keeps
+    extra symmetry-equivalent smallest rings, so its cardinality OVER-COUNTS the
+    P-23.1.9 number on exactly the symmetric cages von Baeyer nomenclature is
+    for:
+
+    * adamantane -- Blue Book ``tricyclo[3.3.1.1^3,7]decane`` (PIN, ``:9840``),
+      3 rings -- symmetrized ring count **4**;
+    * cubane -- ``pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane`` (PIN, ``:9889``),
+      5 rings -- symmetrized ring count **6**;
+    * a 12-atom bridged cage whose reference name is ``heptacyclo[...]dodecane``,
+      7 rings -- symmetrized ring count **11**.
+
+    ``MAX_CAGE_RINGS`` was compared against the symmetrized count, so a cap
+    meant to bound "8 rings" refused *heptacyclo* cages.
+
+    Two other places in the tree already compute this quantity correctly but
+    privately -- ``VonBaeyerAnalyzer._get_ring_count`` (as ``E - V + 1``, so it
+    under-counts a DISCONNECTED atom set) and ``rules/bicyclo.py:163``, whose
+    comment had already diagnosed the hazard in prose ("cycle_rank ... is always
+    reliable regardless of SSSR issues"). Neither was the bug, so neither is
+    rerouted here: ``_get_ring_count`` has 7 PIN-path call sites and swapping its
+    disconnected-set behaviour is a separate, separately-gated change. New
+    callers should use THIS function.
+
+    Returns ``None`` when ``cage_atoms`` is empty, so callers fail closed rather
+    than treat "no cage" as a ring count.
+    """
+    cage = set(cage_atoms)
+    if not cage:
+        return None
+    edges = 0
+    adj = {i: set() for i in cage}
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in cage and b in cage:
+            edges += 1
+            adj[a].add(b)
+            adj[b].add(a)
+    # connected components of the induced subgraph (C in E - V + C)
+    seen: set = set()
+    components = 0
+    for start in sorted(cage):
+        if start in seen:
+            continue
+        components += 1
+        stack = [start]
+        seen.add(start)
+        while stack:
+            cur = stack.pop()
+            for nbr in adj[cur]:
+                if nbr not in seen:
+                    seen.add(nbr)
+                    stack.append(nbr)
+    return edges - len(cage) + components
+
+
 def cyclo_ring_count_word(ring_count: int) -> Optional[str]:
     """The von Baeyer ring-count term for ``ring_count`` rings, or ``None``.
 
