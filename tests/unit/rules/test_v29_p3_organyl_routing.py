@@ -1153,3 +1153,172 @@ def test_f6_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
     """
     from rdkit import Chem
     assert ungated_namer.name(smiles) == ungated_namer.name(Chem.CanonSmiles(smiles))
+
+
+# ==========================================================================
+# FAMILY 7 -- rules/polyazane (4 sites, all NAMING)
+#
+#   line 108  `_collect_substituents`   -> the N-chain prefix block
+#   lines 256/257 `_name_azoxy`         -> the two organyls of R-N=N(O)-R
+#   line 298  `_formazan_substituent`   -> one organyl on a formazan skeleton
+#
+# `_format_n2_substituents` carried the same three defects as polychalcogen's
+# blocks (no hyphen separator -> `1-ethyl2-methylhydrazine` SHIPPED; no P-16.3.3
+# marks; raw sort), plus the missing P-14.4 (g) orientation tie-break, and
+# `_format_substituted_polyazane`/`_name_azoxy` open-coded `f"({name})"` which
+# cannot escalate marks and has no P-16.3.4 carve-out.
+#
+# The widening also moves five names from a CARBON parent to the HYDRAZINE
+# parent, which is the preferred direction:
+#
+#   BB 1776   class seniority order `N > P > As > ... > O > S > Se > Te > C`
+#             -- nitrogen before carbon.
+#   BB 18950  `1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine` (PIN) `( N > Si > O)`
+#             -- hydrazine is the parent even against two RING substituents.
+#
+# and `methylhydrazine` / `phenylhydrazine` (BB PINs, P-68.3.1.2) were already
+# emitted, so before this migration the class split purely on whether the narrow
+# walker accepted the substituent.  (BB 19376 `2-hydrazinylpyridine` (PIN) is not
+# a counterexample: for an N-HETEROCYCLE P-44.2.1 makes the ring senior.)
+# ==========================================================================
+
+@pytest.mark.parametrize("smiles,expected", [
+    # site 108 -- N-chain prefixes
+    ("CC(C)NNC(C)C",         "1,2-di(propan-2-yl)hydrazine"),
+    ("CC(C)NNC",             "1-methyl-2-(propan-2-yl)hydrazine"),
+    ("CC(C)(C)NNC(C)(C)C",   "1,2-di-tert-butylhydrazine"),
+    ("CC(C)NNN",             "1-(propan-2-yl)triazane"),
+    ("CC(C)N=NC(C)C",        "1,2-di(propan-2-yl)diazene"),
+    # >=3-N chain with two DIFFERENT prefixes: exercises that composer's own
+    # P-14.4 (g) tie-break (methyl is cited first, so it takes locant 1)
+    ("CC(C)NNNC",            "1-methyl-3-(propan-2-yl)triazane"),
+    ("CNNNCC",               "1-ethyl-3-methyltriazane"),
+    # MULTIPLIED prefixes on the >=3-N composer: P-16.3.4 hyphen + BB 25719
+    # SIMPLE multiplier outside the marks of a compound prefix
+    ("CC(C)(C)NNNC(C)(C)C",  "1,3-di-tert-butyltriazane"),
+    ("CC(C)NNNC(C)C",        "1,3-di(propan-2-yl)triazane"),
+    # sites 256/257 -- azoxy
+    ("CC(C)N=[N+]([O-])C(C)C",       "di(propan-2-yl)diazene oxide"),
+    ("C1CCCCC1N=[N+]([O-])C1CCCCC1", "dicyclohexyldiazene oxide"),
+])
+def test_f7_polyazane_previously_refused_organyl_is_now_named(
+    ungated_namer, smiles, expected,
+):
+    assert ungated_namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("CC(C)(C)NNC",  "1-tert-butyl-2-methylhydrazine"),
+    ("CC(C)(C)NNCC", "1-tert-butyl-2-ethylhydrazine"),
+    ("CC(C)(C)N=NC", "1-tert-butyl-2-methyldiazene"),
+    ("CC(C)(C)NNN",  "1-tert-butyltriazane"),
+    # the >=3-N block is a SEPARATE composer and needs its own rows
+    ("CC(C)(C)NNNC", "1-tert-butyl-3-methyltriazane"),
+    # P-16.3.4 under a multiplier, on the azoxy composer
+    ("CC(C)(C)N=[N+]([O-])C(C)(C)C", "di-tert-butyldiazene oxide"),
+])
+def test_f7_citation_order_ignores_the_italicized_prefix(
+    ungated_namer, smiles, expected,
+):
+    """P-14.5.2 keys on the LETTERS, so `tert-butyl` sorts under 'butyl'.
+
+    These rows distinguish the shared citation key from a raw string sort, which
+    would put 'methyl'/'ethyl' first (on 'm'/'e' < 't').  Every other witness in
+    this family sorts identically both ways, so without a row like this the
+    raw-sort mutant survives.
+    """
+    assert ungated_namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,before,after", [
+    ("CNNCC", "1-ethyl2-methylhydrazine", "1-ethyl-2-methylhydrazine"),
+])
+def test_f7_prefix_segments_are_hyphen_separated(ungated_namer, smiles, before, after):
+    """A malformed name that SHIPPED is repaired (BB 21649
+    `3-ethyl-2-methylhexane` (PIN) for the separator).  Two different simple
+    organyls both pass the retired narrow walker, so this was reachable before the
+    migration."""
+    name = ungated_namer.name(smiles)
+    assert name == after
+    assert name != before
+
+
+@pytest.mark.parametrize("smiles,before,after", [
+    ("CC(C)NN",          "2-hydrazinylpropane",          "(propan-2-yl)hydrazine"),
+    ("CC(C)(C)NN",       "2-hydrazinyl-2-methylpropane", "tert-butylhydrazine"),
+    ("C1CCCCC1NN",       "hydrazinylcyclohexane",        "cyclohexylhydrazine"),
+    ("C=CNN",            "hydrazinylethene",             "ethenylhydrazine"),
+    ("CCCCCCCCCCCCNN",   "1-hydrazinyldodecane",         "dodecylhydrazine"),
+])
+def test_f7_hydrazine_is_the_senior_parent_over_carbon(
+    ungated_namer, smiles, before, after,
+):
+    """Five names move from a CARBON parent to the HYDRAZINE parent.
+
+    BB 1776 gives the class seniority order `N > P > As > ... > O > S > Se > Te >
+    C` -- nitrogen BEFORE carbon -- and BB 18950
+    `1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine` (PIN) `( N > Si > O)` keeps
+    hydrazine as the parent even against two ring substituents.  `methylhydrazine`
+    and `phenylhydrazine` (BB PINs, P-68.3.1.2) were already emitted, so the old
+    behaviour split one class on nothing but whether the narrow walker accepted
+    the substituent.  All five new names are OPSIN-exact.
+    """
+    name = ungated_namer.name(smiles)
+    assert name == after
+    assert name != before
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("NN",                          "hydrazine"),
+    ("CNN",                         "methylhydrazine"),
+    ("c1ccccc1NN",                  "phenylhydrazine"),
+    ("CNNC",                        "1,2-dimethylhydrazine"),
+    ("CN(C)N",                      "1,1-dimethylhydrazine"),
+    ("NNN",                         "triazane"),
+    ("CNNN",                        "1-methyltriazane"),
+    ("CNNNC",                       "1,3-dimethyltriazane"),
+    ("CN=NC",                       "1,2-dimethyldiazene"),
+    ("c1ccccc1N=Nc1ccccc1",         "1,2-diphenyldiazene"),
+    ("c1ccccc1N=[N+]([O-])c1ccccc1", "diphenyldiazene oxide"),
+    ("CN=[N+]([O-])C",              "dimethyldiazene oxide"),
+])
+def test_f7_polyazane_existing_names_are_byte_identical(
+    ungated_namer, smiles, expected,
+):
+    """PROTECT rows.  `phenylhydrazine` matters most: it shows a RING substituent
+    was already cited as a prefix on the hydrazine parent, which is what makes
+    `cyclohexylhydrazine` the consistent answer rather than a new convention."""
+    assert ungated_namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles", [
+    "CNNCC", "CCNNC", "CC(C)NNC", "CNNC", "CC(C)N=NC", "CC(C)NNN",
+    # the >=3-N composer has its OWN orientation key, so it needs its own rows
+    # with two DIFFERENT substituents for the tie-break to be exercised
+    "CC(C)NNNC", "CNNNCC", "CC(C)(C)NNNC",
+])
+def test_f7_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
+    """P-14.4 (g) (BB 3307) makes the N-chain direction DETERMINISTIC.
+
+    Both `_format_n2_substituents` and `_format_substituted_polyazane` compared
+    only the locant SET; on the symmetric 2-N parent that is {1,2} either way, so
+    the direction fell through to RDKit atom order.  BB 29956
+    `1-hydroxy-3-oxopropane-1,2,3-tricarboxylic acid` (PIN) [not
+    `3-hydroxy-1-oxo...`] is the verbatim witness for the criterion.
+    """
+    from rdkit import Chem
+    assert ungated_namer.name(smiles) == ungated_namer.name(Chem.CanonSmiles(smiles))
+
+
+@pytest.mark.parametrize("smiles,why", [
+    ("OCCNN",   "heteroatom organyl: P-41 seniority keeps it closed"),
+    ("CC(C)N=[N+]([O-])C", "unsymmetric azoxy needs the NNO/ONN locant machinery"),
+])
+def test_f7_other_guards_still_fail_closed(smiles, why):
+    """TRIPWIRE.  The azoxy producer only builds the SYMMETRIC case (its `ra != rb`
+    guard); widening the organyl namer must not make it emit a locant-ambiguous
+    unsymmetric name.  The heteroatom organyl stays refused by the primitive."""
+    from orthonym.rules.polyazane import _name_azoxy
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, smiles
+    assert _name_azoxy(mol) is None, why

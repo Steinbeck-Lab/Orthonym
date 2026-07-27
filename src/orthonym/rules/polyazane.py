@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
-from .substituent_purity import pure_organyl_prefix_name
+from .substituent_purity import organyl_prefix_name
 
 # Saturated homogeneous N-chain PINs (P-21.2.2). n=2 is the retained "hydrazine".
 _SAT_MULT = {3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa'}
@@ -105,7 +105,7 @@ def _collect_substituents(mol, chain: List[int]
             bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
             if bond.GetBondType() != Chem.BondType.SINGLE:
                 return None                    # =CR2 ylidene (hydrazone) -> fail-closed
-            name = pure_organyl_prefix_name(mol, nbr.GetIdx(), idx)
+            name = organyl_prefix_name(mol, nbr.GetIdx(), idx)
             if name is None:
                 return None
             subs.append((pos, name))
@@ -120,22 +120,43 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     symmetric 2-N parent is unambiguous): ``methylhydrazine`` / ``phenylhydrazine``
     (BB PINs, P-68.3.1.2), NOT ``1-methylhydrazine``. Two or more substituents
     are located to distinguish 1,1- from 1,2- (``1,2-dimethyldiazene``)."""
+    from ..assembly.naming_utils import (enclose_if_compound,
+                                         multiplier_needs_hyphen,
+                                         prefix_citation_sort_key)
     if len(subs) == 1:
-        return subs[0][1]
-    def locants(flip):
-        return sorted((1 - p if flip else p) + 1 for p, _ in subs)
-    flip = locants(True) < locants(False)
+        return enclose_if_compound(subs[0][1])
+    # Lowest locant set, then the P-14.4 (g) tie-break (BB 3307): "lowest locants
+    # for the substituent cited first as a prefix in the name" -- BB 29956
+    # `1-hydroxy-3-oxopropane-1,2,3-tricarboxylic acid` (PIN). On the symmetric
+    # 2-N parent the set is {1,2} either way, so without the tie-break the
+    # orientation fell through to RDKit atom order.
+    def orientation_key(flip):
+        placed_ = [((1 - p if flip else p) + 1, name) for p, name in subs]
+        grouped: Dict[str, List[int]] = {}
+        for loc, name in placed_:
+            grouped.setdefault(name, []).append(loc)
+        return (sorted(loc for loc, _ in placed_),
+                [sorted(grouped[nm])
+                 for nm in sorted(grouped, key=prefix_citation_sort_key)])
+    flip = orientation_key(True) < orientation_key(False)
     placed = [((1 - p if flip else p) + 1, name) for p, name in subs]
     by_name: Dict[str, List[int]] = {}
     for loc, name in placed:
         by_name.setdefault(name, []).append(loc)
+    # P-14.5.2 citation order; P-16.3.3 marks; P-16.3.4 italicized carve-out; and
+    # a HYPHEN between segments -- the old code joined with '' and shipped
+    # `1-ethyl2-methylhydrazine` (BB 21649 `3-ethyl-2-methylhexane` (PIN)).
     parts = []
-    for name in sorted(by_name):
+    for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
         mult = _SUB_MULTIPLIER.get(len(locs), '')
-        parts.append((min(locs), f"{','.join(map(str, locs))}-{mult}{name}"))
-    parts.sort()
-    return ''.join(p[1] for p in parts)
+        marked = enclose_if_compound(name)
+        loc_str = ','.join(map(str, locs))
+        if mult and marked == name and multiplier_needs_hyphen(name):
+            parts.append(f"{loc_str}-{mult}-{marked}")
+        else:
+            parts.append(f"{loc_str}-{mult}{marked}")
+    return '-'.join(parts)
 
 
 def _format_substituted_polyazane(n: int, dbpos: int,
@@ -153,22 +174,33 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     A locant-bearing / substituted substituent name is enclosed in parentheses
     and multiplied with the SIMPLE multiplier ('di', not 'bis' — BB verbatim
     '1,3-di(naphthalen-2-yl)triaz-1-ene')."""
-    from ..assembly.naming_utils import is_complex_substituent, alpha_sort_key
+    from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
+                                         multiplier_needs_hyphen,
+                                         prefix_citation_sort_key)
 
     def _analyse(rev: bool):
         def loc(p: int) -> int:
             return (n - p) if rev else (p + 1)
         ene = None if dbpos < 0 else min(loc(dbpos), loc(dbpos + 1))
         sub_locs = sorted(loc(p) for p, _ in subs)
-        return ene, sub_locs, loc
+        # P-14.4 (g) (BB 3307) tie-break: once the 'ene' locant and the
+        # substituent locant SET have tied, the lowest locant goes to the prefix
+        # cited first alphanumerically -- otherwise the direction fell through to
+        # atom order (BB 29956 is the verbatim witness).
+        grouped: Dict[str, List[int]] = {}
+        for p, name in subs:
+            grouped.setdefault(name, []).append(loc(p))
+        tie = [sorted(grouped[nm])
+               for nm in sorted(grouped, key=prefix_citation_sort_key)]
+        return ene, sub_locs, loc, tie
 
     fwd, rev = _analyse(False), _analyse(True)
 
     def _key(d):
-        ene, sub_locs, _ = d
-        return (ene if ene is not None else 0, sub_locs)
+        ene, sub_locs, _, tie = d
+        return (ene if ene is not None else 0, sub_locs, tie)
 
-    ene, _sub_locs, loc = min((fwd, rev), key=_key)
+    ene, _sub_locs, loc, _tie = min((fwd, rev), key=_key)
 
     if dbpos < 0:
         parent = _saturated_parent(n)
@@ -188,8 +220,15 @@ def _format_substituted_polyazane(n: int, dbpos: int,
         mult = _SUB_MULTIPLIER.get(len(locs))
         if mult is None:
             return None
-        enclosed = f"({name})" if is_complex_substituent(name) else name
-        parts.append(f"{','.join(map(str, locs))}-{mult}{enclosed}")
+        # `enclose_if_compound` replaces the raw f"({name})": it ESCALATES the
+        # marks over an inner pair (P-16.5.4.1) and carries the P-16.3.4
+        # italicized carve-out, so `tert-butyl` stays bare and keeps its hyphen
+        # under a multiplier ('1,2-di-tert-butyl', never '1,2-ditert-butyl').
+        enclosed = enclose_if_compound(name)
+        if mult and enclosed == name and multiplier_needs_hyphen(name):
+            parts.append(f"{','.join(map(str, locs))}-{mult}-{enclosed}")
+        else:
+            parts.append(f"{','.join(map(str, locs))}-{mult}{enclosed}")
     from ..assembly.substituent_naming import _joined_prefix_parts
     return ''.join(_joined_prefix_parts(parts)) + parent
 
@@ -253,14 +292,17 @@ def _name_azoxy(mol) -> Optional[str]:
     if any(a.GetFormalCharge() != 0 for a in mol.GetAtoms()
            if a.GetIdx() not in (na.GetIdx(), o_minus.GetIdx())):
         return None
-    ra = pure_organyl_prefix_name(mol, c_a.GetIdx(), na.GetIdx())
-    rb = pure_organyl_prefix_name(mol, c_b.GetIdx(), nb.GetIdx())
+    ra = organyl_prefix_name(mol, c_a.GetIdx(), na.GetIdx())
+    rb = organyl_prefix_name(mol, c_b.GetIdx(), nb.GetIdx())
     if ra is None or rb is None:
         return None
     if ra != rb:
         return None                          # unsymmetric -> NNO/ONN machinery
-    from ..assembly.naming_utils import is_complex_substituent
-    enclosed = f"({ra})" if is_complex_substituent(ra) else ra
+    from ..assembly.naming_utils import (enclose_if_compound,
+                                         multiplier_needs_hyphen)
+    enclosed = enclose_if_compound(ra)
+    if enclosed == ra and multiplier_needs_hyphen(ra):
+        return f"di-{enclosed}diazene oxide"      # P-16.3.4 di-tert-butyl...
     return f"di{enclosed}diazene oxide"
 
 
@@ -295,7 +337,7 @@ def _formazan_substituent(mol, atom_idx, skeleton):
         bond = mol.GetBondBetweenAtoms(atom_idx, nb.GetIdx())
         if bond.GetBondType() != Chem.BondType.SINGLE or nb.GetSymbol() != 'C':
             return False
-        nm = pure_organyl_prefix_name(mol, nb.GetIdx(), atom_idx)
+        nm = organyl_prefix_name(mol, nb.GetIdx(), atom_idx)
         if nm is None:
             return False
         names.append(nm)
