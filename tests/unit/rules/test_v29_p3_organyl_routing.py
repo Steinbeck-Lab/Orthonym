@@ -696,3 +696,184 @@ def test_f3_pseudoketone_other_guards_still_fail_closed(smiles, why):
     another handler owns.
     """
     assert _pk(smiles) is None, why
+
+
+# ==========================================================================
+# FAMILY 4 -- assembly/substituent_naming (2 sites: ONE PREDICATE, ONE NAMING)
+#
+# `_group14_neighbour_prefix` names ONE neighbour of a Si/Ge substituent centre.
+# Its two calls are the worked example of the whole task, and they are opposite
+# kinds:
+#
+#   site 4211  PREDICATE -- gates `get_alkoxy_prefix`, a DIFFERENT producer (the
+#              contracted alkoxy builder).  Migrated to
+#              `is_simple_unbranched_organyl`, which is the same walker, so the
+#              routing is bit-for-bit unchanged.  Widening it would change which
+#              producer claims an -O-R, with no nomenclature justification.
+#   site 4220  NAMING -- the return value IS the prefix.  Widened to
+#              `organyl_prefix_name`.
+#
+# ** The refusal at 4220 did NOT fail closed. **  It handed the fragment to a
+# sibling Group-14 producer that fabricates a linear chain from the carbon
+# skeleton, so `CC(C)[Si](C)(C)CC(=O)O` shipped as
+# `(dimethylpropylsilyl)acetic acid` -- propan-2-yl spelled `propyl`, a WRONG
+# CONSTITUTION.  It was masked only by the SELF-01 OPSIN gate, which fails OPEN
+# when no JRE is present, so these assertions run ungated.  This is invariant 11
+# in its original direction: the refusal was already unmasking a worse generator.
+# ==========================================================================
+
+def _g14_frag(smiles):
+    """``(mol, si_idx, parent_c_idx, frag_set)`` for ``R[Si](A)(B)-CH2-COOH``."""
+    from orthonym.assembly.substituent_naming import _collect_branch_atoms
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, smiles
+    patt = Chem.MolFromSmarts('[Si,Ge]-[CH2]-C(=O)-[OX2H1]')
+    match = mol.GetSubstructMatch(patt)
+    assert match, f"{smiles} must be an R3Si-CH2-COOH witness"
+    si, parent_c = match[0], match[1]
+    return mol, si, parent_c, set(_collect_branch_atoms(mol, si, parent_c))
+
+
+def _g14_name(smiles):
+    from orthonym.assembly.substituent_naming import _name_group14_substituent
+    mol, si, parent_c, frag = _g14_frag(smiles)
+    return _name_group14_substituent(mol, sorted(frag), si)
+
+
+# --- site 4220: NAMING ----------------------------------------------------
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("CC(C)[Si](C)(C)CC(=O)O",     "dimethyl(propan-2-yl)silyl"),
+    ("CC(C)[Si](C(C)C)(C)CC(=O)O", "methylbis(propan-2-yl)silyl"),
+])
+def test_f4_group14_naming_site_replaces_a_fabricated_chain(smiles, expected):
+    """The producer now NAMES the branched organyl instead of declining it."""
+    assert _g14_name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,wrong,right", [
+    ("CC(C)[Si](C)(C)CC(=O)O",     "(dimethylpropylsilyl)acetic acid",
+                                   "[dimethyl(propan-2-yl)silyl]acetic acid"),
+    ("CC(C)[Si](C(C)C)(C)CC(=O)O", "(methyldipropylsilyl)acetic acid",
+                                   "[methylbis(propan-2-yl)silyl]acetic acid"),
+    ("CC(C)[Si](C)(C)CCO",         "2-(dimethylpropylsilyl)ethan-1-ol",
+                                   "2-[dimethyl(propan-2-yl)silyl]ethan-1-ol"),
+])
+def test_f4_wrong_constitution_no_longer_ships(ungated_namer, smiles, wrong, right):
+    """A WRONG CONSTITUTION is replaced by the correct name, asserted UNGATED.
+
+    `propan-2-yl` was spelled `propyl` -- a different compound.  Both new names
+    are OPSIN-exact against the input structure.  The gate is disabled because it
+    fails open with no JRE, which is exactly how the wrong string was reachable.
+    """
+    name = ungated_namer.name(smiles)
+    assert name == right
+    assert name != wrong
+    assert "propylsilyl" not in name, name
+
+
+@pytest.mark.parametrize("smiles,before,after", [
+    ("Cc1ccc(C[Si](C)(C)CC(=O)O)cc1",
+     "{[(4-methylphenyl)methyl]di(methyl)silyl}acetic acid",
+     "{dimethyl[(4-methylphenyl)methyl]silyl}acetic acid"),
+    ("Cc1ccccc1[Si](C)(C)CC(=O)O",
+     "[(2-methylphenyl)di(methyl)silyl]acetic acid",
+     "[dimethyl(2-methylphenyl)silyl]acetic acid"),
+])
+def test_f4_prefix_citation_order_follows_p1452(ungated_namer, smiles, before, after):
+    """Two names are RE-ORDERED, from non-preferred to preferred.
+
+    P-14.5.2 orders prefixes alphanumerically, so `methyl` is cited before
+    `methylphenyl` (a shorter name that is a prefix of a longer one comes first).
+    BB 3545/28174 shows the comparison running over the full prefix string
+    INCLUDING its marks, with a letter preferred to an open parenthesis:
+    `3-[amino(methyl)silyl]-3-[(aminomethyl)silyl]cyclopentan-1-ol` (PIN) {not the
+    reverse; ... at the fourth character of the name, the letter 'a' is preferred
+    to an open parenthesis}.  Both spellings denote the same structure and both
+    round-trip; only the citation order moves.
+    """
+    name = ungated_namer.name(smiles)
+    assert name == after
+    assert name != before
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[Si](C)(C)CC(=O)O",          "trimethylsilyl"),
+    ("Cl[Si](C)(C)CC(=O)O",         "chlorodimethylsilyl"),
+    ("O[Si](C)(C)CC(=O)O",          "hydroxydimethylsilyl"),
+    ("N[Si](C)(C)CC(=O)O",          "aminodimethylsilyl"),
+    ("CCO[Si](OCC)(OCC)CC(=O)O",    "triethoxysilyl"),
+    ("C[Ge](C)(C)CC(=O)O",          "trimethylgermyl"),
+    ("CC(C)(C)[Si](C)(C)CC(=O)O",   "tert-butyldimethylsilyl"),
+    ("C1CCCCC1[Si](C)(C)CC(=O)O",   "cyclohexyldimethylsilyl"),
+    ("C=C[Si](C)(C)CC(=O)O",        "ethenyldimethylsilyl"),
+    ("c1ccccc1[Si](C)(C)CC(=O)O",   "dimethylphenylsilyl"),
+    ("CCCCCCCCCCCC[Si](C)(C)CC(=O)O", "dodecyldimethylsilyl"),
+])
+def test_f4_group14_existing_prefixes_are_byte_identical(smiles, expected):
+    """PROTECT rows.
+
+    `tert-butyldimethylsilyl` is the one that pins the ORDER primitive: raw
+    `sorted()` keys `tert-butyl` on its 't' and would emit
+    `dimethyltert-butylsilyl`.  `chlorodimethylsilyl` and `hydroxydimethylsilyl`
+    pin that the P-16.5.1.3.1 leg was deliberately NOT applied here -- this
+    producer competes with a sibling that emits the bare form for that shape.
+    """
+    assert _g14_name(smiles) == expected
+
+
+# --- site 4211: ROUTING PREDICATE ----------------------------------------
+
+def _o_neighbour_prefix(smiles):
+    """Run `_group14_neighbour_prefix` on the alkoxy OXYGEN of the Si centre."""
+    from orthonym.assembly.substituent_naming import _group14_neighbour_prefix
+    mol, si, parent_c, frag = _g14_frag(smiles)
+    os_ = [n.GetIdx() for n in mol.GetAtomWithIdx(si).GetNeighbors()
+           if n.GetSymbol() == 'O' and n.GetIdx() in frag]
+    assert len(os_) == 1, smiles
+    return _group14_neighbour_prefix(mol, os_[0], si, frag)
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("CO[Si](C)(C)CC(=O)O",   "methoxy"),
+    ("CCO[Si](C)(C)CC(=O)O",  "ethoxy"),
+    ("CCCO[Si](C)(C)CC(=O)O", "propoxy"),
+    # phenyl/naphthyl ARE in the narrow class, so phenoxy was always admitted
+    # here; it is a protect row, not a widening.
+    ("c1ccccc1O[Si](C)(C)CC(=O)O", "phenoxy"),
+])
+def test_f4_predicate_still_admits_the_simple_alkoxy(smiles, expected):
+    """The contracted alkoxy producer keeps the cases it already handled
+    (P-68.2.6.2, BB 38245 `-Ge(OEt)3` -> `triethoxygermyl`)."""
+    assert _o_neighbour_prefix(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,why", [
+    ("CC(C)O[Si](C)(C)CC(=O)O",      "branched R -- internal attachment"),
+    ("CC(C)(C)O[Si](C)(C)CC(=O)O",   "branched R -- tert-butoxy"),
+    ("C1CCCCC1O[Si](C)(C)CC(=O)O",   "ring-bearing R"),
+    ("C=CO[Si](C)(C)CC(=O)O",        "unsaturated R"),
+])
+def test_f4_predicate_did_not_silently_widen(smiles, why):
+    """THE tripwire for the PREDICATE site (4211).
+
+    A ring-bearing, branched or unsaturated -O-R must still NOT take the
+    contracted-alkoxy path.  `is_simple_unbranched_organyl` is the same walker
+    the deprecated namer used, so this routing decision is bit-for-bit what it
+    was; if the site were widened to `organyl_prefix_name` these would start
+    returning an alkoxy prefix and a different producer would claim the molecule
+    -- a behaviour change with no nomenclature justification.
+    """
+    assert _o_neighbour_prefix(smiles) is None, why
+
+
+@pytest.mark.parametrize("smiles", [
+    "CC(C)O[Si](C)(C)CC(=O)O",
+    "C1CCCCC1O[Si](C)(C)CC(=O)O",
+    "C=CO[Si](C)(C)CC(=O)O",
+])
+def test_f4_predicate_refusal_leaves_the_whole_group14_namer_closed(smiles):
+    """The predicate's `None` propagates: `_group14_neighbour_prefix` returns None
+    for that neighbour, so `_name_group14_substituent` declines the fragment and
+    the cascade continues, exactly as before the migration."""
+    assert _g14_name(smiles) is None

@@ -4206,18 +4206,30 @@ def _group14_neighbour_prefix(mol, idx, exclude_idx, frag_set) -> Optional[str]:
             and any(nb.GetIdx() == exclude_idx for nb in heavy_in_frag)):
         others = [nb for nb in heavy_in_frag if nb.GetIdx() != exclude_idx]
         if len(others) == 1 and others[0].GetSymbol() == 'C':
-            from ..rules.substituent_purity import pure_organyl_prefix_name
+            # ROUTING PREDICATE, not a namer: the answer selects a DIFFERENT
+            # producer (`get_alkoxy_prefix`, the contracted alkoxy builder), whose
+            # behaviour on ring-bearing / branched / unsaturated R is not
+            # established. Widening this test would change which producer claims a
+            # molecule rather than turn a refusal into an emission, so it keeps the
+            # narrow semantics under the explicitly narrow name (v29 P3).
+            from ..rules.substituent_purity import is_simple_unbranched_organyl
             r_c = others[0].GetIdx()
-            if pure_organyl_prefix_name(mol, r_c, idx) is not None:
+            if is_simple_unbranched_organyl(mol, r_c, idx):
                 from .substituent_prefix_forms import get_alkoxy_prefix
                 alk = get_alkoxy_prefix(mol, (idx, exclude_idx, r_c),
                                         principal_chain=[exclude_idx])
                 if alk is not None:
                     return alk
         return None
-    # Pure unbranched-alkyl / phenyl-naphthyl organyl (reuse the Phase-7 guard).
-    from ..rules.substituent_purity import pure_organyl_prefix_name
-    return pure_organyl_prefix_name(mol, idx, exclude_idx)
+    # The organyl neighbour, NAMED (this string is the returned prefix). v29 P3:
+    # routed to the shared chokepoint, so a ring-bearing, branched, unsaturated or
+    # long organyl on the Group-14 centre is named instead of refused. The refusal
+    # here did NOT fail closed -- it handed the fragment to a sibling producer that
+    # fabricated a linear chain, shipping `(dimethylpropylsilyl)acetic acid` for
+    # the propan-2-yl compound (a WRONG CONSTITUTION, masked only by the SELF-01
+    # OPSIN gate, which fails OPEN with no JRE).
+    from ..rules.substituent_purity import organyl_prefix_name
+    return organyl_prefix_name(mol, idx, exclude_idx)
 
 
 def _name_group14_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
@@ -4257,7 +4269,53 @@ def _name_group14_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
         prefixes.append(p)
     if not prefixes:
         return stem  # bare -SiH3 -> 'silyl'
-    return _compose_n_substituent_prefix(prefixes) + stem
+    return _compose_group14_prefixes(prefixes) + stem
+
+
+def _compose_group14_prefixes(prefixes: List[str]) -> str:
+    """Compose the prefix block of a Group-14 substituent centre.
+
+    Split out of ``_compose_n_substituent_prefix`` (which stays with its ONE
+    remaining caller, the onium cation-prefix path) because v29 P3 widened the
+    organyl guard feeding it: a prefix here may now carry locants
+    (``propan-2-yl``), a retained italicized prefix (``tert-butyl``) or its own
+    enclosing marks (``(4-methylphenyl)methyl``), none of which the shared
+    N-substituent composer handled.
+
+    Two shared primitives replace raw string work, and BOTH are no-ops on the
+    letters-only class the retired narrow walker could return -- which is what
+    keeps every previously-emitted Group-14 prefix byte-identical:
+
+    * ``prefix_citation_sort_key`` -- P-14.5.2/P-14.5.4 citation order. Raw
+      ``sorted()`` ordered ``tert-butyl`` on its 't' and would have emitted
+      ``dimethyltert-butylsilyl`` for the compound that is spelled
+      ``tert-butyldimethylsilyl``.
+    * ``enclose_if_compound`` -- P-16.3.3 marks for a compound prefix, so
+      ``propan-2-yl`` is cited ``(propan-2-yl)`` and cannot run into the
+      neighbouring token.
+
+    NOT applied here: the P-16.5.1.3.1 (BB 7272) "second and further substituents
+    are each enclosed even for simple substituents" leg, which would respell
+    ``chlorodimethylsilyl`` as ``chlorodi(methyl)silyl``. This producer competes
+    with a sibling Group-14 producer that emits the BARE form for that shape, so
+    applying the rule on one side only would make the two disagree; the gap is
+    pre-existing, shared with the sibling, and out of this task's scope.
+    """
+    from collections import Counter
+
+    from .naming_utils import (enclose_if_compound, get_multiplier_prefix,
+                               is_complex_substituent, prefix_citation_sort_key)
+
+    counts = Counter(prefixes)
+    parts = []
+    for name in sorted(counts.keys(), key=prefix_citation_sort_key):
+        count = counts[name]
+        mult = get_multiplier_prefix(count, name)
+        if is_complex_substituent(name) and count > 1:
+            parts.append(f"{mult}({name})")
+        else:
+            parts.append(f"{mult}{enclose_if_compound(name)}")
+    return ''.join(parts)
 
 
 def _compose_n_substituent_prefix(sub_prefixes: List[str]) -> str:
