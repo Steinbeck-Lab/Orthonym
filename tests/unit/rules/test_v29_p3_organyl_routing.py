@@ -1535,3 +1535,46 @@ def test_f8_other_guards_still_fail_closed(smiles, why):
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None, smiles
     assert name_mononuclear_hydride(mol) is None, why
+
+
+# ==========================================================================
+# The deprecated narrow namer is GONE (all 23 call sites migrated)
+# ==========================================================================
+
+def test_the_deprecated_narrow_namer_no_longer_exists():
+    """Structural tripwire: `pure_organyl_prefix_name` must stay deleted.
+
+    It was a shim carrying the narrow walker while the families migrated. With
+    all 23 call sites moved to `organyl_prefix_name` (naming) or
+    `is_simple_unbranched_organyl` (routing) it has no consumer, and a
+    zero-caller deprecated shim is exactly how a later session acquires new
+    call sites. `_narrow_walk_name` stays private and backs only the predicate.
+    """
+    import orthonym.rules.substituent_purity as sp
+    assert not hasattr(sp, "pure_organyl_prefix_name")
+    assert "pure_organyl_prefix_name" not in sp.__all__
+    assert sp.__all__ == ["organyl_prefix_name", "is_simple_unbranched_organyl"]
+    # the predicate's backing walker must still be there
+    assert callable(sp._narrow_walk_name)
+
+
+def test_no_source_file_calls_the_deprecated_narrow_namer():
+    """No CALL to the retired name anywhere under src/ (prose may mention it)."""
+    import re
+    from pathlib import Path
+    import orthonym
+    root = Path(orthonym.__file__).parent
+    offenders = []
+    for py in root.rglob("*.py"):
+        for lineno, line in enumerate(py.read_text().splitlines(), 1):
+            stripped = line.lstrip()
+            if stripped.startswith("#"):
+                continue
+            if re.search(r'\bpure_organyl_prefix_name\s*\(', line) or \
+                    re.search(r'import\s+pure_organyl_prefix_name', line):
+                offenders.append(f"{py.relative_to(root)}:{lineno}: {stripped}")
+    assert not offenders, (
+        "the retired narrow namer is referenced again; use "
+        "organyl_prefix_name (naming) or is_simple_unbranched_organyl "
+        "(routing):\n" + "\n".join(offenders)
+    )

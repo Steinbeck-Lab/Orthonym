@@ -22,6 +22,12 @@ Two functions, deliberately not interchangeable:
     *which producer* handles a fragment rather than to name it: widening a
     routing test silently changes which handler claims a molecule.
 
+There is deliberately no third, deprecated entry point.  ``pure_organyl_prefix_name``
+existed only as a shim while the nine families migrated (v29 Phase 3); all 23 of
+its call sites now use one of the two functions above, so it was deleted rather
+than left with zero callers -- a zero-caller shim is how the next session acquires
+new ones.  ``_narrow_walk_name`` stays private and backs only the predicate.
+
 What this module used to be, and why it changed
 -----------------------------------------------
 It used to wrap ``rules.phosphorus._characterize_substituent``, which follows
@@ -225,15 +231,7 @@ def is_simple_unbranched_organyl(mol, start_idx: int, exclude_idx: int) -> bool:
     return _narrow_walk_name(mol, start_idx, exclude_idx) is not None
 
 
-def pure_organyl_prefix_name(mol, start_idx: int, exclude_idx: int) -> Optional[str]:
-    """DEPRECATED — the narrow walker, retained while the remaining families
-    migrate to :func:`organyl_prefix_name`.  Do not add new call sites.
-    """
-    return _narrow_walk_name(mol, start_idx, exclude_idx)
-
-
 __all__ = [
     "organyl_prefix_name",
     "is_simple_unbranched_organyl",
-    "pure_organyl_prefix_name",
 ]
