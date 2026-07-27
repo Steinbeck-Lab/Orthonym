@@ -14,7 +14,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
@@ -237,12 +237,132 @@ _ALPHA_BETA_DESCRIPTOR_RE = re.compile(r"\d+(?:alpha|beta|xi)\b")
 # nucleotide stems come from `## **P-106.1** RETAINED NAMES` (:55003).  BB's own
 # examples are descriptor-free, e.g. `uridine 5'-(tetrahydrogen triphosphate)`
 # (:55029) and `2',3',5'-tri-O-acetyladenosine` (:54981).
-_IMPLIED_STEREO_NUCLEOSIDE_STEMS = (
-    'adenosine', 'guanosine', 'inosine', 'xanthosine', 'cytidine',
-    'thymidine', 'uridine',
-    'adenylic', 'guanylic', 'inosinic', 'xanthylic', 'cytidylic',
-    'thymidylic', 'uridylic',
-)
+#
+# v29 P3-FINAL I10: DERIVED from the producer table, not copied from it.  The
+# nucleoside half was a hand-written duplicate of `rules/nucleosides.py`'s
+# `_NUCLEOSIDE_STEM` values, so the two could drift, and the docstring below
+# asserted they could not.  Deriving it also removes the surface a mutation used:
+# appending `'itol'`/`'neuraminic'` to a literal tuple silenced `xylitol` and the
+# neuraminic acids -- the exact three names this predicate must leave VISIBLE --
+# and survived all 92 tests.  There is no longer a literal tuple to append to.
+def _nucleoside_stems() -> Tuple[str, ...]:
+    """Retained nucleoside stems (P-105.1) + nucleotide stems (P-106.1)."""
+    stems = set()
+    try:
+        from .rules.nucleosides import _NUCLEOSIDE_STEM
+        for value in _NUCLEOSIDE_STEM.values():
+            if isinstance(value, str) and value:
+                # `2'-deoxyadenosine` contributes the bare `adenosine` too, so a
+                # derivative of either spelling is covered.
+                stems.add(value.lower())
+                stems.add(value.lower().split('-')[-1])
+    except Exception:  # pragma: no cover - table is always importable in-tree
+        pass
+    # `## **P-106.1** RETAINED NAMES` (:55003) -- the nucleotide `-ylic acid`
+    # stems, which have no constructor table of their own in this repo.  Kept
+    # explicit and separately cited rather than folded into the derived set.
+    # `thymidine` is retained by `## **P-105.1** RETAINED NAMES OF NUCLEOSIDES`
+    # (:54943) but is not reachable through `_NUCLEOSIDE_STEM`, which maps
+    # (uracil, deoxy) to `2'-deoxyuridine`; kept so the exemption covers what the
+    # Blue Book retains rather than only what today's constructor emits.
+    stems.update({
+        'thymidine',
+        'adenylic', 'guanylic', 'inosinic', 'xanthylic', 'cytidylic',
+        'thymidylic', 'uridylic',
+    })
+    return tuple(sorted(s for s in stems if len(s) > 5))
+
+
+_IMPLIED_STEREO_NUCLEOSIDE_STEMS: Tuple[str, ...] = _nucleoside_stems()
+
+# The stem must end at a word boundary, so an acyl/alkyl PREFIX is still covered
+# (`5'-O-(2-methylbutanoyl)adenosine`, `2',3',5'-tri-O-acetyladenosine` -- both
+# verbatim-BB shapes) while an unrelated longer word is not silently swallowed.
+_NUCLEOSIDE_STEM_RE = re.compile(
+    "(?:%s)\\b" % "|".join(re.escape(s) for s in _IMPLIED_STEREO_NUCLEOSIDE_STEMS)
+) if _IMPLIED_STEREO_NUCLEOSIDE_STEMS else None
+
+
+def _steroid_stereoparent_stems() -> frozenset:
+    """Stems of the stereoparents that imply an alpha/beta skeleton.
+
+    Derived from the same three natural-product tables the Family-5 leg keys off,
+    so the alpha/beta leg is anchored to a PARENT rather than firing on any name
+    that merely contains `3beta`.
+    """
+    stems = set()
+    try:
+        from .data.natural_products import (
+            NAME_EXACT_NP_PARENTS, NATURAL_PRODUCT_DERIVATIVES,
+            NATURAL_PRODUCT_SCAFFOLDS,
+        )
+        names = set(NAME_EXACT_NP_PARENTS)
+        names |= {v for v in NATURAL_PRODUCT_DERIVATIVES.values()
+                  if isinstance(v, str)}
+        names |= {e['name'] for e in NATURAL_PRODUCT_SCAFFOLDS.values()
+                  if isinstance(e, dict) and isinstance(e.get('name'), str)}
+    except Exception:  # pragma: no cover
+        return frozenset()
+    for raw in names:
+        low = raw.lower()
+        stems.add(low)
+        for suf in ('anediol', 'enediol', 'anediyl', 'anol', 'enol', 'anone',
+                    'enone', 'ane', 'ene', 'one', 'ol', 'ine', 'an', 'en'):
+            if low.endswith(suf) and len(low) - len(suf) >= 4:
+                stems.add(low[:-len(suf)])
+    return frozenset(s for s in stems if len(s) >= 4)
+
+
+_STEROID_STEREOPARENT_STEMS: frozenset = _steroid_stereoparent_stems()
+
+# A SHORT stem must start at a token boundary; a long one need not.
+#
+# Neither rule alone works, and both failure modes were measured:
+#
+#   * a plain substring test is too loose -- `tropane` contributes the
+#     4-character stem `trop`, which matches inside
+#     `1,6-anhydro-beta-D-al-trop-yranose`, a carbohydrate with no steroid in it
+#     (the single spurious hit across 1963 gold + pack + table names);
+#   * requiring a boundary for EVERY stem is too strict -- substitutive names
+#     concatenate the prefix straight onto the stem, so `androst` in
+#     `17beta-hydroxy-androst-4-en-3-one` (spelled `hydroxyandrost...`) is
+#     preceded by a letter and would be missed.  An existing test caught this.
+#
+# Six characters is the cut: at that length an accidental interior match is not
+# observed anywhere in the corpus, while every genuine sterane/terpenoid stem
+# that appears mid-word (`androst`, `cholest`, `pregnan`, `cholan`) is longer.
+_LONG_STEROID_STEMS = sorted(
+    (s for s in _STEROID_STEREOPARENT_STEMS if len(s) >= 6), key=len, reverse=True)
+_SHORT_STEROID_STEMS = sorted(
+    (s for s in _STEROID_STEREOPARENT_STEMS if len(s) < 6), key=len, reverse=True)
+
+
+def _compile_alt(stems, prefix=""):
+    if not stems:
+        return None
+    return re.compile(prefix + "(?:%s)" % "|".join(re.escape(s) for s in stems))
+
+
+_STEROID_STEM_LONG_RE = _compile_alt(_LONG_STEROID_STEMS)
+_STEROID_STEM_SHORT_RE = _compile_alt(_SHORT_STEROID_STEMS, r"(?<![a-z])")
+
+
+def _has_steroid_stereoparent_stem(low: str) -> bool:
+    if _STEROID_STEM_LONG_RE is not None and _STEROID_STEM_LONG_RE.search(low):
+        return True
+    return (_STEROID_STEM_SHORT_RE is not None
+            and _STEROID_STEM_SHORT_RE.search(low))
+
+# `### **P-107.4.3.1**` (:55227) retains `sphinganine` "*for the aliphatic amino
+# alcohol HAVING THE DESCRIBED ABSOLUTE CONFIGURATION*", and (:55231) gives
+# `(4E)-sphing-4-enine` under `### **P-107.4.3** Glycosphingolipids`.
+#
+# v29 P3-FINAL I10: this was a SIX-CHARACTER substring test, `'sphing' in name`,
+# whose first clause (`'sphinganine' in name`) was dead by subsumption.  It
+# matched anything containing `sphing`, and a mutation to `'sph'` -- which
+# matches every `phosph...` name in the corpus -- survived all 92 tests.  Now an
+# anchored match against the two retained spellings the Blue Book names.
+_SPHINGOID_RETAINED_RE = re.compile(r"\bsphing(?:anine|-?\d*-?enine)\b")
 
 
 def _stereo_is_implied_by_name(name: str) -> bool:
@@ -250,17 +370,49 @@ def _stereo_is_implied_by_name(name: str) -> bool:
     R/S + E/Z counter cannot see?
 
     Diagnostic predicate only — it suppresses a false-positive WARNING and never
-    changes an emitted name.  Each leg is keyed off the SAME table that produced
-    the name, so it cannot drift from the producers.
+    changes an emitted name.
+
+    Every leg is anchored to a table that PRODUCES these names, so it cannot
+    drift from the producers.  v29 P3-FINAL corrected this sentence, which was
+    FALSE for three of the five legs when written: the steroid leg was a bare
+    `\\d+(?:alpha|beta|xi)` regex with no parent requirement, the nucleoside leg
+    was an unbounded substring scan over a hand-copied duplicate of
+    `rules/nucleosides.py`'s table, and the sphingoid leg was the six-character
+    `'sphing' in name`.  A false in-code assertion is the class this range was
+    written to delete, so it is repaired rather than trimmed.
+
+    It also cannot see COMPLETENESS, and the citation it rests on says
+    completeness is required.  `### **P-101.2.6**` (:51045) in full: the name of a
+    fundamental parent structure "*implies the absolute configuration of all
+    chirality centers **and the configuration of double bonds, when applicable**,
+    without further specification.  **All chirality must be defined**...*"  The
+    ellipsis in the previous version of this comment removed both the double-bond
+    clause and the completeness obligation.  A partially-described name in an
+    exempted family would therefore be silenced; no producer reachable today
+    emits one (~20 in-family constructions with an extra undescribed element all
+    fail closed or fall back to a fully systematic name), but nothing structurally
+    prevents it.  The primitive that could check --
+    `stereochemistry.count_expressed_stereo_descriptors` -- counts only
+    parenthesised R/S/E/Z tokens and so returns 0 for `5alpha-cholestan-3beta-ol`,
+    `myo-inositol` and `adenosine`, i.e. it cannot read the alpha/beta or
+    implied-parent channels at all.  Closing this needs a family-implied-count
+    oracle (implied + expressed == defined), not that primitive.
     """
     if not name:
         return False
+
+    _low = name.lower()
 
     # Family 4 — steroid/terpenoid alpha/beta: the name DOES carry descriptors
     # (`cholest-5-en-3beta-yl hydrogen sulfate`, `5alpha-cholestan-3beta-ol`).
     # Produced by `rules.steroid_stereo.collect_steroid_alpha_beta`, whose own
     # module docstring cites P-101.2.6.
-    if _ALPHA_BETA_DESCRIPTOR_RE.search(name):
+    #
+    # BOTH conditions are required.  The locanted descriptor alone exempted any
+    # name containing `3beta`, with no steroid parent anywhere in it; anchoring it
+    # to a stereoparent stem is what makes the leg keyed off the producer.
+    if (_ALPHA_BETA_DESCRIPTOR_RE.search(name)
+            and _has_steroid_stereoparent_stem(_low)):
         return True
 
     # Family 1 — inositols.  `## **P-104.1** DEFINITIONS` (:54821): "*Inositols
@@ -278,19 +430,35 @@ def _stereo_is_implied_by_name(name: str) -> bool:
         pass
 
     # Family 3 — retained nucleosides/nucleotides and their derivatives.
-    _low = name.lower()
-    if any(stem in _low for stem in _IMPLIED_STEREO_NUCLEOSIDE_STEMS):
+    # Anchored: the stem must END at a word boundary, so `2',3',5'-tri-O-
+    # acetyladenosine` (BB :54981) still matches while an unrelated longer word
+    # cannot be swallowed whole.
+    if _NUCLEOSIDE_STEM_RE is not None and _NUCLEOSIDE_STEM_RE.search(_low):
         return True
 
     # Family 5 — stereoparent hydrides.  `**P-101.2.1.3**` (:50991) defines a
     # stereoparent as a parent that "*should include as much configuration as
-    # possible*"; `### **P-101.2.6**` (:51047): "*The name of a fundamental
-    # parent structure usually implies the absolute configuration of all
-    # chirality centers ... without further specification*"; and
-    # `### **P-101.3.6**` (:52106): "*Stereochemistry implied by the name of the
-    # stereoparent structure remains the same, unless otherwise specified.*"
-    # Membership is `**P-101.2.7**` Table 10.1 (:51377).  Keyed off the two
-    # tables that emit these names, so no new hardcoded list.
+    # possible*"; `### **P-101.2.6**` (:51045) is the governing sentence: "*The
+    # name of a fundamental parent structure usually implies the absolute
+    # configuration of all chirality centers **and the configuration of double
+    # bonds, when applicable**, without further specification.  **All chirality
+    # must be defined**...*"
+    #
+    # v29 P3-FINAL: a third citation, `### **P-101.3.6**` (:52106,
+    # "*Stereochemistry implied by the name of the stereoparent structure remains
+    # the same, unless otherwise specified*"), is REMOVED as out of scope.  The
+    # sentence is verbatim, but its section heading is "*Removal of a terminal
+    # ring.*" and the same paragraph ends "*This use of 'des' is restricted to
+    # steroids*" -- it governs `des`-prefixed steroid names, not stereoparent
+    # implication in general.  P-101.2.6 already carries the point.
+    #
+    # Membership is `**P-101.2.7**` Table 10.1 (:51377), approached through the
+    # THREE tables that emit these names (see the note below), so no new
+    # hardcoded list.  NB `NATURAL_PRODUCT_DERIVATIVES` is WIDER than Table 10.1
+    # -- it carries derivative and trivial names that are not fundamental parent
+    # hydrides -- so this leg is broader than P-101.2.7 alone would license.
+    # Recorded rather than narrowed: it is diagnostic-only, and narrowing it
+    # would restore warnings on names that do carry implied configuration.
     try:
         from .data.natural_products import (
             NAME_EXACT_NP_PARENTS, NATURAL_PRODUCT_DERIVATIVES,
@@ -312,10 +480,11 @@ def _stereo_is_implied_by_name(name: str) -> bool:
     except Exception:
         pass
 
-    # `**P-107.4.3.1**` (:55227): "*the retained name 'sphinganine' for the
+    # `### **P-107.4.3.1**` (:55227): "*the retained name 'sphinganine' for the
     # aliphatic amino alcohol HAVING THE DESCRIBED ABSOLUTE CONFIGURATION ...
-    # is preferred to the systematic name (2S,3R)-2-aminooctadecane-1,3-diol*".
-    if 'sphinganine' in _low or 'sphing' in _low:
+    # is preferred to the systematic name (2S,3R)-2-aminooctadecane-1,3-diol*",
+    # and (:55231) `(4E)-sphing-4-enine`.
+    if _SPHINGOID_RETAINED_RE.search(_low):
         return True
 
     return False

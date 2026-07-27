@@ -166,9 +166,132 @@ def test_alpha_beta_needs_a_locant_to_count_as_a_descriptor():
     `beta-D-glucopyranose` is already handled upstream by the anomeric pattern
     in `needs_stereo_injection`; a stray 'alpha'/'beta' inside an ordinary word
     must not buy an exemption.
+
+    ⚠ v29 P3-FINAL: `betaine` and `alphaprodine` do NOT pin what this test's name
+    claims.  Both are rejected by the trailing `\\b`, not by the `\\d+`, so
+    mutating `\\d+(?:alpha|beta|xi)\\b` to `(?:alpha|beta|xi)\\b` left all 92
+    tests green.  `N-acetylalpha-neuraminic acid` -- a name the build really
+    emits -- is the row that pins the locant, because `alpha` there IS followed by
+    a word boundary.
     """
     assert _stereo_is_implied_by_name("betaine") is False
     assert _stereo_is_implied_by_name("alphaprodine") is False
+    # M1 KILLER: locant-free `alpha` at a word boundary, in a live emission.
+    assert _stereo_is_implied_by_name("N-acetylalpha-neuraminic acid") is False, (
+        "a locant-free 'alpha' must not buy an exemption; without this row the "
+        "\\d+ in the descriptor regex is unpinned"
+    )
+
+
+# ---------------------------------------------------------------------------
+# v29 P3-FINAL I11 — the three kept-VISIBLE names, and one anchor row per leg.
+#
+# Three over-broadening mutations previously survived all 92 tests of this file:
+#
+#   M1  `\d+(?:alpha|beta|xi)\b` -> `(?:alpha|beta|xi)\b`      92 passed
+#   M2  `'sphing' in name`       -> `'sph' in name`            92 passed
+#   M5  append `'itol','neuraminic'` to the nucleoside stems   92 passed
+#
+# M5 silenced verbatim the three names the change designates must stay VISIBLE,
+# and none of the three appeared anywhere in the file.  They do now.
+# ---------------------------------------------------------------------------
+
+KEPT_VISIBLE = [
+    # `xylitol` -- the project's own `data/sugar_names.py` comment cites the
+    # governing rule, so "no Blue Book text found" was wrong; either way the name
+    # carries no configurational descriptor and must keep warning.
+    "xylitol",
+    # `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'` (:54291) requires the
+    # alpha-carbon configuration to be designated on a free amino acid, and the
+    # neuraminic acids are not peptides, so P-103.3.4's omission licence
+    # (:54715) does not reach them.
+    "N-acetylneuraminic acid",
+    "N-glycolylneuraminic acid",
+]
+
+
+@pytest.mark.parametrize("name", KEPT_VISIBLE)
+def test_the_kept_visible_names_are_never_exempted(name):
+    """M5 KILLER.  These three are the names the change says must stay visible."""
+    assert _stereo_is_implied_by_name(name) is False, (
+        f"{name!r} must keep warning; exempting it silences a real gap and is "
+        f"exactly what an over-broad stem list does"
+    )
+
+
+def test_the_sphingoid_leg_is_anchored_to_the_retained_name():
+    """M2 KILLER: a `sph`-containing non-sphingoid must not be exempted.
+
+    Every `phosph...` name in the corpus contains `sph`, so the mutation from
+    `'sphing'` to `'sph'` is not academic -- it exempts a whole live class.
+    """
+    for n in ("2-aminoethylphosphonic acid", "triphosphane",
+              "phosphanyl", "phosphonooxyacetic acid"):
+        assert _stereo_is_implied_by_name(n) is False, n
+    # ...while the two spellings the Blue Book retains still are.
+    assert _stereo_is_implied_by_name("sphinganine") is True
+    assert _stereo_is_implied_by_name("(4E)-sphing-4-enine") is True
+    # ...and a sphingoid-ADJACENT non-Blue-Book name is not (P-107.4.3.1 names
+    # `sphinganine`; `sphingosine` is "not a Blue Book name" per the project's
+    # own `data/natural_products.py` comment).
+    assert _stereo_is_implied_by_name("sphingomyelin") is False
+
+
+def test_the_steroid_leg_requires_a_stereoparent_not_just_a_descriptor():
+    """The alpha/beta leg must be anchored to a PARENT.
+
+    Before this, any name containing `3beta` was exempted with no steroid
+    anywhere in it.
+    """
+    assert _stereo_is_implied_by_name("3beta-hydroxyoctadecanoic acid") is False
+    # ...while the real steroid derivatives stay exempt.
+    for n in ("5alpha-cholestan-3beta-ol",
+              "cholest-5-en-3beta-yl 2-hydroxypropanoate"):
+        assert _stereo_is_implied_by_name(n) is True, n
+    # M1 KILLER on the steroid leg.  `**P-101.2.6**` gives the descriptor form
+    # WITH a locant (`3beta`, `5alpha`); an unlocanted `beta-` designates no
+    # centre, so a steroid carrying one is not self-describing and must keep
+    # warning.  Under the locant-free mutation this is exempted.
+    assert _stereo_is_implied_by_name("beta-cholestan-3-ol") is False, (
+        "an unlocanted 'beta-' is not the P-101.2.6 descriptor form even on a "
+        "genuine steroid stem"
+    )
+
+
+def test_the_steroid_stem_must_start_at_a_token_boundary():
+    """A plain substring test on 4-character stems is too loose.
+
+    `tropane` contributes the stem `trop`, which occurs inside
+    `1,6-anhydro-beta-D-altropyranose` -- a carbohydrate, measured as the single
+    spurious hit across 1963 gold + pack + table names.
+    """
+    assert _stereo_is_implied_by_name("1,6-anhydro-beta-D-altropyranose") is False
+    # ...and the genuine tropane stem still matches at a boundary.
+    assert _stereo_is_implied_by_name("tropan-3beta-ol") is True
+
+
+def test_the_nucleoside_leg_is_derived_from_the_producer_table():
+    """I10: the stems must come FROM `rules/nucleosides.py`, not a copy of it.
+
+    A hand-written duplicate is what let a mutation append two unrelated stems.
+    Deriving it means there is no literal tuple to append to, and a drift between
+    the two tables becomes impossible rather than merely unlikely.
+    """
+    from orthonym.namer import _IMPLIED_STEREO_NUCLEOSIDE_STEMS
+    from orthonym.rules.nucleosides import _NUCLEOSIDE_STEM
+
+    produced = {v.lower() for v in _NUCLEOSIDE_STEM.values() if isinstance(v, str)}
+    assert produced, "producer table empty -- test would pass vacuously"
+    missing = {p for p in produced if p not in _IMPLIED_STEREO_NUCLEOSIDE_STEMS}
+    assert not missing, (
+        f"every name the nucleoside constructor can emit must be covered; "
+        f"missing {sorted(missing)}"
+    )
+    # anchored, so an unrelated longer word is not swallowed...
+    assert _stereo_is_implied_by_name("uridinelike-compound") is False
+    # ...but an acylated derivative still is (BB :54981
+    # `2',3',5'-tri-O-acetyladenosine`).
+    assert _stereo_is_implied_by_name("2',3',5'-tri-O-acetyladenosine") is True
 
 
 # ---------------------------------------------------------------------------
