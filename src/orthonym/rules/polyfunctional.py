@@ -351,8 +351,37 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     """
     from ..assembly.naming_utils import (
         needs_brackets, COMPLEX_MULTIPLIERS, apply_enclosing_marks,
-        is_substituted_substituent,
+        is_substituted_substituent, _is_fully_enclosed,
     )
+
+    def _enclose(_p: str) -> str:
+        """Give ``_p`` its outermost enclosing marks — and only if it lacks them.
+
+        v29 P3-REGRESSION.  Callers legitimately hand over a PRE-ENCLOSED prefix
+        (`:1693` passes ``f"({_oxa}imino)"`` verbatim), and such a prefix already
+        satisfies `**P-16.5.1.1**` (BlueBookV2.md:7232), verbatim: "*Parentheses
+        are used around compound (see P-29.1.2) and complex (see P-29.1.3)
+        prefixes; after the multiplicative prefixes 'bis', 'tris', etc.*"  The next
+        level out is taken only when one is required — `### **P-16.5.4** Multiple
+        types of enclosing marks` (:7444), verbatim at :7446: "*When multiple types
+        of enclosing marks are required, the nesting order is as follows:
+        {[({[( )]})]}, etc.*"  Here no second type is required, so none is taken.
+
+        Idempotence lives in this ONE place because THREE independent branches
+        below reach the enclosure step — `compound`, `_compound_nl`, and
+        `_is_derived(multiplier)` — and guarding them one at a time is what let the
+        `count > 1` path keep double-enclosing after the first two were fixed.
+
+        `_is_fully_enclosed` is stricter than the `startswith`/`endswith` pair used
+        for `_partially_enclosed` below: it matches the OPENING mark to its own
+        close, so `(a)-(b)` is correctly NOT fully enclosed and still escalates.
+        """
+        if _is_fully_enclosed(_p):
+            return _p
+        # Auto-detect nesting depth: no inner marks -> '(p)'; already contains
+        # '()' -> '[p]'.  Byte-identical to the previous hard-coded '(p)' for
+        # prefixes without inner enclosing marks.
+        return apply_enclosing_marks(_p, -1)
 
     def _is_derived(multiplier: str) -> bool:
         # P-16.5.1.10: a term modified by a DERIVED multiplier (bis/tris/
@@ -385,6 +414,13 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
         # 1: `(phosphonooxy)acetic acid (PIN)`.  Enclosure (P-16.3.4 / P-16.5.1.1)
         # and multiplier choice (P-16.3.2/P-16.3.5) are different questions and
         # must not be coupled in EITHER direction.
+        #
+        # ⚠ v29 P3-REGRESSION: this disjunct asks the MULTIPLIER question, and
+        # `is_substituted_substituent` deliberately looks THROUGH enclosing marks
+        # ("A fully enclosed token is a single component: decide on its interior"),
+        # so `is_substituted_substituent('(dimethylamino)')` is True.  It may
+        # therefore say "needs marks" about a prefix that already HAS them; the
+        # idempotence that makes that harmless is in `_enclose`.
         _compound_nl = (needs_brackets(prefix_form) or _partially_enclosed
                         or is_substituted_substituent(prefix_form))
         if count > 1:
@@ -392,10 +428,10 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
             if _is_derived(multiplier) and not prefix_form.startswith(("(", "[")):
                 return f"{multiplier}({prefix_form})"
             if _compound_nl:
-                return f"{multiplier}{apply_enclosing_marks(prefix_form, -1)}"
+                return f"{multiplier}{_enclose(prefix_form)}"
             return f"{multiplier}{prefix_form}"
         if _compound_nl:
-            return apply_enclosing_marks(prefix_form, -1)
+            return _enclose(prefix_form)
         return prefix_form
 
     # Format locants
@@ -414,14 +450,17 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # v29 P3-FINAL I13 (see the no-locant branch above for the full reasoning):
     # ask the substituted predicate as well, so the marks are not held by the
     # multiplier word.
+    #
+    # v29 P3-REGRESSION: four gold targets broke here (gate 1641 -> 1637) because
+    # this verdict was then used to ADD a level to a prefix that already carried
+    # one — `methyl 4-(dimethylamino)-4-(ethylimino)butanoate` shipped as
+    # `methyl 4-[(dimethylamino)]4-[(ethylimino)]butanoate`, OPSIN-clean in BOTH
+    # forms, so only the exact-match PIN gate could see it.  The verdict is
+    # unchanged; `_enclose` is now idempotent, which is where the fix belongs
+    # because `_is_derived(multiplier)` below reaches the enclosure step without
+    # consulting `compound` at all.
     compound = (needs_brackets(prefix_form) or _partially_enclosed
                 or is_substituted_substituent(prefix_form))
-
-    def _enclose(_p: str) -> str:
-        # Auto-detect nesting depth (P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232)): no inner marks -> '(p)';
-        # already contains '()' -> '[p]'. Byte-identical to the previous
-        # hard-coded '(p)' for prefixes without inner enclosing marks.
-        return apply_enclosing_marks(_p, -1)
 
     # Get multiplier if multiple instances
     if count > 1:
@@ -441,9 +480,17 @@ def _name_amidine_chain_side(
     """Amino-/imino-side prefix for a chain-terminal amidine (AM-4, P-66.4.1.3.2).
 
     ``base`` is 'amino' (single-bonded N) or 'imino' (double-bonded =N). Returns
-    the decorated prefix — 'amino'/'imino' when the N is unsubstituted, else
-    '{alkyl}{base}' (e.g. 'dimethylamino', 'ethylimino') — or None (fail closed)
-    when any N-substituent branch is un-nameable.
+    the decorated prefix — the BARE 'amino'/'imino' when the N is unsubstituted,
+    else the ENCLOSED '({alkyl}{base})' (e.g. '(dimethylamino)', '(ethylimino)',
+    see the return at the end of this function) — or None (fail closed) when any
+    N-substituent branch is un-nameable.
+
+    ⚠ The enclosure in the substituted case is part of the contract, not
+    incidental: callers pass the result straight to `format_fg_prefix`, which must
+    therefore not enclose it a second time. This docstring previously advertised a
+    bare `'{alkyl}{base}'`, which is what the code returns only in the
+    UNSUBSTITUTED case; the mismatch helped hide the v29 P3-REGRESSION
+    double-enclosure (`4-[(dimethylamino)]`).
     """
     from ..assembly.composer import _name_r_group
     from collections import Counter as _C
@@ -2997,16 +3044,28 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
             current_tail = current.split('-')[-1]
             is_detachable = (current in _DETACHABLE_LETTER_PREFIXES
                              or current_tail in _DETACHABLE_LETTER_PREFIXES)
-            # Insert hyphen between letter/paren and digit
+            # v29 P3-REGRESSION: `)`, `]` and `}` are ONE rule at three depths.
+            # `### **P-16.5.4** Multiple types of enclosing marks`
+            # (BlueBookV2.md:7444) makes them the same device taken in the nesting
+            # order `{[({[( )]})]}` (:7446), so a term ending in ANY of them
+            # separates from a following locant identically.
+            # Testing only `)` dropped the separator after an escalated prefix:
+            # `_join_prefixes(['2-[(methylcarbamoyl)amino]', '4-methyl'])` gave
+            # `2-[(methylcarbamoyl)amino]4-methyl`, reachable on the escalated
+            # W2F-P6 prefix documented at :407 and independent of any multiplier.
+            # (The `)`-then-LETTER rule below is a separate, pre-existing choice
+            # and is deliberately left as it is.)
+            closes_enclosure = last_char in ')]}'
+            # Insert hyphen between letter/enclosing-mark and digit
             # e.g., "amino" + "4-methyl" → "amino-4-methyl"
             # e.g., "(ethanoyl)amino" + "4-methyl" → "(ethanoyl)amino-4-methyl"
-            if first_char.isdigit() and (last_char.isalpha() or last_char == ')'):
+            if first_char.isdigit() and (last_char.isalpha() or closes_enclosure):
                 result += "-"
             # Also between ')' and letter for clarity
             elif last_char == ')' and first_char.isalpha():
                 result += "-"
-            # Letter/paren followed by an italic-N locant prefix
-            elif next_is_n_locant and (last_char.isalpha() or last_char == ')'):
+            # Letter/enclosing-mark followed by an italic-N locant prefix
+            elif next_is_n_locant and (last_char.isalpha() or closes_enclosure):
                 result += "-"
             # Letter followed by a bare detachable oxo-acid prefix (4b)
             elif is_detachable and last_char.isalpha() and first_char.isalpha():
