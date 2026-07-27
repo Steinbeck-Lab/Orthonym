@@ -1291,6 +1291,36 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     if count <= 1:
         return ""
 
+    # v29 P3-FIX Item 4: the hyphen belongs to FORMING the multiplied token, so it
+    # is produced here -- the one place that already knows both the count and the
+    # name -- rather than at each of the ~40 call sites. Three of those sites had
+    # open-coded around it and shipped `ditert-butyl` / `N,N-ditert-butyl...`,
+    # which appears ZERO times in the Blue Book, while sibling producers spelled
+    # the same fragment `di-tert-butyl`.
+    #
+    # `**P-16.2.4** Hyphens` -> `**P-16.2.4.1** Hyphens are used in substitutive
+    # names:` clause `(d) to separate italic letters from Roman letters`
+    # (BlueBookV2.md:6957) with the verbatim example `di-tert-butyl (P-61.2.3)`
+    # (:6964); `### **P-61.2.2** Cyclic hydrocarbons` has `1,2-di-tert-butyl-
+    # benzene (PIN)` (:25717) and `tri-tert-butylphenyl` at :37495. The multiplier
+    # is the SIMPLE `di`/`tri` because `**P-16.3.2** General methodology` clause
+    # (a) (:7033) lists "unsubstituted prefixes, such as ethyl or tert-butyl"
+    # among the simple components "multiplied by the multiplicative prefixes
+    # 'di', 'tri', etc." -- so `bis(tert-butyl)` and `di(tert-butyl)` are both
+    # wrong, and neither occurs in the text.
+    #
+    # Only ever fires for an italicized-prefix-led name, which is simple by
+    # P-16.3.2(a) and therefore never takes bis/tris, so the derived-multiplier
+    # branch below is unreachable with a hyphen. P-16.2.4.2 (:6968) forbids the
+    # hyphen before an ENCLOSED compound substituent, and an enclosed name never
+    # leads with `tert-`/`sec-`, so the two rules cannot collide.
+    if multiplier_needs_hyphen(substituent_name):
+        _word = simple_multiplier_word(count)
+        if _word is None:
+            raise ValueError(
+                f"no simple multiplying prefix can be formed for {count}")
+        return _word + "-"
+
     if is_complex_substituent(substituent_name) \
             or substituent_name in CATENATION_AMBIGUOUS_PREFIXES:
         if count in COMPLEX_MULTIPLIERS:
@@ -1538,8 +1568,14 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # its own named primitive (multiplier_needs_hyphen) because a SECOND producer
     # -- organometallics._ligand_token -- needed it and was shipping the
     # malformed 'ditert-butyl' for want of it.
+    # v29 P3-FIX Item 4: the hyphen now comes from `get_multiplier_prefix` itself
+    # (the one place that has both the count and the name), so this second copy
+    # is gone -- keeping it would emit `di--tert-butyl`. The assertion below is
+    # the tripwire that the primitive really did it.
     if multiplier and multiplier_needs_hyphen(formatted_name):
-        multiplier = f"{multiplier}-"
+        assert multiplier.endswith('-'), (
+            "get_multiplier_prefix must supply the P-16.2.4.1(d) hyphen: "
+            "%r + %r" % (multiplier, formatted_name))
 
     # Assemble: locants-multiplier+name. An empty locant list (elided per
     # P-14.3.4, e.g. a mononuclear parent: phenylmethanol) takes no hyphen.

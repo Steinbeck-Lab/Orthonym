@@ -4402,6 +4402,24 @@ def _compose_group14_prefixes(prefixes: List[str]) -> str:
         if is_complex_substituent(name) and count > 1:
             parts.append(f"{mult}({name})")
         else:
+            # v29 P3-FIX Item 4: a SIMPLE multiplier joined to a name that leads
+            # with an ITALICIZED structural prefix keeps the hyphen boundary.
+            # `**P-16.2.4** Hyphens` -> `**P-16.2.4.1** Hyphens are used in
+            # substitutive names:` -> clause `(d) to separate italic letters from
+            # Roman letters` (BlueBookV2.md:6957) gives the verbatim example
+            # `di-tert-butyl (P-61.2.3)` (:6964), and `### **P-61.2.2** Cyclic
+            # hydrocarbons` gives `1,2-di-tert-butylbenzene (PIN)` (:25717).
+            # `tert-butyl` is SIMPLE, so the multiplier is `di` and not `bis`:
+            # `**P-16.3.2** General methodology` clause (a) (:7033) names it
+            # explicitly -- "Simple components are ... unsubstituted prefixes,
+            # such as ethyl or tert-butyl ... multiplied by ... 'di', 'tri'".
+            # Without this the composer emitted `ditert-butyl`, which appears
+            # ZERO times in the Blue Book, while a SIBLING Group-14 producer
+            # spelled the same fragment `di-tert-butyl` -- one fragment, two
+            # spellings, both OPSIN-clean, so the gate could not see it.
+            # `multiplier_needs_hyphen` is the shared primitive the six other
+            # composers in this class already use; this was the site that
+            # open-coded around it.
             parts.append(f"{mult}{enclose_if_compound(name)}")
     return ''.join(parts)
 

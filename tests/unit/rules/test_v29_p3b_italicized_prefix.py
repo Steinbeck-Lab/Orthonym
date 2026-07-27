@@ -88,7 +88,12 @@ def test_italicized_led_simple_name_is_bare(name):
     assert needs_brackets(name) is False
     assert is_complex_substituent(name) is False
     assert enclose_if_compound(name) == name        # cited BARE (BB 16286)
-    assert get_multiplier_prefix(2, name) == "di"   # di-, not bis- (P-16.3.4)
+    # v29 P3-FIX Item 4: the P-16.2.4.1(d) hyphen is now part of the
+    # multiplied TOKEN and is produced by this one primitive, so the
+    # multiplier comes back as `di-`. The assertion's point is unchanged:
+    # the SIMPLE `di` and not the derived `bis` (P-16.3.2(a)).
+    assert get_multiplier_prefix(2, name) == "di-"
+    assert not get_multiplier_prefix(2, name).startswith("bis")
     assert multiplier_needs_hyphen(name) is True    # 'di-tert-butyl'
 
 
