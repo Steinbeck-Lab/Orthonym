@@ -1606,6 +1606,28 @@ _SORTED_ALPHA_PREFIXES = sorted(IGNORE_FOR_ALPHA - {"sec", "tert"},
                                 key=len, reverse=True)
 
 
+def _numeral_chain_stems() -> frozenset:
+    """Chain stems that a multiplicative prefix in ``IGNORE_FOR_ALPHA`` shadows.
+
+    A numeral prefix like ``penta`` is the chain stem ``pent`` plus the linking
+    vowel ``a``, so ``pentan-2-yl`` starts with ``penta`` by coincidence. Derived
+    from ``data.chain_names`` rather than hardcoded, so a change to the stem table
+    cannot silently desynchronise this guard.
+    """
+    from ..data.chain_names import get_chain_prefix
+    stems = set()
+    for n in range(1, 41):
+        try:
+            stems.add(get_chain_prefix(n))
+        except Exception:                      # noqa: BLE001 — table bound
+            break
+    return frozenset(s for s in stems
+                     if s + 'a' in IGNORE_FOR_ALPHA)
+
+
+_NUMERAL_CHAIN_STEMS = _numeral_chain_stems()
+
+
 def alpha_sort_key(substituent_name: str) -> str:
     """Generate an alphabetization sort key for IUPAC prefix ordering.
 
@@ -1693,6 +1715,34 @@ def alpha_sort_key(substituent_name: str) -> str:
             remainder = text[len(prefix):]
             # Only strip if there is a remainder (avoid stripping entire word)
             if remainder:
+                # v29 P3-FIX Item 7: a numeral that is part of the substituent's
+                # own STEM is not a multiplicative prefix. `pentan-2-yl` is
+                # `pent` + `an-2-yl`, not `penta` + `n-2-yl`; stripping gave the
+                # key `n-2-yl`, which sorted it before `octyl` and (because
+                # `prefix_citation_sort_key` delegates here, and P-14.4(g) gives
+                # the lowest locant to the prefix cited FIRST) also inverted the
+                # locants. `### **P-14.5** ALPHANUMERICAL ORDER` -> `**P-14.5.1**`
+                # (BlueBookV2.md:3448) only lets a MULTIPLICATIVE prefix be
+                # ignored; `**P-14.5.2**` (:3477) says a prefix "is considered to
+                # begin with the first letter of its COMPLETE name", and the
+                # complete name here begins `p`.
+                #
+                # Two structural tells, neither a name list:
+                #  (a) a multiplicative prefix multiplies a substituent NAME, so
+                #      it is never followed by `-<digit>` -- that hyphen-locant
+                #      belongs to the stem's own unsaturation
+                #      (`penta-1,3-dien-1-yl` is pent + a + `-1,3-dien-1-yl`).
+                #      `di-tert-butyl` is unaffected: its hyphen precedes a
+                #      LETTER, not a digit.
+                #  (b) the candidate is `<chain stem>` + the linking `a`, and the
+                #      name continues with the alkane/alkene/alkyne morphology
+                #      `an`/`en`/`yn` -- `pentan-`, `hexane-`, `decan-`. A genuine
+                #      multiplied prefix never continues that way.
+                if re.match(r'-\d', remainder):
+                    return text
+                if prefix.endswith('a') and prefix[:-1] in _NUMERAL_CHAIN_STEMS \
+                        and text[len(prefix) - 1:].startswith(('an', 'en', 'yn')):
+                    return text
                 # Wave2 T1c: do NOT strip when the "multiplier" is really the
                 # start of a numeric CHAIN STEM — there it is part of the name
                 # and alphabetizes (P-14.5.2): tridecyl/octadecyl ('tri'/'octa'
