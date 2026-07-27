@@ -212,10 +212,23 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     by_name: Dict[str, List[int]] = {}
     for p, name in subs:
         by_name.setdefault(name, []).append(loc(p))
-    # Cite prefixes in ALPHABETICAL order (P-14.5.2), each with its locant set;
+    # Cite prefixes in P-14.5 alphanumerical order, each with its locant set;
     # join with a hyphen between a letter and a following locant digit.
+    #
+    # v29 P3-FIX Item 8: this used `alpha_sort_key`, while the ORIENTATION
+    # tie-break 25 lines up (`_analyse`) uses `prefix_citation_sort_key`. Two
+    # different orders in one code path: the direction was chosen to give the
+    # lowest locant to the prefix cited first under one rule, and then the
+    # prefixes were cited under another. `alpha_sort_key` is letters-only, so
+    # `2-methylbutyl` and `3-methylbutyl` tied and the citation fell through to
+    # dict insertion = RDKit atom order, which re-spelling then flipped
+    # (`1-(2-methylbutyl)-3-(3-methylbutyl)triazane` vs
+    # `3-(3-methylbutyl)-1-(2-methylbutyl)triazane` for ONE molecule).
+    # `**P-14.5.4**` (`BlueBookV2.md:3517`) is the rule that separates them, and
+    # it must be the SAME key on both sides or the name contradicts the locants
+    # that were assigned to justify it.
     parts: List[str] = []
-    for name in sorted(by_name, key=alpha_sort_key):
+    for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
         mult = _SUB_MULTIPLIER.get(len(locs))
         if mult is None:

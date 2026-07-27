@@ -886,7 +886,9 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
 
     # Sort prefixes alphabetically (P-14.5.2), with P-14.5.4 lowest-locant
     # tie-break for identical-letter prefixes.
-    all_prefixes.sort(key=prefix_citation_sort_key)
+    # RENDERED prefix strings (locants already attached) -> parent_locants=True.
+    all_prefixes.sort(key=lambda p: prefix_citation_sort_key(
+        p, parent_locants=True))
 
     # --- Step 7: Assemble the complete name ---
     # Format: [prefixes]-[ring_parent]-[suffix_locants]-[multiplier][suffix]
@@ -2135,7 +2137,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
     # Sort all prefixes alphabetically (P-14.5.2), with P-14.5.4 lowest-locant
     # tie-break for identical-letter prefixes.
-    all_prefixes.sort(key=prefix_citation_sort_key)
+    # RENDERED prefix strings (locants already attached) -> parent_locants=True.
+    all_prefixes.sort(key=lambda p: prefix_citation_sort_key(
+        p, parent_locants=True))
 
     # v28 Cluster D (P-41 / P-63.6): a polyfunctional parent with NO principal
     # characteristic group (every group is prefix-only, e.g. sulfoxide +

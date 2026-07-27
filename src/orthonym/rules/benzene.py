@@ -3423,7 +3423,12 @@ def _name_substituted_aniline(
 
     # Alphabetize N- and ring-substituents together (P-14.5.2).
     all_entries = n_prefix_entries + ring_prefix_entries
-    all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(e[1])[1]))
+    # `e[1]` is an already-RENDERED prefix string, so its leading locants are
+    # PARENT locants -> parent_locants=True (P-14.5.4 compares a prefix's OWN
+    # locants, and a parent locant is assigned BY this very order). `[1:]` keeps
+    # the total-order tier so an exact tie cannot fall through to list order.
+    all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(
+        e[1], parent_locants=True)[1:]))
     prefix_part = "-".join(rendered for _key, rendered in all_entries)
 
     return f"{prefix_part}aniline"
@@ -3539,7 +3544,12 @@ def _name_substituted_benzenediamine(
     all_entries = n_prefix_entries + ring_prefix_entries
     if not all_entries:
         return suffix_part
-    all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(e[1])[1]))
+    # `e[1]` is an already-RENDERED prefix string, so its leading locants are
+    # PARENT locants -> parent_locants=True (P-14.5.4 compares a prefix's OWN
+    # locants, and a parent locant is assigned BY this very order). `[1:]` keeps
+    # the total-order tier so an exact tie cannot fall through to list order.
+    all_entries.sort(key=lambda e: (e[0], prefix_citation_sort_key(
+        e[1], parent_locants=True)[1:]))
     prefix_part = "-".join(rendered for _k, rendered in all_entries)
     return f"{prefix_part}{suffix_part}"
 

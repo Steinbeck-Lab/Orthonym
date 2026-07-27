@@ -1680,31 +1680,61 @@ def alpha_sort_key(substituent_name: str) -> str:
     return text
 
 
-def prefix_citation_sort_key(prefix: str) -> tuple:
-    """P-14.5.2 alpha key + P-14.5.4 lowest-locant tie-break for citation.
+def prefix_citation_sort_key(prefix: str, *,
+                             parent_locants: bool = False) -> tuple:
+    """P-14.5 alphanumerical order for citation, as a TOTAL order.
 
-    BB P-14.5.4 (BlueBookV2.md:3517): 'When two or more prefixes consist of
-    identical Roman letters, priority for order of citation is given to the
-    group that contains the lowest locant(s) at the first point of
-    difference.' The prefix's LEADING parent-locant set is stripped (those
-    locants are assigned BY citation order, they may not decide it); the
-    remaining locant tokens are compared in order of appearance via
-    locant_sort_key. Drop-in replacement key for alpha_sort_key at
-    citation-sort sites: identical alpha keys now resolve by locants
-    instead of stable-sort input order.
+    Three tiers, consulted in turn:
+
+    1. the Roman LETTERS only. ``### **P-14.5** ALPHANUMERICAL ORDER``'s preamble
+       (``BlueBookV2.md:3442``) puts "*Nonitalic Roman letters ... first*", and
+       ``**P-14.5.1**`` (``:3448``) makes multiplicative prefixes not alter the
+       order already established. Digits and hyphens are dropped, so
+       identical-letter prefixes (``pentan-2-yl`` vs ``pentan-3-yl``) tie here on
+       purpose and tier 2 decides.
+    2. the prefix's OWN locants, in ORDER OF APPEARANCE. ``**P-14.5.4**``
+       (``:3517``): "*When two or more prefixes consist of identical Roman
+       letters, priority for order of citation is given to the group that
+       contains the lowest locant(s) at the first point of difference*", whose
+       first example is this very pair — ``4-(2-methylbutyl)-N-(3-methylbutyl)-
+       aniline (PIN)``, "*for ordering the substituents '2' is lower than '3'*"
+       (``:3521``). Order of appearance rather than a sorted set, because
+       ``:3533`` prefers ``1-(2-methylpentan-3-yl)-1-(3-methylpentan-2-yl)cyclo-
+       pentane (PIN)`` on the ground that "*the locant set '2,3' is lower than
+       '3,2'*". Compared via ``locant_sort_key``, so locant 2 precedes locant 10.
+    3. the full string. NOT a nomenclature rule -- an engineering requirement.
+       Tiers 1-2 are not injective (``cyclohexylmethyl`` vs a differently-spelled
+       prefix with the same letters and no locants), and a tie in a ``sorted()``
+       whose input order came from a ``Counter`` over RDKit neighbours resolves to
+       HOW THE SMILES WAS WRITTEN. That is how one molecule got two names:
+       ``CCC(C)CSSSCCC(C)C`` and its own re-spelling gave
+       ``1-(2-methylbutyl)-3-(3-methylbutyl)trisulfane`` and
+       ``1-(3-methylbutyl)-3-(2-methylbutyl)trisulfane``. This tier can only ever
+       be reached once P-14.5 has been exhausted, so it decides nothing the Blue
+       Book decides -- it only stops atom order from deciding.
+
+    ``parent_locants`` selects which of the TWO input conventions this function is
+    being handed, because the callers genuinely differ and the leading locant means
+    opposite things in them:
+
+    * ``False`` (default) -- a BARE substituent name (``2-methylbutyl``,
+      ``pentan-2-yl``). Its leading locant is the substituent's OWN and is exactly
+      what P-14.5.4 compares.
+    * ``True`` -- an already-RENDERED prefix string (``3,5-dichloro``,
+      ``2-methyl``) as produced by ``format_substituent_prefix``. Its leading
+      locants are PARENT locants, which are assigned BY citation order and
+      therefore may not decide it; they are stripped before tier 2.
+
+    Passing the wrong convention was the whole defect: one strip served both, so
+    the bare names lost the locant P-14.5.4 needs and keyed to ``('methylbutyl',
+    ())`` apiece.
     """
     from .name_comparison import locant_sort_key, _LOCANT_TOKEN_FINDER
-    # Tier 1 is the Roman LETTERS of the complete-name alpha key (P-14.5.2):
-    # digits/hyphens are dropped so identical-letter prefixes (pentan-2-yl vs
-    # pentan-3-yl) collide here and the locant tier below decides, per
-    # P-14.5.4. (alpha_sort_key already strips leading positional locants and
-    # multiplicative prefixes; here we additionally strip the *internal*
-    # locant digits so the tier is letters-only.)
     alpha_letters = ''.join(ch for ch in alpha_sort_key(prefix) if ch.isalpha())
-    core = _LOCANT_PREFIX_RE.sub('', prefix)
+    body = _LOCANT_PREFIX_RE.sub('', prefix) if parent_locants else prefix
     locs = tuple(locant_sort_key(t)
-                 for t in _LOCANT_TOKEN_FINDER.findall(core))
-    return (alpha_letters, locs)
+                 for t in _LOCANT_TOKEN_FINDER.findall(body))
+    return (alpha_letters, locs, prefix)
 
 
 # ============================================================================

@@ -176,17 +176,26 @@ def _build_substituent_string(names: List[str]) -> str:
       itself a compound prefix (P-16.3.3), since P-16.5.1.3's "first group bare"
       only removes the marks that separate the groups from each other.
     """
-    from ..assembly.naming_utils import (alpha_sort_key, apply_enclosing_marks,
+    from ..assembly.naming_utils import (apply_enclosing_marks,
                                          enclose_if_compound,
-                                         multiplier_needs_hyphen)
+                                         multiplier_needs_hyphen,
+                                         prefix_citation_sort_key)
 
     counts = Counter(names)
     multiplier_map = {1: "", 2: "di", 3: "tri", 4: "tetra"}
 
-    def _alnum_key(name: str) -> str:
-        return re.sub(r"[^a-z]", "", alpha_sort_key(name))
-
-    sorted_unique = sorted(counts.keys(), key=_alnum_key)
+    # v29 P3-FIX Item 2: this held a THIRD private copy of the citation key --
+    # `_alnum_key = re.sub(r"[^a-z]", "", alpha_sort_key(name))` -- which is
+    # exactly the shared key's letters-only TIER 1 and nothing else. With no
+    # locant tier it could not tell `2-methylbutyl` from `3-methylbutyl`, and
+    # `sorted()` being stable, the tie resolved to Counter insertion order =
+    # RDKit neighbour order = how the SMILES was written. One molecule, two
+    # names: `CCC(C)C[As](C)CCC(C)C` gave `methyl(2-methylbutyl)(3-methylbutyl)-
+    # arsane` and its own re-spelling gave `methyl(3-methylbutyl)(2-methylbutyl)-
+    # arsane`. The shared key keeps tier 1 byte-identical and adds the
+    # `**P-14.5.4**` locant tier (`BlueBookV2.md:3517`) plus a total-order
+    # backstop, so it can only change an order that was previously UNDEFINED.
+    sorted_unique = sorted(counts.keys(), key=prefix_citation_sort_key)
 
     parts = []
     for i, name in enumerate(sorted_unique):
