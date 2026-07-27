@@ -466,7 +466,7 @@ def test_the_italicized_prefix_carve_out_lives_in_exactly_one_place():
 ])
 def test_tert_butyl_oxoacid_cites_the_retained_prefix_bare(ungated_namer, smiles, expected):
     """BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN) cites tert-butyl BARE;
-    the prefix is cited BARE (BB 3465 / BB 16286). (NB: 'N-tert-butyl' is NOT a Blue Book string -- verified absent in 4 encodings against 30 hits for `*tert*-butyl`; the bare form follows from BB 3465 and the rules are P-16.3.3(b)/BB 7070 + P-16.2.4.1(d)/BB 6964, not P-16.3.3(b)/P-16.2.4.1(d).)  All four names are
+    the prefix is cited BARE (BB 3465 / BB 16286). (NB: 'N-tert-butyl' is NOT a Blue Book string -- verified absent in 4 encodings against 30 hits for `*tert*-butyl`; the bare form follows from BB 3465 and the rules are P-16.3.3(b)/BB 7070 + P-16.2.4.1(d)/BB 6964, not P-16.3.4.)  All four names are
     OPSIN-exact against the input structure."""
     assert ungated_namer.name(smiles) == expected
 
