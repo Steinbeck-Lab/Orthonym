@@ -1176,7 +1176,7 @@ def test_f6_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
 # The widening also moves five names from a CARBON parent to the HYDRAZINE
 # parent, which is the preferred direction:
 #
-#   BB 1776   class seniority order `N > P > As > ... > O > S > Se > Te > C`
+#   P-44.1.2 (BB 18917)   class seniority order `N > P > As > ... > O > S > Se > Te > C`
 #             -- nitrogen before carbon.
 #   BB 18950  `1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine` (PIN) `( N > Si > O)`
 #             -- hydrazine is the parent even against two RING substituents.
@@ -1184,7 +1184,10 @@ def test_f6_locants_do_not_depend_on_smiles_atom_order(ungated_namer, smiles):
 # and `methylhydrazine` / `phenylhydrazine` (BB PINs, P-68.3.1.2) were already
 # emitted, so before this migration the class split purely on whether the narrow
 # walker accepted the substituent.  (BB 19376 `2-hydrazinylpyridine` (PIN) is not
-# a counterexample: for an N-HETEROCYCLE P-44.2.1 makes the ring senior.)
+# a counterexample: P-44.1.2.2 criterion (1) (BB 19336/19340) makes the RING
+    # senior to the chain when both hold the same senior element -- BB 19378
+    # says exactly "(ring is senior to chain)", not anything about heterocycles.
+    # P-44.2.1 is ring-vs-RING and does not govern this. [v29 P3-FIX Item 9])
 # ==========================================================================
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -1260,7 +1263,7 @@ def test_f7_hydrazine_is_the_senior_parent_over_carbon(
 ):
     """Five names move from a CARBON parent to the HYDRAZINE parent.
 
-    BB 1776 gives the class seniority order `N > P > As > ... > O > S > Se > Te >
+    P-44.1.2 (BB 18917) gives the class seniority order `N > P > As > ... > O > S > Se > Te >
     C` -- nitrogen BEFORE carbon -- and BB 18950
     `1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine` (PIN) `( N > Si > O)` keeps
     hydrazine as the parent even against two ring substituents.  `methylhydrazine`
@@ -1419,7 +1422,7 @@ def test_f8_the_hub_element_is_never_dropped_from_the_name(
 
 
 @pytest.mark.parametrize("smiles,before,after", [
-    # BB 1776 class seniority: Si is senior to C, so the SILANE is the parent
+    # P-44.1.2 (BB 18917) class seniority: Si is senior to C, so the SILANE is the parent
     ("Cl[Si](C)(C)C(C)C",    "2-(chlorodimethylsilyl)propane",
                              "chlorodi(methyl)(propan-2-yl)silane"),
     ("Cl[Si](C)(C)C(C)(C)C", "2-(chlorodimethylsilyl)-2-methylpropane",
@@ -1434,7 +1437,7 @@ def test_f8_silicon_is_the_senior_parent_over_carbon(
 ):
     """Four names move from a CARBON parent to the SILANE parent, toward the PIN.
 
-    BB 1776 gives the class seniority order `N > P > As > Sb > Bi > Si > Ge > Sn >
+    P-44.1.2 (BB 18917) gives the class seniority order `N > P > As > Sb > Bi > Si > Ge > Sn >
     Pb > B > ... > O > S > Se > Te > C` -- silicon BEFORE carbon.  The codebase
     already emitted `methylsilane`, `cyclohexylsilane`, `trichloro(methyl)silane`
     and `chlorotri(methyl)silane` on the silane parent, so the old behaviour split

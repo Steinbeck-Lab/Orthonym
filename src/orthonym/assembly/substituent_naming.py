@@ -4382,12 +4382,26 @@ def _compose_group14_prefixes(prefixes: List[str]) -> str:
       ``propan-2-yl`` is cited ``(propan-2-yl)`` and cannot run into the
       neighbouring token.
 
-    NOT applied here: the P-16.5.1.3.1 (BB 7272) "second and further substituents
-    are each enclosed even for simple substituents" leg, which would respell
-    ``chlorodimethylsilyl`` as ``chlorodi(methyl)silyl``. This producer competes
-    with a sibling Group-14 producer that emits the BARE form for that shape, so
-    applying the rule on one side only would make the two disagree; the gap is
-    pre-existing, shared with the sibling, and out of this task's scope.
+    NOT applied here, and v29 P3-FIX Item 9 replaces the reason. The
+    P-16.5.1.3.1 (BB 7272) "second and further substituents are each enclosed even
+    for simple substituents" leg would respell ``chlorodimethylsilyl`` as
+    ``chlorodi(methyl)silyl``. The old justification -- "a sibling Group-14
+    producer emits the BARE form for that shape" -- could not be substantiated: no
+    such sibling was found in this module (only this composer and
+    ``_compose_n_substituent_prefix``, the latter documented as onium-only).
+
+    The rule genuinely does not reach here, for a reason the rule states itself:
+    its scope sentence is "*For mononuclear parent HYDRIDES with two or more
+    substituents...*", and what is being built here is a substituent PREFIX, not a
+    parent hydride. The Blue Book spells the prefix bare in exactly this shape and
+    contrasts it with the marked parent form:
+    ``1-(trimethylsilyl)ethan-1-one (PIN)`` against the alternative
+    ``acetyltri(methyl)silane`` (BlueBookV2.md:29380);
+    ``[2-(1,3-dioxolan-2-yl)ethyl]tri(methyl)silane (PIN)`` (:35326);
+    ``(tert-butylperoxy)dimethylsilyl propanoate (PIN)`` (:23389), a bare
+    ``dimethyl`` on a silyl PREFIX; ``3-(trimethoxysilyl)propane-1-thiol (PIN)``
+    (:28164). So the bare form is BB-supported here and the parenthesised form is
+    what the rule requires of the parent-hydride name.
     """
     from collections import Counter
 

@@ -1456,13 +1456,28 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     reference (P-16.3.5 / P-16.3.3). Phase 171 consolidates the divergent
     needs-parens / enclosing-mark / prefix-assembly predicates onto THIS function;
     do NOT add a 4th. The divergent predicates as of 169.7:
-      - rules/amides.py:32           _has_positional_locants(name)   (digit-only locant test)
-      - assembly/naming_utils.py:525 is_complex_substituent(name)    (complex-substituent test)
-      - assembly/naming_utils.py:461 apply_enclosing_marks(name, depth)
-      - rules/ortho_fused.py:505     format_substituent_prefix(substituents)  (different signature)
-    They DISAGREE today (e.g. on 'trifluoromethyl'/'tert-butyl': is_complex_substituent
-    True but _has_positional_locants False) — see
-    tests/unit/assembly/test_needs_parens_consolidation.py (xfail-strict tripwire).
+      - rules/amides.py              _has_positional_locants(name)
+      - assembly/naming_utils.py      is_complex_substituent(name)
+      - assembly/naming_utils.py      apply_enclosing_marks(name, depth)
+      - rules/ortho_fused.py          format_substituent_prefix(substituents)  (different signature)
+
+    v29 P3-FIX Item 9 — this paragraph used to assert three things that are all
+    FALSE today, and a false comment is how the next session acquires a wrong
+    belief, so it is corrected rather than trimmed:
+
+    * it claimed the predicates "DISAGREE today ... on 'trifluoromethyl'/
+      'tert-butyl': is_complex_substituent True but _has_positional_locants
+      False". `is_complex_substituent('tert-butyl')` is **False**;
+    * it claimed they are independent. `_has_positional_locants` now DELEGATES
+      (`rules/amides.py`: `return is_complex_substituent(name)`), so the two
+      cannot disagree at all;
+    * it called the consolidation test an "xfail-strict tripwire". That marker is
+      gone — `tests/unit/assembly/test_needs_parens_consolidation.py` now plainly
+      asserts the equality and PASSES.
+
+    Line numbers are deliberately omitted above: the previous ones (525, 461, 32)
+    had all drifted, which is what made the inventory unfollowable. The
+    consolidation onto THIS function still stands; do NOT add a fourth predicate.
 
     Produces a formatted substituent prefix ready for insertion into an
     IUPAC name. Handles simple and complex substituents differently:

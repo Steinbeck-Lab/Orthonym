@@ -231,9 +231,15 @@ def _classify_organyls(mol, hub) -> Optional[List[str]]:
         if name is None:
             return None
         names.append(name)
-    # Defensive: every heavy atom is the hub or a carbon (the per-neighbour purity
-    # walk rejects any heteroatom inside a substituent; a single connected
-    # fragment then guarantees there is no stray heteroatom elsewhere).
+    # Defensive: every heavy atom is the hub or a carbon.
+    # v29 P3-FIX Item 9: this used to say the per-neighbour walk "rejects any
+    # heteroatom inside a substituent". It does NOT -- `organyl_prefix_name`
+    # admits `_PREFIX_ONLY_ELEMENTS = {F, Cl, Br, I, At}` inside the fragment
+    # (P-59 Table 28 cites halogens only as prefixes, so one can never demand a
+    # suffix). It is THIS all-carbon scan, not the walk, that keeps a halogenated
+    # organyl out of this regime, so the halogenated class is unreachable here at
+    # both revisions -- a pre-existing coverage limit, deliberately left closed
+    # rather than a property of the guard above.
     if any(a.GetSymbol() != 'C' and a.GetIdx() != hub_idx
            for a in mol.GetAtoms() if a.GetSymbol() != 'H'):
         return None
@@ -280,8 +286,12 @@ def _classify_mixed_halo_organyl(mol, hub) -> Optional[List[str]]:
     if n_halo == 0 or n_org == 0:
         return None  # not mixed -> a dedicated pure regime handles it
     # Full coverage: every heavy atom is the hub, a counted terminal halogen, or a
-    # carbon inside a verified organyl (organyl_prefix_name rejected
-    # any internal heteroatom). No stray heteroatom remains.
+    # carbon inside a verified organyl.
+    # v29 P3-FIX Item 9: the parenthetical used to claim `organyl_prefix_name`
+    # "rejected any internal heteroatom". It does not -- it admits F/Cl/Br/I/At
+    # inside the fragment. The all-carbon requirement below is what actually
+    # holds, and it is what makes the claim true of THIS function rather than of
+    # the primitive it calls.
     for a in mol.GetAtoms():
         if a.GetSymbol() == 'H':
             continue
