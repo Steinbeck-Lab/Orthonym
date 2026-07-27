@@ -341,7 +341,13 @@ class TestBridgeTables:
         "atom_a,atom_b,h_a,h_b,expected_name",
         [
             ("C", "C", 2, 2, "ethane-1,2-diyl"),  # Wave2 P-29.3.2.2 PIN (was 'ethylene')
-            ("C", "C", 1, 1, "vinylene"),
+            # v29 P3-FINAL I9: was "vinylene", which the Blue Book's own prefix
+            # table marks as NOT the preferred form -- `| ethene-1,2-diyl* (not
+            # <br>vinylene) | -CH=CH- | P-32.1.1 |` (BlueBookV2.md:55998) -- and
+            # `:16615` gives the PIN outright: `stilbene (ring substitution only)
+            # 1,1'-(ethene-1,2-diyl)dibenzene (PIN)`.  E- and Z-stilbene shared
+            # the one string before the change; they now differ.
+            ("C", "C", 1, 1, "ethene-1,2-diyl"),
             ("O", "O", 0, 0, "peroxy"),  # D-09 add (154-AUDIT-B.md §3 #1)
             ("S", "S", 0, 0, "disulfanediyl"),  # D-09 add (154-AUDIT-B.md §3 #2)
         ],
@@ -547,3 +553,64 @@ class TestCentralAreneMultiplicative:
         from orthonym.rules.multiplicative import name_multiplicative
 
         assert name_multiplicative(Chem.MolFromSmiles(smiles)) == expected
+
+
+# ===========================================================================
+# v29 P3-FINAL I9 — (E)- and (Z)-stilbene must not share one name.
+# ===========================================================================
+
+class TestEtheneDiylBridgeI9:
+    """`vinylene` was a verbatim NON-PIN, and both stilbene isomers got it.
+
+    Authority, with headings:
+
+    *   `BlueBookV2.md:55998` -- the Blue Book's own detachable-prefix table
+        (`## **Appendix 2** / DETACHABLE PREFIXES USED FOR SUBSTITUTIVE
+        NOMENCLATURE`) reads `| ethene-1,2-diyl* (not<br>vinylene) | -CH=CH- |
+        P-32.1.1 |`.  The book marks the old spelling "not".
+    *   `:16615` gives the PIN outright: `stilbene (ring substitution only)
+        1,1'-(ethene-1,2-diyl)dibenzene (PIN)`.
+    *   `:47100` shows the configuration cited INSIDE the multiplicative bracket:
+        `1,1'-[(1*E*)-1-(4-chlorophenyl)ethene-1,2-diyl]dibenzene (PIN, see
+        P-93.6)` -- so the preferred form has a channel for the descriptor, and
+        the two isomers can be told apart.
+
+    Before this, `gold_pins.json`'s WSB-01 row pinned the shared string with the
+    note "descriptor-LESS output is EXPECTED, NOT a regression".  Two different
+    compounds with one name is a regression by any reading; the row is re-based.
+    """
+
+    def test_the_bridge_prefix_is_the_pin_not_vinylene(self):
+        from orthonym.rules.multiplicative import _TWO_ATOM_BRIDGES
+        names = [n for *_rest, n in _TWO_ATOM_BRIDGES]
+        assert "vinylene" not in names
+        assert "ethene-1,2-diyl" in names
+
+    def test_the_two_geometric_isomers_get_DIFFERENT_names(self):
+        from orthonym import name_compound
+        e_name = name_compound(r"C(=C/c1ccccc1)\c1ccccc1")
+        z_name = name_compound(r"C(=C\c1ccccc1)\c1ccccc1")
+        assert e_name != z_name, (
+            f"(E)- and (Z)-stilbene must not share a name; both gave {e_name!r}")
+        assert e_name == "1,1'-[(1E)-ethene-1,2-diyl]dibenzene", e_name
+        assert z_name == "1,1'-[(1Z)-ethene-1,2-diyl]dibenzene", z_name
+        assert "vinylene" not in e_name and "vinylene" not in z_name
+
+    def test_an_undefined_geometry_yields_the_bare_pin_prefix(self):
+        """No configuration to express -> no descriptor.  Inventing one would be
+        worse than omitting it ("missing beats wrong")."""
+        from rdkit import Chem
+        from orthonym.rules.multiplicative import _ethene_diyl_bridge_name
+
+        mol = Chem.MolFromSmiles("C(=Cc1ccccc1)c1ccccc1")   # geometry undefined
+        assert mol is not None
+        a, b = None, None
+        for bond in mol.GetBonds():
+            if (bond.GetBondType() == Chem.BondType.DOUBLE
+                    and bond.GetBeginAtom().GetSymbol() == "C"
+                    and bond.GetEndAtom().GetSymbol() == "C"
+                    and bond.GetBeginAtom().GetTotalNumHs() == 1
+                    and bond.GetEndAtom().GetTotalNumHs() == 1):
+                a, b = bond.GetBeginAtom(), bond.GetEndAtom()
+        assert a is not None, "test fixture found no CH=CH bond"
+        assert _ethene_diyl_bridge_name(mol, a, b) == "ethene-1,2-diyl"

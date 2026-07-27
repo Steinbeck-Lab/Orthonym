@@ -58,7 +58,14 @@ _SINGLE_ATOM_BRIDGES: Dict[str, str] = {
 _TWO_ATOM_BRIDGES = [
     # (element1, element2, h_count1, h_count2, bridge_name)
     ("C", "C", 2, 2, "ethane-1,2-diyl"),  # CH2-CH2 (P-29.3.2.2 PIN; 'ethylene' is general-nomenclature only)
-    ("C", "C", 1, 1, "vinylene"),     # CH=CH (rare)
+    # v29 P3-FINAL I9: `vinylene` is a verbatim NON-PIN.  The Blue Book's own
+    # prefix table marks it so: `| ethene-1,2-diyl* (not<br>vinylene) | -CH=CH- |
+    # P-32.1.1 |` (`BlueBookV2.md:55998`), and the stilbene entry gives the PIN
+    # outright: `stilbene (ring substitution only) 1,1'-(ethene-1,2-diyl)dibenzene
+    # (PIN)` (`:16615`).  The bridge carries locants, so the generic enclosure leg
+    # in `_assemble_multiplicative_name` parenthesises it, reproducing that PIN
+    # exactly.
+    ("C", "C", 1, 1, "ethene-1,2-diyl"),   # CH=CH
     # Phase 154.B D-09 audit-driven adds (154-AUDIT-B.md §3 ranks 1-2):
     ("O", "O", 0, 0, "peroxy"),       # O-O; IUPAC P-29; OPSIN multiRadicalSubstituents.xml line 53; 154-AUDIT-B.md §3 #1
     ("S", "S", 0, 0, "disulfanediyl"),# S-S; IUPAC P-29; OPSIN multiRadicalSubstituents.xml; 154-AUDIT-B.md §3 #2
@@ -2022,6 +2029,29 @@ def _classify_single_atom_bridge_ext(
     return None
 
 
+def _ethene_diyl_bridge_name(mol, atom1, atom2) -> str:
+    """`ethene-1,2-diyl`, carrying its configuration when the input defines one.
+
+    v29 P3-FINAL I9.  Without this, (E)- and (Z)-stilbene emitted the SAME name:
+    two different compounds, one string.  The Blue Book puts the descriptor
+    INSIDE the multiplicative bracket, so there is a channel for it --
+    `1,1'-[(1*E*)-1-(4-chlorophenyl)ethene-1,2-diyl]dibenzene (PIN, see P-93.6)`
+    (`BlueBookV2.md:47100`).  The bridge's own locant 1 is the atom cited first,
+    hence `(1E)`/`(1Z)`.
+
+    `_CIPCode` is the repo's single source of truth for E/Z
+    (`perception/stereo.get_double_bond_stereo`); an UNDEFINED geometry yields the
+    bare prefix, which is correct -- the molecule then has no configuration to
+    express, and inventing one would be worse than omitting it.
+    """
+    bond = mol.GetBondBetweenAtoms(atom1.GetIdx(), atom2.GetIdx())
+    if bond is not None and bond.HasProp('_CIPCode'):
+        code = bond.GetProp('_CIPCode')
+        if code in ('E', 'Z'):
+            return f"(1{code})-ethene-1,2-diyl"
+    return "ethene-1,2-diyl"
+
+
 def _classify_two_atom_bridge(atom1, atom2) -> Optional[str]:
     """Classify a two-atom bridge into a known type."""
     sym1 = atom1.GetSymbol()
@@ -2030,11 +2060,16 @@ def _classify_two_atom_bridge(atom1, atom2) -> Optional[str]:
     h2 = atom2.GetTotalNumHs()
 
     for s1, s2, expected_h1, expected_h2, name in _TWO_ATOM_BRIDGES:
-        if sym1 == s1 and sym2 == s2 and h1 == expected_h1 and h2 == expected_h2:
-            return name
-        # Check reverse order
-        if sym1 == s2 and sym2 == s1 and h1 == expected_h2 and h2 == expected_h1:
-            return name
+        matched = (
+            (sym1 == s1 and sym2 == s2 and h1 == expected_h1 and h2 == expected_h2)
+            # Check reverse order
+            or (sym1 == s2 and sym2 == s1 and h1 == expected_h2 and h2 == expected_h1)
+        )
+        if not matched:
+            continue
+        if name == "ethene-1,2-diyl":
+            return _ethene_diyl_bridge_name(atom1.GetOwningMol(), atom1, atom2)
+        return name
     return None
 
 
