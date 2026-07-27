@@ -262,6 +262,80 @@ def test_saturated_halogenated_chain_is_unchanged(smiles, start, excl, expected)
     assert _name_saturated_substituted_chain(mol, frag, start, set()) == expected
 
 
+def test_removing_the_saturation_guard_really_does_delete_the_double_bond():
+    """MUTATION PROOF of the guard above — the reproduction nobody had done.
+
+    The two tests above assert only that the guarded function DECLINES.  That is
+    not evidence the guard is load-bearing: a function that declined for some
+    other reason would pass them identically.  This test removes the saturation
+    decline from the live source and shows the atom/bond loss appear.
+
+    Measured here:
+
+        fragment          guarded (HEAD)   guard removed
+        -CH2-CH=CH-Cl     None             '3-chloropropyl'
+        -CH=CH-Cl         None             '2-chloroethyl'
+        -CH2CH2CH2-Cl     '3-chloropropyl' '3-chloropropyl'   <- CONTROL
+
+    The control is what makes it a collision rather than merely a wrong name:
+    `3-chloropropyl` is the CORRECT name of the saturated chain, so without the
+    guard two different constitutions received one name.
+
+    The mutation target is asserted present before anything is measured, so a
+    drifted source cannot make this test pass by mutating nothing.
+    """
+    import inspect
+
+    from orthonym.assembly import substituent_naming as sn
+
+    src = inspect.getsource(sn._name_saturated_substituted_chain)
+    decline = (
+        "    # SATURATED is in this function's name and contract: decline otherwise.\n"
+        "    for _b in mol.GetBonds():\n"
+        "        if (_b.GetBeginAtomIdx() in sub_set and _b.GetEndAtomIdx() in sub_set\n"
+        "                and _b.GetBondTypeAsDouble() != 1.0):\n"
+        "            return None\n"
+    )
+    assert decline in src, (
+        "the saturation decline is not where this test expects it; re-derive the "
+        "mutation target rather than deleting this test"
+    )
+    namespace = dict(sn.__dict__)
+    exec(compile(src.replace(decline, "").replace(
+        "def _name_saturated_substituted_chain", "def _unguarded", 1),
+        "<mutant>", "exec"), namespace)
+    unguarded = namespace["_unguarded"]
+
+    from orthonym.rules.substituent_purity import _fragment_atoms
+
+    def frag_of(smiles, start, excl):
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None
+        assign_stereochemistry(mol)
+        atoms = _fragment_atoms(mol, start, excl)
+        assert atoms is not None
+        return mol, atoms
+
+    # unsaturated: the guard is the only thing standing between us and the loss
+    for smiles, start, excl, lost_name in (
+        ("NC(CC=CCl)C(=O)O", 2, 1, "3-chloropropyl"),
+        ("NC(CC=CCl)C(=O)O", 3, 2, "2-chloroethyl"),
+    ):
+        mol, atoms = frag_of(smiles, start, excl)
+        assert sn._name_saturated_substituted_chain(mol, atoms, start, set()) is None
+        assert unguarded(mol, atoms, start, set()) == lost_name, (
+            "removing the guard must reproduce the alkane spelling; if it does "
+            "not, the guard is not what protects this class"
+        )
+
+    # CONTROL: the saturated class is byte-identical with and without the guard,
+    # so the guard is not merely refusing everything.
+    mol, atoms = frag_of("NC(CCCCl)C(=O)O", 2, 1)
+    assert sn._name_saturated_substituted_chain(mol, atoms, 2, set()) == \
+        "3-chloropropyl"
+    assert unguarded(mol, atoms, 2, set()) == "3-chloropropyl"
+
+
 # --------------------------------------------------------------------------
 # (g) the counting contract itself — three properties no naming witness reaches
 # --------------------------------------------------------------------------

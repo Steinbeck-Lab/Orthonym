@@ -285,6 +285,47 @@ def test_spelling_independence_treats_a_naming_failure_as_unstable(diag, monkeyp
 # a report that nobody reads next session.
 # ---------------------------------------------------------------------------
 
+def test_a_skipped_round_trip_is_never_reported_as_clean(diag, capsys):
+    """v29 P3-FINAL (review claim 41).
+
+    With OPSIN skipped -- e.g. on a false-positive `_gate_running` hit -- every
+    row still counted as `clean` and the tool still exited 0, so the summary read
+    `-- 1/1 clean` with ZERO round-trips performed.  A reader takes that line as
+    round-trip evidence.  It must say what it actually measured.
+    """
+    rc = diag.main(["--no-opsin", "CCO"])
+    err = capsys.readouterr().err
+    assert rc == 0
+    assert "clean" not in err, (
+        f"a run with no round-trip must not use the word 'clean': {err!r}")
+    assert "OPSIN SKIPPED" in err and "no round-trip" in err
+
+
+def test_spelling_independence_separates_stability_from_refusal(diag, monkeypatch):
+    """v29 P3-FINAL (review claim 40).
+
+    A molecule refused identically for every spelling is 'stable' in the trivial
+    sense and carries no information about naming stability.  On an 80-row slice,
+    40 of the 78 stable rows were of that kind, and the pass rate did not say so.
+    """
+    monkeypatch.setattr(diag, "respell", lambda s, n=4, seed=0: [s, s])
+    monkeypatch.setattr(
+        diag, "diagnose",
+        lambda spellings, **kw: [{"name": "unknown organic compound"}
+                                 for _ in spellings])
+    res = diag.spelling_independence(["CCO"])
+    assert res[0]["stable"] is True
+    assert res[0]["stable_but_refused"] is True, (
+        "a row stable only because every spelling was refused must be flagged")
+
+    monkeypatch.setattr(
+        diag, "diagnose",
+        lambda spellings, **kw: [{"name": "ethanol"} for _ in spellings])
+    res2 = diag.spelling_independence(["CCO"])
+    assert res2[0]["stable"] is True
+    assert res2[0]["stable_but_refused"] is False
+
+
 def test_help_documents_both_fixes(diag):
     # Collapse whitespace: the prose is hard-wrapped, so "spelling\n
     # independence" must still count as documenting spelling independence.
