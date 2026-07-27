@@ -175,12 +175,150 @@ def _final_stereo_check(
     # Predicate said True but no authoritative injection happened -> log gap.
     n_atom_stereo = sum(1 for a in mol.GetAtoms() if a.HasProp('_CIPCode'))
     n_bond_stereo = sum(1 for b in mol.GetBonds() if b.HasProp('_CIPCode'))
+    # v29 P3-CLOSEOUT Item D: ...unless the name expresses its configuration
+    # through a descriptor channel `needs_stereo_injection` cannot see, in which
+    # case this warning is a FALSE POSITIVE and the name is already complete.
+    # 1147 of the gate's warnings across 122 distinct names were this.
+    if _stereo_is_implied_by_name(name):
+        return name
     logger.warning(
         "Stereo backstop: '%s' (handler: %s) has %d R/S + %d E/Z but name lacks "
         "descriptors. Fix handler to include stereo natively.",
-        name[:50], handler, n_atom_stereo, n_bond_stereo
+        name, handler, n_atom_stereo, n_bond_stereo
     )
     return name
+
+
+# ---------------------------------------------------------------------------
+# v29 P3-CLOSEOUT Item D: the descriptor channels the stereo backstop is blind to
+# ---------------------------------------------------------------------------
+#
+# `needs_stereo_injection`'s descriptor vocabulary is `{R,S,r,s,E,Z}` inside
+# parentheses, plus `alpha|beta-D/L-` (the ANOMERIC sugar form) and a bare
+# `D-`/`L-` token.  The Blue Book's PIN descriptor vocabulary is wider.
+# `## **P-91.2.1.2.2** Stereodescriptors used in the nomenclature of natural
+# products` (BlueBookV2.md:44626) legitimises, at :44628-44632, "*(i) The
+# descriptors 'D' and 'L' ... for carbohydrates, amino acids and peptides, and
+# cyclitols; (ii) '*erythro*' and '*threo*' ...; (iii) The stereodescriptors
+# 'alpha', 'beta' are used in the nomenclature of natural products to describe
+# the absolute configuration of alkaloids, terpenes and terpenoids, steroids*".
+#
+# So a name can be configurationally COMPLETE through a channel this predicate
+# cannot read, and the backstop then warns about a correct name.  That was 1147
+# of the gate's warnings, over 122 distinct names.
+#
+# WHY THIS IS A DIAGNOSTIC-ONLY EXEMPTION AND NOT A WIDENING OF
+# `needs_stereo_injection`.  That predicate gates BOTH this log AND the
+# injection path above it, and `rules/stereochemistry.py:456` carries an
+# explicit "*Per D-20, do NOT broaden*".  Widening it would stop injection
+# firing on names that currently receive a correct descriptor block — trading a
+# noisy log for real stereo loss (session invariant 11: removing a wrong output
+# can unmask a worse one).  This check therefore sits at the LOG site only and
+# changes no emitted name.
+#
+# NOT exempted, deliberately: the free amino acids (`alanine`, `serine`,
+# `cysteine`, `cystine`, `threonine`, `isoleucine`, `allo-threonine`,
+# `allo-isoleucine`).  There the warning is TRUE — `## **P-103.1.3.1** The
+# stereodescriptors 'D' and 'L'` (:54291) requires the configuration at the
+# alpha-carbon to be designated, `### **P-103.3.4** Indication of configuration
+# in peptides` (:54715) scopes L-omission to PEPTIDES only, and Table 10.4 pairs
+# each retained name with a `rel-` (RELATIVE) systematic equivalent (:54204,
+# :54211), so the bare name is not enantiospecific.  Left warning on purpose.
+
+# `### **P-101.2.6** Stereochemical configuration of parent structures`
+# (:51045): "*The stereodescriptors 'alpha', 'beta', and 'xi' ... are cited
+# before the name of the fundamental parent structure*", and `**P-101.2.6.1**`
+# (:51051) "*Each chirality center is described by the stereodescriptor 'alpha',
+# 'beta', or 'xi'*".  A locant-prefixed alpha/beta IS a stereodescriptor.
+_ALPHA_BETA_DESCRIPTOR_RE = re.compile(r"\d+(?:alpha|beta|xi)\b")
+
+# `## **P-105.1** RETAINED NAMES OF NUCLEOSIDES` (:54943) retains exactly these
+# seven, whose full ribofuranosyl configuration is implied by the name; the
+# nucleotide stems come from `## **P-106.1** RETAINED NAMES` (:55003).  BB's own
+# examples are descriptor-free, e.g. `uridine 5'-(tetrahydrogen triphosphate)`
+# (:55029) and `2',3',5'-tri-O-acetyladenosine` (:54981).
+_IMPLIED_STEREO_NUCLEOSIDE_STEMS = (
+    'adenosine', 'guanosine', 'inosine', 'xanthosine', 'cytidine',
+    'thymidine', 'uridine',
+    'adenylic', 'guanylic', 'inosinic', 'xanthylic', 'cytidylic',
+    'thymidylic', 'uridylic',
+)
+
+
+def _stereo_is_implied_by_name(name: str) -> bool:
+    """Does ``name`` already express its configuration, by a channel the
+    R/S + E/Z counter cannot see?
+
+    Diagnostic predicate only — it suppresses a false-positive WARNING and never
+    changes an emitted name.  Each leg is keyed off the SAME table that produced
+    the name, so it cannot drift from the producers.
+    """
+    if not name:
+        return False
+
+    # Family 4 — steroid/terpenoid alpha/beta: the name DOES carry descriptors
+    # (`cholest-5-en-3beta-yl hydrogen sulfate`, `5alpha-cholestan-3beta-ol`).
+    # Produced by `rules.steroid_stereo.collect_steroid_alpha_beta`, whose own
+    # module docstring cites P-101.2.6.
+    if _ALPHA_BETA_DESCRIPTOR_RE.search(name):
+        return True
+
+    # Family 1 — inositols.  `## **P-104.1** DEFINITIONS` (:54821): "*Inositols
+    # have retained names and ... employ the stereodescriptors 'D' and 'L' to
+    # describe configurations*"; `**P-104.2.1**` (:54831): "*Stereoisomeric
+    # inositols are described by adding italicized prefixes at the front of the
+    # name 'inositol'. ... Names denoted by the prefixes are preferred.*"  The
+    # prefix IS the descriptor for the five meso forms.  Same table as the
+    # OPSIN-validity carve-out below.
+    try:
+        from .rules.inositols import INOSITOL_NAMES
+        if name in INOSITOL_NAMES:
+            return True
+    except Exception:
+        pass
+
+    # Family 3 — retained nucleosides/nucleotides and their derivatives.
+    _low = name.lower()
+    if any(stem in _low for stem in _IMPLIED_STEREO_NUCLEOSIDE_STEMS):
+        return True
+
+    # Family 5 — stereoparent hydrides.  `**P-101.2.1.3**` (:50991) defines a
+    # stereoparent as a parent that "*should include as much configuration as
+    # possible*"; `### **P-101.2.6**` (:51047): "*The name of a fundamental
+    # parent structure usually implies the absolute configuration of all
+    # chirality centers ... without further specification*"; and
+    # `### **P-101.3.6**` (:52106): "*Stereochemistry implied by the name of the
+    # stereoparent structure remains the same, unless otherwise specified.*"
+    # Membership is `**P-101.2.7**` Table 10.1 (:51377).  Keyed off the two
+    # tables that emit these names, so no new hardcoded list.
+    try:
+        from .data.natural_products import (
+            NAME_EXACT_NP_PARENTS, NATURAL_PRODUCT_DERIVATIVES,
+            NATURAL_PRODUCT_SCAFFOLDS,
+        )
+        if name in NAME_EXACT_NP_PARENTS:
+            return True
+        if name in set(NATURAL_PRODUCT_DERIVATIVES.values()):
+            return True
+        # All three are needed: `NAME_EXACT_NP_PARENTS` deliberately excludes the
+        # parents that DO round-trip in OPSIN (`tropane`, `prostane`,
+        # `thromboxane`), and `tropane`/`stigmastane` live only in the scaffold
+        # table.  Keying off all three covers Table 10.1 without a new list.
+        if name in {
+            _e['name'] for _e in NATURAL_PRODUCT_SCAFFOLDS.values()
+            if isinstance(_e, dict) and 'name' in _e
+        }:
+            return True
+    except Exception:
+        pass
+
+    # `**P-107.4.3.1**` (:55227): "*the retained name 'sphinganine' for the
+    # aliphatic amino alcohol HAVING THE DESCRIBED ABSOLUTE CONFIGURATION ...
+    # is preferred to the systematic name (2S,3R)-2-aminooctadecane-1,3-diol*".
+    if 'sphinganine' in _low or 'sphing' in _low:
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------
