@@ -35,7 +35,7 @@ Blue Book authority for every expected name below (``BlueBookV2/BlueBookV2.md``)
     * ``isobutyl`` is NOT a PIN: BB:16412 "2-methylpropyl (preferred prefix)
       (not isobutyl)" and BB:56371. PIN = ``2-methylpropyl``.
 
-  Enclosing marks (P-16.3.3) -- around the ORGANYL, suffix OUTSIDE
+  Enclosing marks (P-16.5.1.1) -- around the ORGANYL, suffix OUTSIDE
     * BB:18089 "-NH-CH3 methylamino (preferred prefix)" -- a SIMPLE organyl is
       bare; BB:18112 "-NH-CH2Cl (chloromethyl)amino (preferred prefix)" -- a
       COMPOUND organyl is enclosed and 'amino' stays outside the marks.
@@ -49,7 +49,7 @@ Blue Book authority for every expected name below (``BlueBookV2/BlueBookV2.md``)
     * "(CH3)2CH-CH2-O- 2-methylpropoxy (preferred prefix) (not isobutoxy)" --
       note this one CONTRACTS and is BARE, it is not '(2-methylpropyl)oxy'.
 
-  Multiplicity (P-16.3.4(b) vs P-16.3.5(a))
+  Multiplicity (P-16.3.4(a) vs P-16.3.5(a))
     * 'di' for a simple prefix that merely carries a locant -- BB:28170
       "2-[di(butan-2-yl)amino]butan-2-ol (PIN)", BB:25719
       "1,4-di(propan-2-yl)cyclohexane (PIN)";
@@ -156,7 +156,7 @@ def test_mixed_simple_and_italicized_branches_cite_per_p16_5_1_3_1():
     ("tert-butylsulfanyl", "(tert-butylsulfanyl)"),
 ])
 def test_cite_organyl_marks(token, expected):
-    """P-16.3.3: marks around a COMPOUND organyl, none around a simple one."""
+    """P-16.5.1.1: marks around a COMPOUND organyl, none around a simple one."""
     assert cite_organyl_in_composed_prefix(token) == expected
 
 
@@ -188,7 +188,7 @@ def test_composed_alkoxy_prefix_matches_p63_2_2_2(token, expected):
     ("2-chloropropan-2-yl", "bis"),             # BB:7104
 ])
 def test_multiplier_di_vs_bis(token, expected):
-    """P-16.3.4(b) 'di' for a locant-bearing simple prefix vs P-16.3.5(a) 'bis'
+    """P-16.3.4(a) 'di' for a locant-bearing simple prefix vs P-16.3.5(a) 'bis'
     for a substituted one."""
     assert composed_prefix_multiplier(token, 2) == expected
 

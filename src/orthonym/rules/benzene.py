@@ -2986,7 +2986,7 @@ def name_substituted_benzene(
                 else:
                     prefix_str = apply_enclosing_marks(name, -1)
             elif is_complex_substituent(name):
-                # Complex substituent needs enclosing marks per IUPAC P-14.5.2
+                # Complex substituent needs enclosing marks per IUPAC P-16.5.1.1
                 # e.g., "(2-methylbut-2-en-1-yl)benzene"
                 prefix_str = f"({name})"
             else:
@@ -3955,7 +3955,7 @@ def _build_prefix_string(prefix_groups: Dict[str, List[int]]) -> str:
                 # Already has enclosing marks -- keep as-is
                 prefix_str = name
             elif is_complex_substituent(name):
-                # Complex substituent needs enclosing marks per IUPAC P-14.5.2
+                # Complex substituent needs enclosing marks per IUPAC P-16.5.1.1
                 prefix_str = f"({name})"
             else:
                 prefix_str = name

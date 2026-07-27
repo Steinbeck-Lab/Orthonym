@@ -3,7 +3,7 @@ OPSIN round-trip integration tests for multi-ring substituent naming.
 
 Phase 82 Plan 02 — Verifies that ring assembly prefixes ([1,1'-biphenyl]-4-yl)
 and mixed-ring compound prefixes round-trip through OPSIN, and that enclosing
-marks follow IUPAC P-16.3.3 nesting hierarchy.
+marks follow IUPAC P-16.5.1.1 nesting hierarchy.
 """
 
 import subprocess
@@ -167,7 +167,7 @@ class TestMixedRingRoundTrip:
 
 
 # ============================================================================
-# Enclosing Mark Format Tests (IUPAC P-16.3.3)
+# Enclosing Mark Format Tests (IUPAC P-16.5.1.1)
 # ============================================================================
 
 @pytest.mark.integration
@@ -189,7 +189,7 @@ class TestEnclosingMarks:
     def test_biphenyl_prefix_has_outer_parentheses(self):
         """Biphenyl prefix wrapped in parentheses: ([1,1'-biphenyl]-N-yl).
 
-        Per IUPAC P-16.3.3: parentheses () enclose square brackets [].
+        Per IUPAC P-16.5.1.1: parentheses () enclose square brackets [].
         """
         smi = "OC(=O)CCCc1ccc(-c2ccccc2)cc1"
         name = name_compound(smi)

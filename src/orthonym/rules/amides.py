@@ -26,7 +26,7 @@ from ..assembly.naming_utils import (
 
 # Pattern matching a leading positional locant (digit(s)) in a substituent
 # name.  Used to detect compound N-substituent names that need
-# parenthesization per IUPAC P-14.5.2.
+# parenthesization per IUPAC P-16.5.1.1.
 _POSITIONAL_LOCANT_RE = re.compile(r'(?:^|\b)\d')
 
 
@@ -442,7 +442,7 @@ def format_n_substitution(substituents: List[Dict]) -> str:
         is_complex = is_complex_substituent(name)
         from ..assembly.naming_utils import _wrap_n_substituent
         if is_complex:
-            # P-16.3.3 bracket escalation: if the substituent ALREADY carries an
+            # P-16.5.1.1 bracket escalation: if the substituent ALREADY carries an
             # inner "(...)" (e.g. a "(2S)-" stereo descriptor), the outer
             # enclosure must escalate to square brackets — "[(2S)-butan-2-yl]",
             # NOT "((2S)-butan-2-yl)". _wrap_n_substituent picks [] when an inner
@@ -665,7 +665,7 @@ def get_amide_parent_name(
     # NO retained "thioformamide" / "thioacetamide" forms — systematic only per
     # OPSIN-confirmed PINs methanethioamide / ethanethioamide / propanethioamide.
     # Suffix starts with consonant, so terminal 'e' of '{stem}ane' is preserved
-    # per IUPAC P-16.3.3 vowel-elision rule.
+    # per IUPAC P-16.7.1(a) vowel-elision rule.
     stem = _get_chain_prefix(chain_length)
     return f"{stem}ane{suffix_form}"
 

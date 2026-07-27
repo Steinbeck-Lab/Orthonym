@@ -709,7 +709,7 @@ _MULTIPLIER_WORDS = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6,
                      "undeca": 11, "dodeca": 12,
                      "bis": 2, "tris": 3, "tetrakis": 4, "pentakis": 5,
                      "hexakis": 6}
-# P-16.3.3: a multiplying prefix drops its terminal vowel before a
+# P-16.7.1(a): a multiplying prefix drops its terminal vowel before a
 # vowel-initial suffix -- "butane-1,2,3,4-tetraol" is written "...-tetrol",
 # "...-pentaol" is written "...-pentol". The elided spelling is the SAME
 # morpheme with the same value, so it is DERIVED here rather than listed:
@@ -720,7 +720,7 @@ _MULTIPLIERS = {**_MULTIPLIER_WORDS,
                    if word.endswith("a")}}
 # Morphemes that may legitimately PRECEDE a token (consulted by _left_ok).
 # The multipliers are here in BOTH spellings: the elided form is what sits
-# against a vowel-initial suffix, "...-tetr|ol" (P-16.3.3), and dropping it
+# against a vowel-initial suffix, "...-tetr|ol" (P-16.7.1(a)), and dropping it
 # was the last false TOKEN_SUBSTRING_ONLY left on real data.
 _LEFT_GLUE = frozenset(_MULTIPLIERS) | {
     # Ring-assembly and retained-shape prefixes: "bicyclo|hexane", "iso|butyl".

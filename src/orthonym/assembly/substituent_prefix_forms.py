@@ -846,7 +846,7 @@ def get_alkoxysulfinyl_prefix(
     carrying exactly ONE ``-O-alkyl`` arm and the single ``=O`` oxo (no C
     neighbours), name the O-alkyl arm as ``<alkyl>oxy`` and concatenate the
     additive ``sulfinyl`` stem -> ``ethoxysulfinyl``. The compound prefix is
-    returned already enclosed in parentheses per P-16.3.3
+    returned already enclosed in parentheses per P-16.5.1.1
     (``(ethoxysulfinyl)``); the caller's N-substituent wrapper leaves a
     balanced single-paren name unchanged.
 
@@ -918,7 +918,7 @@ def get_phosphoryl_prefix(
     ``-SH`` arms), and concatenate the additive ``phosphoryl`` stem ->
     ``bis(sulfanyl)phosphoryl``. Returned WITHOUT an outer enclosure; the
     caller's N-substituent wrapper escalates the parens-bearing name to square
-    brackets per P-16.3.3 -> ``[bis(sulfanyl)phosphoryl]``.
+    brackets per P-16.5.1.1 -> ``[bis(sulfanyl)phosphoryl]``.
 
     Only ``-SH`` arms are recognised today (the sole verified class); any other
     arm shape fails closed so a partial/ambiguous name never leaks.
@@ -1322,7 +1322,7 @@ def get_n_substituted_carbamoylamino_prefix(
       * unsubstituted distal N -> ``"carbamoylamino"`` (BB preselected prefix,
         NOT 'ureido'/'3-methylureido');
       * substituted distal N -> ``"(methylcarbamoyl)amino"`` /
-        ``"(dimethylcarbamoyl)amino"`` (compound-prefix enclosure, P-16.3.3);
+        ``"(dimethylcarbamoyl)amino"`` (compound-prefix enclosure, P-16.5.1.1);
       * un-nameable distal substituent or ambiguous orientation -> None
         (fail closed).
     """

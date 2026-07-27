@@ -531,7 +531,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
         locant_prefix = f'{attach_locant}-'
 
     # 4. Compose: {locant}-(cation-prefix)anion-parent (P-74.1.3 — prefix the
-    # cation to the anionic parent). Enclosing marks per P-14.5.2 (complex prefix).
+    # cation to the anionic parent). Enclosing marks per P-16.5.1.1 (complex prefix).
     composed = f'{locant_prefix}({cat_prefix}){parent_anion_name}'
 
     # Defensive: never ship a malformed composition where the prefix glues

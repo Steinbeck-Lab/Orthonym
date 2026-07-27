@@ -888,7 +888,7 @@ def composed_prefix_organyl_name(mol, frag_atoms, attach_idx):
 
 
 def cite_organyl_in_composed_prefix(token):
-    """Cite ``token`` inside a composed prefix with its P-16.3.3 enclosing marks.
+    """Cite ``token`` inside a composed prefix with its P-16.5.1.1 enclosing marks.
 
     A SIMPLE prefix is cited BARE: 'butylamino' and 'methylsulfanyl'
     (BB 18089 "-NH-CH3 methylamino (preferred prefix)"; BB 27651 "CH3-S-
@@ -927,7 +927,8 @@ def _is_bare_locant_bearing_alkyl(token):
     followed by its 'an'/'en'/'yn' saturation syllable, so a decorated name like
     '2-chloropropan-2-yl' (which begins with a locant) can never match.
 
-    This is the P-16.3.4(b) class -- a simple prefix that merely has a locant --
+    This is the P-16.3.4(a) class -- "simple substituent prefixes having
+    locants" (BB 7085; clause (b) is the separate ene/yne case) --
     as distinct from the P-16.3.5(a) compound class.
     """
     if not token or not _LOCANT_BEARING_YL_RE.search(token):
@@ -949,7 +950,7 @@ def _is_bare_locant_bearing_alkyl(token):
 def composed_prefix_multiplier(token, count):
     """The multiplicative prefix for ``count`` copies of ``token``, or ``None``.
 
-    P-16.3.4(b) / P-16.3.5(a). A SIMPLE substituent prefix -- including one that
+    P-16.3.4(a) / P-16.3.5(a). A SIMPLE substituent prefix -- including one that
     merely carries a locant -- takes 'di'/'tri': BB 25719
     '1,4-di(propan-2-yl)cyclohexane (PIN)' and BB 28170
     '2-[di(butan-2-yl)amino]butan-2-ol (PIN)'. A COMPOUND (substituted) prefix
@@ -3812,7 +3813,7 @@ def _name_mixed_chalcogen_branch(mol, frag_atoms, attach_idx, parent_atoms):
         _mono = composed_chalcogen_group_prefix(
             mol, sorted(frag_set), r_start, {attach_idx})
         if _mono:
-            # P-16.3.3: this concatenated compound prefix takes enclosing marks --
+            # P-16.5.1.1: this concatenated compound prefix takes enclosing marks --
             # BB 27914 spells the PIN '(methoxysulfanyl)cyclohexane', not
             # 'methoxysulfanylcyclohexane'. Marked HERE so the producer is correct
             # on its own rather than relying on a caller to recognise the shape;

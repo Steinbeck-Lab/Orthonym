@@ -193,7 +193,7 @@ class TestSteroidSuffixOrdering:
 
 
 class TestNBracketWrapping:
-    """Test IUPAC P-16.3.3 bracket escalation for N-substituents.
+    """Test IUPAC P-16.5.1.1 bracket escalation for N-substituents.
 
     When an N-substituent name contains parenthesized content (stereo
     descriptors or compound substituent names), the N-prefix must use
@@ -202,7 +202,7 @@ class TestNBracketWrapping:
     Root cause: N-prefix construction sites (composer.py, fragment_assembly.py,
     engine.py, amides.py, benzene.py, etc.) previously produced f"N-{name}"
     without checking for parentheses. Now all sites route through
-    _wrap_n_substituent() which applies P-16.3.3 bracket escalation.
+    _wrap_n_substituent() which applies P-16.5.1.1 bracket escalation.
     """
 
     # ---- Unit-level tests for _wrap_n_substituent ----

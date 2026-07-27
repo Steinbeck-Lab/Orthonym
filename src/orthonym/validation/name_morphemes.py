@@ -115,7 +115,7 @@ fusion prefixes (benzo-)     ``data.fusion_components`` ``ring_size``
 Hantzsch-Widman stems        ``data.hw_stems.HW_STEMS`` (inverted)
 replacement prefixes (aza-)  ``rules.skeletal_replacement``
 multipliers (di-, bis-)      ``assembly.naming_utils`` (inverted)
-elided stems (thiazol-)      terminal-'e' elision (P-16.3.3) of the
+elided stems (thiazol-)      terminal-'e' elision (P-16.7.1(a)) of the
                              skeletons the tables above agreed on
 ===========================  =========================================
 
@@ -739,7 +739,7 @@ def _add_chain_stems(general: _Lexicon) -> None:
 
 
 def _add_elided_stems(general: _Lexicon) -> None:
-    """Terminal-'e' elision of the NAMED skeletons (P-16.3.3).
+    """Terminal-'e' elision of the NAMED skeletons (P-16.7.1(a)).
 
     A parent hydride drops its final 'e' before a suffix or a locant:
     "1,3-thiazole" but "1,3-thiazol-5-yl", "pyridine" but "pyridin-2-yl". The

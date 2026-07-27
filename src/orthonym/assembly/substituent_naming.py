@@ -20,7 +20,7 @@ is_complex_substituent() and multiplier logic.
 
 References:
     IUPAC 2013 P-31.1.3 (substituent prefix naming)
-    IUPAC 2013 P-14.5.2 (compound substituent enclosing marks)
+    IUPAC 2013 P-16.5.1.1 (compound substituent enclosing marks)
 """
 
 import re
@@ -3286,7 +3286,8 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
                 return None
             branch_groups[bname].append(chain_pos[chain_atom])
 
-    # Wave2 T5b (P-14.5.2(e)): when the free valence sits at the exact chain
+    # Wave2 T5b (P-14.4(g), BB 3307 -- P-14.5.2 has NO lettered sub-items):
+    # when the free valence sits at the exact chain
     # centre AND the branch-locant multiset is direction-invariant (the T3c
     # first-point-of-difference tie-break above could not decide), assign the
     # lowest locants to the substituent cited FIRST in alphanumerical order:
@@ -4378,7 +4379,7 @@ def _compose_group14_prefixes(prefixes: List[str]) -> str:
       ``sorted()`` ordered ``tert-butyl`` on its 't' and would have emitted
       ``dimethyltert-butylsilyl`` for the compound that is spelled
       ``tert-butyldimethylsilyl``.
-    * ``enclose_if_compound`` -- P-16.3.3 marks for a compound prefix, so
+    * ``enclose_if_compound`` -- P-16.5.1.1 marks for a compound prefix, so
       ``propan-2-yl`` is cited ``(propan-2-yl)`` and cannot run into the
       neighbouring token.
 

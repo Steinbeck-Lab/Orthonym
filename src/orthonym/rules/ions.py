@@ -2203,7 +2203,7 @@ def emit_chalcogen_ylium(mol, center_idx: int) -> str:
     Scope (tight, so oxonium/sulfonium/phosphonium are never disturbed — they
     return '' here): the centre is S or Se, formal charge +1, ZERO hydrogens, and
     exactly ONE heavy neighbour which is a CARBON substituent R (alkyl/aryl). R is
-    named via classify_substituent; a complex R gets enclosing marks (P-14.5.2:
+    named via classify_substituent; a complex R gets enclosing marks (P-16.5.1.1:
     (2,2-dichloroethyl)sulfanylium). Acyl R (R-CO-S+) and R-S-S+ (disulfanylium)
     are out of scope -> ''. Returns '' on any decline (caller falls through)."""
     center = mol.GetAtomWithIdx(center_idx)

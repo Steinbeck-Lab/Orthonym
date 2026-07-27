@@ -8,7 +8,7 @@ oxides are classed with zwitterions, so they are senior to esters/acids.
 v28 Cluster D: the BB ester PIN '4-(methoxycarbonyl)benzonitrile oxide' (34893)
 is now BUILT — the aromatic-benzene forced-nitrile fix (_assemble_ring_nitrile_name
 delegates aromatic benzene rings to the benzonitrile assembler) plus the
-'(methoxycarbonyl)' enclosing marks (P-16.3.3) landed. The acid variant still
+'(methoxycarbonyl)' enclosing marks (P-16.5.1.1) landed. The acid variant still
 fails closed (the forced-nitrile override does not demote carboxylic_acid).
 
 Under pytest the OPSIN validity gate is disabled (conftest autouse); the positive
@@ -59,7 +59,7 @@ class TestNitrileOxide:
 
     def test_ester_names_correctly(self):
         # v28 Cluster D: BB:34893 verbatim PIN. The senior nitrile oxide demotes
-        # the ester to the '(methoxycarbonyl)' prefix (P-65.6.3, enclosed P-16.3.3);
+        # the ester to the '(methoxycarbonyl)' prefix (P-65.6.3, enclosed P-16.5.1.1);
         # the aromatic benzene ring is named as a benzonitrile, not cyclohexane.
         mol = Chem.MolFromSmiles("COC(=O)C1=CC=C(C#[N+][O-])C=C1")
         assert _is_nitrile_oxide(_Feat(mol)) is True

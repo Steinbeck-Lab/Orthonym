@@ -149,8 +149,8 @@ def test_phosphorus_oxoacid_names_unchanged(namer, smiles, expected):
 #      * P-29.6.1 (BB 16272): benzyl is a retained PREFERRED prefix, cited bare
 #        -- '2-benzylpyridine' (PIN), BB 16280.
 #      * P-29.6.1 (BB 16270/16286): 'tert-butyl' likewise, cited bare --
-#        '*tert*-butyldi(methyl)phosphane' (PIN); P-16.3.4 'N-tert-butyl' NOT
-#        'N-(tert-butyl)'.
+#        '*tert*-butyldi(methyl)phosphane' (PIN); P-16.3.3(b)/P-16.2.4.1(d) 'N-tert-butyl' NOT
+#        the enclosed form (BB 3465 cites it bare).
 #      * P-16.5.1.3 / BB L36066: for a mononuclear parent the FIRST cited group
 #        takes no marks and each subsequent one is enclosed --
 #        'methyl(phenyl)arsinic acid' (PIN).
@@ -178,7 +178,7 @@ def test_complex_organyl_is_named_correctly(gated_namer, smiles, expected):
 @pytest.mark.parametrize("rules_fn,fg,smiles,expected", [
     ("name_arsonic_acid", "arsonic_acid", "C1=CC=C(C=C1)C[As](=O)(O)O",
      "benzylarsonic acid"),
-    # P-29.6.1 / P-16.3.4 (BB 16286): the retained italicized prefix is BARE.
+    # P-29.6.1 / P-16.3.3(b)/P-16.2.4.1(d) (BB 16286): the retained italicized prefix is BARE.
     ("name_arsonic_acid", "arsonic_acid", "CC(C)(C)[As](=O)(O)O",
      "tert-butylarsonic acid"),
     ("name_stibonic_acid", "stibonic_acid", "C1=CC=C(C=C1)C[Sb](=O)(O)O",

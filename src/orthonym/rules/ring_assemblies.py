@@ -1771,8 +1771,11 @@ def _build_mixed_pcg_ring_assembly(
     lowest locant (P-31.1.4.3.4); the numbering direction of each ring is chosen
     by first-point-of-difference on (suffix locants, then all substituent
     locants, then the alphabetically-first prefix). PIN form places NO hyphen
-    between the prefix block and the opening bracket (BB P-16.3.3 examples:
-    6,6'-dinitro[1,1'-biphenyl]-2,2'-dicarboxylic acid).
+    between the prefix block and the opening bracket (`**P-16.2.4.2**`, BB 6968:
+    no hyphen after a numerical prefix before an enclosing mark). The witness
+    6,6'-dinitro[1,1'-biphenyl]-2,2'-dicarboxylic acid is real but lives at BB
+    49803 under P-93 (axial chirality) -- it is NOT a P-16.3.3 example, and
+    P-16.3.3 contains no biphenyl.
 
     Returns the PIN, or None to fail CLOSED (out-of-class / un-nameable prefix),
     letting ``name_ring_assembly`` fall through to its veto / prefix-only path.
@@ -1901,7 +1904,7 @@ def _build_mixed_pcg_ring_assembly(
             f"-{suffix_loc_str}-{smult}{senior}")
 
     # Prefix block (alphanumerical, grouped multipliers). Directly abuts '[' with
-    # NO hyphen (P-16.3.3: no hyphen before an opening enclosing mark).
+    # NO hyphen (P-16.5.1.1: no hyphen before an opening enclosing mark).
     by_name: Dict[str, List[Tuple[int, int]]] = {}
     for s, nm in prefix_subs:
         by_name.setdefault(nm, []).append(_loc(s))

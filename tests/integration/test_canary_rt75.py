@@ -564,7 +564,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)(C)c1ccc(CC(=O)O)cc1",
-        "2-(4-tert-butylphenyl)ethanoic acid",  # P-16.3.4 (Phase 171): tert-butyl is simple, no enclosing marks
+        "2-(4-tert-butylphenyl)ethanoic acid",  # P-16.3.3(b)/P-16.2.4.1(d) (Phase 171): tert-butyl is simple, no enclosing marks
     ),
     (
         r"CCCCC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)O",

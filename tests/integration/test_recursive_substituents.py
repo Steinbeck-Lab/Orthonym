@@ -148,7 +148,7 @@ class TestBranchedAlkylDetection:
 # ============================================================================
 
 class TestEnclosingMarks:
-    """Test IUPAC P-16.3.3 enclosing mark nesting."""
+    """Test IUPAC P-16.5.1.1 enclosing mark nesting."""
 
     @pytest.mark.integration
     def test_parentheses_depth_0(self):

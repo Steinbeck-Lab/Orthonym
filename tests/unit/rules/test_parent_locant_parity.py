@@ -13,11 +13,11 @@ Source: Phase 147 CONTEXT D-03, D-05, D-09, D-10.
 
 Per Phase 147 D-05 the criterion order applied within each handler orient
 function matches HERITAGE §3 (a)-(f) AND IUPAC P-14.5 / P-14.4:
-  (a) lowest locants for principal characteristic group   (P-14.5.2)
+  (a) lowest locants for principal characteristic group   (P-14.3.5)
   (b) lowest locants for indicated hydrogens              (P-31.1.4 / P-25.7.1)
-  (c) lowest locants for multiple bonds                   (P-14.5.2 / P-31.1.4)
+  (c) lowest locants for multiple bonds                   (P-14.3.5 / P-31.1.4)
   (d) maximum number of substituents                      (P-14.5.2 secondary)
-  (e) lowest locants for substituents                     (P-14.5.2)
+  (e) lowest locants for substituents                     (P-14.3.5)
   (f) lowest locants for substituents in alphabetical citation order (P-14.4(g))
 """
 import pytest

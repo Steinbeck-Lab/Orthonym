@@ -2458,7 +2458,7 @@ def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
     sorted_groups = sorted(groups.items(), key=lambda x: x[0])
 
     # Build prefix parts using format_substituent_prefix for proper
-    # IUPAC P-16.3.3 parenthesization (acyloxy = compound prefix = bis/tris)
+    # IUPAC P-16.5.1.1 parenthesization (acyloxy = compound prefix = bis/tris)
     from ..assembly.naming_utils import format_substituent_prefix
     parts = []
     for acyloxy, locants in sorted_groups:

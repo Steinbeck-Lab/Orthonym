@@ -2047,7 +2047,7 @@ def _compound_ring_on_chain_substituent(
         # the outer mark to brackets (P-16.5.2.4). Mononuclear carrier
         # cites no locant.
         return f"{''.join(_parts)}{alkyl}"
-    # P-16.3.3: enclose the ring-yl in marks only when it is itself complex
+    # P-16.5.1.1: enclose the ring-yl in marks only when it is itself complex
     # (carries locants/parens, e.g. '(naphthalen-2-yl)methyl'); a simple ring-yl
     # is concatenated bare ('cyclohexylmethyl', 'phenylmethyl' is retained
     # 'benzyl' elsewhere). The old unconditional parens produced the non-PIN

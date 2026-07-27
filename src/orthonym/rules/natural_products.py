@@ -1307,7 +1307,7 @@ def _find_methoxys(
 
 def _np_parent_e(next_word: str) -> str:
     """Return the parent-hydride terminal 'e' (``…ane``/``…ene``/``…yne``) that
-    precedes a following suffix, applying IUPAC P-16.3.3 vowel elision.
+    precedes a following suffix, applying IUPAC P-16.7.1(a) vowel elision.
 
     The 'e' is ELIDED before a vowel-initial suffix (single ``-ol``/``-one``) and
     RETAINED before a consonant-initial (i.e. multiplied) suffix (``-diol`` /
@@ -1489,7 +1489,7 @@ def _assemble_np_name(
 
     # --- Build ketone suffix ---
     ketone_suffix = ""
-    ketone_word = ""  # the multiplier+suffix word (one/dione/trione) for P-16.3.3 elision
+    ketone_word = ""  # the multiplier+suffix word (one/dione/trione) for P-16.7.1(a) elision
     if ketones:
         locant_str = ",".join(str(loc) for loc in ketones)
         count = len(ketones)
@@ -1539,7 +1539,7 @@ def _assemble_np_name(
         from ..assembly.naming_utils import _join_multiplied_suffix
         ol_word = _join_multiplied_suffix(multiplier, 'ol')
         ol_suffix = f"-{locant_str}-{ol_word}"
-        # P-16.3.3: the parent-hydride terminal 'e' is elided before the vowel-initial
+        # P-16.7.1(a): the parent-hydride terminal 'e' is elided before the vowel-initial
         # single '-ol' but RETAINED before a consonant-initial multiplied '-diol'/'-triol'
         # (estradiol -> 'triene-3,17-diol'; 5alpha-androstane-3,17-diol).
         e = _np_parent_e(ol_word)
@@ -1551,7 +1551,7 @@ def _assemble_np_name(
     # e.g., "17beta-hydroxy-5alpha-androstan-3-one"
     if unsat_suffix == "an":
         # Saturated: prefix + modification_prefix + stem + "an" + ketone
-        # P-16.3.3: terminal 'e' of "-ane" is elided before the vowel-initial single
+        # P-16.7.1(a): terminal 'e' of "-ane" is elided before the vowel-initial single
         # '-one' but RETAINED before a consonant-initial multiplied '-dione'/'-trione'
         # (androstane-3,17-dione), and kept when no suffix follows (bare name).
         if ketone_suffix:

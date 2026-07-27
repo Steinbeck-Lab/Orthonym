@@ -266,7 +266,7 @@ def test_substituted_benzyl_never_keeps_the_retained_prefix(
     nomenclature; ``2-[(4-bromophenyl)methyl]pyridine`` is the PIN.  A
     substituted benzyl must therefore be spelled ``(...phenyl)methyl``, and the
     compound prefix takes enclosing marks that escalate to SQUARE brackets
-    because the name already contains parentheses (P-16.3.3 / P-16.5.4.1).
+    because the name already contains parentheses (P-16.5.1.1 / P-16.5.4.1).
     """
     name = ungated_namer.name(smiles)
     assert "(4-" in name and ")methyl" in name, name
@@ -348,7 +348,7 @@ def test_provenance_benzylphosphonic_comes_from_the_routed_handler(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# 9. P-16.3.4 / P-29.6.1: a retained ITALICIZED-PREFIX name is cited BARE
+# 9. P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1: a retained ITALICIZED-PREFIX name is cited BARE
 #
 # The routing above made `tert-butyl` reachable as a prefix for the first time
 # and exposed an over-enclosure defect: '(tert-butyl)arsonic acid'.  The Blue
@@ -359,7 +359,7 @@ def test_provenance_benzylphosphonic_comes_from_the_routed_handler(monkeypatch):
 #   BB 16282   "The retained name '*tert*-butyl' has never been recommended for
 #              further substitution ... Acceptable locants have never been
 #              adopted for this name."   -> its hyphen is not a compound boundary
-#   P-16.3.4   'di-tert-butyl' (NOT 'bis(tert-butyl)'), 'N-tert-butyl'
+#   P-16.3.3(b)/P-16.2.4.1(d)   'di-tert-butyl' (NOT 'bis(tert-butyl)'), 'N-tert-butyl'
 #              (cited bare per BB 3465)
 #
 # Root cause: the carve-out was open-coded in three divergent places and MISSING
@@ -369,7 +369,7 @@ def test_provenance_benzylphosphonic_comes_from_the_routed_handler(monkeypatch):
 
 @pytest.mark.parametrize("name", ["tert-butyl", "sec-butyl"])
 def test_retained_italicized_prefix_is_not_compound(name):
-    """P-16.3.4: the leading italicized prefix's hyphen does not make the name
+    """P-16.3.3(b)/P-16.2.4.1(d): the leading italicized prefix's hyphen does not make the name
     compound, so no enclosing marks and the SIMPLE di/tri multiplier."""
     from orthonym.assembly.naming_utils import (
         enclose_if_compound, get_multiplier_prefix, has_structural_hyphen,
@@ -466,7 +466,7 @@ def test_the_italicized_prefix_carve_out_lives_in_exactly_one_place():
 ])
 def test_tert_butyl_oxoacid_cites_the_retained_prefix_bare(ungated_namer, smiles, expected):
     """BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN) cites tert-butyl BARE;
-    the prefix is cited BARE (BB 3465 / BB 16286). (NB: 'N-tert-butyl' is NOT a Blue Book string -- verified absent in 4 encodings against 30 hits for `*tert*-butyl`; the bare form follows from BB 3465 and the rules are P-16.3.3(b)/BB 7070 + P-16.2.4.1(d)/BB 6964, not P-16.3.4.)  All four names are
+    the prefix is cited BARE (BB 3465 / BB 16286). (NB: 'N-tert-butyl' is NOT a Blue Book string -- verified absent in 4 encodings against 30 hits for `*tert*-butyl`; the bare form follows from BB 3465 and the rules are P-16.3.3(b)/BB 7070 + P-16.2.4.1(d)/BB 6964, not P-16.3.3(b)/P-16.2.4.1(d).)  All four names are
     OPSIN-exact against the input structure."""
     assert ungated_namer.name(smiles) == expected
 
@@ -491,7 +491,7 @@ def test_organometallic_ligand_join_cites_the_retained_prefix_bare(ungated_namer
     ("CC(C)(C)c1cccc(C(C)(C)C)c1O",   "2,6-di-tert-butylphenol"),
 ])
 def test_already_correct_tert_butyl_names_are_unchanged(ungated_namer, smiles, expected):
-    """`2,6-di-tert-butylphenol` is the P-16.3.4 multiplication witness (BB
+    """`2,6-di-tert-butylphenol` is the P-16.3.3(b)/P-16.2.4.1(d) multiplication witness (BB
     '1,2-di-tert-butylbenzene' (PIN)); both were correct before the carve-out
     moved and must stay byte-identical."""
     assert ungated_namer.name(smiles) == expected
@@ -536,7 +536,7 @@ def _aba(smiles):
     ("CCCCCCCCCCCCSOS",      "dodecyldithioxane"),
     # two identical compound organyls -> di OUTSIDE the marks (BB 25719)
     ("CC(C)SOSC(C)C",        "di(propan-2-yl)dithioxane"),
-    # P-16.3.4: the italicized prefix keeps its hyphen under the multiplier
+    # P-16.3.3(b)/P-16.2.4.1(d): the italicized prefix keeps its hyphen under the multiplier
     ("CC(C)(C)SOSC(C)(C)C",  "di-tert-butyldithioxane"),
     # two DIFFERENT organyls: P-14.5.2 order ('methyl' < 'propanyl'), and
     # P-16.5.1.3 encloses the second cited group
@@ -628,7 +628,7 @@ def _pk(smiles):
     # branched -- the narrow walker refused an internal attachment
     ("CCC(=O)P(C(C)C)C(C)C",       "1-[di(propan-2-yl)phosphanyl]propan-1-one"),
     ("CCC(=O)P(C(C)C)C",           "1-[methyl(propan-2-yl)phosphanyl]propan-1-one"),
-    # P-16.3.4 retained italicized prefix: bare, hyphen kept under 'di'
+    # P-16.3.3(b)/P-16.2.4.1(d) retained italicized prefix: bare, hyphen kept under 'di'
     ("CCC(=O)P(C(C)(C)C)C(C)(C)C", "1-(di-tert-butylphosphanyl)propan-1-one"),
     # ring-bearing -- the walker miscounted these as linear chains
     ("CCC(=O)P(C1CCCCC1)C1CCCCC1", "1-(dicyclohexylphosphanyl)propan-1-one"),
@@ -942,7 +942,7 @@ def test_f5_frn_organyl_previously_refused_is_now_named(smiles, expected):
     ("CC(C)(C)NP(=O)(O)O",  "N-tert-butylphosphoramidic acid"),
     ("C1CCCCC1NP(=O)(O)O",  "N-cyclohexylphosphoramidic acid"),
     ("C=CNP(=O)(O)O",       "N-ethenylphosphoramidic acid"),
-    # P-16.3.4: the multiplier keeps the italicized prefix's hyphen
+    # P-16.3.3(b)/P-16.2.4.1(d): the multiplier keeps the italicized prefix's hyphen
     ("CC(C)(C)N(C(C)(C)C)P(=O)(O)O", "N,N-di-tert-butylphosphoramidic acid"),
     # BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN): SIMPLE multiplier OUTSIDE
     # the marks of a compound prefix
@@ -952,7 +952,7 @@ def test_f5_frn_organyl_previously_refused_is_now_named(smiles, expected):
 ])
 def test_f5_amido_n_substituent_previously_refused_is_now_named(smiles, expected):
     """BB 32784 `*N*-(propan-2-yl)acetamide` (PIN) for the enclosed locanted
-    prefix; BB 3465 for `tert-butyl` cited bare after a locant (P-16.3.4)."""
+    prefix; BB 3465 for `tert-butyl` cited bare after a locant (P-16.3.3(b)/P-16.2.4.1(d))."""
     assert _f5(smiles) == expected
 
 
@@ -1005,8 +1005,8 @@ def test_f5_other_guards_still_fail_closed(smiles, why):
 #     and for citing alphanumerically even when the locants then DESCEND, which
 #     the old "ascending first-locant order (matches alpha here)" only got right
 #     for the letters-only class the narrow walker could return.
-#  2. no P-16.3.3 marks, so a locanted prefix ran into the stem.
-#  3. no P-16.3.4 carve-out, so `tert-butyl` lost its multiplier hyphen.
+#  2. no P-16.5.1.1 marks, so a locanted prefix ran into the stem.
+#  3. no P-16.3.3(b)/P-16.2.4.1(d) carve-out, so `tert-butyl` lost its multiplier hyphen.
 #
 # The widening also changes WHICH nomenclature claims two molecules, and the Blue
 # Book says the new one is preferred -- BB 23385, verbatim:
@@ -1395,7 +1395,7 @@ def test_f7_other_guards_still_fail_closed(smiles, why):
     # mixed halo+organyl with the COMPOUND prefix in the FIRST (unmarked) slot:
     # P-14.5.2 puts 'cyclohexylmethyl'/'butanyl' before 'fluoro', and
     # P-16.5.1.3.1 withholds only the SEPARATING marks, so the compound prefix
-    # still takes its own P-16.3.3 marks there.
+    # still takes its own P-16.5.1.1 marks there.
     ("C1CCCCC1C[Si](F)(F)F", "(cyclohexylmethyl)tri(fluoro)silane"),
     ("CCC(C)[Si](F)(F)F",    "(butan-2-yl)tri(fluoro)silane"),
     ("CC(C)[Si](F)(F)F",     "trifluoro(propan-2-yl)silane"),
@@ -1510,7 +1510,7 @@ def test_f8_shared_phosphorus_composer_matches_the_bb_shapes():
 
     * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) -- marks kept, SIMPLE
       multiplier outside  (was `dipropan-2-yl`)
-    * P-16.3.4 -- the italicized hyphen survives multiplication
+    * P-16.3.3(b)/P-16.2.4.1(d) -- the italicized hyphen survives multiplication
       (was `ditert-butyl`)
     * BB 16286 `tert-butyldi(methyl)phosphane` (PIN) -- multiplier OUTSIDE the
       marks of the SECOND cited group  (was `tert-butyl(dimethyl)`)

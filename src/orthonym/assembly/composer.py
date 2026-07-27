@@ -2356,7 +2356,7 @@ def _try_name_cyanamide(features: Any) -> Optional[str]:
 
     def _wrap(nm):
         # A compound substituent directly abutting 'cyanamide' takes enclosing
-        # marks (P-16.3.3): '(propan-2-yl)cyanamide'; simple 'methyl' stays bare.
+        # marks (P-16.5.1.1): '(propan-2-yl)cyanamide'; simple 'methyl' stays bare.
         return f"({nm})" if needs_brackets(nm) else nm
 
     sub_names = []
@@ -4012,7 +4012,7 @@ def _assemble_complete_bicyclo_name(mol, features):
     main_name = f"{descriptor}{unsat_suffix}"
     suffix_str, elide_terminal_e = principal_suffix
     if suffix_str:
-        # IUPAC P-16.3.3 / P-31.1.4.3.4 vowel elision: drop the parent's trailing
+        # IUPAC P-16.7.1(a) / P-31.1.4.3.4 vowel elision: drop the parent's trailing
         # 'e' ONLY before a vowel-initial suffix. '-one' elides
         # ('...heptan-6-one', and '...hept-5-en-6-one' for an unsaturated parent);
         # the consonant-initial multiplied '-dione'/'-trione' keeps the 'e'
@@ -6208,7 +6208,7 @@ def _assemble_aromatic_benzonitrile(mol, principal_ring, nitrile_atoms):
 
     def _is_compound_prefix(nm: str) -> bool:
         # A compound substituent prefix (formed by substitution, e.g. the
-        # alkoxycarbonyl family) is enclosed even as a bare word (P-16.3.3);
+        # alkoxycarbonyl family) is enclosed even as a bare word (P-16.5.1.1);
         # simple table prefixes (methyl/chloro/methoxy/nitro/...) are not.
         # The hyphen in the character class made this a copy of the compound
         # predicate; the P-16.3.4 carve-out is the shared primitive.
@@ -6279,7 +6279,7 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
     # where a co-present ester makes the molecule polyfunctional and bypasses the
     # benzene handler). Delegate to the benzene substituted-nitrile assembler so
     # the parent, the nitrile=1 renumbering, and any compound prefix
-    # (methoxycarbonyl, enclosed per P-16.3.3) are correct. Fail closed to the
+    # (methoxycarbonyl, enclosed per P-16.5.1.1) are correct. Fail closed to the
     # saturated cyclo path when any ring substituent is not fully nameable.
     if (ring_size == 6 and nitrile_atoms
             and all(features.mol.GetAtomWithIdx(a).GetIsAromatic()
@@ -6971,7 +6971,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
             )
             if prefix is not None:
                 # Ring assembly prefixes contain square brackets and locants,
-                # so they need parentheses wrapping per IUPAC P-16.3.3:
+                # so they need parentheses wrapping per IUPAC P-16.5.1.1:
                 # 4-([1,1'-biphenyl]-4-yl)butanoic acid
                 ring_sub_groups[f'({prefix})'].append(attach_chain_locant)
                 # Mark all rings in this fragment as consumed
@@ -7110,7 +7110,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 )
                 if (_rc_name and ' ' not in _rc_name
                         and any(_ch.isdigit() for _ch in _rc_name)):
-                    # P-16.3.3 nested enclosure: a decorated ring name that
+                    # P-16.5.1.1 nested enclosure: a decorated ring name that
                     # itself contains parentheses (e.g. '2-(methoxycarbonyl)-
                     # cyclohexyl') must be enclosed in the NEXT bracket level
                     # ([...]), not another pair of parens. apply_enclosing_marks
@@ -7951,7 +7951,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                                 and sorted_locants == [1]),
         ) and (total_substituents == 1 or _prefix_chain_len == 1):
             # A complex/compound substituent still needs enclosing marks even when
-            # its locant is elided (P-16.3.3): '(methylperoxy)ethane',
+            # its locant is elided (P-16.7.1(a)): '(methylperoxy)ethane',
             # '(methyldisulfanyl)methane'. Mirrors the ring-prefix path. The bare
             # name passes through apply_enclosing_marks (correct ()->[]->{} nesting
             # + leading-stereo escalation; avoids the double-enclose hazard).
@@ -9727,7 +9727,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
         if _omit_locant:
             # Monosubstituted carbocyclic ring: omit locant (it's always 1).
             # SUB-05/D-17: complex OR stereo-prefixed substituents need
-            # enclosing marks (P-16.3.3). The old guard skipped enclosing for a
+            # enclosing marks (P-16.5.1.1). The old guard skipped enclosing for a
             # leading-stereo name ((R)-3-methylpentyl starts with '(') -> the
             # broken (R)-3-methylpentylbenzene. Route through apply_enclosing_marks
             # passing the BARE name (it does correct ()->[]->{} nesting +

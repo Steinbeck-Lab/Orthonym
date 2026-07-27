@@ -143,7 +143,7 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     by_name: Dict[str, List[int]] = {}
     for loc, name in placed:
         by_name.setdefault(name, []).append(loc)
-    # P-14.5.2 citation order; P-16.3.3 marks; P-16.3.4 italicized carve-out; and
+    # P-14.5.2 citation order; P-16.5.1.1 marks; P-16.3.3(b)/P-16.2.4.1(d) italicized carve-out; and
     # a HYPHEN between segments -- the old code joined with '' and shipped
     # `1-ethyl2-methylhydrazine` (BB 21649 `3-ethyl-2-methylhexane` (PIN)).
     parts = []
@@ -319,7 +319,7 @@ def _name_azoxy(mol) -> Optional[str]:
                                          multiplier_needs_hyphen)
     enclosed = enclose_if_compound(ra)
     if enclosed == ra and multiplier_needs_hyphen(ra):
-        return f"di-{enclosed}diazene oxide"      # P-16.3.4 di-tert-butyl...
+        return f"di-{enclosed}diazene oxide"      # P-16.3.3(b)/P-16.2.4.1(d) di-tert-butyl...
     return f"di{enclosed}diazene oxide"
 
 

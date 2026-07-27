@@ -17,7 +17,7 @@ tripwire unable to have caught the survivors: it searched only for
 Two of the survivors were shipping defects: ``(tert-butyl)(tert-butyl)zinc`` and
 the outright malformed ``ditert-butylzinc`` / ``ditert-butylmethylsilane``.
 
-**P-16.3.4 / P-29.6.1** — the hyphen of a leading italicized structural prefix is
+**P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1** — the hyphen of a leading italicized structural prefix is
 part of a SIMPLE retained name. Verbatim, on-disk ``BlueBookV2.md``:
 
 * ``:16282`` "The retained name '*tert*-butyl' has never been recommended for
@@ -109,7 +109,7 @@ def test_the_carve_out_never_swallows_a_compound_name(name):
     This is the property that keeps the fix narrower than the open-code it
     replaced: 'tert-butyl' reduces to the simple 'butyl' and is cited bare, but
     'tert-butylsulfanyl' reduces to 'butylsulfanyl' — still compound under the
-    P-16.3.3 chalcogen rule, so it keeps its marks exactly as '(methylsulfanyl)'
+    P-16.5.1.1 chalcogen rule, so it keeps its marks exactly as '(methylsulfanyl)'
     does.
     """
     assert italicized_prefix_is_bare(name) is False
@@ -152,7 +152,7 @@ def test_is_complex_substituent_decides_on_the_stripped_remainder():
     ("sec-butyl", "2,6-di-sec-butyl"),
 ])
 def test_multiplied_italicized_prefix_keeps_its_hyphen(name, expected):
-    """P-16.3.4 — BB '1,2-di-tert-butylbenzene' (PIN) is the witness."""
+    """P-16.3.3(b)/P-16.2.4.1(d) — BB '1,2-di-tert-butylbenzene' (PIN) is the witness."""
     assert format_substituent_prefix(name, [2, 6], 2) == expected
 
 
@@ -178,7 +178,7 @@ def test_mononuclear_multiplied_italicized_prefix_is_not_malformed(ungated_namer
     """The multiplier leg, live and MALFORMED before this phase.
 
     ``CC(C)(C)[SiH](C)C(C)(C)C`` shipped 'ditert-butylmethylsilane' — 'di' fused
-    straight onto 'tert-' with no boundary at all. P-16.3.4 requires the hyphen:
+    straight onto 'tert-' with no boundary at all. P-16.3.3(b)/P-16.2.4.1(d) requires the hyphen:
     'di-tert-butyl'. OPSIN-exact (C(C)(C)(C)[SiH](C)C(C)(C)C).
     """
     assert (ungated_namer.name("CC(C)(C)[SiH](C)C(C)(C)C")
@@ -371,7 +371,7 @@ def test_general_engine_multiplier_and_enclosure_agree_on_an_italicized_prefix()
     ("CC(C)(C)c1cccc(C(C)(C)C)c1O", "2,6-di-tert-butylphenol"),
     ("CC(C)(C)P(=O)(O)O", "tert-butylphosphonic acid"),
     ("CC(C)(C)P(C)(=O)O", "tert-butyl(methyl)phosphinic acid"),
-    # and the compound remainder still takes its P-16.3.3 marks
+    # and the compound remainder still takes its P-16.5.1.1 marks
     ("CC(C)(C)Sc1ccccc1", "(tert-butylsulfanyl)benzene"),
 ])
 def test_converted_sites_stay_byte_identical(ungated_namer, smiles, expected):

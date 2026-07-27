@@ -158,7 +158,7 @@ def _cite_locanted_prefixes(by_name: dict) -> str:
     * Segments are joined by a HYPHEN. The old code joined with '' and emitted
       ``1-ethyl3-methyltrisulfane``; BB 21649's ``3-ethyl-2-methylhexane`` (PIN)
       is the witness for the separator.
-    * P-16.3.3 marks for a compound prefix and the P-16.3.4 italicized carve-out
+    * P-16.5.1.1 marks for a compound prefix and the P-16.3.3(b)/P-16.2.4.1(d) italicized carve-out
       come from the shared primitives, so ``propan-2-yl`` is cited
       ``1,3-di(propan-2-yl)`` (BB 25719 ``1,4-di(propan-2-yl)cyclohexane`` (PIN):
       SIMPLE multiplier OUTSIDE the marks) and ``tert-butyl`` keeps its hyphen.

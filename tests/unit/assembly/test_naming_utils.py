@@ -9,7 +9,7 @@ Tests all pure naming utility functions:
 - Multiplier prefix selection
 - Vowel elision
 - Suffix with locants formatting (PIN style)
-- Enclosing marks depth cycling (P-16.3.3)
+- Enclosing marks depth cycling (P-16.5.1.1)
 """
 
 import pytest
@@ -130,7 +130,7 @@ class TestFormatSubstituentPrefix:
         assert result == "2,4,7-tris(1-methylethyl)"
 
     def test_complex_single_with_parentheses(self):
-        """Single complex substituent with numeric locants gets parentheses (IUPAC P-14.5.2)."""
+        """Single complex substituent with numeric locants gets parentheses (IUPAC P-16.5.1.1)."""
         result = format_substituent_prefix("1-methylethyl", [4], 1)
         assert result == "4-(1-methylethyl)"
 
@@ -260,9 +260,9 @@ class TestIsComplexSubstituent:
         assert is_complex_substituent("1-methylpropyl") is True
 
     def test_sec_tert_retained_names_are_simple(self):
-        """Phase 171 BBR-ASM (P-16.3.4): the leading italic sec-/tert- prefix on an
+        """Phase 171 BBR-ASM (P-16.3.3(b)/P-16.2.4.1(d)): the leading italic sec-/tert- prefix on an
         otherwise-simple retained name does NOT make it complex — di-tert-butyl /
-        N-tert-butyl, NOT bis(tert-butyl) / N-(tert-butyl). The earlier blanket
+        the bare N-substituent, NOT bis(tert-butyl) (BB 3465 / BB 7070). The earlier blanket
         'any hyphen -> complex' rule over-parenthesised these."""
         assert is_complex_substituent("tert-butyl") is False
         assert is_complex_substituent("sec-butyl") is False
@@ -474,7 +474,7 @@ class TestFormatSuffixWithLocants:
 
 @pytest.mark.unit
 class TestEnclosingMarksDepthCycling:
-    """Tests for IUPAC P-16.3.3 enclosing marks cycling through all 7 depths."""
+    """Tests for IUPAC P-16.5.1.1 enclosing marks cycling through all 7 depths."""
 
     @pytest.mark.parametrize("depth,expected", [
         (0, "(x)"),

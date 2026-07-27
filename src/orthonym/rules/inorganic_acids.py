@@ -348,12 +348,15 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     # v29 P3: the guard above is the shared chokepoint, so a prefix here may carry
     # a locant or a retained italicized prefix. The italic-N locant is joined by a
     # hyphen, so an unmarked locanted prefix would read as two locant sets --
-    # enclosing marks come from the shared P-16.3.3 primitive:
+    # enclosing marks come from the shared P-16.5.1.1 primitive:
     #   BB 32784 `N-(propan-2-yl)acetamide` (PIN)  -> locanted organyl enclosed;
     #   BB 3465  `4-butyl-4-tert-butylcyclohexan-1-ol` (PIN) -> the retained
     #            italicized prefix is cited BARE even straight after a locant
-    #            (P-16.3.4), hence `N-tert-butyl`, never `N-(tert-butyl)`, and
-    #            `N,N-di-tert-butyl` keeps the multiplier's hyphen.
+    #            (the BB 3465 example itself; the rule is P-16.2.4.1(d) for the
+    #            hyphen and P-16.3.3(b)/BB 7070 for the simple multiplier, NOT
+    #            P-16.3.4, which is the parentheses rule). Hence the bare
+    #            N-substituent form, and `N,N-di-tert-butyl` keeps the
+    #            multiplier's hyphen. ('N-tert-butyl' is not itself a BB example.)
     for nm in sorted(counts, key=alpha_sort_key):
         c = counts[nm]
         if c not in _MULT:
@@ -473,7 +476,7 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
 
     if organyl_names:
         # `build_p_frn_acid_name` concatenates `front` straight onto the stem and
-        # does no marking of its own, so a compound prefix takes its P-16.3.3 marks
+        # does no marking of its own, so a compound prefix takes its P-16.5.1.1 marks
         # here or it runs into the stem ('propan-2-ylphosphono...'). The shared
         # primitive keeps every simple prefix BARE, as `phenylphosphonochloridic
         # acid` already was.

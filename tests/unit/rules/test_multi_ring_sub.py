@@ -53,7 +53,7 @@ def test_biphenyl_substituent_format():
     assert "[" in name and "]-" in name, (
         f"Expected square bracket enclosing in name, got: {name}"
     )
-    # Must have parentheses around the entire prefix per P-16.3.3
+    # Must have parentheses around the entire prefix per P-16.5.1.1
     assert "([" in name, (
         f"Expected parenthesized bracket prefix, got: {name}"
     )

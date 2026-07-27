@@ -252,7 +252,7 @@ def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atom
         head_alkoxy = _HEAD_GROUP_ALKOXY.get(head_desc)
         if head_alkoxy is None:
             return None  # neutral substitutive form not RT-verified for this head → defer (D-11)
-        # P-16.3.3 nested enclosure: {[(<head-alkoxy>)hydroxyphosphoryl]oxy}
+        # P-16.5.1.1 nested enclosure: {[(<head-alkoxy>)hydroxyphosphoryl]oxy}
         rendered = f"{num[a]}-{{[({head_alkoxy})hydroxyphosphoryl]oxy}}"
         subs.append(("phosphoryl", rendered))
     if not subs:

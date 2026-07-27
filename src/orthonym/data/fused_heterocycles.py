@@ -2204,7 +2204,7 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
                 locs.append(coerced)
         if not scorable:
             continue
-        # P-14.4(f) lowest substituent-locant SET, then P-14.4(g)/P-14.5.2 lowest
+        # P-14.4(f) lowest substituent-locant SET, then P-14.4(g)/P-14.3.5 lowest
         # locant to the alphabetically-first substituent (the alpha tier breaks a
         # mirror-orientation tie deterministically AND PIN-correctly, e.g.
         # 4-bromo-6-methyldibenzofuran rather than the input-order-dependent

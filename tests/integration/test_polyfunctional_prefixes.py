@@ -192,7 +192,7 @@ class TestThreePlusFGAlphabetization:
 # ============================================================================
 
 class TestCompoundPrefixParenthesization:
-    """Verify compound prefixes are correctly parenthesized per IUPAC P-16.3.3."""
+    """Verify compound prefixes are correctly parenthesized per IUPAC P-16.5.1.1."""
 
     @pytest.mark.integration
     def test_methylsulfinyl_parenthesized(self):

@@ -1514,7 +1514,7 @@ def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     if alkyl and alkyl.endswith("yl"):
         import re as _re
         if _re.search(r'[0-9]', alkyl):
-            # P-14.5.2: locant-bearing name requires enclosing marks
+            # P-16.5.1.1: locant-bearing name requires enclosing marks
             candidate = f"({alkyl})oxy"
         else:
             candidate = alkyl[:-2] + "oxy"

@@ -423,7 +423,7 @@ def test_is_dichalcogen_bridge_attach(
     "smiles,frag,attach,parent,expected",
     [
         # Attached through S with an inner O -> the contracted alkoxy + 'sulfanyl',
-        # enclosed per P-16.3.3 (BB 27914 '(methoxysulfanyl)cyclohexane').
+        # enclosed per P-16.5.1.1 (BB 27914 '(methoxysulfanyl)cyclohexane').
         ("CC(C)(C)OSCCO", [0, 1, 2, 3, 4, 5], 5, {6}, "(tert-butoxysulfanyl)"),
         ("COSCCO", [0, 1, 2], 2, {3}, "(methoxysulfanyl)"),
         ("CC(C)OSCCO", [0, 1, 2, 3, 4], 4, {5}, "[(propan-2-yl)oxysulfanyl]"),

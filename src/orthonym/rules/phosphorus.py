@@ -352,7 +352,7 @@ def _name_pnictogen_onic_acid(
     P-29.6.1 retained preferred prefix (BB ``2-benzylpyridine`` PIN), and
     ``[(4-bromophenyl)methyl]phosphonic acid`` for the substituted benzyl that
     P-29.6.1 forbids spelling as a benzyl (BB ``2-[(4-bromophenyl)methyl]-
-    pyridine`` PIN). A compound or complex prefix takes P-16.3.3 enclosing marks.
+    pyridine`` PIN). A compound or complex prefix takes P-16.5.1.1 enclosing marks.
     """
     from .substituent_purity import organyl_prefix_name  # lazy: avoid import cycle
     from ..assembly.naming_utils import enclose_if_compound

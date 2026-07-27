@@ -338,8 +338,8 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
             return None
         if i == 0:
             # First unique: P-16.5.1.3.1 withholds only the marks that SEPARATE
-            # the groups, so a compound prefix still takes its own P-16.3.3 marks
-            # (`(cyclohexylmethyl)di(methyl)silane`), and the P-16.3.4 italicized
+            # the groups, so a compound prefix still takes its own P-16.5.1.1 marks
+            # (`(cyclohexylmethyl)di(methyl)silane`), and the P-16.3.3(b)/P-16.2.4.1(d) italicized
             # carve-out keeps `di-tert-butyl` hyphenated rather than `ditert-`.
             marked = enclose_if_compound(name)
             parts.append(multiplied_component(counts[name], name, marked))
@@ -464,7 +464,7 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
 
     # --- All-halogen regime (every hub element; hub degree >= 2 excludes the
     #     diatomic interhalogens ICl/IBr). Halogens are simple substituents:
-    #     alphanumerical concatenation with NO enclosing marks (P-16.3.3). ---
+    #     alphanumerical concatenation with NO enclosing marks (P-16.5.1.1). ---
     halo_counts = _classify_halogens(mol, hub)
     if halo_counts is not None and hub.GetDegree() >= 2:
         halo_parts = []
@@ -642,8 +642,8 @@ def name_heteroimine(mol) -> Optional[str]:
     if len(organyls) != 1:
         return None      # multi-organyl locant assembly not built here
     # The organyl follows a locant + hyphen, so a compound prefix takes its
-    # P-16.3.3 marks (`1-(propan-2-yl)phosphanimine`) while the retained
-    # italicized prefix stays bare (P-16.3.4).
+    # P-16.5.1.1 marks (`1-(propan-2-yl)phosphanimine`) while the retained
+    # italicized prefix stays bare (P-16.3.3(b)/P-16.2.4.1(d)).
     from ..assembly.naming_utils import enclose_if_compound
     return f"1-{enclose_if_compound(organyls[0])}{stem}imine"
 
@@ -760,7 +760,7 @@ _IO_PREFIX_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
 
 def _apply_hydride_suffix(stem: str, suffix: str) -> str:
     """Attach a suffix to a parent-hydride stem, eliding the stem's terminal 'e'
-    before a vowel-initial suffix (P-16.3.3): sulfane+one -> sulfanone,
+    before a vowel-initial suffix (P-16.7.1(a)): sulfane+one -> sulfanone,
     sulfane+imine -> sulfanimine, but sulfane+dione -> sulfanedione (consonant)."""
     if suffix and suffix[0] in 'aeiouy' and stem.endswith('e'):
         return stem[:-1] + suffix
@@ -811,7 +811,7 @@ def _compose_io_prefixes(items) -> Optional[str]:
         if marked == name and ((i > 0) or (name in complex_names)):
             marked = apply_enclosing_marks(name, -1)
         if mult and marked == name and multiplier_needs_hyphen(name):
-            parts.append(f"{mult}-{marked}")          # P-16.3.4 di-tert-butyl
+            parts.append(f"{mult}-{marked}")          # P-16.3.3(b)/P-16.2.4.1(d) di-tert-butyl
         else:
             parts.append(f"{mult}{marked}")
     return ''.join(parts)

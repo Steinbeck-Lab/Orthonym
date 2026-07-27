@@ -177,7 +177,7 @@ _GROUP14_SUFFIX_ELEMENTS = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
 # '(methoxy)silanetriol'). Compound -oxy prefixes (acyloxy/aryloxy/cyclyl-oxy such
 # as 'acetyloxy'/'phenoxy'/'oxiranylmethoxy') stay complex -> parenthesized. The
 # ligand namer's older ``name.endswith('oxy')`` blanket-wrapped these simple
-# alkoxy names too; this whitelist restores P-16.3.3 (simple alkoxy = no marks).
+# alkoxy names too; this whitelist restores P-16.5.1.1 (simple alkoxy = no marks).
 _SIMPLE_ALKOXY_PREFIXES = frozenset({'methoxy', 'ethoxy', 'propoxy', 'butoxy'})
 
 
@@ -625,8 +625,11 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 # has_structural_hyphen, not a raw `'-' in name`. A leading
                 # italicized 'tert-'/'sec-' is part of a SIMPLE retained prefix and
                 # takes NO marks -- BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN)
-                # cites tert-butyl bare, and P-16.3.4 spells out 'N-tert-butyl' NOT
-                # 'N-(tert-butyl)'. The raw hyphen test made this site the FOURTH
+                # cites tert-butyl bare, as does BB 3465
+                # `4-butyl-4-*tert*-butylcyclohexan-1-ol` (PIN) directly after a
+                # locant. (An earlier comment here attributed an 'N-tert-butyl'
+                # example to P-16.3.4; that string does not occur in the Blue Book
+                # and P-16.3.4 is the parentheses rule.) The raw hyphen test made this site the FOURTH
                 # divergent copy of the compound predicate and emitted the non-PIN
                 # '(tert-butyl)di(methyl)(oxiranylmethoxy)silane' -- the very form
                 # the comment above quotes the Blue Book as writing bare.
@@ -772,7 +775,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # are ALL identical AND simple. Otherwise cite each ligand separately
             # in alphanumerical order, each enclosed — parentheses upgraded to
             # square brackets when the ligand name already contains enclosing
-            # marks (P-16.3.3 nesting). Neutral Group-12 metal -> no Stock number.
+            # marks (P-16.5.1.1 nesting). Neutral Group-12 metal -> no Stock number.
             from ..assembly.naming_utils import (
                 is_complex_substituent as _is_cx, apply_enclosing_marks as _encl,
                 alpha_sort_key as _ask,
@@ -783,14 +786,14 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # sibling `_compound_ligand` above was fixed for: 'tert-butyl' matched
             # `-`, so two IDENTICAL SIMPLE ligands were routed away from the
             # multiplied form and came back as '(tert-butyl)(tert-butyl)zinc'
-            # instead of P-16.3.4's 'di-tert-butylzinc'. `_is_cx` already carries
+            # instead of P-16.3.3(b)/P-16.2.4.1(d)'s 'di-tert-butylzinc'. `_is_cx` already carries
             # the correct hyphen semantics (it calls has_structural_hyphen), so the
             # raw leg is dropped and only the enclosing-mark characters remain.
             _any_complex = any(
                 _is_cx(nm) or any(c in nm for c in '()[]') for nm in organic_names)
             if (len(_distinct) > 1 or _any_complex) and not include_stock:
                 def _enclose_ligand(nm: str) -> str:
-                    # P-16.3.3 enclosure nesting: a ligand name that ALREADY
+                    # P-16.5.1.1 enclosure nesting: a ligand name that ALREADY
                     # contains enclosing marks must be wrapped at the next level
                     # up (depth 1 = square brackets), e.g.
                     # '4-(diphenylstibanyl)phenyl' -> '[4-(diphenylstibanyl)phenyl]'.

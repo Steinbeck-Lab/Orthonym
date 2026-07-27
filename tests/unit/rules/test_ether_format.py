@@ -7,7 +7,7 @@ Validates that:
 4. Currently-passing ether compounds are not regressed
 
 References:
-    IUPAC 2013 P-14.5.2: Compound substituents need enclosing marks
+    IUPAC 2013 P-16.5.1.1: Compound substituents need enclosing marks
     IUPAC 2013 P-14.6: Enclosing mark hierarchy (parentheses, brackets, braces)
     IUPAC 2013 P-63.2: Ether nomenclature
 """
@@ -48,7 +48,7 @@ class TestSimpleEtherNoEnclosingMarks:
 
 
 class TestComplexSubstituentEnclosingMarks:
-    """Complex substituents on rings need enclosing marks per IUPAC P-14.5.2."""
+    """Complex substituents on rings need enclosing marks per IUPAC P-16.5.1.1."""
 
     def test_branched_alkyl_on_monosubstituted_ring(self):
         """2-methylbut-2-en-1-yl on benzene must have enclosing marks.

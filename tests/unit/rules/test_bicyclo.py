@@ -602,7 +602,7 @@ class TestBicycloDiketoneSuffix:
 
     def test_bicyclo_diketone_names_both_carbonyls(self):
         # Both carbonyls emitted with the 'di' multiplier; terminal 'e' RETAINED
-        # before the consonant-initial '-dione' (IN-06 / P-16.3.3 elision rule).
+        # before the consonant-initial '-dione' (IN-06 / P-16.7.1(a) elision rule).
         # Phase 170 WS-6 (DEF-7): von Baeyer numbering now obeys P-14.4, giving the
         # carbonyls the LOWEST locants {2,6} (compare_locant_sets([2,6],[3,8]) < 0).
         # The prior '3,8-dione' was the topology-only numbering the audit flagged

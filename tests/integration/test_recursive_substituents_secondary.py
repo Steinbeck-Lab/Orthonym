@@ -148,7 +148,7 @@ class TestHeterocycleRetainedSubstituents:
 
 
 class TestCompoundSubstituentParenthesization:
-    """Verify IUPAC P-14.5.2 compound substituent parenthesization."""
+    """Verify IUPAC P-16.5.1.1 compound substituent parenthesization."""
 
     @pytest.mark.integration
     def test_fused_ring_compound_sub_parenthesized(self):
@@ -347,7 +347,7 @@ class TestCumulativeRegressionCheck:
 # The improvements from Phase 38 Plan 03 primarily fix:
 # 1. Retained names on rings (propyl -> isopropyl, butyl -> tert-butyl)
 # 2. Branched alkyl naming on rings (octyl -> 1,2,2-trimethylcyclopentyl)
-# 3. Compound substituent parenthesization (IUPAC P-14.5.2)
+# 3. Compound substituent parenthesization (IUPAC P-16.5.1.1)
 # 4. Hyphen insertion after closing parentheses in name assembly
 #
 # These fix ~10-15 of the 163 substituent_loss cases directly.

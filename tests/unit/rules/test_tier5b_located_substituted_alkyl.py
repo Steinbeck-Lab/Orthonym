@@ -20,7 +20,8 @@ declines fail-closed.
 Locant rules exercised: free valence lowest (P-46.1.8); direction tie broken
 by lowest branch-locant set at first point of difference (P-29.4.1, shipped
 T3c); NEW final tie-break — equal locant sets assign the lowest locant to the
-substituent cited first in alphanumerical order (P-14.5.2(e)): the Br/Cl
+substituent cited first in alphanumerical order (`### **P-14.4** NUMBERING`
+item (g), BB 3307 -- P-14.5.2 has no lettered sub-items): the Br/Cl
 pentan-3-yl witness must number bromo=2, never '4-bromo-2-chloro...'.
 """
 

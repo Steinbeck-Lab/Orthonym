@@ -87,7 +87,7 @@ BRANCH_HANDLED_FGS: frozenset = frozenset({
 })
 
 # ---------------------------------------------------------------------------
-# P-16.3.4 / P-29.6.1: the italicized STRUCTURAL prefixes that are written with a
+# P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1: the italicized STRUCTURAL prefixes that are written with a
 # hyphen and are nevertheless part of a SIMPLE retained prefix name.
 #
 # 'tert-butyl' is a retained *preferred* prefix (P-29.6.1, BB 16270) and the Blue
@@ -148,7 +148,7 @@ def has_structural_hyphen(name: str) -> bool:
     """Does ``name`` carry a hyphen that makes it a COMPOUND substituent?
 
     True for every hyphen except a leading italicized structural prefix
-    (P-16.3.4: ``tert-butyl`` / ``sec-butyl`` are simple; ``2-methylpropyl`` and
+    (P-16.3.3(b)/P-16.2.4.1(d): ``tert-butyl`` / ``sec-butyl`` are simple; ``2-methylpropyl`` and
     ``tert-butyl-dimethylsilyl`` are compound).
 
     Examples:
@@ -166,7 +166,7 @@ def has_structural_hyphen(name: str) -> bool:
 def multiplier_needs_hyphen(name: str) -> bool:
     """Does a SIMPLE multiplier joined to ``name`` keep a hyphen boundary?
 
-    P-16.3.4: ``di-tert-butyl`` (never ``ditert-butyl``), ``di-sec-butyl``. This
+    P-16.3.3(b)/P-16.2.4.1(d): ``di-tert-butyl`` (never ``ditert-butyl``), ``di-sec-butyl``. This
     is the SECOND leg of the italicized-prefix rule — the first
     (``has_structural_hyphen``) withholds enclosing marks, this one inserts the
     hyphen — and it shares the one detection primitive so the two legs can never
@@ -189,7 +189,7 @@ def italicized_prefix_is_bare(name: str) -> bool:
     the remainder is itself simple — ``tert-butyl`` / ``sec-butyl`` (BB 16286
     cites ``*tert*-butyldi(methyl)phosphane`` (PIN) with the group bare).
     ``False`` for everything else, including a compound remainder
-    (``tert-butylsulfanyl`` keeps its P-16.3.3 marks) and any name that does not
+    (``tert-butylsulfanyl`` keeps its P-16.5.1.1 marks) and any name that does not
     lead with such a prefix.
 
     This is the form a site with its OWN compound test should call: because it
@@ -234,7 +234,7 @@ _ALKYL_ROOTS_FULL = (
 )
 
 # Chalcogen compound-substituent suffixes that, fused to an alkyl root, form a
-# COMPLEX (compound) substituent requiring enclosing marks per IUPAC P-16.3.3 /
+# COMPLEX (compound) substituent requiring enclosing marks per IUPAC P-16.5.1.1 /
 # P-63.6 — '(methylsulfanyl)', '(methylselanyl)', '(methyltellanyl)'. Phase 171
 # BBR-ASM (DEF-8): the Se/Te analogues (selanyl/tellanyl + the oxidized
 # seleninyl/selenonyl/tellurinyl/telluronyl) were missing, so 'methylselanyl' was
@@ -262,7 +262,7 @@ _MULTIPLYING_PREFIX_ROOTS = frozenset({
 })
 
 # Functional group prefixes that, when fused with alkyl roots, form compound
-# substituents requiring enclosing marks per IUPAC P-14.5.2.
+# substituents requiring enclosing marks per IUPAC P-16.5.1.1.
 # Hoisted to module level for performance (was recreated inside needs_brackets).
 _COMPOUND_FG_PREFIXES = (
     'hydroxy', 'carboxy', 'amino', 'oxo', 'formyl', 'cyano',
@@ -276,7 +276,7 @@ _COMPOUND_FG_PREFIXES = (
 
 # Wave2 T2b: heteroatom-substituted amino/oxy preselected prefixes
 # (P-68.3.1.1.1.5 / P-35.3.1) — compound substituents that take enclosing
-# marks per P-16.3.3. BB PINs: '4-(hydroxyamino)phenol',
+# marks per P-16.5.1.1. BB PINs: '4-(hydroxyamino)phenol',
 # '2-(aminooxy)ethan-1-amine', '8-(chloroamino)octanoic acid'.
 _COMPOUND_HETEROATOM_AMINO_PREFIXES = frozenset({
     'hydroxyamino', 'aminooxy',
@@ -815,7 +815,7 @@ def needs_brackets(name: str) -> bool:
         return True
 
     # Wave2 T2b: heteroatom-substituted amino/oxy preselected prefixes are
-    # compound substituents and take enclosing marks (P-16.3.3) — BB PINs
+    # compound substituents and take enclosing marks (P-16.5.1.1) — BB PINs
     # write 4-(hydroxyamino)phenol, 2-(aminooxy)ethan-1-amine and P-35.3.1
     # 8-(chloroamino)octanoic acid. Simple preselected prefixes (diazenyl,
     # amino, isocyanato) stay bare.
@@ -898,7 +898,7 @@ def needs_brackets(name: str) -> bool:
 
 
 # ============================================================================
-# IUPAC Enclosing Marks (P-16.3.3)
+# IUPAC Enclosing Marks (P-16.5.1.1)
 # ============================================================================
 
 
@@ -985,7 +985,7 @@ def compute_nesting_depth(name: str) -> int:
 
 
 def apply_enclosing_marks(name: str, depth: int = 0) -> str:
-    """Apply IUPAC P-16.3.3 enclosing marks at the correct nesting depth.
+    """Apply IUPAC P-16.5.1.1 enclosing marks at the correct nesting depth.
 
     Nesting order: ( ) -> [ ] -> { } -> ( ) again
     Depth 0: parentheses
@@ -1049,7 +1049,7 @@ def apply_enclosing_marks(name: str, depth: int = 0) -> str:
 
 
 def enclose_if_compound(name: str) -> str:
-    """Enclose a substituent prefix in P-16.3.3 marks iff it is compound/complex.
+    """Enclose a substituent prefix in P-16.5.1.1 marks iff it is compound/complex.
 
     A SIMPLE prefix (``methyl``, ``phenyl``, ``cyclohexyl``, and the retained
     ``benzyl``) is cited bare — BB ``2-benzylpyridine`` (PIN), P-29.6.1. A
@@ -1117,7 +1117,7 @@ def is_complex_substituent(name: str) -> bool:
     # Check for digits (indicates locants within the substituent name)
     if any(ch.isdigit() for ch in name):
         return True
-    # P-16.3.4 / P-29.6.1: decide on the REMAINDER after an italicized structural
+    # P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1: decide on the REMAINDER after an italicized structural
     # prefix, the way needs_brackets already does. Using the carve-out only as an
     # early-exit gate (which is what has_structural_hyphen below is) left every
     # suffix rule further down anchored to the RAW name, so the predicate
@@ -1133,7 +1133,7 @@ def is_complex_substituent(name: str) -> bool:
     # name (tert-butyl, sec-butyl). IUPAC P-16.3.3(b) (BB 7070, verbatim
     # `di-*tert*-butyl`) treats these as SIMPLE for multiplication (di-tert-butyl,
     # NOT bis(tert-butyl)) and BB 3465 cites the prefix bare straight after a
-    # locant. (NOT P-16.3.4, the parentheses rule; and 'N-tert-butyl' is not a
+    # locant. (NOT P-16.3.3(b)/P-16.2.4.1(d), the parentheses rule; and 'N-tert-butyl' is not a
     # Blue Book example -- verified absent.) Phase 171 BBR-ASM: without this,
     # coupling the paren/bis decision to is_complex_substituent over-parenthesised
     # tert-butyl. The leading-digit case above still catches genuine compounds.
@@ -1197,7 +1197,7 @@ def is_complex_substituent(name: str) -> bool:
                 return True
             break
     # Phase 4 SUBST-01: compound (ring/substituent)-yl + alkyl-yl
-    # ('cyclohexylmethyl', 'piperidinylmethyl') — enclosing marks per P-16.3.3.
+    # ('cyclohexylmethyl', 'piperidinylmethyl') — enclosing marks per P-16.5.1.1.
     if _RINGYL_ALKYL_RE.search(name_lower):
         return True
     # v23 Phase 8 (P-16.3.3): a Group-14 silyl/germyl substituent carrying its OWN
@@ -1692,7 +1692,7 @@ def _has_stereo_prefix(name: str) -> bool:
 
 
 def _wrap_n_substituent(name: str) -> str:
-    """Apply IUPAC P-16.3.3 bracket escalation to an N-substituent name.
+    """Apply IUPAC P-16.5.1.1 bracket escalation to an N-substituent name.
 
     When an N-substituent already contains parentheses (from stereo
     descriptors or compound substituent names), the outer enclosure must
@@ -1743,7 +1743,7 @@ def _wrap_n_substituent(name: str) -> str:
                 # The opening paren matches the closing paren at the end
                 return name
     # Contains parentheses (stereo prefix, compound sub-substituent, etc.)
-    # -> escalate to square brackets per P-16.3.3
+    # -> escalate to square brackets per P-16.5.1.1
     if '(' in name:
         return f"[{name}]"
     return name
@@ -1854,13 +1854,13 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # heptanedioic acid'). Fold needs_brackets in here — the ONE canonical
     # enclosing-mark predicate the docstring mandates.
     #
-    # v29 P3: this used to carry a FOURTH copy of the P-16.3.4 tert-/sec- carve-out
+    # v29 P3: this used to carry a FOURTH copy of the P-16.3.3(b)/P-16.2.4.1(d) tert-/sec- carve-out
     # (`and not name.lower().startswith(("tert-", "sec-"))`), because needs_brackets
     # lacked it. needs_brackets now owns the carve-out (via
     # strip_italicized_structural_prefix), so the open-code is gone. It was also
     # strictly BROADER than the rule: it suppressed the marks on 'tert-butyl' (right,
-    # P-16.3.4) but equally on 'tert-butylsulfanyl' (wrong — a compound chalcogen
-    # prefix takes marks under P-16.3.3, exactly as '(methylsulfanyl)' does).
+    # P-16.3.3(b)/P-16.2.4.1(d)) but equally on 'tert-butylsulfanyl' (wrong — a compound chalcogen
+    # prefix takes marks under P-16.5.1.1, exactly as '(methylsulfanyl)' does).
     if needs_brackets(name):
         complex = True
     # W3-P03-7 (P-16.3.4(c)/(d)): a multiplied alkyl name beginning with a numeric-
@@ -1872,7 +1872,7 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         complex = True
     if _has_stereo_prefix(name):
         # Name has a CIP stereo descriptor prefix (e.g., "(R)-sec-butyl"):
-        # use square brackets per IUPAC P-16.3.3 nesting rules
+        # use square brackets per IUPAC P-16.5.1.1 nesting rules
         formatted_name = f"[{name}]"
     elif ('(' in name or '[' in name) and not _is_fully_enclosed(name):
         # P-16.5.4.1 (W2E-P1FC Task 8, generalized by w2f p1 per
@@ -2006,7 +2006,7 @@ def alpha_sort_key(substituent_name: str) -> str:
     text = substituent_name.lower()
 
     # Leading positional descriptors are ALWAYS ignored for alphabetization
-    # (P-14.5.2): a parent locant ('3-'), a compound locant set ('2,4-'), and
+    # (P-14.3.5): a parent locant ('3-'), a compound locant set ('2,4-'), and
     # the italic indicated-hydrogen descriptor ('1H-'). Strip them up front so
     # the enclosed-vs-simple decision below sees the bare substituent name —
     # this is what makes '3-(1H-imidazol-5-yl)' and '(1H-imidazol-5-yl)' yield
@@ -2216,7 +2216,7 @@ def apply_vowel_elision(parent_stem: str, suffix: str) -> str:
 
 def _join_multiplied_suffix(suffix_multiplier: str, suffix: str) -> str:
     """Join a numerical multiplier to a characteristic-group suffix with the
-    IUPAC P-63.1.2 / P-16.3.3 vowel elision applied.
+    IUPAC P-63.1.2 / P-16.7.1(a) vowel elision applied.
 
     The final letter 'a' of a multiplying prefix ('tetra', 'penta', 'hexa', …)
     is elided before the suffix '-ol' (tetra+ol → tetrol, hexa+ol → hexol;
@@ -2309,7 +2309,7 @@ def format_suffix_with_locants(
             return f"{base}e-{locant_str}-{full_suffix}"
         else:
             # Without multiplier: base + '-locants-' + suffix
-            # IUPAC P-16.3.3 vowel elision: drop terminal 'e' of the parent stem
+            # IUPAC P-16.7.1(a) vowel elision: drop terminal 'e' of the parent stem
             # only when the suffix begins with a, i, o, u, or y. Before consonant-
             # leading suffixes (-thione, -selone, -tellone, etc.) preserve the 'e'.
             #

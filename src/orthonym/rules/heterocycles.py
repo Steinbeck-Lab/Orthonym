@@ -2527,7 +2527,7 @@ def name_substituted_heterocycle(
             if _head and (_head[-1].isalpha() or _head[-1] in (')', ']', '}')):
                 _head += "-"
             combined = _head + _het_loc_prefix + parent_name
-        # IUPAC P-16.3.3: elide the parent's terminal 'e' before a suffix token
+        # IUPAC P-16.7.1(a): elide the parent's terminal 'e' before a suffix token
         # that begins with a vowel (piperidine -> piperidin-4-one,
         # pyridine -> pyridin-2-ol). A consonant-initial token (multiplied
         # 'dione'/'triol', or 'carb*') keeps the 'e' (piperidine-2,6-dione,
@@ -2645,7 +2645,7 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
     known they are the PIN citation ('4-cyclohexylmorpholine',
     '1-(naphthalen-2-yl)pyrrolidine'); the italic-N form ('N-methyl') is
     the fallback when no numbering is available. Complex substituent
-    names get the same P-16.3.3 enclosure as C-substituents.
+    names get the same P-16.5.1.1 enclosure as C-substituents.
     """
     from ..assembly.naming_utils import (
         _wrap_n_substituent, is_complex_substituent, needs_brackets,
@@ -2660,7 +2660,7 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
             display = f'[{name}]'
         elif not _fully_enclosed(name) and (
                 is_complex_substituent(name) or needs_brackets(name)):
-            # P-16.3.3: a name that is NOT fully enclosed by one outer pair of
+            # P-16.5.1.1: a name that is NOT fully enclosed by one outer pair of
             # parentheses — e.g. '(pyrimidin-5-yl)methyl' where the paren closes
             # before 'methyl' — still needs enclosure. Use [] when the name
             # already contains '(' (nesting rule), else use ().
@@ -2687,8 +2687,8 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
     Single: 3-methyl
     Multiple same: 2,4-dimethyl
 
-    Per IUPAC P-14.5.2, compound substituent names are parenthesized.
-    Per IUPAC P-16.3.3, enclosing marks nest: (...), [...], {...}.
+    Per IUPAC P-16.5.1.1, compound substituent names are parenthesized.
+    Per IUPAC P-16.5.1.1, enclosing marks nest: (...), [...], {...}.
     Names already containing parentheses use square brackets.
     """
     locant_str = ",".join(str(loc) for loc in locants)
@@ -2702,17 +2702,17 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
 
     if _has_stereo_prefix(name):
         # Name has CIP stereo prefix like "(R)-sec-butyl":
-        # use square brackets per IUPAC P-16.3.3
+        # use square brackets per IUPAC P-16.5.1.1
         display_name = f'[{name}]'
     elif not _fully_enclosed(name) and (
             is_complex_substituent(name) or needs_brackets(name)):
         # is_complex_substituent governs the di-/bis- multiplier choice;
-        # needs_brackets is the broader P-14.5.2 enclosing test that also
+        # needs_brackets is the broader P-16.5.1.1 enclosing test that also
         # flags compound FG-on-alkyl prefixes (hydroxymethyl, aminomethyl)
         # which take a SIMPLE multiplier but STILL require parentheses
         # (the benzene path's '1,3,5-tri(hydroxymethyl)benzene' convention).
         if '(' in name:
-            # P-16.3.3 nesting: a name already containing parentheses is
+            # P-16.5.1.1 nesting: a name already containing parentheses is
             # enclosed in the next mark up ([(naphthalen-2-yl)methyl]).
             display_name = f'[{name}]'
         else:

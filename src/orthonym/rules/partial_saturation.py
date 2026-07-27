@@ -1289,7 +1289,7 @@ def _fused_ring_system_atoms(rings, seed_atoms) -> Set[int]:
 
 
 def _elide_terminal_e(stem: str) -> str:
-    """Elide a terminal 'e' before a vowel-initial suffix (P-16.3.3): naphthalene
+    """Elide a terminal 'e' before a vowel-initial suffix (P-16.7.1(a)): naphthalene
     -> naphthalen (before -one); kept before -dione/-trione (consonant)."""
     return stem[:-1] if stem.endswith('e') else stem
 
@@ -1774,7 +1774,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         ih_str = '(' + ','.join(f"{_locant_display(loc[a])}H" for a in ih_sorted) + ')'
     else:
         ih_str = ''
-    # P-16.3.3: elide terminal 'e' only before a vowel-initial suffix. For the
+    # P-16.7.1(a): elide terminal 'e' only before a vowel-initial suffix. For the
     # oxo table this is exactly the single-carbonyl '-one' case; for imine it is
     # single '-imine' (vowel-initial) but NOT '-diimine'/'-triimine' (consonant).
     elide = parent_name.endswith('e') and bool(suffix) and suffix[0] in 'aeiou'

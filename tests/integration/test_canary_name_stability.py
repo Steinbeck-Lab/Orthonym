@@ -2891,7 +2891,7 @@ P44_3_CANARY = [
     ),
     # Row 59: long-chain amide with indole; NP ring vs C24 chain
     # Updated Phase 106: N-substituent pipeline produces amide-centric name
-    # Updated Phase 121: parenthesized per IUPAC P-14.5.2 (positional locants)
+    # Updated Phase 121: parenthesized per IUPAC P-16.5.1.1 (positional locants)
     (
         "CCCCCCCCCCCCCCCCCCCCCCCC(=O)NCCc1c[nH]c2ccccc12",
         "N-(3-ethyl-1H-indolyl)tetracosanamide",

@@ -362,7 +362,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
 
     if not locants:
         # No locants (mononuclear parent, locant '1' omitted per P-14.3.4.2) —
-        # a COMPOUND prefix must STILL be enclosed per P-16.3.3, else the name
+        # a COMPOUND prefix must STILL be enclosed per P-16.5.1.1, else the name
         # is ambiguous ('methoxy(methylsulfanyl)methane', NOT the run-together
         # 'methoxymethylsulfanylmethane'). Mirror the locant path's compound
         # detection; simple prefixes (methoxy/methyl/chloro) stay bare -> the
@@ -387,7 +387,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # Format locants
     locant_str = ",".join(str(loc) for loc in sorted(locants))
 
-    # Check if prefix is a compound substituent needing parentheses (P-16.3.3).
+    # Check if prefix is a compound substituent needing parentheses (P-16.5.1.1).
     # A prefix that already carries inner enclosing marks but is not itself
     # fully wrapped (e.g. '(methylcarbamoyl)amino', the N-substituted urea
     # prefix, W2F-P6) is compound and needs an ESCALATED outer enclosure
@@ -400,7 +400,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     compound = needs_brackets(prefix_form) or _partially_enclosed
 
     def _enclose(_p: str) -> str:
-        # Auto-detect nesting depth (P-16.3.3): no inner marks -> '(p)';
+        # Auto-detect nesting depth (P-16.5.1.1): no inner marks -> '(p)';
         # already contains '()' -> '[p]'. Byte-identical to the previous
         # hard-coded '(p)' for prefixes without inner enclosing marks.
         return apply_enclosing_marks(_p, -1)
@@ -448,7 +448,7 @@ def _name_amidine_chain_side(
         _parts.append(
             _nm if _c == 1 else f"{get_multiplier_prefix(_c, _nm)}{_nm}"
         )
-    # Substituted amino/imino is a compound substituent (P-16.3.3): enclose in
+    # Substituted amino/imino is a compound substituent (P-16.5.1.1): enclose in
     # parens so it alphabetizes on its complete name ('(dimethylamino)' at 'd').
     return f"({''.join(_parts)}{base})"
 
@@ -1895,7 +1895,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # parent chain splits into 'hydroxy' (the geminal C-OH) + '(hydroxyimino)'
         # (the =N-OH) prefixes on that carbon's locant — PIN
         # '5-hydroxy-5-(hydroxyimino)pentanoic acid'. 'hydroxyimino' is a compound
-        # prefix (hydroxy + imino) and is parenthesised per P-16.3.3; scoped here
+        # prefix (hydroxy + imino) and is parenthesised per P-16.5.1.1; scoped here
         # to the hydroximic_acid class (the general demoted-oxime path P-66.6 is a
         # separate class, out of scope). SMARTS match tuple
         # (C, imino-N, O-on-N, hydroxyl-O). Fires only when every match's C is a
@@ -2718,7 +2718,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         )
                         het_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
                         if het_name and needs_brackets(het_name):
-                            # P-16.3.3 nesting: the marks go ()->[]->{} outward, so
+                            # P-16.5.1.1 nesting: the marks go ()->[]->{} outward, so
                             # a prefix that ALREADY carries parentheses must be
                             # wrapped in SQUARE brackets. The literal f"({...})"
                             # here produced the doubled-paren

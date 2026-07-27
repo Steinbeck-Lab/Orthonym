@@ -572,7 +572,7 @@ class TestPhase24Wave2Fixes:
 # ---------------------------------------------------------------------------
 
 PHASE24_PARSE_FIXES = [
-    # Group A: Compound substituent parenthesization per IUPAC P-14.5.2
+    # Group A: Compound substituent parenthesization per IUPAC P-16.5.1.1
     # A1: hydroxymethyl on polysubstituted benzene gets parentheses
     (
         "OCc1ccc(O)cc1",
@@ -660,7 +660,7 @@ class TestPhase24ParseFixes:
     """Phase 24 parse fix regression tests (plan 24-02).
 
     Covers:
-    - Group A: Compound substituent parenthesization per IUPAC P-14.5.2
+    - Group A: Compound substituent parenthesization per IUPAC P-16.5.1.1
     - Group B: Bare oxy prefix elimination (phenoxy, (oxan-2-yl)oxy, alkoxy)
     - Stability: Verify simple substituents not over-bracketed
     """

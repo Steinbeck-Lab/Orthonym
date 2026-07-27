@@ -353,13 +353,13 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
         if m is None:
             return None
         # Both mark rules are "enclose unless already enclosed", so ask the
-        # shared compound test (P-16.3.3) first and only force marks when it
+        # shared compound test (P-16.5.1.1) first and only force marks when it
         # declined and P-16.5.1.3 still needs a separator.
         marked = enclose_if_compound(nm)
         if len(uniq) >= 2 and i > 0 and marked == nm:
             marked = apply_enclosing_marks(nm, -1)
         if m and marked == nm and multiplier_needs_hyphen(nm):
-            token = f"{m}-{marked}"              # P-16.3.4 di-tert-butyl
+            token = f"{m}-{marked}"              # P-16.3.3(b)/P-16.2.4.1(d) di-tert-butyl
         else:
             token = f"{m}{marked}"
         parts.append(token)

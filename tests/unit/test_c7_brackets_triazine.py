@@ -2,10 +2,10 @@
 Tests for C7 gap-fix cluster: enclosing marks + 1,2,4-triazine naming.
 
 BB rules:
-  P-16.3.3  — enclosing marks cycle; a substituent already containing
+  P-16.5.1.1  — enclosing marks cycle; a substituent already containing
               parentheses must be enclosed in square brackets when it is not
               fully enclosed (e.g. (pyrimidin-5-yl)methyl needs []).
-  P-14.5.2  — compound substituent prefixes must be parenthesized.
+  P-16.5.1.1  — compound substituent prefixes must be parenthesized.
   P-31.1.4.2 — 1,2,4-triazine PIN for 6-membered ring N@1,2,4.
   P-31.1.4.3.3 — numbering direction picks lowest heteroatom locant set.
 """
@@ -19,7 +19,7 @@ from orthonym import name_compound
 # ---------------------------------------------------------------------------
 
 class TestEnclosingMarks:
-    """P-16.3.3: (arylmethyl) substituents must be wrapped in square brackets."""
+    """P-16.5.1.1: (arylmethyl) substituents must be wrapped in square brackets."""
 
     @pytest.mark.unit
     def test_pyrimidinyl_methyl_morpholine(self):

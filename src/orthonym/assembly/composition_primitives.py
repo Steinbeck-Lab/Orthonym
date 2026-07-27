@@ -460,13 +460,13 @@ def apply_mononuclear_enclosing(
         # Blue Book exempts only the locant-bearing first prefix from this rule).
         #
         # The italicized-prefix carve-out is the SHARED primitive, never a raw
-        # `'-' in t`: P-16.3.4 / P-29.6.1 make the hyphen of a leading italicized
+        # `'-' in t`: P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1 make the hyphen of a leading italicized
         # structural prefix part of a SIMPLE retained name (BB 16286 cites
         # '*tert*-butyldi(methyl)phosphane' (PIN) with the group BARE). A raw test
         # classed 'tert-butyl' as compound, which flipped `all(...)` below to False
         # and so silently switched OFF the first-bare/rest-enclosed transform for
         # EVERY prefix in the name, not merely the tert- one.
-        _ital_bare = italicized_prefix_is_bare(t)     # GUARD: P-16.3.4 carve-out
+        _ital_bare = italicized_prefix_is_bare(t)     # GUARD: P-16.3.3(b)/P-16.2.4.1(d) carve-out
         if (re.match(r'^\d', t) or '(' in t or '[' in t
                 or ('-' in t and not _ital_bare)):
             return False

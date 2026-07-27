@@ -2735,7 +2735,7 @@ def _assemble_multiplicative_name(
             return (f"{locant_prefix}{_bridge}"
                     f"{multiplier}({unit_with_locant})")
 
-    # Enclosure (P-16.3.3 / P-16.5): a BRIDGE name that itself contains
+    # Enclosure (P-16.5.1.1 / P-16.5): a BRIDGE name that itself contains
     # parentheses (composite bridge "ethane-1,2-diylbis(oxy)") moves up the
     # nesting order to SQUARE BRACKETS: "2,2'-[ethane-1,2-diylbis(oxy)]di..."
     # (BB P-15.3.2.1 verbatim).  A bridge carrying bare locants

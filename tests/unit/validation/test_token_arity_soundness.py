@@ -259,7 +259,7 @@ _NEWLY_CORRECT = [
     # on a methanone = 14 (was 8, the multiplier swallowing the whole tail).
     ("diphenylmethanone", 14),
     ("diphenylethenone", 15),
-    # Terminal-'e' elision of a named ring (P-16.3.3).
+    # Terminal-'e' elision of a named ring (P-16.7.1(a)).
     ("pyridinyl", 6),
     ("cyclohexanol", 7),
     ("propanoic acid", 5),

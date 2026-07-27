@@ -674,7 +674,7 @@ def test_p4_a_suffix_after_a_saturation_ending_is_at_a_boundary():
 
 
 def test_p4_multiplier_with_its_vowel_elided_still_counts():
-    """P-16.3.3: a multiplying prefix drops its terminal vowel before a
+    """P-16.7.1(a): a multiplying prefix drops its terminal vowel before a
     vowel-initial suffix -- 'butane-1,2,3,4-tetraol' is written '...-tetrol'.
 
     The elided form is the SAME morpheme, so it must serve both as boundary

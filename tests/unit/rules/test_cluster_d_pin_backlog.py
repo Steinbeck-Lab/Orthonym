@@ -55,7 +55,7 @@ class TestD2NoPcgPolyfunctional:
 
 class TestD3RingEsterAlkoxycarbonyl:
     """A monocyclic ring substituent carrying an alkyl-ester decoration is
-    expressed with the alkoxycarbonyl prefix (P-65.6.3), enclosed per P-16.3.3
+    expressed with the alkoxycarbonyl prefix (P-65.6.3), enclosed per P-16.5.1.1
     because it is a compound substituent prefix."""
 
     def test_methoxycarbonyl_cyclohexyl_butanoic_acid(self):
@@ -77,7 +77,7 @@ class TestD4AromaticNitrileOxide:
     """A neutral aromatic nitrile oxide bearing a co-substituent is named by
     functional-class method (1): '<benzonitrile> oxide' (P-66.5.4.2), with the
     senior nitrile oxide demoting a co-present ester to the methoxycarbonyl
-    prefix (P-65.6.3), enclosed per P-16.3.3."""
+    prefix (P-65.6.3), enclosed per P-16.5.1.1."""
 
     def test_methoxycarbonyl_benzonitrile_oxide(self):
         # BB:34893 verbatim PIN (rejects 'methyl 4-...benzoate').

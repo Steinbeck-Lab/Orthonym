@@ -126,7 +126,7 @@ class TestSortAndBrackets:
         assert alpha_sort_key(prefix) == key
 
     @pytest.mark.parametrize("prefix,bracketed", [
-        # compound heteroatom-substituted amino/oxy prefixes: P-16.3.3 marks
+        # compound heteroatom-substituted amino/oxy prefixes: P-16.5.1.1 marks
         ("hydroxyamino", True),
         ("aminooxy", True),
         ("fluoroamino", True),

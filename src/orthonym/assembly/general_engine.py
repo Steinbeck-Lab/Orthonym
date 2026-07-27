@@ -323,7 +323,7 @@ def _mult_prefix(n: int, name: str) -> Optional[str]:
         return None
     if table is _MULT_COMPLEX:
         return f"{table[n]}({name})"
-    # P-16.3.4 second leg: 'di-tert-butyl', never 'ditert-butyl'.
+    # P-16.3.3(b)/P-16.2.4.1(d) second leg: 'di-tert-butyl', never 'ditert-butyl'.
     from .naming_utils import multiplier_needs_hyphen
     return f"{table[n]}{'-' if multiplier_needs_hyphen(name) else ''}{name}"
 
