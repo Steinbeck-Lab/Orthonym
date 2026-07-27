@@ -415,19 +415,38 @@ def name_formazan(mol) -> Optional[str]:
         placed = [(loc, nm) for loc, nm in ((1, s1), (3, s3), (5, s5)) if nm]
         if not placed:
             return None                    # bare formazan -> retained table
-        from ..assembly.naming_utils import is_complex_substituent, alpha_sort_key
+        # v29 P3-FIX Item 5: this site was WIDENED by the Phase 3 organyl
+        # migration but its composer was left on pre-migration raw code, so the
+        # newly-admitted compound prefixes were mis-spelled three ways at once:
+        # a local `_SUB_MULTIPLIER` table that knows neither the P-16.3.5(a)
+        # bis/tris rule nor the P-16.2.4.1(d) hyphen; a bare `f"({nm})"` instead
+        # of the escalating `enclose_if_compound` (P-16.5.4.1.5 requires brackets
+        # once parentheses are already used inside -- `grep -c 'bis((' ` over the
+        # Blue Book is 0 against 7 hits for `bis[(...)...]`); and `alpha_sort_key`,
+        # which ties on identical letters. It shipped `1,5-ditert-butylformazan`
+        # and `1,5-di((3-methylphenyl)methyl)formazan`, both OPSIN-clean so
+        # SELF-01 passed them.
+        #
+        # `formazan` is a retained PIN "fully substitutable by suffixes and
+        # prefixes" (`BlueBookV2.md:16521`), and `## **P-68.3.1.3.5.1** Derivatives
+        # of formazan` (`:38930`) gives `1,3-diphenylformazan (PIN)`, so the
+        # locant+multiplier+marks block is an ordinary substituent prefix block
+        # and belongs to the canonical builder rather than to a local copy.
+        # `format_substituent_prefix` is documented as THE one correct
+        # substituent-prefix + enclosing-mark reference; the sibling
+        # `_name_diazene_oxide` 100 lines up already does it this way.
+        from ..assembly.naming_utils import (format_substituent_prefix,
+                                             prefix_citation_sort_key)
         from ..assembly.substituent_naming import _joined_prefix_parts
         by_name: Dict[str, List[int]] = {}
         for loc, nm in placed:
             by_name.setdefault(nm, []).append(loc)
         parts: List[str] = []
-        for nm in sorted(by_name, key=alpha_sort_key):
+        for nm in sorted(by_name, key=prefix_citation_sort_key):
             locs = sorted(by_name[nm])
-            mult = _SUB_MULTIPLIER.get(len(locs))
-            if mult is None:
-                return None
-            enc = f"({nm})" if is_complex_substituent(nm) else nm
-            parts.append(f"{','.join(map(str, locs))}-{mult}{enc}")
+            if len(locs) not in _SUB_MULTIPLIER:
+                return None            # keep the supported-multiplicity bound
+            parts.append(format_substituent_prefix(nm, locs, len(locs)))
         return ''.join(_joined_prefix_parts(parts)) + 'formazan'
     return None
 
