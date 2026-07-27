@@ -74,11 +74,31 @@ def test_bad_smiles_still_reports_bad_smiles(diag):
 
 
 # ---------------------------------------------------------------------------
-# Defect 2 — `-r` must be OFF by default.
+# Defect 2, CORRECTED (v29 P3-FINAL Item 2) — `-r` must be ON by default,
+# because the SHIPPED validity oracle passes it unconditionally.
+#
+# The earlier direction of this test (`-r` off by default) was wrong twice over:
+#
+#  * it made the shared probe DISAGREE with production.  The oracle behind the
+#    validity gate spawns OPSIN with `-r` at every entry point --
+#    `assembly/retained_substitution.py:138` (`["java","-jar",jar,"-r","-osmi"]`),
+#    `:176` (`get_persistent_opsin(jar, ("-r","-osmi"))`), `:197`, and
+#    `validation/opsin_server.py:41`/`:140` (default `args=("-r","-osmi")`).
+#    So a name production ACCEPTS was reported `OPSIN-UNPARSEABLE` by the probe:
+#    13 of the 15 gold rows whose `expected_pin` is a bare substituent string
+#    flipped to a false failure.
+#  * its stated justification -- that `-r` lets a fragment-only emission score a
+#    clean `OK` -- cannot happen.  `diagnose`'s verdict compares OPSIN's output
+#    against the canonical form of the INPUT MOLECULE
+#    (`_canon(opsin_smi) == r["canonical"]`), and a bare substituent name parses
+#    under `-r` to a strict SUB-structure, which can never compare equal.  The
+#    only input for which `ethyl` compares equal is the ethyl radical itself --
+#    where the name is right.  So `-r` costs no strictness at all and buys
+#    agreement with the gate.
 # ---------------------------------------------------------------------------
 
-def test_opsin_batch_defaults_to_no_radicals(diag, monkeypatch):
-    """The default OPSIN invocation must not contain `-r`."""
+def test_opsin_batch_defaults_to_radicals_like_the_shipped_oracle(diag, monkeypatch):
+    """The default OPSIN invocation must contain `-r`, as production's does."""
     seen = {}
 
     class _P:
@@ -90,13 +110,15 @@ def test_opsin_batch_defaults_to_no_radicals(diag, monkeypatch):
 
     monkeypatch.setattr(diag.subprocess, "run", _fake_run)
     diag.opsin_batch(["ethanol"])
-    assert "-r" not in seen["cmd"], (
-        "-r lets a bare substituent name parse as a radical, so a name "
-        "describing only a fragment of the molecule scores a clean round-trip"
+    assert "-r" in seen["cmd"], (
+        "the shipped oracle (retained_substitution.py:138/176/197, "
+        "opsin_server.py:41) always passes -r; a probe that does not will "
+        "report OPSIN-UNPARSEABLE for names production accepts"
     )
 
 
-def test_opsin_batch_can_opt_in_to_radicals(diag, monkeypatch):
+def test_opsin_batch_can_opt_out_of_radicals(diag, monkeypatch):
+    """`--no-radicals` is the opt-in strict mode."""
     seen = {}
 
     class _P:
@@ -107,8 +129,66 @@ def test_opsin_batch_can_opt_in_to_radicals(diag, monkeypatch):
         return _P()
 
     monkeypatch.setattr(diag.subprocess, "run", _fake_run)
-    diag.opsin_batch(["methyl"], allow_radicals=True)
-    assert "-r" in seen["cmd"]
+    diag.opsin_batch(["methyl"], allow_radicals=False)
+    assert "-r" not in seen["cmd"]
+
+
+def test_the_probes_default_opsin_args_match_the_shipped_oracles(diag, monkeypatch):
+    """Tool-vs-gate agreement, pinned WITHOUT needing a JVM.
+
+    This is the invariant that was violated: the probe and the production oracle
+    must invoke OPSIN with the same radical policy.  Comparing the two default
+    argument lists states that directly, and cannot deadlock on an OPSIN pipe.
+    """
+    from orthonym.validation.opsin_server import get_persistent_opsin  # noqa: F401
+    import inspect
+
+    from orthonym.validation import opsin_server
+
+    oracle_default = inspect.signature(
+        opsin_server.PersistentOpsin.__init__).parameters["args"].default
+    assert "-r" in oracle_default, (
+        "guard for this test itself: if the shipped oracle ever drops -r, this "
+        "test must be revisited rather than silently passing"
+    )
+
+    seen = {}
+
+    class _P:
+        stdout = "CCO\n"
+
+    monkeypatch.setattr(diag.subprocess, "run",
+                        lambda cmd, **kw: (seen.__setitem__("cmd", cmd), _P())[1])
+    diag.opsin_batch(["ethanol"])
+    assert ("-r" in seen["cmd"]) == ("-r" in oracle_default), (
+        f"probe args {seen['cmd']} disagree with oracle default {oracle_default}"
+    )
+
+
+def test_a_gold_radical_pin_is_not_reported_unparseable(diag):
+    """The 15-row regression, end to end: a gold `expected_pin` that IS a bare
+    substituent string must not be reported `OPSIN-UNPARSEABLE` by the probe.
+
+    Skipped (never silently passed) when Java or the jar is absent, because a
+    green result with no OPSIN would be the perfect-harness trap.
+    """
+    import shutil
+
+    if not diag.OPSIN_JAR.exists() or shutil.which("java") is None:
+        pytest.skip("OPSIN jar or java absent — refusing to report a false pass")
+    if diag._gate_running():
+        pytest.skip("gate running — never a second OPSIN job")
+
+    # `pentan-3-yl` is a verbatim gold `expected_pin` (
+    # gold_pins.json) whose SMILES is the radical `CC[CH]CC`.
+    got = diag.opsin_batch(["pentan-3-yl"])
+    assert got and got[0], (
+        "OPSIN returned nothing for the gold PIN 'pentan-3-yl'; with -r "
+        "restored it must parse, exactly as the shipped oracle parses it"
+    )
+    # control: a genuine non-name must still fail, so the assertion above is
+    # not passing for a trivial reason.
+    assert diag.opsin_batch(["zzz-not-a-name"])[0] is None
 
 
 def test_opsin_batch_skips_empty_names_without_spawning_a_jvm(diag, monkeypatch):
@@ -223,5 +303,27 @@ def test_cli_exposes_the_new_flags(diag):
         with pytest.raises(SystemExit):
             diag.main(["--help"])
     help_text = buf.getvalue()
-    for flag in ("--canonical", "--allow-radicals", "--spelling-independence"):
+    for flag in ("--canonical", "--no-radicals", "--allow-radicals",
+                 "--spelling-independence"):
         assert flag in help_text, f"{flag} missing from --help"
+
+
+def test_help_no_longer_asserts_the_false_false_pass_claim(diag):
+    """The `--help`/docstring assertion that `-r` produced a false `OK` was
+    unsound, and a false in-code assertion is the class this range set out to
+    delete.  Pin its removal so it cannot creep back.
+    """
+    doc = " ".join((diag.__doc__ or "").split())
+    assert "scored a clean ``OK``" not in doc
+    assert "cannot happen" in doc, (
+        "the docstring must record WHY -r is safe, not merely drop the claim"
+    )
+    import io
+    import contextlib
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        with pytest.raises(SystemExit):
+            diag.main(["--help"])
+    help_text = " ".join(buf.getvalue().split())
+    assert "scores a clean RT" not in help_text
