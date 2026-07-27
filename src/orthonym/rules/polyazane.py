@@ -121,7 +121,7 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     (BB PINs, P-68.3.1.2), NOT ``1-methylhydrazine``. Two or more substituents
     are located to distinguish 1,1- from 1,2- (``1,2-dimethyldiazene``)."""
     from ..assembly.naming_utils import (enclose_if_compound,
-                                         multiplier_needs_hyphen,
+                                         multiplied_component,
                                          prefix_citation_sort_key)
     if len(subs) == 1:
         return enclose_if_compound(subs[0][1])
@@ -149,13 +149,16 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     parts = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        mult = _SUB_MULTIPLIER.get(len(locs), '')
+        # v29 P3-CLOSEOUT Item A: multiplier word from the shared primitive
+        # (P-16.3.5(a) bis/tris for a SUBSTITUTED prefix); the local table
+        # could only say di/tri, so `1,2-di(cyclohexylmethyl)hydrazine`
+        # shipped where `1,2-bis(...)` is required.
+        if len(locs) not in _SUB_MULTIPLIER:
+            return None
         marked = enclose_if_compound(name)
         loc_str = ','.join(map(str, locs))
-        if mult and marked == name and multiplier_needs_hyphen(name):
-            parts.append(f"{loc_str}-{mult}-{marked}")
-        else:
-            parts.append(f"{loc_str}-{mult}{marked}")
+        parts.append(
+            f"{loc_str}-{multiplied_component(len(locs), name, marked)}")
     return '-'.join(parts)
 
 
@@ -175,7 +178,7 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     and multiplied with the SIMPLE multiplier ('di', not 'bis' — BB verbatim
     '1,3-di(naphthalen-2-yl)triaz-1-ene')."""
     from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
-                                         multiplier_needs_hyphen,
+                                         multiplied_component,
                                          prefix_citation_sort_key)
 
     def _analyse(rev: bool):
@@ -230,18 +233,19 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     parts: List[str] = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        mult = _SUB_MULTIPLIER.get(len(locs))
-        if mult is None:
+        # v29 P3-CLOSEOUT Item A: arity bound stays local (fail closed); the
+        # multiplier WORD comes from the shared primitive so a SUBSTITUTED
+        # prefix here can take bis/tris (P-16.3.5(a)).
+        if len(locs) not in _SUB_MULTIPLIER:
             return None
-        # `enclose_if_compound` replaces the raw f"({name})": it ESCALATES the
-        # marks over an inner pair (P-16.5.4.1) and carries the P-16.3.4
-        # italicized carve-out, so `tert-butyl` stays bare and keeps its hyphen
-        # under a multiplier ('1,2-di-tert-butyl', never '1,2-ditert-butyl').
+        # `enclose_if_compound` ESCALATES the marks over an inner pair
+        # (P-16.5.4.1) and carries the italicized carve-out, so `tert-butyl`
+        # stays bare; `multiplied_component` then keeps its P-16.2.4.1(d) hyphen
+        # ('1,2-di-tert-butyl', never '1,2-ditert-butyl').
         enclosed = enclose_if_compound(name)
-        if mult and enclosed == name and multiplier_needs_hyphen(name):
-            parts.append(f"{','.join(map(str, locs))}-{mult}-{enclosed}")
-        else:
-            parts.append(f"{','.join(map(str, locs))}-{mult}{enclosed}")
+        parts.append(
+            f"{','.join(map(str, locs))}-"
+            f"{multiplied_component(len(locs), name, enclosed)}")
     from ..assembly.substituent_naming import _joined_prefix_parts
     return ''.join(_joined_prefix_parts(parts)) + parent
 

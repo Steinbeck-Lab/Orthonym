@@ -95,8 +95,16 @@ BRANCH_HANDLED_FGS: frozenset = frozenset({
 # (PIN)** -- no enclosing marks on the first cited group. BB 16282 adds that the
 # retained name "has never been recommended for further substitution ... Acceptable
 # locants have never been adopted for this name", so the hyphen can never be a
-# locant boundary. P-16.3.4 states the consequence for both marks and multipliers:
-# 'di-tert-butyl' (NOT 'bis(tert-butyl)'), 'N-tert-butyl' (NOT 'N-(tert-butyl)').
+# locant boundary. Two rules state the consequence, and NEITHER is P-16.3.4:
+# `**P-16.3.3**` clause (b) (BB 7070) carries the verbatim example `di-*tert*-butyl`,
+# making the SIMPLE multiplier correct (not 'bis(tert-butyl)'); `**P-16.2.4.1**`
+# clause (d) (BB 6964) supplies the hyphen. The BARE citation is inferred from
+# BB 3465 `4-butyl-4-*tert*-butylcyclohexan-1-ol` (PIN) -- bare directly after a
+# locant -- and BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN).
+# NOTE: 'N-tert-butyl' does NOT occur in the Blue Book (0 hits in 4 encodings,
+# against 30 for `*tert*-butyl` as a positive control), so it must not be quoted
+# as an example. P-16.3.4 is the PARENTHESES rule and its six-item list does not
+# mention italicized prefixes at all.
 # 'sec-' behaves identically ('sec-butyl', general nomenclature).
 #
 # THE ONE definition of this carve-out. Do not re-derive it inline: before v29 P3
@@ -1122,9 +1130,11 @@ def is_complex_substituent(name: str) -> bool:
         return is_complex_substituent(_remainder)
     # Check for hyphens (indicates compound substituent) — EXCEPT a leading
     # italicized 'sec-'/'tert-' detachable prefix on an otherwise-simple retained
-    # name (tert-butyl, sec-butyl). IUPAC P-16.3.4 treats these as SIMPLE for
-    # multiplication (di-tert-butyl, NOT bis(tert-butyl)) and does not enclose them
-    # in marks (N-tert-butyl, NOT N-(tert-butyl)). Phase 171 BBR-ASM: without this,
+    # name (tert-butyl, sec-butyl). IUPAC P-16.3.3(b) (BB 7070, verbatim
+    # `di-*tert*-butyl`) treats these as SIMPLE for multiplication (di-tert-butyl,
+    # NOT bis(tert-butyl)) and BB 3465 cites the prefix bare straight after a
+    # locant. (NOT P-16.3.4, the parentheses rule; and 'N-tert-butyl' is not a
+    # Blue Book example -- verified absent.) Phase 171 BBR-ASM: without this,
     # coupling the paren/bis decision to is_complex_substituent over-parenthesised
     # tert-butyl. The leading-digit case above still catches genuine compounds.
     # v29 P3: the strip is the SHARED primitive, not an inline copy.
@@ -1199,6 +1209,261 @@ def is_complex_substituent(name: str) -> bool:
     if (name_lower.endswith(('silyl', 'germyl'))
             and name_lower not in ('silyl', 'germyl')):
         return True
+    return False
+
+
+# ===========================================================================
+# P-16.3.2(c) / P-16.3.5(a): is the prefix SUBSTITUTED?  (the MULTIPLIER
+# question, which is NOT the enclosure question above)
+# ===========================================================================
+#
+# `is_complex_substituent` decides ENCLOSURE (P-16.3.4) and its operative test
+# is "contains a digit / hyphen / a known compound morpheme".  Using it to pick
+# the multiplier conflated two different rules and was wrong in BOTH
+# directions:
+#
+#   * `propan-2-yl`, `naphthalen-2-yl`, `bicyclo[3.2.1]octan-3-yl` are SIMPLE
+#     prefixes that merely carry a locant.  P-16.3.4(a) parenthesises them and
+#     P-16.3.2(a) multiplies them with the SIMPLE `di` —
+#     `di(propanG2Gyl)!(preferred!prefix)` at BlueBookV2.md:7087,
+#     `tetra(naphthalenG2Gyl)` at :7089, `di(bicyclo[3.2.1]octanG3Gyl)` under
+#     clause (f), and `1,4-di(propan-2-yl)cyclohexane (PIN)` at :25721.
+#     The digit test made all of these `bis`.
+#   * `hydroxymethyl`, `carboxymethyl`, `oxomethyl`, `silylamino`,
+#     `phenyldiazenyl` are SUBSTITUTED prefixes with no digit anywhere, so the
+#     digit test missed them and emitted `di` where P-16.3.5(a) requires `bis`.
+#
+# The Blue Book's own matched pair states the real rule in one molecule:
+#   `1,4-di(propan-2-yl)cyclohexane (PIN)`        (:25721)
+#   `1,4-bis(2-chloropropan-2-yl)benzene (PIN)`   (:25793)
+# one `chloro` apart, and the multiplier flips.  `**P"16.3.5**` (:7104) clause
+# (a) names the criterion outright: "*compound or complex (i.e. SUBSTITUTED)
+# prefixes*"; `### **P"16.3.2** General!methodology.` (:7031) clause (c): "*any
+# component which is substituted automatically requires use of the
+# multiplicative forms 'bis', 'tris', etc.*", against clause (a)'s
+# "*UNSUBSTITUTED prefixes, such as ethyl or tert-butyl ... are multiplied by
+# the multiplicative prefixes 'di', 'tri', etc.*"
+#
+# WHY THIS IS NOT DECIDED FROM THE GRAPH.  A pure graph test ("does the
+# substituent's skeleton carry anything off its own parent hydride?") is
+# REFUTED by the Blue Book on two retained prefixes: `tert-butyl` and `benzyl`
+# are branched in the graph yet P-16.3.2(a) lists `tert-butyl` verbatim among
+# the UNSUBSTITUTED prefixes taking `di`, and `benzyl` is a retained preferred
+# prefix (P-29.6.1).  Worse, one graph has two valid names on opposite sides of
+# the rule: the retained `tert-butyl` takes `di-` while its systematic synonym
+# `2-methylpropan-2-yl` is a substituted prefix taking `bis`.  Substituted-ness
+# is therefore a property of the NAME AS SPELLED — of the derivation the
+# producer chose — not of the connection table.  This function reconstructs that
+# derivation by asking whether a DETACHABLE SUBSTITUENT PREFIX sits in front of
+# the prefix's own parent core, using the same morpheme tables the producers
+# used to build the name, so it is the inverse of the construction rather than a
+# shape heuristic.
+
+# The prefix morphemes that can be DETACHED from the front of a substituent
+# name.  Derived from the shared tables wherever one exists so the set cannot
+# desynchronise from the producers.
+_SUBSTITUENT_PREFIX_MORPHEMES: frozenset = frozenset(
+    # alkyl carriers — the one shared C1-C20 table
+    set(_ALKYL_ROOTS_FULL)
+    | {
+        # aryl / cycloalkyl carriers (P-29.6.1 retained preferred prefixes and
+        # the ring-yl forms)
+        'phenyl', 'benzyl', 'naphthyl', 'tolyl', 'xylyl', 'trityl',
+        'cyclopropyl', 'cyclobutyl', 'cyclopentyl', 'cyclohexyl',
+        'cycloheptyl', 'cyclooctyl',
+        # characteristic-group prefixes (P-14.4 detachable prefixes)
+        'hydroxy', 'oxo', 'carboxy', 'amino', 'imino', 'nitro', 'nitroso',
+        'cyano', 'isocyano', 'azido', 'diazo', 'formyl', 'acetyl', 'benzoyl',
+        'sulfo', 'sulfino', 'mercapto', 'oxido', 'hydroperoxy', 'carbamoyl',
+        'carbonyl', 'thioxo', 'selanylidene', 'hydrazino', 'hydrazinyl',
+        'fluoro', 'chloro', 'bromo', 'iodo',
+        # heteroatom-hydride-yl carriers that can head a compound prefix
+        'silyl', 'germyl', 'stannyl', 'boryl', 'sulfanyl', 'selanyl',
+        'tellanyl', 'phosphanyl', 'arsanyl', 'stibanyl', 'diazenyl',
+        'sulfinyl', 'sulfonyl', 'phosphoryl',
+    }
+)
+
+# Endings that mark the surviving REMAINDER as itself a group name rather than
+# a stray syllable.  Without this, `methylene` would decompose as `methyl` +
+# `ene` and be called substituted; `bis(methylene)`'s bis comes from the
+# P-16.3.2(d) ambiguity leg, not from substitution.
+_GROUP_NAME_ENDINGS = (
+    'yl', 'ylidene', 'ylidyne', 'ylium', 'ylio', 'yliden',
+    'oxy', 'amino', 'imino', 'ino', 'ium',
+    'o',
+)
+
+# P-16.3.3 clause (a) (BlueBookV2.md:7040): "*The basic numerical prefixes 'di',
+# 'tri', 'tetra', etc. are used to indicate a multiplicity of: (a) functional and
+# cumulative suffixes*" -- `diol`, `dicarboxylic acid`, `disulfonic acid`.
+#
+# `get_multiplier_prefix` is called for SUFFIXES as well as for substituent
+# prefixes, and a suffix word is NEVER decomposed for substituted-ness.  Without
+# this guard the morpheme scan read `carboxylic acid` as `carboxy` + `lic acid`
+# and `sulfonic acid` as `sulfo` + `nic acid`, emitting `benzene-1,4-bis-
+# carboxylic acid` and `4-methylbenzene-1,3-bissulfonic acid` -- 10 gold
+# regressions, caught by the pre-commit flip measurement.
+_FUNCTIONAL_SUFFIX_TAILS = (
+    'ic acid', 'oic acid', 'carboxylic acid', 'sulfonic acid', 'sulfinic acid',
+    'phosphonic acid', 'carbothioic acid', 'peroxoic acid',
+    'carboxamide', 'sulfonamide', 'amide', 'carbonitrile', 'nitrile',
+    'carbaldehyde', 'carboxylate', 'sulfonate', 'oate', 'carboxy',
+)
+
+# P-16.3.5 clause (b) (`:7104`): 'thioic acid' and 'dithioic acid' suffixes and
+# their Se/Te analogues are the EXPLICIT EXCEPTION to P-16.3.3 -- BB
+# `bis(thioic!acid)![multiple!preferred!suffix ...]`, "*whereas dithioic acid
+# describes a -CSSH suffix*", and "*not didithoic acid*".
+_BIS_SUFFIX_EXCEPTIONS = (
+    'thioic acid', 'dithioic acid',
+    'selenoic acid', 'diselenoic acid',
+    'telluroic acid', 'ditelluroic acid',
+)
+
+# A leading locant set on a substituent prefix: `2-`, `2,2-`, `1,3-`, `2'-`.
+_LEADING_LOCANT_RE = re.compile(r"^\d[\d,'′]*-")
+
+# Multiplicative syllables that may precede a repeated substituent morpheme
+# (`trimethylsilyl`, `difluoromethyl`).  Only ever peeled when a real morpheme
+# follows, so a chain root that merely begins with one (`tridecyl`) is safe.
+_LEADING_MULTIPLIER_SYLLABLES = (
+    'tetrakis', 'pentakis', 'hexakis', 'tris', 'bis',
+    'tetra', 'penta', 'hexa', 'hepta', 'octa', 'nona', 'deca',
+    'di', 'tri',
+)
+
+
+def _looks_like_group_name(text: str) -> bool:
+    """Is ``text`` a plausible substituent/parent group name, not a syllable?"""
+    if len(text) < 2:
+        return False
+    return text.endswith(_GROUP_NAME_ENDINGS)
+
+
+def is_substituted_substituent(name: Optional[str]) -> bool:
+    """Is this substituent prefix SUBSTITUTED, per P-16.3.2(c) / P-16.3.5(a)?
+
+    ``True`` -> the derived multipliers ``bis``/``tris``/``tetrakis``.
+    ``False`` -> the basic multipliers ``di``/``tri``/``tetra``.
+
+    This answers ONLY the multiplier question.  Enclosing marks are decided
+    separately by :func:`is_complex_substituent` / :func:`needs_brackets`
+    (P-16.3.4), and the two genuinely disagree: ``propan-2-yl`` is enclosed AND
+    simply multiplied — ``di(propan-2-yl)``.
+
+    A prefix is substituted when a DETACHABLE substituent prefix sits in front
+    of its own parent core.  A prefix that is nothing but an (unsubstituted)
+    parent hydride with attachment/unsaturation locants is simple, however many
+    digits it carries.
+
+    Examples:
+        >>> is_substituted_substituent("propan-2-yl")
+        False
+        >>> is_substituted_substituent("naphthalen-2-yl")
+        False
+        >>> is_substituted_substituent("tridecyl")
+        False
+        >>> is_substituted_substituent("hydroxymethyl")
+        True
+        >>> is_substituted_substituent("2-methylbutyl")
+        True
+        >>> is_substituted_substituent("bromomethyl")
+        True
+    """
+    if not name:
+        return False
+
+    # P-16.3.2(a) names `tert-butyl` among the UNSUBSTITUTED prefixes, and
+    # `sec-` behaves identically.  Decide on the remainder, via THE shared
+    # primitive, so this leg cannot drift from the enclosure legs.
+    remainder, had_italicized = strip_italicized_structural_prefix(name)
+    if had_italicized:
+        # `tert-butyl` -> `butyl`, simple.  `tert-butylsulfanyl` ->
+        # `butylsulfanyl`, still a compound prefix.
+        return is_substituted_substituent(remainder)
+
+    work = name.strip()
+
+    # A fully enclosed token is a single component: decide on its interior
+    # (`(2-chloroethyl)` is substituted, `(propan-2-yl)` is not).
+    if _is_fully_enclosed(work):
+        return is_substituted_substituent(work[1:-1])
+
+    lowered = work.lower()
+
+    # P-16.3.5(b): the thioic/dithioic-acid suffix exception comes FIRST, since
+    # it is an exception to the P-16.3.3(a) rule immediately below.
+    if lowered.endswith(_BIS_SUFFIX_EXCEPTIONS):
+        return True
+
+    # P-16.3.3(a): a functional or cumulative SUFFIX takes the basic di/tri and
+    # is never decomposed for substituted-ness.
+    if lowered.endswith(_FUNCTIONAL_SUFFIX_TAILS):
+        return False
+
+    # P-16.3.4(c)/(d): an unbranched chain root that merely BEGINS with a
+    # multiplier syllable is a single simple prefix — `tridecyl` is C13, not
+    # `tri` + `decyl`; BB `di(tridecyl)`, `tri(decyl)` (:25715 "not
+    # 1,3,5-tris(decyl)cyclohexane").  Tested BEFORE any peeling, which is what
+    # keeps the multiplier peel below safe.
+    # (`needs_p1634_marks` is NOT also consulted here: its stem set is a strict
+    # subset of `_ALKYL_ROOTS_FULL`, verified, so the extra call was dead code
+    # and a mutation of it survived undetected.)
+    if lowered in _ALKYL_ROOTS_FULL:
+        return False
+
+    # An acyloxy prefix is a compound (acyl + oxy) prefix: BB `bis(acetyloxy)`,
+    # `tetrakis(acetyloxy)`, and this repo's `bis(hexadecanoyloxy)` gold rows.
+    # A bare alkoxy (`methoxy`, `phenoxy`) has no `yl` before the `oxy`.
+    if lowered.endswith('yloxy') and len(lowered) > 5:
+        return True
+
+    # A leading substituent prefix enclosed in marks — `(4-methylphenyl)methyl`
+    # — is a detached prefix by construction.
+    if work[:1] in '([{':
+        _pairs = {'(': ')', '[': ']', '{': '}'}
+        _open = work[0]
+        _close = _pairs[_open]
+        _depth = 0
+        for _i, _ch in enumerate(work):
+            if _ch == _open:
+                _depth += 1
+            elif _ch == _close:
+                _depth -= 1
+                if _depth == 0:
+                    # Anything after the closing mark is a second component, so
+                    # the enclosed leader is a detached substituent prefix.
+                    if work[_i + 1:]:
+                        return True
+                    break
+
+    # Peel an optional leading locant set: the locants of a DETACHED prefix
+    # (`2-methylbutyl`).  A locant belonging to the core's own attachment or
+    # unsaturation sits AFTER the stem (`propan-2-yl`) and is never peeled here.
+    body = lowered
+    m = _LEADING_LOCANT_RE.match(body)
+    if m:
+        body = body[m.end():]
+
+    # Now: does a detachable substituent morpheme occupy the front, leaving a
+    # remainder that is itself a group name?  Optionally preceded by a
+    # multiplicative syllable (`trimethylsilyl`, `difluoromethyl`).
+    for mult in ('',) + _LEADING_MULTIPLIER_SYLLABLES:
+        if mult and not body.startswith(mult):
+            continue
+        rest = body[len(mult):]
+        if not rest:
+            continue
+        for morpheme in _SUBSTITUENT_PREFIX_MORPHEMES:
+            if rest.startswith(morpheme):
+                tail = rest[len(morpheme):]
+                if tail and _looks_like_group_name(tail):
+                    return True
+        # A locant may also sit between the multiplier and the morpheme
+        # (`2,2-dimethylpropyl` is handled above; `di(2-...)` never reaches
+        # here).  No further peeling: anything else is a simple parent core.
+
     return False
 
 
@@ -1309,19 +1574,34 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     # 'di', 'tri', etc." -- so `bis(tert-butyl)` and `di(tert-butyl)` are both
     # wrong, and neither occurs in the text.
     #
-    # Only ever fires for an italicized-prefix-led name, which is simple by
-    # P-16.3.2(a) and therefore never takes bis/tris, so the derived-multiplier
-    # branch below is unreachable with a hyphen. P-16.2.4.2 (:6968) forbids the
-    # hyphen before an ENCLOSED compound substituent, and an enclosed name never
-    # leads with `tert-`/`sec-`, so the two rules cannot collide.
-    if multiplier_needs_hyphen(substituent_name):
-        _word = simple_multiplier_word(count)
-        if _word is None:
-            raise ValueError(
-                f"no simple multiplying prefix can be formed for {count}")
-        return _word + "-"
-
-    if is_complex_substituent(substituent_name) \
+    # v29 P3-CLOSEOUT Item A, ORDERING CORRECTION. This hyphen leg used to run
+    # FIRST, on the asserted ground that "only ever fires for an italicized-
+    # prefix-led name, which is simple by P-16.3.2(a) and therefore never takes
+    # bis/tris, so the derived-multiplier branch below is unreachable with a
+    # hyphen". That assertion is FALSE: `tert-butylsulfanyl` is italicized-
+    # prefix-led and SUBSTITUTED (it reduces to the compound `butylsulfanyl`),
+    # so it takes `bis` per P-16.3.5(a) — and running the hyphen leg first
+    # emitted `di-tert-butylsulfanyl`. The substituted test therefore has to
+    # come first, and the two rules DO collide, exactly as P-16.2.4.2 (`:6968`)
+    # anticipates: "*No hyphen is placed after a numerical prefix cited in front
+    # of a compound substituent enclosed by parentheses*" — so a substituted
+    # italicized-led prefix takes `bis(...)` with NO hyphen, while a simple one
+    # (`tert-butyl`) keeps the P-16.2.4.1(d) hyphen. Both legs now reachable.
+    #
+    # The MULTIPLIER question is P-16.3.2(c) /
+    # P-16.3.5(a) -- "is the component SUBSTITUTED?" -- and NOT the enclosure
+    # question P-16.3.4 that `is_complex_substituent` answers.  Consulting the
+    # enclosure predicate here was wrong in both directions: it made every
+    # locant-bearing SIMPLE prefix `bis` (`bis(propan-2-yl)` against
+    # `1,4-di(propan-2-yl)cyclohexane (PIN)`, BlueBookV2.md:25721) and left every
+    # digit-free SUBSTITUTED prefix `di` (`dihydroxymethyl` against
+    # P-16.3.5(a)'s `bis(bromomethyl)` class).  `is_complex_substituent` keeps
+    # its own job unchanged; only this decision moved.
+    #
+    # The second leg is P-16.3.2(d) (a simple component that would be AMBIGUOUS
+    # if multiplied by 'di' -- `disulfanyl` is -S-SH, so two -SH must be
+    # `bis(sulfanyl)`), and it is preserved exactly as it was.
+    if is_substituted_substituent(substituent_name) \
             or substituent_name in CATENATION_AMBIGUOUS_PREFIXES:
         if count in COMPLEX_MULTIPLIERS:
             return COMPLEX_MULTIPLIERS[count]
@@ -1341,7 +1621,52 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
         if word is None:
             raise ValueError(
                 f"no simple multiplying prefix can be formed for {count}")
+        # P-16.2.4.1(d): a SIMPLE prefix led by an italicized structural prefix
+        # keeps a hyphen between the multiplier and the italic letters --
+        # `di-tert-butyl`, never `ditert-butyl`. Reached only on the simple leg,
+        # so a substituted `tert-`-led prefix correctly gets `bis(...)` above
+        # with no hyphen (P-16.2.4.2).
+        if multiplier_needs_hyphen(substituent_name):
+            return word + "-"
         return word
+
+
+def multiplied_component(count: int, name: str, marked: str) -> str:
+    """Join the P-16.3 multiplier to a component whose enclosure is already decided.
+
+    ``name`` is the BARE prefix name (what decides the multiplier); ``marked`` is
+    the same prefix after the caller has applied whatever enclosing marks its own
+    P-16.5.1.x context requires.  Returns the finished multiplied token.
+
+    THE one place the multiplier and the hyphen meet, so the ~7 producers that
+    used to keep a private ``{1:'', 2:'di', 3:'tri'}`` table -- and therefore
+    could never emit ``bis``/``tris`` at all -- cannot drift again.
+
+    Two rules interact here and both are in P-16.2.4:
+
+    * `**P-16.2.4.1**` clause (d) (``BlueBookV2.md:6964``, verbatim
+      ``di-*tert*-butyl``): a hyphen separates the multiplier from a BARE
+      italicized prefix.
+    * `**P-16.2.4.2**` (``:6968``): "*No hyphen is placed after a numerical prefix
+      cited in front of a compound substituent enclosed by parentheses, even if
+      that substituent begins with locants*" -- so once the caller has enclosed
+      the component, the hyphen is dropped.
+
+    Examples:
+        >>> multiplied_component(2, 'methyl', 'methyl')
+        'dimethyl'
+        >>> multiplied_component(2, 'tert-butyl', 'tert-butyl')
+        'di-tert-butyl'
+        >>> multiplied_component(2, 'propan-2-yl', '(propan-2-yl)')
+        'di(propan-2-yl)'
+        >>> multiplied_component(2, 'cyclohexylmethyl', '(cyclohexylmethyl)')
+        'bis(cyclohexylmethyl)'
+    """
+    mult = get_multiplier_prefix(count, name)
+    if mult.endswith('-') and marked != name:
+        # P-16.2.4.2: the component is enclosed, so the hyphen goes.
+        mult = mult[:-1]
+    return f"{mult}{marked}"
 
 
 # ============================================================================

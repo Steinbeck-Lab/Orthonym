@@ -360,7 +360,7 @@ def test_provenance_benzylphosphonic_comes_from_the_routed_handler(monkeypatch):
 #              further substitution ... Acceptable locants have never been
 #              adopted for this name."   -> its hyphen is not a compound boundary
 #   P-16.3.4   'di-tert-butyl' (NOT 'bis(tert-butyl)'), 'N-tert-butyl'
-#              (NOT 'N-(tert-butyl)')
+#              (cited bare per BB 3465)
 #
 # Root cause: the carve-out was open-coded in three divergent places and MISSING
 # from `needs_brackets`, whose blanket `'-' in name` then won inside the union
@@ -466,7 +466,7 @@ def test_the_italicized_prefix_carve_out_lives_in_exactly_one_place():
 ])
 def test_tert_butyl_oxoacid_cites_the_retained_prefix_bare(ungated_namer, smiles, expected):
     """BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN) cites tert-butyl BARE;
-    P-16.3.4 spells out 'N-tert-butyl' NOT 'N-(tert-butyl)'.  All four names are
+    the prefix is cited BARE (BB 3465 / BB 16286). (NB: 'N-tert-butyl' is NOT a Blue Book string -- verified absent in 4 encodings against 30 hits for `*tert*-butyl`; the bare form follows from BB 3465 and the rules are P-16.3.3(b)/BB 7070 + P-16.2.4.1(d)/BB 6964, not P-16.3.4.)  All four names are
     OPSIN-exact against the input structure."""
     assert ungated_namer.name(smiles) == expected
 
@@ -749,7 +749,16 @@ def _g14_name(smiles):
 
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(C)[Si](C)(C)CC(=O)O",     "dimethyl(propan-2-yl)silyl"),
-    ("CC(C)[Si](C(C)C)(C)CC(=O)O", "methylbis(propan-2-yl)silyl"),
+    # v29 P3-CLOSEOUT Item A re-baseline: was `methylbis(propan-2-yl)silyl`.
+    # `propan-2-yl` is an UNSUBSTITUTED simple prefix that merely carries a
+    # locant, so P-16.3.4(a) parenthesises it while P-16.3.2(a) multiplies it
+    # with the SIMPLE `di`.  The Blue Book gives this exact shape verbatim on a
+    # silane: `ethyldi(propanG2Gyl)silane!(PIN)` at BlueBookV2.md:7294, and
+    # `di(propanG2Gyl)!(preferred!prefix)` at :7087.  `bis` is reserved by
+    # `**P-16.3.5**`(a) (:7104) for a SUBSTITUTED prefix -- contrast the BB's own
+    # `1,4-bis(2-chloropropan-2-yl)benzene (PIN)` (:25793) against
+    # `1,4-di(propan-2-yl)cyclohexane (PIN)` (:25721), one chloro apart.
+    ("CC(C)[Si](C(C)C)(C)CC(=O)O", "methyldi(propan-2-yl)silyl"),
 ])
 def test_f4_group14_naming_site_replaces_a_fabricated_chain(smiles, expected):
     """The producer now NAMES the branched organyl instead of declining it."""
@@ -759,8 +768,9 @@ def test_f4_group14_naming_site_replaces_a_fabricated_chain(smiles, expected):
 @pytest.mark.parametrize("smiles,wrong,right", [
     ("CC(C)[Si](C)(C)CC(=O)O",     "(dimethylpropylsilyl)acetic acid",
                                    "[dimethyl(propan-2-yl)silyl]acetic acid"),
+    # Item A re-baseline, same authority as above (BB 7294 `ethyldi(propan-2-yl)silane` (PIN)).
     ("CC(C)[Si](C(C)C)(C)CC(=O)O", "(methyldipropylsilyl)acetic acid",
-                                   "[methylbis(propan-2-yl)silyl]acetic acid"),
+                                   "[methyldi(propan-2-yl)silyl]acetic acid"),
     ("CC(C)[Si](C)(C)CCO",         "2-(dimethylpropylsilyl)ethan-1-ol",
                                    "2-[dimethyl(propan-2-yl)silyl]ethan-1-ol"),
 ])
@@ -901,7 +911,7 @@ def test_f4_predicate_refusal_leaves_the_whole_group14_namer_closed(smiles):
 #             italic-N locant IS enclosed.
 #   BB 3465   `4-butyl-4-*tert*-butylcyclohexan-1-ol` (PIN) -> the retained
 #             italicized prefix is cited BARE even directly after a locant
-#             (P-16.3.4), so `N-tert-butyl`, never `N-(tert-butyl)`.
+#             (P-16.3.3(b) + P-16.2.4.1(d)), so the N-substituent is cited bare per BB 3465.
 # ==========================================================================
 
 def _f5(smiles):

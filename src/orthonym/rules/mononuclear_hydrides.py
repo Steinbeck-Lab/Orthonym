@@ -318,10 +318,14 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
 
     from ..assembly.naming_utils import (apply_enclosing_marks,
                                          enclose_if_compound,
-                                         multiplier_needs_hyphen,
+                                         multiplied_component,
                                          prefix_citation_sort_key)
-    _MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra',
-             5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa'}
+    # v29 P3-CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
+    # it), but the multiplier WORD now comes from the shared primitive, which
+    # knows P-16.3.5(a). This table could only ever say `di`/`tri`, so a
+    # SUBSTITUTED prefix here emitted `tri(2-methylpropyl)arsane` where the
+    # Blue Book requires `tris(...)`.
+    _SUPPORTED_COUNTS = frozenset(range(1, 9))
     counts = Counter(names)
     parts = []
     # v29 P3: the organyl guard feeding this is the shared chokepoint, so a prefix
@@ -330,8 +334,7 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
     # letters ('butyl'), which is also what decides whether the compound prefix
     # lands in the unmarked FIRST slot.
     for i, name in enumerate(sorted(counts, key=prefix_citation_sort_key)):
-        mult = _MULT.get(counts[name])
-        if mult is None:
+        if counts[name] not in _SUPPORTED_COUNTS:
             return None
         if i == 0:
             # First unique: P-16.5.1.3.1 withholds only the marks that SEPARATE
@@ -339,14 +342,12 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
             # (`(cyclohexylmethyl)di(methyl)silane`), and the P-16.3.4 italicized
             # carve-out keeps `di-tert-butyl` hyphenated rather than `ditert-`.
             marked = enclose_if_compound(name)
-            if mult and marked == name and multiplier_needs_hyphen(name):
-                parts.append(f"{mult}-{marked}")
-            else:
-                parts.append(f"{mult}{marked}")
+            parts.append(multiplied_component(counts[name], name, marked))
         else:
             # Subsequent: marks always, multiplier OUTSIDE them (BB 25866
             # 'chlorodi(methyl)'), escalating ( -> [ over an inner pair.
-            parts.append(f"{mult}{apply_enclosing_marks(name, -1)}")
+            parts.append(multiplied_component(
+                counts[name], name, apply_enclosing_marks(name, -1)))
     return ''.join(parts)
 
 

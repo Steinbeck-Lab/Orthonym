@@ -355,7 +355,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
 
             from ..assembly.naming_utils import (apply_enclosing_marks,
                                                  enclose_if_compound,
-                                                 multiplier_needs_hyphen,
+                                                 multiplied_component,
                                                  prefix_citation_sort_key)
             from .substituent_purity import organyl_prefix_name
             names = []
@@ -365,19 +365,17 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
                     return None
                 names.append(nm)
             counts = Counter(names)
-            _MULT = {1: '', 2: 'di', 3: 'tri'}
+            # v29 P3-CLOSEOUT Item A: arity bound local, multiplier word from
+            # the shared primitive (P-16.3.5(a) bis/tris when SUBSTITUTED).
+            _SUPPORTED_COUNTS = frozenset((1, 2, 3))
             parts = []
             for i, nm in enumerate(sorted(counts, key=prefix_citation_sort_key)):
-                m = _MULT.get(counts[nm])
-                if m is None:
+                if counts[nm] not in _SUPPORTED_COUNTS:
                     return None
                 marked = enclose_if_compound(nm)
                 if i > 0 and marked == nm:
                     marked = apply_enclosing_marks(nm, -1)   # P-16.5.1.3.1
-                if m and marked == nm and multiplier_needs_hyphen(nm):
-                    parts.append(f"{m}-{marked}")            # P-16.3.4
-                else:
-                    parts.append(f"{m}{marked}")             # multiplier outside
+                parts.append(multiplied_component(counts[nm], nm, marked))
             hubyl = ''.join(parts) + base
     if not hubyl:
         return None

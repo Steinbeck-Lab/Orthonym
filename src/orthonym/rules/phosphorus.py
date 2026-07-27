@@ -178,11 +178,15 @@ def _build_substituent_string(names: List[str]) -> str:
     """
     from ..assembly.naming_utils import (apply_enclosing_marks,
                                          enclose_if_compound,
-                                         multiplier_needs_hyphen,
+                                         multiplied_component,
                                          prefix_citation_sort_key)
 
     counts = Counter(names)
-    multiplier_map = {1: "", 2: "di", 3: "tri", 4: "tetra"}
+    # v29 P3-CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
+    # it); the multiplier WORD comes from the shared primitive, which knows
+    # P-16.3.5(a). This table could only say di/tri/tetra, so a SUBSTITUTED
+    # organyl on a phosphane could never take bis/tris.
+    _SUPPORTED_COUNTS = frozenset((1, 2, 3, 4))
 
     # v29 P3-FIX Item 2: this held a THIRD private copy of the citation key --
     # `_alnum_key = re.sub(r"[^a-z]", "", alpha_sort_key(name))` -- which is
@@ -200,7 +204,8 @@ def _build_substituent_string(names: List[str]) -> str:
     parts = []
     for i, name in enumerate(sorted_unique):
         count = counts[name]
-        multiplier = multiplier_map.get(count, "")
+        if count not in _SUPPORTED_COUNTS:
+            return None
         # v29 P3: with the widened organyl class these three branches began
         # receiving locanted and italicized prefixes, exposing three defects that
         # BB 7272 (P-16.5.1.3.1) settles verbatim -- "the second and further
@@ -215,15 +220,12 @@ def _build_substituent_string(names: List[str]) -> str:
             # 16286 writes 'tert-butyldi(methyl)phosphane' (PIN).
             if marked == name:
                 marked = apply_enclosing_marks(name, -1)
-            parts.append(f"{multiplier}{marked}")
+            parts.append(multiplied_component(count, name, marked))
         elif count > 1:
-            # Was a bare f"{multiplier}{name}": 'dipropan-2-yl' / 'ditert-butyl'.
-            # BB 25719 '1,4-di(propan-2-yl)cyclohexane' (PIN) keeps the marks with
-            # the SIMPLE multiplier outside; P-16.3.4 keeps the italicized hyphen.
-            if marked == name and multiplier_needs_hyphen(name):
-                parts.append(f"{multiplier}-{marked}")
-            else:
-                parts.append(f"{multiplier}{marked}")
+            # BB 25721 '1,4-di(propan-2-yl)cyclohexane' (PIN) keeps the marks
+            # with the SIMPLE multiplier outside; P-16.2.4.1(d) keeps the
+            # italicized hyphen. Both now come from `multiplied_component`.
+            parts.append(multiplied_component(count, name, marked))
         else:
             # First (or only) group: bare unless it is itself compound/complex.
             parts.append(marked)

@@ -164,17 +164,20 @@ def _cite_locanted_prefixes(by_name: dict) -> str:
       SIMPLE multiplier OUTSIDE the marks) and ``tert-butyl`` keeps its hyphen.
     """
     from ..assembly.naming_utils import (enclose_if_compound,
-                                         multiplier_needs_hyphen)
+                                         multiplied_component)
     parts = []
     for name in _cited_order(by_name):
         locs = sorted(by_name[name])
-        mult = _SUB_MULTIPLIER.get(len(locs), '')
+        # v29 P3-CLOSEOUT Item A: the multiplier WORD comes from the shared
+        # primitive, which knows P-16.3.5(a); the local `_SUB_MULTIPLIER` table
+        # could only ever say di/tri, so a SUBSTITUTED prefix on a polysulfane
+        # could not take bis/tris. The arity bound stays local (fail closed).
+        if len(locs) not in _SUB_MULTIPLIER:
+            return None
         marked = enclose_if_compound(name)
         loc_str = ','.join(str(l) for l in locs)
-        if mult and marked == name and multiplier_needs_hyphen(name):
-            parts.append(f"{loc_str}-{mult}-{marked}")     # 1,3-di-tert-butyl
-        else:
-            parts.append(f"{loc_str}-{mult}{marked}")
+        parts.append(
+            f"{loc_str}-{multiplied_component(len(locs), name, marked)}")
     return '-'.join(parts)
 
 

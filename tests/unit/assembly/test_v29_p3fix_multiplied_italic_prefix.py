@@ -55,13 +55,24 @@ from orthonym.assembly.naming_utils import (format_substituent_prefix,
     (3, 'tert-butyl', 'tri-'),
     (4, 'tert-butyl', 'tetra-'),
     (2, 'sec-butyl',  'di-'),
-    # An italicized-prefix-led name is SIMPLE (P-16.3.2(a)), so it can never take
-    # a derived bis/tris multiplier -- the hyphen and `bis` are mutually exclusive.
+    # v29 P3-CLOSEOUT Item A: the claim that an italicized-prefix-led name "can
+    # never take a derived bis/tris multiplier" is FALSE -- `tert-butylsulfanyl`
+    # reduces to the compound `butylsulfanyl` and takes `bis` (P-16.3.5(a)), with
+    # NO hyphen because it is enclosed (P-16.2.4.2, BB 6968). The carve-out is
+    # about the italicized PREFIX, not about everything it leads.
     (1, 'tert-butyl', ''),
+    (2, 'tert-butylsulfanyl', 'bis'),
     # unchanged for everything else
     (2, 'methyl', 'di'),
     (3, 'phenyl', 'tri'),
-    (2, 'propan-2-yl', 'bis'),
+    # v29 P3-CLOSEOUT Item A re-baseline: was 'bis'. `propan-2-yl` is an
+    # UNSUBSTITUTED simple prefix that merely carries a locant, so P-16.3.4(a)
+    # parenthesises it while P-16.3.2(a) multiplies it with the SIMPLE 'di' --
+    # BB's own example is `di(propanG2Gyl)!(preferred!prefix)` at :7087, and
+    # `1,4-di(propan-2-yl)cyclohexane (PIN)` at :25721. `bis` is reserved by
+    # P-16.3.5(a) for a SUBSTITUTED prefix: contrast
+    # `1,4-bis(2-chloropropan-2-yl)benzene (PIN)` (:25793), one chloro apart.
+    (2, 'propan-2-yl', 'di'),
     (3, 'cyclohexylmethyl', 'tris'),
 ])
 def test_the_multiplier_primitive_carries_the_hyphen(count, name, expected):
