@@ -324,8 +324,9 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     (P-67.1.2.4.1: nonacidic-hydrogen substitution cited with the italic N locant).
     """
     from collections import Counter
-    from .substituent_purity import pure_organyl_prefix_name
-    from ..assembly.naming_utils import alpha_sort_key
+    from .substituent_purity import organyl_prefix_name
+    from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
+                                         multiplier_needs_hyphen)
 
     n = mol.GetAtomWithIdx(n_idx)
     sub_names: list = []
@@ -335,7 +336,7 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
         if mol.GetBondBetweenAtoms(n_idx, nb.GetIdx()).GetBondType() != \
                 Chem.BondType.SINGLE:
             return None
-        nm = pure_organyl_prefix_name(mol, nb.GetIdx(), n_idx)
+        nm = organyl_prefix_name(mol, nb.GetIdx(), n_idx)
         if nm is None:
             return None
         sub_names.append(nm)
@@ -344,12 +345,25 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     _MULT = {1: "", 2: "di", 3: "tri"}
     counts = Counter(sub_names)
     segs = []
+    # v29 P3: the guard above is the shared chokepoint, so a prefix here may carry
+    # a locant or a retained italicized prefix. The italic-N locant is joined by a
+    # hyphen, so an unmarked locanted prefix would read as two locant sets --
+    # enclosing marks come from the shared P-16.3.3 primitive:
+    #   BB 32784 `N-(propan-2-yl)acetamide` (PIN)  -> locanted organyl enclosed;
+    #   BB 3465  `4-butyl-4-tert-butylcyclohexan-1-ol` (PIN) -> the retained
+    #            italicized prefix is cited BARE even straight after a locant
+    #            (P-16.3.4), hence `N-tert-butyl`, never `N-(tert-butyl)`, and
+    #            `N,N-di-tert-butyl` keeps the multiplier's hyphen.
     for nm in sorted(counts, key=alpha_sort_key):
         c = counts[nm]
         if c not in _MULT:
             return None
         locs = ",".join(["N"] * c)
-        segs.append(f"{locs}-{_MULT[c]}{nm}")
+        marked = enclose_if_compound(nm)
+        if _MULT[c] and marked == nm and multiplier_needs_hyphen(nm):
+            segs.append(f"{locs}-{_MULT[c]}-{marked}")
+        else:
+            segs.append(f"{locs}-{_MULT[c]}{marked}")
     return "-".join(segs)
 
 
@@ -375,7 +389,8 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
     (phosphinic FRN — out of scope), or the organyl+N-substituent combination that
     needs P-/N- locant disambiguation (P-45). Pure: no mol mutation.
     """
-    from .substituent_purity import pure_organyl_prefix_name
+    from ..assembly.naming_utils import enclose_if_compound
+    from .substituent_purity import organyl_prefix_name
 
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
@@ -442,7 +457,7 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
 
     organyl_names = []
     for c_idx in organyl_c:
-        nm = pure_organyl_prefix_name(mol, c_idx, p.GetIdx())
+        nm = organyl_prefix_name(mol, c_idx, p.GetIdx())
         if nm is None:
             return None
         organyl_names.append(nm)
@@ -457,7 +472,12 @@ def name_p_oxoacid_frn(mol) -> Optional[str]:
         return None                                  # needs P-/N- locants -> defer
 
     if organyl_names:
-        front = organyl_names[0]
+        # `build_p_frn_acid_name` concatenates `front` straight onto the stem and
+        # does no marking of its own, so a compound prefix takes its P-16.3.3 marks
+        # here or it runs into the stem ('propan-2-ylphosphono...'). The shared
+        # primitive keeps every simple prefix BARE, as `phenylphosphonochloridic
+        # acid` already was.
+        front = enclose_if_compound(organyl_names[0])
     elif n_prefixes:
         front = "-".join(sorted(n_prefixes))
     else:

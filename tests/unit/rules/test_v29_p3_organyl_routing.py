@@ -877,3 +877,99 @@ def test_f4_predicate_refusal_leaves_the_whole_group14_namer_closed(smiles):
     for that neighbour, so `_name_group14_substituent` declines the fragment and
     the cascade continues, exactly as before the migration."""
     assert _g14_name(smiles) is None
+
+
+# ==========================================================================
+# FAMILY 5 -- rules/inorganic_acids (2 sites, both NAMING)
+#
+#   line 338  `_amido_n_prefix`     -> the N-locant prefix block of a
+#             P-oxoacid amide: `N,N-dimethyl`, `N-ethyl-N-methyl`.
+#   line 445  `name_p_oxoacid_frn`  -> the organyl cited in front of the
+#             functional-replacement acid stem: `methylphosphonochloridic acid`.
+#
+# Both strings are concatenated straight into the emitted name (site 445 through
+# `build_p_frn_acid_name`, which does no marking of its own), so a widened prefix
+# carrying a locant would have run into the stem.  Enclosing marks come from the
+# shared `enclose_if_compound`:
+#
+#   BB 32784  `*N*-(propan-2-yl)acetamide` (PIN)  -> a locanted organyl on an
+#             italic-N locant IS enclosed.
+#   BB 3465   `4-butyl-4-*tert*-butylcyclohexan-1-ol` (PIN) -> the retained
+#             italicized prefix is cited BARE even directly after a locant
+#             (P-16.3.4), so `N-tert-butyl`, never `N-(tert-butyl)`.
+# ==========================================================================
+
+def _f5(smiles):
+    """End-to-end at DEFAULT settings is what these assert; the producer is
+    reached through the normal cascade."""
+    from orthonym.rules.inorganic_acids import name_p_oxoacid_frn
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, smiles
+    return name_p_oxoacid_frn(mol)
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # site 445 -- organyl on P
+    ("CC(C)P(=O)(Cl)O",        "(propan-2-yl)phosphonochloridic acid"),
+    ("CC(C)(C)P(=O)(Cl)O",     "tert-butylphosphonochloridic acid"),
+    ("C1CCCCC1P(=O)(Cl)O",     "cyclohexylphosphonochloridic acid"),
+    ("c1ccccc1CP(=O)(Cl)O",    "benzylphosphonochloridic acid"),
+    ("CCCCCCCCCCCCP(=O)(Cl)O", "dodecylphosphonochloridic acid"),
+    ("CC(C)P(=O)(OC#N)O",      "(propan-2-yl)phosphonocyanatidic acid"),
+])
+def test_f5_frn_organyl_previously_refused_is_now_named(smiles, expected):
+    assert _f5(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # site 338 -- N-substituent of the amido nitrogen
+    ("CC(C)NP(=O)(O)O",     "N-(propan-2-yl)phosphoramidic acid"),
+    ("CC(C)(C)NP(=O)(O)O",  "N-tert-butylphosphoramidic acid"),
+    ("C1CCCCC1NP(=O)(O)O",  "N-cyclohexylphosphoramidic acid"),
+    ("C=CNP(=O)(O)O",       "N-ethenylphosphoramidic acid"),
+    # P-16.3.4: the multiplier keeps the italicized prefix's hyphen
+    ("CC(C)(C)N(C(C)(C)C)P(=O)(O)O", "N,N-di-tert-butylphosphoramidic acid"),
+    # BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN): SIMPLE multiplier OUTSIDE
+    # the marks of a compound prefix
+    ("CC(C)N(C(C)C)P(=O)(O)O",       "N,N-di(propan-2-yl)phosphoramidic acid"),
+    # P-14.5.2 order across a simple and a compound prefix ('methyl' < 'propanyl')
+    ("CC(C)N(C)P(=O)(O)O",  "N-methyl-N-(propan-2-yl)phosphoramidic acid"),
+])
+def test_f5_amido_n_substituent_previously_refused_is_now_named(smiles, expected):
+    """BB 32784 `*N*-(propan-2-yl)acetamide` (PIN) for the enclosed locanted
+    prefix; BB 3465 for `tert-butyl` cited bare after a locant (P-16.3.4)."""
+    assert _f5(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("NP(=O)(O)O",         "phosphoramidic acid"),
+    ("CNP(=O)(O)O",        "N-methylphosphoramidic acid"),
+    ("CN(C)P(=O)(O)O",     "N,N-dimethylphosphoramidic acid"),
+    ("CCN(CC)P(=O)(O)O",   "N,N-diethylphosphoramidic acid"),
+    ("CCN(C)P(=O)(O)O",    "N-ethyl-N-methylphosphoramidic acid"),
+    ("c1ccccc1NP(=O)(O)O", "N-phenylphosphoramidic acid"),
+    ("CP(=O)(Cl)O",        "methylphosphonochloridic acid"),
+    ("c1ccccc1P(=O)(Cl)O", "phenylphosphonochloridic acid"),
+    ("CP(=O)(OC#N)O",      "methylphosphonocyanatidic acid"),
+    ("CN(C)P(=O)(Cl)O",    "N,N-dimethylphosphoramidochloridic acid"),
+])
+def test_f5_existing_names_are_byte_identical(smiles, expected):
+    """PROTECT rows.  `N-ethyl-N-methyl` pins that the P-14.5.2 citation order is
+    unchanged, and every simple prefix must stay BARE -- `enclose_if_compound` is
+    a no-op on the letters-only class the narrow walker allowed."""
+    assert _f5(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,why", [
+    ("OCCNP(=O)(O)O",      "heteroatom organyl on N: P-41 seniority"),
+    ("CC(C)P(=O)(O)O",     "no class group at all -> the phosphonic suffix path owns it"),
+    ("CC(C)P(=O)(Cl)N",    "no -OH left -> not class 'acid'"),
+    ("CC(C)P(=O)(Cl)OC",   "an ester -OR neighbour"),
+])
+def test_f5_other_guards_still_fail_closed(smiles, why):
+    """TRIPWIRE.  The widening must not enlarge `name_p_oxoacid_frn`'s scope: the
+    class-group requirement, the >=1 -OH 'acid' requirement and the no-ester rule
+    are independent of the organyl guard.  The `CC(C)P(=O)(O)O` row matters most --
+    a plain phosphonic acid must keep routing to the suffix path (which names it
+    `propan-2-ylphosphonic acid`), not be captured as an FRN acid."""
+    assert _f5(smiles) is None, why
