@@ -736,19 +736,54 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
-    # constitutional form parses — then the name is correct by construction
-    # (P-91/P-93) and OPSIN's narrower generation-side stereo grammar must NOT gate
-    # Orthonym correctness (audit Dim-08 §C; the verbatim Blue Book PIN
-    # `(1s,4s)-cyclohexane-1,4-diol` was being suppressed to `unknown`). The
-    # constitutional gate stays STRICT: a name whose stereo-stripped form ALSO fails
-    # to parse is still suppressed. strip_stereo is read-only — the shipped name keeps
-    # its stereo descriptors.
+    # constitutional form parses — then OPSIN's narrower generation-side stereo
+    # grammar must NOT gate Orthonym correctness (audit Dim-08 §C; the verbatim
+    # Blue Book PIN `(1s,4s)-cyclohexane-1,4-diol` was being suppressed to
+    # `unknown`). The constitutional gate stays STRICT: a name whose stereo-stripped
+    # form ALSO fails to parse is still suppressed. strip_stereo is read-only — the
+    # shipped name keeps its stereo descriptors.
+    #
+    # ARCH-2 (2026-07-27): this branch used to `return name` outright, skipping
+    # SELF-01, so ANY constitutional defect rode out free as long as the name
+    # happened to carry a stereo prefix OPSIN rejects — verification was strongest
+    # on well-formed names and ABSENT on malformed ones, exactly backwards. Measured
+    # on  with the gates ON: 107 names shipped through
+    # here and 98 of them named a DIFFERENT molecule (witness:
+    # COC(=O)NCC[C@@H]1CC[C@H]2[C@@H]1C2(Br)Br shipped as `(1S,4S,5R)-methyl
+    # N-octylcarbamate` — ring + both Br silently dropped); 0 of the 1641 gold
+    # targets were affected.
+    #
+    # The carve-out's licence is narrow — OPSIN need not parse the stereo LAYER —
+    # and it was never a licence to ship an UNVERIFIED CONSTITUTION. The comparison
+    # was available all along: _self_consistency_verdict compares the InChIKey
+    # SKELETON block, which EXCLUDES stereochemistry by construction (ADR-18-07),
+    # so it can judge the stereo-STRIPPED parse with no loss of validity. Route it
+    # through the SAME SELF-01 decision the parsed path uses: a verified
+    # constitutional mismatch suppresses, while `ok`/`inconclusive` still ship the
+    # FULL stereo name (fail-OPEN on any comparison that could not be made).
     from .rules.stereochemistry import strip_stereo
     _stripped = strip_stereo(name)
     if _stripped != name and _validity_gate_status(_stripped) == "parsed":
+        _stripped_smiles = _validity_gate_name_to_smiles(_stripped)
+        if _stripped_smiles is not None:
+            _decided = _self_consistency_decision(name, smiles, _stripped_smiles, stats)
+            if _decided != name:
+                return _decided  # SELF-01 PROVED a different molecule -> suppressed
+            if stats is not None:
+                stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
+            return name  # only the stereo layer is OPSIN-narrow -> ship it whole
+        # 'parsed' but NO usable SMILES: OPSIN accepted the stripped name and then
+        # emitted a structure RDKit cannot canonicalise (an impossible valence) —
+        # the identical situation the non-stereo path already settled above, where
+        # only 'unavailable' fails OPEN and 'parsed'-but-uncanonicalisable is
+        # UNVERIFIABLE and suppressed. It is not merely an unmade measurement: it
+        # is positive evidence that the name denotes a structure RDKit rejects as
+        # impossible. A stereo layer must not lower the burden of proof, so fall
+        # through to the honest fallback exactly as that path does. Measured: 1
+        # corpus row, 0 gold rows, and that row's name is independently wrong.
         if stats is not None:
-            stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
-        return name  # ship the full stereo name — only the stereo layer is OPSIN-narrow
+            stats["gate_stereo_unverifiable"] = (
+                stats.get("gate_stereo_unverifiable", 0) + 1)
     # NOTE (D-06, resolved): radical names now ship normally. The validity gate's
     # primary probe runs the OpsinOracle WITH `-r` (retained_substitution.py), so
     # a well-formed radical name parses -> SELF-01 constitutional compare -> ships.
