@@ -69,6 +69,41 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     # dynamically by substituent_prefix_forms.get_peroxy_prefix (exactly like ether/ester
     # above — no static principal-group prefix form).
     'peroxide',          # P-63.3.1(1): substitutive (R)peroxy via get_peroxy_prefix
+    # ------------------------------------------------------------------
+    # v29 P3-CLEANUP: these nine were added to SENIORITY_ORDER by later waves
+    # WITHOUT being justified here, so both tests in this class had been FAILING.
+    # That is the audit working as designed — the tripwire fired and nobody
+    # answered it. Each already carries an explicit, rule-cited "demoted case
+    # fails closed" decision in `rules/seniority.py`; the justification is
+    # transcribed here so the list is once again a complete record.
+    #
+    # All nine are DELIBERATE fail-closed, not oversights: `PREFIX_FORMS[fg] is
+    # None` means a molecule where the group is DEMOTED (a senior group is
+    # co-present) abstains instead of emitting an unattested prefix. Per
+    # invariant 11 that is the right trade only because abstention here is not
+    # masking a worse generator — the alternative is inventing a prefix string.
+    #
+    # The two halides are a DIFFERENT case from the other seven and are noted as
+    # such: a Blue Book prefix genuinely EXISTS for them, but it is
+    # HALOGEN-DEPENDENT, so no single static string can express it.
+    'sulfonyl_halide',   # -SO2-X. A BB preselected prefix EXISTS but varies with
+                         # the halogen: `chlorosulfonyl` (BlueBookV2.md:36472,
+                         # `--SO2-Cl chlorosulfonyl (preselected prefix)`,
+                         # P-65.3.2.3 / P-67.1.4.4.1), `fluorosulfonyl`, etc.,
+                         # cf. the PIN `3-[(chlorosulfonyl)oxy]propanoic acid`
+                         # (:36492). A static PREFIX_FORMS string cannot carry
+                         # the halogen, so this stays None and the demoted case
+                         # fails closed rather than guess one.
+    'sulfinyl_halide',   # -S(=O)-X, same shape: `chlorosulfinyl` (:36482,
+                         # `--S(=O)-Cl chlorosulfinyl (preselected prefix)`).
+    'sulfonoperoxoic_acid',   # W3-P04 (P-65.3.1.2): demoted prefix fails closed
+    'sulfonothioic_S_acid',   # W3-P04 (P-65.3.1.3): demoted prefix fails closed
+    'sulfonimidic_acid',      # W3-P04 (P-65.3.1.4): demoted prefix fails closed
+    'sulfinimidic_acid',      # W3-P04 (P-65.3.1.4): demoted prefix fails closed
+    'selenonimidamide',       # P-66.4.1.1: demoted prefix fails closed
+    'seleninimidamide',       # P-66.4.1.1: demoted prefix fails closed
+    'imidohydrazide',         # P-66.4.2.3.6 ring prefix not built; the chain-end
+                              # split is owned elsewhere -> fail closed
 })
 
 

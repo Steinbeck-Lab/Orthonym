@@ -175,9 +175,26 @@ class TestNoRegressions:
 
     @pytest.mark.unit
     def test_hydroxy_acid(self):
-        """2-hydroxyethanoic acid must not regress."""
+        """HO-CH2-COOH is `hydroxyacetic acid`, the Blue Book's verbatim PIN.
+
+        v29 P3-CLEANUP: this expected `2-hydroxyethanoic acid` and had been
+        failing. The EXPECTATION was wrong, not the code. BlueBookV2.md:29854,
+        verbatim: `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`,
+        under `### **P-65.1.1.2** Retained names only for general nomenclature`
+        (:29731) -- a section that pairs each non-preferred trivial name with its
+        PIN, e.g. `prop-2-ynoic acid (PIN) (not propiolic acid)`.
+
+        Acetic acid is one of the four named exceptions: `## **P-65.1.2**
+        Systematic names` (:29858) says "*Except for formic acid, acetic acid,
+        oxalic acid ... and oxamic acid ..., systematically formed names are
+        preferred IUPAC names*". So substituted derivatives are built ON the
+        retained acid, and the locant is omitted -- compare :3037,
+        `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`.
+
+        The propanoic siblings in this suite stay systematic; propanoic acid is
+        not one of the four exceptions."""
         result = name_compound('OCC(=O)O')
-        assert result == '2-hydroxyethanoic acid', f"Got '{result}'"
+        assert result == 'hydroxyacetic acid', f"Got '{result}'"
 
     @pytest.mark.unit
     def test_keto_acid(self):

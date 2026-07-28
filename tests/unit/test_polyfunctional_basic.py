@@ -6,11 +6,20 @@ from orthonym import name_compound
 class TestHydroxyAcids:
     """Test hydroxy acid naming (POLY-06)."""
 
-    def test_glycolic_acid_systematic(self):
-        # 2-hydroxyacetic acid (glycolic acid trivial name)
-        # Note: ethanoic = acetic, both are valid
+    def test_glycolic_acid_pin(self):
+        """`hydroxyacetic acid` -- BlueBookV2.md:29854 verbatim,
+        `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`, under
+        `### **P-65.1.1.2** Retained names only for general nomenclature` (:29731).
+
+        v29 P3-CLEANUP: this expected `2-hydroxyethanoic acid` and had been
+        failing; the expectation was wrong. The old comment "ethanoic = acetic,
+        both are valid" is true of general nomenclature and irrelevant to a PIN
+        assertion -- acetic acid is one of the four acids `## **P-65.1.2**
+        Systematic names` (:29858) exempts from systematic naming, so the
+        substituted derivative is built on it and carries no locant (compare
+        :3037, `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`)."""
         result = name_compound("OCC(=O)O")
-        assert result == "2-hydroxyethanoic acid"
+        assert result == "hydroxyacetic acid"
 
     def test_3_hydroxypropanoic_acid(self):
         assert name_compound("OCCC(=O)O") == "3-hydroxypropanoic acid"
@@ -101,9 +110,15 @@ class TestPolyfunctionalIntegration:
     """End-to-end polyfunctional naming tests."""
 
     def test_hydroxy_acid_full_pipeline(self):
+        """v29 P3-CLEANUP: the `"oic acid" in result` half was wrong and had been
+        failing. It encoded an assumption -- that every acid is named on a
+        systematic `-oic acid` stem -- which `## **P-65.1.2** Systematic names`
+        (BlueBookV2.md:29858) explicitly denies for formic, acetic, oxalic and
+        oxamic acid. The PIN here is `hydroxyacetic acid` (:29854, verbatim
+        `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`), so assert the
+        name itself rather than a stem shape that cannot hold for the exceptions."""
         result = name_compound("OCC(=O)O")
-        assert "hydroxy" in result
-        assert "oic acid" in result
+        assert result == "hydroxyacetic acid"
 
     def test_keto_acid_full_pipeline(self):
         result = name_compound("CC(=O)C(=O)O")
