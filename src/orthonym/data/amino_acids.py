@@ -209,11 +209,19 @@ def _build_acyl_names(all_amino_acids: Dict[str, str],
 
 
 # v24 W8 P3 Task 3.1 (P-103.1.3.2.2): the C-3 epimer of L-threonine / L-isoleucine
-# has the retained name `L-allo-<name>`. Base SMILES below are (L-form, L-allo
-# form = C-3 inverted, CIP-verified): L-Thr (2S,3R) / L-allo-Thr (2S,3S);
-# L-Ile (2S,3S) / L-allo-Ile (2S,3R). The full 4-stereoisomer descriptor map is
-# built on demand (canonical-SMILES keys -> descriptor prefix) so the retained
-# lookup can prepend L-/D-/L-allo-/D-allo-.
+# has the retained name `L-allo<name>` — `L-allothreonine`, FUSED, no hyphen after
+# 'allo'. Base SMILES below are (L-form, L-allo form = C-3 inverted, CIP-verified):
+# L-Thr (2S,3R) / L-alloThr (2S,3S); L-Ile (2S,3S) / L-alloIle (2S,3R). The full
+# 4-stereoisomer descriptor map is built on demand (canonical-SMILES keys ->
+# descriptor prefix) so the retained lookup can prepend `L-`, `D-`, `L-allo` or
+# `D-allo`.
+#
+# v29 P3-CLEANUP MINOR 11: this comment wrote every allo descriptor with a
+# TRAILING HYPHEN (`L-allo-<name>`, "prepend L-/D-/L-allo-/D-allo-") while the
+# values are `"L-allo"` / `"D-allo"` and `_allo_aa_forms`'s own docstring says
+# "*the last two carry NO trailing hyphen*" — one file contradicting itself about
+# the exact spelling that `eba5d3bb` had just adjudicated. Corrected here rather
+# than left as a second reading of the same rule.
 #
 # TWO CORRECTIONS to this comment, v29 P3-REGRESSION I12: (1) it said "PIN", but
 # `### **P-100 INTRODUCTION**` (BlueBookV2.md:50939) states at :50943 that

@@ -132,9 +132,20 @@ def test_sphinganine_is_implied_by_definition(name):
 # (:54715) scopes L-omission to PEPTIDES only; and Table 10.4 pairs each
 # retained name with a `rel-` (RELATIVE) systematic equivalent (:54204, :54211),
 # so the bare name is not enantiospecific.  Deliberately NOT exempted.
+# v29 P3-CLEANUP: the last two were written HYPHENATED here. That spelling never
+# shipped -- `eba5d3bb` settled on the FUSED form that `## **P-103.1.3.2.2** Use of
+# the prefix 'allo'` (:54320) writes (`allothreonine`), and the hyphenated italic
+# `*allo*-` in the Blue Book is a CARBOHYDRATE/cyclitol prefix (:53011, :53021,
+# :54890), a different device. The assertion below passes either way -- both forms
+# are correctly un-exempt -- so nothing caught the drift; it is corrected because a
+# stale string in a test reads as a claim about what the system emits.
+#
+# `cystine` stays in this list and stays correct: the predicate is asked about the
+# BARE name, which genuinely lacks its descriptor. Production now emits
+# `L-cystine`/`D-cystine` (P3-CLEANUP Item 1), and the backstop is silent on those.
 GENUINE_AMINO_ACID_GAP = [
     "alanine", "serine", "cysteine", "cystine", "threonine", "isoleucine",
-    "allo-threonine", "allo-isoleucine",
+    "allothreonine", "alloisoleucine",
 ]
 
 
