@@ -387,6 +387,26 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant) 
     Under those conditions every substitutable position is equivalent
     (P-14.3.4.3 *"only one kind of substitutable hydrogen"*), so ``1`` carries no
     information: ``cyclohexanone``, ``cyclopentanol``, ``cyclohexanethiol``.
+
+    ⚠ **The four conditions are deliberately OVER-DETERMINED, and mutation testing
+    proved it — do not "simplify" them.** Measured 2026-07-28: disabling the
+    monocyclic check, the all-carbon check, the H-count check, the single-bond check
+    or the exocyclic-neighbour loop *individually* breaks NO test, because every
+    witness is rejected by two or more of them:
+
+      * no ring heteroatom carries 2 H (``N``-H has 1, ring ``O`` has 0), so the
+        CH2 test already excludes heterocycles — the all-carbon test is redundant;
+      * a fused system's bridgehead atoms carry ≤1 H, so the CH2 test already
+        excludes them — the monocyclic test is redundant;
+      * an sp2 ring CH carries 1 H, so the CH2 test and the single-bond test cover
+        ring unsaturation *jointly* — disabling BOTH does break
+        ``cyclohex-3-en-1-ol`` (verified);
+      * a substituted ring carbon has both an exocyclic neighbour and ≠2 H, so
+        those two cover substitution jointly.
+
+    Removing the whole predicate breaks 4 tests. Each condition is kept because it
+    states one clause of P-14.3.4.2(c) explicitly and defends the licence if another
+    clause is ever loosened — not because it is independently exercised.
     """
     mol = getattr(features, 'mol', None)
     if mol is None or not oriented_ring:
