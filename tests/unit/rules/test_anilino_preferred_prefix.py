@@ -512,16 +512,20 @@ class TestFusedRingNAryLSite:
         )
         assert got == expected
 
-    def test_an_all_carbon_FUSED_n_aryl_fails_closed(self):
+    def test_an_all_carbon_FUSED_n_aryl_keeps_its_real_ring_name(self):
         """A naphthalenyl N-substituent is all-carbon, so ``_bfs_alkyl_from``
-        accepts it, but it is not a C6H5- group so the anilino primitive declines
-        it. Without the ring guard ``get_alkyl_name(10)`` called it
-        ``'decylamino'``. This is the witness that reaches the guard."""
+        accepts it, and it is not a C6H5- group so the anilino primitive declines
+        it — but ``name_substituent_fragment`` DOES name it, so it must keep that
+        name rather than be refused.
+
+        The carbon-count guard is deliberately narrow for exactly this reason: a
+        broader "any ring atom" version refused this case, trading a structurally
+        correct name for an abstention."""
         got = self._identify("c1ccc2cc(Nc3ccc4ccccc4n3)ccc2c1")
+        assert got == "naphthalen-2-ylamino", got
         assert got != "decylamino", (
             "a fused naphthalenyl ring was named by its carbon count"
         )
-        assert got is None, got
 
     def test_a_genuine_alkyl_branch_still_resolves(self):
         """The carbon-count fail-closed must not swallow real alkyls."""

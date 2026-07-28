@@ -1712,6 +1712,10 @@ def _identify_fused_substituent(
                     alkyl_name = name_substituent_fragment(
                         mol, alkyl_atoms, nbr.GetIdx(), list(excluded | {start_idx})
                     )
+                    # Track WHERE the name came from. `get_alkyl_name` names a
+                    # fragment by its CARBON COUNT, which is only meaningful for a
+                    # genuine acyclic alkyl -- see the ring guard below.
+                    _named_by_carbon_count = alkyl_name is None
                     if alkyl_name is None:
                         try:
                             alkyl_name = get_alkyl_name(carbon_count)
@@ -1749,14 +1753,18 @@ def _identify_fused_substituent(
                             'type': 'functional',
                             'atoms': [start_idx] + alkyl_atoms
                         }
-                    # A ring-bearing branch the anilino primitive declined must NOT
-                    # fall through to a carbon-count alkyl name. Reached by an
-                    # all-carbon FUSED N-aryl (naphthalenyl), which
-                    # `anilino_prefix_from_n_branch` rejects as not-a-C6H5 group and
-                    # `get_alkyl_name` would have called 'decylamino'.
-                    if any(mol.GetAtomWithIdx(i).GetIsAromatic()
-                           or mol.GetAtomWithIdx(i).IsInRing()
-                           for i in alkyl_atoms):
+                    # Refuse ONLY the carbon-count naming of a RING. The guard is
+                    # deliberately narrow: an earlier, broader version keyed on
+                    # "any ring atom" also refused the FUSED N-aryl case, whose real
+                    # output is `naphthalen-2-ylamino` -- structurally CORRECT (only
+                    # under-enclosed vs the P-62.2.3 `(naphthalen-2-yl)amino`), not a
+                    # fabrication. Refusing that traded a usable name for an
+                    # abstention, which is the standing invariant-11 trap ("removing
+                    # a wrong output can unmask a worse one") pointing the other way.
+                    # A mutation test caught it. So the condition is exactly the
+                    # defect: a ring named by its carbon count.
+                    if _named_by_carbon_count and any(
+                            mol.GetAtomWithIdx(i).IsInRing() for i in alkyl_atoms):
                         return None
                     if alkyl_name:
                         return {
