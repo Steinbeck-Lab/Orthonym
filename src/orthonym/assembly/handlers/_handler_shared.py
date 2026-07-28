@@ -506,13 +506,30 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
     if mol.GetNumHeavyAtoms() != len(ring) + 1:
         return False
 
-    # ⚠ `features.mol` is NOT always the input molecule. For an oxime the OH is
-    # STRIPPED before the suffix decision and re-added as an `N-hydroxy` prefix, so
-    # `features.mol` for `ON=C1CCCCC1` has 7 heavy atoms, not 8 -- the count above is
-    # structurally blind to it, and the licence wrongly fired
-    # (`N-hydroxycyclohexanimine` for `N-hydroxycyclohexan-1-imine`; the GATE caught
-    # it as a target regression). Re-check against the ORIGINAL input, so anything
-    # the perception layer moved out of `mol` still denies the licence.
+    # ⚠⚠ CORRECTED 2026-07-28 BY MEASUREMENT. This block used to be documented as the
+    # structural catch for the oxime: "Re-check against the ORIGINAL input, so anything
+    # the perception layer moved out of `mol` still denies the licence."
+    # **THAT CLAIM IS FALSE, and the guard is a NO-OP for the molecule it names.**
+    # Measured with a call-spy validated on two known positives (`cyclohexanone`,
+    # `cyclopentanol`), `ON=C1CCCCC1` reaches this predicate with:
+    #     principal_group='imine'  len(ring)=6  mol.GetNumHeavyAtoms()=7
+    #     features.canonical_smiles='N=C1CCCCC1'  -> re-parsed heavy atoms = 7
+    # `canonical_smiles` is NOT the original input -- the perception layer strips the
+    # oxime OH from it too -- so `7 == 6+1` PASSES here exactly as it passes above.
+    # The oxime and the plain imine `N=C1CCCCC1` arrive at this function with
+    # BYTE-IDENTICAL inputs on every field the predicate can read. The only thing that
+    # actually denied the oxime was the `_P14_3_4_RING_SUFFIX_CLASSES` allowlist.
+    #
+    # ⇒ Two consequences, both load-bearing:
+    #   1. The `imine` exclusion above is NOT redundant belt-and-braces; it is the sole
+    #      guard. Do not remove it on the reasoning that this re-check backs it up.
+    #   2. Re-admitting `imine` (Phase C tranche B Task 4) is IMPOSSIBLE at this site,
+    #      not merely awkward: no predicate here can distinguish the two molecules. It
+    #      must be decided where the `N-hydroxy` prefix fragment exists (the assembler),
+    #      or left excluded.
+    # This block is retained because it still denies a scope whose canonical_smiles
+    # genuinely carries extra atoms, but what it guards has NOT been re-derived --
+    # treat its coverage as unknown rather than as documented.
     _canon = getattr(features, 'canonical_smiles', None)
     if not _canon:
         return False
