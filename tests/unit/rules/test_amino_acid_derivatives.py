@@ -55,22 +55,35 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw na
 
 
 # --- 3.1 allo diastereomers (P-103.1.3.2.2) -------------------------------
+# v29 P3-REGRESSION I12: the L forms below expected the BARE retained name, because
+# the producer suppressed 'L-'. That suppression is `### **P-103.3.4** Indication of
+# configuration in peptides` (BlueBookV2.md:54715) applied outside its scope — and
+# `## **P-103.1.3.2.2** Use of the prefix 'allo'` (:54320), the section this pack was
+# built on, writes all four forms WITH the descriptor at :54324-54330:
+#   L-isoleucine (symbols 'Ile',' I')   (2S,3S)-2-amino-3-methylpentanoic acid
+#   L-alloisoleucine (symbol 'aIle')    (2S,3R)-2-amino-3-methylpentanoic acid
+#   L-threonine (symbols 'Thr','T')     (2S,3R)-2-amino-3-hydroxybutanoic acid
+#   L-allothreonine (symbol 'aThr')     (2S,3S)-2-amino-3-hydroxybutanoic acid
+# The D rows are unchanged, which is the point: only the L was being lost.
 @pytest.mark.parametrize("smiles,expected", [
     # L-allo-threonine = (2S,3S) [CIP-verified]; C-3 epimer of L-Thr (2S,3R).
-    ("C[C@H](O)[C@H](N)C(=O)O", "allo-threonine"),
+    ("C[C@H](O)[C@H](N)C(=O)O", "L-allo-threonine"),
     # L-allo-isoleucine = (2S,3R) [CIP-verified]; C-3 epimer of L-Ile (2S,3S).
-    ("CC[C@@H](C)[C@H](N)C(=O)O", "allo-isoleucine"),
+    ("CC[C@@H](C)[C@H](N)C(=O)O", "L-allo-isoleucine"),
 ])
 def test_allo_amino_acids(smiles, expected):
     assert G.name(smiles) == expected
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # All 8 stereoisomers of Thr/Ile emit their retained-name PIN (OPSIN-RT verified).
-    ("C[C@@H](O)[C@H](N)C(=O)O", "threonine"),        # L-Thr (2S,3R)
+    # All 8 stereoisomers of Thr/Ile emit their retained name (OPSIN-RT verified).
+    # These are retained names, NOT PINs: `### **P-100 INTRODUCTION**` (:50943) —
+    # "Preferred IUPAC names (PINs) are not identified for the compounds in this
+    # Chapter."
+    ("C[C@@H](O)[C@H](N)C(=O)O", "L-threonine"),      # L-Thr (2S,3R)
     ("C[C@H](O)[C@@H](N)C(=O)O", "D-threonine"),       # D-Thr (2R,3S)
     ("C[C@@H](O)[C@@H](N)C(=O)O", "D-allo-threonine"), # D-allo-Thr (2R,3R)
-    ("CC[C@H](C)[C@H](N)C(=O)O", "isoleucine"),        # L-Ile (2S,3S)
+    ("CC[C@H](C)[C@H](N)C(=O)O", "L-isoleucine"),      # L-Ile (2S,3S)
     ("CC[C@@H](C)[C@@H](N)C(=O)O", "D-isoleucine"),    # D-Ile (2R,3R)
     ("CC[C@H](C)[C@@H](N)C(=O)O", "D-allo-isoleucine"),# D-allo-Ile (2R,3S)
 ])
@@ -80,7 +93,8 @@ def test_thr_ile_stereoisomers(smiles, expected):
 
 # --- 3.2 amino-acid esters (P-103.2.6, BB 54595-54608) --------------------
 @pytest.mark.parametrize("smiles,expected", [
-    # BB 54601 verbatim example: explicit L- (unlike the bare AA's implicit L).
+    # BB 54601 verbatim example. (The parenthetical "unlike the bare AA's implicit L"
+    # was removed in v29 P3-REGRESSION I12: the bare AA now carries its L too.)
     ("COC(=O)[C@H](C)N", "methyl L-alaninate"),
     # Glycine is achiral -- no descriptor.
     ("COC(=O)CN", "methyl glycinate"),

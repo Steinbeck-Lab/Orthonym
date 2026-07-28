@@ -193,11 +193,17 @@ def _build_acyl_names(all_amino_acids: Dict[str, str],
 
 
 # v24 W8 P3 Task 3.1 (P-103.1.3.2.2): the C-3 epimer of L-threonine / L-isoleucine
-# has the retained-name PIN `allo-<name>`. Base SMILES below are (L-form, L-allo
+# has the retained name `L-allo-<name>`. Base SMILES below are (L-form, L-allo
 # form = C-3 inverted, CIP-verified): L-Thr (2S,3R) / L-allo-Thr (2S,3S);
 # L-Ile (2S,3S) / L-allo-Ile (2S,3R). The full 4-stereoisomer descriptor map is
-# built on demand (canonical-SMILES keys -> descriptor prefix) so the bare
-# retained lookup can prepend allo-/D-allo- exactly like L(implicit)/D-.
+# built on demand (canonical-SMILES keys -> descriptor prefix) so the retained
+# lookup can prepend L-/D-/L-allo-/D-allo-.
+#
+# TWO CORRECTIONS to this comment, v29 P3-REGRESSION I12: (1) it said "PIN", but
+# `### **P-100 INTRODUCTION**` (BlueBookV2.md:50939) states at :50943 that
+# "*Preferred IUPAC names (PINs) are not identified for the compounds in this
+# Chapter*" — these are prescribed retained names, not PINs; (2) the L was written
+# as implicit, which is the P-103.3.4 PEPTIDE rule applied out of scope.
 _ALLO_AA_BASE: Dict[str, tuple] = {
     "threonine": ("C[C@@H](O)[C@H](N)C(=O)O", "C[C@H](O)[C@H](N)C(=O)O"),
     "isoleucine": ("CC[C@H](C)[C@H](N)C(=O)O", "CC[C@@H](C)[C@H](N)C(=O)O"),
@@ -207,17 +213,26 @@ _ALLO_AA_FORMS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
 
 def _allo_aa_forms() -> Dict[str, Dict[str, str]]:
     """Canonical-isomeric-SMILES -> descriptor-prefix map per allo-capable AA.
-    Built lazily (RDKit at call time, not import time). Values: '' (L, implicit),
-    'D-', 'allo-' (L-allo), 'D-allo-'."""
+    Built lazily (RDKit at call time, not import time). Values: 'L-', 'D-',
+    'L-allo-', 'D-allo-'.
+
+    v29 P3-REGRESSION I12: the L forms used to map to ``''`` and ``'allo-'``, i.e.
+    the L was DROPPED. The suppression cited `P-103.1.3.2.2`, and that section
+    refutes it — `## **P-103.1.3.2.2** Use of the prefix 'allo'`
+    (BlueBookV2.md:54320) writes all four out at :54324-54330 WITH the descriptor
+    (`L-isoleucine`, `L-alloisoleucine`, `L-threonine`, `L-allothreonine`), each
+    alongside a fully-configured systematic alternative. The omission licence is
+    `### **P-103.3.4** Indication of configuration in peptides` (:54715) and is
+    scoped to peptides."""
     global _ALLO_AA_FORMS_CACHE
     if _ALLO_AA_FORMS_CACHE is None:
         from rdkit import Chem
         forms: Dict[str, Dict[str, str]] = {}
         for nm, (l_smi, lallo_smi) in _ALLO_AA_BASE.items():
             forms[nm] = {
-                Chem.CanonSmiles(l_smi): "",
+                Chem.CanonSmiles(l_smi): "L-",
                 _enantiomer_canon(l_smi): "D-",
-                Chem.CanonSmiles(lallo_smi): "allo-",
+                Chem.CanonSmiles(lallo_smi): "L-allo-",
                 _enantiomer_canon(lallo_smi): "D-allo-",
             }
         _ALLO_AA_FORMS_CACHE = forms
@@ -242,23 +257,50 @@ def _enantiomer_canon(smiles: str) -> Optional[str]:
 def _aa_config_descriptor(mol, name: str) -> Optional[str]:
     """Recover the L/D configurational descriptor for a standard amino acid (WSD-07).
 
-    Returns "" (achiral, or L which is implicit in the bare retained name),
-    "D-" (explicit), or None to DEFER — the input is a diastereomer the bare
-    retained name cannot represent (e.g. allo-isoleucine).
+    Returns "L-" or "D-" for a resolved α-carbon, "" when there is nothing to
+    designate (glycine is achiral; an unresolvable centre also yields ""), or None
+    to DEFER — the input is a diastereomer the retained name cannot represent.
+
+    v29 P3-REGRESSION I12 — this used to end with
+
+        return "D-" if _get_stereo_prefix(mol, name) == "D-" else ""
+
+    which computed the configuration correctly and then threw the L away, so
+    L-alanine and a configuration-free name were spelled identically. That is a
+    stereo LOSS, and it was invisible to every gate: OPSIN resolves bare `alanine`
+    to the L structure, so the round-trip compares EQUAL, and the gold rows pinned
+    the bare names. Only Orthonym's own stereo backstop objected.
+
+    The suppression was `### **P-103.3.4** Indication of configuration in peptides`
+    (BlueBookV2.md:54715) applied outside its scope; verbatim at :54717: "*The
+    stereodescriptor 'L' is not indicated in the names nor in the symbolic
+    representation of peptides composed of amino acids listed in Table 10.4.*"  A
+    free amino acid is not a peptide — which `rules/peptides.py` already stated in
+    its own docstring ("*the L-omission is a display rule applied here, so a
+    standalone amino acid (P-103.1) still shows L*"). This module violated that
+    invariant; `rules/esters.py` never did, which is why `methyl L-alaninate`
+    (BB :54601) was always right.
+
+    NOT a PIN claim: `### **P-100 INTRODUCTION**` (:50939) at :50943 — "*Preferred
+    IUPAC names (PINs) are not identified for the compounds in this Chapter.*"
+    `L-alanine` is the Blue Book's prescribed retained name, not a PIN.
     """
     from rdkit import Chem
     allo_forms = _allo_aa_forms().get(name)
     if allo_forms is not None:
         # Multi-stereocentre threonine/isoleucine: all four stereoisomers have a
-        # retained-name PIN (L implicit, D-, allo- = C-3 epimer, D-allo-).
-        # P-103.1.3.2.2. A SMILES matching none of the four (should not happen for
+        # retained name (L-, D-, L-allo- = C-3 epimer, D-allo-), per
+        # `## **P-103.1.3.2.2** Use of the prefix 'allo'` (:54320), examples at
+        # :54324-54330. A SMILES matching none of the four (should not happen for
         # these 2-stereocentre AAs) -> None (defer to systematic).
         input_canon = Chem.MolToSmiles(mol, canonical=True)  # isomeric (default)
         return allo_forms.get(input_canon)
-    # Single-stereocentre: alpha-carbon CIP via the peptide descriptor logic
+    # Single-stereocentre: alpha-carbon CIP via the peptide descriptor logic, which
+    # already returns exactly "L-"/"D-"/"" and handles the cysteine CIP inversion
+    # (L = R for the S/Se side chains). Its verdict is now USED, not filtered.
     # (lazy import avoids the data<->rules circular import at module load).
     from ..rules.peptides import _get_stereo_prefix
-    return "D-" if _get_stereo_prefix(mol, name) == "D-" else ""
+    return _get_stereo_prefix(mol, name)
 
 
 def get_amino_acid_name(
@@ -327,7 +369,9 @@ def get_amino_acid_name(
     desc = _aa_config_descriptor(m, name)
     if desc is None:
         return None  # diastereomer -> defer to the systematic namer
-    # desc in {"", "D-", "allo-", "D-allo-"} (P-103.1.1.1 / P-103.1.3.2.2).
+    # desc in {"", "L-", "D-", "L-allo-", "D-allo-"} — "" only when there is nothing
+    # to designate (achiral glycine, or an unresolvable centre). P-103.1.3.1 /
+    # P-103.1.3.2.2.
     return f"{desc}{name}"
 
 
