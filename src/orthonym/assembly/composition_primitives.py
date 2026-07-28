@@ -346,9 +346,19 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
-            if (last_char.isalpha() or last_char in (')', ']')) and first_char.isdigit():
+            # v29 P3-CLEANUP Item 4 (MINOR 8): `}` was missing from both tuples,
+            # so this copy dropped the separator after a brace-enclosed prefix
+            # ('2-{[(methylcarbamoyl)amino]methyl}4-methyl') while the
+            # `polyfunctional._join_prefixes` copy already hyphenated it. A closing
+            # brace ends an enclosure exactly as `)` and `]` do — P-16.5.4's nesting
+            # cycle `{[({[( )]})]}` makes all three the same kind of boundary — and
+            # 24 `}`-bearing gold rows route through THIS copy, so the two must
+            # agree. (No current gold pairs a `}` with a following locant, which is
+            # why the asymmetry survived; see the tests added alongside.)
+            closes_enclosure = last_char in (')', ']', '}')
+            if (last_char.isalpha() or closes_enclosure) and first_char.isdigit():
                 result += "-"
-            elif (last_char.isalpha() or last_char in (')', ']')) and first_char == 'N':
+            elif (last_char.isalpha() or closes_enclosure) and first_char == 'N':
                 result += "-"
         result += current
 

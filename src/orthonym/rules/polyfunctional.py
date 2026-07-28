@@ -425,8 +425,29 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
                         or is_substituted_substituent(prefix_form))
         if count > 1:
             multiplier = get_multiplier_prefix(count, prefix_form)
-            if _is_derived(multiplier) and not prefix_form.startswith(("(", "[")):
-                return f"{multiplier}({prefix_form})"
+            # P-16.5.1.10: a DERIVED multiplier (bis/tris/...kis) forces enclosure
+            # even on a simple base name -> 'bis(sulfanyl)', not 'bissulfanyl'.
+            #
+            # v29 P3-CLEANUP Item 2: this was the FOURTH branch reaching the
+            # enclosure step and the only one still hand-rolling it
+            # (`f"{multiplier}({prefix_form})"` behind a
+            # `not prefix_form.startswith(("(", "["))` guard). Two defects came
+            # with that: the guard tuple omitted `{`, so a brace-enclosed prefix
+            # got a REDUNDANT extra level (`bis({[(...)]methyl})` where the locant
+            # path gives `bis{[(...)]methyl}`), and the parenthesis type was
+            # hard-coded instead of following P-16.5.4. Routed through the shared
+            # `_enclose` — which is idempotent, so the guard is no longer needed at
+            # all — this branch now agrees with the locant path by construction.
+            #
+            # It is DEAD today (instrumented: 0 executions over all 1934 gold rows
+            # and 300 `pubchem_2000` rows; every producer feeding `prefix_form`
+            # calls `apply_enclosing_marks(..., 0)`, which yields `(` or an
+            # escalated `[`, never `{`). Kept rather than deleted because the rule
+            # it encodes is real and the no-locant path could reach it the moment a
+            # mononuclear parent takes a derived multiplier; a dead branch that
+            # bypasses the shared sink is the trap, not the branch itself.
+            if _is_derived(multiplier):
+                return f"{multiplier}{_enclose(prefix_form)}"
             if _compound_nl:
                 return f"{multiplier}{_enclose(prefix_form)}"
             return f"{multiplier}{prefix_form}"
@@ -480,17 +501,34 @@ def _name_amidine_chain_side(
     """Amino-/imino-side prefix for a chain-terminal amidine (AM-4, P-66.4.1.3.2).
 
     ``base`` is 'amino' (single-bonded N) or 'imino' (double-bonded =N). Returns
-    the decorated prefix — the BARE 'amino'/'imino' when the N is unsubstituted,
-    else the ENCLOSED '({alkyl}{base})' (e.g. '(dimethylamino)', '(ethylimino)',
-    see the return at the end of this function) — or None (fail closed) when any
-    N-substituent branch is un-nameable.
+    the BARE prefix — 'amino'/'imino' when the N is unsubstituted, else
+    '{alkyl}{base}' ('dimethylamino', 'ethylimino') — or None (fail closed) when
+    any N-substituent branch is un-nameable.
 
-    ⚠ The enclosure in the substituted case is part of the contract, not
-    incidental: callers pass the result straight to `format_fg_prefix`, which must
-    therefore not enclose it a second time. This docstring previously advertised a
-    bare `'{alkyl}{base}'`, which is what the code returns only in the
-    UNSUBSTITUTED case; the mismatch helped hide the v29 P3-REGRESSION
-    double-enclosure (`4-[(dimethylamino)]`).
+    ⚠ THE OUTER ENCLOSURE IS NOT THIS FUNCTION'S JOB (v29 P3-CLEANUP Item 2). All
+    five call sites pass the result straight to `format_fg_prefix`, which owns the
+    outer marks and picks their TYPE from the P-16.5.4 nesting order. This
+    function used to return a pre-enclosed `'({alkyl}{base})'`, and because it
+    hard-coded parentheses it produced `'((4-chlorophenyl)methylamino)'` — a `(`
+    directly inside a `(` — for any N-substituent that already carried marks of
+    its own. `### **P"16.5.4** Multiple!types!of!enclosing!marks`
+    (BlueBookV2.md:7444), verbatim at :7446: "*When multiple types of enclosing
+    marks are required, the nesting order is as follows: {[({[( )]})]}*". The
+    idempotent `_enclose` then had no way to tell that malformed pre-enclosure
+    from a legitimate one and shipped it verbatim.
+
+    The INNER level is this function's job, and it was missing entirely: a
+    COMPOUND N-substituent (P-16.5.1.1 / P-29.1.2) needs its own marks before
+    `{base}` is glued on, or the boundary is lost. Blue Book, on point —
+    `4-{[(4-chlorophenyl)methylidene]amino}aniline (PIN)` (:26529) under
+    `## **P-62.3.1** Substitutive names for imines` (:26508): same aryl, same
+    N-attached prefix, spelled brace / bracket / paren from the outside in.
+
+    Losing that boundary was not merely cosmetic. For
+    `COC(=O)CCC(=NCC)N(Cc1ccc(Cl)cc1)Cc1ccc(F)cc1` the run-together prefix parsed
+    as a DIFFERENT molecule (a diarylmethyl); SELF-01 caught it and the compound
+    abstained to `unknown organic compound`, so the malformation was costing
+    coverage as well as conformance.
     """
     from ..assembly.composer import _name_r_group
     from collections import Counter as _C
@@ -506,16 +544,24 @@ def _name_amidine_chain_side(
         _names.append(_rn)
     if not _names:
         return base
+    from ..assembly.naming_utils import apply_enclosing_marks, needs_brackets
+
     _counts = _C(_names)
     _parts = []
     for _nm in sorted(_counts):
         _c = _counts[_nm]
+        # P-16.5.1.1: a COMPOUND N-substituent takes its own enclosing marks,
+        # at the next level out from any it already carries (`(4-chlorophenyl)methyl`
+        # -> `[(4-chlorophenyl)methyl]`, auto-detected per P-16.5.4). A SIMPLE one
+        # (methyl, ethyl, benzyl, phenyl) stays bare, so `dimethylamino` and
+        # `ethylimino` are byte-identical to before.
+        _enc = apply_enclosing_marks(_nm, -1) if needs_brackets(_nm) else _nm
         _parts.append(
-            _nm if _c == 1 else f"{get_multiplier_prefix(_c, _nm)}{_nm}"
+            _enc if _c == 1 else f"{get_multiplier_prefix(_c, _enc)}{_enc}"
         )
-    # Substituted amino/imino is a compound substituent (P-16.5.1.1): enclose in
-    # parens so it alphabetizes on its complete name ('(dimethylamino)' at 'd').
-    return f"({''.join(_parts)}{base})"
+    # BARE: `format_fg_prefix` owns the outer marks and their type. See the
+    # docstring — returning them from here is what produced `(` inside `(`.
+    return f"{''.join(_parts)}{base}"
 
 
 # WS-A task 9 / P-66.6.1.2: FGs whose PREFIX_FORMS string ('oxo',
