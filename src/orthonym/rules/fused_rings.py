@@ -1718,10 +1718,18 @@ def _identify_fused_substituent(
                         except (ValueError, KeyError):
                             alkyl_name = None
                     if alkyl_name:
-                        # OPSIN treats "anilino" as a simple substituent
-                        if alkyl_name == 'phenyl':
+                        # P-62.2.1.1.1 (BB:26139): 'anilino' is the retained
+                        # PREFERRED PREFIX for C6H5-NH- with full substitution
+                        # allowed, cited bare when it carries no locant of its own
+                        # (BB:26306) and enclosed when it does (BB:26308). The
+                        # legacy else-branch emitted '{ring}amino' UNENCLOSED
+                        # ('4-methylphenylamino'), which is both the
+                        # general-nomenclature column (BB:26153) and malformed.
+                        from .ring_substituents import anilino_preferred_prefix
+                        _anilino = anilino_preferred_prefix(alkyl_name)
+                        if _anilino is not None:
                             return {
-                                'name': 'anilino',
+                                'name': _anilino,
                                 'type': 'functional',
                                 'atoms': [start_idx] + alkyl_atoms
                             }

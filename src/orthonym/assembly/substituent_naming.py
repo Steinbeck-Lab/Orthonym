@@ -2751,6 +2751,16 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         stem = name[:-3]  # remove "ane"
         return f"{stem}yl"
 
+    # ---- Aniline family: the RETAINED prefix, not a '-yl' transform ----
+    # P-62.2.1.1.1 (BB:26139): "The prefix name 'anilino' is retained as the
+    # preferred prefix for C6H5-NH- with full substitution allowed." Aniline is a
+    # carbocyclic amine, not a heterocycle, so the P-31.1.3 '-ine' -> '-inyl' rule
+    # below must not reach it: it produced '4-methyl-N-methylanilinyl', a morpheme
+    # that appears nowhere in the Blue Book. Must precede the '-ine' branch.
+    if name.endswith('aniline'):
+        from ..rules.ring_substituents import anilino_prefix_from_aniline_name
+        return anilino_prefix_from_aniline_name(name)
+
     # ---- Heterocyclic -ine ending ---- (IUPAC P-31.1.3)
     # e.g., "pyridine" -> "pyridinyl", "piperidine" -> "piperidinyl"
     # Note: -ine must come BEFORE the generic -e fallback

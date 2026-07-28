@@ -3395,23 +3395,24 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             # The count includes the carbonyl C, which is the stem's C1.
             return get_chain_prefix(_n) + "anoylamino"
 
-    # Check for anilino: -NH-phenyl (isolated benzene ring directly on N)
-    for branch_start in branches:
-        branch_atom = mol.GetAtomWithIdx(branch_start)
-        if branch_atom.GetIsAromatic() and branch_atom.GetSymbol() == 'C':
-            for ring in ring_info.AtomRings():
-                if branch_start in ring and len(ring) == 6:
-                    all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
-                    all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
-                    if all_arom and all_c:
-                        # Verify isolated (not fused)
-                        ring_set_check = set(ring)
-                        is_fused = any(
-                            set(other) != ring_set_check and set(other) & ring_set_check
-                            for other in ring_info.AtomRings()
-                        )
-                        if not is_fused:
-                            return "anilino"
+    # Check for anilino: -NH-phenyl (isolated benzene ring directly on N).
+    # P-62.2.1.1.1 (BB:26139) 'anilino' is the retained PREFERRED PREFIX for
+    # C6H5-NH- WITH FULL SUBSTITUTION ALLOWED (BB:26153 '4-chloroanilino
+    # (preferred prefix) | (4-chlorophenyl)amino'). This was the THIRD copy of the
+    # unguarded `return "anilino"`: the ring test never looked at the ring's own
+    # substituents, so OCCCCNc1ccc(Cl)cc1 was named '4-anilinobutan-1-ol' — the
+    # chloro dropped, a different molecule. Routed through the shared primitive,
+    # which proves atom coverage and otherwise fails closed.
+    # enclose=False: this producer's contract is to return the BARE prefix core and
+    # let the caller apply the P-16.5.1.1 marks (its sibling returns are bare too,
+    # e.g. `get_chain_prefix(_n) + "anoylamino"`). Returning a pre-enclosed prefix
+    # here double-wrapped it — '4-ethylcyclohexan-1-yl[(4-ethylanilino)]methanethioic
+    # O-acid' for CCC1CCC(CC1)NC(=S)NC2=CC=C(C=C2)CC.
+    from ..rules.ring_substituents import anilino_prefix_from_n_branch
+    _anilino = anilino_prefix_from_n_branch(
+        mol, attach_idx, frag_atoms, enclose=False)
+    if _anilino is not None:
+        return _anilino
 
     # Simple amino: -NH-alkyl or -N(alkyl)2
     if len(branches) == 1:

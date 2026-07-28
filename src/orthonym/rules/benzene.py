@@ -1466,16 +1466,29 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 _aryl_ring = _rng
                 break
         if _aryl_ring is not None:
-            from .ring_substituents import decorated_ring_substituent_name
+            from .ring_substituents import (
+                anilino_preferred_prefix, decorated_ring_substituent_name,
+            )
             _sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
             _dec = decorated_ring_substituent_name(
                 mol, _aryl_ring, _arylc.GetIdx(),
                 expected_atoms=set(_sub_atoms) - {n_idx},
             )
             if _dec is not None and _dec.endswith('phenyl'):
+                # P-62.2.1.1.1 (BB:26139): 'anilino' is the PREFERRED PREFIX for
+                # C6H5-NH- with full substitution allowed; '(...phenyl)amino' is
+                # the general-nomenclature column (BB:26153 '4-chloroanilino
+                # (preferred prefix) | (4-chlorophenyl)amino'). The locants are
+                # identical because decorated_ring_substituent_name numbers a
+                # carbocycle with the attachment at 1, which is aniline's C-1.
+                # The amine_candidate is DELIBERATELY unchanged: it feeds the
+                # aniline-as-parent promotion ('N-(2,4-dibromophenyl)aniline'),
+                # where the ring is an N-substituent and not an anilino prefix.
+                _pref = anilino_preferred_prefix(_dec)
                 from ..assembly.naming_utils import apply_enclosing_marks
                 return {
-                    'name': apply_enclosing_marks(f'({_dec})amino', -1),
+                    'name': _pref if _pref is not None
+                            else apply_enclosing_marks(f'({_dec})amino', -1),
                     'atoms': _sub_atoms,
                     'is_complex': True,
                     'amine_candidate': {
@@ -1498,10 +1511,15 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 except (ValueError, KeyError):
                     alkyl_name = None
             if alkyl_name:
-                # OPSIN treats "anilino" as a simple substituent
+                # P-62.2.1.1.1 (BB:26139) retained preferred prefix. Cited BARE:
+                # the unsubstituted prefix carries no locant of its own, so no
+                # enclosing marks (BB:26306 '3-anilinobenzoic acid (PIN)').
+                # Routed through the shared primitive so this site and the
+                # substituted ones cannot drift apart.
                 if alkyl_name == 'phenyl':
+                    from .ring_substituents import anilino_preferred_prefix
                     return {
-                        'name': 'anilino',
+                        'name': anilino_preferred_prefix('phenyl'),
                         'atoms': [n_idx] + alkyl_atoms,
                         'is_complex': False,
                         # C4: -NHPh promotes to 'N-phenylaniline' when the amine
@@ -1575,6 +1593,71 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     'atoms': [n_idx] + list(_branch_atoms),
                     'is_complex': True,
                 }
+
+    # P-62.2.1.1.1 (BB:26139) N,N-disubstituted ANILINO. -N(R)-C6H5 takes the
+    # PREFERRED prefix 'N-<R>anilino': BB:26308 verbatim
+    #   '3-(N-methylanilino)phenol (PIN)   3-[methyl(phenyl)amino]phenol'
+    # so the general-nomenclature column is the methyl(phenyl)amino family, and
+    # HEAD's third spelling '(N-methyl-N-phenylamino)' is non-PIN by P-58.1
+    # (BB:24623 — a PIN requires the names of its COMPONENTS to be preferred names
+    # too, even when the parent is right).
+    #
+    # The anilino ring is detected STRUCTURALLY, never from the branch's name: the
+    # N,N-dialkyl path below falls back to get_alkyl_name(carbon_count) when the
+    # universal namer declines, which named a 4-methylphenyl ring 'heptyl' — a
+    # different molecule. Fails closed (falls through to the legacy path) whenever
+    # the branch atoms are not exactly N + one bare benzene + one nameable branch.
+    if h_count == 0 and len(neighbors) == 2 and all(
+            nb.GetSymbol() == 'C' for nb in neighbors):
+        from .ring_substituents import anilino_preferred_prefix
+        _ri = mol.GetRingInfo()
+        _aryl_pairs = []
+        for _cn in neighbors:
+            if not (_cn.GetIsAromatic() and _cn.IsInRing()):
+                continue
+            for _rng in _ri.AtomRings():
+                if (_cn.GetIdx() in _rng and len(_rng) == 6
+                        and not (set(_rng) & ring_atoms)
+                        and all(_ri.NumAtomRings(i) == 1 for i in _rng)
+                        and all(mol.GetAtomWithIdx(i).GetIsAromatic()
+                                and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                                and mol.GetAtomWithIdx(i).GetFormalCharge() == 0
+                                for i in _rng)):
+                    _aryl_pairs.append((_cn, _rng))
+                    break
+        _nn_sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
+        for _arylc, _rng in _aryl_pairs:
+            _other = next(nb for nb in neighbors
+                          if nb.GetIdx() != _arylc.GetIdx())
+            _other_atoms = _bfs_substituent_atoms(
+                mol, _other.GetIdx(), ring_atoms | {n_idx})
+            # The anilino ring must be UNSUBSTITUTED: every branch atom is
+            # accounted for by N + this ring + the other N-branch. (A decorated
+            # ring here would need the ring and N locants merged into one
+            # alphanumerical sequence, which anilino_preferred_prefix declines.)
+            if set(_nn_sub_atoms) != {n_idx} | set(_rng) | set(_other_atoms):
+                continue
+            from ..assembly.substituent_naming import name_substituent_fragment
+            _oname = name_substituent_fragment(
+                mol, _other_atoms, _other.GetIdx(), list(ring_atoms | {n_idx}))
+            if not _oname:
+                continue
+            _pref = anilino_preferred_prefix('phenyl', _oname)
+            if _pref is None:
+                continue
+            return {
+                'name': _pref,
+                'atoms': _nn_sub_atoms,
+                'is_complex': True,
+                # UNCHANGED promotion payload: when the amine is the principal
+                # group the ring is the 'aniline' parent and the two branches are
+                # N-substituents ('N-methyl-N-phenylaniline'), not an anilino
+                # prefix. Same list the legacy path below builds (it sorts too).
+                'amine_candidate': {
+                    'suffix_name': 'amine',
+                    'n_substituents': sorted([_oname, 'phenyl']),
+                },
+            }
 
     # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors
     # IUPAC 2013: (N,N-dialkylamino) (e.g., (N,N-dimethylamino))

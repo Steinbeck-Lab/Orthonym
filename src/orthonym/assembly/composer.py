@@ -8228,6 +8228,23 @@ def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True) -> Op
     return apply_enclosing_marks(core, -1) if enclose else core
 
 
+def _anilino_prefix_from_n_branch(mol, n_idx: int, sub_atoms) -> Optional[str]:
+    """P-62.2.1.1.1 (BB:26139) preferred prefix for an N-attached benzene branch.
+
+    Thin wrapper over ``rules.ring_substituents.anilino_prefix_from_n_branch`` so the
+    two composer sites that emitted the bare literal ``"anilino"`` share ONE
+    implementation with ``rules/benzene.py``, ``rules/polyfunctional.py``,
+    ``rules/fused_rings.py`` and ``assembly/substituent_enumerator.py``. The import
+    is lazy: ``rules.ring_substituents`` imports ``assembly.naming_utils``, so a
+    module-level import here would close a cycle.
+
+    Returns None (fail closed) unless the branch is exactly a nitrogen plus one
+    isolated benzene ring plus that ring's own nameable decoration.
+    """
+    from ..rules.ring_substituents import anilino_prefix_from_n_branch
+    return anilino_prefix_from_n_branch(mol, n_idx, sub_atoms)
+
+
 def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
     """
     Check if a substituent is an acylamino group: -NH-C(=O)-R or -N(R)-C(=O)-R.
@@ -8389,21 +8406,21 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                                 if non_core_c_a == 0:
                                     return f"(({fh_prefix_a})amino)"
                 # --- End Phase 79-02 fused het in acylamino ---
-                # Check for isolated phenyl (not part of a fused system)
-                for ring in ring_info.AtomRings():
-                    if all(r in sub_set for r in ring) and len(ring) == 6:
-                        all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
-                        all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
-                        if all_arom and all_c:
-                            # Verify this is an isolated benzene (not part of fused system)
-                            ring_set_chk_a = set(ring)
-                            is_fused_a = False
-                            for other_ring in ring_info.AtomRings():
-                                if set(other_ring) != ring_set_chk_a and set(other_ring) & ring_set_chk_a:
-                                    is_fused_a = True
-                                    break
-                            if not is_fused_a:
-                                return "anilino"
+                # P-62.2.1.1.1 (BB:26139): -NH-C6H5 and its RING-SUBSTITUTED
+                # analogues take the retained preferred prefix 'anilino', with
+                # full substitution allowed ('4-chloroanilino (preferred prefix)',
+                # BB:26153). This used to be an unconditional `return "anilino"`
+                # guarded only by `all(r in sub_set for r in ring)` — which proves
+                # the six RING atoms are inside the substituent and says nothing
+                # about the ring's own substituents, which are also inside
+                # sub_set and were never examined. Every ring substituent was
+                # silently dropped ('3-anilinopropanenitrile' for
+                # N#CCCNc1ccc(Cl)cc1 — a different molecule; SELF-01 abstained).
+                # The shared primitive proves atom coverage via expected_atoms and
+                # fails closed instead, so this site can no longer drop an atom.
+                _anilino = _anilino_prefix_from_n_branch(mol, idx, sub_atoms)
+                if _anilino is not None:
+                    return _anilino
                 continue  # Skip non-phenyl ring substituents
 
             # Count carbons PER N-branch via C-C bonds only (Phase 167
@@ -8867,23 +8884,17 @@ def _name_n_attached_substituent_fallback(
                         # Fused het with linker carbons: fall through to recursive naming
         # --- End Phase 79-02 fused het detection for N-branch ---
 
-        # Substituent has a ring - check for phenyl/benzene (anilino)
-        # Only match if the ring is NOT part of a fused system (to avoid
-        # falsely matching benzene ring of quinoline etc.)
-        for ring in ring_info.AtomRings():
-            if all(r in sub_set for r in ring) and len(ring) == 6:
-                all_arom = all(mol.GetAtomWithIdx(r).GetIsAromatic() for r in ring)
-                all_c = all(mol.GetAtomWithIdx(r).GetSymbol() == 'C' for r in ring)
-                if all_arom and all_c:
-                    # Verify this is an isolated benzene ring (not part of fused system)
-                    ring_set_check = set(ring)
-                    is_fused = False
-                    for other_ring in ring_info.AtomRings():
-                        if set(other_ring) != ring_set_check and set(other_ring) & ring_set_check:
-                            is_fused = True
-                            break
-                    if not is_fused:
-                        return "anilino"
+        # Substituent has a ring - check for phenyl/benzene (anilino).
+        # P-62.2.1.1.1 (BB:26139) / BB:26153: the SECOND copy of the same
+        # unguarded `return "anilino"` atom drop (see _check_for_acylamino). The
+        # shared primitive derives the ring's own decoration and proves it accounts
+        # for exactly the branch, so a ring substituent can no longer be dropped;
+        # an unsubstituted ring still yields the bare 'anilino' byte-identically
+        # (asserted by tests/unit/assembly/
+        # test_name_heteroatom_substituent_split.py).
+        _anilino = _anilino_prefix_from_n_branch(mol, attach_atom, sub_atoms)
+        if _anilino is not None:
+            return _anilino
 
         # --- Phase 79-01: Direct ring identification for N-branch (DROP-18 fix) ---
         # Try O(1) ring identification before recursive naming fallback.

@@ -3247,6 +3247,230 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     return f'{_stereo_prefix}{prefix_str}{stem}'
 
 
+# --------------------------------------------------------------------------- #
+# P-62.2.1.1.1 — the substituted-'anilino' PREFERRED PREFIX (v29 P4-a)        #
+# --------------------------------------------------------------------------- #
+_PHENYL_STEM = 'phenyl'
+_ANILINO_STEM = 'anilino'
+
+
+def anilino_preferred_prefix(ring_prefix: Optional[str],
+                            n_substituent: Optional[str] = None,
+                            *, enclose: bool = True) -> Optional[str]:
+    """The Blue Book PREFERRED PREFIX for a (fully substitutable) C6H5-NH- group.
+
+    Governing rule, verbatim, under the heading chain ``## P-62.2 AMINES`` /
+    ``### P-62.2.1 Primary amines`` / ``### P-62.2.1.1 Retained names`` /
+    ``**P-62.2.1.1.1**`` (BlueBookV2.md:26139):
+
+        "Aniline, for C6H5-NH2, is the only name for a primary amine retained as a
+         preferred IUPAC name for which full substitution is permitted on the ring
+         and the nitrogen atom. ... The prefix name 'anilino' is retained as the
+         preferred prefix for C6H5-NH- with full substitution allowed. The name
+         'phenylamino' may be used in general nomenclature."
+
+    Corroborated by P-62.2.3 (heading BB:26298, "The substituent prefix name
+    'anilino' is a preferred IUPAC prefix and substitution is allowed"), the
+    retained-prefix tables (BB:17800 / BB:17860 / BB:24565) and the P-34.2.1.3
+    worked explanation (BB:24605, "'anilino' is chosen as retained prefix preferred
+    to 'phenylamino'").
+
+    The Blue Book's own two-column pairs — PREFERRED PREFIX | general nomenclature:
+
+        BB:26151   anilino                  | phenylamino
+        BB:26153   4-chloroanilino          | (4-chlorophenyl)amino
+        BB:26166   4-methylanilino          | (4-methylphenyl)amino  (not p-toluidino)
+
+    so ``(<X>phenyl)amino`` -> ``<X>anilino``, LOCANTS UNCHANGED. The locants
+    coincide by construction: ``decorated_ring_substituent_name`` numbers a
+    carbocyclic ring with the free valence at locant 1 (the ``else:
+    attachment_locant = 1`` branch above), and aniline's C-1 is the N-bearing
+    carbon — the same atom. That is why all three Blue Book pairs carry identical
+    locants.
+
+    This is a HEAD-MORPHEME substitution on an already-CONSTRUCTED ring-substituent
+    name, not a lookup, because the class is OPEN: the set of substituents a ring
+    may carry is unbounded, so any finite table of anilino spellings would be wrong
+    on its complement by construction.
+
+    Enclosure, from BB:26306 vs BB:26308 — a prefix carrying its own locant(s) takes
+    enclosing marks, one carrying none does not:
+
+        BB:26306   3-anilinobenzoic acid (PIN)        | 3-(phenylamino)benzoic acid
+        BB:26308   3-(N-methylanilino)phenol (PIN)    | 3-[methyl(phenyl)amino]phenol
+
+    ★ SCOPE. This function only SPELLS a prefix. It must be called only where an
+    anilino-family prefix is already the chosen construction; it must never be used
+    to promote one over a senior name-selection criterion. Two Blue Book boundary
+    rows pin that limit: BB:26419 (P-62.2.5.1 — multiplicative nomenclature beats
+    BOTH substitutive forms) and BB:26404 (P-45.2.1 — maximum prefix count declines
+    an anilino prefix outright, and marks the anilino-bearing alternative 'not').
+
+    Args:
+        ring_prefix: the ring substituent name, ``'phenyl'`` or ``'<X>phenyl'``
+            (e.g. ``'4-chlorophenyl'``, ``'2,3-dimethylphenyl'``) — normally the
+            return value of ``decorated_ring_substituent_name``. Anything else
+            fails closed.
+        n_substituent: the OTHER substituent on the nitrogen, as a substituent
+            prefix name (``'methyl'``, ``'phenyl'``). An anilino nitrogen carries
+            at most one (parent + ring + this), so a single name, not a list.
+        enclose: apply the P-16.5.1.1 enclosing marks when the prefix carries its
+            own locant(s). Callers that wrap the result themselves pass False.
+
+    Returns:
+        The preferred prefix, or ``None`` when the class boundary is not met — in
+        which case the caller keeps its own construction, so routing a site through
+        this helper can never silently drop an atom.
+    """
+    if not ring_prefix or not ring_prefix.endswith(_PHENYL_STEM):
+        return None
+    ring_decoration = ring_prefix[:-len(_PHENYL_STEM)]
+    # A decoration must be a real prefix sequence, not a stray separator: the
+    # only unadorned form is the bare stem itself.
+    if ring_decoration.endswith('-') or ring_decoration.endswith(','):
+        return None
+    if ring_decoration and n_substituent:
+        # Both an N locant and ring locants would have to be merged into ONE
+        # alphanumerical prefix sequence (P-14.5.2). The derivation found no Blue
+        # Book worked example fixing that merge, so decline rather than invent an
+        # order. Measured 2026-07-28: production already abstains on this shape
+        # (e.g. Oc1cccc(N(C)c2ccc(C)cc2)c1 -> 'unknown organic compound'), so
+        # declining is byte-identical.
+        return None
+    if n_substituent:
+        from ..assembly.naming_utils import _wrap_n_substituent
+        core = f'N-{_wrap_n_substituent(n_substituent)}{_ANILINO_STEM}'
+    else:
+        core = f'{ring_decoration}{_ANILINO_STEM}'
+    # BB:26306 bare vs BB:26308 enclosed: marks iff the prefix has its own locant.
+    carries_own_locant = bool(ring_decoration) or bool(n_substituent)
+    if enclose and carries_own_locant:
+        from ..assembly.naming_utils import apply_enclosing_marks
+        return apply_enclosing_marks(core, -1)
+    return core
+
+
+def anilino_prefix_from_aniline_name(aniline_name: Optional[str],
+                                     *, enclose: bool = True) -> Optional[str]:
+    """``'<X>aniline'`` -> the P-62.2.1.1.1 preferred prefix ``'<X>anilino'``.
+
+    Third entry point for ``anilino_preferred_prefix``, for callers that hold an
+    ASSEMBLED aniline parent name rather than a ring name plus branch names.
+
+    The head-morpheme substitution leaves the prefix sequence untouched, and that is
+    a derived fact, not an assumption: the Blue Book prints the parent and prefix
+    forms with IDENTICAL decoration —
+
+        BB:26147   4-chloroaniline (PIN)
+        BB:26153   4-chloroanilino (preferred prefix)  | (4-chlorophenyl)amino
+        BB:26162   4-methylaniline (PIN)
+        BB:26166   4-methylanilino (preferred prefix)  | (4-methylphenyl)amino
+
+    — and P-14.5.2 orders detachable prefixes among THEMSELVES; the head morpheme
+    does not participate. So whatever order is correct for the aniline parent is
+    correct for the anilino prefix, and this function inherits the ordering that
+    ``rules/benzene.py``'s aniline joiner already computes (which merges N- and
+    ring-locant prefixes into one alphanumerical sequence per P-14.5.2). That is
+    what lets this path serve the ring-AND-nitrogen-substituted case that
+    ``anilino_preferred_prefix`` declines: here the merge is not invented, it is
+    inherited from a producer that already ships the parent form.
+
+    Why it exists: ``assembly/substituent_naming.py``'s ``parent_to_prefix`` reached
+    the P-31.1.3 heterocyclic '-ine' -> '-inyl' rule with '4-methyl-N-methylaniline'
+    and produced '4-methyl-N-methylanilinyl'. Aniline is not a heterocycle and
+    'anilinyl' is not a Blue Book morpheme; the preferred prefix is the retained
+    'anilino' (BB:26139).
+
+    Returns None (fail closed) for anything that is not an aniline-family name.
+    """
+    if not aniline_name or not aniline_name.endswith('aniline'):
+        return None
+    decoration = aniline_name[:-len('aniline')]
+    if decoration.endswith(',') or (decoration and not decoration.endswith('-')
+                                    and not decoration[-1].isalnum()
+                                    and decoration[-1] not in ')]}'):
+        return None
+    # The joiner emits '<rendered>-<rendered>-...' immediately followed by the head
+    # morpheme, so a well-formed decoration never ends in a separator.
+    if decoration.endswith('-'):
+        return None
+    core = f'{decoration}{_ANILINO_STEM}'
+    if enclose and decoration:
+        from ..assembly.naming_utils import apply_enclosing_marks
+        return apply_enclosing_marks(core, -1)
+    return core
+
+
+def anilino_prefix_from_n_branch(mol, n_idx: int, branch_atoms,
+                                 *, enclose: bool = True) -> Optional[str]:
+    """``anilino_preferred_prefix`` derived from the GRAPH rather than from a name.
+
+    Entry point for the emission sites that had no unsubstituted-ring check at all
+    and returned the bare literal ``"anilino"`` as soon as a 6-membered isolated
+    all-carbon aromatic ring was found INSIDE the substituent —
+    ``assembly/composer.py`` (two sites) and
+    ``assembly/substituent_enumerator.py``. Requiring the ring atoms to be inside
+    the branch says nothing about the ring's own substituents, which are also
+    inside the branch and were never examined, so every ring substituent was
+    silently dropped and the emitted name described a DIFFERENT molecule.
+
+    The atom-drop is closed by construction here: the ring name is built by
+    ``decorated_ring_substituent_name`` with ``expected_atoms`` set to the WHOLE
+    branch minus the nitrogen, and that function returns None unless the ring plus
+    its detected decoration accounts for EXACTLY that set.
+
+    Args:
+        mol: the molecule.
+        n_idx: the amine nitrogen.
+        branch_atoms: the complete N-substituent branch (the nitrogen itself may be
+            included or not — it is normalised in).
+        enclose: as for ``anilino_preferred_prefix``.
+
+    Returns:
+        The preferred prefix, or ``None`` — fail closed — when the branch is not
+        exactly a nitrogen plus one isolated benzene ring plus that ring's own
+        nameable decoration.
+    """
+    branch_set = set(branch_atoms) | {n_idx}
+    ring_info = mol.GetRingInfo()
+    n_neighbours = {nbr.GetIdx() for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors()}
+
+    candidate = None
+    for ring in ring_info.AtomRings():
+        if len(ring) != 6 or not set(ring) <= branch_set:
+            continue
+        if not (set(ring) & n_neighbours):
+            continue  # a ring elsewhere in the branch is not the anilino ring
+        # Isolated benzene only: a benzo sub-ring of a fused system is aromatic and
+        # all-carbon but is NOT a C6H5- group (the naphthalene/quinoline trap the
+        # legacy 'is_fused' checks were guarding).
+        if any(ring_info.NumAtomRings(i) != 1 for i in ring):
+            continue
+        if not all(mol.GetAtomWithIdx(i).GetIsAromatic()
+                   and mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                   and mol.GetAtomWithIdx(i).GetFormalCharge() == 0
+                   for i in ring):
+            continue
+        if candidate is not None:
+            return None  # two candidate rings on one N: ambiguous, fail closed
+        candidate = ring
+    if candidate is None:
+        return None
+
+    attachment = sorted(set(candidate) & n_neighbours)
+    if len(attachment) != 1:
+        return None  # the N bridges two atoms of the same ring: not an anilino
+    rest = branch_set - {n_idx} - set(candidate)
+    if not rest:
+        # Unsubstituted C6H5-NH-: the bare retained prefix (BB:26151), which is
+        # byte-identical to what these sites emitted before.
+        return anilino_preferred_prefix(_PHENYL_STEM, enclose=enclose)
+    decorated = decorated_ring_substituent_name(
+        mol, candidate, attachment[0], expected_atoms=branch_set - {n_idx},
+    )
+    return anilino_preferred_prefix(decorated, enclose=enclose)
+
+
 def ring_atom_fg_prefixes(
     mol, ring_atom_idx: int, ring_atom_set: Set[int],
     return_atoms: bool = False,

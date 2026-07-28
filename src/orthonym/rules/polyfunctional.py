@@ -1662,9 +1662,19 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 if not _r_name:
                     _sa_ok = False
                     break
-                # phenyl -> retained 'anilino' (bare); else '({R}amino)' (P-16.3.3)
-                _amino_prefix = (
-                    'anilino' if _r_name == 'phenyl' else f'({_r_name}amino)')
+                # P-62.2.1.1.1 (BB:26139): 'anilino' is the retained PREFERRED
+                # PREFIX for C6H5-NH- with FULL SUBSTITUTION ALLOWED, so a
+                # substituted ring substitutes ONTO 'anilino' (BB:26153
+                # '4-chloroanilino (preferred prefix) | (4-chlorophenyl)amino').
+                # The old else-branch put the general-nomenclature form in a PIN
+                # ('5-(4-chlorophenylamino)-5-oxopentanoic acid' shipped) — and not
+                # even the well-formed general spelling, which BB:26153 writes with
+                # the inner enclosure. Bare 'anilino' stays bare (BB:26306).
+                # Non-phenyl rings keep the legacy '({R}amino)' (P-16.3.3).
+                from .ring_substituents import anilino_preferred_prefix
+                _amino_prefix = anilino_preferred_prefix(_r_name)
+                if _amino_prefix is None:
+                    _amino_prefix = f'({_r_name}amino)'
                 # Collect the whole N-side branch (N + R subtree), never crossing
                 # the amide C, to exclude it from the alkyl substituent walk.
                 _seen = {_sac}
