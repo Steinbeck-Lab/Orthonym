@@ -364,6 +364,17 @@ def _generate_ring_parent(features: Any) -> "NameFragment":
     return NameFragment(text="", fragment_type="parent")
 
 
+# P-14.3.4.2(c) licence: suffix classes with Blue Book evidence that the trivial
+# mono-suffix ring locant is withheld. NOT a spelling table -- a scope restriction on
+# an otherwise structural predicate. `imine` is excluded on purpose; see the docstring.
+_P14_3_4_RING_SUFFIX_CLASSES = frozenset({
+    'ketone',
+    'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'alcohol',
+    'thiol', 'selenol', 'tellurol',
+    'primary_amine', 'amine',
+})
+
+
 def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
                                    suffix_ring_atoms=None) -> bool:
     """P-14.3.4.2(c): may a single non-terminal ring suffix drop its locant?
@@ -412,6 +423,31 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
     mol = getattr(features, 'mol', None)
     if mol is None or not oriented_ring:
         return False
+
+    # Suffix-class allowlist. P-14.3.3 is deny-by-default, so a class is licensed only
+    # where the Blue Book actually shows the locant withheld:
+    #   ketone   -- verbatim "'cyclohexanone' (PIN)"  BB:14916 (+ BB:2917, BB:28394)
+    #   alcohol  -- verbatim "(1) cyclopentanol (PIN)" BB:26854
+    #   thiol    -- P-14.3.4.2(c) worked example `cyclohexanethiol`
+    #   amine    -- same shape, single monovalent heteroatom suffix
+    #
+    # `imine` is DELIBERATELY EXCLUDED. There is no verbatim bare `-imine` row (the
+    # Phase C derivation flagged it as the lowest-confidence of its five gold
+    # conflicts), and licensing it shipped a real defect: for an oxime the OH is
+    # STRIPPED from `features.mol` before this point and re-added later as an
+    # `N-hydroxy` prefix, so the N-substituent is INVISIBLE here -- both
+    # `features.mol` and `features.canonical_smiles` carry the reduced 7-heavy-atom
+    # form of `ON=C1CCCCC1`. The licence therefore fired and emitted
+    # `N-hydroxycyclohexanimine`, but `N` is an ESSENTIAL locant in the same scope and
+    # P-14.3.3 (BB:2869) says one essential locant restores every locant in that
+    # scope, so `N-hydroxycyclohexan-1-imine` is correct. The GATE caught it as a
+    # target regression.
+    #
+    # Deciding this properly needs the whole scope -- i.e. the assembler, where the
+    # prefix fragments exist -- which is tranche B's per-scope machinery. Until then
+    # the honest answer for a class with no verbatim evidence is: do not licence it.
+    if getattr(features, 'principal_group', None) not in _P14_3_4_RING_SUFFIX_CLASSES:
+        return False
     ring = list(oriented_ring)
     ring_set = set(ring)
 
@@ -441,29 +477,65 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
             if bond.GetBondType() != _Chem.BondType.SINGLE:
                 return False
 
-    # Which ring atoms actually BEAR the suffix?
+    # ── The whole-molecule condition ─────────────────────────────────────────
+    # DENY-BY-DEFAULT, and deliberately made OBVIOUSLY correct rather than cleverly
+    # correct: the molecule must be NOTHING BUT the ring plus one suffix heteroatom.
+    # Then, trivially, every other ring position is an unsubstituted CH2, nothing
+    # else in the name can carry a locant, and `1` cannot be distinctive.
     #
-    # NOT `features.principal_group_atoms` -- that is the whole SMARTS match, which
-    # for a ring ketone spans BOTH ALPHA CARBONS as well as the carbonyl:
-    # `O=C1CCCCC1CCCCC` matches `(2, 1, 0, 6)` where 6 is the pentyl-bearing ring
-    # atom. Exempting every match atom from the CH2 test below made a substituent on
-    # an alpha carbon INVISIBLE and emitted `2-pentylcyclohexanone` for
-    # `2-pentylcyclohexan-1-one`. The GATE caught that as a protect regression;
-    # `4-methylcyclohexan-1-one` had passed only because position 4 is not an alpha
-    # carbon. Use the atoms whose locants are actually being decided instead.
-    suffix_ring_atoms = set(suffix_ring_atoms or ())
+    # Two earlier, cleverer versions each shipped a defect:
+    #   (1) exempting every atom of `features.principal_group_atoms` from a per-atom
+    #       CH2 test -- but a ring ketone's SMARTS match spans BOTH ALPHA CARBONS
+    #       (`O=C1CCCCC1CCCCC` -> `(2, 1, 0, 6)`, atom 6 bearing the pentyl), so an
+    #       alpha substituent was invisible and `2-pentylcyclohexanone` shipped. The
+    #       GATE caught it as a protect regression; `4-methylcyclohexan-1-one` had
+    #       passed only because position 4 is not an alpha carbon.
+    #   (2) a per-ring-atom test alone still licensed `ON=C1CCCCC1` ->
+    #       `N-hydroxycyclohexanimine`, because the N-hydroxy hangs off the SUFFIX
+    #       heteroatom, not off a ring atom. But `N` is an ESSENTIAL locant in the
+    #       same scope, and P-14.3.3 (BB:2869) says one essential locant in a scope
+    #       restores every locant in that scope -- so `N-hydroxycyclohexan-1-imine`
+    #       is right. The GATE caught that one too, as a target regression.
+    #
+    # Hence: count heavy atoms. Anything beyond ring + 1 -- a ring substituent, an
+    # N-substituent on the suffix, a multi-atom suffix such as -C(=O)OOH -- denies.
+    # That leaves `-one` / `-ol` / `-thiol` / `-amine` / `-imine` on a bare
+    # cycloalkane, which is exactly the evidence base (BB:14916, BB:26854,
+    # P-14.3.4.2(c)). Widening beyond it needs the real per-scope locant machinery
+    # and belongs in tranche B, not in a looser predicate here.
+    if mol.GetNumHeavyAtoms() != len(ring) + 1:
+        return False
 
-    # Every other ring atom must be an unsubstituted CH2: exactly 2 H, and no
-    # exocyclic heavy neighbour at all.
-    for idx in ring:
-        if idx in suffix_ring_atoms:
-            continue
-        atom = mol.GetAtomWithIdx(idx)
-        if atom.GetTotalNumHs() != 2:
-            return False
-        for nbr in atom.GetNeighbors():
-            if nbr.GetIdx() not in ring_set:
-                return False
+    # ⚠ `features.mol` is NOT always the input molecule. For an oxime the OH is
+    # STRIPPED before the suffix decision and re-added as an `N-hydroxy` prefix, so
+    # `features.mol` for `ON=C1CCCCC1` has 7 heavy atoms, not 8 -- the count above is
+    # structurally blind to it, and the licence wrongly fired
+    # (`N-hydroxycyclohexanimine` for `N-hydroxycyclohexan-1-imine`; the GATE caught
+    # it as a target regression). Re-check against the ORIGINAL input, so anything
+    # the perception layer moved out of `mol` still denies the licence.
+    _canon = getattr(features, 'canonical_smiles', None)
+    if not _canon:
+        return False
+    _input = _Chem.MolFromSmiles(_canon)
+    if _input is None or _input.GetNumHeavyAtoms() != len(ring) + 1:
+        return False
+
+    outside = [a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in ring_set]
+    if len(outside) != 1:
+        return False
+    sub = mol.GetAtomWithIdx(outside[0])
+    if sub.GetSymbol() not in ('O', 'N', 'S', 'Se', 'Te'):
+        return False
+    if sub.GetFormalCharge() != 0:
+        return False
+    # It must hang off exactly one ring atom, and that atom must be the one whose
+    # locant is being decided (when the caller told us which that is).
+    nbrs = [n.GetIdx() for n in sub.GetNeighbors()]
+    if len(nbrs) != 1 or nbrs[0] not in ring_set:
+        return False
+    if suffix_ring_atoms and nbrs[0] not in set(suffix_ring_atoms):
+        return False
+
     return True
 
 

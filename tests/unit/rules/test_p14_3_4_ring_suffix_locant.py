@@ -48,9 +48,6 @@ class TestLicensedOmission:
         ("OC1CCCCC1", "cyclohexanol", "P-14.3.4.2(c)"),
         ("NC1CCCCC1", "cyclohexanamine", "derived, P-14.3.4.2(c)"),
         ("OC1CCC1", "cyclobutanol", "derived, P-14.3.4.2(c)"),
-        # lowest-confidence row of the five Phase C gold conflicts: derived by
-        # parallel with the ring ketone, no verbatim bare '-imine' row exists.
-        ("N=C1CCCCC1", "cyclohexanimine", "derived by parallel with BB:14916"),
     ])
     def test_trivial_ring_suffix_locant_is_omitted(self, smiles, expected, authority):
         assert _name(smiles) == expected, authority
@@ -82,6 +79,21 @@ class TestDenyByDefault:
         ("OC1CC=CCC1", "cyclohex-3-en-1-ol", "ring double bond"),
         # A heterocycle keeps it (cf. piperidine-1-carbonitrile, BB:34730).
         ("OC1CCNCC1", "piperidin-4-ol", "heterocycle"),
+        # ★ imine is EXCLUDED from the licence: no verbatim bare '-imine' row exists,
+        # and licensing it shipped a defect the GATE caught. For an oxime the OH is
+        # STRIPPED from `features.mol` before the suffix decision and re-added as an
+        # `N-hydroxy` prefix, so the N-substituent is invisible at that point -- both
+        # `features.mol` and `features.canonical_smiles` carry the reduced form of
+        # `ON=C1CCCCC1`. The licence fired and emitted `N-hydroxycyclohexanimine`, but
+        # `N` is an essential locant in the same scope and P-14.3.3 (BB:2869) restores
+        # every locant in a scope once one is essential.
+        ("N=C1CCCCC1", "cyclohexan-1-imine", "imine: no verbatim BB row"),
+        ("ON=C1CCCCC1", "N-hydroxycyclohexan-1-imine",
+         "N-substituent invisible to features.mol -- gate-found"),
+        # A multi-atom suffix is out of scope for tranche A (needs whole-locant-set
+        # suppression); the ring+1-heavy-atom condition denies it.
+        ("OOC(=O)C1CCCCC1", "cyclohexane-1-carboperoxoic acid",
+         "multi-atom suffix, tranche B"),
         # Chains are untouched by this change.
         ("OCCCl", "2-chloroethan-1-ol", "BB verbatim: NOT 2-chloroethanol"),
         ("OCC", "ethanol", "already correct, must not regress"),
@@ -117,6 +129,8 @@ class TestDenyByDefault:
         feats = _F()
         feats.mol = mol
         feats.principal_group_atoms = []
+        feats.principal_group = "secondary_alcohol"
+        feats.canonical_smiles = Chem.MolToSmiles(mol)
         assert _ring_suffix_locant_is_trivial(
             feats, list(fused_ring),
             {a: i + 1 for i, a in enumerate(fused_ring)},
@@ -128,7 +142,7 @@ class TestDenyByDefault:
 # --------------------------------------------------------------------------- #
 class TestPredicateDeniesByDefault:
     @staticmethod
-    def _probe(smiles: str, pg_smarts: str) -> bool:
+    def _probe(smiles: str, pg_smarts: str, fg_name: str = "ketone") -> bool:
         """Build the real `features`-shaped inputs the producer passes."""
         from rdkit import Chem
         from orthonym.assembly.handlers._handler_shared import (
@@ -145,6 +159,10 @@ class TestPredicateDeniesByDefault:
         feats = _F()
         feats.mol = mol
         feats.principal_group_atoms = matches
+        # The predicate also reads the suffix CLASS (allowlist) and re-checks the
+        # ORIGINAL input, because `features.mol` is not always the input molecule.
+        feats.principal_group = fg_name
+        feats.canonical_smiles = Chem.MolToSmiles(mol)
         ring_map = {a: i + 1 for i, a in enumerate(ring)}
         # The producer passes the suffix-BEARING ring atom(s), not the whole SMARTS
         # match -- here, the ring atom carrying the exocyclic characteristic
@@ -175,6 +193,8 @@ class TestPredicateDeniesByDefault:
         feats = _F()
         feats.mol = None
         feats.principal_group_atoms = []
+        feats.principal_group = "ketone"
+        feats.canonical_smiles = "CCO"
         assert _ring_suffix_locant_is_trivial(feats, [0, 1, 2], {0: 1}) is False
 
     def test_empty_ring_denies(self):
@@ -188,4 +208,11 @@ class TestPredicateDeniesByDefault:
         feats = _F()
         feats.mol = Chem.MolFromSmiles("CCO")
         feats.principal_group_atoms = []
+        feats.principal_group = "ketone"
+        feats.canonical_smiles = "CCO"
         assert _ring_suffix_locant_is_trivial(feats, [], {}) is False
+
+    def test_imine_class_is_not_licensed(self):
+        """The suffix-class allowlist, at predicate level."""
+        assert self._probe("N=C1CCCCC1", "[CX3]=[NX2]", fg_name="imine") is False
+        assert self._probe("O=C1CCCCC1", "[CX3]=[OX1]", fg_name="ketone") is True
