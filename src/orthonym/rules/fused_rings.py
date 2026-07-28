@@ -1717,22 +1717,48 @@ def _identify_fused_substituent(
                             alkyl_name = get_alkyl_name(carbon_count)
                         except (ValueError, KeyError):
                             alkyl_name = None
-                    if alkyl_name:
-                        # P-62.2.1.1.1 (BB:26139): 'anilino' is the retained
-                        # PREFERRED PREFIX for C6H5-NH- with full substitution
-                        # allowed, cited bare when it carries no locant of its own
-                        # (BB:26306) and enclosed when it does (BB:26308). The
-                        # legacy else-branch emitted '{ring}amino' UNENCLOSED
-                        # ('4-methylphenylamino'), which is both the
-                        # general-nomenclature column (BB:26153) and malformed.
-                        from .ring_substituents import anilino_preferred_prefix
+                    # P-62.2.1.1.1 (BB:26139): 'anilino' is the retained PREFERRED
+                    # PREFIX for C6H5-NH- with full substitution allowed, cited bare
+                    # when it carries no locant of its own (BB:26306) and enclosed
+                    # when it does (BB:26308). The legacy else-branch emitted
+                    # '{ring}amino' UNENCLOSED ('4-methylphenylamino'), which is
+                    # both the general-nomenclature column (BB:26153) and malformed.
+                    #
+                    # Derive from the GRAPH first, not from `alkyl_name`. This site
+                    # reaches `_bfs_alkyl_from`, which rejects only HETEROATOMS --
+                    # an all-carbon AROMATIC ring passes it, and when
+                    # `name_substituent_fragment` then declined, the
+                    # `get_alkyl_name(carbon_count)` fallback below named the ring by
+                    # its carbon COUNT: a quinoline bearing -NH-(4-methylphenyl)
+                    # emitted 'heptylamino' (7 ring+methyl carbons) and
+                    # -NH-(4-ethylphenyl) emitted 'octylamino'. Those name a
+                    # DIFFERENT molecule. Pre-existing (the same else-branch shipped
+                    # before P4-a) and not reached end-to-end today -- the whole-
+                    # molecule pipeline abstains on these -- but it is a fabrication
+                    # inside this class, so the ring is named as a ring here.
+                    from .ring_substituents import (
+                        anilino_preferred_prefix, anilino_prefix_from_n_branch,
+                    )
+                    _anilino = anilino_prefix_from_n_branch(
+                        mol, start_idx, [start_idx] + alkyl_atoms)
+                    if _anilino is None and alkyl_name:
                         _anilino = anilino_preferred_prefix(alkyl_name)
-                        if _anilino is not None:
-                            return {
-                                'name': _anilino,
-                                'type': 'functional',
-                                'atoms': [start_idx] + alkyl_atoms
-                            }
+                    if _anilino is not None:
+                        return {
+                            'name': _anilino,
+                            'type': 'functional',
+                            'atoms': [start_idx] + alkyl_atoms
+                        }
+                    # A ring-bearing branch the anilino primitive declined must NOT
+                    # fall through to a carbon-count alkyl name. Reached by an
+                    # all-carbon FUSED N-aryl (naphthalenyl), which
+                    # `anilino_prefix_from_n_branch` rejects as not-a-C6H5 group and
+                    # `get_alkyl_name` would have called 'decylamino'.
+                    if any(mol.GetAtomWithIdx(i).GetIsAromatic()
+                           or mol.GetAtomWithIdx(i).IsInRing()
+                           for i in alkyl_atoms):
+                        return None
+                    if alkyl_name:
                         return {
                             'name': f'{alkyl_name}amino',
                             'type': 'functional',

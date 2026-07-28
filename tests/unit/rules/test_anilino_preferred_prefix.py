@@ -441,3 +441,122 @@ class TestAmineParentPromotionUnchanged:
     ])
     def test_promotion_names_are_byte_identical(self, smiles, expected):
         assert _name(smiles) == expected
+
+
+# --------------------------------------------------------------------------- #
+# 7. The two routed sites the first review found had no witness              #
+#                                                                            #
+# Both were raised by the P4-a adversarial review (2026-07-28):              #
+#   - fused_rings.py's N-monoalkyl site was the one entry in the brief's site #
+#     census with no row in p62_anilino.json and no unit test, because every  #
+#     end-to-end attempt is intercepted by an unrelated handler upstream.     #
+#   - substituent_enumerator.py's enclose=False contract was documented by    #
+#     comment only; flipping it changed no test.                             #
+# Both are therefore pinned here by DIRECT calls, which is the only level at  #
+# which they are reachable.                                                   #
+# --------------------------------------------------------------------------- #
+class TestFusedRingNAryLSite:
+    """``fused_rings._identify_fused_substituent`` — the 8th routed site.
+
+    ``_bfs_alkyl_from`` rejects only HETEROATOMS, so an all-carbon AROMATIC ring
+    passes it. When ``name_substituent_fragment`` then declined, the
+    ``get_alkyl_name(carbon_count)`` fallback named the ring by its carbon COUNT:
+    a quinoline bearing ``-NH-(4-methylphenyl)`` emitted ``'heptylamino'`` (7
+    ring+methyl carbons) and ``-NH-(4-ethylphenyl)`` emitted ``'octylamino'``.
+    Those name a DIFFERENT molecule. Pre-existing, never reached end-to-end, and
+    now routed through the graph-derived primitive instead.
+    """
+
+    @staticmethod
+    def _quinoline_core(mol):
+        """The fused ring system carrying the aromatic (ring) nitrogen."""
+        ring_info = mol.GetRingInfo()
+        ar_n = [a.GetIdx() for a in mol.GetAtoms()
+                if a.GetSymbol() == 'N' and a.GetIsAromatic()][0]
+        core = set()
+        for ring in ring_info.AtomRings():
+            if ar_n in ring:
+                core |= set(ring)
+        for ring in ring_info.AtomRings():
+            if set(ring) & core:
+                core |= set(ring)
+        return core
+
+    def _identify(self, smiles: str):
+        from rdkit import Chem
+        from orthonym.rules.fused_rings import _identify_fused_substituent
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, f"unparseable test SMILES {smiles!r}"
+        exo_n = [a.GetIdx() for a in mol.GetAtoms()
+                 if a.GetSymbol() == 'N' and not a.GetIsAromatic()]
+        assert len(exo_n) == 1, f"expected exactly one exocyclic N in {smiles!r}"
+        result = _identify_fused_substituent(
+            mol, exo_n[0], self._quinoline_core(mol))
+        return None if result is None else result['name']
+
+    def test_bare_phenyl_is_the_bare_retained_prefix(self):
+        """BB:26151/26306 — no locant of its own, so no enclosing marks."""
+        assert self._identify("c1ccc(Nc2ccc3ccccc3n2)cc1") == "anilino"
+
+    @pytest.mark.parametrize("smiles,expected,fabricated", [
+        # BB:26166 '4-methylanilino (preferred prefix)'
+        ("Cc1ccc(Nc2ccc3ccccc3n2)cc1", "(4-methylanilino)", "heptylamino"),
+        ("CCc1ccc(Nc2ccc3ccccc3n2)cc1", "(4-ethylanilino)", "octylamino"),
+    ])
+    def test_all_carbon_decorated_ring_is_not_named_by_carbon_count(
+            self, smiles, expected, fabricated):
+        got = self._identify(smiles)
+        assert got != fabricated, (
+            f"{smiles} named the aromatic ring by its carbon count as "
+            f"{fabricated!r} — a different molecule"
+        )
+        assert got == expected
+
+    def test_an_all_carbon_FUSED_n_aryl_fails_closed(self):
+        """A naphthalenyl N-substituent is all-carbon, so ``_bfs_alkyl_from``
+        accepts it, but it is not a C6H5- group so the anilino primitive declines
+        it. Without the ring guard ``get_alkyl_name(10)`` called it
+        ``'decylamino'``. This is the witness that reaches the guard."""
+        got = self._identify("c1ccc2cc(Nc3ccc4ccccc4n3)ccc2c1")
+        assert got != "decylamino", (
+            "a fused naphthalenyl ring was named by its carbon count"
+        )
+        assert got is None, got
+
+    def test_a_genuine_alkyl_branch_still_resolves(self):
+        """The carbon-count fail-closed must not swallow real alkyls."""
+        assert self._identify("CC(C)Nc1ccc2ccccc2n1") == "propan-2-ylamino"
+
+
+class TestSubstituentEnumeratorEnclosureContract:
+    """``substituent_enumerator._name_amino_branch`` must return the BARE core.
+
+    That producer's contract is to hand back an unenclosed prefix and let the
+    caller apply the P-16.5.1.1 marks — its sibling returns are bare too. Passing
+    the pre-enclosed form double-wrapped it, e.g.
+    ``4-ethylcyclohexan-1-yl[(4-ethylanilino)]methanethioic O-acid``. The call
+    site pins ``enclose=False``; this test pins that it stays pinned.
+    """
+
+    def test_returns_the_bare_prefix_without_enclosing_marks(self):
+        from rdkit import Chem
+        from orthonym.assembly.substituent_enumerator import _name_amino_branch
+        mol = Chem.MolFromSmiles("OCCCCNc1ccc(Cl)cc1")
+        assert mol is not None
+        n_idx = [a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'N'][0]
+        parent = {a.GetIdx() for a in mol.GetAtoms()
+                  if a.GetSymbol() == 'O'
+                  or (a.GetSymbol() == 'C' and not a.GetIsAromatic())}
+        frag, stack = {n_idx}, [n_idx]
+        while stack:
+            for nbr in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+                idx = nbr.GetIdx()
+                if idx not in frag and idx not in parent:
+                    frag.add(idx)
+                    stack.append(idx)
+        got = _name_amino_branch(mol, sorted(frag), n_idx, sorted(parent))
+        assert got == "4-chloroanilino", got
+        assert not got.startswith(("(", "[")), (
+            f"{got!r} is pre-enclosed; the caller applies the marks, so this "
+            f"double-wraps downstream"
+        )
