@@ -78,10 +78,26 @@ NON_STANDARD_AMINO_ACIDS: Dict[str, str] = {
     "CSCC(N)C(=O)O": "S-methylcysteine",
     # v23 Phase 12 follow-on (audit F2): cystine is the disulfide dimer of two
     # cysteines. The natural L-cystine (2R,2'R) is already in the OPSIN-import
-    # catalog (-> 'cystine'); the D-enantiomer (2S,2'S) was unrecognised. Keyed by
-    # exact stereo SMILES (OPSIN parses 'D-cystine'; RT-verified). meso-cystine
-    # (2R,2'S) has no simple retained name and stays fail-closed (unknown).
-    "N[C@H](CSSC[C@@H](N)C(=O)O)C(=O)O": "D-cystine",
+    # catalog; the D-enantiomer (2S,2'S) was unrecognised, so it is keyed here by
+    # exact stereo SMILES. meso-cystine (2R,2'S) has no retained name and stays
+    # fail-closed (unknown).
+    #
+    # v29 P3-CLEANUP Item 1: the VALUE was `"D-cystine"` -- the descriptor written
+    # straight into the table -- while the L form resolved through the OPSIN import
+    # to a bare `"cystine"`. That is what made the two enantiomers asymmetric: D
+    # kept a descriptor on EVERY path (including the deliberately bare
+    # `with_descriptor=False` peptide/fragment contract) and L had one on none.
+    # Both now carry the BARE retained name and the single descriptor path
+    # (`_dimeric_aa_forms`) supplies L-/D-, so the pair cannot drift again.
+    "N[C@H](CSSC[C@@H](N)C(=O)O)C(=O)O": "cystine",
+    # v29 P3-CLEANUP Item 1: dopa is the OTHER Table 10.5 entry in this table that
+    # was dropping its P-103.1.3.1 descriptor. The OPSIN import supplies only the
+    # L (2S) key, so the D enantiomer had NO retained name at all while L shipped a
+    # bare `dopa`. Hand-curated here (hand-curated wins: `_integrate_opsin_simplegroup`
+    # skips keys already present) so the pair is symmetric, and the descriptor
+    # itself comes from the shared path via `_DL_CAPABLE_NONSTANDARD`.
+    # OPSIN-verified: `D-dopa` -> O=C(O)[C@H](N)CC1=CC=C(O)C(O)=C1, this structure.
+    "N[C@H](Cc1ccc(O)c(O)c1)C(=O)O": "dopa",
     "NCCCC(N)C(=O)O": "ornithine",            # Orn - not proteinogenic
     "NC(CCCN)C(=O)O": "ornithine",            # Orn - alternate
     "NCCC(N)C(=O)O": "2,4-diaminobutanoic acid",  # Dab
@@ -210,6 +226,59 @@ _ALLO_AA_BASE: Dict[str, tuple] = {
 }
 _ALLO_AA_FORMS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
 
+# v29 P3-CLEANUP Item 1 (P-103.1.1.2 + P-103.1.3.1): the Table 10.5 "less common"
+# amino acids carry the SAME alpha-carbon D/L descriptor as the Table 10.4 ones.
+# `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'` (BlueBookV2.md:54291)
+# scopes itself to "*the alpha-amino carboxylic acids*" -- NOT to Table 10.4 --
+# and at :54301 names cystine EXPLICITLY: "*The 'L' configuration corresponds to
+# the 'S' configuration of the CIP system, except that cysteine has the 'R'
+# configuration (and also cystine, see P-103.1.1.2)*". Cystine is a Table 10.5
+# entry (`P-103.1.1.2 Retained names of 'less common' amino acids`, :54233/:54238,
+# systematic equivalent `3,3'-disulfanediyldialanine`). That is the SAME sentence
+# I12 quoted to license `cysteine -> L-cysteine`, so leaving cystine bare was an
+# inconsistency in the I12 class fix, not a separate policy.
+#
+# Cystine is a SYMMETRIC DIMER: BOTH stereocentres are alpha-carbons, so ONE
+# descriptor designates both (2R,2'R = L-cystine, 2S,2'S = D-cystine) -- exactly
+# what the pre-existing hand-curated `D-cystine` entry already assumed for the D
+# side while the L side shipped bare.
+#
+# The MESO diastereomer (2R,2'S) is deliberately ABSENT from the map. It is a
+# single compound, not the equimolar D/L MIXTURE that P-103.1.3.1 (:54305)
+# reserves 'DL' for ("*A mixture of equimolar amounts of 'D' and 'L' compounds is
+# termed a 'racemate' and is designated by the stereodescriptor 'DL'*"), so it has
+# no retained form here: `.get()` returns None -> defer to the systematic namer
+# (fail closed), preserving the behaviour claimed at the NON_STANDARD entry above.
+_DIMERIC_AA_BASE: Dict[str, str] = {
+    # retained name -> the L form; the D form is derived as its exact enantiomer,
+    # so the two descriptors CANNOT drift apart the way the hand-curated pair did.
+    "cystine": "N[C@@H](CSSC[C@H](N)C(=O)O)C(=O)O",
+}
+_DIMERIC_AA_FORMS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+
+# The NON-standard retained names whose alpha-carbon configuration IS designated
+# D/L, i.e. the ones the `is_standard` gate in `get_amino_acid_name` must not
+# silence. Membership requires a Blue Book Table 10.4/10.5 entry -- NOT mere
+# presence in the merged OPSIN-import vocabulary.
+#
+# Why so short: an audit of all 49 stereo-specified non-standard entries against
+# `BlueBookV2.md` found NO occurrence of statine, lanthionine, diaminopimelic,
+# selenocystine, tellurocystine, carnitine, lysopine, pantetheine or homocystine
+# (positive controls in the same chapter: cysteine 6, homocysteine 2, citrulline
+# 1, allysine 1, cysteic 1, so the search does reach Table 10.5; the OCR-tolerant
+# pattern returned the same counts as the literal one). Prepending `L-` to those
+# would invent a name the Blue Book does not give and that OPSIN cannot parse --
+# which the validity gate would then suppress to `unknown organic compound`,
+# trading a spelling nit for a coverage loss (invariant 11).
+#
+#   cystine : Table 10.5 (:54238); named EXPLICITLY by P-103.1.3.1 at :54301.
+#             Descriptor via `_dimeric_aa_forms` (two alpha-carbons).
+#   dopa    : Table 10.5 (:54241, systematic `3-hydroxytyrosine`). One
+#             alpha-carbon, standard L=S rule, so `_get_stereo_prefix` judges it.
+#             OPSIN-verified both ways: `L-dopa`/`D-dopa` parse back to the exact
+#             (S)/(R) input structures.
+_DL_CAPABLE_NONSTANDARD = frozenset({"cystine", "dopa"})
+
 
 def _allo_aa_forms() -> Dict[str, Dict[str, str]]:
     """Canonical-isomeric-SMILES -> descriptor-prefix map per allo-capable AA.
@@ -253,6 +322,27 @@ def _allo_aa_forms() -> Dict[str, Dict[str, str]]:
             }
         _ALLO_AA_FORMS_CACHE = forms
     return _ALLO_AA_FORMS_CACHE
+
+
+def _dimeric_aa_forms() -> Dict[str, Dict[str, str]]:
+    """Canonical-isomeric-SMILES -> descriptor-prefix map per symmetric-dimer AA.
+
+    Built lazily (RDKit at call time, not import time), mirroring
+    ``_allo_aa_forms``. Values are ``'L-'`` / ``'D-'``; every other stereoisomer
+    (for cystine, the meso form) is ABSENT by construction, so the caller's
+    ``.get()`` yields None = "defer to the systematic namer". See the
+    ``_DIMERIC_AA_BASE`` comment for the Blue Book derivation."""
+    global _DIMERIC_AA_FORMS_CACHE
+    if _DIMERIC_AA_FORMS_CACHE is None:
+        from rdkit import Chem
+        forms: Dict[str, Dict[str, str]] = {}
+        for nm, l_smi in _DIMERIC_AA_BASE.items():
+            forms[nm] = {
+                Chem.CanonSmiles(l_smi): "L-",
+                _enantiomer_canon(l_smi): "D-",
+            }
+        _DIMERIC_AA_FORMS_CACHE = forms
+    return _DIMERIC_AA_FORMS_CACHE
 
 
 def _enantiomer_canon(smiles: str) -> Optional[str]:
@@ -302,6 +392,13 @@ def _aa_config_descriptor(mol, name: str) -> Optional[str]:
     `L-alanine` is the Blue Book's prescribed retained name, not a PIN.
     """
     from rdkit import Chem
+    # Symmetric-dimer AAs (cystine): BOTH stereocentres are alpha-carbons, so the
+    # single-alpha-carbon `_get_stereo_prefix` below cannot judge them. Explicit
+    # stereoisomer map; meso is absent -> None -> defer (P-103.1.1.2 / P-103.1.3.1,
+    # see `_DIMERIC_AA_BASE`).
+    dimeric_forms = _dimeric_aa_forms().get(name)
+    if dimeric_forms is not None:
+        return dimeric_forms.get(Chem.MolToSmiles(mol, canonical=True))
     allo_forms = _allo_aa_forms().get(name)
     if allo_forms is not None:
         # Multi-stereocentre threonine/isoleucine: all four stereoisomers have a
@@ -372,9 +469,29 @@ def get_amino_acid_name(
     if name is None or not with_descriptor:
         return name
 
-    # WSD-07 descriptor path: STANDARD amino acids only (see note above). A
-    # non-standard exact-match returns its bare name unchanged (original behavior).
-    if not is_standard:
+    # WSD-07 descriptor path: STANDARD amino acids, PLUS the Blue-Book-attested
+    # non-standard retained names that P-103.1.3.1 designates a D/L for.
+    #
+    # v29 P3-CLEANUP Item 1: this used to be a blanket `if not is_standard`. The
+    # docstring's justification for that gate is real but NARROWER than the gate --
+    # a non-standard `D-<name>` invented for an OPSIN-vocabulary entry (D-butyrine,
+    # D-statine, ...) is not OPSIN-parseable and would be SUPPRESSED to 'unknown',
+    # i.e. a coverage loss traded for a spelling (invariant 11). That argument does
+    # not reach a name the Blue Book itself prescribes the descriptor for and OPSIN
+    # parses: `L-cystine` -> the exact input structure (RT-verified). Using
+    # `is_standard` as the proxy therefore dropped the descriptor on the one
+    # non-standard AA the BB names EXPLICITLY at :54301, while the D side kept one
+    # because it had been hand-written into the table VALUE -- the asymmetry.
+    #
+    # The registry is keyed by RETAINED NAME and is deliberately tiny: membership
+    # requires a Blue Book Table 10.4/10.5 entry, not mere presence in the merged
+    # OPSIN-import vocabulary. A BB-absence audit over all 49 stereo-specified
+    # non-standard entries (positive controls: cysteine 6, homocysteine 2,
+    # citrulline 1, allysine 1, cysteic 1 -- so the search reaches Table 10.5) found
+    # NO Blue Book occurrence of statine / lanthionine / diaminopimelic /
+    # selenocystine / tellurocystine / carnitine / homocystine, so those correctly
+    # keep the bare OPSIN vocabulary name rather than acquiring a fabricated one.
+    if not is_standard and name not in _DL_CAPABLE_NONSTANDARD:
         return name
 
     # Recover the configurational descriptor + full-stereo verify.
