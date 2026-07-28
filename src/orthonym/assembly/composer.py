@@ -5275,6 +5275,31 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                         prefix_parts.append(p.text)
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
+                    # P-14.3.3 (BB:2869): a ring substituent prefix carries an ESSENTIAL
+                    # locant, so "all locants must be cited for the parent structure or
+                    # that structural unit" -- the suffix locant comes back:
+                    # `4-methylcyclohexane-1-carboxamide`, not
+                    # `4-methylcyclohexanecarboxamide`. The bare mono case keeps its
+                    # licensed omission under P-14.3.4.2(c) (BB:2891 + BB:2913),
+                    # `cyclohexanecarboxamide`.
+                    #
+                    # Same consistency fix as the ring nitrile above: the sibling classes
+                    # already do this (measured -- `4-methylcyclohexane-1-carboxylic acid`
+                    # and `-1-carbaldehyde` are correct, via `_generate_suffix`'s terminal
+                    # ring branch and its `other_subs_exist` check). A call-spy recorded
+                    # ZERO `_generate_suffix` calls for the ring carboxamide: it is named
+                    # here, and this site had no equivalent check.
+                    #
+                    # Only the plain ring-carboxamide spelling is rewritten. An
+                    # N-substituted amide already starts with `N-`/`N,N-` and is left
+                    # alone: `N` is itself an essential locant, and reshaping that string
+                    # is out of scope for this rule (fail toward the existing spelling).
+                    if base_name[:1] != "N":
+                        _tail = "carboxamide"
+                        if base_name.endswith(_tail):
+                            _stem = base_name[: -len(_tail)]
+                            if _stem.startswith("cyclo") and _stem.endswith("e"):
+                                base_name = f"{_stem}-1-{_tail}"
                     # Insert hyphen before N-locant prefix (base_name may
                     # start with "N-" or "N,N-" from name_amide())
                     sep = "-" if base_name[:1] == "N" else ""
@@ -6343,6 +6368,37 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
     )
 
     if prefix_str:
+        # P-14.3.3 (BB:2869), verbatim: "if any locants are essential for defining the
+        # structure of the parent structure ... then all locants must be cited for the
+        # parent structure or that structural unit." A ring substituent prefix carries an
+        # essential locant, so the suffix locant must come back too:
+        # `4-methylcyclohexane-1-carbonitrile`, not `4-methylcyclohexanecarbonitrile`.
+        #
+        # The bare mono case stays locant-free under P-14.3.4.2(c) (BB:2891 + BB:2913,
+        # "in monosubstituted homogeneous monocyclic rings") -- `cyclohexanecarbonitrile`,
+        # BB:34728 verbatim -- because then no locant in the scope is essential.
+        #
+        # ★ This is a CONSISTENCY fix, not new policy: the sibling suffix classes already
+        # behave this way. Measured -- `4-methylcyclohexane-1-carboxylic acid` and
+        # `4-methylcyclohexane-1-carbaldehyde` are correct today, because they route
+        # through `_generate_suffix`'s terminal ring branch, whose `other_subs_exist`
+        # check implements exactly this rule. A call-spy recorded ZERO `_generate_suffix`
+        # calls for the ring nitrile and the ring carboxamide: they are named here
+        # instead, and this site had no equivalent check. Corroborating BB rows for a
+        # SUBSTITUTED ring acid citing its 1: BB:5822 and BB:23198,
+        # `4,4'-oxydi(cyclohexane-1-carboxylic acid) (PIN)`.
+        #
+        # The ring is already numbered with the nitrile carbon's ring atom at 1 (the
+        # prefix locants above are computed against that orientation), so the restored
+        # locant is 1 by construction rather than by search.
+        _suffix_tail = "carbonitrile"
+        if base_name.endswith(_suffix_tail) and parent_name.endswith("e"):
+            _stem_only = base_name[: -len(_suffix_tail)]
+            # `name_nitrile` builds `<parent minus trailing e>` + `ecarbonitrile`, so the
+            # stem here is the full parent name; only rebuild when that holds, else leave
+            # the name untouched (fail toward the existing spelling).
+            if _stem_only == parent_name:
+                base_name = f"{parent_name}-1-{_suffix_tail}"
         return _join_prefix_to_name(prefix_str, base_name)  # L2 (P-16.3.3)
 
     return base_name

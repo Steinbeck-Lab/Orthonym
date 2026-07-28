@@ -136,17 +136,61 @@ class TestKnownAdjacentDefects:
         ABSTENTION -- the systematic aryl path had to be built (invariant 11)."""
         assert namer.name("OOC(=O)c1ccccc1") == "benzenecarboperoxoic acid"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "Pre-existing P-14.3.3 UNDER-citation: the essential 4-methyl locant must "
-        "restore the suffix locant. Its siblings already do — measured, "
-        "`4-methylcyclohexane-1-carboxylic acid` and "
-        "`4-methylcyclohexane-1-carbaldehyde` are correct, so nitrile and amide are "
-        "inconsistent with them. BB:5822/:23198 print "
-        "`4,4'-oxydi(cyclohexane-1-carboxylic acid) (PIN)`, a substituted ring "
-        "carboxylic acid citing its 1."))
     def test_substituted_ring_carbonitrile_cites_its_locant(self, namer):
+        """FIXED in the same session. P-14.3.3 (BB:2869): the essential 4-methyl locant
+        restores the suffix locant.
+
+        ★ SIXTH off-path site of the phase. A call-spy validated on two known positives
+        (the ring acid and the ring aldehyde, which BOTH record a call and BOTH cite
+        correctly) recorded ZERO ``_generate_suffix`` calls for the ring nitrile and the
+        ring carboxamide -- they are named in ``composer.py``'s own ring-nitrile and
+        ring-amide paths, neither of which had the ``other_subs_exist`` check that
+        ``_generate_suffix``'s terminal ring branch already implements. So this was a
+        CONSISTENCY fix across four sibling suffix classes, not new policy.
+
+        BB corroboration for a substituted ring acid citing its 1: BB:5822 and BB:23198,
+        ``4,4'-oxydi(cyclohexane-1-carboxylic acid) (PIN)``."""
         assert namer.name("N#CC1CCC(C)CC1") == "4-methylcyclohexane-1-carbonitrile"
 
-    @pytest.mark.xfail(strict=True, reason="Same class as the carbonitrile above.")
     def test_substituted_ring_carboxamide_cites_its_locant(self, namer):
         assert namer.name("NC(=O)C1CCC(C)CC1") == "4-methylcyclohexane-1-carboxamide"
+
+    @pytest.mark.parametrize("smiles,expected,why", [
+        ("N#CC1CCCCC1", "cyclohexanecarbonitrile",
+         "bare mono: P-14.3.4.2(c) licence still applies, BB:34728"),
+        ("NC(=O)C1CCCCC1", "cyclohexanecarboxamide", "bare mono"),
+        ("N#CC1CCC1", "cyclobutanecarbonitrile", "the class is OPEN in ring size"),
+        ("NC(=O)C1CCC1", "cyclobutanecarboxamide", "ditto"),
+        ("N#CC1CCC(Cl)CC1", "4-chlorocyclohexane-1-carbonitrile",
+         "any cited substituent, not just methyl"),
+        ("NC(=O)C1CCC(Cl)CC1", "4-chlorocyclohexane-1-carboxamide", "ditto"),
+        ("N#CC1CCCCC1C#N", "2-cyanocyclohexane-1-carbonitrile",
+         "already cited before the fix -- must not double up"),
+        ("NC(=O)C1CCCCC1C(=O)N", "cyclohexane-1,2-dicarboxamide",
+         "multiplied suffix, already cited"),
+        ("OC(=O)C1CCC(C)CC1", "4-methylcyclohexane-1-carboxylic acid",
+         "the sibling that was already correct -- the reference behaviour"),
+        ("O=CC1CCC(C)CC1", "4-methylcyclohexane-1-carbaldehyde", "ditto"),
+        ("OOC(=O)C1CCC(C)CC1", "4-methylcyclohexane-1-carboperoxoic acid",
+         "the peroxy sibling, correct via TERMINAL_GROUPS"),
+    ])
+    def test_the_four_sibling_classes_now_agree(self, namer, smiles, expected, why):
+        """All four ring `carb-` suffix classes must answer P-14.3.3 the same way. The
+        defect was that two of them did not."""
+        assert namer.name(smiles) == expected, why
+
+    @pytest.mark.xfail(strict=True, reason=(
+        "N-SUBSTITUTED ring amides are deliberately OUT OF SCOPE of the P-14.3.3 fix and "
+        "have a SECOND, independent defect. We emit "
+        "`4-methyl-N-methylcyclohexanecarboxamide`: the ring locant is still missing, AND "
+        "the prefix order violates P-14.5.2 alphanumerical ordering -- the same class as "
+        "the known `1-phenyl-N-methyl(2R)-propan-2-amine` defect. `N` is itself an "
+        "essential locant, so reshaping that string needs the P-14.5.2 work, not this "
+        "rule. Recorded rather than half-fixed."))
+    def test_n_substituted_ring_amide(self, namer):
+        assert namer.name("CNC(=O)C1CCC(C)CC1") == \
+            "N,4-dimethylcyclohexane-1-carboxamide"
+
+    # (The two xfail-strict rows that used to sit here — for the ring carbonitrile and
+    # the ring carboxamide — were FIXED in the same session and are now the plain
+    # assertions above. They are not duplicated here.)
