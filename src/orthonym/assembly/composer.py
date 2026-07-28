@@ -552,6 +552,29 @@ TERMINAL_GROUPS = {
     "thioaldehyde",        # Always at chain end (locant 1)
     "selenoaldehyde",      # Always at chain end (locant 1)
     "telluroaldehyde",     # Always at chain end (locant 1)
+    # v29 Phase C tranche B Task 2 (P-14.3.4.2(c) / P-14.3.4.3): `peroxy_acid` was
+    # present in `naming_utils.TERMINAL_FG_TYPES` (with the same "always at chain end"
+    # comment) but MISSING here, and these two tables must agree. MEASURED set
+    # difference before this line was added:
+    #     TERMINAL_FG_TYPES - TERMINAL_GROUPS ==
+    #         {hydrazidine, hydrazonamide, hydrazonic_acid, imidic_acid,
+    #          peroxy_acid, thiohydrazide}
+    #     TERMINAL_GROUPS - TERMINAL_FG_TYPES == {}   (empty)
+    #
+    # This set gates two sibling branches of `_handler_shared._generate_suffix`: the
+    # TERMINAL ring branch, which already withholds the trivial mono locant (which is
+    # why `cyclohexanecarboxylic acid` and `cyclohexanecarbaldehyde` are correct),
+    # versus the NON-terminal branch, which cites it. A peroxy acid took the wrong
+    # branch, so we shipped `cyclohexane-1-carboperoxoic acid` against the verbatim
+    # `cyclohexanecarboperoxoic acid (PIN)` at BlueBookV2.md:30184.
+    #
+    # ⚠ ONLY `peroxy_acid` is added. The other five asymmetric classes include
+    # `hydrazonamide` and `imidic_acid`, which have substitutable suffix NITROGENS, and
+    # the terminal branch's per-scope check reads `features.ring_substituents` only --
+    # it does NOT see a substituent on the suffix heteroatom. That is the exact hole
+    # that shipped `N-hydroxycyclohexanimine` in tranche A. Add those only together
+    # with a real per-scope prefix check.
+    "peroxy_acid",      # Always at chain end (P-43.1: propaneperoxoic acid)
     "carbamic_acid",    # Retained name, terminal (locant 1)
     # D-FOLLOWON item 8 (P-66.4.1): amidine/imidamide characteristic C is terminal.
     "amidine",          # Always at chain end (locant 1)

@@ -90,10 +90,20 @@ class TestDenyByDefault:
         ("N=C1CCCCC1", "cyclohexan-1-imine", "imine: no verbatim BB row"),
         ("ON=C1CCCCC1", "N-hydroxycyclohexan-1-imine",
          "N-substituent invisible to features.mol -- gate-found"),
-        # A multi-atom suffix is out of scope for tranche A (needs whole-locant-set
-        # suppression); the ring+1-heavy-atom condition denies it.
-        ("OOC(=O)C1CCCCC1", "cyclohexane-1-carboperoxoic acid",
-         "multi-atom suffix, tranche B"),
+        # ⚠ The `OOC(=O)C1CCCCC1` row that used to sit here has been REMOVED, not
+        # updated. It asserted `cyclohexane-1-carboperoxoic acid` on the reasoning
+        # "a multi-atom suffix is out of scope for tranche A, so the ring+1-heavy-atom
+        # condition correctly denies it". The DENIAL was correct for tranche A, but the
+        # asserted STRING was a non-PIN: BB:30184 prints `cyclohexanecarboperoxoic acid
+        # (PIN)` verbatim. So this tripwire was enshrining a wrong name — the same trap
+        # tranche A's own gold row fell into — and it FAILED the moment tranche B Task 2
+        # fixed the real defect (a one-row asymmetry: `peroxy_acid` was missing from
+        # `composer.TERMINAL_GROUPS`).
+        # It now lives, correctly, in test_p14_3_4_peroxy_acid_locant.py, together with
+        # the deny-by-default rows that show the locant coming back
+        # (`4-methylcyclohexane-1-carboperoxoic acid`).
+        # LESSON: a tripwire must assert what the Blue Book requires, never merely what
+        # the code currently emits.
         # Chains are untouched by this change.
         ("OCCCl", "2-chloroethan-1-ol", "BB verbatim: NOT 2-chloroethanol"),
         ("OCC", "ethanol", "already correct, must not regress"),
