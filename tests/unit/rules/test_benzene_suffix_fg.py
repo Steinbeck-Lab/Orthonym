@@ -157,8 +157,30 @@ def test_benzene_fg_not_dropped(smiles, desc):
     ("OC(=O)c1ccc(C)cc1", "4-methylbenzoic acid"),
     # Acid + dimethyl substituents
     ("OC(=O)c1cc(C)cc(C)c1", "3,5-dimethylbenzoic acid"),
-    # Thiol + methyl (both prefix)
-    ("Sc1ccc(cc1)C", "1-methyl-4-sulfanylbenzene"),
+    # Thiol + methyl.
+    # ⚠ CORRECTED 2026-07-28 (v29 Phase C tranche C). This row asserted
+    # `1-methyl-4-sulfanylbenzene`, i.e. BOTH groups as prefixes on a bare benzene
+    # parent. That is wrong: `-thiol` is a suffixable characteristic group, and with
+    # nothing senior present it MUST be the suffix (P-41) -- BB:6656 and BB:27292 both
+    # print `C6H5-SH benzenethiol (PIN) (not thiophenol)`. A hydrocarbon parent carrying
+    # only prefixes is correct only when no suffixable group exists. Benzene simply had
+    # no `-thiol` suffix form, so the SH was demoted and this row froze that behaviour.
+    # The true PIN also cites the suffix locant, because the 4-methyl locant is
+    # essential and P-14.3.3 (BB:2869) then restores every locant in the scope --
+    # cf. BB:31167 `4-methylbenzene-1,3-disulfonic acid (PIN)`. We now emit
+    # `4-methylbenzenethiol`, which fixes the suffix but still under-cites, so the row
+    # keeps the TRUE PIN and is marked xfail rather than being re-frozen on the
+    # intermediate form. Tracked by
+    # test_benzene_suffix_forms.py::TestKnownAdjacentDefect.
+    pytest.param(
+        "Sc1ccc(cc1)C", "4-methylbenzene-1-thiol",
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason="P-14.3.3 under-citation: emits `4-methylbenzenethiol`. The `-thiol` "
+                   "suffix itself is now correct (was `1-methyl-4-sulfanylbenzene`); the "
+                   "remaining gap is the essential-locant restoration.",
+        ),
+    ),
     # Fluoro + trifluoromethyl
     ("Fc1ccc(cc1)C(F)(F)F", "1-fluoro-4-(trifluoromethyl)benzene"),
 ])

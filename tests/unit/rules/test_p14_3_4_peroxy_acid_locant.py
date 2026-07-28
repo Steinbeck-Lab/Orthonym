@@ -122,11 +122,18 @@ class TestKnownAdjacentDefects:
     ``peroxy_acid`` fix, so this task did not cause them).
     """
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "Pre-existing: we emit the deprecated `perbenzoic acid`. BB:30178 and BB:29797 "
-        "both print `benzenecarboperoxoic acid (PIN)` beside it, and BB:3009 states "
-        "\"The prefix 'per-' is no longer recommended.\""))
     def test_benzenecarboperoxoic_acid(self, namer):
+        """FIXED later in the same session -- kept here as a cross-check that the ring
+        (this file) and aryl (test_benzene_suffix_forms.py) peroxy-acid paths agree.
+
+        It was recorded as xfail-strict when found, and STRICT is what made the fix
+        visible: once the aryl suffix form was built the test XPASSed and failed the
+        suite, instead of quietly turning green unnoticed.
+
+        BB:30178 verbatim: `C6H5-CO-OOH benzenecarboperoxoic acid (PIN) peroxybenzoic
+        acid perbenzoic acid`; BB:29797 prints the same pair reversed; BB:3009 states
+        "The prefix 'per-' is no longer recommended". Note the deny row alone gave an
+        ABSTENTION -- the systematic aryl path had to be built (invariant 11)."""
         assert namer.name("OOC(=O)c1ccccc1") == "benzenecarboperoxoic acid"
 
     @pytest.mark.xfail(strict=True, reason=(

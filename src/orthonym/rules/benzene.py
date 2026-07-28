@@ -52,6 +52,9 @@ SUBSTITUENT_PREFIXES = {
 # Highest priority first (carboxylic acid > sulfonamide > amide > nitrile > aldehyde)
 _SUFFIX_PRIORITY = [
     'carboxylic acid',
+    # v29 Phase C: peroxy acid, rank 1 in SENIORITY_ORDER (directly after
+    # carboxylic_acid at rank 0). BB:30178 benzenecarboperoxoic acid (PIN).
+    'carboperoxoic acid',
     'sulfonic acid',
     # D-FOLLOWON item 5: P/Se/Te + sulfinic ring oxoacids, junior to carboxylic
     # acid and sulfonic acid (P-41 acid seniority C-acids > S > Se/Te/P oxoacids) so
@@ -110,6 +113,13 @@ _SUFFIX_PRIORITY = [
     'carboselenaldehyde',
     'carbotelluraldehyde',
     'ol',  # ASML-13: hydroxyl as suffix when principal group on benzene
+    # v29 Phase C tranche C: thiol is rank 94 in SENIORITY_ORDER, between the alcohols
+    # (88/89) and phenol (91) above it and the amines (102+) below. BB:6656/:27292
+    # `benzenethiol (PIN) (not thiophenol)`. Placed here, NOT appended at the end --
+    # putting it after 'amine' would make a thiol lose to an amine, inverting P-41.
+    'thiol',
+    'selenol',
+    'tellurol',
     # C4 (P-41 / P-62.2.1.1.1): amine is JUNIOR to alcohol and all C/S/Se/Te/P
     # acids, amides, nitriles, aldehydes, ketones. It MUST be the LAST entry so
     # it only becomes the ring parent suffix ('aniline') when nothing more
@@ -120,6 +130,13 @@ _SUFFIX_PRIORITY = [
 
 # Prefix forms for suffix FGs when they are NOT the principal group
 _SUFFIX_TO_PREFIX = {
+    # v29 Phase C tranche C: needed so a `-thiol` that loses the suffix slot to the
+    # senior `-ol` (P-41) demotes to its correct prefix rather than being dropped.
+    # BB:6656/:27292 `benzenethiol (PIN)`; the demoted form is `sulfanyl`
+    # (e.g. `2-sulfanylphenol`).
+    'thiol': 'sulfanyl',
+    'selenol': 'selanyl',
+    'tellurol': 'tellanyl',
     'carboxylic acid': 'carboxy',
     'sulfonic acid': 'sulfo',
     # D-FOLLOWON item 5 (prefix forms; seniority.py FG_PREFIXES already has these).
@@ -149,6 +166,14 @@ _SUFFIX_TO_PREFIX = {
 # Pre-compiled SMARTS for suffix FG identification (avoid per-call recompilation)
 _BENZENE_FG_SMARTS = {
     'acid': Chem.MolFromSmarts('[CX3](=O)[OX2H1]'),
+    # v29 Phase C: aryl PEROXY acid -C(=O)-O-OH -> '-carboperoxoic acid'.
+    # Disjoint from 'acid' above by construction: that SMARTS requires the O bonded to
+    # the carbon to carry the H ([OX2H1]), and in a peroxy acid that O is bonded to a
+    # second O instead. Checked first anyway, so the intent is explicit.
+    'peroxy_acid': Chem.MolFromSmarts('[CX3](=O)[OX2][OX2H1]'),
+    # v29 Phase C: aryl THIOL -SH -> '-thiol'. P-63.1.2 / BB:6656 + BB:27292 both print
+    # 'C6H5-SH benzenethiol (PIN) (not thiophenol)'.
+    'ring_thiol': Chem.MolFromSmarts('[SX2H1]'),
     'hydroxamic': Chem.MolFromSmarts('[CX3](=O)[NX3;H1][OX2H]'),
     'amide': Chem.MolFromSmarts('[CX3](=O)[NX3H2]'),
     'sec_amide': Chem.MolFromSmarts('[CX3](=O)[NX3H1][#6]'),
@@ -434,6 +459,25 @@ def _identify_suffix_fg_on_benzene(
 
     # Carbon-based suffix FGs
     if symbol == 'C':
+        # v29 Phase C: peroxy acid -C(=O)-O-OH -> '-carboperoxoic acid'.
+        # BB:30178 verbatim: 'C6H5-CO-OOH benzenecarboperoxoic acid (PIN)
+        # peroxybenzoic acid perbenzoic acid'. Before this, benzene had NO peroxy-acid
+        # suffix form at all, so the group fell through and the molecule was named from
+        # the OPSIN-import trivial name 'perbenzoic acid' -- itself doubly non-preferred
+        # (BB prints the PIN beside it at :30178 and :29797, and BB:3009 states "The
+        # prefix 'per-' is no longer recommended"). Denying that trivial name alone
+        # produced an ABSTENTION, not the PIN -- session invariant 11 -- which is why the
+        # suffix form had to be built rather than the name merely denied.
+        # Seniority: SENIORITY_ORDER puts peroxy_acid at rank 1, directly after
+        # carboxylic_acid at rank 0, and _SUFFIX_PRIORITY mirrors that.
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['peroxy_acid']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carboperoxoic acid',
+                    'suffix_name': 'carboperoxoic acid',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
         # Carboxylic acid: C(=O)(OH) -- check before amide!
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['acid']):
             if match[0] == start_idx:
@@ -631,6 +675,22 @@ def _identify_suffix_fg_on_benzene(
 
     # Sulfur-based suffix FGs
     if symbol == 'S':
+        # v29 Phase C tranche C: ring -SH -> '-thiol'. BB:6656 and BB:27292 BOTH print
+        # 'C6H5-SH benzenethiol (PIN) (not thiophenol)'. We emitted 'sulfanylbenzene'
+        # because benzene had no thiol SUFFIX form, so the SH was demoted to a
+        # 'sulfanyl' prefix -- a missing suffix, not a locant defect, which is why the
+        # P-14.3.4.2(c) licence alone could never have produced the right name.
+        # Placed FIRST in this branch but guarded on SX2H1, which is disjoint from every
+        # oxidised-sulfur pattern below (all SX3/SX4).
+        # Seniority: thiol is rank 94 in SENIORITY_ORDER, between the alcohols (88-91)
+        # and the amines (102+); _SUFFIX_PRIORITY places it between 'ol' and 'amine'.
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['ring_thiol']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'thiol', 'suffix_name': 'thiol',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
         # Wave2 completion (P-66.4.3.2): -S(=N-NH2)-NH-NH2 ->
         # '-sulfinohydrazonohydrazide' (BB verbatim benzene example). SX3 vs
         # SX4 keeps this disjoint from the sulfonohydrazide match below.
@@ -2948,11 +3008,31 @@ def name_substituted_benzene(
             if fg_name in _FUNCTIONAL_CLASS_FGS:
                 has_competing_fg = True
                 break
-    if 'hydroxy' in prefix_groups and not suffix_groups and not has_competing_fg:
-        # No other suffix FGs detected and no competing FGs -- hydroxyl IS
-        # the principal group. Move from prefix to suffix.
+    # ⚠ The guard is "no suffix SENIOR to -ol", not "no suffix at all".
+    # v29 Phase C tranche C REGRESSION, caught by an A/B against HEAD before shipping:
+    # adding the `-thiol` suffix form (for `benzenethiol`, BB:6656/:27292) made this
+    # `not suffix_groups` test false whenever an SH was present, so the promotion was
+    # skipped and the JUNIOR thiol won the suffix -- `Sc1ccccc1O` went from the correct
+    # `2-sulfanylphenol` to `2-hydroxybenzenethiol`. Any future junior suffix form would
+    # have reintroduced the same inversion, so the guard is now seniority-aware rather
+    # than existence-aware.
+    # SENIORITY_ORDER ranks: primary/secondary alcohol 88/89, phenol 91, thiol 94,
+    # amines 102+. So -ol outranks -thiol and must claim the suffix when both are
+    # present, leaving the SH as a `sulfanyl` prefix (P-41).
+    _OL_JUNIOR_SUFFIXES = frozenset({'thiol', 'selenol', 'tellurol', 'amine'})
+    _senior_to_ol = {s for s in suffix_groups if s not in _OL_JUNIOR_SUFFIXES}
+    if 'hydroxy' in prefix_groups and not _senior_to_ol and not has_competing_fg:
+        # No suffix FG senior to -ol, and no competing functional-class FG -- hydroxyl
+        # IS the principal group. Move from prefix to suffix, and demote any junior
+        # suffix that was holding the slot back to its own prefix form.
         suffix_groups['ol'] = prefix_groups.pop('hydroxy')
-    # When suffix_groups is non-empty (acid, aldehyde, etc.), hydroxyl stays
+        for _junior in list(suffix_groups):
+            if _junior in _OL_JUNIOR_SUFFIXES:
+                _jlocs = suffix_groups.pop(_junior)
+                _jprefix = _SUFFIX_TO_PREFIX.get(_junior, _junior)
+                prefix_groups[_jprefix].extend(_jlocs)
+                prefix_groups[_jprefix].sort()
+    # When a suffix SENIOR to -ol is present (acid, aldehyde, etc.), hydroxyl stays
     # as prefix "hydroxy" -- correct per IUPAC seniority rules.
 
     # --- C4 (P-62.2.1.1.1 / P-41): reclassify an amine as the '-amine'

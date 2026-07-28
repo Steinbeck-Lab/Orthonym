@@ -38,14 +38,10 @@ BENZALDEHYDE_CASES = [
     ("O=Cc1ccccc1O", "2-hydroxybenzaldehyde"),
     ("O=Cc1ccc(O)c(O)c1", "3,4-dihydroxybenzaldehyde"),
     ("O=Cc1cc(O)c(O)c(O)c1", "3,4,5-trihydroxybenzaldehyde"),
-    # Alkyl substituted -- benzaldehyde base is correct, substituent naming
-    # gives "isopropyl" instead of "propan-2-yl" (separate issue from retained base)
-    pytest.param(
-        "CC(C)c1ccc(C=O)cc1", "4-(propan-2-yl)benzaldehyde",
-        marks=pytest.mark.xfail(
-            reason="Substituent naming: isopropyl vs propan-2-yl (not a benzaldehyde base issue)"
-        ),
-    ),
+    # Alkyl substituted. The xfail here (substituent named "isopropyl" instead of
+    # "propan-2-yl") was STALE -- it XPASSed on 2026-07-28, so the assertion is live now.
+    # It was non-strict, which is why it sat unnoticed after the underlying fix landed.
+    ("CC(C)c1ccc(C=O)cc1", "4-(propan-2-yl)benzaldehyde"),
 ]
 
 # === Phenol, benzoic acid, and other retained bases (regression checks) ===
@@ -67,21 +63,17 @@ RETAINED_BASE_REGRESSION_CASES = [
 
 MULTI_OH_CASES = [
     # Per IUPAC 2013 P-63.1.1.1, benzene-X,Y-diol is the preferred IUPAC name.
-    # OPSIN parses both systematic and retained forms.
-    # Current code returns retained names (hydroquinone, pyrogallol) from lookup.
-    # These are acceptable names but not the IUPAC PIN.
-    pytest.param(
-        "Oc1ccc(O)cc1", "benzene-1,4-diol",
-        marks=pytest.mark.xfail(
-            reason="Returns retained name 'hydroquinone' instead of systematic PIN"
-        ),
-    ),
-    pytest.param(
-        "Oc1cccc(O)c1O", "benzene-1,2,3-triol",
-        marks=pytest.mark.xfail(
-            reason="Returns retained name 'pyrogallol' instead of systematic PIN"
-        ),
-    ),
+    # ✅ FIXED 2026-07-28, v29 Phase C Task 10 -- these two xfails XPASSed and are now
+    # live assertions. They had recorded exactly the right diagnosis ("returns retained
+    # name ... instead of systematic PIN") and sat non-strict, so nothing announced the
+    # fix. `hydroquinone` and `pyrogallol` now carry `pin: false` rows in
+    # data/iupac_2013_pin_list.json: BB:26806/:26808 print `hydroquinone` /
+    # `benzene-1,4-diol (PIN)`, and `pyrogallol` appears nowhere in the Blue Book at all,
+    # so the systematic form governs by default.
+    # ⚠ Denying `hydroquinone` first UNMASKED `quinol`, a second non-PIN synonym for the
+    # same structure -- invariant 11 -- which needed its own row.
+    ("Oc1ccc(O)cc1", "benzene-1,4-diol"),
+    ("Oc1cccc(O)c1O", "benzene-1,2,3-triol"),
 ]
 
 # Combine all cases for the main parametrized test
