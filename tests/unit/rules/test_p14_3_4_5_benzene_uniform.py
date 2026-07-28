@@ -260,73 +260,139 @@ class TestBenzeneLicenceHelper:
 
 # --------------------------------------------------------------------------- #
 class TestIsotopeEndToEnd:
-    """END-TO-END isotope tripwires — the ones that actually bind.
+    """END-TO-END isotope locant behaviour (v29 Phase C).
 
-    ``TestBenzeneLicenceHelper::test_isotope_denies`` above calls the licence
-    directly and so cannot see the real defect: on the production path
-    ``rules/isotopes.py:decorate_isotopic_name`` strips every isotope BEFORE the
-    name is built, names the isotope-free skeleton, then splices the descriptor
-    into the finished string. Every ``has_isotope`` guard is therefore dead by
-    construction, and the licences elide locants that P-82.6.1.1 requires.
+    THE DEFECT: ``rules/isotopes.py:decorate_isotopic_name`` strips every label, names the
+    isotope-FREE skeleton, then splices the descriptor into the finished string. The
+    P-14.3.4 licences therefore saw ``GetIsotope() == 0`` everywhere, every
+    ``has_isotope`` guard was structurally unreachable-True (measured with a spy validated
+    on 2 positives + 1 negative), and we shipped ``(2-13C1)cyclohexanol``.
 
-    AUTHORITY, verified verbatim. §P-82.6.1 "Omission of locants (see also
-    P-14.3.4)", **P-82.6.1.1** (``BlueBookV2/BlueBookV2.md:44180``): "In preferred
-    IUPAC names, locants are omitted if no locants are necessary in unmodified
-    names. However, if isotopic modification requires a locant to specify its
-    position, then all locants must be specified and none are omitted." Its own
-    worked chain analogue on the same line: "13CH3-CH2-OH (2-13C)ethan-1-ol
-    [not (2-13C)ethanol]". Reinforced by **P-82.6.1.4** (``:44198``) "Locants are
-    not omitted when there is a possibility of isomers", whose example ``:44206``
-    ``1-(79Br)bromo(2-13C)benzene (PIN)`` is the exact structural analogue: a
-    benzene substituent locant that P-14.3.4.2 would otherwise license away,
-    restored solely because of an isotope elsewhere on the ring.
+    THE FIX: when the descriptor itself needs a locant, **P-82.6.1.1** (``:44180``)
+    restores the parent's locants -- *"if isotopic modification requires a locant to
+    specify its position, then all locants must be specified and none are omitted"* --
+    and its own example prints the elided form as the rejected one (``:44186``):
+    ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``. The decorator re-names the
+    skeleton inside ``locant_omission.forced_locant_scope()``, an ambient P-14.3.3 scope
+    the licences consult, so the parent's locants come back.
 
-    CONTRAST that must keep working — **P-82.6.1.3** (``:44202``): when all
-    positions are labelled the same way the locants ARE omitted, e.g.
-    ``(2H6)benzene (PIN)``. So a singly-labelled fully-symmetric ring is correct
-    without a label locant.
-
-    These are xfail-strict rather than deleted: the defect is real and measured,
-    the fix belongs in ``isotopes.py`` (decorate a name derived FROM the labelled
-    molecule), and strict xfail means the day that lands, these tests fail loudly
-    instead of silently passing unnoticed. Corpus exposure is ZERO across all 7,500
-    benchmark rows, so this moves no gate number — it is a pure spelling-layer
-    defect, which is exactly why it survived to a green 1651/1651.
+    ★ THE CONDITION IS "THE DESCRIPTOR NEEDS A LOCANT", NOT "AN ISOTOPE IS PRESENT".
+    A blanket rule over-cites, and the tests below pin both sides. Two names the
+    adversarial sweep reported as defects are in fact CORRECT, and are kept here as
+    passing tests precisely because they are the near-miss neighbours of a real one --
+    see ``test_hexamethylbenzene_scoped_descriptor_is_correct``.
     """
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "MEASURED: isotopes.py strips the label before naming, so the benzene L5 "
-        "licence elides locants P-82.6.1.1 (BB:44180) requires. Forced-False A/B "
-        "confirms the licence causes it."))
-    def test_labelled_hexamethylbenzene_keeps_locants(self):
+    # ---------------- FIXED: the descriptor carries a locant => parent cites --------- #
+
+    def test_labelled_cyclohexanol_keeps_its_locant(self):
         from orthonym.namer import Orthonym
-        got = Orthonym().name("Cc1c(C)c(C)c(C)c(C)[13c]1C")
-        assert got == "1,2,3,4,5,6-hexamethyl(13C1)benzene", got
+        assert Orthonym().name("OC1CCCC[13CH2]1") == "(2-13C1)cyclohexan-1-ol"
+
+    def test_labelled_cyclohexanone_keeps_its_locant(self):
+        """The ketone class too -- the defect spanned the whole licence allowlist."""
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("O=C1CCCC[13CH2]1") == "(2-13C1)cyclohexan-1-one"
+
+    def test_deuterium_keeps_its_locant(self):
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("[2H]C1CCCCC1O") == "(2-2H1)cyclohexan-1-ol"
+
+    def test_chain_analogue_matches_the_bb_example(self):
+        """BB:44186 verbatim: ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``."""
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("[13CH3]CO") == "(2-13C1)ethan-1-ol"
+
+    # ---------------- CORRECT ALREADY: omission is right, sweep over-claimed -------- #
+
+    def test_hexamethylbenzene_scoped_descriptor_is_correct(self):
+        """★ The adversarial sweep reported ``hexamethyl(13C1)benzene`` as a defect and
+        it is NOT one. **P-82.2.1** (``:44182``, verbatim) says the descriptor is inserted
+        *"before the part of the compound that is isotopically substituted"* -- so its
+        POSITION carries its scope. Here it precedes ``benzene``, scoping the ring, whose
+        six carbons are all equivalent; one isotopomer, no locant required, so
+        P-82.6.1.1's condition is not met and the parent keeps its licensed omission.
+
+        ``:7492`` ``1,2-di[(13C)methyl]benzene (PIN. P-82.2.1)`` is the direct witness for
+        scoped descriptors carrying no locant of their own.
+
+        Contrast ``:44206`` ``1-(79Br)bromo(2-13C)benzene (PIN)``: bromobenzene's ring
+        carbons are NOT equivalent, so there the label does need a locant and the bromo
+        locant is duly restored. That is the real discriminator."""
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("Cc1c(C)c(C)c(C)c(C)[13c]1C") == "hexamethyl(13C1)benzene"
+
+    def test_hexafluorobenzene_correctly_omits(self):
+        """Also reported by the sweep, also correct: hexafluorobenzene has exactly ONE
+        carbon environment (fluorine is not carbon), so one 13C gives one isotopomer."""
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("Fc1c(F)c(F)c(F)c(F)[13c]1F") == "hexafluoro(13C1)benzene"
+
+    def test_uniformly_equivalent_ring_correctly_omits(self):
+        """P-82.6.1.3 (``:44202``) -- all six ring positions are one orbit, so labelling
+        any of them gives the same compound. Must stay locant-free."""
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("O[13c]1c(O)c(O)c(O)c(O)c1O") == "(13C1)benzenehexol"
+
+    def test_scoped_descriptor_on_an_ester_alkyl_is_correct(self):
+        """★ THE WITNESS THAT REFUTED AN OVER-BROAD FIX. A whole-molecule
+        isotopomer-ambiguity test was built, wired, and REGRESSED this name to
+        ``(1-13C1)methyl acetate``. Methyl acetate has three distinct carbons, so a
+        whole-molecule test calls it ambiguous -- but the descriptor precedes ``methyl``,
+        whose scope is a single carbon, so the name is already unique (P-82.2.1). The
+        over-broad test was withdrawn; this row guards against re-introducing it."""
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("[13CH3]OC(C)=O") == "(13C1)methyl acetate"
+
+    # ---------------- STILL OPEN, with evidence ------------------------------------- #
 
     @pytest.mark.xfail(strict=True, reason=(
-        "MEASURED: same root cause on the suffix side of the L5 licence."))
-    def test_labelled_benzenehexol_keeps_locants(self):
+        "OPEN DEFECT, evidenced not guessed. Two 13C on benzenehexol: the 1,2- / 1,3- / "
+        "1,4-isotopomers are three distinct compounds, so P-82.6.1.4 (BB:44198, "
+        "'Locants are not omitted when there is a possibility of isomers') requires the "
+        "label locants, and P-82.6.1.1 would then restore the six hydroxy locants. "
+        "MEASURED: we emit `(13C2)benzenehexol` for the 1,2-isotopomer only because "
+        "OPSIN's default parse lands there, while the 1,3- and 1,4-isotopomers emit "
+        "`unknown organic compound`. Blocked on a MULTI-locant descriptor: "
+        "`_descriptor(locant)` takes a single locant and cannot spell `(1,2-13C2)`. "
+        "Not fixed by the ambient-scope mechanism, because the trigger is the "
+        "descriptor's own locant, which is never reached here."))
+    def test_double_labelled_benzenehexol_needs_locants(self):
         from orthonym.namer import Orthonym
-        got = Orthonym().name("O[13c]1[13c](O)c(O)c(O)c(O)c1O")
-        # P-82.6.1.4 (:44198): the 1,2- / 1,3- / 1,4-isotopomers are three distinct
-        # compounds, so the label locants are essential and P-82.6.1.1 then forces
-        # the six hydroxy locants back. We currently emit `(13C2)benzenehexol`, which
-        # names only ONE of the three and only because OPSIN's default parse of the
-        # locant-free form happens to land on 1,2.
-        assert got == "(1,2-13C2)benzene-1,2,3,4,5,6-hexol", got
+        assert Orthonym().name("O[13c]1[13c](O)c(O)c(O)c(O)c1O") == \
+            "(1,2-13C2)benzene-1,2,3,4,5,6-hexol"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "MEASURED: the tranche A ring-suffix licence has the same blindness -- "
-        "isotopes.py names the stripped skeleton, which legitimately elides."))
-    def test_labelled_cyclohexanol_keeps_locant(self):
-        from orthonym.namer import Orthonym
-        got = Orthonym().name("OC1CCCC[13CH2]1")
-        assert got == "(2-13C1)cyclohexan-1-ol", got
 
-    def test_uniformly_labelled_ring_correctly_omits(self):
-        """P-82.6.1.3 (BB:44202) — all six positions equivalent, so no label locant
-        is needed. This one is CORRECT today and must stay correct: it is the
-        boundary that stops an isotope fix from over-citing."""
-        from orthonym.namer import Orthonym
-        got = Orthonym().name("O[13c]1c(O)c(O)c(O)c(O)c1O")
-        assert got == "(13C1)benzenehexol", got
+class TestForcedLocantScope:
+    """The ambient P-14.3.3 mechanism itself (``assembly/locant_omission.py``)."""
+
+    def test_scope_is_inert_by_default(self):
+        from orthonym.assembly.locant_omission import locants_are_forced
+        assert locants_are_forced() is False
+
+    def test_scope_activates_and_restores(self):
+        from orthonym.assembly.locant_omission import (
+            forced_locant_scope,
+            locants_are_forced,
+        )
+        assert locants_are_forced() is False
+        with forced_locant_scope("test"):
+            assert locants_are_forced() is True
+        assert locants_are_forced() is False, "the ContextVar token must be reset"
+
+    def test_both_licences_decline_inside_the_scope(self):
+        """Wired at two sites; if either stops consulting the scope, the isotope defect
+        returns silently -- SELF-01 cannot see it (`namer.py` states verbatim that it
+        'ignores isotopes')."""
+        from rdkit import Chem
+
+        from orthonym.assembly.locant_omission import forced_locant_scope
+        from orthonym.rules.benzene import _benzene_l5_uniform_licence
+
+        mol = Chem.MolFromSmiles("Cc1c(C)c(C)c(C)c(C)c1C")
+        ring = [a.GetIdx() for a in mol.GetAtoms() if a.GetIsAromatic()][:6]
+        args = (mol, ring, {}, {"methyl": [1, 2, 3, 4, 5, 6]}, ())
+        assert _benzene_l5_uniform_licence(*args) is True, "licensed outside the scope"
+        with forced_locant_scope("isotope"):
+            assert _benzene_l5_uniform_licence(*args) is False, \
+                "the benzene L5 licence must decline inside a forced-locant scope"

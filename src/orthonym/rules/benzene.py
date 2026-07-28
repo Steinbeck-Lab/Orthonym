@@ -4110,6 +4110,18 @@ def _benzene_l5_uniform_licence(
         at benzene's own scope and defend the licence if the primitive is ever
         loosened -- not because they are independently exercised.
     """
+    # P-14.3.3 (BB:2869) ambient scope -- see locant_omission.forced_locant_scope.
+    # The isotope path names an isotope-STRIPPED molecule, so this function's own
+    # `has_isotope` test is structurally unreachable-True there (measured: a spy recorded
+    # isotopes_seen_in_mol=[] for a 13C input). MEASURED consequence:
+    # `Cc1c(C)c(C)c(C)c(C)[13c]1C` shipped `hexamethyl(13C1)benzene` against P-82.6.1.1
+    # (BB:44180). Conditional by construction: the decorator enters the scope only after
+    # establishing that the label needs a locant, so `(13C1)benzenehexol` -- correct per
+    # P-82.6.1.3 (BB:44202), all six positions one orbit -- is unaffected.
+    from ..assembly.locant_omission import locants_are_forced
+    if locants_are_forced():
+        return False
+
     from ..assembly.locant_omission import l5_uniform_complete, scope_forces_locants
 
     if mol is None or not oriented_ring or len(oriented_ring) != 6:

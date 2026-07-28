@@ -423,6 +423,17 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
     mol = getattr(features, 'mol', None)
     if mol is None or not oriented_ring:
         return False
+    # P-14.3.3 (BB:2869) as an AMBIENT scope. Some essential-locant facts are known
+    # only OUTSIDE this call: rules/isotopes.py strips every label and names the
+    # isotope-FREE skeleton, so `features.mol` here has GetIsotope()==0 everywhere and
+    # every isotope test we could write is structurally False. MEASURED: `OC1CCCC[13CH2]1`
+    # shipped `(2-13C1)cyclohexanol` where P-82.6.1.1 (BB:44180) requires
+    # `(2-13C)cyclohexan-1-ol` -- BB:44186 prints the elided form as "[not
+    # (2-13C)ethanol]". The decorator now declares the scope; we honour it.
+    from ..locant_omission import locants_are_forced
+    if locants_are_forced():
+        return False
+
 
     # Suffix-class allowlist. P-14.3.3 is deny-by-default, so a class is licensed only
     # where the Blue Book actually shows the locant withheld:

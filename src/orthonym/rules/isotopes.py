@@ -286,6 +286,32 @@ def _decorate_demultiplied(skeleton, keys, original, stripped) -> Optional[str]:
     return winners[0][3]
 
 
+# ─────────────────────────────────────────────────────────────────────────────────────
+# WITHDRAWN 2026-07-28: a whole-molecule isotopomer-ambiguity test.
+#
+# It was built and wired here, and it REGRESSED a correct name, so it is recorded rather
+# than kept. It asked "can this nuclide multiset be placed on the skeleton in more than
+# one non-isomorphic way?" and forced a locant when so. That ignores **P-82.2.1**
+# (``:44182``, verbatim): the descriptor is inserted *"before the part of the compound
+# that is isotopically substituted"* -- so the descriptor's POSITION carries its scope,
+# and ambiguity has to be judged inside that scope, not over the whole molecule.
+#
+# The witness that refuted it: ``[13CH3]OC(C)=O`` -> ``(13C1)methyl acetate``. Methyl
+# acetate has three distinct carbons, so a whole-molecule test says "ambiguous" and forces
+# ``(1-13C1)methyl acetate``. But the descriptor sits before ``methyl``, whose scope is a
+# single carbon, so the name is already unique. ``:7492`` settles it:
+# ``1,2-di[(13C)methyl]benzene (PIN. P-82.2.1)`` -- descriptor inside the brackets,
+# scoped to ``methyl``, no locant on the label.
+#
+# Judging scope correctly needs awareness of the name's grammar, which this module does
+# not have (it enumerates insertion offsets and lets the round-trip oracle choose). So the
+# general rule is NOT implemented. What IS implemented below is the half with a verbatim
+# Blue Book anchor: when the descriptor itself needs a locant, P-82.6.1.1 restores the
+# parent's locants. See the open-defect note in
+# 
+# ─────────────────────────────────────────────────────────────────────────────────────
+
+
 def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     """Fail-closed isotopic-substitution PIN (P-82.2.1 + P-45.4).
 
@@ -362,26 +388,76 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     # tried first — locants are omitted when the position is unambiguous; then
     # integer locants ascending (lowest-locant-first). Among round-trippers,
     # P-45.4.2/.4.3 (higher Z then higher mass at the lower locant) breaks ties.
-    winners = []
-    for locant in [None] + list(range(1, n_pos + 1)):
-        desc = _descriptor(locant)
-        for off in offsets:
-            candidate = skeleton[:off] + desc + skeleton[off:]
-            if _isotope_round_trips(candidate, original):
-                groups = [(locant, mass, el, count) for (mass, el), count in keys]
-                # locant None ranks as lowest for P-45.4.1 (unambiguous omit).
-                loc_rank = -1 if locant is None else locant
-                winners.append((_p4542_p4543_key(groups), loc_rank, off, candidate))
-        if winners:
-            # P-45.4.1: the first locant-form that yields ANY round-tripper is
-            # the lowest-locant form (None precedes integers, integers ascend);
-            # do not consider higher-locant forms once a lower one succeeds.
-            break
-    if not winners:
+    def _enumerate(skel):
+        """Best (candidate, loc_rank) for one skeleton spelling, or (None, None).
+
+        ``loc_rank`` is -1 when the winning descriptor needs NO locant, else the
+        locant. That value is the P-82.6.1.1 trigger: see below.
+        """
+        _offs = [0] + [
+            i for i in range(1, len(skel) + 1)
+            if i < len(skel) and skel[i].isalpha()
+        ]
+        _seen, _o = set(), []
+        for x in _offs:
+            if x not in _seen:
+                _seen.add(x)
+                _o.append(x)
+        won = []
+        for locant in [None] + list(range(1, n_pos + 1)):
+            desc = _descriptor(locant)
+            for off in _o:
+                candidate = skel[:off] + desc + skel[off:]
+                if _isotope_round_trips(candidate, original):
+                    groups = [(locant, mass, el, count) for (mass, el), count in keys]
+                    # locant None ranks as lowest for P-45.4.1 (unambiguous omit).
+                    loc_rank = -1 if locant is None else locant
+                    won.append((_p4542_p4543_key(groups), loc_rank, off, candidate))
+            if won:
+                # P-45.4.1: the first locant-form that yields ANY round-tripper is
+                # the lowest-locant form (None precedes integers, integers ascend);
+                # do not consider higher-locant forms once a lower one succeeds.
+                break
+        if not won:
+            return None, None
+        # Among equally-low-locant round-trippers, P-45.4.2/.4.3 then front-first.
+        won.sort(key=lambda w: (w[0], w[1], w[2]))
+        return won[0][3], won[0][1]
+
+    best, loc_rank = _enumerate(skeleton)
+    if best is None:
         # De-multiplication (single AND mixed nuclides) was already attempted
         # ahead of this enumeration by _decorate_demultiplied; nothing else to
         # try -> fail closed (never a wrong labeled name).
         return None
-    # Among equally-low-locant round-trippers, P-45.4.2/.4.3 then front-first.
-    winners.sort(key=lambda w: (w[0], w[1], w[2]))
-    return winners[0][3]
+
+    # ── P-82.6.1.1 (BB:44180), the conditional locant restoration ────────────────
+    # Verbatim: "In preferred IUPAC names, locants are omitted if no locants are
+    # necessary in unmodified names. However, if isotopic modification requires a locant
+    # to specify its position, then all locants must be specified and none are omitted."
+    # Its own example prints the elided form as the REJECTED one (BB:44186):
+    #     13CH3-CH2-OH   (2-13C)ethan-1-ol   [not (2-13C)ethanol]
+    #
+    # `loc_rank >= 1` is precisely "the isotopic modification requires a locant": the
+    # enumeration tries the locant-FREE descriptor first, so a locant is only reached
+    # when the locant-free form failed to round-trip -- i.e. when the position genuinely
+    # has to be stated. When `loc_rank == -1` no locant was needed, the condition in the
+    # rule is not met, and the parent keeps its licensed omission. That is what makes
+    # `(13C1)benzenehexol` correct (P-82.6.1.3, BB:44202 -- all six ring positions are one
+    # orbit, so there is only one isotopomer) while `(13C2)benzenehexol` is not.
+    #
+    # The skeleton above was named from the isotope-STRIPPED molecule, so the P-14.3.4
+    # licences could not see the label and elided freely. Re-name it inside the ambient
+    # P-14.3.3 scope so they decline, then re-enumerate against the locanted spelling.
+    if loc_rank is not None and loc_rank >= 1:
+        from ..assembly.locant_omission import forced_locant_scope
+        from ..namer import Orthonym
+        with forced_locant_scope("isotope"):
+            skel2 = Orthonym(style="systematic").name(stripped_smiles)
+        if skel2 and "unknown" not in skel2.lower() and skel2 != skeleton:
+            best2, _ = _enumerate(skel2)
+            # Fail toward the locanted spelling only if it still round-trips; never
+            # trade a verified name for an unverified one.
+            if best2 is not None:
+                return best2
+    return best

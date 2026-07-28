@@ -42,6 +42,9 @@ construction. Structural predicates only.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
+
 from typing import Dict, FrozenSet, Iterable, Mapping, Optional
 
 from rdkit import Chem
@@ -54,6 +57,9 @@ __all__ = [
     "l3_one_kind_of_substitutable_h",
     "l6_all_substitutable_h_share_one_locant",
     "scope_forces_locants",
+    "forced_locant_scope",
+    "locants_are_forced",
+    "forced_locant_reason",
 ]
 
 #: ``:3007`` -- "Except for hydrogen atoms attached to chalcogen atoms, such as in
@@ -268,6 +274,74 @@ def _has_letter_locant(locants: Iterable) -> bool:
         if not str(loc).strip().isdigit():
             return True
     return False
+
+
+# --------------------------------------------------------------------------------- #
+# P-14.3.3 as an AMBIENT SCOPE                                                        #
+# --------------------------------------------------------------------------------- #
+# Some essential-locant facts are known only OUTSIDE the naming call that has to honour
+# them. The isotope path is the measured case: ``rules/isotopes.py`` strips every label,
+# names the isotope-FREE skeleton, then splices the descriptor into the finished string.
+# The licences run deep inside that skeleton naming and receive a molecule with
+# ``GetIsotope() == 0`` everywhere, so every ``has_isotope`` argument they compute is
+# structurally False. Measured with a spy validated on 2 known positives + 1 negative:
+# ``scope_forces_locants`` IS reached for a labelled benzene and receives
+# ``has_isotope=False``.
+#
+# So we shipped ``hexamethyl(13C1)benzene`` and ``(2-13C1)cyclohexanol`` against
+# **P-82.6.1.1** (``:44180``): *"In preferred IUPAC names, locants are omitted if no
+# locants are necessary in unmodified names. However, if isotopic modification requires a
+# locant to specify its position, then all locants must be specified and none are
+# omitted."* -- whose own example prints the elided form as the rejected one:
+# ``(2-13C)ethan-1-ol [not (2-13C)ethanol]`` (``:44186``).
+#
+# Patching each guard cannot work: by the time a licence runs, the isotope is gone. The
+# fact has to be carried DOWN from where it is known. A ContextVar is the mechanism --
+# it is exactly "this whole naming scope contains an essential locant", which is the
+# sentence P-14.3.3 is made of, and it is async/thread-safe so concurrent naming cannot
+# leak state between callers.
+#
+# ⚠ IT IS DELIBERATELY CONDITIONAL, NOT A BLANKET "isotope => cite". P-82.6.1.1 fires
+# only when the modification *requires a locant to specify its position*. When every
+# candidate position is equivalent, no locant is needed and the parent keeps its licensed
+# omission -- **P-82.6.1.3** (``:44202``) prints ``(2H6)benzene (PIN)``, and
+# ``(13C1)benzenehexol`` is correct today for exactly that reason (all six ring positions
+# are one orbit, so there is only one isotopomer). ``rules/isotopes.py`` therefore enters
+# this scope only after its own descriptor enumeration has *established* that a locant is
+# required -- i.e. only when the locant-free descriptor failed to round-trip.
+_FORCED_LOCANT_REASON: "contextvars.ContextVar[Optional[str]]" = contextvars.ContextVar(
+    "orthonym_forced_locant_reason", default=None
+)
+
+
+@contextlib.contextmanager
+def forced_locant_scope(reason: str):
+    """Declare that this naming scope contains an essential locant (``P-14.3.3``).
+
+    Every P-14.3.4 licence must consult :func:`locants_are_forced` and decline while
+    this is active. ``reason`` is free text for debugging (e.g. ``"isotope"``); it is
+    never parsed.
+    """
+    token = _FORCED_LOCANT_REASON.set(reason)
+    try:
+        yield
+    finally:
+        _FORCED_LOCANT_REASON.reset(token)
+
+
+def locants_are_forced() -> bool:
+    """True when an enclosing :func:`forced_locant_scope` is active.
+
+    A licence that does not consult this will silently elide a locant the Blue Book
+    requires, and neither SELF-01 (``namer.py`` states verbatim that it *"ignores
+    isotopes"*) nor the gold set can see it.
+    """
+    return _FORCED_LOCANT_REASON.get() is not None
+
+
+def forced_locant_reason() -> "Optional[str]":
+    """The active reason, or None. Diagnostics only."""
+    return _FORCED_LOCANT_REASON.get()
 
 
 def scope_forces_locants(
