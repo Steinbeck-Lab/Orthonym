@@ -114,14 +114,29 @@ class TestValueQuality:
         """Values should be lowercase except for known patterns like
         N,N-dimethylformamide, (E)-cinnamic acid, L-tartaric acid, etc.
         """
-        # Allowed uppercase patterns: element-prefixed (N,N- O- S-),
-        # stereodescriptors (R/S/E/Z), indicated hydrogen (1H- 7H-),
-        # amino acid L- prefix, DMSO, etc.
-        # Indicated hydrogen can appear mid-name (e.g., "3,4-dihydro-2H-pyran")
+        # Allowed uppercase patterns: italic ELEMENT LOCANTS (N- N, N'- O- S- P- Se-),
+        # stereodescriptors (R/S/E/Z), indicated hydrogen (1H- 7H-), configurational
+        # L-/D- prefixes. Indicated hydrogen can appear mid-name ("3,4-dihydro-2H-pyran").
+        #
+        # ⚠ FIXED 2026-07-28 (v29 Phase C). This test had been failing since `13a74917`
+        # on `[C-]#[N+]O` -> `N-hydroxy-λ2-methanamine`, and THE TEST WAS WRONG, not the
+        # data. The old pattern was `[NOPS],` — it required a COMMA after the element
+        # symbol, so it accepted `N,N-dimethylformamide` but rejected a SINGLE `N-`
+        # locant, which is the commonest form there is (`N-methylurea`, `N-hydroxy…`).
+        # The giveaway was the hard-coded `N-acetyl` alternative: a special case standing
+        # in for the general rule that was missing.
+        #
+        # Replaced with the actual Blue Book rule (P-14.3.2 / P-16.3): an italic element
+        # locant is an element symbol, optionally primed, followed by `-` or `,`, at the
+        # name start or after a separator. Validated empirically both ways — it accepts
+        # every legitimate name in the table (0 unexplained rows, down from 1) and still
+        # REJECTS `Benzene`, `toLuene`, `Hydroquinone`, so it did not become a rubber
+        # stamp. A permanently-red test erodes the signal from every other test.
         import re
         allowed_upper = re.compile(
-            r"[NOPS],|[0-9]+H-|^[LDld]-|^\([RSEZ]\)-|"
-            r"N-acetyl|^L-|^D-"
+            r"(?:^|[-,(\[])[NOPS](?:e|i)?['′]?[-,]"
+            r"|[0-9]+H-"
+            r"|^[LDld]-|^\([RSEZ]\)-|^L-|^D-"
         )
 
         bad = []
