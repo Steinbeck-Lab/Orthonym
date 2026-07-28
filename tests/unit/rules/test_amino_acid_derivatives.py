@@ -66,10 +66,10 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw na
 #   L-allothreonine (symbol 'aThr')     (2S,3S)-2-amino-3-hydroxybutanoic acid
 # The D rows are unchanged, which is the point: only the L was being lost.
 @pytest.mark.parametrize("smiles,expected", [
-    # L-allo-threonine = (2S,3S) [CIP-verified]; C-3 epimer of L-Thr (2S,3R).
-    ("C[C@H](O)[C@H](N)C(=O)O", "L-allo-threonine"),
-    # L-allo-isoleucine = (2S,3R) [CIP-verified]; C-3 epimer of L-Ile (2S,3S).
-    ("CC[C@@H](C)[C@H](N)C(=O)O", "L-allo-isoleucine"),
+    # L-allothreonine = (2S,3S) [CIP-verified]; C-3 epimer of L-Thr (2S,3R).
+    ("C[C@H](O)[C@H](N)C(=O)O", "L-allothreonine"),
+    # L-alloisoleucine = (2S,3R) [CIP-verified]; C-3 epimer of L-Ile (2S,3S).
+    ("CC[C@@H](C)[C@H](N)C(=O)O", "L-alloisoleucine"),
 ])
 def test_allo_amino_acids(smiles, expected):
     assert G.name(smiles) == expected
@@ -82,10 +82,10 @@ def test_allo_amino_acids(smiles, expected):
     # Chapter."
     ("C[C@@H](O)[C@H](N)C(=O)O", "L-threonine"),      # L-Thr (2S,3R)
     ("C[C@H](O)[C@@H](N)C(=O)O", "D-threonine"),       # D-Thr (2R,3S)
-    ("C[C@@H](O)[C@@H](N)C(=O)O", "D-allo-threonine"), # D-allo-Thr (2R,3R)
+    ("C[C@@H](O)[C@@H](N)C(=O)O", "D-allothreonine"), # D-allo-Thr (2R,3R)
     ("CC[C@H](C)[C@H](N)C(=O)O", "L-isoleucine"),      # L-Ile (2S,3S)
     ("CC[C@@H](C)[C@@H](N)C(=O)O", "D-isoleucine"),    # D-Ile (2R,3R)
-    ("CC[C@H](C)[C@@H](N)C(=O)O", "D-allo-isoleucine"),# D-allo-Ile (2R,3S)
+    ("CC[C@H](C)[C@@H](N)C(=O)O", "D-alloisoleucine"),# D-allo-Ile (2R,3S)
 ])
 def test_thr_ile_stereoisomers(smiles, expected):
     assert G.name(smiles) == expected

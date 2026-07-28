@@ -80,12 +80,12 @@ FREE_AMINO_ACIDS = [
 ALLO_QUARTET = [
     ("C[C@@H](O)[C@H](N)C(=O)O", "L-threonine", "amino_acid_derivatives #4"),
     ("C[C@H](O)[C@@H](N)C(=O)O", "D-threonine", "amino_acid_derivatives #5"),
-    ("C[C@H](O)[C@H](N)C(=O)O", "L-allo-threonine", "amino_acid_derivatives #0"),
-    ("C[C@@H](O)[C@@H](N)C(=O)O", "D-allo-threonine", "amino_acid_derivatives #1"),
+    ("C[C@H](O)[C@H](N)C(=O)O", "L-allothreonine", "amino_acid_derivatives #0"),
+    ("C[C@@H](O)[C@@H](N)C(=O)O", "D-allothreonine", "amino_acid_derivatives #1"),
     ("CC[C@H](C)[C@H](N)C(=O)O", "L-isoleucine", "amino_acid_derivatives #6"),
     ("CC[C@@H](C)[C@@H](N)C(=O)O", "D-isoleucine", "amino_acid_derivatives #7"),
-    ("CC[C@@H](C)[C@H](N)C(=O)O", "L-allo-isoleucine", "amino_acid_derivatives #2"),
-    ("CC[C@H](C)[C@@H](N)C(=O)O", "D-allo-isoleucine", "amino_acid_derivatives #3"),
+    ("CC[C@@H](C)[C@H](N)C(=O)O", "L-alloisoleucine", "amino_acid_derivatives #2"),
+    ("CC[C@H](C)[C@@H](N)C(=O)O", "D-alloisoleucine", "amino_acid_derivatives #3"),
 ]
 
 
@@ -112,12 +112,12 @@ class TestTheDetector:
     @pytest.mark.parametrize("name,expected", [
         ("alanine", True),
         ("threonine", True),
-        ("allo-threonine", True),          # the pre-fix spelling: no configuration
+        ("allothreonine", True),          # the pre-fix spelling: no configuration
         ("cysteine", True),
         ("L-alanine", False),
         ("D-alanine", False),
-        ("L-allo-threonine", False),
-        ("D-allo-isoleucine", False),
+        ("L-allothreonine", False),
+        ("D-alloisoleucine", False),
         ("", False),                        # nothing emitted is not "bare"
         (None, False),
     ])

@@ -214,7 +214,21 @@ _ALLO_AA_FORMS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
 def _allo_aa_forms() -> Dict[str, Dict[str, str]]:
     """Canonical-isomeric-SMILES -> descriptor-prefix map per allo-capable AA.
     Built lazily (RDKit at call time, not import time). Values: 'L-', 'D-',
-    'L-allo-', 'D-allo-'.
+    'L-allo', 'D-allo' (the last two carry NO trailing hyphen: the Blue Book fuses
+    'allo' into the retained name, giving `L-allothreonine`).
+
+    THE 'allo' IS NOT HYPHENATED for an amino acid. `## **P-103.1.3.2.2** Use of the
+    prefix 'allo'` (BlueBookV2.md:54320) writes `L-allothreonine`,
+    `L-alloisoleucine` (:54326-54330), and `allothreonine`/`alloisoleucine` at
+    :54226-54228 and inside a peptide at :54721 (`L-allothreonyl`) — 5 unhyphenated
+    occurrences and ZERO hyphenated ones (searched both the literal `allo-threonine`
+    and the OCR form `alloGthreonine`, with a positive control proving the `G`=hyphen
+    pattern finds matches in this file). The hyphenated, ITALIC `*allo*-` does occur
+    — but only as a CARBOHYDRATE/cyclitol configurational prefix (:53011, :53021,
+    :54890, e.g. `D-*allo*-non-3-ulose`, `*allo*-inositol`). v29 P3-REGRESSION
+    applied the sugar convention to amino acids; corrected here. This OVERTURNS the
+    v24 W8 P3 spelling (recorded in baseline_targets `rebaselined_v28_aa_stereo_gold`),
+    which cited P-103.1.3.2.2 — the section that spells it fused.
 
     v29 P3-REGRESSION I12: the L forms used to map to ``''`` and ``'allo-'``, i.e.
     the L was DROPPED. The suppression cited `P-103.1.3.2.2`, and that section
@@ -232,8 +246,10 @@ def _allo_aa_forms() -> Dict[str, Dict[str, str]]:
             forms[nm] = {
                 Chem.CanonSmiles(l_smi): "L-",
                 _enantiomer_canon(l_smi): "D-",
-                Chem.CanonSmiles(lallo_smi): "L-allo-",
-                _enantiomer_canon(lallo_smi): "D-allo-",
+                # No hyphen after 'allo': the Blue Book FUSES it into the retained
+                # amino-acid name -- see the docstring below.
+                Chem.CanonSmiles(lallo_smi): "L-allo",
+                _enantiomer_canon(lallo_smi): "D-allo",
             }
         _ALLO_AA_FORMS_CACHE = forms
     return _ALLO_AA_FORMS_CACHE
