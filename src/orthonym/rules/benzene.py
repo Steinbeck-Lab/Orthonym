@@ -2996,7 +2996,11 @@ def name_substituted_benzene(
     if suffix_groups:
         name = _assemble_benzene_with_suffix(
             mol, suffix_groups, prefix_groups, n_substituents_map,
-            atom_to_locant, oriented_ring, demoted_prefix_overrides
+            atom_to_locant, oriented_ring, demoted_prefix_overrides,
+            # v29 Phase C tranche B: the P-14.3.4 licence is evaluated PER SCOPE, and a
+            # stereodescriptor in this scope is an essential locant that restores every
+            # other one (P-14.3.3, BB:2869). The suffix assembler could not see them.
+            stereo_descriptors=stereo_descriptors,
         )
         if stereo_descriptors:
             stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
@@ -3048,13 +3052,27 @@ def name_substituted_benzene(
         is_monosubstituted=is_monosubstituted,
     )
 
+    # P-14.3.4.5 (BB:3007): a ring whose every substitutable position carries the SAME
+    # prefix omits all locants -- 'hexamethylbenzene', 'hexafluorobenzene'. Distinct
+    # from the monosubstituted licence above (that one has no locant to cite), so it
+    # needs its own branch: the MULTIPLIER must survive, and the `_omit` branch below
+    # emits the bare name without one.
+    _l5_omit = (not _omit) and _benzene_l5_uniform_licence(
+        mol, oriented_ring, {}, prefix_groups, stereo_descriptors
+    )
+
     # Build prefix strings, sorted alphabetically by substituent name
     prefixes = []
     for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
         locants = prefix_groups[name]
         count = len(locants)
 
-        if _omit:
+        if _l5_omit:
+            # An empty locant list is format_substituent_prefix's own documented
+            # P-14.3.4 elision path: it drops the locant string and its hyphen while
+            # keeping the multiplier, so 'methyl' x6 -> 'hexamethyl'.
+            prefix_str = format_substituent_prefix(name, [], count)
+        elif _omit:
             # Monosubstituted: just "chloro", "methyl", etc. - no locant
             if name.startswith('(') or name.startswith('['):
                 # A name with a leading bracket may be either FULLY enclosed
@@ -3103,6 +3121,7 @@ def _assemble_benzene_with_suffix(
     atom_to_locant: Dict[int, int],
     oriented_ring: List[int],
     demoted_prefix_overrides: Optional[Dict[str, str]] = None,
+    stereo_descriptors: Optional[List] = None,
 ) -> str:
     """
     Assemble benzene name with suffix functional groups.
@@ -3117,6 +3136,10 @@ def _assemble_benzene_with_suffix(
         n_substituents_map: Dict of suffix_name -> list of N-alkyl names
         atom_to_locant: Mapping from atom index to locant
         oriented_ring: The oriented ring
+        stereo_descriptors: The scope's stereodescriptors, needed because a
+            stereodescriptor is an essential locant and P-14.3.3 (BB:2869) then
+            restores every locant in the scope. ``None`` means "not established" and
+            fails closed (the P-14.3.4 licence is refused).
 
     Returns:
         IUPAC name string with suffix FG
@@ -3202,7 +3225,17 @@ def _assemble_benzene_with_suffix(
             )
             mult = SIMPLE_MULTIPLIERS.get(len(ol_locants), str(len(ol_locants)))
             loc_str = ','.join(str(l) for l in sorted(ol_locants))
-            suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'ol')}"
+            multiplied = _join_multiplied_suffix(mult, 'ol')
+            # P-14.3.4.5 (BB:3007): when every substitutable ring position bears the
+            # SAME decoration the locants are omitted -- 'benzenehexol' (PIN) BB:7625.
+            # Deny by default (P-14.3.3, BB:2869): any prefix, any stereodescriptor,
+            # any partial substitution and the locants all come back.
+            if _benzene_l5_uniform_licence(
+                mol, oriented_ring, {'ol': ol_locants}, remaining_prefix_groups,
+                stereo_descriptors,
+            ):
+                return f"benzene{multiplied}"
+            suffix_part = f"benzene-{loc_str}-{multiplied}"
             if remaining_prefix_groups:
                 prefix_part = _build_prefix_string_with_locants(
                     remaining_prefix_groups, mono_needs_locant=True
@@ -4002,6 +4035,124 @@ def _renumber_relative_to(
             best_groups = dict(converted)
 
     return best_groups if best_groups else {}
+
+
+_BENZENE_PARENT_HYDRIDE_CACHE = []
+
+
+def _benzene_parent_hydride():
+    """The parent hydride benzene, C6H6, atom ``i`` <-> ring locant ``i + 1``.
+
+    P-14.3.4.5 speaks of the substitutable positions of the PARENT, so the licence must
+    be evaluated against the undecorated ring: on the input molecule a fully
+    substituted ring carbon has zero hydrogens, and the count that decides the licence
+    would be lost. Benzene's six carbons each carry exactly one substitutable H, which
+    is precisely why ``benzenehexol`` (BB:7625) omits while
+    ``cyclohexane-1,2,3,4,5,6-hexol`` (BB:54823) retains.
+    """
+    if not _BENZENE_PARENT_HYDRIDE_CACHE:
+        from rdkit import Chem
+        _BENZENE_PARENT_HYDRIDE_CACHE.append(Chem.MolFromSmiles('c1ccccc1'))
+    return _BENZENE_PARENT_HYDRIDE_CACHE[0]
+
+
+def _benzene_l5_uniform_licence(
+    mol,
+    oriented_ring: List[int],
+    suffix_locants_by_kind: Optional[Dict[str, List[int]]],
+    prefix_groups: Optional[Dict[str, List[int]]],
+    stereo_descriptors: Optional[List] = None,
+) -> bool:
+    """P-14.3.4.5 (BB:3007): may this benzene ring omit ALL of its locants?
+
+    v29 Phase C tranche B Task 1. **DENY BY DEFAULT** -- P-14.3.3 "Citation of locants"
+    (BB:2869) says *"if any locants are essential ... then all locants must be cited
+    for the parent structure or that structural unit"*, so this returns True only when
+    the ring is completely substituted **in the same way**, and False for everything it
+    cannot positively establish.
+
+    Licensed (all must hold):
+      * the parent is a six-membered all-carbon aromatic ring -- the benzene handler's
+        own parent hydride, whose every position carries exactly one substitutable H;
+      * every one of the six positions is decorated, and every decoration is the same
+        kind (suffix and prefix kinds are distinguished, so ``5 x -ol + 1 x chloro``
+        is heterogeneous and denied -- BB:3009 *"In case of partial substitution or
+        modification, all numerical prefixes must be indicated"*);
+      * nothing else in the scope forces locants: no stereodescriptor, no isotopic
+        label (BB:44180).
+
+    ⚠ The decision is delegated to ``assembly.locant_omission`` -- the ONE place the
+    Blue Book licences live -- and this function only marshals benzene's scope into it.
+    Do not re-derive the rule here.
+
+    ⚠ It counts HYDROGENS, not positions. The whole boundary pair
+    (``benzenehexol`` omits, ``cyclohexane-1,2,3,4,5,6-hexol`` retains) turns on the
+    ring carbon having one substitutable H rather than two, and a predicate that counts
+    positions strips the inositols -- which BB:54823 spells out in one sentence.
+
+    ``stereo_descriptors=None`` means "the caller did not establish them" and fails
+    closed, because a stereodescriptor is an essential locant in the same scope.
+    """
+    from ..assembly.locant_omission import l5_uniform_complete, scope_forces_locants
+
+    if mol is None or not oriented_ring or len(oriented_ring) != 6:
+        return False
+
+    # Confirm the perceived parent really is a benzene ring before licensing anything
+    # against benzene's parent hydride.
+    for idx in oriented_ring:
+        try:
+            atom = mol.GetAtomWithIdx(int(idx))
+        except (OverflowError, RuntimeError, ValueError, TypeError):
+            return False
+        if atom.GetSymbol() != 'C' or not atom.GetIsAromatic():
+            return False
+
+    # Marshal the scope: ring locant (1..6) -> decoration kind, keyed so a suffix and a
+    # prefix of the same spelling can never be mistaken for "the same way".
+    decoration_of: Dict[int, str] = {}
+    all_suffix_locants: List = []
+    all_prefix_locants: List = []
+    for source, groups, bucket in (
+        ('suffix', suffix_locants_by_kind or {}, all_suffix_locants),
+        ('prefix', prefix_groups or {}, all_prefix_locants),
+    ):
+        for kind, locants in groups.items():
+            for loc in (locants or []):
+                bucket.append(loc)
+                if isinstance(loc, bool) or not isinstance(loc, int):
+                    return False
+                if not 1 <= loc <= 6:
+                    return False
+                if loc - 1 in decoration_of:
+                    return False        # two decorations claiming one position
+                decoration_of[loc - 1] = f"{source}:{kind}"
+
+    if stereo_descriptors is None:
+        stereo_text = None              # not established -> fail closed
+    else:
+        stereo_text = 'stereo' if stereo_descriptors else ''
+
+    has_isotope = any(a.GetIsotope() for a in mol.GetAtoms())
+
+    if scope_forces_locants(
+        prefix_locants=all_prefix_locants,
+        suffix_locants=all_suffix_locants,
+        stereo_text=stereo_text,
+        has_indicated_h=False,
+        has_isotope=has_isotope,
+        # A ring assembly / multiplicative name / skeletal replacement never reaches
+        # this handler: it names ONE benzene ring as the whole parent. Measured
+        # 2026-07-28 -- a validated call-spy recorded zero hits here for
+        # 1,1'-biphenyl and 1,1'-oxydibenzene.
+        is_multiplicative=False,
+        is_ring_assembly=False,
+        has_skeletal_replacement=False,
+    ):
+        return False
+
+    return l5_uniform_complete(
+        _benzene_parent_hydride(), decoration_of=decoration_of)
 
 
 def _build_prefix_string(prefix_groups: Dict[str, List[int]]) -> str:
