@@ -291,12 +291,12 @@ def scope_forces_locants(
     of the hard overrides of derivation Part C (indicated/added hydrogen; isotopic
     labels -- ``:44180`` §"P-82.6.1.1" *"if isotopic modification requires a locant to
     specify its position"*; multiplicative names; ring assemblies; skeletal
-    replacement).
-
-    ⚠ The task brief cited ``:6446`` for skeletal replacement. That line is
-    §"P-15.4.1.2", the element-seniority order (``F > Cl > Br > ...``) -- nothing to do
-    with locant citation. Verified 2026-07-28 with ``sed -n 6446p``; the reference is
-    dropped rather than guessed at.
+    replacement -- ``:6446`` §"P-15.4.1.2", whose sentence *"Once a structure modified
+    by skeletal replacement ('a') prefixes has been named and numbered, it is
+    considered to be a new parent hydride. As locants assigned to heteroatoms are
+    essential, all locants must be cited as defined in P-14.3.3"* is the override;
+    the same line *opens* with the unrelated element-seniority order, ``F > Cl > Br >
+    ...``, but that is not the clause being cited here).
 
     **Fail-closed:** any argument that is ``None`` -- i.e. the caller could not
     establish it -- returns True.

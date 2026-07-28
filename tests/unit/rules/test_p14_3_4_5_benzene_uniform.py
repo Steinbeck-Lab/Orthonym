@@ -31,12 +31,14 @@ ring carbon has TWO substitutable H and six OH is therefore only PARTIAL substit
 If ``OC1C(O)C(O)C(O)C(O)C1O`` ever loses its locants, the predicate is counting
 positions instead of hydrogens.
 
-MEASURED CODE PATH (validated call-spy, 2026-07-28 -- see task-pcB1-report.md):
-  * the suffix target is joined at ``rules/benzene.py:3204`` inside
-    ``_assemble_benzene_with_suffix`` -- CONFIRMED, 8 line hits for benzenehexol
-    against 4 for the known positive ``benzene-1,2-diol``;
+MEASURED CODE PATH (validated call-spy, 2026-07-28 -- see task-pcB1-report.md; line
+numbers re-verified 2026-07-28 after drift, function names are the durable anchor):
+  * the suffix target is joined at ``rules/benzene.py:3237``
+    (``return f"benzene{multiplied}"``) inside ``_assemble_benzene_with_suffix`` --
+    CONFIRMED, 8 line hits for benzenehexol against 4 for the known positive
+    ``benzene-1,2-diol``;
   * the three prefix targets are joined INLINE in ``name_substituted_benzene``
-    (``:3080`` ``format_substituent_prefix`` -> ``:3085`` ``_join_benzene_prefixes``),
+    (``:3074`` ``format_substituent_prefix`` -> ``:3103`` ``_join_benzene_prefixes``),
     **not** in ``_build_prefix_string_with_locants`` as the task brief stated -- that
     function and its sibling ``_build_prefix_string`` record ZERO hits for
     ``hexamethylbenzene`` AND zero for the prefix known positive
