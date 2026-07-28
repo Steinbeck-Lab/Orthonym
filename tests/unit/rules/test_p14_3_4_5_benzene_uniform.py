@@ -168,6 +168,41 @@ class TestBenzeneLicenceHelper:
                          {}, {"methyl": [1, 2, 3, 4, 5, 6]},
                          stereo=[{"locant": 1, "descriptor": "E"}]) is False
 
+    def test_non_aromatic_six_ring_denied(self):
+        """★ The licence is evaluated against BENZENE's parent hydride, so it must
+        first prove the parent IS a benzene ring.
+
+        Found by mutation testing: disabling the aromatic/carbon confirmation loop
+        broke NO test, and the missing witness was the most important molecule in the
+        whole class. A cyclohexane ring carbon has TWO substitutable H, so six
+        identical substituents are only PARTIAL (BB:3009, BB:54823) -- but measured
+        against benzene's parent hydride they look complete. Without this guard the
+        predicate licenses ``hexamethylcyclohexane``, which is wrong.
+        """
+        from rdkit import Chem
+
+        from orthonym.rules.benzene import _benzene_l5_uniform_licence
+        mol = Chem.MolFromSmiles("CC1C(C)C(C)C(C)C(C)C1C")
+        ring = [a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()]
+        assert len(ring) == 6
+        assert _benzene_l5_uniform_licence(
+            mol, ring, {}, {"methyl": [1, 2, 3, 4, 5, 6]}, ()) is False
+
+    def test_heteroatom_six_ring_denied(self):
+        """Second witness for the same guard, for the OTHER reason it can fail:
+        an aromatic six-ring that is not all-carbon. Pyridine's N is not a
+        substitutable position at all, so benzene's parent hydride does not describe
+        it."""
+        from rdkit import Chem
+
+        from orthonym.rules.benzene import _benzene_l5_uniform_licence
+        mol = Chem.MolFromSmiles("Cc1c(C)c(C)nc(C)c1C")
+        ring = [a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()]
+        assert len(ring) == 6
+        assert any(mol.GetAtomWithIdx(i).GetSymbol() == "N" for i in ring)
+        assert _benzene_l5_uniform_licence(
+            mol, ring, {}, {"methyl": [1, 2, 3, 4, 5, 6]}, ()) is False
+
     def test_non_six_ring_denied(self):
         from orthonym.rules.benzene import _benzene_l5_uniform_licence
         from rdkit import Chem
