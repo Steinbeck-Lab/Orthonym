@@ -1,0 +1,166 @@
+"""P-14.3.4.2(c) — omission of a trivial mono-suffix locant on a ring (v29 Phase C tranche A).
+
+Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md``:
+
+``P-14.3.3`` "Citation of locants" (``:2869``) is **DENY BY DEFAULT** —
+
+    "if any locants are essential … then all locants must be cited for the parent
+     structure or that structural unit"
+
+so ``P-14.3.4`` "Omission of locants" (``:2871``) grants narrow LICENCES, and its own
+preamble says *"for absolute clarity in preferred IUPAC names it is necessary to be
+prescriptive about when omission of locants is permissible."*
+
+The licence exercised here, P-14.3.4.2(c), is witnessed verbatim:
+
+    ``:14916``  "by suffixes, such as 'cyclohexanecarboxylic acid' (PIN) and
+                 'cyclohexanone' (PIN)"
+    ``:26854``  "(1) cyclopentanol (PIN)"
+
+ROOT CAUSE this file guards (found by a validated call-spy, 2026-07-28):
+``_handler_shared._generate_suffix`` gates its whole P-14.3.4 elision block — including
+the ``should_omit_locant_one`` call — on ``features.principal_chain`` being non-empty
+(``:411``). A RING parent has no principal chain, so **rings never reached the elision
+logic at all**, and the non-terminal ring branch cited the locant unconditionally. The
+sibling TERMINAL ring branch already withheld it, which is why ``cyclohexanecarbaldehyde``
+was correct while ``cyclohexan-1-one`` was not.
+
+⚠ Invariant 11: removing a locant can unmask something worse. Every guard below asserts the
+FULL emitted name, not merely that a locant vanished.
+"""
+import pytest
+
+from orthonym.namer import Orthonym
+
+
+def _name(smiles: str) -> str:
+    return Orthonym().name(smiles)
+
+
+# --------------------------------------------------------------------------- #
+# 1. The licence fires — trivial mono-suffix locant on a saturated carbocycle  #
+# --------------------------------------------------------------------------- #
+class TestLicensedOmission:
+    @pytest.mark.parametrize("smiles,expected,authority", [
+        ("O=C1CCCCC1", "cyclohexanone", "verbatim BB:14916"),
+        ("OC1CCCC1", "cyclopentanol", "verbatim BB:26854"),
+        ("SC1CCCCC1", "cyclohexanethiol", "P-14.3.4.2(c) example"),
+        ("OC1CCCCC1", "cyclohexanol", "P-14.3.4.2(c)"),
+        ("NC1CCCCC1", "cyclohexanamine", "derived, P-14.3.4.2(c)"),
+        ("OC1CCC1", "cyclobutanol", "derived, P-14.3.4.2(c)"),
+        # lowest-confidence row of the five Phase C gold conflicts: derived by
+        # parallel with the ring ketone, no verbatim bare '-imine' row exists.
+        ("N=C1CCCCC1", "cyclohexanimine", "derived by parallel with BB:14916"),
+    ])
+    def test_trivial_ring_suffix_locant_is_omitted(self, smiles, expected, authority):
+        assert _name(smiles) == expected, authority
+
+
+# --------------------------------------------------------------------------- #
+# 2. The deny-default holds — every one of these MUST keep its locant          #
+#    (the Part-D tripwire set; each asserts the whole name)                    #
+# --------------------------------------------------------------------------- #
+class TestDenyByDefault:
+    @pytest.mark.parametrize("smiles,expected,why", [
+        # A second suffix makes the locants essential.
+        ("OC1CCCCC1O", "cyclohexane-1,2-diol", "multiplied suffix"),
+        # Any other cited substituent restores them.
+        ("O=C1CCC(C)CC1", "4-methylcyclohexan-1-one", "ring carries a methyl"),
+        ("OC1CCCCC1C", "2-methylcyclohexan-1-ol", "ring carries a methyl"),
+        # Ring unsaturation makes positions distinct.
+        ("OC1CC=CCC1", "cyclohex-3-en-1-ol", "ring double bond"),
+        # A heterocycle keeps it (cf. piperidine-1-carbonitrile, BB:34730).
+        ("OC1CCNCC1", "piperidin-4-ol", "heterocycle"),
+        # Chains are untouched by this change.
+        ("OCCCl", "2-chloroethan-1-ol", "BB verbatim: NOT 2-chloroethanol"),
+        ("OCC", "ethanol", "already correct, must not regress"),
+        ("OCCO", "ethane-1,2-diol", "already correct"),
+        ("ClCCCCC", "1-chloropentane", "already correct"),
+        # Unsubstituted ring hydrocarbons / arenes are unaffected.
+        ("C1=CCCCC1", "cyclohexene", "bond locant, different licence"),
+        ("Oc1ccccc1", "phenol", "retained name"),
+    ])
+    def test_locant_is_retained(self, smiles, expected, why):
+        assert _name(smiles) == expected, why
+
+    def test_a_fused_ring_keeps_its_suffix_locant(self):
+        """A fused system numbers non-equivalently, so the licence must decline.
+
+        Asserts on the PREDICATE rather than the emitted name, because
+        ``Oc1cccc2ccccc12`` resolves to the pre-existing retained name
+        ``1-naphthol`` before the suffix path is reached — which would make an
+        end-to-end assertion here pass for the wrong reason.
+        """
+        from rdkit import Chem
+        from orthonym.assembly.handlers._handler_shared import (
+            _ring_suffix_locant_is_trivial,
+        )
+
+        mol = Chem.MolFromSmiles("Oc1cccc2ccccc12")
+        assert mol is not None
+        fused_ring = next(r for r in mol.GetRingInfo().AtomRings())
+
+        class _F:
+            pass
+
+        feats = _F()
+        feats.mol = mol
+        feats.principal_group_atoms = []
+        assert _ring_suffix_locant_is_trivial(
+            feats, list(fused_ring),
+            {a: i + 1 for i, a in enumerate(fused_ring)},
+        ) is False
+
+
+# --------------------------------------------------------------------------- #
+# 3. The predicate itself, unit-level                                         #
+# --------------------------------------------------------------------------- #
+class TestPredicateDeniesByDefault:
+    @staticmethod
+    def _probe(smiles: str, pg_smarts: str) -> bool:
+        """Build the real `features`-shaped inputs the producer passes."""
+        from rdkit import Chem
+        from orthonym.assembly.handlers._handler_shared import (
+            _ring_suffix_locant_is_trivial,
+        )
+        mol = Chem.MolFromSmiles(smiles)
+        assert mol is not None, smiles
+        patt = Chem.MolFromSmarts(pg_smarts)
+        matches = [tuple(m) for m in mol.GetSubstructMatches(patt)]
+        ring = next((r for r in mol.GetRingInfo().AtomRings()), ())
+
+        class _F:
+            pass
+        feats = _F()
+        feats.mol = mol
+        feats.principal_group_atoms = matches
+        return _ring_suffix_locant_is_trivial(
+            feats, list(ring), {a: i + 1 for i, a in enumerate(ring)})
+
+    def test_saturated_carbocyclic_ketone_is_licensed(self):
+        assert self._probe("O=C1CCCCC1", "[CX3]=[OX1]") is True
+
+    def test_missing_mol_denies(self):
+        from orthonym.assembly.handlers._handler_shared import (
+            _ring_suffix_locant_is_trivial,
+        )
+
+        class _F:
+            pass
+        feats = _F()
+        feats.mol = None
+        feats.principal_group_atoms = []
+        assert _ring_suffix_locant_is_trivial(feats, [0, 1, 2], {0: 1}) is False
+
+    def test_empty_ring_denies(self):
+        from orthonym.assembly.handlers._handler_shared import (
+            _ring_suffix_locant_is_trivial,
+        )
+        from rdkit import Chem
+
+        class _F:
+            pass
+        feats = _F()
+        feats.mol = Chem.MolFromSmiles("CCO")
+        feats.principal_group_atoms = []
+        assert _ring_suffix_locant_is_trivial(feats, [], {}) is False

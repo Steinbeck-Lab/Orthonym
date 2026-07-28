@@ -364,6 +364,82 @@ def _generate_ring_parent(features: Any) -> "NameFragment":
     return NameFragment(text="", fragment_type="parent")
 
 
+def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant) -> bool:
+    """P-14.3.4.2(c): may a single non-terminal ring suffix drop its locant?
+
+    v29 Phase C tranche A. **DENY BY DEFAULT** — P-14.3.3 "Citation of locants"
+    (``BlueBookV2.md:2869``) says *"if any locants are essential … then all locants
+    must be cited"*, so this returns True only for the case where the Blue Book's own
+    ``(PIN)`` rows show the locant withheld, and False for everything else including
+    anything it cannot positively establish.
+
+    Licensed (all must hold):
+      * the parent is ONE ring (monocyclic) — a fused system numbers
+        non-equivalently, so ``naphthalen-1-ol`` keeps its locant;
+      * every ring atom is carbon — a heterocycle keeps it
+        (``piperidine-1-carbonitrile``, ``:34730``);
+      * every ring bond is single — unsaturation makes positions distinct, so
+        ``cyclohex-2-en-1-ol`` keeps its locant;
+      * every ring atom other than the suffix-bearing one is an unsubstituted CH2 —
+        any other cited substituent restores the locant
+        (``4-methylcyclohexan-1-one``).
+
+    Under those conditions every substitutable position is equivalent
+    (P-14.3.4.3 *"only one kind of substitutable hydrogen"*), so ``1`` carries no
+    information: ``cyclohexanone``, ``cyclopentanol``, ``cyclohexanethiol``.
+    """
+    mol = getattr(features, 'mol', None)
+    if mol is None or not oriented_ring:
+        return False
+    ring = list(oriented_ring)
+    ring_set = set(ring)
+
+    ring_info = mol.GetRingInfo()
+    # Monocyclic only: every ring atom must belong to exactly one ring, and the
+    # perceived parent must be the whole of that ring system.
+    for idx in ring:
+        try:
+            if ring_info.NumAtomRings(idx) != 1:
+                return False
+        except Exception:
+            return False
+    if not any(set(r) == ring_set for r in ring_info.AtomRings()):
+        return False
+
+    # All-carbon, and every ring bond single.
+    for idx in ring:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
+            return False
+        if atom.GetFormalCharge() != 0:
+            return False
+    from rdkit import Chem as _Chem
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if a in ring_set and b in ring_set:
+            if bond.GetBondType() != _Chem.BondType.SINGLE:
+                return False
+
+    # Which ring atoms belong to the principal group (the suffix carbon(s))?
+    pg_atoms = set()
+    for match in (features.principal_group_atoms or []):
+        pg_atoms |= set(match if isinstance(match, (list, tuple, set, frozenset))
+                        else [match])
+
+    # Every other ring atom must be an unsubstituted CH2: exactly 2 H, and no
+    # exocyclic heavy neighbour at all.
+    for idx in ring:
+        if idx in pg_atoms:
+            continue
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetTotalNumHs() != 2:
+            return False
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() not in ring_set:
+                return False
+    return True
+
+
 def _generate_suffix(features: Any) -> Optional["NameFragment"]:
     """Generate suffix fragment for principal group.
 
@@ -643,6 +719,32 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         if fg_locants:
             fg_count = len(fg_locants)
             locants = tuple(fg_locants)
+            # P-14.3.4.2(c) (v29 Phase C tranche A). The TERMINAL ring branch
+            # above already withholds a trivial mono-suffix locant -- which is why
+            # `cyclohexanecarbaldehyde` is correct today -- while this
+            # NON-terminal sibling cited it unconditionally, emitting
+            # `cyclohexan-1-one` / `cyclopentan-1-ol` / `cyclohexane-1-thiol`
+            # against the verbatim PINs `cyclohexanone` (BB:14916),
+            # `cyclopentanol` (BB:26854) and `cyclohexanethiol`
+            # (P-14.3.4.2(c) example).
+            #
+            # P-14.3.3 "Citation of locants" (BB:2869) is DENY-BY-DEFAULT, so this
+            # is a narrow LICENCE, never a locant-stripping pass. It fires only
+            # where the locant is provably not distinctive: a single suffix on a
+            # MONOCYCLIC, fully saturated, all-carbon ring whose every other
+            # position is an unsubstituted CH2. Then all substitutable positions
+            # are equivalent (P-14.3.4.3 "only one kind of substitutable
+            # hydrogen") and `1` carries no information.
+            #
+            # Everything else keeps its locant, deliberately:
+            #  - heterocycles          -> `piperidine-1-carbonitrile` (BB:34730)
+            #  - any ring unsaturation -> `cyclohex-2-en-1-ol` (positions differ)
+            #  - any other substituent -> `4-methylcyclohexan-1-one`
+            #  - multiplied suffixes   -> `cyclohexane-1,2-diol`
+            #  - fused/bridged systems -> `naphthalen-1-ol` (Tranche B widens this)
+            if len(fg_locants) == 1 and _ring_suffix_locant_is_trivial(
+                    features, oriented_ring, ring_idx_to_locant):
+                locants = ()
 
     # Final safety: reconcile multiplier count with actual locants
     if locants:
