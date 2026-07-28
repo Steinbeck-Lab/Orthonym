@@ -21,7 +21,7 @@ Governing rule chain, verbatim from ``BlueBookV2/BlueBookV2.md``:
      indicated."
 
 Verbatim ``(PIN)`` witnesses: ``:7625`` ``benzenehexol (PIN, P-63.1.2) (not
-benzenehexaol)``; the free-valence analogue ``:3025`` ``benzenehexayl``. The three
+benzenehexaol)``; the free-valence analogue ``:3021`` ``benzenehexayl``. The three
 prefix targets (``hexamethyl-`` / ``hexafluoro-`` / ``hexachlorobenzene``) are
 **DERIVED** from ``:3007``, not verbatim rows -- derivation F7.
 

@@ -143,7 +143,7 @@ def l5_uniform_complete(
 
     ``counts`` is an optional per-atom decoration multiplicity, defaulting to 1. It
     exists because ``decoration_of`` maps one key per atom and cannot otherwise express
-    a doubly decorated position -- ``heptafluorobutanoic acid`` (``:3021``) puts two F
+    a doubly decorated position -- ``heptafluorobutanoic acid`` (``:3017``) puts two F
     on each of two CH2 carbons. Omitting it means "one decoration per atom", so a
     position with two substitutable hydrogens is *partial* and the licence is denied:
     that is exactly the ``cyclohexane-1,2,3,4,5,6-hexols`` boundary (``:54823``).
@@ -289,8 +289,14 @@ def scope_forces_locants(
     licence is permitted to omit. What forces is anything *essential* in the same
     scope -- a letter or primed locant, a stereodescriptor that needs a locant, or one
     of the hard overrides of derivation Part C (indicated/added hydrogen; isotopic
-    labels, ``:44180``; multiplicative names; ring assemblies; skeletal replacement,
-    ``:6446``).
+    labels -- ``:44180`` §"P-82.6.1.1" *"if isotopic modification requires a locant to
+    specify its position"*; multiplicative names; ring assemblies; skeletal
+    replacement).
+
+    ⚠ The task brief cited ``:6446`` for skeletal replacement. That line is
+    §"P-15.4.1.2", the element-seniority order (``F > Cl > Br > ...``) -- nothing to do
+    with locant citation. Verified 2026-07-28 with ``sed -n 6446p``; the reference is
+    dropped rather than guessed at.
 
     **Fail-closed:** any argument that is ``None`` -- i.e. the caller could not
     establish it -- returns True.
