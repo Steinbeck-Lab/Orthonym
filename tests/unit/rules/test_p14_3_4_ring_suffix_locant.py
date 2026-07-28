@@ -67,6 +67,17 @@ class TestDenyByDefault:
         # Any other cited substituent restores them.
         ("O=C1CCC(C)CC1", "4-methylcyclohexan-1-one", "ring carries a methyl"),
         ("OC1CCCCC1C", "2-methylcyclohexan-1-ol", "ring carries a methyl"),
+        # ★ A substituent on an ALPHA carbon. These two were found by the GATE as
+        # protect regressions, not by this file — the first version of the predicate
+        # exempted every atom of `features.principal_group_atoms` from the CH2 test,
+        # and a ring ketone's SMARTS match spans BOTH alpha carbons
+        # (`O=C1CCCCC1CCCCC` -> match `(2, 1, 0, 6)`, atom 6 bearing the pentyl), so
+        # an alpha substituent was invisible. `4-methyl...` above passed throughout
+        # because position 4 is not an alpha carbon. The exemption is now the
+        # suffix-BEARING ring atom only, derived from the cited locants.
+        ("O=C1CCCCC1CCCCC", "2-pentylcyclohexan-1-one", "alpha-carbon substituent"),
+        ("O=C1CCCC1N1CCCC1", "2-(pyrrolidin-1-yl)cyclopentan-1-one",
+         "alpha-carbon substituent"),
         # Ring unsaturation makes positions distinct.
         ("OC1CC=CCC1", "cyclohex-3-en-1-ol", "ring double bond"),
         # A heterocycle keeps it (cf. piperidine-1-carbonitrile, BB:34730).
@@ -134,11 +145,25 @@ class TestPredicateDeniesByDefault:
         feats = _F()
         feats.mol = mol
         feats.principal_group_atoms = matches
+        ring_map = {a: i + 1 for i, a in enumerate(ring)}
+        # The producer passes the suffix-BEARING ring atom(s), not the whole SMARTS
+        # match -- here, the ring atom carrying the exocyclic characteristic
+        # heteroatom. Mirror that contract exactly.
+        match_atoms = {a for m in matches for a in m}
+        suffix_ring_atoms = {
+            a for a in ring
+            if any(nbr.GetIdx() in match_atoms and nbr.GetIdx() not in set(ring)
+                   for nbr in mol.GetAtomWithIdx(a).GetNeighbors())
+        }
         return _ring_suffix_locant_is_trivial(
-            feats, list(ring), {a: i + 1 for i, a in enumerate(ring)})
+            feats, list(ring), ring_map, suffix_ring_atoms=suffix_ring_atoms)
 
     def test_saturated_carbocyclic_ketone_is_licensed(self):
         assert self._probe("O=C1CCCCC1", "[CX3]=[OX1]") is True
+
+    def test_alpha_substituted_ring_ketone_is_denied(self):
+        """The gate-found regression, at predicate level."""
+        assert self._probe("O=C1CCCCC1CCCCC", "[CX3]=[OX1]") is False
 
     def test_missing_mol_denies(self):
         from orthonym.assembly.handlers._handler_shared import (

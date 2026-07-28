@@ -364,7 +364,8 @@ def _generate_ring_parent(features: Any) -> "NameFragment":
     return NameFragment(text="", fragment_type="parent")
 
 
-def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant) -> bool:
+def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
+                                   suffix_ring_atoms=None) -> bool:
     """P-14.3.4.2(c): may a single non-terminal ring suffix drop its locant?
 
     v29 Phase C tranche A. **DENY BY DEFAULT** — P-14.3.3 "Citation of locants"
@@ -440,16 +441,22 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant) 
             if bond.GetBondType() != _Chem.BondType.SINGLE:
                 return False
 
-    # Which ring atoms belong to the principal group (the suffix carbon(s))?
-    pg_atoms = set()
-    for match in (features.principal_group_atoms or []):
-        pg_atoms |= set(match if isinstance(match, (list, tuple, set, frozenset))
-                        else [match])
+    # Which ring atoms actually BEAR the suffix?
+    #
+    # NOT `features.principal_group_atoms` -- that is the whole SMARTS match, which
+    # for a ring ketone spans BOTH ALPHA CARBONS as well as the carbonyl:
+    # `O=C1CCCCC1CCCCC` matches `(2, 1, 0, 6)` where 6 is the pentyl-bearing ring
+    # atom. Exempting every match atom from the CH2 test below made a substituent on
+    # an alpha carbon INVISIBLE and emitted `2-pentylcyclohexanone` for
+    # `2-pentylcyclohexan-1-one`. The GATE caught that as a protect regression;
+    # `4-methylcyclohexan-1-one` had passed only because position 4 is not an alpha
+    # carbon. Use the atoms whose locants are actually being decided instead.
+    suffix_ring_atoms = set(suffix_ring_atoms or ())
 
     # Every other ring atom must be an unsubstituted CH2: exactly 2 H, and no
     # exocyclic heavy neighbour at all.
     for idx in ring:
-        if idx in pg_atoms:
+        if idx in suffix_ring_atoms:
             continue
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetTotalNumHs() != 2:
@@ -762,8 +769,13 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
             #  - any other substituent -> `4-methylcyclohexan-1-one`
             #  - multiplied suffixes   -> `cyclohexane-1,2-diol`
             #  - fused/bridged systems -> `naphthalen-1-ol` (Tranche B widens this)
+            _wanted = set(fg_locants)
+            _suffix_ring_atoms = {
+                _a for _a, _loc in ring_idx_to_locant.items() if _loc in _wanted
+            }
             if len(fg_locants) == 1 and _ring_suffix_locant_is_trivial(
-                    features, oriented_ring, ring_idx_to_locant):
+                    features, oriented_ring, ring_idx_to_locant,
+                    suffix_ring_atoms=_suffix_ring_atoms):
                 locants = ()
 
     # Final safety: reconcile multiplier count with actual locants
