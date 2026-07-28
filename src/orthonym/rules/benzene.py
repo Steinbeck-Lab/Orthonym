@@ -4092,6 +4092,23 @@ def _benzene_l5_uniform_licence(
 
     ``stereo_descriptors=None`` means "the caller did not establish them" and fails
     closed, because a stereodescriptor is an essential locant in the same scope.
+
+    ⚠ **Measured with mutation testing, 2026-07-28 (22 mutations, 20 caught) -- do not
+    "simplify" the two redundant guards.**
+
+      * disabling the aromatic/all-carbon loop broke NO test, and that was a REAL
+        DEFECT rather than redundancy: the licence measures against benzene's parent
+        hydride, so without the loop it licensed ``hexamethylcyclohexane``. Two
+        witnesses (one per reason the loop can fire) now cover it;
+      * the ``1 <= loc <= 6`` range check and the ``len(oriented_ring) != 6`` check
+        each survive mutation *individually*, because ``l5_uniform_complete`` validates
+        every atom index against the parent hydride's atom count and requires every
+        substitutable position to be decorated -- so a locant of 7 becomes atom index 6
+        (out of range) and a five-membered ring leaves position 6 undecorated. Removing
+        the primitive's index validation IS caught (by
+        ``test_out_of_range_index_denies``). They are kept because they state the rule
+        at benzene's own scope and defend the licence if the primitive is ever
+        loosened -- not because they are independently exercised.
     """
     from ..assembly.locant_omission import l5_uniform_complete, scope_forces_locants
 
