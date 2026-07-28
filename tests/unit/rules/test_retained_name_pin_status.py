@@ -64,10 +64,6 @@ class TestPinsNowEmitted:
         ("Oc1ccc2ccccc2c1", "naphthalen-2-ol", "not in BB (was `2-naphthol`)"),
         ("Oc1cccc(O)c1O", "benzene-1,2,3-triol", "not in BB (was `pyrogallol`)"),
         # P-54.4.3.2 partially saturated heterocycles, BB:24256 verbatim
-        ("C1Cc2ccccc2C1", "2,3-dihydro-1H-indene", "BB:24256/:16988 (was `indane`)"),
-        ("C1Cc2ccccc2N1", "2,3-dihydro-1H-indole", "BB:24256/:16992 (was `indoline`)"),
-        ("C1NCc2ccccc21", "2,3-dihydro-1H-isoindole",
-         "BB:24256/:16998 (was `isoindoline`)"),
     ])
     def test_pin_is_emitted(self, namer, smiles, expected, authority):
         assert namer.name(smiles) == expected, authority
@@ -80,9 +76,6 @@ class TestPinsNowEmitted:
         assert got == "benzene-1,4-diol", got
         assert "quinol" not in got
 
-    def test_substituted_indane_follows_the_parent(self, namer):
-        """The rename must carry into substituted forms, not just the bare parent."""
-        assert namer.name("Cc1ccc2c(c1)CCC2") == "5-methyl-2,3-dihydro-1H-indene"
 
 
 class TestTheSuffixPromotionHalf:
@@ -138,16 +131,16 @@ class TestDenyMechanismIsReached:
             assert rows[nm]["citation"] == "P-54.4.3.2", \
                 f"{nm}: P-54.4.3.2 (BB:24256) is the governing rule"
 
-    def test_fused_heterocycle_table_holds_the_pins(self):
-        """The row that ACTUALLY fixes the indane family."""
+    def test_fused_heterocycle_table_still_holds_the_non_pins(self):
+        """⚠ The indane-family rename was ATTEMPTED AND REVERTED -- the gate caught 1
+        protect + 3 target regressions. This asserts the CURRENT (non-PIN) state so the
+        revert is deliberate and visible, not an oversight. See
+        TestBlockedIndaneFamily below for the blocking reason and the ordered fix."""
         from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
         names = {v.get("name") for v in FUSED_HETEROCYCLE_DATA.values()}
-        assert "2,3-dihydro-1H-indene" in names
-        assert "2,3-dihydro-1H-indole" in names
-        assert "2,3-dihydro-1H-isoindole" in names
-        assert "indane" not in names
-        assert "indoline" not in names
-        assert "isoindoline" not in names
+        assert "indane" in names
+        assert "indoline" in names
+        assert "isoindoline" in names
 
     @pytest.mark.parametrize("name", [
         "1-naphthol", "2-naphthol", "hydroquinone", "quinol", "resorcinol",
@@ -245,3 +238,55 @@ class TestKnownAdjacentDefect:
         "assembled."))
     def test_dihydroindenol_should_use_the_ol_suffix(self, namer):
         assert namer.name("OC1Cc2ccccc2C1") == "2,3-dihydro-1H-inden-2-ol"
+
+
+class TestBlockedIndaneFamily:
+    """indane / indoline / isoindoline -- derived, attempted, REVERTED, and why.
+
+    **P-54.4.3.2** (``:24256``) names all three verbatim as non-preferred: *"The retained
+    names for the partially saturated heterocycles, indane, indoline, isoindoline, and
+    chromane, isochromane and their chalcogen analogues are not used as preferred IUPAC
+    names…"*, and ``:16988``/``:16992``/``:16998`` print the PINs. The diagnosis is not in
+    doubt.
+
+    ★ THE RENAME WAS APPLIED AND THE GATE REJECTED IT -- 1 protect + 3 target
+    regressions. Root cause: ``fused_heterocycles``'s ``name`` field feeds TWO consumers.
+    Standalone naming wants the saturated PIN, but ``rules/spiro.py:_name_spirobi_core``
+    embeds it as the SPIRO COMPONENT, and **P-24.3.1** (``:10146``) requires the bracket
+    to hold the *component ring system*, with hydrogen cited OUTSIDE it. Every worked
+    example is mancude -- ``1,1'-spirobi[indene] (PIN)`` (``:10164``),
+    ``1H,1'H-2,2'-spirobi[naphthalene] (PIN)`` (``:10158``). The rename produced
+    ``1,2'-spirobi[2,3-dihydro-1H-indene]`` where the gold correctly has
+    ``2,3,2',3'-tetrahydro-1,2'-spirobi[1H-indene]``.
+
+    ⚠ AND THE SHORTCUT IS WORSE. Putting the mancude component in the bracket without
+    hoisting the hydro prefixes gives ``1,2'-spirobi[1H-indene]`` -- the UNSATURATED
+    molecule. That is a wrong STRUCTURE, not a wrong spelling, and session invariant 11
+    says removing a wrong output can unmask something worse. Reverted rather than shipped.
+
+    ORDERED FIX: (1) teach ``_name_spirobi_core`` to hoist hydro prefixes onto the
+    assembly with primed/unprimed locants; (2) rename the three table rows; (3) correct
+    the two gold rows that enforce the non-PIN (``gold_pins`` protect ``C1Cc2ccccc2C1``
+    → ``indane``, and the ``5-methylindoline`` target).
+    """
+
+    @pytest.mark.parametrize("smiles,pin", [
+        ("C1Cc2ccccc2C1", "2,3-dihydro-1H-indene"),
+        ("C1Cc2ccccc2N1", "2,3-dihydro-1H-indole"),
+        ("C1NCc2ccccc21", "2,3-dihydro-1H-isoindole"),
+        ("Cc1ccc2c(c1)CCC2", "5-methyl-2,3-dihydro-1H-indene"),
+    ])
+    @pytest.mark.xfail(strict=True, reason=(
+        "BLOCKED on the spiro hydro-hoisting (P-24.3.1). The rename is correct for the "
+        "standalone parent but breaks the spiro component, and the shortcut would name a "
+        "different molecule. Diagnosis is BB-verbatim (P-54.4.3.2, :24256)."))
+    def test_indane_family_pin(self, namer, smiles, pin):
+        assert namer.name(smiles) == pin
+
+    def test_the_spiro_form_that_blocks_it_is_correct_today(self, namer):
+        """The row the rename regressed. Must keep passing -- it is the reason the
+        rename is blocked, so if this ever changes the blocker has moved."""
+        got = namer.name("C1Cc2ccccc2C11Cc2ccccc2C1")
+        assert "spirobi" in got, got
+        assert "2,3-dihydro-1H-indene]" not in got, \
+            f"hydro must not be inside the spiro bracket (P-24.3.1): {got!r}"

@@ -460,17 +460,37 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # indoline
     'c1ccc2c(c1)CCN2': {
-        # v29 Phase C Task 10: P-54.4.3.2 (BB:24256) names this retained form
-        # verbatim as NOT a preferred IUPAC name. Its list-mates chromane /
-        # isochromane / thiochromane, and the sibling entries
-        # 1,2,3,4-tetrahydroquinoline and 1,2,3,4-tetrahydroisoquinoline in THIS
-        # dict, already carry their full systematic names -- so this was a stale
-        # row, not a missing rule. ⚠ A `pin: false` row in
-        # iupac_2013_pin_list.json does NOT fix these: MEASURED, `indane` had such
-        # a row all along and still emitted `indane`, because this surface is not
-        # filtered by the deny-set. The table row IS the fix.
-        # Verbatim: BB:16992/:16994 '1H-indoline / 2,3-dihydro-1H-indole (PIN)'
-        'name': '2,3-dihydro-1H-indole',
+        # ⚠⚠ v29 Phase C Task 10 -- THE PIN RENAME WAS ATTEMPTED AND REVERTED. The gate
+        # caught it: 1 protect + 3 target regressions. DO NOT re-apply without first
+        # fixing the spiro constructor (see below).
+        #
+        # THE NAME BELOW IS NOT THE PIN. P-54.4.3.2 (BB:24256) names it verbatim as
+        # non-preferred -- "The retained names for the partially saturated heterocycles,
+        # indane, indoline, isoindoline, and chromane, isochromane and their chalcogen
+        # analogues are not used as preferred IUPAC names" -- and BB:16988/:16992/:16998
+        # print the PINs (2,3-dihydro-1H-indene / -1H-indole / -1H-isoindole).
+        #
+        # WHY THE RENAME CANNOT LAND YET: this field is read by TWO consumers with
+        # different needs. Standalone naming wants the saturated PIN. But
+        # `rules/spiro.py:_name_spirobi_core` embeds it as the SPIRO COMPONENT, and
+        # P-24.3.1 (BB:10146) requires the bracket to hold the COMPONENT RING SYSTEM,
+        # with hydrogen cited OUTSIDE it -- every worked example is mancude:
+        # `1,1'-spirobi[indene] (PIN)` (BB:10164), `1H,1'H-2,2'-spirobi[naphthalene]
+        # (PIN)` (BB:10158), `1,1'-spirobi[isoindole] (PIN)` (BB:10166). The rename
+        # produced `1,2'-spirobi[2,3-dihydro-1H-indene]` where the gold (correctly) has
+        # `2,3,2',3'-tetrahydro-1,2'-spirobi[1H-indene]`.
+        #
+        # ⚠ And the obvious shortcut is WORSE, not merely wrong: putting the MANCUDE
+        # component in the bracket without hoisting the hydro prefixes would emit
+        # `1,2'-spirobi[1H-indene]`, which denotes the UNSATURATED molecule -- a wrong
+        # STRUCTURE, not a wrong spelling (session invariant 11).
+        #
+        # THE REAL FIX, in order: teach `_name_spirobi_core` to hoist hydro prefixes out
+        # of the component onto the assembly with primed/unprimed locants
+        # (`2,3,2',3'-tetrahydro-`), THEN rename here, THEN correct the two gold rows
+        # that currently enforce the non-PIN (`gold_pins` protect `C1Cc2ccccc2C1` ->
+        # `indane`, and the `5-methylindoline` target).
+        'name': 'indoline',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
         'parent_atoms': 9,
@@ -478,17 +498,37 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # isoindoline
     'c1ccc2c(c1)CNC2': {
-        # v29 Phase C Task 10: P-54.4.3.2 (BB:24256) names this retained form
-        # verbatim as NOT a preferred IUPAC name. Its list-mates chromane /
-        # isochromane / thiochromane, and the sibling entries
-        # 1,2,3,4-tetrahydroquinoline and 1,2,3,4-tetrahydroisoquinoline in THIS
-        # dict, already carry their full systematic names -- so this was a stale
-        # row, not a missing rule. ⚠ A `pin: false` row in
-        # iupac_2013_pin_list.json does NOT fix these: MEASURED, `indane` had such
-        # a row all along and still emitted `indane`, because this surface is not
-        # filtered by the deny-set. The table row IS the fix.
-        # Verbatim: BB:16998/:17000 '2H-isoindoline / 2,3-dihydro-1H-isoindole (PIN)'
-        'name': '2,3-dihydro-1H-isoindole',
+        # ⚠⚠ v29 Phase C Task 10 -- THE PIN RENAME WAS ATTEMPTED AND REVERTED. The gate
+        # caught it: 1 protect + 3 target regressions. DO NOT re-apply without first
+        # fixing the spiro constructor (see below).
+        #
+        # THE NAME BELOW IS NOT THE PIN. P-54.4.3.2 (BB:24256) names it verbatim as
+        # non-preferred -- "The retained names for the partially saturated heterocycles,
+        # indane, indoline, isoindoline, and chromane, isochromane and their chalcogen
+        # analogues are not used as preferred IUPAC names" -- and BB:16988/:16992/:16998
+        # print the PINs (2,3-dihydro-1H-indene / -1H-indole / -1H-isoindole).
+        #
+        # WHY THE RENAME CANNOT LAND YET: this field is read by TWO consumers with
+        # different needs. Standalone naming wants the saturated PIN. But
+        # `rules/spiro.py:_name_spirobi_core` embeds it as the SPIRO COMPONENT, and
+        # P-24.3.1 (BB:10146) requires the bracket to hold the COMPONENT RING SYSTEM,
+        # with hydrogen cited OUTSIDE it -- every worked example is mancude:
+        # `1,1'-spirobi[indene] (PIN)` (BB:10164), `1H,1'H-2,2'-spirobi[naphthalene]
+        # (PIN)` (BB:10158), `1,1'-spirobi[isoindole] (PIN)` (BB:10166). The rename
+        # produced `1,2'-spirobi[2,3-dihydro-1H-indene]` where the gold (correctly) has
+        # `2,3,2',3'-tetrahydro-1,2'-spirobi[1H-indene]`.
+        #
+        # ⚠ And the obvious shortcut is WORSE, not merely wrong: putting the MANCUDE
+        # component in the bracket without hoisting the hydro prefixes would emit
+        # `1,2'-spirobi[1H-indene]`, which denotes the UNSATURATED molecule -- a wrong
+        # STRUCTURE, not a wrong spelling (session invariant 11).
+        #
+        # THE REAL FIX, in order: teach `_name_spirobi_core` to hoist hydro prefixes out
+        # of the component onto the assembly with primed/unprimed locants
+        # (`2,3,2',3'-tetrahydro-`), THEN rename here, THEN correct the two gold rows
+        # that currently enforce the non-PIN (`gold_pins` protect `C1Cc2ccccc2C1` ->
+        # `indane`, and the `5-methylindoline` target).
+        'name': 'isoindoline',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
         'parent_atoms': 9,
@@ -1055,17 +1095,37 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # indane
     'c1ccc2c(c1)CCC2': {
-        # v29 Phase C Task 10: P-54.4.3.2 (BB:24256) names this retained form
-        # verbatim as NOT a preferred IUPAC name. Its list-mates chromane /
-        # isochromane / thiochromane, and the sibling entries
-        # 1,2,3,4-tetrahydroquinoline and 1,2,3,4-tetrahydroisoquinoline in THIS
-        # dict, already carry their full systematic names -- so this was a stale
-        # row, not a missing rule. ⚠ A `pin: false` row in
-        # iupac_2013_pin_list.json does NOT fix these: MEASURED, `indane` had such
-        # a row all along and still emitted `indane`, because this surface is not
-        # filtered by the deny-set. The table row IS the fix.
-        # Verbatim: BB:16988 '(formerly indan) 2,3-dihydro-1H-indene (PIN)'
-        'name': '2,3-dihydro-1H-indene',
+        # ⚠⚠ v29 Phase C Task 10 -- THE PIN RENAME WAS ATTEMPTED AND REVERTED. The gate
+        # caught it: 1 protect + 3 target regressions. DO NOT re-apply without first
+        # fixing the spiro constructor (see below).
+        #
+        # THE NAME BELOW IS NOT THE PIN. P-54.4.3.2 (BB:24256) names it verbatim as
+        # non-preferred -- "The retained names for the partially saturated heterocycles,
+        # indane, indoline, isoindoline, and chromane, isochromane and their chalcogen
+        # analogues are not used as preferred IUPAC names" -- and BB:16988/:16992/:16998
+        # print the PINs (2,3-dihydro-1H-indene / -1H-indole / -1H-isoindole).
+        #
+        # WHY THE RENAME CANNOT LAND YET: this field is read by TWO consumers with
+        # different needs. Standalone naming wants the saturated PIN. But
+        # `rules/spiro.py:_name_spirobi_core` embeds it as the SPIRO COMPONENT, and
+        # P-24.3.1 (BB:10146) requires the bracket to hold the COMPONENT RING SYSTEM,
+        # with hydrogen cited OUTSIDE it -- every worked example is mancude:
+        # `1,1'-spirobi[indene] (PIN)` (BB:10164), `1H,1'H-2,2'-spirobi[naphthalene]
+        # (PIN)` (BB:10158), `1,1'-spirobi[isoindole] (PIN)` (BB:10166). The rename
+        # produced `1,2'-spirobi[2,3-dihydro-1H-indene]` where the gold (correctly) has
+        # `2,3,2',3'-tetrahydro-1,2'-spirobi[1H-indene]`.
+        #
+        # ⚠ And the obvious shortcut is WORSE, not merely wrong: putting the MANCUDE
+        # component in the bracket without hoisting the hydro prefixes would emit
+        # `1,2'-spirobi[1H-indene]`, which denotes the UNSATURATED molecule -- a wrong
+        # STRUCTURE, not a wrong spelling (session invariant 11).
+        #
+        # THE REAL FIX, in order: teach `_name_spirobi_core` to hoist hydro prefixes out
+        # of the component onto the assembly with primed/unprimed locants
+        # (`2,3,2',3'-tetrahydro-`), THEN rename here, THEN correct the two gold rows
+        # that currently enforce the non-PIN (`gold_pins` protect `C1Cc2ccccc2C1` ->
+        # `indane`, and the `5-methylindoline` target).
+        'name': 'indane',
         'tautomer_locant': None,
         'ring_system': 'bicyclic-saturated',
         'parent_atoms': 9,
