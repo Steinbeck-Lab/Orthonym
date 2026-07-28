@@ -1234,8 +1234,24 @@ def name_substituted_polycyclic(
             'carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile',
             'carbaldehyde',
             # v29 Phase C Task 10: `-ol` sits between the aldehyde and the amine in the
-            # P-41 seniority order. Its absence from this list is why a ring hydroxy was
-            # never expressible as a suffix (`9-hydroxyanthracene` for `anthracen-9-ol`).
+            # P-41 seniority order.
+            #
+            # ⚠ CORRECTED BY MUTATION TESTING. An earlier version of this comment claimed
+            # "its absence from this list is why a ring hydroxy was never expressible as a
+            # suffix". That is FALSE: deleting this entry breaks no end-to-end test. What
+            # made `-ol` expressible is the hydroxy->ol PROMOTION above; and because that
+            # promotion is guarded by `not suffix_groups`, a promoted `ol` is always the
+            # ONLY key in `suffix_groups`, so the `next(iter(...))` fallback below selects
+            # it whether or not it appears here.
+            #
+            # The entry is nonetheless KEPT, as a correctness guard for a state that is
+            # currently unreachable but one change away: if a hydroxy ever arrives already
+            # flagged `is_suffix` (today `get_polycyclic_substituents` returns it with
+            # `is_suffix` unset — measured), `suffix_groups` could hold `ol` alongside a
+            # senior suffix, and the fallback would then be free to pick `ol` over a
+            # carboxylic acid. Ordering is asserted directly by
+            # test_retained_name_pin_status.py::TestSuffixPriorityOrder, because no
+            # end-to-end test can reach it.
             'ol',
             'amine',  # Fix 2: amine is the lowest suffix (P-41); only chosen when
                       # promoted (i.e. no senior suffix present).

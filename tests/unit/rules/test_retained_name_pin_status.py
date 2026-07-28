@@ -169,6 +169,46 @@ class TestDenyMechanismIsReached:
             f"{name}: hc_override would stop this row filtering the hand-curated surface"
 
 
+class TestSuffixPriorityOrder:
+    """``_SUFFIX_PRIORITY`` ordering, asserted as DATA.
+
+    ★ Why this test exists: mutation testing showed that deleting ``'ol'`` from
+    ``polycyclics.py``'s ``_SUFFIX_PRIORITY`` breaks NO end-to-end test. The promotion
+    is guarded by ``not suffix_groups``, so a promoted ``ol`` is always the only key and
+    the ``next(iter(...))`` fallback selects it either way. The entry is a guard for a
+    state that is currently unreachable but one change away — if a hydroxy ever arrives
+    already flagged ``is_suffix``, ``suffix_groups`` could hold ``ol`` beside a senior
+    suffix and the fallback would be free to pick the junior one.
+
+    An untested unreachable guard is how dead code accumulates and how a wrong comment
+    survives (this one had one). Pinning the order as data makes the guard mutable-and-
+    caught without pretending an end-to-end witness exists.
+    """
+
+    def _priority(self):
+        import inspect
+        import re
+
+        from orthonym.rules.polycyclics import name_substituted_polycyclic
+        src = inspect.getsource(name_substituted_polycyclic)
+        i = src.index("_SUFFIX_PRIORITY = [")
+        body = src[i + len("_SUFFIX_PRIORITY = ["):src.index("]", i)]
+        return re.findall(r"'([^']+)'", body)
+
+    def test_ol_sits_between_carbaldehyde_and_amine(self):
+        """P-41 seniority: ... > carbaldehyde > ol > amine."""
+        pr = self._priority()
+        assert "ol" in pr, f"the -ol suffix guard was removed: {pr}"
+        assert "carbaldehyde" in pr and "amine" in pr, pr
+        assert pr.index("carbaldehyde") < pr.index("ol") < pr.index("amine"), pr
+
+    def test_acids_outrank_ol(self):
+        pr = self._priority()
+        for senior in ("carboxylic acid", "sulfonic acid", "carboxamide",
+                       "carbonitrile"):
+            assert pr.index(senior) < pr.index("ol"), f"{senior} must outrank -ol: {pr}"
+
+
 class TestUnchangedControls:
     """Names that were ALREADY correct. A deny-set edit is exactly the kind of change
     that moves neighbours, so the whole neighbourhood is pinned."""
