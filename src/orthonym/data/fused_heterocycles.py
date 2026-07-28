@@ -460,7 +460,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # indoline
     'c1ccc2c(c1)CCN2': {
-        'name': 'indoline',
+        # v29 Phase C Task 10: P-54.4.3.2 (BB:24256) names this retained form
+        # verbatim as NOT a preferred IUPAC name. Its list-mates chromane /
+        # isochromane / thiochromane, and the sibling entries
+        # 1,2,3,4-tetrahydroquinoline and 1,2,3,4-tetrahydroisoquinoline in THIS
+        # dict, already carry their full systematic names -- so this was a stale
+        # row, not a missing rule. ⚠ A `pin: false` row in
+        # iupac_2013_pin_list.json does NOT fix these: MEASURED, `indane` had such
+        # a row all along and still emitted `indane`, because this surface is not
+        # filtered by the deny-set. The table row IS the fix.
+        # Verbatim: BB:16992/:16994 '1H-indoline / 2,3-dihydro-1H-indole (PIN)'
+        'name': '2,3-dihydro-1H-indole',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
         'parent_atoms': 9,
@@ -468,7 +478,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # isoindoline
     'c1ccc2c(c1)CNC2': {
-        'name': 'isoindoline',
+        # v29 Phase C Task 10: P-54.4.3.2 (BB:24256) names this retained form
+        # verbatim as NOT a preferred IUPAC name. Its list-mates chromane /
+        # isochromane / thiochromane, and the sibling entries
+        # 1,2,3,4-tetrahydroquinoline and 1,2,3,4-tetrahydroisoquinoline in THIS
+        # dict, already carry their full systematic names -- so this was a stale
+        # row, not a missing rule. ⚠ A `pin: false` row in
+        # iupac_2013_pin_list.json does NOT fix these: MEASURED, `indane` had such
+        # a row all along and still emitted `indane`, because this surface is not
+        # filtered by the deny-set. The table row IS the fix.
+        # Verbatim: BB:16998/:17000 '2H-isoindoline / 2,3-dihydro-1H-isoindole (PIN)'
+        'name': '2,3-dihydro-1H-isoindole',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-saturated',
         'parent_atoms': 9,
@@ -1035,7 +1055,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # indane
     'c1ccc2c(c1)CCC2': {
-        'name': 'indane',
+        # v29 Phase C Task 10: P-54.4.3.2 (BB:24256) names this retained form
+        # verbatim as NOT a preferred IUPAC name. Its list-mates chromane /
+        # isochromane / thiochromane, and the sibling entries
+        # 1,2,3,4-tetrahydroquinoline and 1,2,3,4-tetrahydroisoquinoline in THIS
+        # dict, already carry their full systematic names -- so this was a stale
+        # row, not a missing rule. ⚠ A `pin: false` row in
+        # iupac_2013_pin_list.json does NOT fix these: MEASURED, `indane` had such
+        # a row all along and still emitted `indane`, because this surface is not
+        # filtered by the deny-set. The table row IS the fix.
+        # Verbatim: BB:16988 '(formerly indan) 2,3-dihydro-1H-indene (PIN)'
+        'name': '2,3-dihydro-1H-indene',
         'tautomer_locant': None,
         'ring_system': 'bicyclic-saturated',
         'parent_atoms': 9,

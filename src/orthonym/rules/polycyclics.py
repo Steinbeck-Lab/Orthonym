@@ -177,6 +177,19 @@ def get_polycyclic_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
 # makes principal_group != amine, so the amine stays the 'amino' prefix.
 _PAH_AMINE_PRINCIPAL_KEYS = frozenset({'aromatic_amine', 'primary_amine'})
 
+# v29 Phase C Task 10 (P-14.3.4 / P-41): the principal-group keys under which a ring
+# hydroxy on a polycyclic parent must be expressed as the `-ol` SUFFIX rather than a
+# `hydroxy` PREFIX. MEASURED with a call-spy validated on two known positives
+# (`Nc1cccc2ccccc12` -> naphthalen-1-amine, `OC(=O)c1cccc2ccccc12` ->
+# naphthalene-1-carboxylic acid): a ring-OH PAH arrives with
+# `principal_group == 'phenol'` and the substituent named `'hydroxy'`.
+#
+# Deliberately NARROW — `'phenol'` only, not the generic alcohol keys. A PAH bearing a
+# side-chain alcohol (`primary_alcohol`, …) has its OH on an exocyclic carbon, where
+# promoting a RING substituent would be wrong. Widen only on a measurement, never on a
+# guess.
+_PAH_OL_PRINCIPAL_KEYS = frozenset({'phenol'})
+
 
 def get_polycyclic_substituents(mol, pah_name: str,
                                 principal_group: Optional[str] = None
@@ -1162,6 +1175,35 @@ def name_substituted_polycyclic(
     # suffix keeps the amine as a prefix (aminonaphthalenecarboxylic acid); the
     # authoritative principal_group already encodes "-OH senior to amine", so an
     # amino+ol PAH is not promoted (fails closed to the prior double-prefix).
+    # v29 Phase C Task 10 (P-14.3.4 / P-41): the same promotion for the ALCOHOL suffix,
+    # which was missing entirely — so a ring hydroxy was demoted to a `hydroxy` prefix
+    # and we shipped `9-hydroxyanthracene` for `anthracen-9-ol` and
+    # `1,4-dihydroxynaphthalene` for `naphthalene-1,4-diol`.
+    #
+    # BB authority, verified verbatim under §P-63.1.1 "Retained names" (`:26762`), whose
+    # example block prints the non-preferred trivial name immediately ABOVE the (PIN):
+    #   `:26817`/`:26819`  1-naphthol      / naphthalen-1-ol (PIN)
+    #   `:26805`/`:26807`  hydroquinone    / benzene-1,4-diol (PIN)
+    # P-14.3.3 (`:2869`) then requires the locant, hence `naphthalen-1-ol`, and the
+    # existing P-16.7.1(a) `e`-elision below handles `naphthalene` + vowel-initial `ol`.
+    #
+    # ★ THIS ALONE DOES NOT FIX THE TWO NAPHTHOLS. Measured with the same validated
+    # spy: `Oc1cccc2ccccc12` and `Oc1ccc2ccccc2c1` record ZERO calls into this function
+    # — the retained-name table intercepts them upstream — so they also need their
+    # `pin: false` deny rows. It DOES fix `anthracen-9-ol` and `naphthalene-1,4-diol`,
+    # which do reach here. Conversely the deny rows alone would have emitted
+    # `1-hydroxynaphthalene`: one non-PIN swapped for another (session invariant 11).
+    # Both halves are required; neither is sufficient.
+    #
+    # Ordered BEFORE the amine promotion on purpose: `-ol` is senior to `-amine` (P-41),
+    # and the amine promotion is guarded by `not suffix_groups`, so promoting the ol
+    # first makes an amino+ol PAH correctly render as `x-aminonaphthalen-y-ol` instead
+    # of the previous double-prefix fail-closed.
+    if (principal_group in _PAH_OL_PRINCIPAL_KEYS
+            and 'hydroxy' in prefix_substituent_groups
+            and not suffix_groups):
+        suffix_groups['ol'] = prefix_substituent_groups.pop('hydroxy')
+
     if (principal_group in _PAH_AMINE_PRINCIPAL_KEYS
             and 'amino' in prefix_substituent_groups
             and not suffix_groups):
@@ -1191,6 +1233,10 @@ def name_substituted_polycyclic(
         _SUFFIX_PRIORITY = [
             'carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile',
             'carbaldehyde',
+            # v29 Phase C Task 10: `-ol` sits between the aldehyde and the amine in the
+            # P-41 seniority order. Its absence from this list is why a ring hydroxy was
+            # never expressible as a suffix (`9-hydroxyanthracene` for `anthracen-9-ol`).
+            'ol',
             'amine',  # Fix 2: amine is the lowest suffix (P-41); only chosen when
                       # promoted (i.e. no senior suffix present).
         ]
@@ -1224,6 +1270,7 @@ def name_substituted_polycyclic(
             'carboxamide': 'carbamoyl',
             'carbonitrile': 'cyano',
             'amine': 'amino',  # Fix 2: demote cleanly if a senior suffix coexists
+            'ol': 'hydroxy',   # Task 10: demote cleanly if a senior suffix coexists
         }
         for suf_name, suf_locants in suffix_groups.items():
             if suf_name == chosen_suffix:
