@@ -55,6 +55,8 @@ __all__ = [
     "substitutable_positions",
     "l5_uniform_complete",
     "l3_one_kind_of_substitutable_h",
+    "l3_monosubstituted_locant_omitted",
+    "l3_locant_omitted_for_parent_atoms",
     "l6_all_substitutable_h_share_one_locant",
     "scope_forces_locants",
     "forced_locant_scope",
@@ -455,3 +457,242 @@ def scope_forces_locants(
     if _has_letter_locant(prefix_locants) or _has_letter_locant(suffix_locants):
         return True
     return False
+
+
+def l3_monosubstituted_locant_omitted(
+    parent,
+    *,
+    n_substitutions,
+    prefix_locants,
+    suffix_locants,
+    parent_cites_locants,
+    stereo_text,
+    has_indicated_h,
+    has_isotope,
+    is_multiplicative: bool = False,
+    is_ring_assembly: bool = False,
+    has_skeletal_replacement: bool = False,
+) -> bool:
+    """§**P-14.3.4.3** (``:2939``) -- the WHOLE licence, for ONE substitution.
+
+        "The locant is omitted in monosubstituted symmetrical parent hydrides or
+         parent compounds where there is only one kind of substitutable hydrogen."
+
+    True => that single locant is omitted. The orbit test itself is NOT re-derived
+    here: it is :func:`l3_one_kind_of_substitutable_h`, the one place the licence
+    lives. This function adds the three things the orbit test deliberately leaves to
+    its caller (its own docstring says so): that the substitution really is *mono*,
+    that nothing else in the scope forces locants, and the two ambient P-14.3.3
+    scopes.
+
+    ``parent`` is the **parent hydride or parent compound** -- the molecule with the
+    ONE substitution REMOVED -- because that is what the rule's own examples measure:
+
+    ==========================  ==================================  =============
+    printed PIN                 ``parent``                          orbit test
+    ==========================  ==================================  =============
+    ``pyrazinecarboxylic acid`` pyrazine (parent **hydride**)       4 CH, 1 orbit
+    ``chloropropanedioic acid`` propanedioic acid (parent **cpd**)  C2 only
+    ``chlorobutanedioic acid``  butanedioic acid                    C2/C3, 1 orbit
+    ``methylurea``              urea                                2 NH2, 1 orbit
+    ==========================  ==================================  =============
+
+    ★ **The boundary the whole task turns on**, and it falls out of ``:3007`` with no
+    special case: propanedioic acid's two acid O-H are on a chalcogen and are NOT
+    substitutable, leaving C2 as the only kind, so the licence fires. Propane**diamide**
+    has C2 *and* two amide N-H -- neither a chalcogen H nor a formyl H, so they count --
+    giving two kinds, so it is denied and ``2-methylpropanediamide`` (``:2887``) keeps
+    its locant. ``:2889`` ``N1,N3-dimethylpropanediamide (PIN)`` proves independently
+    that an amide N-H is substitutable. ⚠ Do NOT "fix" the chalcogen exclusion to make
+    trisulfane work: it is load-bearing HERE, and ``methyltrisulfane`` is licensed by a
+    different sub-rule (P-14.3.4.4, unimplemented) -- see
+    ``.
+
+    ⚠ **This licence is orthogonal to P-14.3.4.2(c)** (``_ring_suffix_locant_is_trivial``),
+    which is restricted to saturated all-carbon monocycles and therefore cannot reach a
+    heteroarene. L3 is what licenses ``pyrazinecarboxylic acid`` while
+    ``piperidine-1-carbonitrile`` (``:34730``) correctly keeps its locant -- piperidine's
+    N-H, C2/C6, C3/C5 and C4 are FOUR orbits. Neither rule may be widened into the
+    other; the orbit predicate is the only thing separating those two rings.
+
+    Args:
+        parent: the parent hydride / parent compound, substitution removed.
+        n_substitutions: how many decorations sit on ``parent``. The rule says
+            *"monosubstituted"*, so anything but exactly 1 denies. Passed
+            separately from the locant lists because a decoration whose locant was
+            already elided upstream contributes no locant, and counting locants
+            alone would read a disubstituted parent as mono.
+        prefix_locants: locants of substituent prefixes in this scope.
+        suffix_locants: locants of suffixes in this scope.
+        parent_cites_locants: True when the parent name itself already cites a
+            locant -- a heteroatom locant set (``1,4-dioxane``), an added/indicated
+            hydrogen, or an unsaturation locant. ``P-14.3.3`` (``:2869``) then
+            restores every locant in the scope, so the licence declines. Every one of
+            the Blue Book's five printed L3 positives has a locant-free parent name
+            (pyrazine, urea, disiloxane, coronene, propanedioic acid), so this is the
+            deny-by-default side of a boundary the source does not print, and it is
+            recorded as such rather than as a verified rule.
+    """
+    # P-14.3.3 (``:2869``) as an AMBIENT scope -- ``rules/isotopes.py`` names an
+    # isotope-STRIPPED skeleton, so every structural isotope test further down reads
+    # 0 even for a labelled input and cannot be the guard.
+    if locants_are_forced():
+        return False
+    # ⚠ AND the weaker declaration. Measured 2026-07-29 (Task 5a): the isotope
+    # decorator enters ``forced_locant_scope`` only CONDITIONALLY, so
+    # ``locants_are_forced()`` alone is False for a labelled molecule whose finished
+    # name still carries ``(13C1)``. This licence empties its scope of ALL locants,
+    # which is exactly what **P-82.6.1.1** (``:44180``) forbids when an isotopic
+    # modification needs a locant, so it must decline on the weaker flag too.
+    if scope_has_isotopic_modification():
+        return False
+
+    if parent is None:
+        return False
+    if isinstance(n_substitutions, bool) or not isinstance(n_substitutions, int):
+        return False
+    if n_substitutions != 1:
+        return False
+
+    prefix_locants = list(prefix_locants or [])
+    suffix_locants = list(suffix_locants or [])
+    # Exactly ONE cited locant in the scope -- the one this licence would omit.
+    # Emptying a scope that cites two locants is not what :2939 licenses.
+    if len(prefix_locants) + len(suffix_locants) != 1:
+        return False
+
+    if parent_cites_locants:
+        return False
+
+    if scope_forces_locants(
+        prefix_locants=prefix_locants,
+        suffix_locants=suffix_locants,
+        stereo_text=stereo_text,
+        has_indicated_h=has_indicated_h,
+        has_isotope=has_isotope,
+        is_multiplicative=is_multiplicative,
+        is_ring_assembly=is_ring_assembly,
+        has_skeletal_replacement=has_skeletal_replacement,
+    ):
+        return False
+
+    return l3_one_kind_of_substitutable_h(parent)
+
+
+def _one_substituent_removed(mol, parent_atoms: FrozenSet[int]) -> bool:
+    """Structural proof of *"monosubstituted"* for ``P-14.3.4.3``.
+
+    True iff the atoms OUTSIDE ``parent_atoms`` form exactly **one** connected
+    component joined to the parent by exactly **one** bond -- i.e. the parent bears
+    exactly one substituent group.
+
+    This is what makes ``n_substitutions`` a measurement rather than a caller's
+    belief. It also rejects the two shapes that would otherwise read as "one":
+    several separate decorations (``3,3,3-trifluoro...`` removes THREE fluorines =
+    three components) and a group bonded twice (a fused/bridging ring, two
+    attachment bonds), neither of which ``:2939`` licenses.
+    """
+    if mol is None:
+        return False
+    n = mol.GetNumAtoms()
+    outside = [i for i in range(n) if i not in parent_atoms]
+    if not outside:
+        return False                      # nothing substituted -> no locant to omit
+    outside_set = set(outside)
+
+    # Exactly one attachment bond between the parent and everything outside it.
+    attachments = 0
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if (a in parent_atoms) != (b in parent_atoms):
+            attachments += 1
+            if attachments > 1:
+                return False
+    if attachments != 1:
+        return False
+
+    # ...and the outside atoms are ONE connected component.
+    seen = {outside[0]}
+    stack = [outside[0]]
+    while stack:
+        cur = stack.pop()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nb.GetIdx()
+            if j in outside_set and j not in seen:
+                seen.add(j)
+                stack.append(j)
+    return len(seen) == len(outside_set)
+
+
+def l3_locant_omitted_for_parent_atoms(
+    mol,
+    parent_atoms,
+    *,
+    prefix_locants,
+    suffix_locants,
+    parent_cites_locants,
+    stereo_text,
+    is_multiplicative: bool = False,
+    is_ring_assembly: bool = False,
+    has_skeletal_replacement: bool = False,
+) -> bool:
+    """§**P-14.3.4.3** (``:2939``) where the parent is given as an ATOM SET.
+
+    The one entry point both live call sites use. It performs the parent surgery --
+    delete every atom outside ``parent_atoms``, letting RDKit restore the implicit
+    hydrogens that the substituent had displaced -- and derives the two arguments a
+    caller must not be trusted with:
+
+    * ``n_substitutions``, proven by :func:`_one_substituent_removed`;
+    * ``has_isotope``, read off the real (undeleted) molecule, because the parent
+      copy may not carry the label.
+
+    Returns False -- retain the locant -- on any failure to establish the structure,
+    including a sanitization failure on the reconstructed parent.
+
+    ⚠ ``parent_atoms`` is the parent **hydride or compound** in the rule's sense: for
+    ``pyrazinecarboxylic acid`` it is the six RING atoms only (the ``-carboxylic acid``
+    carbon is the substitution), while for ``chloropropanedioic acid`` it is the chain
+    **plus** both ``-COOH`` groups (the chloro is the substitution). Getting that
+    boundary wrong silently changes which molecule the orbit test measures.
+    """
+    if mol is None or parent_atoms is None:
+        return False
+    try:
+        parent_set = frozenset(int(i) for i in parent_atoms)
+    except (TypeError, ValueError):
+        return False
+    n_atoms = mol.GetNumAtoms()
+    if not parent_set or any(i < 0 or i >= n_atoms for i in parent_set):
+        return False
+
+    if not _one_substituent_removed(mol, parent_set):
+        return False
+
+    rw = Chem.RWMol(mol)
+    for idx in sorted(range(n_atoms), reverse=True):
+        if idx not in parent_set:
+            rw.RemoveAtom(idx)
+    parent = rw.GetMol()
+    try:
+        Chem.SanitizeMol(parent)
+    except Exception:
+        return False
+    if parent.GetNumAtoms() != len(parent_set):
+        return False
+
+    has_isotope = any(a.GetIsotope() for a in mol.GetAtoms())
+
+    return l3_monosubstituted_locant_omitted(
+        parent,
+        n_substitutions=1,
+        prefix_locants=prefix_locants,
+        suffix_locants=suffix_locants,
+        parent_cites_locants=parent_cites_locants,
+        stereo_text=stereo_text,
+        has_indicated_h=False,
+        has_isotope=has_isotope,
+        is_multiplicative=is_multiplicative,
+        is_ring_assembly=is_ring_assembly,
+        has_skeletal_replacement=has_skeletal_replacement,
+    )

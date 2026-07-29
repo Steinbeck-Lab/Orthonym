@@ -2535,7 +2535,66 @@ def name_substituted_heterocycle(
         # pyridine-3-carbaldehyde).
         if combined and combined[-1] == 'e' and suffix_token[:1].lower() in 'aeiouy':
             combined = combined[:-1]
-        combined = f"{combined}-{locant_str}-{suffix_token}"
+
+        # ------------------------------------------------------------------ #
+        # P-14.3.4.3 (BB:2939) "Omission of locants" -- the ring-SUFFIX case. #
+        # ------------------------------------------------------------------ #
+        # "The locant is omitted in monosubstituted symmetrical parent hydrides or
+        #  parent compounds where there is only one kind of substitutable hydrogen."
+        #
+        # Its own example block prints `pyrazinecarboxylic acid (PIN)` (BB:2949) --
+        # a SUFFIX substitution, which is why this licence lives at the suffix join
+        # and not only on the prefix side. Pyrazine's four ring CH are one
+        # CanonicalRankAtoms(breakTies=False) orbit, so `2` carries no information.
+        #
+        # ⚠ This is NOT "symmetric heterocycle => omit", and it must not be rewritten
+        # into that: the decision is delegated whole to
+        # assembly.locant_omission.l3_locant_omitted_for_parent_atoms, the ONE place
+        # the P-14.3.4 licences live, which measures the ORBITS of the substitutable
+        # hydrogens. That is the only thing separating `pyrazinecarboxylic acid` from
+        # `piperidine-1-carbonitrile (PIN)` (BB:34730) -- piperidine's N-H, C2/C6,
+        # C3/C5 and C4 are FOUR orbits, so it keeps its locant -- and from
+        # `pyridine-4-carboxylic acid`, whose ring is three orbits.
+        #
+        # P-14.3.3 (BB:2869) is deny-by-default, so every essential locant that could
+        # share this scope is excluded FIRST, and anything not positively established
+        # retains the locant:
+        #   * no substituent prefixes at all           -> "monosubstituted"
+        #   * exactly one suffix group, one locant      -> ditto
+        #   * no OTHER suffix FG (those become carboxy/cyano prefixes below)
+        #   * a parent_name that is not purely alphabetic already cites a locant --
+        #     a heteroatom set (`1,4-dioxane`) or an indicated hydrogen (`1H-pyrrole`)
+        #     -- and P-14.3.3 then restores all of them. All five printed L3 positives
+        #     have locant-free parent names, so this is the conservative side of a
+        #     boundary the Blue Book does not settle.
+        #   * no retained-heteroatom locant prefix (P-31.1.4.3.4, injected above)
+        #   * no N-substituent / N-hydroxy prefix -- those carry ESSENTIAL italic-N
+        #     locants and are prepended AFTER this join, so they must be consulted
+        #     here or the scope would be emptied of a locant it still needs.
+        #   * no stereodescriptors
+        _l3_omit_suffix_locant = False
+        if (not prefix_str and len(suffix_fg) == 1 and len(chosen_locants) == 1
+                and not multiplier
+                and parent_name and parent_name.isalpha()
+                and not _het_loc_prefix
+                and not suffix_n_substituents and not amine_n_by_locant
+                and not suffix_n_hydroxy
+                and not stereo_descriptors):
+            from ..assembly.locant_omission import (
+                l3_locant_omitted_for_parent_atoms,
+            )
+            _l3_omit_suffix_locant = l3_locant_omitted_for_parent_atoms(
+                mol, ring_atoms,
+                prefix_locants=[],
+                suffix_locants=list(chosen_locants),
+                parent_cites_locants=False,
+                stereo_text="",
+            )
+
+        if _l3_omit_suffix_locant:
+            combined = f"{combined}{suffix_token}"
+        else:
+            combined = f"{combined}-{locant_str}-{suffix_token}"
 
         # C4 (P-62.2.1.1.1): prepend the amine N-substituent prefixes
         # (N-methyl / N-phenyl / N,N-dimethyl) to the ring-amine suffix name.

@@ -1336,10 +1336,117 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
     return NameFragment(text=text, fragment_type="stereo")
 
 
+def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) -> bool:
+    """P-14.3.4.3 (BB:2939) "Omission of locants" -- the substituent-PREFIX case.
+
+        "The locant is omitted in monosubstituted symmetrical parent hydrides or
+         parent compounds where there is only one kind of substitutable hydrogen."
+
+    Its example block prints `chloropropanedioic acid (PIN)` (BB:2951) and
+    `methylurea (PIN)` (BB:2943): a PREFIX substitution, the mirror of the ring-suffix
+    case wired in `rules/heterocycles.py`. Both delegate the decision to
+    `assembly.locant_omission`, the one place the P-14.3.4 licences live.
+
+    ★ Read together with P-14.3.4.1 (BB:2877), which is ALREADY live here and is a
+    DIFFERENT rule: it withdraws only the TERMINAL (suffix) locants, which is what
+    makes `HOOC-CH2-CH2-COOH` `butanedioic acid` rather than `butane-1,4-dioic acid`.
+    It says nothing about substituent locants. Conflating the two would emit
+    `chloropropanediamide` for the class of `2-methylpropanediamide (PIN)` (BB:2887),
+    which sits in P-14.3.4.1's OWN example block WITH its locant. The two rows only
+    look contradictory until the split is applied: L1 takes the suffix locants off
+    both, and L3 then decides the substituent locant separately -- omitting it on the
+    di-ACID (propanedioic acid's sole substitutable position is C2, the two acid O-H
+    being chalcogen H excluded by BB:3007) and keeping it on the di-AMIDE (C2 *and*
+    the amide N-H, which are substitutable -- proven by BB:2889
+    `N1,N3-dimethylpropanediamide (PIN)`). Nothing about chain length, nothing about
+    the substituent.
+
+    Returns True only when every essential-locant escape has been positively
+    excluded; anything unestablished retains the locant (P-14.3.3 is deny-by-default).
+    """
+    import re as _re
+
+    if features is None or not fragments:
+        return False
+
+    prefixes = [f for f in fragments if f.fragment_type == "prefix"]
+    suffixes = [f for f in fragments if f.fragment_type == "suffix"]
+    parents = [f for f in fragments if f.fragment_type == "parent"]
+    stereos = [f for f in fragments if f.fragment_type == "stereo"]
+
+    # "monosubstituted": exactly ONE prefix, carrying exactly ONE locant, once.
+    if len(prefixes) != 1 or len(parents) != 1 or len(suffixes) > 1:
+        return False
+    pf = prefixes[0]
+    pf_locants = list(pf.locants or [])
+    if len(pf_locants) != 1 or getattr(pf, "count", 1) != 1:
+        return False
+    # A prefix whose TEXT already begins with a digit names its own locants (a ring
+    # or complex substituent); it is not the simple mono prefix this licence covers,
+    # and the assembler's `already_has_locant` branch would leave them in place.
+    if _re.match(r"^\d", pf.text or ""):
+        return False
+
+    # P-14.3.3: any other locant cited in the same scope restores them all.
+    if stereos and str(stereos[0].text or "").strip():
+        return False
+    stem = parents[0].text or ""
+    if not stem.isalpha():
+        # A stem that is not purely alphabetic already cites something -- an
+        # indicated hydrogen or a locant baked into the parent name.
+        # ⚠ MUTATION-SURVIVING, DELIBERATELY KEPT (measured 2026-07-29): deleting this
+        # breaks no test, because no molecule that reaches this assembler with a single
+        # locant-bearing prefix has a non-alphabetic stem -- chain stems ('prop', 'but')
+        # and 'cyclohex' are all alpha, and indicated-hydrogen parents are named by
+        # other handlers. It states one clause of P-14.3.3 explicitly and defends the
+        # licence if another clause is ever loosened. Do not "simplify" it; the same
+        # reasoning is already recorded for the over-determined conditions of
+        # `_ring_suffix_locant_is_trivial` above.
+        return False
+    for bond_locants in (parents[0].locants or ()):
+        if bond_locants:
+            return False                    # unsaturation locant in the parent scope
+    if suffixes and list(suffixes[0].locants or []):
+        # ⚠ ALSO MUTATION-SURVIVING AND DELIBERATELY KEPT. Unreachable today for the
+        # same reason: the orbit test is restrictive enough that no parent compound
+        # whose suffix still cites a locant also has just one kind of substitutable
+        # hydrogen. It is the direct statement of P-14.3.3's *"then all locants must be
+        # cited"* for the suffix half of the scope, and it is what would stop the
+        # licence the moment L1 (P-14.3.4.1) stopped withdrawing the terminal locants.
+        return False                        # suffix locant still cited in the scope
+
+    # The parent COMPOUND is the parent skeleton PLUS its principal characteristic
+    # group(s) -- for `chloropropanedioic acid` the three chain carbons and BOTH
+    # -COOH. Everything else is the one substitution, and
+    # `l3_locant_omitted_for_parent_atoms` proves structurally that it is exactly one.
+    parent_atoms = set()
+    for seq in (getattr(features, "principal_chain", None) or (),
+                getattr(features, "principal_ring", None) or ()):
+        for idx in seq:
+            parent_atoms.add(int(idx))
+    for match in (getattr(features, "principal_group_atoms", None) or ()):
+        for idx in match:
+            parent_atoms.add(int(idx))
+    if not parent_atoms:
+        return False
+
+    from ..locant_omission import l3_locant_omitted_for_parent_atoms
+
+    return l3_locant_omitted_for_parent_atoms(
+        getattr(features, "mol", None),
+        parent_atoms,
+        prefix_locants=pf_locants,
+        suffix_locants=[],
+        parent_cites_locants=False,
+        stereo_text="",
+    )
+
+
 def _assemble_fragments(
     fragments: List["NameFragment"],
     style: str,
     is_mononuclear_parent: bool = False,
+    l3_omit_prefix_locant: bool = False,
 ) -> str:
     """
     Assemble fragments into final name string.
@@ -1364,6 +1471,13 @@ def _assemble_fragments(
             atom count == 1) — NOT by string-matching the stem. Governs the
             P-16.5.1.3.1 mononuclear enclosing rule below. Default False so the
             other (multi-atom) callers are byte-identical.
+        l3_omit_prefix_locant: the P-14.3.4.3 (BB:2939) licence, decided by
+            `_l3_prefix_locant_omitted` in the caller — where `features` exists, as
+            for `is_mononuclear_parent`. True means the scope's SINGLE substituent
+            prefix cites no locant (`chloropropanedioic acid`, BB:2951). NOT a
+            locant-stripping flag: it is only ever set by a positively-licensed
+            structural predicate, and defaults False so every other caller of this
+            shared assembler stays byte-identical.
     """
     from ..composer import NameFragment
     # Phase 179 (D-03): the composition-grammar primitives now live in the leaf
@@ -1465,11 +1579,15 @@ def _assemble_fragments(
     # NOTE: Some prefixes already have locants baked in (ring substituent prefixes
     # like "4-phenyl"). Only add locants to those that don't already have them.
     import re
+    # `l3_omit_prefix_locant` is the P-14.3.4.3 (BB:2939) licence decided by the
+    # caller (`_l3_prefix_locant_omitted`). It only ever holds when there is exactly
+    # ONE prefix carrying exactly ONE locant, so suppressing the locant here cannot
+    # reach a second prefix: `chloropropanedioic acid`, `chlorobutanedioic acid`.
     prefix_texts = []
     for f in prefixes:
         text = f.text
         already_has_locant = bool(re.match(r'^\d', text))
-        if f.locants and not already_has_locant:
+        if f.locants and not already_has_locant and not l3_omit_prefix_locant:
             loc_str = ",".join(str(l) for l in f.locants)
             prefix_texts.append(f"{loc_str}-{text}")
         else:

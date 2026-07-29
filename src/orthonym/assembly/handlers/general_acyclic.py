@@ -169,8 +169,17 @@ def name_general_acyclic(
     # stem-string (`parent_frag.text == "meth"`) + no-suffix gate, which was a
     # molecule-class band-aid.
     is_mononuclear_parent = (_get_parent_atom_count(features) == 1)
+    # P-14.3.4.3 (BB:2939) is decided HERE for the same reason as the mononuclear
+    # rule above: the licence needs the STRUCTURE (the parent compound's
+    # substitutable-hydrogen orbits), and `_assemble_fragments` receives only name
+    # fragments. `_l3_prefix_locant_omitted` delegates the rule itself to
+    # `assembly.locant_omission`; deny-by-default, so False whenever the licence
+    # cannot be positively established.
+    from ._handler_shared import _l3_prefix_locant_omitted
+    l3_omit_prefix_locant = _l3_prefix_locant_omitted(features, fragments)
     assembled = _assemble_fragments(
-        fragments, style, is_mononuclear_parent=is_mononuclear_parent
+        fragments, style, is_mononuclear_parent=is_mononuclear_parent,
+        l3_omit_prefix_locant=l3_omit_prefix_locant,
     )
 
     # Observational coverage logging for fallback chain/ring path (ARCH-06)
