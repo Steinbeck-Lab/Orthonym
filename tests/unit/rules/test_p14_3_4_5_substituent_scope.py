@@ -245,12 +245,89 @@ class TestDenyByDefault:
         (Orthonym names this as an N-acylpiperidine), so pinning the exact string
         would enshrine an unrelated spelling. What must hold is that the fluoro
         locants are all cited.
+
+        ⚠⚠ **THIS TEST IS GREEN-BUT-BLIND, AND KNOWINGLY SO.** A review measured
+        **0 calls** to ``_l5_substituent_prefix`` for this molecule and proved, via a
+        ``git worktree`` at the pre-Task-5a commit, that it emits the identical name
+        with none of the licence code present. It would pass if the whole licence were
+        reverted, so it is **not** a regression guard for this licence -- it is only an
+        end-to-end assertion that the Blue Book's required spelling holds on a path
+        that happens not to reach the licence today.
+
+        It is KEPT because that assertion is worth having (if the fluorinated chain
+        ever routes through the substituent composer, this fires), and the real
+        discriminator it was *supposed* to provide now lives in
+        :meth:`test_uniformity_broken_by_a_second_halogen_kind`, which is measured to
+        reach the licence. Do not delete this one; do not trust it alone.
         """
         got = _name(namer, "FC(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)"
                            "C(F)(F)C(=O)N1CCCCC1")
         assert "pentadecafluoro" in got, got
         assert "2,2,3,3,4,4,5,5,6,6,7,7,8,8,8-pentadecafluoro" in got, \
             f"the fluoro locants are required, see P-14.3.4.5 (:29619): {got!r}"
+
+    @pytest.mark.parametrize(
+        "smiles,expected",
+        [
+            # Reaches the licence via _located_acyclic_alkyl_name (the aryl cascade).
+            ("ClC(Cl)(C(F)(F)F)c1ccccc1", "(1,1-dichloro-2,2,2-trifluoroethyl)benzene"),
+            # ...and via _name_saturated_substituted_chain (the generic cascade), so
+            # BOTH live sites are covered by this discriminator, not just one.
+            ("FC(F)(F)C(Cl)(Cl)C1CCCCC1",
+             "(1,1-dichloro-2,2,2-trifluoroethyl)cyclohexane"),
+        ],
+    )
+    def test_uniformity_broken_by_a_second_halogen_kind(self, namer, smiles, expected):
+        """★ ``:29619``'s discriminator, on a path that ACTUALLY REACHES the licence.
+
+        This is the production-reachable replacement for
+        :meth:`test_zero_h_everywhere_but_not_by_the_same_group`, which a review
+        measured at 0 calls (see its docstring).
+
+        Both carbons of the ethyl scope have **zero** substitutable hydrogen left --
+        so a naive "no H remain" predicate fires and strips the locants -- but the
+        replacements are **two different kinds** (chloro and fluoro), so
+        ``:3007``'s *"in the same way"* is violated and every locant must be cited.
+        That is exactly why the Blue Book keeps the locants in
+        ``pentadecafluorooctan-1-one`` (``:29619``) while citing P-14.3.4.5 by name.
+
+        Measured 2026-07-29: the licence helper is called for both rows and correctly
+        returns ``None``. The whole name is asserted (invariant 11) because the
+        failure mode here is not just a missing locant -- a mutation of the
+        uniformity check was measured to emit ``pentachloro`` while **silently
+        dropping the fluorines**.
+        """
+        assert _name(namer, smiles) == expected
+
+    @pytest.mark.parametrize(
+        "smiles,expected,why",
+        [
+            # A formal charge on the scope: the helper's own GetFormalCharge() guard
+            # is load-bearing here (unlike the sibling no-op guards the contributor guide warns
+            # about), because _name_saturated_substituted_chain has no charge check.
+            ("[NH3+]CCC(F)(F)C(F)(F)c1ccccc1",
+             "3,3,4,4-tetrafluoro-4-phenylbutan-1-aminium",
+             "charged: partial fluorination anyway, so locants are required"),
+            # Charge on the PARENT, complete uniform substitution on the SUBSTITUENT:
+            # the licence correctly fires inside the enclosing marks while the
+            # anion is expressed on the parent. Per-scope evaluation, working.
+            ("FC(F)(F)C(F)(F)c1ccc([O-])cc1",
+             "4-(pentafluoroethyl)phenolate",
+             "charge outside the scope must not veto a licence inside it"),
+        ],
+    )
+    def test_charge_does_not_break_the_per_scope_evaluation(
+        self, namer, smiles, expected, why
+    ):
+        """Charge coverage, added after review found it verified-but-untested.
+
+        the contributor guide records that on a sibling predicate **both** ``GetFormalCharge()``
+        guards were measured to be **no-ops**, because the molecule arrives
+        neutralised. These two rows pin the behaviour that was measured to be correct
+        here, so that a future neutralisation change cannot silently make this
+        licence charge-blind too.
+        """
+        assert _name(namer, smiles) == expected, why
 
     def test_amide_nh_are_substitutable_so_the_amide_keeps(self, namer):
         """★ The sharpest boundary pair in Phase C: identical fluorination, the ACID

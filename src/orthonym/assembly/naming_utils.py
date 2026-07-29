@@ -55,6 +55,17 @@ _MULT_ALT = '|'.join(_MULTIPLIER_SYLLABLES)
 # ``:3023`` prints ``1-chloro-2-(pentafluoroethyl)benzene (PIN)`` WITH the marks, and
 # a bare ``heptafluoropropylbenzene`` also reads as ``heptafluoro`` + ``propylbenzene``.
 # The multiplier set is now complete, because the substituted-alkyl class is OPEN.
+#
+# ⚠ RELATIONSHIP TO ``_MULT_SUBSTITUENT_RE`` (raised by review, 2026-07-29). The two
+# patterns OVERLAP on ``di``..``hexa`` + halogen + alkyl -- ``difluoromethyl`` matches
+# both, and ``_MULT_SUBSTITUENT_RE`` is tested first (``is_complex_substituent``).
+# The overlap is deliberate REDUNDANCY, not a division of labour, and neither is a
+# subset of the other: ``_MULT_SUBSTITUENT_RE`` is unanchored and also covers
+# non-halogen stems (``triphenyl``), while this pattern is ``$``-anchored and carries
+# the full P-14.5.2 multiplier set (``hepta`` upward). So a future narrowing of either
+# one does not silently open a hole in the halogen case -- but do not *rely* on that:
+# if you touch either, re-check the hepta+ case, which is the one that was broken and
+# which no test exercised before Task 5a because the names still carried digits.
 _HALOALKYL_RE = re.compile(
     r'^(?:(?:' + _MULT_ALT + r')?(?:fluoro|chloro|bromo|iodo))'
     r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|nonyl|decyl|'

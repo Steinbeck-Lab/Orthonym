@@ -959,10 +959,24 @@ def _l5_substituent_prefix(mol, sub_atoms, chain, k, groups) -> Optional[str]:
 
     ⚠ **DENY BY DEFAULT.** This is not a locant stripper: every omission is a
     positively-licensed structural predicate, and anything that cannot be
-    established returns ``None``. The rule itself is NOT re-derived here -- the
-    decision is delegated to ``assembly.locant_omission.l5_uniform_complete``, the
-    one place the Blue Book licences live. This function only marshals the
-    substituent's scope into it.
+    established returns ``None``. The **completeness/uniformity test** itself is NOT
+    re-derived here -- it is delegated to
+    ``assembly.locant_omission.l5_uniform_complete``, the one place the Blue Book
+    licences live.
+
+    ⚠ It does **more than marshal**, and the docstring said otherwise until a review
+    caught it (2026-07-29). Beyond building the parent hydride and the decoration
+    map, this function independently decides two further rule questions:
+
+    * the **two ambient P-14.3.3 scopes** (``locants_are_forced`` and the weaker
+      ``scope_has_isotopic_modification``) -- either one vetoes;
+    * the **k >= 2 internal-free-valence boundary**: for a free valence anywhere but
+      position 1 the valence locant is itself essential, so P-14.3.3's *"then all
+      locants must be cited ... for that structural unit"* restores the substitution
+      locants and the licence declines. This is a deny-by-default reading, not a
+      printed Blue Book example (the BB prints no fully substituted substituent group
+      with an internal free valence), and it is recorded as ASSUMED, not VERIFIED;
+    * plus ``scope_forces_locants`` for the ordinary essential-locant cases.
 
     Args:
         mol: the whole molecule the substituent lives in.
