@@ -163,6 +163,29 @@ _SUFFIX_TO_PREFIX = {
 }
 
 
+# FGs named by FUNCTIONAL CLASS nomenclature: they are never a benzene SUFFIX, so
+# an empty ``suffix_groups`` does NOT mean "the -OH is the principal group".
+# Hoisted to module scope (v29 Phase C Task 9) so the prefix->suffix promotion in
+# ``name_substituted_benzene`` and the P-14.4(c) numbering anchor in
+# ``principal_group_ring_atoms`` are gated by ONE definition and cannot drift.
+_FUNCTIONAL_CLASS_FGS = frozenset({
+    'isocyanate', 'isothiocyanate', 'azide', 'diazo',
+    'cyanate', 'thiocyanate', 'selenocyanate',
+})
+
+# Suffixes JUNIOR to -ol (P-41): SENIORITY_ORDER ranks phenol 91, thiol 94,
+# selenol/tellurol just after, amines 102+. A junior suffix holding the slot must
+# not block the -ol promotion. Hoisted with _FUNCTIONAL_CLASS_FGS, same reason.
+_OL_JUNIOR_SUFFIXES = frozenset({'thiol', 'selenol', 'tellurol', 'amine'})
+
+
+def _has_functional_class_fg(detected_fgs) -> bool:
+    """True when a functional-class-named FG is present (blocks suffix promotion)."""
+    if not detected_fgs:
+        return False
+    return any(fg in _FUNCTIONAL_CLASS_FGS for fg in detected_fgs)
+
+
 # Pre-compiled SMARTS for suffix FG identification (avoid per-call recompilation)
 _BENZENE_FG_SMARTS = {
     'acid': Chem.MolFromSmarts('[CX3](=O)[OX2H1]'),
@@ -2725,6 +2748,147 @@ def _detect_chain_functional_group(mol, chain_atoms: List[int]) -> Optional[str]
     return None
 
 
+def _molecule_principal_group(mol) -> Optional[str]:
+    """The molecule-level principal characteristic group name, or None.
+
+    For call sites that have no ``MolecularFeatures`` to read
+    ``features.principal_group`` from. Routes through the same
+    ``seniority.get_principal_group`` authority the namer uses, so the answer
+    cannot diverge from ``features.principal_group``. Fails closed to ``None``
+    (= legacy numbering) on any perception failure.
+    """
+    try:
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        pg_name, _ = get_principal_group(mol, detect_functional_groups(mol))
+        return pg_name
+    except Exception:
+        return None
+
+
+def principal_group_ring_atoms(
+    mol,
+    ring_atoms: Tuple[int, ...],
+    substituents: Dict[int, List[Dict]],
+    principal_group: Optional[str] = None,
+    detected_fgs: Optional[Dict] = None,
+) -> Set[int]:
+    """P-14.4(c): the ring atoms bearing the PRINCIPAL characteristic group.
+
+    This is the input to ``orient_benzene``'s criterion-0 tier. §P-14.4
+    "NUMBERING" (heading at BB:3219) states at BB:3221: "When several structural
+    features appear in cyclic and acyclic compounds, low locants are assigned to
+    them in the following decreasing order of seniority:". That order ranks
+    **(c) principal characteristic groups and free valences (suffixes);**
+    (BB:3256) four places ABOVE **(f) detachable alphabetized prefixes, all
+    considered together in a series of increasing numerical order;** (BB:3301) and
+    five above **(g) lowest locants for the substituent cited first as a prefix in
+    the name;** (BB:3307). So the suffix locant set is minimised FIRST and the
+    prefixes take what is left. Benzene has no fixed numbering (a, BB:3227) and no
+    indicated hydrogen (b, BB:3246), so (c) decides whenever it applies.
+
+    Every caller used to derive this set from the ``is_suffix`` marker alone,
+    which made it EMPTY for phenols: a ring -OH is still spelled as the *prefix*
+    ``hydroxy`` when the ring is numbered and is promoted to the ``-ol`` suffix
+    only later, inside ``name_substituted_benzene``. Criterion (c) therefore never
+    ran and criterion (f) handed locant 1 to the prefix -- emitting
+    ``1-chlorobenzene-2,3,4,5,6-pentol`` for the PIN
+    ``6-chlorobenzene-1,2,3,4,5-pentol``.
+
+    The promotion is decided GENERICALLY off the shared seniority tables --
+    ``get_suffix(pg, is_ring=True)`` and ``get_prefix(pg)`` -- exactly as
+    ``rules/heterocycles.py`` (:1671) and ``rules/polycyclics.py`` (:1202) already
+    do, so no functional group is named as a literal here and the class is not
+    hydroxy-only: any FG whose seniority entry has a ring suffix and a prefix form
+    (``-ol``/hydroxy, ``-amine``/amino, ``-thiol``/sulfanyl, ...) is handled by the
+    same path. The decision is LOCANT-FREE -- it depends only on WHICH groups are
+    present, never on where -- which is what lets it be consulted BEFORE the ring
+    is numbered.
+
+    P-41 is respected: only the SENIOR group is the principal characteristic
+    group. ``principal_group`` is the molecule-level answer from
+    ``seniority.get_principal_group``, so a ring carrying both -ol and -thiol
+    yields the -ol atoms only (matching the emitted ``2-sulfanylphenol``, whose
+    numbering hint previously contradicted the name by anchoring the thiol).
+
+    FAILS TOWARD CURRENT BEHAVIOUR: whenever the seniority tables cannot answer
+    (no principal group, a functional-class-named group, a prefix vocabulary that
+    does not match, ...) this returns the legacy ``is_suffix`` union, so the change
+    is a strict improvement rather than a coin flip. In particular a ring with NO
+    principal characteristic group -- ``Cc1c(C)c(C)c(C)c(C)c1Cl`` -- has
+    ``principal_group is None`` and returns the empty set, leaving criterion (c)
+    vacuous and (f)+(g) legitimately in charge of
+    ``1-chloro-2,3,4,5,6-pentamethylbenzene``.
+
+    Args:
+        mol: RDKit Mol object (unused today; kept so callers pass the full context
+            and a future rule can consult the graph without a signature change).
+        ring_atoms: The benzene ring's atom indices.
+        substituents: Dict from ``get_benzene_substituents``.
+        principal_group: ``features.principal_group`` -- the molecule-level PCG
+            name from ``seniority.get_principal_group``. ``None`` disables the
+            promotion tier (legacy behaviour).
+        detected_fgs: ``features.functional_groups``, used only for the shared
+            functional-class guard.
+
+    Returns:
+        Set of ring atom indices bearing the principal characteristic group;
+        empty when criterion (c) does not apply.
+    """
+    from .seniority import get_prefix, get_suffix
+
+    if not isinstance(substituents, dict):
+        return set()
+
+    ring_set = set(ring_atoms or ())
+    suffix_atoms: Dict[str, Set[int]] = defaultdict(set)
+    prefix_atoms: Dict[str, Set[int]] = defaultdict(set)
+
+    for atom_idx, subs in substituents.items():
+        if ring_set and atom_idx not in ring_set:
+            continue
+        if not isinstance(subs, list):
+            continue
+        for sub in subs:
+            if not isinstance(sub, dict):
+                continue
+            if sub.get('is_suffix'):
+                if sub.get('suffix_name'):
+                    suffix_atoms[sub['suffix_name']].add(atom_idx)
+            elif sub.get('name'):
+                prefix_atoms[sub['name']].add(atom_idx)
+
+    # The legacy answer, and the fail-closed floor for every early return below.
+    legacy: Set[int] = set()
+    for _atoms in suffix_atoms.values():
+        legacy |= _atoms
+
+    if not principal_group:
+        return legacy
+
+    # A group named by functional class has no ring suffix at all, so the tables
+    # answer "no PCG suffix" for it directly.
+    pg_ring_suffix = get_suffix(principal_group, is_ring=True)
+    if not pg_ring_suffix:
+        return legacy
+
+    # Already spelled as a suffix at orientation time: take THAT group's atoms
+    # only (P-41 -- a co-occurring junior suffix is not the principal group).
+    if pg_ring_suffix in suffix_atoms:
+        return set(suffix_atoms[pg_ring_suffix])
+
+    # Still spelled as a prefix: it will be promoted downstream. Mirror the
+    # promotion guard so the numbering and the emitted name cannot disagree.
+    if _has_functional_class_fg(detected_fgs):
+        return legacy
+
+    pg_prefix = get_prefix(principal_group)
+    if pg_prefix and pg_prefix in prefix_atoms:
+        return set(prefix_atoms[pg_prefix])
+
+    return legacy
+
+
 def orient_benzene(
     mol,
     ring_atoms: Tuple[int, ...],
@@ -3000,14 +3164,11 @@ def name_substituted_benzene(
     # (isocyanate, azide, etc.). These FGs are not in _SUFFIX_PRIORITY, so
     # suffix_groups would be empty even though OH may not be the true principal
     # group. Blacklist approach: only block known functional-class-naming FGs.
-    _FUNCTIONAL_CLASS_FGS = {'isocyanate', 'isothiocyanate', 'azide', 'diazo',
-                              'cyanate', 'thiocyanate', 'selenocyanate'}
-    has_competing_fg = False
-    if detected_fgs:
-        for fg_name in detected_fgs:
-            if fg_name in _FUNCTIONAL_CLASS_FGS:
-                has_competing_fg = True
-                break
+    # v29 Phase C Task 9: _FUNCTIONAL_CLASS_FGS and the predicate are now module
+    # level, SHARED with principal_group_ring_atoms (the P-14.4(c) numbering
+    # anchor), so the promotion decision and the numbering that depends on it are
+    # gated by one definition.
+    has_competing_fg = _has_functional_class_fg(detected_fgs)
     # ⚠ The guard is "no suffix SENIOR to -ol", not "no suffix at all".
     # v29 Phase C tranche C REGRESSION, caught by an A/B against HEAD before shipping:
     # adding the `-thiol` suffix form (for `benzenethiol`, BB:6656/:27292) made this
@@ -3019,7 +3180,8 @@ def name_substituted_benzene(
     # SENIORITY_ORDER ranks: primary/secondary alcohol 88/89, phenol 91, thiol 94,
     # amines 102+. So -ol outranks -thiol and must claim the suffix when both are
     # present, leaving the SH as a `sulfanyl` prefix (P-41).
-    _OL_JUNIOR_SUFFIXES = frozenset({'thiol', 'selenol', 'tellurol', 'amine'})
+    # _OL_JUNIOR_SUFFIXES is module level (v29 Phase C Task 9), shared with the
+    # P-14.4(c) anchor.
     _senior_to_ol = {s for s in suffix_groups if s not in _OL_JUNIOR_SUFFIXES}
     if 'hydroxy' in prefix_groups and not _senior_to_ol and not has_competing_fg:
         # No suffix FG senior to -ol, and no competing functional-class FG -- hydroxyl
@@ -4611,6 +4773,9 @@ def _preferred_benzene_parent_ring(mol):
     candidates = _benzene_parent_candidates(mol)
     if not candidates:
         return None
+    # Computed ONCE for the molecule (it is ring-independent) rather than per
+    # candidate ring, so the extra perception cost is paid at most once.
+    _pg = _molecule_principal_group(mol)
     scored = []
     for ring_atoms in candidates:
         substituents = get_benzene_substituents(mol, ring_atoms)
@@ -4620,11 +4785,17 @@ def _preferred_benzene_parent_ring(mol):
             # W3-P04 (P-14.4(c)): anchor the principal characteristic group to
             # the lowest locant before detachable substituents (mirrors the
             # composer._assemble_benzene_name path and namer.py Branch 3, so the
-            # NAME and locant HINT agree). Empty set (phenols) is a no-op.
-            pcg_positions = {
-                atom_idx for atom_idx, subs in substituents.items()
-                if any(s.get("is_suffix") for s in subs)
-            }
+            # NAME and locant HINT agree).
+            # v29 Phase C Task 9: routed through the shared authority. This site
+            # has no ``features``, so it derives the molecule-level principal group
+            # from the same seniority entry point the rest of the pipeline uses.
+            # It is only reached for MULTI-benzene molecules whose principal group
+            # is None or a secondary amine (see composer._assemble_benzene_name),
+            # and it passes no detected_fgs to name_substituted_benzene either, so
+            # the promotion guard stays consistent with the name built here.
+            pcg_positions = principal_group_ring_atoms(
+                mol, ring_atoms, substituents, principal_group=_pg,
+            )
             oriented_ring = orient_benzene(
                 mol, ring_atoms, substituents,
                 principal_group_positions=pcg_positions or None,

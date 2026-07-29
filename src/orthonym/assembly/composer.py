@@ -2735,7 +2735,9 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
     Returns:
         Complete IUPAC name for the benzene derivative
     """
-    from ..rules.benzene import orient_benzene, name_substituted_benzene
+    from ..rules.benzene import (
+        orient_benzene, name_substituted_benzene, principal_group_ring_atoms,
+    )
 
     mol = features.mol
 
@@ -2803,21 +2805,27 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
         )
 
     # Orient the ring for lowest locants.
-    # W3-P04 (P-14.4(c)): anchor the principal characteristic group (ring atoms
-    # bearing a suffix-type FG) to the lowest locant BEFORE detachable
-    # substituents. Without this the numberer minimized the COMBINED substituent
-    # set, giving e.g. '1-methylbenzene-2,4-disulfonic acid' instead of the PIN
-    # '4-methylbenzene-1,3-disulfonic acid'. Mirrors the shipped E1/DD4 anchor in
-    # namer.py Branch 3 (so the locant HINT and emitted NAME agree). Phenols
-    # (hydroxy = prefix) leave the set empty -> no-op (anchored downstream).
-    _pcg_positions = set()
-    if isinstance(substituents, dict):
-        _pcg_positions = {
-            atom_idx for atom_idx, subs in substituents.items()
-            if isinstance(subs, list) and any(
-                isinstance(s, dict) and s.get("is_suffix") for s in subs
-            )
-        }
+    # W3-P04 (P-14.4(c)): anchor the principal characteristic group to the lowest
+    # locant BEFORE detachable substituents. Without this the numberer minimized
+    # the COMBINED substituent set, giving e.g. '1-methylbenzene-2,4-disulfonic
+    # acid' instead of the PIN '4-methylbenzene-1,3-disulfonic acid'. Mirrors the
+    # anchor in namer.py Branch 3 (so the locant HINT and emitted NAME agree).
+    #
+    # v29 Phase C Task 9: this set used to be built inline from ``is_suffix``, and
+    # the comment here read "Phenols (hydroxy = prefix) leave the set empty ->
+    # no-op". That WAS the defect: criterion (c) never ran for a phenol, so
+    # criterion (f) gave locant 1 to the prefix and we emitted
+    # '1-chlorobenzene-2,3,4,5,6-pentol' for the PIN
+    # '6-chlorobenzene-1,2,3,4,5-pentol'. The shared helper also recognises the
+    # groups that are promoted from a PREFIX to the suffix downstream, off the
+    # seniority tables (P-41), and is the single authority for all three anchor
+    # call sites (here, namer.py Branch 3, _preferred_benzene_parent_ring).
+    detected_fgs = getattr(features, 'functional_groups', None) or {}
+    _pcg_positions = principal_group_ring_atoms(
+        mol, ring_atoms, substituents,
+        principal_group=_pg,
+        detected_fgs=detected_fgs,
+    )
     oriented_ring = orient_benzene(
         mol, ring_atoms, substituents,
         principal_group_positions=_pcg_positions or None,
@@ -2830,8 +2838,8 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
     from ..rules.stereochemistry import _ring_atom_to_locant_from_oriented
     features.benzene_atom_to_locant = _ring_atom_to_locant_from_oriented(oriented_ring)
 
-    # Generate systematic name
-    detected_fgs = getattr(features, 'functional_groups', None) or {}
+    # Generate systematic name (detected_fgs hoisted above the orientation call,
+    # which now needs it for the shared functional-class promotion guard).
     return name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents, detected_fgs)
 
 

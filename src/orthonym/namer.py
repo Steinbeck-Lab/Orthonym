@@ -1534,7 +1534,9 @@ def _build_ring_info_for_parent_selection(features):
         identify_polycyclic,
         get_polycyclic_iupac_locants,
     )
-    from .rules.benzene import orient_benzene, get_benzene_substituents
+    from .rules.benzene import (
+        orient_benzene, get_benzene_substituents, principal_group_ring_atoms,
+    )
     from .rules.heterocycles import orient_heterocycle_with_substituents
     from .perception.rings import get_spiro_atoms
     from .rules.bridged_fused import is_bridged_fused
@@ -1594,15 +1596,17 @@ def _build_ring_info_for_parent_selection(features):
             try:
                 substituents = get_benzene_substituents(mol, ring_atoms)
                 # E1/DD4 (P-14.4(c)): anchor the principal characteristic group
-                # (the ring atoms bearing a senior suffix group) to the lowest
-                # locant before detachable substituents. Derived from the
-                # is_suffix marker already set by get_benzene_substituents
-                # (acids/aldehydes/amides); phenols are anchored downstream by
-                # _renumber_relative_to, so an empty set here is a no-op.
-                pcg_positions = {
-                    atom_idx for atom_idx, subs in substituents.items()
-                    if any(s.get("is_suffix") for s in subs)
-                }
+                # to the lowest locant before detachable substituents.
+                # v29 Phase C Task 9: this was derived from the is_suffix marker
+                # alone, which made it EMPTY for phenols (a ring -OH is spelled as
+                # the 'hydroxy' PREFIX here and promoted to '-ol' downstream) --
+                # so this locant HINT disagreed with the emitted NAME. It now uses
+                # the same shared authority as the composer, so the two agree.
+                pcg_positions = principal_group_ring_atoms(
+                    mol, ring_atoms, substituents,
+                    principal_group=getattr(features, 'principal_group', None),
+                    detected_fgs=getattr(features, 'functional_groups', None),
+                )
                 oriented = orient_benzene(
                     mol, ring_atoms, substituents,
                     principal_group_positions=pcg_positions or None,
