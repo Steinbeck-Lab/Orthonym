@@ -592,6 +592,37 @@ class TestC11PlusAlkylRootCoverage:
         from orthonym.assembly.naming_utils import _HALOALKYL_RE
         assert _HALOALKYL_RE.match("fluoromethyl") is not None
 
+    def test_multiplier_syllables_match_simple_multipliers(self):
+        """_MULTIPLIER_SYLLABLES is a forward declaration of SIMPLE_MULTIPLIERS.
+
+        It exists only because the regexes compile at import time, ahead of the
+        table. If the two drift apart, a whole band of multipliers silently stops
+        being recognised as a compound haloalkyl prefix -- which is exactly the bug
+        v29 Phase C Task 5a hit: the alternation stopped at ``hexa``, so
+        ``heptafluoropropyl`` lost its enclosing marks the moment P-14.3.4.5
+        (``:3007``) removed its locants.
+        """
+        from orthonym.assembly.naming_utils import (
+            _MULTIPLIER_SYLLABLES, SIMPLE_MULTIPLIERS,
+        )
+        assert set(_MULTIPLIER_SYLLABLES) == set(SIMPLE_MULTIPLIERS.values())
+
+    @pytest.mark.parametrize("name", [
+        "heptafluoropropyl", "octafluorobutyl", "nonafluorobutyl",
+        "undecafluoropentyl", "pentadecafluorooctyl", "tridecafluorohexyl",
+    ])
+    def test_haloalkyl_re_covers_multipliers_above_hexa(self, name):
+        """P-14.3.4.5 emits locant-free names, so this regex -- not the digit check
+        in is_complex_substituent -- becomes the load-bearing enclosing-mark gate."""
+        from orthonym.assembly.naming_utils import _HALOALKYL_RE
+        assert _HALOALKYL_RE.match(name) is not None, name
+
+    @pytest.mark.parametrize("name", ["ethyl", "methyl", "propyl", "butyl",
+                                      "phenyl", "cyclohexyl"])
+    def test_haloalkyl_re_does_not_overmatch_plain_alkyls(self, name):
+        from orthonym.assembly.naming_utils import _HALOALKYL_RE
+        assert _HALOALKYL_RE.match(name) is None, name
+
     def test_alkylamino_re_undecylamino(self):
         """C11: _ALKYLAMINO_RE should match undecylamino."""
         from orthonym.assembly.naming_utils import _ALKYLAMINO_RE

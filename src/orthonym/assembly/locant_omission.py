@@ -60,6 +60,8 @@ __all__ = [
     "forced_locant_scope",
     "locants_are_forced",
     "forced_locant_reason",
+    "isotopic_naming_scope",
+    "scope_has_isotopic_modification",
 ]
 
 #: ``:3007`` -- "Except for hydrogen atoms attached to chalcogen atoms, such as in
@@ -342,6 +344,70 @@ def locants_are_forced() -> bool:
 def forced_locant_reason() -> "Optional[str]":
     """The active reason, or None. Diagnostics only."""
     return _FORCED_LOCANT_REASON.get()
+
+
+# --------------------------------------------------------------------------------- #
+# "THIS NAMING SCOPE IS ISOTOPICALLY MODIFIED" -- weaker than forced_locant_scope     #
+# --------------------------------------------------------------------------------- #
+# ⚠ MEASURED 2026-07-29 (v29 Phase C Task 5a). ``forced_locant_scope`` above is NOT
+# sufficient for every licence, because ``rules/isotopes.py`` enters it *conditionally*
+# -- only once ``_enumerate`` has established that the descriptor needs a locant
+# (``loc_rank >= 1``). A validated spy at the two live substituent sites recorded, for
+# ``FC(F)(F)[13C](F)(F)C1CCCCC1``:
+#
+#     locants_are_forced() == False   and   every GetIsotope() in the scope == 0
+#
+# i.e. BOTH signals a licence could consult are negative, yet the finished name really
+# does carry ``(13C1)``. Wiring P-14.3.4.5 on ``locants_are_forced()`` alone therefore
+# turned ``(1,1,2,2,2-pentafluoro(13C1)ethyl)cyclohexane`` into
+# ``(pentafluoro(13C1)ethyl)cyclohexane`` -- stripping the only locants left in a scope
+# that carries an isotopic modification, which is what **P-82.6.1.1** (``:44180``)
+# forbids: *"if isotopic modification requires a locant to specify its position, then
+# all locants must be specified and none are omitted."* The ethyl group's two carbons
+# are NOT equivalent, so the position does have to be stated, and the Blue Book's own
+# locant-free precedent ``(2H6)benzene (PIN)`` (``:44202``) is licensed precisely
+# because all six positions ARE equivalent.
+#
+# Nothing could catch this: SELF-01 "ignores isotopes" (``namer.py`` verbatim), the
+# name round-trips cleanly through OPSIN either way, and gold exposure for the whole
+# class is zero.
+#
+# So this is a SEPARATE, WEAKER declaration: *"an isotopic descriptor will be spliced
+# into this scope"*, made unconditionally by the isotope decorator. A licence consults
+# it when it is about to empty a scope of ALL its locants. It is deliberately NOT
+# folded into ``forced_locant_scope``, because that would also gag the licences whose
+# locant-free form is CORRECT under P-82.6.1.3 -- ``(13C1)benzenehexol`` and
+# ``(2H6)benzene`` -- which is why ``rules/benzene.py`` still consults only
+# ``locants_are_forced()``.
+_ISOTOPIC_NAMING_SCOPE: "contextvars.ContextVar[Optional[str]]" = contextvars.ContextVar(
+    "orthonym_isotopic_naming_scope", default=None
+)
+
+
+@contextlib.contextmanager
+def isotopic_naming_scope(reason: str = "isotope"):
+    """Declare that an isotopic descriptor will be spliced into this naming scope.
+
+    Entered UNCONDITIONALLY by ``rules/isotopes.py`` around its skeleton naming,
+    because the labels are stripped before naming and are therefore invisible to
+    every structural test further down.
+    """
+    token = _ISOTOPIC_NAMING_SCOPE.set(reason)
+    try:
+        yield
+    finally:
+        _ISOTOPIC_NAMING_SCOPE.reset(token)
+
+
+def scope_has_isotopic_modification() -> bool:
+    """True when an enclosing :func:`isotopic_naming_scope` is active.
+
+    A licence that would leave a scope with ZERO locants must decline on this
+    (P-82.6.1.1, ``:44180``). A licence whose locant-free form stays correct under
+    P-82.6.1.3 (all candidate positions in one orbit) must NOT -- see the comment
+    above for why this is separate from :func:`locants_are_forced`.
+    """
+    return _ISOTOPIC_NAMING_SCOPE.get() is not None
 
 
 def scope_forces_locants(

@@ -327,6 +327,23 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     stripped, label_map = strip_isotopes(original)
     if not label_map:
         return None
+    # P-82.6.1.1 (``:44180``). Everything below names the isotope-STRIPPED molecule,
+    # so no structural test further down can see that a label exists -- measured: at
+    # the P-14.3.4 substituent licences every ``GetIsotope()`` in scope reads 0 even
+    # for a 13C input. Declare it ambiently instead, UNCONDITIONALLY, so a licence
+    # about to empty a scope of all its locants can decline. This is deliberately
+    # weaker than ``forced_locant_scope`` (entered further down only once a locant is
+    # known to be REQUIRED): the weaker flag must not gag the omissions that stay
+    # correct under P-82.6.1.3, i.e. ``(13C1)benzenehexol`` and ``(2H6)benzene``.
+    from ..assembly.locant_omission import isotopic_naming_scope
+    with isotopic_naming_scope("isotope"):
+        return _decorate_isotopic_name_inner(
+            smiles, style, namer, original, stripped, label_map)
+
+
+def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
+                                  label_map) -> Optional[str]:
+    """Body of :func:`decorate_isotopic_name`, run inside the ambient isotopic scope."""
     stripped_smiles = Chem.MolToSmiles(stripped)
     # Skeleton in systematic style so parents carry locants (ethan-1-ol, not
     # ethanol) — the descriptor's locant needs a locanted parent.

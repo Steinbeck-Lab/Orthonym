@@ -29,11 +29,34 @@ _MULT_SUBSTITUENT_RE = re.compile(
     r'fluoro|chloro|bromo|iodo)'
 )
 
+# Every numerical multiplying-prefix syllable P-14.5.2 uses. Kept adjacent to the
+# regexes that need it because those compile at import time, ahead of
+# ``SIMPLE_MULTIPLIERS``; ``tests/unit/assembly/test_naming_utils.py`` asserts the two
+# stay in step, so this is a forward declaration and NOT a second source of truth.
+# Longest-first so the alternation reads unambiguously (``trideca`` before ``tri``).
+_MULTIPLIER_SYLLABLES = (
+    'pentadeca', 'tetradeca', 'heptadeca', 'hexadeca', 'octadeca', 'nonadeca',
+    'trideca', 'undeca', 'dodeca', 'tetra', 'penta', 'hexa', 'hepta', 'octa',
+    'nona', 'deca', 'icosa', 'di', 'tri',
+)
+_MULT_ALT = '|'.join(_MULTIPLIER_SYLLABLES)
+
 # Halogen + alkyl compound substituent patterns (e.g., fluoromethyl,
 # trifluoromethyl, chloroethyl). These are compound substituents per
 # IUPAC P-31.1.2.3 and require enclosing marks.
+#
+# ⚠ v29 Phase C Task 5a: the multiplier alternation used to stop at ``hexa``, which
+# was invisible for as long as every fully-halogenated alkyl carried locants --
+# ``is_complex_substituent`` returns True on the FIRST digit it sees, so this regex
+# was never the load-bearing gate. P-14.3.4.5 (``:3007``) removes those digits, and
+# the truncation surfaced immediately as a LOST enclosing mark:
+# ``(1,1,2,2,3,3,3-heptafluoropropyl)benzene`` became ``heptafluoropropylbenzene``
+# (hepta is not in the old list), while ``(pentafluoroethyl)benzene`` was fine.
+# ``:3023`` prints ``1-chloro-2-(pentafluoroethyl)benzene (PIN)`` WITH the marks, and
+# a bare ``heptafluoropropylbenzene`` also reads as ``heptafluoro`` + ``propylbenzene``.
+# The multiplier set is now complete, because the substituted-alkyl class is OPEN.
 _HALOALKYL_RE = re.compile(
-    r'^(?:(?:di|tri|tetra|penta|hexa)?(?:fluoro|chloro|bromo|iodo))'
+    r'^(?:(?:' + _MULT_ALT + r')?(?:fluoro|chloro|bromo|iodo))'
     r'(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|nonyl|decyl|'
     r'undecyl|dodecyl|tridecyl|tetradecyl|pentadecyl|'
     r'hexadecyl|heptadecyl|octadecyl|nonadecyl|icosyl)$'

@@ -867,6 +867,275 @@ def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
 _HALOGEN_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
 
 
+# ============================================================================
+# P-14.3.4.5 inside a SUBSTITUENT (enclosing-mark) scope
+# ============================================================================
+# ``P-14.3.4.5`` (``BlueBookV2/BlueBookV2.md:3007``), under ``P-14.3.4``
+# "Omission of locants":
+#
+#     "All locants are omitted in compounds or substituent groups in which all
+#      substitutable positions are completely substituted or modified, for
+#      example, by hydro, in the same way. Except for hydrogen atoms attached to
+#      chalcogen atoms, such as in acids, alcohols, and to the carbon atoms of
+#      formyl groups (aldehydes), all hydrogen atoms are considered
+#      substitutable."
+#
+# and its counter-clause ``:3009``: *"In case of partial substitution or
+# modification, all numerical prefixes must be indicated. The prefix 'per-' is no
+# longer recommended."*
+#
+# ★ It is the ONLY one of the six P-14.3.4 licences whose text says *"compounds or
+# **substituent groups**"* -- the others speak only of parent structures. That word
+# is what licenses ``1-chloro-2-(pentafluoroethyl)benzene (PIN)`` (``:3023``).
+#
+# The licence is carved out of the DENY-DEFAULT ``P-14.3.3`` "Citation of locants"
+# (``:2869``), which is scoped *"as defined by its appropriate enclosing marks"*.
+# That scoping sentence is the whole mechanism here: in
+# ``1-chloro-2-(pentafluoroethyl)benzene`` the ethyl group inside the parentheses is
+# completely and uniformly substituted and omits, while the benzene ring outside is
+# only partially substituted and keeps ``1,2``. ONE molecule, TWO scopes, opposite
+# answers -- so the licence must be applied at the SUBSTITUENT sites, where the
+# enclosing-mark scope is known, and never inside the shared
+# ``composer._format_prefix_groups`` (whose ``composer.py:216`` caller is
+# parent-level and would strip ``benzenehexol``'s siblings).
+#
+# The class is **OPEN**: ``:3009`` retires the ``per-`` contraction, which *was*
+# exactly a closed-list mechanism, and the 2013 recommendations replaced it with
+# counting. So a table keyed on ``"pentafluoroethyl"`` is wrong on its complement by
+# construction -- ``heptafluoropropyl``, ``pentachloroethyl``,
+# ``heptafluoropropan-2-yl`` are all entailed and none is printed in the Blue Book
+# (``:3023`` is the ONLY printed instance of any of them; verified by grep).
+# Structural predicate only.
+_L5_CHAIN_HYDRIDE_CACHE: Dict[Tuple[int, int], object] = {}
+
+
+def _l5_chain_parent_hydride(chain_len: int, k: int):
+    """Parent hydride of an acyclic saturated all-carbon substituent chain.
+
+    ``chain_len`` carbons, free valence at 1-based locant ``k``, the free valence
+    represented as a **dummy atom**. Atom index ``i`` <-> chain locant ``i + 1``;
+    the dummy is the last atom and carries no hydrogen, so it is never a
+    substitutable position.
+
+    P-14.3.4.5 speaks of the substitutable positions of the PARENT, so the licence
+    has to be measured against the UNDECORATED chain: on the input molecule a fully
+    substituted carbon has zero hydrogens and the count that decides the licence
+    would be lost. Same reason, and the same idiom, as
+    ``rules/benzene.py::_benzene_parent_hydride()`` -- which is the site behind the
+    ``benzenehexol`` (omits) vs ``cyclohexane-1,2,3,4,5,6-hexol`` (retains) pair.
+
+    The dummy consumes exactly one hydrogen (**P-29.2**, ``:15813``: *"The atom with
+    the free valence terminates a chain and always has the locant '1', which is
+    omitted from the name"*), and the attachment carbon's REMAINING hydrogens still
+    count. That arithmetic is what makes the Blue Book print ``penta``fluoroethyl:
+    ethyl has 5 substitutable H, 2 at C1 and 3 at C2. Measured here as
+    ``*CC -> {1: 2, 2: 3}``.
+    """
+    key = (chain_len, k)
+    cached = _L5_CHAIN_HYDRIDE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    rw = Chem.RWMol()
+    for _ in range(chain_len):
+        rw.AddAtom(Chem.Atom(6))
+    for i in range(chain_len - 1):
+        rw.AddBond(i, i + 1, Chem.BondType.SINGLE)
+    dummy = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(k - 1, dummy, Chem.BondType.SINGLE)
+    hydride = rw.GetMol()
+    try:
+        Chem.SanitizeMol(hydride)
+    except Exception:  # noqa: BLE001  -- deny-by-default
+        return None
+    _L5_CHAIN_HYDRIDE_CACHE[key] = hydride
+    return hydride
+
+
+def _l5_substituent_prefix(mol, sub_atoms, chain, k, groups) -> Optional[str]:
+    """``P-14.3.4.5`` (``:3007``) for ONE substituent enclosing-mark scope.
+
+    Returns the **locant-free** prefix string (``'pentafluoro'``) when the licence
+    positively fires, or ``None`` meaning *"keep the locants"*.
+
+    ⚠ **DENY BY DEFAULT.** This is not a locant stripper: every omission is a
+    positively-licensed structural predicate, and anything that cannot be
+    established returns ``None``. The rule itself is NOT re-derived here -- the
+    decision is delegated to ``assembly.locant_omission.l5_uniform_complete``, the
+    one place the Blue Book licences live. This function only marshals the
+    substituent's scope into it.
+
+    Args:
+        mol: the whole molecule the substituent lives in.
+        sub_atoms: every atom of the substituent scope (chain + decorations).
+        chain: ordered principal-chain atom indices; ``chain[i]`` is locant
+            ``i + 1``.
+        k: the free-valence locant, 1-based.
+        groups: ``{prefix name: [locant, ...]}`` with ONE ENTRY PER OCCURRENCE,
+            exactly as both call sites already build it (``pentafluoroethyl`` is
+            ``{'fluoro': [1, 1, 2, 2, 2]}``).
+    """
+    from .locant_omission import (
+        l5_uniform_complete, locants_are_forced, scope_forces_locants,
+        scope_has_isotopic_modification,
+    )
+    from .naming_utils import format_substituent_prefix
+
+    # P-14.3.3 (``:2869``) as an AMBIENT scope. The isotope path names an
+    # isotope-STRIPPED molecule -- measured: at both live sites every
+    # ``GetIsotope()`` in the scope reads 0 even for a 13C input -- so the
+    # structural ``has_isotope`` below is blind by construction and THIS is the
+    # live guard. A licence that skips it elides a locant P-82.6.1.1 (``:44180``)
+    # requires, and neither SELF-01 (``namer.py`` states verbatim that it *"ignores
+    # isotopes"*) nor the gold set can see it: gold exposure for this whole class
+    # is zero.
+    if locants_are_forced():
+        return None
+
+    # ⚠ AND the weaker isotopic declaration, because ``locants_are_forced()`` ALONE
+    # IS NOT ENOUGH -- measured 2026-07-29. The isotope decorator enters the forced
+    # scope only after establishing that the descriptor needs a locant, so for
+    # ``FC(F)(F)[13C](F)(F)C1CCCCC1`` it is False here while the finished name still
+    # carries ``(13C1)``. Consulting only the forced flag turned
+    # ``(1,1,2,2,2-pentafluoro(13C1)ethyl)cyclohexane`` into
+    # ``(pentafluoro(13C1)ethyl)cyclohexane``, emptying of ALL locants a scope whose
+    # two carbons are inequivalent -- exactly what P-82.6.1.1 (``:44180``) forbids.
+    # This licence empties a scope completely, so it must decline on the weaker flag
+    # too. (``rules/benzene.py`` must NOT: its locant-free form is correct under
+    # P-82.6.1.3, ``(13C1)benzenehexol``.)
+    if scope_has_isotopic_modification():
+        return None
+
+    if mol is None or not chain or not groups or not sub_atoms:
+        return None
+    chain_len = len(chain)
+    if not isinstance(k, int) or isinstance(k, bool) or not 1 <= k <= chain_len:
+        return None
+
+    # ★ TERMINAL FREE VALENCE ONLY (k == 1). This is a rule boundary, not a
+    # convenience narrowing, and it is the conservative side of a genuine ambiguity
+    # the source does not settle by a printed example.
+    #
+    # P-29.2 (``:15813``) *"the atom with the free valence terminates a chain and
+    # always has the locant '1', which is omitted from the name"* -- so for k == 1
+    # the enclosing-mark scope contains NO locant of its own, and P-14.3.4.5 can
+    # empty it. That is precisely the shape of the only printed positive,
+    # ``(pentafluoroethyl)`` (``:3023``).
+    #
+    # For k >= 2 the scope must cite the free-valence locant itself
+    # (``propan-2-yl``), and that locant IS essential -- it distinguishes
+    # propan-2-yl from propan-1-yl. P-14.3.3 (``:2869``) then applies verbatim:
+    # *"if any locants are essential for defining the structure of ... a unit of
+    # structure as defined by its appropriate enclosing marks, then all locants must
+    # be cited for ... that structural unit."* So the substitution locants come
+    # back, and ``1,1,1,2,3,3,3-heptafluoropropan-2-yl`` KEEPS them.
+    #
+    # Consistency check: the Blue Book's flagship negative ``:46359``
+    # ``(1,1,1,3,3,3-hexafluoropropan-2-yl)oxy`` is k == 2 and keeps -- reachable
+    # both by this clause and by its C2 retaining a hydrogen, so the two readings
+    # agree there. The Blue Book prints NO fully-substituted substituent group with
+    # an internal free valence, so nothing decides between them; deny-by-default
+    # picks retention.
+    if k != 1:
+        return None
+
+    sub_set = set(sub_atoms)
+    if not set(chain) <= sub_set or len(set(chain)) != chain_len:
+        return None
+
+    # Independently re-establish the preconditions the parent hydride encodes, so a
+    # third call site cannot be wired up against a scope this shape does not fit:
+    # acyclic, all-carbon, saturated, and connected in the given order.
+    ring_info = mol.GetRingInfo()
+    for idx in chain:
+        try:
+            atom = mol.GetAtomWithIdx(int(idx))
+        except (OverflowError, RuntimeError, ValueError, TypeError):
+            return None
+        if atom.GetSymbol() != 'C' or atom.GetFormalCharge() != 0:
+            return None
+        if ring_info.NumAtomRings(int(idx)) > 0:
+            return None
+    for a, b in zip(chain, chain[1:]):
+        bond = mol.GetBondBetweenAtoms(int(a), int(b))
+        if bond is None or bond.GetBondTypeAsDouble() != 1.0:
+            return None
+    # Any unsaturation ANYWHERE in the scope changes the hydrogen count the licence
+    # is measured against, so it is a precondition of the whole scope, not just the
+    # chain.
+    for bond in mol.GetBonds():
+        if (bond.GetBeginAtomIdx() in sub_set and bond.GetEndAtomIdx() in sub_set
+                and bond.GetBondTypeAsDouble() != 1.0):
+            return None
+
+    # Marshal: locant -> the ONE decoration kind there, plus its multiplicity.
+    # ``counts`` is mandatory: ethyl's C1 has TWO substitutable hydrogens, so
+    # without it a doubly-fluorinated C1 reads as partial and the licence is
+    # (correctly, but uselessly) denied. Every decoration is included, not just
+    # halogens -- otherwise a scope whose uniformity is broken by a NON-halogen
+    # substituent could not be detected, which is the ``:29619`` failure mode.
+    kind_at: Dict[int, set] = {}
+    count_at: Dict[int, int] = {}
+    total = 0
+    for kind, locants in groups.items():
+        if kind is None or not str(kind).strip():
+            return None
+        for loc in (locants or []):
+            if isinstance(loc, bool) or not isinstance(loc, int):
+                return None
+            if not 1 <= loc <= chain_len:
+                return None
+            kind_at.setdefault(loc - 1, set()).add(kind)
+            count_at[loc - 1] = count_at.get(loc - 1, 0) + 1
+            total += 1
+    if not kind_at or any(len(kinds) != 1 for kinds in kind_at.values()):
+        return None                      # two kinds at one position -> not "in the
+                                         # same way" -> :3009
+    decoration_of = {idx: next(iter(kinds)) for idx, kinds in kind_at.items()}
+
+    # P-14.3.3: anything ESSENTIAL in the same scope restores every locant.
+    # Uniform complete substitution structurally precludes a stereocentre on the
+    # chain (a carbon bearing two identical decorations is not stereogenic), but
+    # that is checked rather than assumed -- a complex uniform decoration could
+    # carry one of its own.
+    has_stereo = any(
+        mol.GetAtomWithIdx(int(i)).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+        for i in sub_atoms
+    )
+    if scope_forces_locants(
+        prefix_locants=[loc for locs in groups.values() for loc in (locs or [])],
+        # A substituent prefix scope carries no suffix of its own.
+        suffix_locants=[],
+        stereo_text='stereo' if has_stereo else '',
+        # Indicated hydrogen is a ring/tautomer device; the scope is verified
+        # acyclic above. Multiplicative names and ring assemblies name their scope
+        # elsewhere and never arrive here as one acyclic chain. Skeletal
+        # replacement needs a heteroatom IN the chain; verified all-carbon above.
+        has_indicated_h=False,
+        has_isotope=any(mol.GetAtomWithIdx(int(i)).GetIsotope() for i in sub_atoms),
+        is_multiplicative=False,
+        is_ring_assembly=False,
+        has_skeletal_replacement=False,
+    ):
+        return None
+
+    hydride = _l5_chain_parent_hydride(chain_len, k)
+    if hydride is None:
+        return None
+    if not l5_uniform_complete(hydride, decoration_of=decoration_of,
+                               counts=count_at):
+        return None
+
+    # Render through the ONE canonical substituent-prefix formatter, which already
+    # documents the empty-locant case as the P-14.3.4 elision path
+    # (``naming_utils.py``: *"An empty locant list (elided per P-14.3.4, e.g. a
+    # mononuclear parent: phenylmethanol) takes no hyphen"*). Passing ``[]``
+    # therefore reuses its multiplier, bis/tris and
+    # enclosing-mark logic instead of adding a tenth inline copy of the join.
+    only_kind = next(iter(set(decoration_of.values())))
+    rendered = format_substituent_prefix(only_kind, [], total)
+    return rendered or None
+
+
 def _name_saturated_substituted_chain(
     mol,
     sub_atoms: List[int],
@@ -977,6 +1246,20 @@ def _name_saturated_substituted_chain(
     for h_idx, c_idx in halogens:
         groups[_HALOGEN_PREFIX[mol.GetAtomWithIdx(h_idx).GetSymbol()]].append(pos[c_idx])
 
+    stem = get_chain_prefix(len(backbone))
+
+    # P-14.3.4.5 (``:3007``), substituent enclosing-mark scope -- MEASURED-LIVE site
+    # for ``(pentafluoroethyl)cyclohexane`` (a validated call-spy recorded this
+    # function as the sole productive namer of that fragment, reached from
+    # ``name_substituent_fragment`` Step 2c; ``_located_acyclic_alkyl_name`` is
+    # never productive for it). Deny-by-default: the helper returns None unless the
+    # licence positively fires, and the locant-multiplier join below is then
+    # BYPASSED, never post-processed. ``ordered`` is attach-first, so the free
+    # valence is locant 1.
+    _l5 = _l5_substituent_prefix(mol, sub_atoms, ordered, 1, groups)
+    if _l5:
+        return f"{_l5}{stem}yl"
+
     _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
     # Alphabetical order of the (base) halogen prefixes (P-14.5.1: the di/tri
     # multiplier on a simple substituent is ignored for ordering).
@@ -987,7 +1270,6 @@ def _name_saturated_substituted_chain(
         mult = _MULT.get(len(locs), f"{len(locs)}")
         part_strings.append(f"{loc_str}-{mult}{prefix}")
 
-    stem = get_chain_prefix(len(backbone))
     return f"{'-'.join(part_strings)}{stem}yl"
 
 
@@ -3335,8 +3617,20 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
     except (ValueError, KeyError):
         return None
 
+    # P-14.3.4.5 (``:3007``), substituent enclosing-mark scope -- MEASURED-LIVE site
+    # for ``1-chloro-2-(pentafluoroethyl)benzene`` (``:3023``). A validated call-spy
+    # recorded this function as the sole productive namer of that fragment, reached
+    # from ``substituent_enumerator.py:1513``; ``_name_saturated_substituted_chain``
+    # is never even CALLED for it -- the two live sites sit on two entirely
+    # different cascades, which is why both have to be wired.
+    # Deny-by-default: the licence is consulted, and only a positive answer replaces
+    # the located join. It fires only for k == 1 (see the helper's derivation), so
+    # the ``an-k-yl`` branch below is unaffected by construction.
+    _l5 = _l5_substituent_prefix(mol, sub_atoms, chain, k, branch_groups) \
+        if branch_groups else None
+
     from .composer import _format_prefix_groups
-    prefix = _format_prefix_groups(branch_groups) if branch_groups else ""
+    prefix = _l5 or (_format_prefix_groups(branch_groups) if branch_groups else "")
 
     if k == 1:
         try:
