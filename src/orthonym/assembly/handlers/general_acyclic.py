@@ -168,12 +168,11 @@ def name_general_acyclic(
     # applied by REBUILDING THE PREFIX FRAGMENTS WITHOUT LOCANTS rather than by a
     # print-time flag, so every renderer downstream agrees -- see the helper's
     # docstring § "Why the fragments and not a flag".
-    import dataclasses as _dc
-
-    from ._handler_shared import _l5_prefix_locants_omitted
+    from ._handler_shared import (
+        _l5_prefix_locants_omitted, _prefix_fragments_without_locants,
+    )
     if _l5_prefix_locants_omitted(features, fragments):
-        fragments = [_dc.replace(f, locants=()) if f.fragment_type == "prefix" else f
-                     for f in fragments]
+        fragments = _prefix_fragments_without_locants(fragments)
 
     # Assemble in correct order.
     # P-16.5.1.3.1 mononuclear enclosing rule is keyed on a STRUCTURAL property:
@@ -189,11 +188,18 @@ def name_general_acyclic(
     # fragments. `_l3_prefix_locant_omitted` delegates the rule itself to
     # `assembly.locant_omission`; deny-by-default, so False whenever the licence
     # cannot be positively established.
+    #
+    # Applied by REBUILDING THE PREFIX FRAGMENTS, exactly like P-14.3.4.5 above and
+    # for the same measured reason: it used to be a print-time flag threaded into
+    # `_assemble_fragments` only, which the name-tree serializer -- the production
+    # composition site for this class -- never saw, so the two renderers disagreed
+    # on `chloropropanedioic acid` and `_serializer_flip_or_name` silently kept the
+    # legacy string. See `_prefix_fragments_without_locants`.
     from ._handler_shared import _l3_prefix_locant_omitted
-    l3_omit_prefix_locant = _l3_prefix_locant_omitted(features, fragments)
+    if _l3_prefix_locant_omitted(features, fragments):
+        fragments = _prefix_fragments_without_locants(fragments)
     assembled = _assemble_fragments(
         fragments, style, is_mononuclear_parent=is_mononuclear_parent,
-        l3_omit_prefix_locant=l3_omit_prefix_locant,
     )
 
     # Observational coverage logging for fallback chain/ring path (ARCH-06)

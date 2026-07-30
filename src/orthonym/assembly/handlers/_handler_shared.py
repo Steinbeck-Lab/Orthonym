@@ -1369,6 +1369,21 @@ def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) ->
     if features is None or not fragments:
         return False
 
+    # ⚠ THE THIRD THING TO CONSULT. This licence empties its scope of ALL locants,
+    # so besides the two ambient declarations that `locant_omission` checks
+    # (`locants_are_forced`, `scope_has_isotopic_modification`) it must also
+    # establish that the scope's boundary IS the molecule being named -- the
+    # fragment-boundary observation of
+    # .
+    # Without it the decomposition engine can cap a fragment into a different
+    # compound, have the licence fire CORRECTLY on that surrogate, and splice the
+    # locant-free string into an enclosing scope that cites an essential `N`
+    # (BB:29619 is the Blue Book saying so about that very shape). The sibling
+    # P-14.3.4.5 licence below has consulted it since Task 5b; this one was wired
+    # before the observation existed, and it is the same class.
+    if _naming_call_produces_a_name_component():
+        return False
+
     prefixes = [f for f in fragments if f.fragment_type == "prefix"]
     suffixes = [f for f in fragments if f.fragment_type == "suffix"]
     parents = [f for f in fragments if f.fragment_type == "parent"]
@@ -1381,11 +1396,29 @@ def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) ->
     pf_locants = list(pf.locants or [])
     if len(pf_locants) != 1 or getattr(pf, "count", 1) != 1:
         return False
-    # A prefix whose TEXT already begins with a digit names its own locants (a ring
-    # or complex substituent); it is not the simple mono prefix this licence covers,
-    # and the assembler's `already_has_locant` branch would leave them in place.
+    # A prefix whose TEXT begins with a digit cites locants of its own.
+    #
+    # ⚠ This used to refuse UNCONDITIONALLY, on the ground that such a prefix "names
+    # its own locants (a ring or complex substituent)". Measured 2026-07-30: that is
+    # also true of every ALKYL prefix, because `composer._generate_alkyl_prefixes`
+    # renders through `format_substituent_prefix`, which bakes `2-` into the string.
+    # So the licence declined for `2-methylpropanedioic acid` while firing for the
+    # structurally IDENTICAL `chloropropanedioic acid` (BB:2951, verbatim (PIN)) --
+    # same parent, same one-prefix-one-locant scope, differing only in which
+    # producer rendered the prefix. Spy output for the two, side by side:
+    #     ('prefix', '2-methyl', (2,), 1)   -> refused here
+    #     ('prefix', 'chloro',   (2,), 1)   -> reached the licence, fired
+    #
+    # The fix is NOT to strip the digits: the licence is allowed to proceed only
+    # when the PRODUCER has supplied the locant-free spelling as data
+    # (`text_without_locants`), which is the positive establishment that the digits
+    # are exactly this fragment's own cited locants AND that a rendering without
+    # them exists. A ring/complex prefix that names locants INSIDE itself supplies
+    # no such spelling and is still refused, deny-by-default.
+    _unlocanted = getattr(pf, "text_without_locants", None)
     if _re.match(r"^\d", pf.text or ""):
-        return False
+        if not _unlocanted or _re.match(r"^\d", _unlocanted):
+            return False
 
     # P-14.3.3: any other locant cited in the same scope restores them all.
     if stereos and str(stereos[0].text or "").strip():
@@ -1440,6 +1473,77 @@ def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) ->
         parent_cites_locants=False,
         stereo_text="",
     )
+
+
+def locant_scope_is_a_name_component() -> bool:
+    """The fragment-boundary observation, for callers OUTSIDE this module.
+
+    Same answer as :func:`_naming_call_produces_a_name_component` (the single
+    implementation, documented there), with the IMPORT itself fail-closed so a
+    ``rules/`` module that cannot reach it cites the locant rather than eliding it.
+
+    This is the THIRD of the three things any P-14.3.4 licence that empties a scope
+    of ALL its locants must consult -- see
+    ``,
+    § "The rule this establishes". The other two, ``locants_are_forced()`` and
+    ``scope_has_isotopic_modification()``, are ambient declarations checked inside
+    ``assembly.locant_omission`` itself; this one is a read-only observation of
+    ``assembly.fragment_naming``'s state and is kept out of that module so it stays
+    the pure "RDKit mols in, booleans out" leaf its docstring promises.
+
+    Exported (no leading underscore) precisely so the ring and polyfunctional
+    licences share ONE copy instead of each growing their own -- the failure mode
+    the 119-site ARCH finding is about.
+    """
+    try:
+        return bool(_naming_call_produces_a_name_component())
+    except Exception:                          # noqa: BLE001 -- deny-by-default
+        return True
+
+
+def _prefix_fragments_without_locants(
+    fragments: List["NameFragment"],
+) -> List["NameFragment"]:
+    """Rebuild every PREFIX fragment so it cites no locants. Non-prefixes untouched.
+
+    THE one way a P-14.3.4 licence is applied at parent scope, shared by
+    P-14.3.4.3 (:func:`_l3_prefix_locant_omitted`) and P-14.3.4.5
+    (:func:`_l5_prefix_locants_omitted`).
+
+    ★ **Why the FRAGMENTS and not a print-time flag.** The fragment list is the
+    single input to BOTH renderers -- the legacy ``_assemble_fragments`` and, via
+    ``name_tree_builder.fragments_to_tree``, the name-tree serializer, which is the
+    production composition site for ``general_acyclic`` (the sole member of
+    ``name_tree_to_string.SERIALIZER_PRODUCTION_CLASSES``). A flag reaching only one
+    of the two makes them disagree, and ``composer._serializer_flip_or_name`` then
+    silently keeps the legacy string -- so the divergence is invisible. Measured
+    exactly that way for ``chloropropanedioic acid`` while P-14.3.4.3 was applied by
+    the ``l3_omit_prefix_locant`` flag: legacy emitted the licensed form, the
+    serializer emitted ``2-chloropropanedioic acid``, and the flip fell back.
+    Clearing ``locants`` fixes both by construction.
+
+    Two things are rebuilt, not one:
+
+    * ``locants=()`` -- so neither renderer prepends a ``{locants}-`` head;
+    * ``text`` -- replaced by the producer's ``text_without_locants`` when it
+      supplied one, because a producer that BAKES its locants into the string
+      (``composer._generate_alkyl_prefixes`` -> ``'2-methyl'``) would otherwise keep
+      them however empty ``locants`` is. This is the whole reason the licence could
+      not reach the alkyl-prefixed diacids. It is a choice between two renderings
+      the producer computed, never an edit of a rendered string.
+    """
+    import dataclasses as _dc
+    out = []
+    for f in fragments:
+        if f.fragment_type != "prefix":
+            out.append(f)
+            continue
+        _unlocanted = getattr(f, "text_without_locants", None)
+        if _unlocanted:
+            out.append(_dc.replace(f, locants=(), text=_unlocanted))
+        else:
+            out.append(_dc.replace(f, locants=()))
+    return out
 
 
 def _naming_call_produces_a_name_component() -> bool:
@@ -1537,9 +1641,12 @@ def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     substitutable hydrogen replaced -- and where both could hold they agree.
 
     **Why the fragments and not a flag.** The caller applies a True answer by
-    REBUILDING the prefix fragments with empty ``locants``, not by threading a
-    print-time suppression flag into :func:`_assemble_fragments` the way the older
-    ``l3_omit_prefix_locant`` does. The fragment list is the single input to BOTH the
+    REBUILDING the prefix fragments with empty ``locants``
+    (:func:`_prefix_fragments_without_locants`), not by threading a print-time
+    suppression flag into :func:`_assemble_fragments` the way the older
+    ``l3_omit_prefix_locant`` parameter did -- Task 3b converted P-14.3.4.3 to this
+    same mechanism and deleted that parameter. The fragment list is the single input
+    to BOTH the
     legacy assembler and ``name_tree_builder.fragments_to_tree``, and the tree IS the
     production composition site for this handler -- ``general_acyclic`` is the sole
     member of ``name_tree_to_string.SERIALIZER_PRODUCTION_CLASSES``. A flag reaching
@@ -1863,7 +1970,6 @@ def _assemble_fragments(
     fragments: List["NameFragment"],
     style: str,
     is_mononuclear_parent: bool = False,
-    l3_omit_prefix_locant: bool = False,
 ) -> str:
     """
     Assemble fragments into final name string.
@@ -1888,13 +1994,11 @@ def _assemble_fragments(
             atom count == 1) — NOT by string-matching the stem. Governs the
             P-16.5.1.3.1 mononuclear enclosing rule below. Default False so the
             other (multi-atom) callers are byte-identical.
-        l3_omit_prefix_locant: the P-14.3.4.3 (BB:2939) licence, decided by
-            `_l3_prefix_locant_omitted` in the caller — where `features` exists, as
-            for `is_mononuclear_parent`. True means the scope's SINGLE substituent
-            prefix cites no locant (`chloropropanedioic acid`, BB:2951). NOT a
-            locant-stripping flag: it is only ever set by a positively-licensed
-            structural predicate, and defaults False so every other caller of this
-            shared assembler stays byte-identical.
+    Note: the P-14.3.4.3 licence used to arrive here as an `l3_omit_prefix_locant`
+    parameter. It does not any more — Task 3b applies it (and P-14.3.4.5) upstream by
+    rebuilding the prefix fragments with empty `locants`, so BOTH this assembler and
+    the name-tree serializer read one answer. See
+    `_prefix_fragments_without_locants`.
     """
     from ..composer import NameFragment
     # Phase 179 (D-03): the composition-grammar primitives now live in the leaf
@@ -1996,15 +2100,20 @@ def _assemble_fragments(
     # NOTE: Some prefixes already have locants baked in (ring substituent prefixes
     # like "4-phenyl"). Only add locants to those that don't already have them.
     import re
-    # `l3_omit_prefix_locant` is the P-14.3.4.3 (BB:2939) licence decided by the
-    # caller (`_l3_prefix_locant_omitted`). It only ever holds when there is exactly
-    # ONE prefix carrying exactly ONE locant, so suppressing the locant here cannot
-    # reach a second prefix: `chloropropanedioic acid`, `chlorobutanedioic acid`.
+    # v29 Phase C Task 3b: the P-14.3.4.3 licence used to arrive here as an
+    # `l3_omit_prefix_locant` PARAMETER that suppressed the locant at print time.
+    # It is now applied upstream by rebuilding the prefix fragments with
+    # `locants=()` (`_prefix_fragments_without_locants`), because this assembler is
+    # only ONE of the two renderers reading this fragment list -- the name-tree
+    # serializer is the other, and is the production composition site for
+    # general_acyclic -- so a print-time flag made them disagree. Nothing is lost by
+    # the removal: an empty `locants` tuple reaches the `else` below and emits the
+    # text unchanged, which is byte-identical to what the flag produced.
     prefix_texts = []
     for f in prefixes:
         text = f.text
         already_has_locant = bool(re.match(r'^\d', text))
-        if f.locants and not already_has_locant and not l3_omit_prefix_locant:
+        if f.locants and not already_has_locant:
             loc_str = ",".join(str(l) for l in f.locants)
             prefix_texts.append(f"{loc_str}-{text}")
         else:

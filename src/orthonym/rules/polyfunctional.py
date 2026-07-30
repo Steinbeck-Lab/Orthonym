@@ -1411,6 +1411,64 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         and _should_omit_l1(context="prefix", chain_length=len(principal_chain))
     )
 
+    # ------------------------------------------------------------------------- #
+    # P-14.3.4.3 (BB:2939) -- the THIRD handler that reaches this licence class.  #
+    # ------------------------------------------------------------------------- #
+    # Measured 2026-07-30: `OC(=O)C(N)C(=O)O` and `OC(=O)C(O)C(=O)O` are named by
+    # THIS handler (POOL source `polyfunctional`), not by `general_acyclic`, because
+    # amino/hydroxy are detected functional groups and chloro is not -- so
+    # `chloropropanedioic acid` (BB:2951, verbatim (PIN)) got the licence via
+    # `_l3_prefix_locant_omitted` while `2-aminopropanedioic acid` and
+    # `2-hydroxypropanedioic acid` recorded ZERO calls to it. Same parent compound,
+    # same one-prefix-one-locant scope, different handler.
+    #
+    # The PIN really is the systematic form for both: BB:4973 `HOOC-CH2-COOH
+    # propanedioic acid (PIN) malonic acid (not 2-carboxyacetic acid)` and BB:2951
+    # `chloropropanedioic acid (PIN) chloromalonic acid` establish that a
+    # substituted malonic acid is named on the systematic parent. Their trivial
+    # names -- tartronic acid (2-hydroxy-) and aminomalonic acid (2-amino-) --
+    # appear ZERO times anywhere in BlueBookV2.md, so no retained name pre-empts
+    # them (checked because P-63/P-103 do retain some acid and amino-acid names).
+    #
+    # ★ "monosubstituted" is established STRUCTURALLY, before any prefix is
+    # rendered, and that is what makes the decision safe in a handler whose
+    # `all_prefixes` list is assembled from eight different branches:
+    # `l3_locant_omitted_for_parent_atoms` proves via `_one_substituent_removed`
+    # that the atoms outside the parent compound form exactly ONE connected
+    # component joined by exactly ONE bond. A second FG prefix, ring prefix, alkyl
+    # prefix or N-substituent prefix would each be a further such component, so the
+    # proof fails for every scope that could hold two prefixes. The
+    # `len(all_prefixes) == 1` re-check at the application site below is belt and
+    # braces against a branch double-counting one component.
+    _l3_parent_atoms = set()
+    for _seq in (principal_chain or (),
+                 getattr(features, 'principal_ring', None) or ()):
+        for _idx in _seq:
+            _l3_parent_atoms.add(int(_idx))
+    for _match in (getattr(features, 'principal_group_atoms', None) or ()):
+        for _idx in _match:
+            _l3_parent_atoms.add(int(_idx))
+    from ..assembly.handlers._handler_shared import (
+        locant_scope_is_a_name_component as _l3_scope_is_nested,
+    )
+    _l3_scope_ok = bool(
+        _l3_parent_atoms
+        and not _omit_mononuclear_locants        # that rule already omits, P-14.3.4.2(a)
+        and not features.double_bonds and not features.triple_bonds
+        and not features.stereocenters
+        and not getattr(features, 'double_bond_stereo', None)
+        # A ring parent's stem cites its own locants in this handler; restrict to a
+        # chain parent, deny-by-default (mirrors the `_acetic_context` guard).
+        and not (getattr(features, 'is_cyclic', False)
+                 and not getattr(features, 'chain_is_parent', False))
+        # The third scope check: this licence empties the whole name of locants.
+        and not _l3_scope_is_nested()
+    )
+    #: (prefix_form, count) of the single FG prefix the licence has cleared, so the
+    #: application below can RE-RENDER it from its parts. Never a string edit of the
+    #: already-rendered prefix.
+    _l3_render_from = None
+
     # Collect substituent branch atoms for FG-on-branch filtering (BUG-B).
     # FGs located entirely on a substituent branch are already named by the
     # substituent naming path (e.g., hydroxymethyl), so skip them here.
@@ -2179,6 +2237,27 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             count)
         all_prefixes.append(formatted)
 
+        # P-14.3.4.3: with the scope preconditions already established above, ask
+        # the licence about THIS prefix's single locant. The rule itself is not
+        # re-derived here -- it is `assembly.locant_omission`, the one place the
+        # P-14.3.4 licences live, and it measures the orbits of the parent
+        # compound's substitutable hydrogens (propanedioic acid: C2 only, because
+        # both acid O-H sit on a chalcogen and are excluded by BB:3007 -> ONE kind
+        # -> fires; pentanedioic acid: C2/C4 in one orbit and C3 in another -> two
+        # kinds -> denied).
+        if _l3_scope_ok and count == 1 and len(locants) == 1:
+            from ..assembly.locant_omission import (
+                l3_locant_omitted_for_parent_atoms as _l3_licence,
+            )
+            if _l3_licence(
+                mol, _l3_parent_atoms,
+                prefix_locants=list(locants),
+                suffix_locants=[],
+                parent_cites_locants=False,
+                stereo_text="",
+            ):
+                _l3_render_from = (prefix_form, count)
+
     # --- Generate ring substituent prefixes (when chain is parent) ---
     if getattr(features, 'chain_is_parent', False):
         from ..assembly.composer import _generate_ring_substituent_prefixes
@@ -2412,6 +2491,38 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         and not features.stereocenters
         and not getattr(features, 'double_bond_stereo', None)
     )
+    # P-14.3.4.3 APPLICATION. Everything the scope needs is final here:
+    # `all_prefixes` is complete, and `suffix_locants` is known (P-14.3.3 restores
+    # every locant in a scope where the SUFFIX still cites one, so a suffix locant
+    # vetoes -- the multiplied but locant-LESS `-dioic acid` does not, which is
+    # exactly the `chloropropanedioic acid` shape). The prefix is RE-RENDERED from
+    # the parts the FG loop used, so the locant-free spelling comes from
+    # `format_fg_prefix` like every other prefix in this handler and not from
+    # editing a rendered string.
+    #
+    # ⚠ Both conditions are MUTATION-SURVIVING and DELIBERATELY KEPT (measured
+    # 2026-07-30: removing either changes no name), for two DIFFERENT reasons:
+    #
+    # * `not suffix_locants` is over-determined today by the orbit test inside the
+    #   licence -- a parent compound with only ONE kind of substitutable hydrogen and
+    #   a suffix that still cites a locant does not occur, because the one-orbit chain
+    #   parents are the diacids, whose terminal suffix locants P-14.3.4.1 has already
+    #   withdrawn. `OC(=O)CC(O)C` (suffix locant 3, one prefix) is refused by the
+    #   orbit test on butanoic acid instead. It is the direct statement of P-14.3.3
+    #   for the suffix half of the scope, and what would stop the licence the moment
+    #   either the orbit test or P-14.3.4.1 changed.
+    #
+    # * `len(all_prefixes) == 1` covers a case the structural monosubstitution proof
+    #   canNOT: ONE substituent component matched by TWO different FG types would
+    #   append two prefixes while `_one_substituent_removed` still measures one
+    #   component. No witness for that shape was found, so it survives mutation, but
+    #   it is not redundant with the structural proof -- do not remove it on the
+    #   strength of the mutation result.
+    if (_l3_render_from is not None and len(all_prefixes) == 1
+            and not suffix_locants
+            and not double_locants and not triple_locants):
+        all_prefixes = [format_fg_prefix(_l3_render_from[0], [], _l3_render_from[1])]
+
     if _acetic_context:
         from ..assembly.composition_primitives import retained_acetic_from_prefixes
         name = retained_acetic_from_prefixes(all_prefixes)

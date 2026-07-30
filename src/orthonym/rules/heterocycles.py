@@ -2443,10 +2443,85 @@ def name_substituted_heterocycle(
         )
         prefix_parts.append((prefix, name))
 
+    # ------------------------------------------------------------------ #
+    # P-14.3.4.3 (BB:2939) "Omission of locants" -- the ring-PREFIX case. #
+    # ------------------------------------------------------------------ #
+    # Sibling of the ring-SUFFIX licence further down (which serves
+    # `pyrazinecarboxylic acid`, BB:2949). BOTH halves of L3's own example block
+    # are printed, and the prefix half is the one this branch serves:
+    #
+    #     BB:2947   chlorocoronene (PIN)
+    #     BB:2951   chloropropanedioic acid (PIN)   chloromalonic acid
+    #
+    # `chlorocoronene` is a monosubstituted symmetrical RING parent whose single
+    # substituent PREFIX cites no locant -- exactly the shape of `chloropyrazine`.
+    #
+    # ⚠ NOT "symmetric heterocycle => omit". The decision is delegated whole to
+    # assembly.locant_omission.l3_locant_omitted_for_parent_atoms, which measures the
+    # ORBITS of the parent hydride's substitutable hydrogens
+    # (CanonicalRankAtoms(breakTies=False)). That is the ONLY thing separating
+    # pyrazine (four ring CH, ONE orbit -> omit) from pyridine (2/6, 3/5, 4 =
+    # THREE orbits -> `4-chloropyridine` and `2-chloropyridine` KEEP their locants)
+    # and from piperidine (N-H, C2/C6, C3/C5, C4 = FOUR orbits, BB:34730
+    # `piperidine-1-carbonitrile`). Measured on the parents themselves:
+    # pyrazine True, pyridine False, piperidine False.
+    #
+    # P-14.3.3 (BB:2869) is deny-by-default, so every locant that could share this
+    # scope is excluded FIRST and anything not positively established retains:
+    #   * exactly ONE C-substituent prefix, ONE occurrence, ONE numeric locant
+    #   * no N-substituent prefixes -- those carry an ESSENTIAL italic-N or ring-N
+    #     locant, which restores every locant in the scope
+    #   * no suffix FG at all: a suffix cites its own locant (and the sibling
+    #     licence below owns that case), so a scope with both is not "the single
+    #     locant this licence may omit"
+    #   * a parent_name that is not purely alphabetic already cites a locant -- a
+    #     heteroatom set (`1,4-dioxane`) or an indicated hydrogen (`1H-pyrrole`)
+    #   * no stereodescriptors
+    # The `_het_loc_prefix` injection cannot apply here: it is computed only inside
+    # the `if suffix_fg:` block below, which this branch excludes.
+    #
+    # ⚠ `not suffix_fg` and `not n_groups` are MUTATION-SURVIVING and DELIBERATELY
+    # KEPT. Measured 2026-07-30: removing either changes no name, because the
+    # licence's own STRUCTURAL monosubstitution proof
+    # (`locant_omission._one_substituent_removed`) already refuses any scope holding
+    # two substituent components -- for `OC(=O)c1cnc(Cl)cn1` (a suffix -COOH plus a
+    # chloro prefix on the ONE-orbit pyrazine ring) it measures False, and for
+    # `CN1CCC(C)CC1` both it and the orbit test measure False. A DOUBLE mutation
+    # (drop `not suffix_fg` AND relax `_one_substituent_removed`) does move that name,
+    # while relaxing `_one_substituent_removed` alone moves nothing -- so these are
+    # mutually-covering preconditions in a stack, not dead code, and they state
+    # P-14.3.3's *"then all locants must be cited"* for the halves of the scope this
+    # branch is not allowed to inspect.
+    _l3_omit_prefix_locant = False
+    if (not n_groups and len(c_groups) == 1 and not suffix_fg
+            and parent_name and parent_name.isalpha()
+            and not stereo_descriptors):
+        _only_locants = next(iter(c_groups.values()))
+        # The THIRD scope check (the fragment-boundary observation): this licence
+        # empties the whole name of locants, so it may only fire when the scope's
+        # boundary IS the molecule being named. The two ambient declarations are
+        # checked inside `locant_omission` itself.
+        from ..assembly.handlers._handler_shared import (
+            locant_scope_is_a_name_component,
+        )
+        if (len(_only_locants) == 1 and _only_locants[0] is not None
+                and not locant_scope_is_a_name_component()):
+            from ..assembly.locant_omission import (
+                l3_locant_omitted_for_parent_atoms,
+            )
+            _l3_omit_prefix_locant = l3_locant_omitted_for_parent_atoms(
+                mol, ring_atoms,
+                prefix_locants=list(_only_locants),
+                suffix_locants=[],
+                parent_cites_locants=False,
+                stereo_text="",
+            )
+
     # Format C-substituent prefixes
     for name, locants in c_groups.items():
         count = len(locants)
-        prefix = _format_c_substituent(name, sorted(locants), count)
+        prefix = _format_c_substituent(
+            name, sorted(locants), count, omit_locants=_l3_omit_prefix_locant)
         prefix_parts.append((prefix, name))
 
     # Sort alphabetically by the base substituent name
@@ -2740,7 +2815,8 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
         return f"{n_locants}-{multiplier}{wrapped}"
 
 
-def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
+def _format_c_substituent(name: str, locants: List[int], count: int,
+                          omit_locants: bool = False) -> str:
     """
     Format a C-substituent prefix with numeric locants.
 
@@ -2751,6 +2827,15 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
     Enclosing marks are required by P-16.5.1.1 (BB 7232); their ORDER
     (...), [...], {...} is P-16.5.4 (BB 7444), escalating per P-16.5.4.1.5 (BB 7509).
     Names already containing parentheses use square brackets.
+
+    ``omit_locants`` is the P-14.3.4.3 (BB:2939) licence, decided by the CALLER
+    (``name_substituted_heterocycle``) -- the only place with the ring structure the
+    orbit test needs, exactly as for the sibling suffix licence. True means this
+    scope's single substituent prefix cites no locant: ``chloropyrazine``,
+    ``methylpyrazine``, on the model of BB:2947 ``chlorocoronene (PIN)``.
+    NOT a locant-stripping flag: it is only ever set by a positively-licensed
+    structural predicate, it defaults False, and the ENCLOSING MARKS and multiplier
+    below are still applied -- only the ``{locants}-`` head is withheld.
     """
     locant_str = ",".join(str(loc) for loc in locants)
     # Wrap compound names in enclosing marks to prevent locant ambiguity
@@ -2779,9 +2864,11 @@ def _format_c_substituent(name: str, locants: List[int], count: int) -> str:
         else:
             display_name = f'({name})'
     if count == 1:
-        return f"{locant_str}-{display_name}"
+        return display_name if omit_locants else f"{locant_str}-{display_name}"
     else:
         multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+        if omit_locants:
+            return f"{multiplier}{display_name}"
         return f"{locant_str}-{multiplier}{display_name}"
 
 

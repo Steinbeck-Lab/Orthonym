@@ -631,6 +631,23 @@ class NameFragment:
     priority: int = 0
     fragment_type: str = "prefix"  # prefix, parent, suffix, stereo
     count: int = 1  # Number of instances (for multiplier when locants are omitted)
+    #: The SAME prefix rendered from its parts with no locants cited.
+    #:
+    #: Most prefix producers hand back ``text`` WITHOUT locants and carry the
+    #: locants as data in ``locants``, so a P-14.3.4 licence can withhold them at
+    #: print time.  ``_generate_alkyl_prefixes`` cannot: it renders through
+    #: ``format_substituent_prefix``, which BAKES ``2-`` into the string.  That is
+    #: why the P-14.3.4.3 licence could not reach ``2-methylpropanedioic acid``
+    #: (measured: it declined at the "text begins with a digit" guard, while the
+    #: structurally identical ``chloro`` prefix reached the licence and fired).
+    #:
+    #: A producer that bakes locants into ``text`` therefore also supplies the
+    #: locant-free spelling HERE, produced by the same renderer from ``name`` and
+    #: ``count`` -- never by editing the formatted string, which would be the
+    #: string band-aid ``./skills/fix-methodology.md`` forbids and would be
+    #: wrong on the complement (``2-methylpentanedioic acid`` legitimately keeps
+    #: its locant).  ``None`` means "``text`` cites no locants of its own".
+    text_without_locants: Optional[str] = None
 
 
 def _get_parent_atom_count(features) -> int:
@@ -7715,6 +7732,33 @@ def _collect_pure_alkyl_atoms(mol, start_idx, excluded):
     return atoms if atoms else None
 
 
+def _render_prefix_without_locants(name: str, count: int) -> str:
+    """Render a substituent prefix with its multiplier and enclosing marks, NO locants.
+
+    The one renderer for the locant-free spelling of a chain substituent prefix.
+    Extracted verbatim from ``_generate_alkyl_prefixes``' P-14.3.4.2 elision branch
+    so that branch and the P-14.3.4.3 licence produce byte-identical strings from
+    one place, rather than a second copy that could drift (the ARCH finding
+    ``).
+
+    A complex/compound substituent still needs enclosing marks when its locant is
+    elided (P-16.5.1.1, BB:7232 *"Parentheses are used around compound ... and
+    complex ... prefixes"*; BB:7236 ``(chloromethyl)silane [PIN; ...
+    chloro(methyl)silane would describe Cl-SiH2-CH3]``), and a multiplied
+    occurrence still cites its COUNT -- ``bis(methylsulfanyl)methane`` -- because
+    P-14.3.4 withdraws LOCANTS, never multiplicative prefixes. The bare name passes
+    through ``apply_enclosing_marks`` for correct ()->[]->{} nesting and
+    leading-stereo escalation (avoids the double-enclose hazard).
+    """
+    from ..assembly.naming_utils import (
+        apply_enclosing_marks, _has_stereo_prefix, get_multiplier_prefix,
+    )
+    _mult = get_multiplier_prefix(count, name) if count > 1 else ""
+    if is_complex_substituent(name) or _has_stereo_prefix(name):
+        return _mult + apply_enclosing_marks(name, depth=-1)
+    return _mult + name
+
+
 def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for all substituents on chain parents.
@@ -8051,27 +8095,28 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             # '(methyldisulfanyl)methane'. Mirrors the ring-prefix path. The bare
             # name passes through apply_enclosing_marks (correct ()->[]->{} nesting
             # + leading-stereo escalation; avoids the double-enclose hazard).
-            from ..assembly.naming_utils import (
-                apply_enclosing_marks, _has_stereo_prefix, get_multiplier_prefix,
-            )
-            # Preserve the multiplier when the (locant-elided) substituent occurs
-            # more than once — e.g. two methylsulfanyl groups on a methane parent
-            # -> bis(methylsulfanyl)methane (NOT a single dropped group). The locant
-            # is omitted (methane, position 1) but the COUNT must still be cited.
-            _mult = get_multiplier_prefix(count, name) if count > 1 else ""
-            if is_complex_substituent(name) or _has_stereo_prefix(name):
-                formatted = _mult + apply_enclosing_marks(name, depth=-1)
-            else:
-                formatted = _mult + name
+            formatted = _render_prefix_without_locants(name, count)
             emit_locants = ()
+            unlocanted = None
         else:
             formatted = format_substituent_prefix(name, sorted_locants, count)
             emit_locants = tuple(sorted_locants)
+            # ★ THREAD THE LOCANTS OUT. `format_substituent_prefix` bakes `2-` into
+            # the string, so a P-14.3.4 licence downstream has nothing to withhold
+            # and (measured) declined at the "text begins with a digit" guard for
+            # every alkyl-prefixed molecule -- which is why
+            # `2-methylpropanedioic acid` shipped while the structurally identical
+            # `chloropropanedioic acid` (BB:2951, verbatim (PIN)) was correct.
+            # Carry the locant-free spelling as data, produced by the SAME renderer
+            # the elision branch above uses, so the licence can choose a rendering
+            # instead of editing a rendered string.
+            unlocanted = _render_prefix_without_locants(name, count)
 
         prefixes.append(NameFragment(
             text=formatted,
             locants=emit_locants,
-            fragment_type="prefix"
+            fragment_type="prefix",
+            text_without_locants=unlocanted,
         ))
 
     # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)

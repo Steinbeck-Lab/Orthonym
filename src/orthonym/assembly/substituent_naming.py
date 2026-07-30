@@ -1864,6 +1864,145 @@ def _joined_prefix_parts(parts: List[str]) -> List[str]:
     return out
 
 
+def _ether_chain_locants_omitted(mol, sub_atoms, backbone, groups) -> bool:
+    """P-14.3.4 for the ether-substituted-chain SUBSTITUENT scope.
+
+    True => this substituent group's own enclosing-mark scope cites NO locants.
+
+    ⚠ Replaces a hand-rolled ``cite_locants = len(backbone) > 1`` that appeared
+    nowhere in the Blue Book (recorded as an unaudited private licence in
+    ``). The
+    ANSWER it gave for a one-carbon backbone is right; the REASON was missing, and
+    on a >1-carbon backbone it denied a licence P-14.3.4.5 grants.
+
+    Two licences can fire, both delegated whole to ``assembly.locant_omission``:
+
+    * `**P-14.3.4.6**` (BB:3031) *"All locants are omitted for parent compounds when
+      all substitutable hydrogen atoms have the same locant."* -- a ONE-carbon
+      backbone puts every substitutable hydrogen of the ``methyl`` parent hydride at
+      locant 1, so ``-CH(O-CH3)2`` is ``dimethoxymethyl``, not
+      ``1,1-dimethoxymethyl``.
+
+      ★ **The printed positive is the Blue Book's own preferred prefix**
+      ``diphenylmethyl`` (BB:16408 ``diphenylmethyl (preferred prefix) (not
+      benzhydryl)``; BB:55912 ``| diphenylmethyl* | (C6H5)2CH– | P-29.6.3 |``).
+      (C6H5)2CH- is the identical shape: a ``methyl`` substituent group with 2 of
+      its 3 substitutable hydrogens replaced -- **partial** substitution, so
+      P-14.3.4.5 does NOT apply and BB:3009's *"In case of partial substitution ...
+      all numerical prefixes must be indicated"* would demand a locant -- yet the
+      preferred prefix carries none. P-14.3.4.6 is the licence that explains it,
+      and this is also why the rule's *"parent compounds"* wording is read as
+      reaching a substituent group: P-14.3.4.5 one clause earlier says
+      *"compounds **or substituent groups**"*, and BB:40566
+      ``dichloromethylidene (PIN)`` is a second locant-free substituent-group row.
+
+    * `**P-14.3.4.5**` (BB:3007) uniform COMPLETE substitution, the
+      ``(pentafluoroethyl)`` case, for a backbone longer than one carbon whose every
+      substitutable hydrogen is replaced by the same oxy prefix.
+
+    Deny-by-default: anything not positively established returns False (cite).
+
+    The two ambient P-14.3.3 scopes are consulted because this licence empties a
+    scope of ALL its locants -- see
+    ``.
+    The **fragment-boundary observation** (``_naming_call_produces_a_name_component``)
+    is deliberately NOT consulted, and that is not a two-of-three omission: it asks
+    *"is the molecule I measured the molecule whose name I am editing?"*, and here the
+    unit being measured IS this substituent's own enclosing-mark scope, which
+    P-14.3.3 (BB:2869) scopes to *"a unit of structure as defined by its appropriate
+    enclosing marks"*. Consulting it would gag the licence unconditionally (a
+    substituent naming is always nested inside a larger name) and would therefore
+    also break ``(pentafluoroethyl)cyclohexane``. Same reading as the sibling
+    substituent-scope licence ``_l5_substituent_prefix`` above, which predates the
+    observation and likewise does not consult it.
+    """
+    from .locant_omission import (
+        l5_uniform_complete, l6_all_substitutable_h_share_one_locant,
+        locants_are_forced, scope_forces_locants,
+        scope_has_isotopic_modification,
+    )
+
+    # The two ambient P-14.3.3 declarations (isotope path names a label-STRIPPED
+    # skeleton, so no structural test below can see the label).
+    if locants_are_forced():
+        return False
+    if scope_has_isotopic_modification():
+        return False
+
+    if mol is None or not backbone or not groups or not sub_atoms:
+        return False
+
+    chain_len = len(backbone)
+    # Free valence at locant 1 (P-29.2, BB:15813 *"the atom with the free valence
+    # terminates a chain and always has the locant '1'"*). Established BY
+    # CONSTRUCTION in the caller, not assumed: it builds `ordered` starting from
+    # `attach_idx` and `pos = {idx: i + 1}`, so `pos[attach_idx] == 1`, and it has
+    # already refused a non-terminal attachment (`attach_c_nbrs > 1 -> None`). Only
+    # `len(backbone)` is read here, so the BFS order of `backbone` is irrelevant;
+    # every locant coming in via `groups` is range-checked below.
+    hydride = _l5_chain_parent_hydride(chain_len, 1)
+    if hydride is None:
+        return False
+
+    # Marshal {hydride atom index -> the ONE decoration kind there} + multiplicity.
+    kind_at: Dict[int, set] = {}
+    count_at: Dict[int, int] = {}
+    for kind, locants in groups.items():
+        if kind is None or not str(kind).strip():
+            return False
+        for loc in (locants or []):
+            if isinstance(loc, bool) or not isinstance(loc, int):
+                return False
+            if not 1 <= loc <= chain_len:
+                return False
+            kind_at.setdefault(loc - 1, set()).add(kind)
+            count_at[loc - 1] = count_at.get(loc - 1, 0) + 1
+    if not kind_at:
+        return False
+
+    # P-14.3.3: anything ESSENTIAL in the same scope restores every locant.
+    has_stereo = any(
+        mol.GetAtomWithIdx(int(i)).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+        for i in sub_atoms
+    )
+    if scope_forces_locants(
+        prefix_locants=[loc for locs in groups.values() for loc in (locs or [])],
+        suffix_locants=[],          # a substituent prefix scope has no suffix
+        stereo_text='stereo' if has_stereo else '',
+        has_indicated_h=False,      # backbone verified acyclic by the caller
+        has_isotope=any(mol.GetAtomWithIdx(int(i)).GetIsotope() for i in sub_atoms),
+        is_multiplicative=False,
+        is_ring_assembly=False,
+        has_skeletal_replacement=False,
+    ):
+        return False
+
+    # P-14.3.4.6 -- every substitutable hydrogen of the parent hydride at one locant.
+    atom_to_locant = {a.GetIdx(): a.GetIdx() + 1 for a in hydride.GetAtoms()}
+    if l6_all_substitutable_h_share_one_locant(hydride, atom_to_locant):
+        return True
+
+    # P-14.3.4.5 -- uniform COMPLETE substitution of the parent hydride.
+    #
+    # ⚠ MUTATION-SURVIVING, DELIBERATELY KEPT. Measured 2026-07-30: replacing this
+    # whole leg with ``return False`` changes no name, because it is unreachable
+    # today from BOTH sides -- for a one-carbon backbone P-14.3.4.6 above has already
+    # returned True, and the >1-carbon shape that would need it (every substitutable
+    # hydrogen of an ethyl backbone replaced by the same oxy prefix,
+    # ``c1ccccc1C(OC)(OC)C(OC)(OC)OC``) is declined upstream by this producer's own
+    # accounting and names ``unknown organic compound``. It is the same rule the
+    # sibling ``_l5_substituent_prefix`` implements for halogens, it is the correct
+    # answer if that shape ever becomes nameable, and it is a *narrowing* condition on
+    # an already-denied path -- so keeping it cannot license anything the rule does
+    # not. Do not "simplify" it away without re-running that witness.
+    if any(len(kinds) != 1 for kinds in kind_at.values()):
+        return False                # two kinds at one position -> not "in the same
+                                    # way" -> BB:3009
+    decoration_of = {idx: next(iter(kinds)) for idx, kinds in kind_at.items()}
+    return bool(l5_uniform_complete(hydride, decoration_of=decoration_of,
+                                    counts=count_at))
+
+
 def _name_ether_substituted_chain(
     mol,
     sub_atoms: List[int],
@@ -2094,21 +2233,56 @@ def _name_ether_substituted_chain(
             oxy = apply_enclosing_marks(f"{_r_enclosed}sulfanyl", -1)
         groups[oxy].append(pos[bb_c])
 
-    _MULT = {1: "", 2: "bis", 3: "tris", 4: "tetrakis"}
-    cite_locants = len(backbone) > 1  # methyl: single position -> elide locant
+    # ---- P-16.3 multiplier + P-14.3.4 locant licence, both DELEGATED. ----
+    # This block used to carry a private ``_MULT = {2: 'bis', 3: 'tris', ...}`` (one
+    # of the 27 divergent multiplier tables measured in
+    # ``) and a
+    # hand-rolled ``cite_locants = len(backbone) > 1`` locant licence that appears
+    # nowhere in the Blue Book. Both decisions now go to the shared primitives.
+    from .naming_utils import (
+        _has_stereo_prefix, is_substituted_substituent, multiplied_component,
+    )
+    cite_locants = not _ether_chain_locants_omitted(
+        mol, sub_atoms, backbone, groups)
     part_strings = []
     # Alphanumerical order by the (compound) oxy prefix name (P-14.5.2).
     for prefix in sorted(groups.keys(), key=alpha_sort_key):
         locs = sorted(groups[prefix])
-        mult = _MULT.get(len(locs), f"{len(locs)}")
-        # Compound oxy prefixes (phenoxy, benzyloxy, methoxy) are enclosed when
-        # multiplied; single occurrence is cited bare.
-        body = f"({prefix})" if len(locs) > 1 else prefix
+        n_occ = len(locs)
+        # `**P-16.3.5**` (BB:7104) "The numerical prefixes 'bis', 'tris',
+        # 'tetrakis', etc. are used to indicate a multiplicity of: (a) compound or
+        # complex (i.e. substituted) prefixes" -- so the multiplier turns on
+        # "is the component SUBSTITUTED?", which is exactly what
+        # ``get_multiplier_prefix`` (via ``multiplied_component``) already decides
+        # for every other producer. The private table above answered 'bis'
+        # UNCONDITIONALLY, so it emitted ``bis(methoxy)`` where the Blue Book
+        # prints the CONTRACTED prefix's simple multiplier:
+        #   BB:5098   CH3-CH2-CH(O-CH3)2       1,1-dimethoxypropane (PIN)
+        #   BB:35344  CH3(CH2)3-CH(S-CH3)2     1,1-bis(methylsulfanyl)pentane (PIN)
+        # One skeleton shape, two spellings: ``methoxy`` is derived "from a
+        # contracted name" (BB:17958, verbatim, P-63.2.2.2) and is therefore a
+        # SIMPLE prefix taking ``di``/no marks, while the uncontracted
+        # ``methylsulfanyl`` is substituted and takes ``bis(...)``. ``bis(methoxy)``
+        # occurs ZERO times in the Blue Book; ``dimethoxy`` occurs in five printed
+        # PINs/preferred prefixes (:5098, :27705, :27754, :36275, :37045).
+        # Enclosure accompanies the complex multiplier (P-16.3.5(a)'s own examples
+        # are all enclosed: ``bis(bromomethyl)``, ``bis(dimethylamino)``), and a
+        # prefix this producer already enclosed whole (the S-branch's
+        # ``(methylsulfanyl)``) is NOT re-enclosed -- that would give
+        # ``bis[(methylsulfanyl)]`` against BB:35344.
+        if n_occ > 1 and (is_substituted_substituent(prefix)
+                          or is_complex_substituent(prefix)
+                          or _has_stereo_prefix(prefix)) \
+                and not _is_fully_enclosed(prefix):
+            marked = apply_enclosing_marks(prefix, -1)
+        else:
+            marked = prefix
+        head = multiplied_component(n_occ, prefix, marked)
         if cite_locants:
             loc_str = ",".join(str(loc) for loc in locs)
-            part_strings.append(f"{loc_str}-{mult}{body}")
+            part_strings.append(f"{loc_str}-{head}")
         else:
-            part_strings.append(f"{mult}{body}")
+            part_strings.append(head)
 
     stem = get_chain_prefix(len(backbone))
     return f"{''.join(part_strings) if not cite_locants else '-'.join(part_strings)}{stem}yl"
