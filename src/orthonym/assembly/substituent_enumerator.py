@@ -1486,6 +1486,39 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                 mol, list(frag_atoms_set), attach_idx, _parent_atoms)
             return _stereo_route(_mixed) if _mixed else None
 
+    # ---- Tier 1.75 (P-102.6.1.2): O-glycosyl (glycosyloxy) substituent ----
+    # A sugar O-linked to a non-sugar aglycone is a COMPOUND substituent prefix
+    # 'glycosyl' + 'oxy' (BB :53915), cited at the aglycone's attachment locant
+    # -- BB's worked example is 1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one
+    # (:53927). Naming it HERE is what single-counts the glycosidic oxygen: the
+    # ordinary parent+prefix machinery then assigns the locant and cites only the
+    # REMAINING hydroxy groups. Without this tier the fragment reaches Tier 5 and
+    # collapses to the 'substituent' placeholder, the assembled name is rejected
+    # as garbled, and the pre-general decomposition fallback glues the sugar onto
+    # the aglycone's ALCOHOL name -- expressing the glycosidic O twice and citing
+    # no locant. Placed before the cache / recursive tiers, which name the
+    # fragment as a free molecule (a '...pyranose' PARENT, not a prefix).
+    # Disjoint from Tier 1.7 by construction: a glycosidic O's in-fragment
+    # neighbour is a carbon, so neither the peroxy (O-O) nor the mixed-chalcogen
+    # predicate can match. Fails closed (falls through) on every shape whose PIN
+    # morphology is a different construction -- see glycosyl_substituent_prefix.
+    if attach_idx is not None and attach_idx in frag_atoms_set:
+        try:
+            from ..data.sugar_names import glycosyl_substituent_prefix
+            _glyco = glycosyl_substituent_prefix(
+                mol, frag_atoms_set, attach_idx)
+            if _glyco:
+                # Returned WITHOUT _stereo_route on purpose. The carbohydrate
+                # descriptors the prefix already carries (the anomeric 'alpha'/
+                # 'beta' plus the 'D'/'L' configurational prefix, P-102.3.4) name
+                # every stereocentre of the glycosyl group. _stereo_route's
+                # double-apply guard only recognises a LEADING '(...)' CIP block,
+                # so it would not see them and would prepend a second, redundant
+                # R/S block -- '(2R,3R,4S,5S,6R)-beta-D-glucopyranosyloxy'.
+                return _glyco
+        except Exception:
+            pass
+
     # ---- Tier 1.8 (DD5 RC-6 / SEN-04): located acyclic alkyl ----
     # A BRANCHED or INTERNALLY-attached acyclic all-carbon saturated alkyl
     # substituent is named by its OWN principal chain numbered from the free

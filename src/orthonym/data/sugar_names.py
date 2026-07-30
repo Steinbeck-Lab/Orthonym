@@ -971,6 +971,140 @@ def sugar_to_glycosyloxy_prefix(
         return glycosyloxy
 
 
+def glycosyl_substituent_prefix(mol, frag_atoms, attach_idx) -> Optional[str]:
+    """Name an O-linked cyclic monosaccharide substituent (P-102.6.1.2), or None.
+
+    Blue Book **P-102.6.1.2 "*O*-Glycosyl compounds"**
+    (``BlueBookV2/BlueBookV2.md:53915``):
+
+        "The substituent group formed by removal of a hydrogen atom from the
+        anomeric -OH group is considered as a compound substituent group formed
+        by the 'glycosyl' group and an 'oxy' group. In the examples, names are
+        formed by using the seniority of class to determine the principal
+        characteristic group to be assigned to the monosaccharide or to the
+        aglycone component."
+
+    Its worked example (``:53927``) fixes every open question::
+
+        1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one
+          [not 4'-(beta-D-glucopyranosyloxy)acetophenone ...]
+          (not 4-acetylphenyl beta-D-glucopyranoside;
+           a ketone is senior to a hydroxy compound)
+
+    The glycosyloxy group is a *detachable prefix on the aglycone parent*, so it
+    is cited **at the aglycone's attachment locant** (``4-``) inside enclosing
+    marks, and the glycosylated oxygen appears **only** inside that prefix --
+    the parent must not also cite it as a hydroxy. Per **P-102.6.1.1.1**
+    (``:53896``) "No locant is added to the name of the substituent to indicate
+    the position of the free valence", so the glycosyl token itself carries no
+    internal locant.
+
+    Returning the prefix lets the ordinary parent+prefix machinery assign that
+    locant and cite the remaining hydroxy groups, which is what makes the
+    oxygen single-counted. This function therefore does perception only; it
+    never builds a whole-molecule name.
+
+    Deliberately fails closed (returns ``None``, so the cascade falls through)
+    for every shape whose PIN morphology is a *different* construction:
+
+    * a **substituted** glycosyl -- P-102.6.1.2's third example (``:53935``)
+      spells it ``5-{[4,6-dideoxy-4-(dimethylamino)-alpha-D-glucopyranosyl]oxy}``,
+      i.e. the decorated glycosyl goes inside its own enclosing marks before
+      'oxy'. ``sugar_to_glycosyloxy_prefix`` cannot build that, so a base name
+      carrying any locant or decoration is refused rather than mis-spelled.
+    * a **uronic** glycosyl -- P-102.6.1.2's second example (``:53929``) cites
+      it as ``beta-D-glucopyranosyluronic acid``, not as a '...osyloxy' token.
+      The naive contraction 'glucuronopyranosyloxy' is a fabricated morpheme
+      (measured: OPSIN cannot parse it), so it is refused here.
+    * an **anomer/configuration-less** sugar -- ``sugar_to_glycosyloxy_prefix``
+      drops both descriptors together when either is absent, which would spell
+      a stereochemically unspecified group for a molecule that has a definite
+      anomeric configuration.
+
+    Args:
+        mol: RDKit Mol of the whole molecule.
+        frag_atoms: Atom indices of the substituent fragment -- the glycosidic
+            oxygen together with the entire glycosyl group.
+        attach_idx: Index within ``frag_atoms`` of the atom bonded to the
+            parent, i.e. the glycosidic oxygen.
+
+    Returns:
+        The ``<glycosyl>oxy`` compound prefix (e.g. ``beta-D-glucopyranosyloxy``),
+        or ``None`` to fall through to the remaining tiers.
+    """
+    from rdkit import Chem as _C
+
+    frag = set(frag_atoms)
+    if attach_idx is None or attach_idx not in frag:
+        return None
+
+    o_atom = mol.GetAtomWithIdx(attach_idx)
+    if o_atom.GetSymbol() != "O" or o_atom.GetFormalCharge() != 0:
+        return None
+    inside = [n for n in o_atom.GetNeighbors() if n.GetIdx() in frag]
+    outside = [n for n in o_atom.GetNeighbors() if n.GetIdx() not in frag]
+    if len(inside) != 1 or len(outside) != 1:
+        return None
+
+    # The in-fragment neighbour must be the ANOMERIC carbon of a sugar ring that
+    # lies wholly inside the fragment. Uses the shared primitive rather than a
+    # second anomeric walker.
+    anomeric = inside[0]
+    if anomeric.GetSymbol() != "C" or not anomeric.IsInRing():
+        return None
+    matched_ring = None
+    for ring in mol.GetRingInfo().AtomRings():
+        if anomeric.GetIdx() not in ring or len(ring) not in (5, 6):
+            continue
+        ring_oxygens = [
+            i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O"
+        ]
+        if len(ring_oxygens) != 1:
+            continue
+        if _locate_anomeric_carbon(mol, ring, ring_oxygens[0]) != anomeric.GetIdx():
+            continue
+        if not set(ring) <= frag:
+            return None
+        matched_ring = ring
+        break
+    if matched_ring is None:
+        return None
+
+    # The fragment IS the free monosaccharide: the glycosidic oxygen becomes the
+    # anomeric -OH once the bond to the parent is cut, so no capping is needed
+    # and the anomeric configuration is carried through unchanged.
+    try:
+        frag_smi = _C.MolFragmentToSmiles(
+            mol, atomsToUse=sorted(frag), isomericSmiles=True, canonical=True
+        )
+        frag_mol = _C.MolFromSmiles(frag_smi) if frag_smi else None
+    except Exception:
+        return None
+    if frag_mol is None:
+        return None
+
+    try:
+        canonical = _C.MolToSmiles(frag_mol)
+    except Exception:
+        return None
+
+    info = lookup_sugar(canonical) or recognize_sugar_skeleton(frag_mol)
+    if not info:
+        return None
+    anomer, config, base = info
+
+    if not anomer or not config:
+        return None
+    if "urono" in base or "uronic" in base:
+        return None
+    # A decorated base name needs the P-102.6.1.2 '[...]oxy' enclosing-mark form.
+    if any(ch.isdigit() for ch in base) or "-" in base:
+        return None
+
+    prefix = sugar_to_glycosyloxy_prefix(anomer, config, base)
+    return prefix or None
+
+
 def sugar_to_glycoside_class_name(
     anomer: Optional[str], config: Optional[str], base_name: str
 ) -> str:

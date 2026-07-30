@@ -2201,6 +2201,28 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             for r in ring
                         )
                         if ring_has_o and ring_size in (5, 6):
+                            # P-102.6.1.2 first: a recognized cyclic monosaccharide
+                            # O-linked here is the compound prefix 'glycosyl'+'oxy'
+                            # cited at this ring locant -- BB's own worked example
+                            # is 1-[4-(beta-D-glucopyranosyloxy)phenyl]ethan-1-one
+                            # (BlueBookV2.md:53927). Without this the skeleton-only
+                            # fallback below names the sugar by its RING SIZE alone
+                            # and silently discards every decoration on it (all the
+                            # hydroxy groups and the CH2OH), while still reporting
+                            # the whole fragment in 'atoms' -- so the coverage
+                            # bookkeeping cannot see the loss.
+                            from ..data.sugar_names import (
+                                glycosyl_substituent_prefix,
+                            )
+                            _gly = glycosyl_substituent_prefix(
+                                mol, set(sub_atoms), o_idx
+                            )
+                            if _gly:
+                                return {
+                                    'name': _gly,
+                                    'atoms': sub_atoms,
+                                    'is_complex': True,
+                                }
                             # Use systematic heterocyclic names:
                             # 5-membered with O = oxolane (tetrahydrofuran)
                             # 6-membered with O = oxane (tetrahydropyran)

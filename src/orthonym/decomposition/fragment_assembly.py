@@ -894,17 +894,38 @@ def _assemble_glycoside(
                 # are never dropped (D-11).
                 return f"{aglycone_prefix} {head}"
 
-    # --- Legacy substitutive fallback (unchanged; zero-regression default) -
-    # If sugar_name already ends in "oxy" (glycosyloxy prefix), use as-is
-    if sugar_name.endswith("oxy"):
-        sugar_prefix = sugar_name
-    else:
-        # When used as a substituent prefix, convert ring parent names to
-        # substituent form per IUPAC P-31.1.3.4 (e.g., benzene -> phenyl)
-        sugar_prefix = _parent_to_substituent_prefix(sugar_name)
-
-    # Assemble as "(prefix)aglycone" with proper hyphenation
-    return _join_components(f"({sugar_prefix})", aglycone_name)
+    # --- The legacy substitutive fallback is REMOVED (it could not be right) ---
+    #
+    # It used to emit ``_join_components(f"({sugar_prefix})", aglycone_name)``.
+    # That is not a nomenclature operation: ``aglycone_name`` is the aglycone
+    # named as a COMPLETE PARENT, and the glycosidic oxygen arrives from the
+    # cleavage attached to it, so the aglycone is named as an alcohol/phenol.
+    # Gluing the sugar prefix onto that name therefore expressed the glycosidic
+    # oxygen TWICE -- once as the aglycone's own hydroxy and once inside the
+    # '...osyloxy' prefix -- and, because the aglycone name is already complete,
+    # the prefix could carry no attachment locant. The result denotes a molecule
+    # with an extra OH and no linkage, which is why these scored
+    # ``constitution_mismatch`` rather than merely reading oddly.
+    #
+    # This is unconditional, not a bad case among good ones: the functional-class
+    # branch above is the only one that consumes the glycosidic oxygen (via
+    # ``_alcohol_to_alkyl``: phenol -> phenyl), so every path that reaches HERE
+    # still has it doubled. Measured on the dev500 split: the branch produced 19
+    # names, 18 of them final, and NONE was correct -- it also wrapped whole
+    # parent names in parentheses as pseudo-prefixes, e.g.
+    # '((3S)-butan-3-ol)(8S)-...' and
+    # '((3R,4S,6R)-3,4,5,6-tetrahydroxyoxane-2-carboxylic acid)apigenin'.
+    # All 19 were already abstentions under the shipped configuration (both OPSIN
+    # gates reject them), so no shipped name is lost by refusing here.
+    #
+    # Failing closed lets the dispatcher fall through to the GENERAL pipeline,
+    # where the sugar is named as the P-102.6.1.2 compound prefix by
+    # ``sugar_names.glycosyl_substituent_prefix`` (substituent cascade Tier
+    # 1.75) and the ordinary parent+prefix machinery assigns the attachment
+    # locant and cites only the remaining hydroxy groups -- the oxygen is then
+    # expressed exactly once. That is the correct construction; this branch had
+    # no way to reach it, because it never sees the aglycone's locants.
+    return None
 
 
 def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[str]:

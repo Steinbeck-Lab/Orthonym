@@ -1675,6 +1675,40 @@ def _identify_fused_substituent(
                                 'atoms': [start_idx] + alkyl_atoms
                             }
 
+        # General -O-R delegate. Everything above needs the R group to be a plain
+        # ALKYL: `_bfs_alkyl_from` returns None as soon as R contains a ring or a
+        # heteroatom, and the branch then fell out of this `if symbol == 'O'`
+        # block and returned None -- which SILENTLY DROPPED the whole substituent.
+        # A glycosyloxy is exactly that shape (the R is a ring-and-oxygen-rich
+        # sugar), so a flavonoid glycoside was named as the bare aglycone with the
+        # sugar and its oxygen missing. Delegating to the substituent cascade is
+        # what the CARBON branch above already does for a ring-bearing R; doing
+        # the same here lets any nameable O-linked substituent be cited, including
+        # the P-102.6.1.2 glycosyloxy prefix built by Tier 1.75.
+        # Placed AFTER the alkoxy logic, so every -OR the tables already handle
+        # keeps its existing name. A cascade decline still returns None (the
+        # pre-existing drop), which the downstream coverage/SELF-01 gates catch.
+        if start_atom.GetTotalNumHs() == 0 and not start_atom.GetIsAromatic():
+            _o_nbrs = [n for n in start_atom.GetNeighbors()
+                       if n.GetIdx() not in excluded]
+            _bonds_to_core_single = all(
+                bond.GetBondTypeAsDouble() != 2.0
+                for bond in start_atom.GetBonds()
+                if bond.GetOtherAtomIdx(start_idx) in excluded
+            )
+            if len(_o_nbrs) == 1 and _bonds_to_core_single:
+                _frag = _bfs_collect_all(mol, start_idx, excluded)
+                if _frag and len(_frag) <= 25:
+                    from ..assembly.substituent_enumerator import name_substituent
+                    _oname = name_substituent(mol, sorted(_frag), start_idx)
+                    if (_oname and _oname != 'substituent'
+                            and ' ' not in _oname):
+                        return {
+                            'name': _oname,
+                            'type': 'functional',
+                            'atoms': sorted(_frag),
+                        }
+
     # Nitrogen groups (amino, nitro, N-alkyl amino, etc.)
     if symbol == 'N':
         h_count = start_atom.GetTotalNumHs()
