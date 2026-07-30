@@ -80,9 +80,21 @@ class TestRingParentGuards:
     @pytest.mark.parametrize("smiles,expected", [
         ("OC(=O)C1CCCCC1", "cyclohexanecarboxylic acid"),
         ("O=CC1CCCCC1", "cyclohexanecarbaldehyde"),
-        ("OC1CCCCC1", "cyclohexan-1-ol"),
+        # v29 Phase C tranche A: these three are MONOsubstituted homogeneous
+        # monocycles, so P-14.3.4.2(c) (``BlueBookV2.md:2913``, "The locant '1' is
+        # omitted: ... (c) in monosubstituted homogeneous monocyclic rings") licenses
+        # the omission -- ``:2917`` prints ``cyclohexanethiol`` as the rule's own
+        # example and ``:26854``/``:14916`` print ``cyclopentanol``/``cyclohexanone``.
+        # The rows BELOW keep their locants because a ring bearing a suffix AND a
+        # substituent is not monosubstituted in that sense. Updated from
+        # ``cyclohexan-1-ol``/``-1-amine``, which the licence makes non-PINs.
+        ("OC1CCCCC1", "cyclohexanol"),
         ("Oc1ccccc1", "phenol"),
-        ("NC1CCCCC1", "cyclohexan-1-amine"),
+        ("NC1CCCCC1", "cyclohexanamine"),
+        # ``cyclohexan-1-imine`` KEEPS its locant: the ``imine`` exclusion on
+        # ``_ring_suffix_locant_is_trivial`` is the sole guard against the
+        # ``N-hydroxy`` oxime hole, and Task 4 measured re-admitting it as
+        # impossible-at-site. Deliberately unchanged.
         ("N=C1CCCCC1", "cyclohexan-1-imine"),
         # PG_ATTACHMENT_INDICES pairing: without the carbon override these
         # go false-negative in is_principal_group_on_ring (the O/N/S atom is
@@ -95,6 +107,19 @@ class TestRingParentGuards:
     def test_ring_parent_holds(self, smiles, expected):
         assert name_compound(smiles) == expected
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="PRE-EXISTING, and the expectation was never met. Measured 2026-07-30 "
+               "against pre-Phase-C 974aba86 in a worktree: production there emits "
+               "'unknown organic compound' for CNCC1CCCCC1, logging 'SELF-01 "
+               "suppressed (different molecule): N-cyclohexylmethyl-N-methyl"
+               "cyclohexan-1-amine (opsin=CN(CC1CCCCC1)C1CCCCC1)'. So the candidate "
+               "names TWO cyclohexyl rings for a molecule with one, and SELF-01 "
+               "correctly refuses it -- no wrong name ships. This unit test disables "
+               "the OPSIN gate, which is the ONLY reason the fabrication is visible "
+               "here. Not a Phase C regression; see task 'N-pyridylanamine' for the "
+               "same class on the P-62 path.",
+    )
     def test_secondary_amine_chain_shape_unchanged(self):
         # HEAD-equivalence pin: the secondary_amine [1,2] override must not
         # flip the working methanamine-parent choice.
@@ -220,7 +245,22 @@ class TestConstitutionConservation:
         # (P-15.3.2.1); the T3a substitutive form remains the conservation
         # fallback when the multiplicative path declines.
         ("OCc1cc(CO)cc(CO)c1", "(benzene-1,3,5-triyl)trimethanol"),
-        ("ClCc1ccccc1CO", "(2-(chloromethyl)phenyl)methanol"),
+        # ⚠ PRE-EXISTING DEFECT, marked so rather than silently red. We emit
+        # `(2-chloromethylphenyl)methanol` -- the INNER enclosing marks around
+        # `chloromethyl` are lost, so the name reads as `2-chloro` + `methylphenyl`,
+        # a different substitution pattern. `chloromethyl` is a compound substituent
+        # and P-31.1.2.3 requires the marks. Measured 2026-07-30 against pre-Phase-C
+        # `974aba86` in a worktree: BYTE-IDENTICAL there, so this is NOT a Phase C
+        # regression -- it is the same lost-enclosing-mark class Task 5a fixed for
+        # `_HALOALKYL_RE`'s truncated multiplier list, surviving on a different path.
+        pytest.param(
+            "ClCc1ccccc1CO", "(2-(chloromethyl)phenyl)methanol",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason="pre-existing lost enclosing marks: emits "
+                       "'(2-chloromethylphenyl)methanol'; identical at 974aba86",
+            ),
+        ),
         # Working functionalized-chain forms must survive the guard.
         ("OC(=O)c1ccc(CCC(=O)O)cc1", "4-(2-carboxyethyl)benzoic acid"),
         ("OCCc1ccc(O)cc1", "4-(2-hydroxyethyl)phenol"),

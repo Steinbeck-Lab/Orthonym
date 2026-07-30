@@ -393,9 +393,11 @@ def test_an_essential_N_locant_restores_the_ring_suffix_locant(namer, smiles, ex
         # --- not this task: L4 (P-14.3.4.4) owns the polysulfanes ---
         ("CSSS", "1-methyltrisulfane",
          "wrong today, but licensed by P-14.3.4.4 which is unimplemented"),
-        # --- not this task: L5 parent scope, Task 5's remaining row ---
-        ("OC(=O)C(F)(F)C(F)(F)C(F)(F)F", "2,2,3,3,4,4,4-heptafluorobutanoic acid",
-         "wrong today (:3017), but a different licence"),
+        # --- not this task: L5 parent scope, SHIPPED by Task 5b (2026-07-30) ---
+        ("OC(=O)C(F)(F)C(F)(F)C(F)(F)F", "heptafluorobutanoic acid",
+         "P-14.3.4.5 (:3017 verbatim PIN) -- a DIFFERENT licence, which must not be "
+         "reached by widening L3: L3 needs exactly ONE cited locant and this cites "
+         "seven"),
     ],
 )
 def test_negatives_unchanged(namer, smiles, expected, why):

@@ -33,9 +33,17 @@ class TestRingKetoneSuffixLocant:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("O=C1CCCCC1", "cyclohexan-1-one"),
-        ("OC1CCCCC1", "cyclohexan-1-ol"),
-        ("NC1CCCCC1", "cyclohexan-1-amine"),
+        # v29 Phase C tranche A: MONOsubstituted homogeneous monocycles omit the
+        # locant '1' per P-14.3.4.2(c) (``BlueBookV2.md:2913``), worked verbatim as
+        # ``cyclohexanethiol`` at ``:2917``, ``cyclopentanone`` at ``:28394`` and
+        # ``'cyclohexanone' (PIN)`` at ``:14916``. Updated from the ``-1-`` forms,
+        # which that licence makes non-PINs.
+        ("O=C1CCCCC1", "cyclohexanone"),
+        ("OC1CCCCC1", "cyclohexanol"),
+        ("NC1CCCCC1", "cyclohexanamine"),
+        # ★ THE BOUNDARY, and why the rows above are not a blanket strip: add ANY
+        # second substituent and the ring is no longer monosubstituted, so
+        # P-14.3.3's deny-default restores every locant. These two must NOT change.
         ("OC1CCC(N)CC1", "4-aminocyclohexan-1-ol"),
         ("O=C1CCC(C)CC1", "4-methylcyclohexan-1-one"),
     ])

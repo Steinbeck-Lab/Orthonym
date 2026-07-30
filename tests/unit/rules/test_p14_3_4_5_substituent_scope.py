@@ -340,9 +340,15 @@ class TestDenyByDefault:
             "2,2,3,3,3-pentafluoropropanamide"
 
     @pytest.mark.parametrize("smiles,expected", [
-        # Parent-scope L5 -- Task 5b, NOT this task. Must be untouched here.
-        ("OC(=O)C(F)(F)C(F)(F)C(F)(F)F", "2,2,3,3,4,4,4-heptafluorobutanoic acid"),
-        ("OC(=O)C(F)(F)C(F)(F)F", "2,2,3,3,3-pentafluoropropanoic acid"),
+        # Parent-scope L5 -- SHIPPED by Task 5b (2026-07-30), so these two rows now
+        # carry the Blue Book spelling. ``:3017`` prints `heptafluorobutanoic acid
+        # (PIN)` verbatim; the propanoic row is the same licence one carbon shorter.
+        # They are kept here as the cross-scope tripwire: the substituent licence must
+        # not be what produces them (it is not -- they route through
+        # `handlers/general_acyclic`, measured), and neither licence may regress the
+        # other. Full coverage lives in test_p14_3_4_5_parent_scope.py.
+        ("OC(=O)C(F)(F)C(F)(F)C(F)(F)F", "heptafluorobutanoic acid"),
+        ("OC(=O)C(F)(F)C(F)(F)F", "pentafluoropropanoic acid"),
         # Correct today for other reasons -- census tripwires.
         ("OC(=O)C(F)(F)F", "trifluoroacetic acid"),
         ("OC(=O)CC(F)(F)F", "3,3,3-trifluoropropanoic acid"),

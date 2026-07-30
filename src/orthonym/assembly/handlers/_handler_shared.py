@@ -1442,6 +1442,423 @@ def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) ->
     )
 
 
+def _naming_call_produces_a_name_component() -> bool:
+    """True while this naming call's result will be spliced into a LARGER name.
+
+    ``P-14.3.3`` (BB:2869) scopes locant citation to *"the parent structure or ... a
+    unit of structure **as defined by its appropriate enclosing marks**"*. A licence
+    that empties a scope of ALL its locants therefore may only fire when the scope's
+    boundary is known -- and it is known only when the molecule being named IS the
+    whole compound. It is NOT known when the "molecule" is a decomposition fragment
+    standing in for a substituent, because the enclosing scope's own locants are
+    invisible from inside.
+
+    ★ MEASURED 2026-07-30, and it is the defect invariant 11 exists to catch. For
+    ``F(CF2)7-CO-N(piperidine)`` the decomposition engine cuts the acyl bond, CAPS the
+    fragment as the free acid, and names ``pentadecafluorooctanoic acid`` as a
+    standalone molecule -- for which P-14.3.4.5 genuinely fires, 15 of 15 -- then
+    rewrites ``oic acid`` -> ``oyl`` and splices it in as ``N-...oylpiperidine``. That
+    scope cites ``N``, an essential letter locant, so P-14.3.3 restores every locant;
+    and BB:29619 says so about this very molecule in as many words: *"(PIN, the locants
+    for the fluoro substituents are required, see P-14.3.4.5)"*. Without this guard the
+    licence emitted ``N-pentadecafluorooctanoylpiperidine``, contradicting the Blue
+    Book's own explicit negative for the rule it was implementing.
+
+    The signal is ``assembly.fragment_naming``'s visited-SMILES set, read-only. That
+    module's own comment calls its recursive entry point *"THE chokepoint where a
+    WHOLE-MOLECULE naming becomes a NAME COMPONENT"*; it adds the fragment's canonical
+    SMILES before delegating to ``name_compound`` and discards it in a ``finally``, so
+    a non-empty set means exactly "a nested fragment naming is in progress".
+
+    Spy-validated on 3 known positives (``heptafluorobutanoic acid``,
+    ``pentafluoropropanoic acid``, ``hexafluoroethane`` -- all top-level, all empty)
+    and the known negative above (non-empty, holding precisely the capped surrogate
+    ``O=C(O)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)C(F)(F)F``).
+
+    Kept HERE rather than in ``locant_omission`` so that module stays the pure
+    "RDKit mols in, booleans out" leaf its docstring promises.
+    """
+    try:
+        from ..fragment_naming import _get_visited
+    except Exception:                          # noqa: BLE001 -- deny-by-default
+        return True
+    try:
+        return bool(_get_visited())
+    except Exception:                          # noqa: BLE001 -- deny-by-default
+        return True
+
+
+def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:
+    """§**P-14.3.4.5** (BB:3007) "Omission of locants" -- the PARENT-scope case.
+
+        "All locants are omitted in compounds or substituent groups in which all
+         substitutable positions are completely substituted or modified, for example,
+         by hydro, in the same way. Except for hydrogen atoms attached to chalcogen
+         atoms, such as in acids, alcohols, and to the carbon atoms of formyl groups
+         (aldehydes), all hydrogen atoms are considered substitutable."
+
+    and its counter-clause BB:3009: *"In case of partial substitution or modification,
+    all numerical prefixes must be indicated. The prefix 'per-' is no longer
+    recommended."*
+
+    True => this scope's substituent prefixes cite NO locants:
+    ``heptafluorobutanoic acid`` (BB:3017, verbatim ``(PIN)``).
+
+    ★ **THE SHARPEST BOUNDARY IN THE CLASS**, and it falls straight out of BB:3007's
+    chalcogen carve-out with no special case::
+
+        F3C-CF2-COOH   ->  heptafluoro... / pentafluoropropanoic acid   OMITS
+        F3C-CF2-CO-NH2 ->  2,2,3,3,3-pentafluoropropanamide            KEEPS
+
+    Identical fluorination. The acid's own O-H sits on a CHALCOGEN and is excluded
+    from the substitutable count, so C2/C3 are the whole substitutable set and
+    fluorine exhausts it. Propanamide's set is C2 + C3 **+ the amide N-H**, which are
+    neither chalcogen H nor formyl H -- so they count, they are unsubstituted, the
+    substitution is *partial*, and BB:3009 restores every locant. That an amide N-H is
+    substitutable is proven independently by BB:2889 ``N1,N3-dimethylpropanediamide
+    (PIN)``. Any wiring that moves the amide row has implemented "fluorines everywhere
+    => drop locants", not P-14.3.4.5.
+
+    ⚠ **Read as a carve-out of the DENY-DEFAULT** P-14.3.3 (BB:2869). Everything this
+    function cannot positively establish returns False, and the rule itself is NOT
+    re-derived here: the decision is delegated to
+    ``assembly.locant_omission.l5_uniform_complete``, the one place the P-14.3.4
+    licences live. This function only proves the preconditions and marshals the scope.
+
+    ★ **The class is OPEN.** BB:3009 retires the ``per-`` contraction, which *was*
+    exactly a closed-list mechanism, and the 2013 recommendations replaced it with
+    counting -- so a table keyed on ``"heptafluoro"`` would be wrong on its complement
+    by construction (``nonafluoropentanoic acid``, ``pentachloropropanoic acid``,
+    ``octafluoropropane``, ``hexafluoropentanedioic acid`` are all entailed and none is
+    printed anywhere in the Blue Book). Structural predicate only.
+
+    Sibling: :func:`_l3_prefix_locant_omitted` (P-14.3.4.3) above. The two are
+    disjoint in practice -- L3 needs exactly ONE cited locant, L5 needs every
+    substitutable hydrogen replaced -- and where both could hold they agree.
+
+    **Why the fragments and not a flag.** The caller applies a True answer by
+    REBUILDING the prefix fragments with empty ``locants``, not by threading a
+    print-time suppression flag into :func:`_assemble_fragments` the way the older
+    ``l3_omit_prefix_locant`` does. The fragment list is the single input to BOTH the
+    legacy assembler and ``name_tree_builder.fragments_to_tree``, and the tree IS the
+    production composition site for this handler -- ``general_acyclic`` is the sole
+    member of ``name_tree_to_string.SERIALIZER_PRODUCTION_CLASSES``. A flag reaching
+    only one of the two makes them disagree, and ``composer._serializer_flip_or_name``
+    then silently falls back to the legacy string, so the flip becomes a no-op for
+    exactly the rows the licence touched. Measured 2026-07-30: that is already the
+    case for ``chloropropanedioic acid`` (legacy ``chloropropanedioic acid`` vs
+    serialized ``2-chloropropanedioic acid`` -> DIVERGE), while all three L5 rows
+    probed AGREE. Removing the locants from the NAME STRUCTURE is also what
+    P-14.3.4.5 actually says.
+    """
+    from ..locant_omission import (
+        l5_uniform_complete, locants_are_forced, scope_forces_locants,
+        scope_has_isotopic_modification, substitutable_h_count,
+    )
+
+    # P-14.3.3 (BB:2869) as an AMBIENT scope. ``rules/isotopes.py`` names an
+    # isotope-STRIPPED skeleton, so the structural ``has_isotope`` computed below is
+    # blind by construction for a labelled input and cannot be the guard.
+    if locants_are_forced():
+        return False
+    # ⚠ AND the weaker declaration: measured 2026-07-29 (Task 5a), the isotope
+    # decorator enters ``forced_locant_scope`` only CONDITIONALLY, so
+    # ``locants_are_forced()`` alone reads False for a molecule whose finished name
+    # still carries ``(13C1)``. This licence empties its scope of ALL prefix locants,
+    # which is exactly what **P-82.6.1.1** (BB:44180) forbids when an isotopic
+    # modification needs a locant to state its position.
+    if scope_has_isotopic_modification():
+        return False
+    # ⚠ AND the third P-14.3.3 scoping fact: this licence empties a scope completely,
+    # so it may only fire when the scope's boundary IS the molecule being named. See
+    # :func:`_naming_call_produces_a_name_component` -- without it, BB:29619's own
+    # explicit negative lost its locants.
+    if _naming_call_produces_a_name_component():
+        return False
+
+    if features is None or not fragments:
+        return False
+    mol = getattr(features, "mol", None)
+    if mol is None:
+        return False
+
+    prefixes = [f for f in fragments if f.fragment_type == "prefix"]
+    suffixes = [f for f in fragments if f.fragment_type == "suffix"]
+    parents = [f for f in fragments if f.fragment_type == "parent"]
+    stereos = [f for f in fragments if f.fragment_type == "stereo"]
+    if not prefixes or len(parents) != 1 or len(suffixes) > 1:
+        return False
+
+    # ------------------------------------------------------------------ #
+    # P-14.3.3: anything ELSE cited in this scope restores every locant.  #
+    # ------------------------------------------------------------------ #
+    if stereos and str(stereos[0].text or "").strip():
+        return False
+    stem = parents[0].text or ""
+    if not stem.isalpha():
+        # A stem that is not purely alphabetic already cites something -- an indicated
+        # hydrogen or a locant baked into the parent name.
+        return False
+    for bond_locants in (parents[0].locants or ()):
+        if bond_locants:
+            # An unsaturation locant (``but-2-enoic acid``) is essential, so P-14.3.3
+            # restores the substitution locants. This is also the deny-by-default side
+            # of a boundary the Blue Book does not print: ``tetrafluoroethene``'s
+            # parent name cites no locant of its own (P-14.3.4.2(d) omits it for
+            # unsubstituted dinuclear alkenes), so the elided form is arguably
+            # licensed -- but no printed example settles it, so we retain.
+            return False
+    if suffixes and list(suffixes[0].locants or []):
+        # ★ LOAD-BEARING, and it is a rule not a convenience: the cited suffix locant
+        # IS essential, so P-14.3.3's *"then all locants must be cited"* restores the
+        # prefix locants. This is the only thing that keeps
+        # ``1,1,2,2,3,3,3-heptafluoropropan-1-ol`` (whose propane skeleton IS
+        # completely and uniformly fluorinated -- 7 of 7 -- yet whose ``-1-ol``
+        # distinguishes it from propan-2-ol) and, for the same reason,
+        # ``1,1,1,3,3,3-hexafluoropropan-2-one`` (BB:3005 lists ``propan-2-one``
+        # among the four spellings that keep their locant even when unambiguous) and
+        # ``1,1,2,2,2-pentafluoroethane-1-thiol``.
+        return False
+    for pf in prefixes:
+        # A prefix whose TEXT already begins with a digit names its own locants (a
+        # ring or complex substituent). Those are a different enclosing-mark scope,
+        # and the assembler's ``already_has_locant`` branch would leave them in place,
+        # so the scope would still cite a locant.
+        if re.match(r"^\d", pf.text or ""):
+            return False
+        if not pf.text or not str(pf.text).strip():
+            return False
+        if not pf.locants:
+            return False
+        # ⚠ INVARIANT: the multiplier must survive the elision. Every prefix that
+        # reaches this assembler bakes its multiplier INTO ``text``
+        # (``heptafluoro``) and carries ``count == 1`` -- ``_assemble_fragments``
+        # ignores ``count`` entirely, so a ``count > 1`` prefix relying on the
+        # name-tree serializer's ``multiplicative_prefix`` to supply the multiplier
+        # would silently LOSE it once the locants (and with them the only thing the
+        # legacy path prints) go. Deny rather than emit ``fluorobutanoic acid`` for
+        # seven fluorines. (Task 5a hit the same class from the other side: dropping
+        # the locants there lost the ENCLOSING MARKS.)
+        if getattr(pf, "count", 1) != 1:
+            return False
+
+    # ------------------------------------------------------------------ #
+    # The scope must be an ACYCLIC ALL-CARBON SATURATED CHAIN parent.     #
+    # ------------------------------------------------------------------ #
+    # Independently re-established here (not taken from the handler's name) so a
+    # second call site cannot be wired against a scope this marshalling does not fit.
+    chain = [int(i) for i in (getattr(features, "principal_chain", None) or ())]
+    if not chain or len(set(chain)) != len(chain):
+        return False
+    if getattr(features, "oriented_ring", None) or getattr(features, "principal_ring", None):
+        # A ring parent's locants come from the ring orientation, and its L5 case is
+        # ``benzenehexol`` -- already wired in ``rules/benzene.py`` against a ring
+        # parent hydride. ``cyclohexanecarboxylic acid`` reaches this handler with an
+        # EMPTY principal_chain, so it is denied here by construction.
+        return False
+    n_atoms = mol.GetNumAtoms()
+    if any(i < 0 or i >= n_atoms for i in chain):
+        return False
+    ring_info = mol.GetRingInfo()
+    for idx in chain:
+        atom = mol.GetAtomWithIdx(idx)
+        # ⚠ The all-carbon clause is MUTATION-SURVIVING and UNREACHABLE today (measured
+        # 2026-07-30, mutation M12): no heteroatom-chain parent reaches this handler at
+        # all -- ``F[Si](F)(F)[Si](F)(F)F``, ``Cl[Si](Cl)(Cl)[Si](Cl)(Cl)Cl``,
+        # ``FN(F)N(F)F`` and ``F[P](F)[P](F)F`` all emit ``unknown organic compound``,
+        # and the germanium analogue is refused upstream. It is a deliberate SCOPE
+        # NARROWING, not a correctness guard: ``hexafluorodisilane`` would in fact be
+        # licensed by P-14.3.4.5 the day disilane becomes nameable, and the count would
+        # then have to be re-derived for a chain whose atoms are not all tetravalent.
+        # Deny-by-default until that is done.
+        if atom.GetSymbol() != "C" or atom.GetFormalCharge() != 0:
+            return False
+        if ring_info.NumAtomRings(idx) > 0:
+            return False
+        if atom.GetIsotope():
+            return False
+    for a, b in zip(chain, chain[1:]):
+        bond = mol.GetBondBetweenAtoms(a, b)
+        if bond is None or bond.GetBondTypeAsDouble() != 1.0:
+            return False
+
+    # ``chain[pos]`` is locant ``pos + 1`` -- the same map ``_get_fg_locants``
+    # (composer.py:6485) builds to ASSIGN these locants. It is not trusted: the
+    # ``n_out`` cross-check below re-derives the decoration count at every locant
+    # from the STRUCTURE and requires it to equal the count the name cites, so a
+    # wrong or reversed mapping denies instead of silently mis-measuring.
+    idx_to_locant = {a: pos + 1 for pos, a in enumerate(chain)}
+
+    # The parent COMPOUND is the chain PLUS the principal characteristic group(s) --
+    # for ``heptafluorobutanoic acid`` the four chain carbons and the whole -COOH.
+    parent_set = set(chain)
+    for match in (getattr(features, "principal_group_atoms", None) or ()):
+        for idx in match:
+            parent_set.add(int(idx))
+    if any(i < 0 or i >= n_atoms for i in parent_set):
+        return False
+    for idx in parent_set:
+        if mol.GetAtomWithIdx(idx).GetFormalCharge() != 0:
+            return False
+        if mol.GetAtomWithIdx(idx).GetIsotope():
+            return False
+
+    # ------------------------------------------------------------------ #
+    # Marshal the cited locants into a per-position decoration map.        #
+    # ------------------------------------------------------------------ #
+    # EVERY prefix is included, not only the halogens -- otherwise a scope whose
+    # uniformity is broken by a non-halogen substituent could not be detected, which
+    # is precisely BB:29619's ``...pentadecafluorooctan-1-one (PIN, the locants for
+    # the fluoro substituents are required, see P-14.3.4.5)``: every carbon there has
+    # zero hydrogens, but C1 is substituted by something that is not fluorine.
+    kind_at: Dict[int, set] = {}
+    count_at: Dict[int, int] = {}
+    for pf in prefixes:
+        for loc in pf.locants:
+            if isinstance(loc, bool) or not isinstance(loc, int):
+                return False          # a letter locant (N-, N1-) is always essential
+            if not 1 <= loc <= len(chain):
+                return False
+            kind_at.setdefault(loc, set()).add(pf.text)
+            count_at[loc] = count_at.get(loc, 0) + 1
+    # Two kinds at one position is not "in the same way" -> BB:3009.
+    # ⚠ MUTATION-SURVIVING (M8's sibling; measured 2026-07-30 as M5) and kept as the
+    # explicit statement of the rule. Its removal is now provably harmless rather than
+    # seed-dependent: the ``"|".join(sorted(...))`` key built below hands a mixed
+    # position a composite kind, which ``l5_uniform_complete``'s own uniformity test
+    # refuses on every hash seed. See the comment there -- that determinism is the
+    # thing that had to be fixed, not this check.
+    if not kind_at or any(len(kinds) != 1 for kinds in kind_at.values()):
+        return False
+
+    # ★ THE MAPPING IS A MEASUREMENT, NOT AN ASSUMPTION. For each chain atom, count
+    # the bonds leaving the parent compound: that is how many decorations really sit
+    # there, independent of any name string. Requiring it to equal the cited count at
+    # that locant states, structurally, that (a) the locant->atom map is right, (b)
+    # every decoration in the molecule is one of the prefixes counted above, and (c) no
+    # decoration hangs off a principal-group atom (an N-substituent), whose locant is
+    # a letter and whose position this marshalling cannot express.
+    #
+    # ⚠ MUTATION-SURVIVING, DELIBERATELY KEPT (measured 2026-07-30, mutation M4). It is
+    # OVER-DETERMINED by ``l5_uniform_complete``'s own per-position test, and the reason
+    # is a small proof worth recording: in the parent hydride the substitutable-H count
+    # at an atom EQUALS the number of decorations removed from it (each displaced
+    # exactly one H). So any locant->atom bijection error either moves a count onto an
+    # atom whose H count differs -- which ``l5_uniform_complete`` rejects -- or is an
+    # automorphism of the count profile, in which case the licence's answer is
+    # unchanged. Purpose (b) is covered for the same reason: an uncounted decoration
+    # makes the cited count strictly less than the H count. Kept because it is the
+    # clause that makes P-14.3.3's "the map must be structural" explicit, and because
+    # the redundancy is a property of TODAY's marshalling (all-carbon, one prefix kind
+    # per position), not of the rule. Same reasoning already recorded for the
+    # over-determined clauses of ``_l3_prefix_locant_omitted`` above.
+    for idx in chain:
+        atom = mol.GetAtomWithIdx(idx)
+        n_out = sum(1 for nb in atom.GetNeighbors() if nb.GetIdx() not in parent_set)
+        if count_at.get(idx_to_locant[idx], 0) != n_out:
+            return False
+    # ...and nothing may hang off a NON-chain parent atom either (the acid O-H, the
+    # amide N-H): such a decoration is not in ``count_at`` at all, so the per-chain
+    # check above cannot see it.
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if (a in parent_set) == (b in parent_set):
+            continue
+        inside = a if a in parent_set else b
+        if inside not in idx_to_locant:
+            return False
+
+    # P-14.3.3, the residual clauses. Fail-closed on anything unestablished.
+    if scope_forces_locants(
+        prefix_locants=[loc for pf in prefixes for loc in pf.locants],
+        suffix_locants=[],
+        stereo_text="",
+        # Indicated hydrogen is a ring/tautomer device and the scope is verified
+        # acyclic; multiplicative names and ring assemblies name their scope
+        # elsewhere and never arrive here as one acyclic chain; skeletal replacement
+        # needs a heteroatom IN the chain, verified all-carbon above.
+        has_indicated_h=False,
+        has_isotope=any(a.GetIsotope() for a in mol.GetAtoms()),
+        is_multiplicative=False,
+        is_ring_assembly=False,
+        has_skeletal_replacement=False,
+    ):
+        return False
+
+    # ------------------------------------------------------------------ #
+    # Build the PARENT COMPOUND and hand the rule its own question.       #
+    # ------------------------------------------------------------------ #
+    # P-14.3.4.5 speaks of the substitutable positions of the PARENT, so the licence
+    # must be measured against the UNDECORATED skeleton: on the input molecule a
+    # fully substituted carbon has zero hydrogens and the count that DECIDES the
+    # licence would be lost. Deleting the decorations lets RDKit restore the implicit
+    # hydrogens they displaced. Same reason, and the same idiom, as
+    # ``rules/benzene.py::_benzene_parent_hydride`` and
+    # ``locant_omission.l3_locant_omitted_for_parent_atoms``.
+    from rdkit import Chem
+
+    rw = Chem.RWMol(mol)
+    for idx in sorted(range(n_atoms), reverse=True):
+        if idx not in parent_set:
+            rw.RemoveAtom(idx)
+    parent = rw.GetMol()
+    try:
+        Chem.SanitizeMol(parent)
+    except Exception:                          # noqa: BLE001 -- deny-by-default
+        return False
+    kept = sorted(parent_set)
+    if parent.GetNumAtoms() != len(kept):
+        return False
+    # Deleting in DESCENDING index order preserves the survivors' relative order, so
+    # the new index of a kept atom is its rank in ``kept``. Verified rather than
+    # assumed -- a mismatch of element or degree denies.
+    old_to_new = {}
+    for new_i, old_i in enumerate(kept):
+        if (parent.GetAtomWithIdx(new_i).GetAtomicNum()
+                != mol.GetAtomWithIdx(old_i).GetAtomicNum()):
+            return False
+        old_to_new[old_i] = new_i
+    for a, b in ((bd.GetBeginAtomIdx(), bd.GetEndAtomIdx()) for bd in mol.GetBonds()):
+        if a in parent_set and b in parent_set:
+            if parent.GetBondBetweenAtoms(old_to_new[a], old_to_new[b]) is None:
+                return False
+
+    # ⚠ ``"|".join(sorted(...))`` and NOT ``next(iter(kinds))``. A position carrying two
+    # kinds is already refused above, so this join can only ever see one element today
+    # -- but ``next(iter(set))`` would make the FALLBACK behaviour hash-order dependent
+    # if that check were ever weakened: for ``2-chloro-2,3,3,3-tetrafluoropropanoic
+    # acid`` C2 holds {chloro, tetrafluoro} and its cited count (2) equals its
+    # substitutable-H count (2), so an arbitrary pick of ``tetrafluoro`` would present
+    # ``l5_uniform_complete`` with ONE uniform kind and elide a locant the Blue Book
+    # requires -- on some hash seeds only. Task 5a hit exactly this seed-dependent
+    # escape. A sorted join is deterministic and, being unequal to the single-kind key
+    # at the other positions, is refused by ``l5_uniform_complete``'s own uniformity
+    # test on EVERY seed.
+    decoration_of = {
+        old_to_new[chain[loc - 1]]: "|".join(sorted(kinds))
+        for loc, kinds in kind_at.items()
+    }
+    counts = {old_to_new[chain[loc - 1]]: n for loc, n in count_at.items()}
+
+    # A decorated position whose parent hydride has NO substitutable hydrogen would make
+    # the aggregate arithmetic unsound (it could offset a bare position), so it is
+    # rejected outright rather than left to ``l5_uniform_complete``, whose docstring
+    # deliberately tolerates such entries for ``decahydronaphthalene``'s bridgeheads.
+    #
+    # ⚠ MUTATION-SURVIVING, DELIBERATELY KEPT (measured 2026-07-30, mutation M8), and
+    # UNREACHABLE for today's scope -- provably: a decorated chain atom's parent-hydride
+    # H count is at least the number of decorations removed from it, so it is >= 1; the
+    # only way to reach 0 is BB:3007's carve-outs, and neither applies (a chain atom is
+    # verified all-carbon, so not a chalcogen; a formyl carbon has exactly one H and
+    # would not be a decorated position). It becomes load-bearing the moment the scope
+    # is widened to heteroatom chains, where a decorated chalcogen IS possible.
+    for new_i in decoration_of:
+        if substitutable_h_count(parent, new_i) <= 0:
+            return False
+
+    return l5_uniform_complete(parent, decoration_of=decoration_of, counts=counts)
+
+
 def _assemble_fragments(
     fragments: List["NameFragment"],
     style: str,

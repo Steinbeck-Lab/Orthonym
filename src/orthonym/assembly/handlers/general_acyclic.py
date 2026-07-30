@@ -161,6 +161,20 @@ def name_general_acyclic(
         if stereo:
             fragments.append(stereo)
 
+    # P-14.3.4.5 (BB:3007) at PARENT scope -- `heptafluorobutanoic acid` (BB:3017,
+    # verbatim (PIN)). Decided HERE for the same reason as the mononuclear rule and
+    # the P-14.3.4.3 licence below: the rule counts the PARENT COMPOUND's
+    # substitutable hydrogens and only `features` carries the structure. The licence is
+    # applied by REBUILDING THE PREFIX FRAGMENTS WITHOUT LOCANTS rather than by a
+    # print-time flag, so every renderer downstream agrees -- see the helper's
+    # docstring § "Why the fragments and not a flag".
+    import dataclasses as _dc
+
+    from ._handler_shared import _l5_prefix_locants_omitted
+    if _l5_prefix_locants_omitted(features, fragments):
+        fragments = [_dc.replace(f, locants=()) if f.fragment_type == "prefix" else f
+                     for f in fragments]
+
     # Assemble in correct order.
     # P-16.5.1.3.1 mononuclear enclosing rule is keyed on a STRUCTURAL property:
     # the perceived parent skeleton has exactly ONE heavy atom (parent atom count
