@@ -11,6 +11,7 @@ and OPSIN JAR file(s) in the project root.
 
 import os
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -36,8 +37,17 @@ def _find_opsin_jar(version: str = "2.9.0") -> Optional[str]:
     return None
 
 
+@lru_cache(maxsize=1)
 def _java_available() -> bool:
-    """Check if Java runtime is available."""
+    """Check if Java runtime is available.
+
+    ⚠ **CACHED.** Measured 2026-07-30: this probe re-spawned a JVM on every call
+    purely to re-answer "is Java installed?". A Java runtime cannot appear or
+    disappear inside one process, so caching is **provably output-neutral** — no name
+    can change. ``maxsize=1`` matches the idiom in ``name_morphemes.py``; the sibling
+    probe in ``perception/centres_bridge.py`` is cached identically and carries the
+    full measurement.
+    """
     try:
         proc = subprocess.run(
             ["java", "-version"],

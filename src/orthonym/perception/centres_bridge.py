@@ -37,6 +37,7 @@ import os
 import re
 import subprocess
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -104,8 +105,26 @@ def _find_centres_jar(version: Optional[str] = None) -> Optional[str]:
     return str(candidates[-1]) if candidates else None
 
 
+@lru_cache(maxsize=1)
 def _java_available() -> bool:
-    """Check if a Java runtime is available (copied from opsin_roundtrip)."""
+    """Check if a Java runtime is available (copied from opsin_roundtrip).
+
+    ⚠ **CACHED, and the cache is the point.** Measured 2026-07-30 by counting
+    ``subprocess`` invocations whose argv contains ``java``: this probe was spawning a
+    JVM **twice per molecule** — 30 of 65 total spawns across a 15-molecule batch, i.e.
+    **46% of all JVM launches during naming** — purely to re-answer "is Java
+    installed?". At ~130 ms of JVM startup each that was ~260 ms per molecule of pure
+    process launch, against a 2.11 mol/s whole-pipeline rate.
+
+    Caching is safe because a Java runtime cannot appear or disappear inside one
+    process, so this is **provably output-neutral**: no name can change. That matters
+    here — session invariant 9 records four occasions where a change that looked like a
+    pure cleanup altered what got emitted, so a performance fix has to be one that
+    *cannot*.
+
+    ``maxsize=1`` matches the established idiom in ``validation/name_morphemes.py``.
+    The sibling probe in ``validation/opsin_roundtrip.py`` is cached identically.
+    """
     try:
         proc = subprocess.run(
             ["java", "-version"],
