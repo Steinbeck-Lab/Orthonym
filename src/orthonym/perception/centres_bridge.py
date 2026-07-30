@@ -207,7 +207,18 @@ def centres_label_batch(
         return out  # every SMILES served from cache -> no JVM, no jar probe
 
     jar = _find_centres_jar()
-    if jar is None or not _java_available():
+    # PERF: the in-process JVM (jvm_bridge, JPype) makes the `_java_available`
+    # probe irrelevant -- there is no `java` binary to find, only a JVM already
+    # running in this process -- so only pay for that probe on the subprocess
+    # path. Ordering matters: asking `_java_available()` first would spawn a JVM
+    # to answer a question the in-process path does not ask.
+    try:
+        from ..jvm_bridge import centres_available, centres_stdout
+        _inproc = jar is not None and centres_available()
+    except ImportError:  # pragma: no cover - jvm_bridge always present
+        centres_stdout = None  # type: ignore[assignment]
+        _inproc = False
+    if jar is None or not (_inproc or _java_available()):
         # Engine unavailable -- signal the caller to fall back to RDKit.
         return None
 
@@ -222,12 +233,27 @@ def centres_label_batch(
             temp_input = f.name
 
         # argv list, NEVER a shell; SMILES live in the temp file, not on argv.
-        cmd = ["java", "-jar", jar, "-i", "smi", temp_input]
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout
-        )
+        # This measured 30 of the 37 remaining JVM spawns (2026-07-30): a
+        # function named "batch" that production calls twice per molecule with
+        # ONE molecule each, so ~130 ms of process launch bought nothing. The
+        # in-process path drives LabelCip.main with the IDENTICAL argv and the
+        # IDENTICAL temp file (byte-identical by construction, verified over 508
+        # SMILES) at 0.8 ms/call. The temp-file security posture
+        # (T-177-01/02/03) is unchanged: SMILES still never touch argv.
+        stdout_text: Optional[str] = None
+        if _inproc and centres_stdout is not None:
+            stdout_text = centres_stdout(["-i", "smi", temp_input])
+        if stdout_text is None:
+            # In-process unavailable or Java raised -> the original subprocess.
+            if not _java_available():
+                return None
+            cmd = ["java", "-jar", jar, "-i", "smi", temp_input]
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout
+            )
+            stdout_text = proc.stdout
 
-        for line in proc.stdout.split("\n") if proc.stdout else []:
+        for line in stdout_text.split("\n") if stdout_text else []:
             if "\t" not in line:
                 continue
             labels_str, idx_str = line.rsplit("\t", 1)

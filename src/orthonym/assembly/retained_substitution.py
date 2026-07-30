@@ -130,16 +130,30 @@ class OpsinOracle:
             # byte-identical regardless (the flag is OFF, so the controller is never invoked).
             self._cache[key] = False
             return False
+        # PERF: prefer the ONE in-process JVM (jvm_bridge, JPype) over a ~130 ms
+        # process launch. It hands back exactly the bytes the `java -jar` call
+        # below would have written to stdout, so the handling is shared verbatim;
+        # served=False falls through to the subprocess unchanged.
+        _text = None
+        _served = False
         try:
-            result = subprocess.run(
-                # -r (--allowRadicals): add consistently with _invoke_opsin so the
-                # oracle accepts radical names; proven strictly additive over 11,668
-                # names (66 gains / 0 changes / 0 regressions; 184-RESEARCH §WS-E-RADICAL).
-                ["java", "-jar", self._jar, "-r", "-osmi"],
-                input=post_swap_subtree_str + "\n",
-                capture_output=True, text=True, timeout=10,
-            )
-            opsin_smiles = result.stdout.strip()
+            from ..jvm_bridge import opsin_stdout
+            _text, _served = opsin_stdout(post_swap_subtree_str,
+                                          allow_radicals=True, jar_path=self._jar)
+        except ImportError:  # pragma: no cover - jvm_bridge always present
+            _served = False
+        try:
+            if not _served:
+                result = subprocess.run(
+                    # -r (--allowRadicals): add consistently with _invoke_opsin so the
+                    # oracle accepts radical names; proven strictly additive over 11,668
+                    # names (66 gains / 0 changes / 0 regressions; 184-RESEARCH §WS-E-RADICAL).
+                    ["java", "-jar", self._jar, "-r", "-osmi"],
+                    input=post_swap_subtree_str + "\n",
+                    capture_output=True, text=True, timeout=10,
+                )
+                _text = result.stdout
+            opsin_smiles = (_text or "").strip()
             if not opsin_smiles:
                 self._cache[key] = False
                 return False
@@ -171,6 +185,24 @@ class OpsinOracle:
         # (None, False) — server absent/dead/timeout/protocol-guard — we FALL
         # THROUGH to the one-shot subprocess below, so correctness never depends
         # on the optimization; it only removes JVM-startup latency.
+        # PERF tier 1: the ONE in-process JVM (jvm_bridge, JPype) -- a JNI call
+        # instead of a process launch. It returns exactly the bytes
+        # `java -jar ... -r -osmi` writes to stdout, so the (raw, ran) mapping
+        # here is identical to the one-shot subprocess path's below. When it
+        # cannot serve the call it reports served=False and we drop to the
+        # persistent server, then to the one-shot subprocess -- the tiers below
+        # are untouched and remain the correctness path.
+        if self._jar:
+            try:
+                from ..jvm_bridge import opsin_stdout
+                _text, _served = opsin_stdout(name, allow_radicals=True,
+                                              jar_path=self._jar)
+            except ImportError:  # pragma: no cover - jvm_bridge always present
+                _text, _served = None, False
+            if _served:
+                _smi = (_text or "").strip()
+                return (_smi or None), True
+
         try:
             from ..validation.opsin_server import get_persistent_opsin
             _srv = get_persistent_opsin(self._jar, ("-r", "-osmi"))

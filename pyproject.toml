@@ -61,6 +61,18 @@ dev = [
 ml = [
     "STOUT-pypi==2.0.5; python_version < '3.12'",
 ]
+# Performance-only extra: one in-process JVM instead of a `java -jar` subprocess
+# per call (src/orthonym/jvm_bridge.py). Measured 2026-07-30 on the real
+# single-molecule centres pattern: 216 ms/call -> 0.8 ms/call.
+#
+# OPTIONAL, deliberately: every JVM bridge keeps its subprocess path and falls
+# back to it when jpype is absent or the JVM will not start, so this changes only
+# how fast a name is produced, never whether or what. Byte-identity was verified
+# against the real CLI (217 names x 2 OPSIN configs, 508 centres SMILES, 0
+# mismatches). Set ORTHONYM_DISABLE_JPYPE=1 to force the subprocess path.
+jvm = [
+    "jpype1>=1.5",
+]
 
 [project.scripts]
 orthonym = "orthonym.cli:main"

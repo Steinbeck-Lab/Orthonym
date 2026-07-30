@@ -152,11 +152,49 @@ def test_mol_label_returns_false_when_jar_absent(monkeypatch):
 
 
 @pytest.mark.integration
-def test_batch_returns_none_when_java_absent(monkeypatch):
-    """Java-absent -> centres_label_batch returns None even if the jar exists."""
+def test_batch_returns_none_when_no_jvm_at_all(monkeypatch):
+    """Engine unavailable -> centres_label_batch returns None (D-13).
+
+    There are now TWO ways to reach a JVM, so both must be absent for the engine
+    to count as unavailable: the in-process JVM (``jvm_bridge``, JPype) and the
+    external ``java`` binary. This asserts the D-13 contract itself -- no JVM by
+    any route means None, so the caller falls back to RDKit rather than hard-failing.
+
+    Note the SMILES must not already be in the process-level label cache, or the
+    cache would serve it before any availability check is reached.
+    """
+    import orthonym.jvm_bridge as jb
     import orthonym.perception.centres_bridge as cb
+    smi = "CC[C@@H](O)CC[C@H](C)Cl"          # distinctive; not cached by other tests
+    assert smi not in cb._CENTRES_LABEL_CACHE, "precondition: SMILES not cached"
     monkeypatch.setattr(cb, "_java_available", lambda *a, **k: False)
-    assert cb.centres_label_batch(["C[C@H](O)CC"]) is None
+    monkeypatch.setattr(jb, "centres_available", lambda *a, **k: False)
+    assert cb.centres_label_batch([smi]) is None
+
+
+@pytest.mark.integration
+def test_batch_works_without_java_binary_when_inprocess_jvm_available(monkeypatch):
+    """An in-process JVM needs no ``java`` BINARY on PATH.
+
+    JPype loads libjvm into this process, so ``_java_available()`` -- which shells
+    out to ``java -version`` -- stopped being the operative availability test. This
+    locks the intended new behaviour and would catch a regression that silently
+    reintroduced a per-call `java` process launch as a precondition.
+
+    Skips when the in-process JVM genuinely is not available (no jpype / no jar).
+    """
+    import orthonym.jvm_bridge as jb
+    import orthonym.perception.centres_bridge as cb
+    if not jb.centres_available():
+        pytest.skip("in-process JVM (jpype + centres jar) not available")
+    # Remove the external binary as an option, so a pass can ONLY come from the
+    # in-process JVM. Without this the test would prove nothing.
+    monkeypatch.setattr(cb, "_java_available", lambda *a, **k: False)
+    smi = "C[C@@H](O)CCCC"                    # distinctive; forces a real engine call
+    cb._CENTRES_LABEL_CACHE.pop(smi, None)
+    result = cb.centres_label_batch([smi])
+    assert result is not None, "in-process engine should have served this"
+    assert any(d in ("R", "S", "r", "s") for d in result[smi].values()), result
 
 
 @pytest.mark.integration

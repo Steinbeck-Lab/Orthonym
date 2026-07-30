@@ -76,28 +76,47 @@ def opsin_parse(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     if jar_path is None:
         return None
 
+    # PERF: prefer the ONE in-process JVM (jvm_bridge, JPype) over a ~130 ms
+    # process launch per name. It returns EXACTLY the bytes this `java -jar`
+    # invocation would have written to stdout, so the parsing below is shared
+    # verbatim between the two sources and cannot drift. `served` is False
+    # whenever the in-process path cannot serve the call (jpype absent, jar
+    # unresolvable, a different OPSIN version requested, an embedded newline,
+    # a Java-side error) -- we then fall through to the subprocess exactly as
+    # before, so correctness never depends on the optimization.
+    stdout_text: Optional[str] = None
+    served = False
     try:
-        result = subprocess.run(
-            ["java", "-jar", jar_path, "-osmi"],
-            input=name,
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        lines = result.stdout.strip().split("\n")
-        out = lines[-1].strip() if lines else ""
+        from ..jvm_bridge import opsin_stdout
+        stdout_text, served = opsin_stdout(name, allow_radicals=False,
+                                           jar_path=jar_path)
+    except ImportError:  # pragma: no cover - jvm_bridge always present
+        served = False
 
-        if not out:
-            return None
-        if "could not be interpreted" in out.lower():
-            return None
-        if "unsure of the meaning" in out.lower():
+    if not served:
+        try:
+            result = subprocess.run(
+                ["java", "-jar", jar_path, "-osmi"],
+                input=name,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            stdout_text = result.stdout
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
             return None
 
-        return out
+    lines = (stdout_text or "").strip().split("\n")
+    out = lines[-1].strip() if lines else ""
 
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    if not out:
         return None
+    if "could not be interpreted" in out.lower():
+        return None
+    if "unsure of the meaning" in out.lower():
+        return None
+
+    return out
 
 
 def opsin_roundtrip_check(
