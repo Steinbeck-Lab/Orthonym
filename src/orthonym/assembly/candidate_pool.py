@@ -379,6 +379,32 @@ def _count_multiple_bonds_in_atom_set(mol: Any, atom_set: Set[int]) -> int:
 # NEVER returns empty list — if all candidates tie, all are returned.
 # ---------------------------------------------------------------------------
 
+# ============================================================================
+# UNREACHABLE IN PRODUCTION -- measured 2026-07-30 at d5f9ca96 (v30 Task 2)
+#
+# This function and the rest of the P-44 criteria cascade below (through
+# _TIER1_FILTERS, _has_iupac_locants and _best_two_tier) CANNOT EXECUTE in the
+# shipped configuration. Three independent measured reasons, any one sufficient:
+#
+#   1. _DEFAULT_SELECTION_MODE is 'first_applicable', so best() returns early and
+#      never reaches its _best_two_tier call.
+#   2. The pool never holds more than ONE candidate. Spied over all 309 dev500
+#      failures: 517 best() calls, pool size == 1 in 517/517, _best_two_tier
+#      invoked 0 times, 0 rows with >1 candidate. Seniority filters over a set of
+#      one are a no-op by construction.
+#   3. dispatch_inner never consults the pool -- composer.py:1121 returns the
+#      winning handler's own NamingResult. Handlers RETURN rather than ADD (32 of
+#      36 HANDLER_POLICIES are direct_return=True), so nothing is ever ranked.
+#
+# -style `wins` (correct name available but not selected) = 1 of 309, and
+# that one was a fragment name from an abandoned nested pool, not a rival
+# whole-molecule candidate. Write-up:  "v30 Task 2".
+#
+# DO NOT revive by flipping ORTHONYM_SELECTION_MODE=score_based -- measured, that
+# changes 0 of 300 names, because of reason 3. DO NOT calibrate FACTOR_WEIGHTS
+# against it ( tunes a selector that never runs).
+# Kept rather than deleted because Plan-02 unit tests call these directly.
+# ============================================================================
 def _filter_max_pcg_count(candidates: List['CandidateName']) -> List['CandidateName']:
     """P-44.1.1: max principal characteristic group count wins.
 
@@ -1195,6 +1221,10 @@ def clear_pool(features: Any = None) -> None:
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1
 # ---------------------------------------------------------------------------
 
+# UNREACHABLE IN PRODUCTION -- v30 Task 2, 2026-07-30. A permanent stub: both import
+# targets (composer.name_chain, composer._name_chain) are ABSENT from composer.py,
+# verified in-process, so this returns None unconditionally even with the selection
+# mode flipped. The V18 chain-vs-ring competitor it was written for never existed.
 def compute_chain_candidate(
     features: Any, style: str = "iupac"
 ) -> Optional['CandidateName']:
