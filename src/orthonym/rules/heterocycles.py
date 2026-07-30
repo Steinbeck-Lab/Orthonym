@@ -2803,16 +2803,19 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
         locant_str = ",".join(str(loc) for loc in sorted(locants))
         if count == 1:
             return f"{locant_str}-{display}"
-        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"{locant_str}-{multiplier}{display}"
+        # P-16.3.5(a) -- same shared join as _format_c_substituent below; see the
+        # comment there. A private SIMPLE_MULTIPLIERS lookup here could not emit
+        # `bis` either, so `N,N-di(bromomethyl)...` had the identical defect.
+        from ..assembly.naming_utils import multiplied_component
+        return f"{locant_str}-{multiplied_component(count, name, display)}"
     wrapped = _wrap_n_substituent(name)
     if count == 1:
         return f"N-{wrapped}"
     else:
         # N,N-dimethyl, N,N,N-trimethyl, etc.
         n_locants = ",".join(["N"] * count)
-        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"{n_locants}-{multiplier}{wrapped}"
+        from ..assembly.naming_utils import multiplied_component
+        return f"{n_locants}-{multiplied_component(count, name, wrapped)}"
 
 
 def _format_c_substituent(name: str, locants: List[int], count: int,
@@ -2865,11 +2868,21 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
             display_name = f'({name})'
     if count == 1:
         return display_name if omit_locants else f"{locant_str}-{display_name}"
-    else:
-        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        if omit_locants:
-            return f"{multiplier}{display_name}"
-        return f"{locant_str}-{multiplier}{display_name}"
+    # P-16.3.5(a) (BB:7104): 'bis'/'tris'/'tetrakis' indicate a multiplicity of
+    # "compound or complex (i.e. substituted) prefixes", with the verbatim
+    # preferred prefix `bis(bromomethyl)` in that rule's own example list and the
+    # assembled PIN `1,2-bis(bromomethyl)benzene (PIN)` at :25811. The private
+    # SIMPLE_MULTIPLIERS lookup that used to sit here could not express that at
+    # all, so EVERY multiplied prefix on a heterocyclic parent came back `di`.
+    # `multiplied_component` is THE shared join of multiplier + enclosure +
+    # P-16.2.4 hyphen -- the same primitive the carbocyclic producer already
+    # uses, which is why benzene spelled :25811 correctly and pyridine did not.
+    # It consults `is_substituted_substituent` (the MULTIPLIER question), NOT
+    # `is_complex_substituent` (the ENCLOSURE question decided above); the two
+    # disagree, and `di(propan-2-yl)` (:25721) is the row that proves it.
+    from ..assembly.naming_utils import multiplied_component
+    token = multiplied_component(count, name, display_name)
+    return token if omit_locants else f"{locant_str}-{token}"
 
 
 def get_saturation_prefix(
