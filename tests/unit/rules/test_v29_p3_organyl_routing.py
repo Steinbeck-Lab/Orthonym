@@ -1029,10 +1029,15 @@ def test_f5_other_guards_still_fail_closed(smiles, why):
 # ==========================================================================
 
 @pytest.mark.parametrize("smiles,expected", [
-    # site 105 -- chain parent
-    ("CC(C)SSSC(C)C",           "1,3-di(propan-2-yl)trisulfane"),
-    ("CC(C)SSSC",               "1-methyl-3-(propan-2-yl)trisulfane"),
-    ("CC(C)(C)SSSC(C)(C)C",     "1,3-di-tert-butyltrisulfane"),
+    # site 105 -- chain parent.  ⚠ The three chain-parent rows lost their locants
+    # on 2026-07-30 (v29 Phase C Task 11) to P-14.3.4.4 (BB 2953); BB 39339
+    # `dimethyltrisulfane (PIN)` and BB 39341 `methyl(phenyl)triselane (PIN)` are
+    # the verbatim witnesses, and BB 7272 (P-16.5.1.3.1) supplies the enclosing
+    # marks on the second cited prefix.  The ORDER these rows exist to pin is
+    # still fully observable in the string.
+    ("CC(C)SSSC(C)C",           "di(propan-2-yl)trisulfane"),
+    ("CC(C)SSSC",               "methyl(propan-2-yl)trisulfane"),
+    ("CC(C)(C)SSSC(C)(C)C",     "di-tert-butyltrisulfane"),
     # site 259 -- parent + -ol/-thiol suffix layer
     ("CC(C)SSO",                "(propan-2-yl)disulfanol"),
     ("CC(C)SSSO",               "(propan-2-yl)trisulfanol"),
@@ -1049,8 +1054,13 @@ def test_f6_polychalcogen_previously_refused_organyl_is_now_named(
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("CC(C)(C)SSSC",   "1-tert-butyl-3-methyltrisulfane"),
-    ("CC(C)(C)SSSCC",  "1-tert-butyl-3-ethyltrisulfane"),
+    # ⚠ The two chain-parent rows lost their locants to P-14.3.4.4 on 2026-07-30
+    # (Task 11), but they still discriminate: `tert-butyl` is cited FIRST, so a
+    # raw sort (which orders it under 't') would emit `ethyl(tert-butyl)...` and
+    # `methyl(tert-butyl)...`.  BB 16286 `tert-butyldi(methyl)phosphane` (PIN)
+    # independently confirms the italicized prefix stays BARE when cited first.
+    ("CC(C)(C)SSSC",   "tert-butyl(methyl)trisulfane"),
+    ("CC(C)(C)SSSCC",  "tert-butyl(ethyl)trisulfane"),
     ("CC(C)(C)S(=O)S(=O)C",
      "1-tert-butyl-2-methyl-1lambda4,2lambda4-disulfane-1,2-dione"),
 ])
@@ -1070,8 +1080,18 @@ def test_f6_citation_order_ignores_the_italicized_prefix(
 
 
 @pytest.mark.parametrize("smiles,before,after", [
-    ("CSSSCC",   "1-ethyl3-methyltrisulfane",   "1-ethyl-3-methyltrisulfane"),
-    ("CSSSSSCC", "1-ethyl5-methylpentasulfane", "1-ethyl-5-methylpentasulfane"),
+    # ⚠ RE-POINTED 2026-07-30 (v29 Phase C Task 11).  These rows used to be
+    # `CSSSCC` / `CSSSSSCC`, which P-14.3.4.4 now names `ethyl(methyl)trisulfane`
+    # and `ethyl(methyl)pentasulfane` -- i.e. the locanted join this test exists to
+    # protect is no longer REACHED for them, so keeping them here would have left a
+    # test that passes however the separator behaves (global constraint 5:
+    # tautological by architecture).  An isotopic label makes the licence decline
+    # (`isotopic_naming_scope`, P-82.6.1.1 / BB 44180), which is the one live route
+    # back to the locanted join in this producer -- measured, not assumed.
+    ("[13CH3]SSSCC",   "1-ethyl3-(13C1)methyltrisulfane",
+                       "1-ethyl-3-(13C1)methyltrisulfane"),
+    ("[13CH3]SSSSSCC", "1-ethyl5-(13C1)methylpentasulfane",
+                       "1-ethyl-5-(13C1)methylpentasulfane"),
 ])
 def test_f6_prefix_segments_are_hyphen_separated(ungated_namer, smiles, before, after):
     """A malformed name that SHIPPED is repaired.
@@ -1088,10 +1108,13 @@ def test_f6_prefix_segments_are_hyphen_separated(ungated_namer, smiles, before, 
 
 
 @pytest.mark.parametrize("smiles,before,after", [
+    # Locants dropped 2026-07-30 by P-14.3.4.4 (Task 11); the point of these rows
+    # -- WHICH nomenclature claims the molecule -- is untouched, and the `trithia`
+    # forms are still the rejected ones.
     ("CCCCCCCCCCCCSSSC", "2,3,4-trithiahexadecane",
-                         "1-dodecyl-3-methyltrisulfane"),
+                         "dodecyl(methyl)trisulfane"),
     ("C=CSSSC=C",        "3,4,5-trithiahepta-1,6-diene",
-                         "1,3-diethenyltrisulfane"),
+                         "diethenyltrisulfane"),
 ])
 def test_f6_polysulfane_parent_beats_skeletal_replacement(
     ungated_namer, smiles, before, after,
@@ -1114,10 +1137,14 @@ def test_f6_polysulfane_parent_beats_skeletal_replacement(
 
 @pytest.mark.parametrize("smiles,expected", [
     ("SSS",               "trisulfane"),
-    ("CSSS",              "1-methyltrisulfane"),
-    ("CSSSC",             "1,3-dimethyltrisulfane"),
-    ("CSSSSC",            "1,4-dimethyltetrasulfane"),
-    ("CSSSSSC",           "1,5-dimethylpentasulfane"),
+    # ⚠ The four substituted rows are P-14.3.4.4 (BB 2953) omissions as of
+    # 2026-07-30 (Task 11), not the locanted forms this list first recorded.
+    # BB 39335 `methyltrisulfane (PIN)` and BB 39339 `dimethyltrisulfane (PIN)`
+    # are verbatim; the tetra/penta homologues follow the same licence.
+    ("CSSS",              "methyltrisulfane"),
+    ("CSSSC",             "dimethyltrisulfane"),
+    ("CSSSSC",            "dimethyltetrasulfane"),
+    ("CSSSSSC",           "dimethylpentasulfane"),
     ("CSSO",              "methyldisulfanol"),
     ("CSSSO",             "methyltrisulfanol"),
     ("CS(=O)S(=O)C",      "1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione"),

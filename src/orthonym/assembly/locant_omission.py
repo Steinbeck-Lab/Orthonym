@@ -44,8 +44,9 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import itertools
 
-from typing import Dict, FrozenSet, Iterable, Mapping, Optional
+from typing import Dict, FrozenSet, Iterable, List, Mapping, Optional, Tuple
 
 from rdkit import Chem
 
@@ -55,6 +56,7 @@ __all__ = [
     "substitutable_positions",
     "l5_uniform_complete",
     "l3_one_kind_of_substitutable_h",
+    "l4_no_isomer_by_relocation",
     "l3_monosubstituted_locant_omitted",
     "l3_locant_omitted_for_parent_atoms",
     "l6_all_substitutable_h_share_one_locant",
@@ -228,6 +230,295 @@ def l3_one_kind_of_substitutable_h(mol) -> bool:
     if ranks is None:
         return False
     return len({ranks[i] for i in positions}) == 1
+
+
+# --------------------------------------------------------------------------------- #
+# P-14.3.4.4 -- the ISOMER-COUNT licence                                            #
+# --------------------------------------------------------------------------------- #
+_BOND_ORDER_TO_TYPE = {
+    1: Chem.BondType.SINGLE,
+    2: Chem.BondType.DOUBLE,
+    3: Chem.BondType.TRIPLE,
+}
+
+#: Hard ceiling on the placement enumeration. Exceeding it DENIES (fail closed)
+#: rather than costing unbounded time; every Blue Book example of this rule has at
+#: most 3 candidate positions and at most 2 decorations.
+_L4_MAX_ASSIGNMENTS = 4096
+
+
+def _l4_components(mol, parent_set: FrozenSet[int]
+                   ) -> Optional[List[Tuple[int, int, int]]]:
+    """The decorations, read STRUCTURALLY off ``mol`` as ``(anchor, position, order)``.
+
+    A "decoration" is one connected component of the atoms OUTSIDE ``parent_set``
+    -- which is what makes this predicate cover *"suffixes and/or prefixes"* alike
+    (``:2953``) without being told which is which: a ``-one`` oxygen and a
+    ``methyl`` carbon are both simply atoms outside the parent.
+
+    ``anchor`` is the component atom bonded to the parent, ``position`` the parent
+    atom it is bonded to, ``order`` the integer bond order (how many parent
+    hydrogens that decoration consumes -- 1 for ``chloro``, 2 for ``ethylidene``,
+    3 for ``methylidyne``).
+
+    Returns None -- deny -- unless EVERY component attaches by exactly one bond to
+    exactly one parent atom. A component joined twice is a bridge or a fused ring,
+    for which "moving it to another position" is not the operation ``:2953``
+    describes, and the single-vertex relocation below would not be faithful to it.
+    """
+    n = mol.GetNumAtoms()
+    outside = [i for i in range(n) if i not in parent_set]
+    if not outside:
+        return None
+    outside_set = set(outside)
+
+    # Connected components of the outside atoms.
+    unseen = set(outside_set)
+    comps: List[Tuple[int, int, int]] = []
+    while unseen:
+        start = min(unseen)
+        stack = [start]
+        comp = {start}
+        unseen.discard(start)
+        while stack:
+            cur = stack.pop()
+            for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                j = nb.GetIdx()
+                if j in outside_set and j in unseen:
+                    unseen.discard(j)
+                    comp.add(j)
+                    stack.append(j)
+        # Exactly one bond from this component into the parent.
+        links = []
+        for i in sorted(comp):
+            for bond in mol.GetAtomWithIdx(i).GetBonds():
+                j = bond.GetOtherAtomIdx(i)
+                if j in parent_set:
+                    order = bond.GetBondTypeAsDouble()
+                    if order not in (1.0, 2.0, 3.0):
+                        return None          # aromatic/dative -> cannot relocate
+                    links.append((i, j, int(order)))
+        if len(links) != 1:
+            return None
+        comps.append(links[0])
+    return comps
+
+
+def _l4_relocated_key(mol, comps, assignment, capacity) -> Optional[str]:
+    """Canonical SMILES of ``mol`` with every decoration moved to ``assignment``.
+
+    ★ The relocation is performed on the **REAL molecule**: the attachment bond is
+    detached from its current parent atom and re-attached, at the same bond order,
+    to the assigned one. Nothing is modelled by a placeholder, so the constitution
+    compared is the constitution the rule speaks about, with the decorations' own
+    structure, isotopes and charges intact.
+
+    Parent hydrogen counts are frozen explicitly first (``SetNoImplicit``), so the
+    surgery cannot silently move a hydrogen and make two genuinely different
+    constitutions compare equal.
+
+    Returns None on any failure to build or sanitize -- the caller denies.
+    """
+    rw = Chem.RWMol(mol)
+    used: Dict[int, int] = {}
+    for (_anchor, _old, order), new_pos in zip(comps, assignment):
+        used[new_pos] = used.get(new_pos, 0) + order
+    for pos, cap in capacity.items():
+        left = cap - used.get(pos, 0)
+        if left < 0:
+            return None
+        atom = rw.GetAtomWithIdx(pos)
+        atom.SetNoImplicit(True)
+        atom.SetNumExplicitHs(left)
+    for (anchor, old_pos, order), new_pos in zip(comps, assignment):
+        if old_pos == new_pos:
+            continue
+        rw.RemoveBond(old_pos, anchor)
+        rw.AddBond(new_pos, anchor, _BOND_ORDER_TO_TYPE[order])
+    out = rw.GetMol()
+    try:
+        Chem.SanitizeMol(out)
+        return Chem.MolToSmiles(out)
+    except Exception:                          # noqa: BLE001 -- deny-by-default
+        return None
+
+
+def l4_no_isomer_by_relocation(
+    mol,
+    parent_atoms,
+    *,
+    prefix_locants,
+    suffix_locants,
+    stereo_text,
+    has_indicated_h,
+    has_isotope,
+    is_multiplicative: bool = False,
+    is_ring_assembly: bool = False,
+    has_skeletal_replacement: bool = False,
+) -> bool:
+    """§**P-14.3.4.4** (``:2953``) -- the ISOMER-COUNT licence.
+
+        "Locants are omitted when no isomer can be generated by moving suffixes
+         and/or prefixes (if any) from their position to another or by
+         interchanging them between two different positions."
+
+    True => every locant in this scope is omitted.
+
+    ``mol`` is the DECORATED molecule and ``parent_atoms`` the atom indices of the
+    parent hydride / parent compound within it; the decorations are then read off
+    structurally (:func:`_l4_components`) rather than taken on trust.
+
+    The test is exactly the rule's own two operations, run to exhaustion: place the
+    decoration multiset over every position of the parent that bears a hydrogen, in
+    every way the positions' hydrogen counts allow, and compare the resulting
+    constitutions. One distinct constitution => no isomer can be generated => omit.
+
+    ⚠⚠ **``substitutable_positions()`` IS DELIBERATELY NOT REUSED HERE**, and that
+    is the single most important line of this function. That helper implements
+    ``:3007``'s carve-out (*"Except for hydrogen atoms attached to chalcogen atoms,
+    such as in acids, alcohols, and to the carbon atoms of formyl groups"*), which
+    is a sentence of **P-14.3.4.5** and has no counterpart in P-14.3.4.4 -- this
+    rule counts ISOMERS, and says nothing whatever about which hydrogens are
+    "substitutable". Routing through it would make the whole polysulfane family
+    deny by construction: trisulfane is ``HS-S-SH``, so EVERY hydrogen it has is on
+    a chalcogen, ``substitutable_positions`` is **empty**, and
+    ``l3_one_kind_of_substitutable_h`` / :func:`l5_uniform_complete` /
+    :func:`l6_all_substitutable_h_share_one_locant` therefore all deny -- yet
+    ``:39335`` prints ``CH3-S-S-SH methyltrisulfane (PIN)`` under §**P-68.4.1.1**
+    *"Compounds with three or more contiguous identical chalcogen atoms are treated
+    as parent hydrides in substitutive nomenclature"*. Positions here are those
+    bearing a hydrogen in the ORDINARY sense, and the reason no isomer exists for
+    methyltrisulfane is a hydrogen COUNT, not a carve-out: the middle sulfur bears
+    **zero** hydrogens, so S1/S3 are the only placements and they are one orbit.
+    (⚠ And the ``:3007`` carve-out must NOT be loosened to make this work: it is
+    load-bearing for P-14.3.4.3, where propanedioic acid's two acid O-H must not
+    count or ``chloropropanedioic acid`` (``:2951``) loses its licence.)
+
+    Derived against **every** example printed in the rule's own block, positives
+    and negatives, which is what fixes the two design points a simpler reading
+    misses:
+
+    ==========================================  ====================================
+    ``:39335`` ``methyltrisulfane``              S2 has no H => S1/S3 only, one orbit
+    ``:39339`` ``dimethyltrisulfane``            both placements forced, one result
+    ``:39341`` ``methyl(phenyl)triselane``       ★ HETEROGENEOUS: interchange gives
+                                                the same molecule
+    ``:2979``  ``not 1-bromo-2-methyldisulfane`` heterogeneous disulfane, likewise
+    ``:2959``  ``ethylidenehydrazinyl``          ethylidene needs 2 H => only N2 can
+                                                host it: ONE placement
+    ``:2983``  ``oxoethenyl``                    same, oxo needs 2 H
+    ``:2975``  ``chloro(silylidene)hydrazine``   2+1 > N's 2 H, so no co-location;
+                                                the two swaps agree
+    ``:2995``  ``1-ethylidene-2-propylidene-     ★ interchange DOES give an isomer
+               disilan-1-yl`` (locants needed)   -- a single-orbit test would have
+                                                wrongly omitted here
+    ``:2999``  ``1-chloro-2-ethylidenedisilane`` ★ the BB's reason is *"moving the
+               (locants needed)                  Cl atom to the other Si atom"*, and
+                                                Si has 3 H, so CO-LOCATION on one
+                                                position is a legal placement and
+                                                must be enumerated
+    ``:3003``  ``2-chloroethen-1-yl``            C1 and C2 both have H and differ
+    ==========================================  ====================================
+
+    So single-orbit equivalence is NOT the test on either flank: it is too weak for
+    a heterogeneous multiset (``:2995``) and too narrow to notice co-location
+    (``:2999``).
+
+    ⚠ The four spellings of ``:3005`` -- *"As an exception the locant is not omitted
+    from propan-2-one, butan-2-one, prop-2-enoic acid and prop-2-ynoic acid although
+    unambiguous without a locant"* -- are exceptions to THIS licence (that sentence
+    closes P-14.3.4.4's block). They are NOT enumerated here, deliberately: the set
+    is demonstrably OPEN -- ``prop-2-enamide (PIN)`` (``:32724``),
+    ``...prop-2-enenitrile (PIN)`` (``:46790``) and ``prop-2-enoyl (preferred
+    prefix)`` (``:30570``) are all equally unambiguous without a locant and all
+    printed with one. (``prop-2-enal``'s locanted spelling appears at ``:35068``
+    only inside a ``[not 2-butylprop-2-enal...]`` clause that rejects the name on a
+    different ground -- parent selection -- so it evidences the SPELLING, not a PIN
+    endorsement; the three above carry the tag themselves.) A four-row table would
+    therefore be wrong on its complement by construction. They stay
+    correct because nothing routes an unsaturated chain suffix through this licence;
+    a caller that ever does must handle the class, not the four names.
+
+    **Deny-by-default**, per this module's docstring. It declines on all THREE of
+    the things ``ARCH-a-licence-can-be-evaluated-on-the-wrong-molecule.md`` requires
+    of a P-14.3.4 licence: :func:`locants_are_forced` and
+    :func:`scope_has_isotopic_modification` here, and the fragment-boundary
+    observation at its call site (kept in ``handlers/_handler_shared.py`` so this
+    module stays a pure leaf). It also denies on any defined stereochemistry, since
+    relocating a bond cannot be shown to preserve a descriptor.
+    """
+    # ARCH-a, the two AMBIENT declarations. This licence empties its scope of ALL
+    # locants, which is precisely what P-82.6.1.1 (``:44180``) forbids while an
+    # isotopic modification is being spliced in -- and the isotope path names an
+    # isotope-STRIPPED skeleton, so no structural test here can see the label.
+    if locants_are_forced():
+        return False
+    if scope_has_isotopic_modification():
+        return False
+
+    if mol is None or parent_atoms is None:
+        return False
+    try:
+        parent_set = frozenset(int(i) for i in parent_atoms)
+    except (TypeError, ValueError):
+        return False
+    n_atoms = mol.GetNumAtoms()
+    if not parent_set or any(i < 0 or i >= n_atoms for i in parent_set):
+        return False
+
+    if scope_forces_locants(
+        prefix_locants=prefix_locants,
+        suffix_locants=suffix_locants,
+        stereo_text=stereo_text,
+        has_indicated_h=has_indicated_h,
+        has_isotope=has_isotope,
+        is_multiplicative=is_multiplicative,
+        is_ring_assembly=is_ring_assembly,
+        has_skeletal_replacement=has_skeletal_replacement,
+    ):
+        return False
+
+    # Relocating a bond cannot be shown to preserve a stereodescriptor, so any
+    # defined stereochemistry denies rather than being silently rewired.
+    for atom in mol.GetAtoms():
+        if atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+            return False
+    for bond in mol.GetBonds():
+        if bond.GetStereo() != Chem.BondStereo.STEREONONE:
+            return False
+
+    comps = _l4_components(mol, parent_set)
+    if not comps:
+        return False
+
+    # Capacity = the parent HYDRIDE's hydrogen count at each parent atom: what it
+    # carries now, plus whatever the decorations sitting on it displaced.
+    capacity: Dict[int, int] = {}
+    for pos in sorted(parent_set):
+        capacity[pos] = mol.GetAtomWithIdx(pos).GetTotalNumHs()
+    for (_anchor, old_pos, order) in comps:
+        capacity[old_pos] = capacity.get(old_pos, 0) + order
+
+    positions = [p for p in sorted(parent_set) if capacity[p] > 0]
+    if not positions:
+        return False
+    if len(positions) ** len(comps) > _L4_MAX_ASSIGNMENTS:
+        return False                           # fail closed rather than run long
+
+    keys = set()
+    for assignment in itertools.product(positions, repeat=len(comps)):
+        load: Dict[int, int] = {}
+        for (_anchor, _old, order), pos in zip(comps, assignment):
+            load[pos] = load.get(pos, 0) + order
+        if any(load[p] > capacity[p] for p in load):
+            continue                           # not a placement at all
+        key = _l4_relocated_key(mol, comps, assignment, capacity)
+        if key is None:
+            return False                       # could not establish -> deny
+        keys.add(key)
+        if len(keys) > 1:
+            return False                       # an isomer exists -> cite
+    return len(keys) == 1
 
 
 def l6_all_substitutable_h_share_one_locant(

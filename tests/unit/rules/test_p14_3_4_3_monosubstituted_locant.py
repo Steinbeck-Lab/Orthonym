@@ -391,8 +391,14 @@ def test_an_essential_N_locant_restores_the_ring_suffix_locant(namer, smiles, ex
         ("OC1CCCCC1", "cyclohexanol", "P-14.3.4.2(c)"),
         ("CCO", "ethanol", "P-14.3.4.2(a)"),
         # --- not this task: L4 (P-14.3.4.4) owns the polysulfanes ---
-        ("CSSS", "1-methyltrisulfane",
-         "wrong today, but licensed by P-14.3.4.4 which is unimplemented"),
+        # SHIPPED by Task 11 (2026-07-30): L4 is implemented and this row is now
+        # BB 39335's verbatim PIN. It stays in THIS file's negative list because
+        # the point it makes is unchanged -- L3 must not be widened to reach it,
+        # and no L3 change may alter it. (:3007's chalcogen carve-out still makes
+        # trisulfane's substitutable set EMPTY, so all of L3/L5/L6 deny here.)
+        ("CSSS", "methyltrisulfane",
+         "licensed by P-14.3.4.4, NOT by L3: every H is on a chalcogen, so "
+         "substitutable_positions is empty and L3 denies by construction"),
         # --- not this task: L5 parent scope, SHIPPED by Task 5b (2026-07-30) ---
         ("OC(=O)C(F)(F)C(F)(F)C(F)(F)F", "heptafluorobutanoic acid",
          "P-14.3.4.5 (:3017 verbatim PIN) -- a DIFFERENT licence, which must not be "

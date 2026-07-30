@@ -32,8 +32,13 @@ class TestBareChains:
 
 class TestCarbonSubstituted:
     @pytest.mark.parametrize("smiles,expected", [
-        ("CSSS", "1-methyltrisulfane"),
-        ("CSSSC", "1,3-dimethyltrisulfane"),
+        # P-14.3.4.4 (BB 2953) licenses the omission; every row of this producer's
+        # own Blue Book example block (P-68.4.1.1) is locant-free. Corrected
+        # 2026-07-30 (Task 11) -- these two used to assert `1-methyltrisulfane`
+        # and `1,3-dimethyltrisulfane`, both of which BB 39335/39339 contradict
+        # verbatim.
+        ("CSSS", "methyltrisulfane"),            # BB 39335 verbatim (PIN)
+        ("CSSSC", "dimethyltrisulfane"),         # BB 39339 verbatim (PIN)
     ])
     def test_terminal_organyl_min_three(self, smiles, expected):
         assert _name(smiles) == expected

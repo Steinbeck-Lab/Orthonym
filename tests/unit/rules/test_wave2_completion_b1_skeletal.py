@@ -131,7 +131,11 @@ class TestLambdaPolysulfane:
 
     def test_plain_polysulfanes_unchanged(self):
         assert name_compound("SSS") == "trisulfane"
-        assert name_compound("CSSSC") == "1,3-dimethyltrisulfane"
+        # Corrected 2026-07-30 (v29 Phase C Task 11): BB 39339 prints
+        # `CH3-S-S-S-CH3 dimethyltrisulfane (PIN)` verbatim -- P-14.3.4.4
+        # (BB 2953) omits the locants because trisulfane's middle sulfur bears no
+        # hydrogen, so S1/S3 are the only placements and they are one orbit.
+        assert name_compound("CSSSC") == "dimethyltrisulfane"
 
 
 @pytest.mark.unit
