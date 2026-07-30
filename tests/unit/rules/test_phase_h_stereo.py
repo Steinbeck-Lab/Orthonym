@@ -146,7 +146,16 @@ def test_ster02_missing_output_order_declines():
 def test_v18_cysteine_no_malformed_locant():
     """V-18: L-cysteine must not carry a malformed '(1R)-' block on the retained name."""
     name = name_compound("N[C@@H](CS)C(=O)O")
-    assert name == "cysteine"
+    # STALE EXPECTATION CORRECTED 2026-07-30: was `== "cysteine"`. The v29 P3REG
+    # work made the L-descriptor explicit, and `data/amino_acids.py` now emits
+    # `L-cysteine` -- which is right: the SMILES is specifically the (R)/L-enantiomer,
+    # and a bare `cysteine` would under-specify it. There is NO code site to fix here;
+    # only this assertion was stale.
+    assert name == "L-cysteine"
+    # ★ THIS is the actual V-18 tripwire and it has passed throughout: the retained
+    # name must not carry a malformed '(1R)-'/'(1S)-' block. Do not weaken or merge
+    # it into the line above -- the defect V-18 guards against is the malformed
+    # locant block, not the stereo-prefix spelling.
     assert "(1R)" not in name and "(1S)" not in name
 
 

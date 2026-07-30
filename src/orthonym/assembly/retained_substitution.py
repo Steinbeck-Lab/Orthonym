@@ -323,9 +323,25 @@ class OpsinOracle:
 
 def _recompute_multiplicative_prefix(old_mult: Optional[str], new_name: str) -> Optional[str]:
     """TRIV-02 (D-05): re-derive the di<->bis multiplier for a repeated substituent whose name
-    changed, using ``get_multiplier_prefix`` (which consults ``is_complex_substituent``
-    internally) — never a static per-entry flag. Preserves the occurrence count encoded by the
-    old multiplier; returns None when the node carried no multiplier.
+    changed, using ``get_multiplier_prefix`` — never a static per-entry flag. Preserves the
+    occurrence count encoded by the old multiplier; returns None when the node carried no
+    multiplier.
+
+    ⚠ **Docstring corrected 2026-07-30.** It said ``get_multiplier_prefix`` "consults
+    ``is_complex_substituent`` internally". It does **not** — measured with a spy,
+    ``is_complex_substituent`` records **zero** calls from it; the predicate actually
+    consulted is ``is_substituted_substituent`` (plus
+    ``CATENATION_AMBIGUOUS_PREFIXES``). The two genuinely disagree, so the wrong name
+    was not a harmless synonym:
+
+        1,2-xylene    complex=True  substituted=False  -> 'di'
+        bromomethyl   complex=True  substituted=True   -> 'bis'
+        propan-2-yl   complex=True  substituted=False  -> 'di'
+
+    and ``substituted`` is the one that matches the Blue Book — ``:25811``
+    ``1,2-bis(bromomethyl)benzene (PIN)`` against ``:25719``'s ``di(propan-2-yl)``.
+    A stale docstring naming the wrong predicate is how commit ``b3f6ce7c`` came to
+    re-point this at ``is_complex_substituent`` and regress it in both directions.
 
     This matters because the serializer renders ``node.multiplicative_prefix`` verbatim
     (name_tree_to_string.py:164-165) — it does NOT recompute from sibling counts. So a swap that

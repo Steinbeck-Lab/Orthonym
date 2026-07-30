@@ -220,11 +220,41 @@ class TestFrozenDataclassInvariants:
         assert out.multiplicative_prefix == "di"
 
     @pytest.mark.unit
-    def test_multiplier_recompute_complex_flips_to_bis(self):
-        # "1,2-xylene" is COMPLEX (digit + hyphen) => di flips to bis (TRIV-02 di<->bis feedback)
+    def test_multiplier_recompute_unsubstituted_stays_di(self):
+        """TRIV-02: the recompute consults ``is_substituted_substituent``, so a name that
+        is *complex* but **not substituted** keeps ``di``.
+
+        ⚠ **RENAMED AND CORRECTED 2026-07-30.** This was
+        ``test_multiplier_recompute_complex_flips_to_bis`` and expected ``"bis"``, on the
+        premise that "1,2-xylene is COMPLEX (digit + hyphen) => di flips to bis". The
+        premise names a predicate the code does not use: a spy measured
+        ``is_complex_substituent`` at **zero** calls from ``get_multiplier_prefix``.
+        Measured, ``1,2-xylene`` is complex=True but **substituted=False**, so ``di`` is
+        both what the code produces and what the Blue Book requires — P-16.3.2 /
+        P-16.3.5, with ``:25719``'s ``di(propan-2-yl)`` the analogous unsubstituted case
+        against ``:25811``'s ``1,2-bis(bromomethyl)benzene (PIN)``.
+
+        Reachable scope: **0 shipped names.** ``_recompute_multiplicative_prefix`` is
+        reached only through ``apply_triviality_controller``, whose callers pass an
+        ``enabled`` flag defaulting FALSE. So this was a stale test over dormant code,
+        not a live defect — but the docstrings it agreed with had already caused one real
+        regression (``b3f6ce7c``), which is why both were corrected too.
+        """
         entry = _entry("Cc1ccccc1C")
         out = _build_rewrite(NameTreeNode(parent_stem="x", multiplicative_prefix="di"), entry, ())
-        assert out.multiplicative_prefix == "bis"
+        assert out.multiplicative_prefix == "di"
+
+    def test_multiplier_recompute_substituted_flips_to_bis(self):
+        """The other side of the boundary: a genuinely *substituted* prefix takes ``bis``.
+
+        Added 2026-07-30 alongside the correction above, so the pair pins the real
+        discriminator rather than only one side of it. Without this, re-pointing the
+        predicate at ``is_complex_substituent`` would leave the suite green.
+        """
+        from orthonym.assembly.naming_utils import get_multiplier_prefix
+        assert get_multiplier_prefix(2, "bromomethyl") == "bis"
+        assert get_multiplier_prefix(2, "1,2-xylene") == "di"
+        assert get_multiplier_prefix(2, "propan-2-yl") == "di"
 
 
 class TestCompleteNameFieldReset:

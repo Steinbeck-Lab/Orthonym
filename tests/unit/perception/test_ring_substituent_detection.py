@@ -119,7 +119,15 @@ class TestClassifySubstituent:
         parent_atoms = set(range(6, mol.GetNumAtoms()))
         result = classify_substituent(mol, ring_atoms, parent_atoms)
         assert result['type'] == 'ring'
-        assert 'piperidinyl' in result['name'].lower()
+        # STALE EXPECTATION CORRECTED 2026-07-30: was `'piperidinyl' in ...lower()`.
+        # Production emits the PIN form `piperidin-3-yl` -- P-29.2 requires the free
+        # valence to carry its locant, and `ring_substituents.py:508` builds it
+        # correctly. Measured: `(piperidin-4-yl)acetic acid`,
+        # `3-(piperidin-3-yl)propanoic acid` etc. all OPSIN-clean, so ZERO molecules
+        # were mis-named -- only this assertion was.
+        # Asserted EXACTLY, not by substring: the loose `'piperid' in ...` shape used
+        # at line ~178 is why this went unnoticed, since it passes for both spellings.
+        assert result['name'] == 'piperidin-3-yl'
 
     def test_methyl_classified_as_alkyl(self):
         """Methyl substituent should be classified as alkyl."""
@@ -285,10 +293,17 @@ class TestRingTypeIdentification:
                 parent_idx = atom.GetIdx()
                 break
         result = classify_substituent(mol, ring_atoms, {parent_idx})
-        assert 'piperidinyl' in result['name']
+        # STALE EXPECTATION CORRECTED 2026-07-30 -- see the note at the piperidine
+        # test above. `piperidin-3-yl` is the PIN; 0 molecules were mis-named.
+        assert result['name'] == 'piperidin-3-yl'
 
     def test_aromatic_heterocycle_pyridine(self):
-        """Pyridine ring gives pyridyl."""
+        """Pyridine ring gives the PIN substituent prefix `pyridin-3-yl`.
+
+        Docstring corrected 2026-07-30: it said "gives pyridyl". `pyridyl` is the
+        retained/CAS form; P-29.2 requires the free valence to carry its locant, so
+        the PIN is `pyridin-3-yl` -- which is what production emits.
+        """
         mol = Chem.MolFromSmiles('c1ccncc1C')  # methylpyridine
         ri = mol.GetRingInfo()
         ring_atoms = list(ri.AtomRings()[0])
@@ -298,4 +313,8 @@ class TestRingTypeIdentification:
                 parent_idx = atom.GetIdx()
                 break
         result = classify_substituent(mol, ring_atoms, {parent_idx})
-        assert 'pyridyl' in result['name'] or 'pyridinyl' in result['name']
+        # STALE EXPECTATION CORRECTED 2026-07-30: was
+        # `'pyridyl' in name or 'pyridinyl' in name`. Both disjuncts are
+        # locant-less and neither is the PIN. Asserted exactly -- a two-way
+        # substring disjunct cannot distinguish the PIN from either superseded form.
+        assert result['name'] == 'pyridin-3-yl'

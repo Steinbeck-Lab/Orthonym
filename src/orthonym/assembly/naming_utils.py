@@ -2149,8 +2149,30 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     """Get the appropriate multiplier prefix for a count of substituents.
 
     For count=1, returns empty string (no multiplier needed).
-    For simple substituent names (no digits/hyphens), uses di/tri/tetra.
-    For complex substituent names, uses bis/tris/tetrakis.
+
+    ⚠ **Docstring corrected 2026-07-30.** It said "For simple substituent names (no
+    digits/hyphens), uses di/tri/tetra. For complex substituent names, uses
+    bis/tris/tetrakis." That is **not what this function does**, and the difference is
+    load-bearing. The predicate is ``is_substituted_substituent`` (plus
+    ``CATENATION_AMBIGUOUS_PREFIXES``) — **not** ``is_complex_substituent``, which a spy
+    measured at **zero** calls from here. "Has digits/hyphens" is the *complex* test, and
+    the two disagree:
+
+        1,2-xylene    complex=True  substituted=False  -> 'di'
+        propan-2-yl   complex=True  substituted=False  -> 'di'
+        bromomethyl   complex=True  substituted=True   -> 'bis'
+        sulfanyl      complex=False substituted=False  -> 'bis'  (catenation-ambiguous)
+
+    The governing rule is **P-16.3.2 / P-16.3.5**, not P-14.5.1 (which is *alphanumerical
+    order* — a section this project has twice cited by mistake for di/bis). The
+    discriminator is a *contracted* name: ``:5098`` ``1,1-dimethoxypropane (PIN)`` takes
+    ``di`` because ``methoxy`` is contracted (``:17958``), while ``:35344``
+    ``1,1-bis(methylsulfanyl)pentane (PIN)`` takes ``bis`` for the uncontracted form.
+
+    ⛔ **Do not "fix" this by re-pointing at ``is_complex_substituent``.** Commit
+    ``b3f6ce7c`` did exactly that and regressed in both directions —
+    ``bis(propan-2-yl)`` against the PIN at ``:25719``, and ``dihydroxymethyl`` against
+    P-16.3.5(a). Preserve the ordering of the checks.
 
     Args:
         count: Number of identical substituents.
