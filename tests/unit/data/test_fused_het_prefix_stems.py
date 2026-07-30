@@ -227,13 +227,18 @@ class TestPartialSaturation:
     """Verify partially saturated entries produce correct prefix stems."""
 
     @pytest.mark.parametrize("smiles,expected_stem", [
-        ("c1ccc2c(c1)CCN2", "indolin"),
+        # v29 Phase C: the SAME P-54.4.3.2 sentence that demotes chromane/isochromane
+        # (see the note below) names 'indoline' and 'isoindoline' as non-preferred too,
+        # so their prefix stems follow the PIN parents (BB:16992 / :16999). OPSIN-RT
+        # verified: `1-(2,3-dihydro-1H-indol-1-yl)ethan-1-one` round-trips.
+        ("c1ccc2c(c1)CCN2", "2,3-dihydro-1H-indol"),
+        ("c1ccc2c(c1)CNC2", "2,3-dihydro-1H-isoindol"),
+        ("c1ccc2c(c1)CCC2", "2,3-dihydro-1H-inden"),
         # v23 IH-01h: chromane/isochromane PINs are the 1-/2-benzopyran forms (P-54.4.3.2);
         # the substituent prefix stem follows (OPSIN-RT: 3,4-dihydro-2H-1-benzopyran-6-yl parses).
         ("c1ccc2c(c1)CCCO2", "3,4-dihydro-2H-1-benzopyran"),
         ("c1ccc2c(c1)CCCN2", "1,2,3,4-tetrahydroquinolin"),
         ("c1ccc2c(c1)CCOC2", "3,4-dihydro-1H-2-benzopyran"),
-        ("c1ccc2c(c1)CNC2", "isoindolin"),
     ])
     def test_partial_saturation_stems(self, smiles, expected_stem):
         stem = FUSED_HETEROCYCLE_PREFIX_STEMS.get(smiles)

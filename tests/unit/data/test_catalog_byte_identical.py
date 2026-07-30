@@ -93,16 +93,19 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2[nH]nnc2c1': '1H-benzotriazole',
     'c1ccc2[se]cnc2c1': '1,3-benzoselenazole',
     'c1ccc2c(c1)-c1ccccc1-2': 'biphenylene',
-    'c1ccc2c(c1)CCC2': 'indane',
+    # v29 Phase C: P-54.4.3.2 (BB:24256) names the retained forms 'indane' /
+    # 'indoline' / 'isoindoline' verbatim as NOT preferred IUPAC names; BB:16988 /
+    # :16992 / :16999 print the PINs. The baseline is re-frozen on the PIN spelling.
+    'c1ccc2c(c1)CCC2': '2,3-dihydro-1H-indene',
     'c1ccc2c(c1)CCCN2': '1,2,3,4-tetrahydroquinoline',
     'c1ccc2c(c1)CCCO2': '3,4-dihydro-2H-1-benzopyran',
     'c1ccc2c(c1)CCCS2': '3,4-dihydro-2H-1-benzothiopyran',
-    'c1ccc2c(c1)CCN2': 'indoline',
+    'c1ccc2c(c1)CCN2': '2,3-dihydro-1H-indole',
     'c1ccc2c(c1)CCNC2': '1,2,3,4-tetrahydroisoquinoline',
     'c1ccc2c(c1)CCO2': '2,3-dihydro-1-benzofuran',
     'c1ccc2c(c1)CCOC2': '3,4-dihydro-1H-2-benzopyran',
     'c1ccc2c(c1)CCS2': '2,3-dihydro-1-benzothiophene',
-    'c1ccc2c(c1)CNC2': 'isoindoline',
+    'c1ccc2c(c1)CNC2': '2,3-dihydro-1H-isoindole',
     'c1ccc2c(c1)COc1ccccc1-2': '6H-dibenzo[b,d]pyran',
     'c1ccc2c(c1)Cc1ccccc1O2': '9H-xanthene',
     'c1ccc2c(c1)Cc1ccccc1S2': '9H-thioxanthene',

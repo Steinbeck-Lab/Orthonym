@@ -485,20 +485,25 @@ class TestSaturatedVariants:
 
     @pytest.mark.unit
     def test_indoline(self):
-        """Indoline (2,3-dihydro-1H-indole) should be identified."""
+        """The indoline ring system is named by its PIN.
+
+        P-54.4.3.2 (BB:24256) names 'indoline' verbatim as NOT a preferred IUPAC
+        name; BB:16992 prints the PIN '2,3-dihydro-1H-indole'.
+        """
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == 'indoline'
+        assert result[0] == '2,3-dihydro-1H-indole'
         assert result[1] is None  # No tautomer locant for saturated
 
     @pytest.mark.unit
     def test_isoindoline(self):
-        """Isoindoline should be identified."""
+        """The isoindoline ring system is named by its PIN (P-54.4.3.2,
+        BB:24256; the PIN is printed at BB:16999)."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CNC2')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == 'isoindoline'
+        assert result[0] == '2,3-dihydro-1H-isoindole'
 
     @pytest.mark.unit
     def test_tetrahydroquinoline(self):

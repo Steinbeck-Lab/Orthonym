@@ -245,11 +245,15 @@ class TestE2ESaturationNaming:
         assert result == '1,2,3,4-tetrahydroquinoline'
 
     def test_indoline_e2e(self):
-        """Test that indoline gets correct retained name."""
+        """The indoline ring system emits its PIN, not the retained name.
+
+        P-54.4.3.2 (BB:24256) lists 'indoline' among the retained names that
+        'are not used as preferred IUPAC names'; BB:16992 prints the PIN.
+        """
         from orthonym import name_compound
 
         result = name_compound('c1ccc2c(c1)CCN2')
-        assert result == 'indoline'
+        assert result == '2,3-dihydro-1H-indole'
 
     def test_tetrahydroisoquinoline_e2e(self):
         """Test tetrahydroisoquinoline naming."""
@@ -440,9 +444,10 @@ class TestWSD02TetralinNoPhantomAlkyl:
         assert name_compound('C1CCC2CCCCC2C1') == 'decahydronaphthalene'
 
     @pytest.mark.unit
-    def test_indane_retained(self):
-        # PROTECT: retained name (partial-sat namer returns None -> defers).
-        assert name_compound('C1Cc2ccccc2C1') == 'indane'
+    def test_indane_pin_not_the_retained_name(self):
+        # PROTECT: the WSD-02 no-phantom-alkyl behaviour, now pinned on the PIN.
+        # P-54.4.3.2 (BB:24256) / BB:16988: 'indane' is not a preferred IUPAC name.
+        assert name_compound('C1Cc2ccccc2C1') == '2,3-dihydro-1H-indene'
 
     @pytest.mark.unit
     def test_substituted_tetralin_keeps_real_substituent_no_butyl(self):

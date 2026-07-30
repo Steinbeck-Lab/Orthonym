@@ -452,10 +452,11 @@ class TestEdgeCases:
 
     @pytest.mark.unit
     def test_indoline_saturated(self):
-        """Indoline (saturated indole) should be recognized."""
+        """The saturated indole ring system is named by its PIN (P-54.4.3.2,
+        BB:24256; PIN printed at BB:16992)."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # indoline
         name = name_fused_heterocycle(mol)
-        assert name == 'indoline'
+        assert name == '2,3-dihydro-1H-indole'
 
     @pytest.mark.unit
     def test_tetrahydroquinoline(self):

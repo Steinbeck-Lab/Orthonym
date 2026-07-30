@@ -2315,6 +2315,456 @@ def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: in
     return min(candidate_locants)
 
 
+# --------------------------------------------------------------------------
+# P-24.3.2 -- hydro / indicated-hydrogen hoisting for 'spirobi' components
+#
+# P-24.3.2 (BB:10152): "Where appropriate the maximum number of noncumulative
+# double bonds is added (i.e., the system is made mancude) AFTER CONSTRUCTION OF
+# THE COMPLETE SKELETON. Indicated hydrogen (P-14.7) of individual components is
+# not cited. No indicated hydrogen is cited when none is present in the spiro
+# system. If indicated hydrogen is needed, it is cited in front of the spiro atom
+# locants."
+#
+# Two consequences drive everything below:
+#
+#   1. The bracket holds the MANCUDE component ring system -- never a hydro form
+#      and never the component's own indicated hydrogen. Saturation is expressed
+#      by 'hydro' prefixes on the ASSEMBLED name, outside the bracket.
+#      Template, BB:46336: 1,3'-dihydro-3H-1lambda6,1'-spirobi[[2,1]benzoxathiole]
+#      -> [hydro][indicated-H][spiro locants]-spirobi[mancude component].
+#      All ~20 'spirobi' examples in the Blue Book cite indicated hydrogen
+#      OUTSIDE the bracket; NONE cites it inside.
+#
+#   2. Because the skeleton is made mancude as a WHOLE, the hydro locants are
+#      NOT the component's own hydro locants. The spiro atom has four single
+#      ring bonds, so it is sp3 by construction and takes no double bond; the
+#      maximum matching over the REMAINING component atoms is the mancude form.
+#      Atoms left unmatched are indicated hydrogen; atoms saturated in the real
+#      molecule but matched in the mancude form are the 'hydro' positions.
+#
+# Validated against five Blue Book spirobi PINs before use (see the module test):
+#   BB:10164  1,1'-spirobi[indene]                       (spiro at the sp3, no IH)
+#   BB:10158  1H,1'H-2,2'-spirobi[naphthalene]           (9 non-spiro atoms -> 1 IH)
+#   BB:10160  3H,3'H-2,2'-spirobi[[1]benzothiophene]     (divalent S ineligible)
+#   BB:10170  1'H,2H-1,2'-spirobi[azulene]               (IH locant + prime order)
+#   BB:10176  2'H,3H-2,3'-spirobi[[1]benzothiophene]     (isolated C2' forced IH)
+# --------------------------------------------------------------------------
+
+# The mancude matching recursion is exponential in the worst case; spirobi
+# components are small fused ring systems, so cap and fail closed above it.
+_MANCUDE_MATCH_ATOM_CAP = 32
+
+
+def _spirobi_locant_key(loc, primes: int = 0) -> Tuple[int, str, int]:
+    """P-14.3.5 sort key for a locant of an assembled spiro system.
+
+    **P-14.3.5 "Lowest set of locants"** (``BlueBookV2/BlueBookV2.md:3193``):
+    *"Primed locants are placed immediately after the corresponding unprimed
+    locants in a set arranged in ascending order; locants consisting of a number
+    and a lower-case letter with or without primes as 4a and 4'a (not 4a') are
+    placed immediately after the corresponding numeric locant"*.
+
+    So the order is ``4 < 4' < 4a < 4'a < 5`` -- keyed ``(number, letter,
+    primes)``. It is NOT "every unprimed locant before every primed locant":
+    the spirobi worked example ``BB:16779``
+    ``2-phospha-3,3'-spirobi[bicyclo[3.3.1]nonane]-6',7-diene (PIN)`` cites
+    ``6'`` BEFORE ``7``, and ``BB:10170`` ``1'H,2H-1,2'-spirobi[azulene] (PIN)``
+    cites ``1'H`` before ``2H``.
+    """
+    if isinstance(loc, int):
+        return (loc, '', primes)
+    text = str(loc)
+    digits = 0
+    while digits < len(text) and text[digits].isdigit():
+        digits += 1
+    if digits == 0:
+        return (10 ** 6, text, primes)
+    return (int(text[:digits]), text[digits:], primes)
+
+
+def _spirobi_locant_display(loc, primes: int = 0) -> str:
+    """Render a locant with ``primes`` prime marks: ``(3, 1)`` -> ``3'``.
+
+    The prime goes after the NUMBER, not after the whole locant: P-14.3.5
+    (``BB:3193``) spells the primed fusion locant ``4'a`` and says explicitly
+    ``(not 4a')``.
+    """
+    text = str(loc)
+    digits = 0
+    while digits < len(text) and text[digits].isdigit():
+        digits += 1
+    return f"{text[:digits]}{chr(39) * primes}{text[digits:]}"
+
+
+def _mancude_max_matching(adj, nodes, key_of):
+    """Maximum-cardinality matching over ``nodes``; among the maximum matchings,
+    minimise the sorted tuple of UNMATCHED locant keys (P-14.3.5 lowest set).
+
+    Returns ``(pairs, unmatched)``. Each pair becomes one noncumulative double
+    bond of the mancude system; each unmatched atom is an indicated-hydrogen
+    position.
+
+    Same recursion as ``partial_saturation._max_oxo_matching``, extended to
+    carry the matched PAIRS -- needed here because the mancude component has to
+    be BUILT (bond orders set), not merely counted. Neighbour lists are sorted
+    so the result is order-independent.
+    """
+    from functools import lru_cache
+
+    node_set = frozenset(nodes)
+
+    @lru_cache(maxsize=None)
+    def rec(avail):
+        if not avail:
+            return (0, (), ())
+        first = min(avail)
+        rest = avail - {first}
+        size, unmatched_key, pairs = rec(rest)
+        best = (size, tuple(sorted(unmatched_key + (key_of[first],))), pairs)
+        for other in adj[first]:
+            if other not in rest:
+                continue
+            size2, unmatched_key2, pairs2 = rec(rest - {other})
+            cand = (size2 + 1, unmatched_key2, pairs2 + ((first, other),))
+            if cand[0] > best[0] or (cand[0] == best[0] and cand[1] < best[1]):
+                best = cand
+        return best
+
+    _size, _key, pairs = rec(node_set)
+    matched = {atom for pair in pairs for atom in pair}
+    return list(pairs), set(node_set) - matched
+
+
+def _component_ring_degree(mol, idx: int, comp_atoms: Set[int]) -> int:
+    """Number of the atom's neighbours that lie inside this component."""
+    return sum(1 for nbr in mol.GetAtomWithIdx(idx).GetNeighbors()
+               if nbr.GetIdx() in comp_atoms)
+
+
+def _can_bear_ring_double_bond(mol, idx: int, comp_atoms: Set[int]) -> bool:
+    """True when this skeletal atom has spare standard valence for one ring
+    double bond -- the eligibility test for the mancude assignment.
+
+    A divalent ring O or S (furan, thiophene, and the O atoms of
+    [1,3,2]benzodioxathiole) has none, which is why such atoms are never doubly
+    bonded in a mancude system and never carry indicated hydrogen. A ring N with
+    two ring bonds does have spare valence (pyridine-type when matched,
+    pyrrole-type N-H when unmatched, hence ``1H-indole``).
+
+    Charged skeletons are declined: their valence bookkeeping is not derived
+    here, and this predicate must never over-report eligibility.
+    """
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetFormalCharge() != 0:
+        return False
+    try:
+        default = Chem.GetPeriodicTable().GetDefaultValence(atom.GetAtomicNum())
+    except Exception:
+        return False
+    if default < 0:
+        return False
+    return default - _component_ring_degree(mol, idx, comp_atoms) >= 1
+
+
+def _is_saturated_in_component(mol, idx: int, comp_atoms: Set[int]) -> bool:
+    """True when the atom sits in no multiple or aromatic bond of its component
+    (i.e. it is sp3 in the real molecule)."""
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetIsAromatic():
+        return False
+    for bond in atom.GetBonds():
+        if bond.GetOtherAtomIdx(idx) not in comp_atoms:
+            continue
+        if bond.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE,
+                                  Chem.BondType.AROMATIC):
+            return False
+    return True
+
+
+def _component_eligible_adjacency(mol, atoms: Set[int], comp_atoms: Set[int]):
+    """``(eligible_atoms, adjacency)`` restricted to atoms of ``atoms`` that can
+    bear a ring double bond. Adjacency lists are sorted (determinism)."""
+    eligible = sorted(a for a in atoms
+                      if _can_bear_ring_double_bond(mol, a, comp_atoms))
+    elig = set(eligible)
+    adj = {a: sorted(nbr.GetIdx() for nbr in mol.GetAtomWithIdx(a).GetNeighbors()
+                     if nbr.GetIdx() in elig)
+           for a in eligible}
+    return eligible, adj
+
+
+def _component_raw_catalog_locants(mol, comp_atoms: Set[int]):
+    """Raw (UNCOERCED) catalog locants for a spirobi component.
+
+    ``_name_fused_component`` coerces lettered fusion locants to their base
+    integer (``'7a'`` -> ``7``), which is harmless for a spiro descriptor but
+    would silently mis-spell a hydro prefix sitting on a fusion atom. The hydro
+    prefix needs the real locant, so the catalog is consulted directly here.
+
+    Returns ``(frag, orig_to_frag, {orig_atom: raw_locant})`` or None.
+    """
+    extracted = _extract_subfragment(mol, comp_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    try:
+        from ..data.fused_heterocycles import match_fused_heterocycle_core
+    except ImportError:
+        return None
+    match = match_fused_heterocycle_core(frag)
+    if match is None:
+        return None
+    _core_name, frag_locants, _core_smiles = match
+    raw: Dict[int, object] = {}
+    for frag_idx, locant in frag_locants.items():
+        orig = frag_to_orig.get(frag_idx)
+        if orig is None:
+            continue
+        raw[orig] = locant
+    if set(raw) != set(comp_atoms):
+        return None
+    return frag, orig_to_frag, raw
+
+
+def _component_numberings(frag, orig_to_frag, raw_locants):
+    """Every valid numbering of the component ring system, as
+    ``{orig_atom: raw_locant}`` maps.
+
+    P-24.3.1: *"The established numbering system of the polycyclic ring system
+    component is retained"*. Where the ring system is symmetric several
+    numberings are equally established (indane positions 1 and 3 are mirror
+    images), and the spiro rules then choose between them. The alternatives are
+    exactly ``raw_locants o sigma`` for the automorphisms sigma of the component,
+    so they are enumerated from the fragment's self-matches rather than guessed.
+    """
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    try:
+        automorphisms = frag.GetSubstructMatches(
+            frag, uniquify=False, useChirality=False, maxMatches=64)
+    except Exception:
+        automorphisms = ()
+    if not automorphisms:
+        return [dict(raw_locants)]
+    out = []
+    seen = set()
+    for match in automorphisms:
+        candidate = {}
+        ok = True
+        for orig, frag_idx in orig_to_frag.items():
+            if frag_idx >= len(match):
+                ok = False
+                break
+            image = frag_to_orig.get(match[frag_idx])
+            if image is None or image not in raw_locants:
+                ok = False
+                break
+            candidate[orig] = raw_locants[image]
+        if not ok or len(set(map(str, candidate.values()))) != len(candidate):
+            continue
+        fingerprint = tuple(sorted((k, str(v)) for k, v in candidate.items()))
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        out.append(candidate)
+    return out or [dict(raw_locants)]
+
+
+def _mancude_component_name(mol, comp_atoms: Set[int], raw_locants) -> Optional[str]:
+    """Name the MANCUDE ring system of a spirobi component, with the
+    component's own indicated hydrogen removed (P-24.3.2: *"Indicated hydrogen
+    of individual components is not cited"*).
+
+    The mancude form is BUILT from the component skeleton -- every ring bond
+    reset to single, then the maximum noncumulative double-bond assignment
+    applied -- and named through the ordinary fused-ring cascade, so the answer
+    comes from the ring-system catalog rather than from string surgery on the
+    saturated component's name. ``indane`` -> ``1H-indene`` -> ``indene``.
+    """
+    extracted = _extract_subfragment(mol, comp_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    frag_atoms = set(orig_to_frag.values())
+    if len(frag_atoms) > _MANCUDE_MATCH_ATOM_CAP:
+        return None
+    # Eligibility / adjacency in FRAGMENT index space.
+    eligible = sorted(
+        f for orig, f in orig_to_frag.items()
+        if _can_bear_ring_double_bond(mol, orig, comp_atoms))
+    elig = set(eligible)
+    adj = {f: sorted(nbr.GetIdx() for nbr in frag.GetAtomWithIdx(f).GetNeighbors()
+                     if nbr.GetIdx() in elig)
+           for f in eligible}
+    if not eligible:
+        return None
+    key_of = {f: _spirobi_locant_key(raw_locants[orig])
+              for orig, f in orig_to_frag.items() if f in elig}
+    pairs, _unmatched = _mancude_max_matching(adj, eligible, key_of)
+    rw = Chem.RWMol(frag)
+    for bond in rw.GetBonds():
+        bond.SetBondType(Chem.BondType.SINGLE)
+        bond.SetIsAromatic(False)
+    for atom in rw.GetAtoms():
+        atom.SetIsAromatic(False)
+        atom.SetNoImplicit(False)
+        atom.SetNumExplicitHs(0)
+    for first, second in pairs:
+        bond = rw.GetBondBetweenAtoms(first, second)
+        if bond is None:
+            return None
+        bond.SetBondType(Chem.BondType.DOUBLE)
+    mancude = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mancude)
+    except Exception:
+        return None
+    rings = [list(r) for r in mancude.GetRingInfo().AtomRings()]
+    if not rings:
+        return None
+    named = _name_fused_component(mancude, rings)
+    if named is None:
+        return None
+    _ih_locants, bare = _extract_leading_indicated_h(named[0])
+    return bare
+
+
+def _spirobi_component_saturation(mol, comp_atoms: Set[int], spiro_center: int,
+                                  numbering):
+    """P-24.3.2 saturation report for ONE spirobi component under ``numbering``.
+
+    Returns ``(hydro_locants, indicated_h_locants)`` -- both as raw locants in
+    the component's own numbering -- or None (fail closed).
+
+    The spiro atom carries four single ring bonds, so it is excluded from the
+    mancude assignment; the maximum matching over the remaining atoms is the
+    mancude form of the ASSEMBLED skeleton. Unmatched atoms are indicated
+    hydrogen. Atoms that are sp3 in the real molecule but matched in the mancude
+    form are the 'hydro' positions.
+    """
+    others = set(comp_atoms) - {spiro_center}
+    if any(a not in numbering for a in others):
+        return None
+    if len(others) > _MANCUDE_MATCH_ATOM_CAP:
+        return None
+    eligible, adj = _component_eligible_adjacency(mol, others, comp_atoms)
+    elig = set(eligible)
+    key_of = {a: _spirobi_locant_key(numbering[a]) for a in eligible}
+    _pairs, unmatched = _mancude_max_matching(adj, eligible, key_of)
+    real_sp3 = {a for a in others
+                if _is_saturated_in_component(mol, a, comp_atoms)}
+    # An indicated-hydrogen position must really carry hydrogen in the molecule.
+    # When the lowest-locant mancude choice does not, the correct name needs a
+    # joint indicated-H/hydro locant optimisation that is NOT derived here --
+    # decline rather than guess (the failure mode would be a wrong STRUCTURE).
+    #
+    # ⚠ MUTATION-TESTED, and the result is recorded because it is not what it
+    # looks like: deleting THIS guard alone breaks no test (it "survives"). It is
+    # not dead code -- it is REDUNDANT WITH the parity guard below on every
+    # witness reachable here. Whenever the lowest-locant mancude choice misses a
+    # real sp3 atom, the leftover set also comes out odd, so the parity check
+    # refuses the same molecule. Deleting BOTH is killed. Attempts to build a
+    # witness that isolates this guard failed for a structural reason: forcing
+    # the mancude sp3 onto a non-lowest locant also forces an extra sp3 fusion
+    # atom, which flips the parity. Kept as the guard that states the intent,
+    # since the two express different rules and the parity coincidence is not
+    # something a future edit should be allowed to rely on.
+    if not unmatched <= real_sp3:
+        return None
+    # Atoms with no spare valence (divalent ring O/S) are sp3 in the mancude form
+    # too: they gained no hydrogen and must not attract a hydro prefix.
+    hydro = (real_sp3 & elig) - unmatched
+    if len(hydro) % 2 != 0:
+        return None  # hydro atoms pair into reduced double bonds
+    return ({numbering[a] for a in hydro},
+            {numbering[a] for a in unmatched})
+
+
+def _spirobi_component_report(mol, comp_atoms: Set[int], spiro_center: int,
+                             spiro_locant):
+    """Resolve ONE spirobi component: pick the numbering that places the spiro
+    atom at ``spiro_locant`` (P-24.2.4.1 gives the spiro atom the low locant
+    first) and, among those, the one with the lowest hydro/indicated-H locant
+    set (P-14.3.5). Returns ``(mancude_name, hydro, indicated_h)`` or None.
+    """
+    resolved = _component_raw_catalog_locants(mol, comp_atoms)
+    if resolved is None:
+        return None
+    frag, orig_to_frag, raw_locants = resolved
+    target = _spirobi_locant_key(spiro_locant)
+    best = None
+    for numbering in _component_numberings(frag, orig_to_frag, raw_locants):
+        if spiro_center not in numbering:
+            continue
+        if _spirobi_locant_key(numbering[spiro_center]) != target:
+            continue
+        report = _spirobi_component_saturation(
+            mol, comp_atoms, spiro_center, numbering)
+        if report is None:
+            continue
+        hydro, indicated = report
+        rank = (tuple(sorted(_spirobi_locant_key(x) for x in hydro)),
+                tuple(sorted(_spirobi_locant_key(x) for x in indicated)))
+        if best is None or rank < best[0]:
+            best = (rank, numbering, hydro, indicated)
+    if best is None:
+        return None
+    _rank, numbering, hydro, indicated = best
+    mancude = _mancude_component_name(mol, comp_atoms, numbering)
+    if mancude is None:
+        return None
+    return mancude, hydro, indicated
+
+
+def _spirobi_saturation_prefix(mol, spiro_center: int, components):
+    """P-24.3.2 front-of-name prefix for a partially saturated spirobi system.
+
+    ``components`` is ``[(atoms, spiro_locant, primes), ...]`` in citation order
+    (unprimed first). Returns ``(front_prefix, mancude_component_name)`` or None
+    (fail closed).
+
+    Assembly order is the Blue Book template ``BB:46336``
+    ``1,3'-dihydro-3H-1lambda6,1'-spirobi[[2,1]benzoxathiole]``: hydro prefix,
+    then indicated hydrogen, then the spiro locants.
+    """
+    from .partial_saturation import get_saturation_prefix
+
+    hydro_tokens = []
+    indicated_tokens = []
+    mancude_names = set()
+    for atoms, spiro_locant, primes in components:
+        report = _spirobi_component_report(mol, atoms, spiro_center, spiro_locant)
+        if report is None:
+            return None
+        mancude, hydro, indicated = report
+        mancude_names.add(mancude)
+        for locant in hydro:
+            hydro_tokens.append((_spirobi_locant_key(locant, primes),
+                                 _spirobi_locant_display(locant, primes)))
+        for locant in indicated:
+            indicated_tokens.append((_spirobi_locant_key(locant, primes),
+                                     _spirobi_locant_display(locant, primes)))
+    # Both components are graph-isomorphic, so a disagreement here means one of
+    # them was mis-resolved -- decline rather than pick a side.
+    if len(mancude_names) != 1:
+        return None
+    component_name = mancude_names.pop()
+    if not component_name:
+        return None
+
+    front = ""
+    if hydro_tokens:
+        multiplier = get_saturation_prefix(len(hydro_tokens))
+        if not multiplier:
+            return None
+        locants = ",".join(text for _key, text in sorted(hydro_tokens))
+        front += f"{locants}-{multiplier}-"
+    if indicated_tokens:
+        locants = ",".join(f"{text}H" for _key, text in sorted(indicated_tokens))
+        front += f"{locants}-"
+    return front, component_name
+
+
 def is_spirobi(mol) -> bool:
     """P-24.3.1: monospiro ring system with two IDENTICAL (polycyclic)
     components joined at one spiro atom (e.g. 1,1'-spirobi[indene]).
@@ -2402,18 +2852,43 @@ def _name_spirobi_core(mol):
     if loc_a <= loc_b:
         lo, hi = loc_a, loc_b
         unprimed_map, primed_map = loc_map_a, loc_map_b
+        unprimed_atoms, primed_atoms = atoms_a, atoms_b
     else:
         lo, hi = loc_b, loc_a
         unprimed_map, primed_map = loc_map_b, loc_map_a
+        unprimed_atoms, primed_atoms = atoms_b, atoms_a
 
-    # P-24.3.2 / P-24.5.1: indicated hydrogen of the individual component is not
-    # cited when the spiro atom occupies that locant.
-    component_name = _strip_consumed_indicated_h(name_a, lo)
     # P-24.8.2: a NONSTANDARD (λ) spiro atom carries its λ token on the UNPRIMED
     # locant (e.g. 2lambda4,2'-spirobi[[1,3,2]benzodioxathiole]).
     lam = _nonstandard_bonding_number(mol, spiro_center)
     lo_tok = f"{lo}lambda{lam}" if lam is not None else str(lo)
-    name = f"{lo_tok},{hi}'-spirobi[{component_name}]"
+
+    # P-24.3.2: a component atom that COULD carry a ring double bond but does not
+    # is saturation that has to be expressed OUTSIDE the bracket -- as a hydro
+    # prefix or as indicated hydrogen. Gating on that predicate (rather than on
+    # "is anything sp3") keeps every fully-mancude component -- indene,
+    # [1,3,2]benzodioxathiole, whose divalent ring O atoms are sp3 but can never
+    # be doubly bonded -- on the long-standing code path below, byte-identical.
+    needs_hoist = any(
+        _is_saturated_in_component(mol, atom, comp)
+        and _can_bear_ring_double_bond(mol, atom, comp)
+        for comp in (unprimed_atoms, primed_atoms)
+        for atom in comp if atom != spiro_center
+    )
+    if needs_hoist:
+        hoisted = _spirobi_saturation_prefix(mol, spiro_center, [
+            (unprimed_atoms, lo, 0),
+            (primed_atoms, hi, 1),
+        ])
+        if hoisted is None:
+            return None  # fail closed: saturation we cannot spell is not named
+        front, component_name = hoisted
+        name = f"{front}{lo_tok},{hi}'-spirobi[{component_name}]"
+    else:
+        # P-24.3.2 / P-24.5.1: indicated hydrogen of the individual component is
+        # not cited when the spiro atom occupies that locant.
+        component_name = _strip_consumed_indicated_h(name_a, lo)
+        name = f"{lo_tok},{hi}'-spirobi[{component_name}]"
 
     combined_locants: Dict[int, _Locant] = {}
     for atom_idx, locant in unprimed_map.items():

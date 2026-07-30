@@ -140,10 +140,19 @@ class TestSpirobiBuiltP24_3:
         # 1H-indene mancude component; spiro at C1 of both -> 1,1'.
         assert name_compound("C1=Cc2ccccc2C13C=Cc1ccccc13") == "1,1'-spirobi[indene]"
 
-    def test_spirobi_indane_named(self):
-        # Spiro is benzylic (locant 1) in one indane, the middle carbon
-        # (locant 2) in the other -> 1,2' (NOT 1,1'); RT-verified PIN.
-        assert name_compound("C1Cc2ccccc2C13Cc1ccccc1C3") == "1,2'-spirobi[indane]"
+    def test_spirobi_saturated_component_hoists_the_hydro_prefix(self):
+        """Spiro is benzylic (locant 1) in one half, the middle carbon (2') in the
+        other -> 1,2' (NOT 1,1').
+
+        v29 Phase C: the bracket now holds the MANCUDE component and the
+        saturation is hoisted outside it (P-24.3.2, BB:10152) -- the retained
+        ``spirobi[indane]`` form is not a PIN because P-54.4.3.2 (BB:24256)
+        excludes 'indane'. Hydro locants are derived against the ASSEMBLED
+        mancude skeleton, so they are 2,3 / 1',3' and are cited in P-14.3.5
+        (BB:3193) order, primed immediately after the corresponding unprimed.
+        """
+        assert (name_compound("C1Cc2ccccc2C13Cc1ccccc1C3")
+                == "1',2,3,3'-tetrahydro-1,2'-spirobi[indene]")
 
     def test_spirobi_claimed_by_new_detector_only(self):
         from orthonym.rules.spiro import (

@@ -172,11 +172,15 @@ class TestSpecificNewEntries:
         assert data["name"] == "acenaphthylene"
 
     def test_indane_new(self):
-        """Indane should be a new entry."""
+        """The indane ring system is catalogued under its PIN.
+
+        P-54.4.3.2 (BB:24256) names 'indane' verbatim as NOT a preferred IUPAC
+        name; BB:16988 prints '(formerly indan) 2,3-dihydro-1H-indene (PIN)'.
+        """
         smi = Chem.CanonSmiles("C1Cc2ccccc2C1")
         assert smi in FUSED_HETEROCYCLE_DATA
         data = FUSED_HETEROCYCLE_DATA[smi]
-        assert data["name"] == "indane"
+        assert data["name"] == "2,3-dihydro-1H-indene"
 
     def test_phenoxathiin_new(self):
         """Phenoxathiin should be a new entry."""

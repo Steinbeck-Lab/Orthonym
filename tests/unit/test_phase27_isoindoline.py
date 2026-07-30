@@ -25,19 +25,33 @@ class TestIsoindolineDioneLocants:
     def test_bare_phthalimide(self):
         """Bare phthalimide returns retained name 'phthalimide'."""
         name = name_compound("O=C1NC(=O)c2ccccc21")
-        assert name == "phthalimide" or "isoindoline-1,3-dione" in name
+        assert name == "phthalimide" or "isoindole-1,3-dione" in name
 
     @pytest.mark.unit
     def test_hydroxy_phthalimide(self):
-        """6-hydroxy substituted phthalimide has correct locants."""
+        """Hydroxy-substituted phthalimide has correct locants.
+
+        v29 Phase C: the ring-system stem follows its PIN parent (P-54.4.3.2,
+        BB:24256 / BB:16999).
+
+        ⚠ The `6-hydroxy` this test used to demand was ALREADY WRONG and this test
+        was ALREADY FAILING before the rename -- a HEAD A/B shows HEAD emitting
+        `5-hydroxyisoindoline-1,3-dione`. The locant 5 is correct and was not
+        changed here: both carbonyls of an isoindole-1,3-dione are equivalent so
+        either may be C1, the reflection through N2 maps 4<->7 and 5<->6 with the
+        N-substituent ON that axis, and P-14.3.5 takes the lower locant. Recorded
+        so nobody credits the rename with a locant fix it did not make.
+        """
         name = name_compound("O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1")
-        assert "6-hydroxyisoindoline-1,3-dione" in name
+        assert "5-hydroxy" in name, name
+        assert "isoindole-1,3-dione" in name, name
+        assert "6-hydroxy" not in name, f"6 is the higher equivalent locant: {name}"
 
     @pytest.mark.unit
     def test_phthalimide_with_pyrazole(self):
         """Phthalimide bearing pyrazole substituent."""
         name = name_compound("Cc1cc(N2C(=O)c3ccccc3C2=O)n(C)n1")
-        assert "isoindoline-1,3-dione" in name
+        assert "isoindole-1,3-dione" in name
 
 
 # ---------------------------------------------------------------------------
@@ -53,10 +67,10 @@ class TestIsoindolinMonoOneLocants:
         """Basic isoindolinone produces isoindolin-3-one or isoindolin-1-one."""
         name = name_compound("O=C1NCc2ccccc21")
         # C=O adjacent to benzo junction should be position 1 or 3
-        assert "isoindolin-" in name
+        assert "isoindol-" in name
         assert "-one" in name
-        # Must NOT produce isoindolin-2-one (position 2 is nitrogen)
-        assert "isoindolin-2-one" not in name
+        # Must NOT put the suffix on position 2 (position 2 is nitrogen)
+        assert "isoindol-2-one" not in name
 
 
 # ---------------------------------------------------------------------------
@@ -85,8 +99,8 @@ class TestIsoindolineIndex200:
     def test_index_200_correct_suffix_locant(self):
         """Index 200: suffix locant is isoindolin-1-one (not 2-one)."""
         name = name_compound("COc1c(C)c(O)cc2c1C(=O)N[C@H]2C")
-        assert "isoindolin-1-one" in name
-        assert "isoindolin-2-one" not in name
+        assert "isoindol-1-one" in name
+        assert "isoindol-2-one" not in name
 
     @pytest.mark.unit
     def test_index_200_opsin_parseable(self):
@@ -124,7 +138,7 @@ class TestIsoindolineIndex200:
         name = name_compound("COc1c(C)c(O)cc2c1C(=O)N[C@H]2C")
         assert "6-hydroxy" in name
         assert "4-methoxy" in name
-        assert "isoindolin-1-one" in name
+        assert "isoindol-1-one" in name
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +161,7 @@ class TestIsoindolineLocantMapping:
         result = match_fused_heterocycle_core(mol)
         assert result is not None
         name, atom_mapping, _ = result
-        assert name == "isoindoline"
+        assert name == "2,3-dihydro-1H-isoindole"
 
         # Find the N atom and verify its IUPAC locant is 2
         for atom_idx, locant in atom_mapping.items():
