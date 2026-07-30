@@ -1536,6 +1536,7 @@ def _build_ring_info_for_parent_selection(features):
     )
     from .rules.benzene import (
         orient_benzene, get_benzene_substituents, principal_group_ring_atoms,
+        molecule_principal_group_and_fgs,
     )
     from .rules.heterocycles import orient_heterocycle_with_substituents
     from .perception.rings import get_spiro_atoms
@@ -1602,10 +1603,24 @@ def _build_ring_info_for_parent_selection(features):
                 # the 'hydroxy' PREFIX here and promoted to '-ol' downstream) --
                 # so this locant HINT disagreed with the emitted NAME. It now uses
                 # the same shared authority as the composer, so the two agree.
+                #
+                # ⚠ v29 Phase C Task 9b: reading ``features.principal_group`` alone
+                # made the whole anchor a NO-OP here. ``compute_features()`` runs
+                # ``_perceive`` only, so that attribute is None for all four external
+                # callers (rules/ring_chalcogen_oxide.py:277,
+                # rules/multiplicative.py:1795 and :2454, rules/ions.py:2240) --
+                # i.e. every caller but namer.py:3900. Fall back to the shared
+                # molecule-level authority so the hint is computed, not skipped.
+                _pg = getattr(features, 'principal_group', None)
+                _fgs = getattr(features, 'functional_groups', None)
+                if _pg is None:
+                    _pg, _fallback_fgs = molecule_principal_group_and_fgs(mol)
+                    if not _fgs:
+                        _fgs = _fallback_fgs
                 pcg_positions = principal_group_ring_atoms(
                     mol, ring_atoms, substituents,
-                    principal_group=getattr(features, 'principal_group', None),
-                    detected_fgs=getattr(features, 'functional_groups', None),
+                    principal_group=_pg,
+                    detected_fgs=_fgs,
                 )
                 oriented = orient_benzene(
                     mol, ring_atoms, substituents,

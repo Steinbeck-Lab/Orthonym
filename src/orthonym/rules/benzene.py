@@ -163,20 +163,71 @@ _SUFFIX_TO_PREFIX = {
 }
 
 
-# FGs named by FUNCTIONAL CLASS nomenclature: they are never a benzene SUFFIX, so
-# an empty ``suffix_groups`` does NOT mean "the -OH is the principal group".
-# Hoisted to module scope (v29 Phase C Task 9) so the prefix->suffix promotion in
-# ``name_substituted_benzene`` and the P-14.4(c) numbering anchor in
-# ``principal_group_ring_atoms`` are gated by ONE definition and cannot drift.
+# FGs whose presence blocks the prefix->suffix promotion below, keyed on the
+# DETECTOR's vocabulary (``perception.functional_groups.FUNCTIONAL_GROUP_SMARTS``).
+#
+# ⚠ v29 Phase C Task 9b: this set carried two keys that could never fire --
+# ``'azide'`` and ``'selenocyanate'`` -- because the detector emits ``'azido'`` and
+# has no selenocyanate pattern at all. That is "presence in a lookup table is not
+# evidence the table is REACHED" in its exact shape, so ``_assert_registry_keys``
+# below now fails at import if a member is not a detector key, and the dead keys are
+# gone rather than repaired: azides must NOT block the promotion.
+# §**P-61.7 "AZIDES"** (``BlueBookV2/BlueBookV2.md:25991``) states *"Compounds
+# containing a -N3 ... group attached to a parent hydride, are named using
+# substitutive nomenclature and the prefix 'azido'. This method gives preferred
+# IUPAC names rather than names based on the class name 'azido' in functional class
+# nomenclature"*, and ``:25997`` gives the decisive worked PIN
+# ``3-azidonaphthalene-2-sulfonic acid (PIN)`` -- azido cited as a detachable prefix
+# while a SUFFIX governs the parent. So ``6-azidobenzene-1,2,3,4,5-pentol`` is the
+# PIN and the dead key was accidentally producing the right answer for the wrong
+# reason.
+#
+# ⚠ KNOWN RESIDUAL DEFECT, derived but deliberately NOT changed here (it is a
+# suffix-SELECTION question, outside this task's numbering scope): by the same
+# argument the remaining members are wrong too. ``:1710`` item (p) records that
+# *"The -N=C=O group, its chalcogen analogues, and the -NC group have been added to
+# the list of characteristic groups that are always cited as prefixes in
+# substitutive nomenclature"*, ``:26003`` repeats it for isocyanates, and ``:26014``
+# gives ``4-isocyanatobenzene-1-sulfonyl chloride (PIN)`` -- isocyanato as a prefix
+# with a suffix on the parent. A group that can never BE a suffix cannot outrank
+# -ol, so ``Oc1c(O)c(O)c(O)c(O)c1N=C=O`` should be
+# ``6-isocyanatobenzene-1,2,3,4,5-pentol`` and today emits
+# ``1,2,3,4,5-pentahydroxy-6-isocyanatobenzene``. Removing the guard wholesale
+# changes the benzene SUFFIX layer, so it is recorded here with its citations and
+# pinned by an xfail-strict test rather than guessed at.
 _FUNCTIONAL_CLASS_FGS = frozenset({
-    'isocyanate', 'isothiocyanate', 'azide', 'diazo',
-    'cyanate', 'thiocyanate', 'selenocyanate',
+    'isocyanate', 'isothiocyanate', 'diazo', 'cyanate', 'thiocyanate',
 })
 
 # Suffixes JUNIOR to -ol (P-41): SENIORITY_ORDER ranks phenol 91, thiol 94,
 # selenol/tellurol just after, amines 102+. A junior suffix holding the slot must
-# not block the -ol promotion. Hoisted with _FUNCTIONAL_CLASS_FGS, same reason.
+# not block the -ol promotion.
+#
+# ⚠ v29 Phase C Task 9b: two comments used to claim this set was "shared with the
+# P-14.4(c) anchor", which was FALSE -- the anchor never referenced it. The claim is
+# now TRUE rather than deleted: it is read by ``benzene_prefix_suffix_promotion``
+# below, which is the single authority both the anchor and the promotion consult.
 _OL_JUNIOR_SUFFIXES = frozenset({'thiol', 'selenol', 'tellurol', 'amine'})
+
+
+def _assert_registry_keys() -> None:
+    """Every ``_FUNCTIONAL_CLASS_FGS`` member must be a key the DETECTOR can emit.
+
+    A blacklist keyed on a vocabulary nothing produces is silently inert, and an
+    inert guard reads as a working one. Called at import so the failure is loud and
+    immediate rather than a name that is quietly wrong.
+    """
+    from ..perception.functional_groups import FUNCTIONAL_GROUP_SMARTS
+    dead = sorted(_FUNCTIONAL_CLASS_FGS - set(FUNCTIONAL_GROUP_SMARTS))
+    if dead:
+        raise AssertionError(
+            '_FUNCTIONAL_CLASS_FGS members absent from '
+            'perception.functional_groups.FUNCTIONAL_GROUP_SMARTS (they can never '
+            'fire): %s' % dead
+        )
+
+
+_assert_registry_keys()
 
 
 def _has_functional_class_fg(detected_fgs) -> bool:
@@ -184,6 +235,64 @@ def _has_functional_class_fg(detected_fgs) -> bool:
     if not detected_fgs:
         return False
     return any(fg in _FUNCTIONAL_CLASS_FGS for fg in detected_fgs)
+
+
+def benzene_prefix_suffix_promotion(
+    suffix_names,
+    prefix_names,
+    detected_fgs=None,
+    has_amine_candidates: bool = False,
+) -> Tuple[Optional[str], frozenset]:
+    """THE single authority on which detachable prefix becomes the ring suffix.
+
+    Two questions must give the same answer and were previously computed twice:
+
+    1. ``name_substituted_benzene`` -- which prefix does the NAME promote to the
+       suffix? (a ring -OH is perceived as the prefix ``hydroxy`` and only becomes
+       ``-ol`` here; likewise a promotable amine becomes ``-amine``/aniline.)
+    2. ``principal_group_ring_atoms`` -- which ring atoms may criterion P-14.4(c)
+       therefore minimise the locants of?
+
+    ⚠ v29 Phase C Task 9b, root cause of C-2: (2) used to answer *"the principal
+    group has a prefix form that appears on this ring"*, which is true for **76** of
+    the 136 seniority names (every entry with both a ring suffix and a prefix) while
+    (1) only ever promotes **two** of them. For the other 74, criterion (c)
+    minimised the locant of a group the name still spells as a detachable prefix --
+    INVERTING (f)/(g). Two answers that must agree and are computed twice is the
+    defect shape, so both callers now read this one function.
+
+    Args:
+        suffix_names: the suffix names already present (``suffix_groups`` keys).
+        prefix_names: the detachable prefix names present (``prefix_groups`` keys).
+        detected_fgs: ``features.functional_groups``, for the functional-class guard.
+        has_amine_candidates: whether any ring amine carries the
+            ``amine_candidate`` payload ``_identify_nitrogen_group`` sets.
+
+    Returns:
+        ``(promoted_suffix, promoted_prefix_names)``. ``(None, frozenset())`` when
+        no promotion happens. For the amine promotion the prefix set is empty
+        because the promoted atoms are identified by the ``amine_candidate`` marker
+        (the prefix may be ``amino``, ``(N-methylamino)``, ...), not by one name.
+    """
+    if _has_functional_class_fg(detected_fgs):
+        return None, frozenset()
+
+    suffix_names = set(suffix_names or ())
+    prefix_names = set(prefix_names or ())
+
+    # P-41: the guard is "no suffix SENIOR to -ol", not "no suffix at all" -- a
+    # junior -thiol holding the slot is demoted to `sulfanyl` instead of blocking.
+    senior_to_ol = {s for s in suffix_names if s not in _OL_JUNIOR_SUFFIXES}
+    if 'hydroxy' in prefix_names and not senior_to_ol:
+        return 'ol', frozenset({'hydroxy'})
+
+    # The amine (aniline) promotion runs only when NOTHING holds the suffix -- and
+    # if the -ol promotion had fired, ``suffix_groups`` would hold 'ol' by now, so
+    # reaching here already means it did not.
+    if has_amine_candidates and not suffix_names:
+        return 'amine', frozenset()
+
+    return None, frozenset()
 
 
 # Pre-compiled SMARTS for suffix FG identification (avoid per-call recompilation)
@@ -2757,13 +2866,26 @@ def _molecule_principal_group(mol) -> Optional[str]:
     cannot diverge from ``features.principal_group``. Fails closed to ``None``
     (= legacy numbering) on any perception failure.
     """
+    return molecule_principal_group_and_fgs(mol)[0]
+
+
+def molecule_principal_group_and_fgs(mol) -> Tuple[Optional[str], Optional[Dict]]:
+    """The molecule-level principal group AND the detected FGs, in ONE perception.
+
+    ``principal_group_ring_atoms`` needs both, and detecting the functional groups
+    twice for one molecule is the only reason the two were ever separate. Routes
+    through the same ``seniority.get_principal_group`` authority the namer uses, so
+    the answer cannot diverge from ``features.principal_group``. Fails closed to
+    ``(None, None)`` (= legacy numbering) on any perception failure.
+    """
     try:
         from ..perception.functional_groups import detect_functional_groups
         from .seniority import get_principal_group
-        pg_name, _ = get_principal_group(mol, detect_functional_groups(mol))
-        return pg_name
+        detected = detect_functional_groups(mol)
+        pg_name, _ = get_principal_group(mol, detected)
+        return pg_name, detected
     except Exception:
-        return None
+        return None, None
 
 
 def principal_group_ring_atoms(
@@ -2795,15 +2917,19 @@ def principal_group_ring_atoms(
     ``1-chlorobenzene-2,3,4,5,6-pentol`` for the PIN
     ``6-chlorobenzene-1,2,3,4,5-pentol``.
 
-    The promotion is decided GENERICALLY off the shared seniority tables --
-    ``get_suffix(pg, is_ring=True)`` and ``get_prefix(pg)`` -- exactly as
-    ``rules/heterocycles.py`` (:1671) and ``rules/polycyclics.py`` (:1202) already
-    do, so no functional group is named as a literal here and the class is not
-    hydroxy-only: any FG whose seniority entry has a ring suffix and a prefix form
-    (``-ol``/hydroxy, ``-amine``/amino, ``-thiol``/sulfanyl, ...) is handled by the
-    same path. The decision is LOCANT-FREE -- it depends only on WHICH groups are
-    present, never on where -- which is what lets it be consulted BEFORE the ring
-    is numbered.
+    Whether the group IS promoted is not decided here: it is asked of
+    ``benzene_prefix_suffix_promotion``, the single authority
+    ``name_substituted_benzene`` also reads.
+
+    ⚠ v29 Phase C Task 9b: this used to ask the seniority tables directly --
+    "does ``get_suffix(pg, is_ring=True)`` exist and is ``get_prefix(pg)`` on this
+    ring?" -- which is a test for promotion ELIGIBILITY, not promotion. **76** of
+    the 136 seniority entries have both a ring suffix and a prefix form and only
+    **two** are ever promoted, so for the other 74 criterion (c) was minimising the
+    locant of a group the name still spells as a detachable prefix, inverting (f)
+    and (g). The decision is still LOCANT-FREE -- it depends only on WHICH groups
+    are present, never on where -- which is what lets it be consulted BEFORE the
+    ring is numbered.
 
     P-41 is respected: only the SENIOR group is the principal characteristic
     group. ``principal_group`` is the molecule-level answer from
@@ -2811,10 +2937,10 @@ def principal_group_ring_atoms(
     yields the -ol atoms only (matching the emitted ``2-sulfanylphenol``, whose
     numbering hint previously contradicted the name by anchoring the thiol).
 
-    FAILS TOWARD CURRENT BEHAVIOUR: whenever the seniority tables cannot answer
-    (no principal group, a functional-class-named group, a prefix vocabulary that
-    does not match, ...) this returns the legacy ``is_suffix`` union, so the change
-    is a strict improvement rather than a coin flip. In particular a ring with NO
+    FAILS TOWARD CURRENT BEHAVIOUR: whenever the answer is not available (no
+    principal group, no ring suffix for it, nothing promoted, ...) this returns the
+    legacy ``is_suffix`` union, so the change is a strict improvement rather than a
+    coin flip. In particular a ring with NO
     principal characteristic group -- ``Cc1c(C)c(C)c(C)c(C)c1Cl`` -- has
     ``principal_group is None`` and returns the empty set, leaving criterion (c)
     vacuous and (f)+(g) legitimately in charge of
@@ -2835,7 +2961,7 @@ def principal_group_ring_atoms(
         Set of ring atom indices bearing the principal characteristic group;
         empty when criterion (c) does not apply.
     """
-    from .seniority import get_prefix, get_suffix
+    from .seniority import get_suffix
 
     if not isinstance(substituents, dict):
         return set()
@@ -2843,6 +2969,7 @@ def principal_group_ring_atoms(
     ring_set = set(ring_atoms or ())
     suffix_atoms: Dict[str, Set[int]] = defaultdict(set)
     prefix_atoms: Dict[str, Set[int]] = defaultdict(set)
+    amine_candidate_atoms: Set[int] = set()
 
     for atom_idx, subs in substituents.items():
         if ring_set and atom_idx not in ring_set:
@@ -2857,6 +2984,8 @@ def principal_group_ring_atoms(
                     suffix_atoms[sub['suffix_name']].add(atom_idx)
             elif sub.get('name'):
                 prefix_atoms[sub['name']].add(atom_idx)
+                if sub.get('amine_candidate') is not None:
+                    amine_candidate_atoms.add(atom_idx)
 
     # The legacy answer, and the fail-closed floor for every early return below.
     legacy: Set[int] = set()
@@ -2877,16 +3006,148 @@ def principal_group_ring_atoms(
     if pg_ring_suffix in suffix_atoms:
         return set(suffix_atoms[pg_ring_suffix])
 
-    # Still spelled as a prefix: it will be promoted downstream. Mirror the
-    # promotion guard so the numbering and the emitted name cannot disagree.
-    if _has_functional_class_fg(detected_fgs):
+    # Still spelled as a prefix. Anchor it ONLY if the shared authority says the
+    # NAME will actually promote it to exactly this suffix.
+    #
+    # ⚠ v29 Phase C Task 9b (C-2): this used to be `get_prefix(principal_group) in
+    # prefix_atoms`, i.e. "the principal group HAS a prefix form and it is on this
+    # ring". That is true for 76 seniority entries and only 2 are ever promoted, so
+    # criterion (c) was minimising the locant of a group the name still spells as a
+    # detachable prefix -- which inverts (f) and (g). The anchor and the promotion
+    # are now ONE decision instead of two that merely happened to agree for hydroxy.
+    promoted_suffix, promoted_prefixes = benzene_prefix_suffix_promotion(
+        set(suffix_atoms), set(prefix_atoms), detected_fgs,
+        has_amine_candidates=bool(amine_candidate_atoms),
+    )
+    if promoted_suffix != pg_ring_suffix:
         return legacy
 
-    pg_prefix = get_prefix(principal_group)
-    if pg_prefix and pg_prefix in prefix_atoms:
-        return set(prefix_atoms[pg_prefix])
+    if promoted_suffix == 'amine':
+        # Identified by the promotion marker, not by a prefix name: the prefix may
+        # be 'amino', '(N-methylamino)', 'anilino', ... and only the marked ones
+        # are promoted.
+        return set(amine_candidate_atoms)
 
-    return legacy
+    anchored: Set[int] = set()
+    for _name in promoted_prefixes:
+        anchored |= prefix_atoms.get(_name, set())
+    return anchored or legacy
+
+
+def benzene_prefix_citation_locants(
+    oriented: List[int],
+    substituents: Dict[int, List[Dict]],
+    principal_group_positions: Optional[Set[int]] = None,
+) -> Tuple[Tuple[int, ...], ...]:
+    """P-14.4(g): the per-prefix locant sets, in alphabetical CITATION order.
+
+    §**P-14.4 "NUMBERING"** (``BlueBookV2/BlueBookV2.md:3221``) criterion
+    **(g)** (``:3307``) reads verbatim:
+
+        (g) lowest locants for the substituent cited first as a prefix in the
+        name;
+
+    worked at ``:3315`` ``4-methyl-5-nitrooctanedioic acid (PIN)`` and, decisively
+    for a ring, at ``:3317`` ``1-methyl-4-nitronaphthalene (PIN) (not
+    4-methyl-1-nitronaphthalene)``. The same rule is stated a second time, with a
+    *benzene* worked example, as §**P-61.11.2 "Low locants are assigned to the
+    prefix cited first in the name"** (``:26085``): ``1-bromo-2-chloroethane
+    (PIN)`` and ``1-azido-4-isocyanatobenzene (PIN)`` (``:26094``).
+
+    "Cited first" is the P-14.5.1 alphanumerical order, so the sequence is keyed
+    on the shared ``alpha_sort_key`` (di/tri ignored, iso/neo/cyclo/sec/tert
+    included) rather than a hand-rolled sort. Every candidate orientation of one
+    molecule carries the SAME set of prefix names, so only the locants differ and
+    the returned tuple can be compared lexicographically.
+
+    A substituent is a prefix here unless it is the suffix:
+      * atoms in ``principal_group_positions`` bear the principal characteristic
+        group, so the group itself is criterion (c)'s business, not (g)'s -- BUT any
+        italic-*N* substituent it carries IS cited as a prefix in the name
+        (``N-(4-aminophenyl)-...``) and therefore enters at that locant. Without
+        this, two suffix instances distinguished ONLY by their N-substituents give
+        an empty (g) key and the tie falls through to the canonical last resort,
+        which orders by symmetry class rather than by citation -- measured: it named
+        ``Nc1ccc(Nc2ccc(Nc3ccccc3)cc2)cc1`` with ``(4-aminophenyl)`` on the HIGHER
+        nitrogen, though ``aminoanilino`` is cited before ``anilino``.
+      * an ``is_suffix`` substituent outside that set is a JUNIOR suffix that
+        ``name_substituted_benzene`` demotes back to its own prefix form (P-41),
+        so it IS cited as a prefix and enters under ``_SUFFIX_TO_PREFIX``;
+      * when no PCG set is supplied every ``is_suffix`` substituent is the
+        suffix, so all of them are excluded.
+
+    For a single-instance suffix this is a no-op: criterion (c) has already fixed
+    that locant, so the entry is identical in every surviving candidate.
+
+    Returns:
+        Tuple of locant tuples, ordered by the prefix's citation position.
+    """
+    pcg_set = set(principal_group_positions or ())
+    by_name: Dict[str, List[int]] = defaultdict(list)
+
+    def _n_substituent_names(sub):
+        """The italic-N prefixes this suffix instance will cite, if any."""
+        names = sub.get('n_substituents')
+        if not names:
+            candidate = sub.get('amine_candidate')
+            if isinstance(candidate, dict):
+                names = candidate.get('n_substituents')
+        return names or ()
+
+    for i, atom_idx in enumerate(oriented):
+        for sub in substituents.get(atom_idx) or ():
+            if not isinstance(sub, dict):
+                continue
+            if atom_idx in pcg_set:
+                for n_name in _n_substituent_names(sub):
+                    if n_name:
+                        by_name[n_name].append(i + 1)
+                continue
+            if sub.get('is_suffix'):
+                if not pcg_set:
+                    continue
+                suffix_name = sub.get('suffix_name')
+                name = _SUFFIX_TO_PREFIX.get(suffix_name, suffix_name)
+            else:
+                name = sub.get('name')
+            if name:
+                by_name[name].append(i + 1)
+
+    return tuple(
+        tuple(sorted(by_name[name]))
+        for name in sorted(by_name, key=alpha_sort_key)
+    )
+
+
+def _canonical_orbit_key(mol, oriented: List[int]) -> Tuple[int, ...]:
+    """The LAST-RESORT tie-break: canonical symmetry-class ranks, never input order.
+
+    ``Chem.CanonicalRankAtoms(mol, breakTies=False)`` is a canonical graph
+    invariant -- verified invariant under ``RenumberAtoms`` -- so this key depends
+    only on the STRUCTURE, which is what a numbering cascade must terminate in. A
+    cascade that ends in candidate-enumeration order is not an implementation of
+    P-14.4: it is a coin flip that happens to agree on the molecules tested, and
+    that is exactly how the same molecule came to be named
+    ``6-chloro-2-methylphenol`` from one SMILES and ``2-chloro-6-methylphenol``
+    from another.
+
+    With ``breakTies=False`` symmetry-equivalent atoms share a rank, so two
+    orientations tie here only when they are related by an automorphism of the
+    ranked graph -- i.e. they carry the same substituent at every locant and
+    therefore produce the SAME name. The order is total up to name equality.
+
+    Fails closed to an empty key (no discrimination) if RDKit cannot rank the
+    molecule; the earlier tiers have then already reduced the field to
+    name-identical candidates.
+    """
+    try:
+        ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    except Exception:
+        return ()
+    try:
+        return tuple(ranks[a] for a in oriented)
+    except (IndexError, TypeError):
+        return ()
 
 
 def orient_benzene(
@@ -2898,28 +3159,51 @@ def orient_benzene(
     """
     Orient benzene ring to give lowest locants to substituents.
 
-    IUPAC 2013 Rules (applied in order):
-    0. (P-14.4(c)) Lowest locant to the principal characteristic group, BEFORE
-       detachable substituents — applied only when ``principal_group_positions``
-       is supplied (the ring atoms bearing the senior suffix group). v22 Phase
-       E1 / DD4: this is the PCG-anchor tier that the kind-agnostic numberer
-       previously lacked; it is routed through the shared ``compare_locant_sets``
-       primitive. When the argument is ``None`` the function is byte-identical to
-       its pre-E1 behaviour (every current caller that does not pass a PCG set is
-       unchanged; phenol/acid suffix paths still re-anchor via
-       ``_renumber_relative_to`` and now AGREE with this tier).
-    1. For monosubstituted: substituent position is 1
-    2. For polysubstituted: use first-point-of-difference for locants
-    3. For identical substituents: minimize locant set
-    4. When locant sets are equal: position 1 goes to alphabetically first substituent
+    §**P-14.4 "NUMBERING"** (``BlueBookV2/BlueBookV2.md:3221``) is an ORDERED
+    cascade. Benzene has no fixed numbering (a, ``:3227``), no indicated hydrogen
+    (b, ``:3246``), no added indicated hydrogen (d, ``:3270``), no
+    saturation/unsaturation choice (e, ``:3288``) and no skeletal atom in a
+    nonstandard valence state (h, ``:3320``), so the applicable criteria are
+    exactly (c), (f), (g) -- and the cascade must then TERMINATE IN THE STRUCTURE,
+    never in the order RDKit happened to enumerate the ring:
+
+    0. **(c)** ``:3256`` *principal characteristic groups and free valences
+       (suffixes)* -- lowest locant SET for the principal characteristic group,
+       four places above (f). Applied only when ``principal_group_positions`` is
+       supplied; ``None`` disables the tier.
+    1. **(f)** ``:3301`` *detachable alphabetized prefixes, all considered
+       together in a series of increasing numerical order*, worked at ``:3305``
+       (*"the locant set '4,5,8' is lower than '4,7,8'"*) -- first point of
+       difference over the substituted positions.
+    2. **(g)** ``:3307`` *lowest locants for the substituent cited first as a
+       prefix in the name*, worked at ``:3315`` and ``:3317``
+       (``1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-nitronaphthalene)``);
+       restated as §P-61.11.2 ``:26085`` with the benzene PIN
+       ``1-azido-4-isocyanatobenzene`` (``:26094``). See
+       ``benzene_prefix_citation_locants``.
+    3. **last resort** canonical symmetry-class orbits
+       (``_canonical_orbit_key``) -- a structure-derived invariant, so the answer
+       cannot depend on how the molecule was spelled.
+
+    ⚠ v29 Phase C Task 9b: tiers 2 and 3 are new. Before them the cascade ended
+    at (f) plus a crude "position 1 goes to the alphabetically first substituent
+    AT position 1" heuristic, and fell through to candidate-enumeration order --
+    which made the emitted name a function of the input SMILES. Tier 2 subsumes
+    that heuristic: a (g) tie means every prefix holds the same locants in every
+    surviving candidate, so the substituent at position 1 is the same too and the
+    heuristic could not have discriminated either.
+
+    Monosubstituted rings short-circuit (the substituent is at locant 1), and an
+    unsubstituted ring returns the input order because every orientation is the
+    same name.
 
     Args:
-        mol: RDKit Mol object
+        mol: RDKit Mol object (required for the canonical last-resort tier)
         ring_atoms: Tuple of atom indices in the benzene ring (ordered)
         substituents: Dict from get_benzene_substituents
         principal_group_positions: Optional set of ring atom indices bearing the
             principal characteristic group (P-14.4(c)). Default None = no PCG
-            tier (byte-identical legacy behaviour).
+            tier.
 
     Returns:
         List of ring atom indices reordered so position 1 is first
@@ -2942,25 +3226,15 @@ def orient_benzene(
         start_pos = substituted_indices[0]
         return _rotate_list(ring_list, start_pos)
 
-    # Polysubstituted - try all starting positions and both directions
-    # Collect all candidates with their locant sets and alphabetic scores
+    # Polysubstituted - every starting position in both directions (12 for a ring
+    # of 6). The cascade below narrows these; it must never terminate while more
+    # than one survives, because their enumeration order is the input atom order.
     candidates = []
 
     for start_pos in range(n):
         for direction in [1, -1]:  # 1 = clockwise, -1 = counterclockwise
-            # Build oriented ring
             oriented = _build_oriented_ring(ring_list, start_pos, direction)
-
-            # Calculate locants for this orientation
-            locants = _calculate_locants(oriented, substituents)
-
-            # Get the substituent at position 1 for alphabetical tie-breaking
-            pos1_atom = oriented[0]
-            pos1_sub_name = None
-            if pos1_atom in substituents and substituents[pos1_atom]:
-                pos1_sub_name = substituents[pos1_atom][0]['name']
-
-            candidates.append((oriented, locants, pos1_sub_name))
+            candidates.append((oriented, _calculate_locants(oriented, substituents)))
 
     # --- Criterion 0 (P-14.4(c)): principal characteristic group lowest locant ---
     # Keep only the orientations giving the PCG its lowest locant set, BEFORE the
@@ -2972,40 +3246,52 @@ def orient_benzene(
             return sorted(i + 1 for i, a in enumerate(oriented) if a in pcg_set)
 
         best_pcg = None
-        for oriented, _, _ in candidates:
+        for oriented, _ in candidates:
             pl = _pcg_locants(oriented)
             if pl and (best_pcg is None or _compare_locant_sets(pl, best_pcg) < 0):
                 best_pcg = pl
         if best_pcg is not None:
             candidates = [c for c in candidates if _pcg_locants(c[0]) == best_pcg]
 
-    # Find the best locant set
+    # --- Criterion (f) (P-14.4, BB:3301, worked at :3305): the detachable
+    # alphabetized prefixes considered TOGETHER, first point of difference.
+    # Criterion (c) above has already fixed the suffix locant set, so minimising
+    # the substituted positions as one series is (f) over what remains -- and when
+    # no PCG was supplied every substituent IS a detachable prefix, so it is (f)
+    # exactly.
     best_locants = None
-    for _, locants, _ in candidates:
+    for _, locants in candidates:
         if best_locants is None or _compare_locant_sets(locants, best_locants) < 0:
             best_locants = locants
 
-    # Filter to only candidates with the best locant set
     best_candidates = [
-        (oriented, pos1_sub) for oriented, locants, pos1_sub in candidates
-        if locants == best_locants
+        oriented for oriented, locants in candidates if locants == best_locants
     ]
 
-    # If multiple candidates with same locant set, pick one where alphabetically
-    # first substituent is at position 1
     if len(best_candidates) == 1:
-        return best_candidates[0][0]
+        return best_candidates[0]
 
-    # Sort by alphabetical order of position 1 substituent
-    # None should sort last (no substituent at position 1)
-    def sort_key(item):
-        oriented, pos1_sub = item
-        if pos1_sub is None:
-            return 'zzzzz'  # Sort last
-        return alpha_sort_key(pos1_sub)
+    # --- Criterion (g) (BB:3307, worked at :3315/:3317; restated P-61.11.2
+    # BB:26085 with the benzene PIN '1-azido-4-isocyanatobenzene' BB:26094):
+    # lowest locants for the substituent cited first as a prefix in the name.
+    # Compared lexicographically over the alphabetical citation sequence, so a tie
+    # on the first-cited prefix falls to the second, and so on.
+    def _g_key(oriented):
+        return benzene_prefix_citation_locants(
+            oriented, substituents, principal_group_positions,
+        )
 
-    best_candidates.sort(key=sort_key)
-    return best_candidates[0][0]
+    best_g = min(_g_key(o) for o in best_candidates)
+    best_candidates = [o for o in best_candidates if _g_key(o) == best_g]
+
+    if len(best_candidates) == 1:
+        return best_candidates[0]
+
+    # --- Last resort: canonical symmetry-class orbits, NEVER the order in which
+    # the candidates were enumerated (which is the input SMILES' atom order).
+    # Every survivor here is name-identical, so this only makes the CHOICE
+    # reproducible; see _canonical_orbit_key.
+    return min(best_candidates, key=lambda o: _canonical_orbit_key(mol, o))
 
 
 def _rotate_list(lst: List, start: int) -> List:
@@ -3161,14 +3447,22 @@ def name_substituted_benzene(
     # the principal group (no higher-seniority suffix FG detected), move it to
     # suffix_groups so it routes to the phenol/ol naming path.
     # Guard: also check detected_fgs for FGs that use functional class naming
-    # (isocyanate, azide, etc.). These FGs are not in _SUFFIX_PRIORITY, so
+    # (isocyanate and the cyanate family). These FGs are not in _SUFFIX_PRIORITY, so
     # suffix_groups would be empty even though OH may not be the true principal
     # group. Blacklist approach: only block known functional-class-naming FGs.
-    # v29 Phase C Task 9: _FUNCTIONAL_CLASS_FGS and the predicate are now module
-    # level, SHARED with principal_group_ring_atoms (the P-14.4(c) numbering
-    # anchor), so the promotion decision and the numbering that depends on it are
-    # gated by one definition.
-    has_competing_fg = _has_functional_class_fg(detected_fgs)
+    # ⚠ v29 Phase C Task 9b: the comment here used to say "isocyanate, azide, etc."
+    # -- azide was never in the effective set (dead key, see _FUNCTIONAL_CLASS_FGS),
+    # and per P-61.7 (BB:25991) it must not be. The remaining members are a KNOWN
+    # RESIDUAL DEFECT recorded with citations at _FUNCTIONAL_CLASS_FGS.
+    # v29 Phase C Task 9b: the promotion decision itself now comes from the SHARED
+    # authority ``benzene_prefix_suffix_promotion``, which the P-14.4(c) numbering
+    # anchor also reads. Before this, the anchor computed its own answer from the
+    # seniority tables and agreed with this block only for hydroxy -- see C-2 in
+    # ``.
+    _promoted_suffix, _promoted_prefixes = benzene_prefix_suffix_promotion(
+        set(suffix_groups), set(prefix_groups), detected_fgs,
+        has_amine_candidates=bool(amine_candidates),
+    )
     # ⚠ The guard is "no suffix SENIOR to -ol", not "no suffix at all".
     # v29 Phase C tranche C REGRESSION, caught by an A/B against HEAD before shipping:
     # adding the `-thiol` suffix form (for `benzenethiol`, BB:6656/:27292) made this
@@ -3180,14 +3474,19 @@ def name_substituted_benzene(
     # SENIORITY_ORDER ranks: primary/secondary alcohol 88/89, phenol 91, thiol 94,
     # amines 102+. So -ol outranks -thiol and must claim the suffix when both are
     # present, leaving the SH as a `sulfanyl` prefix (P-41).
-    # _OL_JUNIOR_SUFFIXES is module level (v29 Phase C Task 9), shared with the
-    # P-14.4(c) anchor.
-    _senior_to_ol = {s for s in suffix_groups if s not in _OL_JUNIOR_SUFFIXES}
-    if 'hydroxy' in prefix_groups and not _senior_to_ol and not has_competing_fg:
+    # _OL_JUNIOR_SUFFIXES is module level (v29 Phase C Task 9); it is read by
+    # ``benzene_prefix_suffix_promotion``, which is where the seniority test that
+    # used to be inlined here now lives.
+    if _promoted_suffix == 'ol':
         # No suffix FG senior to -ol, and no competing functional-class FG -- hydroxyl
         # IS the principal group. Move from prefix to suffix, and demote any junior
-        # suffix that was holding the slot back to its own prefix form.
-        suffix_groups['ol'] = prefix_groups.pop('hydroxy')
+        # suffix that was holding the slot back to its own prefix form. The prefix
+        # NAME comes from the shared authority rather than a literal here, so the
+        # anchor and the promotion cannot disagree about which prefix moves.
+        _promoted_locants: List[int] = []
+        for _pname in _promoted_prefixes:
+            _promoted_locants.extend(prefix_groups.pop(_pname, []))
+        suffix_groups['ol'] = sorted(_promoted_locants)
         for _junior in list(suffix_groups):
             if _junior in _OL_JUNIOR_SUFFIXES:
                 _jlocs = suffix_groups.pop(_junior)
@@ -3199,12 +3498,13 @@ def name_substituted_benzene(
 
     # --- C4 (P-62.2.1.1.1 / P-41): reclassify an amine as the '-amine'
     # (aniline) SUFFIX when it IS the molecule-level principal group. ---
-    # This runs AFTER the hydroxy->ol promotion and checks `not suffix_groups`,
-    # so any senior group (acid/aldehyde/nitrile/ol/etc.) keeps the amine as
-    # its 'amino'/(N-alkylamino)/anilino PREFIX -> 4-aminophenol,
-    # 4-aminobenzoic acid, 4-(N-methylamino)benzoic acid stay unchanged.
-    # Symmetric to the hydroxy->ol block above (amine sits last in seniority).
-    if amine_candidates and not suffix_groups and not has_competing_fg:
+    # ``benzene_prefix_suffix_promotion`` returns 'amine' only when NOTHING else
+    # holds the suffix -- including the '-ol' it would itself have promoted -- so
+    # any senior group (acid/aldehyde/nitrile/ol/etc.) keeps the amine as its
+    # 'amino'/(N-alkylamino)/anilino PREFIX -> 4-aminophenol, 4-aminobenzoic acid,
+    # 4-(N-methylamino)benzoic acid stay unchanged. The two promotions are mutually
+    # exclusive by construction now, not by statement order.
+    if _promoted_suffix == 'amine':
         amine_locants = sorted(amine_candidates.keys())
         # Remove each promoted amine from its prefix group (by locant), so the
         # amine no longer appears as a substituent prefix.
@@ -4240,8 +4540,30 @@ def _renumber_relative_to(
     """
     Renumber substituent locants relative to a reference position.
 
-    The reference position becomes position 1. Tries both clockwise and
-    counterclockwise numbering and picks the one giving lowest locants.
+    The reference position becomes position 1 (criterion (c) has already put the
+    principal characteristic group there). The two remaining numberings -- clockwise
+    and counterclockwise -- are then separated by the SAME ordered criteria
+    ``orient_benzene`` uses, or the two paths would disagree about the identical
+    molecule:
+
+    * **(f)** ``BlueBookV2/BlueBookV2.md:3301`` *detachable alphabetized prefixes,
+      all considered together in a series of increasing numerical order* (worked at
+      ``:3305``);
+    * **(g)** ``:3307`` *lowest locants for the substituent cited first as a prefix
+      in the name* (worked at ``:3315``, and at ``:3317``
+      ``1-methyl-4-nitronaphthalene (PIN) (not 4-methyl-1-nitronaphthalene)``;
+      restated as §P-61.11.2 ``:26085``).
+
+    ⚠ v29 Phase C Task 9b: (g) is new here. Without it a tie on (f) silently kept
+    ``direction = 1`` -- the direction ``orient_benzene`` happened to hand over,
+    i.e. the input SMILES' atom order. That is what made ONE molecule,
+    ``Cc1cccc(Cl)c1O``, come out as ``2-chloro-6-methylphenol`` from one spelling
+    and ``6-chloro-2-methylphenol`` from another: both directions give the prefix
+    set {2,6}, so only (g) can decide, and ``chloro`` is cited before ``methyl``.
+
+    No further tier is needed: if (f) and (g) both tie then every name holds the
+    same locants in both directions, so the two ``converted`` maps are equal and
+    the choice is not observable. The order is total.
 
     Args:
         groups: Dict of name -> list of locants in original numbering
@@ -4251,7 +4573,7 @@ def _renumber_relative_to(
         Dict of name -> list of renumbered locants
     """
     best_groups = None
-    best_locant_set = None
+    best_key = None
 
     for direction in [1, -1]:
         converted: Dict[str, List[int]] = defaultdict(list)
@@ -4269,11 +4591,16 @@ def _renumber_relative_to(
         for name in converted:
             converted[name].sort()
 
-        # Calculate overall locant set for comparison
+        # (f) the whole prefix series, then (g) per prefix in citation order.
         all_locants = sorted([loc for locs in converted.values() for loc in locs])
+        citation_locants = tuple(
+            tuple(converted[name])
+            for name in sorted(converted, key=alpha_sort_key)
+        )
+        key = (all_locants, citation_locants)
 
-        if best_locant_set is None or all_locants < best_locant_set:
-            best_locant_set = all_locants
+        if best_key is None or key < best_key:
+            best_key = key
             best_groups = dict(converted)
 
     return best_groups if best_groups else {}

@@ -156,14 +156,56 @@ GOLD_DERIVED = [
     ("Nc1ccc(S(=O)(=O)O)cc1", "4-aminobenzene-1-sulfonic acid"),
     ("CCc1ccc(cc1)S(=O)(=O)OC", "methyl 4-ethylbenzene-1-sulfonate"),
     ("Cc1ccc(cc1)S(=O)(=O)O", "4-methylbenzene-1-sulfonic acid"),
+    # ⚠ KNOWN-DEFECT SNAPSHOT, not a gold PIN. The gold row is
+    # 'N1-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine'; the emitted form drops the
+    # '1' from the first italic-N locant. The ASSIGNMENT is what Task 9b is
+    # responsible for and it is correct -- '(4-aminophenyl)' is on the LOWER
+    # nitrogen, as P-14.4(g) requires ('aminoanilino' is cited before 'anilino') --
+    # so this row is here to catch the assignment flipping, which it did once
+    # during Task 9b before the italic-N prefixes were fed to the (g) tier.
     ("Nc1ccc(Nc2ccc(Nc3ccccc3)cc2)cc1",
      "N-(4-aminophenyl)-N4-phenylbenzene-1,4-diamine"),
+    # ⚠ The 17th mandated row, absent from the Task 9 file. Its actual current
+    # output is a REFUSAL, which is a real tripwire: the day it becomes nameable
+    # this row must be re-derived rather than silently accepting whatever appears.
+    # Asserting 'not 4-[(4-hydroxyanilino)methyl]phenol' would be vacuously green
+    # against the refusal string -- see feedback_harness_that_reports_success.
+    ("Oc1ccc(CNc2ccc(O)cc2)cc1", "unknown organic compound"),
 ]
 
 
 @pytest.mark.parametrize("smiles,expected", GOLD_DERIVED)
 def test_gold_derived_names_unchanged(smiles, expected):
     """Every gold-derived benzene name exposed to the numbering change."""
+    assert name_compound(smiles) == expected
+
+
+# --------------------------------------------------------------------------
+# The P-41 re-anchor branch, through the NAME. Task 9b: the branch had
+# name-visible consequences that no test asserted -- 'Oc1ccccc1S' ->
+# '2-sulfanylphenol' passes with the feature fully reverted, so it was not a
+# witness for anything.
+# --------------------------------------------------------------------------
+
+P41_REANCHOR_NAMES = [
+    # -ol outranks -thiol, so the SH is a 'sulfanyl' prefix and the OH takes the
+    # suffix AND locant 1.
+    ("Oc1ccccc1S", "2-sulfanylphenol"),
+    ("Oc1ccc(S)cc1", "4-sulfanylphenol"),
+    ("Oc1cccc(S)c1", "3-sulfanylphenol"),
+    # ★ Three groups, so the numbering is genuinely contested: the -ol anchors at
+    # 1 and (g) then orders the two prefixes (chloro before sulfanyl).
+    ("Oc1cc(S)cc(Cl)c1", "3-chloro-5-sulfanylphenol"),
+    ("Oc1c(S)cccc1Cl", "2-chloro-6-sulfanylphenol"),
+    # thiol outranks amine, so here the SH takes the suffix.
+    ("Nc1ccccc1S", "2-aminobenzenethiol"),
+    ("Nc1ccc(S)cc1", "4-aminobenzenethiol"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", P41_REANCHOR_NAMES)
+def test_p41_reanchor_is_name_visible(smiles, expected):
+    """P-41 seniority decides which group is the suffix -- asserted as a NAME."""
     assert name_compound(smiles) == expected
 
 
@@ -227,9 +269,33 @@ def test_discriminator_picks_only_the_senior_group_p41():
 
 
 def test_discriminator_ignores_hydroxy_when_a_senior_suffix_is_present():
-    """A carboxylic acid outranks -ol, so the PCG is the acid's ring atom only."""
-    atoms = _pcg_atoms("Oc1ccc(C(=O)O)cc1")
+    """A carboxylic acid outranks -ol, so the PCG is the acid's ring atom only.
+
+    ⚠ Task 9b repair: this used to assert only ``len(atoms) == 1``, which is TRUE
+    of the wrong answer too -- the hydroxy-bearing atom is also a single atom -- so
+    it could not detect the very error it is named for. It now asserts the atom's
+    IDENTITY.
+    """
+    from rdkit import Chem
+
+    smiles = "Oc1ccc(C(=O)O)cc1"
+    atoms = _pcg_atoms(smiles)
+    mol = Chem.MolFromSmiles(smiles)
     assert len(atoms) == 1, atoms
+    (idx,) = tuple(atoms)
+    neighbours = list(mol.GetAtomWithIdx(idx).GetNeighbors())
+    # The PCG atom must bear the -COOH carbon, never the hydroxy oxygen.
+    assert not any(n.GetSymbol() == "O" for n in neighbours), (
+        "PCG atom %d bears the hydroxy group, not the senior carboxylic acid" % idx
+    )
+    assert any(
+        n.GetSymbol() == "C" and any(
+            b.GetBondTypeAsDouble() == 2.0 for b in n.GetBonds()
+        )
+        for n in neighbours
+    ), "PCG atom %d does not bear the carboxylic acid carbon" % idx
+    # And the whole name, so the discriminator's consequence is pinned too.
+    assert name_compound(smiles) == "4-hydroxybenzoic acid"
 
 
 def test_discriminator_excludes_a_co_occurring_junior_SUFFIX_p41():
@@ -259,14 +325,16 @@ def test_discriminator_excludes_a_co_occurring_junior_SUFFIX_p41():
 def test_discriminator_falls_back_to_legacy_without_a_principal_group():
     """Fail toward current behaviour: no principal group -> the legacy is_suffix set.
 
-    Pins the fail-closed contract directly. The pentol has NO ``is_suffix``
-    substituent at orientation time, so the legacy answer is the empty set: with
-    the promotion tier disabled the numbering must be exactly what it was before.
+    ⚠ Task 9b repair: this used to run on the PENTOL, whose legacy answer is ALSO
+    ``set()``, so ``== set()`` was tautological -- it passed whether the fallback
+    returned the legacy union or nothing at all. It now runs on a molecule whose
+    legacy ``is_suffix`` union is NON-empty and asserts that exact set, so a
+    fallback that returned ``set()`` instead would fail.
     """
     from rdkit import Chem
     from orthonym.perception.functional_groups import detect_functional_groups
 
-    smiles = "Oc1c(O)c(O)c(O)c(O)c1Cl"
+    smiles = "Cc1ccc(S(=O)(=O)O)cc1"          # 4-methylbenzene-1-sulfonic acid
     mol = Chem.MolFromSmiles(smiles)
     ring_atoms = next(
         r for r in mol.GetRingInfo().AtomRings()
@@ -277,40 +345,106 @@ def test_discriminator_falls_back_to_legacy_without_a_principal_group():
     )
     subs = get_benzene_substituents(mol, ring_atoms)
     detected = detect_functional_groups(mol)
+
+    legacy = {
+        atom_idx for atom_idx, entries in subs.items()
+        if any(e.get("is_suffix") for e in entries)
+    }
+    assert len(legacy) == 1, (
+        "witness is only meaningful with a NON-empty legacy union: %s" % legacy
+    )
+
     assert principal_group_ring_atoms(
         mol, ring_atoms, subs,
         principal_group=None, detected_fgs=detected,
-    ) == set()
+    ) == legacy
+
+    # Guard the guard: with the principal group supplied the answer is the same
+    # single atom, so the row above is testing the FALLBACK and not a coincidence
+    # of this molecule having no other candidate.
+    assert principal_group_ring_atoms(
+        mol, ring_atoms, subs,
+        principal_group="sulfonic_acid", detected_fgs=detected,
+    ) == legacy
 
 
 def test_discriminator_respects_the_functional_class_guard():
-    """A functional-class-named FG blocks the promotion, so (c) stays vacuous.
+    """The anchor makes the SAME call as the promotion -- even when that call is wrong.
 
-    ``name_substituted_benzene`` refuses the hydroxy -> -ol promotion when an
-    isocyanate/azide/cyanate-family group is present (they are named by functional
-    class and are never a benzene suffix), and emits
-    ``1,3,4,5,6-pentahydroxy-2-isocyanatobenzene`` -- hydroxy as a PREFIX. The
-    numbering anchor must make the SAME call, or it would anchor a group the name
-    does not treat as the suffix. Both consult ``_has_functional_class_fg``.
+    ⚠ Task 9b: this test used to present the emitted
+    ``1,2,3,4,5-pentahydroxy-6-isocyanatobenzene`` as CORRECT, while the same file
+    asserted the opposite treatment for the structurally parallel azide (green only
+    because ``'azide'`` was a dead key the detector could never emit). It is now
+    labelled for what it is: a snapshot of a KNOWN DEFECT.
+
+    Derived at source, not guessed: ``BlueBookV2/BlueBookV2.md:1710`` item (p)
+    records that the -N=C=O group "and its chalcogen analogues ... have been added
+    to the list of characteristic groups that are ALWAYS cited as prefixes in
+    substitutive nomenclature"; ``:26003`` repeats it for isocyanates; and
+    ``:26014`` gives ``4-isocyanatobenzene-1-sulfonyl chloride (PIN)`` --
+    isocyanato as a detachable prefix WITH a suffix on the parent. A group that can
+    never be a suffix cannot outrank -ol, so the PIN is
+    ``6-isocyanatobenzene-1,2,3,4,5-pentol``. The PIN is pinned xfail-strict in
+    ``test_p14_4_g_total_order.py``; what this test guards is only that the anchor
+    and the promotion agree, which is the invariant Task 9b is responsible for.
     """
     assert _pcg_atoms("Oc1c(O)c(O)c(O)c(O)c1N=C=O") == set()
+    # The anchor's answer and the NAME must be consistent: hydroxy stays a prefix.
+    assert (
+        name_compound("Oc1c(O)c(O)c(O)c(O)c1N=C=O")
+        == "1,2,3,4,5-pentahydroxy-6-isocyanatobenzene"
+    )
+
+
+def test_the_azide_twin_is_treated_the_OTHER_way_and_that_is_correct():
+    """★ The row the dead ``'azide'`` key made accidentally green.
+
+    §**P-61.7 "AZIDES"** (``BlueBookV2/BlueBookV2.md:25991``): azides "are named
+    using substitutive nomenclature and the prefix 'azido'. This method gives
+    preferred IUPAC names rather than names based on the class name 'azido' in
+    functional class nomenclature", with ``:25997``
+    ``3-azidonaphthalene-2-sulfonic acid (PIN)`` -- azido cited as a prefix while a
+    SUFFIX governs. So azido must NOT block the promotion, the anchor MUST fire,
+    and the answer is genuinely right rather than right by accident.
+    """
+    atoms = _pcg_atoms("Oc1c(O)c(O)c(O)c(O)c1N=[N+]=[N-]")
+    assert len(atoms) == 5, atoms
+    assert (
+        name_compound("Oc1c(O)c(O)c(O)c(O)c1N=[N+]=[N-]")
+        == "6-azidobenzene-1,2,3,4,5-pentol"
+    )
 
 
 def _parent_selection_locant_hint(smiles):
-    """The benzene locant HINT that namer.py Branch 3 publishes for the ring."""
+    """The benzene locant HINT that namer.py Branch 3 publishes for the ring.
+
+    ⚠ Task 9b repair: this helper used to ASSIGN ``features.principal_group``
+    itself, which concealed the fact that the whole anchor was a NO-OP for every
+    external caller -- ``compute_features()`` runs ``_perceive`` only, so the
+    attribute is ``None`` there. Nothing is assigned now; the production fallback
+    inside ``_build_ring_info_for_parent_selection`` has to do the work.
+    """
     from rdkit import Chem
     from orthonym.namer import (
         compute_features, _build_ring_info_for_parent_selection,
     )
-    from orthonym.rules.seniority import get_principal_group
 
     features = compute_features(Chem.MolFromSmiles(smiles), smiles)
-    features.principal_group, _ = get_principal_group(
-        features.mol, features.functional_groups
+    assert getattr(features, "principal_group", None) is None, (
+        "compute_features now populates principal_group -- this helper's premise "
+        "is stale and the production fallback it exercises may be dead"
     )
     info = _build_ring_info_for_parent_selection(features)
     assert info and info.get("iupac_locants"), f"no locant hint produced for {smiles}"
     return features.mol, info["iupac_locants"]
+
+
+def _hint_locants_by_neighbour(mol, hint, symbol):
+    return {
+        locant for atom_idx, locant in hint.items()
+        if any(n.GetSymbol() == symbol
+               for n in mol.GetAtomWithIdx(atom_idx).GetNeighbors())
+    }
 
 
 def test_locant_hint_agrees_with_the_emitted_name():
@@ -325,27 +459,37 @@ def test_locant_hint_agrees_with_the_emitted_name():
     # The five hydroxy-bearing ring atoms must hold locants 1-5, chloro gets 6,
     # matching '6-chlorobenzene-1,2,3,4,5-pentol'.
     mol, hint = _parent_selection_locant_hint("Oc1c(O)c(O)c(O)c(O)c1Cl")
-    oh_locants, cl_locants = set(), set()
-    for atom_idx, locant in hint.items():
-        neighbours = {
-            n.GetSymbol() for n in mol.GetAtomWithIdx(atom_idx).GetNeighbors()
-        }
-        if "O" in neighbours:
-            oh_locants.add(locant)
-        if "Cl" in neighbours:
-            cl_locants.add(locant)
-    assert oh_locants == {1, 2, 3, 4, 5}, hint
-    assert cl_locants == {6}, hint
+    assert _hint_locants_by_neighbour(mol, hint, "O") == {1, 2, 3, 4, 5}, hint
+    assert _hint_locants_by_neighbour(mol, hint, "Cl") == {6}, hint
 
     # ★ The guard: no principal characteristic group, so (g) gives locant 1 to
     # chloro -- matching '1-chloro-2,3,4,5,6-pentamethylbenzene'.
     mol, hint = _parent_selection_locant_hint("Cc1c(C)c(C)c(C)c(C)c1Cl")
-    chloro_locant = next(
-        locant for atom_idx, locant in hint.items()
-        if any(n.GetSymbol() == "Cl"
-               for n in mol.GetAtomWithIdx(atom_idx).GetNeighbors())
-    )
-    assert chloro_locant == 1, hint
+    assert _hint_locants_by_neighbour(mol, hint, "Cl") == {1}, hint
+
+
+# ⚠ Task 9b repair: the Task 9 version of the test below used two molecules for
+# which production never computes this hint at all, so it proved nothing about the
+# unified anchor. These two DO route through it, and each asserts the hint AND the
+# whole emitted name, so a hint that silently disagreed with the name would fail.
+HINT_AND_NAME = [
+    # A mono-hydroxy phenol with two bulky prefixes: the ONE oxygen-bearing ring
+    # atom must hold locant 1, and the two quaternary carbons 2 and 6.
+    ("CC(C)(C)c1cccc(C(C)(C)C)c1O", "2,6-di-tert-butylphenol", "O", {1}),
+    # Two oxygen-bearing ring atoms, only ONE of which is the promoted -ol. The
+    # anchor must put the phenol OH at 1 and leave the methoxy at 3.
+    ("COc1cccc(O)c1", "3-methoxyphenol", "O", {1, 3}),
+]
+
+
+@pytest.mark.parametrize("smiles,expected,symbol,locants", HINT_AND_NAME)
+def test_locant_hint_is_computed_for_molecules_production_actually_uses(
+    smiles, expected, symbol, locants
+):
+    """The hint exists, is anchored, and agrees with the emitted whole name."""
+    mol, hint = _parent_selection_locant_hint(smiles)
+    assert _hint_locants_by_neighbour(mol, hint, symbol) == locants, hint
+    assert name_compound(smiles) == expected
 
 
 def test_discriminator_is_wired_into_the_live_orientation_call(monkeypatch):
