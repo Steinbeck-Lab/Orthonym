@@ -757,7 +757,12 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # 2026-07-11 from OPSIN `2H-3,5-(epoxymethano)furo[3,4-b]pyran -o extendedsmi`.
     'C1=C2COc3coc(c31)CO2': {
         'name': "2H-3,5-(epoxymethano)furo[3,4-b]pyran",
-        'tautomer_locant': None,
+        # The name carries an indicated hydrogen, so the metadata must record it;
+        # it read None, which is the one entry in this table where the two
+        # disagree. Metadata only -- the sole consumer (rules/fused_rings.py:1290)
+        # discards the value with "Name already includes tautomer locant if
+        # present", so no emitted name can change.
+        'tautomer_locant': 2,
         'ring_system': 'epoxymethanofuropyran',
         'parent_atoms': 11,
         'iupac_locants': {0: 4, 1: 3, 2: 2, 3: 1, 4: '7a', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 8, 10: 9},
@@ -1581,7 +1586,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     'C1=Cc2c(c3ccccc3c3ncoc23)C1': {
         'name': '8H-cyclopenta[3,4]naphtho[1,2-d][1,3]oxazole',
-        'tautomer_locant': None,
+        'tautomer_locant': 8,   # was None; the name's own indicated H (metadata only)
         'ring_system': 'polycyclic',
         'parent_atoms': 16,
         'iupac_locants': {0: 9, 1: 10, 2: '10a', 3: '7b', 4: '7a', 5: 7, 6: 6, 7: 5, 8: 4, 9: '3b', 10: '3a', 11: 3, 12: 2, 13: 1, 14: '10b', 15: 8},
@@ -1595,7 +1600,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     'C1=CN2C=CC3=CNOC3=C2O1': {
         'name': '2H-[1,2]oxazolo[5,4-c][1,3]oxazolo[3,2-a]pyridine',
-        'tautomer_locant': None,
+        'tautomer_locant': 2,   # was None; the name's own indicated H (metadata only)
         'ring_system': 'polycyclic',
         'parent_atoms': 12,
         'iupac_locants': {0: 8, 1: 7, 2: 6, 3: 5, 4: 4, 5: '3a', 6: 3, 7: 2, 8: 1, 9: '9b', 10: '9a', 11: 9},

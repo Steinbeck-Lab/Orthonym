@@ -1395,6 +1395,79 @@ def name_fused_heterocycle(mol):
     return (name, ring_atoms, atom_mapping, True)
 
 
+def _exocyclic_amine_n_substituents(mol, n_idx: int, core_atoms) -> Optional[List[str]]:
+    """Names of the groups on an EXOCYCLIC amine nitrogen, or ``None`` to decline.
+
+    P-41: an amine is a characteristic group and, when it is the senior one, must
+    be expressed as the ``-amine`` SUFFIX -- ``N-methylquinolin-2-amine``, never
+    the parent hydride plus an ``(methylamino)`` prefix. The collector this serves
+    routed only the BARE ``amino`` to the suffix, so every N-substituted amine on
+    a fused parent was demoted to a prefix and shipped a non-PIN
+    (``2-(methylamino)quinoline``).
+
+    Decided from the GRAPH, never by parsing the prefix name -- the same lesson
+    this module records at the anilino site, where naming from a carbon COUNT
+    turned a quinolinyl-amine into ``heptylamino``.
+
+    Declines (``None``) unless the nitrogen is a plain amine N:
+      * neutral, unradicalised, three-valent, all single bonds -- so an amide,
+        imine, nitro, N-oxide or nitrile N is never mistaken for one. Those are
+        senior to or different from an amine and belong to other producers.
+      * not in ANY ring, so a ring nitrogen keeps the existing is_nitrogen path.
+      * bonded to the core atom plus one or two CARBON branches, none of which is
+        an acyl carbon (that would make it an amide, P-66.1, senior to the amine).
+      * every branch nameable by the shared substituent namer. A branch we cannot
+        name is refused outright rather than approximated.
+    """
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetSymbol() != 'N':
+        return None
+    if n_atom.GetFormalCharge() != 0 or n_atom.GetNumRadicalElectrons() != 0:
+        return None
+    if n_atom.IsInRing() or n_atom.GetIsAromatic():
+        return None
+    if n_atom.GetTotalValence() != 3:
+        return None
+    if any(b.GetBondType() != Chem.BondType.SINGLE for b in n_atom.GetBonds()):
+        return None
+
+    branches = [nb.GetIdx() for nb in n_atom.GetNeighbors()
+                if nb.GetIdx() not in core_atoms]
+    if not branches or len(branches) > 2:
+        return None
+
+    from ..assembly.substituent_enumerator import name_substituent
+
+    names = []
+    for b_idx in branches:
+        b_atom = mol.GetAtomWithIdx(b_idx)
+        if b_atom.GetSymbol() != 'C':
+            return None
+        # An acyl carbon makes this an AMIDE, not an amine.
+        for nb in b_atom.GetNeighbors():
+            if nb.GetSymbol() in ('O', 'S', 'Se', 'Te') and \
+                    mol.GetBondBetweenAtoms(b_idx, nb.GetIdx()).GetBondType() == \
+                    Chem.BondType.DOUBLE:
+                return None
+        frag, seen, stack = [], {n_idx} | set(core_atoms), [b_idx]
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            frag.append(x)
+            stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(x).GetNeighbors()
+                         if nb.GetIdx() not in seen)
+        try:
+            nm = name_substituent(mol, frag, b_idx)
+        except Exception:                                     # noqa: BLE001
+            nm = None
+        if not nm:
+            return None
+        names.append(nm)
+    return names
+
+
 def get_fused_heterocycle_substituents(
     mol,
     core_match: Dict[int, Any]
@@ -1456,8 +1529,23 @@ def get_fused_heterocycle_substituents(
 
             if sub_type == 'alkyl':
                 if is_nitrogen:
-                    # N-substitution
-                    result['n_substituents'][sub_name] += 1
+                    # P-14.3.2: a RING nitrogen has a NUMERIC locant, and that
+                    # locant is the PIN citation -- `1-methyl-1H-indole`, on the
+                    # model of `(1H-indol-1-yl)acetic acid (PIN)`
+                    # (BlueBookV2.md:2039), where the ring N is cited as `1-yl`
+                    # and never `N-yl`. The italic-`N` form is the fallback for
+                    # when no ring numbering is available, which is never the
+                    # case here: `locant` comes straight from `core_match`.
+                    # This site emitted `N-methyl-1H-indole`; the monocyclic
+                    # sibling (`heterocycles.py::_format_n_substituent`) was
+                    # migrated to numeric locants and this one was missed.
+                    #
+                    # A ring-N substituent is rendered exactly like any other
+                    # ring substituent once it has a locant, so it joins
+                    # `c_substituents` rather than growing a parallel branch --
+                    # the italic-N path below now serves ONLY the exocyclic
+                    # amine nitrogen, which genuinely has no numeric locant.
+                    result['c_substituents'][sub_name].append(locant)
                 else:
                     # C-substitution
                     result['c_substituents'][sub_name].append(locant)
@@ -1467,6 +1555,26 @@ def get_fused_heterocycle_substituents(
             elif sub_type == 'functional' and sub_name == 'amino':
                 # Amino group (-NH2) - use suffix form (-amine)
                 result['amino_substituents'].append(locant)
+            elif sub_type == 'functional' and (
+                    _n_subs := _exocyclic_amine_n_substituents(
+                        mol, nbr_idx, core_atoms)):
+                # P-41: an N-SUBSTITUTED amine is still an amine, so it takes the
+                # `-amine` suffix with its N-substituents cited as italic-N
+                # prefixes -- `N-methylquinolin-2-amine`. Only the bare `amino`
+                # reached the suffix before this branch, so every N-substituted
+                # amine on a fused parent fell through to the generic `functional`
+                # case below and shipped the parent hydride plus a
+                # `(methylamino)`/`anilino` prefix: a name with NO suffix for the
+                # senior characteristic group. `4-methoxy-N-phenylaniline (PIN)`
+                # (BlueBookV2.md:21610) is the shape required.
+                #
+                # `anilino` is a genuine preferred PREFIX (:6371
+                # `4-[(4-hydroxyanilino)methyl]phenol (PIN)`), but only on a parent
+                # whose own characteristic group outranks the amine -- there, a
+                # phenol. With no senior group present the amine cannot be demoted.
+                result['amino_substituents'].append(locant)
+                for _nm in _n_subs:
+                    result['n_substituents'][_nm] += 1
             elif sub_type == 'functional':
                 # Other functional groups (nitro, hydroxy, methylamino, etc.)
                 # These are prefix substituents on the ring
