@@ -22,7 +22,7 @@ atom indices as those are NOT valid IUPAC locants.
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry, detect_axial_chirality
@@ -61,6 +61,32 @@ def _composite_locant_sort_key(
     return (int(locant), '')
 
 
+def _is_true_exocyclic(mol, in_scope_idx: int, other_idx: int) -> bool:
+    """Is this double bond genuinely EXOcyclic to the ring carrying the locant?
+
+    The exocyclic licence lets a bond borrow the locant of its one in-scope atom
+    (`cyclohexan-1-ylidene`-shaped cases: the ring atom is numbered, the other end
+    hangs off the ring). It requires BOTH halves of "exocyclic":
+
+    1. the in-scope atom is in a ring, and
+    2. the other end is NOT in a ring.
+
+    Only (1) used to be tested, so an ENDOcyclic double bond of some OTHER ring —
+    one the scope's numbering does not cover — also qualified and borrowed a locant
+    from whichever of its atoms happened to appear in the map. That is how
+    `2,2,3-tri(cyclodec-1-en-1-yl)propanoate` acquired a parent-scope `(3E)`: the
+    C=C lies inside a cyclodecene SUBSTITUENT, and propanoate has no double bond at
+    its C3 for the descriptor to resolve to (OPSIN: `Could not find bond that:
+    <stereoChemistry locant="3" …> was referring to`). Per P-91.3 (BB:44639) that
+    descriptor belongs on the substituent prefix, not at parent scope.
+    """
+    if not mol.GetAtomWithIdx(in_scope_idx).IsInRing():
+        return False
+    if mol.GetAtomWithIdx(other_idx).IsInRing():
+        return False
+    return True
+
+
 def collect_stereodescriptors(
     mol,
     atom_to_locant: Dict[int, int],
@@ -74,12 +100,17 @@ def collect_stereodescriptors(
         atom_to_locant: Mapping from atom index to IUPAC locant number.
                        Only atoms in this mapping are considered (principal
                        chain/ring atoms).
-        include_near_parent_ez: If True, also collect E/Z bonds that are
-                       one hop away from the parent (i.e., neither bond atom
-                       is in atom_to_locant, but one has a neighbor that is).
-                       Per IUPAC P-93.5.2, substituent E/Z attached directly
-                       to the parent should be reported. Only enable for
-                       top-level naming, not decomposition fragments.
+        include_near_parent_ez: RETAINED FOR CALL-SITE COMPATIBILITY; NO LONGER
+                       EMITS. It used to admit E/Z bonds one hop away from the
+                       parent (neither bond atom in atom_to_locant, but one has
+                       a neighbour that is), citing the neighbour's locant, on
+                       the stated authority of "IUPAC P-93.5.2". That citation
+                       is wrong — P-93.5.2 (BB:48024) is "von Baeyer compounds".
+                       P-91.3 (BB:44639) instead requires a substituent's
+                       descriptor to be cited "at the front of the corresponding
+                       prefix", so a bond lying wholly inside a substituent has
+                       no locant in the PARENT's numbering and is now skipped.
+                       See the fail-closed branch below for the full derivation.
 
     Returns:
         List of (locant, cip_code) tuples, sorted by locant ascending.
@@ -142,37 +173,38 @@ def collect_stereodescriptors(
             elif begin_idx in atom_to_locant and end_idx not in atom_to_locant:
                 # Only include if the in-mapping atom is in a ring
                 # (true exocyclic bond, not a chain substituent bond)
-                if not mol.GetAtomWithIdx(begin_idx).IsInRing():
+                if not _is_true_exocyclic(mol, begin_idx, end_idx):
                     continue
                 locant = atom_to_locant[begin_idx]
             elif end_idx in atom_to_locant and begin_idx not in atom_to_locant:
-                if not mol.GetAtomWithIdx(end_idx).IsInRing():
+                if not _is_true_exocyclic(mol, end_idx, begin_idx):
                     continue
                 locant = atom_to_locant[end_idx]
             else:
-                # Neither atom in parent.
-                if not include_near_parent_ez:
-                    continue
-                # One-hop case (IUPAC P-93.5.2): E/Z bonds in
-                # substituents attached directly to the parent should
-                # be reported, referencing the parent locant at the
-                # attachment point.  Example: a styrenyl substituent
-                # on a ring has C=C entirely off the ring, but one
-                # bond atom is directly bonded to a ring atom that
-                # IS in atom_to_locant.
-                locant = None
-                for idx in (begin_idx, end_idx):
-                    atom = mol.GetAtomWithIdx(idx)
-                    for nbr in atom.GetNeighbors():
-                        nbr_idx = nbr.GetIdx()
-                        if nbr_idx in atom_to_locant:
-                            candidate = atom_to_locant[nbr_idx]
-                            if locant is None or (isinstance(candidate, int) and
-                                                  isinstance(locant, int) and
-                                                  candidate < locant):
-                                locant = candidate
-                if locant is None:
-                    continue
+                # Neither atom is in this scope's numbering, so this bond has NO locant
+                # in this scope and cannot be cited here.
+                #
+                # A "one-hop" branch used to stand here: it walked to a neighbouring
+                # in-scope atom and cited THAT atom's locant, on the stated authority of
+                # "IUPAC P-93.5.2". That citation is wrong — P-93.5.2 (BB:48024) is
+                # "von Baeyer compounds", and says nothing about projecting a
+                # substituent's double bond onto a parent locant.
+                #
+                # The rule that does govern is P-91.3 "NAMING OF STEREOISOMERS"
+                # (BB:44639): "They are placed at the front of the complete name when
+                # related to the parent structure ... WHEN THEY RELATE TO SUBSTITUENT
+                # GROUPS, THEY ARE CITED AT THE FRONT OF THE CORRESPONDING PREFIX." A C=C
+                # lying wholly inside a substituent is a substituent stereogenic unit, so
+                # its descriptor belongs on that prefix — which the substituent naming
+                # path already does, e.g. `[(E)-2-phenylethenyl]`. Citing it at parent
+                # scope invents a locant the parent does not have a double bond at, which
+                # OPSIN rejects with `Could not find bond that: <stereoChemistry …> was
+                # referring to`, or — worse — silently binds it to an unrelated parent
+                # double bond that IS at that locant.
+                #
+                # So fail closed. Measured effect (n=1000, pubchem_2000): see
+                # 
+                continue
 
             cip_code = bond.GetProp('_CIPCode')  # 'E' or 'Z'
             descriptors.append((locant, cip_code))
@@ -200,12 +232,47 @@ def collect_stereodescriptors(
     descriptors.sort(key=_composite_locant_sort_key)
 
     # Filter out stereo descriptors with invalid locants (locant 0 or > parent size)
+    #
+    # ⚠ NOTE this check is SELF-REFERENTIAL and therefore much weaker than it looks:
+    # `parent_size` is the max of the very map that produced every locant, so it can only
+    # ever catch 0/negatives. It cannot tell that the map itself belongs to a different
+    # scope than the name being decorated. The caller owns that (see
+    # `handlers/general_acyclic.py`, P-91.3).
     if descriptors and atom_to_locant:
         int_locants = [v for v in atom_to_locant.values() if isinstance(v, int)]
         parent_size = max(int_locants) if int_locants else 0
         if parent_size > 0:
             from .locant_validation import validate_stereo_locants
             descriptors = validate_stereo_locants(descriptors, parent_size)
+
+    # P-91.3 "NAMING OF STEREOISOMERS" (BB:44639): a stereodescriptor is "preceded by a
+    # numerical or letter locant to describe THE POSITION OF THE STEREOGENIC UNIT". A
+    # locant names one position in one numbering, so two descriptors sharing a locant in
+    # a single block do not describe two positions — the block is unresolvable, and OPSIN
+    # rejects it with `Could not find atom/bond that: <stereoChemistry …> was referring to`.
+    #
+    # Two DIFFERENT double bonds cannot share one parent locant, so an E/Z locant cited
+    # twice means at least one of them was projected in from another scope, e.g.
+    # `2,2,3-tri(cyclodec-1-en-1-yl)propanoate` -> `(2E,2E,3E)-`, where the bonds live in
+    # the SUBSTITUENTS and P-91.3 puts their descriptors "at the front of the corresponding
+    # prefix". Fail closed on the contested locant rather than arbitrarily keeping one,
+    # which would assert a configuration for a position with more than one unit on it.
+    #
+    # SCOPED TO E/Z DELIBERATELY. R/S cannot collide (one atom carries one code), and an
+    # axial element legitimately shares its locant with the underlying bond's own CIP code
+    # — `detect_axial_chirality` reports `(7,'Sa')` for the very bond the E/Z loop reports
+    # as `(7,'M')`. That is ONE stereogenic unit described twice, not two units contesting
+    # a locant, and an unscoped rule deletes both (caught by TestCollectStereodescriptorsAxial).
+    _ez = [d for d in descriptors if d[1] in ('E', 'Z')]
+    if len(_ez) > 1:
+        counts: Dict[Any, int] = {}
+        for locant, _cip in _ez:
+            counts[locant] = counts.get(locant, 0) + 1
+        if any(c > 1 for c in counts.values()):
+            descriptors = [
+                d for d in descriptors
+                if d[1] not in ('E', 'Z') or counts.get(d[0], 0) == 1
+            ]
 
     return descriptors
 

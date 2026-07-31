@@ -155,9 +155,15 @@ def name_general_acyclic(
     prefixes = _generate_prefixes(features)
     fragments.extend(prefixes)
 
-    # Generate stereodescriptors (for R/S stereocenters and E/Z double bonds)
+    # Stereodescriptors. P-91.3 (BB:44639): a parent-scope descriptor's locant is read in
+    # the PARENT's numbering, so hand the collector the map of the parent selected above;
+    # else `oriented_ring` (a SUBSTITUENT ring) overrides it -- the measured cause of both
+    # v29-P7 C1 defects. `{}` = chain parent, no numbering -> fail closed. Derivation +
+    # 1000-row A/B: 
     if features.stereocenters or getattr(features, 'double_bond_stereo', None):
-        stereo = _generate_stereodescriptors(features)
+        _scope = dict(features.atom_to_locant or {}) if features.principal_chain else None
+        stereo = None if _scope == {} else _generate_stereodescriptors(
+            features, atom_to_locant_override=_scope)
         if stereo:
             fragments.append(stereo)
 
