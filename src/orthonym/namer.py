@@ -879,6 +879,24 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str) -> str:
     return "ok"
 
 
+def _record_gate_outcome(outcome: str, name: Optional[str]) -> None:
+    """v29 P7 T1: publish what the validity gate DID for ``name``.
+
+    Observation-only (two ContextVar writes) — no gate BEHAVIOUR depends on
+    it, and no emitted name changes. `name_tiered` derives `opsin` /
+    `gates_passed` from this instead of from jar presence. ``name`` is the
+    string the caller is about to RETURN, so a suppression records the
+    fallback it shipped rather than the candidate it rejected.
+
+    Threaded through a contextvar rather than the gate's return value on
+    purpose: `_final_opsin_validity_gate` returns a `str` that four call sites
+    treat as the name, and widening that contract to a tuple would touch every
+    one of them.
+    """
+    from .metrics.provenance import record_gate_outcome
+    record_gate_outcome(outcome, name)
+
+
 def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: str,
                                stats: Optional[Dict[str, int]]) -> str:
     """SELF-01: OPSIN already PARSED ``name``; verify it parses to the SAME molecule.
@@ -887,10 +905,18 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     stereo-only / tautomer difference, never when the comparison is inconclusive
     (fail-OPEN). In mode "warn" it logs + counts the would-suppression but ships the
     name unchanged (behaviour-neutral); in mode "off" it is a no-op."""
+    from .metrics import provenance as _pv
     if _SC_MODE == "off" or not smiles:
+        _record_gate_outcome(_pv.GATE_OUTCOME_SELF01_SKIPPED, name)
         return name
     verdict = _self_consistency_verdict(smiles, opsin_smiles)
     if verdict != "mismatch":
+        # v29 P7 T1: "ok" is the ONE state that earns SELF-01. "inconclusive"
+        # ships by failing OPEN — the comparison could not be made, so nothing
+        # was verified and it must not claim to have been.
+        _record_gate_outcome(
+            _pv.GATE_OUTCOME_SELF01 if verdict == "ok"
+            else _pv.GATE_OUTCOME_SELF01_INCONCLUSIVE, name)
         return name  # "ok" ships; "inconclusive" fails OPEN
     if stats is not None:
         stats["self_consistency_mismatch"] = stats.get("self_consistency_mismatch", 0) + 1
@@ -898,6 +924,7 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
         logger.warning(
             "SELF-01 would-suppress (warn-only): %r names a constitutionally DIFFERENT "
             "molecule (input=%s opsin=%s)", name[:80], smiles, opsin_smiles)
+        _record_gate_outcome(_pv.GATE_OUTCOME_SELF01_WARN_MISMATCH, name)
         return name
     # mode "on": suppress to the honest descriptive fallback.
     if stats is not None:
@@ -907,7 +934,9 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     from .metrics.abstention import AbstentionCode, record_suppression
     record_suppression(AbstentionCode.GATE_SUPPRESSED, detail='self01_mismatch',
                        candidate=name)
-    return _descriptive_fallback(smiles)
+    _suppressed_to = _descriptive_fallback(smiles)
+    _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+    return _suppressed_to
 
 
 def _final_opsin_validity_gate(name: str, smiles: Optional[str],
@@ -920,18 +949,29 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     leaves name()/name_with_confidence(); inside the is_top_level_naming guard
     so it never fires on decomposition fragments.
     """
-    if not name or _DISABLE_VALIDITY_GATE:
+    from .metrics import provenance as _pv
+    if not name:
+        # The ONE return that records nothing, deliberately: there is no name
+        # to have an outcome about, and writing one here would OVERWRITE the
+        # outcome of a real earlier gate call in the same naming session (the
+        # retry cascade calls this gate more than once). The contextvar's
+        # NOT_RUN default already fails closed.
+        return name
+    if _DISABLE_VALIDITY_GATE:
+        _record_gate_outcome(_pv.GATE_OUTCOME_DISABLED, name)
         return name
     # Don't re-gate an already-descriptive fallback (it won't OPSIN-parse, and
     # re-suppressing is idempotent anyway) — skip the wasted OPSIN subprocess.
     try:
         from .errors import _DESCRIPTIVE_FALLBACK_NAMES
         if name in _DESCRIPTIVE_FALLBACK_NAMES:
+            _record_gate_outcome(_pv.GATE_OUTCOME_DESCRIPTIVE_FALLBACK, name)
             return name
     except Exception:
         pass
     # D-13 fail-OPEN: probe the JAR FIRST.
     if not _validity_gate_jar_present():
+        _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name
     # CR-01 (code review 2026-06-02): suppress ONLY on a DEFINITIVE OPSIN
     # rejection. 'parsed' ships as-is; 'unavailable' (subprocess timeout / OSError
@@ -952,7 +992,10 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         # RE-PARSES to the wrong constitution (locant-assignment bug). Ship it —
         # the BB is the sole PIN authority and OPSIN's bug must not gate us.
         if _POLYACID_PREFIX_DERIVATIVE_PIN_RE.match(name):
+            _record_gate_outcome(
+                _pv.carveout_outcome("polyacid_prefix_derivative"), name)
             return name
+        # _self_consistency_decision records its own outcome (one per verdict).
         return _self_consistency_decision(name, smiles, opsin_smiles, stats)
     # opsin_smiles is None -> either OPSIN was UNAVAILABLE (transient: no jar /
     # timeout / OSError), OR OPSIN PARSED the name but emitted a SMILES that RDKit
@@ -965,6 +1008,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # carve-outs below and, absent a whitelist hit, suppress to the honest fallback
     # (fail-closed, accuracy #1). Conflating the two here shipped the wrong name.
     if _validity_gate_status(name) == "unavailable":
+        _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name  # transient -> fail-OPEN (never suppress)
     # DD2 / BBR-GATE (Phase D): OPSIN's generation grammar does not recognise the
     # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
@@ -977,6 +1021,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # descriptor ('ethane-1,2-bisSO-thioperoxol') is a real formatting defect and
     # stays suppressed to the honest fallback rather than shipping malformed.
     if "thioperoxol" in name and not re.search(r"[A-Za-z](SO|OS)-thioperoxol", name):
+        _record_gate_outcome(_pv.carveout_outcome("thioperoxol"), name)
         return name
     # v23 Phase 12 follow-on (P-104.2.1): the inositol retained names
     # (myo-/scyllo-/cis-/epi-/neo-/allo-/muco-/D-chiro-/L-chiro-inositol) are the
@@ -988,6 +1033,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     try:
         from .rules.inositols import INOSITOL_NAMES
         if name in INOSITOL_NAMES:
+            _record_gate_outcome(_pv.carveout_outcome("inositol"), name)
             return name
     except Exception:
         pass
@@ -1001,6 +1047,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     try:
         from .data.natural_products import NAME_EXACT_NP_PARENTS
         if name in NAME_EXACT_NP_PARENTS:
+            _record_gate_outcome(_pv.carveout_outcome("np_stereoparent"), name)
             return name
     except Exception:
         pass
@@ -1013,26 +1060,33 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # thioperoxol/inositol OPSIN generation-grammar gap. The regex guard keeps the
     # carve-out tight: >=2 acid-like words followed by a multiplied '...anhydride'.
     if _DIANHYDRIDE_PIN_RE.match(name):
+        _record_gate_outcome(_pv.carveout_outcome("dianhydride"), name)
         return name
     # W8-P4 (P-65.7.6.4.1): chalcogen di-/poly-anhydride PIN carve-out — see
     # _CHALCOGEN_DIANHYDRIDE_PIN_RE docstring above.
     if _CHALCOGEN_DIANHYDRIDE_PIN_RE.match(name):
+        _record_gate_outcome(
+            _pv.carveout_outcome("chalcogen_dianhydride"), name)
         return name
     # W3-P07 (P-65.6.3.3.3.2 method (1)): functional-class polyol polyester PIN
     # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate') — correct-by-construction
     # from _assemble_glyceride but OPSIN cannot parse the multi-anion syntax
     # (exactly the inositol/dianhydride generation-grammar gap).
     if _POLYOL_POLYESTER_PIN_RE.match(name):
+        _record_gate_outcome(_pv.carveout_outcome("polyol_polyester"), name)
         return name
     # W8-P9 Task 9.1 (P-69.2.3/.4/.6): additive/coordination organometallic
     # PIN carve-out — see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above.
     if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name):
+        _record_gate_outcome(
+            _pv.carveout_outcome("organometallic_additive"), name)
         return name
     # W8-P8 Task 8.12 (P-26.2/.3): phane simplified-skeletal PIN carve-out —
     # see _PHANE_PIN_RE docstring above. Emitted ONLY by the hard-gated
     # rules.phane.build_phane_pin (formula-conservation-vetoed), so OPSIN's
     # total lack of phane grammar must not suppress it.
     if _PHANE_PIN_RE.match(name):
+        _record_gate_outcome(_pv.carveout_outcome("phane"), name)
         return name
     # W8-P5 Task 2 (P-72.3/P-72.8.1): substituted halogen-uide PIN carve-out
     # ('diphenyliodanuide') — see _HALOGEN_UIDE_PIN_RE docstring above.
@@ -1040,6 +1094,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # branch (atom-conservation-vetoed), so OPSIN's substituted-uide grammar
     # limitation must not suppress it.
     if _HALOGEN_UIDE_PIN_RE.match(name):
+        _record_gate_outcome(_pv.carveout_outcome("halogen_uide"), name)
         return name
     # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
@@ -1088,6 +1143,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             if stats is not None:
                 stats["gate_stereo_unavailable"] = (
                     stats.get("gate_stereo_unavailable", 0) + 1)
+            _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
             return name  # transient -> fail-OPEN, with the stereo layer intact
         # 'rejected' is unchanged: a stripped form OPSIN DEFINITIVELY rejects is a
         # genuine constitutional defect and falls through to the fallback below.
@@ -1104,9 +1160,21 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                     if stats is not None:
                         stats["gate_stereo_mismatch"] = (
                             stats.get("gate_stereo_mismatch", 0) + 1)
+                    # `_decided` is the fallback; _self_consistency_decision
+                    # already recorded GATE_OUTCOME_SUPPRESSED against it.
                     return _decided  # SELF-01 PROVED a different molecule -> suppress
                 if stats is not None:
                     stats["gate_stereo_kept"] = stats.get("gate_stereo_kept", 0) + 1
+                # v29 P7 T1: SELF-01 judged the stereo-STRIPPED parse, so an
+                # "ok" here verifies the CONSTITUTION ONLY — the stereo layer
+                # was never checked (that is the whole point of this
+                # carve-out). Downgrade the inner verdict to say so. Any other
+                # inner outcome (inconclusive / skipped / warn-mismatch) is
+                # already non-verifying and is left exactly as recorded.
+                if (_pv.get_provenance()["gate_outcome"]
+                        == _pv.GATE_OUTCOME_SELF01):
+                    _record_gate_outcome(
+                        _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY, name)
                 return name  # only the stereo layer is OPSIN-narrow -> ship it whole
             # 'parsed' but NO usable SMILES: OPSIN accepted the stripped name and
             # then emitted a structure RDKit cannot canonicalise (an impossible
@@ -1138,7 +1206,9 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     from .metrics.abstention import AbstentionCode, record_suppression
     record_suppression(AbstentionCode.GATE_SUPPRESSED, detail='opsin_unparseable',
                        candidate=name)
-    return _descriptive_fallback(smiles)
+    _suppressed_to = _descriptive_fallback(smiles)
+    _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+    return _suppressed_to
 
 
 # ---------------------------------------------------------------------------
@@ -2584,13 +2654,27 @@ class Orthonym:
         (systematic-PIN certification) is reserved. Default construction
         (no flags) keeps today's PIN-or-abstain behavior byte-identically.
         """
+        from .metrics import provenance as _pv
         from .metrics.provenance import clear_provenance, get_provenance
         clear_provenance()
         name = self.name(smiles)
         prov = get_provenance()
         source = prov["source"] or "pin_path"
-        gate_active = (not self._disable_opsin_validity_gate
-                       and _validity_gate_jar_present())
+        # v29 P7 T1: what the gate DID for THIS name, not whether a jar exists.
+        # The old `gate_active = (not disabled and jar_present())` stamped
+        # `opsin="verified"` / `SELF-01` on every PIN-path emission on a
+        # machine with a jar, including the gate's ten by-design carve-outs and
+        # its stereo-stripped branch — three OPSIN-UNPARSEABLE names reported
+        # SELF-01 (FINDINGS.md §2). `resolve_gate_outcome` additionally denies
+        # an outcome recorded for a DIFFERENT string than the one shipped.
+        if self._disable_opsin_validity_gate:
+            # The instance flag short-circuits the gate at its call sites, so
+            # nothing is recorded; the honest label is that it was disabled.
+            gate_outcome = _pv.GATE_OUTCOME_DISABLED
+        else:
+            gate_outcome = _pv.resolve_gate_outcome(
+                prov["gate_outcome"], prov["gate_outcome_name"], name)
+        gate_opsin_label = _pv.opsin_label_for_gate_outcome(gate_outcome)
         formula = None
         limit_code = None
         # v27 P6 T6.4: only surface stereo_unexpressed when a general-engine
@@ -2623,24 +2707,38 @@ class Orthonym:
             if self._general_fallback:
                 name = None
         elif source == "general_engine":
-            opsin = prov["opsin"] or ("verified" if gate_active
-                                      else "unverified")
+            # The general engine runs its OWN OPSIN round-trip against the
+            # input structure (`_rt_match`, :2921) and publishes the verdict as
+            # prov["opsin"], which is always a non-empty string — so this
+            # branch never consulted jar presence and is unchanged.
+            opsin = prov["opsin"] or gate_opsin_label
             tier = "T3" if opsin == "verified" else "T4"
             is_pin = False
             stereo_unexpressed = bool(prov.get("stereo_unexpressed"))
         elif source == "trivial_retained":
             tier, is_pin = "T3", False
-            opsin = "verified" if gate_active else "unverified"
+            opsin = gate_opsin_label
         else:
             tier, is_pin = "T1", True
-            opsin = "verified" if gate_active else "unverified"
+            opsin = gate_opsin_label
         gates = []
         if source == "general_engine":
             gates.append("E1")
-        if opsin == "verified":
-            gates.append("SELF-01")
+            # E1-path verification is the engine's OWN round-trip check
+            # (prov["opsin"]), not a gate outcome, so its token is unchanged.
+            if opsin == "verified":
+                gates.append("SELF-01")
+        elif opsin != "n/a":
+            # T1 / T3-retained: the token is whatever the gate actually
+            # earned — `SELF-01` only for a full-name SELF-01 "ok",
+            # `SELF-01(constitution)` for the stereo-stripped verdict, and
+            # nothing at all for a carve-out, a bypass or a fail-OPEN.
+            _token = _pv.gate_token_for_gate_outcome(gate_outcome)
+            if _token is not None:
+                gates.append(_token)
         return {"name": name, "tier": tier, "is_pin": is_pin,
                 "source": source, "opsin": opsin, "gates_passed": gates,
+                "gate_outcome": gate_outcome,
                 "formula": formula, "limit_code": limit_code,
                 "stereo_unexpressed": stereo_unexpressed}
 

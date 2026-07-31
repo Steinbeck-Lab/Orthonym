@@ -8,6 +8,72 @@ from __future__ import annotations
 import contextvars
 from typing import Optional
 
+# ---------------------------------------------------------------------------
+# v29 Phase 7 Task 1: what the OPSIN validity gate ACTUALLY DID for this name
+# ---------------------------------------------------------------------------
+# `name_tiered` used to derive `opsin`/`gates_passed` from
+#     gate_active = (not self._disable_opsin_validity_gate
+#                    and _validity_gate_jar_present())
+# i.e. from *jar presence*. That is not evidence that THIS name passed
+# anything: `namer._final_opsin_validity_gate` has ten `return name`
+# carve-outs that never reach `_self_consistency_decision`, plus a BBR-GATE
+# stereo branch that judges only the stereo-STRIPPED parse. Measured at
+# `a6cf6157` ( §2): three names
+# OPSIN cannot parse at all reported `gates_passed: ['SELF-01']`.
+#
+# The gate now records its per-name outcome here and the report is derived
+# from it. Deny-by-default in three ways: the default is NOT_RUN, the outcome
+# is stored WITH the name it was recorded for (an outcome belonging to a
+# different string never counts — see `resolve_gate_outcome`), and only the
+# two outcomes explicitly listed in `_VERIFIED_GATE_OUTCOMES` may claim any
+# verification (see `opsin_label_for_gate_outcome`).
+
+#: no gate call was recorded for this naming session (the default).
+GATE_OUTCOME_NOT_RUN = "not_run"
+#: an outcome WAS recorded, but for a different string than the one shipped
+#: (e.g. `_apply_trivial_fallback` ships a retained name the gate never saw).
+GATE_OUTCOME_BYPASSED = "bypassed"
+#: `_DISABLE_VALIDITY_GATE` (env) or `_disable_opsin_validity_gate` (instance).
+GATE_OUTCOME_DISABLED = "gate_disabled"
+#: jar absent / transient OPSIN failure — the gate failed OPEN.
+GATE_OUTCOME_UNAVAILABLE = "unavailable"
+#: the name handed to the gate was already a descriptive-fallback sentinel,
+#: so the gate skipped it (nothing was verified).
+GATE_OUTCOME_DESCRIPTIVE_FALLBACK = "descriptive_fallback"
+#: the gate suppressed a candidate to the descriptive fallback.
+GATE_OUTCOME_SUPPRESSED = "suppressed"
+#: OPSIN parsed the FULL name and SELF-01 returned verdict "ok". The ONE
+#: state that may claim a bare SELF-01.
+GATE_OUTCOME_SELF01 = "self01_verified"
+#: the BBR-GATE stereo carve-out: SELF-01 judged the stereo-STRIPPED parse, so
+#: the CONSTITUTION is verified and the stereo layer is NOT.
+GATE_OUTCOME_SELF01_CONSTITUTION_ONLY = "self01_verified_constitution_only"
+#: SELF-01 ran and could not compare (fail-OPEN) — nothing was proven.
+GATE_OUTCOME_SELF01_INCONCLUSIVE = "self01_inconclusive"
+#: SELF-01 was a no-op (`_SC_MODE == "off"`, or no input SMILES to compare to).
+GATE_OUTCOME_SELF01_SKIPPED = "self01_skipped"
+#: SELF-01 PROVED a different molecule but `_SC_MODE == "warn"` shipped it.
+GATE_OUTCOME_SELF01_WARN_MISMATCH = "self01_warn_mismatch"
+#: prefix for the ten by-design `return name` carve-outs: `carveout:<slug>`.
+GATE_OUTCOME_CARVEOUT_PREFIX = "carveout:"
+
+#: The ONLY outcomes that may report anything other than "unverified".
+#: An allowlist, never a blocklist — an outcome string this code has never
+#: seen (a future carve-out, a path someone forgot to instrument) falls
+#: through to "unverified" rather than inheriting a claim it did not earn.
+_VERIFIED_GATE_OUTCOMES = {
+    GATE_OUTCOME_SELF01: "verified",
+    GATE_OUTCOME_SELF01_CONSTITUTION_ONLY: "verified_constitution_only",
+}
+
+#: `gates_passed` token per verified outcome. `SELF-01(constitution)` is
+#: deliberately a DIFFERENT token from `SELF-01`: the stereo carve-out checked
+#: the constitution only, and folding it into either bucket would lose that.
+_GATE_TOKENS = {
+    GATE_OUTCOME_SELF01: "SELF-01",
+    GATE_OUTCOME_SELF01_CONSTITUTION_ONLY: "SELF-01(constitution)",
+}
+
 _SOURCE = contextvars.ContextVar("orthonym_prov_source", default=None)
 _OPSIN = contextvars.ContextVar("orthonym_prov_opsin", default=None)
 # v27 Phase 6 T6.4: honest flag for a best-effort emission that ships a
@@ -21,12 +87,22 @@ _STEREO_UNEXPRESSED = contextvars.ContextVar(
 # component recursion (name_compound inherits it).
 general_fallback_ctx = contextvars.ContextVar(
     "orthonym_general_fallback", default=False)
+# v29 P7 T1: the validity gate's per-name outcome, and the name string it was
+# recorded FOR. Defaults fail closed (NOT_RUN / no name).
+_GATE_OUTCOME = contextvars.ContextVar(
+    "orthonym_prov_gate_outcome", default=GATE_OUTCOME_NOT_RUN)
+_GATE_OUTCOME_NAME = contextvars.ContextVar(
+    "orthonym_prov_gate_outcome_name", default=None)
 
 
 def clear_provenance() -> None:
     _SOURCE.set(None)
     _OPSIN.set(None)
     _STEREO_UNEXPRESSED.set(False)
+    # v29 P7 T1: a gate outcome left over from the PREVIOUS molecule would
+    # mislabel this one, so it resets with the rest of the provenance.
+    _GATE_OUTCOME.set(GATE_OUTCOME_NOT_RUN)
+    _GATE_OUTCOME_NAME.set(None)
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
@@ -42,9 +118,61 @@ def record_stereo_unexpressed(flag: bool) -> None:
     _STEREO_UNEXPRESSED.set(bool(flag))
 
 
+def record_gate_outcome(outcome: str, name: Optional[str]) -> None:
+    """v29 P7 T1: record what `_final_opsin_validity_gate` DID, and for WHICH
+    string. Called at every return of the gate (and of
+    `_self_consistency_decision`, which owns the gate's SELF-01 exits).
+
+    ``name`` must be the string the gate is about to RETURN, not the one it
+    was handed — on a suppression those differ, and the outcome belongs to
+    what actually ships.
+    """
+    _GATE_OUTCOME.set(outcome)
+    _GATE_OUTCOME_NAME.set(name)
+
+
+def carveout_outcome(slug: str) -> str:
+    """``carveout:<slug>`` — a by-design `return name` carve-out. The name is
+    shipped deliberately despite an OPSIN coverage gap; it is NOT verified."""
+    return GATE_OUTCOME_CARVEOUT_PREFIX + slug
+
+
+def resolve_gate_outcome(outcome: Optional[str], outcome_name: Optional[str],
+                         shipped_name: Optional[str]) -> str:
+    """The outcome that applies to ``shipped_name`` — deny-by-default.
+
+    A recorded outcome only counts for the exact string it was recorded for.
+    Paths that ship a name the gate never saw (`_apply_trivial_fallback`
+    returns a retained name only AFTER the gate has suppressed the systematic
+    candidate, so the recorded outcome then belongs to a DIFFERENT string) get
+    ``bypassed``, never the previous name's verdict.
+    """
+    if not outcome or outcome == GATE_OUTCOME_NOT_RUN:
+        return GATE_OUTCOME_NOT_RUN
+    if outcome_name is None or outcome_name != shipped_name:
+        return GATE_OUTCOME_BYPASSED
+    return outcome
+
+
+def opsin_label_for_gate_outcome(outcome: Optional[str]) -> str:
+    """``verified`` / ``verified_constitution_only`` / ``unverified``.
+
+    Allowlist, so it fails closed: any outcome not explicitly listed —
+    including a state that does not exist yet — reports ``unverified``.
+    """
+    return _VERIFIED_GATE_OUTCOMES.get(outcome, "unverified")
+
+
+def gate_token_for_gate_outcome(outcome: Optional[str]) -> Optional[str]:
+    """The `gates_passed` token this outcome earns, or None if it earns none."""
+    return _GATE_TOKENS.get(outcome)
+
+
 def get_provenance() -> dict:
     return {
         "source": _SOURCE.get(),
         "opsin": _OPSIN.get(),
         "stereo_unexpressed": _STEREO_UNEXPRESSED.get(),
+        "gate_outcome": _GATE_OUTCOME.get(),
+        "gate_outcome_name": _GATE_OUTCOME_NAME.get(),
     }
