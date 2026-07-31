@@ -221,6 +221,124 @@ def test_descriptor_block_is_decided_by_the_map_it_is_given():
 
 
 # --------------------------------------------------------------------------
+# THE CLASS, not two patches (Task 2 review, CRITICAL).
+#
+# The first fix lived in ONE caller (`general_acyclic.py`, via an
+# `atom_to_locant_override`). The shared priority chain was untouched, so the four
+# `composer.py` callers that pick a parent the same way — `if features.principal_chain:
+# chain parent` — still took a SUBSTITUENT ring's numbering. These two molecules are the
+# reviewer's measured counter-examples; both reached `composer.py:5564` and both produced
+# the same OPSIN error signature as 2a/2b. The rule now lives in
+# `_generate_stereodescriptors` itself, so every caller inherits it.
+# --------------------------------------------------------------------------
+
+# `prop-2-enamide` has THREE carbons; the emitted `(1R,2R)` came from the cyclopropyl
+# substituent's own numbering. The parent genuinely does have a stereogenic C2=C3 bond, so
+# the correct parent block is `(2E)` — the fix ADDS a right descriptor, it does not merely
+# delete a wrong one (the contributor guide #9).
+SMILES_CE1 = "C[C@@H]1C[C@H]1/C=C/C(N)=O"
+EXPECTED_CE1 = "(2E)-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enamide"
+
+SMILES_CE2 = "C[C@@H]1C[C@H]1/C=C/C(=O)NC"
+EXPECTED_CE2 = "N-methyl(2E)-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enamide"
+
+COUNTEREXAMPLES = [(SMILES_CE1, EXPECTED_CE1), (SMILES_CE2, EXPECTED_CE2)]
+
+
+def test_counterexample_set_is_non_empty():
+    """No vacuous parametrised loop (a Phase 6 review finding)."""
+    assert len(COUNTEREXAMPLES) == 2
+
+
+@pytest.mark.parametrize("smiles,expected", COUNTEREXAMPLES)
+def test_amide_caller_inherits_the_parent_scope_rule(namer, smiles, expected):
+    """`composer.py:5564` never passed an override — the shared chain must decide."""
+    assert namer.name(smiles) == expected
+
+
+@pytest.mark.parametrize("smiles,expected", COUNTEREXAMPLES)
+def test_counterexample_block_cites_a_locant_the_parent_actually_has(namer, smiles, expected):
+    """`prop-2-enamide` has C1..C3, so a leading `1`/`2` must denote the parent's own bond."""
+    name = namer.name(smiles)
+    block = re.search(r"\((\d+)([EZRS])\)-", name)
+    assert block is not None, f"expected a parent-scope block, got: {name}"
+    assert block.group(1) == "2", f"locant {block.group(1)!r} is not the parent's: {name}"
+    # the substituent block keeps its OWN numbering, inside the brackets (P-91.3)
+    assert "[(1R,2R)-2-methylcyclopropyl]" in name, name
+
+
+def _ce1_features(principal_chain):
+    """CE-1's real molecule and the real maps the spy recorded at `composer.py:5564`.
+
+    A stub rather than `compute_features`, deliberately: `principal_chain` and
+    `oriented_ring` are populated LATER in `namer.py` during parent selection (`:4684`,
+    `:4732`), so `compute_features` alone leaves them empty and a test built on it would
+    assert nothing about the branch under test.
+    """
+    from types import SimpleNamespace
+
+    from rdkit import Chem
+    from rdkit.Chem import rdCIPLabeler
+
+    mol = Chem.MolFromSmiles(SMILES_CE1)
+    rdCIPLabeler.AssignCIPLabels(mol)       # never the legacy labeller (the contributor guide)
+    return SimpleNamespace(
+        mol=mol,
+        stereocenters=[1, 3],
+        double_bond_stereo=[(4, 5)],
+        atom_to_locant={6: 1, 5: 2, 4: 3},      # prop-2-enamide, the PARENT
+        heterocycle_atom_to_locant=None,
+        oriented_ring=[1, 3, 2],                # 2-methylcyclopropyl, a SUBSTITUENT
+        principal_chain=principal_chain,
+    )
+
+
+# (principal_chain, caller_selects_parent) -> the block the shared function must return.
+# Measured 2x2; every cell is a distinct branch of the rule.
+MAP_SELECTION_TABLE = [
+    # a parent-assembling caller with a chain parent: the PARENT's own C2=C3 bond.
+    ((6, 5, 4), True, "(2E)-"),
+    # `_inject_stereo_if_missing`: it did not choose the parent, so principal_chain is not
+    # evidence about it — legacy ring priority is retained on purpose.
+    ((6, 5, 4), False, "(1R,2R)-"),
+    # no chain at all => a ring parent; the ring map IS the parent scope, both ways.
+    ((), True, "(1R,2R)-"),
+    ((), False, "(1R,2R)-"),
+]
+
+
+def test_map_selection_table_is_non_empty():
+    """No vacuous parametrised loop (a Phase 6 review finding)."""
+    assert len(MAP_SELECTION_TABLE) == 4
+
+
+@pytest.mark.parametrize("principal_chain,caller_selects_parent,expected",
+                         MAP_SELECTION_TABLE)
+def test_the_rule_lives_in_the_shared_function_not_in_a_caller(
+        principal_chain, caller_selects_parent, expected):
+    """The class contract, asserted on `_generate_stereodescriptors` itself.
+
+    Row 1 is what makes this a CLASS fix rather than five patches: called with no
+    override — exactly how the four `composer.py` sites call it — the function refuses the
+    substituent ring's numbering on its own, so a caller need not know the rule.
+
+    Row 2 is the measured boundary: applying the rule at `_inject_stereo_if_missing`
+    dropped correct descriptors from two ring-parent names whose `principal_chain` was a
+    stale 1–2 atom fragment.
+
+    Rows 3–4 are why the guard is conditional and not a deletion: with no chain, the ring
+    map is the only numbering there is.
+    """
+    from orthonym.assembly.handlers._handler_shared import _generate_stereodescriptors
+
+    features = _ce1_features(principal_chain)
+    block = _generate_stereodescriptors(
+        features, caller_selects_parent=caller_selects_parent)
+    assert block is not None, "premise gone: no descriptor at all"
+    assert block.text == expected, block.text
+
+
+# --------------------------------------------------------------------------
 # Both corrected names must actually PARSE. The whole defect class is defined by
 # OPSIN rejecting the stereo layer, so this is the assertion that bites.
 # --------------------------------------------------------------------------
@@ -245,7 +363,9 @@ def _opsin_smiles(jar: str, name: str):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,name", [(SMILES_2A, EXPECTED_2A),
-                                         (SMILES_2B, EXPECTED_2B)])
+                                         (SMILES_2B, EXPECTED_2B),
+                                         (SMILES_CE1, EXPECTED_CE1),
+                                         (SMILES_CE2, EXPECTED_CE2)])
 def test_corrected_names_round_trip_through_opsin(opsin_jar, smiles, name):
     """The defect class IS "OPSIN rejects the stereo layer", so this is the assertion
     that bites — and it checks IDENTITY, not merely parseability: the parsed structure

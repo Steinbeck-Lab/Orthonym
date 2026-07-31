@@ -9946,8 +9946,15 @@ def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional
     if re.match(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-', name):
         return name
 
-    # Generate stereo prefix using the centralized function
-    stereo_frag = _generate_stereodescriptors(features, atom_to_locant_override=atom_to_locant)
+    # Generate stereo prefix using the centralized function.
+    # caller_selects_parent=False: this function does NOT choose the parent -- it
+    # decorates a name an early-return handler already built, which may well be a RING
+    # parent even though features.principal_chain is truthy (measured: a stale 1-2 atom
+    # chain on `...cyclohexane` and on `cyclonon-2-en-1-yl formate`). So the
+    # parent-scope rule that the parent-assembling callers get by default must not be
+    # inferred here; callers that DO know their scope pass atom_to_locant explicitly.
+    stereo_frag = _generate_stereodescriptors(
+        features, atom_to_locant_override=atom_to_locant, caller_selects_parent=False)
     if stereo_frag and stereo_frag.text:
         return f"{stereo_frag.text}{name}"
     return name

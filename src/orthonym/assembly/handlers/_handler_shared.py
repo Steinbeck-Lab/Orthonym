@@ -1220,7 +1220,7 @@ def _is_unsubstituted_monocyclic_cycloalkene(mol) -> bool:
     return True
 
 
-def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional[Dict[int, int]] = None) -> Optional["NameFragment"]:
+def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional[Dict[int, int]] = None, caller_selects_parent: bool = True) -> Optional["NameFragment"]:
     """
     Generate stereodescriptor prefix using correct IUPAC locants.
 
@@ -1241,6 +1241,16 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
         features: MolecularFeatures object with stereocenters and/or double_bond_stereo
         atom_to_locant_override: Optional explicit locant map. When provided,
             bypasses the features.* priority chain entirely.
+        caller_selects_parent: True when the caller is about to assemble the parent
+            itself as `if features.principal_chain: chain parent; elif ...: ring parent`
+            -- every parent-assembling caller does exactly that, so for them a truthy
+            `principal_chain` IS the parent scope (see the priority chain below).
+            `_inject_stereo_if_missing` passes False: it decorates a name some OTHER
+            handler already built, so `features.principal_chain` there is not evidence
+            about that name's parent. Measured -- two ring-parent names
+            (`3-fluoro-...-cyclohexane`, `cyclonon-2-en-1-yl formate`) carry a STALE
+            1-2 atom `principal_chain` while the ring is the real parent, and applying
+            the parent-scope rule to them dropped a correct descriptor.
 
     Returns:
         NameFragment with stereodescriptor prefix like "(2R)-" or "(2E,3R)-",
@@ -1262,17 +1272,41 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
     if atom_to_locant_override:
         atom_to_locant = atom_to_locant_override
     else:
-        # Existing priority chain (unchanged):
         atom_to_locant = features.atom_to_locant
 
-        # For heterocycles, use ring-specific mapping
-        if getattr(features, 'heterocycle_atom_to_locant', None):
-            atom_to_locant = features.heterocycle_atom_to_locant
-        elif getattr(features, 'oriented_ring', None):
-            # Build mapping from oriented_ring for cycloalkanes/cycloalkenes
-            # oriented_ring is a list of atom indices in ring order starting at position 1
-            # This creates ring_atom_to_locant: {atom_idx: ring_locant} where locants are 1-indexed
-            atom_to_locant = {idx: pos + 1 for pos, idx in enumerate(features.oriented_ring)}
+        # P-91.3 (BB:44639) "NAMING OF STEREOISOMERS": a descriptor placed "at the
+        # front of the complete name" is "related to the parent structure", and its
+        # locant is read in the PARENT's numbering; one that relates to a substituent
+        # group "is cited at the front of the corresponding prefix" instead. P-14.3.3
+        # (BB:2869) "Citation of locants" scopes locants per enclosing-mark unit.
+        #
+        # The two ring maps below ARE the parent scope when a ring is the parent, which
+        # is why this chain exists (measured: a ring-parent call has principal_chain
+        # falsy and an EMPTY chain map, so without them no descriptor could be cited at
+        # all). But when a principal chain exists the ring is a SUBSTITUENT, and its
+        # numbering is a different scope -- citing it at parent scope yields a locant
+        # that cannot resolve. Every caller that assembles a parent selects it as
+        # `if features.principal_chain: chain parent; elif ...: ring parent`, so a
+        # truthy principal_chain means the chain map is the parent scope. Guarding both
+        # ring branches on it is the v29-P7 C1 class fix; a chain parent with no
+        # numbering fails closed rather than borrowing another scope's locants.
+        #
+        # `caller_selects_parent` is what makes that inference sound: it is only true
+        # for the callers that pick the parent by that very test. The one caller that
+        # does NOT (`_inject_stereo_if_missing`) keeps the legacy ring priority, because
+        # a truthy principal_chain tells it nothing about the parent of the name it was
+        # handed -- measured, it is sometimes a stale 1-2 atom fragment on a RING parent.
+        # Derivation + A/B: 
+        _chain_is_parent = caller_selects_parent and getattr(features, 'principal_chain', None)
+        if not _chain_is_parent:
+            # For heterocycles, use ring-specific mapping
+            if getattr(features, 'heterocycle_atom_to_locant', None):
+                atom_to_locant = features.heterocycle_atom_to_locant
+            elif getattr(features, 'oriented_ring', None):
+                # Build mapping from oriented_ring for cycloalkanes/cycloalkenes
+                # oriented_ring is a list of atom indices in ring order starting at position 1
+                # This creates ring_atom_to_locant: {atom_idx: ring_locant} where locants are 1-indexed
+                atom_to_locant = {idx: pos + 1 for pos, idx in enumerate(features.oriented_ring)}
 
     if not atom_to_locant:
         return None
