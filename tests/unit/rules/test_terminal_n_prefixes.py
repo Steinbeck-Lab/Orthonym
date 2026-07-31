@@ -100,8 +100,13 @@ class TestProtectedNeighbors:
         ("O=C=NCCCC", "1-isocyanatobutane"),
         # azide is not stolen by the diazenyl SMARTS
         ("[N-]=[N+]=NCCCC(=O)O", "4-azidobutanoic acid"),
-        # oxime is not stolen by hydroxylamine/diazenyl
-        ("ON=CCCC(=O)O", "4-hydroxyiminobutanoic acid"),
+        # oxime is not stolen by hydroxylamine/diazenyl.
+        # Expectation corrected (was unparenthesised): the compound prefix takes
+        # P-16.5.1.1 enclosing marks, printed verbatim in three PINs --
+        # BlueBookV2.md:38474 `3-(hydroxyimino)butan-2-one (PIN)`, :38478
+        # `4-(hydroxyimino)-1-methylcyclohexa-2,5-diene-1-carboxylic acid (PIN)`,
+        # :30140 `5-hydroxy-5-(hydroxyimino)pentanoic acid (PIN)`.
+        ("ON=CCCC(=O)O", "4-(hydroxyimino)butanoic acid"),
         # terminal hydrazine stays hydrazinyl (P-35.2.2 sibling, existing)
         ("NNCCCC(=O)O", "4-hydrazinylbutanoic acid"),
     ])

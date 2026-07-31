@@ -110,11 +110,23 @@ class TestAmidoEndToEnd:
         ("CCC(=O)NCCCC(=O)O", "4-propanamidobutanoic acid"),
         ("CCCCC(=O)NC(CCC(=O)O)C(=O)O", "2-pentanamidopentanedioic acid"),
         ("CC(=O)NC(CC(=O)O)C(=O)O", "2-acetamidobutanedioic acid"),
-        # ring acyl on a chain parent (fragment path)
-        ("OC(=O)CNC(=O)c1ccccc1", "2-benzamidoethanoic acid"),
-        ("OC(=O)CNC(=O)c1ccc(C)cc1", "2-(4-methylbenzamido)ethanoic acid"),
+        # ring acyl on a chain parent (fragment path).
+        #
+        # Expectations corrected (were `2-...ethanoic acid`). `acetic acid` is a
+        # RETAINED FUNCTIONAL PARENT and the PIN: BlueBookV2.md:2010 prints
+        # "CH3-COOH acetic acid (PIN) ethanoic acid", and :2004 says outright
+        # that "the corresponding systematic alternatives, benzenol and ethanoic
+        # acid, may be used in GENERAL IUPAC nomenclature" -- i.e. ethanoic acid
+        # is not the preferred form. Substituted acetic acid stays the PIN:
+        # :2039/:2048 `(1H-indol-1-yl)acetic acid (PIN)` and :1868
+        # `disilylacetic acid`.
+        #
+        # No locant, either: acetic acid has exactly one substitutable carbon,
+        # so P-14.3.4.3 withdraws it -- and :2039's own PIN carries none.
+        ("OC(=O)CNC(=O)c1ccccc1", "benzamidoacetic acid"),
+        ("OC(=O)CNC(=O)c1ccc(C)cc1", "(4-methylbenzamido)acetic acid"),
         ("OC(=O)CNC(=O)c1cccc2ccccc12",
-         "2-(naphthalene-1-carboxamido)ethanoic acid"),
+         "(naphthalene-1-carboxamido)acetic acid"),
         # benzene ring parent (P-66.1.1.4.3 Blue Book example verbatim)
         ("O=CNc1ccc(C(=O)O)cc1", "4-formamidobenzoic acid"),
         ("CC(=O)Nc1ccc(C(=O)O)cc1", "4-acetamidobenzoic acid"),
