@@ -34,6 +34,54 @@ _SUPPORTED_SUFFIX_STYLES = {
     'one': 'locant', 'ol': 'locant', 'amine': 'locant', 'thiol': 'locant',
 }
 
+# v29 P7 Task 5.  An INLINE suffix ('one', 'ol', 'amine', 'thiol', 'imine')
+# adds no skeletal atom: it CONVERTS one parent-hydride atom into the
+# characteristic group, so its locant designates THAT atom and no other.
+#
+#   P-64.2.2.2 "Cyclic ketones" (BlueBookV2/BlueBookV2.md:28384 heading;
+#   sentence at :28386) -- "Names of cyclic ketones are formed substitutively
+#   by using the suffix 'one'.  As the formation of ketones is achieved by the
+#   conversion of a methylene, >CH2, group into a >C=O group, the suffix 'one'
+#   with appropriate locants can be added to the name of parent hydrides having
+#   such groups."   :28390 -- "Ketones resulting from the substitution of >CH2
+#   groups are named substitutively using the suffix 'one' to designate the
+#   principal characteristic group."   The section's own example is
+#   `bicyclo[3.2.1]octan-2-one (PIN)` (:28396) -- a von Baeyer ketone whose
+#   locant is the carbonyl carbon, not a neighbour of it.
+#
+# The FG SMARTS match is NOT a proxy for that atom.  The shipped ketone pattern
+# is `[#6][CX3](=O)[#6]` (perception/functional_groups.py:342), so a match also
+# contains BOTH flanking carbons; the previous `min(atom_to_locant[i] for i in
+# on_cage)` therefore cited whichever neighbour happened to number lowest.
+_INLINE_SUFFIX_CORES = frozenset({'one', 'ol', 'amine', 'thiol', 'imine'})
+
+
+def _inline_suffix_locant(pg, match, parent_set, atom_to_locant):
+    """Locant of the parent atom an inline suffix converts, or ``None``.
+
+    Delegates atom selection to ``rules.parent_selection._pg_attachment_atoms``
+    -- the primitive that already owns the "which atom of this SMARTS match
+    bears the locant" question, driven by ``seniority.PG_ATTACHMENT_INDICES``
+    (``ketone`` -> ``[1]``, the alcohol/thiol/amine family -> the carbon(s),
+    ``imine`` -> the SMARTS-leading carbon by default).  ``min()`` over the
+    survivors matches that primitive's documented contract for multi-position
+    groups such as ``secondary_amine`` -> ``[1, 2]``.
+
+    ``None`` means the characteristic atom is NOT on this parent -- e.g. an
+    acetyl carbon hanging off the chosen chain -- and the caller must refuse.
+    Citing the attachment atom's locant instead would both misplace the suffix
+    and swallow the acyl carbons into ``suffix_atoms``, emitting a name for a
+    strictly smaller molecule.
+    """
+    from ..rules.parent_selection import _pg_attachment_atoms
+
+    anchors = [i for i in _pg_attachment_atoms(pg, tuple(match))
+               if i in parent_set]
+    if not anchors:
+        return None
+    return min(atom_to_locant[i] for i in anchors)
+
+
 _MULT_SIMPLE = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
                 7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
 _MULT_COMPLEX = {2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis',
@@ -259,10 +307,22 @@ def _partition(mol, features, chain) -> Optional[dict]:
             on_chain = [i for i in match if i in chain_set]
             if not on_chain:
                 return _refuse("PG instance not on parent chain")
+            if suffix_core in _INLINE_SUFFIX_CORES:
+                # P-64.2.2.2 (:28386): an inline suffix CONVERTS a parent atom,
+                # so its locant is that atom's -- never a flanking atom of the
+                # SMARTS match, and never an attachment atom standing in for a
+                # characteristic carbon that is off the chain.
+                loc = _inline_suffix_locant(pg, match, chain_set,
+                                            atom_to_locant)
+                if loc is None:
+                    return _refuse(
+                        "inline suffix characteristic atom off parent chain")
+            else:
+                loc = min(atom_to_locant[i] for i in on_chain)
             suffix_atoms.update(i for i in match
                                 if i not in chain_set
                                 and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
-            pg_chain_locants.append(min(atom_to_locant[i] for i in on_chain))
+            pg_chain_locants.append(loc)
 
     try:
         subs = discover_substituents(
@@ -807,7 +867,14 @@ def _emit_ring_from_analysis(
                     continue
                 seen.add(key)
                 on_cage = [i for i in match if i in cage_set]
-                if on_cage:
+                if suffix_core in _INLINE_SUFFIX_CORES:
+                    # P-64.2.2.2 (:28386) -- see _inline_suffix_locant.
+                    loc = _inline_suffix_locant(pg, match, cage_set,
+                                                atom_to_locant)
+                    if loc is None:
+                        return _refuse(
+                            "inline suffix characteristic atom off cage")
+                elif on_cage:
                     loc = min(atom_to_locant[i] for i in on_cage)
                 else:
                     # appended suffix (e.g. -carboxylic acid): match sits fully
@@ -1257,7 +1324,14 @@ def name_general_monocycle(
                 continue
             seen.add(key)
             on_ring = [i for i in match if i in ring_set]
-            if on_ring:
+            if suffix_core in _INLINE_SUFFIX_CORES:
+                # P-64.2.2.2 (:28386) -- see _inline_suffix_locant.
+                loc = _inline_suffix_locant(pg, match, ring_set,
+                                            atom_to_locant)
+                if loc is None:
+                    return _refuse(
+                        "inline suffix characteristic atom off ring")
+            elif on_ring:
                 loc = min(atom_to_locant[i] for i in on_ring)
             else:
                 nbrs = [n.GetIdx()
