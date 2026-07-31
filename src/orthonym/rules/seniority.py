@@ -59,6 +59,40 @@ PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
     "primary_amine": [1],
     "secondary_amine": [1, 2],
     "tertiary_amine": [1, 2, 3],
+    # v29 P7 C2: the aromatic/enolic members of the same -ol/-amine family were
+    # left out of the Wave2 T3a block above, so they fell through to the
+    # default index 0 -- which for all three SMARTS is the HETEROATOM:
+    #   phenol         [OX2H][cX3]          -> 0 is O, the aromatic C is 1
+    #   aromatic_amine [NX3H2][cX3]         -> 0 is N, the aromatic C is 1
+    #   enol           [OX2H][CX3]=[CX3]    -> 0 is O, the hydroxy C is 1
+    # A heteroatom is never a parent-hydride skeletal atom, so every consumer
+    # asking "is the PG on this ring/chain, and at which locant?" got 'no'.
+    # After general_engine._inline_suffix_locant began refusing on an empty
+    # anchor set (Task 5, 5f46d505) that silently destroyed correct names.
+    #
+    # P-62.2.1.2 (BlueBookV2/BlueBookV2.md:26168) -- "Primary amines, R-NH2,
+    # are systematically named in the following ways: (1) by adding the suffix
+    # 'amine' to the name of the parent hydride".  The suffix attaches to the
+    # PARENT HYDRIDE; its examples are `quinolin-4-amine (PIN)` and
+    # `1-benzofuran-2-amine (PIN)` -- the locant is the ring carbon.
+    # P-63.1.2 "Systematic names of alcohols, phenols, enols, and ynols"
+    # (:26826) -- "(1) substitutively, using the suffix 'ol' ... the starting
+    # point and the direction of numbering ... are chosen so as to give lowest
+    # locants to the 'ol' suffixes"; `naphthalen-1-ol (PIN)` (:26820) and
+    # `2-nitrobenzene-1,3-diol (PIN)` cite ring carbons -- the hydroxy oxygen
+    # has no skeletal locant at all.
+    # P-14.3.3 "Citation of locants" (:2869) -- "the name 2-chloroethan-1-ol is
+    # the PIN": the '1' is the carbon bearing the -OH, not the oxygen.
+    "phenol": [1],
+    "aromatic_amine": [1],
+    "enol": [1],
+    # imine `[CX3]=[NX2;...]` ALREADY leads with the carbon, so [0] is exactly
+    # the default and this entry changes no behaviour today.  Pinned anyway:
+    # parent_selection.py:52 and general_engine.py:66 both assert "imine
+    # already leads with C" in prose, and that is an unenforced dependency on
+    # SMARTS atom order -- reordering the pattern would move every imine locant
+    # onto the nitrogen with no test to catch it.
+    "imine": [0],
 }
 
 # Functional group seniority order (highest priority first)
