@@ -126,11 +126,32 @@ def test_gate_disabled_never_reports_verified():
 # 5. the ContextVar is reset per molecule (a stale outcome must not leak)
 # --------------------------------------------------------------------------
 
+# The leak-sensitive probe PAIR, measured at `8d0cd594`. Both ship the exact
+# same string, and that collision is the point — see the test below.
+#   `[C-]#[O+]`  the gate SUPPRESSES the candidate to the descriptive fallback
+#                and records `suppressed` FOR 'unknown organic compound'.
+#   the C16H8 PAH ships 'unknown organic compound' having reached NO
+#                gate-recording branch at all, so its honest outcome is
+#                `not_run`. (5 of 60 pubchem_2000 rows land here; no EMITTED
+#                row does — a descriptive-fallback abstain is the realistic
+#                shape of "the gate was never invoked".)
+LEAK_PROBE_RECORDS = "[C-]#[O+]"
+LEAK_PROBE_NO_GATE = "C1=CC2=CC3=CC4=CC=CC5=C4C3=C2C1=C5"
+
+
 @pytest.mark.opsin_gate
-def test_outcome_does_not_leak_between_consecutive_molecules():
+def test_consecutive_molecules_each_report_their_own_gate_branch():
     """Two molecules named in sequence, in BOTH orders. Each reports its own
-    outcome — a contextvar left set by the previous molecule would mislabel the
-    next one."""
+    outcome.
+
+    NOTE — this test does NOT exercise `clear_provenance`'s reset: both probes
+    hit a real gate-recording branch on every call, so the contextvar is
+    legitimately overwritten whether or not the reset runs (confirmed by
+    mutation testing). It pins that the recording sites are wired to the right
+    exits. The reset is covered by
+    `test_stale_outcome_cannot_leak_onto_a_molecule_the_gate_never_saw` below
+    and by `test_clear_provenance_resets_the_gate_outcome`.
+    """
     nm = Orthonym()
 
     first = nm.name_tiered("CC=C.C=C.[Ti+2]")          # carve-out
@@ -144,6 +165,61 @@ def test_outcome_does_not_leak_between_consecutive_molecules():
     assert third["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert fourth["gate_outcome"] == "carveout:organometallic_additive"
     assert "SELF-01" not in fourth["gates_passed"]
+
+
+@pytest.mark.opsin_gate
+def test_stale_outcome_cannot_leak_onto_a_molecule_the_gate_never_saw():
+    """`name_tiered` must RESET the gate contextvar per molecule.
+
+    `resolve_gate_outcome`'s deny-by-default name guard is not sufficient on
+    its own: it only rejects a stale outcome recorded for a *different* string.
+    This probe pair defeats that guard deliberately — the recorder molecule
+    records `suppressed` FOR the very string the second molecule ships — so
+    `clear_provenance` is the ONLY thing standing between the second row and
+    the first molecule's verdict.
+
+    With the reset, the second row honestly says the gate never ran. Without
+    it, the row claims the gate examined this molecule and suppressed a
+    candidate, which never happened. Verified by mutation: deleting the two
+    `_GATE_OUTCOME*` lines from `clear_provenance` makes this test FAIL
+    (`assert 'suppressed' == 'not_run'`).
+    """
+    nm = Orthonym()
+
+    # (a) The recorder molecule records an outcome, and records it FOR the
+    #     string it ships. Asserted, not assumed: if a future change breaks
+    #     the collision the failure lands HERE with a clear message rather
+    #     than silently turning this test back into a tautology.
+    recorder = nm.name_tiered(LEAK_PROBE_RECORDS)
+    live = pv.get_provenance()
+    assert live["gate_outcome"] == pv.GATE_OUTCOME_SUPPRESSED, (
+        f"probe pair broken: {LEAK_PROBE_RECORDS} no longer records "
+        f"`suppressed` (got {live['gate_outcome']!r}) — pick a new recorder")
+    assert live["gate_outcome_name"] == recorder["name"], (
+        "probe pair broken: the recorded outcome must belong to the SHIPPED "
+        "string, otherwise the name guard — not the reset — is what blocks "
+        "the leak")
+
+    # (b) The second molecule reaches NO gate-recording branch, and ships the
+    #     SAME string, so the name guard cannot fire.
+    ungated = nm.name_tiered(LEAK_PROBE_NO_GATE)
+    assert ungated["name"] == recorder["name"], (
+        f"probe pair broken: {LEAK_PROBE_NO_GATE} must ship the same string "
+        f"as the recorder ({recorder['name']!r}) for the name guard to be "
+        f"neutralised; got {ungated['name']!r} — pick a new pair")
+
+    # (c) THE LEAK-SENSITIVE ASSERTION. Fails as `suppressed != not_run` if
+    #     the reset is removed.
+    assert ungated["gate_outcome"] == pv.GATE_OUTCOME_NOT_RUN, (
+        f"stale gate outcome leaked onto the next molecule: expected "
+        f"{pv.GATE_OUTCOME_NOT_RUN!r}, got {ungated['gate_outcome']!r} — "
+        f"`clear_provenance` did not reset the contextvar")
+    assert "SELF-01" not in ungated["gates_passed"]
+
+    # (d) The reverse order must not leak either: the recorder still reports
+    #     its own outcome after the ungated molecule left `not_run` behind.
+    again = nm.name_tiered(LEAK_PROBE_RECORDS)
+    assert again["gate_outcome"] == pv.GATE_OUTCOME_SUPPRESSED
 
 
 def test_clear_provenance_resets_the_gate_outcome():

@@ -191,8 +191,17 @@ def main(args: List[str] = None) -> int:
         action="store_true",
         default=False,
         help=(
-            "Emit {name,tier,is_pin,source,opsin,gates_passed} JSON "
-            "instead of the bare name (v25 G3)."
+            "Emit the provenance row as JSON instead of the bare name "
+            "(v25 G3): {name,tier,is_pin,source,opsin,gates_passed,"
+            "gate_outcome,formula,limit_code,stereo_unexpressed}. "
+            "'opsin' is one of verified / verified_constitution_only "
+            "(v29 P7: SELF-01 judged a stereo-STRIPPED parse, so the "
+            "constitution is verified and the stereo layer is NOT) / "
+            "unverified / n/a. 'gate_outcome' (v29 P7) reports what the "
+            "OPSIN validity gate ACTUALLY DID for this name -- "
+            "self01_verified, not_run, bypassed, suppressed, "
+            "gate_disabled, unavailable, carveout:<slug>, ... -- rather "
+            "than merely whether an OPSIN jar was present."
         ),
     )
     parser.add_argument(
