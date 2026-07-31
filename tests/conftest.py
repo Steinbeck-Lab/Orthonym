@@ -255,28 +255,129 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: Full 100k validation suite"
     )
+    config.addinivalue_line(
+        "markers",
+        "opsin_gate: run this test with the OPSIN validity gate ENABLED "
+        "(it is disabled suite-wide by default). Skips if the OPSIN jar is "
+        "absent, because the gate fails OPEN without it."
+    )
 
 
 # ============================================================================
-# Phase 146 RESEARCH §8.4 — thread-local cleanup auto-fixture.
-# Prevents state leakage when later plans introduce monkeypatch.setenv
-# + importlib.reload patterns for V17/V18 parametrized testing
-# (test_feature_flag.py, test_score_based_mode.py).
+# The OPSIN validity gate in tests — declarative, and never silently blind.
 # ============================================================================
-@pytest.fixture(autouse=True)
-def _disable_opsin_validity_gate_for_tests(monkeypatch):
-    """SUB-03/D-13: the OPSIN-parse validity gate is default-ON in production,
-    but the test suite asserts RAW output (incl. some deliberately-malformed
-    names) and must not pay a per-name OPSIN subprocess. Disable the gate by
-    default for every test; the gate's own tests (test_opsin_validity_gate.py)
-    re-enable it via monkeypatch. Best-effort — a missing attr never breaks a
-    test (raising=False)."""
+# The gate is default-ON in production: suppressing a name OPSIN cannot parse,
+# or that OPSIN parses to a DIFFERENT molecule (SELF-01), is the whole point of
+# it. The suite disables it by default because most tests assert RAW generator
+# output — some deliberately malformed — and must not pay a per-name OPSIN call.
+#
+# That default is a TRAP, and it has been sprung. A test written *about* gate
+# behaviour is green-but-blind unless it re-enables the gate, and nothing says
+# so. Measured 2026-07-31 on the canary `CC(=O)N(CC1CO1)C(C)C`:
+#
+#     gate OFF -> '(5-carbamoylpentyl)oxirane'   <- a DIFFERENT molecule
+#     gate ON  -> 'unknown organic compound'     <- SELF-01 suppressed it
+#
+# so "assert this molecule abstains" passes for the wrong reason with the gate
+# off, and would keep passing if the gate were deleted outright.
+#
+# There is now exactly ONE supported way to ask for the gate:
+#
+#     pytestmark = pytest.mark.opsin_gate       # module-wide, or
+#     @pytest.mark.opsin_gate                   # per-test, or
+#     def test_x(opsin_gate): ...               # fixture form
+#
+# and it is VERIFIED rather than merely requested. Two silent-failure modes are
+# closed:
+#
+#   1. A rename of the flag. The old `raising=False` meant a rename would turn
+#      every re-enable in the suite into a no-op at once, silently. The setattr
+#      below raises.
+#   2. A missing OPSIN jar. `_final_opsin_validity_gate` fails OPEN when the jar
+#      is absent (D-13), so "gate on, no jar" is the same blind state by another
+#      route — and a worktree checkout has no jar (the `opsin` gitlink has no
+#      .gitmodules to fetch from). `pytest_runtest_call` below skips those tests
+#      instead of passing them.
+#
+# (2) is enforced at the hook level rather than in the fixture, so it also covers
+# the ~36 legacy files that still hand-roll
+# `monkeypatch.setattr(namer, "_DISABLE_VALIDITY_GATE", False)`. Those keep
+# working; the marker is the way to write new ones.
+# ============================================================================
+
+_GATE_FLAG = "_DISABLE_VALIDITY_GATE"
+
+
+def _opsin_jar_present() -> bool:
+    """True when the validity gate can actually reach OPSIN.
+
+    Mirrors `namer._validity_gate_jar_present` rather than calling it, so this
+    stays a test-side observation of the same fact and does not depend on the
+    gate module's own import graph being healthy.
+    """
+    try:
+        from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+        return _find_opsin_jar() is not None
+    except Exception:
+        return False
+
+
+def _gate_is_on() -> bool:
+    """Read the live flag. Absent module/attr counts as gate-off (not blind)."""
     try:
         import orthonym.namer as _namer
-        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", True, raising=False)
+        return getattr(_namer, _GATE_FLAG) is False
     except Exception:
-        pass
+        return False
+
+
+@pytest.fixture(autouse=True)
+def _opsin_validity_gate_state(request, monkeypatch):
+    """Set the gate per test: OFF by default, ON under the `opsin_gate` marker.
+
+    Note `raising` is left at its default True — a rename of the flag must be a
+    loud AttributeError here, not a suite-wide silent no-op.
+    """
+    import orthonym.namer as _namer
+
+    wants_gate = (
+        request.node.get_closest_marker("opsin_gate") is not None
+        or "opsin_gate" in request.fixturenames
+    )
+    monkeypatch.setattr(_namer, _GATE_FLAG, not wants_gate)
     yield
+
+
+@pytest.fixture
+def opsin_gate(_opsin_validity_gate_state):
+    """Fixture form of `@pytest.mark.opsin_gate`, for tests that prefer to
+    request it. The autouse fixture above sees this in `request.fixturenames`
+    and has already enabled the gate; this only asserts that it did."""
+    import orthonym.namer as _namer
+    assert getattr(_namer, _GATE_FLAG) is False, (
+        "the opsin_gate fixture did not enable the gate — the autouse "
+        "fixture's fixturenames check has broken"
+    )
+    return True
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item):
+    """Refuse to run a gate-ON test blind.
+
+    Runs after every fixture has been set up, so it observes the gate state the
+    test body will actually see — whether that came from the `opsin_gate`
+    marker or from a legacy hand-rolled monkeypatch. With the gate on but no
+    jar, `_final_opsin_validity_gate` returns the name unchanged (D-13
+    fail-OPEN) and the test asserts nothing about the gate.
+    """
+    if _gate_is_on() and not _opsin_jar_present():
+        pytest.skip(
+            "OPSIN jar absent: the validity gate fails OPEN without it (D-13), "
+            "so this gate-enabled test would be green-but-blind. Build/fetch "
+            "the OPSIN jar to run it."
+        )
+    return (yield)
 
 
 @pytest.fixture(autouse=True)

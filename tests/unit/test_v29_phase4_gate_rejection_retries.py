@@ -27,18 +27,15 @@ from orthonym import Orthonym
 from orthonym.errors import _DESCRIPTIVE_FALLBACK_NAMES
 
 
-@pytest.fixture(autouse=True)
-def _reenable_the_validity_gate(monkeypatch):
-    """⚠ REQUIRED. ``tests/conftest.py`` has an autouse fixture that disables the
-    OPSIN validity gate suite-wide (it asserts raw output and will not pay a
-    per-name OPSIN call). Phase 4 is *defined* by what happens on a gate
-    rejection, so with the gate off every test here is green-but-blind — and
-    worse, ``CC(=O)N(CC1CO1)C(C)C`` then SHIPS `(5-carbamoylpentyl)oxirane`, a
-    different molecule, because nothing suppresses it. Re-enable it here.
-    """
-    import orthonym.namer as _namer
-    monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-    yield
+# ⚠ REQUIRED. ``tests/conftest.py`` disables the OPSIN validity gate suite-wide
+# (most tests assert raw output and will not pay a per-name OPSIN call). Phase 4
+# is *defined* by what happens on a gate rejection, so with the gate off every
+# test here is green-but-blind — and worse, ``CC(=O)N(CC1CO1)C(C)C`` then SHIPS
+# `(5-carbamoylpentyl)oxirane`, a different molecule, because nothing suppresses
+# it. The marker re-enables the gate, and additionally SKIPS if the OPSIN jar is
+# absent — without a jar the gate fails OPEN (D-13) and these tests would be
+# blind a second way. See ``tests/unit/test_opsin_gate_test_harness.py``.
+pytestmark = pytest.mark.opsin_gate
 
 # A ceramide that abstained before Phase 4: its first-matching class produced a
 # name the gate rejected, and the molecule died there. A later class names it
