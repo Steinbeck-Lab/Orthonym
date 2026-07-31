@@ -96,3 +96,86 @@ def test_mixed_prefix_suffix_biaryl(smiles, expected):
 def test_mixed_builder_no_overreach_without_pcg(smiles, expected):
     assert name_compound(smiles, style="pin") == expected
     assert RAW.name(smiles) == expected
+
+
+# ---------------------------------------------------------------------------
+# v29 P7 gate regression (introduced b0ec23eb, fixed here).
+#
+# b0ec23eb hoisted ``if any(s['name'] is None ...): return None`` to the top of
+# ``name_ring_assembly``. But ``s['name']`` is ONE producer's opinion
+# (``_name_substituent``); ``_mixed_ring_assembly_prefix_name`` names a whole
+# further set. Nitro gets None from the first and 'nitro' from the second, so
+# the blanket check killed the assembly before the producer that could spell it
+# ever ran -- regressing the P2-RING-ASSEMBLY-MIXED gold target to
+# 'unknown organic compound'. The abstention belongs at the veto loop,
+# immediately before ``s['name']`` is spelled into the prefix string.
+#
+# P-61.5.1 "Nitro and nitroso compounds" (BB:25933): "Compounds containing the
+# -NO2 or -NO group are named by means of the prefixes 'nitro' and 'nitroso',
+# respectively, unless these groups can be named on the basis of the parent
+# structures nitric and nitrous acids, NO2-OH and NO-OH, respectively, or their
+# corresponding esters, anhydrides, amides and hydrazides." A -NO2 on a ring
+# assembly therefore always HAS a preferred prefix form; abstaining was never
+# nomenclaturally correct.
+#
+# P-28.2.1 "Ring assemblies with a single bond junction" (BB:15560): "Each
+# cyclic system is numbered in the traditional way, one with unprimed locants,
+# the other with primed locants. Lowest possible locants must be used to denote
+# the positions of attachment. These locants must be cited in preferred IUPAC
+# names" -- the [1,1'-biphenyl] parent and its primed locant set.
+# ---------------------------------------------------------------------------
+def test_name_substituent_none_does_not_veto_a_group_another_producer_names():
+    """Pin the producer disagreement itself, not just the emitted name.
+
+    A whole-molecule assertion alone would go green again if someone moved the
+    blanket check somewhere else that still ran before the mixed prefix
+    builder. Asserting both producers directly pins the actual invariant:
+    ``_name_substituent`` returning None is NOT evidence the group is
+    un-nameable.
+    """
+    from rdkit import Chem
+    from orthonym.rules import ring_assemblies as RA
+
+    mol = Chem.MolFromSmiles(
+        "[N+](=O)([O-])C1=CC=C(C=C1)C1=CC=C(C=C1)C(=O)O")
+    assert mol is not None
+    match = mol.GetSubstructMatch(Chem.MolFromSmarts("[N+](=O)[O-]"))
+    assert len(match) == 3, "nitro SMARTS must match exactly the -NO2 atoms"
+    attach = match[0]  # the nitrogen carries the bond to the ring
+    assert mol.GetAtomWithIdx(attach).GetSymbol() == 'N'
+
+    # Producer A cannot name it ...
+    assert RA._name_substituent(mol, list(match), attach) is None
+    # ... producer B can, which is exactly why the assembly must not abort.
+    assert RA._mixed_ring_assembly_prefix_name(
+        mol, list(match), attach, None) == 'nitro'
+
+
+# Every category ``_mixed_ring_assembly_prefix_name`` claims to support, each
+# paired with a carboxylic-acid suffix so the group is forced down the PREFIX
+# path. A guard that gates N categories must be probed on all N: the blanket
+# check would have taken out any of these whose group makes _name_substituent
+# return None, and only the nitro row was covered before.
+@pytest.mark.parametrize("smiles,expected", [
+    ("O=Cc1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "4'-formyl[1,1'-biphenyl]-4-carboxylic acid"),
+    ("N#Cc1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "4'-cyano[1,1'-biphenyl]-4-carboxylic acid"),
+    ("Nc1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "4'-amino[1,1'-biphenyl]-4-carboxylic acid"),
+    ("Oc1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "4'-hydroxy[1,1'-biphenyl]-4-carboxylic acid"),
+    ("Clc1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "4'-chloro[1,1'-biphenyl]-4-carboxylic acid"),
+    ("Cc1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "4'-methyl[1,1'-biphenyl]-4-carboxylic acid"),
+    ("COc1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "4'-methoxy[1,1'-biphenyl]-4-carboxylic acid"),
+    # Same-kind pair: routes through the single-suffix branch, which never
+    # consults s['name'] at all -- the blanket check was wrong there too.
+    ("OC(=O)c1ccc(cc1)-c1ccc(cc1)C(=O)O",
+     "[1,1'-biphenyl]-4,4'-dicarboxylic acid"),
+])
+def test_mixed_prefix_supported_set_every_category(smiles, expected):
+    assert name_compound(smiles, style="pin") == expected
+    assert RAW.name(smiles) == expected

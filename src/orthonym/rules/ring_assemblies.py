@@ -2019,12 +2019,21 @@ def name_ring_assembly(
     # branch, the P-28.3.1 citation-order tiebreak, and the prefix builder).
     substituent_list = _get_substituent_info(mol, ring_systems, connections)
 
-    # Fail closed on an unnameable substituent. ``_name_substituent`` returns
-    # None when no prefix form exists; there is no legal way to spell such a
-    # group, so the assembly name cannot be built and must be abstained from
-    # rather than completed with a placeholder word.
-    if any(s.get('name') is None for s in substituent_list):
-        return None
+    # ⚠ Do NOT hoist a ``s['name'] is None`` abstention to here. ``s['name']``
+    # is ONE producer's opinion (``_name_substituent``), not the question
+    # "is this group nameable". Two builders below name substituents WITHOUT
+    # consulting it -- the single-kind PCG suffix branch, which expresses the
+    # group as a SUFFIX and so legitimately needs no prefix form at all, and
+    # ``_build_mixed_pcg_ring_assembly`` via
+    # ``_mixed_ring_assembly_prefix_name`` (carboxy/formyl/cyano/amino/hydroxy,
+    # nitro, halogen, alkyl, alkoxy). A blanket check here short-circuits both.
+    # The abstention belongs where the prefix-only path actually consumes
+    # ``s['name']`` -- see the veto loop below, which has fail-closed on a
+    # missing name since c6b9f6ba (P-29.2). v29 P7 T4 (b0ec23eb) added the
+    # hoisted duplicate and it cost the P2-RING-ASSEMBLY-MIXED gold target
+    # (4'-nitro[1,1'-biphenyl]-4-carboxylic acid -> abstention): nitro reaches
+    # ``_name_substituent`` first, gets None, and the assembly died before the
+    # producer that spells 'nitro' ever ran.
 
     # P-28.2.1 (connection/"free valence" locant) + P-31.1.4.3.4 (lowest
     # locants to substituents): for a 2-component assembly, decide ONCE,
@@ -2261,6 +2270,13 @@ def name_ring_assembly(
         # double/triple and no prefix spells that free valence. Refuse for the
         # same reason as the two cases above -- a name built around a missing
         # or single-valence token describes a different molecule.
+        #
+        # This is the ONE correct home for the missing-name abstention, and it
+        # is load-bearing: it is the last statement before ``s['name']`` is
+        # actually spelled into the prefix string below, and everything above
+        # it (the suffix and mixed prefix+suffix builders) can still name a
+        # group this producer could not. Do not hoist it -- see the note at
+        # ``substituent_list = _get_substituent_info(...)``.
         if not _s.get('name'):
             return None
 
