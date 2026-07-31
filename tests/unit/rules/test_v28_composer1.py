@@ -60,8 +60,22 @@ def test_detach_and_name_isolated_cage_fragment():
     "CC(C)(C)Sc1ccc(-c2nc3ccccc3c(=O)[nH]2)cc1", # benzene core + -S-C(CH3)3 decoration
 ])
 def test_decorated_ring_substituent_emits_via_engine(smi):
+    """A decorated ring substituent must EMIT — that is what this test protects.
+
+    v29 Phase 6 relaxed the provenance assertion from `== "general_engine"` to
+    "engine or better". The tert-butylsulfanyl case now resolves on the PIN path
+    as `2-[4-(tert-butylsulfanyl)phenyl]quinazolin-4(3H)-one` (T1, round-trips to
+    the input) because the decorated-CARBOCYCLIC producer added in Phase 6 can
+    now supply `4-(tert-butylsulfanyl)phenyl`, letting the PIN path complete
+    instead of falling through to the best-effort engine.
+
+    That is a T4 -> T1 PROMOTION, i.e. the outcome this project wants, so
+    pinning the source to `general_engine` would be pinning the weaker result.
+    The first parameter still exercises the engine path (T3), so engine coverage
+    is not lost.
+    """
     row = _be().name_tiered(smi)
-    assert row["source"] == "general_engine", row
+    assert row["source"] in ("general_engine", "pin_path"), row
     assert row["name"] and "unknown" not in row["name"] and " substituent" not in row["name"]
 
 

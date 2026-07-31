@@ -513,6 +513,38 @@ _DECO_MULT: Dict[int, str] = {
 }
 
 
+# P-16.3.3: a decoration prefix that is itself SUBSTITUTED takes enclosing
+# marks. `needs_brackets` catches the locant/hyphen forms; it does NOT catch a
+# prefix built by multiplying another prefix, and that is the common case here:
+# the Blue Book writes `(dimethylamino)` **24 times and never once unbracketed**
+# (`grep -c "(dimethylamino)" BlueBookV2.md` = 24; `[0-9]-dimethylamino[a-z]` = 0),
+# because `4-dimethylaminophenyl` could otherwise read as di(methylamino).
+#
+# Restricted to a multiplier followed by a stem the multiplier could plausibly be
+# multiplying. Prefixes that merely BEGIN with those letters and are atomic
+# — diazo, diazenyl, dioxolan… — are listed as exceptions rather than guessed at,
+# since wrapping a simple prefix is itself a spelling error.
+_DECO_MULTIPLIERS = ('di', 'tri', 'tetra', 'penta', 'hexa', 'bis', 'tris',
+                     'tetrakis')
+_DECO_MULT_FALSE_FRIENDS = frozenset({
+    'diazo', 'diazenyl', 'diazanyl', 'diazinyl', 'dioxo', 'dithio',
+    'trityl', 'triazenyl', 'triazolyl', 'tetrazolyl', 'diyl', 'triyl',
+})
+
+
+def _enclose_decoration(nm: str) -> str:
+    """Enclosing marks for one decoration prefix, per P-16.3.3."""
+    from ..assembly.naming_utils import needs_brackets as _nb
+    if not nm or nm[0] in '([':
+        return nm
+    if nm in _DECO_MULT_FALSE_FRIENDS:
+        return nm
+    composite = _nb(nm) or any(
+        nm.startswith(m) and len(nm) > len(m) for m in _DECO_MULTIPLIERS
+    )
+    return f"({nm})" if composite else nm
+
+
 def _decorated_heteroaryl_substituent_name(
     mol,
     frag_atoms,
@@ -545,6 +577,23 @@ def _decorated_heteroaryl_substituent_name(
 
     het_atoms = [i for i in ring_list if mol.GetAtomWithIdx(i).GetSymbol() != 'C']
 
+    # v29 Phase 6: CARBOCYCLIC (benzene) rings have no heteroaryl stem, so a
+    # DECORATED PHENYL substituent had no producer at all and fell straight
+    # through to DROP-24 — even though it is among the commonest shapes in
+    # drug-like space. Measured on the Phase 5 corpus, every one of these was
+    # unnameable at EVERY ring attachment point:
+    #     CN(C)c1ccccc1      -> 4-(dimethylamino)phenyl
+    #     NS(=O)(=O)c1ccccc1 -> 4-sulfamoylphenyl
+    #
+    # P-29.3.5: the free valence of a benzene substituent is position 1 and its
+    # locant is NOT cited — the retained prefix is 'phenyl', never 'benzen-1-yl'
+    # — after which the decorations take the lowest locants. The numbering
+    # cascade below already produces exactly that for a carbocycle: with no
+    # heteroatoms and no indicated H the sort key degenerates to
+    # (fv_loc, deco_locs), so the free valence wins position 1 and the
+    # decorations are minimised against it. Only the CORE spelling differs.
+    is_carbocyclic = (ring_name == 'benzene' and not het_atoms)
+
     # Aromatic simple monocycle: each ring atom has exactly two in-ring neighbours.
     if not all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_list):
         return None
@@ -562,7 +611,7 @@ def _decorated_heteroaryl_substituent_name(
         n_idx = [i for i in het_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
         if len(n_idx) == 2 and mol.GetBondBetweenAtoms(n_idx[0], n_idx[1]) is not None:
             stem = 'pyrazol'
-    if stem is None:
+    if stem is None and not is_carbocyclic:
         return None
 
     # Indicated hydrogen: a ring NH (only when an actual H is present — an
@@ -664,12 +713,21 @@ def _decorated_heteroaryl_substituent_name(
         mult = _DECO_MULT.get(len(locs))
         if mult is None:
             return None
-        text = f"{','.join(str(l) for l in locs)}-{mult}{nm}"
+        text = f"{','.join(str(l) for l in locs)}-{mult}{_enclose_decoration(nm)}"
         prefix_parts.append((_alpha(nm), text))
     prefix_parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in prefix_parts)
     ih = f"{ih_locant}H-" if indicated_h_atom is not None else ""
-    core = f"{ih}{stem}-{attach_locant}-yl"
+    if is_carbocyclic:
+        # P-29.3.5: 'phenyl', with the free valence at 1 and its locant elided.
+        # The guard is not decorative — if the cascade ever failed to place the
+        # free valence at 1 the elided locant would name a DIFFERENT molecule,
+        # so fail closed rather than emit an unlocanted prefix.
+        if attach_locant != 1 or indicated_h_atom is not None:
+            return None
+        core = "phenyl"
+    else:
+        core = f"{ih}{stem}-{attach_locant}-yl"
     # Hyphen between the last prefix and the stem only when the stem/indicated-H
     # tail is digit-initial (e.g. '-1H-pyrazol...'); elide before a letter-initial
     # stem ('dimethylpyrazol...').
