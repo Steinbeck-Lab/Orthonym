@@ -63,6 +63,41 @@ def _is_ring_ester(features: Any) -> bool:
     return True
 
 
+def _functional_class_name(features: Any) -> Optional[str]:
+    """P-65.6.3.2.1 functional-class name for a mono-ester, or None.
+
+    P-65.6.3.2.1 "General methodology": *"All preferred IUPAC names for esters
+    are named by functional class nomenclature."* So `cyclohexyl acetate`, not
+    the substitutive `acetyloxycyclohexane` this handler otherwise builds.
+
+    The acyloxy-prefix form is licensed by P-65.6.3.2.3 "Esters cited as
+    prefixes" in two situations, and NEITHER can hold here:
+
+      * *"another group is present that has priority for citation as the
+        principal group"* — impossible: `_is_ring_ester` requires
+        ``principal_group == 'ester'``, and every group that outranks an ester
+        in the P-41 seniority order would have been chosen as the PG instead.
+        (This is exactly the case in P-65.6.3.3.6's example
+        ``CH3-CO-O-C6H4-COOH`` -> `4-(acetyloxy)benzoic acid` (PIN): there the
+        carboxylic acid is senior, so the PG is not the ester and this handler
+        does not fire.)
+      * *"when all ester groups cannot be described by the methods prescribed
+        for naming esters"* — that is precisely the fall-back below, taken when
+        this function returns None.
+
+    Restricted to the single-ester case; a ring carrying several ester groups
+    is left to the prefix assembler, which can express all of them.
+    """
+    from ...rules.esters import find_ester_match, name_ester
+    try:
+        match = find_ester_match(features.mol)
+        if match is None:
+            return None
+        return name_ester(features.mol, match) or None
+    except Exception:
+        return None
+
+
 def name_ring_ester(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
@@ -83,7 +118,9 @@ def name_ring_ester(
     if not exocyclic:
         return None
 
-    ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
+    ring_ester_name = _functional_class_name(features) if len(exocyclic) == 1 else None
+    if ring_ester_name is None:
+        ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
     if not ring_ester_name:
         return None
 

@@ -46,19 +46,24 @@ def _opsin_parse(name: str) -> str:
 class TestRingEsterPrefixJoining:
     """EL-01: Ring ester prefixes use hyphen joining with locants."""
 
-    def test_single_acyloxy_benzene(self):
-        """Single acyloxy on benzene -- no locant needed."""
-        result = name_compound("CC(=O)Oc1ccccc1")
-        assert result is not None
-        assert "acetyloxy" in result
-        assert "benzene" in result
+    def test_single_ester_is_functional_class_not_an_acyloxy_prefix(self):
+        """A MONO-ester with no senior group is functional class, not a prefix.
 
-    def test_single_acyloxy_cyclohexane(self):
-        """Single acyloxy on cyclohexane."""
-        result = name_compound("CC(=O)OC1CCCCC1")
-        assert result is not None
-        assert "acetyloxy" in result
-        assert "cyclohexane" in result
+        Updated in v29 Phase 5. This previously asserted `acetyloxybenzene`.
+        P-65.6.3.2.1 "General methodology": "All preferred IUPAC names for
+        esters are named by functional class nomenclature." The acyloxy prefix
+        is licensed by P-65.6.3.2.3 only when a senior group is present or the
+        ester cannot otherwise be named; here the ester IS the principal group
+        and it names cleanly, so the PIN is the two-word form.
+
+        The prefix-joining behaviour this class exists to cover is still
+        exercised by the multi-acyloxy tests below, which are unaffected.
+        """
+        assert name_compound("CC(=O)Oc1ccccc1") == "phenyl acetate"
+
+    def test_single_ester_on_cyclohexane_is_functional_class(self):
+        """As above: `cyclohexyl acetate` (PIN), not `acetyloxycyclohexane`."""
+        assert name_compound("CC(=O)OC1CCCCC1") == "cyclohexyl acetate"
 
     def test_different_acyloxy_benzene(self):
         """Two different acyloxy prefixes on benzene have locants and hyphens."""
@@ -214,13 +219,15 @@ class TestEsterOPSINRoundTrip:
         opsin_smi = _opsin_parse(name)
         assert opsin_smi, f"OPSIN failed to parse: {name!r}"
 
-    def test_format_acetyloxybenzene_no_hyphens_missing(self):
-        """Acetyloxybenzene format is correct (no stray hyphens)."""
+    def test_format_phenyl_acetate_no_hyphens_missing(self):
+        """Format is clean (no stray hyphens).
+
+        Updated in v29 Phase 5: this molecule is now the functional-class PIN
+        `phenyl acetate` (P-65.6.3.2.1), not `acetyloxybenzene`. The format
+        assertion — the actual point of the test — is retained.
+        """
         name = name_compound("CC(=O)Oc1ccccc1")
-        assert name is not None
-        assert "acetyloxy" in name
-        assert "benzene" in name
-        # Should not have double hyphens or misplaced characters
+        assert name == "phenyl acetate"
         assert "--" not in name
 
     def test_format_multi_acyloxy_has_parentheses(self):

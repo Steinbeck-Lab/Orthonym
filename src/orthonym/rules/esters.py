@@ -551,6 +551,46 @@ def _name_alkyl_fragment_with_unsaturation(
     return None
 
 
+def _ester_attachment_atom(mol, alkyl_set: set) -> Optional[int]:
+    """The alkyl-fragment atom bonded to the ester chalcogen.
+
+    `parse_ester_fragments` cuts at the ester O (or S/Se/Te), so the fragment
+    has exactly one atom with a neighbour outside it. If that is not true the
+    caller was handed something other than a clean alcohol component — return
+    None and let the legacy path decide rather than guessing an attachment.
+    """
+    external = [
+        idx for idx in sorted(alkyl_set)
+        if any(nbr.GetIdx() not in alkyl_set
+               for nbr in mol.GetAtomWithIdx(idx).GetNeighbors())
+    ]
+    return external[0] if len(external) == 1 else None
+
+
+def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
+    """Name the alcohol component with the centralized substituent primitive.
+
+    Returns the raw organyl word (`2-methylpropyl`, `cyclohexyl`,
+    `(2S)-butan-2-yl`) or None when the primitive declines — including when it
+    declines a ring-bearing fragment, which it does deliberately rather than
+    anchoring a free valence it cannot place (see the DROP-24 guard in
+    assembly/substituent_naming.py).
+    """
+    attach = _ester_attachment_atom(mol, alkyl_set)
+    if attach is None:
+        return None
+    try:
+        from ..assembly.substituent_naming import name_substituent_fragment
+        parent = sorted(set(range(mol.GetNumAtoms())) - alkyl_set)
+        return name_substituent_fragment(
+            mol, sorted(alkyl_set), attach, parent
+        ) or None
+    except Exception:
+        # The primitive is a large recursive surface; a failure here must
+        # degrade to the legacy word, never break ester naming outright.
+        return None
+
+
 def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
     """
     Get the alkyl name from the alkyl fragment.
@@ -593,6 +633,25 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
             break
     if has_ring and _has_nonring_unsat:
         return ""
+
+    # --- v29 Phase 5: delegate to the centralized substituent primitive -----
+    # Everything below this point derives the organyl word from a CARBON COUNT
+    # plus a branch check that only looks at the attachment carbon. Branching
+    # anywhere else is silently lost, so CC(=O)OCC(C)C (isobutyl) came out
+    # 'butyl' and CC(=O)OC1CCCCC1 came out 'hexyl' — different molecules, saved
+    # only by SELF-01 suppressing them into an abstention.
+    #
+    # name_substituent_fragment is the project's documented "centralized entry
+    # point for all substituent naming" and handles branching, rings,
+    # unsaturation, attachment position and stereo. Measured over 20 acetate
+    # esters: 12 words identical, 8 different, and in all 8 the count-based
+    # word was the WRONG MOLECULE while the primitive's was right.
+    #
+    # The legacy path stays as the fallback for fragments the primitive
+    # declines, so nothing it already named correctly can regress.
+    _primitive = _alkyl_name_via_substituent_primitive(mol, alkyl_set)
+    if _primitive:
+        return _primitive
 
     if has_ring:
         # Try to name the ring-containing alkyl fragment
