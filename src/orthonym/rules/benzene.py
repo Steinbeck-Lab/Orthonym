@@ -3135,9 +3135,21 @@ def benzene_prefix_citation_locants(
             if name:
                 by_name[name].append(i + 1)
 
+    # Ordered by the SHARED total order, not by the raw ``alpha_sort_key``
+    # string. P-14.5's preamble (:3442) makes this a two-stage comparison --
+    # "Nonitalic Roman letters are considered first ... When all the Roman
+    # letters are identical, the set of locants ... are compared" -- and a single
+    # key string conflates the stages, because it still carries digits and,
+    # before the enclosing-mark strip, brackets. `4-[(1R)-1-chloroethyl]phenoxy`
+    # keyed as `1-chloroethylphenoxy`, whose leading '1' (ASCII 49) sorts under
+    # every letter, so it was cited ahead of `chloroethyl` and took locant 1 --
+    # the wrong numbering for gold row W2F-P8-01. `prefix_citation_sort_key`
+    # separates the stages (letters, then locants, then P-14.4(j) configuration)
+    # and is the same authority the rest of the cascade consults.
+    from ..assembly.naming_utils import prefix_citation_sort_key
     return tuple(
         tuple(sorted(by_name[name]))
-        for name in sorted(by_name, key=alpha_sort_key)
+        for name in sorted(by_name, key=prefix_citation_sort_key)
     )
 
 
@@ -3625,9 +3637,17 @@ def name_substituted_benzene(
         mol, oriented_ring, {}, prefix_groups, stereo_descriptors
     )
 
-    # Build prefix strings, sorted alphabetically by substituent name
+    # Build prefix strings in P-14.5 citation order. Uses the shared TOTAL order
+    # rather than the raw `alpha_sort_key` string: P-14.5 (:3442) compares
+    # nonitalic Roman letters FIRST and only then locants, and a single key
+    # string conflates the two because it still carries digits. That is what
+    # cited `4-[(1R)-1-chloroethyl]phenoxy` (key `1-chloroethylphenoxy`, leading
+    # '1' = ASCII 49) ahead of `chloroethyl`. The citation order here must agree
+    # with `benzene_prefix_citation_locants`, which assigns the locants under
+    # P-14.4(g) -- if the two disagree the name's order and its numbering come
+    # from different rules.
     prefixes = []
-    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
+    for name in sorted(prefix_groups.keys(), key=prefix_citation_sort_key):
         locants = prefix_groups[name]
         count = len(locants)
 

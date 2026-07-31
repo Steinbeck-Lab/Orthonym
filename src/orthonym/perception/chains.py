@@ -789,7 +789,24 @@ def find_principal_chain(
                 entries.append((alpha_sort_key(nm or "zzz"), pos[chain_atom]))
                 sub_locants.append(pos[chain_atom])
         entries.sort()
-        return (sorted(sub_locants), tuple(loc for _a, loc in entries))
+        # P-45.6.1: when every structural criterion ties, the PIN is the name
+        # that comes first in alphanumerical order. The locant tuple alone
+        # cannot express that -- two candidate chains through the SAME molecule
+        # can carry the same locant set and the same locants-in-citation-order
+        # and still give different names, because the substituent NAMES differ.
+        #
+        # Gold row W2E-P0CF-01 is exactly that: heptanoic acid whose C4 branch
+        # can be read as `(1,2-difluoropropyl)` (chain through the nitro side)
+        # or as `(1,2-dinitropropyl)` (chain through the fluoro side). Both give
+        # locants 4,5,6 in citation order, so the old key tied and the winner
+        # was whichever chain `find_all_carbon_chains` enumerated first. The
+        # names decide it: 'difluoropropyl' < 'dinitropropyl' at the third
+        # letter, so the PIN is `4-(1,2-difluoropropyl)-5,6-dinitroheptanoic
+        # acid`. Appending the citation SEQUENCE makes that comparison explicit
+        # instead of accidental.
+        return (sorted(sub_locants),
+                tuple(loc for _a, loc in entries),
+                tuple(a for a, _loc in entries))
 
     def _lambda_direct_key(chain: List[int]) -> tuple:
         """P-45.3.1 (BB 22172-22182): among chains tying on every P-44 term,

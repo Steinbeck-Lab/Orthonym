@@ -342,6 +342,100 @@ _N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
 # '(1H-imidazol-5-yl)' must sort at 'i', not at the leading digit '1'.
 _INDICATED_H_PREFIX_RE = re.compile(r'^\d+[hH]-')
 
+# ---------------------------------------------------------------------------
+# P-14.5 alphanumerical-order NOISE: what may never enter the PRIMARY key.
+#
+# `### **P-14.5** ALPHANUMERICAL ORDER` closes its preamble (BlueBookV2.md:3446)
+# with, verbatim:
+#
+#     In these subsections the principles of alphanumerical order do not include
+#     Greek letters (except in conjunctive names) or isotopic or stereochemical
+#     descriptors.
+#
+# and :44601 says the same from the other side: capitalized CIP stereodescriptors
+# "are written in italics to indicate that they are not involved in the primary
+# stage of alphanumerical order". The preamble (:3442) also excludes Roman
+# letters "used as locants ... or in an isotopic descriptor".
+#
+# So `[(E)-2-phenylethenyl]` alphabetizes at `p`, NOT at `e`. This matters twice
+# over: since `48d53a9d` wired P-14.4(g) ("lowest locants to the substituent
+# cited first as a prefix", :3307) the key decides LOCANTS, not merely citation
+# order, so a wrong key is a wrong name rather than a cosmetic one.
+#
+# ⚠ THIS CANNOT SHIP WITHOUT ``cip_descriptor_rank_key``. Before that tier
+# existed, the descriptor sitting in the primary key was silently breaking ties
+# that P-14.5 forbids it to break -- gold row W2F-P8-01 pits `(1R)-1-chloroethyl`
+# against `(1S)-1-chloroethyl`, whose Roman letters are identical. Stripping the
+# descriptor alone made them tie and the order fell through to the engineering
+# fallback, flipping the PIN and failing the gate at 1649/1651. P-14.4(j) is what
+# is supposed to decide there. The two changes are one change.
+#
+# A "descriptor run" is one or more descriptor tokens joined by hyphens and
+# terminated by one, anchored either at the start of the prefix or immediately
+# after an opening enclosing mark -- which is where a substituent's own
+# configuration sits (`[(1s,4s)-4-methylcyclohexyl]`, `{(1S,2S)-3-oxo-...}`).
+#
+# `d`/`l` (the italic small-capital configurational prefixes of `beta-D-gluco-
+# pyranosyl`) are admitted ONLY as a NON-INITIAL token of a run. A bare leading
+# `d-` is far more likely to be an ordinary name than a descriptor, and this
+# regex must never corrupt one: anything that does not match keeps the previous
+# behaviour exactly.
+#
+# ⚠ Deliberately NOT `rules.stereochemistry.strip_stereo`, though the two overlap.
+# That one answers "does the CONSTITUTIONAL form of a whole NAME parse?" for the
+# OPSIN gate probe; this one answers "which characters may enter a P-14.5 sort
+# key for one PREFIX?" and is therefore broader (Greek + isotopic + D/L) and
+# applied globally rather than only leading + nested. Unifying them would break
+# one of the two callers -- different questions with overlapping syntax.
+_ALPHA_NOISE_HEAD = (
+    r"(?:"
+    r"\((?:[0-9]+[a-z]?[rsez*]|[rsez]|rs|sr|[,\-+ ])+\)"   # (R) (2S) (1E,3E) (RS)
+    r"|rel|rac|cis|trans|\(±\)"                        # relative / racemic / geometric
+    r"|alpha|beta|gamma|delta|[α-ω]"    # Greek, spelled or literal
+    r"|\[\d+[a-z]{1,2}\]"                                   # isotopic: [2H], [13C]
+    r")"
+)
+_ALPHA_NOISE_TAIL = r"(?:" + _ALPHA_NOISE_HEAD + r"|[dl])"
+_ALPHA_NOISE_RUN_RE = re.compile(
+    r"(?:^|(?<=[\[({]))" + _ALPHA_NOISE_HEAD + r"-(?:" + _ALPHA_NOISE_TAIL + r"-)*",
+    re.IGNORECASE,
+)
+
+# An isotopic descriptor is BRACKETED and JUXTAPOSED -- no hyphen joins it to the
+# name it modifies -- so the hyphen-terminated run above can never reach it.
+# P-16.3.4(f)'s own example list prints `di([4-2H]benzoyl)` (:7104), i.e. the
+# descriptor carries its own locant inside the brackets. Requiring a following
+# letter keeps this off ordinary enclosing marks: `[pent-2-en-1-yl]` cannot match
+# (it does not end in digits-then-element), and neither can a bare `[3]`.
+_ALPHA_ISOTOPE_RE = re.compile(r"\[[\d,\-]*\d+[a-z]{1,2}\](?=[a-z])", re.IGNORECASE)
+
+
+def strip_alphanumerical_noise(text: str) -> str:
+    """Remove everything P-14.5 (``BlueBookV2.md:3446``) bars from a sort key.
+
+    Greek letters, isotopic descriptors and stereochemical descriptors are not
+    part of alphanumerical order. THE single definition of that exclusion, so the
+    ~140 ``alpha_sort_key`` call sites cannot each grow their own -- one already
+    had (``rules/ring_substituents.py`` open-coded ``_alpha_sort_key(_strip_stereo(nm))``).
+
+    What is removed here does not vanish from the ordering: it reappears at
+    ``prefix_citation_sort_key`` tier 3 via :func:`cip_descriptor_rank_key`,
+    which is where P-14.4(j) says configuration belongs.
+
+    Examples:
+        >>> strip_alphanumerical_noise('(e)-3-phenylprop-2-en-1-yl')
+        '3-phenylprop-2-en-1-yl'
+        >>> strip_alphanumerical_noise('beta-d-glucopyranosyloxy')
+        'glucopyranosyloxy'
+        >>> strip_alphanumerical_noise('[(2z)-pent-2-en-1-yl]')
+        '[pent-2-en-1-yl]'
+        >>> strip_alphanumerical_noise('[4-2h]benzoyl')
+        'benzoyl'
+        >>> strip_alphanumerical_noise('decyl')          # not a descriptor
+        'decyl'
+    """
+    return _ALPHA_ISOTOPE_RE.sub('', _ALPHA_NOISE_RUN_RE.sub('', text))
+
 
 # ============================================================================
 # Terminal Functional Group Types (IUPAC P-14.3.4.1)
@@ -2608,7 +2702,7 @@ def _numeral_chain_stems() -> frozenset:
 _NUMERAL_CHAIN_STEMS = _numeral_chain_stems()
 
 
-def alpha_sort_key(substituent_name: str) -> str:
+def _alpha_sort_key_core(substituent_name: str) -> str:
     """Generate an alphabetization sort key for IUPAC prefix ordering.
 
     According to IUPAC 2013 rules:
@@ -2644,6 +2738,19 @@ def alpha_sort_key(substituent_name: str) -> str:
         'butyl'
     """
     text = substituent_name.lower()
+
+    # P-14.5 preamble, last sentence (BlueBookV2.md:3446). Applied FIRST and
+    # GLOBALLY, before any other stripping, for two reasons:
+    #  * a descriptor sits AHEAD of the locant it qualifies ('(1E,3E,5E)-hepta-
+    #    1,3,5-trien-1-yl'), so the locant strip below cannot see the locant
+    #    until the descriptor is gone;
+    #  * `prefix_citation_sort_key` builds its tier-1 key from EVERY alpha
+    #    character this function returns, so an INTERNAL descriptor
+    #    ('2-[(2Z)-pent-2-en-1-yl]cyclopentyl') contributes a stray 'z' unless it
+    #    is removed wherever it occurs, not merely at the front.
+    # Conjunctive names are the rule's own carve-out; this engine does not emit
+    # them (P-15.6 is not a PIN construction here), so the exception cannot fire.
+    text = strip_alphanumerical_noise(text)
 
     # Leading positional descriptors are ALWAYS ignored for alphabetization
     # (P-14.5.2, under `### **P-14.5** ALPHANUMERICAL ORDER` at BB 3436:
@@ -2749,9 +2856,172 @@ def alpha_sort_key(substituent_name: str) -> str:
                 # (a genuine 2x azido) still strips to 'azido'.
                 if remainder in ('azenyl', 'azo'):
                     return text
+                # P-14.5.1 vs P-14.5.2, decided STRUCTURALLY rather than by
+                # whether the caller happened to wrap the string.
+                #
+                # P-14.5.1 ignores a multiplicative prefix that multiplies
+                # SEPARATE simple prefixes on the parent ('2,2-dimethyl' -> 'm').
+                # P-14.5.2 counts one INTERNAL to a single compound substituent,
+                # which "is considered to begin with the first letter of its
+                # complete name" (:3477) -- the BB's own
+                # `7-(1,2-difluorobutyl)-5-ethyltridecane (PIN)` alphabetizes the
+                # compound prefix at 'd', ahead of 'ethyl'.
+                #
+                # The enclosure test above is only a PROXY for that distinction
+                # and it fails whenever a caller passes the bare name -- which
+                # they do. `5,9-dimethyl-2-(propan-2-ylidene)deca-4,8-dien-1-yl`
+                # keyed at 'm' instead of 'd' and was cited last instead of
+                # first. It had been masked: the prefix also carried a `(4E)`
+                # whose '(' sorted ahead of every letter and accidentally
+                # restored the right order, so removing the descriptor per :3446
+                # exposed it. Invariant 9, an unmasked generator.
+                #
+                # Strip ONLY when the remainder is a BARE SIMPLE PREFIX. Two
+                # independent tells are needed; neither alone separates the
+                # cases actually observed:
+                #  * `is_substituted_substituent` -- the predicate that already
+                #    answers "is this prefix substituted?" for P-16.3.5's bis/di
+                #    choice. Catches 'hydroxypentyl' (from '4,5-dihydroxypentyl'),
+                #    whose own locants the leading-locant strip already consumed.
+                #  * residual LOCANTS or enclosing marks -- what is left when a
+                #    multiplier is carved out of the middle of a compound name.
+                #    Catches 'methyl-2-(propan-2-ylidene)deca-4,8-dien-1-yl',
+                #    which the predicate reads as unsubstituted because it is a
+                #    fragment rather than a well-formed name.
+                # A leading-locant test cannot serve as a third: '2,2-dimethyl'
+                # and '4,5-dihydroxypentyl' both carry one and go opposite ways.
+                if is_substituted_substituent(remainder) \
+                        or any(c.isdigit() for c in remainder) \
+                        or '(' in remainder or '[' in remainder:
+                    return text
                 return remainder
 
     return text
+
+
+# Enclosing marks are P-16.5 TYPOGRAPHY, not alphanumerical content. P-14.5
+# orders "nonitalic Roman letters" and then numerals (:3442); a bracket is
+# neither, so it may not enter a sort key.
+_ENCLOSING_MARKS_RE = re.compile(r'[()\[\]{}]')
+
+
+def alpha_sort_key(substituent_name: str) -> str:
+    """P-14.5 alphanumerical sort key for a substituent prefix.
+
+    Thin wrapper over :func:`_alpha_sort_key_core` that removes enclosing marks
+    from the finished key.
+
+    ⚠ **This strip is load-bearing, not cosmetic.** The core returns the key
+    with any marks the branch logic left in place, and a leading mark decides
+    comparisons outright because ``(`` is ASCII 40 and ``[`` is 91 -- both below
+    every lowercase letter. ``alpha_sort_key('4-[(1R)-1-chloroethyl]phenoxy')``
+    used to yield ``'[1-chloroethyl]phenoxy'``, which sorts ahead of
+    ``'chloroethyl'`` and, through P-14.4(g), took locant 1 -- the wrong
+    numbering for gold row W2F-P8-01. The defect was masked while
+    stereodescriptors were still in the key, since their ``(`` sorted earlier
+    still. ``tests/unit/rules/test_anilino_preferred_prefix.py`` had already
+    recorded the same leak from the ``(`` side.
+
+    The key is only ever COMPARED, never reconstructed into a name, so dropping
+    marks cannot affect any emitted string.
+
+    Examples:
+        >>> alpha_sort_key('4-[(1R)-1-chloroethyl]phenoxy')
+        'chloroethylphenoxy'
+        >>> alpha_sort_key('(2-chloroethyl)')
+        '2-chloroethyl'
+        >>> alpha_sort_key('methyl')
+        'methyl'
+    """
+    return _ENCLOSING_MARKS_RE.sub('', _alpha_sort_key_core(substituent_name))
+
+
+# ---------------------------------------------------------------------------
+# P-14.4(j) / P-45.6.3 -- the CIP tie-break.
+#
+# `**P-14.4**`'s numbering cascade ends with clause (j) (BlueBookV2.md:3346),
+# verbatim:
+#
+#     (j) When there is a choice for lower locants related to the presence of
+#     stereogenic centers or stereoisomers, the lower locant is assigned to CIP
+#     stereodescriptors *Z*, *R*, *M*, and *r* (pseudoasymmetry) that are
+#     preferred to *E*, *S*, *P*, and *s*, respectively, which are preferred to
+#     the non-CIP stereodescriptors *cis*, *trans*, or *r* (reference), *c*, and
+#     *t*
+#
+# and `**P-45.6.3**` (:22606) states the citation-order half: "When names based
+# on alphanumerical order and isotopic descriptors are the same, further choice
+# depends on the alphabetic order of the stereochemical descriptors 'R' and 'S'."
+#
+# :22589 specifies the tier ORDER outright -- "since the alphabetic characters
+# and locants (ignoring the configuration symbols) are identical the
+# configurational symbols are compared and 'R' precedes 'S'" -- i.e. letters,
+# then locants, THEN configuration. That is why this is tier 3 and the
+# full-string engineering fallback moves to tier 4.
+#
+# ⚠ THREE of the four pairs happen to be alphabetical, but `Z` before `E` is
+# NOT: :45363 says "'Z' is senior to 'E', **irrespective of the alphabetical
+# order**". A string comparison silently gets that one backwards, which is why
+# this is an explicit rank table and not `sorted()`.
+#
+# Worked examples this reproduces, both printed as (PIN):
+#   :22609  1-[(1R)-1-bromoethyl]-1-[(1S)-1-bromoethyl]cyclopentane
+#   :22597  4-{3,4-bis[(1R)-1-chloroethyl]phenoxy}-1,2-bis[(1S)-1-chloroethyl]benzene
+#
+# P-14.4(i) puts isotopic modifications AHEAD of (j) for low locants. Their
+# locants already reach tier 2, so no separate tier is added here; a case that
+# needs one would be an isotope-vs-isotope choice, which this engine has never
+# emitted.
+_CIP_DESCRIPTOR_RANK = {
+    # CIP, preferred member of each pair -> 0
+    'z': 0, 'r': 0, 'm': 0,
+    'seqcis': 0,
+    # CIP, other member -> 1
+    'e': 1, 's': 1, 'p': 1,
+    'seqtrans': 1,
+    # non-CIP -> 2, after every CIP descriptor
+    'cis': 2, 'trans': 2, 'c': 2, 't': 2,
+}
+
+# A configuration block: '(1R)', '(2S,3R)', '(E)', '(1r,4r)', '(2Z,6E)' -- OR a
+# bare hyphenated non-CIP descriptor, which carries no enclosing marks at all
+# ('cis-4-methylcyclohexyl'). Both forms are found by ONE pattern so the ranks
+# come back in order of appearance even when a name mixes them.
+_CIP_BLOCK_RE = re.compile(
+    r"\((?:[0-9]+[a-z]?[rsezmp*]|[rsezmp]|seqcis|seqtrans|rs|sr|[,\-+ ])+\)"
+    r"|(?:^|(?<=[\[({-]))(?:cis|trans)(?=-)",
+    re.IGNORECASE,
+)
+_CIP_TOKEN_RE = re.compile(r"seqcis|seqtrans|cis|trans|[rsezmp]", re.IGNORECASE)
+
+
+def cip_descriptor_rank_key(prefix: str) -> tuple:
+    """P-14.4(j) rank of a prefix's configurational symbols, in order.
+
+    Lower sorts first, i.e. is cited first and takes the lower locant. Returns
+    an empty tuple when the prefix carries no configuration, so a prefix WITH a
+    descriptor never outranks one without on this tier alone -- absence ties
+    with absence and the comparison falls through.
+
+    Examples:
+        >>> cip_descriptor_rank_key('(1R)-1-chloroethyl')
+        (0,)
+        >>> cip_descriptor_rank_key('(1S)-1-chloroethyl')
+        (1,)
+        >>> cip_descriptor_rank_key('(2Z)-pent-2-en-1-yl')
+        (0,)
+        >>> cip_descriptor_rank_key('(2E)-pent-2-en-1-yl')
+        (1,)
+        >>> cip_descriptor_rank_key('methyl')
+        ()
+    """
+    ranks = []
+    for block in _CIP_BLOCK_RE.findall(prefix or ''):
+        for tok in _CIP_TOKEN_RE.findall(block):
+            rank = _CIP_DESCRIPTOR_RANK.get(tok.lower())
+            if rank is not None:
+                ranks.append(rank)
+    return tuple(ranks)
 
 
 def prefix_citation_sort_key(prefix: str, *,
@@ -2776,7 +3046,16 @@ def prefix_citation_sort_key(prefix: str, *,
        ``:3533`` prefers ``1-(2-methylpentan-3-yl)-1-(3-methylpentan-2-yl)cyclo-
        pentane (PIN)`` on the ground that "*the locant set '2,3' is lower than
        '3,2'*". Compared via ``locant_sort_key``, so locant 2 precedes locant 10.
-    3. the full string. NOT a nomenclature rule -- an engineering requirement.
+    3. the CONFIGURATIONAL symbols, in order of appearance, ranked by
+       ``**P-14.4**`` clause (j) (``:3346``) / ``**P-45.6.3**`` (``:22606``).
+       ``:22589`` puts this tier exactly here: "*since the alphabetic characters
+       and locants (ignoring the configuration symbols) are identical the
+       configurational symbols are compared and 'R' precedes 'S'*". Before this
+       tier existed the descriptor was doing this job from INSIDE tier 1, which
+       P-14.5 (``:3446``) forbids -- and :44601 says outright that capitalized
+       CIP descriptors "are written in italics to indicate that they are not
+       involved in the primary stage of alphanumerical order".
+    4. the full string. NOT a nomenclature rule -- an engineering requirement.
        Tiers 1-2 are not injective (``cyclohexylmethyl`` vs a differently-spelled
        prefix with the same letters and no locants), and a tie in a ``sorted()``
        whose input order came from a ``Counter`` over RDKit neighbours resolves to
@@ -2808,7 +3087,7 @@ def prefix_citation_sort_key(prefix: str, *,
     body = _LOCANT_PREFIX_RE.sub('', prefix) if parent_locants else prefix
     locs = tuple(locant_sort_key(t)
                  for t in _LOCANT_TOKEN_FINDER.findall(body))
-    return (alpha_letters, locs, prefix)
+    return (alpha_letters, locs, cip_descriptor_rank_key(prefix), prefix)
 
 
 # ============================================================================

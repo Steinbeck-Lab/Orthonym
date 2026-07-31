@@ -117,7 +117,15 @@ class TestSortAndBrackets:
         ("diazenyl", "diazenyl"),   # structural 'di' — NOT stripped
         ("diazo", "diazo"),         # structural 'di' — NOT stripped
         ("diazido", "azido"),       # genuine 2x azido — still strips
-        ("dimethylamino", "methylamino"),
+        # P-14.5.2: 'dimethylamino' is ONE compound prefix, so its internal 'di'
+        # is part of the complete name and alphabetizes at 'd'. Expectation
+        # corrected from 'methylamino' against BlueBookV2.md:26630,
+        # `1,5-bis(dimethylamino)-N,N-dimethylpentan-3-amine N-oxide (PIN)`:
+        # bis(dimethylamino) is cited BEFORE N,N-dimethyl, which is only possible
+        # if it keys at 'd' -- keying at 'm' gives methyl < methylamino and
+        # inverts the PIN. P-16.3.5(a) (:7104) independently lists
+        # `bis(dimethylamino)` as a preferred prefix, i.e. a COMPOUND prefix.
+        ("dimethylamino", "dimethylamino"),
         ("hydroxyamino", "hydroxyamino"),
         ("aminooxy", "aminooxy"),
         ("chloroamino", "chloroamino"),

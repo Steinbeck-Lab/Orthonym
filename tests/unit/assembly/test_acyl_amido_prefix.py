@@ -159,7 +159,16 @@ class TestAlphaSortChainStemGuard:
         ("dimethyl", "methyl"),
         ("triethyl", "ethyl"),
         ("tetrachloro", "chloro"),
-        ("dioctadecanamido", "octadecanamido"),
+        # Expectation corrected. `di` + an acylamido prefix is a form the Blue
+        # Book REJECTS: BlueBookV2.md:33107 prints "*N*-acetylacetamido
+        # (preferred prefix) diacetylamino (not diacetylazanyl) (not
+        # diacetamido)", and :55811 indexes "diacetamido: see
+        # N-acetylacetamido". An acylamido prefix is compound, so P-16.3.5(a)
+        # multiplies it with `bis(...)`, and this engine emits exactly that --
+        # `get_multiplier_prefix(2, 'octadecanamido')` is 'bis'. The string
+        # `dioctadecanamido` is therefore never produced; when it IS handed to
+        # the key, P-14.5.2's complete-name rule applies and it keys at 'd'.
+        ("dioctadecanamido", "dioctadecanamido"),
     ])
     def test_sort_key(self, name, key):
         assert alpha_sort_key(name) == key
