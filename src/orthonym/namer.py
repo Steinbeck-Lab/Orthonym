@@ -1924,6 +1924,15 @@ class Orthonym:
         # so they must not be gated). Final top-level name() calls leave this
         # False -> the gate applies.
         self._disable_opsin_validity_gate: bool = _disable_opsin_validity_gate
+        # v29 Phase 4 (verification as a filter over the dispatch cascade).
+        # `_excluded_dispatch_classes` holds the classes already tried and
+        # GATE-REJECTED for the molecule currently being named; the cascade skips
+        # them so the next entry gets its turn. `_last_dispatch_class` is the
+        # class that produced the name now under gate. Both are per-molecule
+        # scratch: name() clears them on entry and in a finally, so nothing
+        # leaks between molecules (that would make naming order-dependent).
+        self._excluded_dispatch_classes: frozenset = frozenset()
+        self._last_dispatch_class = None
         # Phase 173.6 T3: scoped principal-group override (FG name). Set ONLY by the
         # charged chokepoint's S/P-oxoacid-anion re-entry (_reenter_forced) so the
         # anionic group is forced as the principal characteristic group per P-72/P-74.
@@ -2185,6 +2194,76 @@ class Orthonym:
         """
         return dict(self._grammar_stats)
 
+    # v29 Phase 4. Bounded deliberately: each retry is a full re-name plus an
+    # OPSIN round-trip, and the cascade's useful alternatives for one molecule
+    # are few. 3 was chosen as the smallest bound that lets a molecule try the
+    # GENERAL engine after two specialised classes have been rejected.
+    _PHASE4_MAX_GATE_RETRIES = 3
+
+    def _retry_cascade_on_gate_rejection(self, smiles, pre_gate, gated):
+        """v29 Phase 4: a GATE REJECTION re-enters the dispatch cascade.
+
+        The cascade in ``_name_impl`` already falls through when a handler
+        returns ``None``, but the gates run out here in ``name()`` -- AFTER the
+        cascade has exited -- so a handler that produced a name the gate then
+        rejected aborted the whole molecule with no retry. That is the defect
+        this phase exists to close: "keep the first that clears both gates, fall
+        through instead of aborting the molecule."
+
+        ⚠ The roadmap framed this as filtering over ``CandidatePool``. It is not:
+        the pool holds ONE candidate in 158 of 158 spied calls. The real
+        generator of alternatives is the DISPATCH CASCADE, and this works with
+        it directly.
+
+        Only ever converts an ABSTENTION into a name: it runs solely when the
+        gate replaced a real name with the descriptive fallback, and it returns
+        that same fallback unless a later class produces a name that PASSES the
+        gate. A name that already shipped cannot be changed by this path, so
+        0-wrong is preserved by construction -- every replacement has cleared
+        the same OPSIN round-trip the original failed.
+        """
+        from .errors import _DESCRIPTIVE_FALLBACK_NAMES
+        # Did the gate actually suppress a REAL name? If the handler already
+        # abstained, there is nothing to retry past.
+        if (gated == pre_gate
+                or gated not in _DESCRIPTIVE_FALLBACK_NAMES
+                or not pre_gate
+                or pre_gate in _DESCRIPTIVE_FALLBACK_NAMES):
+            return gated
+
+        for _ in range(self._PHASE4_MAX_GATE_RETRIES):
+            cls = self._last_dispatch_class
+            if cls is None or cls in self._excluded_dispatch_classes:
+                break
+            self._excluded_dispatch_classes |= {cls}
+            try:
+                cand = self._name_impl(smiles)
+            except Exception:                                   # noqa: BLE001
+                # A later class raising is a decline, not a failure of the
+                # molecule -- the original fallback still ships.
+                break
+            if not cand or cand in _DESCRIPTIVE_FALLBACK_NAMES:
+                continue
+            _mol = Chem.MolFromSmiles(smiles)
+            if _mol is None:
+                break
+            from .assembly.coverage_scoring import retrieve_confidence
+            _conf = retrieve_confidence()
+            cand = _final_stereo_check(
+                _mol, cand, handler=_conf.get('handler', 'unknown'),
+                atom_to_locant=_conf.get('atom_to_locant'),
+                is_phenol_benzene=_conf.get('is_phenol_benzene'),
+            )
+            cand = _final_grammar_check(
+                cand, smiles, _conf.get('handler', 'unknown'),
+                self._grammar, self._grammar_stats,
+            )
+            if _final_opsin_validity_gate(
+                    cand, smiles, self._grammar_stats) not in \
+                    _DESCRIPTIVE_FALLBACK_NAMES:
+                return cand
+        return gated
+
     def name(self, smiles: str, *, raise_on_limit: bool = False) -> str:
         """
         Generate IUPAC name from SMILES.
@@ -2239,6 +2318,12 @@ class Orthonym:
                 clear_pool()
             except Exception:
                 pass
+            # v29 Phase 4: same invariant as the clears around it. The
+            # gate-rejection exclusion set is PER-MOLECULE; leaking it would
+            # make a molecule's name depend on what was named before it, which
+            # is precisely the order-dependence this block exists to stop.
+            self._excluded_dispatch_classes = frozenset()
+            self._last_dispatch_class = None
             # v25 P0 Task 0.1: reset the typed-abstention telemetry slot per
             # top-level molecule (same invariant as the confidence/pool
             # clears above). Side-effect-only — never changes a name.
@@ -2400,8 +2485,16 @@ class Orthonym:
                     # fail-OPEN on no-JAR. Skipped for neutralize-recurse /
                     # fragment intermediates (self._disable_opsin_validity_gate).
                     if not self._disable_opsin_validity_gate:
+                        _pre_gate = result
                         result = _final_opsin_validity_gate(
                             result, smiles, self._grammar_stats,
+                        )
+                        # v29 Phase 4: the gate is now a FILTER over the
+                        # cascade, not a terminal abort. Only fires when a real
+                        # name was suppressed; returns the same fallback unless
+                        # a later class clears the gate.
+                        result = self._retry_cascade_on_gate_rejection(
+                            smiles, _pre_gate, result,
                         )
             # DETERMINISM (w2f p11): abstention must have ONE canonical sentinel.
             # Some fail-closed paths (a handler that DECLINES without producing a
@@ -3250,12 +3343,20 @@ class Orthonym:
             _skip_decomposition=self._skip_decomposition,
             _style=self.style,
         )
-        name = result.handler(
-            mol, smiles, canonical_smiles,
-            features=None,
-            style=self.style,
-            _skip_decomposition=self._skip_decomposition,
-        )
+        # v29 Phase 4: a class already tried and REJECTED BY A GATE on this
+        # molecule is skipped, so the cascade below moves to the next entry.
+        # Treated exactly like a handler that returned None, which is the
+        # fall-through the cascade already implements.
+        if result.class_id in self._excluded_dispatch_classes:
+            self._last_dispatch_class = result.class_id
+            name = None
+        else:
+            name = result.handler(
+                mol, smiles, canonical_smiles,
+                features=None,
+                style=self.style,
+                _skip_decomposition=self._skip_decomposition,
+            )
 
         # Cascade-continuation when a handler returns None (audit § 1 row
         # notes for ANION_SMALL / POLY_ANION / MULTI_COMPONENT_NEUTRAL /
@@ -3268,6 +3369,8 @@ class Orthonym:
             for entry in sorted(DISPATCH_TABLE.values(), key=lambda e: e.priority):
                 if entry.priority <= current_priority:
                     continue
+                if entry.class_id in self._excluded_dispatch_classes:
+                    continue  # v29 Phase 4: already gate-rejected on this molecule
                 # Predicate signature: (mol, smiles, canonical_smiles, features, **kwargs)
                 try:
                     matched = entry.predicate(
@@ -3294,6 +3397,9 @@ class Orthonym:
                 )
                 if name is not None or entry.class_id == StoutClass.GENERAL:
                     break
+        # v29 Phase 4: whichever class actually produced this name, so a gate
+        # rejection in name() can exclude it and re-enter the cascade.
+        self._last_dispatch_class = result.class_id
 
         # ============================================================
         # GENERAL pipeline fallback — Task 158-02-01 design choice (a)
