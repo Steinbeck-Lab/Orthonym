@@ -93,14 +93,38 @@ def test_decoration_locants_are_lowest():
 
 
 def test_alphanumerical_tie_break_on_equal_locant_sets():
-    """P-14.4: when two numberings give the same locant SET {2,5}, the prefix
-    first in alphanumerical order takes the lower locant. Attached ortho to the
-    chlorine that is `2-chloro-5-fluorophenyl`; attached ortho to the fluorine
-    the set is fixed by the ring, giving `5-chloro-2-fluorophenyl`. Both are
-    legitimate and correspond to DIFFERENT attachment points."""
+    """Two DIFFERENT attachment points on the same ring, each with its locant
+    set fixed by the ring — both names are legitimate."""
     got = _names_at_every_ring_attachment("Fc1ccc(Cl)cc1")
     assert "2-chloro-5-fluorophenyl" in got
     assert "5-chloro-2-fluorophenyl" in got
+
+
+@pytest.mark.parametrize("smiles", [
+    "Brc1cccc(Cl)c1",
+    "Clc1cccc(Br)c1",
+    "c1(Br)cccc(Cl)c1",
+])
+def test_p14_4_g_breaks_the_symmetric_tie_deterministically(smiles):
+    """P-14.4(g): when every earlier criterion ties, the lower locant goes to
+    the substituent cited FIRST in alphanumerical order.
+
+    With a bromine on one ortho position and a chlorine on the other, BOTH
+    ring-traversal directions give the locant set {2,6} — an exact tie. Before
+    the fix the winner was whichever direction RDKit's neighbour order
+    enumerated first, so the SAME MOLECULE written two ways got two names:
+
+        Brc1cccc(Cl)c1  ->  2-bromo-6-chlorophenyl   (correct)
+        Clc1cccc(Br)c1  ->  6-bromo-2-chlorophenyl   (non-PIN)
+
+    Nondeterministic and non-PIN. `bromo` sorts before `chloro`, so it takes
+    locant 2 regardless of how the input was written.
+    """
+    got = _names_at_every_ring_attachment(smiles)
+    ortho = {n for n in got if "bromo" in n and "chloro" in n
+             and n.startswith(("2-", "6-"))}
+    assert "2-bromo-6-chlorophenyl" in ortho, ortho
+    assert "6-bromo-2-chlorophenyl" not in ortho, ortho
 
 
 # --------------------------------------------------------------------------
@@ -136,10 +160,22 @@ def test_simple_decoration_prefixes_stay_bare():
     ("diazenyl", "diazenyl"),      # atomic prefix that merely starts with 'di'
     ("diazo", "diazo"),
     ("(already)", "(already)"),
+    # escalates ( -> [ when the inner name already carries parentheses
+    ("3-(methylsulfanyl)phenyl", "[3-(methylsulfanyl)phenyl]"),
 ])
-def test_enclose_decoration_unit(nm, enclosed):
-    from orthonym.rules.ring_substituents import _enclose_decoration
-    assert _enclose_decoration(nm) == enclosed
+def test_enclosing_marks_come_from_the_shared_primitive(nm, enclosed):
+    """The decoration assembler must use `enclose_if_compound`, not a local
+    re-derivation.
+
+    A hand-rolled version was written first: "wrap when the name starts with a
+    multiplying prefix", plus a hand-maintained list of atomic false friends
+    (diazo, diazenyl, ...) that merely begin with those letters. It was deleted.
+    `enclose_if_compound` already unions `needs_brackets` with
+    `is_complex_substituent` — neither is complete alone — gets every one of
+    these right with no list to maintain, and escalates the mark level.
+    """
+    from orthonym.assembly.naming_utils import enclose_if_compound
+    assert enclose_if_compound(nm) == enclosed
 
 
 # --------------------------------------------------------------------------
@@ -148,7 +184,39 @@ def test_enclose_decoration_unit(nm, enclosed):
 
 def test_unnameable_decoration_still_fails_closed():
     """A ring whose decoration the identifier cannot name must yield NOTHING,
-    not a phenyl name that silently drops it."""
-    for name in _names_at_every_ring_attachment("NS(=O)(=O)c1ccccc1"):
-        # if a name IS produced it must account for the sulfamoyl group
-        assert "sulfamoyl" in name or "sulf" in name, name
+    not a phenyl name that silently drops it.
+
+    ⚠ This assertion is written to be NON-VACUOUS. The first version was
+    `for name in ...: assert "sulf" in name`, which passes trivially when the
+    set is empty — and it IS empty, so the test proved nothing (a code review
+    caught it; cf. `feedback_harness_that_reports_success`).
+
+    `_identify_fused_substituent`'s sulfur branch handles only `-SH` and
+    `-S-alkyl`; a sulfonamide sulfur has three neighbours (O, O, N) and matches
+    no branch, so the decoration is unnameable and the whole producer must
+    decline. Naming this molecule is a genuine remaining gap — the point here
+    is that the gap FAILS CLOSED rather than emitting a phenyl that drops the
+    -SO2NH2.
+    """
+    got = _names_at_every_ring_attachment("NS(=O)(=O)c1ccccc1")
+    dropped = {n for n in got if "sulf" not in n and "amino" not in n}
+    assert not dropped, (
+        f"a name was emitted that silently drops the sulfamoyl group: {dropped}"
+    )
+
+
+def test_known_remaining_gaps_are_declines_not_wrong_names():
+    """Two shapes named in the Phase 6 commit message are NOT fixed by it, and
+    this test pins that honestly so the claim cannot drift.
+
+    * `NS(=O)(=O)c1ccccc1` — the sulfonamide decoration is unnameable (above).
+    * `Cc1ncsc1C` — `identify_ring_system`'s aromatic-5-ring branch has cases
+      for [O], [S], [N] and [N,N] but none for [N,S], so thiazole is not
+      identified at all and `_PIN_HETEROARYL_STEMS` has no thiazole entry.
+      Carbocyclic admission cannot help: `is_carbocyclic` requires
+      `ring_name == 'benzene'`.
+
+    Both must DECLINE. If either ever starts producing a name, this test should
+    be updated deliberately — not silently satisfied.
+    """
+    assert _names_at_every_ring_attachment("Cc1ncsc1C") == set()

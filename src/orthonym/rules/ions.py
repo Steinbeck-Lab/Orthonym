@@ -2133,7 +2133,7 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
         return ''
     from ..perception.chains import classify_substituent
     from ..assembly.naming_utils import (
-        get_multiplier_prefix, alpha_sort_key, is_complex_substituent)
+        get_multiplier_prefix, alpha_sort_key, enclose_if_compound)
     _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
     parent_atoms = {center_idx}
     name_to_count: Dict[str, int] = {}
@@ -2183,10 +2183,18 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
     parts = []
     for sub_name, count in name_to_count.items():
         mult = get_multiplier_prefix(count, sub_name)
-        if is_complex_substituent(sub_name) and count > 1:
-            body = f"{mult}({sub_name})"
-        else:
-            body = f"{mult}{sub_name}"
+        # P-16.3.4 / P-16.3.5(a): a compound prefix takes enclosing marks
+        # whatever its COUNT.
+        # This used to wrap only when count > 1, so a single composite ligand
+        # was concatenated bare and ran straight into the preceding prefix:
+        # `[B-](c1cccc(SC)c1)(F)(F)F` emitted
+        # `trifluoro3-(methylsulfanyl)phenylboranuide` — a letter/digit junction
+        # with no separator. OPSIN happens to parse it to the right molecule, so
+        # no gate catches it; it is a spelling defect, and the PIN is
+        # `trifluoro[3-(methylsulfanyl)phenyl]boranuide`.
+        # `enclose_if_compound` also escalates ( -> [ so the mark nests correctly
+        # around a ligand that already carries parentheses (P-16.3.1).
+        body = f"{mult}{enclose_if_compound(sub_name)}"
         parts.append((alpha_sort_key(sub_name), body))
     parts.sort(key=lambda t: t[0])
     return f"{''.join(p[1] for p in parts)}{suffix}"

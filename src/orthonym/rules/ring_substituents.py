@@ -513,38 +513,6 @@ _DECO_MULT: Dict[int, str] = {
 }
 
 
-# P-16.3.3: a decoration prefix that is itself SUBSTITUTED takes enclosing
-# marks. `needs_brackets` catches the locant/hyphen forms; it does NOT catch a
-# prefix built by multiplying another prefix, and that is the common case here:
-# the Blue Book writes `(dimethylamino)` **24 times and never once unbracketed**
-# (`grep -c "(dimethylamino)" BlueBookV2.md` = 24; `[0-9]-dimethylamino[a-z]` = 0),
-# because `4-dimethylaminophenyl` could otherwise read as di(methylamino).
-#
-# Restricted to a multiplier followed by a stem the multiplier could plausibly be
-# multiplying. Prefixes that merely BEGIN with those letters and are atomic
-# — diazo, diazenyl, dioxolan… — are listed as exceptions rather than guessed at,
-# since wrapping a simple prefix is itself a spelling error.
-_DECO_MULTIPLIERS = ('di', 'tri', 'tetra', 'penta', 'hexa', 'bis', 'tris',
-                     'tetrakis')
-_DECO_MULT_FALSE_FRIENDS = frozenset({
-    'diazo', 'diazenyl', 'diazanyl', 'diazinyl', 'dioxo', 'dithio',
-    'trityl', 'triazenyl', 'triazolyl', 'tetrazolyl', 'diyl', 'triyl',
-})
-
-
-def _enclose_decoration(nm: str) -> str:
-    """Enclosing marks for one decoration prefix, per P-16.3.3."""
-    from ..assembly.naming_utils import needs_brackets as _nb
-    if not nm or nm[0] in '([':
-        return nm
-    if nm in _DECO_MULT_FALSE_FRIENDS:
-        return nm
-    composite = _nb(nm) or any(
-        nm.startswith(m) and len(nm) > len(m) for m in _DECO_MULTIPLIERS
-    )
-    return f"({nm})" if composite else nm
-
-
 def _decorated_heteroaryl_substituent_name(
     mol,
     frag_atoms,
@@ -585,9 +553,11 @@ def _decorated_heteroaryl_substituent_name(
     #     CN(C)c1ccccc1      -> 4-(dimethylamino)phenyl
     #     NS(=O)(=O)c1ccccc1 -> 4-sulfamoylphenyl
     #
-    # P-29.3.5: the free valence of a benzene substituent is position 1 and its
-    # locant is NOT cited — the retained prefix is 'phenyl', never 'benzen-1-yl'
-    # — after which the decorations take the lowest locants. The numbering
+    # P-29.6.1 "Retained prefixes that are preferred prefixes" (`:16270`) — the
+    # free valence of a benzene substituent is position 1 and its locant is NOT
+    # cited; the retained preferred prefix is 'phenyl', never 'benzen-1-yl'.
+    # The verbatim BB example is `4-methylphenyl (preferred prefix)` (`:16298`).
+    # Decorations then take the lowest locants. The numbering
     # cascade below already produces exactly that for a carbocycle: with no
     # heteroatoms and no indicated H the sort key degenerates to
     # (fv_loc, deco_locs), so the free valence wins position 1 and the
@@ -671,6 +641,10 @@ def _decorated_heteroaryl_substituent_name(
     if len(order) != n:
         return None
 
+    from ..assembly.naming_utils import (
+        alpha_sort_key as _alpha,
+        enclose_if_compound as _enclose_if_compound,
+    )
     deco_atoms = [ra for ra, _ in decorations]
     best_key = None
     best_pos = None
@@ -690,7 +664,22 @@ def _decorated_heteroaryl_substituent_name(
                       if indicated_h_atom is not None else 0)
             fv_loc = atom_to_pos[attachment_atom]
             deco_locs = tuple(sorted(atom_to_pos[ra] for ra in deco_atoms))
-            key = (het_locs, seniority_locs, ih_loc, fv_loc, deco_locs)
+            # P-14.4(g): when every earlier criterion ties, the lower locant
+            # goes to the substituent cited FIRST in alphanumerical order.
+            # Without this term the tie was broken by whichever ring-traversal
+            # direction happened to be enumerated first, which depends on RDKit
+            # neighbour order — so the SAME molecule written two ways got two
+            # names: `Brc1cccc(Cl)c1` -> 2-bromo-6-chlorophenyl (correct) but
+            # `Clc1cccc(Br)c1` -> 6-bromo-2-chlorophenyl. Nondeterministic AND
+            # non-PIN. Comparing (locant, alpha-key) pairs in locant order
+            # resolves it: ((2,'bromo'),(6,'chloro')) < ((2,'chloro'),(6,'bromo')).
+            deco_named = tuple(
+                (atom_to_pos[ra], _alpha(nm))
+                for ra, nm in sorted(decorations,
+                                     key=lambda t: atom_to_pos[t[0]])
+            )
+            key = (het_locs, seniority_locs, ih_loc, fv_loc, deco_locs,
+                   deco_named)
             if best_key is None or key < best_key:
                 best_key = key
                 best_pos = atom_to_pos
@@ -703,7 +692,6 @@ def _decorated_heteroaryl_substituent_name(
 
     # Group decorations by name; assemble alphabetised, multiplied prefixes.
     from collections import defaultdict as _dd
-    from ..assembly.naming_utils import alpha_sort_key as _alpha
     groups = _dd(list)
     for ra, nm in decorations:
         groups[nm].append(best_pos[ra])
@@ -713,7 +701,19 @@ def _decorated_heteroaryl_substituent_name(
         mult = _DECO_MULT.get(len(locs))
         if mult is None:
             return None
-        text = f"{','.join(str(l) for l in locs)}-{mult}{_enclose_decoration(nm)}"
+        # Enclosing marks. P-16.3.4 "Parentheses (round brackets) ... are used
+        # to enclose multiplied components that are: ... (c) simple substituent
+        # prefixes and functionalized parent hydrides beginning with a
+        # multiplicative prefix" (`:7085`), and P-16.3.5(a) covers "compound or
+        # complex (i.e. substituted) prefixes" with the verbatim example
+        # `bis(dimethylamino) (preferred prefix)` (`:7104`). So
+        # `4-dimethylaminophenyl` — which can read as di(methylamino) — must be
+        # `4-(dimethylamino)phenyl`. `enclose_if_compound` is the shared
+        # primitive for this — it unions needs_brackets with
+        # is_complex_substituent (neither is complete alone), escalates
+        # ( -> [ -> { for an already-bracketed inner name, leaves simple
+        # prefixes bare, and is idempotent.
+        text = f"{','.join(str(l) for l in locs)}-{mult}{_enclose_if_compound(nm)}"
         prefix_parts.append((_alpha(nm), text))
     prefix_parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in prefix_parts)
