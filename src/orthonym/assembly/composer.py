@@ -9912,7 +9912,8 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
 # Phase 160.2 Plan-02-01: _generate_stereodescriptors lifted to handlers/_handler_shared.py per CONTEXT D-02 + D-03.
 
 
-def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional[Dict[int, int]] = None) -> str:
+def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional[Dict[int, int]] = None,
+                              parent_scope: Optional[str] = None) -> str:
     """Prepend stereodescriptor prefix to a name if stereocenters exist but aren't represented.
 
     Used after early-return handlers that bypass _generate_stereodescriptors().
@@ -9924,12 +9925,22 @@ def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional
         atom_to_locant: Optional explicit locant map to forward to
             _generate_stereodescriptors. When provided, bypasses the features.*
             priority chain. Pass None to use default features.* resolution.
+        parent_scope: What the CALLING handler built ``name`` from -- ``'chain'``
+            when the parent hydride is ``features.principal_chain``, ``'ring'``
+            when it is a ring, or ``None`` when the handler cannot know. This is
+            the scope the front-of-name block is read in (P-91.3, BB:44639
+            "NAMING OF STEREOISOMERS", :44643 -- descriptors "are placed at the
+            front of the complete name when related to the parent structure",
+            and P-14.3.3, BB:2867 "Citation of locants", :2869 -- locants are
+            scoped per enclosing-mark unit). It CANNOT be inferred here; see the
+            fail-closed branch below for the two refuted inference attempts.
 
     Returns:
         Name with stereo prefix prepended if needed, or original name if:
         - No stereocenters/double bond stereo in features
         - Name already has a stereo prefix
         - No atom_to_locant mapping available for locant resolution
+        - The parent scope is undeclared and the two candidate scopes disagree
     """
     import re
 
@@ -9946,15 +9957,43 @@ def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional
     if re.match(r'\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)-', name):
         return name
 
-    # Generate stereo prefix using the centralized function.
-    # caller_selects_parent=False: this function does NOT choose the parent -- it
-    # decorates a name an early-return handler already built, which may well be a RING
-    # parent even though features.principal_chain is truthy (measured: a stale 1-2 atom
-    # chain on `...cyclohexane` and on `cyclonon-2-en-1-yl formate`). So the
-    # parent-scope rule that the parent-assembling callers get by default must not be
-    # inferred here; callers that DO know their scope pass atom_to_locant explicitly.
-    stereo_frag = _generate_stereodescriptors(
-        features, atom_to_locant_override=atom_to_locant, caller_selects_parent=False)
+    # This function does NOT choose the parent -- it decorates a name some OTHER
+    # handler already built, so the scope of a front-of-name block is a property of
+    # THAT name, which only its producer knows. Two inference attempts were measured
+    # and both are REFUTED, so neither may be reinstated:
+    #   * `features.principal_chain` truthy => chain parent. False: it is a stale
+    #     1-2 atom fragment on the ring-parent rows `...pentakis(acetyloxy)cyclohexane`
+    #     (pc=(1,0)) and `cyclonon-2-en-1-yl formate` (pc=(1,)); guarding on it dropped
+    #     both correct descriptors.
+    #   * `features.chain_is_parent` (namer.py:1447, parent selection's own verdict)
+    #     => chain parent. False: it is True on 48/48 differing calls of the
+    #     pubchem_2000 census, INCLUDING both ring-parent rows above -- the handlers
+    #     here override parent selection and build a ring-parent name anyway.
+    # So the scope is DECLARED by the caller (`parent_scope` / `atom_to_locant`), and
+    # where it is not declared we fail closed on disagreement rather than cite a
+    # locant that may not resolve. Cf. composer.py:2685 D-09, "better a missing stereo
+    # block than a wrong one".
+    if atom_to_locant:
+        # Caller handed us the exact numbering of the name it built -- the priority
+        # chain is bypassed entirely, so caller_selects_parent cannot matter
+        # (measured: 229/229 override calls resolve identically either way).
+        stereo_frag = _generate_stereodescriptors(
+            features, atom_to_locant_override=atom_to_locant)
+    elif parent_scope == 'chain':
+        stereo_frag = _generate_stereodescriptors(features, caller_selects_parent=True)
+    elif parent_scope == 'ring':
+        stereo_frag = _generate_stereodescriptors(features, caller_selects_parent=False)
+    else:
+        _ring_res = _generate_stereodescriptors(features, caller_selects_parent=False)
+        _chain_res = _generate_stereodescriptors(features, caller_selects_parent=True)
+        _rt = _ring_res.text if _ring_res else None
+        _ct = _chain_res.text if _chain_res else None
+        if _rt != _ct:
+            # The two candidate scopes disagree and no caller declared which one the
+            # name is numbered in. Emitting either risks a front-of-name locant that
+            # does not resolve in the parent's numbering (P-14.3.3, BB:2869).
+            return name
+        stereo_frag = _ring_res
     if stereo_frag and stereo_frag.text:
         return f"{stereo_frag.text}{name}"
     return name

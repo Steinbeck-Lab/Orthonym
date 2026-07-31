@@ -63,6 +63,26 @@ def _is_ring_ester(features: Any) -> bool:
     return True
 
 
+def _alcohol_is_ring(mol: Any) -> Optional[str]:
+    """``'ring'`` when the ester's alkoxy carbon is a ring atom, else ``None``.
+
+    ``find_ester_match`` returns the ``[CX3](=O)[OX2][#6]`` match, so
+    ``match[3]`` is the alcohol-side carbon -- the atom the ``<R>yl`` word of a
+    P-65.6.3.2.1 functional-class ester name is numbered from. ``None`` means
+    "not declarable here", never "chain": the acid-side parent of such a name is
+    not ``features.principal_chain`` in general, so claiming ``'chain'`` would be
+    the same unproven inference this whole fix removes.
+    """
+    from ...rules.esters import find_ester_match
+    try:
+        match = find_ester_match(mol)
+        if match is None or len(match) < 4:
+            return None
+        return 'ring' if mol.GetAtomWithIdx(int(match[3])).IsInRing() else None
+    except Exception:  # noqa: BLE001 -- declaration is advisory; None = fail closed
+        return None
+
+
 def _functional_class_name(features: Any) -> Optional[str]:
     """P-65.6.3.2.1 functional-class name for a mono-ester, or None.
 
@@ -118,9 +138,26 @@ def name_ring_ester(
     if not exocyclic:
         return None
 
+    # v29 P7 C1: record WHICH parent this handler numbered the name in, so the
+    # stereo injector does not have to guess it (P-91.3, BB:44639 "NAMING OF
+    # STEREOISOMERS", :44643 -- a front-of-name block is read in the parent's
+    # numbering). Neither features.principal_chain nor features.chain_is_parent
+    # recovers it here: both say "chain" on the ring-parented rows this handler
+    # emits (see composer._inject_stereo_if_missing).
+    parent_scope = None
     ring_ester_name = _functional_class_name(features) if len(exocyclic) == 1 else None
-    if ring_ester_name is None:
+    if ring_ester_name is not None:
+        # P-65.6.3.2.1 functional class `<R>yl <acyl>ate`. The front-of-name
+        # descriptor is numbered in the ALCOHOL component, so the ring is the
+        # scope only when the alkoxy carbon is the ring atom. When it is not
+        # (`methyl ...oate`, acid-side parent) the scope stays undeclared and the
+        # injector fails closed rather than cite the ring's numbering.
+        parent_scope = _alcohol_is_ring(features.mol)
+    else:
         ring_ester_name = _assemble_ring_with_ester_prefixes(features, exocyclic)
+        # Substitutive ring parent by construction -- the assembler numbers the
+        # ring and cites every ester as an acyloxy prefix on it.
+        parent_scope = 'ring'
     if not ring_ester_name:
         return None
 
@@ -133,7 +170,9 @@ def name_ring_ester(
 
     pool = get_current_pool()
     pool.add(ring_ester_name, "ring_ester", features)
-    final_name = _inject_stereo_if_missing(features, pool.best().name)
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, parent_scope=parent_scope,
+    )
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="ring_ester", iupac_section_cite="P-65.6", fragment_legacy=final_name),

@@ -383,3 +383,262 @@ def test_corrected_names_round_trip_through_opsin(opsin_jar, smiles, name):
     assert Chem.MolToInchiKey(got) == Chem.MolToInchiKey(Chem.MolFromSmiles(smiles)), (
         f"{name} round-trips to a DIFFERENT stereoisomer: {parsed}"
     )
+
+
+# ==========================================================================
+# RESIDUAL (Task 2 CRITICAL review): `_inject_stereo_if_missing`.
+#
+# The five parent-ASSEMBLING callers inherit the parent-scope rule by default.
+# `_inject_stereo_if_missing` is the one caller that does NOT select a parent --
+# it decorates a name ~42 handler sites already built -- so it was left on legacy
+# ring-priority resolution and stayed a live member of the class.
+#
+# Measured over 661 live calls / 176 molecules / 21 distinct call sites
+# (pubchem_2000 + chebi_5000 stereo rows, census in
+# ):
+#   * 429 calls pass an explicit `atom_to_locant` -> immune, 0 differ.
+#   * 66 calls / 16 molecules resolve DIFFERENTLY under the two candidate scopes.
+#   * 14 of those 16 abstain; 2 emit, and in both the LEGACY answer is correct.
+#     0 leak a wrong emission, so the 0-wrong invariant held -- it was a coverage
+#     loss, not a wrong name.
+#
+# Two inference attempts were measured and REFUTED, and these tests pin both so
+# neither can be reinstated:
+#   * `features.principal_chain` truthy => chain parent -- false, it is a stale
+#     1-2 atom fragment on the two ring-parent rows below.
+#   * `features.chain_is_parent` (parent selection's own verdict, namer.py:1447)
+#     => chain parent -- false, it is True on 48/48 differing pubchem calls
+#     INCLUDING both ring-parent rows.
+# So the scope is DECLARED by the producer that chose the parent.
+# ==========================================================================
+
+# The residual counter-example. NOTE the parent stem: the acyl chain is
+# UNSATURATED, so the PIN is `prop-2-enoyl`, not `propanoyl`. `propanoyl` is
+# saturated and OPSIN rejects `(2E)-...propanoyl chloride` outright with
+# "Could not find bond that: <stereoChemistry locant='2' type='EorZ'> was
+# referring to" -- the C=C had been silently dropped by the acyl namer.
+SMILES_C1R = "C[C@@H]1C[C@H]1/C=C/C(Cl)=O"
+EXPECTED_C1R = "(2E)-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enoyl chloride"
+
+
+def test_residual_acid_halide_cites_the_parents_own_numbering(namer):
+    """HEAD emitted `(1R,2R)-3-[(1R,2R)-2-methylcyclopropyl]propanoyl chloride`:
+    the cyclopropyl SUBSTITUENT's numbering, duplicated at parent scope, on a
+    parent stem that had also lost its double bond."""
+    assert namer.name(SMILES_C1R) == EXPECTED_C1R
+
+
+def test_residual_parent_block_is_not_the_substituent_block(namer):
+    """The `(1R,2R)` belongs inside the brackets and nowhere else (P-91.3)."""
+    name = namer.name(SMILES_C1R)
+    assert name.startswith("(2E)-"), name
+    assert name.count("(1R,2R)") == 1, f"substituent block duplicated: {name}"
+
+
+# The two rows a naive `principal_chain`-only guard broke. Both are RING parents
+# carrying a STALE truthy `principal_chain` (pc=(1,0) and pc=(1,)) AND
+# `chain_is_parent=True`. They must keep their descriptors.
+RING_PARENT_ROWS = [
+    ("CC(=O)O[C@@H]1[C@H](C([C@H]([C@@H](C1OC(=O)C)OC(=O)C)OC(=O)C)F)OC(=O)C",
+     "(1S,2R,4S,5R)-3-fluoro-1,2,4,5,6-pentakis(acetyloxy)cyclohexane"),
+    ("C1CCCC(/C=C\\CC1)OC=O", "(2Z)-cyclonon-2-en-1-yl formate"),
+]
+
+
+def test_ring_parent_row_set_is_non_empty():
+    """No vacuous parametrised loop."""
+    assert len(RING_PARENT_ROWS) == 2
+
+
+@pytest.mark.parametrize("smiles,expected", RING_PARENT_ROWS)
+def test_ring_parent_descriptors_are_not_dropped(namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+def _capture_injections(namer, smiles):
+    """Run the REAL pipeline and capture every `_inject_stereo_if_missing` call.
+
+    `compute_features` alone is NOT enough here: it does not run parent
+    selection, so `principal_group`/`principal_chain`/`chain_is_parent` are all
+    empty and a test built on it would assert against features production never
+    sees. Spying the live call is also the stronger test -- it pins the value the
+    producer actually declared.
+    """
+    import orthonym.assembly.composer as composer
+
+    orig = composer._inject_stereo_if_missing
+    seen = []
+
+    def _spy(features, name, atom_to_locant=None, parent_scope=None):
+        out = orig(features, name, atom_to_locant, parent_scope)
+        seen.append({"features": features, "name": name,
+                     "atom_to_locant": atom_to_locant,
+                     "parent_scope": parent_scope, "out": out})
+        return out
+
+    composer._inject_stereo_if_missing = _spy
+    try:
+        final = namer.name(smiles)
+    finally:
+        composer._inject_stereo_if_missing = orig
+    return final, seen
+
+
+def test_the_injection_site_is_actually_on_the_path(namer):
+    """Spy validated on known positives before anything is asserted about it
+    (a documented 8-for-8 failure mode: the named site is off the path)."""
+    for smiles, _ in RING_PARENT_ROWS:
+        _final, seen = _capture_injections(namer, smiles)
+        assert seen, f"_inject_stereo_if_missing never ran for {smiles}"
+    _final, seen = _capture_injections(namer, SMILES_C1R)
+    assert seen, "_inject_stereo_if_missing never ran for the residual row"
+
+
+def test_ring_parent_rows_defeat_both_refuted_inferences(namer):
+    """Pins WHY the scope must be declared: on these rows both candidate
+    signals say "chain" while the name is numbered in the RING."""
+    checked = 0
+    for smiles, _expected in RING_PARENT_ROWS:
+        _final, seen = _capture_injections(namer, smiles)
+        assert seen, f"site never ran for {smiles}"
+        features = seen[0]["features"]
+        assert features.principal_chain, (
+            "premise gone: principal_chain is falsy, so it could not mislead")
+        assert getattr(features, "chain_is_parent", False), (
+            "premise gone: chain_is_parent is False, so it could not mislead")
+        # ... and yet the chain it points at is a 1-2 atom fragment, not the parent.
+        assert len(features.principal_chain) <= 2, features.principal_chain
+        checked += 1
+    assert checked == len(RING_PARENT_ROWS)
+
+
+def test_undeclared_scope_fails_closed_when_the_two_scopes_disagree(namer):
+    """`parent_scope=None` and the ring/chain resolutions differ -> no block.
+
+    Better a missing stereo block than a locant that may not resolve
+    (P-14.3.3, BB:2867 "Citation of locants", :2869) -- the same D-09 posture
+    `_ring_handler_parent_atom_indices` already documents.
+    """
+    from orthonym.assembly.composer import _inject_stereo_if_missing
+    from orthonym.assembly.handlers._handler_shared import _generate_stereodescriptors
+
+    _final, seen = _capture_injections(namer, SMILES_C1R)
+    assert seen, "site never ran"
+    features = seen[0]["features"]
+
+    ring = _generate_stereodescriptors(features, caller_selects_parent=False)
+    chain = _generate_stereodescriptors(features, caller_selects_parent=True)
+    ring_t = ring.text if ring else None
+    chain_t = chain.text if chain else None
+    assert ring_t != chain_t, (
+        "premise gone: the two scopes agree here, so this row cannot test "
+        f"fail-closed ({ring_t!r} vs {chain_t!r})")
+
+    stem = "3-[(1R,2R)-2-methylcyclopropyl]prop-2-enoyl chloride"
+    assert _inject_stereo_if_missing(features, stem) == stem
+    assert _inject_stereo_if_missing(
+        features, stem, parent_scope='chain') == chain_t + stem
+    assert _inject_stereo_if_missing(
+        features, stem, parent_scope='ring') == ring_t + stem
+
+
+def test_declared_scope_is_honoured_even_when_the_scopes_agree(namer):
+    """A declaration must never *lose* a descriptor the legacy path emitted."""
+    from orthonym.assembly.composer import _inject_stereo_if_missing
+
+    smiles, _ = RING_PARENT_ROWS[1]
+    _final, seen = _capture_injections(namer, smiles)
+    assert seen, "site never ran"
+    features = seen[0]["features"]
+    stem = "cyclonon-2-en-1-yl formate"
+    assert _inject_stereo_if_missing(
+        features, stem, parent_scope='ring') == "(2Z)-" + stem
+
+
+# --------------------------------------------------------------------------
+# The producer reports the parent it chose -- that is where the fix is rooted.
+# --------------------------------------------------------------------------
+
+ACYL_SCOPE_ROWS = [
+    ("CCC(Cl)=O", "chain"),                    # acyclic acyl -> chain parent
+    ("c1ccccc1C(Cl)=O", "ring"),               # benzoyl -> ring parent
+    ("C[C@@H]1C[C@H]1/C=C/C(Cl)=O", "chain"),  # the residual row
+]
+
+
+def test_acyl_scope_row_set_is_non_empty():
+    assert len(ACYL_SCOPE_ROWS) == 3
+
+
+@pytest.mark.parametrize("smiles,expected_scope", ACYL_SCOPE_ROWS)
+def test_acid_halide_producer_reports_its_parent(namer, smiles, expected_scope):
+    """End-to-end: the producer records the branch it took and the handler hands
+    that declaration to the injector."""
+    _final, seen = _capture_injections(namer, smiles)
+    assert seen, f"the injection site never ran for {smiles}"
+    scopes = {c["parent_scope"] for c in seen}
+    assert expected_scope in scopes, (
+        f"{smiles}: expected a {expected_scope!r} declaration, saw {scopes}")
+
+
+def test_ring_ester_declares_ring_only_when_the_alcohol_is_the_ring():
+    """`<R>yl <acyl>ate` is numbered in the ALCOHOL component."""
+    from rdkit import Chem
+
+    from orthonym.assembly.handlers.ring_ester import _alcohol_is_ring
+
+    assert _alcohol_is_ring(Chem.MolFromSmiles("C1CCCC(/C=C\\CC1)OC=O")) == 'ring'
+    assert _alcohol_is_ring(Chem.MolFromSmiles("CCCCCC(=O)OC")) is None
+
+
+# --------------------------------------------------------------------------
+# Collateral, found by verifying WHAT IS EMITTED after the fix (the contributor guide #9):
+# `_build_acyl_name`'s `unsaturation` parameter had NO caller, so every acyl
+# halide was spelled saturated and its C=C silently dropped.
+# --------------------------------------------------------------------------
+
+ACYL_UNSATURATION_ROWS = [
+    ("CCCCC/C=C\\C(Cl)=O", "(2Z)-oct-2-enoyl chloride"),
+    ("CCC(Cl)=O", "propanoyl chloride"),      # saturated control, unchanged
+    ("CC(=O)Cl", "acetyl chloride"),          # retained name, unchanged
+    ("c1ccccc1C(Cl)=O", "benzoyl chloride"),  # ring parent, unchanged
+]
+
+
+def test_acyl_unsaturation_row_set_is_non_empty():
+    assert len(ACYL_UNSATURATION_ROWS) == 4
+
+
+@pytest.mark.parametrize("smiles,expected", ACYL_UNSATURATION_ROWS)
+def test_acyl_halide_spells_its_own_unsaturation(namer, smiles, expected):
+    assert namer.name(smiles) == expected
+
+
+@pytest.mark.opsin_gate
+def test_residual_name_round_trips_through_opsin(opsin_jar):
+    """InChIKey identity, not merely parseability."""
+    from rdkit import Chem
+
+    if not opsin_jar:
+        pytest.skip("OPSIN jar not available")
+
+    parsed = _opsin_smiles(opsin_jar, EXPECTED_C1R)
+    assert parsed, f"OPSIN could not parse: {EXPECTED_C1R}"
+    got = Chem.MolFromSmiles(parsed)
+    assert got is not None, parsed
+    assert Chem.MolToInchiKey(got) == Chem.MolToInchiKey(
+        Chem.MolFromSmiles(SMILES_C1R)), (
+        f"{EXPECTED_C1R} round-trips to a DIFFERENT stereoisomer: {parsed}")
+
+
+@pytest.mark.opsin_gate
+def test_the_briefs_saturated_spelling_is_genuinely_unparseable(opsin_jar):
+    """Guards the correction: `propanoyl` carries no C2=C3, so `(2E)-` cannot
+    resolve. This is why the expected name is `prop-2-enoyl`, and it must stay
+    red if anyone 'simplifies' the stem back."""
+    if not opsin_jar:
+        pytest.skip("OPSIN jar not available")
+
+    bad = "(2E)-3-[(1R,2R)-2-methylcyclopropyl]propanoyl chloride"
+    assert _opsin_smiles(opsin_jar, bad) is None, (
+        "OPSIN now parses the saturated spelling -- re-derive the expected name")

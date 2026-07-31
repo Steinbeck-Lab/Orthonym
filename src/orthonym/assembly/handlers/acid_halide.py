@@ -48,7 +48,12 @@ def name_acid_halide(
     from ..composer import _inject_stereo_if_missing
     from ...rules.acid_halides import name_acid_halide as _name_acid_halide
 
-    halide_name = _name_acid_halide(features)
+    # v29 P7 C1: the producer records which parent it numbered the name in; the
+    # stereo injector below must not re-infer it (measured: both
+    # features.principal_chain and features.chain_is_parent report "chain" on
+    # ring-parented names -- see composer._inject_stereo_if_missing).
+    _scope_out: dict = {}
+    halide_name = _name_acid_halide(features, scope_out=_scope_out)
     if not halide_name:
         return None
 
@@ -64,6 +69,7 @@ def name_acid_halide(
     # composer.py:923 inline: _inject_stereo_if_missing(features, pool.best().name, atom_to_locant=None)
     final_name = _inject_stereo_if_missing(
         features, pool.best().name, atom_to_locant=None,
+        parent_scope=_scope_out.get('parent_scope'),
     )
     return NamingResult(
         name=final_name,
