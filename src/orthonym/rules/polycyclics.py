@@ -175,7 +175,18 @@ def get_polycyclic_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
 # tier (P-62.2.1.2 / P-14.4(c)). Using the authoritative principal_group avoids
 # re-deriving seniority here and is fail-safe: any senior group (acid/-ol/...)
 # makes principal_group != amine, so the amine stays the 'amino' prefix.
-_PAH_AMINE_PRINCIPAL_KEYS = frozenset({'aromatic_amine', 'primary_amine'})
+#
+# `secondary_amine`/`tertiary_amine` added 2026-07-31: an N-SUBSTITUTED amine is
+# still an amine and P-41 still requires it as the suffix
+# (`N-phenylnaphthalen-1-amine`, on the model of :21610
+# `4-methoxy-N-phenylaniline (PIN)`). Excluding them left the PAH path shipping
+# `1-anilinonaphthalene` -- a parent hydride with NO suffix for the senior
+# characteristic group -- and abstaining outright on `CNc1cccc2ccccc12`. The
+# `not suffix_groups` guard on the promotion is unchanged, so any senior group
+# still keeps the amine a prefix.
+_PAH_AMINE_PRINCIPAL_KEYS = frozenset({
+    'aromatic_amine', 'primary_amine', 'secondary_amine', 'tertiary_amine',
+})
 
 # v29 Phase C Task 10 (P-14.3.4 / P-41): the principal-group keys under which a ring
 # hydroxy on a polycyclic parent must be expressed as the `-ol` SUFFIX rather than a
@@ -858,6 +869,31 @@ def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optio
     if h_count == 2 and len(neighbors) == 0:
         return {'name': 'amino', 'atoms': [n_idx]}
 
+    # An N-SUBSTITUTED amine is named here in its honest PREFIX form
+    # (`methylamino`, `dimethylamino`) -- P-62.5's `bis(dimethylamino)` shows the
+    # construction. Whether it may instead become the `-amine` SUFFIX depends on
+    # the molecule's principal group and on no senior suffix being present, and
+    # neither is known here; the collector decides that in a second pass.
+    #
+    # Deciding it at this point would be unsafe in a specific way: a prefix
+    # rewritten to bare `amino` whose promotion then does NOT fire would silently
+    # drop the N-substituent and name a DIFFERENT molecule. Naming the prefix
+    # honestly is safe either way -- it was previously unnamed, so these
+    # molecules abstained outright.
+    if h_count <= 1 and neighbors:
+        from .fused_rings import _exocyclic_amine_n_substituents
+        _detected = _exocyclic_amine_n_substituents(mol, n_idx, core_atoms)
+        if _detected:
+            from collections import Counter as _Counter
+            from ..assembly.naming_utils import (
+                enclose_if_compound as _enc, get_multiplier_prefix as _gmp,
+            )
+            _names, _atoms = _detected
+            _parts = [f"{_gmp(_ct, _nm)}{_enc(_nm)}"
+                      for _nm, _ct in sorted(_Counter(_names).items())]
+            return {'name': f"{''.join(_parts)}amino",
+                    'atoms': [n_idx] + _atoms}
+
     # W2F-P6 (P-66.1.6.1.1.3): N-substituted urea substituent on the PAH core.
     # The PROXIMAL N (-NH-) is bonded to the core + a carbonyl C that bears one
     # =O and a second (DISTAL) N: core-NH-C(=O)-NR2 -> '(R-carbamoyl)amino'.
@@ -1161,12 +1197,44 @@ def name_substituted_polycyclic(
     suffix_groups: Dict[str, List[int]] = defaultdict(list)  # suffix_name -> [locants]
     prefix_substituent_groups: Dict[str, List[int]] = defaultdict(list)
 
+    amine_n_substituents: List[str] = []   # italic-N prefixes of an N-substituted amine
+    _amine_candidates = []                 # (position, prefix_name, nitrogen_idx)
     for position, sub_list in substituents.items():
         for sub_info in sub_list:
             if sub_info.get('is_suffix'):
                 suffix_groups[sub_info['name']].append(position)
             else:
                 prefix_substituent_groups[sub_info['name']].append(position)
+                _atoms = sub_info.get('atoms') or ()
+                if _atoms and sub_info['name'] != 'amino' and \
+                        mol.GetAtomWithIdx(_atoms[0]).GetSymbol() == 'N':
+                    _amine_candidates.append(
+                        (position, sub_info['name'], _atoms[0]))
+
+    # P-41, SECOND PASS: an N-substituted amine cited as a prefix
+    # (`anilino`, `methylamino`) becomes the `-amine` SUFFIX with italic-N
+    # prefixes -- `N-phenylnaphthalen-1-amine`, not the suffix-less
+    # `1-anilinonaphthalene`. `4-methoxy-N-phenylaniline (PIN)` (:21610) is the
+    # shape; `anilino` stays a legitimate prefix only where a SENIOR group holds
+    # the suffix (:6371's phenol), which is what `not suffix_groups` tests.
+    #
+    # Deliberately a second pass, not a decision inside `_identify_pah_substituent`:
+    # rewriting a prefix to bare `amino` when the promotion then fails to fire
+    # would DROP the N-substituent and name a different molecule. Here both
+    # preconditions are already known, and every step is reversible-by-omission --
+    # if the detector declines, nothing is touched.
+    if (principal_group in _PAH_AMINE_PRINCIPAL_KEYS and not suffix_groups
+            and len(_amine_candidates) == 1):
+        from .fused_rings import _exocyclic_amine_n_substituents
+        _pos, _nm, _nidx = _amine_candidates[0]
+        _detected = _exocyclic_amine_n_substituents(mol, _nidx, core_set)
+        _subs = _detected[0] if _detected else None
+        if _subs:
+            prefix_substituent_groups[_nm].remove(_pos)
+            if not prefix_substituent_groups[_nm]:
+                del prefix_substituent_groups[_nm]
+            prefix_substituent_groups['amino'].append(_pos)
+            amine_n_substituents.extend(_subs)
 
     # v28 Cluster A Fix 2 (P-62.2.1.1.1 / P-41, mirror of benzene.py C4): when a
     # primary amine IS the molecule-level principal group (no senior suffix, no
@@ -1222,6 +1290,28 @@ def name_substituted_polycyclic(
         count = len(locants)
         prefix_str = format_substituent_prefix(name, locants, count)
         prefixes.append(prefix_str)
+
+    # The italic-N prefixes of a promoted N-substituted amine. Cited only when
+    # the amine actually became the suffix -- `suffix_groups.get('amine')` is the
+    # promotion's own record, so an amine left as a prefix by a senior group
+    # never reaches here. P-14.3.2: the amine nitrogen has no numeric locant, so
+    # italic N is correct here (unlike a RING nitrogen, which takes its number).
+    if amine_n_substituents and suffix_groups.get('amine'):
+        # Aliased on import: a later function-local `from ... import
+        # get_multiplier_prefix` in this same function makes the module-level
+        # binding a local, so referring to the bare name here raises
+        # UnboundLocalError before that import executes.
+        from ..assembly.naming_utils import (
+            _wrap_n_substituent as _wrap_n,
+            get_multiplier_prefix as _gmp,
+        )
+        from collections import Counter as _Counter
+        _n_parts = []
+        for _nm, _ct in sorted(_Counter(amine_n_substituents).items(),
+                               key=lambda kv: alpha_sort_key(kv[0])):
+            _n_parts.append(f"{','.join(['N'] * _ct)}-"
+                            f"{_gmp(_ct, _nm)}{_wrap_n(_nm)}")
+        prefixes = _n_parts + prefixes
 
     # Join prefixes with proper hyphenation
     prefix_part = _join_pah_prefixes(prefixes)

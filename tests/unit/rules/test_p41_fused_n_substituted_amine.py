@@ -56,6 +56,30 @@ def test_monocyclic_controls_unchanged(smiles, expected):
     assert name_compound(smiles) == expected
 
 
+@pytest.mark.parametrize("smiles,expected", [
+    # The CARBOCYCLIC half, a separate producer (rules/polycyclics.py). The
+    # anilino row shipped a wrong name; the rest abstained outright.
+    ("c1ccc2c(c1)cccc2Nc1ccccc1", "N-phenylnaphthalen-1-amine"),
+    ("CNc1cccc2ccccc12", "N-methylnaphthalen-1-amine"),
+    ("CCNc1cccc2ccccc12", "N-ethylnaphthalen-1-amine"),
+    ("CN(C)c1cccc2ccccc12", "N,N-dimethylnaphthalen-1-amine"),
+    # primary amine on the same parent unchanged
+    ("Nc1cccc2ccccc12", "naphthalen-1-amine"),
+])
+def test_pah_amine_takes_the_suffix(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+def test_a_senior_group_keeps_the_amine_a_prefix():
+    """``anilino`` IS a preferred prefix where a SENIOR characteristic group
+    holds the suffix -- ``:6371``'s example sits on a phenol. With a carboxylic
+    acid present the amine must NOT be promoted, and the `not suffix_groups`
+    guard is what enforces it. This is the control that makes the promotion
+    above safe rather than indiscriminate."""
+    assert name_compound("OC(=O)c1ccc2ccccc2c1Nc1ccccc1") == \
+        "1-anilinonaphthalene-2-carboxylic acid"
+
+
 class TestTheGuardsHold:
     """The detector must decline anything that is not a plain amine nitrogen."""
 

@@ -1395,8 +1395,12 @@ def name_fused_heterocycle(mol):
     return (name, ring_atoms, atom_mapping, True)
 
 
-def _exocyclic_amine_n_substituents(mol, n_idx: int, core_atoms) -> Optional[List[str]]:
-    """Names of the groups on an EXOCYCLIC amine nitrogen, or ``None`` to decline.
+def _exocyclic_amine_n_substituents(mol, n_idx: int, core_atoms):
+    """``(names, atoms)`` for an EXOCYCLIC amine nitrogen, or ``None`` to decline.
+
+    ``names`` are the groups on the nitrogen; ``atoms`` are every atom they
+    cover, so a caller that must account for the whole fragment can do so
+    without re-walking the graph.
 
     P-41: an amine is a characteristic group and, when it is the senior one, must
     be expressed as the ``-amine`` SUFFIX -- ``N-methylquinolin-2-amine``, never
@@ -1438,7 +1442,7 @@ def _exocyclic_amine_n_substituents(mol, n_idx: int, core_atoms) -> Optional[Lis
 
     from ..assembly.substituent_enumerator import name_substituent
 
-    names = []
+    names, all_atoms = [], []
     for b_idx in branches:
         b_atom = mol.GetAtomWithIdx(b_idx)
         if b_atom.GetSymbol() != 'C':
@@ -1465,7 +1469,8 @@ def _exocyclic_amine_n_substituents(mol, n_idx: int, core_atoms) -> Optional[Lis
         if not nm:
             return None
         names.append(nm)
-    return names
+        all_atoms.extend(frag)
+    return names, all_atoms
 
 
 def get_fused_heterocycle_substituents(
@@ -1556,7 +1561,7 @@ def get_fused_heterocycle_substituents(
                 # Amino group (-NH2) - use suffix form (-amine)
                 result['amino_substituents'].append(locant)
             elif sub_type == 'functional' and (
-                    _n_subs := _exocyclic_amine_n_substituents(
+                    _amine := _exocyclic_amine_n_substituents(
                         mol, nbr_idx, core_atoms)):
                 # P-41: an N-SUBSTITUTED amine is still an amine, so it takes the
                 # `-amine` suffix with its N-substituents cited as italic-N
@@ -1573,7 +1578,7 @@ def get_fused_heterocycle_substituents(
                 # whose own characteristic group outranks the amine -- there, a
                 # phenol. With no senior group present the amine cannot be demoted.
                 result['amino_substituents'].append(locant)
-                for _nm in _n_subs:
+                for _nm in _amine[0]:
                     result['n_substituents'][_nm] += 1
             elif sub_type == 'functional':
                 # Other functional groups (nitro, hydroxy, methylamino, etc.)
