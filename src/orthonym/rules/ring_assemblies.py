@@ -2147,9 +2147,15 @@ def name_ring_assembly(
     # '[1,1'-biphenyl]-4,4'-dicarboxylic acid', '[1,1'-biphenyl]-4-carbaldehyde',
     # '[1,1'-biphenyl]-4-carbonitrile' — and direct groups —
     # '[1,1'-biphenyl]-4-amine', '[1,1'-biphenyl]-4,4'-diol' — all follow the
-    # same enclosed-parent + locant + multiplied-suffix shape. Prefix forms for
-    # these mis-name or drop atoms (CHO -> 'formaldehydyl', CN -> 'hydrogen
-    # cyanidyl' — leaks the OPSIN self-consistency gate suppresses to 'unknown').
+    # same enclosed-parent + locant + multiplied-suffix shape. Expressing the
+    # PRINCIPAL characteristic group as a prefix would be wrong here regardless
+    # of spelling — it is the suffix rule above that forces the enclosed-parent
+    # shape, not any defect in the prefix vocabulary.
+    # (Historical note, corrected v29 P7 Task 3: this comment used to justify
+    # itself by claiming the generic namer emits 'formaldehydyl' / 'hydrogen
+    # cyanidyl'. It did, but that was a defect in parent_to_prefix, now fixed —
+    # CHO -> 'formyl' and HCN -> 'cyano'. Do not re-derive a nomenclature rule
+    # from that former misbehaviour.)
     # Scope (fail-closed): EVERY substituent is the SAME suffix-expressible PCG;
     # mixed / other decorations keep the established prefix-only path below.
     _pcg_kinds = [
@@ -2206,13 +2212,29 @@ def name_ring_assembly(
         if _mixed is not None:
             return _mixed
 
-    # Fail-closed veto: a -CHO / -C#N on a ring assembly has NO valid prefix
-    # form — the generic substituent namer emits the bogus 'formaldehydyl' /
-    # 'hydrogen cyanidyl' (OPSIN-unparseable; suppressed WITH Java, shipped WRONG
-    # without it). The single-kind suffix path above already consumed the pure
-    # cases; reaching here means the group is MIXED with others, which needs the
-    # prefix+suffix ring-assembly builder (not yet built). Refuse rather than
-    # ship a wrong name (accuracy #1).
+    # Fail-closed veto: a MIXED -CHO / -C#N on a ring assembly.
+    #
+    # ⚠ Corrected v29 P7 Task 3 — this comment previously read "a -CHO / -C#N
+    # on a ring assembly has NO valid prefix form". That is FALSE as a
+    # nomenclature claim, and the Blue Book says so directly:
+    #   P-66.6.1.3 (BB:35000, under P-66.6 ALDEHYDES): "... a -CHO group is
+    #     expressed by the preferred prefix 'oxo' if located at an end of a
+    #     carbon chain, or, otherwise, by the preferred prefix 'formyl'."
+    #     BB:35009 is a verbatim ring example: '4-formylcyclohexane-1-
+    #     carboxylic acid (PIN)'.
+    #   P-66.5.1.1.4 (BB:34734): the -CN group "is designated by the preferred
+    #     prefix 'cyano'".
+    # Both groups DO have valid preferred prefixes. What was true was the
+    # empirical half: parent_to_prefix emitted 'formaldehydyl' / 'hydrogen
+    # cyanidyl'. That was a defect in the converter, not a fact about IUPAC,
+    # and it is fixed (see _FUNCTIONAL_PARENT_NO_YL_FORM in
+    # assembly/substituent_naming.py).
+    #
+    # The veto nevertheless STAYS, for the reason stated in the next sentence
+    # and only that reason: the single-kind suffix path above already consumed
+    # the pure cases, so reaching here means the group is MIXED with others,
+    # which needs the prefix+suffix ring-assembly builder (not yet built).
+    # Refuse rather than ship a wrong name (accuracy #1).
     for _s in substituent_list:
         _a = _s['sub_atoms'][0]
         if (_is_formyl_substituent(mol, _s['sub_atoms'], _a)

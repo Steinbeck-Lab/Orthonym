@@ -2365,6 +2365,33 @@ _RETAINED_NAME_PREFIX = {
     'oxalic acid': 'oxalyl',             # ethanedioyl
     'phthalic acid': 'phthaloyl',        # benzene-1,2-dicarbonyl
 
+    # Aldehyde functional parent -> the DEFINED prefix, not a '-yl' transform.
+    # P-66.6.1.3 (BB:35000, under P-66.6 ALDEHYDES): "In the presence of a
+    # characteristic group having priority to be cited as a suffix or when
+    # present on a side chain, a -CHO group is expressed by the preferred
+    # prefix 'oxo' if located at an end of a carbon chain, or, otherwise, by
+    # the preferred prefix 'formyl'."  A substituent named through this
+    # converter is by construction NOT part of the parent chain, so the
+    # 'otherwise' arm applies (cf. BB:35009 '4-formylcyclohexane-1-carboxylic
+    # acid (PIN)').  P-65.1.8.3 (BB:30702) confirms the spelling and that the
+    # H of -CHO is substitutable.  Formaldehyde has ONE carbon, so -CHO is the
+    # only substituent derivable from it -- the conversion is unambiguous.
+    # ACETaldehyde is deliberately absent: with two carbons the prefix is
+    # 'acetyl' (attachment at the carbonyl C) or '2-oxoethyl' (attachment at
+    # the methyl C), and this converter receives no attachment context to
+    # choose between them, so it fails closed below instead.
+    'formaldehyde': 'formyl',
+
+    # HCN as a substituent -> the DEFINED prefix. P-66.5.1.1.4 (BB:34734):
+    # "When a group is present that has priority for citation as the principal
+    # characteristic group or when all -CN groups cannot be expressed as the
+    # principal characteristic group, the -CN group is designated by the
+    # preferred prefix 'cyano'."  BB:34687 derives nitriles "from hydrocyanic
+    # acid, H-C=N".  One carbon, one removable H, so unambiguous.  Without this
+    # the terminal fallback produced 'hydrogen cyanidyl' -- the sibling defect
+    # named in rules/ring_assemblies.py's veto comment.
+    'hydrogen cyanide': 'cyano',
+
     # Note: acetamide, formamide, benzamide are handled by the -amide regex
     # cascade (producing carbamoyl prefix form per IUPAC P-66.1.1.4).
     # They do NOT need lookup table entries.
@@ -2908,10 +2935,91 @@ def sulfino_hydrazonoyl_amido_prefix_from_branch(mol, n_idx: int, s_idx: int,
     return f"{stem}{word}hydrazonamido"
 
 
+def _elide_parent_hydride_ending(base: str):
+    """Elide a parent hydride's ending so ``-yl`` can be appended (P-29.2).
+
+    P-29.2 "GENERAL METHODOLOGY FOR NAMING SUBSTITUENT GROUPS" (BB:15811):
+    *"Systematic names are formed by using the suffixes 'yl', 'ylidene' and
+    'ylidyne', **with elision of the final letter 'e' of parent hydrides, when
+    present**, according to two methods"* — method (1) (BB:15813): *"The
+    suffixes 'yl', 'ylidene', and 'ylidyne' **replace the ending 'ane'** of the
+    parent hydride name."*
+
+    The callers previously elided only ``an``/``a`` and left ``ane`` intact,
+    which is how ``ethane`` + ``yl`` became ``ethaneyl`` (BB occurrences of
+    that string: zero).
+
+    Returns the elided stem, or ``None`` when ``base`` carries no elidable
+    parent-hydride ending — in which case the caller keeps its previous
+    behaviour rather than guessing.
+    """
+    if base.endswith('ane'):
+        return base[:-3]          # method (1): 'yl' replaces 'ane'
+    if base.endswith('an'):
+        return base[:-2]
+    if base.endswith('ene') or base.endswith('yne'):
+        return base[:-1]          # method (2): elide only the final 'e'
+    if base.endswith('a'):
+        return base[:-1]
+    return None
+
+
+# --- Functional parents that have NO '-yl' form ------------------------------
+# P-29.2 (BB:15811, heading "GENERAL METHODOLOGY FOR NAMING SUBSTITUENT
+# GROUPS") licenses the 'yl'/'ylidene'/'ylidyne' suffixes only for a PARENT
+# HYDRIDE.  A FUNCTIONAL parent is not a parent hydride, so no '<name>yl' form
+# exists for it — the Blue Book gives each of these classes a DEFINED prefix
+# instead.
+#
+# This guard must run BEFORE the suffix branches below, because two of them
+# match on a bare string ending and would otherwise CAPTURE these names: the
+# unlocanted '-ol' branch turned 'ethaneperoxol' into 'hydroxyethaneperoxyl'
+# and 'methanethiol' into 'hydroxymethanethiyl' (asserting an -OH where the
+# molecule has -SH), and the unlocanted '-amine' branch turned
+# 'O-methylhydroxylamine' into 'aminoO-methylhydroxylyl'.  Positioning, not
+# absence, was the defect: the pre-existing RC-1 guard further down is correct
+# but sits downstream of the branches that mis-capture.
+#
+# Only classes whose ending denotes a DIFFERENT characteristic group are listed.
+# Genuine alcohols with unsystematic stems ('menthol', 'cholesterol',
+# 'inositol', 'glycerol') are deliberately NOT here: 'hydroxy...yl' at least
+# names the right element for them, and denying them would change names outside
+# this defect class.
+_FUNCTIONAL_PARENT_NO_YL_FORM = (
+    # (name ending, the prefix the Blue Book uses instead)
+    ('aldehyde',
+     "'oxo' at a chain end, else 'formyl' (P-66.6.1.3, BB:35000)"),
+    ('thioperoxol',
+     "chalcogen analogue of 'hydroperoxy' (P-63.4.2, BB:27961)"),
+    ('peroxol',
+     "'hydroperoxy' (P-63.4.1, BB:27944)"),
+    ('thiol',
+     "'sulfanyl' — the group is -SH; 'hydroxy' would assert -OH"),
+    ('hydroxylamine',
+     "'hydroxyimino' / '(alkoxyimino)' (P-68.3.1.1.2, BB:38460)"),
+    ('glycol',
+     'a functional-class name, not a parent hydride'),
+)
+
+# Inorganic / functional-class parents matched as WHOLE names.  Deliberately
+# exact rather than a "contains a space" rule: the census shows space-bearing
+# ester parents ('henicosyl prop-2-enoate' -> '23-carboxytricosyl') convert
+# legitimately through the '-oate' branch, so a blanket space rule would break
+# them.  Each of these otherwise reached the terminal fallback and produced
+# 'wateryl' / 'ammoniayl' / 'carbon dioxidyl'.
+_NON_HYDRIDE_WHOLE_NAMES = frozenset({
+    'water',            # as a substituent the group is -OH, prefix 'hydroxy'
+    'ammonia',          # as a substituent the group is -NH2, prefix 'amino'
+    'carbon dioxide',
+    'carbon monoxide',
+    'hydrogen peroxide',  # -OOH is 'hydroperoxy' (P-63.4.1, BB:27944)
+})
+
+
 def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1) -> str:
     """Convert a parent compound name to substituent prefix form.
 
-    Per IUPAC P-31.1.3, the parent compound name is transformed into
+    Per IUPAC P-29.2 (BB:15811), the parent compound name is transformed into
     a substituent prefix by:
     1. Removing the suffix (e.g., -oic acid, -ol, -one)
     2. Converting the suffix to its prefix form (e.g., -ol -> hydroxy)
@@ -2941,6 +3049,25 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     name_lower = name.lower()
     if name_lower in _RETAINED_NAME_PREFIX:
         return _RETAINED_NAME_PREFIX[name_lower]
+
+    # v29 P7 C3: fail closed on FUNCTIONAL parents that have no '-yl' form.
+    # Hoisted ABOVE the suffix cascade on purpose — the '-ol' and '-amine'
+    # branches match on a bare string ending and would otherwise capture these
+    # (see _FUNCTIONAL_PARENT_NO_YL_FORM). Returning None makes the caller
+    # abstain; every call site tolerates it (5 guard with `if prefix:`, and
+    # name_substituent_fragment's _add_substituent_stereo returns None for a
+    # None name), so the SELF-01 gate sees an abstention rather than an
+    # OPSIN-unparseable fabrication.
+    if name_lower in _NON_HYDRIDE_WHOLE_NAMES:
+        logger.debug("C3 fail-closed: %r is not a parent hydride", name)
+        return None
+    for _ending, _bb_alternative in _FUNCTIONAL_PARENT_NO_YL_FORM:
+        if name_lower.endswith(_ending):
+            logger.debug(
+                "C3 fail-closed: %r is a functional parent with no '-yl' form; "
+                "the Blue Book uses %s", name, _bb_alternative,
+            )
+            return None
 
     # ---- Carboxylic acids: -oic acid / -anoic acid ----
     # e.g., "butanoic acid" -> "3-carboxypropyl"
@@ -2995,8 +3122,8 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         return f"{locant}-hydroxy{sep}{stem}yl"
 
     # ---- Multi-FG alcohol: -diol, -triol ----
-    # e.g., "propane-1,2-diol" -> "2,3-dihydroxypropyl"
-    # e.g., "ethane-1,2-diol" -> "2-hydroxy-1-(hydroxymethyl)" ... complex
+    # e.g., "propane-1,2-diol" -> "1,2-dihydroxypropyl"
+    # e.g., "ethane-1,2-diol" -> "1,2-dihydroxyethyl"
     # P-63.1.2 elides the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol),
     # so match BOTH spellings (tetra? = tetr|tetra) and derive the hydroxy
     # multiplier from the locant COUNT — group(2) 'tetr' must NOT become the
@@ -3008,10 +3135,9 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         count = locants.count(',') + 1
         multiplier = SIMPLE_MULTIPLIERS.get(count, '') if count > 1 else ''
         stem = name[:m_diol.start()]
-        if stem.endswith('an'):
-            stem = stem[:-2]
-        elif stem.endswith('a'):
-            stem = stem[:-1]
+        # P-29.2 (BB:15811/15813): elide the parent hydride's ending. Without
+        # the 'ane' arm this produced '1,2-dihydroxyethaneyl'.
+        stem = _elide_parent_hydride_ending(stem) or stem
         prefix = "hydroxy" if multiplier == '' else f"{multiplier}hydroxy"
         return f"{locants}-{prefix}{stem}yl"
 
@@ -3021,10 +3147,8 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         locants = m_dione.group(1)
         multiplier = m_dione.group(2)
         stem = name[:m_dione.start()]
-        if stem.endswith('an'):
-            stem = stem[:-2]
-        elif stem.endswith('a'):
-            stem = stem[:-1]
+        # P-29.2 (BB:15811/15813) elision — see the -diol branch above.
+        stem = _elide_parent_hydride_ending(stem) or stem
         return f"{locants}-{multiplier}oxo{stem}yl"
 
     # ---- Multi-FG amine: -diamine, -triamine ----
@@ -3033,10 +3157,9 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         locants = m_diamine.group(1)
         multiplier = m_diamine.group(2)
         stem = name[:m_diamine.start()]
-        if stem.endswith('an'):
-            stem = stem[:-2]
-        elif stem.endswith('a'):
-            stem = stem[:-1]
+        # P-29.2 (BB:15811/15813) elision — see the -diol branch above.
+        # This is the 'ethaneyl' witness: 'ethane' must elide to 'eth'.
+        stem = _elide_parent_hydride_ending(stem) or stem
         return f"{locants}-{multiplier}amino{stem}yl"
 
     # ---- Unlocanted alcohol: ends in -ol (e.g., "ethanol", "methanol") ----
