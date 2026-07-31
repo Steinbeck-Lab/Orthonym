@@ -1848,17 +1848,88 @@ def _name_polyfunctional_acyclic_substituent(
     return f"{''.join(_joined_prefix_parts(parts))}{stem}yl"
 
 
+# --- P-16.2.4.1(a): the hyphen between a word fragment and a following locant --
+#
+# BB:6936, section heading "P-16.2.4 Hyphens":
+#   "P-16.2.4.1 Hyphens are used in substitutive names:
+#    (a) to separate locants from words or word fragments;
+#    Example: 2-chloro-2-methylpropane (PIN, P-61.3.1)"
+#
+# Which strings count as a locant is fixed by BB:2847, section heading
+# "P-14.3.1 Types of locants":
+#   "Traditional types of locants are arabic numbers, for example, 1, 2, 3;
+#    primed locants, for example, 1', 1''', 2''; locants including a lower case
+#    Roman letter, for example, 3a, 3b; ITALICIZED ROMAN LETTERS, for example,
+#    O, N, P; ..."
+# and the same paragraph admits the composite forms 'N^2' and 'O^3'.
+#
+# So an italic element locant takes the separating hyphen exactly as an arabic
+# one does -- confirmed verbatim by the PIN example under P-16.2.4.1(b),
+# BB:6944: "N1-(2-aminoethyl)-N1,N2,N2-trimethylethane-1,2-diamine (PIN,
+# P-62.2.4.1.3)".
+#
+# The counter-rule that bounds this is P-16.2.4.2 (BB:6968): "No hyphen is
+# placed after a numerical prefix cited in front of a compound substituent
+# enclosed by parentheses, even if that substituent begins with locants" --
+# example "N,1-bis(4-chlorophenyl)methanimine (PIN)". A '(' is not a locant, so
+# the predicate below declines it and 'bis(' is never split.
+_ITALIC_ELEMENT_LOCANT_RE = re.compile(r"[NOSP]\d*['′]*\Z")
+
+
+def _starts_with_locant(text: str) -> bool:
+    """True when ``text`` opens with a cited locant set (P-14.3.1).
+
+    Recognises the arabic forms ('2-methyl', '2,12-dimethyl') and the italic
+    element forms ('N-methyl', 'O-methyl', 'N1-(2-aminoethyl)', "N2'-..."), the
+    latter only when the whole hyphen-terminated head parses as locants -- so a
+    plain word fragment ('methyl', 'tert-butyl', 'beta-D-glucopyranosyl') is
+    declined and configurational/CIP letters (D, L, R, S as '(S)-') never reach
+    it, being parenthesised.
+
+    The leading-digit arm is deliberately the unchanged legacy test, so every
+    arabic case keeps its historical answer byte-for-byte; the italic arm is
+    purely additive.
+    """
+    if text[:1].isdigit():
+        return True
+    head, sep, _rest = text.partition("-")
+    if not sep or not head:
+        return False
+    return all(_ITALIC_ELEMENT_LOCANT_RE.fullmatch(tok) for tok in head.split(","))
+
+
+def _prefix_stem_yl(prefix: str, stem: str) -> str:
+    """Assemble ``<prefix><stem>yl`` under P-16.2.4.1(a).
+
+    ``prefix`` is a word fragment that may itself carry a leading locant
+    ('3-amino'); ``stem`` is a parent-hydride stem that may itself *begin* with
+    one ('2,12-dimethyltetradec', 'N1-(2-aminoethyl)-N2-methyleth'). When it
+    does, the two must be separated by a hyphen or the locant fuses into the
+    preceding word and the name denotes nothing:
+    '3-amino' + '2,12-dimethyltetradec' + 'yl' must be
+    '3-amino-2,12-dimethyltetradecyl', not '3-amino2,12-dimethyltetradecyl'.
+    """
+    if (prefix and stem and (prefix[-1].isalpha() or prefix[-1] in ")]}")
+            and _starts_with_locant(stem)):
+        return f"{prefix}-{stem}yl"
+    return f"{prefix}{stem}yl"
+
+
 def _joined_prefix_parts(parts: List[str]) -> List[str]:
     """Join alphabetised prefix parts inserting a hyphen between a letter (or a
-    closing enclosing mark) and a following locant digit (e.g. 'amino' +
+    closing enclosing mark) and a following locant (e.g. 'amino' +
     '2-carboxy' -> 'amino-2-carboxy'; '2-(hydroxymethyl)' + '5-oxo' ->
     '2-(hydroxymethyl)-5-oxo'). W2F-P3: the closing-bracket case is needed by the
     branched-substituent path, whose complex sub-branch parts end in ')'; the
-    linear path never emits bracketed parts, so it is byte-identical."""
+    linear path never emits bracketed parts, so it is byte-identical.
+
+    v29 P7 T4: the locant test is now the shared ``_starts_with_locant`` so that
+    italic element locants ('N1-', 'O-') take the P-16.2.4.1(a) hyphen too. The
+    arabic answer is unchanged by construction (see that function's docstring)."""
     out = []
     for i, p in enumerate(parts):
         if (i > 0 and out and (out[-1][-1].isalpha() or out[-1][-1] in ")]}")
-                and p[:1].isdigit()):
+                and _starts_with_locant(p)):
             out.append("-")
         out.append(p)
     return out
@@ -3116,10 +3187,9 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         # Keep unsaturation: -en stays as -en, -yn stays as -yn
         if stem.endswith('an'):
             stem = stem[:-2]  # propan -> prop
-        # Insert hyphen between hydroxy and stem when stem starts with a
-        # digit (e.g., "3-methylbut-2-en") to avoid "hydroxy3-methylbut"
-        sep = "-" if stem and stem[0].isdigit() else ""
-        return f"{locant}-hydroxy{sep}{stem}yl"
+        # P-16.2.4.1(a): a stem that itself begins with a locant (e.g.
+        # "3-methylbut-2-en") must be separated, else "hydroxy3-methylbut".
+        return _prefix_stem_yl(f"{locant}-hydroxy", stem)
 
     # ---- Multi-FG alcohol: -diol, -triol ----
     # e.g., "propane-1,2-diol" -> "1,2-dihydroxypropyl"
@@ -3139,7 +3209,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         # the 'ane' arm this produced '1,2-dihydroxyethaneyl'.
         stem = _elide_parent_hydride_ending(stem) or stem
         prefix = "hydroxy" if multiplier == '' else f"{multiplier}hydroxy"
-        return f"{locants}-{prefix}{stem}yl"
+        return _prefix_stem_yl(f"{locants}-{prefix}", stem)
 
     # ---- Multi-FG ketone: -dione, -trione ----
     m_dione = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)one$', name)
@@ -3149,7 +3219,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         stem = name[:m_dione.start()]
         # P-29.2 (BB:15811/15813) elision — see the -diol branch above.
         stem = _elide_parent_hydride_ending(stem) or stem
-        return f"{locants}-{multiplier}oxo{stem}yl"
+        return _prefix_stem_yl(f"{locants}-{multiplier}oxo", stem)
 
     # ---- Multi-FG amine: -diamine, -triamine ----
     m_diamine = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)amine$', name)
@@ -3160,7 +3230,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         # P-29.2 (BB:15811/15813) elision — see the -diol branch above.
         # This is the 'ethaneyl' witness: 'ethane' must elide to 'eth'.
         stem = _elide_parent_hydride_ending(stem) or stem
-        return f"{locants}-{multiplier}amino{stem}yl"
+        return _prefix_stem_yl(f"{locants}-{multiplier}amino", stem)
 
     # ---- Unlocanted alcohol: ends in -ol (e.g., "ethanol", "methanol") ----
     if name.endswith('ol') and not name.endswith('diol') and not name.endswith('triol'):
@@ -3174,7 +3244,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         else:
             stem = base
         # Alcohol: add hydroxy prefix
-        return f"hydroxy{stem}yl"
+        return _prefix_stem_yl("hydroxy", stem)
 
     # ---- Locanted ketone: -an-N-one ----
     # e.g., "butan-2-one" -> "2-oxobutyl"
@@ -3183,7 +3253,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         locant = m_one.group(1)
         stem_end = m_one.start()
         stem = name[:stem_end].rstrip('-')
-        return f"{locant}-oxo{stem}yl"
+        return _prefix_stem_yl(f"{locant}-oxo", stem)
 
     # ---- Unlocanted ketone: ends in -one ----
     if name.endswith('one') and not name.endswith('none'):
@@ -3194,7 +3264,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
             stem = base[:-1]
         else:
             stem = base
-        return f"oxo{stem}yl"
+        return _prefix_stem_yl("oxo", stem)
 
     # ---- Locanted amine: -an-N-amine ----
     # e.g., "propan-1-amine" -> "1-aminopropyl"
@@ -3203,7 +3273,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         locant = m_amine.group(1)
         stem_end = m_amine.start()
         stem = name[:stem_end].rstrip('-')
-        return f"{locant}-amino{stem}yl"
+        return _prefix_stem_yl(f"{locant}-amino", stem)
 
     # ---- Unlocanted amine: ends in -amine / -anamine ----
     if name.endswith('amine'):
@@ -3214,7 +3284,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
             stem = base[:-1]
         else:
             stem = base
-        return f"amino{stem}yl"
+        return _prefix_stem_yl("amino", stem)
 
     # ---- Aldehyde: ends in -al or -anal ----
     # e.g., "propanal" -> "3-oxopropyl"  (moving-base-atom: the -CHO carbon is
@@ -3235,7 +3305,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         # P-31.1.4.3.4), so the oxo locant is the LAST carbon = chain_length.
         # '1-oxo...yl' (oxo at the attachment/acyl carbon) is the disfavoured CAS
         # acyl form, explicitly NOT a preferred IUPAC prefix.
-        return f"{chain_length}-oxo{stem}yl"
+        return _prefix_stem_yl(f"{chain_length}-oxo", stem)
 
     # ---- Ester: -oate suffix ---- (IUPAC P-65.6.3)
     # e.g., "propanoate" -> carboxy prefix form
@@ -3257,7 +3327,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     if name.endswith('carboximidamide'):
         stem = name[:-15]  # remove "carboximidamide"
         if stem:
-            return f"carbamimidoyl{stem}yl"
+            return _prefix_stem_yl("carbamimidoyl", stem)
         return "carbamimidoyl"
     m_imidamide = re.search(r'(?:an)?imidamide$', name)
     if m_imidamide:
@@ -3273,7 +3343,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     if name.endswith('carboxamide'):
         stem = name[:-11]  # remove "carboxamide"
         if stem:
-            return f"carbamoyl{stem}yl"
+            return _prefix_stem_yl("carbamoyl", stem)
         return "carbamoyl"
 
     # ---- Amide: general -amide suffix ---- (IUPAC P-66.1.1.4)
@@ -3292,7 +3362,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     if name.endswith('carbonitrile'):
         stem = name[:-12]  # remove "carbonitrile"
         if stem:
-            return f"cyano{stem}yl"
+            return _prefix_stem_yl("cyano", stem)
         return "cyano"
 
     # ---- Nitrile: general -nitrile suffix ---- (IUPAC P-66.1.4.1)
@@ -3371,9 +3441,15 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     # this point, so any residue reaching here is a class this string converter
     # cannot express: DECLINE (return None) so the caller fails closed to the
     # SELF-01 gate instead of fabricating an OPSIN-unparseable string. Every
-    # call site tolerates None (5 guard `if prefix:`; substituent_naming.py:3604
-    # -> _add_substituent_stereo returns None on a None name, line 3011). Class-
-    # specific to functional residues — never touches -ene/-yne/-ane/-ine/-yl.
+    # call site tolerates None (5 guard `if prefix:`; and the terminal
+    # `return _add_substituent_stereo(...)` in `name_substituent_fragment`
+    # is safe because `_add_substituent_stereo` opens with
+    # `if not sub_atoms or not name: return name`, so a None name comes back
+    # None). Cited by SYMBOL, not by line: the two line numbers that used to
+    # stand here (`:3604` and `line 3011`) were both stale — every insertion
+    # above them moves them, and v29 P7 alone shifted this file three times.
+    # Class-specific to functional residues — never touches
+    # -ene/-yne/-ane/-ine/-yl.
     if (' acid' in name
             or name.endswith('ate')      # functional-class / residual ester (formate, carbamate, ...)
             or name.endswith('urea')
