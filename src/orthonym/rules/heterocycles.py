@@ -2284,7 +2284,19 @@ def name_substituted_heterocycle(
         get_multiplier_prefix,
         get_suffix_multiplier_prefix,
         _join_multiplied_suffix,  # P-63.1.2/P-64.2.2.1 multiplier-'a' elision (tetraol->tetrol)
-        _wrap_n_substituent,  # C4: italic-N substituent wrapping for amine suffix
+        # v29 Phase 8 (P-16.5.1.1): the italic-N substituent of a ring-amine /
+        # ring-carboxamide suffix is enclosed iff it is a COMPOUND or COMPLEX
+        # prefix. _wrap_n_substituent only ESCALATES a name that already carries
+        # parentheses ("Simple names (no parentheses) are returned unchanged"),
+        # so a bare compound prefix such as '2-bromophenyl' was cited naked ->
+        # 'N-2-bromophenylpyridin-2-amine'. enclose_if_compound is the primitive
+        # that answers the P-16.5.1.1 question, and it subsumes the escalation
+        # ( -> [ -> {) that _wrap_n_substituent provided. Safe at these call
+        # sites specifically because the multiplying prefix is applied OUTSIDE
+        # the call (f"N,N-{_mp}{...(_subs[0])}"), so the argument is always the
+        # SINGULAR substituent name -- enclose_if_compound('dimethyl') would
+        # wrongly give '(dimethyl)', but 'dimethyl' is never passed here.
+        enclose_if_compound,
     )
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
     from ..perception.stereo import assign_stereochemistry
@@ -2688,10 +2700,10 @@ def name_substituted_heterocycle(
                 if len(_subs) == 2 and _subs[0] == _subs[1]:
                     _mp = get_multiplier_prefix(2, _subs[0])
                     _parts.append(
-                        f"N{_loc},N{_loc}-{_mp}{_wrap_n_substituent(_subs[0])}")
+                        f"N{_loc},N{_loc}-{_mp}{enclose_if_compound(_subs[0])}")
                 else:
                     for _s in _subs:
-                        _parts.append(f"N{_loc}-{_wrap_n_substituent(_s)}")
+                        _parts.append(f"N{_loc}-{enclose_if_compound(_s)}")
             _n_prefix = "-".join(_parts)
             if _n_prefix:
                 if combined and combined[0].isdigit():
@@ -2703,13 +2715,13 @@ def name_substituted_heterocycle(
             _n_subs = suffix_n_substituents[chosen_suffix]
             _n_prefix = ""
             if len(_n_subs) == 1:
-                _n_prefix = f"N-{_wrap_n_substituent(_n_subs[0])}"
+                _n_prefix = f"N-{enclose_if_compound(_n_subs[0])}"
             elif len(_n_subs) == 2 and _n_subs[0] == _n_subs[1]:
                 _mp = get_multiplier_prefix(2, _n_subs[0])
-                _n_prefix = f"N,N-{_mp}{_wrap_n_substituent(_n_subs[0])}"
+                _n_prefix = f"N,N-{_mp}{enclose_if_compound(_n_subs[0])}"
             else:
                 _n_prefix = "-".join(
-                    f"N-{_wrap_n_substituent(_n)}" for _n in _n_subs
+                    f"N-{enclose_if_compound(_n)}" for _n in _n_subs
                 )
             if _n_prefix:
                 # A hyphen is needed when the existing name already begins with a
@@ -2783,7 +2795,7 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
     names get the same P-16.5.1.1 enclosure as C-substituents.
     """
     from ..assembly.naming_utils import (
-        _wrap_n_substituent, is_complex_substituent, needs_brackets,
+        enclose_if_compound, is_complex_substituent, needs_brackets,
     )
     if locants:
         from ..assembly.naming_utils import _has_stereo_prefix
@@ -2808,7 +2820,7 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
         # `bis` either, so `N,N-di(bromomethyl)...` had the identical defect.
         from ..assembly.naming_utils import multiplied_component
         return f"{locant_str}-{multiplied_component(count, name, display)}"
-    wrapped = _wrap_n_substituent(name)
+    wrapped = enclose_if_compound(name)
     if count == 1:
         return f"N-{wrapped}"
     else:

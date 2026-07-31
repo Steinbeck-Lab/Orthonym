@@ -63,6 +63,18 @@ SKELETAL_SUFFIX_PGS = {
     "imine",
 }
 
+# v29 Phase 8: the PGs whose characteristic heteroatom can carry MORE THAN ONE
+# bearing carbon, and can therefore BRIDGE two parent candidates. These are the
+# only subtypes for which the RC-4 (heteroatom, bearing-C) normalisation in
+# seniority._normalize_pcg_match loses information -- it keeps one carbon and
+# discards the rest, tie-broken by atom index. Alcohols, primary amines and
+# aromatic amines have exactly one bearing carbon, so they are excluded: nothing
+# is lost for them and the membership loop already answers them.
+_BRIDGING_HETEROATOM_PGS = frozenset({
+    "secondary_amine",
+    "tertiary_amine",
+})
+
 logger = logging.getLogger(__name__)
 
 
@@ -257,6 +269,51 @@ def is_principal_group_on_ring(
             atom = mol.GetAtomWithIdx(attachment_atom)
             for neighbor in atom.GetNeighbors():
                 if neighbor.GetIdx() in ring_atoms_set:
+                    return True
+
+    # v29 Phase 8 (P-44.1): a characteristic heteroatom that BRIDGES two parent
+    # candidates -- a secondary/tertiary amine N bonded to a carbon of EACH ring
+    # -- is attached to BOTH of them, so P-44.1 disqualifies neither and the
+    # P-44.2 ring-seniority tiebreak is what decides (namer.py:4321 already says
+    # so in prose). The loop above could not see that: the RC-4 union in
+    # get_principal_group normalises every amine match to a ``(N, bearing-C)``
+    # 2-tuple (``_normalize_pcg_match``), which KEEPS ONLY ONE of the N's
+    # carbons -- picked by heavy-neighbour count, tie-broken by ATOM INDEX. For a
+    # bridging N the candidate carbons tie, so the survivor -- and therefore this
+    # predicate's answer -- flipped with the input atom order. Measured on
+    # Brc1ccccc1Nc1ccccn1: 8 of 12 randomised orderings named it, 4 abstained,
+    # because ``pg_on_senior`` went False whenever the surviving carbon sat in
+    # the JUNIOR ring and the senior pyridine was then discarded for
+    # ``atom_rings[0]``. ``PG_ATTACHMENT_INDICES['secondary_amine'] = [1, 2]``
+    # was written for the raw 3-tuple and is dead against the normalised shape.
+    #
+    # Ask the characteristic heteroatom instead: it is order-independent and it
+    # sees EVERY bearing carbon. For this family the heteroatom's heavy
+    # neighbours ARE its bearing carbons, so "het is in / bonded to this ring" is
+    # exactly "some bearing carbon is in this ring" -- the P-44.1 question --
+    # and it can never report a group as on-ring that is not attached to it.
+    # Scoped to the two subtypes whose heteroatom can carry more than one carbon;
+    # alcohols, primary and aromatic amines have a single bearing carbon, so the
+    # loop above already answers them and this block is a no-op there.
+    # Both members of _BRIDGING_HETEROATOM_PGS are also in SKELETAL_SUFFIX_PGS,
+    # where "on ring" is MEMBERSHIP-only: the locant-bearing carbon must BE a
+    # ring atom, never merely bonded to one. That semantics is preserved exactly
+    # -- the heteroatom's heavy neighbours are its bearing carbons, so the test
+    # below is "some bearing carbon of this N IS an atom of this ring", which is
+    # the same question the loop above asks, only over ALL the carbons instead of
+    # the single one that survived normalisation. The N itself is deliberately
+    # NOT accepted by membership: a ring-skeletal nitrogen is a ring heteroatom,
+    # not an amine suffix on that ring.
+    if principal_group in _BRIDGING_HETEROATOM_PGS:
+        for pg_atoms in principal_group_atoms:
+            if not pg_atoms:
+                continue
+            het = mol.GetAtomWithIdx(pg_atoms[0])
+            if het.GetSymbol() != 'N':
+                continue  # unexpected match shape -- fail closed to the loop above
+            for neighbor in het.GetNeighbors():
+                if (neighbor.GetSymbol() == 'C'
+                        and neighbor.GetIdx() in ring_atoms_set):
                     return True
 
     return False
