@@ -1425,7 +1425,8 @@ def _walk_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> List[int]:
     return result
 
 
-def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
+def _name_substituent(mol, sub_atoms: List[int],
+                      attachment_atom: int) -> Optional[str]:
     """
     Name a substituent attached to a ring assembly.
 
@@ -1547,8 +1548,16 @@ def _name_substituent(mol, sub_atoms: List[int], attachment_atom: int) -> str:
         except Exception:
             pass
 
-    # Last resort: return generic placeholder (should be rare after recursive fallback)
-    return "substituent"
+    # Last resort: FAIL CLOSED. This used to return the literal word
+    # "substituent", which is not a nomenclature term at all -- it named
+    # nothing and merely deferred the failure to whoever spelled it into a
+    # name. v29 P7 T3 made ``parent_to_prefix`` legitimately return None for a
+    # functional parent that has no '-yl' form, which put this branch back on
+    # the execution path, so the placeholder is now reachable rather than
+    # theoretical. Returning None makes every caller abstain (P-14: a name we
+    # cannot construct must not be emitted); ``_get_substituent_info`` and
+    # ``name_ring_assembly`` propagate the abstention.
+    return None
 
 
 def _is_carboxyl_substituent(mol, sub_atoms: List[int],
@@ -1719,9 +1728,10 @@ def _mixed_ring_assembly_prefix_name(
     """Prefix name for a NON-principal substituent in the mixed prefix+suffix
     ring-assembly builder. Fails CLOSED (returns None) for anything outside the
     supported carbocyclic-biaryl class, so the caller abstains rather than ship
-    a garbage/dropped prefix (the local ``_name_substituent`` returns the string
-    ``"substituent"`` / an ``"unknown organic compound"`` mangle for groups it
-    cannot name -- a no-Java leak).
+    a garbage/dropped prefix (the local ``_name_substituent`` can still return an
+    ``"unknown organic compound"`` mangle for groups it cannot name -- a no-Java
+    leak. Its former ``"substituent"`` placeholder is gone: v29 P7 T4 made that
+    branch return None, so an unnameable group now fails closed at the source).
 
     Supported: demoted suffix-expressible PCG kinds (carboxy/formyl/cyano/
     amino/hydroxy), nitro, single halogen, all-C/H alkyl, and O-attached alkoxy.
@@ -1741,7 +1751,7 @@ def _mixed_ring_assembly_prefix_name(
     # All-carbon/hydrogen alkyl.
     if all(mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H') for i in sub_atoms):
         nm = _name_substituent(mol, sub_atoms, attachment_atom)
-        if nm and nm != 'substituent' and 'unknown' not in nm:
+        if nm and 'unknown' not in nm:
             return nm
         return None
     # O-attached alkoxy (O then only C/H).
@@ -1752,7 +1762,7 @@ def _mixed_ring_assembly_prefix_name(
             mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'H') for i in rest
         ):
             nm = _name_substituent(mol, sub_atoms, attachment_atom)
-            if nm and nm != 'substituent' and 'unknown' not in nm:
+            if nm and 'unknown' not in nm:
                 return nm
     return None
 
@@ -2008,6 +2018,13 @@ def name_ring_assembly(
     # Substituents on the assembly, computed once and reused below (the ylidene
     # branch, the P-28.3.1 citation-order tiebreak, and the prefix builder).
     substituent_list = _get_substituent_info(mol, ring_systems, connections)
+
+    # Fail closed on an unnameable substituent. ``_name_substituent`` returns
+    # None when no prefix form exists; there is no legal way to spell such a
+    # group, so the assembly name cannot be built and must be abstained from
+    # rather than completed with a placeholder word.
+    if any(s.get('name') is None for s in substituent_list):
+        return None
 
     # P-28.2.1 (connection/"free valence" locant) + P-31.1.4.3.4 (lowest
     # locants to substituents): for a 2-component assembly, decide ONCE,
