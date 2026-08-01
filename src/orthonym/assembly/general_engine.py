@@ -222,7 +222,8 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
     ``-ide``/``-uide``) start with i/y/u. The MULTIPLIED forms
     (``-1,4-diium``/``-1,4-diide``/...) begin with the consonant of the
     multiplier (di/tri/...), so the terminal 'e' must be RETAINED
-    (P-16.3.3), e.g. ``1,4-diazine``->``1,4-diazine-1,4-diium`` (NOT
+    (P-16.7.1(a) elides only before a vowel or 'y'), e.g.
+    ``1,4-diazine``->``1,4-diazine-1,4-diium`` (NOT
     ``diazin-1,4-diium``). Returns the charged name, or None to FAIL CLOSED
     (a charge that is not expressible, or a co-occurring FG suffix -- the
     cumulative FG+charge construction is out of P5 scope)."""
@@ -235,11 +236,18 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
 
 
 def _elide_before_ionic_suffix(name: str, cs: str) -> str:
-    """P-16.3.3 / P-74.1.1 (:42417) parent-'e' elision before an ionic suffix.
+    """P-16.7.1(a) / P-74.1.1 (:42417) parent-'e' elision before an ionic suffix.
 
-    *"The final letter 'e' of the name of a parent hydride, or of an 'ide' or
-    'uide' suffix, is elided before the letter 'i' or 'y', or before a
-    cumulative suffix beginning with a vowel."*  The single-charge bases
+    The governing rule is **P-16.7 "ELISION OF VOWELS"** (:7591), clause
+    **P-16.7.1(a)** (:7595): *"the terminal letter 'e' in names of parent
+    hydrides or endings 'ene' and 'yne' when followed by a suffix or 'en' ending
+    beginning with 'a', 'e', 'i', 'o', 'u', or 'y'"*.  **P-74.1.1 "Ionic centers
+    in the same parent structure"** (:42417) restates it for ionic suffixes
+    specifically: *"The final letter 'e' of the name of a parent hydride, or of
+    an 'ide' or 'uide' suffix, is elided before the letter 'i' or 'y', or before
+    a cumulative suffix beginning with a vowel."*  (NOT P-16.3.3, which is
+    "The basic numerical prefixes 'di', 'tri', 'tetra', etc." -- multiplication,
+    not elision.)  The single-charge bases
     (``ium``/``ylium``/``ide``/``uide``/``olate``) start with a vowel or 'y' ->
     elide (``...pentaene`` -> ``...pentaen-6-ium``). The MULTIPLIED forms
     (``-1,4-diium``) begin with the multiplier's consonant -> the 'e' is
@@ -316,6 +324,16 @@ _ZWIT_CATION_BASES = {
     'aminium': 'ium', 'onium': 'ium', 'quaternary': 'ium', 'ylium': 'ylium',
 }
 # P-72.2.2.1 / P-72.3 SKELETAL anionic suffix bases, keyed by ``classify_anion``.
+# This is the P-74.1.1 branch (BOTH ionic centres skeletal to the parent hydride)
+# and it is REACHED -- not a lookup table nobody visits (the contributor guide #10). Entry
+# point: ``name_general_ring``/``name_general_spiro`` -> ``_emit_ring_from_analysis``.
+# Five cage zwitterions exercise it, every emitted name OPSIN-round-tripped to the
+# input InChIKey; they are the parametrised cases in
+# ``tests/unit/assembly/test_general_engine_zwitterion.py::SKELETAL_ZWITTERIONS``.
+# NB ``classify_anion`` returns 'aminide' for a ring N(-), which is deliberately
+# NOT in this table -- the Blue Book's own aminide zwitterion (:42460,
+# ``N,1,4-triphenyl-1H-1,2,4-triazol-4-ium-3-aminide``) needs an N-substituted
+# aminide the cage producer cannot build, so it fails closed instead.
 _ZWIT_SKELETAL_ANION_BASES = {
     'carbanion': 'ide', 'heteroatom_hydride_anion': 'ide', 'uide_anion': 'uide',
 }
@@ -324,23 +342,53 @@ _ZWIT_OLATE_ANION_CLASSES = frozenset({'alkoxide', 'phenolate'})
 
 
 def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
-    """P-74.1.1 (BlueBookV2.md:42415) — cumulative ionic suffixes for a
-    NET-NEUTRAL zwitterion whose ionic centres lie in THIS numbered parent.
+    """Cumulative ionic suffixes for a NET-NEUTRAL zwitterion whose ionic
+    centres lie in THIS numbered parent.
 
-    P-74.1.1 (:42421): *"For nomenclature purposes, zwitterionic compounds
-    having the ionic centers in the same parent structure are not considered as
-    neutral compounds."*  Construction (:42417): *"…may be named by combining
-    appropriate cumulative suffixes at the end of the name of a parent hydride
-    … anionic suffixes are cited after cationic suffixes."*  P-74.1.2 (:42463)
-    restates the order: *"In names, cationic suffixes are cited before anionic
-    suffixes."*  Governing (PIN) example (:42456)
-    ``1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate``.
+    **The governing case is P-74.1.2** "Zwitterionic compounds with at least one
+    ionic center on a characteristic group" (heading :42445).  Its sentence
+    (:42447): *"Zwitterionic compounds with at least one ionic center on a
+    characteristic group may be named by adding the appropriate ionic suffix to
+    the name of the ionic parent hydride.  In names, cationic suffixes are cited
+    before anionic suffixes."*  Worked (PIN) example (:42456)
+    ``1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate`` — a SKELETAL ring
+    ``-ium`` plus a characteristic-group-derived anionic suffix, which is exactly
+    the shape of the R7 target's ``-6-ium-2-olate`` (the ``-olate`` branch below).
+
+    **P-74.1.1** "Ionic centers in the same parent structure" (heading :42415)
+    governs the other branch — both centres skeletal to the parent hydride — and
+    supplies the construction and elision used by BOTH branches.  :42419: *"For
+    nomenclature purposes, zwitterionic compounds having the ionic centers in the
+    same parent structure are not considered as neutral compounds."*  :42417:
+    *"…may be named by combining appropriate cumulative suffixes at the end of
+    the name of a parent hydride in the order 'ium', 'ylium', 'ide', 'uide'.  …
+    In either case anionic suffixes are cited after cationic suffixes in the
+    name…  The final letter 'e' … is elided before the letter 'i' or 'y'…"*
 
     This is the ZWITTERION widening of the v26-P5 charge-suffix layer. That
     layer (``_charge_suffix_text``) is gated on NET molecular charge and
     explicitly declines the mixed-sign case, so a zwitterion (net 0) reached
-    neither the suffix nor the refusal and shipped a NEUTRAL name -- the P-74.1.1
-    error the Blue Book itself calls out at :42441.
+    neither the suffix nor the refusal and shipped a NEUTRAL name -- the error
+    the Blue Book itself calls out at :42439,
+    ``2-methyl-4-oxo-3,4-dihydro-1H-2-benzoselenopyran-2-ium-3-ide (PIN)``
+    *(not ``…-2-ium-3-id-4-one``)*.
+
+    LOCANTS.  P-74.1.2 (:42447) closes with *"For assignment of lower locants,
+    ionic centers on skeletal atoms of the parent hydride are preferred to the
+    locants for positions of attachment of characteristic groups denoted by
+    ionic suffixes."*  This function does NOT re-number: it consumes the
+    ``atom_to_locant`` the ring/chain engine already fixed.  That is sound
+    because the ionic criterion never gets a choice here — for a heterocyclic
+    von Baeyer parent, P-23.3.1 (:9765) fixes the numbering from the hydrocarbon
+    system and P-23.3.2.1 (:9777) then assigns *"low locants … to the
+    heteroatoms considered together as a set"*, which is decided strictly BEFORE
+    any ionic-suffix locant.  For the R7 target the four numberings the
+    bicyclo[4.4.0] descriptor permits give heteroatom sets {1,2,4}, {1,8,10},
+    {3,5,6} and {6,7,9} — all distinct, so P-23.3.2.1 decides alone and the
+    P-74.1.2 locant sentence is satisfied VACUOUSLY (zero remaining freedom).
+    See ``test_p74_1_2_ionic_locant_rule_has_no_freedom_here`` and the xfail
+    ``test_von_baeyer_heteroatom_locants_should_be_lowest_set`` for the separate,
+    PRE-EXISTING P-23.3.2.1 defect that the cage engine picks {3,5,6}.
 
     Returns ``(held_out_atoms, suffix_text)`` where ``held_out_atoms`` must be
     withheld from substituent discovery so the anion is not ALSO spelled as a
@@ -401,7 +449,7 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
         anion_locant = atom_to_locant[neighbour.GetIdx()]
         held.add(anion_idx)
 
-    # P-74.1.2 (:42463): cationic suffix first, then the anionic suffix.
+    # P-74.1.2 (:42447): cationic suffix first, then the anionic suffix.
     text = '-%s-%s-%s-%s' % (cation_locant, cation_base,
                             anion_locant, anion_base)
     return frozenset(held), text
@@ -701,7 +749,7 @@ def _assemble(mol, features, chain, part,
         if name is None:
             return _refuse("charge not expressible as a chain-parent suffix")
     elif _has_ionic_centres(mol):
-        # P-74.1.1 (:42421): a zwitterion is "not considered as a neutral
+        # P-74.1.1 (:42419): a zwitterion is "not considered as a neutral
         # compound". The chain producer holds no atom out of discovery, so it
         # cannot build the cumulative suffix without double-counting an FG
         # anion -> fail closed rather than ship a neutral (wrong) structure.
@@ -1101,10 +1149,12 @@ def _emit_ring_from_analysis(
             return _refuse("ring ketone/imine locant coincides with ring double "
                            "bond (valence)")
 
-    # P-74.1.1 (BlueBookV2.md:42415, decisive sentence :42421): a zwitterion
+    # P-74.1.2 (BlueBookV2.md:42445, sentence :42447) is the governing case for
+    # the R7 shape -- a skeletal ring cation plus a characteristic-group-derived
+    # anionic suffix. P-74.1.1 (:42419) supplies the construction: a zwitterion
     # whose ionic centres lie in THIS parent is "not considered as a neutral
     # compound" -> cumulative ionic suffixes (cationic before anionic, P-74.1.2
-    # :42463). Planned BEFORE discovery because the anionic oxygen of an -olate
+    # :42447). Planned BEFORE discovery because the anionic oxygen of an -olate
     # must be HELD OUT of the substituent partition -- otherwise it is also
     # spelled as a neutral 'oxo'/'hydroxy' prefix and the atom is counted twice.
     # Declined when an FG suffix is already present: the cumulative FG+charge
@@ -1623,7 +1673,7 @@ def name_general_monocycle(
         if name is None:
             return _refuse("charge not expressible as a monocycle-parent suffix")
     elif _has_ionic_centres(mol):
-        # P-74.1.1 (:42421) fail-closed backstop -- see the chain producer.
+        # P-74.1.1 (:42419) fail-closed backstop -- see the chain producer.
         return _refuse("ionic centres not expressible as a monocycle-parent "
                        "suffix")
 
