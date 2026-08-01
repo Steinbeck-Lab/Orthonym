@@ -124,9 +124,26 @@ class TestRecoveredName:
         # also the configuration the breadth harness measures.
         from orthonym import Orthonym
 
+        # Spelling updated with the P-16.7.1(a) elision fix on the von Baeyer
+        # path: 'diamine' begins with a CONSONANT, so the terminal 'e' of the
+        # 'ene' ending is RETAINED ('...triene-3,4-diamine').  The previous
+        # expectation '...trien-3,4-diamine' encoded the defect -- the cage
+        # producer hardcoded '-en' and never tested the suffix at all.
+        #
+        # Evidence for the moved value (OPSIN accepts BOTH spellings and
+        # returns the same structure, so round-trip cannot adjudicate it):
+        #   * P-16.7 "ELISION OF VOWELS", P-16.7.1(a) (BlueBookV2.md:7595) --
+        #     elision applies to the 'ene'/'yne' endings only before a suffix
+        #     beginning 'a', 'e', 'i', 'o', 'u', or 'y'.
+        #   * Worked example in the Blue Book: 'undeca-2,9-diene-4,8-diol
+        #     (PIN)' -- the identical ene + consonant-initial multiplied suffix
+        #     shape, 'e' retained.  The elided 'trien-N-di...' form appears
+        #     nowhere in the Blue Book.
+        #   * Internal consistency: Orthonym's chain engine, an independent
+        #     producer, already spelled this 'but-2-ene-1,4-diamine'.
         name = Orthonym(**BEST_EFFORT).name("C1=C(C(=C2N1C=NS2)N)N")
         assert name == (
-            "6-thia-1,7-diazabicyclo[3.3.0]octa-2,4,7-trien-3,4-diamine"
+            "6-thia-1,7-diazabicyclo[3.3.0]octa-2,4,7-triene-3,4-diamine"
         )
 
     @pytest.mark.slow

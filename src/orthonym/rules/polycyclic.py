@@ -3146,39 +3146,42 @@ def _build_parent_with_unsaturation(
     if len(double_bonds) > 1 or (double_bonds and triple_bonds):
         stem = stem + 'a'
 
-    # Build suffix part with locants. P-63.1.2: elide multiplier-final 'a' before
-    # '-ol' (tetra+ol -> tetrol) via the shared helper (no-op for one/amine).
-    from ..assembly.naming_utils import _join_multiplied_suffix
+    # P-16.7 "ELISION OF VOWELS", P-16.7.1(a) (BlueBookV2.md:7595): "the
+    # terminal letter 'e' in names of parent hydrides or endings 'ene' and
+    # 'yne' when followed by a suffix or 'en' ending beginning with 'a', 'e',
+    # 'i', 'o', 'u', or 'y'".  Restated at :25013 -- "If, and only if, the
+    # COMPLETE SUFFIX (that is, the suffix plus its multiplying prefixes, if
+    # any) begins with a vowel, a terminal letter 'e' (if any) of the parent
+    # hydride name is elided."
+    #
+    # This used to be decided here twice and wrongly.  The unsaturated branch
+    # did not decide at all -- `unsat_parts` hardcodes '-en'/'-yn', so the
+    # terminal 'e' of the 'ene'/'yne' ending was dropped unconditionally and
+    # 'oct-2-ene-4,8-dione' came out 'oct-2-en-4,8-dione'.  The saturated
+    # branch tested the BARE suffix ('one') rather than the complete one
+    # ('dione'), so 'pentane-2,4-dione' came out 'pentan-2,4-dione'.  Both are
+    # consonant-initial complete suffixes, which RETAIN the 'e'.
+    #
+    # `format_suffix_with_locants` already owns exactly this decision for the
+    # general chain engine -- it routes the multiplier through
+    # `_join_multiplied_suffix` (tetra+ol -> tetrol, P-63.1.2) and then tests
+    # the complete suffix against the shared `_ELISION_VOWELS`.  Delegating to
+    # it removes the second implementation rather than repairing it.  The
+    # unsaturation block is passed as part of the stem because it carries its
+    # own locants ('-2,5-dien') and is not the plain 'an'/'en' infix the helper
+    # names that parameter for.
+    from ..assembly.naming_utils import format_suffix_with_locants
+
     fg_count = len(suffix_locants)
     fg_mult = fg_multipliers.get(fg_count, str(fg_count))
-    fg_full = _join_multiplied_suffix(fg_mult, suffix_text)
-
-    if suffix_locants:
-        locant_str = ','.join(str(loc) for loc in suffix_locants)
-        suffix_part = f"-{locant_str}-{fg_full}"
-    else:
-        suffix_part = f"-{fg_full}"
-
-    # Vowel elision: check if suffix starts with a vowel
-    # If so, drop trailing 'e' from unsaturation or 'an' stem
-    # e.g., decan + -2-one -> decan-2-one (not decane-2-one)
-    # but decan + -2-ol -> decan-2-ol (not decane-2-ol)
-    # The 'an' ending already has no 'e', so just add the suffix
 
     if has_unsaturation:
-        # With unsaturation: stem + unsat_parts + suffix_part
-        # e.g., dec-5-en-2-one
-        result = stem + ''.join(unsat_parts) + suffix_part
+        parent_stem = stem + ''.join(unsat_parts)
+        unsat_infix = ''
     else:
-        # Saturated: stem + 'an' + suffix_part
-        # Vowel elision: before vowel suffix, keep 'an' (decan-2-one)
-        # Before consonant suffix, add 'e' (decane-...)
-        # Common suffixes starting with vowel: one, ol, amine
-        # Common suffixes starting with consonant: thiol, thione
-        first_char_of_suffix = suffix_text[0] if suffix_text else ''
-        if first_char_of_suffix in ('a', 'e', 'i', 'o', 'u'):
-            result = stem + 'an' + suffix_part
-        else:
-            result = stem + 'ane' + suffix_part
+        parent_stem = stem
+        unsat_infix = 'an'
 
-    return result
+    return format_suffix_with_locants(
+        parent_stem, unsat_infix, suffix_text, list(suffix_locants), fg_mult,
+    )
