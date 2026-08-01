@@ -304,7 +304,19 @@ class TestCollectStereodescriptorsAxial:
     """Tests for axial chirality flowing through collect_stereodescriptors."""
 
     def test_atropisomer_in_atom_to_locant_returns_descriptor(self):
-        """Atropisomer bond atom in atom_to_locant -> Ra/Sa included."""
+        """One atropisomeric axis yields EXACTLY one descriptor.
+
+        ⚠ This assertion is deliberately an exact-set comparison. It used to
+        filter to `cip in ('Ra', 'Sa')` and then assert `len(...) >= 1`, which
+        made it structurally incapable of seeing a spurious EXTRA descriptor —
+        and there was one. `collect_stereodescriptors` returned
+        [(7, 'M'), (7, 'Sa')], spelled '(7M,7Sa)-': RDKit sets `_CIPCode` to the
+        helicity letter 'M' on a STEREOATROPCW bond, the E/Z collection loop
+        tested only `HasProp('_CIPCode')`, and so the single axis was emitted
+        once through the E/Z channel and once (correctly) through
+        `detect_axial_chirality`. A membership check cannot catch a duplicate;
+        only an exact set can.
+        """
         mol = _make_biaryl_atropisomer(Chem.BondStereo.STEREOATROPCW)
         # Find the biaryl bond begin atom index
         begin_atom = None
@@ -321,10 +333,67 @@ class TestCollectStereodescriptorsAxial:
             atom_to_locant[i] = i + 1
 
         descriptors = collect_stereodescriptors(mol, atom_to_locant)
-        # Should contain an Sa descriptor (STEREOATROPCW -> M -> Sa)
-        axial_descs = [(loc, cip) for loc, cip in descriptors if cip in ('Ra', 'Sa')]
-        assert len(axial_descs) >= 1
-        assert axial_descs[0][1] == 'Sa'
+        assert descriptors, "no stereodescriptor at all -- the axis was lost"
+        # STEREOATROPCW -> RDKit helicity 'M' -> axial descriptor 'Sa'.
+        assert descriptors == [(7, 'Sa')], (
+            f"expected exactly one axial descriptor, got {descriptors}"
+        )
+        assert format_stereodescriptor_string(descriptors) == '(7Sa)-'
+
+    def test_atropisomer_emits_no_bare_helicity_letter(self):
+        """No bare 'M'/'P' may reach the descriptor list.
+
+        RDKit reports axial configuration as the helicity letter 'M'/'P' in the
+        bond's `_CIPCode`. Orthonym spells axial chirality with the Ra/Sa
+        forms, so a bare 'M' or 'P' in the output is always a leak from the E/Z
+        channel rather than a deliberate emission. Both rotation senses are
+        checked so the guard cannot pass by only handling one.
+        """
+        for stereo, expected in (
+            (Chem.BondStereo.STEREOATROPCW, [(7, 'Sa')]),
+            (Chem.BondStereo.STEREOATROPCCW, [(7, 'Ra')]),
+        ):
+            mol = _make_biaryl_atropisomer(stereo)
+            atom_to_locant = {i: i + 1 for i in range(mol.GetNumAtoms())}
+            descriptors = collect_stereodescriptors(mol, atom_to_locant)
+
+            assert descriptors, f"{stereo}: axis lost entirely"
+            assert descriptors == expected, f"{stereo}: got {descriptors}"
+
+            codes = [cip for _loc, cip in descriptors]
+            assert 'M' not in codes and 'P' not in codes, (
+                f"{stereo}: bare helicity letter leaked into the descriptor "
+                f"list: {descriptors}"
+            )
+            # And it must not reach the spelled name either.
+            rendered = format_stereodescriptor_string(descriptors)
+            assert 'M' not in rendered and 'P' not in rendered, (
+                f"{stereo}: bare helicity letter reached the name: {rendered!r}"
+            )
+
+    def test_ez_descriptors_still_collected(self):
+        """The M/P filter must not disturb ordinary E/Z collection.
+
+        Guards the near-miss in the fix: gating the E/Z loop on
+        `bond.GetStereo() in (STEREOE, STEREOZ)` is the intuitive filter and is
+        WRONG — RDKit reports STEREOTRANS/STEREOCIS for ordinary SMILES double
+        bonds while `_CIPCode` is 'E'/'Z', so that allow-list would have deleted
+        essentially every E/Z descriptor the project emits. The real filter keys
+        on the CIP code VALUE. This test fails loudly if anyone 'simplifies' it.
+        """
+        cases = [
+            ('C/C=C/C', [(2, 'E')]),
+            (r'C/C=C\C', [(2, 'Z')]),
+            ('C/C=C/C=C/C', [(2, 'E'), (4, 'E')]),
+        ]
+        for smiles, expected in cases:
+            mol = Chem.MolFromSmiles(smiles)
+            rdCIPLabeler.AssignCIPLabels(mol)
+            atom_to_locant = {i: i + 1 for i in range(mol.GetNumAtoms())}
+            descriptors = collect_stereodescriptors(mol, atom_to_locant)
+            assert descriptors == expected, (
+                f"{smiles}: expected {expected}, got {descriptors}"
+            )
 
     def test_atropisomer_not_in_locant_map_filtered_out(self):
         """Atropisomer bond atom NOT in atom_to_locant -> filtered out."""
@@ -358,11 +427,13 @@ class TestCollectStereodescriptorsAxial:
         atom_to_locant = {i: i + 1 for i in range(final_mol.GetNumAtoms())}
         descriptors = collect_stereodescriptors(final_mol, atom_to_locant)
 
-        # Should have both R/S and Ra/Sa descriptors
-        rs_descs = [(l, c) for l, c in descriptors if c in ('R', 'S')]
-        axial_descs = [(l, c) for l, c in descriptors if c in ('Ra', 'Sa')]
-        assert len(rs_descs) >= 1, "Should have R/S descriptor"
-        assert len(axial_descs) >= 1, "Should have Ra/Sa descriptor"
+        # Exact set, not membership: a membership check here could not tell a
+        # correct [(2,'S'),(9,'Ra')] from the defective
+        # [(2,'S'),(9,'P'),(9,'Ra')] that this code path used to produce.
+        assert descriptors == [(2, 'S'), (9, 'Ra')], (
+            f"expected one point centre and one axis, got {descriptors}"
+        )
+        assert format_stereodescriptor_string(descriptors) == '(2S,9Ra)-'
 
     def test_end_to_end_format_ra_with_s(self):
         """End-to-end: collect_stereodescriptors -> format produces '(NRa,MS)-' style."""

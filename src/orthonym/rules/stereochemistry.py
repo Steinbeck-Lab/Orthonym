@@ -142,8 +142,30 @@ def collect_stereodescriptors(
                 descriptors.append((locant, cip_code))
 
     # Collect E/Z double bonds (bond-based)
+    #
+    # ⚠ `_CIPCode` ON A BOND IS NOT EXCLUSIVELY AN E/Z CODE. RDKit also sets it on
+    # STEREOATROPCW / STEREOATROPCCW bonds — an atropisomeric AXIS — where the value
+    # is the helicity letter 'M' or 'P', not 'E'/'Z'. Testing only `HasProp` therefore
+    # fed an axial stereogenic unit into the E/Z channel, and because the axis is ALSO
+    # reported (correctly) by `detect_axial_chirality` below, one unit was emitted
+    # twice: `collect_stereodescriptors` returned [(7,'M'),(7,'Sa')] and
+    # `format_stereodescriptor_string` spelled it '(7M,7Sa)-' — a malformed
+    # duplicate-locant block. Measured on the suite's own `_make_biaryl_atropisomer`.
+    #
+    # The filter is on the CIP CODE VALUE, deliberately, NOT on `bond.GetStereo()`.
+    # Gating on `GetStereo() in (STEREOE, STEREOZ)` looks like the obvious test and is
+    # WRONG: measured with RDKit here, an ordinary SMILES double bond reports
+    # STEREOTRANS / STEREOCIS while carrying `_CIPCode` 'E'/'Z' —
+    #     'C/C=C/C'  -> stereo=STEREOTRANS, _CIPCode=E
+    #     'C/C=C\\C'  -> stereo=STEREOCIS,   _CIPCode=Z
+    # so that allow-list would have silently deleted essentially EVERY legitimate E/Z
+    # descriptor the project emits. Keying on the value is exact: the E/Z channel
+    # carries E/Z codes, whatever enum RDKit used to record the geometry, and any
+    # future letter RDKit adds is excluded by construction rather than by enumeration.
+    #
+    # The axis itself is NOT lost — `detect_axial_chirality` remains its single source.
     for bond in mol.GetBonds():
-        if bond.HasProp('_CIPCode'):
+        if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z'):
             # Skip ring-constrained double bonds in small rings: double bonds
             # in rings of size 7 or fewer have geometry fixed by ring strain.
             # Macrocyclic rings (8+ members) CAN have meaningful E/Z geometry
@@ -258,11 +280,20 @@ def collect_stereodescriptors(
     # prefix". Fail closed on the contested locant rather than arbitrarily keeping one,
     # which would assert a configuration for a position with more than one unit on it.
     #
-    # SCOPED TO E/Z DELIBERATELY. R/S cannot collide (one atom carries one code), and an
-    # axial element legitimately shares its locant with the underlying bond's own CIP code
-    # — `detect_axial_chirality` reports `(7,'Sa')` for the very bond the E/Z loop reports
-    # as `(7,'M')`. That is ONE stereogenic unit described twice, not two units contesting
-    # a locant, and an unscoped rule deletes both (caught by TestCollectStereodescriptorsAxial).
+    # SCOPED TO E/Z DELIBERATELY, because only E/Z can be projected in from another scope.
+    # R/S cannot collide (one atom carries one code), and an axial element may share its
+    # locant with a genuine E/Z bond at the same position (e.g. a cumulene numbered so the
+    # axis and a double bond start at one locant) — that is two DIFFERENT kinds of unit,
+    # not two E/Z bonds contesting one locant, and an unscoped rule deletes both (locked by
+    # TestCollectStereodescriptorsAxial).
+    #
+    # This comment used to justify the scoping differently: it said an axial element
+    # "legitimately shares its locant with the underlying bond's own CIP code —
+    # `detect_axial_chirality` reports (7,'Sa') for the very bond the E/Z loop reports as
+    # (7,'M')". That was describing the DEFECT, not a legitimate case. The E/Z loop had no
+    # business reporting an atropisomeric axis as (7,'M') at all; it is now filtered at
+    # source (see the E/Z collection loop above), so one axis yields exactly one
+    # descriptor and the duplicate never forms.
     _ez = [d for d in descriptors if d[1] in ('E', 'Z')]
     if len(_ez) > 1:
         counts: Dict[Any, int] = {}
