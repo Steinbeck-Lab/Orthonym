@@ -203,8 +203,8 @@ class TestOPSINRoundTrip:
 
         # Parse back through OPSIN
         parsed_smiles = opsin_to_smiles(name)
-        if parsed_smiles:
-            assert canonical(parsed_smiles) == canonical(smiles)
+        assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed_smiles) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_2_methylbutane_roundtrip(self, opsin_to_smiles, canonical):
@@ -214,8 +214,8 @@ class TestOPSINRoundTrip:
         assert name == "2-methylbutane"
 
         parsed_smiles = opsin_to_smiles(name)
-        if parsed_smiles:
-            assert canonical(parsed_smiles) == canonical(smiles)
+        assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed_smiles) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_propan_1_ol_roundtrip(self, opsin_to_smiles, canonical):
@@ -225,8 +225,8 @@ class TestOPSINRoundTrip:
         assert name == "propan-1-ol"
 
         parsed_smiles = opsin_to_smiles(name)
-        if parsed_smiles:
-            assert canonical(parsed_smiles) == canonical(smiles)
+        assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed_smiles) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_butan_2_one_roundtrip(self, opsin_to_smiles, canonical):
@@ -236,8 +236,8 @@ class TestOPSINRoundTrip:
         assert name == "butan-2-one"
 
         parsed_smiles = opsin_to_smiles(name)
-        if parsed_smiles:
-            assert canonical(parsed_smiles) == canonical(smiles)
+        assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed_smiles) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_propanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -247,8 +247,8 @@ class TestOPSINRoundTrip:
         assert name == "propanoic acid"
 
         parsed_smiles = opsin_to_smiles(name)
-        if parsed_smiles:
-            assert canonical(parsed_smiles) == canonical(smiles)
+        assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed_smiles) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_but_1_ene_roundtrip(self, opsin_to_smiles, canonical):
@@ -258,8 +258,8 @@ class TestOPSINRoundTrip:
         assert name == "but-1-ene"
 
         parsed_smiles = opsin_to_smiles(name)
-        if parsed_smiles:
-            assert canonical(parsed_smiles) == canonical(smiles)
+        assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed_smiles) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_but_1_yne_roundtrip(self, opsin_to_smiles, canonical):
@@ -269,8 +269,8 @@ class TestOPSINRoundTrip:
         assert name == "but-1-yne"
 
         parsed_smiles = opsin_to_smiles(name)
-        if parsed_smiles:
-            assert canonical(parsed_smiles) == canonical(smiles)
+        assert parsed_smiles is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed_smiles) == canonical(smiles)
 
 
 class TestEdgeCases:

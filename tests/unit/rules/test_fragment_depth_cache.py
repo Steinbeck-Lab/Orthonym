@@ -289,6 +289,80 @@ DEPTH_LIMIT_COMPOUNDS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Round-trip expectations for the depth-limit compounds.
+#
+# ⚠ These assertions had NEVER RUN before 2026-08-01. The shared
+# `opsin_to_smiles` fixture invoked OPSIN as `java -jar <jar> -osmi <name>`;
+# OPSIN's CLI reads a trailing argument as an INPUT FILE, so every call raised
+# FileNotFoundException and the fixture returned None for every name. The
+# assertion sat behind `if parsed:` and so was skipped on every run.
+#
+# With the fixture repaired, 16 of the 25 compounds do not round-trip. MEASURED
+# what production actually does with those 16 (the suite disables the OPSIN
+# validity gate; production has it ON — `namer._DISABLE_VALIDITY_GATE` is False
+# by default):
+#
+#     failing round-trips ................................ 16 / 25
+#     of those, production emits 'unknown organic compound' 16 / 16
+#     of those, production ships the raw name .............. 0 / 16
+#
+# So these are BREADTH gaps (the generator cannot yet name these structures and
+# the gate correctly abstains), NOT wrong-name defects — no incorrect name
+# reaches a caller. They are xfailed with `strict=True` so that closing any one
+# of them turns this suite RED and forces the entry to be removed, rather than
+# rotting into a permanent excuse. `test_production_never_emits_a_wrong_name`
+# below pins the invariant that actually matters for these rows.
+#
+# Full evidence: 
+# ---------------------------------------------------------------------------
+_RT_BREADTH_GAPS = {
+    "001_chloroquinoline_ester",
+    "002_penicillin_like",
+    "003_terpene_dioxolane",
+    "005_steroid_polyol",
+    "007_galactitol_glucoside",
+    "008_allylamine_benzophenone",
+    "011_macrolide_lactone",
+    "012_biaryl_ether",
+    "013_dipeptide_proline",
+    "016_phenol_ether_ketone",
+    "017_tripeptide_arginine",
+    "018_steroid_furanone",
+    "020_tetrapeptide",
+    "021_udp_sugar",
+    "023_serine_succinate",
+    "025_pyrrolizinone_amide",
+}
+
+_RT_GAP_REASON = (
+    "BREADTH GAP measured 2026-08-01, not a wrong-name defect. With the OPSIN "
+    "validity gate DISABLED (the suite-wide test default) the raw generator "
+    "emits a name that either OPSIN cannot parse (e.g. "
+    "'N-(4-oxo-3-propan-3-ylsubstituent)heptanamide') or that denotes a "
+    "different structure (e.g. serine succinate -> 'butanedioic acid', a "
+    "silent atom drop). With the gate ON — which is production's default — all "
+    "16 of these compounds emit 'unknown organic compound' instead, so no "
+    "wrong name ships. strict=True: fix the generator and this goes red."
+)
+
+_RT_PARAMS = [
+    pytest.param(
+        p.values[0],
+        id=p.id,
+        marks=pytest.mark.xfail(strict=True, reason=_RT_GAP_REASON),
+    )
+    if p.id in _RT_BREADTH_GAPS
+    else p
+    for p in DEPTH_LIMIT_COMPOUNDS
+]
+
+assert len(_RT_BREADTH_GAPS) == 16, "the measured gap list changed size"
+assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
+    "a _RT_BREADTH_GAPS id does not match any DEPTH_LIMIT_COMPOUNDS param"
+)
+
+
 class TestDepthLimitCompounds:
     """Regression tests for compounds that previously hit depth_limit_reached.
 
@@ -304,13 +378,55 @@ class TestDepthLimitCompounds:
         assert "unknown" not in result.lower(), f"Name contains unknown: {result}"
 
     @pytest.mark.roundtrip
-    @pytest.mark.parametrize("smiles", DEPTH_LIMIT_COMPOUNDS)
+    @pytest.mark.parametrize("smiles", _RT_PARAMS)
     def test_opsin_roundtrip(self, smiles, opsin_to_smiles, canonical):
         """Named compound should parse back via OPSIN (Tier 2 round-trip)."""
         result = name_compound(smiles)
         assert result is not None, f"name_compound returned None for {smiles}"
         parsed = opsin_to_smiles(result)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles), (
-                f"Round-trip mismatch: {smiles} -> '{result}' -> {parsed}"
-            )
+        assert parsed is not None, (
+            f"OPSIN could not parse the emitted name: {smiles} -> '{result}'"
+        )
+        assert canonical(parsed) == canonical(smiles), (
+            f"Round-trip mismatch: {smiles} -> '{result}' -> {parsed}"
+        )
+
+    @pytest.mark.roundtrip
+    @pytest.mark.opsin_gate
+    def test_production_never_emits_a_wrong_name(self, opsin_to_smiles, canonical):
+        """The invariant that actually holds for all 25: production either
+        names the compound CORRECTLY or abstains — it never ships a name that
+        denotes a different structure.
+
+        This runs with the OPSIN validity gate ENABLED (`opsin_gate` marker),
+        i.e. production's real configuration, unlike every other test in this
+        file. Skips rather than passes when the jar is absent, because the gate
+        fails OPEN without it (see tests/conftest.py).
+        """
+        emitted, abstained, wrong = [], [], []
+        for param in DEPTH_LIMIT_COMPOUNDS:
+            smiles = param.values[0]
+            name = name_compound(smiles)
+            assert name is not None, f"name_compound returned None for {smiles}"
+            if "unknown" in name.lower():
+                abstained.append(param.id)
+                continue
+            parsed = opsin_to_smiles(name)
+            if parsed is not None and canonical(parsed) == canonical(smiles):
+                emitted.append(param.id)
+            else:
+                wrong.append((param.id, name, parsed))
+
+        # Anti-vacuity: a generator that abstained on all 25 would satisfy
+        # "never wrong" trivially. Pin the measured floor so a coverage
+        # regression is a failure, not a silent pass.
+        assert len(emitted) >= 9, (
+            f"only {len(emitted)} of 25 depth-limit compounds round-trip under "
+            f"the production gate; 9 did on 2026-08-01. Coverage regressed. "
+            f"Correct: {emitted}"
+        )
+        assert not wrong, (
+            "production emitted a name denoting a DIFFERENT structure — this "
+            f"is a 0-wrong violation, not a breadth gap: {wrong}"
+        )
+        assert len(emitted) + len(abstained) == len(DEPTH_LIMIT_COMPOUNDS)

@@ -582,7 +582,17 @@ class TestSUB02Camphor:
         name = name_compound("CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2")
         assert "bicyclo[2.2.1]" in name and "heptan" in name and "one" in name
 
-    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): camphor now emits the structurally-complete '...bicyclo[2.2.1]heptan-6-one' (ketone present, format valid), but the von Baeyer NUMBERING for substituted bicyclics is non-canonical (locant 6 vs PIN 2), so OPSIN reconstructs a different structure. Canonical von Baeyer numbering (lowest-locant-to-principal-group) is the deeper 'algorithmic von Baeyer' issue flagged in the V20 audit — out of SUB-02's perception-fix scope. Simple bicyclic ketones (norbornan-2-one) DO RT.", strict=False)
+    # xfail REMOVED 2026-08-01. It recorded "the von Baeyer NUMBERING for
+    # substituted bicyclics is non-canonical (locant 6 vs PIN 2), so OPSIN
+    # reconstructs a different structure" — that is no longer true, and the
+    # test had in any case never been able to observe it: the shared
+    # `opsin_to_smiles` fixture passed the name to OPSIN as a trailing CLI
+    # argument, which OPSIN reads as an input FILE, so the fixture returned
+    # None for every name and `assert out is not None` was what failed. The
+    # xfail therefore attributed a fixture bug to a nomenclature cause.
+    # Measured now: camphor emits
+    #     '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one'
+    # — locant 2, the PIN — and the stereo-free InChI round-trips exactly.
     def test_camphor_opsin_roundtrips(self, opsin_to_smiles):
         from rdkit import Chem
         smi = "CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2"

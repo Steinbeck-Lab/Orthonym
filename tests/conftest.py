@@ -81,60 +81,95 @@ def medium_sample(test_data) -> List[Dict[str, str]]:
 
 @pytest.fixture(scope="session")
 def opsin_jar() -> str:
-    """Find OPSIN JAR path if available."""
-    import glob
-    
-    # Search patterns for OPSIN JAR
-    patterns = [
-        str(PROJECT_ROOT / "opsin" / "opsin-cli" / "target" / "opsin-cli-*-jar-with-dependencies.jar"),
-        str(PROJECT_ROOT / "opsin-cli-*.jar"),
-        str(PROJECT_ROOT / "opsin.jar"),
-        "opsin-cli-*-jar-with-dependencies.jar",
-        "opsin.jar",
-    ]
-    
-    for pattern in patterns:
-        matches = glob.glob(pattern)
-        if matches:
-            return matches[0]
-    
-    return None
+    """Path to the OPSIN CLI jar, or None when it cannot be found.
+
+    Delegates to ``orthonym.validation.opsin_roundtrip._find_opsin_jar`` — the
+    SAME resolver ``opsin_parse`` uses internally — so "the fixture found a jar"
+    and "the parse helper can use a jar" cannot disagree.
+
+    A hand-rolled ``glob`` over five patterns used to stand here. It could
+    resolve a jar (e.g. under ``opsin/opsin-cli/target/``) that ``_find_opsin_jar``
+    would NOT return, which would have made ``opsin_to_smiles`` skip-free but
+    silently None-returning — the exact blind state this file exists to prevent.
+    """
+    try:
+        from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+        return _find_opsin_jar()
+    except Exception:
+        return None
 
 
 @pytest.fixture
 def opsin_available(opsin_jar) -> bool:
     """Check if OPSIN is available for round-trip testing."""
     import shutil
-    
+
     if not shutil.which("java"):
         return False
-    
+
     return opsin_jar is not None
 
 
+@pytest.fixture(scope="session")
+def _opsin_parse_canary(opsin_jar) -> bool:
+    """Prove the OPSIN parse path actually parses before any test trusts it.
+
+    ⚠ HISTORY — this is why the canary exists. ``opsin_to_smiles`` used to shell
+    out as ``java -jar <jar> -osmi <name>``. OPSIN's CLI reads a TRAILING
+    argument as an INPUT FILE, so every single call died with::
+
+        java.io.FileNotFoundException: butan-2-ol (No such file or directory)
+        exit 1
+
+    The fixture's ``if result.returncode == 0`` therefore never held and it
+    returned ``None`` for EVERY name ever passed to it. Sixteen tests guarded on
+    ``if parsed:`` and so passed vacuously for as long as the fixture existed;
+    the seventeenth failed and was papered over with an xfail whose recorded
+    reason named an unrelated cause.
+
+    A None return is indistinguishable from "OPSIN legitimately could not
+    interpret this name", so the breakage can only be caught by probing a name
+    OPSIN is known to parse. That is this fixture. It ASSERTS rather than skips:
+    a present-but-unusable jar must be loud.
+    """
+    if opsin_jar is None:
+        return False
+
+    from rdkit import Chem
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+
+    probe = opsin_parse("butan-2-ol")
+    assert probe is not None, (
+        "OPSIN canary failed: opsin_parse('butan-2-ol') returned None even "
+        f"though a jar was found at {opsin_jar}. Every round-trip test "
+        "depending on this fixture would silently validate nothing. Fix the "
+        "OPSIN invocation before trusting any round-trip result."
+    )
+    assert Chem.CanonSmiles(probe) == Chem.CanonSmiles("CCC(C)O"), (
+        "OPSIN canary parsed 'butan-2-ol' to the WRONG structure "
+        f"({probe!r}); the parse path is returning something other than the "
+        "SMILES for that name."
+    )
+    return True
+
+
 @pytest.fixture
-def opsin_to_smiles(opsin_available, opsin_jar):
-    """Convert IUPAC name to SMILES using OPSIN."""
+def opsin_to_smiles(opsin_available, _opsin_parse_canary):
+    """Convert an IUPAC name to SMILES with OPSIN, or None if OPSIN cannot
+    interpret it.
+
+    Thin alias for ``orthonym.validation.opsin_roundtrip.opsin_parse`` — the
+    maintained primitive. It feeds the name on **stdin** (the CLI's only correct
+    input channel for a name) and prefers the in-process JPype JVM, so it is
+    both correct and ~100x cheaper than a per-name process launch. Do not
+    reintroduce a third hand-rolled subprocess call here.
+    """
     if not opsin_available:
         pytest.skip("OPSIN not available")
-    
-    import subprocess
-    
-    def _convert(name: str) -> str:
-        try:
-            result = subprocess.run(
-                ['java', '-jar', opsin_jar, '-osmi', name],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
-        except Exception:
-            pass
-        return None
-    
-    return _convert
+
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+
+    return opsin_parse
 
 
 # ============================================================================

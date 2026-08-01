@@ -138,8 +138,8 @@ class TestCarbamoylRoundTrip:
         name = name_compound(smiles)
         assert name == "4-amino-4-oxobutanoic acid"
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_3_carbamoylpropanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -147,8 +147,8 @@ class TestCarbamoylRoundTrip:
         name = name_compound(smiles)
         assert name == "3-amino-3-oxopropanoic acid"
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_5_carbamoylpentanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -156,8 +156,8 @@ class TestCarbamoylRoundTrip:
         name = name_compound(smiles)
         assert name == "5-amino-5-oxopentanoic acid"
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_6_carbamoylhexanoic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -165,8 +165,8 @@ class TestCarbamoylRoundTrip:
         name = name_compound(smiles)
         assert name == "6-amino-6-oxohexanoic acid"
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_4_carbamoylbenzoic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -175,8 +175,8 @@ class TestCarbamoylRoundTrip:
         assert name is not None
         assert "carbamoyl" in name
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_2_carbamoylbenzoic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -185,8 +185,8 @@ class TestCarbamoylRoundTrip:
         assert name is not None
         assert "carbamoyl" in name
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_3_carbamoylbenzoic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -195,8 +195,8 @@ class TestCarbamoylRoundTrip:
         assert name is not None
         assert "carbamoyl" in name
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_carbamoyl_pyridine_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -205,8 +205,8 @@ class TestCarbamoylRoundTrip:
         assert name is not None
         assert "carbamoyl" in name
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_4_carbamoylcyclohexanecarboxylic_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -215,8 +215,8 @@ class TestCarbamoylRoundTrip:
         assert name is not None
         assert "carbamoyl" in name
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
     @pytest.mark.roundtrip
     def test_carbamoyl_hydroxy_acid_roundtrip(self, opsin_to_smiles, canonical):
@@ -224,8 +224,8 @@ class TestCarbamoylRoundTrip:
         name = name_compound(smiles)
         assert name == "4-amino-2-hydroxy-4-oxobutanoic acid"
         parsed = opsin_to_smiles(name)
-        if parsed:
-            assert canonical(parsed) == canonical(smiles)
+        assert parsed is not None, f"OPSIN could not parse the emitted name {name!r}"
+        assert canonical(parsed) == canonical(smiles)
 
 
 # ============================================================================
