@@ -887,6 +887,31 @@ def composed_prefix_organyl_name(mol, frag_atoms, attach_idx):
     return name
 
 
+def _assemble_amino_prefix_core(branch_entries):
+    """The amino-prefix CORE ('methyl(propan-2-yl)amino'), or ``None``.
+
+    A two-line delegation to ``composer._assemble_decorated_amino_prefix`` --
+    deliberately NOT a second assembler. That function is documented as "the ONE
+    assembler" and already owns every ordering and marking decision:
+
+      * P-16.5.1.3.1 (BB:7272, section "P-16.5 ENCLOSING MARKS") *"For
+        mononuclear parent hydrides with two or more substituents the first
+        cited substituent never has enclosing marks unless it includes a locant.
+        The second and further substituents are each enclosed with parentheses
+        even for simple substituents."* -- the nitrogen is that mononuclear
+        parent, which is why 'ethyl(methyl)amino' carries an inner pair the
+        symmetric 'dimethylamino' does not;
+      * P-63.7 POLYFUNCTIONAL COMPOUNDS, BB:28170
+        ``2-[di(butan-2-yl)amino]butan-2-ol (PIN)`` -- the outer bracket over
+        the whole prefix is applied downstream, so this returns the core
+        UNENCLOSED, matching every sibling return in ``_name_amino_branch``.
+
+    The import is lazy because ``composer`` imports this module.
+    """
+    from .composer import _assemble_decorated_amino_prefix
+    return _assemble_decorated_amino_prefix(branch_entries, enclose=False)
+
+
 def cite_organyl_in_composed_prefix(token):
     """Cite ``token`` inside a composed prefix with its P-16.5.1.1 enclosing marks.
 
@@ -3482,22 +3507,31 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
                 return f"{_fv.prefix}amino"
             if _fv.must_fail_closed:
                 return None
-            try:
-                alkyl_name = get_alkyl_name(carbon_count)
-                return f"{alkyl_name}amino"
-            except (ValueError, KeyError):
-                pass
+            # NEVER get_alkyl_name(carbon_count) here. A COUNT named butyl,
+            # 2-methylpropyl, butan-2-yl and tert-butyl all 'butyl', so three of
+            # every four C4H9 amino prefixes described a molecule other than the
+            # one drawn -- 'CC(C)NCC(=O)N' -> '2-(propylamino)acetamide' and
+            # 'CC(C)(C)NCC(=O)N' -> '2-(butylamino)acetamide', both a different
+            # constitution. This was the THIRD carbon-count amino site;
+            # composer._composed_amino_branch_name's docstring converted the
+            # other two and this one was missed. Route through the SAME
+            # constitution-perceiving primitive the acid path uses, then through
+            # the ONE assembler, so the amide and the acid cannot disagree.
+            _organyl = composed_prefix_organyl_name(mol, visited, branches[0])
+            if _organyl is None:
+                return None
+            return _assemble_amino_prefix_core([(_organyl, False)])
 
     # -N(alkyl)2+ -> dialkylamino (e.g. dimethylamino). HYG-04 site#2 (Phase 167):
     # the disubstituted case the docstring promised but was never implemented, so
     # N,N-dialkylamino substituents on a chain parent fell to `return None` and were
-    # mis-walked into a spurious amino+alkylamino split. Mirror the WORKING
-    # principal-amine multiplicity (composer._assemble_amine_name: Counter +
-    # SIMPLE_MULTIPLIERS) as a PREFIX form (no N- locants). Principal-amine path
+    # mis-walked into a spurious amino+alkylamino split. Multiplicity, ordering
+    # and P-16.5.1.3.1 marking are all delegated to the ONE assembler; the local
+    # `Counter` + `SIMPLE_MULTIPLIERS` copy that used to live here spelled
+    # 'ethylmethylamino' for an ASYMMETRIC pair, which OPSIN reads as the single
+    # substituent 2-ethylmethyl -- a different constitution. Principal-amine path
     # (_assemble_amine_name) is untouched (Pitfall 3).
     if len(branches) >= 2:
-        from collections import Counter
-
         branch_names = []
         all_pure = True
         for branch_start in branches:
@@ -3534,24 +3568,16 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             if _fv.must_fail_closed:
                 all_pure = False
                 break
-            try:
-                branch_names.append(get_alkyl_name(carbon_count))
-            except (ValueError, KeyError):
+            # Same carbon-count hazard as the single-branch case, and the same
+            # cure -- the shared constitution-perceiving organyl namer.
+            _organyl = composed_prefix_organyl_name(mol, visited, branch_start)
+            if _organyl is None:
                 all_pure = False
                 break
+            branch_names.append(_organyl)
         if all_pure and branch_names:
-            counts = Counter(branch_names)
-            parts = []
-            # Alphabetical by alkyl stem (di-/tri- are ignored for ordering,
-            # matching the principal-amine analog's sorted assembly).
-            for nm in sorted(counts.keys()):
-                count = counts[nm]
-                if count == 1:
-                    parts.append(nm)
-                else:
-                    mult = SIMPLE_MULTIPLIERS.get(count, str(count))
-                    parts.append(f"{mult}{nm}")
-            return f"{''.join(parts)}amino"
+            return _assemble_amino_prefix_core(
+                [(nm, False) for nm in branch_names])
 
     return None
 

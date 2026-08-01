@@ -69,7 +69,12 @@ def test_no_spurious_bare_amino_prefix(namer, smiles):
     """The fabricated `amino` prefix invented a nitrogen that is not there."""
     name = _name(namer, smiles)
     assert name is not None
-    assert "amino-" not in name.replace("(", "").replace(")", "")[:0] or True
+    # Enclosing marks hide the duplication from a raw substring test, so strip
+    # them first: pre-fix '2-amino-2-(methylamino)acetamide' flattens to
+    # '2-amino-2-methylaminoacetamide' and counts TWO. Exactly one nitrogen is
+    # substituted in every row here, so exactly one 'amino' token is correct.
+    flat = name.replace("(", "").replace(")", "").replace("[", "").replace("]", "")
+    assert flat.count("amino") == 1, f"nitrogen spelled twice: {name!r}"
     # a bare 'amino' prefix would appear as '<locant>-amino-'
     assert "-amino-" not in name, f"bare amino prefix duplicates the N: {name!r}"
 
@@ -92,7 +97,6 @@ def test_primary_amine_and_plain_amides_unchanged(namer, smiles, expected):
 
 def test_nitrogen_count_matches_structure(namer):
     """The emitted name must not invent or drop a nitrogen (atom coverage)."""
-    from orthonym.rules.amino_acids import Chem as _C  # noqa: F401
     for smiles in ("CNCC(=O)N", "CCCCNCC(=O)N", "CN(C)CC(=O)N"):
         name = _name(namer, smiles)
         assert name is not None
