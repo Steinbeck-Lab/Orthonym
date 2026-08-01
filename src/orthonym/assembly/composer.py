@@ -9073,14 +9073,17 @@ def _name_n_attached_substituent_fallback(
                 frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
                 if frag_smiles:
                     from .fragment_naming import name_fragment_recursively
-                    from .substituent_naming import parent_to_prefix
+                    from .substituent_naming import (
+                        ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
                     frag_name = name_fragment_recursively(frag_smiles)
                     if frag_name:
                         carbon_count = sum(
                             1 for idx in sub_atoms
                             if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
                         )
-                        prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                        prefix = parent_to_prefix(
+                            frag_name, chain_length=carbon_count,
+                            attach_locant=ATTACH_LOCANT_UNKNOWN)
                         if prefix:
                             from .naming_utils import needs_brackets
                             if needs_brackets(prefix):
@@ -9247,14 +9250,17 @@ def _name_c_attached_ring_substituent_fallback(
             frag_smiles = Chem.MolFragmentToSmiles(mol, list(sub_set))
             if frag_smiles:
                 from .fragment_naming import name_fragment_recursively
-                from .substituent_naming import parent_to_prefix
+                from .substituent_naming import (
+                    ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
                 frag_name = name_fragment_recursively(frag_smiles)
                 if frag_name:
                     carbon_count = sum(
                         1 for idx in sub_atoms
                         if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
                     )
-                    prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                    prefix = parent_to_prefix(
+                        frag_name, chain_length=carbon_count,
+                        attach_locant=ATTACH_LOCANT_UNKNOWN)
                     if prefix:
                         from .naming_utils import needs_brackets
                         if needs_brackets(prefix):

@@ -1535,14 +1535,17 @@ def _name_substituent(mol, sub_atoms: List[int],
             frag_smiles = Chem.MolFragmentToSmiles(mol, atomsToUse=sub_atoms)
             if frag_smiles:
                 from ..assembly.fragment_naming import name_fragment_recursively
-                from ..assembly.substituent_naming import parent_to_prefix
+                from ..assembly.substituent_naming import (
+                    ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
                 frag_name = name_fragment_recursively(frag_smiles)
                 if frag_name:
                     carbon_count = sum(
                         1 for i in sub_atoms
                         if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
                     )
-                    prefix = parent_to_prefix(frag_name, chain_length=carbon_count)
+                    prefix = parent_to_prefix(
+                        frag_name, chain_length=carbon_count,
+                        attach_locant=ATTACH_LOCANT_UNKNOWN)
                     if prefix:
                         return prefix
         except Exception:

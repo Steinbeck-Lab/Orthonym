@@ -3087,7 +3087,26 @@ _NON_HYDRIDE_WHOLE_NAMES = frozenset({
 })
 
 
-def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1) -> str:
+class _AttachLocantUnknown:
+    """Sentinel type for ``parent_to_prefix(attach_locant=...)``."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - diagnostic only
+        return "ATTACH_LOCANT_UNKNOWN"
+
+    def __bool__(self) -> bool:
+        return False
+
+
+#: Explicit "this caller cannot prove where the free valence sits" value for
+#: ``parent_to_prefix``. It is a distinct object rather than ``None`` so that a
+#: caller which simply has no locant is never confused with one that computed
+#: ``0``/``None`` by accident.
+ATTACH_LOCANT_UNKNOWN = _AttachLocantUnknown()
+
+
+def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> str:
     """Convert a parent compound name to substituent prefix form.
 
     Per IUPAC P-29.2 (BB:15811), the parent compound name is transformed into
@@ -3097,20 +3116,72 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     3. Adding the prefix at the correct locant
     4. Appending -yl at the free-valence position
 
-    Per IUPAC P-46.2, the point of free valency receives the lowest
-    possible locant consistent with any fixed numbering of the parent
-    hydride. For chain-derived substituents with no fixed numbering,
-    the chain is oriented so the attachment point is at locant 1.
+    ⚠ **This converter may only emit locants it can justify.** (v29 residue Task A.)
+
+    It is handed a *name string* and a *carbon count*, and nothing else. The
+    string was produced by naming the fragment as a free molecule after capping
+    its free valence with H, so every locant inside it belongs to the CAPPED
+    molecule's numbering -- which was chosen to favour that molecule's own
+    principal characteristic group. P-46.1 criterion (h) / **P-46.1.8** require
+    the opposite for a substituent group: *"The principal substituent chain has
+    the lowest locants for free valences of any kind."*
+
+    The two numberings genuinely disagree. Measured witness (R8.2), fragment
+    ``-C(CH3)(C2H5)-(CH2)8-CH(NH2)-CH(CH3)2``::
+
+        capped + named as a molecule : 2,12-dimethyltetradecan-3-amine
+        string-surgered to a prefix  : 3-amino-2,12-dimethyltetradecyl
+        numbered from the free valence: 12-amino-3,13-dimethyltetradecan-3-yl
+
+    The chain is numbered from opposite ends, so the amino locant and both
+    methyl locants differ. **Splicing a free-valence locant onto the borrowed
+    stem therefore cannot repair these branches** -- it would produce
+    ``3-amino-2,12-dimethyltetradecan-3-yl``, one name in two numberings. The
+    numbering has to be recomputed from the structure, which only a caller
+    holding the molecule can do (see ``_located_acyclic_alkyl_name``).
+
+    The count-derived branches fail the same way for a second reason. A whole
+    fragment carbon COUNT is not a proof of the fragment's shape: for the
+    branched acyl ``-C(=O)CH(CH3)2`` the count is 4 while the principal chain is
+    3, so ``f"{chain_length}-oxo"`` spliced locant **4** onto a three-carbon
+    ``propyl`` stem (``4-oxo-2-methylpropyl``).
+
+    So both families now DECLINE (return ``None``) rather than fabricate. A
+    one-position stem is the exception that needs no proof: **P-14.3.4.6**
+    (BB:3031) *"All locants are omitted for parent compounds when all
+    substitutable hydrogen atoms have the same locant"* -- ``carbamoylmethyl``,
+    never ``1-carbamoylmethyl``.
 
     Args:
         parent_name: Parent compound IUPAC name (e.g., "propan-2-ol").
         chain_length: Number of carbons in the substituent chain.
-        attach_locant: Locant of the free-valence carbon (default 1).
+        attach_locant: Locant of the free-valence atom, or
+            ``ATTACH_LOCANT_UNKNOWN`` when the caller cannot prove one.
+            **Required** -- "make a prefix unrenderable without its locant"
+            (`:345``). It used to default to ``1`` and was read by
+            nothing, so all six call sites silently omitted it.
 
     Returns:
-        Prefix-form name (e.g., "2-hydroxypropyl"). Returns raw name
-        WITHOUT enclosing marks.
+        Prefix-form name (e.g., "hydroxymethyl"), ``""``/``None`` when this
+        converter cannot express the fragment. Returns the raw name WITHOUT
+        enclosing marks.
     """
+    # Read the parameter that used to be dead. A proven integer still cannot
+    # rescue the foreign-numbering branches below (see the docstring), but it is
+    # recorded here so the decline is attributable and so no future caller can
+    # re-enter the fabrication path by simply forgetting the argument.
+    _attach_proven = isinstance(attach_locant, int) and not isinstance(
+        attach_locant, bool)
+
+    def _decline_unjustifiable(kind: str, detail: str):
+        """A locant this converter cannot justify -> fail closed (never fabricate)."""
+        logger.debug(
+            "TaskA fail-closed: %s locant is not derivable from (name=%r, "
+            "chain_length=%d, attach_locant=%r); %s",
+            kind, parent_name, chain_length, attach_locant, detail,
+        )
+        return None
+
     if not parent_name:
         return ""
 
@@ -3165,13 +3236,18 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         # Actually: butanoic acid -> carboxy replaces the acid, chain becomes 3C (propyl)
         # The parent chain of the substituent WITHOUT the carboxylic acid is chain_length - 1
         shortened_length = chain_length - 1
-        if shortened_length >= 1:
-            from ..data.chain_names import get_chain_prefix
-            short_stem = get_chain_prefix(shortened_length)
-            # carboxy locant is the shortened chain length (farthest from attachment)
-            return f"{shortened_length}-carboxy{short_stem}yl"
-        else:
-            return "carboxy"
+        if shortened_length == 1:
+            # P-14.3.4.6 (BB:3031): a one-carbon stem has all its substitutable
+            # hydrogens at the same locant, so NO locant is cited -> the count
+            # cannot be wrong here. 'carboxymethyl', never '1-carboxymethyl'.
+            return "carboxymethyl"
+        if shortened_length >= 2:
+            # The carboxy locant was read off the whole-fragment carbon COUNT,
+            # which is not a proof of the fragment's shape (a branched fragment
+            # has a shorter principal chain than its carbon count).
+            return _decline_unjustifiable(
+                "carboxy", "count-derived locant on a multi-position stem")
+        return "carboxy"
 
     # ---- Locanted alcohol: -N-ol ----
     # Matches saturated (-an-N-ol), unsaturated (-en-N-ol, -yn-N-ol),
@@ -3187,9 +3263,14 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
         # Keep unsaturation: -en stays as -en, -yn stays as -yn
         if stem.endswith('an'):
             stem = stem[:-2]  # propan -> prop
-        # P-16.2.4.1(a): a stem that itself begins with a locant (e.g.
-        # "3-methylbut-2-en") must be separated, else "hydroxy3-methylbut".
-        return _prefix_stem_yl(f"{locant}-hydroxy", stem)
+        # P-46.1.8: `locant` here is the HYDROXY position in the capped
+        # molecule's numbering, which was chosen to give the OH the lowest
+        # locant -- the opposite of what a substituent group requires. It
+        # produced '1-hydroxypropyl' for -CH2CH2CH2OH (wrong end) and
+        # '3-hydroxy(3S)-oct-1-enyl' for the prostaglandin side chain (no
+        # free-valence locant at all).
+        return _decline_unjustifiable(
+            "hydroxy", "locant borrowed from the capped molecule's numbering")
 
     # ---- Multi-FG alcohol: -diol, -triol ----
     # e.g., "propane-1,2-diol" -> "1,2-dihydroxypropyl"
@@ -3199,38 +3280,27 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     # multiplier from the locant COUNT — group(2) 'tetr' must NOT become the
     # wrong 'tetrhydroxy'. (v22 G2 follow-on: keeps this converter in sync with
     # the elision fix in naming_utils._join_multiplied_suffix.)
+    # Every locant in these three multi-FG forms is read straight out of the
+    # capped molecule's numbering (P-46.1.8 decline -- see the docstring). The
+    # -diamine arm is the R4 witness: it kept the parent's N1/N2 italic locants
+    # in a prefix scope that has no N1/N2, giving the OPSIN-unparseable
+    # '1,2-diamino-N1-(2-aminoethyl)-N2-methylethyl'.
     m_diol = re.search(r'[,-](\d+(?:,\d+)*)-(?:di|tri|tetra?)ol$', name)
     if m_diol:
-        locants = m_diol.group(1)
-        count = locants.count(',') + 1
-        multiplier = SIMPLE_MULTIPLIERS.get(count, '') if count > 1 else ''
-        stem = name[:m_diol.start()]
-        # P-29.2 (BB:15811/15813): elide the parent hydride's ending. Without
-        # the 'ane' arm this produced '1,2-dihydroxyethaneyl'.
-        stem = _elide_parent_hydride_ending(stem) or stem
-        prefix = "hydroxy" if multiplier == '' else f"{multiplier}hydroxy"
-        return _prefix_stem_yl(f"{locants}-{prefix}", stem)
+        return _decline_unjustifiable(
+            "polyhydroxy", "locants borrowed from the capped molecule's numbering")
 
     # ---- Multi-FG ketone: -dione, -trione ----
     m_dione = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)one$', name)
     if m_dione:
-        locants = m_dione.group(1)
-        multiplier = m_dione.group(2)
-        stem = name[:m_dione.start()]
-        # P-29.2 (BB:15811/15813) elision — see the -diol branch above.
-        stem = _elide_parent_hydride_ending(stem) or stem
-        return _prefix_stem_yl(f"{locants}-{multiplier}oxo", stem)
+        return _decline_unjustifiable(
+            "polyoxo", "locants borrowed from the capped molecule's numbering")
 
     # ---- Multi-FG amine: -diamine, -triamine ----
     m_diamine = re.search(r'[,-](\d+(?:,\d+)*)-([dt]i|tri|tetra)amine$', name)
     if m_diamine:
-        locants = m_diamine.group(1)
-        multiplier = m_diamine.group(2)
-        stem = name[:m_diamine.start()]
-        # P-29.2 (BB:15811/15813) elision — see the -diol branch above.
-        # This is the 'ethaneyl' witness: 'ethane' must elide to 'eth'.
-        stem = _elide_parent_hydride_ending(stem) or stem
-        return _prefix_stem_yl(f"{locants}-{multiplier}amino", stem)
+        return _decline_unjustifiable(
+            "polyamino", "locants borrowed from the capped molecule's numbering")
 
     # ---- Unlocanted alcohol: ends in -ol (e.g., "ethanol", "methanol") ----
     if name.endswith('ol') and not name.endswith('diol') and not name.endswith('triol'):
@@ -3250,10 +3320,8 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     # e.g., "butan-2-one" -> "2-oxobutyl"
     m_one = re.search(r'an?-(\d+)-one$', name)
     if m_one:
-        locant = m_one.group(1)
-        stem_end = m_one.start()
-        stem = name[:stem_end].rstrip('-')
-        return _prefix_stem_yl(f"{locant}-oxo", stem)
+        return _decline_unjustifiable(
+            "oxo", "locant borrowed from the capped molecule's numbering")
 
     # ---- Unlocanted ketone: ends in -one ----
     if name.endswith('one') and not name.endswith('none'):
@@ -3270,10 +3338,12 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     # e.g., "propan-1-amine" -> "1-aminopropyl"
     m_amine = re.search(r'an?-(\d+)-amine$', name)
     if m_amine:
-        locant = m_amine.group(1)
-        stem_end = m_amine.start()
-        stem = name[:stem_end].rstrip('-')
-        return _prefix_stem_yl(f"{locant}-amino", stem)
+        # The R8.2 witness: '2,12-dimethyltetradecan-3-amine' ->
+        # '3-amino-2,12-dimethyltetradecyl'. Numbered from the free valence the
+        # SAME fragment is '12-amino-3,13-dimethyltetradecan-3-yl' -- a different
+        # locant for every prefix, because the chain runs the other way.
+        return _decline_unjustifiable(
+            "amino", "locant borrowed from the capped molecule's numbering")
 
     # ---- Unlocanted amine: ends in -amine / -anamine ----
     if name.endswith('amine'):
@@ -3300,12 +3370,17 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
                 stem = base[:-1]
             else:
                 stem = base
-        # IUPAC P-66.6.1 + Table-28.1 note (m): the former -CHO carbon sits at the
-        # chain terminus OPPOSITE the attachment (attachment = locant 1, P-29 /
-        # P-31.1.4.3.4), so the oxo locant is the LAST carbon = chain_length.
-        # '1-oxo...yl' (oxo at the attachment/acyl carbon) is the disfavoured CAS
-        # acyl form, explicitly NOT a preferred IUPAC prefix.
-        return _prefix_stem_yl(f"{chain_length}-oxo", stem)
+        # The oxo locant used to be `chain_length` -- the whole fragment's carbon
+        # COUNT -- on the reasoning that the -CHO carbon sits at the terminus
+        # opposite the attachment. That holds only for an UNBRANCHED chain. A
+        # count is not a proof of shape: '2-methylpropanal' counts 4 carbons but
+        # its stem is the 3-carbon 'prop', so the converter spliced locant 4 onto
+        # a three-position stem ('4-oxo-2-methylpropyl', R12.1). A one-carbon
+        # stem needs no locant at all (P-14.3.4.6, BB:3031) and is kept.
+        if stem and not _starts_with_locant(stem) and chain_length == 1:
+            return _prefix_stem_yl("oxo", stem)
+        return _decline_unjustifiable(
+            "oxo", "count-derived aldehyde locant is not a proof of chain length")
 
     # ---- Ester: -oate suffix ---- (IUPAC P-65.6.3)
     # e.g., "propanoate" -> carboxy prefix form
@@ -3313,10 +3388,11 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     m_oate = re.search(r'(?:an)?oate$', name)
     if m_oate:
         shortened = chain_length - 1
-        if shortened >= 1:
-            from ..data.chain_names import get_chain_prefix
-            short_stem = get_chain_prefix(shortened)
-            return f"{shortened}-carboxy{short_stem}yl"
+        if shortened == 1:
+            return "carboxymethyl"          # P-14.3.4.6: one position, no locant
+        if shortened >= 2:
+            return _decline_unjustifiable(
+                "carboxy", "count-derived locant on a multi-position stem")
         return "carboxy"
 
     # ---- Amidine: -carboximidamide / -imidamide ---- (IUPAC P-66.4.1.3.1)
@@ -3332,10 +3408,11 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     m_imidamide = re.search(r'(?:an)?imidamide$', name)
     if m_imidamide:
         shortened = chain_length - 1
-        if shortened >= 1:
-            from ..data.chain_names import get_chain_prefix
-            short_stem = get_chain_prefix(shortened)
-            return f"{shortened}-carbamimidoyl{short_stem}yl"
+        if shortened == 1:
+            return "carbamimidoylmethyl"    # P-14.3.4.6: one position, no locant
+        if shortened >= 2:
+            return _decline_unjustifiable(
+                "carbamimidoyl", "count-derived locant on a multi-position stem")
         return "carbamimidoyl"
 
     # ---- Amide: -carboxamide (most specific first) ---- (IUPAC P-66.1.1.4)
@@ -3351,10 +3428,11 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     m_amide = re.search(r'(?:an)?amide$', name)
     if m_amide:
         shortened = chain_length - 1
-        if shortened >= 1:
-            from ..data.chain_names import get_chain_prefix
-            short_stem = get_chain_prefix(shortened)
-            return f"{shortened}-carbamoyl{short_stem}yl"
+        if shortened == 1:
+            return "carbamoylmethyl"        # P-14.3.4.6: one position, no locant
+        if shortened >= 2:
+            return _decline_unjustifiable(
+                "carbamoyl", "count-derived locant on a multi-position stem")
         return "carbamoyl"
 
     # ---- Nitrile: -carbonitrile (most specific first) ---- (IUPAC P-66.1.4.1)
@@ -3369,10 +3447,11 @@ def parent_to_prefix(parent_name: str, chain_length: int, attach_locant: int = 1
     # e.g., "propanenitrile" -> "2-cyanoethyl", "acetonitrile" -> "cyanomethyl"
     if name.endswith('nitrile') and not name.endswith('carbonitrile'):
         shortened = chain_length - 1
-        if shortened >= 1:
-            from ..data.chain_names import get_chain_prefix
-            short_stem = get_chain_prefix(shortened)
-            return f"{shortened}-cyano{short_stem}yl"
+        if shortened == 1:
+            return "cyanomethyl"            # P-14.3.4.6: one position, no locant
+        if shortened >= 2:
+            return _decline_unjustifiable(
+                "cyano", "count-derived locant on a multi-position stem")
         return "cyano"
 
     # ---- Simple acid names: convert to acyl prefix ---- (IUPAC P-65.1.7)
@@ -3813,6 +3892,23 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
             if atom.GetDegree() != 1 or atom.GetTotalNumHs() < 1 \
                     or len(in_frag) != 1 or in_frag[0].GetSymbol() != 'C':
                 return None
+        elif sym == 'N':
+            # PRIMARY amine only: a degree-1 -NH2 hanging off a fragment carbon
+            # is a simple detachable prefix in exactly the way hydroxyl and the
+            # halogens above already are (P-46.1.12), so the same chain
+            # selection applies and 'amino' is the whole of its contribution.
+            #
+            # This is a PROOF of the admissible shape, not a deny-list: exactly
+            # two hydrogens, degree 1, uncharged, no radical, carbon-bonded.
+            # -NH-R (a secondary amine) fails it because 'amino' would silently
+            # drop R; nitro, nitrile, imine and N-oxide fail on degree, H-count
+            # or the bond-order check below. Everything unproven still declines
+            # to the recursive path.
+            in_frag = [n for n in atom.GetNeighbors() if n.GetIdx() in sub_set]
+            if (atom.GetDegree() != 1 or atom.GetTotalNumHs() != 2
+                    or atom.GetNumRadicalElectrons() != 0
+                    or len(in_frag) != 1 or in_frag[0].GetSymbol() != 'C'):
+                return None
         else:
             return None
         for nbr in atom.GetNeighbors():
@@ -3947,7 +4043,7 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
             # admitted only degree-1 halogens / hydroxyl O, so a 1-atom
             # non-carbon frag maps directly to its prefix.
             _SIMPLE_BRANCH = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo',
-                              'I': 'iodo', 'O': 'hydroxy'}
+                              'I': 'iodo', 'O': 'hydroxy', 'N': 'amino'}
             _sym0 = mol.GetAtomWithIdx(nidx).GetSymbol()
             if len(frag) == 1 and _sym0 in _SIMPLE_BRANCH:
                 branch_groups[_SIMPLE_BRANCH[_sym0]].append(
@@ -4792,7 +4888,9 @@ def name_substituent_fragment(
         1 for i in sub_atoms
         if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
     )
-    prefix_name = parent_to_prefix(parent_name, chain_length=carbon_count)
+    prefix_name = parent_to_prefix(
+        parent_name, chain_length=carbon_count,
+        attach_locant=ATTACH_LOCANT_UNKNOWN)
 
     return _add_substituent_stereo(mol, sub_atoms, prefix_name, attach_idx=attach_idx)
 

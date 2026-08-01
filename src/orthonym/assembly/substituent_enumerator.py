@@ -1350,6 +1350,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     import re as _re
     from .fragment_naming import FRAGMENT_NAME_CACHE
     from .substituent_naming import (
+        ATTACH_LOCANT_UNKNOWN,
         parent_to_prefix,
         _check_retained_substituent,
         _is_linear_alkyl,
@@ -1782,7 +1783,9 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                         1 for i in frag_atoms_set
                         if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
                     )
-                    prefix = parent_to_prefix(cached, chain_length=carbon_count)
+                    prefix = parent_to_prefix(
+                        cached, chain_length=carbon_count,
+                        attach_locant=ATTACH_LOCANT_UNKNOWN)
                     if prefix:
                         return _stereo_route(prefix)
     except Exception:
@@ -3180,7 +3183,8 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
         if frag_smiles and frag_smiles != "unknown":
             try:
                 from .fragment_naming import name_fragment_recursively
-                from .substituent_naming import parent_to_prefix
+                from .substituent_naming import (
+                    ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
                 frag_name = name_fragment_recursively(frag_smiles)
                 if frag_name:
                     # Convert parent name to prefix form (e.g., "benzoic acid" -> not useful,
@@ -3189,7 +3193,9 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
                         1 for idx in frag_atoms
                         if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
                     )
-                    prefix_name = parent_to_prefix(frag_name, chain_length=carbon_count)
+                    prefix_name = parent_to_prefix(
+                        frag_name, chain_length=carbon_count,
+                        attach_locant=ATTACH_LOCANT_UNKNOWN)
                     if prefix_name:
                         logger.debug(
                             "DROP-18/19 fallback: recursive naming for %s -> %s",
