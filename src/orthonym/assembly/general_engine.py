@@ -82,6 +82,87 @@ def _inline_suffix_locant(pg, match, parent_set, atom_to_locant):
     return min(atom_to_locant[i] for i in anchors)
 
 
+# Functional groups that reach the monocycle ring-suffix path
+# (``_RING_SUFFIX_STYLES``) with NO entry in ``seniority.PG_ATTACHMENT_INDICES``
+# and whose SMARTS have been audited to lead with the locant-bearing atom, so
+# ``_pg_attachment_atoms``' index-0 default is correct for them:
+#
+#   carboxylic_acid        [CX3](=O)[OX2H1]                -> 0 is the acyl C
+#   ester                  [CX3](=O)[OX2][#6]              -> 0 is the acyl C
+#   primary/secondary/
+#     tertiary_amide       [CX3](=O)[NX3...]               -> 0 is the acyl C
+#   primary/secondary/
+#     tertiary_sulfonamide [SX4](=O)(=O)[NX3...]           -> 0 is the S
+#   amidine                [CX3](=[NX2])[NX3;...]          -> 0 is the amidine C
+#   nitrile                [CX2]#[NX1]                     -> 0 is the nitrile C
+#   aldehyde               [CX3;H1,H2](=O)                 -> 0 is the carbonyl C
+#
+# This list is NOT decoration.  ``_pg_attachment_atoms`` silently falls back to
+# SMARTS index 0 for any unknown FG, and for the ``phenol``/``aromatic_amine``/
+# ``enol`` SMARTS index 0 is the HETEROATOM -- a gap that became a live
+# regression once before (see the v29 P7 C2 block in seniority.py).  Anything
+# that reaches this path undeclared must be audited, not assumed; the invariant
+# is enforced by tests/unit/assembly/test_general_monocycle_pg_anchor.py.
+_LEADING_ANCHOR_RING_PGS = frozenset({
+    "carboxylic_acid", "ester",
+    "primary_amide", "secondary_amide", "tertiary_amide",
+    "primary_sulfonamide", "secondary_sulfonamide", "tertiary_sulfonamide",
+    "amidine", "nitrile", "aldehyde",
+})
+
+
+def _pg_bearing_ring_atoms(mol, pg, match, ring_set):
+    """Ring atoms that BEAR the principal characteristic group (P-14.4).
+
+    The raw SMARTS match is not the answer.  ``[#6][CX3](=O)[#6]`` matches a
+    ring ketone's carbonyl carbon *and both of its ring neighbours*, so
+    intersecting the whole match with the ring hands the numbering comparator
+    three atoms for a monoketone and all six for a para-dione -- identical for
+    every candidate orientation, which silently neuters the principal-group
+    criterion and lets ring unsaturation win instead.  P-64.2.1.2
+    (``BlueBookV2.md:28307``) settles the intended outcome at ``:28320``:
+    ``1,4-benzoquinone   cyclohexa-2,5-diene-1,4-dione (PIN)`` -- the dione
+    takes 1,4, the diene takes 2,5.
+
+    So ask the one question both ring-suffix styles share: *which ring atom
+    carries the group?*
+
+    * inline suffix (``one``/``ol``/``amine``/``thiol``/``imine``) -- the
+      characteristic atom is itself a ring atom; that is the answer.
+    * appended suffix (``carboxylic acid``/``carbaldehyde``/``carbonitrile``/
+      ``carboxamide``/``sulfonamide``/...) -- the anchor hangs off the ring, so
+      the locant belongs to the ring atom it is attached to.  Intersecting the
+      raw match with the ring returns *nothing* for these, which is why an
+      unsubstituted ring acid numbered its own attachment carbon 4.
+
+    Atom selection is delegated to ``parent_selection._pg_attachment_atoms``
+    (driven by ``seniority.PG_ATTACHMENT_INDICES``) -- the primitive that
+    already owns "which atom of this SMARTS match bears the locant".  An FG with
+    neither a table entry nor a place on ``_LEADING_ANCHOR_RING_PGS`` is treated
+    as undeclared and falls back to the historical whole-match behaviour rather
+    than silently trusting SMARTS index 0.
+    """
+    from ..rules.parent_selection import _pg_attachment_atoms
+    from ..rules.seniority import PG_ATTACHMENT_INDICES
+
+    whole_match = [i for i in match if i in ring_set]
+    if PG_ATTACHMENT_INDICES.get(pg) is None and pg not in _LEADING_ANCHOR_RING_PGS:
+        return whole_match
+
+    anchors = _pg_attachment_atoms(pg, tuple(match))
+    on_ring = [i for i in anchors if i in ring_set]
+    if on_ring:
+        return on_ring
+
+    attached = []
+    for a in anchors:
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            j = nb.GetIdx()
+            if j in ring_set and j not in attached:
+                attached.append(j)
+    return attached or whole_match
+
+
 _MULT_SIMPLE = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
                 7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
 _MULT_COMPLEX = {2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis',
@@ -1540,8 +1621,8 @@ def name_general_monocycle(
             suffix_atoms.update(i for i in match
                                 if i not in ring_set
                                 and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
-            on_ring = [i for i in match if i in ring_set]
-            pg_ring_atoms.update(on_ring)
+            pg_ring_atoms.update(
+                _pg_bearing_ring_atoms(mol, pg, match, ring_set))
     for i in ring_set:
         for nb in mol.GetAtomWithIdx(i).GetNeighbors():
             j = nb.GetIdx()
