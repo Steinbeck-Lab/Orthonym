@@ -454,8 +454,61 @@ def find_principal_chain(
                 _normalize_pcg_match(mol, m, _het_z)
                 for sub in _members for m in functional_groups.get(sub, [])
             ]
+        # v29 R1 (P-44.1.1): a SKELETAL-suffix PCG -- the '-one' family -- puts
+        # the characteristic group's OWN atom into the parent hydride, so only
+        # that atom may satisfy "this chain bears the PCG". The ketone SMARTS
+        # '[#6][CX3](=O)[#6]' carries BOTH FLANKING carbons, and the whole-match
+        # semantics below let a chain through a mere NEIGHBOUR of the carbonyl
+        # score contains_fg=1 / fg_count=1. Criterion 3 (length) then handed the
+        # win to a longer carbonyl-FREE chain, the acyl carbons were dropped as
+        # an unnameable substituent (DROP-09) and the '=O' was re-expressed on
+        # the attachment atom -- a SILENT ATOM DROP:
+        #   CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C  (C21H42O)
+        #     -> '5-butyl-2,4-dimethyltridecan-4-one'  (C19H38O, 2 C GONE)
+        #
+        # P-64.2.2.1 "Acyclic ketones" (BlueBookV2/BlueBookV2.md:28346) -- "(1)
+        # substitutively, using the suffix 'one' ... Method (1) generates
+        # preferred IUPAC names"; its examples `butan-2-one (PIN)`,
+        # `heptan-3-one (PIN)` and `5-methylhexan-2-one (PIN)` all number the
+        # CARBONYL CARBON as a skeletal atom of the parent chain.
+        # P-44.1.1 (:18875) -- "The senior parent structure has the maximum
+        # number of substituents corresponding to the principal characteristic
+        # group (suffix)"; P-44.1 (:18873) -- these criteria "must always be
+        # applied before those applicable to ... chains (see P-44.3)". A chain
+        # without the carbonyl carbon bears ZERO ketones, so it loses at
+        # P-44.1.1 before chain length is ever consulted.
+        #
+        # This is the same correction ``_pg_is_on_ring`` already applies to
+        # RINGS via SKELETAL_SUFFIX_PGS (parent_selection.py:265, "the
+        # bonded-to-ring relaxation is invalid and mis-parented every aryl
+        # ketone"). The chain selector never received it. Both the primitive
+        # and the membership set are reused, not reinvented.
+        #
+        # Scoped to the SKELETAL_SUFFIX_PGS members that reach the het_z-is-None
+        # fallback: alcohol, imine, ketone, selenoketone, selenol, telluroketone,
+        # tellurol, thioketone, thiol. For every one of those except the ketone
+        # family the only non-anchor match atom is a HETEROATOM, which can never
+        # be a member of a carbon chain -- so the restriction is byte-identical
+        # there and bites exactly the flanking-carbon case it was derived for.
+        # The alcohol/amine classes have het_z set and keep the bearing-carbon
+        # branch below (the correct semantics for an exocyclic heteroatom).
+        # Function-local import: rules.parent_selection imports perception.chains
+        # at module scope, so a top-level import here would be circular.
+        from ..rules.parent_selection import (
+            SKELETAL_SUFFIX_PGS, _pg_attachment_atoms,
+        )
+        _skeletal_suffix = (
+            _het_z is None and principal_group in SKELETAL_SUFFIX_PGS
+        )
+
+        def _pcg_anchor_atoms(match) -> Set[int]:
+            """Atoms of ``match`` that can make a chain bear this PCG."""
+            if not _skeletal_suffix:
+                return set(match)
+            return set(_pg_attachment_atoms(principal_group, tuple(match)))
+
         for match in fg_matches:
-            fg_atoms.update(match)
+            fg_atoms.update(_pcg_anchor_atoms(match))
         # Build the bearing-carbon set for each PCG instance (deduped by
         # heteroatom so a group present under >1 SMARTS subtype counts once).
         # Bearing carbons = carbons DIRECTLY bonded to the characteristic
@@ -472,8 +525,11 @@ def find_principal_chain(
                     None,
                 )
             if het is None:
-                # Legacy fallback: count where any match atom is on the chain.
-                fg_bearing_carbons.append(set(match))
+                # Legacy fallback: count where any match atom is on the chain --
+                # narrowed by v29 R1 to the PCG's own skeletal atom for the
+                # SKELETAL_SUFFIX_PGS families (see the P-44.1.1 note above), so
+                # a chain through a flanking carbon no longer counts the group.
+                fg_bearing_carbons.append(_pcg_anchor_atoms(match))
                 continue
             if het in _seen_het:
                 continue
