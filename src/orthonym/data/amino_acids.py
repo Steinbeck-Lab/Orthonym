@@ -631,3 +631,55 @@ logger.debug(
     "Expanded acyl names to %d entries (+%d generated)",
     len(AMINO_ACID_ACYL_NAMES), len(_generated_acyl),
 )
+
+
+# --- Task E: PIN gate over the amino-acid tables -----------------------------
+# Until now this surface never consulted the curated PIN authority
+# (data/iupac_2013_pin_list.json), which is why `CNCC(=O)O` emitted `sarcosine`
+# on the DEFAULT --style pin path. `sarcosine` appears nowhere in the Blue Book
+# (0 hits; grep methodology validated against `glycine` = 26 hits), and
+# P-103.1.1.3 "Systematic substitutive names" (BlueBookV2.md:54247), sentence
+# :54251, directs exactly this case elsewhere: "When not denoted by a retained
+# name, amino acids receive systematic substitutive names constructed by
+# applying the principles, rules and conventions of substitutive nomenclature."
+# The Blue Book states the precedent itself at :54253 -- norvaline and
+# norleucine are likewise non-retained and "are not recommended".
+#
+# Note the framing: P-100 "INTRODUCTION" (:50939), sentence :50943, says
+# "Preferred IUPAC names (PINs) are not identified for the compounds in this
+# Chapter", so NO Chapter-10 name is Blue-Book-designated (PIN) -- not
+# `sarcosine` and not `glycine`. The P-103 tables give prescribed RETAINED
+# names. The defect is therefore not "sarcosine is not the PIN" but "sarcosine
+# is a name no Blue Book rule licenses".
+#
+# Rows are DEMOTED, never deleted: a denied name moves to
+# GENERAL_ONLY_AMINO_ACIDS so general nomenclature and --trivial keep it. This
+# mirrors the ALL_RETAINED_NAMES / GENERAL_RETAINED_NAMES split exactly.
+#
+# ⚠ The gate is the curated deny-list, NOT the OPSIN `is_pin` field.
+#  hard-codes `"is_pin": False` (lines 268/742/847),
+# so all 232 entries in amino_acids_opsin.py carry False; gating on it would
+# withdraw all 88 names this module integrates, `cystine` (Blue Book Table 10.5,
+# P-103.1.1.2) among them. Each deny is adjudicated per row, with a citation and
+# a verified systematic replacement -- the granularity data/__init__.py:263
+# already identifies as the correct one.
+from .pin_policy import is_pin_denied as _is_pin_denied  # noqa: E402
+
+#: Canonical SMILES -> trivial name for amino acids withdrawn from the PIN path.
+GENERAL_ONLY_AMINO_ACIDS: Dict[str, str] = {
+    smi: name
+    for smi, name in {**STANDARD_AMINO_ACIDS, **NON_STANDARD_AMINO_ACIDS}.items()
+    if _is_pin_denied(name)
+}
+
+for _smi in GENERAL_ONLY_AMINO_ACIDS:
+    STANDARD_AMINO_ACIDS.pop(_smi, None)
+    NON_STANDARD_AMINO_ACIDS.pop(_smi, None)
+
+if GENERAL_ONLY_AMINO_ACIDS:
+    logger.debug(
+        "PIN gate withdrew %d amino-acid keys (%d distinct names) to "
+        "GENERAL_ONLY_AMINO_ACIDS",
+        len(GENERAL_ONLY_AMINO_ACIDS),
+        len(set(GENERAL_ONLY_AMINO_ACIDS.values())),
+    )

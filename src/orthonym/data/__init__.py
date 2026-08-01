@@ -144,32 +144,15 @@ _PIN_LIST_PATH = Path(__file__).parent / "iupac_2013_pin_list.json"
 # on (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) so
 # any malformed file degrades gracefully rather than crashing import.
 # Source: 150-REVIEW.md WR-06.
-try:
-    with open(_PIN_LIST_PATH) as f:
-        _PIN_LIST = json.load(f)
-    _PIN_ALLOW = frozenset(
-        e["name"].lower() for e in _PIN_LIST["entries"] if e.get("pin") is True
-    )
-    _PIN_DENY = frozenset(
-        e["name"].lower() for e in _PIN_LIST["entries"] if e.get("pin") is False
-    )
-    # Phase 167 HYG-03: deny subset that ALSO filters the hand-curated dict.
-    # Excludes ``hc_override`` entries (cumene/quinuclidine/acetylene) which
-    # Phase 150 D-11 intentionally retains on the HC side (their deny applies
-    # only to OPSIN-side promotion). New HYG-03 corrections carry no
-    # hc_override, so they filter BOTH emission sources.
-    _PIN_DENY_HC = frozenset(
-        e["name"].lower() for e in _PIN_LIST["entries"]
-        if e.get("pin") is False and not e.get("hc_override")
-    )
-except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) as e:
-    _PIN_ALLOW = frozenset()
-    _PIN_DENY = frozenset()
-    _PIN_DENY_HC = frozenset()
-    logger.warning(
-        "PIN list load failed at %s: %s; classifier degrades to "
-        "Signal 1 only", _PIN_LIST_PATH, e
-    )
+# Task E: the loader moved to data/pin_policy.py so the amino-acid,
+# natural-product and trivial-acid surfaces read the SAME adjudicated sets
+# instead of not reading them at all. Values are unchanged; the try/except
+# degradation (empty sets + warning on a malformed file) now lives there.
+from .pin_policy import (  # noqa: E402
+    PIN_ALLOW as _PIN_ALLOW,
+    PIN_DENY as _PIN_DENY,
+    PIN_DENY_HC as _PIN_DENY_HC,
+)
 
 # Phase 150 D-04: load round-trip cache (Plan 02 produces this)
 _ROUNDTRIP_CACHE_PATH = (

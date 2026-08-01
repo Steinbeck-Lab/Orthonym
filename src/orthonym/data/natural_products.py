@@ -430,6 +430,23 @@ NAME_EXACT_NP_PARENTS = frozenset({
 # 3. Helper function for derivative lookup
 # ---------------------------------------------------------------------------
 
+# Task E: this surface never consulted the curated PIN authority
+# (data/iupac_2013_pin_list.json), so an adjudicated non-PIN row here reached the
+# DEFAULT --style pin path even when the SAME name was already denied for the
+# retained-names dict -- `camphor` is keyed in BOTH this table and
+# retained_names.py, and a runtime spy showed the emission came from here, so
+# the deny row on the other surface was inert. Rows are demoted, not deleted:
+# a denied name stays in NATURAL_PRODUCT_DERIVATIVES for general nomenclature
+# and is simply withheld from the PIN lookup.
+from .pin_policy import is_pin_denied as _is_pin_denied  # noqa: E402
+
+#: Canonical SMILES -> name for derivatives withdrawn from the PIN path.
+GENERAL_ONLY_NATURAL_PRODUCTS: Dict[str, str] = {
+    smi: name for smi, name in NATURAL_PRODUCT_DERIVATIVES.items()
+    if _is_pin_denied(name)
+}
+
+
 def get_natural_product_name(canonical_smiles: str) -> Optional[str]:
     """Look up exact natural product derivative name by canonical SMILES.
 
@@ -437,8 +454,10 @@ def get_natural_product_name(canonical_smiles: str) -> Optional[str]:
         canonical_smiles: RDKit canonical SMILES string.
 
     Returns:
-        The retained/trivial name if found, otherwise None.
+        The retained/trivial name if found and PIN-admissible, otherwise None.
     """
+    if canonical_smiles in GENERAL_ONLY_NATURAL_PRODUCTS:
+        return None
     return NATURAL_PRODUCT_DERIVATIVES.get(canonical_smiles)
 
 
