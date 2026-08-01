@@ -252,19 +252,21 @@ class TestAnilinoPrefixFromAnilineName:
         SELF-01 could not see it and the fabricated name SHIPPED. This is the
         standing hazard in its exact form: making the composer site fail closed
         removed a wrong output and unmasked a worse generator."""
-        from orthonym.assembly.substituent_naming import parent_to_prefix
+        from orthonym.assembly.substituent_naming import (
+            ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
         for aniline in ("aniline", "4-methylaniline", "N-methylaniline",
                         "4-methyl-N-methylaniline"):
-            got = parent_to_prefix(aniline, 6)
+            got = parent_to_prefix(aniline, 6, attach_locant=ATTACH_LOCANT_UNKNOWN)
             assert got is None or "anilinyl" not in got, (
-                f"parent_to_prefix({aniline!r}) -> {got!r} fabricates 'anilinyl'"
+                f"parent_to_prefix({aniline!r}, attach_locant=ATTACH_LOCANT_UNKNOWN) -> {got!r} fabricates 'anilinyl'"
             )
 
     def test_the_heterocyclic_ine_rule_still_works(self):
         """The aniline carve-out must precede, not replace, P-31.1.3."""
-        from orthonym.assembly.substituent_naming import parent_to_prefix
-        assert parent_to_prefix("pyridine", 5) == "pyridinyl"
-        assert parent_to_prefix("piperidine", 5) == "piperidinyl"
+        from orthonym.assembly.substituent_naming import (
+            ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
+        assert parent_to_prefix("pyridine", 5, attach_locant=ATTACH_LOCANT_UNKNOWN) == "pyridinyl"
+        assert parent_to_prefix("piperidine", 5, attach_locant=ATTACH_LOCANT_UNKNOWN) == "piperidinyl"
 
     def test_ring_and_nitrogen_substituted_end_to_end(self):
         """The case ``anilino_preferred_prefix`` declines (it would have to invent

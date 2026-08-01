@@ -34,6 +34,7 @@ locanted amine branch for the other).
 import pytest
 
 from orthonym.assembly.substituent_naming import (
+    ATTACH_LOCANT_UNKNOWN,
     _joined_prefix_parts,
     _prefix_stem_yl,
     _starts_with_locant,
@@ -110,16 +111,39 @@ class TestPrefixStemYl:
 class TestParentToPrefixWitnesses:
     """Whole-fragment pins on the two spy-proven producing branches."""
 
-    def test_witness_one_locanted_amine_branch(self):
-        # CCC(C)(CCCCCCCCC(C(C)C)N)C1=CC(=O)C(=CC1=O)C(C)(CC)CCCCCCCCC(C(C)C)N
-        # was '3-amino2,12-dimethyltetradecyl'.
-        assert (parent_to_prefix("2,12-dimethyltetradecan-3-amine", 14)
+    # v29 residue Task A: these two witnesses used to assert the STRING the
+    # locanted-amine and multi-FG-amine branches produced. Those strings are
+    # provably not general answers -- ``parent_to_prefix`` is handed only a name
+    # and a carbon count, and that pair is NOT injective over fragments:
+    # ``-CH2CH2CH2OH`` and ``-CH(OH)CH2CH3`` both cap to ``propan-1-ol`` with
+    # count 3, yet OPSIN 2.9.0 makes the single old output ``1-hydroxypropyl``
+    # EXACT for the second and a DIFFERENT MOLECULE for the first. Witness one
+    # is the same failure: OPSIN round-trips ``(3-amino-2,12-dimethyltetradecyl)
+    # benzene`` to a different molecule, while the structurally numbered
+    # ``(12-amino-3,13-dimethyltetradecan-3-yl)benzene`` is EXACT
+    # (P-46.1.8, BB:22718: "The principal substituent chain has the lowest
+    # locants for free valences of any kind").
+    #
+    # The C4 HYPHEN behaviour they were written to guard is preserved by pinning
+    # it on ``_prefix_stem_yl`` -- the function that actually performs it -- so
+    # this change updates the contract without dropping coverage.
+
+    def test_witness_one_hyphen_is_still_inserted(self):
+        assert (_prefix_stem_yl("3-amino", "2,12-dimethyltetradec")
                 == "3-amino-2,12-dimethyltetradecyl")
 
-    def test_witness_two_multi_fg_amine_branch(self):
-        # CNCCNCCNCC(=O)O was '1,2-diaminoN1-(2-aminoethyl)-N2-methylethyl'.
-        assert (parent_to_prefix("N1-(2-aminoethyl)-N2-methylethane-1,2-diamine", 2)
+    def test_witness_two_hyphen_is_still_inserted(self):
+        assert (_prefix_stem_yl("1,2-diamino", "N1-(2-aminoethyl)-N2-methyleth")
                 == "1,2-diamino-N1-(2-aminoethyl)-N2-methylethyl")
+
+    @pytest.mark.parametrize("parent,length", [
+        ("2,12-dimethyltetradecan-3-amine", 14),                    # R8.2
+        ("N1-(2-aminoethyl)-N2-methylethane-1,2-diamine", 2),       # R4
+    ])
+    def test_witness_branches_now_fail_closed(self, parent, length):
+        """Neither locant set is derivable from (name, count): decline."""
+        assert parent_to_prefix(
+            parent, length, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_witness_three_fails_closed(self):
         # 'aminoO-methylhydroxyl' came from the unlocanted-amine branch on the
@@ -128,18 +152,33 @@ class TestParentToPrefixWitnesses:
         # guard now declines the whole conversion -- the C4 hyphen is moot here
         # and the emitter abstains instead. Pinned so a later change to that
         # guard cannot silently resurrect the glued fragment.
-        assert parent_to_prefix("O-methylhydroxylamine", 1) is None
+        assert parent_to_prefix("O-methylhydroxylamine", 1, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
-    # --- negative controls: current output, verified before pinning --------
-    @pytest.mark.parametrize("parent,length,expected", [
-        ("tetradecan-1-ol", 14, "1-hydroxytetradecyl"),
-        ("hexane-2,5-diamine", 6, "2,5-diaminohexyl"),
-        ("butan-2-one", 4, "2-oxobutyl"),
-        ("butanoic acid", 4, "3-carboxypropyl"),
-        ("propan-2-ol", 3, "2-hydroxypropyl"),
+    # --- negative controls: the undecorated stems take no hyphen -----------
+    # Re-pointed at _prefix_stem_yl for the same reason as the witnesses above:
+    # the locants in these parent names belong to the CAPPED molecule, so
+    # parent_to_prefix can no longer emit them. The hyphen rule under test is
+    # unchanged and is still exercised on every stem.
+    @pytest.mark.parametrize("prefix,stem,expected", [
+        ("1-hydroxy", "tetradec", "1-hydroxytetradecyl"),
+        ("2,5-diamino", "hex", "2,5-diaminohexyl"),
+        ("2-oxo", "but", "2-oxobutyl"),
+        ("3-carboxy", "prop", "3-carboxypropyl"),
+        ("2-hydroxy", "prop", "2-hydroxypropyl"),
     ])
-    def test_undecorated_stems_keep_no_hyphen(self, parent, length, expected):
-        assert parent_to_prefix(parent, length) == expected
+    def test_undecorated_stems_keep_no_hyphen(self, prefix, stem, expected):
+        assert _prefix_stem_yl(prefix, stem) == expected
+
+    @pytest.mark.parametrize("parent,length", [
+        ("tetradecan-1-ol", 14),
+        ("hexane-2,5-diamine", 6),
+        ("butan-2-one", 4),
+        ("butanoic acid", 4),
+        ("propan-2-ol", 3),
+    ])
+    def test_those_parents_no_longer_borrow_a_locant(self, parent, length):
+        assert parent_to_prefix(
+            parent, length, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
 
 class TestJoinedPrefixParts:

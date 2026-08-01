@@ -23,6 +23,7 @@ from orthonym.assembly.naming_utils import (
     format_substituent_prefix,
 )
 from orthonym.assembly.substituent_naming import (
+    ATTACH_LOCANT_UNKNOWN,
     _is_linear_alkyl,
     name_substituent_fragment,
     parent_to_prefix,
@@ -285,35 +286,44 @@ class TestParentToPrefix:
 
     @pytest.mark.integration
     def test_alkane_to_yl(self):
-        assert parent_to_prefix("propane", 3) == "propyl"
+        assert parent_to_prefix("propane", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) == "propyl"
 
     @pytest.mark.integration
     def test_branched_alkane_to_yl(self):
-        assert parent_to_prefix("2-methylpropane", 3) == "2-methylpropyl"
+        assert parent_to_prefix("2-methylpropane", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) == "2-methylpropyl"
 
     @pytest.mark.integration
     def test_alcohol_to_hydroxy(self):
-        assert parent_to_prefix("ethanol", 2) == "hydroxyethyl"
+        assert parent_to_prefix("ethanol", 2, attach_locant=ATTACH_LOCANT_UNKNOWN) == "hydroxyethyl"
 
     @pytest.mark.integration
     def test_locanted_alcohol_to_hydroxy(self):
-        assert parent_to_prefix("propan-2-ol", 3) == "2-hydroxypropyl"
+        # v29 residue Task A: (name, count) is not injective over fragments --
+        # '-CH2CH2CH2OH' and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with
+        # count 3, and OPSIN 2.9.0 makes the single old answer EXACT for one
+        # and a DIFFERENT MOLECULE for the other. P-46.1.8 (BB:22718) can only
+        # be honoured by a caller holding the molecule, so this declines; the
+        # structural namers still give the right whole-molecule name.
+        assert parent_to_prefix("propan-2-ol", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     @pytest.mark.integration
     def test_ketone_to_oxo(self):
-        assert parent_to_prefix("butan-2-one", 4) == "2-oxobutyl"
+        assert parent_to_prefix("butan-2-one", 4, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     @pytest.mark.integration
     def test_aldehyde_to_oxo(self):
         # Phase 172 MBA-02: the absorbed -CHO carbon sits at the terminus opposite
         # the attachment (= chain_length), so oxo is at C3, not the acyl C1.
         # '1-oxopropyl' is NOT a preferred IUPAC prefix (BlueBookV2.md Table-28.1 note m).
-        assert parent_to_prefix("propanal", 3) == "3-oxopropyl"
+        # Task A: `chain_length` is a COUNT, not a proof of chain length -- on
+        # '2-methylpropanal' (count 4, stem 'prop') it spliced locant 4 onto a
+        # three-position stem. Declines; the end-to-end name is unaffected.
+        assert parent_to_prefix("propanal", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     @pytest.mark.integration
     def test_amine_to_amino(self):
-        assert parent_to_prefix("propan-1-amine", 3) == "1-aminopropyl"
+        assert parent_to_prefix("propan-1-amine", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     @pytest.mark.integration
     def test_carboxylic_acid_to_carboxy(self):
-        assert parent_to_prefix("butanoic acid", 4) == "3-carboxypropyl"
+        assert parent_to_prefix("butanoic acid", 4, attach_locant=ATTACH_LOCANT_UNKNOWN) is None

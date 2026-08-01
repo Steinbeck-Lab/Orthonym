@@ -19,7 +19,8 @@ W2E-P1FC follow-up (see ).
 import pytest
 
 from orthonym.namer import name_compound
-from orthonym.assembly.substituent_naming import parent_to_prefix
+from orthonym.assembly.substituent_naming import (
+    ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
 
 # OPSIN-canonical evidence SMILES for '6-(4-carboxyphenyl)-9H-fluorene-2-
 # carboxylic acid' (guaranteed round-trip).
@@ -31,9 +32,16 @@ class TestP59215MultiRingPG:
     def test_ring_acid_not_flattened_to_chain(self):
         # Root fail-closed guard: a RING acid parent name must never be
         # converted to a carboxy-alkyl chain prefix (the phenyl->hexyl leak).
-        assert parent_to_prefix("benzoic acid", 7) == ""
-        # A genuine systematic CHAIN acid still converts.
-        assert parent_to_prefix("butanoic acid", 4) == "3-carboxypropyl"
+        assert parent_to_prefix("benzoic acid", 7, attach_locant=ATTACH_LOCANT_UNKNOWN) == ""
+        # A genuine systematic CHAIN acid is still RECOGNISED as a chain (it
+        # does not hit the ring-acid '' guard). Task A: it no longer emits
+        # '3-carboxypropyl', because that locant came from a carbon COUNT
+        # rather than a proof of the chain; the whole-molecule name is
+        # unaffected (OC(=O)c1ccc(CCC(=O)O)cc1 ->
+        # '4-(2-carboxyethyl)benzoic acid'). The one-position form, which
+        # needs no locant at all (P-14.3.4.6), still converts.
+        assert parent_to_prefix("butanoic acid", 4, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
+        assert parent_to_prefix("acetic acid", 2, attach_locant=ATTACH_LOCANT_UNKNOWN) == "acetyl"
 
     def test_no_carboxyhexyl_flattening_leak(self):
         # The phenyl->hexyl flattened name must NEVER be emitted (the historical

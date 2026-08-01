@@ -13,7 +13,8 @@ them structurally and returns the authoritative prefix.
 import pytest
 
 from orthonym.namer import Orthonym
-from orthonym.assembly.substituent_naming import parent_to_prefix
+from orthonym.assembly.substituent_naming import (
+    ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
 
 
 @pytest.fixture(scope="module")
@@ -52,10 +53,10 @@ def test_bp2_no_fabricated_garbage(namer_pin, smiles):
 
 def test_rc1_parent_to_prefix_fail_closed():
     """parent_to_prefix declines functional-parent residues (returns None)."""
-    assert parent_to_prefix("isothiocyanic acid", chain_length=1) is None
-    assert parent_to_prefix("ethyl formate", chain_length=1) is None
-    assert parent_to_prefix("prop-2-enal", chain_length=3) is None
+    assert parent_to_prefix("isothiocyanic acid", chain_length=1, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
+    assert parent_to_prefix("ethyl formate", chain_length=1, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
+    assert parent_to_prefix("prop-2-enal", chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
     # ...but never touches legitimate hydrocarbon / ring substituent parents:
-    assert parent_to_prefix("propane", chain_length=3) == "propyl"
-    assert parent_to_prefix("pyridine", chain_length=0) == "pyridinyl"
-    assert parent_to_prefix("prop-1-ene", chain_length=3) == "prop-1-enyl"
+    assert parent_to_prefix("propane", chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN) == "propyl"
+    assert parent_to_prefix("pyridine", chain_length=0, attach_locant=ATTACH_LOCANT_UNKNOWN) == "pyridinyl"
+    assert parent_to_prefix("prop-1-ene", chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN) == "prop-1-enyl"

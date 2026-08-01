@@ -1,8 +1,8 @@
-"""TDD RED tests for name_substituent() five-tier cascade and parent_to_prefix() extensions.
+"""TDD RED tests for name_substituent() five-tier cascade and parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN) extensions.
 
 Tests the Phase 85 deliverables:
 - name_substituent(mol, frag_atoms, attach_idx) -> str (never None)
-- parent_to_prefix() extended for ester, amide, nitrile, cyclic parent names
+- parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN) extended for ester, amide, nitrile, cyclic parent names
 
 References:
     IUPAC 2013 P-31.1.3 (substituent prefix naming)
@@ -15,7 +15,8 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly.substituent_enumerator import name_substituent
-from orthonym.assembly.substituent_naming import parent_to_prefix
+from orthonym.assembly.substituent_naming import (
+    ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
 
 
 # ============================================================================
@@ -169,7 +170,7 @@ class TestTierOrdering:
     def test_cache_hit_returns_cache_result(self):
         """Fragment matching FRAGMENT_NAME_CACHE entry returns cached name (tier 2)."""
         # ethanol fragment: "CCO" is in the cache as "ethanol"
-        # parent_to_prefix("ethanol", 2) -> "hydroxyethyl" or similar
+        # parent_to_prefix("ethanol", 2, attach_locant=ATTACH_LOCANT_UNKNOWN) -> "hydroxyethyl" or similar
         mol = _make_mol("CCCO")  # propan-1-ol: C0-C1-C2-O3
         # Fragment = {1, 2, 3} (ethanol fragment: C1-C2-O3)
         # This should hit cache for "CCO" -> "ethanol" -> prefix form
@@ -256,23 +257,20 @@ class TestAttachIdx:
 # ============================================================================
 
 class TestParentToPrefixEster:
-    """Verify parent_to_prefix() handles ester (-oate) names."""
+    """Verify parent_to_prefix handles ester (-oate) names."""
 
-    def test_propanoate_ester(self):
-        """IUPAC P-65.6.3: propanoate -> some form of carboxy/alkoxycarbonyl prefix."""
-        result = parent_to_prefix("propanoate", 3)
-        assert result is not None
-        assert isinstance(result, str)
-        assert len(result) > 0
-        # Should produce a carboxy-related or alkoxycarbonyl prefix
-        assert any(word in result.lower() for word in
-                   ["carboxy", "oxycarbonyl", "alkoxycarbonyl"])
+    def test_ethanoate_ester_one_position_stem(self):
+        """P-65.6.3 + P-14.3.4.6: a one-position stem needs no locant, so the
+        carbon count cannot mis-place one. 'ethanoate' -> 'carboxymethyl'."""
+        result = parent_to_prefix("ethanoate", 2, attach_locant=ATTACH_LOCANT_UNKNOWN)
+        assert result == "carboxymethyl"
 
-    def test_butanoate_ester(self):
-        """butanoate -> carboxy/alkoxycarbonyl prefix."""
-        result = parent_to_prefix("butanoate", 4)
-        assert result is not None
-        assert len(result) > 0
+    @pytest.mark.parametrize("parent,clen", [("propanoate", 3), ("butanoate", 4)])
+    def test_longer_esters_decline_the_count_derived_locant(self, parent, clen):
+        """v29 residue Task A: the carboxy locant was read off the whole-fragment
+        carbon COUNT, which is not a proof of the fragment's shape."""
+        assert parent_to_prefix(
+            parent, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
 
 # ============================================================================
@@ -280,25 +278,24 @@ class TestParentToPrefixEster:
 # ============================================================================
 
 class TestParentToPrefixAmide:
-    """Verify parent_to_prefix() handles amide names."""
+    """Verify parent_to_prefix handles amide names."""
 
-    def test_propanamide(self):
-        """IUPAC P-66.1.1.4: propanamide -> carbamoyl prefix form."""
-        result = parent_to_prefix("propanamide", 3)
-        assert result is not None
-        assert isinstance(result, str)
-        assert "carbamoyl" in result.lower()
+    def test_propanamide_declines_the_count_derived_locant(self):
+        """v29 residue Task A -- see test_longer_esters_decline... above.
+        The whole-molecule name is unaffected where the chain is proven."""
+        assert parent_to_prefix(
+            "propanamide", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_acetamide(self):
         """acetamide -> carbamoyl prefix form."""
-        result = parent_to_prefix("acetamide", 2)
+        result = parent_to_prefix("acetamide", 2, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result is not None
         assert isinstance(result, str)
         assert "carbamoyl" in result.lower()
 
     def test_carboxamide(self):
         """benzcarboxamide -> carbamoyl prefix form."""
-        result = parent_to_prefix("carboxamide", 0)
+        result = parent_to_prefix("carboxamide", 0, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result is not None
         assert "carbamoyl" in result.lower()
 
@@ -308,25 +305,23 @@ class TestParentToPrefixAmide:
 # ============================================================================
 
 class TestParentToPrefixNitrile:
-    """Verify parent_to_prefix() handles nitrile names."""
+    """Verify parent_to_prefix handles nitrile names."""
 
-    def test_propanenitrile(self):
-        """IUPAC P-66.1.4.1: propanenitrile -> cyano prefix form."""
-        result = parent_to_prefix("propanenitrile", 3)
-        assert result is not None
-        assert isinstance(result, str)
-        assert "cyano" in result.lower()
+    def test_propanenitrile_declines_the_count_derived_locant(self):
+        """v29 residue Task A -- see test_longer_esters_decline... above."""
+        assert parent_to_prefix(
+            "propanenitrile", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_acetonitrile(self):
         """acetonitrile -> cyano prefix form."""
-        result = parent_to_prefix("acetonitrile", 2)
+        result = parent_to_prefix("acetonitrile", 2, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result is not None
         assert isinstance(result, str)
         assert "cyano" in result.lower()
 
     def test_carbonitrile(self):
         """carbonitrile -> cyano prefix form."""
-        result = parent_to_prefix("carbonitrile", 0)
+        result = parent_to_prefix("carbonitrile", 0, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result is not None
         assert "cyano" in result.lower()
 
@@ -336,25 +331,25 @@ class TestParentToPrefixNitrile:
 # ============================================================================
 
 class TestParentToPrefixCyclic:
-    """Verify parent_to_prefix() handles cyclic parent names."""
+    """Verify parent_to_prefix handles cyclic parent names."""
 
     def test_cyclohexane(self):
         """cyclohexane -> cyclohexyl."""
-        result = parent_to_prefix("cyclohexane", 6)
+        result = parent_to_prefix("cyclohexane", 6, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result is not None
         assert "cyclohex" in result.lower()
         assert result.endswith("yl")
 
     def test_pyridine(self):
         """pyridine -> pyridinyl (or pyridyl)."""
-        result = parent_to_prefix("pyridine", 5)
+        result = parent_to_prefix("pyridine", 5, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result is not None
         assert result.endswith("yl")
         assert "pyridin" in result.lower()
 
     def test_cyclopentane(self):
         """cyclopentane -> cyclopentyl."""
-        result = parent_to_prefix("cyclopentane", 5)
+        result = parent_to_prefix("cyclopentane", 5, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result is not None
         assert "cyclopent" in result.lower()
         assert result.endswith("yl")

@@ -1,13 +1,14 @@
 """Unit tests for substituent_naming module.
 
 Tests for name_substituent_fragment(), _is_linear_alkyl(),
-_extract_fragment_smiles(), and parent_to_prefix().
+_extract_fragment_smiles(), and parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN).
 """
 
 import pytest
 from rdkit import Chem
 
 from orthonym.assembly.substituent_naming import (
+    ATTACH_LOCANT_UNKNOWN,
     _is_linear_alkyl,
     _extract_fragment_smiles,
     parent_to_prefix,
@@ -93,35 +94,83 @@ class TestExtractFragmentSmiles:
 
 
 class TestParentToPrefix:
-    """Tests for parent_to_prefix()."""
+    """Tests for parent_to_prefix(, attach_locant=ATTACH_LOCANT_UNKNOWN)."""
 
     def test_alkane_to_yl(self):
         """propane -> propyl."""
-        assert parent_to_prefix("propane", chain_length=3) == "propyl"
+        assert parent_to_prefix("propane", chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN) == "propyl"
 
     def test_alkane_to_yl_butane(self):
         """butane -> butyl."""
-        assert parent_to_prefix("butane", chain_length=4) == "butyl"
+        assert parent_to_prefix("butane", chain_length=4, attach_locant=ATTACH_LOCANT_UNKNOWN) == "butyl"
 
     def test_alcohol_to_hydroxy(self):
         """propan-2-ol -> 2-hydroxypropyl."""
-        result = parent_to_prefix("propan-2-ol", chain_length=3)
-        assert result == "2-hydroxypropyl"
+        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
+        # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
+        # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
+        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # chain has the lowest locants for free valences of any kind") can only
+        # be honoured by a caller holding the molecule, so these branches now
+        # decline. The correct names are still produced end-to-end by the
+        # STRUCTURAL namers -- e.g. OC(=O)c1ccc(CCCO)cc1 ->
+        # '4-(3-hydroxypropyl)benzoic acid' (the old path said '1-hydroxypropyl',
+        # a different molecule).
+        assert parent_to_prefix(
+            "propan-2-ol", chain_length=3,
+            attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_ketone_to_oxo(self):
         """butan-2-one -> 2-oxobutyl."""
-        result = parent_to_prefix("butan-2-one", chain_length=4)
-        assert result == "2-oxobutyl"
+        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
+        # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
+        # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
+        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # chain has the lowest locants for free valences of any kind") can only
+        # be honoured by a caller holding the molecule, so these branches now
+        # decline. The correct names are still produced end-to-end by the
+        # STRUCTURAL namers -- e.g. OC(=O)c1ccc(CCCO)cc1 ->
+        # '4-(3-hydroxypropyl)benzoic acid' (the old path said '1-hydroxypropyl',
+        # a different molecule).
+        assert parent_to_prefix(
+            "butan-2-one", chain_length=4,
+            attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_amine_to_amino(self):
         """propan-1-amine -> 1-aminopropyl."""
-        result = parent_to_prefix("propan-1-amine", chain_length=3)
-        assert result == "1-aminopropyl"
+        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
+        # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
+        # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
+        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # chain has the lowest locants for free valences of any kind") can only
+        # be honoured by a caller holding the molecule, so these branches now
+        # decline. The correct names are still produced end-to-end by the
+        # STRUCTURAL namers -- e.g. OC(=O)c1ccc(CCCO)cc1 ->
+        # '4-(3-hydroxypropyl)benzoic acid' (the old path said '1-hydroxypropyl',
+        # a different molecule).
+        assert parent_to_prefix(
+            "propan-1-amine", chain_length=3,
+            attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_carboxylic_acid_to_carboxy(self):
         """butanoic acid -> 3-carboxypropyl."""
-        result = parent_to_prefix("butanoic acid", chain_length=4)
-        assert result == "3-carboxypropyl"
+        # v29 residue Task A: this converter is handed only a NAME and a CARBON
+        # COUNT, and that pair is not injective over fragments -- '-CH2CH2CH2OH'
+        # and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with count 3, and OPSIN
+        # 2.9.0 makes the single old answer EXACT for one and a DIFFERENT
+        # MOLECULE for the other. P-46.1.8 (BB:22718, "The principal substituent
+        # chain has the lowest locants for free valences of any kind") can only
+        # be honoured by a caller holding the molecule, so these branches now
+        # decline. The correct names are still produced end-to-end by the
+        # STRUCTURAL namers -- e.g. OC(=O)c1ccc(CCCO)cc1 ->
+        # '4-(3-hydroxypropyl)benzoic acid' (the old path said '1-hydroxypropyl',
+        # a different molecule).
+        assert parent_to_prefix(
+            "butanoic acid", chain_length=4,
+            attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_aldehyde_to_oxo(self):
         """propanal -> 3-oxopropyl (Phase 172 MBA-02 fix).
@@ -131,33 +180,38 @@ class TestParentToPrefix:
         '1-oxopropyl' (oxo at the acyl carbon) is explicitly NOT a preferred IUPAC
         prefix (BlueBookV2.md Table-28.1 note m) -- it is the CAS acyl form.
         """
-        result = parent_to_prefix("propanal", chain_length=3)
-        assert result == "3-oxopropyl"
+        # Task A: the oxo locant was `chain_length` -- a COUNT, not a proof of
+        # chain length. For the branched '2-methylpropanal' (count 4, stem
+        # 'prop') it spliced locant 4 onto a three-position stem. Declines now;
+        # OC(=O)c1ccc(CCC=O)cc1 -> '4-(3-oxopropyl)benzoic acid' still holds.
+        assert parent_to_prefix(
+            "propanal", chain_length=3,
+            attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_methane_to_methyl(self):
         """methane -> methyl."""
-        assert parent_to_prefix("methane", chain_length=1) == "methyl"
+        assert parent_to_prefix("methane", chain_length=1, attach_locant=ATTACH_LOCANT_UNKNOWN) == "methyl"
 
     def test_ethane_to_ethyl(self):
         """ethane -> ethyl."""
-        assert parent_to_prefix("ethane", chain_length=2) == "ethyl"
+        assert parent_to_prefix("ethane", chain_length=2, attach_locant=ATTACH_LOCANT_UNKNOWN) == "ethyl"
 
     def test_methylpropane_to_yl(self):
         """2-methylpropane -> 2-methylpropyl."""
-        result = parent_to_prefix("2-methylpropane", chain_length=3)
+        result = parent_to_prefix("2-methylpropane", chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN)
         assert result == "2-methylpropyl"
 
     def test_ethanol_to_hydroxyethyl(self):
         """ethanol -> 2-hydroxyethyl (ethanol has -ol at implicit C-2)."""
         # ethanol = ethan-1-ol
-        result = parent_to_prefix("ethanol", chain_length=2)
+        result = parent_to_prefix("ethanol", chain_length=2, attach_locant=ATTACH_LOCANT_UNKNOWN)
         # ethanol without explicit locant -> hydroxyethyl
         assert "hydroxy" in result
         assert "ethyl" in result
 
     def test_fallback_unknown_suffix(self):
         """Unknown suffix -> just add -yl."""
-        result = parent_to_prefix("benzene", chain_length=6)
+        result = parent_to_prefix("benzene", chain_length=6, attach_locant=ATTACH_LOCANT_UNKNOWN)
         # Should strip -e and add -yl or just add -yl
         assert result.endswith("yl")
 

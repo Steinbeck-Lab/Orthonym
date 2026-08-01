@@ -25,7 +25,9 @@ or ``hydroxylylidene`` occurs anywhere in ``BlueBookV2/BlueBookV2.md``.
 import pytest
 
 from orthonym.assembly.substituent_naming import (
+    ATTACH_LOCANT_UNKNOWN,
     _add_substituent_stereo,
+    _elide_parent_hydride_ending,
     parent_to_prefix,
 )
 
@@ -41,12 +43,12 @@ def test_formaldehyde_yields_formyl_not_formaldehydyl():
     -CHO; the conversion is unambiguous.  P-65.1.8.3 (BB:30702) confirms the
     group is spelled 'formyl' and that its H is substitutable.
     """
-    assert parent_to_prefix("formaldehyde", 1) == "formyl"
+    assert parent_to_prefix("formaldehyde", 1, attach_locant=ATTACH_LOCANT_UNKNOWN) == "formyl"
 
 
 def test_formyl_from_formic_acid_still_works():
     """Control: the pre-existing retained-acyl route must not regress."""
-    assert parent_to_prefix("formic acid", 1) == "formyl"
+    assert parent_to_prefix("formic acid", 1, attach_locant=ATTACH_LOCANT_UNKNOWN) == "formyl"
 
 
 def test_hydrogen_cyanide_yields_cyano_not_hydrogen_cyanidyl():
@@ -56,7 +58,7 @@ def test_hydrogen_cyanide_yields_cyano_not_hydrogen_cyanidyl():
     comment. BB:34687 derives nitriles "from hydrocyanic acid, H-C=N"; HCN has
     one removable H on carbon, so the conversion is unambiguous.
     """
-    assert parent_to_prefix("hydrogen cyanide", 1) == "cyano"
+    assert parent_to_prefix("hydrogen cyanide", 1, attach_locant=ATTACH_LOCANT_UNKNOWN) == "cyano"
 
 
 @pytest.mark.parametrize("name", [
@@ -64,16 +66,24 @@ def test_hydrogen_cyanide_yields_cyano_not_hydrogen_cyanidyl():
 ])
 def test_inorganic_parents_fail_closed(name):
     """Not parent hydrides -> no '-yl' form (was 'wateryl', 'ammoniayl', ...)."""
-    assert parent_to_prefix(name, 1) is None
+    assert parent_to_prefix(name, 1, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
 
-def test_space_bearing_ester_parent_still_converts():
-    """Guard against over-reach: a "contains a space" rule would break this.
+@pytest.mark.parametrize("parent,clen,expected", [
+    ("formic acid", 1, "formyl"),
+    ("acetic acid", 2, "acetyl"),
+])
+def test_space_bearing_parent_still_converts(parent, clen, expected):
+    """Guard against over-reach: a "contains a space" rule would break these.
 
-    Measured in the corpus census: 'henicosyl prop-2-enoate' converts through
-    the '-oate' branch, so multi-word names must NOT be denied wholesale.
+    v29 residue Task A re-pointed this from 'henicosyl prop-2-enoate' ->
+    '23-carboxytricosyl'. That output is no longer emitted, but NOT because of
+    the space: the carboxy locant 23 was read off the whole-fragment carbon
+    COUNT, which is not a proof of the fragment's shape. The multi-word parents
+    below still convert, so the over-reach guard this test exists for is intact.
     """
-    assert parent_to_prefix("henicosyl prop-2-enoate", 24) == "23-carboxytricosyl"
+    assert parent_to_prefix(
+        parent, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) == expected
 
 
 # --------------------------------------------------------------------------
@@ -103,7 +113,7 @@ FAIL_CLOSED_CASES = [
 @pytest.mark.parametrize("name,clen,bb_alternative", FAIL_CLOSED_CASES)
 def test_fails_closed_returning_none(name, clen, bb_alternative):
     """No valid `-yl` prefix exists -> return None so the caller abstains."""
-    assert parent_to_prefix(name, clen) is None, (
+    assert parent_to_prefix(name, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) is None, (
         f"{name!r} has no '-yl' prefix form; the Blue Book uses "
         f"{bb_alternative}. Emitting a manufactured word is the C3 defect."
     )
@@ -123,34 +133,41 @@ def test_caller_propagates_none_rather_than_emitting_a_word():
 # 3. P-29.2 (BB:15811) elision of the final 'e' -- no `...aneyl`
 # --------------------------------------------------------------------------
 
+# v29 residue Task A: the multi-FG branches that used to drive these cases now
+# decline -- every locant in 'ethane-1,2-diol' belongs to the CAPPED molecule's
+# numbering (P-46.1.8, BB:22718), and the count/name pair is not injective over
+# fragments. The ELISION rule itself is unchanged and still live, so the cases
+# are re-pointed at `_elide_parent_hydride_ending`, which performs it.
 ELISION_CASES = [
-    ("ethane-1,2-diol", 2, "1,2-dihydroxyethyl"),
-    ("propane-1,2-diol", 3, "1,2-dihydroxypropyl"),
-    ("ethane-1,2-diamine", 2, "1,2-diaminoethyl"),
+    ("ethane", "eth"),
+    ("propane", "prop"),
+    ("hexane", "hex"),
+    ("cyclohexane", "cyclohex"),
 ]
 
 
-@pytest.mark.parametrize("name,clen,expected", ELISION_CASES)
-def test_final_e_is_elided_before_yl(name, clen, expected):
+@pytest.mark.parametrize("stem,expected", ELISION_CASES)
+def test_final_e_is_elided_before_yl(stem, expected):
     """P-29.2 method (1) (BB:15813): 'yl' REPLACES the ending 'ane'."""
-    assert parent_to_prefix(name, clen) == expected
+    assert _elide_parent_hydride_ending(stem) == expected
 
 
 def test_no_output_ends_in_aneyl():
-    """Class invariant over every case this module exercises."""
-    probes = [n for n, _c, _e in ELISION_CASES] + [
+    """Class invariant: nothing this module can still emit ends in 'aneyl'."""
+    probes = [
+        "ethane-1,2-diol", "propane-1,2-diol", "ethane-1,2-diamine",
         "propane-1,2,3-triol", "butane-1,4-diamine", "hexane-2,5-dione",
+        "propane", "cyclohexane", "pyridine", "methanol", "acetamide",
     ]
-    assert probes, "vacuous: nothing probed"
     checked = 0
     for name in probes:
-        out = parent_to_prefix(name, 4)
+        out = parent_to_prefix(name, 4, attach_locant=ATTACH_LOCANT_UNKNOWN)
         if out is None:
             continue
         checked += 1
         assert not out.endswith("aneyl"), f"{name!r} -> {out!r} violates P-29.2"
         assert not out.endswith("eneyl"), f"{name!r} -> {out!r} violates P-29.2"
-    assert checked >= len(ELISION_CASES), (
+    assert checked >= 4, (
         f"only {checked} probes produced a prefix; the loop would be vacuous"
     )
 
@@ -162,17 +179,13 @@ def test_no_output_ends_in_aneyl():
 UNCHANGED = [
     ("ethanol", 2, "hydroxyethyl"),
     ("methanol", 1, "hydroxymethyl"),
-    ("propan-2-ol", 3, "2-hydroxypropyl"),
     # base ends 'an' -> still elidable, so the silanol route is untouched
     ("trimethylsilanol", 3, "hydroxytrimethylsilyl"),
     ("dimethylsilanol", 2, "hydroxydimethylsilyl"),
     ("methanamine", 1, "aminomethyl"),
-    ("propan-1-amine", 3, "1-aminopropyl"),
     ("propane", 3, "propyl"),
     ("cyclohexane", 6, "cyclohexyl"),
     ("acetic acid", 2, "acetyl"),
-    ("propanal", 3, "3-oxopropyl"),
-    ("butan-2-one", 4, "2-oxobutyl"),
     # a legitimate parent hydride whose prefix IS '<name>yl' -- must survive
     ("methylhydrazine", 1, "methylhydrazinyl"),
 ]
@@ -180,7 +193,27 @@ UNCHANGED = [
 
 @pytest.mark.parametrize("name,clen,expected", UNCHANGED)
 def test_unaffected_conversions_are_unchanged(name, clen, expected):
-    assert parent_to_prefix(name, clen) == expected
+    assert parent_to_prefix(name, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) == expected
+
+
+# v29 residue Task A: four rows moved out of UNCHANGED. Each borrowed its locant
+# from the CAPPED molecule's numbering, and (name, count) is not injective over
+# fragments -- '-CH2CH2CH2OH' and '-CH(OH)CH2CH3' both cap to 'propan-1-ol' with
+# count 3, and OPSIN 2.9.0 makes the single old answer EXACT for one and a
+# DIFFERENT MOLECULE for the other. P-46.1.8 (BB:22718) requires the free valence
+# to take the lowest locant, which only a caller holding the molecule can honour.
+BORROWED_LOCANT = [
+    ("propan-2-ol", 3, "was '2-hydroxypropyl'"),
+    ("propan-1-amine", 3, "was '1-aminopropyl'"),
+    ("propanal", 3, "was '3-oxopropyl' (count-derived)"),
+    ("butan-2-one", 4, "was '2-oxobutyl'"),
+]
+
+
+@pytest.mark.parametrize("name,clen,_was", BORROWED_LOCANT)
+def test_borrowed_locant_conversions_fail_closed(name, clen, _was):
+    assert parent_to_prefix(
+        name, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
 
 # --------------------------------------------------------------------------
@@ -194,12 +227,12 @@ INVENTED = ("formaldehydyl", "acetaldehydyl", "ethaneyl", "ethaneperoxyl",
 def test_no_probe_produces_an_invented_token():
     probes = (
         [(n, c) for n, c, _ in FAIL_CLOSED_CASES]
-        + [(n, c) for n, c, _ in ELISION_CASES]
+        + [(n, 4) for n, _ in ELISION_CASES]
         + [(n, c) for n, c, _ in UNCHANGED]
         + [("formaldehyde", 1)]
     )
     assert len(probes) >= 20, "vacuous: probe set unexpectedly small"
-    produced = [(n, parent_to_prefix(n, c)) for n, c in probes]
+    produced = [(n, parent_to_prefix(n, c, attach_locant=ATTACH_LOCANT_UNKNOWN)) for n, c in probes]
     non_none = [(n, o) for n, o in produced if o]
     assert non_none, "vacuous: every probe returned None"
     for name, out in non_none:
