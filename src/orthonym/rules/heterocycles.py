@@ -547,15 +547,34 @@ def build_hw_name(
     )
 
     # Collect the FULL heteroatom locant set (P-22.2.2.1.3): for a HW name with
-    # more than one heteroatom, ALL locants are cited ONCE at the front as a
-    # single ascending set (e.g. 1,4-oxazepane, 1,3,5-oxadiazinane), NOT
-    # distributed per prefix. A single heteroatom carries no locant (oxolane,
-    # azepane). This is the fix that keeps mixed-element medium rings from
-    # dropping their locants (bare 'oxazepane' is the 1,2-isomer — a different
-    # molecule).
+    # more than one heteroatom, ALL locants are cited ONCE at the front of the
+    # name — a single heteroatom carries no locant (oxolane, azepane). This is
+    # what keeps mixed-element medium rings from dropping their locants (bare
+    # 'oxazepane' is the 1,2-isomer — a different molecule).
+    #
+    # The ORDER of that citation is NOT a global ascending sort. P-22.2.2.1.3
+    # (BlueBookV2.md:8284), last sentence: "Locants are cited at the front of
+    # the name, IN THE ORDER OF CITATION OF THE SKELETAL REPLACEMENT ('a')
+    # PREFIXES." Set selection and set citation are two separate steps: the
+    # numbering is chosen to give the lowest locant SET, then that set is spelled
+    # grouped per element, each element's own locants ascending, in 'a'-prefix
+    # seniority order. The rule's own example block is decisive —
+    #   1,6,2-dioxazepane   (PIN, :8300)  dioxa owns 1 and 6, aza owns 2
+    #   1,3,2-dioxaboretane (PIN, :37178) dioxa owns 1 and 3, bora owns 2
+    # — and the Blue Book prints the tie-break reasoning for the first as the
+    # SET "'1,2,6' is lower than '1,3,4'" while citing the name as "1,6,2-".
+    #
+    # A global flat sort spells those "1,2,6-" and "1,2,3-", and for an O-Si-O
+    # ring it spells "1,2,3-dioxasilolane" — asserting an O-O bond that is not
+    # in the structure (OPSIN rejects it: O in an unphysical valency state).
+    # It is a no-op wherever the senior element already holds the lowest slot,
+    # which is why the degenerate cases (1,4-oxazepane, 1,3,5-oxadiazinane,
+    # 1,2,6-oxadithiepane) never exposed it.
     lambda_by_locant = lambda_by_locant or {}
-    all_locants = sorted(loc for locs in element_locants.values() for loc in locs)
-    total_het = len(all_locants)
+    cited_locants = [
+        loc for elem in elements_by_priority for loc in sorted(element_locants[elem])
+    ]
+    total_het = len(cited_locants)
     locant_prefix = ""
     # P-22.2.2.1.3: a ring in which ONE heteroatom element occupies EVERY skeletal
     # position needs no heteroatom locants — the numbering is unambiguous
@@ -574,7 +593,7 @@ def build_hw_name(
         from .lambda_convention import format_lambda_token
         locant_prefix = ','.join(
             format_lambda_token(loc, lambda_by_locant.get(loc))
-            for loc in all_locants
+            for loc in cited_locants
         ) + '-'
 
     # Build the element prefix chain in seniority order, each element carrying
