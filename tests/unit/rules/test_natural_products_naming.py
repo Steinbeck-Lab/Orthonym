@@ -100,9 +100,23 @@ class TestExactDerivativeNaming:
         mol = _mol(DIAMORPHINE_SMILES)
         assert name_natural_product(mol) == "diamorphine"
 
-    def test_camphor(self):
+    def test_camphor_is_withheld_from_the_np_surface(self):
+        """v29 Task E2: was ``== "camphor"``. Camphor is an adjudicated non-PIN, so
+        this surface now declines it and the PIN path names it systematically.
+
+        Camphor is a KETONE, and the retained-ketone rule is a CLOSED list that
+        excludes it -- a positive exclusion, not an absence argument. P-64.2.1
+        "Retained names" (BlueBookV2.md:28295): P-64.2.1.1 (:28297) "The name
+        'chalcone' is the only retained name as a preferred IUPAC name"; P-64.2.1.2
+        (:28307) retains only acetone, 1,4-benzoquinone, naphthoquinone,
+        anthraquinone, ketene, acetophenone and benzophenone for general
+        nomenclature, closing "Substitutive names, systematically constructed, are
+        the preferred IUPAC names for ketones". The Blue Book never constructs
+        "camphor": its 2 occurrences are :32500 (a different compound, camphoric
+        anhydride) and :52646, the familiar label beside "(1R,4R)-bornan-2-one".
+        """
         mol = _mol(CAMPHOR_SMILES)
-        assert name_natural_product(mol) == "camphor"
+        assert name_natural_product(mol) is None
 
     def test_limonene(self):
         mol = _mol(LIMONENE_SMILES)
@@ -200,8 +214,14 @@ class TestPipelineIntegration:
         assert result == "morphine"
 
     def test_camphor_via_name_compound(self):
+        """v29 Task E2: was ``== "camphor"``. The PIN path now emits the Blue Book's
+        own rendering, printed verbatim at BlueBookV2.md:52648 as
+        "(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one" (this input carries no
+        stereo, so no descriptors are due). See P-64.2.1.1/.2 for why the trivial
+        name has no standing: BlueBookV2.md:28297 and :28307.
+        """
         result = name_compound(CAMPHOR_SMILES)
-        assert result == "camphor"
+        assert result == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
 
 
 # ===========================================================================
@@ -479,7 +499,13 @@ class TestNoRegressionExistingNP:
         assert name_compound(HYDROCODONE_SMILES) == "hydrocodone"
 
     def test_camphor(self):
-        assert name_compound(CAMPHOR_SMILES) == "camphor"
+        """v29 Task E2: camphor is the ONE of these 26 rows that is deliberately no
+        longer returned as a trivial name -- it is an adjudicated non-PIN
+        (P-64.2.1.1 BlueBookV2.md:28297, P-64.2.1.2 :28307). This is a demotion, not
+        a regression: the emitted name is the Blue Book's own von Baeyer rendering
+        from :52648, and the row is still present in NATURAL_PRODUCT_DERIVATIVES.
+        """
+        assert name_compound(CAMPHOR_SMILES) == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
 
     def test_limonene(self):
         assert name_compound(LIMONENE_SMILES) == "limonene"

@@ -459,8 +459,18 @@ class TestWSD01VonBaeyerFGSuffix:
         assert name_compound('O=C1CC2CCC1C2') == 'bicyclo[2.2.1]heptan-2-one'
 
     @pytest.mark.unit
-    def test_protect_camphor_retained(self):
-        assert name_compound('CC1(C)C2CCC1(C)C(=O)C2') == 'camphor'
+    def test_camphor_is_named_von_baeyer_not_retained(self):
+        """v29 Task E2: renamed from test_protect_camphor_retained, which asserted
+        'camphor'. Camphor is a KETONE and the retained-ketone rule is a closed list
+        that excludes it: P-64.2.1.1 (BlueBookV2.md:28297) makes chalcone "the only
+        retained name as a preferred IUPAC name", and P-64.2.1.2 (:28307) closes with
+        "Substitutive names, systematically constructed, are the preferred IUPAC
+        names for ketones". So the von Baeyer name this class builds IS the PIN --
+        and the Blue Book prints it verbatim at :52648,
+        "(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one".
+        """
+        assert (name_compound('CC1(C)C2CCC1(C)C(=O)C2')
+                == '1,7,7-trimethylbicyclo[2.2.1]heptan-2-one')
 
     @pytest.mark.unit
     def test_protect_norbornene(self):

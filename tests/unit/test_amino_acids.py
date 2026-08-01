@@ -117,10 +117,48 @@ class TestBasicAminoAcids:
 class TestNonStandardAminoAcids:
     """Test non-standard amino acids."""
 
+    @pytest.mark.opsin_gate
     def test_sarcosine(self):
-        """Sarcosine: N-methylglycine."""
+        """Sarcosine (N-methylglycine) is named systematically.
+
+        ⚠ THIS TEST REQUIRES THE OPSIN GATE, and that is a finding, not a
+        formality. With the gate OFF (the suite-wide default) this molecule names
+        to '2-aminopropanoic acid' -- which is ALANINE, a DIFFERENT MOLECULE. The
+        shipped name is correct only because SELF-01 vetoes that candidate:
+
+            gate OFF -> '2-aminopropanoic acid'    <- a different molecule
+            gate ON  -> '(methylamino)acetic acid' <- SELF-01 suppressed the above
+
+        That is the same shape as the trap documented in tests/conftest.py:313, and
+        an instance of the measured class where the 0-wrong margin is the GATE
+        rather than the producers. Gating sarcosine did not create the bad
+        candidate; it removed the trivial-name short-circuit that used to hide it
+        (the contributor guide invariant 9 -- removing a wrong output can unmask a worse
+        generator). Asserting the gate-off value here would encode a wrong molecule
+        as the expectation, so the marker is the correct resolution and the
+        underlying producer defect is recorded for its own task.
+
+        v29 Task E2: was ``== "sarcosine"``. 'sarcosine' occurs NOWHERE in the Blue
+        Book (grep validated against known positives -- 'glycine' 26 hits,
+        'norvaline'/'norleucine' found), and it is absent from both retained tables,
+        10.4 and 10.5 (BlueBookV2.md:54186-:54245). P-103.1.1.3 "Systematic
+        substitutive names" (:54247), sentence :54251, governs: "When not denoted by
+        a retained name, amino acids receive systematic substitutive names
+        constructed by applying the principles, rules and conventions of
+        substitutive nomenclature." The Blue Book gives the precedent at :54253 --
+        norvaline and norleucine take systematic names and "The names 'norvaline'
+        and 'norleucine' are not recommended."
+
+        On the UNLOCANTED form: acetic acid is a retained PIN parent that may be
+        substituted -- P-65.1.1.1 "Retained names as preferred IUPAC names"
+        (:29715): "Only the following five carboxylic acids retained names and are
+        also preferred IUPAC names. All can be functionalized, but only acetic acid,
+        benzoic acid, and oxamic acid can be substituted according to P-15.1.8.2.1".
+        The same rule prints its own substituted-acetic-acid example WITHOUT
+        locants: "H2N-CO-COOH  oxamic acid (PIN)  amino(oxo)acetic acid".
+        """
         result = name_compound("CNCC(=O)O")
-        assert result == "sarcosine"
+        assert result == "(methylamino)acetic acid"
 
     def test_ornithine(self):
         """Ornithine: 2,5-diaminopentanoic acid."""
@@ -272,22 +310,34 @@ class TestOPSINSimpleGroupAminoAcids:
     """Test OPSIN simpleGroup amino acid integration (141-02)."""
 
     def test_opsin_simplegroup_amino_acids(self):
-        """10 representative simpleGroup entries are lookupable by canonical SMILES."""
+        """simpleGroup entries are lookupable by canonical SMILES.
+
+        v29 Task E2: 3 of the original 10 rows (statine, abrine, taurine) are now
+        adjudicated non-PINs and are withheld from this PIN-path lookup, so they
+        moved to the companion assertion below. The 7 that remain still prove the
+        simpleGroup integration is reached, which is what this test exists for.
+
+        Why those 3 are withheld -- P-103.1.1.3 "Systematic substitutive names"
+        (BlueBookV2.md:54247), decisive sentence :54251: "When not denoted by a
+        retained name, amino acids receive systematic substitutive names constructed
+        by applying the principles, rules and conventions of substitutive
+        nomenclature." The retained sets are Tables 10.4/10.5 (:54186-:54245) and
+        none of the three is in them. The Blue Book states the precedent itself at
+        :54253: norvaline and norleucine are likewise non-retained, take systematic
+        names, and "The names 'norvaline' and 'norleucine' are not recommended."
+        """
         from orthonym.data.amino_acids import get_amino_acid_name
         from rdkit import Chem
 
-        # 10 representative simpleGroup entries from OPSIN_AMINO_ACIDS
+        # simpleGroup entries from OPSIN_AMINO_ACIDS that remain PIN-path names
         test_cases = [
             ("CC(C)(CO)[C@@H](O)C(=O)NCCC(=O)NCCS", "pantetheine"),
             ("CC(C)(CO)[C@@H](O)C(=O)NCCCO", "pantothenol"),
-            ("CC(C)C[C@H](N)[C@@H](O)CC(=O)O", "statine"),
             ("CC(NC(C)C(=O)O)C(=O)O", "alanopine"),
             ("CC(NCC(=O)O)C(=O)O", "strombine"),
             ("CCC(N)C(=O)O", "butyrine"),
             ("CN(CC(=O)O)C(=N)N", "creatine"),
-            ("CN[C@@H](Cc1c[nH]c2ccccc12)C(=O)O", "abrine"),
             ("CSCCCN", "methioninamine"),
-            ("NCCS(=O)(=O)O", "taurine"),
         ]
 
         for smiles, expected_name in test_cases:
@@ -295,6 +345,28 @@ class TestOPSINSimpleGroupAminoAcids:
             result = get_amino_acid_name(can_smiles)
             assert result == expected_name, (
                 f"Expected {expected_name!r} for {can_smiles}, got {result!r}"
+            )
+
+    def test_gated_simplegroup_amino_acids_are_demoted_not_deleted(self):
+        """The 3 withheld rows leave the PIN lookup but stay in the general dict.
+
+        This is the demote-not-delete contract every existing deny row already
+        follows; it is asserted here so a future deletion cannot pass silently.
+        """
+        from orthonym.data.amino_acids import (
+            GENERAL_ONLY_AMINO_ACIDS, get_amino_acid_name,
+        )
+        from rdkit import Chem
+
+        for smiles, name in [
+            ("CC(C)C[C@H](N)[C@@H](O)CC(=O)O", "statine"),
+            ("CN[C@@H](Cc1c[nH]c2ccccc12)C(=O)O", "abrine"),
+            ("NCCS(=O)(=O)O", "taurine"),
+        ]:
+            can = Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
+            assert get_amino_acid_name(can) is None, f"{name!r} still on the PIN path"
+            assert name in set(GENERAL_ONLY_AMINO_ACIDS.values()), (
+                f"{name!r} was deleted rather than demoted"
             )
 
     def test_existing_amino_acids_preserved(self):
@@ -354,12 +426,19 @@ class TestOPSINSimpleGroupAminoAcids:
         assert result is not None, "Expected acyl name for 'abrine'"
 
     def test_abrine_in_data(self):
-        """abrine should be present in expanded amino acid data."""
-        from orthonym.data.amino_acids import NON_STANDARD_AMINO_ACIDS
+        """abrine should still be present in the expanded amino acid data.
 
-        # Check that 'abrine' appears as a value in NON_STANDARD_AMINO_ACIDS
-        assert "abrine" in NON_STANDARD_AMINO_ACIDS.values(), (
-            "Expected 'abrine' in NON_STANDARD_AMINO_ACIDS values"
+        v29 Task E2: abrine is an adjudicated non-PIN (P-103.1.1.3,
+        BlueBookV2.md:54247/:54251 -- amino acids not in the retained Tables
+        10.4/10.5 take systematic substitutive names), so it moved OUT of
+        NON_STANDARD_AMINO_ACIDS and INTO GENERAL_ONLY_AMINO_ACIDS. The point of
+        this test -- that the row was imported and is not lost -- is preserved by
+        asserting the demotion target instead.
+        """
+        from orthonym.data.amino_acids import GENERAL_ONLY_AMINO_ACIDS
+
+        assert "abrine" in GENERAL_ONLY_AMINO_ACIDS.values(), (
+            "Expected 'abrine' in GENERAL_ONLY_AMINO_ACIDS values"
         )
 
 
@@ -367,11 +446,18 @@ class TestExpandedAminoAcidPipeline:
     """Test expanded amino acids through full naming pipeline (141-02 Task 2)."""
 
     def test_name_compound_new_amino_acid(self):
-        """OPSIN simpleGroup amino acid is reachable via name_compound()."""
-        # abrine is a new OPSIN simpleGroup entry
+        """OPSIN simpleGroup amino acid is reachable via name_compound().
+
+        v29 Task E2: was ``assert "abrine" in result``. abrine is an adjudicated
+        non-PIN under P-103.1.1.3 (BlueBookV2.md:54247), decisive sentence :54251 --
+        "When not denoted by a retained name, amino acids receive systematic
+        substitutive names constructed by applying the principles, rules and
+        conventions of substitutive nomenclature." It is in neither retained Table
+        10.4 nor 10.5. The molecule is still named, and the systematic name RECOVERS
+        the (2S) stereodescriptor that the trivial name silently dropped.
+        """
         result = name_compound("CN[C@@H](Cc1c[nH]c2ccccc12)C(=O)O")
-        assert result is not None
-        assert "abrine" in result, f"Expected 'abrine' in result, got: {result}"
+        assert result == "(2S)-3-(1H-indol-3-yl)-2-(methylamino)propanoic acid"
 
     def test_name_compound_creatine(self):
         """Creatine (non-alpha amino acid) found via SMILES lookup."""
@@ -380,10 +466,16 @@ class TestExpandedAminoAcidPipeline:
         assert "creatine" in result.lower(), f"Expected 'creatine', got: {result}"
 
     def test_name_compound_taurine(self):
-        """Taurine (sulfonic acid amino) found via SMILES lookup."""
+        """Taurine (sulfonic acid amino) is named systematically.
+
+        v29 Task E2: was ``assert "taurine" in result.lower()``. 'taurine' does not
+        occur anywhere in the Blue Book, and P-103.1.1.3 (BlueBookV2.md:54247),
+        sentence :54251, sends amino acids that are not in the retained Tables
+        10.4/10.5 to systematic substitutive names. The molecule is still named --
+        this is a demotion, not a coverage loss.
+        """
         result = name_compound("NCCS(=O)(=O)O")
-        assert result is not None
-        assert "taurine" in result.lower(), f"Expected 'taurine', got: {result}"
+        assert result == "2-aminoethane-1-sulfonic acid"
 
     def test_pin_mode_returns_systematic(self):
         """systematic mode bypasses trivial name lookup for amino acids."""

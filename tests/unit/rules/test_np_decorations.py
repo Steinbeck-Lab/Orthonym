@@ -94,10 +94,19 @@ class TestNPDecorationEnumeration:
         result = name_compound(smiles)
         assert result == "cholestane"
 
-    def test_camphor_exact_match(self):
-        """Camphor is an exact derivative match, not steroid enumeration."""
+    def test_camphor_not_steroid_enumeration(self):
+        """Camphor must not be reached by steroid decoration enumeration.
+
+        v29 Task E2: renamed from test_camphor_exact_match and the expected value
+        changed from "camphor". Camphor is now an adjudicated non-PIN -- it is a
+        ketone, and P-64.2.1.1 (BlueBookV2.md:28297) makes chalcone "the only
+        retained name as a preferred IUPAC name", while P-64.2.1.2 (:28307) is a
+        closed general-nomenclature list that excludes it. The point this test
+        guards is unchanged: the name comes from the von Baeyer builder, NOT from
+        steroid enumeration. The value is the Blue Book's own form at :52648.
+        """
         result = name_compound("CC12CCC(CC1=O)C2(C)C")
-        assert result == "camphor"
+        assert result == "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
 
     def test_saturated_hydroxy_androstane(self):
         """3-Hydroxyandrostane (saturated) -> androstan-3-ol.

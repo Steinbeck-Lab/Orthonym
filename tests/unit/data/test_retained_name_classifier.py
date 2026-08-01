@@ -361,7 +361,27 @@ class TestHCGateSafetyA1:
     # F-T9/DD6 RET-01: 'biphenyl' is NO LONGER genuine — it is general-only (PIN
     # 1,1'-biphenyl) and is now correctly denied. Replaced with 'naphthalene', a true
     # retained PIN that must stay non-denied + emittable.
-    GENUINE = ["benzaldehyde", "butanoic acid", "camphor", "naphthalene", "acetamide"]
+    #
+    # v29 Task E2: 'camphor' is NO LONGER genuine either, and is removed here for the
+    # same reason biphenyl was. It is a KETONE, and the retained-ketone rule is a
+    # closed list that excludes it, so this is a POSITIVE exclusion, not an absence
+    # argument. P-64.2.1 "Retained names" (heading BlueBookV2.md:28295):
+    #   * P-64.2.1.1 (:28297) — "The name 'chalcone' is the only retained name as a
+    #     preferred IUPAC name". Camphor is not chalcone.
+    #   * P-64.2.1.2 (:28307) — the general-nomenclature retained set is exactly
+    #     acetone, 1,4-benzoquinone, naphthoquinone, anthraquinone, ketene,
+    #     acetophenone and benzophenone, closing with "Substitutive names,
+    #     systematically constructed, are the preferred IUPAC names for ketones".
+    #     Camphor is on neither list, so it has no standing at either level.
+    # The Blue Book never CONSTRUCTS "camphor" as a name: it occurs twice in the whole
+    # book, at :32500 (a DIFFERENT compound, "camphoric anhydride") and at :52646,
+    # where it is the familiar label printed beside "(1R,4R)-bornan-2-one".
+    # Replaced with 'toluene' so the guard keeps its width — a name the curated list
+    # positively affirms (pin: true, P-22.1.3), not merely one it fails to deny.
+    # The POSITIVE record that camphor is now deliberately denied (and demoted, not
+    # deleted) lives in tests/unit/data/test_pin_deny_amino_and_trivial.py
+    # ::TestNaturalProductSurfaceIsGated, so removing it here loses no coverage.
+    GENUINE = ["benzaldehyde", "butanoic acid", "toluene", "naphthalene", "acetamide"]
 
     @pytest.mark.unit
     def test_genuine_names_not_denied(self):

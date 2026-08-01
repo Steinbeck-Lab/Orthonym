@@ -39,7 +39,17 @@ def test_tier5d_n_substituted_het_carboxamides(smiles, expected):
         # primary amides and the benzene N-substituted path must not move
         ("NC(=O)c1ccco1", "furan-2-carboxamide"),
         ("CN(C)C(=O)c1ccccc1", "N,N-dimethylbenzamide"),
-        ("NC(=O)c1cccnc1", "nicotinamide"),
+        # v29 Task E2: was "nicotinamide". This is NOT an absence argument -- both
+        # Blue Book occurrences of the trivial name are NEGATIVE:
+        #   :32895 "2-chloropyridine-3-carboxamide (PIN) (not 2-chloronicotinamide)"
+        #   :33170 "pyridine-4-carbothioamide (PIN) (not thioisonicotinamide)"
+        # The parent acid is retained for GENERAL nomenclature only -- P-65.1.1.2.2
+        # "The following names are retained for general nomenclature with
+        # functionalization but no substitution is allowed", listing "nicotinic acid
+        # / pyridine-3-carboxylic acid (PIN)". The amide is built from the PIN acid
+        # stem under P-66.1.1.1. This also makes the three controls uniformly
+        # systematic, matching the furan-2-carboxamide row above.
+        ("NC(=O)c1cccnc1", "pyridine-3-carboxamide"),
     ],
 )
 def test_tier5d_regression_controls(smiles, expected):
