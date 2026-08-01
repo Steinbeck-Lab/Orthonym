@@ -264,3 +264,76 @@ class TestNotOverGated:
             "guanidino prefix defect appears fixed -- retire this test and gate "
             "glycocyamine, whose fallback 'guanidinoacetic acid' then becomes "
             "'carbamimidoylaminoacetic acid'")
+
+
+@pytest.mark.unit
+class TestFattyAcidEsterStemsAreOutOfDenyListReach:
+    """v29 Task E2: 'methyl laurate' is non-PIN, but a deny row would be INERT.
+
+    THE BLUE BOOK EXCLUSION IS POSITIVE, not an absence argument. The retained
+    carboxylic-acid names are FOUR closed lists and 'lauric' is in none of them:
+
+    * P-65.1.1.1 "Retained names as preferred IUPAC names" (BlueBookV2.md:29715)
+      -- "Only the following five carboxylic acids retained names and are also
+      preferred IUPAC names": formic, oxalic, acetic, benzoic, oxamic.
+    * P-65.1.1.2.1 (:29733) -- general nomenclature WITH substitution: 2-furoic,
+      isophthalic, phthalic, terephthalic.
+    * P-65.1.1.2.2 (:29745) -- "retained for general nomenclature with
+      functionalization but no substitution is allowed": acrylic, adipic,
+      butyric, cinnamic, fumaric, glutaric, malonic, methacrylic, isonicotinic,
+      maleic, 2-naphthoic, nicotinic, oleic, PALMITIC, propionic, STEARIC,
+      succinic, peracetic, perbenzoic, performic, EDTA.
+    * P-65.1.1.2.3 (:29811) -- citric, lactic, glyceric, pyruvic, tartaric.
+
+    P-65.1.2 "Systematic names" (heading :29858) then states the disposal rule
+    outright, at :29860: "Except for formic acid, acetic acid, oxalic acid (see
+    P-65.1.1.1), and oxamic acid (see P-65.1.1.1), systematically formed names
+    are preferred IUPAC names; the names given in P-65.1.1.2 are retained names
+    for use in general nomenclature."
+
+    The omission is deliberate, not accidental: palmitic (C16) and stearic (C18)
+    ARE listed and lauric (C12) is NOT, so this is a closed list excluding it
+    rather than a gap in the book. 'lauric'/'laurate' return 0 hits book-wide
+    (grep validated against known positives: toluene 17, mesitylene 6,
+    morphine 1). And P-65.1.1.2.2 states the ester pattern itself -- "the
+    formation of esters leads to names such as methyl butyrate" -- which makes
+    'methyl <trivial>ate' a GENERAL-nomenclature device that presupposes a
+    retained acid. Lauric is not retained at any level, so 'methyl laurate' has
+    no standing even in general nomenclature. The PIN is 'methyl dodecanoate'.
+
+    SO WHY IS THERE NO DENY ROW? Because it would not work. MEASURED: a
+    pin:false row for 'methyl laurate' was added and the CLI still emitted
+    'methyl laurate'. The name is not served by any surface the deny-list
+    governs -- it is built from a CARBON-COUNT map, FATTY_ACID_TRIVIAL_BY_STRUCTURE,
+    a local dict inside get_acid_fragment_name in rules/esters.py, which never
+    consults data/iupac_2013_pin_list.json. Adding the row anyway would create a
+    second no-op like the documented 'indane' row (the contributor guide invariant 10:
+    presence in a lookup table is not evidence the table is reached).
+
+    THE FIX IS OUT OF SCOPE HERE, and the reason is blast radius, not effort.
+    The map has 9 rows and 6 of them (lauric, myristic, linoleic, linolenic,
+    arachidic, arachidonic) are retained nowhere; the other 3 (palmitic,
+    stearic, oleic) are general-only under P-65.1.1.2.2, so on --style pin all 9
+    are wrong. But 'palmitate' is asserted by 
+    (row WSC-01-PROTECT, expected_pin 'ethyl palmitate') and by ~20 canary CSVs,
+    so correcting the class moves GOLD ROWS and requires a full gate run. That
+    makes it a gated milestone task of its own, not a test-expectation change.
+    """
+
+    def test_methyl_laurate_has_no_deny_row_because_one_would_be_inert(self):
+        denied = {e["name"].lower() for e in _pin_list()["entries"]
+                  if e.get("pin") is False}
+        assert "methyl laurate" not in denied, (
+            "a deny row for 'methyl laurate' is a NO-OP -- the name comes from "
+            "FATTY_ACID_TRIVIAL_BY_STRUCTURE in rules/esters.py, not from a "
+            "deny-list-governed surface. Fix the map, not this file.")
+
+    def test_the_carbon_count_map_is_still_the_site(self):
+        """Pins the site so the next session does not re-derive it."""
+        from pathlib import Path
+        import orthonym.rules.esters as esters
+        src = Path(esters.__file__).read_text()
+        assert '(12, 0): "lauric"' in src, (
+            "the fatty-acid trivial-stem map changed -- re-check whether "
+            "--style pin still emits 'methyl laurate', and if it now emits "
+            "'methyl dodecanoate', retire this class")
