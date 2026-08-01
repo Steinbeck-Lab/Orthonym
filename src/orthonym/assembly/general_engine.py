@@ -231,9 +231,180 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
     cs = _charge_suffix_text(mol, atom_to_locant)
     if cs is None:
         return None
+    return _elide_before_ionic_suffix(name, cs)
+
+
+def _elide_before_ionic_suffix(name: str, cs: str) -> str:
+    """P-16.3.3 / P-74.1.1 (:42417) parent-'e' elision before an ionic suffix.
+
+    *"The final letter 'e' of the name of a parent hydride, or of an 'ide' or
+    'uide' suffix, is elided before the letter 'i' or 'y', or before a
+    cumulative suffix beginning with a vowel."*  The single-charge bases
+    (``ium``/``ylium``/``ide``/``uide``/``olate``) start with a vowel or 'y' ->
+    elide (``...pentaene`` -> ``...pentaen-6-ium``). The MULTIPLIED forms
+    (``-1,4-diium``) begin with the multiplier's consonant -> the 'e' is
+    RETAINED (``1,4-diazine-1,4-diium``). Extracted from ``_append_charge_suffix``
+    so the zwitterion (P-74.1.1) path elides by the SAME rule, not a copy."""
     first_alpha = next((c for c in cs if c.isalpha()), '')
     stem = name[:-1] if name.endswith('e') and first_alpha in 'aeiouy' else name
     return stem + cs
+
+
+# Elements that form a SEMIPOLAR (dative) bond to a terminal oxygen, i.e. whose
+# ``[X+]-[O-]`` depiction is the charge-separated form of a NEUTRAL ``X=O``
+# functional group (P-59 internal charge): N-oxide, phosphine/phosphoryl oxide,
+# sulfoxide/sulfone, arsine oxide, selenoxide, iodoso/iodoxy.
+_SEMIPOLAR_OXIDE_ELEMENTS = frozenset({'N', 'P', 'S', 'As', 'Se', 'Sb', 'Te',
+                                       'Cl', 'Br', 'I', 'Xe'})
+
+
+def _genuine_ion_sites(mol):
+    """``get_ion_sites`` minus the semipolar ``[X+]-[O-]`` oxide pairs.
+
+    ``get_ion_sites`` already masks the P-59 internal charges it knows about
+    (nitro drawn ``[N+](=O)[O-]``, azide, N-oxide, diazo) -- verified: it
+    reports ZERO sites for ``C[N+](=O)[O-]``, ``[N-]=[N+]=NC``,
+    ``C[N+]([O-])(C)C`` and ``[O-][n+]1ccccc1``. But the mask does not cover
+    every element, and a P-oxide written ``[PH+]...[O-]`` leaks through as a
+    "zwitterion" although RDKit/InChI treat it as the SAME species as ``P(=O)``
+    (measured: ``CC1CO[PH+](C1)[O-]`` and OPSIN's ``CC1CP(OC1)=O`` share
+    InChIKey ``DWXZAVJWXATXAG-UHFFFAOYSA-N``). Treating such a pair as an ionic
+    centre suppressed the correct, round-tripping name
+    ``4-methyl-2-oxo-1,2-oxaphospholane``.
+
+    So a cation directly bonded to a TERMINAL, H-free oxide anion is an internal
+    (semipolar) charge, not an ionic centre. The R7 mesoionic target is
+    unaffected: its ``[O-]`` sits on a ring CARBON, not on the cation.
+    """
+    from ..perception.ions import get_ion_sites
+
+    sites = get_ion_sites(mol)
+    cations = list(sites.get('cations') or [])
+    anions = list(sites.get('anions') or [])
+
+    semipolar_c: set = set()
+    semipolar_a: set = set()
+    cation_idxs = {c['atom_idx'] for c in cations}
+    for site in anions:
+        idx = site['atom_idx']
+        atom = mol.GetAtomWithIdx(idx)
+        if (atom.GetSymbol() != 'O' or atom.GetDegree() != 1
+                or atom.GetTotalNumHs() or atom.GetFormalCharge() != -1):
+            continue
+        nbr = atom.GetNeighbors()[0]
+        if (nbr.GetIdx() in cation_idxs
+                and nbr.GetFormalCharge() == 1
+                and nbr.GetSymbol() in _SEMIPOLAR_OXIDE_ELEMENTS):
+            semipolar_a.add(idx)
+            semipolar_c.add(nbr.GetIdx())
+
+    return ([c for c in cations if c['atom_idx'] not in semipolar_c],
+            [a for a in anions if a['atom_idx'] not in semipolar_a])
+
+
+def _has_ionic_centres(mol) -> bool:
+    """True when the molecule carries a genuine (non-semipolar) ionic centre.
+
+    Deliberately reuses the SAME perception the suffix builders use, so the
+    fail-closed guard and the emitters can never disagree."""
+    cations, anions = _genuine_ion_sites(mol)
+    return bool(cations) or bool(anions)
+
+
+# P-73.1 / P-73.2.2.1.1 cationic suffix bases, keyed by ``classify_cation``.
+_ZWIT_CATION_BASES = {
+    'aminium': 'ium', 'onium': 'ium', 'quaternary': 'ium', 'ylium': 'ylium',
+}
+# P-72.2.2.1 / P-72.3 SKELETAL anionic suffix bases, keyed by ``classify_anion``.
+_ZWIT_SKELETAL_ANION_BASES = {
+    'carbanion': 'ide', 'heteroatom_hydride_anion': 'ide', 'uide_anion': 'uide',
+}
+# P-72.2.2 ``-ol`` -> ``-olate``: an anionic oxygen hanging off ONE parent atom.
+_ZWIT_OLATE_ANION_CLASSES = frozenset({'alkoxide', 'phenolate'})
+
+
+def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
+    """P-74.1.1 (BlueBookV2.md:42415) — cumulative ionic suffixes for a
+    NET-NEUTRAL zwitterion whose ionic centres lie in THIS numbered parent.
+
+    P-74.1.1 (:42421): *"For nomenclature purposes, zwitterionic compounds
+    having the ionic centers in the same parent structure are not considered as
+    neutral compounds."*  Construction (:42417): *"…may be named by combining
+    appropriate cumulative suffixes at the end of the name of a parent hydride
+    … anionic suffixes are cited after cationic suffixes."*  P-74.1.2 (:42463)
+    restates the order: *"In names, cationic suffixes are cited before anionic
+    suffixes."*  Governing (PIN) example (:42456)
+    ``1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate``.
+
+    This is the ZWITTERION widening of the v26-P5 charge-suffix layer. That
+    layer (``_charge_suffix_text``) is gated on NET molecular charge and
+    explicitly declines the mixed-sign case, so a zwitterion (net 0) reached
+    neither the suffix nor the refusal and shipped a NEUTRAL name -- the P-74.1.1
+    error the Blue Book itself calls out at :42441.
+
+    Returns ``(held_out_atoms, suffix_text)`` where ``held_out_atoms`` must be
+    withheld from substituent discovery so the anion is not ALSO spelled as a
+    neutral prefix (the ``2-oxo`` double-count), or ``None`` to FAIL CLOSED.
+
+    Scope (tight, mirroring ``charged_router._route_zwitterion``'s D-06 scope):
+    exactly one cationic and one anionic centre, each singly charged, the cation
+    skeletal to this parent. The anion is either skeletal (``-ide``/``-uide``) or
+    a single-bonded, H-free oxygen on a parent atom (``-olate``). Anything else
+    -- an off-parent cation, a multiply-charged atom, a carboxylate/sulfonate FG
+    anion (the PIN charged path owns those), a net-charged species -- declines.
+    """
+    from ..rules.ions import classify_cation, classify_anion
+
+    if mol is None or Chem.GetFormalCharge(mol) != 0:
+        return None  # net-charged -> the existing _charge_suffix_text path owns it
+
+    # Semipolar [X+]-[O-] oxide pairs are internal charges, not ionic centres.
+    cations, anions = _genuine_ion_sites(mol)
+    if len(cations) != 1 or len(anions) != 1:
+        return None
+    cation, anion = cations[0], anions[0]
+    if abs(int(cation.get('charge', 0))) != 1:
+        return None
+    if abs(int(anion.get('charge', 0))) != 1:
+        return None
+
+    # --- cationic centre: must be a numbered atom of THIS parent (P-74.1.1) ---
+    cation_idx = cation['atom_idx']
+    if cation_idx not in atom_to_locant:
+        return None
+    cation_base = _ZWIT_CATION_BASES.get(classify_cation(mol, cation))
+    if cation_base is None:
+        return None  # diazonium / acylium -> the PIN charged path owns those
+    cation_locant = atom_to_locant[cation_idx]
+
+    # --- anionic centre ---
+    anion_idx = anion['atom_idx']
+    held: set = set()
+    if anion_idx in atom_to_locant:
+        anion_base = _ZWIT_SKELETAL_ANION_BASES.get(classify_anion(mol, anion))
+        if anion_base is None:
+            return None
+        anion_locant = atom_to_locant[anion_idx]
+    else:
+        if not allow_fg_anion:
+            return None  # caller cannot hold the atom out -> would double-count
+        atom = mol.GetAtomWithIdx(anion_idx)
+        if (atom.GetSymbol() != 'O' or atom.GetDegree() != 1
+                or atom.GetTotalNumHs()):
+            return None
+        if classify_anion(mol, anion) not in _ZWIT_OLATE_ANION_CLASSES:
+            return None  # carboxylate/sulfonate/... -> PIN charged path
+        neighbour = atom.GetNeighbors()[0]
+        if neighbour.GetIdx() not in atom_to_locant:
+            return None
+        anion_base = 'olate'
+        anion_locant = atom_to_locant[neighbour.GetIdx()]
+        held.add(anion_idx)
+
+    # P-74.1.2 (:42463): cationic suffix first, then the anionic suffix.
+    text = '-%s-%s-%s-%s' % (cation_locant, cation_base,
+                            anion_locant, anion_base)
+    return frozenset(held), text
 
 
 def name_general_chain(
@@ -529,6 +700,12 @@ def _assemble(mol, features, chain, part,
             has_fg_suffix=bool(part['suffix_core']))
         if name is None:
             return _refuse("charge not expressible as a chain-parent suffix")
+    elif _has_ionic_centres(mol):
+        # P-74.1.1 (:42421): a zwitterion is "not considered as a neutral
+        # compound". The chain producer holds no atom out of discovery, so it
+        # cannot build the cumulative suffix without double-counting an FG
+        # anion -> fail closed rather than ship a neutral (wrong) structure.
+        return _refuse("ionic centres not expressible as a chain-parent suffix")
     # v25 G4: parent-scope stereo from structure (substituent-internal
     # stereo is already handled inside name_substituent's stereo route).
     name = _stereo_prefix(
@@ -924,11 +1101,23 @@ def _emit_ring_from_analysis(
             return _refuse("ring ketone/imine locant coincides with ring double "
                            "bond (valence)")
 
+    # P-74.1.1 (BlueBookV2.md:42415, decisive sentence :42421): a zwitterion
+    # whose ionic centres lie in THIS parent is "not considered as a neutral
+    # compound" -> cumulative ionic suffixes (cationic before anionic, P-74.1.2
+    # :42463). Planned BEFORE discovery because the anionic oxygen of an -olate
+    # must be HELD OUT of the substituent partition -- otherwise it is also
+    # spelled as a neutral 'oxo'/'hydroxy' prefix and the atom is counted twice.
+    # Declined when an FG suffix is already present: the cumulative FG+charge
+    # construction is out of scope (same rule as _append_charge_suffix).
+    zwit_plan = (_zwitterion_suffix_plan(mol, atom_to_locant)
+                 if (allow_charged and not suffix_core) else None)
+    zwit_held: set = set(zwit_plan[0]) if zwit_plan else set()
+
     # --- substituent prefixes (generic ordered-atom discovery + recursion) ---
     ordered_cage = sorted(cage_set, key=lambda i: atom_to_locant[i])
     try:
         subs = discover_substituents(
-            mol, cage_set | suffix_atoms | ester_r_frag | n_sub_atoms,
+            mol, cage_set | suffix_atoms | ester_r_frag | n_sub_atoms | zwit_held,
             parent_type='chain',
             principal_chain=ordered_cage, atom_to_locant=atom_to_locant,
             general_fallback=True)
@@ -996,12 +1185,22 @@ def _emit_ring_from_analysis(
     else:
         name = core
 
-    # v26 P5: charge suffix on a cage skeletal atom (fail closed otherwise).
-    if allow_charged and Chem.GetFormalCharge(mol) != 0:
+    # P-74.1.1: cumulative ionic suffixes for a net-neutral zwitterion, then the
+    # v26 P5 net-charge suffix, then the fail-closed backstop. A molecule with a
+    # genuine ionic centre must NEVER receive a neutral name -- that is a
+    # different (uncharged) species, not an approximation.
+    if zwit_plan is not None:
+        name = _elide_before_ionic_suffix(name, zwit_plan[1])
+        if zwit_held:
+            bindings.append(TokenBinding(tuple(sorted(zwit_held)),
+                                         zwit_plan[1].lstrip('-'), 'suffix'))
+    elif allow_charged and Chem.GetFormalCharge(mol) != 0:
         name = _append_charge_suffix(name, mol, atom_to_locant,
                                      has_fg_suffix=bool(suffix_core))
         if name is None:
             return _refuse("charge not expressible as a cage-parent suffix")
+    elif _has_ionic_centres(mol):
+        return _refuse("ionic centres not expressible as a cage-parent suffix")
 
     # v25 G4: parent-scope stereo from structure (VB locants).
     name = _stereo_prefix(mol, atom_to_locant) + name
@@ -1423,6 +1622,10 @@ def name_general_monocycle(
                                      has_fg_suffix=bool(suffix_core))
         if name is None:
             return _refuse("charge not expressible as a monocycle-parent suffix")
+    elif _has_ionic_centres(mol):
+        # P-74.1.1 (:42421) fail-closed backstop -- see the chain producer.
+        return _refuse("ionic centres not expressible as a monocycle-parent "
+                       "suffix")
 
     # v25 G4: parent-scope stereo from structure (ring locants).
     name = _stereo_prefix(mol, atom_to_locant) + name
