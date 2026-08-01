@@ -976,6 +976,32 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             for sub_atoms in sub_list:
                 branch_atoms.update(sub_atoms)
 
+    # TASK-I: collect the ATTACHMENT atom of every substituent branch -- the atom
+    # that bonds the branch to the parent. A branch is always named from its point
+    # of attachment outwards, so the attachment atom is necessarily spelled by the
+    # branch's own name. Used below to stop a substituted amine nitrogen from being
+    # spelled a SECOND time as a bare 'amino' FG prefix.
+    #
+    # BUG-B (above) already does this for BRANCH_HANDLED_FGS, but only for branches
+    # of <= 3 carbons, because for a big branch a *pendant* FG deep inside is NOT in
+    # the branch's name. The attachment atom is the one position where branch size is
+    # irrelevant: '(butylamino)' spells its N exactly as '(methylamino)' does.
+    branch_attachment_atoms = set()
+    if features.mol is not None:
+        _sub_sources = []
+        if features.substituents:
+            _sub_sources.append(features.substituents)
+        if ring_substituents:
+            _sub_sources.append(ring_substituents)
+        for _src in _sub_sources:
+            for _pos, sub_list in _src.items():
+                for sub_atoms in sub_list:
+                    _own = set(sub_atoms)
+                    for _a in sub_atoms:
+                        if any(nbr.GetIdx() not in _own
+                               for nbr in features.mol.GetAtomWithIdx(_a).GetNeighbors()):
+                            branch_attachment_atoms.add(_a)
+
     # DEF-4 (P-14.3.4, Phase 171 BBR-ASM): the locant-1 omission decision must use
     # the MOLECULE-WIDE substituent count, not the per-FG-type count. Collect FG
     # prefix specs here, then emit them after the loop once the total is known
@@ -1014,6 +1040,29 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
         # double-counted (e.g. CSSC -> '(methyldisulfanyl)disulfanediylmethane').
         if fg_name in ('peroxide', 'disulfide'):
             continue
+
+        # TASK-I (P-62.2.3 "The prefix 'amino'"): a SUBSTITUTED amine nitrogen has
+        # no bare-prefix spelling. "Preferred IUPAC names for prefixes corresponding
+        # to -NHR, -NRR', or -NR2 are formed by prefixing the names of the groups R
+        # and R' to the prefix 'amino'" (PIN: 4,4-bis(methylamino)butanoic acid).
+        # But seniority.get_prefix maps secondary_amine/tertiary_amine to the bare
+        # string 'amino', which cannot express R at all. When such a nitrogen is the
+        # attachment atom of a substituent branch, that branch is ALREADY spelled
+        # '(methylamino)'/'(butylamino)'/'(dimethylamino)', so emitting the FG prefix
+        # too spells one nitrogen TWICE at one locant and invents an -NH2 that is not
+        # in the molecule:
+        #   CNCC(=O)N    -> '2-amino-2-(methylamino)acetamide'   (3 N named, 2 real)
+        #   CCCCNCC(=O)N -> '2-amino-2-(butylamino)acetamide'
+        # Both are different molecules. Drop the duplicate; the branch keeps the atom,
+        # so this can never turn a duplication into an atom drop.
+        if fg_name in ('secondary_amine', 'tertiary_amine') and branch_attachment_atoms:
+            matches = [
+                m for m in matches
+                if not (m and m[0] in branch_attachment_atoms
+                        and features.mol.GetAtomWithIdx(m[0]).GetSymbol() == 'N')
+            ]
+            if not matches:
+                continue
 
         # Filter out FGs on ring atoms when chain is parent
         if ring_atom_set:

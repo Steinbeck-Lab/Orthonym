@@ -229,6 +229,102 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     return _name_amino_acid_systematic(mol)
 
 
+def _verify_denoted_alkanoic_backbone(mol, aa_atoms) -> Optional[int]:
+    """Prove `mol` IS the structure `2-amino{stem}anoic acid` denotes.
+
+    That name denotes exactly one constitution::
+
+        HOOC-CH(NH2)-(CH2)n-CH3
+
+    i.e. an unbranched, fully saturated, all-carbon backbone running from the acid
+    carbon to a terminal methyl, carrying one terminal -NH2 on C2 and no other
+    heteroatom, unsaturation, charge or isotope anywhere in the molecule.
+
+    This is an ALLOW-LIST. It replaces a whole-molecule carbon count that could not
+    distinguish a chain carbon from a carbon on the far side of a contracted
+    heteroatom, and it subsumes every entry of the historical deny-list above
+    (thioether/selenoether/telluroether drop, hydroxy, halogen, nitro, ketone,
+    amide, nitrile, branching, rings, polyamine, dicarboxylic).
+
+    Args:
+        mol: RDKit Mol object.
+        aa_atoms: the 5-tuple from :func:`get_amino_acid_atoms` --
+            (N, alpha_C, carbonyl_C, carbonyl_O, acid_O).
+
+    Returns:
+        The number of backbone carbons (== the stem length) if the molecule is
+        provably the denoted structure, else None.
+    """
+    n_idx, alpha_c, carbonyl_c, carbonyl_o, acid_o = aa_atoms
+
+    # --- composition: only C, N, O; no charges, no isotopes, no radicals --------
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() not in ('C', 'N', 'O'):
+            return None
+        if atom.GetFormalCharge() != 0:
+            return None
+        if atom.GetIsotope() != 0:
+            return None
+        if atom.GetNumRadicalElectrons() != 0:
+            return None
+
+    # --- exactly one nitrogen, and it is the terminal alpha -NH2 ---------------
+    nitrogens = [a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'N']
+    if nitrogens != [n_idx]:
+        return None
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetTotalNumHs() != 2 or n_atom.GetDegree() != 1:
+        return None
+    if n_atom.GetNeighbors()[0].GetIdx() != alpha_c:
+        return None
+
+    # --- exactly two oxygens, and both belong to the one COOH ------------------
+    oxygens = {a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'O'}
+    if oxygens != {carbonyl_o, acid_o}:
+        return None
+    for o_idx in (carbonyl_o, acid_o):
+        o_atom = mol.GetAtomWithIdx(o_idx)
+        if o_atom.GetDegree() != 1 or o_atom.GetNeighbors()[0].GetIdx() != carbonyl_c:
+            return None
+
+    # --- saturation: every bond single except the single carbonyl C=O ----------
+    for bond in mol.GetBonds():
+        if bond.GetBondType() == Chem.BondType.SINGLE:
+            continue
+        ends = {bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()}
+        if bond.GetBondType() == Chem.BondType.DOUBLE and ends == {carbonyl_c, carbonyl_o}:
+            continue
+        return None  # C=C, C#C, aromatic, or a second C=O
+
+    # --- the carbon skeleton is one unbranched path covering EVERY carbon ------
+    # Walk from the acid carbon through the alpha carbon to a terminal methyl.
+    def carbon_neighbours(idx):
+        return [nbr.GetIdx() for nbr in mol.GetAtomWithIdx(idx).GetNeighbors()
+                if nbr.GetSymbol() == 'C']
+
+    if carbon_neighbours(carbonyl_c) != [alpha_c]:
+        return None  # acid carbon must be a chain terminus attached to C2
+
+    path = [carbonyl_c, alpha_c]
+    prev, current = carbonyl_c, alpha_c
+    while True:
+        onward = [c for c in carbon_neighbours(current) if c != prev]
+        if not onward:
+            break  # terminal carbon reached
+        if len(onward) > 1:
+            return None  # branch point -- not an unbranched chain
+        prev, current = current, onward[0]
+        if current in path:
+            return None  # defensive: a carbocycle (rings already bail above)
+        path.append(current)
+
+    all_carbons = {a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'C'}
+    if set(path) != all_carbons:
+        return None  # carbons exist off the backbone -> something was contracted
+
+    return len(path)
+
+
 def _name_amino_acid_systematic(mol) -> str:
     """
     Generate systematic IUPAC name for non-standard amino acid.
@@ -294,11 +390,29 @@ def _name_amino_acid_systematic(mol) -> str:
            for atom in mol.GetAtoms() if atom.GetSymbol() == 'C'):
         return None  # branched side chain -> general pipeline
 
-    # Count carbons in the backbone (acid chain) -- safe for acyclic molecules
-    carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+    # TASK-I (root cause): the stem used to come from a whole-molecule carbon count
+    #   carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+    # guarded by the DENY-LIST above. A carbon count cannot see whether those carbons
+    # are actually one unbranched saturated chain, so every heteroatom or unsaturation
+    # the deny-list had not yet enumerated was silently CONTRACTED -- its flanking
+    # carbons counted into the backbone and the atom itself dropped from the name.
+    # Three holes were open simultaneously, each emitting a DIFFERENT MOLECULE:
+    #   CNCC(=O)O       sarcosine  -> '2-aminopropanoic acid'  (= alanine)
+    #   COCC(N)C(=O)O   O-Me-serine-> '2-aminobutanoic acid'   (ether O dropped)
+    #   C=CCC(N)C(=O)O  allylgly   -> '2-aminopentanoic acid'  (= norvaline)
+    # and CNCCNCCNCC(=O)O dropped TWO nitrogens. A deny-list can only exclude the
+    # holes already found; it is the wrong shape for a fail-closed namer.
+    #
+    # The name this function emits, '2-amino{stem}anoic acid', denotes exactly one
+    # constitution: HOOC-CH(NH2)-(CH2)n-CH3. So PROVE the molecule is that, and
+    # derive the stem from the proven backbone. Anything else returns None and goes
+    # to the general polyfunctional pipeline, which names it correctly.
+    backbone_length = _verify_denoted_alkanoic_backbone(mol, aa_atoms)
+    if backbone_length is None:
+        return None
 
-    # Get stem from carbon count using centralized module
-    stem = get_chain_prefix(carbon_count)
+    # Get stem from the PROVEN backbone length using centralized module
+    stem = get_chain_prefix(backbone_length)
 
     # For alpha-amino acids, the amino group is at position 2
     # (position 1 is the acid carbon)
