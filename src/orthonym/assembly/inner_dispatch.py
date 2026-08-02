@@ -1150,6 +1150,37 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- Task V (P-66.1.1.3.1.1): N-substituted sulfonamide handler.
+#     secondary/tertiary_sulfonamide were PERCEIVED and carried a SUFFIX_FORMS
+#     row, but no producer rendered the N-substituent: the suffix paths emitted
+#     `methanesulfonamide` for CS(=O)(=O)NC (N-methyl carbon DROPPED) and
+#     `sulfanylbenzene` for c1ccccc1S(=O)(=O)NC, both killed one gate later by
+#     SELF-01.
+#
+#     Priority 2970 -- it MUST fire before tier_a_ring@4500. Measured: at 5213
+#     (after tier_a_ring) EVERY ring-bearing member of the class was still lost,
+#     because Tier-A claimed the molecule first and emitted `sulfanylbenzene`
+#     for CNS(=O)(=O)c1ccccc1. The predicate is narrow -- principal_group is
+#     secondary/tertiary_sulfonamide only -- so this takes from Tier-A exactly
+#     the rows Tier-A was naming WRONG; primary_sulfonamide is excluded, leaving
+#     `benzenesulfonamide` / `4-methylbenzenesulfonamide` on the Tier-A path
+#     byte-identical. Fail-safe: returns None, so Tier-A and then
+#     general_acyclic@99999 remain the backstops.
+from .handlers.n_substituted_sulfonamide import (  # noqa: E402
+    _is_n_substituted_sulfonamide,
+    name_n_substituted_sulfonamide,
+)
+
+_register_inner(
+    handler_id="n_substituted_sulfonamide",
+    priority=2970,
+    predicate=_is_n_substituted_sulfonamide,
+    handler=name_n_substituted_sulfonamide,
+    iupac_section="P-66.1.1.3.1.1",
+    description="N-substituted sulfonamide -> N-<sub><parent>sulfonamide PIN (Task V; P-66.1.1.3.1.1)",
+    side_effect_inventory=(),
+)
+
 # --- Plan-03 commit 03-03: amine (Tier-2 mid-tier with polyfunctional + Tier-A
 #     mutex; audit § 1 + § 3). Predicate:
 #       principal_group in {secondary_amine, tertiary_amine}
