@@ -431,27 +431,39 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         # 1H-azepine.  Unsaturated 9- and 10-rings escaped only by accident,
         # via the separate has_aromatic gate in _try_cyclic_replacement_name.
         #
-        # MEASURED CONSEQUENCE (enumerate: 1274 bare heteromonocycles, sizes
-        # 3-14).  340 rings change name, all of them size 7-10; sizes 3-6 and
-        # 11-14 are untouched.  Of those, 82 now ABSTAIN where they previously
-        # emitted a replacement name.  That is deliberate fail-closed
-        # behaviour, not a lost capability -- P-22.2.7 puts lambda rings on the
-        # same side of the boundary ("1H-1<lambda>4-thiepine (PIN)" at :9496 is
-        # Hantzsch-Widman, while the 14-membered
-        # "1-oxa-4<lambda>4-thiacyclotetradecane (PIN)" at :9486 is
-        # replacement), so the names these rings used to get were not PINs.
-        # They split into two UNBUILT producer gaps, both already fail-closed:
-        #   * 78 rows: hypervalent (lambda-4) S rings in a HYDRO form.
-        #     _name_lambda_heteromonocycle refuses these by documented
-        #     contract ("2,3-dihydro-... unbuilt for lambda rings").
-        #   * 4 rows: 9-membered 2-N rings where
-        #     name_partially_saturated_monocyclic_heterocycle cites locant 1 as
-        #     BOTH a hydro position and indicated hydrogen
-        #     ("1,2,6,7,8,9-hexahydro-1H-1,5-diazonine"); the OPSIN validity
-        #     gate suppresses it, so nothing wrong is emitted.
-        # Zero real-corpus impact: 0 router diffs over pubchem_2000 and
-        # chebi_5000 (7000 molecules) -- neither contains a bare
-        # heteromonocyclic parent hydride of size 7-10.
+        # Redirecting the 7-10 rings here left a residue of producer-level
+        # abstentions.  P-22.2.7 puts lambda rings on the Hantzsch-Widman side
+        # of this same boundary ("1H-1<lambda>4-thiepine (PIN)" at :9496,
+        # against the 14-membered "1-oxa-4<lambda>4-thiacyclotetradecane (PIN)"
+        # at :9486, which is replacement), so the replacement names those rings
+        # used to get were not PINs and withdrawing them was right.
+        #
+        # ⚠ The figures once recorded here -- "82 abstain, split into two
+        # unbuilt gaps of 78 + 4" -- were WRONG, and wrong in a way worth
+        # keeping visible.  They came from an enumeration of 1,274 bare
+        # heteromonocycles; the real enumeration is 27,687 (sizes 3-14 x
+        # N/O/S/O+N/S+N/N+N at EVERY heteroatom position x EVERY independent
+        # edge set of the ring), a ~22x superset.  Measured against that:
+        #
+        #   * the residue was 707 abstentions, not 82, and it spanned sizes
+        #     3-10 (2/4/13/24/53/96/185/330) -- so it was never a boundary
+        #     effect at all.  This edit only made sizes 7-10 VISIBLE; sizes 3-6
+        #     were abstaining before it and were untouched by it;
+        #   * there was no "4-row second gap".  Those 9-membered 2-N rings were
+        #     never producer abstentions -- they EMITTED a malformed name that
+        #     only the OPSIN validity gate suppressed downstream.  Counting a
+        #     gate-suppressed emission as a producer abstention merged a
+        #     coverage gap with a correctness bug.  Fixed separately in
+        #     _aromatizable_hydro_name.
+        #
+        # All 707 are now named: the mancude lambda parents whose indicated
+        # hydrogen sits on a CARBON (3H-1<lambda>4-thiophene (PIN), :9171) and
+        # the genuine hydro forms (3,4,5,6-tetrahydro-1<lambda>4,2-thiazin-1-ol
+        # (PIN), :33292).  See _name_lambda_heteromonocycle.
+        #
+        # Real-corpus impact of the redirect itself was measured as zero at the
+        # time (0 router diffs over pubchem_2000 + chebi_5000) -- inherited,
+        # not re-run here.
         if len(ring_info.AtomRings()) == 1:
             if len(ring_info.AtomRings()[0]) <= 10:
                 return None

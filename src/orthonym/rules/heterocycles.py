@@ -890,6 +890,145 @@ def _mancude_monocycle_parent(mol, ring_atoms):
     return None, None
 
 
+def _mancude_bond_eligible(mol, oriented: List[int]) -> List[bool]:
+    """Which ring positions may carry a mancude ring double bond.
+
+    A ring atom already spends two of its valences on ring sigma bonds, so it
+    can take a ring double bond only if its BONDING NUMBER is three or more.
+    For an atom in a standard valence state that is a property of the element
+    -- the divalent chalcogens O/S/Se/Te cannot, everything else can -- which
+    is why this test used to be written on the element symbol alone.  Under
+    the lambda-convention it is not a property of the element: a lambda-4
+    sulfur has bonding number 4 and takes a ring double bond exactly as a
+    carbon does, while its standard-valence twin cannot.
+
+    **P-22.2.7 "Heteromonocyclic hydrides having heteroatoms with nonstandard
+    bonding numbers."** (``BlueBookV2.md:9156``), P-22.2.7.1 (``:9158``) --
+    "The indicated hydrogen symbol *H*, if required to denote saturated
+    skeletal atoms, is cited at the front of the complete name".  The decisive
+    statement is the parenthetical printed under ``1lambda6-thiopyran (PIN)``
+    (``:9511``), at ``:9513``: "this heteromonocycle has the maximum number of
+    double bonds and one double bond at every position; hence, no indicated
+    hydrogen is cited for the sulfur atom".  Three things follow, and the
+    whole lambda-hydro producer rests on them:
+
+    * a lambda atom DOES join the mancude matching;
+    * it takes at most ONE ring double bond (a second would be cumulative, and
+      a mancude ring carries the maximum number of NONcumulative double bonds);
+    * its spare valence becomes hydrogen, which is CITED as indicated hydrogen
+      only when the atom carries no ring double bond -- so ``1lambda6-thiopyran``
+      needs none even though its sulfur holds three hydrogens, while
+      ``1H-1lambda4-thiophene`` (``:9167``) needs one.
+
+    Outside the lambda class this is the OLD EXPRESSION VERBATIM, not a
+    reimplementation of it: an atom for which ``nonstandard_bonding_number``
+    returns None -- every standard-valence atom, and every charged atom, which
+    the lambda helper excludes by design -- is still judged by
+    ``symbol not in _DIVALENT``.  So no ring without a lambda atom can change
+    behaviour, and that needs no measurement to believe.
+    """
+    from .lambda_convention import nonstandard_bonding_number
+    _DIVALENT = frozenset({'O', 'S', 'Se', 'Te'})
+    out: List[bool] = []
+    for i in oriented:
+        lam = nonstandard_bonding_number(mol, i)
+        if lam is None:
+            out.append(mol.GetAtomWithIdx(i).GetSymbol() not in _DIVALENT)
+        else:
+            out.append(lam >= 3)
+    return out
+
+
+def _monocycle_numberings(mol, ordered: List[int]):
+    """Every one of the ``2n`` ring numberings, keyed by the HETEROATOM cascade.
+
+    Yields ``(het_key, loc)`` where ``loc`` maps a ring POSITION (index into
+    ``ordered``) to its locant, and ``het_key`` ranks the numbering by the
+    heteroatom criteria alone.  Callers append their own tail to the key --
+    indicated hydrogen, then hydro prefixes -- so that the heteroatom rules
+    always outrank them.
+
+    P-22.2.2.1.3 (``BlueBookV2.md:8284``) fixes the first two criteria, and
+    their order is not the intuitive one: "The locant '1' is given to a
+    heteroatom that occurs first in the seniority sequence used for citation
+    of the skeletal replacement ('a') prefixes.  The numbering is THEN chosen
+    to give lowest locants to heteroatoms considered as a set in ascending
+    numerical order."  Senior-heteroatom-at-1 OUTRANKS the lowest locant set,
+    which is why furazan is ``1,2,5-oxadiazole`` (``:14717``) and not
+    ``2,1,3-oxadiazole``.  P-22.2.3.2.3 (``:8806``) states the whole cascade
+    verbatim and adds the third criterion, "and then, if necessary, according
+    to the order of seniority above".
+
+    Scoped to the Hantzsch-Widman range: above ten ring members the parent is
+    named by skeletal replacement, whose numbering rule is the lowest
+    heteroatom SET with no senior-at-1 clause (P-31.1.4.4, ``:16697``), so
+    ``senior_at_one`` is neutralised there.
+
+    Extracted so that the mancude lambda branch and the hydro namer cannot
+    drift apart: the lambda branch used to inherit ``orient_heterocycle``'s
+    numbering, which ranks heteroatoms but NOT indicated hydrogen, and so
+    emitted ``5H-1lambda4-thiophene`` where P-14.4(b) (``:3246``) requires
+    ``2H-``.  Neither OPSIN nor an InChIKey can see that -- both names denote
+    the same molecule -- so it survived a 707/707 round-trip.
+    """
+    n = len(ordered)
+    het_pos = [p for p in range(n)
+               if mol.GetAtomWithIdx(ordered[p]).GetSymbol() != 'C']
+    out = []
+    for start in range(n):
+        for direction in (1, -1):
+            loc = {(start + k * direction) % n: k + 1 for k in range(n)}
+            at_one = next(p for p in range(n) if loc[p] == 1)
+            senior_at_one = (
+                get_heteroatom_priority(
+                    mol.GetAtomWithIdx(ordered[at_one]).GetSymbol())
+                if n <= 10 else 0
+            )
+            het_locs = tuple(sorted(loc[p] for p in het_pos))
+            seniority = tuple(sorted(
+                (get_heteroatom_priority(
+                    mol.GetAtomWithIdx(ordered[p]).GetSymbol()), loc[p])
+                for p in het_pos
+            ))
+            out.append(((senior_at_one, het_locs, seniority), loc))
+    return out
+
+
+def _apply_retained_stem(hw_name: str) -> str:
+    """P-22.2.1: swap a Hantzsch-Widman stem for its RETAINED mancude name.
+
+    The substitution is on the STEM -- the segment after the last hyphen --
+    and it must match the WHOLE stem, never a suffix of it.  A suffix test
+    says ``1,2-dithiole`` ends in ``thiole`` and rewrites it to the
+    non-existent ``1,2-dithiophene``, destroying the Blue Book's own
+    ``1lambda4,3-dithiole (PIN)`` (``BlueBookV2.md:9527``); by the same route
+    ``1,3-oxazole`` would become ``1,3-furan``.  Whole-stem matching leaves
+    both untouched, and a locant-carrying stem (``dioxine``, ``oxazole``) is
+    never a key.
+
+    ONE table, because it had drifted into three partial hand-copies that
+    disagreed: ``_MANCUDE_RETAINED_STEM`` (10 rows, used by the hydro namer),
+    a 3-row dict in :func:`name_heterocycle` (oxine/azine/thiine) and a 3-row
+    tuple in :func:`_name_lambda_heteromonocycle` (thiole/selenole/tellurole,
+    matched with ``endswith`` -- the trap above).  Measured consequence on the
+    27,687-ring enumeration: ``2H-azole`` was emitted where P-22.2.1
+    (``:8163``, "pyrrole (1H-isomer shown; the PIN is 1H-pyrrole)") and
+    ``3,4-dihydro-2H-pyrrole (PIN)`` (``:16896``) require ``2H-pyrrole``, and
+    ``1lambda4-thiine`` where ``:8141`` ("pyran ... the PIN is 2H-pyran;
+    thiopyran (S instead of O)") requires ``1lambda4-thiopyran``.
+
+    All ten rows re-opened at write time: pyran/thiopyran/selenopyran/
+    telluropyran ``:8141``; pyrrole ``:8163``; selenophene ``:8165``;
+    tellurophene ``:8170``; thiophene ``:8174``; pyridine ``:8157``.  Table
+    2.2's own ``furan`` row survives only as an image in this OCR
+    (``_page_149_Picture_3.jpeg``), so furan's PIN status is taken from
+    ``:12047`` -- "furo (preferred prefix) (from furan, PIN)".
+    """
+    head, sep, stem = hw_name.rpartition('-')
+    retained = _MANCUDE_RETAINED_STEM.get(stem)
+    return head + sep + retained if retained else hw_name
+
+
 def _mancude_max_matching(mol, oriented: List[int]) -> Tuple[int, List[bool]]:
     """Mancude maximum for a monocyclic ring given in cycle order.
 
@@ -902,13 +1041,14 @@ def _mancude_max_matching(mol, oriented: List[int]) -> Tuple[int, List[bool]]:
 
     Factored out of :func:`_monocycle_indicated_h_prefix` so the partial-saturation
     namer can reuse the exact mancude count for non-aromatizable (4-pi) HW rings.
+
+    Eligibility is delegated to :func:`_mancude_bond_eligible`, which is
+    lambda-aware; see there for why that is byte-identical outside the
+    lambda-convention class.
     """
     from itertools import combinations
     n = len(oriented)
-    _DIVALENT = frozenset({'O', 'S', 'Se', 'Te'})
-    eligible = [
-        mol.GetAtomWithIdx(i).GetSymbol() not in _DIVALENT for i in oriented
-    ]
+    eligible = _mancude_bond_eligible(mol, oriented)
     ok_edges = [p for p in range(n) if eligible[p] and eligible[(p + 1) % n]]
     max_match = 0
     for size in range(min(n // 2, len(ok_edges)), 0, -1):
@@ -1035,6 +1175,7 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     indicated-hydrogen position are decided by matchings on the ring graph.
     """
     from .partial_saturation import SATURATION_PREFIXES
+    from .lambda_convention import nonstandard_bonding_number
 
     n = len(ring_set)
     if n < 4 or n > 10:
@@ -1042,6 +1183,22 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     ordered = _macrocycle_ordered_ring(mol, ring_set)
     if ordered is None or len(ordered) != n:
         return None
+    # P-22.2.7.2 (``BlueBookV2.md:9515``) -- "If a further choice is needed
+    # between two or more of the same skeletal atom with different bonding
+    # numbers, the lower locant is assigned in order of the decreasing value
+    # of the bonding number" -- is NOT implemented in the numbering cascade
+    # below, so a ring carrying a lambda on one of several same-element
+    # heteroatoms must fail closed here rather than be numbered by a rule that
+    # cannot see the bonding number.  Self-defending: the lambda namer applies
+    # the same guard before it delegates, but this function is also reachable
+    # directly from ``name_partially_saturated_monocyclic_heterocycle``.
+    for p, idx in enumerate(ordered):
+        if nonstandard_bonding_number(mol, idx) is None:
+            continue
+        sym = mol.GetAtomWithIdx(idx).GetSymbol()
+        if sum(1 for q in ordered
+               if mol.GetAtomWithIdx(q).GetSymbol() == sym) > 1:
+            return None
     # RDKit-aromatic rings carry no DOUBLE ring bonds, so the saturation census
     # below would be meaningless -> leave them to the mancude namers.
     if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
@@ -1146,28 +1303,21 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     # P-14.4 (``:3219``) then continues: (b) indicated hydrogen ``:3246`` before
     # (e)(i) hydro prefixes ``:3287`` -- restated for this exact combination by
     # P-31.2.2 (``:16879``).
+    # The heteroatom half of the cascade is shared with the mancude lambda
+    # branch (:func:`_monocycle_numberings`); the tail below is this namer's
+    # own -- P-14.4 (``:3219``) (b) indicated hydrogen (``:3246``) ahead of
+    # (e)(i) hydro prefixes (``:3288``/``:3289``), restated for exactly this
+    # combination by P-31.2.2 (``:16880``).
     best_key = None
     best: Optional[Tuple[Dict[int, int], frozenset]] = None
-    for start in range(n):
-        for direction in (1, -1):
-            loc = {(start + k * direction) % n: k + 1 for k in range(n)}
-            at_one = next(p for p in range(n) if loc[p] == 1)
-            senior_at_one = get_heteroatom_priority(
-                mol.GetAtomWithIdx(ordered[at_one]).GetSymbol()
-            )
-            het_locs = tuple(sorted(loc[p] for p in het_pos))
-            seniority = tuple(sorted(
-                (get_heteroatom_priority(mol.GetAtomWithIdx(ordered[p]).GetSymbol()),
-                 loc[p])
-                for p in het_pos
-            ))
-            for ih in ih_candidates:
-                ih_locs = tuple(sorted(loc[p] for p in ih))
-                hydro_locs = tuple(sorted(loc[p] for p in sp3_pos - set(ih)))
-                key = (senior_at_one, het_locs, seniority, ih_locs, hydro_locs)
-                if best_key is None or key < best_key:
-                    best_key = key
-                    best = (loc, ih)
+    for het_key, loc in _monocycle_numberings(mol, ordered):
+        for ih in ih_candidates:
+            ih_locs = tuple(sorted(loc[p] for p in ih))
+            hydro_locs = tuple(sorted(loc[p] for p in sp3_pos - set(ih)))
+            key = (het_key, ih_locs, hydro_locs)
+            if best_key is None or key < best_key:
+                best_key = key
+                best = (loc, ih)
     if best is None:
         return None
     loc, ih = best
@@ -1175,10 +1325,19 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     het_pairs = sorted(
         (loc[p], mol.GetAtomWithIdx(ordered[p]).GetSymbol()) for p in het_pos
     )
-    stem = build_hw_name(het_pairs, n, is_saturated=False, is_aromatic=False)
+    # P-22.2.7.1 (``:9158``): a nonstandard bonding number is cited as
+    # lambda^n immediately after its locant.  The map is EMPTY for every
+    # standard-valence ring, so this is a no-op outside the lambda class.
+    lambda_by_locant: Dict[int, int] = {}
+    for p in het_pos:
+        lam = nonstandard_bonding_number(mol, ordered[p])
+        if lam is not None:
+            lambda_by_locant[loc[p]] = lam
+    stem = build_hw_name(het_pairs, n, is_saturated=False, is_aromatic=False,
+                         lambda_by_locant=lambda_by_locant)
     if not stem:
         return None
-    stem = _MANCUDE_RETAINED_STEM.get(stem, stem)
+    stem = _apply_retained_stem(stem)
 
     # P-14.7.1 (:3721): in a PIN the locant and the symbol 'H' must be cited.
     if ih:
@@ -1430,19 +1589,20 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
 def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Optional[str]:
     """P-22.2.7.1: heteromonocycle with nonstandard-bonding-number heteroatom(s).
 
-    Emits '<locants-with-lambda>-<HW name>' with indicated hydrogen when a
-    lambda heteroatom is the saturated skeletal position (1H-1lambda4-thiophene).
+    Emits '<locants-with-lambda>-<HW name>' with indicated hydrogen, and hands
+    HYDRO forms to :func:`_mancude_hydro_name`.
     Fail-closed contract — returns None for: rings >10 / aromatic-perceived
-    rings; lambda on a skeletal CARBON; two same-element heteroatoms with
-    different lambda values (P-22.2.7.2 tie-break unbuilt); any unsaturated
-    ring that is not a perfect mancude matching with only HETEROATOM
-    saturated positions (hydro forms); >1 indicated-H position.
+    rings; lambda on a skeletal CARBON; more than one atom of the lambda
+    atom's element (P-22.2.7.2 tie-break unbuilt, ``:9515``); cumulated ring
+    double bonds; a ring double bond on an atom that cannot carry one; more
+    ring double bonds than the mancude parent has; >1 indicated-H position.
 
     MEASURED RESIDUE (Task AA re-measurement; enumerate 27,687 bare
     heteromonocycles: sizes 3-14 x N/O/S/O+N/S+N/2N at every heteroatom
     position x every independent-edge set of the ring).  Of the 2,848 rings of
-    size <= 10, **707 abstain at producer level and all 707 fail on ONE branch**
-    — the "hydro form of a lambda ring" refusal below.  Not two gaps, one.
+    size <= 10, **707 abstained at producer level and all 707 fell on ONE code
+    branch** — the "hydro form of a lambda ring" refusal.  All 707 are now
+    named (0 lost, 0 wrong; 707/707 OPSIN round-trip to the input structure).
     It spans sizes 3-10 (2/4/13/24/53/96/185/330), so it is not a boundary
     effect: c3413078 only made sizes 7-10 *visible* by routing them here; sizes
     3-6 abstained before it and were untouched by it.  (The other half of the
@@ -1451,20 +1611,39 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     OPSIN validity gate suppressed downstream; the real class was 51 rings and
     is fixed in _aromatizable_hydro_name.)
 
-    The class IS licensed, so this is a coverage gap, not a correctness one.
-    P-66.1.5.2.3 "Intramolecular amides of amino sulfinic acids." (``:33282``)
-    gives ``3,4,5,6-tetrahydro-1<lambda>4,2-thiazin-1-ol (PIN)`` (``:33292``),
-    and P-66.1.5.2.1 (``:33246``) gives
-    ``1-hydroxy-4,5-dihydro-3H-1<lambda>6,2-thiazol-1-one (PIN)`` (``:33268``)
-    — hydro prefixes on a lambda Hantzsch-Widman ring, one of them also
-    carrying indicated hydrogen, both marked (PIN).  Building it means making
-    ``_mancude_max_matching`` lambda-aware (a lambda atom's spare valence
-    changes which ring positions are matchable) and adding P-14.4(h) (``:3320``
-    — "When a choice is needed between the same skeletal atom in different
-    valence states, the one in a nonstandard valence state is assigned the
-    lower locant") to the numbering key.  Deliberately left fail-closed rather
-    than half-built: a partial lambda-hydro producer would emit names for
-    hypervalent rings that nothing in the tree can currently check.
+    ⚠ The residue statement above is the shape of the class, but its claim
+    that all 707 "fail on ONE branch" is true only of the CODE.  In
+    NOMENCLATURE they are two classes, and the single ``is any saturated ring
+    atom a carbon?`` test merged them:
+
+    * **60** are not hydro forms at all.  They are mancude lambda parents
+      whose indicated hydrogen happens to sit on a CARBON — which is the Blue
+      Book's own ``3H-1lambda4-thiophene (PIN)`` (``:9171``), the companion of
+      ``1H-1lambda4-thiophene (PIN)`` (``:9167``) whose indicated hydrogen is
+      on the sulfur and which this producer already emitted.  So the refusal
+      was rejecting a verbatim (PIN) example.  Sizes 3/5/7/9 (2/8/18/32).
+    * **647** are genuine hydro forms, sizes 4-10 (4/5/24/35/96/153/330).
+
+    Both are licensed.  P-66.1.5.2.3 "Intramolecular amides of amino sulfinic
+    acids." (``:33282``) gives ``3,4,5,6-tetrahydro-1<lambda>4,2-thiazin-1-ol
+    (PIN)`` (``:33292``); **P-66.1.5.2.2** "Sultims are tautomers of sultams
+    and are named as described in P-66.1.5.2.1 ... using the term 'sultim'"
+    (``:33264``) gives ``1-hydroxy-4,5-dihydro-3H-1<lambda>6,2-thiazol-1-one
+    (PIN)`` (``:33268``) — hydro prefixes on a lambda Hantzsch-Widman ring,
+    one also carrying indicated hydrogen, both (PIN).  (That second one was
+    recorded here as P-66.1.5.2.1; re-opened, the heading above it is
+    P-66.1.5.2.2.)  A third, in another chapter, shows the same combination on
+    a phosphorus ring: ``1,1,3,3-tetraphenyl-4,5-dihydro-1H-1,2,3lambda5-
+    triphosphol-3-ium (PIN)`` (``:41403``).
+
+    ⚠ Building it did NOT need P-14.4(h) (``:3320``), which this docstring
+    used to say it did.  (h) disambiguates "the same skeletal atom in
+    different valence states"; measured over the enumeration, all 707 rings
+    carry exactly ONE lambda atom and it is lambda-4 in every one, so the
+    criterion can never fire for this class.  The guard above refuses the
+    multi-same-element case outright instead.  What it DID need was
+    ``_mancude_max_matching`` made lambda-aware — see
+    :func:`_mancude_bond_eligible`.
     """
     from .lambda_convention import nonstandard_bonding_number, STANDARD_BONDING_NUMBER
     ring_size = info['ring_size']
@@ -1500,22 +1679,95 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
         for bond in mol.GetBonds():
             i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             if i in ring_set and j in ring_set and bond.GetBondTypeAsDouble() >= 2.0:
+                if i in in_double or j in in_double:
+                    return None  # cumulated ring double bonds -> not mancude
                 in_double.update((i, j))
                 n_double += 1
         sp3 = [idx for idx in oriented if idx not in in_double]
-        # a saturated ring CARBON means a hydro form, not a mancude lambda
-        # parent (2,3-dihydro-... unbuilt for lambda rings) -> refuse
-        if any(mol.GetAtomWithIdx(idx).GetSymbol() == 'C' for idx in sp3):
-            return None
-        # perfect mancude matching on the unsaturated part
-        if 2 * n_double != ring_size - len(sp3):
-            return None
+        # How many noncumulative ring double bonds the MANCUDE PARENT carries,
+        # counted lambda-aware (a lambda-4 sulfur is matchable; see
+        # _mancude_bond_eligible).  Comparing the molecule against that number
+        # is what separates the two nomenclature classes that used to be
+        # merged behind a single "is any saturated ring atom a carbon?" test.
+        max_match, eligible = _mancude_max_matching(mol, oriented)
+        pos_of = {idx: p for p, idx in enumerate(oriented)}
+        if any(not eligible[pos_of[idx]] for idx in in_double):
+            return None  # a ring double bond on an atom that cannot hold one
+        if n_double > max_match:
+            return None  # more double bonds than a mancude parent has
+        if n_double < max_match:
+            # HYDRO FORM of a lambda ring.  P-66.1.5.2.3 "Intramolecular
+            # amides of amino sulfinic acids." (``BlueBookV2.md:33282``) gives
+            # ``3,4,5,6-tetrahydro-1lambda4,2-thiazin-1-ol (PIN)`` (``:33292``)
+            # and P-66.1.5.2.2 "Sultims are tautomers of sultams..."
+            # (``:33264``) gives
+            # ``1-hydroxy-4,5-dihydro-3H-1lambda6,2-thiazol-1-one (PIN)``
+            # (``:33268``) -- hydro prefixes on a lambda Hantzsch-Widman ring,
+            # one of them also carrying indicated hydrogen, both marked (PIN).
+            # A third, in a different chapter: ``1,1,3,3-tetraphenyl-4,5-
+            # dihydro-1H-1,2,3lambda5-triphosphol-3-ium (PIN)`` (``:41403``).
+            #
+            # Hand it to the general matching-based hydro namer, which already
+            # implements the P-14.4(b)-over-(e)(i) numbering and the
+            # unique-reconstruction proof; it became lambda-capable when
+            # _mancude_max_matching did.  Delegating from HERE, after the
+            # guards above, is what keeps the P-22.2.7.2 same-element case
+            # fail-closed.
+            return _mancude_hydro_name(mol, ring_set)
+        # n_double == max_match: the molecule IS the mancude parent, so the
+        # only thing to add is indicated hydrogen.
+        #
+        # RE-NUMBER first.  ``oriented`` arrives from ``orient_heterocycle``,
+        # which ranks the heteroatom criteria but knows nothing of indicated
+        # hydrogen, so where those criteria TIE it picks arbitrarily between
+        # numberings that P-14.4 "NUMBERING" (``:3219``) separates: "low
+        # locants are assigned to them in the following decreasing order of
+        # seniority ... (b) indicated hydrogen for unsubstituted compounds"
+        # (``:3246``).  Measured on the 60 mancude lambda rings in the
+        # enumeration, 5 came out non-minimal -- ``5H-1lambda4-thiophene`` for
+        # C1=CC[SH]=C1 where ``2H-`` is reachable, and the same in thiepine,
+        # thionine.  Invisible to both available structural oracles, because
+        # the two numberings describe the SAME molecule.
+        ih_of = {}
+        for p, idx in enumerate(oriented):
+            if idx in in_double:
+                continue
+            if mol.GetAtomWithIdx(idx).GetTotalValence() - 2 >= 1:
+                ih_of[p] = True
+        best = None
+        for het_key, cand in _monocycle_numberings(mol, oriented):
+            key = (het_key, tuple(sorted(cand[p] for p in ih_of)))
+            if best is None or key < best[0]:
+                best = (key, cand)
+        loc_of = {oriented[p]: L for p, L in best[1].items()}
+        lambda_by_locant = {
+            loc_of[idx]: nonstandard_bonding_number(mol, idx)
+            for idx in oriented
+            if nonstandard_bonding_number(mol, idx) is not None
+        }
+        heteroatom_locants = sorted(
+            (loc_of[idx], mol.GetAtomWithIdx(idx).GetSymbol())
+            for idx in oriented
+            if mol.GetAtomWithIdx(idx).GetSymbol() != 'C'
+        )
         ih_locs = []
         for idx in sp3:
-            atom = mol.GetAtomWithIdx(idx)
-            capacity = lambda_by_locant.get(
-                loc_of[idx], STANDARD_BONDING_NUMBER.get(atom.GetSymbol(), 0)
-            )
+            # The indicated-hydrogen position is decided by BONDING NUMBER,
+            # which is exactly ``GetTotalValence()`` -- the same quantity
+            # ``nonstandard_bonding_number`` measures -- so it needs no lookup
+            # table and is element-agnostic, as P-22.2.2.1.2 (``:8320``)
+            # requires: the ring atom "with a bonding number of three or
+            # higher connected to adjacent ring atoms by single bonds only,
+            # and carrying one or more hydrogen atoms".
+            #
+            # It must NOT be read out of ``STANDARD_BONDING_NUMBER``: that
+            # table deliberately omits carbon (adding 'C' there would give
+            # every radical carbon a spurious lambda3), so a carbon scored 0
+            # and never qualified.  Harmless while a saturated ring carbon was
+            # refused outright one branch above; the moment that refusal was
+            # lifted it silently dropped the '3H-' from the Blue Book's own
+            # ``3H-1lambda4-thiophene (PIN)`` (``:9171``).
+            capacity = mol.GetAtomWithIdx(idx).GetTotalValence()
             if capacity - 2 >= 1:  # 2 ring sigma bonds; spare valence -> H position
                 ih_locs.append(loc_of[idx])
         if len(ih_locs) > 1:
@@ -1528,18 +1780,14 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     )
     if not hw:
         return None
-    # P-22.2.1 retained stems: the mancude S/Se/Te 5-ring HW names are
-    # replaced by their retained parents (BB example: 1H-1lambda4-THIOPHENE,
-    # not 1H-1lambda4-thiole).
-    for hw_stem, retained in (
-        ('thiole', 'thiophene'),
-        ('selenole', 'selenophene'),
-        ('tellurole', 'tellurophene'),
-    ):
-        if hw.endswith(hw_stem):
-            hw = hw[: -len(hw_stem)] + retained
-            break
-    return ih_prefix + hw
+    # P-22.2.1 retained stems (BB example: 1H-1lambda4-THIOPHENE at ``:9167``,
+    # not 1H-1lambda4-thiole).  Shared whole-stem helper: the three rows that
+    # used to be inlined here missed 'thiine' -> 'thiopyran', so
+    # ``1lambda4-thiine`` was emitted for C1=CC=[SH]C=C1, and they were matched
+    # with ``endswith``, which would have rewritten the Blue Book's own
+    # ``1lambda4,3-dithiole (PIN)`` (``:9527``) to '...dithiophene' the moment
+    # the P-22.2.7.2 guard above stopped refusing two-sulfur rings.
+    return ih_prefix + _apply_retained_stem(hw)
 
 
 def name_heterocycle(mol, ring_atoms) -> Optional[str]:
@@ -1643,20 +1891,19 @@ def name_heterocycle(mol, ring_atoms) -> Optional[str]:
         # also keeps the indicated-hydrogen step below from doing ``ih + None``.
         return None
 
-    # Post-process: replace OPSIN-incompatible HW stems with the IUPAC-
-    # preferred retained STEMS. "oxine"/"thiine" (6-membered unsaturated
-    # O/S-rings) are not recognized by OPSIN; IUPAC 2013 uses "pyran"/
-    # "thiopyran" with the tautomer's indicated hydrogen — which is computed
-    # generically below (2H-pyran vs 4H-pyran; the old hardcoded '2H-'
-    # mislabelled the 4H tautomers). "azine" -> "pyridine" (aromatic, no
-    # indicated H).
-    _HW_TO_RETAINED = {
-        'oxine': 'pyran',
-        'azine': 'pyridine',
-        'thiine': 'thiopyran',
-    }
-    if hw_name in _HW_TO_RETAINED:
-        hw_name = _HW_TO_RETAINED[hw_name]
+    # Post-process: replace the Hantzsch-Widman stem with the IUPAC-preferred
+    # RETAINED stem (P-22.2.1, Table 2.2). "oxine"/"thiine" (6-membered
+    # unsaturated O/S-rings) are not recognized by OPSIN either; IUPAC 2013
+    # uses "pyran"/"thiopyran" with the tautomer's indicated hydrogen — which
+    # is computed generically below (2H-pyran vs 4H-pyran; the old hardcoded
+    # '2H-' mislabelled the 4H tautomers). "azine" -> "pyridine".
+    #
+    # This site used to carry its own three-row copy of the table
+    # (oxine/azine/thiine). The five-ring rows were missing, so a mancude
+    # 5-ring emitted its HW stem: '2H-azole' for C1=CCN=C1, where P-22.2.1
+    # (``:8163``) and ``3,4-dihydro-2H-pyrrole (PIN)`` (``:16896``) require
+    # '2H-pyrrole'. One shared table now, matched on the whole stem.
+    hw_name = _apply_retained_stem(hw_name)
 
     # Wave2 T2d (P-22.2.2.1.4 / P-31.1.4.2.4): indicated hydrogen for a
     # mancude monocyclic parent (2H-1,3-dioxole, 1H-azirine, 2H-/4H-pyran).
