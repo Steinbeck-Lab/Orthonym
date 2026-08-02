@@ -125,6 +125,36 @@ def test_the_hw_systematic_form_is_gone(smiles, historical_wrong_name):
 
 
 # --------------------------------------------------------------------------
+# 2b. The SAME root cause one layer up: the numbering.
+#
+# ``orient_heterocycle_with_substituents`` decided which ring atom carries the
+# indicated hydrogen with ``GetTotalNumHs() >= 1`` -- an atom count the
+# substituent has already consumed.  An N-substituted azole nitrogen therefore
+# read as pyridine-type, lost its claim on locant 1, and the suffix took it
+# instead: ``Cn1nccc1C(=O)O`` came out ``2-methyl-1H-pyrazole-3-carboxylic
+# acid``, whose ``1H`` and whose ``2-methyl`` contradict each other.
+#
+# P-14.4 "NUMBERING" (``BlueBookV2.md:3219``) assigns low locants "in the
+# following decreasing order of seniority", and prints
+# **(b) indicated hydrogen** ahead of **(c) principal characteristic groups and
+# free valences (suffixes)**.  (b)'s own caveat -- "a higher locant may be
+# needed at another position to accommodate a substituent suffix in accordance
+# with structural feature (d)" -- points at (d) *added* indicated hydrogen
+# (``3,4-dihydronaphthalen-1(2H)-one``), not at ordinary substitution.
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("Cn1nccc1C(=O)O", "1-methyl-1H-pyrazole-5-carboxylic acid"),
+    ("Cn1ncc(C(=O)O)c1", "1-methyl-1H-pyrazole-4-carboxylic acid"),
+    ("Cn1cccc1C(=O)O", "1-methyl-1H-pyrrole-2-carboxylic acid"),
+    ("Cn1ccnc1C(=O)O", "1-methyl-1H-imidazole-2-carboxylic acid"),
+    ("OC(=O)c1cccn1C", "1-methyl-1H-pyrrole-2-carboxylic acid"),
+])
+def test_indicated_hydrogen_outranks_the_suffix_in_numbering(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+# --------------------------------------------------------------------------
 # 3. Fused controls -- a ring that merely CONTAINS the pattern is a different
 #    ring system.  The repair must not cross a fusion bond.
 # --------------------------------------------------------------------------

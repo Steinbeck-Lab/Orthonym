@@ -236,6 +236,55 @@ def orient_heterocycle(mol, ring_atoms) -> Tuple[List[int], Dict[int, int]]:
     return oriented, atom_to_locant
 
 
+#: Group 15 ring heteroatoms -- the only ones that carry an indicated hydrogen a
+#: substituent can displace while the atom stays NEUTRAL.  An aromatic ring O, S
+#: or Se with an exocyclic bond is an onium centre, excluded by the formal-charge
+#: test below; naming the elements states the chemistry rather than relying on it.
+_INDICATED_H_ELEMENTS = frozenset({7, 15, 33, 51, 83})  # N, P, As, Sb, Bi
+
+
+def _occupies_indicated_h_position(mol, idx: int, ring_set: Set[int]) -> bool:
+    """Does this ring atom hold the ring's indicated-hydrogen position?
+
+    P-14.4 "NUMBERING" (``BlueBookV2/BlueBookV2.md:3219``) assigns low locants
+    "in the following decreasing order of seniority", listing
+    **(b) indicated hydrogen** ahead of **(c) principal characteristic groups
+    and free valences (suffixes)**.  So the atom holding the indicated hydrogen
+    has to be identified before the suffix can compete for locant 1.  (b)'s own
+    caveat -- "a higher locant may be needed at another position to accommodate
+    a substituent suffix in accordance with structural feature (d)" -- points at
+    (d) *added* indicated hydrogen (``3,4-dihydronaphthalen-1(2H)-one``), not at
+    ordinary substitution.
+
+    Testing ``GetTotalNumHs() >= 1`` answers a different question.  A substituent
+    does not move the indicated hydrogen -- it stands in its place, and
+    P-15.1.8.1 "Substitution rules for Type 1 retained names" (``:4916``),
+    sentence ``:4918``, allows that substitution without limit.  An N-substituted
+    azole nitrogen has no hydrogen left to count, so it read as pyridine-type and
+    surrendered locant 1: ``Cn1nccc1C(=O)O`` was named
+    ``2-methyl-1H-pyrazole-3-carboxylic acid``, whose ``1H`` and whose
+    ``2-methyl`` describe different atoms, and which OPSIN rejects outright.
+
+    The displacement is *proved*, not assumed: a neutral group-15 aromatic ring
+    atom with no hydrogen and exactly ONE exocyclic SINGLE bond has had exactly
+    one hydrogen's worth of valence taken from it.  Nothing here consults a ring
+    size or a heteroatom count.
+    """
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetTotalNumHs() >= 1:
+        return True
+    if not atom.GetIsAromatic() or atom.GetFormalCharge() != 0:
+        return False
+    if atom.GetAtomicNum() not in _INDICATED_H_ELEMENTS:
+        return False
+    exocyclic = [nb.GetIdx() for nb in atom.GetNeighbors()
+                 if nb.GetIdx() not in ring_set]
+    if len(exocyclic) != 1:
+        return False
+    bond = mol.GetBondBetweenAtoms(idx, exocyclic[0])
+    return bond is not None and bond.GetBondType() == Chem.BondType.SINGLE
+
+
 def orient_heterocycle_with_substituents(
     mol,
     ring_atoms,
@@ -308,10 +357,14 @@ def orient_heterocycle_with_substituents(
         atom_to_locant = {atom_idx: locant for locant, atom_idx in enumerate(ring_list, 1)}
         return ring_list, atom_to_locant
 
-    # Find the best (priority, H_count) tier from sorted heteroatoms.
+    # Find the best (priority, indicated-H tier) from sorted heteroatoms.
     # P-31.1.4.3.4: heteroatom bearing indicated H (pyrrole-type) takes
-    # the lower locant; (a) element priority, (b) H_count (lower=better),
-    # (c) canonical rank for deterministic tiebreaking.
+    # the lower locant; (a) element priority, (b) indicated-H tier
+    # (lower=better), (c) canonical rank for deterministic tiebreaking.
+    #
+    # (b) used to be ``GetTotalNumHs() >= 1`` -- an atom count a substituent has
+    # already consumed, so an N-substituted azole nitrogen read as pyridine-type
+    # and lost locant 1 to the suffix.  See ``_occupies_indicated_h_position``.
     # For rings where all heteroatoms are equal-priority AND equal-H_count
     # (e.g. three sp2 N in 1,2,4-triazine) the old code fixed a single
     # start atom, producing wrong locants when that atom wasn't the optimal
@@ -324,17 +377,18 @@ def orient_heterocycle_with_substituents(
         heteroatoms,
         key=lambda x: (
             get_heteroatom_priority(x[1]),
-            0 if mol.GetAtomWithIdx(x[0]).GetTotalNumHs() >= 1 else 1,
+            0 if _occupies_indicated_h_position(mol, x[0], ring_set) else 1,
             _canon_rank[x[0]],
         )
     )
     best_prio = get_heteroatom_priority(sorted_heteroatoms[0][1])
-    best_hcount = 0 if mol.GetAtomWithIdx(sorted_heteroatoms[0][0]).GetTotalNumHs() >= 1 else 1
+    best_hcount = (0 if _occupies_indicated_h_position(
+        mol, sorted_heteroatoms[0][0], ring_set) else 1)
     # Collect all atoms that share the best (priority, h_count) tier
     start_candidates = [
         idx for idx, sym in heteroatoms
         if get_heteroatom_priority(sym) == best_prio
-        and (0 if mol.GetAtomWithIdx(idx).GetTotalNumHs() >= 1 else 1) == best_hcount
+        and (0 if _occupies_indicated_h_position(mol, idx, ring_set) else 1) == best_hcount
     ]
 
     pg_set = principal_group_atoms or set()
@@ -455,14 +509,6 @@ def _get_other_heteroatom_locants(
 # ---------------------------------------------------------------------------
 # Heterocycle naming functions
 # ---------------------------------------------------------------------------
-
-
-# Group 15 ring heteroatoms are the only ones that carry an indicated hydrogen
-# a substituent can displace while the atom stays NEUTRAL.  An aromatic ring O,
-# S or Se with an exocyclic bond is an onium centre (charged), and is excluded
-# by the formal-charge test in ``_ring_smiles_with_indicated_h_restored``
-# anyway; naming it here states the chemistry rather than relying on that.
-_INDICATED_H_ELEMENTS = frozenset({7, 15, 33, 51, 83})  # N, P, As, Sb, Bi
 
 
 def _ring_is_ortho_fused(mol, ring_atoms) -> bool:
