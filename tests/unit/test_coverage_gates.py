@@ -2,7 +2,12 @@
 
 Tests coverage_utils.py functions:
 - estimate_parent_coverage: atom-index-based coverage ratio
-- estimate_name_coverage_heuristic: name-length-based coverage heuristic
+
+Task Z2 (2026-08-02) removed the tests for ``estimate_name_coverage_heuristic``
+along with the function itself: it had zero callers and measured a name's
+character count. Its tests did not protect anything -- they PINNED the defect,
+one of them asserting outright that "longer names should give higher coverage".
+See 
 
 Tests NP scaffold gating:
 - Large molecule + small NP scaffold -> name_natural_product returns None
@@ -32,10 +37,7 @@ Tests retained name exact-match (NAM-01):
 import pytest
 from rdkit import Chem
 
-from orthonym.assembly.coverage_utils import (
-    estimate_parent_coverage,
-    estimate_name_coverage_heuristic,
-)
+from orthonym.assembly.coverage_utils import estimate_parent_coverage
 
 
 # ---------------------------------------------------------------------------
@@ -85,40 +87,6 @@ class TestEstimateParentCoverage:
         if mol is not None and mol.GetNumHeavyAtoms() == 0:
             result = estimate_parent_coverage(mol, set())
             assert result == pytest.approx(1.0)
-
-
-# ---------------------------------------------------------------------------
-# estimate_name_coverage_heuristic tests
-# ---------------------------------------------------------------------------
-
-class TestEstimateNameCoverageHeuristic:
-    """Tests for estimate_name_coverage_heuristic()."""
-
-    def test_naphthalene_in_large_mol(self):
-        """'naphthalene' (12 chars) for a 30-atom mol -> ~0.27."""
-        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1CCCCCCCCCCCCCCCCCCCC")
-        assert mol is not None
-        total = mol.GetNumHeavyAtoms()
-        result = estimate_name_coverage_heuristic("naphthalene", mol)
-        expected = min(len("naphthalene") / total / 1.5, 1.0)
-        assert result == pytest.approx(expected, abs=0.05)
-
-    def test_long_name_for_medium_mol(self):
-        """Long name for moderate molecule -> higher coverage."""
-        # Use a real steroid-like SMILES
-        mol = Chem.MolFromSmiles("C1CCC2C(C1)CCC1C2CCC2(C)C1CCC2=O")
-        assert mol is not None
-        name = "3-hydroxycholest-4-en-17-one"
-        result = estimate_name_coverage_heuristic(name, mol)
-        # Should be moderate to high
-        assert result > 0.3
-
-    def test_short_name_small_mol(self):
-        """'ethanol' (7 chars) for a 3-atom mol -> 1.0 (capped)."""
-        mol = Chem.MolFromSmiles("CCO")
-        assert mol is not None
-        result = estimate_name_coverage_heuristic("ethanol", mol)
-        assert result == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -433,40 +401,12 @@ class TestQualityGate:
 
 
 # ---------------------------------------------------------------------------
-# Coverage heuristic edge cases
+# Coverage heuristic edge cases -- REMOVED (Task Z2, 2026-08-02)
 # ---------------------------------------------------------------------------
-
-class TestCoverageHeuristicEdgeCases:
-    """Edge case tests for estimate_name_coverage_heuristic."""
-
-    def test_heuristic_empty_name(self):
-        """Empty string name -> 0.0 coverage."""
-        mol = Chem.MolFromSmiles("CCCCCC")  # hexane, 6 heavy atoms
-        assert mol is not None
-        result = estimate_name_coverage_heuristic("", mol)
-        assert result == pytest.approx(0.0), (
-            f"Empty name should give 0.0 coverage, got {result}"
-        )
-
-    def test_heuristic_zero_atoms(self):
-        """Molecule with 0 heavy atoms -> 1.0 (degenerate case)."""
-        mol = Chem.MolFromSmiles("[H][H]")
-        if mol is not None and mol.GetNumHeavyAtoms() == 0:
-            result = estimate_name_coverage_heuristic("hydrogen", mol)
-            assert result == pytest.approx(1.0), (
-                f"Zero-atom molecule should give 1.0 coverage, got {result}"
-            )
-
-    def test_heuristic_monotonic_with_name_length(self):
-        """Longer names should give higher coverage for same molecule."""
-        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1CCCCCCCCCC")  # 20 heavy atoms
-        assert mol is not None
-
-        short_name = "naphthalene"
-        long_name = "2-decylnaphthalene"
-        short_coverage = estimate_name_coverage_heuristic(short_name, mol)
-        long_coverage = estimate_name_coverage_heuristic(long_name, mol)
-        assert long_coverage > short_coverage, (
-            f"Longer name should give higher coverage: "
-            f"'{long_name}'={long_coverage} vs '{short_name}'={short_coverage}"
-        )
+# Three tests for estimate_name_coverage_heuristic stood here and went with the
+# function. They are worth recording as a pattern rather than just deleting:
+# all three passed, and all three asserted the defect. The clearest was
+# `test_heuristic_monotonic_with_name_length` -- "Longer names should give
+# higher coverage" -- which is precisely the anti-correlation that makes the
+# quantity useless: a name that INVENTS atoms scores higher than a correct one.
+# Green tests over a meaningless quantity are not a safety net.

@@ -265,15 +265,30 @@ def _name_has_ring_system_token(name: str) -> bool:
 def _name_covers_molecule(name: str, mol) -> bool:
     """Check if a pipeline name plausibly covers the whole molecule.
 
-    Uses a chars/HA heuristic: IUPAC names average ~1.5 chars per heavy atom
-    for retained names, ~2.0 for substitutive. If estimated coverage is below
-    55%, the name likely describes only a substructure.
+    ⚠ NOT a coverage measurement (Task Z2). The "estimated coverage" below is
+    ``len(name) / 1.5 / heavy_atoms`` -- a CHARACTER COUNT rescaled by a
+    constant. It is anti-correlated with real coverage: the correct retained
+    name ``cholesterol`` scores 0.393 on its own 28-atom molecule, while a name
+    that INVENTS atoms scores higher the more verbose it is. Real coverage is
+    decided by constitution (InChIKey skeleton), never by a ratio --
+    ``validation/atom_coverage.py``. That oracle spawns a JVM per call, so it
+    cannot be used here: this function is called inside the decomposition
+    recursion. Treat the number below as a cheap triage heuristic and nothing
+    more; do not report it, or anything derived from it, as coverage.
 
     Only rejects when ALL conditions are met:
-    (a) molecule has > 15 heavy atoms (small molecules always pass)
+    (a) molecule has > 20 heavy atoms (small/medium always pass)
     (b) not in decomposition context (visited set empty)
     (c) molecule has cleavable bonds (alternative exists)
-    (d) estimated coverage < 0.55
+    (d) name is under 30 characters
+    (e) estimated coverage < 0.45
+
+    (a), (d) and (e) are the LIVE constants, re-read from the code 2026-08-02.
+    This docstring previously said "> 15", "below 55%" and "< 0.55"; none of
+    those values exists in the body, and the 0.55 was copied into the
+    outward-facing  from
+    here. Measured: (d) alone bypasses this function on 10 of the 16 molecules
+    that reach it, and the rejection at (e) fired 0 times across 40 molecules.
 
     Args:
         name: The pipeline name.
@@ -387,13 +402,30 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
 
     heavy_atoms = mol.GetNumHeavyAtoms()
 
-    # Suspiciously short name for a complex molecule
+    # Suspiciously short name for a complex molecule.
+    #
+    # ⚠ THIS IS THE DOMINANT GUARD IN THIS FUNCTION (Task Z2). It is a
+    # character count -- `len(name) < heavy_atoms // 2` is `chars/HA < ~0.5`
+    # written without a division, which is why a grep for `len(name) /` misses
+    # it. Because it runs first and is stricter than the chars/HA tests below,
+    # it SHADOWS them: it is what rejects `cholesterol` on a 28-heavy-atom
+    # steroid (11 < 14), not the 0.45 test that used to sit at the end of this
+    # function. Before re-tuning anything below, check whether this line has
+    # already returned.
     if heavy_atoms > 15 and len(name) < heavy_atoms // 2:
         return False
 
-    # D-04: chars/HA check for medium molecules (15-30 HA)
-    # Catches names like "quinoline" (0.39 chars/HA) for a 23 HA molecule.
-    # Does NOT lower the HA <= 20 bypass in _name_covers_molecule() -- orthogonal check.
+    # D-04: chars/HA check for medium molecules (15-30 HA).
+    #
+    # ⚠ The example this comment used to give -- "catches names like
+    # 'quinoline' (0.39 chars/HA) for a 23 HA molecule" -- is FALSE, measured
+    # 2026-08-02: 'quinoline' is in _RETAINED_CORE_NAMES and 0.391 >= 0.25, so
+    # the retained-name branch above returns True and this block is never
+    # reached for it. What this block does catch is the opposite shape: a name
+    # long enough to clear the // 2 test above but still terse, e.g.
+    # 'ethyl stearate' (0.636 on 22 HA) -- a CORRECT name, sent to
+    # decomposition for being short. This is the one chars/HA test in this
+    # function measured to fire on the naming path.
     # Threshold 0.65 (lowered from 0.7 to avoid rejecting "2-methylicosane" at 0.68).
     # Cleavable-bond bypass: only reject if decomposition is actually possible.
     # "hexadecane" (0.625) for 16 HA has no cleavable bonds -> no point rejecting.
@@ -408,10 +440,15 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             except Exception:
                 return False  # On error, still reject
 
-    # For very large molecules, an adequate name should have at least
-    # 0.45 characters per heavy atom (locants, prefixes, parent name)
-    if heavy_atoms > 25 and len(name) / heavy_atoms < 0.45:
-        return False
+    # REMOVED (Task Z2, 2026-08-02): a `heavy_atoms > 25 and
+    # len(name)/heavy_atoms < 0.45 -> return False` test stood here. It was
+    # UNREACHABLE, and provably so rather than by sampling: any name short
+    # enough to trip it (len < 0.45*HA) is also short enough to trip the
+    # `len(name) < heavy_atoms // 2` test above (len < HA//2), which returns
+    # first. Checked exhaustively for every HA in 26..4000 -- no value admits
+    # the one without the other. The spy agreed: 68 evaluations across 17 of
+    # 40 molecules, 0 rejections. Deleting it changes no name.
+    # Do not reintroduce a ratio test here; re-derive from the guard above.
 
     # Large molecule with no digits and no hyphens: likely just a retained
     # name for one fragment (e.g., "benzene" for a 25-atom ester).
@@ -572,6 +609,17 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                         # Use a higher ratio threshold (1.5) because naming
                         # two ring systems requires substantially more chars
                         # than naming one ring + simple substituents.
+                        #
+                        # ⚠ MEASURED INERT (Task Z2, 2026-08-02): reached 3
+                        # times on 1 of 40 molecules, rejected 0 times. Unlike
+                        # the 0.45 test deleted above, this is NOT provably
+                        # unreachable -- it is a character count that happens
+                        # never to have fired on the sample -- so it was left
+                        # in place rather than removed on a 40-molecule zero.
+                        # Removing it admits new behaviour and needs the full
+                        # gate. It is also anti-correlated with what it claims
+                        # to check: a verbose name naming ONE ring passes,
+                        # a terse name naming BOTH fails.
                         ratio = len(name) / heavy_atoms if heavy_atoms else 999
                         if ratio < 1.5:
                             return False
@@ -592,6 +640,21 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # tetraol" (ratio 0.86) are complete despite not mentioning every bond
     # type, because they result from cleaving ONE bond and naming each half.
     # Only pipeline names with low coverage (< 0.8) are suspect.
+    #
+    # ⚠ THE PRE-FILTER IS A CHARACTER COUNT AND IT KEEPS THIS BLOCK SHUT
+    # (Task Z2, 2026-08-02). `coverage_ratio` is `len(name)/heavy_atoms`, so
+    # what "< 0.8" actually buys is: a name VERBOSE enough is exempt from the
+    # bond-token check below -- which is a real structural test. Measured: the
+    # ratio is computed 34 times across 13 of 40 molecules and the branch is
+    # entered ZERO times. Neither of the two tests that name this block reach
+    # it either -- test_quality_gate.py:360 is rejected earlier by the
+    # `len(name) < heavy_atoms // 2` guard (its own comment concedes this) and
+    # :331 by the D-04 chars/HA reject. So this block has no test coverage and
+    # no observed execution.
+    # NOT removed: a reachable window exists (ratio in [0.65, 0.8) for
+    # 15 < HA <= 30), so unlike the 0.45 test deleted above it is not provably
+    # dead, and dropping the pre-filter would START rejecting names. Either
+    # change needs the full gate.
     try:
         # Reuse bonds from the multi-amide block above if available
         if 'bonds' not in dir():

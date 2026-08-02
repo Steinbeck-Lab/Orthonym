@@ -1,17 +1,26 @@
-"""Lightweight coverage estimation functions for naming-time gating.
+"""Coverage estimation from atom indices, for naming-time gating.
 
-These functions estimate what fraction of a molecule's heavy atoms the
-generated parent name accounts for, WITHOUT requiring OPSIN or any
-external process.  All computations are O(1) using data already available
-in the naming pipeline (atom indices, name strings, heavy-atom counts).
+``estimate_parent_coverage`` reports what fraction of a molecule's heavy atoms
+the named parent structure accounts for, WITHOUT requiring OPSIN or any
+external process.  It is O(1) over data already available in the naming
+pipeline, and it counts ATOMS -- it is a real fraction in [0, 1].
 
-Two estimators are provided:
+It is not, and must not be used as, a proof of correctness: covering the right
+NUMBER of atoms is not covering the right atoms.  Constitution is decided by
+``validation/atom_coverage.py`` (InChIKey skeleton), which is the only thing
+that separates e.g. sarcosine from alanine -- they share a formula AND an
+element multiset.
 
-1. ``estimate_parent_coverage`` -- uses the actual set of parent atom
-   indices.  Exact when available.
-
-2. ``estimate_name_coverage_heuristic`` -- uses name length vs heavy atom
-   count.  Useful when atom indices are not tracked explicitly.
+REMOVED 2026-08-02 (Task Z2): ``estimate_name_coverage_heuristic``, which
+returned ``min(len(name) / heavy / 1.5, 1.0)``.  A name's character count is
+not an estimate of how many atoms it names; the quantity is anti-correlated
+with coverage (correct ``cholesterol`` 0.393, a name that INVENTS atoms 5.333),
+and clamping it to 1.0 hid exactly the atom-gain case.  It had **zero callers**
+in ``src/``, `the project tooling` and `the project tooling` -- only its own unit tests -- and a
+fresh-process spy over 40 molecules recorded **0** executions.  Nothing was
+rewired: there was no consumer to rewire.  Do not reintroduce a name-length
+estimator here; if atom indices are unavailable, the honest answer is that
+coverage is unknown, not a number derived from the string.
 
 Usage example::
 
@@ -37,23 +46,3 @@ def estimate_parent_coverage(mol, parent_atom_indices: set) -> float:
     if total_heavy == 0:
         return 1.0
     return len(parent_atom_indices) / total_heavy
-
-
-def estimate_name_coverage_heuristic(name: str, mol) -> float:
-    """Heuristic coverage when atom indices unavailable.
-
-    Uses observation: adequate IUPAC names have >= 0.5 chars per heavy atom.
-    Returns approximate coverage 0.0-1.0.
-
-    Args:
-        name: The generated IUPAC name string.
-        mol: RDKit Mol object.
-
-    Returns:
-        Approximate coverage fraction (0.0-1.0), capped at 1.0.
-    """
-    heavy = mol.GetNumHeavyAtoms()
-    if heavy == 0:
-        return 1.0
-    name_ratio = len(name) / heavy
-    return min(name_ratio / 1.5, 1.0)

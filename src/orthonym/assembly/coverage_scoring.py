@@ -34,6 +34,30 @@ a caller passes ``parent_atom_indices`` -- which no production caller does.
 Every record therefore carries ``coverage_provenance`` so that no consumer can
 mistake the estimate for a measurement.  Do not remove that field, and do not
 present ``atom_coverage`` as verified coverage without checking it.
+
+MEASURED REACH (Task Z2, 2026-08-02) -- fresh process per molecule, 40
+molecules, 20 of them over 25 heavy atoms:
+
+  * ``ratio_raw`` (the name-length proxy) is computed **114 times across 29 of
+    the 40 molecules** -- the hottest of the nine sites that carried this
+    formula, and it feeds BOTH ``factors['ratio']`` and, in production,
+    ``factors['atom_coverage']``.
+  * Nothing observed acted on the result. ``composer._confidence_gate`` -- the
+    function whose docstring defines the accept/reject rule -- recorded
+    **0 calls**; it is off the execution path entirely. The one live threshold
+    comparison, ``candidate_pool.py`` Tier B (``policy.tier == 'ring_b'``),
+    also recorded **0**.
+
+So on that sample this is scoring and reporting, not an accept/reject gate.
+That is a reason to distrust the number, not a reason to relax about it: it is
+still a CHARACTER COUNT standing in for coverage, and it is anti-correlated
+with coverage (correct ``cholesterol`` 0.393; a name that invents atoms 5.333).
+It was left unchanged only because altering it moves candidate selection, which
+requires a full gate run to certify. Do not "fix" the factor without one, and
+do not cite ``factors['ratio']`` or ``factors['atom_coverage']`` as evidence
+about atoms. Real coverage: ``validation/atom_coverage.py`` (constitution by
+InChIKey skeleton). Full audit:
+``.
 """
 
 import logging
