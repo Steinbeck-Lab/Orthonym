@@ -132,6 +132,63 @@ def test_r3_abstains_rather_than_emitting_a_wrong_constitution():
     assert _formula(R3_SMILES) == "C15H30N4S"
 
 
+def _features_for(smiles):
+    """The MolecularFeatures the dispatcher hands the thiourea handler.
+
+    Captured through the handler's own late-bound import so the object under
+    test is the real one, and filtered to the WHOLE molecule (the pipeline also
+    names sub-fragments through the same builder).
+    """
+    import orthonym.assembly.composer as C
+    from orthonym import Orthonym as _OS
+    n_atoms = Chem.MolFromSmiles(smiles).GetNumAtoms()
+    grabbed = []
+    orig = C._try_name_thiourea
+
+    def spy(f):
+        if getattr(f, "mol", None) is not None and f.mol.GetNumAtoms() == n_atoms:
+            grabbed.append(f)
+        return orig(f)
+
+    C._try_name_thiourea = spy
+    try:
+        _OS(style="pin").name_tiered(smiles)
+    finally:
+        C._try_name_thiourea = orig
+    return grabbed[0] if grabbed else None
+
+
+def test_try_name_thiourea_refuses_r3_instead_of_dropping_the_ring_half():
+    """GENERATOR-level. The gate must not be what saves us here.
+
+    R3's N'-substituent is un-nameable. If the builder SKIPPED it (the way the
+    urea builder does) it would emit ``N-tert-butylthiourea`` for a
+    20-heavy-atom molecule — dropping the entire cyclohexyl/diazenyl half. The
+    validity gate would suppress that, which is exactly why this assertion is
+    made against the builder and not against the pipeline's output.
+    """
+    from orthonym.assembly.composer import _try_name_thiourea
+    features = _features_for(R3_SMILES)
+    assert features is not None, "the thiourea builder was never reached"
+    assert _try_name_thiourea(features) is None
+
+
+def test_name_r_group_never_spells_a_ring_as_a_straight_chain():
+    """GENERATOR-level guard on the count anti-pattern.
+
+    ``_name_r_group`` used to hand a ring-bearing fragment's carbon TALLY to
+    ``get_alkyl_name``, which spells an ACYCLIC chain: the R3 N'-branch (6 ring
+    + 4 chain carbons) came back ``'decyl'``, opening the ring into a chain — a
+    different molecule that only the validity gate caught.
+    """
+    from orthonym.assembly.composer import _name_r_group
+    mol = Chem.MolFromSmiles(R3_SMILES)
+    core = {4, 5, 6, 7}                      # the N-CS-N core; atom 7 is the N'
+    result = _name_r_group(mol, 8, core)     # the cyclohexyl attachment carbon
+    # Either it declines, or it names the ring AS a ring — never a chain stem.
+    assert result is None or "cyclo" in result, result
+
+
 def test_blocker_1_1_disubstituted_cycloalkyl_substituent_is_unnameable():
     """Pins WHY R3 abstains. NOT thiourea-specific -- 1-methylcyclohexyl fails too.
 
