@@ -2126,6 +2126,65 @@ def _compound_ring_on_chain_substituent(
     return f'{loc}-{inner}{alkyl}'
 
 
+def _contained_rings(mol, ring_atoms: Tuple[int, ...]):
+    """The SSSR rings wholly inside ``ring_atoms``.
+
+    Mirrors the single-ring guard in :func:`identify_ring_system`; factored out
+    so the Task AA5 heteromonocycle fallback applies the identical test rather
+    than a second, drifting copy of it.
+    """
+    ring_set = set(ring_atoms)
+    return [r for r in mol.GetRingInfo().AtomRings() if set(r) <= ring_set]
+
+
+def _bare_stem_was_withdrawn_as_non_pin(frag_smi: str) -> bool:
+    """True iff this ring fragment's retained bare stem was DENIED as non-PIN.
+
+    Task AA5. Distinguishes "the retained table never had a name for this ring"
+    (leave it fail-closed) from "the retained table had one and the adjudicated
+    PIN list withdrew it" (the substituent path just lost its only answer and
+    must fall back to the systematic parent name).
+
+    Reads the demotion the deny performs: ``pin_policy``'s contract is that a
+    denied name leaves ``ALL_RETAINED_NAMES`` and lands in the general-only
+    companion dict, so the presence of a PIN-denied name there IS the signal.
+    """
+    if not frag_smi:
+        return False
+    try:
+        from ..data import GENERAL_RETAINED_NAMES
+        from ..data.pin_policy import is_pin_denied
+    except ImportError:
+        return False
+    demoted = GENERAL_RETAINED_NAMES.get(frag_smi)
+    return bool(demoted) and is_pin_denied(demoted)
+
+
+def _heteromonocycle_parent_name(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
+    """Systematic parent name for a heteromonocyclic ring, or None (fail-closed).
+
+    Task AA5. Delegates to the Hantzsch-Widman / retained-stem namer the PARENT
+    path already uses, so the substituent path cannot disagree with the parent
+    path about what a ring is called. Returns None for an all-carbon ring (the
+    carbocyclic branches above own those), for anything the namer declines, and
+    for any name carrying a locant-bearing substituent or a space -- only a bare
+    parent hydride name is safe to turn into a '-yl' stem here.
+    """
+    if not any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_atoms):
+        return None
+    try:
+        from .heterocycles import name_heterocycle
+        name = name_heterocycle(mol, tuple(ring_atoms))
+    except Exception:  # noqa: BLE001 - a declining namer must never propagate
+        return None
+    if not name or not isinstance(name, str):
+        return None
+    # A parent hydride only: no whitespace, no substituent prefixes, no suffix.
+    if ' ' in name or name.endswith('yl'):
+        return None
+    return name
+
+
 def get_ring_substituent_name(
     mol,
     ring_atoms: Tuple[int, ...],
@@ -2231,6 +2290,55 @@ def get_ring_substituent_name(
             mol, ring_atoms, attachment_point, allow_mancude=allow_mancude)
         if poly:
             return poly
+
+        # Task AA5 (P-22.2.1): last resort for a HETEROMONOCYCLE the retained
+        # table does not name.
+        #
+        # ``identify_ring_system`` describes a ring by size + heteroatom set and
+        # has no branch for a two-heteroatom saturated five-ring, so
+        # 1,3-thiazolidine, 1,2-thiazolidine, 1,2-oxazolidine, their Se/Te
+        # analogues, selenophene and 1,2-selenazole all arrive here with
+        # ``ring_name is None`` even though they are plain monocycles. Until
+        # Task AA5 the retained lookup above rescued them by returning a BARE
+        # stem ('thiazolidine'), so the substituent path had no route of its own
+        # to the systematic name -- it depended entirely on the retained table.
+        # Withdrawing those bare stems as non-PINs (they are: P-22.2.1 Table 2.3
+        # prints '1,3-thiazolidine (PIN)' at BlueBookV2.md:8182 and
+        # '1,2-thiazolidine (PIN)' at :8184) therefore turned ten correct names
+        # into abstentions -- '(thiazolidin-4-yl)methanol' became 'unknown'.
+        # That is the the contributor guide invariant-9 trap: removing a wrong output
+        # unmasked a worse one. The parent path never had this gap because it
+        # reaches the Hantzsch-Widman namer directly.
+        #
+        # Placement is deliberate: this runs AFTER every existing producer has
+        # declined, so it can never change a name any current path produces.
+        #
+        # ⚠ SCOPE IS DELIBERATELY NARROW, and the narrowing is measured, not
+        # cautious by taste. The obvious generalisation -- "any heteromonocycle
+        # the retained table misses" -- newly names 1660 distinct substituent
+        # stems across pubchem_2000 + chebi_5000 + opsin_selftest_500, and it is
+        # WRONG on a large share of them: for macrocycles such as
+        # '1,10-dioxa-4-azacycloheptadeca-2,7,12-triene' the independently
+        # computed attachment locant lands on a ring OXYGEN, and OPSIN either
+        # refuses the name outright or resolves it to a different structure.
+        # Turning an abstention into a wrong name is worse than the abstention.
+        #
+        # So this fires ONLY for a ring whose bare retained stem THIS project has
+        # adjudicated non-PIN and withdrawn -- i.e. exactly the rings the deny
+        # list took the substituent path's only answer away from. That is a
+        # closed, auditable, data-driven class (read off the deny list itself,
+        # not a molecule list), and it self-maintains: a future deny row of the
+        # same shape gets the same rescue automatically.
+        if attachment_point is not None and len(_contained_rings(mol, ring_atoms)) == 1:
+            if _bare_stem_was_withdrawn_as_non_pin(frag_smi):
+                het_name = _heteromonocycle_parent_name(mol, ring_atoms)
+                if het_name:
+                    stem = het_name[:-1] if het_name.endswith('e') else het_name
+                    locant = _get_polycyclic_attachment_locant(
+                        mol, ring_atoms, attachment_point, ring_name=het_name
+                    )
+                    if locant is not None:
+                        return f'{stem}-{locant}-yl'
 
         # Fail-closed: an unidentifiable ring system (the old generic
         # ``cyclo{N}yl`` size-guess named a DIFFERENT molecule — norbornane as

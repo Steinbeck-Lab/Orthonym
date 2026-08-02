@@ -669,7 +669,13 @@ class TestC6bMediumRingHWNames:
         # Retained names MUST be untouched.
         ("C1COCCN1", "morpholine"),
         ("C1CNCCN1", "piperazine"),
-        ("C1NCCS1", "thiazolidine"),
+        # Task AA5: was "thiazolidine".  P-22.2.1 Table 2.3, BlueBookV2.md:8182,
+        # one non-interleaved line: "oxazolidine 1,3-oxazolidine (PIN)
+        # thiazolidine (S instead of O) 1,3-thiazolidine (PIN) ...".  Note this
+        # very class already asserted the locant-bearing form for the OXYGEN
+        # analogue two blocks up ("C1NCCO1" -> "1,3-oxazolidine"); the sulfur row
+        # asserting the bare stem was the inconsistency, not the fix.
+        ("C1NCCS1", "1,3-thiazolidine"),
         ("C1CNCN1", "imidazolidine"),
         ("C1CCNCC1", "piperidine"),
         ("C1CCOCC1", "oxane"),

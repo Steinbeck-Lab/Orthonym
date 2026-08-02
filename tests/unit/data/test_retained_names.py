@@ -91,42 +91,86 @@ class TestThiazolidineRetainedNames:
         assert canonical in RETAINED_NAMES
         assert RETAINED_NAMES[canonical] == 'isothiazolidine'
 
-    @pytest.mark.unit
-    def test_get_retained_name_thiazolidine(self):
-        """get_retained_name should return 'thiazolidine' for canonical SMILES."""
-        result = get_retained_name('C1CSCN1')
-        assert result == 'thiazolidine', f"Got {result}"
+    # ----------------------------------------------------------------------
+    # Task AA5: the six expectations below asserted the BARE stem, which the
+    # Blue Book prints as NOT the PIN.  Section **P-22.2.1 "Retained names of
+    # heteromonocycles"** (heading ``BlueBookV2.md:8109``), whose lead-in at
+    # ``:8117`` reads "Retained names for saturated heteromonocycles are given
+    # in Table 2.3".  Both governing lines are single, non-interleaved lines --
+    # no OCR column reconstruction is involved for either name:
+    #
+    #   :8182  "oxazolidine 1,3-oxazolidine (PIN) thiazolidine (S instead of O)
+    #           1,3-thiazolidine (PIN) selenazolidine (Se instead of O)"
+    #   :8184  "1,2-oxazolidine (PIN) isothiazolidine (S instead of O)
+    #           1,2-thiazolidine (PIN) isoselenazolidine (Se instead of O) ..."
+    #
+    # Independent corroboration (does NOT use the code under test): OPSIN 2.9.0
+    # parses '1,3-thiazolidine' -> C1CSCN1 and '1,2-thiazolidine' -> C1CNSC1, so
+    # the new names denote exactly these molecules.  ⚠ That check confirms
+    # VALIDITY only -- OPSIN resolves the old bare names to the same structures,
+    # so it cannot adjudicate PIN-preference.  Preference rests on the Blue Book
+    # lines above, which state it explicitly.  Second corroboration, internal:
+    # every sibling in the same two table rows already emitted the
+    # locant-bearing form (1,3-oxazolidine, 1,3-selenazolidine,
+    # 1,3-tellurazolidine, 1,2-oxazole, 1,2-thiazole) -- members of one series
+    # that must agree, and did not.
+    #
+    # What would make this wrong: if the "(PIN)" marker in Table 2.3 attached to
+    # the trivial column rather than the locant-bearing one.  It does not -- both
+    # pairs are printed left-to-right on one line, and Table 2.2's :8135/:8137
+    # print the identical mapping for the mancude analogues.
+    # ----------------------------------------------------------------------
 
     @pytest.mark.unit
-    def test_get_retained_name_isothiazolidine(self):
-        """get_retained_name should return 'isothiazolidine' for canonical SMILES."""
-        result = get_retained_name('C1CNSC1')
-        assert result == 'isothiazolidine', f"Got {result}"
+    def test_get_retained_name_no_longer_returns_bare_thiazolidine(self):
+        """The PIN-path lookup must not serve the non-PIN bare stem.
+
+        ``get_retained_name`` reads the merged, deny-filtered
+        ``ALL_RETAINED_NAMES``; the adjudicated deny row withdraws
+        'thiazolidine' from it so the generic path can supply the PIN.
+        """
+        assert get_retained_name('C1CSCN1') != 'thiazolidine'
+
+    @pytest.mark.unit
+    def test_get_retained_name_no_longer_returns_bare_isothiazolidine(self):
+        assert get_retained_name('C1CNSC1') != 'isothiazolidine'
+
+    @pytest.mark.unit
+    def test_bare_stems_are_demoted_not_deleted(self):
+        """The deny is a demotion to the --trivial surface, not a deletion.
+
+        Keeps teeth on the mechanism: if a future change deletes the rows
+        instead of denying them, the legitimate general-nomenclature names are
+        silently lost and this fails.
+        """
+        from orthonym.data import GENERAL_RETAINED_NAMES
+        demoted = set(GENERAL_RETAINED_NAMES.values())
+        assert 'thiazolidine' in demoted
+        assert 'isothiazolidine' in demoted
 
     @pytest.mark.unit
     def test_thiazolidine_naming_e2e(self):
-        """name_compound should return 'thiazolidine' for 1,3-thiazolidine ring."""
+        """name_compound returns the PIN '1,3-thiazolidine' (BB:8182)."""
         result = name_compound('C1CSCN1')
-        assert result == 'thiazolidine', f"Got {result}"
+        assert result == '1,3-thiazolidine', f"Got {result}"
 
     @pytest.mark.unit
     def test_thiazolidine_naming_alt_input(self):
-        """name_compound should return 'thiazolidine' for alternate SMILES input."""
-        # Test various input forms that should all give thiazolidine
+        """Alternate input form gives the same PIN."""
         result = name_compound('C1SCNC1')
-        assert result == 'thiazolidine', f"Got {result}"
+        assert result == '1,3-thiazolidine', f"Got {result}"
 
     @pytest.mark.unit
     def test_isothiazolidine_naming_e2e(self):
-        """name_compound should return 'isothiazolidine' for 1,2-isothiazolidine ring."""
+        """name_compound returns the PIN '1,2-thiazolidine' (BB:8184)."""
         result = name_compound('C1CNSC1')
-        assert result == 'isothiazolidine', f"Got {result}"
+        assert result == '1,2-thiazolidine', f"Got {result}"
 
     @pytest.mark.unit
     def test_isothiazolidine_naming_alt_input(self):
-        """name_compound should return 'isothiazolidine' for alternate SMILES input."""
+        """Alternate input form gives the same PIN."""
         result = name_compound('C1CCSN1')
-        assert result == 'isothiazolidine', f"Got {result}"
+        assert result == '1,2-thiazolidine', f"Got {result}"
 
 
 # =============================================================================
