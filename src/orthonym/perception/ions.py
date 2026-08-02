@@ -30,12 +30,177 @@ _INTERNAL_CHARGE_SMARTS = [
 _INTERNAL_CHARGE_SMARTS = [p for p in _INTERNAL_CHARGE_SMARTS if p is not None]
 
 
+# O, S, Se, Te.  This is not a hand-picked element list: it is the Blue Book's
+# OWN enumeration of the class in P-74.2.1.4 "Phosphine oxides and chalcogen
+# analogues" (":43041") -- "Chalcogen analogues are phosphine sulfides,
+# phosphine selenides, and phosphine telluride (where O is replaced by S, Se,
+# and Te, respectively)" -- and in P-74.2.1.2 (":43008") "chalcogen analogues
+# are amine sulfides, imine selenides, etc. (where O is replaced by S, Se, or
+# Te)".  The ANION element is what the Blue Book uses to draw the boundary; see
+# _semipolar_chalcogenide_atoms.
+_CHALCOGEN_ATOMIC_NUMS = frozenset({8, 16, 34, 52})
+
+# Raising a semipolar single bond to the multiple bond of the uncharged form.
+_BOND_ORDER_UP = {
+    Chem.BondType.SINGLE: Chem.BondType.DOUBLE,
+    Chem.BondType.DOUBLE: Chem.BondType.TRIPLE,
+}
+
+
+def _semipolar_chalcogenide_atoms(mol) -> Set[int]:
+    """Atoms of a P-74.2.1 semipolar (dative) ``X(+)-A(-)`` chalcogenide pair.
+
+    **P-74.2 "DIPOLAR COMPOUNDS"** (heading, ``BlueBookV2.md:42501``): *"Dipolar
+    compounds are electrically neutral molecules carrying a negative and a
+    positive charge in at least one of their major canonical resonance
+    structures. ... 1,2-Dipolar compounds have the opposite charges on adjacent
+    atoms."*
+
+    **P-74.2.1.1 "'Ylides'"** (heading, ``:42509``) explains why the SMARTS list
+    above was ever sufficient, and why it stopped being so -- the decisive
+    clause is the last one: *"If 'X' is a saturated atom of an element from the
+    second row of the periodic system, the 'ylide' is commonly represented by a
+    charge-separated form; if 'X' is a third, fourth, etc. row element uncharged
+    canonical forms are usually shown, RmX=YRn."*  A second-row cation (N) has
+    no uncharged depiction, so nitro / N-oxide / azide / diazo are ALWAYS drawn
+    charge-separated and each earned an explicit SMARTS.  A third/fourth-row
+    cation (P, S, As, Se, Sb, Te, I...) is *usually* drawn uncharged -- which is
+    why no SMARTS was ever written for it -- but nothing prevents an input from
+    being drawn charge-separated, and when it is, the pair used to read as a
+    genuine ionic centre.
+
+    **P-74.2.1.4** (heading ``:43041``) settles what the pair means: *"Phosphine
+    oxides have the generic formula R3P+ -O- <-> R3P=O."*  The Blue Book's own
+    double-headed arrow says the two depictions are one compound, and *"Method
+    (3) leads to preferred IUPAC names"* makes the NEUTRAL name (a
+    ``l5``-phosphanone) the PIN.  Likewise **P-74.2.1.2** (``:43015``): *"Method
+    (2) leads to preferred IUPAC names when one amine oxide is present. ...
+    Hence, zwitterionic compounds are never PINs"*.
+
+    THE BOUNDARY -- the Blue Book draws it by the ANION, and the other side of
+    it must keep its charges VISIBLE:
+
+    * anion on CARBON is an ylide. **P-74.2.1.1** ``:42513``: *"Method (1) is
+      applicable to all 'ylides' and leads to preferred IUPAC names"*, method
+      (1) being *"as zwitterionic compounds"*.  So an ylide's PIN IS the
+      zwitterion name -- masking it would emit a valid but non-preferred
+      ``l5`` name.  (Measured: ``C[P+](C)(C)[CH2-]`` already emits the correct
+      ``(trimethylphosphaniumyl)methanide``.)
+    * anion on NITROGEN under a nitrogen cation is an amine imide.
+      **P-74.2.1.3** (heading ``:43022``): *"Method (1) leads to preferred IUPAC
+      names"*, method (1) being *"as a zwitterion based on hydrazine"*.
+      (Measured: already emits ``1,2,2,2-tetramethylhydrazin-2-ium-1-ide``.)
+    * anion on a CHALCOGEN is the oxide / chalcogenide class -- neutral PIN, so
+      the charges are internal.  That is this function.
+
+    Two guards keep it from swallowing a genuine oxoanion, and neither is a
+    count standing in for a structure proof:
+
+    1. **Local charge balance.**  The cation's positive charge must be exactly
+       cancelled by the terminal chalcogenide anions bonded to it, per P-74.2's
+       "electrically neutral" above.  ``[O-][I+]([O-])(O)(O)(O)O`` puts two
+       ``O-`` on a ``+1`` iodine and ``[O-][Cl+3]([O-])([O-])[O-]`` four on a
+       ``+3`` chlorine; both are genuine anions and both are refused here.
+    2. **The uncharged form must denote the SAME SPECIES.**  The pair is
+       rewritten as the multiple bond of the uncharged depiction and the result
+       must both sanitise and carry the same standard InChIKey.  This is what
+       replaces the cation element list a local workaround used to carry: an
+       element list cannot tell a semipolar oxide from an oxoanion, whereas this
+       proof is exactly the claim being relied on -- that naming the neutral
+       form names the input molecule.  ``CC1CO[PH+](C1)[O-]`` and
+       ``CC1CP(OC1)=O`` share ``DWXZAVJWXATXAG-UHFFFAOYSA-N``, which is why
+       ``4-methyl-2-oxo-1,2-oxaphospholane`` is the correct name for it.
+
+    Fails closed: any parse/sanitise/InChI failure leaves the charges visible.
+    """
+    # Cheap pre-filter -- the overwhelming majority of molecules leave here.
+    by_cation: Dict[int, List[tuple]] = {}
+    for bond in mol.GetBonds():
+        begin, end = bond.GetBeginAtom(), bond.GetEndAtom()
+        for cation, anion in ((begin, end), (end, begin)):
+            if cation.GetFormalCharge() < 1 or anion.GetFormalCharge() != -1:
+                continue
+            if anion.GetAtomicNum() not in _CHALCOGEN_ATOMIC_NUMS:
+                continue
+            # Terminal and hydrogen-free: an oxide, not a hydroxide or a bridge.
+            if anion.GetDegree() != 1 or anion.GetTotalNumHs():
+                continue
+            by_cation.setdefault(cation.GetIdx(), []).append(
+                (anion.GetIdx(), bond.GetIdx())
+            )
+    if not by_cation:
+        return set()
+
+    # Guard 1: local charge balance (P-74.2 "electrically neutral").
+    balanced = {
+        idx: pairs
+        for idx, pairs in by_cation.items()
+        if mol.GetAtomWithIdx(idx).GetFormalCharge() == len(pairs)
+    }
+    if not balanced:
+        return set()
+
+    try:
+        reference_key = Chem.MolToInchiKey(mol)
+    except Exception:  # noqa: BLE001 -- perception must never raise
+        return set()
+    if not reference_key:
+        return set()
+
+    internal: Set[int] = set()
+    for cation_idx, pairs in balanced.items():
+        rw = Chem.RWMol(mol)
+        rewritten = True
+        for anion_idx, bond_idx in pairs:
+            bond = rw.GetBondWithIdx(bond_idx)
+            raised = _BOND_ORDER_UP.get(bond.GetBondType())
+            if raised is None:
+                rewritten = False
+                break
+            bond.SetBondType(raised)
+            _neutralize_pinning_hydrogens(rw.GetAtomWithIdx(anion_idx))
+        if not rewritten:
+            continue
+        _neutralize_pinning_hydrogens(rw.GetAtomWithIdx(cation_idx))
+        candidate = rw.GetMol()
+        try:
+            Chem.SanitizeMol(candidate)
+            # Guard 2: the uncharged depiction must be the SAME SPECIES.
+            if Chem.MolToInchiKey(candidate) != reference_key:
+                continue
+        except Exception:  # noqa: BLE001 -- an invalid rewrite proves nothing
+            continue
+        internal.add(cation_idx)
+        internal.update(anion_idx for anion_idx, _ in pairs)
+    return internal
+
+
+def _neutralize_pinning_hydrogens(atom) -> None:
+    """Zero an atom's formal charge while holding its hydrogen count fixed.
+
+    Raising the bond order changes the implicit-H count RDKit would compute, so
+    the total H is pinned as explicit first. Without this the rewritten molecule
+    silently loses the ``H`` of a ``[PH+]`` and the InChIKey comparison rejects a
+    pair that is in fact semipolar."""
+    atom.SetNumExplicitHs(atom.GetTotalNumHs())
+    atom.SetNoImplicit(True)
+    atom.SetFormalCharge(0)
+
+
 def _get_internal_charge_atoms(mol) -> Set[int]:
     """Return atom indices whose formal charges are bonding features, not ionic.
 
-    Identifies atoms in prefix-only functional groups (nitro, N-oxide, azide,
-    diazo) per IUPAC P-59 Table 5.1. These atoms have formal charges as part
-    of their bonding structure, NOT as ionic charges.
+    Two complementary mechanisms, because the Blue Book itself describes the
+    class in two ways (P-74.2.1.1 ``:42509``, quoted in
+    ``_semipolar_chalcogenide_atoms``):
+
+    1. Named prefix-only groups whose cation is a SECOND-ROW element and which
+       therefore have no uncharged depiction at all -- nitro, N-oxide, azide,
+       diazo, per IUPAC P-59 Table 5.1. Matched by SMARTS.
+    2. P-74.2.1 semipolar ``X(+)-A(-)`` chalcogenides, whose cation is a
+       third/fourth-row element and which DO have an uncharged depiction. There
+       is no closed list of these, so they are proven structurally rather than
+       enumerated.
 
     Note: Nitroso (N=O) is excluded -- no formal charges in standard SMILES.
     Note: Only organic azides [N]=[N+]=[N-] are filtered, NOT the azide anion
@@ -47,6 +212,7 @@ def _get_internal_charge_atoms(mol) -> Set[int]:
             for idx in match:
                 if mol.GetAtomWithIdx(idx).GetFormalCharge() != 0:
                     internal.add(idx)
+    internal |= _semipolar_chalcogenide_atoms(mol)
     return internal
 
 
