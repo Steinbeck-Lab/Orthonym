@@ -576,8 +576,16 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     # symmetric 2-carbon (ethane) parent -> 'ethanesulfonamide' (PIN, OPSIN-RT), not
     # 'ethane-1-sulfonamide'; N-substituents don't perturb the ethane symmetry
     # (N-methylethanesulfonamide). A 3+ carbon chain keeps its locant
-    # (propane-1-sulfonamide). Sulfinamide (no FG defined yet) deferred.
+    # (propane-1-sulfonamide).
     "primary_sulfonamide", "secondary_sulfonamide", "tertiary_sulfonamide",
+    # Task Y (P-66.1.1.2 / P-14.3.4.4): sulfinamide's characteristic S attaches to
+    # a chain carbon exactly like sulfonamide's, so the suffix locant elides on the
+    # symmetric 2-carbon parent -> 'ethanesulfinamide', not 'ethane-1-sulfinamide'.
+    # A 3+ carbon chain KEEPS its locant, which the Blue Book's own worked PINs
+    # require: `butane-2-sulfinamide` (@32754) and
+    # `N-hydroxypropane-1-sulfinamide` (@31236). (This closes the TODO that stood
+    # here reading "Sulfinamide (no FG defined yet) deferred".)
+    "primary_sulfinamide", "secondary_sulfinamide", "tertiary_sulfinamide",
     # Wave2 T3d (P-66.1.1 / P-14.3.4.4): sulfonimidamide attaches to a chain
     # carbon exactly like sulfonamide -> 'ethanesulfonimidamide' (OPSIN-RT),
     # not 'ethane-1-sulfonimidamide'. propane-1- keeps its locant.

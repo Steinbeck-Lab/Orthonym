@@ -247,6 +247,33 @@ FUNCTIONAL_GROUP_SMARTS = {
     # NO overlap with the carbon-based imine/oxime/hydrazone SMARTS (the
     # composite-N carbon families that need the perception-priority prototype).
     "sulfonimidamide": "[SX4](=[OX1])(=[NX2])[NX3H2]",
+    # Task Y (P-66.1.1.2, Table 6.1 item 24 @18782): sulfinamide -SO-NH2, a
+    # PRESELECTED suffix -- "Sulfonamides, sulfinamides, and the analogous
+    # selenium and tellurium amides are named substitutively using the following
+    # suffixes: ... -SO-NH2 sulfinamide (preselected suffix)" (@32744/@32746),
+    # with the worked PIN `butane-2-sulfinamide` (@32754). The whole class used
+    # to be unnameable (CS(=O)N -> 'unknown organic compound').
+    #
+    # Mirrors the primary/secondary/tertiary split of sulfonamide above, and the
+    # split is LOAD-BEARING, not cosmetic: a single permissive [NX3] bucket would
+    # send CS(=O)NC down the generic suffix path and silently DROP the N-methyl
+    # carbon -- exactly the v29 defect recorded in rules/sulfonamides.py. With the
+    # split, secondary/tertiary have no producer yet and so fail CLOSED instead.
+    #
+    # The $([SX3][#6]) carbon guard is REQUIRED (parallels sulfinic_acid /
+    # sulfinyl_halide): without it the pattern claims H2N-S(=O)-OH, and @36500
+    # states "the name sulfinamidic acid is not an approved name". It also keeps
+    # out the S-free sulfurous diamide O=S(N)N.
+    #
+    # Measured disjoint (20-molecule RDKit matrix, zero shared matches) from
+    # sulfinic_acid, sulfinic_ester, sulfinyl_halide, sulfinimidamide, sulfoxide,
+    # primary/secondary/tertiary_amine, primary_sulfonamide,
+    # sulfinohydrazonohydrazide and sulfenic_acid -> no suppression rows needed.
+    # The split also excludes CS(=O)NN (sulfinohydrazide, N is H1 with no C) and
+    # CS(=O)NO (N-hydroxy), so neither is misnamed.
+    "primary_sulfinamide": "[SX3;$([SX3][#6])](=[OX1])[NX3H2]",
+    "secondary_sulfinamide": "[SX3;$([SX3][#6])](=[OX1])[NX3H1][#6]",
+    "tertiary_sulfinamide": "[SX3;$([SX3][#6])](=[OX1])[NX3]([#6])[#6]",
     # Wave2 T3d (P-66.1.1 Table 6.1 item 25): sulfinimidamide -S(=NH)-NH2 = the
     # shipped sulfonimidamide with the S(=O) removed (SX4->SX3, one fewer O).
     # SX3-vs-SX4 makes it disjoint from every shipped SMARTS -> no suppression.

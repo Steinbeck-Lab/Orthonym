@@ -71,6 +71,9 @@ _SUFFIX_PRIORITY = [
     'sulfonamide',
     # Wave-2 P1AM (P-66.4.1.1): sulfonimidamide ranks just below sulfonamide.
     'sulfonimidamide',
+    # Task Y (P-66.1.1.2, Table 6.1 item 24 @18782): sulfinamide -SO-NH2 ranks
+    # below sulfonimidamide (item 20) and above sulfonohydrazide (item 34).
+    'sulfinamide',
     # C1 (P-65.3.1): sulfonohydrazide ranks with the sulfonamide family, above
     # the carbon carboxamide/carbohydrazide (S oxoacid-derivatives are named after
     # the S parent; here it is the sole principal group in the target set).
@@ -147,6 +150,8 @@ _SUFFIX_TO_PREFIX = {
     'telluronic acid': 'tellurono',
     'tellurinic acid': 'tellurino',  # W3-P11 (P-65.3): -inic prefix form
     'sulfonamide': 'sulfamoyl',
+    # Task Y: NOT 'sulfinamoyl' -- @55485 gives `aminosulfinyl* (not sulfinamoyl)`.
+    'sulfinamide': 'aminosulfinyl',
     'sulfonohydrazide': 'hydrazinesulfonyl',  # C1 (P-65.3.1)
     'carbonyl chloride': 'carbonochloridoyl',
     'carboxamide': 'carbamoyl',
@@ -348,6 +353,11 @@ _BENZENE_FG_SMARTS = {
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
+    # Task Y (P-66.1.1.2 @32746): ring-attached sulfinamide -S(=O)-NH2. SX3 (one
+    # fewer O) keeps it disjoint from every SX4 pattern here; the carbon guard
+    # parallels sulfinic_acid and excludes H2N-S(=O)-OH (@36500 "the name
+    # sulfinamidic acid is not an approved name").
+    'sulfinamide': Chem.MolFromSmarts('[SX3;$([SX3][#6])](=[OX1])[NX3H2]'),
     # Wave-2 P1AM (P-66.4.1.1, BB 34173): ring-attached sulfonimidamide
     # -S(=O)(=NH)-NH2. The imido =N breaks the sulfonamide (=O)(=O) SMARTS so
     # there is no overlap; checked BEFORE sulfonamide (more specific).
@@ -860,6 +870,15 @@ def _identify_suffix_fg_on_benzene(
             if match[0] == start_idx:
                 return {
                     'name': 'sulfonamide', 'suffix_name': 'sulfonamide',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
+        # Task Y: sulfinamide S(=O)(NH2) -- checked after sulfonamide; the SX3/SX4
+        # split means neither can steal the other's match.
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfinamide']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'sulfinamide', 'suffix_name': 'sulfinamide',
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
@@ -3894,6 +3913,16 @@ def _assemble_benzene_with_suffix(
             remaining_prefix_groups, chosen_locants[0],
             atom_to_locant, oriented_ring
         )
+
+    # Task Y (P-66.1.1.2 @32746): single sulfinamide on benzene ->
+    # 'benzenesulfinamide'. Mirrors the sulfonimidamide rule immediately below:
+    # only the unsubstituted parent is built, because a ring substituent would
+    # need the merged N/numeric prefix list and N-substitution is not built for
+    # this class at all. ANY additional ring substituent -> fail closed.
+    if chosen_suffix == 'sulfinamide' and chosen_count == 1:
+        if remaining_prefix_groups:
+            return None
+        return "benzenesulfinamide"
 
     # Wave-2 P1AM (P-66.4.1.1, BB 34173): single sulfonimidamide on benzene ->
     # 'benzenesulfonimidamide'. Only the unsubstituted parent is built here;

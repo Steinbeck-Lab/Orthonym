@@ -230,8 +230,16 @@ SENIORITY_ORDER = [
     "sulfonimidamide",
     # Wave-2 P1AM (P-66.4.1.1): Se analogue of sulfonimidamide, ranks with it.
     "selenonimidamide",
+    # Task Y (P-66.1.1 Table 6.1 item 24 @18782): sulfinamide -SO-NH2. Table 6.1
+    # orders 19 sulfonamide > 20 sulfonimidamide > 21 sulfonodiimidamide >
+    # 22 sulfonohydrazonamide > 23 sulfonodihydrazonamide > 24 SULFINAMIDE >
+    # 25 sulfinimidamide, so it sits BELOW sulfonimidamide and ABOVE
+    # sulfinimidamide -- which is exactly here.
+    "primary_sulfinamide",
+    "secondary_sulfinamide",
+    "tertiary_sulfinamide",
     # Wave2 T3d (P-66.1.1 Table 6.1 item 25): sulfinimidamide -S(=NH)-NH2 ranks
-    # just below sulfonimidamide (item 20; sulfinamide item 24 not yet shipped).
+    # just below sulfinamide (item 24).
     "sulfinimidamide",
     # Wave-2 P1AM (P-66.4.1.1): Se analogue of sulfinimidamide, ranks with it.
     "seleninimidamide",
@@ -562,6 +570,13 @@ SUFFIX_FORMS = {
     "primary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "secondary_sulfonamide": ("sulfonamide", "sulfonamide"),
     "tertiary_sulfonamide": ("sulfonamide", "sulfonamide"),
+    # Task Y (P-66.1.1.2 @32746, Table 6.1 item 24): same word for chain and ring,
+    # exactly like sulfonamide -- 'methane' + 'sulfinamide' = methanesulfinamide,
+    # 'benzene' + 'sulfinamide' = benzenesulfinamide. Worked PINs:
+    # `butane-2-sulfinamide` (@32754), `N-hydroxypropane-1-sulfinamide` (@31236).
+    "primary_sulfinamide": ("sulfinamide", "sulfinamide"),
+    "secondary_sulfinamide": ("sulfinamide", "sulfinamide"),
+    "tertiary_sulfinamide": ("sulfinamide", "sulfinamide"),
     # Wave2 T3d (P-66.1.1 item 20): same word for chain/ring (like sulfonamide);
     # methanesulfonimidamide / benzenesulfonimidamide.
     "sulfonimidamide": ("sulfonimidamide", "sulfonimidamide"),
@@ -790,6 +805,17 @@ PREFIX_FORMS = {
     "primary_sulfonamide": "sulfamoyl",
     "secondary_sulfonamide": "sulfamoyl",
     "tertiary_sulfonamide": "sulfamoyl",
+    # Task Y: -S(=O)-NH2 as a detachable prefix. NOT the naive parallel to
+    # 'sulfamoyl' -- BB @55485 lists `aminosulfinyl* (not sulfinamoyl) | H2N-S(O)- |
+    # P-66.1.1.4.2`, i.e. it names 'sulfinamoyl' explicitly as the non-preferred
+    # form, and @56829 redirects "sulfinamoyl: see aminosulfinyl*". Confirmed in
+    # use by the PIN at @36500, `3-[(aminosulfinyl)oxy]propanoic acid (PIN)`.
+    # Required so a DEMOTED sulfinamide is not silently dropped by the
+    # `no_fg_prefix_form` skip (_handler_shared.py DROP-16 / polyfunctional.py
+    # DROP-23) when a senior group takes the suffix.
+    "primary_sulfinamide": "aminosulfinyl",
+    "secondary_sulfinamide": "aminosulfinyl",
+    "tertiary_sulfinamide": "aminosulfinyl",
     # C1 (P-65.3.1): -SO2-NH-NH2 as a substituent prefix (defensive; target
     # compounds are mono-functional so it is normally the principal suffix).
     "sulfonohydrazide": "hydrazinesulfonyl",
