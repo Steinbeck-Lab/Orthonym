@@ -42,21 +42,42 @@ molecules, 20 of them over 25 heavy atoms:
     the 40 molecules** -- the hottest of the nine sites that carried this
     formula, and it feeds BOTH ``factors['ratio']`` and, in production,
     ``factors['atom_coverage']``.
-  * Nothing observed acted on the result. ``composer._confidence_gate`` -- the
-    function whose docstring defines the accept/reject rule -- recorded
-    **0 calls**; it is off the execution path entirely. The one live threshold
-    comparison, ``candidate_pool.py`` Tier B (``policy.tier == 'ring_b'``),
-    also recorded **0**.
+  * ``composer._confidence_gate`` -- the function whose docstring defines the
+    accept/reject rule -- recorded **0 calls**; it is off the execution path
+    entirely. ``candidate_pool.py`` Tier B (``policy.tier == 'ring_b'``) also
+    recorded **0**. Both re-confirmed by Task Z3 (48 molecules, 0 and 0).
 
-So on that sample this is scoring and reporting, not an accept/reject gate.
-That is a reason to distrust the number, not a reason to relax about it: it is
-still a CHARACTER COUNT standing in for coverage, and it is anti-correlated
-with coverage (correct ``cholesterol`` 0.393; a name that invents atoms 5.333).
-It was left unchanged only because altering it moves candidate selection, which
-requires a full gate run to certify. Do not "fix" the factor without one, and
-do not cite ``factors['ratio']`` or ``factors['atom_coverage']`` as evidence
-about atoms. Real coverage: ``validation/atom_coverage.py`` (constitution by
-InChIKey skeleton). Full audit:
+⚠ CORRECTION (Task Z3, 2026-08-02) -- THIS RATIO **DOES** GATE A LIVE DECISION.
+Task Z2 concluded "nothing observed acted on the result" after checking those
+two sites. It checked the wrong two. The live consumer is **``namer.py:3810``**:
+
+    atom_cov = _factors.get('atom_coverage')      # namer.py:3802
+    elif atom_cov < 0.55:                          # namer.py:3810
+        ... return decomp_name                     # namer.py:3827
+
+It reads ``factors['atom_coverage']`` DIRECTLY, so it never touches
+``confidence`` and neither of the two gates Z2 examined could ever have
+revealed it. Because that factor is ``ratio_score`` in the production path,
+``atom_cov < 0.55`` is exactly ``len(name) / heavy_atoms < 0.825`` -- a
+character-count gate stricter than any of the three in
+``decomposition/engine.py``, wearing the name "atom coverage". Measured by
+Task Z3 over 48 molecules, fresh process each: ``ratio_raw`` computed **205
+times across 32 molecules**; ``namer.py:3810`` **REACHED 6 times on 6
+molecules** and rejected **0**. So it is live and reachable, and merely
+happened not to fire on that sample -- which is a different and much weaker
+statement than "nothing acts on it".
+
+It is still a CHARACTER COUNT standing in for coverage, and it is
+anti-correlated with coverage (correct ``cholesterol`` 0.393; a name that
+invents atoms 5.333). It is STILL left unchanged here, for the reason Z2 gave
+and Z3 confirms: ``atom_coverage`` carries weight 0.20 in
+``FACTOR_WEIGHTS_V17``, so altering it moves ``confidence`` and therefore
+candidate selection, which requires a full gate run to certify. Do not "fix"
+the factor without one, and do not cite ``factors['ratio']`` or
+``factors['atom_coverage']`` as evidence about atoms. Real coverage:
+``validation/atom_coverage.py`` (constitution by InChIKey skeleton) -- wired
+into the ``decomposition/engine.py`` guards by Task Z3. Full audits:
+`` and
 ``.
 """
 

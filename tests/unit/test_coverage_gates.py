@@ -391,13 +391,19 @@ class TestQualityGate:
         total_heavy = mol.GetNumHeavyAtoms()
         assert total_heavy == 30
 
-        # 'triacontane' is 11 chars; ratio = 11/30 = 0.37 < 0.45
-        # Also: no digits, no hyphens -> bare name rule fires for >20 atoms
-        result = _name_quality_is_acceptable("triacontane", mol)
+        # Task Z3: the probe used to be 'triacontane', which is this molecule's
+        # own correct systematic name (C30 unbranched alkane) -- so the test was
+        # asserting that a correct name must be rejected, on a character count.
+        # 'decane' has the same shape for the guard (6 chars, ratio 0.20 < 0.45,
+        # no digits, no hyphens) but describes only 10 of the 30 atoms, so the
+        # rejection it pins is a true positive.
+        result = _name_quality_is_acceptable("decane", mol)
         assert result is False, (
-            f"'triacontane' (ratio {len('triacontane')/total_heavy:.2f}) for "
+            f"'decane' (ratio {len('decane')/total_heavy:.2f}) for "
             f"{total_heavy}-atom mol should be rejected"
         )
+        # The molecule's own correct name is NOT rejected.
+        assert _name_quality_is_acceptable("triacontane", mol) is True
 
 
 # ---------------------------------------------------------------------------

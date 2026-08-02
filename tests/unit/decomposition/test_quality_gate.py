@@ -91,12 +91,23 @@ class TestTieredCoverage:
 
     @pytest.mark.unit
     def test_sulfonamide_uses_higher_threshold(self):
-        """Sulfonamide bond type should use 0.8 chars/HA threshold."""
+        """Sulfonamide bond type should use 0.8 chars/HA threshold.
+
+        Task Z3 changed the probe name, not the threshold. This test used
+        "phenyl palmitate", which DENOTES this molecule exactly -- so once a
+        failing character count started being checked against the real oracle,
+        it was (correctly) no longer discarded, and the test could no longer
+        demonstrate the 0.6/0.8 tier. "phenyl acetate" has the same length
+        behaviour at both thresholds (14 chars: >= int(24*0.6)=14, <
+        int(24*0.8)=19) but describes only 10 of the 24 heavy atoms, so the
+        oracle agrees it is partial and the tier is exercised as intended.
+        """
         from orthonym.decomposition.engine import _coverage_is_adequate
-        # "phenyl palmitate" = 16 chars, 24 HA => 0.67 chars/HA
-        # Fails 0.8 threshold
+        # "phenyl acetate" = 14 chars, 24 HA => 0.58 chars/HA
+        # Passes 0.6 threshold, fails 0.8 threshold; genuinely partial.
         mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")  # ~24 HA
-        assert _coverage_is_adequate("phenyl palmitate", mol, bond_type="sulfonamide") is False
+        assert _coverage_is_adequate("phenyl acetate", mol, bond_type="ester") is True
+        assert _coverage_is_adequate("phenyl acetate", mol, bond_type="sulfonamide") is False
 
     @pytest.mark.unit
     def test_sulfonamide_passes_with_long_name(self):
@@ -128,12 +139,19 @@ class TestTieredCoverage:
 
     @pytest.mark.unit
     def test_default_bond_type_uses_high_threshold(self):
-        """No bond_type (default="") should use 0.8 threshold for backward compat."""
+        """No bond_type (default="") should use 0.8 threshold for backward compat.
+
+        Probe name changed by Task Z3 for the reason given in
+        test_sulfonamide_uses_higher_threshold: the old probe covered the
+        molecule, so it is no longer discardable on length alone.
+        """
         from orthonym.decomposition.engine import _coverage_is_adequate
-        # "phenyl palmitate" = 16 chars, 24 HA => 0.67 chars/HA
-        # Should fail 0.8 threshold
+        # "phenyl acetate" = 14 chars, 24 HA => 0.58 chars/HA; partial name.
         mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")
-        assert _coverage_is_adequate("phenyl palmitate", mol) is False
+        assert _coverage_is_adequate("phenyl acetate", mol) is False
+        # And the covering name is NOT discarded, at either threshold. This is
+        # the Task Z3 behaviour change stated positively.
+        assert _coverage_is_adequate("phenyl palmitate", mol) is True
 
     @pytest.mark.unit
     def test_each_functional_class_type_uses_low_threshold(self):

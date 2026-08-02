@@ -16,14 +16,25 @@ short enough to trip the `// 2` guard first. It was deleted as dead code.
 These tests exist so that a future change to the `// 2` threshold cannot
 silently resurrect that dead branch's behaviour without someone noticing, and
 so the shadowing itself stays documented in an executable form.
+
+UPDATED BY TASK Z3. Two tests here pinned the guards REJECTING names that were
+each correct for their own molecule -- deliberately, as a record of the defect
+rather than an endorsement of it. Z3 fixed that defect: the character counts
+are unchanged and still match, but a name they would discard is now measured
+against the real oracle and kept when the measurement proves it denotes the
+molecule. Those two tests now assert the fixed behaviour AND, via the rollback
+lever, that turning the oracle off restores the old rejection exactly -- so
+they still pin the character count itself, which is what this file is for.
 """
 import math
 
 import pytest
 from rdkit import Chem
 
+from orthonym.decomposition import engine
 from orthonym.decomposition.engine import (
     _name_covers_molecule,
+    _name_is_proven_complete,
     _name_quality_is_acceptable,
 )
 
@@ -49,19 +60,41 @@ def test_deleted_045_test_was_unreachable_for_every_plausible_size():
         )
 
 
-def test_cholesterol_is_rejected_by_the_short_name_guard():
-    """The rejection is real -- it just does not happen where it was reported.
+def test_cholesterol_survives_the_short_name_guard(monkeypatch):
+    """Task Z3 FIXED the defect this test used to pin.
 
-    A correct retained name for its own molecule is refused because it is 11
-    characters long. This is the defect; pinning it keeps the behaviour visible
-    rather than asserting it is desirable.
+    Z2 asserted ``is False`` here and said so explicitly -- "pinning it keeps
+    the behaviour visible rather than asserting it is desirable". The character
+    count is unchanged and still MATCHES; what changed is that it no longer
+    gets to be the verdict, because the real oracle
+    (``validation/atom_coverage.py``, constitution by InChIKey skeleton)
+    overrules it.
+
+    Both directions are asserted, so the new expectation has teeth: with the
+    rollback lever off, the old rejection comes straight back, which proves the
+    oracle -- and not some unrelated drift -- is what changed the answer.
+
+    SCOPE: ``is True`` here is a claim about COVERAGE, not about preference.
+    The fixture SMILES carries no stereocentres, so ``cholesterol`` denotes it
+    up to constitution, which is the only question this predicate asks.
     """
     mol = Chem.MolFromSmiles(CHOLESTEROL)
     ha = mol.GetNumHeavyAtoms()
     assert ha == 28
 
+    # The character count still fires -- it was not retuned or removed.
     assert len("cholesterol") < ha // 2, "the // 2 guard is what fires"
     assert len("cholesterol") / ha < 0.45, "the deleted guard would also match"
+
+    # Independent of the predicate under test: OPSIN parse-back + InChIKey
+    # skeleton says this name denotes exactly this molecule.
+    assert _name_is_proven_complete("cholesterol", mol) is True
+
+    assert _name_quality_is_acceptable("cholesterol", mol) is True
+
+    # Mutation: revert the fix, and the pre-Z3 rejection returns.
+    monkeypatch.setenv("ORTHONYM_DECOMP_COVERAGE_ORACLE", "0")
+    engine._PROVEN_COMPLETE_CACHE.clear()
     assert _name_quality_is_acceptable("cholesterol", mol) is False
 
 
@@ -89,15 +122,28 @@ def test_name_covers_molecule_accepts_cholesterol():
     assert _name_covers_molecule("cholesterol", mol) is True
 
 
-@pytest.mark.parametrize("name,smiles,expected", [
-    # The one chars/HA guard measured to reject on the naming path, and it
-    # rejects a CORRECT name for being 14 characters long (0.636 < 0.65).
-    ("ethyl stearate", "CCCCCCCCCCCCCCCCCC(=O)OCC", False),
+@pytest.mark.parametrize("name,smiles", [
+    # The one chars/HA guard measured to reject on the naming path. Z2 recorded
+    # it rejecting this name for being 14 characters long (0.636 < 0.65).
+    #
+    # ⚠ `ethyl stearate` is NOT the preferred name: BlueBookV2.md:29791 puts
+    # `(PIN)` on `octadecanoic acid`, making `stearic` the non-PIN alternative.
+    # It is used here ONLY as a constitution witness -- it denotes exactly this
+    # molecule, so a COVERAGE predicate must not call it partial. Do not read
+    # this test as endorsing the name; the PIN question is decided elsewhere.
+    ("ethyl stearate", "CCCCCCCCCCCCCCCCCC(=O)OCC"),
 ])
-def test_d04_rejects_a_correct_name_for_being_short(name, smiles, expected):
+def test_d04_no_longer_rejects_a_covering_name_for_being_short(name, smiles,
+                                                              monkeypatch):
     mol = Chem.MolFromSmiles(smiles)
     ha = mol.GetNumHeavyAtoms()
     assert 15 < ha <= 30, f"D-04 only applies to 15<HA<=30, got {ha}"
     assert len(name) >= ha // 2, "must survive the // 2 guard to reach D-04"
     assert len(name) / ha < 0.65, "and must be under the D-04 threshold"
-    assert _name_quality_is_acceptable(name, mol) is expected
+
+    assert _name_is_proven_complete(name, mol) is True
+    assert _name_quality_is_acceptable(name, mol) is True
+
+    monkeypatch.setenv("ORTHONYM_DECOMP_COVERAGE_ORACLE", "0")
+    engine._PROVEN_COMPLETE_CACHE.clear()
+    assert _name_quality_is_acceptable(name, mol) is False

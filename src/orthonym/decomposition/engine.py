@@ -259,6 +259,89 @@ def _name_has_ring_system_token(name: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# The real coverage oracle (Task Z3)
+# ---------------------------------------------------------------------------
+
+# (name, canonical SMILES) -> "does this name denote exactly this molecule?"
+# The oracle costs an OPSIN parse, so each distinct pair is asked once.
+_PROVEN_COMPLETE_CACHE: Dict[tuple, bool] = {}
+
+# Rollback lever. Set to a false value ('0'/'false'/'no'/'off') to restore the
+# pre-Z3 behaviour EXACTLY -- sound, because the only thing the oracle is ever
+# allowed to do here is turn a character count's REJECT into an ACCEPT.
+_COVERAGE_ORACLE_ENV = "ORTHONYM_DECOMP_COVERAGE_ORACLE"
+
+
+def _name_is_proven_complete(name: str, mol) -> bool:
+    """MEASURED: does *name* denote exactly *mol*'s constitution?
+
+    This is the real oracle -- ``validation/atom_coverage.py``, which parses
+    the name back with OPSIN and compares INCHIKEY SKELETON BLOCKS -- not a
+    character count. It exists because every "coverage" test in this module is
+    really a test of how many CHARACTERS the name has, and a character count is
+    anti-correlated with coverage: the correct ``cholesterol`` scores 0.393
+    chars/HA while ``2-amino-2-(methylamino)acetamide``, a name that INVENTS
+    atoms, scores 5.333.
+
+    THREE PROPERTIES THIS FUNCTION IS RELIED ON FOR -- do not break them:
+
+    1. **It is only ever consulted to RESCUE, never to reject.** Every call
+       site sits on a path where a character count has *already decided to
+       return False*; the oracle can only overturn that to True. So no name
+       that is accepted today can be newly rejected, and the worst case of an
+       oracle failure is the pre-Z3 behaviour. Measured on 77 molecules
+       (48-molecule mixed corpus + the 29-molecule short-name class): the
+       character counts produced 7 distinct rejections and the oracle AGREED
+       with 6 of them. It is not a rubber stamp.
+
+    2. **It answers CONSTITUTION, not PIN-preference.** A True here means "the
+       same atoms, bonded the same way" and nothing more -- OPSIN proves a name
+       VALID, never PREFERRED (the contributor guide). ``ethyl stearate`` is proven
+       complete by this function and is NOT the PIN (``BlueBookV2.md:29791``
+       puts ``(PIN)`` on ``octadecanoic acid``). That is acceptable *here* only
+       because this predicate's question is "should we DECOMPOSE this
+       molecule?", and decomposition cannot fix a non-preferred name -- it
+       re-derives it. Never promote this to a correctness or PIN test.
+
+    3. **It fails CLOSED.** With OPSIN absent, an unparseable name, or any
+       exception, ``is_complete`` is False and no rescue happens, so behaviour
+       is byte-identical to pre-Z3. Cost is bounded the same way: the oracle is
+       reached only on the reject path and memoised per (name, molecule).
+
+    Source of the constitution rule: ``validation/atom_coverage.py`` docstring,
+    "``is_complete`` is therefore decided by CONSTITUTION -- the InChIKey
+    skeleton block of the input compared with that of the parse-back -- and
+    never by a threshold on a count."
+    """
+    if not name or mol is None:
+        return False
+    import os
+    if os.environ.get(_COVERAGE_ORACLE_ENV, "1").strip().lower() in (
+            "0", "false", "no", "off"):
+        return False
+    try:
+        key = (name, Chem.MolToSmiles(mol))
+    except Exception:
+        return False
+    cached = _PROVEN_COMPLETE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    try:
+        from ..validation.atom_coverage import validate_atom_coverage
+        result = validate_atom_coverage(mol, name)
+        # extra_atoms is redundant with constitution_match (identical skeleton
+        # implies identical formula) and is asserted anyway, so that a future
+        # change loosening is_complete cannot silently admit a name that
+        # FABRICATES atoms -- the failure mode atom_coverage.py was rewritten
+        # in 872cb124 to catch.
+        proven = bool(result.is_complete and result.extra_atoms == 0)
+    except Exception:
+        proven = False
+    _PROVEN_COMPLETE_CACHE[key] = proven
+    return proven
+
+
+# ---------------------------------------------------------------------------
 # Name-size coverage heuristic (Phase 099-04)
 # ---------------------------------------------------------------------------
 
@@ -343,6 +426,11 @@ def _name_covers_molecule(name: str, mol) -> bool:
         # "5-chloroquinoline" (0.44) and "(22E)-stigmasta-7,22-diene" (0.42)
         # while accepting legitimate decomposition names.
         if coverage < 0.45:
+            # Task Z3: everything above is a CHARACTER COUNT, so it selects
+            # WHICH names to measure -- it does not get to be the verdict.
+            # The measurement decides.
+            if _name_is_proven_complete(name, mol):
+                return True
             return False
 
         return True
@@ -413,6 +501,16 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # function. Before re-tuning anything below, check whether this line has
     # already returned.
     if heavy_atoms > 15 and len(name) < heavy_atoms // 2:
+        # Task Z3: this character count refuses CORRECT names in bulk. Asked
+        # directly, it rejects `pyrene` (PIN, 16 HA), `coronene` (PIN, 24 HA),
+        # `picene` (PIN, 22 HA) -- Blue Book P-25.1.1 "Retained names for
+        # hydrocarbons used for parent ring components", Table 2.7, each marked
+        # (PIN) -- and the systematic `henicosane`, `docosane`, `hexacosane`,
+        # `icosanoic acid`. A retained or systematic name for a big skeleton is
+        # SHORT by design, which is exactly what this line punishes. So it is
+        # demoted to a pre-filter and the measurement decides.
+        if _name_is_proven_complete(name, mol):
+            return True
         return False
 
     # D-04: chars/HA check for medium molecules (15-30 HA).
@@ -436,6 +534,9 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             try:
                 bonds = find_cleavable_bonds(mol)
                 if bonds:
+                    # Task Z3: measure before discarding (see the X guard above).
+                    if _name_is_proven_complete(name, mol):
+                        return True
                     return False  # Low ratio + cleavable bonds -> try decomposition
             except Exception:
                 return False  # On error, still reject
@@ -468,6 +569,19 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
         has_digits = any(c.isdigit() for c in name)
         has_hyphens = "-" in name
         if not has_digits and not has_hyphens:
+            # Task Z3: "no locants" is a NAME-SHAPE proxy for under-coverage,
+            # and it is wrong for a whole legitimate class -- an unbranched
+            # parent hydride or acid needs no locants at all. MEASURED: this
+            # exact line, and no other, refuses `henicosane` (21 HA),
+            # `icosanoic acid` (22 HA), `docosanedioic acid` (26 HA) and
+            # `octadecanedioyl dichloride` (22 HA), each of which is the
+            # correct systematic name for the molecule it was asked about.
+            # The measurement decides, as at the character-count guards above.
+            # The guard's own stated target -- `benzene` naming a 25-atom
+            # ester -- is untouched, because such a name can never be proven
+            # complete.
+            if _name_is_proven_complete(name, mol):
+                return True
             return False
 
     # Multi-amide under-naming detection (PEP-01)
@@ -622,6 +736,13 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                         # a terse name naming BOTH fails.
                         ratio = len(name) / heavy_atoms if heavy_atoms else 999
                         if ratio < 1.5:
+                            # Task Z3: measure before discarding. This ratio is
+                            # anti-correlated with what it claims to check -- a
+                            # verbose name covering ONE ring passes it, a terse
+                            # name covering BOTH fails -- so it must not be the
+                            # verdict on its own.
+                            if _name_is_proven_complete(name, mol):
+                                return True
                             return False
     except Exception:
         pass  # Guard: never let ring detection crash the quality gate
@@ -782,10 +903,16 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
 def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
     """Check if a decomposed name covers enough of the molecule.
 
-    Uses name length as a proxy for atom coverage: a well-named molecule
-    should have roughly 2+ characters per heavy atom (locants, prefixes,
-    parent name, substituents). Names with less than the expected minimum
-    length are considered inadequate coverage.
+    ⚠ THE LENGTH TEST HERE IS A PRE-FILTER, NOT THE VERDICT (Task Z3). A name
+    that clears the character threshold is accepted on the threshold alone; a
+    name that FAILS it is then MEASURED against the real oracle
+    (``_name_is_proven_complete``) and kept if the measurement proves it
+    denotes the molecule exactly. The character count can therefore no longer
+    discard a name on its own.
+
+    Uses name length as a first-pass proxy for atom coverage: a well-named
+    molecule should have roughly 2+ characters per heavy atom (locants,
+    prefixes, parent name, substituents).
 
     Tiered thresholds (Phase 099):
     - Functional-class types (ester, amide, glycosidic, carbamate, thioester)
@@ -835,7 +962,16 @@ def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
             break
 
     effective_length = len(name) * retained_bonus
-    return effective_length >= expected_min
+    if effective_length >= expected_min:
+        return True
+
+    # Task Z3: the comparison above is a CHARACTER COUNT written WITHOUT a
+    # division -- `len(name) * bonus >= int(heavy_atoms * threshold)` -- which
+    # is why neither a `len(name) /` grep nor a `heavy_atoms //` grep finds it,
+    # and why the Task Z2 audit of this class missed this function entirely
+    # despite its four production call sites. Same treatment as its siblings:
+    # the count selects what to measure, the measurement decides.
+    return _name_is_proven_complete(name, mol)
 
 
 # ---------------------------------------------------------------------------

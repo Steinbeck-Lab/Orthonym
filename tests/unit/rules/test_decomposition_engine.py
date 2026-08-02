@@ -482,9 +482,16 @@ class TestCoverageGate:
         - Ester (functional-class): 15 * 0.6 = 9 chars min
         """
         mol = _mol("CCCCCCCCCCCCCCC")  # pentadecane, 15 heavy atoms
-        # "pentadecane" = 11 chars: passes 0.6 (ester), fails 0.8 (default)
+        # Task Z3: "pentadecane" IS this molecule's correct systematic name, so
+        # asserting it has inadequate coverage was asserting the defect. The
+        # tier is now demonstrated with "decan-1-ol" (10 chars), which has the
+        # same length behaviour -- passes int(15*0.6)=9, fails int(15*0.8)=12 --
+        # but genuinely describes a different, smaller structure.
+        assert _coverage_is_adequate("decan-1-ol", mol, bond_type="ester") is True
+        assert _coverage_is_adequate("decan-1-ol", mol) is False  # 10 < 12
+        # The correct name is not discarded at either threshold.
         assert _coverage_is_adequate("pentadecane", mol, bond_type="ester") is True
-        assert _coverage_is_adequate("pentadecane", mol) is False  # 11 < 12
+        assert _coverage_is_adequate("pentadecane", mol) is True
         # Very short name rejected at both thresholds (5 chars < 9)
         assert _coverage_is_adequate("short", mol) is False
         # A more descriptive name passes even default threshold (27 chars >= 12)
@@ -550,19 +557,38 @@ class TestLeafFirstOrdering:
         _fragment_guard.visited = set()
         _fragment_guard.cache = None
 
-    def test_smaller_fragment_named_first(self):
+    def test_smaller_fragment_named_first(self, monkeypatch):
         """In decomposition, smaller fragments should be named before larger ones.
 
         Uses a large asymmetric ester (methyl hexacosanoate) where the small
         methyl fragment should be named before the large acid fragment,
         populating the cache for potential reuse.
+
+        Task Z3: on the default path the quality gate now proves the pipeline
+        name "methyl hexacosanoate" already denotes this molecule, so
+        try_decompose returns None and the ordering under test is never
+        reached. Measured: decomposition previously returned the IDENTICAL
+        string, and the emitted name is unchanged either way. The coverage
+        oracle is therefore switched off here so the ordering logic is actually
+        exercised; the default-path name is asserted separately below.
         """
+        from orthonym.decomposition import engine
+        monkeypatch.setenv("ORTHONYM_DECOMP_COVERAGE_ORACLE", "0")
+        engine._PROVEN_COMPLETE_CACHE.clear()
+
         # Methyl hexacosanoate: 29 heavy atoms, methyl (1 HA) vs acid (~28 HA)
         mol = _mol("CCCCCCCCCCCCCCCCCCCCCCCCCC(=O)OC")
         result = try_decompose(mol)
         assert result is not None
         assert isinstance(result, str)
         assert len(result) > 5
+
+    def test_large_asymmetric_ester_named_on_the_default_path(self):
+        """Output-level half of the test above: the emitted name is unchanged
+        by skipping a decomposition that only re-derived the same string."""
+        from orthonym import name_compound
+        assert name_compound("CCCCCCCCCCCCCCCCCCCCCCCCCC(=O)OC") == \
+            "methyl hexacosanoate"
 
     def test_ordering_does_not_crash_on_equal_size(self):
         """Two fragments of equal size should not cause sorting issues."""

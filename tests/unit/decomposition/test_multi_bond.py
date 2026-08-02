@@ -80,8 +80,21 @@ class TestPerformanceGuard:
             # NOT because of performance guard
             assert result is None
 
-    def test_performance_guard_allows_single_bond(self):
-        """Single-bond molecules pass the performance guard (existing behavior)."""
+    def test_performance_guard_allows_single_bond(self, monkeypatch):
+        """Single-bond molecules pass the performance guard (existing behavior).
+
+        Task Z3: on the DEFAULT path `try_decompose` now returns None for this
+        molecule, because the quality gate proves the pipeline name
+        ("phenyl palmitate") already denotes it exactly and decomposition is not
+        needed. Measured: decomposition used to run and RE-DERIVE the identical
+        string, and the emitted name is byte-identical either way.
+
+        None is therefore ambiguous on the default path -- "guard blocked" and
+        "gate said no decomposition needed" look the same -- so the performance
+        guard is exercised with the coverage oracle turned off, which is the
+        only thing standing between this call and decomposition. The emitted
+        name on the default path is asserted separately below.
+        """
         # Use a real ester that the decomposition engine can handle
         mol = Chem.MolFromSmiles("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1")
 
@@ -93,12 +106,22 @@ class TestPerformanceGuard:
             "Test molecule should have <= MAX_CLEAVABLE_BONDS bonds"
         )
 
+        from orthonym.decomposition import engine
+        monkeypatch.setenv("ORTHONYM_DECOMP_COVERAGE_ORACLE", "0")
+        engine._PROVEN_COMPLETE_CACHE.clear()
+
         # The molecule should be decomposed (not blocked by performance guard)
         result = try_decompose(mol)
         # phenyl palmitate -- decomposition should produce a name
         assert result is not None, (
             "Single-bond ester should not be blocked by performance guard"
         )
+
+    def test_single_bond_ester_still_named_on_the_default_path(self):
+        """The output-level half of the test above: skipping a decomposition
+        that would only re-derive the same string must not change the name."""
+        from orthonym import name_compound
+        assert name_compound("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1") == "phenyl palmitate"
 
 
 # ---------------------------------------------------------------------------
