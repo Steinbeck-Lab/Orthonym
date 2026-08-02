@@ -1134,6 +1134,56 @@ def _ring_perfect_matchings(n: int, allowed: Set[int], eligible: List[bool]) -> 
     return out
 
 
+def _kekulized_if_aromatic(mol, ring_set) -> Optional['Chem.Mol']:
+    """A copy of ``mol`` with the ring's real double bonds made explicit, or
+    ``None`` if that cannot be done.
+
+    RDKit's ``GetIsAromatic()`` answers "does this ring satisfy RDKit's
+    aromaticity model?".  It does NOT answer "is this ring mancude?", and three
+    separate sites in this module used it as though it did.  The two are
+    different whenever a ring atom contributes a LONE PAIR to the pi system
+    instead of a double bond: two or more pyrrole-type heteroatoms make a ring
+    RDKit-aromatic while it carries FEWER ring double bonds than
+    P-22.2.2.1.1 (``BlueBookV2.md:8222``) demands of an unsaturated
+    Hantzsch-Widman parent -- "Unsaturated compounds are those having the
+    maximum number of noncumulative double bonds (mancude compounds) and at
+    least one double bond."
+
+    Kekulising is what makes the real count readable, and it is a no-op for a
+    ring that was never RDKit-aromatic, so every caller keeps its previous
+    behaviour on non-aromatic input by construction.
+
+    Returns the ORIGINAL object when the ring is not aromatic, so callers can
+    rebind unconditionally.
+    """
+    if not any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
+        return mol
+    kek = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return None
+    if any(kek.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
+        return None
+    return kek
+
+
+def _ring_double_bond_count(mol, ring_set) -> Optional[int]:
+    """Number of DOUBLE bonds inside the ring once it is kekulised, or ``None``
+    if the ring cannot be kekulised.  See :func:`_kekulized_if_aromatic` for
+    why RDKit aromaticity may not be read as unsaturation."""
+    kek = _kekulized_if_aromatic(mol, ring_set)
+    if kek is None:
+        return None
+    n = 0
+    for bond in kek.GetBonds():
+        if bond.GetBondType() != Chem.BondType.DOUBLE:
+            continue
+        if bond.GetBeginAtomIdx() in ring_set and bond.GetEndAtomIdx() in ring_set:
+            n += 1
+    return n
+
+
 def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     """P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle,
     INCLUDING the case where the mancude parent itself needs indicated hydrogen.
@@ -1199,10 +1249,17 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
         if sum(1 for q in ordered
                if mol.GetAtomWithIdx(q).GetSymbol() == sym) > 1:
             return None
-    # RDKit-aromatic rings carry no DOUBLE ring bonds, so the saturation census
-    # below would be meaningless -> leave them to the mancude namers.
-    if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
-        return None
+    # An RDKit-aromatic ring carries no DOUBLE ring bonds, so the saturation
+    # census below cannot read it as written -- this used to ``return None``
+    # for every such ring, "leaving them to the mancude namers".  That is only
+    # sound if RDKit-aromatic implies mancude, and it does not: see
+    # :func:`_kekulized_if_aromatic`.  Kekulise instead, so the census reads
+    # the ring's REAL double bonds; a ring that is genuinely mancude then
+    # leaves a few lines below on ``d == max_match`` exactly as before, and a
+    # non-aromatic ring is untouched because the helper returns ``mol`` itself.
+    mol = _kekulized_if_aromatic(mol, ring_set)
+    if mol is None:
+        return None  # cannot read the ring's double bonds -> fail closed
     # An exocyclic double bond makes its ring atom neither unsaturated-in-ring
     # nor a hydro position (it is a ketone / methylidene carbon, P-14.7.2
     # 'added indicated hydrogen' territory) -> fail closed.
@@ -1568,12 +1625,30 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
     if not mol_unsat:
         # Fully saturated -> retained / HW saturated stem handles it.
         return None
-    # A fully-aromatic (mancude) ring has NO hydro positions. Bail now: the
-    # mancude parent of an aromatic ring is itself, so naming it (below) would
-    # re-enter name_heterocycle -> here -> infinite recursion for an aromatic
-    # ring that lacks a retained name (e.g. a HW-named azine).
+    # "A fully-aromatic ring is mancude, so it has NO hydro positions" was the
+    # premise here, and it is FALSE -- see :func:`_kekulized_if_aromatic`.
+    # Two or more pyrrole-type heteroatoms donate lone pairs instead of double
+    # bonds, so ``c1c[nH][nH]1``, ``c1cc[nH]cc[nH]c1`` and ``c1ccc[nH][nH]cc1``
+    # are all RDKit-aromatic while carrying one ring double bond FEWER than
+    # their mancude parent.  Returning None here dropped them through to the
+    # plain Hantzsch-Widman path, which named each as that parent --
+    # 1,2-diazete / 1,4-diazocine / 1,2-diazocine -- a DIFFERENT MOLECULE by
+    # P-22.2.2.1.1 (``BlueBookV2.md:8222``).  P-54.4.1 "Hantzsch-Widman
+    # heteromonocycles" (``:24169``) gives the correct form at ``:24171``:
+    # "'Hydro' prefixes added to names of fully unsaturated Hantzsch-Widman
+    # rings lead to preferred IUPAC names for partially unsaturated rings."
+    # Measured over 397,371 enumerated bare heteromonocycles: 133 rings, of
+    # sizes 4/7/8, every one of them RDKit-aromatic.
+    #
+    # Hand it to the matching-based namer, NOT to _aromatizable_hydro_name --
+    # that is what keeps the infinite recursion this bail used to guard
+    # impossible.  _mancude_hydro_name builds its stem with build_hw_name and
+    # never calls name_heterocycle, whereas _aromatizable_hydro_name does, and
+    # the "mancude parent" of an aromatic ring can be the ring itself.
+    # _mancude_hydro_name returns None unless ``1 <= d < max_match``, so a
+    # genuinely mancude aromatic ring still declines here exactly as before.
     if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
-        return None
+        return _mancude_hydro_name(mol, ring_set)
 
     # (1) the RDKit-aromatizable mancude parent (pyridine, 1H-pyrrole, ...).
     named = _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat)
@@ -1880,11 +1955,48 @@ def name_heterocycle(mol, ring_atoms) -> Optional[str]:
             bare_ring=(mol.GetNumHeavyAtoms() == ring_size),
         )
 
+    # The degree of hydrogenation the STEM is about to assert, checked against
+    # the structure.  P-22.2.2.1.1 (``BlueBookV2.md:8222``) defines what an
+    # unsaturated Hantzsch-Widman stem means -- "Unsaturated compounds are
+    # those having the maximum number of noncumulative double bonds (mancude
+    # compounds) and at least one double bond" -- so spelling one for a ring
+    # that holds fewer than the mancude maximum names a different molecule.
+    # Both flags reaching here are derived from RDKit aromaticity, which is not
+    # the same question (:func:`_kekulized_if_aromatic`), so re-derive from the
+    # kekulised ring.
+    _d = _ring_double_bond_count(mol, set(oriented))
+    if _d is not None:
+        _max_match, _ = _mancude_max_matching(mol, oriented)
+        if _d == 0 and not info['is_saturated']:
+            # Fully saturated, but RDKit called the ring aromatic -- which it
+            # does for the all-heteroatom three-membered rings (``N1NN1`` came
+            # back as 'triazirine', the UNSATURATED stem, for triaziridine).
+            # P-31.2.3.2 (``:16928``): "Preferred IUPAC names of saturated
+            # heteromonocyclic compounds are either Hantzsch-Widman names
+            # described in P-22.2.2.1.1 or retained names described in Table
+            # 2.3."  56 such rings in the enumeration, every one of size 3:
+            # 16 where a mancude double bond is possible at all, so the old
+            # unsaturated stem denoted a DIFFERENT molecule (OPSIN decodes
+            # 'triazirine' to N1=NN1, not to triaziridine); and 40 all-divalent
+            # rings where none is, so the old '2H-...irene' spelling happened
+            # to decode to the right structure and the correction is one of
+            # spelling only -- invisible to OPSIN and to an InChIKey.
+            # Corrected on ``info`` itself so that the indicated-hydrogen step
+            # below reads the same verdict the stem does.
+            info = {**info, 'is_saturated': True, 'is_aromatic': False}
+        elif 1 <= _d < _max_match:
+            # A hydro form that :func:`name_partially_saturated_monocyclic_heterocycle`
+            # declined to name.  It must NOT fall through to the mancude stem:
+            # that is precisely how 1,2-diazete / 1,4-diazocine / 1,2-diazocine
+            # were emitted for their dihydro molecules.  Fail closed -- an
+            # abstention is recoverable, a wrong molecule is not.
+            return None
+
     hw_name = build_hw_name(
         heteroatom_locants,
         ring_size,
         info['is_saturated'],
-        info['is_aromatic']
+        info['is_aromatic'],
     )
     if hw_name is None:
         # A ring heteroatom has no Table 2.4 prefix -> refuse. Returning early
