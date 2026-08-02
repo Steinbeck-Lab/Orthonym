@@ -102,3 +102,47 @@ def test_von_baeyer_heteroatom_locants_are_the_lowest_set():
 ])
 def test_unsubstituted_cage_descriptors_unchanged(namer, smiles, expected):
     assert namer.name(smiles) == expected
+
+
+# --------------------------------------------------------------------------
+# The orientation pass is descriptor-preserving BY CONSTRUCTION.
+#
+# It ranks alternative numberings, and a candidate whose descriptor differs is a
+# different RING ANALYSIS -- that was settled by P-23.2.1 - P-23.2.6, not by
+# P-23.3.2/P-14.4 -- so it is rejected rather than ranked. Measured: with the
+# rejection removed, 185 of 398 cage descriptors in the corpus MOVE (mostly
+# steroid tetracycles, e.g. tetracyclo[8.7.0.0^4,9.0^13,17] ->
+# tetracyclo[8.7.0.0^2,7.0^11,15]). Whether those alternatives are themselves
+# preferable under P-23.2.6.2.4 is a separate, pre-existing question about main
+# ring selection; this locant pass must not decide it silently.
+# --------------------------------------------------------------------------
+
+DESCRIPTOR_STABLE = [
+    "CC1CC2C3CCC4=CC(=O)C=CC4(C3(C(CC2(C1(C(=O)COP(=O)(O)O)O)C)O)F)C",
+    "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@@]4([C@]3([C@H](C[C@@]2("
+    "[C@]1(C(=O)COC(=O)C)OC(=O)C(C)C)C)O)F)C",
+    "C[C@H](CCCC(C)C)[C@H]1CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CC[C@@H]4[C@@]3"
+    "(C(CC4=O)C(=O)OC)C)C",
+    "CC12CCC3C(C1CCC2O)CCC4=CC(=NN(C)C)CCC34C",
+]
+
+
+@pytest.mark.parametrize("smiles", DESCRIPTOR_STABLE)
+def test_orientation_pass_never_changes_the_descriptor(smiles):
+    from orthonym.rules.polycyclic import VonBaeyerAnalyzer
+
+    mol = Chem.MolFromSmiles(smiles)
+    ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
+    analyzer = VonBaeyerAnalyzer()
+
+    incumbent = analyzer._analyze_impl(mol, ring_atoms)
+    chosen = analyzer.analyze(mol, ring_atoms)
+
+    assert chosen.descriptor_string == incumbent.descriptor_string, (
+        f"the locant pass moved the descriptor: "
+        f"{incumbent.descriptor_string} -> {chosen.descriptor_string}"
+    )
+    # And it must still be a complete, one-locant-per-atom numbering.
+    locants = [chosen.numbering.get(i) for i in ring_atoms]
+    assert all(l is not None for l in locants)
+    assert len(set(locants)) == len(ring_atoms)
