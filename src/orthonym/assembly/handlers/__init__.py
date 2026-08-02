@@ -59,6 +59,7 @@ from .isothiocyanate import name_isothiocyanate  # commit 02-05
 from .carbamic_acid import name_carbamic_acid  # commit 02-06
 from .carbamate import name_carbamate  # commit 02-07
 from .urea import name_urea  # commit 02-08
+from .thiourea import name_thiourea  # R3 (P-66.1.6.1.3)
 from .guanidine import name_guanidine  # commit 02-09
 from .cyanamide import name_cyanamide  # AM-1
 from .boronic_acid import name_boronic_acid  # commit 02-10
@@ -101,6 +102,7 @@ __all__ = [
     "name_carbamic_acid",  # 02-06
     "name_carbamate",  # 02-07
     "name_urea",  # 02-08
+    "name_thiourea",  # R3 (P-66.1.6.1.3)
     "name_guanidine",  # 02-09
     "name_cyanamide",  # AM-1
     "name_boronic_acid",  # 02-10

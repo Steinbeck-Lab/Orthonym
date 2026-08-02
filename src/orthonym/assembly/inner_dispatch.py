@@ -569,6 +569,24 @@ _register_inner(
     side_effect_inventory=(),
 )
 
+# --- R3: chalcogen analogues of urea (P-66.1.6.1.3; retained parent
+#     thiourea / selenourea / tellurourea with N,N' letter locants).
+#     Priority 810 sits immediately after urea (800): the two predicates are
+#     mutually exclusive (different FG keys, and the perception collision
+#     resolver gives each unit to exactly one of them), so the order between
+#     them is not load-bearing — it keeps the chalcogen-urea rows adjacent.
+from .handlers.thiourea import _is_thiourea, name_thiourea  # noqa: E402
+
+_register_inner(
+    handler_id="thiourea",
+    priority=810,
+    predicate=_is_thiourea,
+    handler=name_thiourea,
+    iupac_section="P-66.1.6.1.3",
+    description="Chalcogen-urea retained name with N,N' substitution",
+    side_effect_inventory=(),
+)
+
 # --- Plan-02 commit 02-09: guanidine (Tier-1 LIFT; audit § 1 row + § 2.10).
 from .handlers.guanidine import _is_guanidine, name_guanidine  # noqa: E402
 

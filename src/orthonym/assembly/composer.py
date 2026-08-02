@@ -1741,6 +1741,24 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
                     pass
                 return None
 
+    # R3: the aromatic branch above already bypasses the carbon-count path
+    # because it "would miscount aromatic ring carbons as a linear chain
+    # (e.g. 'hexyl')". A SATURATED ring was never given the same guard, so a
+    # tert-butyldiazenyl-cyclohexyl branch (6 ring + 4 chain carbons) was
+    # spelled 'decyl' — the ring opened into a straight chain, a different
+    # molecule. get_alkyl_name() describes an ACYCLIC chain, so no fragment
+    # containing a ring atom may reach it; route those to the same substituent
+    # chokepoint the aromatic case uses.
+    if any(mol.GetAtomWithIdx(i).IsInRing() for i in frag_atoms):
+        try:
+            from .substituent_enumerator import name_substituent as _ns_ring
+            prefix = _ns_ring(mol, set(frag_atoms), start_idx)
+            if prefix and prefix != "substituent":
+                return prefix
+        except Exception:
+            pass
+        return None
+
     # Count carbons and check branching for alkyl name
     carbon_atoms = [i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C']
     carbon_count = len(carbon_atoms)
@@ -2370,6 +2388,107 @@ def _try_name_urea(features: Any) -> Optional[str]:
     return _build_n_substituted_name(tagged_subs, "urea")
 
 
+# R3: retained parent for the chalcogen analogues of urea.
+# P-66.1.6.1.3.1 ("P-66.1.6.1.3 Chalcogen analogues of urea and isourea",
+# BlueBookV2.md :33437 / :33439): "Chalcogen analogues of urea are named by
+# functional replacement nomenclature using the prefixes 'thio', 'seleno', and
+# 'telluro'."  `thiourea (PIN)` :33444; `N-(butan-2-yl)selenourea (PIN)` :33451.
+_CHALCOGEN_UREA_STEMS = {"S": "thiourea", "Se": "selenourea", "Te": "tellurourea"}
+
+
+def _try_name_thiourea(features: Any) -> Optional[str]:
+    """Name a chalcogen analogue of urea on its RETAINED PARENT (P-66.1.6.1.3).
+
+    Residue R3. ``CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C`` was named on the
+    cyclohexane ring, with the single thiourea unit spelled twice and the
+    ring->N bond rendered ring->C. The parent is the thiourea:
+
+      * **P-66.1.6.1.1.2** (:33320) ranks urea *"as an amide of carbonic acid"*,
+        and P-66.1.6.1.3.1 makes thiourea its retained chalcogen analogue;
+      * **P-41 Table 4.1** puts amides at class **11** (:18184), diazenes at
+        class **21** (:18197) and carbon rings/chains at class **40** (:18216);
+      * **P-44.1.1** (:18875) selects the parent by that class order;
+      * the "a ring outranks a chain" licence cannot promote the cyclohexane —
+        **P-52.2.8** (:24096) gates it on *"Within the same heteroatom class"*,
+        and a class-40 ring is not in the amide class.
+
+    Locants are the italic letters *N* / *N*′, never numerals —
+    **P-66.1.6.1.3.1** (:33439) *"Preferred IUPAC names use the letter locants
+    N, and N′. Numerical locants may be used for thiourea in general
+    nomenclature."*, restated at :33446 *"Numerical locants are no longer used
+    for thiourea in the IUPAC preferred name."* and at :1717. The unprimed *N*
+    goes to the substituent cited first in alphanumerical order (P-15.3.2.4.3
+    :6273; :32809 *"when there is a choice, lowest locants are assigned to the
+    first cited N-substituent"*).
+
+    Fail-closed: more than one chalcogen-urea unit, an unrecognised chalcogen,
+    or ANY N-substituent this tree cannot name -> None. The urea sibling
+    silently SKIPS an unnameable substituent, which drops atoms; this one
+    refuses, so the caller falls through rather than emitting a short molecule.
+    """
+    mol = features.mol
+    matches = features.functional_groups.get('thiourea', [])
+    # Exactly one unit: two chalcogen-urea units need multiplicative /
+    # condensed-urea machinery (P-66.1.6.2) that does not exist here.
+    if len(matches) != 1:
+        return None
+    match = matches[0]
+    if len(match) < 4:
+        return None
+
+    n_idxs = [i for i in match if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+    x_idxs = [i for i in match
+              if mol.GetAtomWithIdx(i).GetSymbol() in _CHALCOGEN_UREA_STEMS]
+    c_idxs = [i for i in match if mol.GetAtomWithIdx(i).GetSymbol() == 'C']
+    if len(n_idxs) != 2 or len(x_idxs) != 1 or len(c_idxs) != 1:
+        return None
+    n1_idx, n2_idx = n_idxs
+    c_idx = c_idxs[0]
+    stem = _CHALCOGEN_UREA_STEMS[mol.GetAtomWithIdx(x_idxs[0]).GetSymbol()]
+    core = {n1_idx, n2_idx, c_idx, x_idxs[0]}
+
+    def _subs_on(n_idx):
+        """Named substituents on this N, or None if any is un-nameable."""
+        out = []
+        for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx == c_idx or nbr.GetAtomicNum() <= 1:
+                continue
+            sub_name = _name_r_group(mol, nidx, exclude_atoms=core)
+            if not sub_name:
+                return None          # never drop a substituent — fail closed
+            out.append(sub_name)
+        return out
+
+    n1_subs = _subs_on(n1_idx)
+    n2_subs = _subs_on(n2_idx)
+    if n1_subs is None or n2_subs is None:
+        return None
+
+    if not n1_subs and not n2_subs:
+        return stem                                   # thiourea / selenourea
+
+    if n1_subs and not n2_subs:
+        first_subs, second_subs = n1_subs, n2_subs
+    elif n2_subs and not n1_subs:
+        first_subs, second_subs = n2_subs, n1_subs
+    else:
+        # Both substituted. The N bearing MORE substituents takes the unprimed
+        # locant ({N,N,N'} < {N,N',N'} per P-14.3.5); on an equal count the
+        # alphanumerically-first substituent set takes it (P-15.3.2.4.3 :6273).
+        # Keying on alpha_sort_key (not the raw string) also makes this
+        # independent of SMILES atom order.
+        key1 = (-len(n1_subs), sorted(alpha_sort_key(s) for s in n1_subs))
+        key2 = (-len(n2_subs), sorted(alpha_sort_key(s) for s in n2_subs))
+        first_subs, second_subs = (
+            (n1_subs, n2_subs) if key1 <= key2 else (n2_subs, n1_subs)
+        )
+
+    tagged_subs = [("N", s) for s in first_subs]
+    tagged_subs += [("N'", s) for s in second_subs]
+    return _build_n_substituted_name(tagged_subs, stem, sort_key=alpha_sort_key)
+
+
 def _try_name_cyanamide(features: Any) -> Optional[str]:
     """AM-1 (P-66.1.6.2): name a cyanamide (H2N-C#N) and its N-substituted
     derivatives with 'cyanamide' as the retained parent — no N-locants
@@ -2533,12 +2652,20 @@ def _try_name_guanidine(features: Any) -> Optional[str]:
     return _build_n_substituted_name(tagged_subs, "guanidine")
 
 
-def _build_n_substituted_name(tagged_subs: list, base_name: str) -> str:
+def _build_n_substituted_name(
+    tagged_subs: list, base_name: str, sort_key=None
+) -> str:
     """Build a name like 'N-methyl{base}' or 'N,N'-dimethyl{base}' from tagged substituents.
 
     Args:
         tagged_subs: list of (locant, sub_name) pairs, e.g. [("N", "methyl"), ("N'", "ethyl")]
         base_name: The retained name, e.g. "urea" or "guanidine"
+        sort_key: optional key for the P-14.5 alphanumerical ordering of the
+            prefixes. Defaults to None = the RAW string sort this function has
+            always used, so the urea/guanidine callers stay byte-identical.
+            The chalcogen-urea caller passes ``alpha_sort_key``, which is the
+            P-14.5 key (``:3446`` excludes italicised ``tert-``/``sec-`` from
+            the primary key, so ``tert-butyl`` sorts under ``butyl``).
 
     Returns:
         Complete name with N-substitution prefix.
@@ -2562,7 +2689,8 @@ def _build_n_substituted_name(tagged_subs: list, base_name: str) -> str:
     # Build prefix parts, sorted alphabetically by substituent name
     from .naming_utils import needs_brackets, apply_enclosing_marks
     prefix_parts = []
-    for name in sorted(sub_locants.keys()):
+    for name in sorted(sub_locants.keys(), key=sort_key) if sort_key \
+            else sorted(sub_locants.keys()):
         locants = sub_locants[name]
         count = len(locants)
         locant_str = ",".join(locants)

@@ -271,8 +271,21 @@ FUNCTIONAL_GROUP_SMARTS = {
     # === THIOUREA (Wave-2 completion, P-66.1.6.1.3.3): thio-analogue of urea,
     # N-C(=S)-N. Prefix form 'carbamothioylamino' (mirror of urea's
     # carbamoylamino). More specific than thioamide (which requires a C
-    # neighbour) and primary_amine — suppresses those on its atoms below. ===
-    "thiourea": "[NX3][CX3](=[SX1])[NX3]",
+    # neighbour) and primary_amine — suppresses those on its atoms below.
+    #
+    # R3: broadened from [SX1] to the whole chalcogen set. P-66.1.6.1.3.1
+    # ("P-66.1.6.1.3 Chalcogen analogues of urea and isourea", BlueBookV2.md
+    # :33439): "Chalcogen analogues of urea are named by functional replacement
+    # nomenclature using the prefixes 'thio', 'seleno', and 'telluro'." The
+    # section's own worked example is a Se compound — ':33451'
+    # "N-(butan-2-yl)selenourea (PIN)". Before the broadening the Se/Te
+    # analogues were not perceived at all, so the collision resolver below never
+    # suppressed the terminal-amine read and NC(=[Se])N was named 'methanamine'
+    # — a SILENT CHALCOGEN DROP (gate-suppressed in production, but fabricated).
+    # The FG name stays 'thiourea'; consumers select the stem from the actual
+    # chalcogen (see composer._try_name_thiourea) and the PREFIX path fails
+    # closed for Se/Te, whose prefixes P-66.1.6.1.3.3 does not enumerate.
+    "thiourea": "[NX3][CX3](=[S,Se,Te;X1])[NX3]",
 
     # === GUANIDINE (must check before imines -- N-C(=N)-N is more specific) ===
     "guanidine": "[NX3][CX3](=[NX2])[NX3]",

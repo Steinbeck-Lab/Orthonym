@@ -1046,6 +1046,19 @@ def _name_alkyl_branch_from_atom(
 
     Heteroatom-bearing alkyl fragments return None (the caller falls through
     to a different prefix form).
+
+    ⚠ **A carbon COUNT only names an UNBRANCHED ACYCLIC chain.**
+    ``get_alkyl_name(n)`` spells the straight-chain stem, so handing it the
+    count of a branched or cyclic fragment renames the molecule:
+    ``-C(CH3)3`` (4 carbons) came back ``"butyl"`` and phenyl (6) came back
+    ``"hexyl"`` — different constitutions, found while building the R3
+    thiourea prefix (this is the count-anti-pattern class of
+    ``). The count
+    path is now gated on the fragment actually BEING an unbranched acyclic
+    chain attached at one of its termini — a walk over the real bonds, not a
+    tally — and everything else is routed to the substituent chokepoint that
+    already produces located PINs (``tert-butyl``, ``phenyl``,
+    ``propan-2-yl``). Un-nameable there -> None (fail closed).
     """
     # Reject heteroatom-bearing alkyl side per IUPAC P-66.6.1 substituent
     # naming (analog to get_alkoxycarbonyl_prefix Guard 3).
@@ -1064,15 +1077,46 @@ def _name_alkyl_branch_from_atom(
             if nbr_idx not in visited and nbr_idx not in exclude:
                 queue.append(nbr_idx)
 
-    carbon_count = _count_fragment_atoms(
-        mol, alkyl_atom, exclude, carbons_only=True
-    )
-    if carbon_count == 0:
-        return None
+    # Structure proof that the count is a faithful description: every fragment
+    # carbon must be acyclic, and the fragment must be a simple path whose end
+    # is the attachment atom. Walk the actual bonds inside the fragment.
+    def _is_unbranched_acyclic_chain() -> bool:
+        for i in visited:
+            a = mol.GetAtomWithIdx(i)
+            if a.IsInRing():
+                return False
+            degree_in_frag = sum(
+                1 for nbr in a.GetNeighbors() if nbr.GetIdx() in visited
+            )
+            # interior atoms have 2 neighbours in-fragment, termini have 1
+            if degree_in_frag > 2:
+                return False
+        attach = mol.GetAtomWithIdx(alkyl_atom)
+        attach_degree = sum(
+            1 for nbr in attach.GetNeighbors() if nbr.GetIdx() in visited
+        )
+        return attach_degree <= 1
+
+    if _is_unbranched_acyclic_chain():
+        carbon_count = _count_fragment_atoms(
+            mol, alkyl_atom, exclude, carbons_only=True
+        )
+        if carbon_count == 0:
+            return None
+        try:
+            return get_alkyl_name(carbon_count)
+        except (ValueError, KeyError):
+            return None
+
+    # Branched or cyclic: name it properly instead of counting it.
     try:
-        return get_alkyl_name(carbon_count)
-    except (ValueError, KeyError):
+        from .substituent_enumerator import name_substituent as _ns
+        prefix = _ns(mol, set(visited), alkyl_atom)
+    except Exception:
         return None
+    if prefix and prefix != "substituent":
+        return prefix
+    return None
 
 
 def get_n_alkyl_carbamoyl_prefix(
@@ -1279,7 +1323,7 @@ def _urea_distal_n(mol, urea_atoms, principal_chain) -> Optional[int]:
 
 
 def _carbamoyl_with_distal_substituents(
-    mol, distal_n: int, urea_set: Set[int]
+    mol, distal_n: int, urea_set: Set[int], stem: str = "carbamoyl"
 ) -> Optional[str]:
     """Name the distal-N substituents into the carbamoyl acyl (P-66.1.6.1.1.3).
 
@@ -1288,6 +1332,13 @@ def _carbamoyl_with_distal_substituents(
     to ``carbamoyl`` (``methylcarbamoyl`` / ``dimethylcarbamoyl``; the enclosed
     carbamoyl form drops N-locants per BB 33354). Any un-nameable substituent
     -> None (fail closed).
+
+    ``stem`` selects the acyl: ``"carbamoyl"`` for urea (P-66.1.6.1.1.3) or
+    ``"carbamothioyl"`` for thiourea (P-66.1.6.1.3.3 :33489 lists the
+    unsubstituted ``carbamothioylamino``; ``carbamothioyl`` itself is a
+    retained preferred prefix per P-65.2.1.5 :30869 and P-66.1.4.4 :33198,
+    *"carbamothioyl (not thiocarbamoyl) for -CS-NH2"*). Defaulted so the urea
+    caller is byte-identical.
     """
     from collections import Counter
     from .naming_utils import get_multiplier_prefix
@@ -1295,7 +1346,7 @@ def _carbamoyl_with_distal_substituents(
     ext = [nbr.GetIdx() for nbr in mol.GetAtomWithIdx(distal_n).GetNeighbors()
            if nbr.GetIdx() not in urea_set and nbr.GetAtomicNum() > 1]
     if not ext:
-        return "carbamoyl"
+        return stem
     names: List[str] = []
     for x in ext:
         excl = urea_set | {distal_n} | (set(ext) - {x})
@@ -1308,7 +1359,7 @@ def _carbamoyl_with_distal_substituents(
     for base in sorted(counts, key=alpha_sort_key):
         c = counts[base]
         parts.append(base if c == 1 else f"{get_multiplier_prefix(c, base)}{base}")
-    return "".join(parts) + "carbamoyl"
+    return "".join(parts) + stem
 
 
 def get_n_substituted_carbamoylamino_prefix(
@@ -1337,6 +1388,78 @@ def get_n_substituted_carbamoylamino_prefix(
         return None
     if core == "carbamoyl":
         return "carbamoylamino"
+    return f"({core})amino"
+
+
+def _chalcogen_of_thiourea_match(mol, atoms: tuple) -> Optional[str]:
+    """The chalcogen element symbol of an N-C(=X)-N match, or None."""
+    for i in atoms:
+        sym = mol.GetAtomWithIdx(i).GetSymbol()
+        if sym in ("S", "Se", "Te"):
+            return sym
+    return None
+
+
+def get_n_substituted_carbamothioylamino_prefix(
+    mol, atoms: tuple, principal_chain: Optional[List[int]] = None
+) -> Optional[str]:
+    """P-66.1.6.1.3.3: ``-NH-CS-NR2`` substituent -> ``(carbamothioyl…)amino``.
+
+    Residue R3 root cause. This row used to be the STATIC lookup
+    ``PREFIX_FORMS['thiourea']`` -> ``"carbamothioylamino"``, returned
+    unconditionally and ignoring ``atoms`` entirely. ``carbamothioylamino`` is
+    the MONOVALENT group ``H2N-CS-NH-`` (P-66.1.6.1.3.3, BlueBookV2.md :33489).
+    When the 4-atom core bridges two parts of the molecule — both nitrogens
+    substituted — the static string named a two-attachment bridge with a
+    one-attachment prefix: everything past the distal nitrogen was orphaned and
+    re-attached elsewhere, and the core was consumed a second time from the
+    other direction. Measured on ``CC(C)(C)NC(=S)NC1CCCCC1``: 31 calls, 31
+    ``carbamothioylamino`` returns, output
+    ``1-(2-(carbamothioylamino)-2-carbamothioylamino-2-methylpropyl)cyclohexane``
+    — one thiourea unit spelled twice, and a ring->N bond rendered ring->C.
+
+    This is now the exact mirror of the oxo sibling
+    ``get_n_substituted_carbamoylamino_prefix`` (P-66.1.6.1.1.3), which never
+    had the defect because it resolves the distal nitrogen structurally and
+    returns None when the orientation is ambiguous — measured 12/12 None on the
+    urea analogue of the same molecule, which then correctly re-parents onto
+    urea.
+
+      * unsubstituted distal N -> ``"carbamothioylamino"``
+        (the enumerated preferred prefix, :33489; BB example :33501
+        ``3-(carbamothioylamino)propanoic acid (PIN)``);
+      * substituted distal N -> ``"(methylcarbamothioyl)amino"`` /
+        ``"(dimethylcarbamothioyl)amino"``. P-66.1.6.1.3.3 enumerates NO
+        substituted-distal-N row — the form is derived across the
+        P-66.1.6.1.3.1 chalcogen-replacement relationship (:33439) from the oxo
+        `(PIN)` example ``2-[(methylcarbamoyl)amino]naphthalene-1-carboxylic
+        acid`` (:33354);
+      * both nitrogens substituted / ambiguous orientation -> None. The caller
+        falls through and the molecule re-parents onto the retained thiourea
+        (P-44.1.1 :18875 over P-41 Table 4.1: amides class 11 :18184 outrank
+        carbon rings class 40 :18216).
+
+    Se/Te analogues return None. P-66.1.6.1.3.3 enumerates only the sulfur
+    prefix, and no ``carbamoselenoyl``/``carbamotelluroyl`` spelling appears
+    anywhere in the Blue Book, so inventing one would risk a wrong name; the
+    Se/Te RETAINED PARENT is built instead (P-66.1.6.1.3.1 :33451
+    ``N-(butan-2-yl)selenourea (PIN)``).
+    """
+    if not atoms:
+        return None
+    if _chalcogen_of_thiourea_match(mol, atoms) != "S":
+        return None
+    core_set = set(atoms)
+    distal_n = _urea_distal_n(mol, atoms, principal_chain)
+    if distal_n is None:
+        return None
+    core = _carbamoyl_with_distal_substituents(
+        mol, distal_n, core_set, stem="carbamothioyl"
+    )
+    if core is None:
+        return None
+    if core == "carbamothioyl":
+        return "carbamothioylamino"
     return f"({core})amino"
 
 
@@ -1540,7 +1663,12 @@ def get_substituent_prefix_form(
         # -NH-CO-NMe2 -> (dimethylcarbamoyl)amino. Un-nameable/ambiguous -> None.
         return get_n_substituted_carbamoylamino_prefix(mol, atoms, principal_chain)
     if fg_name == "thiourea":
-        return PREFIX_FORMS.get("thiourea")  # "carbamothioylamino" (P-66.1.6.1.3.3)
+        # R3: was a STATIC, unparametrised PREFIX_FORMS lookup that ignored
+        # `atoms` and so named a BRIDGING N-CS-N core with the monovalent
+        # prefix. Now the exact mirror of the `urea` row two lines up.
+        return get_n_substituted_carbamothioylamino_prefix(
+            mol, atoms, principal_chain
+        )
     if fg_name == "isocyanate":
         return PREFIX_FORMS.get("isocyanate")  # "isocyanato"
     if fg_name == "isothiocyanate":
