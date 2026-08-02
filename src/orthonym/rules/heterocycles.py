@@ -457,12 +457,121 @@ def _get_other_heteroatom_locants(
 # ---------------------------------------------------------------------------
 
 
+# Group 15 ring heteroatoms are the only ones that carry an indicated hydrogen
+# a substituent can displace while the atom stays NEUTRAL.  An aromatic ring O,
+# S or Se with an exocyclic bond is an onium centre (charged), and is excluded
+# by the formal-charge test in ``_ring_smiles_with_indicated_h_restored``
+# anyway; naming it here states the chemistry rather than relying on that.
+_INDICATED_H_ELEMENTS = frozenset({7, 15, 33, 51, 83})  # N, P, As, Sb, Bi
+
+
+def _ring_is_ortho_fused(mol, ring_atoms) -> bool:
+    """True when a bond of this ring is shared with another ring.
+
+    An ortho-fused ring is not a ring system of its own: indole contains a
+    pyrrole ring and benzofuran a furan ring, yet each is its own retained
+    name.  Anything that reconstructs a ring's parent hydride must stop at a
+    fusion bond or it starts naming indole as a substituted pyrrole.
+    """
+    ring_set = set(ring_atoms)
+    ring_info = mol.GetRingInfo()
+    for idx in ring_atoms:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() not in ring_set:
+                continue
+            bond = mol.GetBondBetweenAtoms(idx, nb.GetIdx())
+            if bond is not None and ring_info.NumBondRings(bond.GetIdx()) > 1:
+                return True
+    return False
+
+
+def _ring_smiles_with_indicated_h_restored(mol, ring_atoms) -> Optional[str]:
+    """Rebuild the ring key after a substituent displaced its indicated hydrogen.
+
+    P-14.7.1 "Indicated hydrogen" (``BlueBookV2.md:3721``) -- a mancude azole
+    carries one saturated ring position, the ``1H``.  When a substituent sits
+    there instead of the hydrogen, the ring atom's H count is zero, and the
+    plain fragment extraction writes a bare aromatic ``n``: ``Cn1cccc1`` gives
+    ``c1ccnc1``, which is not a kekulisable molecule at all.  The parent hydride
+    the retained-name table is keyed on still has the hydrogen, so it is put
+    back before the fragment is written.
+
+    P-15.1.8.1 "Substitution rules for Type 1 retained names" (``:4916``),
+    sentence ``:4918``: "Type 1 retained names of parent hydrides described in
+    Chapters P-2 and P-3 have unlimited substitution by substituent groups cited
+    either as suffixes or prefixes."  Substitution never demotes the retained
+    name, so the key must survive it.  The Blue Book prints such a PIN outright
+    under P-44.1 (``:18871``) at ``:18940``:
+    ``1-(trimethylsilyl)-1H-imidazole (PIN)``.
+
+    Returns ``None`` -- and the caller then keeps its existing result byte for
+    byte -- unless every one of these can be shown:
+
+    * the ring is not ortho-fused (see ``_ring_is_ortho_fused``);
+    * the atom is an aromatic, NEUTRAL group-15 ring atom with **no** hydrogen;
+    * it has exactly **one** exocyclic neighbour, joined by a **single** bond --
+      i.e. exactly one hydrogen's worth of valence was taken from it;
+    * the rebuilt fragment parses.
+
+    This is a reconstruction of the parent hydride, not a repair of a name: no
+    string produced here is ever edited, and nothing about the ring's size or
+    heteroatom count is consulted.
+    """
+    if _ring_is_ortho_fused(mol, ring_atoms):
+        return None
+
+    ring_set = set(ring_atoms)
+    work = Chem.Mol(mol)
+    restored = 0
+    for idx in ring_atoms:
+        atom = work.GetAtomWithIdx(idx)
+        if not atom.GetIsAromatic():
+            continue
+        if atom.GetAtomicNum() not in _INDICATED_H_ELEMENTS:
+            continue
+        if atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0:
+            continue
+        exocyclic = [nb.GetIdx() for nb in atom.GetNeighbors()
+                     if nb.GetIdx() not in ring_set]
+        if len(exocyclic) != 1:
+            continue
+        bond = mol.GetBondBetweenAtoms(idx, exocyclic[0])
+        if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+            continue
+        atom.SetNumExplicitHs(1)
+        atom.SetNoImplicit(True)
+        restored += 1
+
+    if not restored:
+        return None
+    work.UpdatePropertyCache(strict=False)
+
+    ring_smiles = Chem.MolFragmentToSmiles(work, atomsToUse=list(ring_atoms))
+    ring_mol = Chem.MolFromSmiles(ring_smiles)
+    if ring_mol is None:
+        return None
+    return Chem.MolToSmiles(ring_mol, canonical=True)
+
+
 def get_ring_canonical_smiles(mol, ring_atoms) -> str:
     """
     Extract a ring as canonical SMILES for retained name lookup.
 
     Creates a new molecule containing only the ring atoms and their bonds,
     then returns the canonical SMILES representation.
+
+    ``MolFragmentToSmiles`` writes each atom with the hydrogen count it has in
+    ``mol``, so a ring whose indicated hydrogen has been replaced by a
+    substituent comes back as a string that describes no molecule at all
+    (``Cn1cccc1`` -> ``c1ccnc1``, unkekulisable).  Such a string can never equal
+    a table key, and the retained name is lost purely to the extraction.  When
+    -- and only when -- that happens, the displaced indicated hydrogen is
+    restored and the fragment rewritten
+    (``_ring_smiles_with_indicated_h_restored``).
+
+    The repair is therefore **strictly additive**: a ring whose fragment already
+    parses is returned exactly as before, so no key that resolves today can
+    change.  The only outcomes that move are keys that match nothing.
 
     Args:
         mol: RDKit Mol object
@@ -476,9 +585,11 @@ def get_ring_canonical_smiles(mol, ring_atoms) -> str:
         >>> ring = mol.GetRingInfo().AtomRings()[0]
         >>> get_ring_canonical_smiles(mol, ring)
         'c1ccncc1'
+        >>> mol = Chem.MolFromSmiles('Cn1cccc1')  # 1-methyl-1H-pyrrole
+        >>> ring = mol.GetRingInfo().AtomRings()[0]
+        >>> get_ring_canonical_smiles(mol, ring)
+        'c1cc[nH]c1'
     """
-    ring_set = set(ring_atoms)
-
     # Use MolFragmentToSmiles to extract just the ring
     # This handles aromaticity correctly
     ring_smiles = Chem.MolFragmentToSmiles(mol, atomsToUse=list(ring_atoms))
@@ -487,6 +598,10 @@ def get_ring_canonical_smiles(mol, ring_atoms) -> str:
     ring_mol = Chem.MolFromSmiles(ring_smiles)
     if ring_mol:
         return Chem.MolToSmiles(ring_mol, canonical=True)
+
+    restored = _ring_smiles_with_indicated_h_restored(mol, ring_atoms)
+    if restored is not None:
+        return restored
 
     return ring_smiles
 
