@@ -75,6 +75,47 @@ RETAINED_NAMES = {
     
     # === KETONES ===
     # NOTE: acetone removed -- IUPAC 2013 P-31.1.3 PIN is "propan-2-one"
+    # v29 Task L: `chalcone` is the ONE retained ketone name that is a PIN.
+    #   P-64.2.1.1 (BlueBookV2.md:28297), under `### **P-64.2.1** Retained names`:
+    #   "The name 'chalcone' is the only retained name as a preferred IUPAC name
+    #   and is limited to ring substitution only by characteristic groups lower
+    #   than 'ketone'. Chalcone refers only to the trans- or (E)- stereoisomer."
+    #   The (PIN) line follows at :28299 -- `chalcone (PIN) (2E)-1,3-diphenyl-
+    #   prop-2-en-1-one`. P-64.2.1.2 (:28307) then closes the GENERAL-only ketone
+    #   list and ends "Substitutive names, systematically constructed, are the
+    #   preferred IUPAC names for ketones" -- which is why acetophenone and
+    #   benzophenone below are `_PIN_DENY_HC`-demoted to general-only while this
+    #   row is not.
+    #
+    #   The key is the ISOMERIC canonical SMILES (`_name_impl` builds its lookup
+    #   key with `Chem.MolToSmiles(mol, canonical=True)`, isomeric by default), so
+    #   this single row enforces ALL THREE limits the rule imposes, exactly rather
+    #   than approximately:
+    #     (1) (E) only      -- the (Z) isomer canonicalises to
+    #                          `O=C(/C=C\c1ccccc1)c1ccccc1` and the stereo-
+    #                          UNSPECIFIED molecule to `O=C(C=Cc1ccccc1)c1ccccc1`;
+    #                          three distinct keys, so neither can match.
+    #     (2) ring substitution only, by groups junior to ketone, and
+    #     (3) no chain substitution
+    #                       -- ANY substituent changes the whole-molecule key, so
+    #                          the BB's own worked counter-example
+    #                          `2',4'-dihydroxychalcone-4-carboxamide` (:28305,
+    #                          "(not ...)"; also in bluebook_not_names.py:171) is
+    #                          structurally unreachable from here.
+    #
+    #   SCOPE: substituted chalcones that ARE PINs (e.g. `2',4'-dihydroxy-3,3'-
+    #   dimethoxychalcone`, :28303) are deliberately NOT emitted -- they need
+    #   primed-locant machinery across two rings plus a ketone-seniority test, and
+    #   a wrong construction would ship a WRONG name where falling through ships
+    #   the valid systematic one. Fail-open to systematic is the safe direction.
+    #
+    #   NB the OPSIN import surface already carries this exact SMILES key as the
+    #   STEM `chalcon` (no trailing 'e'); it never promoted because
+    #   `_is_complete_name('chalcon')` is False. Hand-curated wins the merge
+    #   (`ALL_RETAINED_NAMES = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}`), so this
+    #   row is what ships. OPSIN 2.9.0 parses `chalcone` -> InChIKey
+    #   DQFBYFPFKXHELB-VAWYXSNFSA-N, identical to the input's (round-trip verified).
+    "O=C(/C=C/c1ccccc1)c1ccccc1": "chalcone",
     "CC(=O)c1ccccc1": "acetophenone",
     "O=C(c1ccccc1)c1ccccc1": "benzophenone",
     
