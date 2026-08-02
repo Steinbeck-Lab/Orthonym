@@ -2314,8 +2314,22 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             if _pni in _chain_set_amine or _pnb.GetAtomicNum() <= 1:
                 continue
             _rn = _name_r_group(mol, _pni, exclude_atoms={_amine_n_atom})
-            if _rn:
-                _n_sub_names.append(_rn)
+            if not _rn:
+                # Fail closed. This block is the ONLY producer of the principal
+                # amine's N-substituent prefixes -- the branch is deliberately
+                # excluded from the substituent walk a few lines above -- so
+                # skipping an un-nameable one does not degrade the name, it
+                # DELETES atoms from it. Measured on
+                # 'CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OCC(COP(=O)(O)OCCNC)'
+                # 'OC(=O)CCCCCCCCCCCCCCCCC': the phosphate-bearing arm returned
+                # None here and the emitted name was
+                # '1-((11Z,14Z)-icosa-11,14-dienoyloxy)-N-methyl-2-'
+                # '(stearoyloxy)propanamine' -- a molecule with no phosphate at
+                # all. Before T2 (56833b46) the same arm was FABRICATED as
+                # 'N-tritetracontyl', a C43 chain; removing the fabrication made
+                # the refusal honest and exposed this caller (the contributor guide #9).
+                return None
+            _n_sub_names.append(_rn)
         if _n_sub_names:
             _n_counts = _NCounter(_n_sub_names)
             for _rn in sorted(_n_counts.keys()):

@@ -1937,6 +1937,66 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
     return None
 
 
+def _named_n_substituents(
+    mol, n_idx: int, core_c_idx: int, exclude_atoms: set,
+) -> Optional[list]:
+    """Every heavy substituent on this nitrogen, named -- or None if ANY is not.
+
+    The one place the retained-parent builders (carbamic acid, carbamate, urea,
+    thiourea/selenourea, guanidine) are allowed to ask "what is on this N?".
+
+    **Why this exists.** Each of those builders used to inline the same loop
+    with the same one-character defect::
+
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=core)
+        if sub_name:                      # <-- a REFUSAL vanishes here
+            n_subs.append(sub_name)
+
+    ``_name_r_group`` returns ``None`` when it cannot PROVE a fragment is
+    describable -- since the count-based fabrication was removed (T2,
+    ``56833b46``) that refusal is honest and load-bearing. Appending only the
+    truthy results turns the refusal into a name for a molecule the input is
+    not: ``CC(C)(C)NC(=O)NC1(CCCCC1)N=NC(C)(C)C`` (20 heavy atoms) came back
+    ``N-tert-butylurea`` (8 heavy atoms), silently dropping the entire
+    cyclohexyl/diazenyl half, and ``OC(=O)NCCOP(=O)(O)O`` came back bare
+    ``carbamic acid``, dropping a whole phosphate arm. That is a silent atom
+    drop -- the most serious defect class in this project -- and only the
+    OPSIN/SELF-01 validity gate was suppressing it.
+
+    A dropped substituent is indistinguishable, at the call site, from a
+    nitrogen that never carried one: both arrive as a short ``n_subs`` list.
+    So the refusal has to be preserved as a distinct value, and callers must
+    propagate it. ``None`` means "this molecule cannot be named here"; ``[]``
+    means "this nitrogen is genuinely unsubstituted".
+
+    The thiourea builder already did exactly this (its private ``_subs_on``,
+    added with the comment *"never drop a substituent -- fail closed"*); this
+    helper generalises that one correct instance to the whole class so the
+    invariant is single-sourced instead of re-derived per handler.
+
+    Args:
+        mol: RDKit Mol object.
+        n_idx: The nitrogen whose substituents are wanted.
+        core_c_idx: The functional-parent carbon bonded to that nitrogen; it is
+            skipped rather than treated as a substituent.
+        exclude_atoms: The functional-parent core, excluded from each R walk.
+
+    Returns:
+        A list of substituent prefix names (possibly empty, meaning genuinely
+        unsubstituted), or ``None`` if any substituent could not be named.
+    """
+    out = []
+    for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+        nidx = nbr.GetIdx()
+        if nidx == core_c_idx or nbr.GetAtomicNum() <= 1:
+            continue
+        sub_name = _name_r_group(mol, nidx, exclude_atoms=exclude_atoms)
+        if not sub_name:
+            return None          # never drop a substituent -- fail closed
+        out.append(sub_name)
+    return out
+
+
 # ============================================================================
 # Boronic acid naming (functional class: "methylboronic acid")
 # ============================================================================
@@ -2035,18 +2095,9 @@ def _name_carbamic_acid(features: Any) -> Optional[str]:
     carbamic_core = set(match)  # N, C, O=, OH
 
     # Check N-substituents
-    n_atom = mol.GetAtomWithIdx(n_idx)
-    n_subs = []
-    for nbr in n_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx == c_idx:
-            continue
-        if nbr.GetAtomicNum() <= 1:
-            continue
-        # Carbon-based substituent on nitrogen
-        sub_name = _name_r_group(mol, nidx, exclude_atoms=carbamic_core)
-        if sub_name:
-            n_subs.append(sub_name)
+    n_subs = _named_n_substituents(mol, n_idx, c_idx, carbamic_core)
+    if n_subs is None:
+        return None          # un-nameable N-substituent -> fail closed
 
     if not n_subs:
         # Unsubstituted: "carbamic acid"
@@ -2139,19 +2190,9 @@ def _name_carbamate(features: Any) -> Optional[str]:
         return None
 
     # Check N-substitution
-    n_atom = mol.GetAtomWithIdx(n_idx)
-    n_subs = []
-    for nbr in n_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx == c_idx:
-            continue
-        if nbr.GetSymbol() == 'H':
-            continue
-        # Only count carbon-based substituents (not H)
-        if nbr.GetAtomicNum() > 1:
-            sub_name = _name_r_group(mol, nidx, exclude_atoms=carbamate_core)
-            if sub_name:
-                n_subs.append(sub_name)
+    n_subs = _named_n_substituents(mol, n_idx, c_idx, carbamate_core)
+    if n_subs is None:
+        return None          # un-nameable N-substituent -> fail closed
 
     if not n_subs:
         # Unsubstituted: "ethyl carbamate"
@@ -2371,27 +2412,12 @@ def _try_name_urea(features: Any) -> Optional[str]:
                 return f"tetra{_hp}urea"
         # else: ambiguous partial / mixed-halogen pattern -> fall through.
 
-    # Collect substituents on N1
-    n1_subs = []
-    n1_atom = mol.GetAtomWithIdx(n1_idx)
-    for nbr in n1_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
-            continue
-        sub_name = _name_r_group(mol, nidx, exclude_atoms=urea_core)
-        if sub_name:
-            n1_subs.append(sub_name)
-
-    # Collect substituents on N2
-    n2_subs = []
-    n2_atom = mol.GetAtomWithIdx(n2_idx)
-    for nbr in n2_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
-            continue
-        sub_name = _name_r_group(mol, nidx, exclude_atoms=urea_core)
-        if sub_name:
-            n2_subs.append(sub_name)
+    # Collect substituents on N1 and N2. A refusal from either must abstain,
+    # never shorten the list -- see _named_n_substituents.
+    n1_subs = _named_n_substituents(mol, n1_idx, c_idx, urea_core)
+    n2_subs = _named_n_substituents(mol, n2_idx, c_idx, urea_core)
+    if n1_subs is None or n2_subs is None:
+        return None
 
     # No substituents: plain "urea"
     if not n1_subs and not n2_subs:
@@ -2492,21 +2518,11 @@ def _try_name_thiourea(features: Any) -> Optional[str]:
     stem = _CHALCOGEN_UREA_STEMS[mol.GetAtomWithIdx(x_idxs[0]).GetSymbol()]
     core = {n1_idx, n2_idx, c_idx, x_idxs[0]}
 
-    def _subs_on(n_idx):
-        """Named substituents on this N, or None if any is un-nameable."""
-        out = []
-        for nbr in mol.GetAtomWithIdx(n_idx).GetNeighbors():
-            nidx = nbr.GetIdx()
-            if nidx == c_idx or nbr.GetAtomicNum() <= 1:
-                continue
-            sub_name = _name_r_group(mol, nidx, exclude_atoms=core)
-            if not sub_name:
-                return None          # never drop a substituent — fail closed
-            out.append(sub_name)
-        return out
-
-    n1_subs = _subs_on(n1_idx)
-    n2_subs = _subs_on(n2_idx)
+    # This builder's private _subs_on was the ONE handler that already refused
+    # to drop a substituent; it is now the shared _named_n_substituents, so the
+    # invariant is stated once instead of re-derived per handler.
+    n1_subs = _named_n_substituents(mol, n1_idx, c_idx, core)
+    n2_subs = _named_n_substituents(mol, n2_idx, c_idx, core)
     if n1_subs is None or n2_subs is None:
         return None
 
@@ -2633,38 +2649,17 @@ def _try_name_guanidine(features: Any) -> Optional[str]:
     # Core atoms: all three nitrogens and the central carbon
     guanidine_core = {n_single1_idx, c_idx, n_double_idx, n_single2_idx}
 
-    # Collect substituents on the =NH nitrogen (N_double -> "N" locant)
-    n_double_subs = []
-    n_double_atom = mol.GetAtomWithIdx(n_double_idx)
-    for nbr in n_double_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
-            continue
-        sub_name = _name_r_group(mol, nidx, exclude_atoms=guanidine_core)
-        if sub_name:
-            n_double_subs.append(sub_name)
-
-    # Collect substituents on N_single1 (-> "N'" locant)
-    n_single1_subs = []
-    n_single1_atom = mol.GetAtomWithIdx(n_single1_idx)
-    for nbr in n_single1_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
-            continue
-        sub_name = _name_r_group(mol, nidx, exclude_atoms=guanidine_core)
-        if sub_name:
-            n_single1_subs.append(sub_name)
-
-    # Collect substituents on N_single2 (-> "N''" locant)
-    n_single2_subs = []
-    n_single2_atom = mol.GetAtomWithIdx(n_single2_idx)
-    for nbr in n_single2_atom.GetNeighbors():
-        nidx = nbr.GetIdx()
-        if nidx == c_idx or nbr.GetAtomicNum() <= 1:
-            continue
-        sub_name = _name_r_group(mol, nidx, exclude_atoms=guanidine_core)
-        if sub_name:
-            n_single2_subs.append(sub_name)
+    # Collect substituents on each nitrogen: the =NH one ("N" locant),
+    # N_single1 ("N'") and N_single2 ("N''"). A refusal from any of the three
+    # must abstain, never shorten a list -- see _named_n_substituents.
+    n_double_subs = _named_n_substituents(
+        mol, n_double_idx, c_idx, guanidine_core)
+    n_single1_subs = _named_n_substituents(
+        mol, n_single1_idx, c_idx, guanidine_core)
+    n_single2_subs = _named_n_substituents(
+        mol, n_single2_idx, c_idx, guanidine_core)
+    if n_double_subs is None or n_single1_subs is None or n_single2_subs is None:
+        return None
 
     # No substituents: plain "guanidine"
     if not n_double_subs and not n_single1_subs and not n_single2_subs:
