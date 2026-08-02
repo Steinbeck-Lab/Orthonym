@@ -1122,13 +1122,30 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     if not het_pos:
         return None
 
-    # P-14.4 / P-31.2.2 numbering cascade: heteroatom locants as a set, then
-    # heteroatom seniority, then indicated hydrogen, then the hydro prefixes.
+    # Numbering cascade.
+    #
+    # P-22.2.2.1.3 (``BlueBookV2.md:8284``) fixes the FIRST two criteria, and
+    # their order is not the intuitive one: "The locant '1' is given to a
+    # heteroatom that occurs first in the seniority sequence used for citation
+    # of the skeletal replacement ('a') prefixes. The numbering is THEN chosen
+    # to give lowest locants to heteroatoms considered as a set in ascending
+    # numerical order."  Senior-heteroatom-at-1 OUTRANKS the lowest locant set,
+    # which is why furazan is ``1,2,5-oxadiazole`` (BB :14717) and not
+    # ``2,1,3-oxadiazole`` even though {1,2,3} is the lower set. Ranking the set
+    # first silently renumbered every N-O-N / N-S-N ring.
+    #
+    # P-14.4 (``:3219``) then continues: (b) indicated hydrogen ``:3246`` before
+    # (e)(i) hydro prefixes ``:3287`` -- restated for this exact combination by
+    # P-31.2.2 (``:16879``).
     best_key = None
     best: Optional[Tuple[Dict[int, int], frozenset]] = None
     for start in range(n):
         for direction in (1, -1):
             loc = {(start + k * direction) % n: k + 1 for k in range(n)}
+            at_one = next(p for p in range(n) if loc[p] == 1)
+            senior_at_one = get_heteroatom_priority(
+                mol.GetAtomWithIdx(ordered[at_one]).GetSymbol()
+            )
             het_locs = tuple(sorted(loc[p] for p in het_pos))
             seniority = tuple(sorted(
                 (get_heteroatom_priority(mol.GetAtomWithIdx(ordered[p]).GetSymbol()),
@@ -1138,7 +1155,7 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
             for ih in ih_candidates:
                 ih_locs = tuple(sorted(loc[p] for p in ih))
                 hydro_locs = tuple(sorted(loc[p] for p in sp3_pos - set(ih)))
-                key = (het_locs, seniority, ih_locs, hydro_locs)
+                key = (senior_at_one, het_locs, seniority, ih_locs, hydro_locs)
                 if best_key is None or key < best_key:
                     best_key = key
                     best = (loc, ih)
@@ -1244,6 +1261,26 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
         for direction in (1, -1):
             seq = [ordered[(start + k * direction) % n] for k in range(n)]
             loc = {a: idx + 1 for idx, a in enumerate(seq)}
+            # P-22.2.2.1.3 (BlueBookV2.md:8284): "The locant '1' is given to a
+            # heteroatom that occurs first in the seniority sequence ... The
+            # numbering is THEN chosen to give lowest locants to heteroatoms
+            # considered as a set." Senior-at-1 outranks the lowest set. Without
+            # it the hydro locants were numbered by the set rule while
+            # ``parent_name`` came back numbered by the seniority rule, and the
+            # two disagreed: C1=NONC1 was emitted as
+            # '1,5-dihydro-1,2,5-oxadiazole', which hydrogenates the ring OXYGEN.
+            #
+            # Scoped to the Hantzsch-Widman range (P-22.2.2 covers rings of 3 to
+            # 10). Above it the parent is named by skeletal replacement ('a')
+            # nomenclature, whose numbering rule is the lowest heteroatom SET
+            # (P-31.1.4.4, :16697) with no senior-at-1 clause -- and those parent
+            # names really do carry locant 1 on a junior heteroatom
+            # (7-oxa-1,4,11-triazacyclopentadeca-...). Applying the HW rule there
+            # re-created the very mismatch this fixes.
+            senior_at_one = (
+                get_heteroatom_priority(mol.GetAtomWithIdx(seq[0]).GetSymbol())
+                if n <= 10 else 0
+            )
             het_locs = tuple(sorted(loc[a] for a in het))
             seniority = tuple(sorted(
                 (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
@@ -1251,7 +1288,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
             ))
             ih_locs = tuple(sorted(loc[a] for a in indicated_nh))
             hydro_locs = tuple(sorted(loc[a] for a in hydro))
-            key = (het_locs, seniority, ih_locs, hydro_locs)
+            key = (senior_at_one, het_locs, seniority, ih_locs, hydro_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best_map = loc

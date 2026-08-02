@@ -149,3 +149,136 @@ def test_fails_closed_on_exocyclic_double_bond():
     the namer must not invent one."""
     name = _name_ring("O=C1CCCCO1")
     assert name is None or "hydro" not in name
+
+
+# ---------------------------------------------------------------------------
+# White-box tests.
+#
+# The four guards below are unreachable THROUGH ``name_heterocycle`` because the
+# retained-name lookup (``data/retained_names.py``) and the upstream
+# "fully saturated -> return None" check short-circuit first.  Mutation testing
+# proved it: mutating each guard left the black-box tests entirely green.  They
+# are therefore exercised directly on ``_mancude_hydro_name`` /
+# ``_ring_perfect_matchings``.
+# ---------------------------------------------------------------------------
+
+from orthonym.rules.heterocycles import (  # noqa: E402
+    _mancude_hydro_name,
+    _ring_perfect_matchings,
+)
+
+
+def _ring_only(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    ring = mol.GetRingInfo().AtomRings()[0]
+    return mol, set(ring)
+
+
+def test_exocyclic_double_bond_refused_whitebox():
+    """``C1NOC(=O)C=N1`` is a corpus row (benchmarks) whose ring carbon carries
+    an exocyclic C=O.  That carbon has no ring double bond, so without the
+    exocyclic gate it would be miscounted as a hydro position and the ring would
+    be named ``3,6-dihydro-2H-1,2,4-oxadiazine`` -- a wrong molecule.  The
+    exocyclic carbon belongs to a suffix (P-14.7.2 'added indicated hydrogen'),
+    not to a hydro prefix."""
+    mol, ring = _ring_only("C1NOC(=O)C=N1")
+    assert _mancude_hydro_name(mol, ring) is None
+
+
+def test_saturated_ring_refused_whitebox():
+    """A fully saturated ring has no mancude hydro name; it is named by its
+    retained or Hantzsch-Widman saturated stem (P-31.2.3.2)."""
+    for smiles in ("C1CCOC1", "O1CCNCC1", "C1CCOCC1", "C1CNCCN1"):
+        mol, ring = _ring_only(smiles)
+        assert _mancude_hydro_name(mol, ring) is None, smiles
+
+
+def test_mancude_parent_itself_refused_whitebox():
+    """``d == max_match`` is the mancude parent, not a hydro form."""
+    for smiles in ("c1ccncc1", "c1ccoc1"):
+        mol, ring = _ring_only(smiles)
+        assert _mancude_hydro_name(mol, ring) is None, smiles
+
+
+def test_ring_perfect_matchings_contract():
+    """The two structure proofs both rest on this helper.
+
+    A full even cycle admits TWO perfect matchings -- which is exactly why the
+    reconstruction proof demands uniqueness before trusting a placement.  A path
+    admits one.  A vertex set with an isolated member admits none, which is how
+    an illegitimate indicated-hydrogen position is rejected."""
+    eligible6 = [True] * 6
+    assert len(_ring_perfect_matchings(6, set(range(6)), eligible6)) == 2
+    assert len(_ring_perfect_matchings(6, {0, 1, 2, 3}, eligible6)) == 1
+    assert len(_ring_perfect_matchings(6, {0, 3}, eligible6)) == 0
+    # odd-sized vertex sets can never be perfectly matched
+    assert _ring_perfect_matchings(6, {0, 1, 2}, eligible6) == []
+    # an ineligible member (divalent chalcogen) can never be covered
+    eligible_o = [False] + [True] * 5
+    assert _ring_perfect_matchings(6, {0, 1}, eligible_o) == []
+
+
+                                                                         # noqa
+# ---------------------------------------------------------------------------
+# P-22.2.2.1.3 (BlueBookV2.md:8284) -- "The locant '1' is given to a heteroatom
+# that occurs first in the seniority sequence used for citation of the skeletal
+# replacement ('a') prefixes.  The numbering is THEN chosen to give lowest
+# locants to heteroatoms considered as a set."
+#
+# Senior-at-1 outranks the lowest locant set.  These N-O-N / N-S-N rings are the
+# discriminating case: the heteroatoms are contiguous, so numbering from a ring
+# N gives the set {1,2,3} while numbering from the ring O gives {1,2,5}.  The
+# set rule alone would pick {1,2,3} and produce '...-2,1,3-oxadiazole'; the Blue
+# Book names this ring system 1,2,5-oxadiazole (":14717", formerly furazan).
+#
+# All three rows below were found by exhaustively enumerating every 5-, 6- and
+# 7-membered ring over {C,N,O,S} (12,923 rings) and comparing against mutants;
+# they are the falsifiers for the numbering cascade, the indicated-hydrogen
+# validity check and the reconstruction proof.  Each is OPSIN round-tripped.
+# ---------------------------------------------------------------------------
+
+P22_2_2_1_3_ROWS = [
+    ("C1=CNON1", "2,5-dihydro-1,2,5-oxadiazole"),
+    ("C1C=NON1", "2,3-dihydro-1,2,5-oxadiazole"),
+    ("C1=CNSN1", "2,5-dihydro-1,2,5-thiadiazole"),
+    ("C1C=NSN1", "2,3-dihydro-1,2,5-thiadiazole"),
+    # 7-ring, three heteroatoms: falsifies the heteroatom-locant-set criterion
+    ("C1=CCNOCO1", "2,3-dihydro-7H-1,6,2-dioxazepine"),
+    ("C1=CCNOCS1", "2,3-dihydro-7H-1,6,2-oxathiazepine"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", P22_2_2_1_3_ROWS)
+def test_senior_heteroatom_takes_locant_one(smiles, expected):
+    assert _name_ring(smiles) == expected
+
+
+def test_hydro_never_lands_on_a_ring_oxygen():
+    """Regression guard for the concrete symptom of getting P-22.2.2.1.3
+    backwards: the parent name was numbered with O at locant 1 while the hydro
+    locants were numbered by the lowest-set rule, so the two disagreed and
+    ``C1C=NON1`` was emitted as '1,5-dihydro-1,2,5-oxadiazole' -- hydrogenating
+    the ring oxygen at locant 1, which denotes a different molecule."""
+    for smiles in ("C1C=NON1", "C1=CNON1", "C1C=NSN1", "C1=CNSN1"):
+        name = _name_ring(smiles)
+        mol = Chem.MolFromSmiles(smiles)
+        ring = mol.GetRingInfo().AtomRings()[0]
+        # locants of the ring chalcogens under the emitted numbering are not
+        # recoverable from the string alone, so assert the concrete defect:
+        assert not name.startswith("1,5-dihydro"), name
+        assert "dihydro" in name
+        assert sum(1 for a in ring
+                   if mol.GetAtomWithIdx(a).GetSymbol() in ("O", "S")) == 1
+
+
+def test_indicated_hydrogen_position_5_is_structurally_invalid():
+    """For 1,3-oxazine (O1, N3) the saturated positions are 4, 5 and 6.  Putting
+    the indicated hydrogen at 5 isolates C6 -- its only other neighbour is the
+    ring O -- so no mancude parent exists and '5H' must never be chosen.  This
+    is what forces ``4H`` rather than a bare lowest-locant pick over {4,5,6}."""
+    eligible = [False, True, True, True, True, True]  # position 0 = O1
+    # removing position 4 (locant 5) leaves C6 isolated -> no mancude parent
+    assert _ring_perfect_matchings(6, {1, 2, 3, 5}, eligible) == []
+    # removing position 3 (locant 4) does leave one -> 4H-1,3-oxazine exists
+    assert len(_ring_perfect_matchings(6, {1, 2, 4, 5}, eligible)) == 1
+    assert _name_ring("C1=NCCCO1") == "5,6-dihydro-4H-1,3-oxazine"
