@@ -71,7 +71,11 @@ def test_reconstructor_rebuilds_blue_book_pins(descriptor, smiles):
 
 
 def test_reconstructor_atom_and_bond_counts():
-    """Sizes are fixed by P-23.2.6.1.1 (bracket sum + 2 = skeletal atoms)."""
+    """Sizes are fixed by P-23.2.6.1.4 (bracket sum + 2 = skeletal atoms).
+
+    Cited as P-23.2.6.1.1 until v29 Task S2; that rule (``:9645``) fixes the
+    ring-count WORD, not the atom count. The atom count is ``:9651``.
+    """
     assert reconstruct_von_baeyer_skeleton("bicyclo[2.2.1]")[0] == 7
     assert len(reconstruct_von_baeyer_skeleton("bicyclo[2.2.1]")[1]) == 8
     # adamantane: 10 atoms, 12 bonds -> circuit rank 3 = 'tricyclo'
@@ -143,11 +147,14 @@ def test_audit_accepts_secondary_bridge_numbered_from_higher_bridgehead():
 def test_audit_rejects_bridge_dropping_descriptor():
     """The live defect this floor exists for.
 
-    ``polycyclic.py:640`` detects the P-23.2.6.1.1 violation and only
-    ``logger.error``s it; ``analyze``'s fallback branch runs no validity check.
-    The result is a name whose brackets account for 11 atoms while its own stem
-    says 12 -- and with both OPSIN gates off (their documented no-Java state) it
-    ships.
+    ``_analyze_impl`` detects the P-23.2.6.1.4 violation (``:9651`` -- the
+    bracket sum + 2 must equal the alkane stem) and used to only ``logger.error``
+    it, while ``analyze``'s fallback branch ran no validity check at all. The
+    result is a name whose brackets account for 11 atoms while its own stem says
+    12 -- and with both OPSIN gates off (their documented no-Java state) it
+    shipped. v29 Task S2 wired this audit into ``analyze`` and the three
+    name-producers, so that molecule now abstains; the audit's own verdict,
+    asserted here, is unchanged.
     """
     mol, ring, desc = _cage("C1C2CC1C1CCC3(C2)CC1C3")
     assert len(ring) == 12

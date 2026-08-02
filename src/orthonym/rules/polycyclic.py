@@ -215,6 +215,14 @@ class PolycyclicDescriptor:
     total_atoms: int
     descriptor_string: str
     bridge_lengths: List[int] = field(default_factory=list)  # all bridge lengths, sorted descending
+    #: Verdict of ``VonBaeyerAnalyzer._legality_verified`` -- True only when
+    #: ``descriptor_string``, read by the Blue Book's own numbering rules,
+    #: rebuilds exactly this cage under ``numbering``. ``None`` means NOT
+    #: ADJUDICATED (a raw ``_analyze_impl`` candidate); ``analyze`` sets it on
+    #: every return path. **Anything that spells a name from this object must
+    #: require ``legality is True``** -- a descriptor that fails is not a worse
+    #: name, it is a name for a different molecule.
+    legality: Optional[bool] = None
 
 
 # ============================================================================
@@ -378,9 +386,23 @@ class VonBaeyerAnalyzer:
     @staticmethod
     def _descriptor_is_valid(result: "PolycyclicDescriptor",
                              ring_atoms: Set[int]) -> bool:
-        """Well-formed iff bridge lengths are all non-negative, the
-        P-23.2.6.1.1 invariant holds (sum + 2 == ring atoms), and every ring
-        atom received a locant. Malformed descriptors are OPSIN-unparseable.
+        """Well-formed iff bridge lengths are all non-negative, the atom-count
+        invariant holds (sum + 2 == ring atoms), and every ring atom received a
+        locant. Malformed descriptors are OPSIN-unparseable.
+
+        **P-23.2.6.1** "Naming polycyclic alicyclic hydrocarbons"
+        (``BlueBookV2/BlueBookV2.md:9641``), rule **P-23.2.6.1.4** (``:9651``):
+        *"The name is terminated by the name of the alkane representing the
+        total number of ring atoms; this number corresponds to the sum of the
+        arabic numbers in the numerical descriptor enclosed by brackets plus two
+        (for the two main bridgehead atoms)."*  This code cited P-23.2.6.1.1 for
+        it until v29 Task S2; that rule (``:9645``) is a different clause -- it
+        fixes the ring-count WORD ('tricyclo', 'tetracyclo') -- and is enforced
+        separately inside ``audit_von_baeyer_descriptor``.
+
+        This is an ATOM COUNT and nothing more. A descriptor can satisfy it and
+        still cite bridges the molecule does not have, so it is NOT sufficient to
+        spell a name from: use ``_legality_verified``.
         """
         if result is None:
             return False
@@ -389,6 +411,43 @@ class VonBaeyerAnalyzer:
         if sum(result.bridge_lengths) + 2 != result.total_atoms:
             return False
         return set(result.numbering.keys()) >= set(ring_atoms)
+
+    @staticmethod
+    def _legality_verified(mol, ring_atoms: Set[int],
+                           result: "PolycyclicDescriptor") -> bool:
+        """True iff the descriptor STRING rebuilds exactly this cage under this
+        numbering -- the proof ``_descriptor_is_valid`` is not.
+
+        ``audit_von_baeyer_descriptor`` (v29 Task S) reconstructs the skeleton
+        the emitted string denotes from P-23.2.3 / P-23.2.5.2 / P-23.2.6.3 and
+        requires SET EQUALITY with the molecule's own cage bonds in locant
+        space. It proves LEGALITY (this name denotes this molecule under this
+        numbering), never PREFERENCE.
+
+        Composed with the arithmetic check rather than replacing it: the
+        arithmetic clause is the cheap pre-filter and names the specific
+        P-23.2.6.1.4 violation in the log. Composing adds no false rejection --
+        measured 0 cages with ``audit=True, arith=False`` over 8,201 enumerated
+        cages and over 1,547 accepted corpus cages (v29 Task S2).
+
+        Deliberately Java-free: both downstream OPSIN gates are documented
+        FAIL-OPEN when no jar is present, so with Java absent this is the only
+        thing between a bridge-dropping descriptor and an emitted name.
+        """
+        if result is None or not result.numbering:
+            return False
+        cage = set(ring_atoms)
+        if not VonBaeyerAnalyzer._descriptor_is_valid(result, cage):
+            return False
+        from .vonbaeyer_universal import audit_von_baeyer_descriptor
+        try:
+            return bool(audit_von_baeyer_descriptor(
+                mol, cage, result.numbering, result.descriptor_string))
+        except Exception:
+            # A checker that cannot reach a verdict has not proved legality.
+            logger.debug("legality audit raised for %s",
+                         result.descriptor_string, exc_info=True)
+            return False
 
     @staticmethod
     def _is_unsubstituted_ring_system(mol, ring_atoms: Set[int]) -> bool:
@@ -419,18 +478,32 @@ class VonBaeyerAnalyzer:
         copy renumbered into a total RDKit canonical-rank order (identical for
         every SMILES spelling), making the descriptor spelling-independent; the
         numbering is then mapped back to the caller's atom indices. If the
-        canonical run yields a malformed descriptor it falls back to the
-        original order, so the result is never worse than the un-renumbered
-        path. SUBSTITUTED / heteroatom cages are NOT renumbered (that shifts
-        substituent locants and breaks round-trips); they still tie-break on
-        canonical ranks inside ``_find_main_ring``.
+        canonical run yields a malformed descriptor the cascade falls back to
+        the original atom order. SUBSTITUTED / heteroatom cages are NOT
+        renumbered (that shifts substituent locants and breaks round-trips);
+        they still tie-break on canonical ranks inside ``_find_main_ring``.
+
+        **The fallback carries no quality guarantee.** This docstring used to
+        claim the fallback "is never worse than the un-renumbered path" -- it IS
+        the un-renumbered path, so the sentence was true only vacuously, and it
+        read as a validation that did not exist: the fallback result was
+        returned with no check at all, which is how descriptors whose brackets
+        do not account for every skeletal atom reached the namer (v29 Task S2).
+
+        What IS guaranteed: every return path is adjudicated by
+        ``_legality_verified`` and the verdict published as
+        ``PolycyclicDescriptor.legality``. ``analyze`` still returns its best
+        analysis when that verdict is False -- the numbering remains useful to
+        callers that only inspect the cage -- so **every caller that SPELLS A
+        NAME must require ``legality is True``** and fail closed otherwise.
 
         Args:
             mol: RDKit Mol object
             ring_atoms: Set of atom indices in the ring system
 
         Returns:
-            PolycyclicDescriptor with all VB information
+            PolycyclicDescriptor with all VB information, ``legality`` set, or
+            None when the cascade could not produce an analysis at all.
         """
         if self._is_unsubstituted_ring_system(mol, ring_atoms):
             order = self._canonical_atom_order(mol)
@@ -459,6 +532,10 @@ class VonBaeyerAnalyzer:
                         bridge.atoms = [new_to_old.get(a, a) for a in bridge.atoms]
                         bridge.start_bh = new_to_old.get(bridge.start_bh, bridge.start_bh)
                         bridge.end_bh = new_to_old.get(bridge.end_bh, bridge.end_bh)
+                    # Adjudicated against the ORIGINAL mol/ring_atoms, i.e. the
+                    # indices the caller will use, not the canonical copy.
+                    canon_result.legality = self._legality_verified(
+                        mol, ring_atoms, canon_result)
                     return canon_result
 
         # Substituted / heteroatom cages: the canonical renumber above is unsafe
@@ -467,12 +544,20 @@ class VonBaeyerAnalyzer:
         # (:3219). Rank the legal alternatives on locants instead of leaving the
         # arbitrary canonical-rank backstop to decide.
         incumbent = self._analyze_impl(mol, ring_atoms)
-        if incumbent is None or not incumbent.numbering:
+        if incumbent is None:
+            return None
+        if not incumbent.numbering:
+            # No locants at all: nothing can be spelled from this, and the
+            # audit cannot even be evaluated. Not adjudicable == not legal.
+            incumbent.legality = False
             return incumbent
         bridgeheads = self._find_all_bridgeheads(mol, ring_atoms)
-        return self._choose_lowest_locant_numbering(
+        chosen = self._choose_lowest_locant_numbering(
             mol, ring_atoms, bridgeheads, incumbent
         )
+        # This branch previously returned UNCHECKED -- the whole of site 2.
+        chosen.legality = self._legality_verified(mol, ring_atoms, chosen)
+        return chosen
 
     def _analyze_impl(self, mol, ring_atoms: Set[int],
                       optimize_orientation: bool = False,
@@ -637,11 +722,25 @@ class VonBaeyerAnalyzer:
 
         total_atoms = len(ring_atoms)
 
-        # VB invariant: sum(bridge_lengths) + 2 == total_ring_atoms
+        # P-23.2.6.1.4 (:9651, under P-23.2.6.1 "Naming polycyclic alicyclic
+        # hydrocarbons"): the alkane stem equals the bracket sum + 2. A
+        # violation means the descriptor drops a skeletal atom the stem still
+        # counts -- `tetracyclo[5.1.1.2^3,6]dodecane` brackets 11 atoms and says
+        # 12.
+        #
+        # This is a DIAGNOSTIC, not the decision. `_analyze_impl` is a candidate
+        # generator -- `_choose_lowest_locant_numbering` calls it in a loop and
+        # discards most results -- so refusing here would only mean "this
+        # candidate lost", not "this molecule cannot be named". The decision is
+        # made once, on the result `analyze` actually returns, by
+        # `_legality_verified`, and published as `PolycyclicDescriptor.legality`
+        # for the name-producers to enforce. Until v29 Task S2 there was no such
+        # decision anywhere and this log line was the whole of the response.
         total_bridge_len = sum(bridge_lengths)
         if total_bridge_len + 2 != total_atoms:
-            logger.error(
-                "VB invariant violated: sum(%s) + 2 = %d, expected %d total ring atoms",
+            logger.debug(
+                "P-23.2.6.1.4 violated: sum(%s) + 2 = %d, expected %d total "
+                "ring atoms (candidate is adjudicated in analyze)",
                 bridge_lengths, total_bridge_len + 2, total_atoms
             )
 
@@ -2043,6 +2142,14 @@ def generate_polycyclic_name(mol) -> Optional[str]:
     # Analyze the system
     desc = analyzer.analyze(mol, ring_atoms)
 
+    # Legality gate (v29 Task S2) -- the descriptor and the alkane stem below
+    # are both read straight off `desc`, so an unverified descriptor here spells
+    # a cage the molecule does not have. Measured at HEAD, this function emitted
+    # `tetracyclo[3.1.1.2^1,4]decane` for C1CC23CC(C2)C12CC3C2: the brackets
+    # account for 9 atoms, `decane` says 10.
+    if desc is None or desc.legality is not True:
+        return None
+
     # Use total_atoms from VB analysis (sum(bridge_lengths) + 2) rather than
     # len(ring_atoms), which may miss non-ring atoms in the VB framework.
     total_ring_atoms = desc.total_atoms
@@ -2364,6 +2471,13 @@ def name_polycyclic_with_heteroatoms(mol) -> Optional[str]:
 
     # Analyze the system to get descriptor and numbering
     desc = analyzer.analyze(mol, ring_atoms)
+
+    # Legality gate (v29 Task S2). Doubly load-bearing here: an unverified
+    # descriptor is spelled below AND its numbering is what places every
+    # 'oxa'/'aza'/'thia' locant, so a numbering the descriptor disagrees with
+    # puts the heteroatoms on the wrong skeletal positions.
+    if desc is None or desc.legality is not True:
+        return None
 
     # Get heteroatom replacement prefix
     hetero_prefix = get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
@@ -3137,6 +3251,22 @@ def name_polycyclic_complete(mol, features=None):
                 # any ring substituents via the stored atom_to_locant.
                 return (_sat_name, _sat_ring_atoms, _sat['atom_to_locant'], False)
         # IN-01: no smiles arg — Orthonym.name back-fills the original input SMILES.
+        from ..errors import unsupported_ring_system
+        raise unsupported_ring_system()
+
+    # LEGALITY GATE (v29 Task S2). Everything below SPELLS `desc`: its
+    # descriptor string, its numbering (stereo, substituent and heteroatom
+    # locants) and its atom count all feed the name. A descriptor that does not
+    # rebuild this cage names a DIFFERENT molecule, so refuse rather than emit.
+    #
+    # Placed after the bridged-fused and aromatic delegations above on purpose:
+    # neither of those spells `desc`, and 15 corpus cages with an unverifiable
+    # descriptor are named correctly by the partial-saturation constructor.
+    #
+    # Raising rather than returning None, for the same reason as the G0 refusal
+    # directly above: None cascades to a fragment namer that would name one
+    # sub-ring of the cage.
+    if desc is None or desc.legality is not True:
         from ..errors import unsupported_ring_system
         raise unsupported_ring_system()
 

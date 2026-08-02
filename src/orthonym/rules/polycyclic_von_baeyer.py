@@ -172,13 +172,17 @@ def name_higher_polycyclo(mol) -> Optional[str]:
         total_atoms = result.total_atoms
         numbering = result.numbering
         # Legality floor (v29 Task S): the descriptor STRING must rebuild this
-        # exact cage. ``analyze`` can return a descriptor whose bridges do not
-        # account for every skeletal atom -- the P-23.2.6.1.1 invariant at
-        # ``polycyclic.py:640`` is only ``logger.error``-ed, never enforced, and
-        # the fallback branch of ``analyze`` runs no validity check at all -- so
-        # without this a name like ``tetracyclo[5.1.1.2^3,6]dodecane`` (11
-        # bracketed atoms, ``dodecane`` = 12) can be built here. Both OPSIN gates
+        # exact cage, or a name like ``tetracyclo[5.1.1.2^3,6]dodecane`` (11
+        # bracketed atoms, ``dodecane`` = 12) gets built here. Both OPSIN gates
         # are documented FAIL-OPEN with no Java, so this must not rely on them.
+        #
+        # v29 Task S2 also wired this proof into ``analyze`` itself, which now
+        # publishes the same verdict as ``result.legality``. This call is kept
+        # rather than replaced by the flag: it is the guard this module's own
+        # tests exercise, it re-proves against the ring-atom set THIS function
+        # chose, and it is idempotent. (The rule the atom count comes from is
+        # P-23.2.6.1.4 at ``:9651``; this comment cited P-23.2.6.1.1, which is
+        # the ring-count-WORD rule at ``:9645``.)
         if not audit_von_baeyer_descriptor(
                 mol, ring_atoms, numbering, descriptor):
             logger.info(
