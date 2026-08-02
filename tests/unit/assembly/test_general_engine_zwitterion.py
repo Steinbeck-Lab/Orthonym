@@ -58,8 +58,17 @@ MESOIONIC = "CC1=N[N+]2=CC=CC=C2C(=N1)[O-]"
 # Coordinator-verified, re-verified in this session: fed to opsin-cli-2.9.0 the
 # returned structure has InChIKey YZYLEZPSMVVLED-UHFFFAOYSA-N, identical to
 # MESOIONIC's InChIKey.
-TARGET = ("4-methyl-3,5,6-triazabicyclo[4.4.0]deca-1(10),2,4,6,8-"
-          "pentaen-6-ium-2-olate")
+#
+# The heteroatom locants were '3,5,6' until the von Baeyer numbering cascade
+# gained its P-23.3.2.1 term. Of the four numberings the bicyclo[4.4.0]
+# descriptor permits -- (1,2,4), (1,8,10), (3,5,6), (6,7,9), enumerated by
+# ``test_four_legal_numberings_exist`` below -- P-23.3.2.1 (:9777) *"Low locants
+# are assigned to the heteroatoms considered together as a set compared in
+# increasing numerical order"* selects (1,2,4). The suffix locants follow the
+# renumbering; the name still returns InChIKey YZYLEZPSMVVLED-UHFFFAOYSA-N from
+# opsin-cli-2.9.0, i.e. the same molecule, re-lettered.
+TARGET = ("3-methyl-1,2,4-triazabicyclo[4.4.0]deca-1(10),2,4,6,8-"
+          "pentaen-1-ium-5-olate")
 
 
 def _name(smiles, tier="best-effort"):
@@ -94,8 +103,8 @@ def test_mesoionic_cationic_suffix_precedes_anionic():
 def test_mesoionic_parent_hydride_e_is_elided():
     """P-74.1.1 :42417 — final 'e' elided before a suffix beginning 'i'."""
     name = _name(MESOIONIC)
-    assert "pentaen-6-ium" in name
-    assert "pentaene-6-ium" not in name
+    assert "pentaen-1-ium" in name
+    assert "pentaene-1-ium" not in name
 
 
 def test_mesoionic_pin_tier_unchanged():
@@ -377,12 +386,6 @@ def test_p74_1_2_ionic_locant_rule_has_no_freedom_here():
     assert len(set(sets)) == len(sets)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "PRE-EXISTING von Baeyer defect, NOT introduced by the zwitterion fix "
-    "(the neutral name it replaced was also '3,5,6-triaza...'). P-23.3.2.1 "
-    "(:9777) requires the LOWEST heteroatom set; the cage engine picks "
-    "(3,5,6) where (1,2,4) is legal and lower. Reported, not fixed: "
-    "re-numbering the von Baeyer engine has repo-wide blast radius."))
 def test_von_baeyer_heteroatom_locants_should_be_lowest_set():
     """P-23.3.2.1 (:9777) — *"Low locants are assigned to the heteroatoms
     considered together as a set compared in increasing numerical order. The

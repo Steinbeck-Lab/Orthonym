@@ -461,10 +461,23 @@ class VonBaeyerAnalyzer:
                         bridge.end_bh = new_to_old.get(bridge.end_bh, bridge.end_bh)
                     return canon_result
 
-        return self._analyze_impl(mol, ring_atoms)
+        # Substituted / heteroatom cages: the canonical renumber above is unsafe
+        # here (it shifts substituent locants), but the numbering freedom that
+        # P-23.2 leaves open is still governed -- P-23.3.2 (:9777) and P-14.4
+        # (:3219). Rank the legal alternatives on locants instead of leaving the
+        # arbitrary canonical-rank backstop to decide.
+        incumbent = self._analyze_impl(mol, ring_atoms)
+        if incumbent is None or not incumbent.numbering:
+            return incumbent
+        bridgeheads = self._find_all_bridgeheads(mol, ring_atoms)
+        return self._choose_lowest_locant_numbering(
+            mol, ring_atoms, bridgeheads, incumbent
+        )
 
     def _analyze_impl(self, mol, ring_atoms: Set[int],
-                      optimize_orientation: bool = False) -> PolycyclicDescriptor:
+                      optimize_orientation: bool = False,
+                      forced: Optional[Tuple[List[int], Tuple[int, int]]] = None,
+                      ) -> PolycyclicDescriptor:
         """Von Baeyer cascade (VB-1..VB-7) on the given atom ordering.
 
         When ``optimize_orientation`` is set (pure-cage path only) the main
@@ -475,7 +488,10 @@ class VonBaeyerAnalyzer:
         """
         ring_count = self._get_ring_count(mol, ring_atoms)
         bridgeheads = self._find_all_bridgeheads(mol, ring_atoms)
-        main_ring, bh_pair = self._find_main_ring(mol, ring_atoms, bridgeheads)
+        if forced is not None:
+            main_ring, bh_pair = list(forced[0]), forced[1]
+        else:
+            main_ring, bh_pair = self._find_main_ring(mol, ring_atoms, bridgeheads)
         main_bridge = self._find_main_bridge(mol, ring_atoms, main_ring, bh_pair)
 
         if optimize_orientation:
@@ -696,7 +712,8 @@ class VonBaeyerAnalyzer:
         self,
         mol,
         ring_atoms: Set[int],
-        bridgeheads: Set[int]
+        bridgeheads: Set[int],
+        return_candidates: bool = False,
     ) -> Tuple[List[int], Tuple[int, int]]:
         """
         VB-2: Find the main ring -- the largest ring in the system.
@@ -749,12 +766,24 @@ class VonBaeyerAnalyzer:
         #    balance,              # P-23.2.6.2.1: main ring divided as symmetrically as possible
         #    tie_key)              # deterministic canon-rank tie-break (lowest ranks win)
         best_score = None
+        # Every decomposition tied at the top of the STRUCTURAL part of the score
+        # (ring_size, main_bridge_len, balance). These all yield the same von
+        # Baeyer descriptor, so P-23.2 does not distinguish them -- the choice
+        # between them is exactly the "choice for numbering" that P-23.3.2 and
+        # P-14.4 govern. Retained so ``_choose_lowest_locant_numbering`` can rank
+        # them on locants instead of on the arbitrary canonical-rank backstop.
+        tied_candidates: List[Tuple[List[int], Tuple[int, int]]] = []
 
         def _consider(ring, bh1, bh2, branch1_len, branch2_len, main_bridge_len):
             nonlocal best_score, best_ring, best_bh_pair
             balance = min(branch1_len, branch2_len)
             tie_key = tuple(-r for r in _rank_key(ring))
-            score = (len(ring), main_bridge_len, balance, tie_key)
+            structural = (len(ring), main_bridge_len, balance)
+            score = (structural, tie_key)
+            if best_score is None or structural > best_score[0]:
+                tied_candidates.clear()
+            if best_score is None or structural >= best_score[0]:
+                tied_candidates.append((ring, (bh1, bh2)))
             if best_score is None or score > best_score:
                 best_score = score
                 best_ring = ring
@@ -826,6 +855,17 @@ class VonBaeyerAnalyzer:
         # Reorder main ring so that bh1 is first and the longer path to bh2 comes first
         if best_ring and best_bh_pair:
             best_ring = self._orient_main_ring(best_ring, best_bh_pair)
+
+        if return_candidates:
+            oriented = []
+            seen_c = set()
+            for ring, bhp in tied_candidates:
+                ring = self._orient_main_ring(ring, bhp)
+                k = (tuple(ring), bhp)
+                if k not in seen_c:
+                    seen_c.add(k)
+                    oriented.append((ring, bhp))
+            return best_ring, best_bh_pair, oriented
 
         return best_ring, best_bh_pair
 
@@ -1044,6 +1084,232 @@ class VonBaeyerAnalyzer:
                 best_ring = cand_ring
                 best_bhp = cand_bhp
         return best_ring, best_bhp
+
+    #: Cap on the number of alternative numberings ranked by
+    #: ``_choose_lowest_locant_numbering``. Symmetric cages can present many
+    #: tied decompositions; the cascade is O(candidates x cage size) and this
+    #: keeps a pathological cage from dominating a naming run. On exceeding the
+    #: cap the incumbent numbering is kept (never a partial ranking, which would
+    #: be order-dependent).
+    _MAX_LOCANT_CANDIDATES = 64
+
+    #: P-23.3.1 (:9765) heteroatom citation order, used by P-23.3.2.2 as the
+    #: "decreasing seniority order of heteroatoms" tie-break.
+    _HETERO_SENIORITY = {
+        sym: rank for rank, sym in enumerate(
+            ("F", "Cl", "Br", "I", "O", "S", "Se", "Te", "N", "P", "As", "Sb",
+             "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga", "In", "Tl")
+        )
+    }
+
+    def _principal_group_ring_atoms(self, mol, ring_atoms) -> Set[int]:
+        """Cage atoms that bear the principal characteristic group (P-14.4(c)).
+
+        Sourced from the existing seniority primitives -- ``detect_functional_groups``
+        -> ``get_principal_group`` (P-41 seniority) -> ``_pg_attachment_atoms``
+        (the per-FG locant-bearing SMARTS index) -- rather than from a local
+        heteroatom guess, which cannot tell an ``-ol`` suffix from an ``amino``
+        prefix.
+
+        ``_pg_attachment_atoms`` falls back to SMARTS atom 0 for any FG absent
+        from ``PG_ATTACHMENT_INDICES``, and several O/N SMARTS lead with the
+        heteroatom rather than the carbon that carries the locant. That fallback
+        atom is therefore often OFF the cage. Handled explicitly: an attachment
+        atom outside the ring contributes the ring atom(s) it is bonded to, so a
+        table gap degrades to "locate via the bond" instead of silently dropping
+        the principal group from the P-14.4(c) term.
+        """
+        try:
+            from ..perception.functional_groups import detect_functional_groups
+            from .seniority import get_principal_group
+            from .parent_selection import _pg_attachment_atoms
+        except Exception:
+            return set()
+        try:
+            fgs = detect_functional_groups(mol)
+            pg_name, pg_matches = get_principal_group(mol, fgs)
+        except Exception:
+            return set()
+        if not pg_name or not pg_matches:
+            return set()
+
+        out: Set[int] = set()
+        for match in pg_matches:
+            attachments = _pg_attachment_atoms(pg_name, tuple(match))
+            for a in attachments:
+                if a in ring_atoms:
+                    out.add(a)
+                else:
+                    # Table gap / heteroatom-leading SMARTS: walk the one bond
+                    # back onto the cage.
+                    try:
+                        nbrs = mol.GetAtomWithIdx(a).GetNeighbors()
+                    except Exception:
+                        continue
+                    for nbr in nbrs:
+                        if nbr.GetIdx() in ring_atoms:
+                            out.add(nbr.GetIdx())
+        return out
+
+    def _locant_criteria_key(self, mol, ring_atoms, desc):
+        """The P-23.3.2 -> P-14.4 numbering cascade, as a sort key (lower wins).
+
+        Applied ONLY among numberings that produce an identical von Baeyer
+        descriptor, so this can never change the ring analysis -- it only
+        chooses between numberings that P-23.2 left open.
+
+        Order (each verified against BlueBookV2.md, heading + sentence):
+          1. P-23.3.2.1 (:9777) "Low locants are assigned to the heteroatoms
+             considered together as a set compared in increasing numerical
+             order." Skeletal heteroatoms are part of the parent hydride and so
+             precede suffixes -- P-14.4 preamble (1) (:3226).
+          2. P-23.3.2.2 (:9789) heteroatoms in decreasing seniority order.
+          3. P-14.4(c) (:3256) "principal characteristic groups and free
+             valences (suffixes)".
+          4. P-14.4(e) (:3286) saturation/unsaturation.
+          5. P-14.4(f) (:3296) detachable alphabetized prefixes.
+        """
+        numbering = desc.numbering
+        pg_ring_atoms = self._principal_group_ring_atoms(mol, ring_atoms)
+
+        hetero, hetero_rank, pg, unsat, prefixes = [], [], [], [], []
+        for idx in ring_atoms:
+            loc = numbering.get(idx)
+            if not loc:
+                continue
+            atom = mol.GetAtomWithIdx(idx)
+            sym = atom.GetSymbol()
+            if sym != "C":
+                hetero.append(loc)
+                hetero_rank.append((loc, self._HETERO_SENIORITY.get(sym, 99)))
+            if idx in pg_ring_atoms:
+                # P-14.4(c): the PRINCIPAL characteristic group only. Every other
+                # substituent is a detachable prefix and is ranked at (f) -- the
+                # two must not be pooled, or an -amino prefix ties with an -ol
+                # suffix and the arbitrary backstop decides between them.
+                pg.append(loc)
+                continue
+            for nbr in atom.GetNeighbors():
+                if nbr.GetIdx() in ring_atoms:
+                    continue
+                if nbr.GetAtomicNum() <= 1:
+                    continue
+                prefixes.append(loc)
+                break
+        for bond in mol.GetBonds():
+            a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if a in ring_atoms and b in ring_atoms and \
+                    bond.GetBondTypeAsDouble() > 1.0:
+                la, lb = numbering.get(a), numbering.get(b)
+                if la and lb:
+                    unsat.append(min(la, lb))
+
+        return (
+            tuple(sorted(hetero)),
+            tuple(r for _, r in sorted(hetero_rank)),
+            tuple(sorted(pg)),
+            tuple(sorted(unsat)),
+            tuple(sorted(prefixes)),
+        )
+
+    def _choose_lowest_locant_numbering(self, mol, ring_atoms, bridgeheads,
+                                        incumbent):
+        """Pick the lowest-locant numbering among the legal alternatives.
+
+        P-23.2 fixes the descriptor but frequently leaves several numberings
+        open (which main bridgehead is locant 1, the traversal direction, and --
+        on a symmetric cage -- which of several equivalent decompositions is
+        used). P-23.3.2 (:9777) *"When there is a choice for numbering, the
+        following criteria are applied in order until a decision can be made"*
+        and P-14.4 (:3219) then govern that choice; before this pass it was made
+        by an arbitrary canonical-rank backstop.
+
+        Only candidates whose ``descriptor_string`` is IDENTICAL to the
+        incumbent's are considered, so the ring analysis is provably untouched
+        and the change is confined to locants.
+        """
+        try:
+            _, _, candidates = self._find_main_ring(
+                mol, ring_atoms, bridgeheads, return_candidates=True
+            )
+        except Exception:
+            return incumbent
+        if not candidates or len(candidates) > self._MAX_LOCANT_CANDIDATES:
+            return incumbent
+
+        # Expand each tied decomposition over its legal orientations: either
+        # main bridgehead may be locant 1 (P-23.2.3 ":9591" -- "starting with
+        # one of the bridgeheads"), and on a symmetric main ring either
+        # traversal direction is legal.
+        expanded = []
+        seen = set()
+        for ring, bhp in candidates:
+            for cand_ring, cand_bhp in self._orientation_variants(ring, bhp):
+                k = (tuple(cand_ring), cand_bhp)
+                if k not in seen:
+                    seen.add(k)
+                    expanded.append((cand_ring, cand_bhp))
+        if len(expanded) > self._MAX_LOCANT_CANDIDATES:
+            return incumbent
+
+        best = incumbent
+        best_key = self._locant_criteria_key(mol, ring_atoms, incumbent)
+        for cand in expanded:
+            try:
+                desc = self._analyze_impl(mol, ring_atoms, forced=cand)
+            except Exception:
+                continue
+            if desc is None or not desc.numbering:
+                continue
+            # The descriptor is settled by P-23.2 -- a candidate that changes it
+            # is a different ring analysis, not a renumbering. Reject it.
+            if desc.descriptor_string != incumbent.descriptor_string:
+                continue
+            # Every skeletal atom must receive exactly one locant: a candidate
+            # that drops or doubles an atom is malformed, not merely worse.
+            locs = [desc.numbering.get(i) for i in ring_atoms]
+            if any(l is None for l in locs) or len(set(locs)) != len(ring_atoms):
+                continue
+            key = self._locant_criteria_key(mol, ring_atoms, desc)
+            if key < best_key:
+                best_key = key
+                best = desc
+        return best
+
+    def _orientation_variants(self, main_ring, bh_pair):
+        """Legal (ring, bh_pair) orientations of one fixed decomposition.
+
+        P-23.2.3 "Numbering bicyclic alicyclic hydrocarbons" (:9589), sentence
+        :9591: *"The bicyclic ring system is numbered starting with one of the
+        bridgeheads and proceeding first along the longer segment of the main
+        ring to the second bridgehead, then back to the first bridgehead along
+        the unnumbered segment of the main ring."*  Either bridgehead may start;
+        the longer segment must come first, so the direction is free only when
+        the two segments are equal.
+        """
+        bh1, bh2 = bh_pair
+        out, seen = [], set()
+        if bh1 not in main_ring or bh2 not in main_ring or bh1 == bh2:
+            return [(list(main_ring), bh_pair)]
+        n = len(main_ring)
+        for start, partner in ((bh1, bh2), (bh2, bh1)):
+            s = main_ring.index(start)
+            rot = main_ring[s:] + main_ring[:s]
+            p = rot.index(partner)
+            forward_len, backward_len = p - 1, n - p - 1
+            reflected = [rot[0]] + rot[1:][::-1]
+            if forward_len > backward_len:
+                options = [rot]
+            elif backward_len > forward_len:
+                options = [reflected]
+            else:
+                options = [rot, reflected]
+            for opt in options:
+                k = tuple(opt)
+                if k not in seen:
+                    seen.add(k)
+                    out.append((opt, (start, partner)))
+        return out
 
     # ========================================================================
     # VB-5: Main Bridge
