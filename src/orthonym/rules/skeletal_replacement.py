@@ -430,6 +430,28 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         # emit non-PIN forms such as "1-azacyclohepta-2,4,6-triene" for
         # 1H-azepine.  Unsaturated 9- and 10-rings escaped only by accident,
         # via the separate has_aromatic gate in _try_cyclic_replacement_name.
+        #
+        # MEASURED CONSEQUENCE (enumerate: 1274 bare heteromonocycles, sizes
+        # 3-14).  340 rings change name, all of them size 7-10; sizes 3-6 and
+        # 11-14 are untouched.  Of those, 82 now ABSTAIN where they previously
+        # emitted a replacement name.  That is deliberate fail-closed
+        # behaviour, not a lost capability -- P-22.2.7 puts lambda rings on the
+        # same side of the boundary ("1H-1<lambda>4-thiepine (PIN)" at :9496 is
+        # Hantzsch-Widman, while the 14-membered
+        # "1-oxa-4<lambda>4-thiacyclotetradecane (PIN)" at :9486 is
+        # replacement), so the names these rings used to get were not PINs.
+        # They split into two UNBUILT producer gaps, both already fail-closed:
+        #   * 78 rows: hypervalent (lambda-4) S rings in a HYDRO form.
+        #     _name_lambda_heteromonocycle refuses these by documented
+        #     contract ("2,3-dihydro-... unbuilt for lambda rings").
+        #   * 4 rows: 9-membered 2-N rings where
+        #     name_partially_saturated_monocyclic_heterocycle cites locant 1 as
+        #     BOTH a hydro position and indicated hydrogen
+        #     ("1,2,6,7,8,9-hexahydro-1H-1,5-diazonine"); the OPSIN validity
+        #     gate suppresses it, so nothing wrong is emitted.
+        # Zero real-corpus impact: 0 router diffs over pubchem_2000 and
+        # chebi_5000 (7000 molecules) -- neither contains a bare
+        # heteromonocyclic parent hydride of size 7-10.
         if len(ring_info.AtomRings()) == 1:
             if len(ring_info.AtomRings()[0]) <= 10:
                 return None
