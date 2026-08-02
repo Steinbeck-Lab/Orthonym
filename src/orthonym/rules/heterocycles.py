@@ -1134,6 +1134,13 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     # ``2,1,3-oxadiazole`` even though {1,2,3} is the lower set. Ranking the set
     # first silently renumbered every N-O-N / N-S-N ring.
     #
+    # P-22.2.3.2.3 (``:8806``) states the whole cascade verbatim and adds the
+    # third criterion: "... the locant '1' is given to the heteroatom first
+    # cited in the order of seniority ... The direction of numbering is then
+    # chosen to give lower locants to the heteroatoms as a set without regard to
+    # the kind of heteroatom, and then, if necessary, according to the order of
+    # seniority above."  Hence ``senior_at_one`` -> ``het_locs`` -> ``seniority``.
+    #
     # P-14.4 (``:3219``) then continues: (b) indicated hydrogen ``:3246`` before
     # (e)(i) hydro prefixes ``:3287`` -- restated for this exact combination by
     # P-31.2.2 (``:16879``).

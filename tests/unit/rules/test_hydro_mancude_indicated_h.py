@@ -220,10 +220,16 @@ def test_ring_perfect_matchings_contract():
 
                                                                          # noqa
 # ---------------------------------------------------------------------------
-# P-22.2.2.1.3 (BlueBookV2.md:8284) -- "The locant '1' is given to a heteroatom
-# that occurs first in the seniority sequence used for citation of the skeletal
-# replacement ('a') prefixes.  The numbering is THEN chosen to give lowest
-# locants to heteroatoms considered as a set."
+# P-22.2.3.2.3 (BlueBookV2.md:8806) states the complete cascade verbatim:
+# "When heteroatoms of different kinds are present, the locant '1' is given to
+# the heteroatom first cited in the order of seniority given above.  The
+# direction of numbering is then chosen to give lower locants to the heteroatoms
+# as a set without regard to the kind of heteroatom, and then, if necessary,
+# according to the order of seniority above.  Low locants are assigned first to
+# the heteroatoms and then to unsaturated sites.  When required, locants for
+# indicated hydrogen atoms are assigned in accordance with P-14.7."
+# P-22.2.2.1.3 (":8284") gives the same first two criteria for Hantzsch-Widman
+# rings specifically.
 #
 # Senior-at-1 outranks the lowest locant set.  These N-O-N / N-S-N rings are the
 # discriminating case: the heteroatoms are contiguous, so numbering from a ring
@@ -245,6 +251,11 @@ P22_2_2_1_3_ROWS = [
     # 7-ring, three heteroatoms: falsifies the heteroatom-locant-set criterion
     ("C1=CCNOCO1", "2,3-dihydro-7H-1,6,2-dioxazepine"),
     ("C1=CCNOCS1", "2,3-dihydro-7H-1,6,2-oxathiazepine"),
+    # criterion 3, the seniority tie-break: O-S-N with the SAME locant set
+    # {1,2,6} either way, so only "and then, if necessary, according to the
+    # order of seniority" (P-22.2.3.2.3) chooses S at 2 over N at 2.
+    ("C1=CCNOS1", "5,6-dihydro-1,2,6-oxathiazine"),
+    ("C1C=CNOS1", "3,6-dihydro-1,2,6-oxathiazine"),
 ]
 
 
