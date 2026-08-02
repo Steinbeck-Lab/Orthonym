@@ -15,7 +15,8 @@ Phase-171 gold targets (def_id / SMILES / PIN / Blue Book / owning workstream):
   DEF-4  ClCCCCC                -> 1-chloropentane                       (P-14.3.4)    WS-3
   DEF-4  ClCC(F)C               -> 1-chloro-2-fluoropropane              (P-14.3.4)    WS-3
   DEF-4  FCCCl                  -> 1-chloro-2-fluoroethane               (P-14.3.4)    WS-3
-  DEF-3  O=C(O)CCS(=O)(=O)[O-]  -> 2-carboxyethanesulfonate              (P-72.7/P-41) WS-2
+  DEF-3  O=C(O)CCS(=O)(=O)[O-]  -> 2-carboxyethane-1-sulfonate           (P-72.7/P-41) WS-2
+                                    (locant corrected 2026-08-02; see the test)
   DEF-8  O=C(CCl)N(CCCl)CCCl    -> 2-chloro-N,N-bis(2-chloroethyl)acetamide (P-16.3.5) WS-3
   DEF-8  ClCCCCc1ccccc1         -> (4-chlorobutyl)benzene                (P-46)        WS-3
   DEF-8  CCC[Se]C               -> 1-(methylselanyl)propane              (P-16.3.5)    WS-3 (selenide parens)
@@ -70,9 +71,39 @@ def test_def4_1_chloro_2_fluoroethane(namer):
 # forced as principal (P-72/P-74) and orient_chain anchors the sulfonic-acid locant
 # on its attachment carbon, so the neutral COOH is demoted to a 'carboxy' prefix and
 # the sulfonate is the suffix at C1. xfail removed (was strict -> XPASS failed the run).
+# CORRECTED 2026-08-02: this asserted the locant-omitted `2-carboxyethanesulfonate`.
+# The gold oracle was already fixed on 2026-07-23 (v28 Cluster E, VERIFY-GOLD) and this
+# test was never updated with it, so the suite contradicted `gold_pins.json`.
+#
+# P-14.3.4.2 (``:2891``) licence **(b)** (``:2900``) omits the locant '1' only "in
+# **monosubstituted** homogeneous chains consisting of only two identical atoms" —
+# worked example ``CH3-CH2-OH ethanol (PIN)``. HOOC-CH2-CH2-SO3(-) carries TWO
+# substituents on the ethane (carboxy at C2, sulfonate at C1), so it is not
+# monosubstituted, the licence does not reach it, and P-14.3.3 (``:2869``,
+# deny-by-default) requires the locant to be cited.
+#
+# The Blue Book prints exactly this shape, locant and all:
+#   ``:31713``  `2-(acetyloxy)ethane-1-sulfonic acid (PIN)  2-acetoxyethanesulfonic acid`
+#               -- the locant-omitted form is the NON-PIN alternative
+#   ``:31252``  `2-(thiosulfino)ethane-1-sulfonic acid`
+#
+# The producer already draws the distinction correctly, which is the internal-consistency
+# check: `CCS(=O)(=O)[O-]` (monosubstituted) -> `ethanesulfonate`, locant elided per
+# licence (b); `O=C(O)CCS(=O)(=O)[O-]` (disubstituted) -> `2-carboxyethane-1-sulfonate`.
+# Both spellings decode to the same molecule under OPSIN, so this is spelling-only.
 @pytest.mark.unit
 def test_def3_carboxyethanesulfonate(namer):
-    assert namer.name("O=C(O)CCS(=O)(=O)[O-]") == "2-carboxyethanesulfonate"
+    assert namer.name("O=C(O)CCS(=O)(=O)[O-]") == "2-carboxyethane-1-sulfonate"
+
+
+@pytest.mark.unit
+def test_def3_monosubstituted_ethane_sulfonate_still_elides(namer):
+    """The control for the licence boundary: MONOsubstituted keeps eliding.
+
+    Without this, the correction above could be satisfied by a producer that simply
+    always cites the locant — which would be wrong for `ethanesulfonate` (P-14.3.4.2(b)).
+    """
+    assert namer.name("CCS(=O)(=O)[O-]") == "ethanesulfonate"
 
 
 # --- DEF-8 — assembly: bis()/enclosing marks + P-46 compound-substituent locants, WS-3 ---
