@@ -26,11 +26,18 @@ class TestDihydroHW:
         assert orthonym.name_compound("C1CPC1", style="pin") == "phosphetane"
 
     def test_dihydroazepine_boundary(self):
-        # 7-ring mancude needs 1 indicated-H → the new dihydro-HW branch (gate b)
-        # DECLINES, so this ring is left to its pre-existing namer. At HEAD
-        # 86fa454a that emits the RT-verified replacement PIN below (the plan's
-        # None/unknown expectation was stale, from older HEAD 7d00a785). The
-        # boundary that matters: the new branch must NOT emit a 'dihydroazepine'.
+        # A 7-membered ring is Hantzsch-Widman territory: P-22.2.3
+        # (BlueBookV2.md:8482) "Mancude and saturated heteromonocyclic
+        # compounds with up to and including ten ring members are named by the
+        # extended Hantzsch-Widman system".  Partial saturation is expressed as
+        # hydro prefixes on that mancude parent -- P-31.2.3.1 (:16906), whose
+        # own PIN examples include 2,7-dihydro-1H-azepine (:16920) and
+        # 4,5-dihydro-3H-azepine (:16888).
+        #
+        # This assertion previously demanded "1-azacyclohepta-2,4-diene",
+        # justified in-comment as an "RT-verified replacement PIN".  An OPSIN
+        # round-trip proves a name denotes the right STRUCTURE; it never
+        # decides which name is PREFERRED, and no Blue Book rule was cited for
+        # sending an unsaturated 7-ring to replacement nomenclature.
         out = orthonym.name_compound("C1CC=CC=CN1", style="pin")
-        assert out == "1-azacyclohepta-2,4-diene"
-        assert "dihydro" not in (out or "")
+        assert out == "2,3-dihydro-1H-azepine"

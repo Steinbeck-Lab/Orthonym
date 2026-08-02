@@ -151,36 +151,52 @@ class TestPinTriggerEndToEnd:
 
 @pytest.mark.unit
 class TestUnsaturatedCyclicReplacement:
-    """Test unsaturated large heterocyclic ring replacement naming."""
+    """Test unsaturated large heterocyclic ring replacement naming.
 
-    def test_oxacycloheptadiene(self):
-        """7-member ring with O and 2 double bonds."""
-        mol = Chem.MolFromSmiles('C1=CC=COCC1')
+    P-22.2.3 (``BlueBookV2.md:8482``) fixes the boundary by RING SIZE, not by
+    saturation: "Mancude and saturated heteromonocyclic compounds with up to
+    and including ten ring members are named by the extended Hantzsch-Widman
+    system (see P-22.2.2). For monocyclic rings with eleven and more ring
+    members, skeletal replacement ('a') nomenclature (see P-15.4) is used".
+
+    These cases therefore use 11-membered rings.  The 7- and 8-membered
+    versions they used to assert belong to Hantzsch-Widman and are covered by
+    ``test_hw_vs_replacement_boundary.py``.
+    """
+
+    def test_oxacycloundecapentaene(self):
+        """11-member ring with O, mancude -> replacement ('a') nomenclature."""
+        mol = Chem.MolFromSmiles('O1C=CC=CC=CC=CC=C1')
         result = try_skeletal_replacement_name(mol)
         assert result is not None
         assert 'oxa' in result
-        assert 'diene' in result
+        assert 'pentaene' in result
 
-    def test_oxacyclooctatriene(self):
-        """8-member ring with O and 3 double bonds."""
-        mol = Chem.MolFromSmiles('O1C=CC=CC=CC1')
+    def test_oxacycloundecene(self):
+        """11-member ring with O and one double bond."""
+        mol = Chem.MolFromSmiles('O1CCCCCCCC=CC1')
         result = try_skeletal_replacement_name(mol)
         assert result is not None
         assert 'oxa' in result
-        assert 'triene' in result
+        assert 'ene' in result
 
-    def test_oxacyclooctadiene(self):
-        """8-member ring with O and 2 double bonds."""
-        mol = Chem.MolFromSmiles('C1=CC=COCCC1')
-        result = try_skeletal_replacement_name(mol)
-        assert result is not None
-        assert 'oxa' in result
-        assert 'diene' in result
+    def test_unsaturated_seven_and_eight_rings_decline(self):
+        """P-22.2.3: <=10 ring members are Hantzsch-Widman territory.
+
+        These four used to be asserted as replacement names; the expectation
+        was recorded from observed output and carried no Blue Book citation.
+        """
+        for smiles in ('C1=CC=COCC1',     # 7-ring, O, 2 C=C
+                       'O1C=CC=CC=CC1',   # 8-ring, O, 3 C=C
+                       'C1=CC=COCCC1'):   # 8-ring, O, 2 C=C
+            mol = Chem.MolFromSmiles(smiles)
+            assert try_skeletal_replacement_name(mol) is None, smiles
 
     def test_saturated_still_works(self):
         """C6b: a saturated 2-heteroatom 9-ring now takes the Hantzsch-Widman
         PIN (1,4-dioxonane, P-22.2.2.1), so skeletal replacement DECLINES.
-        Unsaturated medium heterorings (below) still keep skeletal replacement.
+        Unsaturated medium heterorings decline too -- P-22.2.3 makes the
+        boundary ring size alone, not saturation.
         """
         from orthonym import name_compound
         mol = Chem.MolFromSmiles('C1COCCOCCC1')  # saturated dioxa 9-ring
@@ -195,11 +211,16 @@ class TestUnsaturatedCyclicReplacement:
         assert result is None
 
     def test_no_double_vowel(self):
-        """Name should not have double vowels at prefix-suffix junction."""
-        mol = Chem.MolFromSmiles('C1=CC=COCCC1')  # 8-member, O, 2 DB
+        """Name should not have double vowels at prefix-suffix junction.
+
+        Moved from an 8-membered ring (now Hantzsch-Widman territory, see
+        P-22.2.3) to an 11-membered one, where the replacement builder that
+        this elision property belongs to still runs.
+        """
+        mol = Chem.MolFromSmiles('O1CCCCCCCC=CC1')  # 11-member, O, 1 DB
         result = try_skeletal_replacement_name(mol)
         assert result is not None
-        # Should not contain "octaadiene" or "octaene" - should be "octadiene"
+        # Should not contain "undecaaene"/"undecaene" - should be "undec-3-ene"
         assert 'aa' not in result
         assert 'ae' not in result
 

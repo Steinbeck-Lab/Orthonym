@@ -402,28 +402,37 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
                 break
         if not all_rings_large_hetero:
             return None
-        # P-22.2.2.1: saturated heterocyclic rings of size 3-10 use
-        # Hantzsch-Widman naming (oxepane/azepane, and mixed-heteroatom PINs
-        # such as 1,4-oxazepane / 1,4-diazepane / 1,4-thiazepane), NOT cyclic
-        # skeletal ("aza"/"oxa") replacement. Route ALL saturated 7-10 single-
-        # ring heterocycles back to the HW namer here (return None) regardless
-        # of how many heteroatoms they carry — the HW builder emits the correct
-        # collected-locant PIN. Only UNSATURATED single-rings (mancude/partial)
-        # and rings > 10 keep cyclic replacement (P-22.1.3); those fall through.
+        # P-22.2.3 "Heteromonocyclic hydrides named by skeletal replacement
+        # ('a') nomenclature" opens by fixing this boundary, and it is RING
+        # SIZE ALONE -- saturation plays no part:
+        #
+        #   "Mancude and saturated heteromonocyclic compounds with up to and
+        #    including ten ring members are named by the extended
+        #    Hantzsch-Widman system (see P-22.2.2). For monocyclic rings with
+        #    eleven and more ring members, skeletal replacement ('a')
+        #    nomenclature (see P-15.4) is used for the fully saturated or
+        #    fully unsaturated compounds ([n]annulenes)."
+        #
+        # Confirmed independently by P-51.4.2.1 ("...for heteromonocyclic
+        # compounds having more than ten ring atoms") and by P-52.2.2.2
+        # ("Preferred IUPAC names for heteromonocyclic rings with no more than
+        # ten ring members are Hantzsch-Widman names").
+        #
+        # So every single heteromonocycle of ten atoms or fewer goes back to
+        # the HW namer, which owns both the mancude parent (1H-azepine,
+        # azocine, 2H-oxocine) and the partially saturated forms, expressed as
+        # hydro prefixes on that parent per P-31.2.3.1 (2,3-dihydro-1H-azepine,
+        # 4,5,6,7-tetrahydro-1,4-thiazepine).  Only rings of ELEVEN or more
+        # fall through to cyclic replacement.
+        #
+        # This test used to also require every ring bond to be single, which
+        # let unsaturated 7- and 8-membered rings reach replacement naming and
+        # emit non-PIN forms such as "1-azacyclohepta-2,4,6-triene" for
+        # 1H-azepine.  Unsaturated 9- and 10-rings escaped only by accident,
+        # via the separate has_aromatic gate in _try_cyclic_replacement_name.
         if len(ring_info.AtomRings()) == 1:
-            _ring = ring_info.AtomRings()[0]
-            _rsize = len(_ring)
-            if 7 <= _rsize <= 10:
-                # Check saturation: any double/triple ring bond?
-                _all_single = all(
-                    mol.GetBondBetweenAtoms(_ring[i], _ring[(i + 1) % _rsize])
-                    .GetBondTypeAsDouble() == 1.0
-                    for i in range(_rsize)
-                )
-                if _all_single:
-                    # HW namer owns saturated 7-10 rings: oxepane, azepane,
-                    # 1,4-oxazepane, 1,4-diazepane, 1,4-thiazepane, ...
-                    return None
+            if len(ring_info.AtomRings()[0]) <= 10:
+                return None
         # For large heterocyclic rings (>= 11, or unsaturated/multi-heteroatom
         # 7-10-rings), try cyclic replacement naming per IUPAC P-22.1.3.
         # Keep the "no priority FGs" gate.

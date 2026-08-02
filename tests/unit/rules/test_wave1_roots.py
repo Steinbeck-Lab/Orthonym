@@ -91,8 +91,15 @@ def test_r5_medium_rings_use_hantzsch_widman():
     (oxepane/oxocane/oxonane/oxecane), not '1-oxacyclo...ane' skeletal replacement.
 
     C6b (completes 1.7) extends this to SATURATED MULTI-heteroatom medium rings:
-    they too take the HW PIN (1,4-dioxepane), not the replacement form. Only
-    UNSATURATED single-rings and rings > 10 keep skeletal replacement.
+    they too take the HW PIN (1,4-dioxepane), not the replacement form.
+
+    P-22.2.3 (``BlueBookV2.md:8482``) then settles the unsaturated half, which
+    P-22.2.2.1 above does not speak to: "Mancude and saturated heteromonocyclic
+    compounds with up to and including ten ring members are named by the
+    extended Hantzsch-Widman system (see P-22.2.2). For monocyclic rings with
+    eleven and more ring members, skeletal replacement ('a') nomenclature (see
+    P-15.4) is used".  The boundary is ring size alone.  ONLY rings > 10 keep
+    skeletal replacement.
     """
     assert name_compound("O1CCCCCC1", style="pin") == "oxepane"    # 7
     assert name_compound("O1CCCCCCC1", style="pin") == "oxocane"   # 8
@@ -103,8 +110,10 @@ def test_r5_medium_rings_use_hantzsch_widman():
     assert "oxacycloundecane" in name_compound("O1CCCCCCCCCC1", style="pin")
     # C6b: saturated 2-heteroatom 7-ring now takes the HW PIN (was replacement).
     assert name_compound("O1CCOCCC1", style="pin") == "1,4-dioxepane"
-    # REGRESSION GUARD: UNSATURATED 7-rings stay on replacement (NOT forced to HW).
-    assert name_compound("O1CCCCC=C1", style="pin") == "1-oxacyclohept-2-ene"
+    # P-22.2.3 + P-31.2.3.1: an UNSATURATED 7-ring is HW too, with the degree of
+    # hydrogenation carried by hydro prefixes on the mancude parent (oxepine).
+    # Hydro prefixes take the lowest locants, giving '2,3,4,5' not '4,5,6,7'.
+    assert name_compound("O1CCCCC=C1", style="pin") == "2,3,4,5-tetrahydrooxepine"
 
 
 # ---------------------------------------------------------------------------
