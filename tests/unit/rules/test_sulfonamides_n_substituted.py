@@ -120,6 +120,19 @@ def test_unsymmetric_n_n_disubstituted_is_alphabetised():
     ("CS(=O)NC",           "sulfINamide: no FG perception exists, separate class"),
     ("CC(=O)NC",           "carboxamide, not a sulfonamide"),
     ("NS(=O)(=O)N",        "sulfuric diamide: both N unsubstituted"),
+    # -- one mutation-test target each, so each guard has a witness ---------
+    ("CNS(=O)(=O)c1ccc(cc1)S(=O)(=O)NC",
+     "DIsulfonamide: needs the superscripted N^1/N^3 locants of "
+     "P-66.1.1.3.1.1, which are not built here"),
+    ("CNS(=O)(=O)N",  "sulfamide: the excised parent is 'sulfuric diamide', "
+                      "NOT a sulfonamide, so prefixing 'N-methyl' would name "
+                      "a different class"),
+    ("CNS(=O)(=O)NC", "N,N'-disubstituted sulfamide: same, two amide N"),
+    ("O=S1(=O)CCCN1", "cyclic sulfonamide (sultam): the branch loops back to S"),
+    ("O=S1(=O)CCCCN1", "cyclic sulfonamide (sultam)"),
+    ("CS(=O)(=O)NO",  "N-hydroxy: a heteroatom N-substituent is P-66.1.1.3.2 "
+                      "territory, a different construction"),
+    ("CS(=O)(=O)NN",  "N-amino: heteroatom N-substituent"),
 ])
 def test_fails_closed_outside_the_class(smiles, why):
     assert _name(smiles) is None, why

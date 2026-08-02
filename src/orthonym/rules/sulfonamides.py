@@ -75,6 +75,24 @@ MEASURED CLASS BOUNDARY (fails closed outside it)
   group perception in this tree at all, so even the UNSUBSTITUTED
   ``methanesulfinamide`` is unnameable; that is a separate unbuilt class.
 * carbon-attached N-substituents only.
+
+MEASURED GUARD REDUNDANCY (do not "simplify" this away without re-measuring)
+---------------------------------------------------------------------------
+12 mutations were applied to this module. Only THREE are killable at all --
+disabling ``_parent_hydride_is_unsubstituted``, dropping the ``N-`` prefix, and
+allowing a heteroatom N-substituent. The other nine (ring N, >1 sulfonamide
+unit, the parent-suffix check, the empty-branch check, the sultam loop-back, >2
+branches, branch disjointness, the two-``=O`` count, branch ORDER) are
+EQUIVALENT MUTANTS: over a 33-molecule probe set covering every one of their
+target shapes, no input distinguishes mutant from original, because each is
+masked by an earlier guard -- e.g. a ring nitrogen is rejected by
+``IsInRing`` before the sultam loop-back can see it, and branch order is
+irrelevant because ``format_n_substitution`` sorts internally.
+
+They are kept deliberately: each names a distinct refusal reason at the point a
+reader would look for it. But NONE of them is individually load-bearing today,
+so a test asserting one of them in isolation cannot fail, and a future edit that
+removes an EARLIER guard silently promotes a later one to load-bearing.
 """
 from __future__ import annotations
 
