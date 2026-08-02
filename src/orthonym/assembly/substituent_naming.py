@@ -3815,9 +3815,23 @@ def _check_retained_substituent(
     # a heteroatom-bearing fragment (e.g. -C(CH3)2CH2OH) satisfied the old
     # carbon-count test and was silently flattened to 'tert-butyl', DROPPING
     # the heteroatom (wrong constitution; SELF-01 was the only safety net).
+    # R3 follow-up: the fragment must also be ACYCLIC. `tert-butyl` is an
+    # acyclic prefix (P-29.6.1, Blue Book 16196 / 16286), but the three tests
+    # above are all satisfied by **1-methylcyclopropyl**, whose attachment
+    # carbon has two RING neighbours plus a methyl -- 4 carbons, 3 carbon
+    # neighbours, no heteroatom. `NC(=O)NC1(C)CC1` was therefore named
+    # `N-tert-butylurea`: the cyclopropane ring opened into a chain, a
+    # different molecule that happens to share the C4H9 formula, and SELF-01
+    # was the only thing that caught it.
+    #
+    # Same class as the heteroatom hardening noted just above, and of
+    # : a COUNT is not
+    # a constitution. The ring test is structural (RDKit ring membership), not
+    # another tally.
     if (carbon_count == 4 and len(c_neighbors_in_frag) == 3
             and all(mol.GetAtomWithIdx(i).GetSymbol() == 'C'
-                    for i in sub_atoms)):
+                    for i in sub_atoms)
+            and not any(mol.GetAtomWithIdx(i).IsInRing() for i in sub_atoms)):
         # tert-butyl: C(CH3)3 -- 3 carbon branches at the attachment carbon.
         return "tert-butyl"
 

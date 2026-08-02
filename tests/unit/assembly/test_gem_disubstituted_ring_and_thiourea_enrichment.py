@@ -337,6 +337,43 @@ def test_cyanamide_complete_names_are_not_enriched(namer, smiles, expected):
     assert _name(namer, smiles) == expected
 
 
+def test_retained_tert_butyl_never_names_a_ring():
+    """PRODUCER-level. ``tert-butyl`` is ACYCLIC (P-29.6.1, BB:16196/:16286).
+
+    The retained matcher accepted any fragment with 4 carbons, 3 carbon
+    neighbours at the attachment atom, and no heteroatom -- and
+    **1-methylcyclopropyl** satisfies all three (its attachment carbon has two
+    RING neighbours plus the methyl). So `NC(=O)NC1(C)CC1` was named
+    `N-tert-butylurea`: a cyclopropane ring opened into a chain, a different
+    molecule with the same C4H9 formula, caught only by SELF-01.
+
+    Exactly the class of
+     -- the same
+    matcher had already been hardened once, against heteroatoms, without
+    anyone adding a ring check.
+    """
+    from orthonym.assembly.substituent_naming import _check_retained_substituent
+    from orthonym.assembly.substituent_enumerator import name_substituent
+    mol = Chem.MolFromSmiles("NC(=O)NC1(C)CC1")
+    frag = [4, 5, 6, 7]                       # 1-methylcyclopropyl, attach = 4
+    assert mol.GetAtomWithIdx(4).IsInRing()
+    assert _check_retained_substituent(mol, frag, 4) != "tert-butyl"
+    assert name_substituent(mol, set(frag), 4) == "1-methylcyclopropyl"
+    # the genuine acyclic tert-butyl must still be retained
+    tb = Chem.MolFromSmiles("CC(C)(C)NC(=O)N")
+    assert _check_retained_substituent(tb, [0, 1, 2, 3], 1) == "tert-butyl"
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("NC(=O)NC1(C)CC1",  "N-(1-methylcyclopropyl)urea"),
+    ("NC(=S)NC1(C)CC1",  "N-(1-methylcyclopropyl)thiourea"),
+    ("CC(C)(C)NC(=O)N",  "N-tert-butylurea"),
+    ("CC(C)(C)NC(=S)N",  "N-tert-butylthiourea"),
+])
+def test_cyclopropyl_is_not_flattened_to_tert_butyl(namer, smiles, expected):
+    assert _name(namer, smiles) == expected
+
+
 def test_gap_b_letter_locant_not_a_numeral(namer):
     """P-66.1.6.1.3.1 (:33439/:33446): numerals are general nomenclature only."""
     got = _name(namer, "NC(=S)NC1CCCCC1")
