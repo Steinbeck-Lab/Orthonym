@@ -53,7 +53,23 @@ class TestPolyfunctionalAcidStemPrefix:
     @pytest.mark.parametrize("smiles,expected", [
         ("CS(=O)CCO", "2-(methanesulfinyl)ethan-1-ol"),
         ("OCCS(C)(=O)=O", "2-(methanesulfonyl)ethan-1-ol"),
-        ("CS(=O)CC(=O)O", "2-(methanesulfinyl)ethanoic acid"),
+        # CORRECTED 2026-08-02. Asserted `2-(methanesulfinyl)ethanoic acid`
+        # until now -- an over-generalisation from the `ethan-1-ol` /
+        # `ethan-1-amine` siblings above. Acetic acid does NOT behave like
+        # ethanol here: it is a RETAINED name that keeps its retained form
+        # under substitution AND drops the locant.
+        #   BB:2010  `CH3-COOH acetic acid (PIN) ethanoic acid`
+        #            -- `ethanoic acid` is the non-PIN alternative.
+        #   BB:3037  `difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)`
+        #            -- the substituted form keeps `acetic acid` and the
+        #            locant is explicitly marked "not".
+        #   BB:4967  `sulfanylacetic acid (PIN)` -- a SULFUR substituent on
+        #            acetic acid, the direct analogue of this row.
+        #   BB:2039  `(1H-indol-1-yl)acetic acid (PIN)`, P-13.1.
+        # The old value was thus non-PIN on both counts. Both spellings parse
+        # to the same molecule under OPSIN, so this is a spelling correction,
+        # not a structural one.
+        ("CS(=O)CC(=O)O", "(methanesulfinyl)acetic acid"),
         ("CS(=O)CCN", "2-(methanesulfinyl)ethan-1-amine"),
     ])
     def test_prefix_form(self, smiles, expected):
@@ -73,13 +89,32 @@ def _validity_gate_on(monkeypatch):
 
 @pytest.mark.unit
 class TestConservation:
-    def test_beyond_unit_atoms_decline(self, _validity_gate_on):
-        # -S-CH3 beyond the sulfoxide unit: the FC walk used to emit
-        # 'ethyl methyl sulfoxide' (a different molecule). Now fail-closed;
-        # the PIN 1-(methanesulfinyl)-2-(methylsulfanyl)ethane (BB 18284)
-        # needs the thioether principal-group demotion — documented T3b
-        # deferral (same prefix-only debt as ether).
-        assert name_compound("CSCCS(=O)C") == "unknown organic compound"
+    def test_beyond_unit_atoms_are_named_not_dropped(self, _validity_gate_on):
+        """The atoms beyond the sulfoxide unit survive — now positively.
+
+        History: the old functional-class walk emitted `ethyl methyl sulfoxide`
+        for this, silently losing the `-S-CH3` — a DIFFERENT molecule. T3b made
+        it fail closed (`unknown organic compound`) and this test asserted that
+        abstention, recording the real PIN as a deferral in its own comment:
+        "the PIN 1-(methanesulfinyl)-2-(methylsulfanyl)ethane (BB 18284) needs
+        the thioether principal-group demotion — documented T3b deferral".
+
+        CORRECTED 2026-08-02: that deferral has since closed and the producer
+        now emits exactly the PIN the comment named. Verified verbatim at
+        ``BlueBookV2.md:18284``::
+
+            CH3-S-CH2-CH2-SO-CH3
+            1-(methanesulfinyl)-2-(methylsulfanyl)ethane (PIN)
+            (C > sulfide and sulfoxide)
+
+        The conservation intent is unchanged and is now asserted POSITIVELY —
+        naming every atom is a strictly stronger guarantee than declining to
+        name any. Confirmed pre-existing (identical at the session-start commit
+        `6de1a105`), so this is a stale expectation, not a regression.
+        """
+        assert name_compound("CSCCS(=O)C") == (
+            "1-(methanesulfinyl)-2-(methylsulfanyl)ethane"
+        )
 
     def test_benzyl_side_declines(self, _validity_gate_on):
         # A benzyl side is not an honestly-nameable FC side (the old walk
