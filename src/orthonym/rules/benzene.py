@@ -4437,36 +4437,57 @@ def _name_substituted_benzamide(
     Returns:
         IUPAC name like "4-methylbenzamide" or "N-methylbenzamide"
     """
-    # Build N-substituent prefix part
-    from ..assembly.naming_utils import _wrap_n_substituent
-    n_prefix = ""
-    if n_substituents:
-        if len(n_substituents) == 1:
-            n_prefix = f"N-{_wrap_n_substituent(n_substituents[0])}"
-        elif len(n_substituents) == 2 and n_substituents[0] == n_substituents[1]:
-            mp = get_multiplier_prefix(2, n_substituents[0])
-            n_prefix = f"N,N-{mp}{_wrap_n_substituent(n_substituents[0])}"
-        else:
-            # Different N-substituents
-            parts = [f"N-{_wrap_n_substituent(name)}" for name in n_substituents]
-            n_prefix = "-".join(parts)
-
-    if not prefix_groups and not n_prefix:
+    if not prefix_groups and not n_substituents:
         return "benzamide"
 
     # Renumber relative to amide position (amide = position 1)
     renumbered_groups = _renumber_relative_to(prefix_groups, amide_locant)
 
-    # Build ring-substituent prefixes
-    ring_prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
+    # ------------------------------------------------------------------ #
+    # P-16.3.3 (:7038) clause (b) (:7067) -- ONE multiplying prefix per   #
+    # substituent NAME, over the WHOLE locant set.                        #
+    # ------------------------------------------------------------------ #
+    # The N-substituents used to be spelled into their own string and glued in
+    # front of the ring-prefix string. That produced TWO distinct defects, both
+    # of which round-tripped cleanly through OPSIN + InChIKey (a round trip
+    # proves the STRUCTURE, never the SPELLING):
+    #
+    #   MERGE  CNC(=O)c1ccc(C)cc1  -> N-methyl-4-methylbenzamide
+    #                                 PIN N,4-dimethylbenzamide      (:32879)
+    #   ORDER  CNC(=O)c1cccc(Cl)c1 -> N-methyl-3-chlorobenzamide
+    #                                 PIN 3-chloro-N-methylbenzamide (:32881)
+    #
+    # They are NOT one defect. `chloro` and `methyl` are different names and can
+    # never merge -- that one is purely P-14.5.2 alphanumerical ORDER, and the
+    # Blue Book settles the direction with a sulfonamide PIN that cites the
+    # parent's `3-chloro` BEFORE the N-prefix (:32881).
+    #
+    # Both vanish under one structural change: multiplicity is a property of the
+    # substituent NAME, not of which atom carries it (P-16.3.3(b), whose own
+    # example list prints `dimethyl`), so an N-methyl and a ring 4-methyl are ONE
+    # group of two. Put the N-substituents in the SAME name-keyed bucket carrying
+    # the italic locant 'N', and `_build_prefix_string_with_locants` then does the
+    # merging (name-keyed dict + count) and the alphanumerical ordering
+    # (alpha_sort_key) that it already did for ring substituents alone.
+    #
+    # P-14.3.3 "Citation of locants" (:2869) is deny-by-default, so the whole
+    # merged set is cited: `N,4-`. The Blue Book's own mixed italic/numeral sets
+    # confirm the rendering -- `N,N,N,1-tetramethyl...` (:42213) and
+    # `N,1,4-triphenyl...` (:42460) -- and `format_substituent_prefix` already
+    # reproduces both byte-exactly, so NO new prefix formatter is added here.
+    #
+    # This is the same move `rules/heterocycles.py` makes for ring-N substituents
+    # (Task P). It differs in one respect worth stating: there the ring N is a
+    # NUMBERED skeletal atom and takes an arabic numeral, whereas an amide N is
+    # not numbered and keeps its italic 'N' -- which is exactly why the merged
+    # set here is mixed, and why `locant_sort_key` is needed to order it.
+    merged: Dict[str, List] = {
+        name: list(locants) for name, locants in renumbered_groups.items()
+    }
+    for sub_name in n_substituents:
+        merged.setdefault(sub_name, []).append("N")
 
-    # Combine N-prefix and ring-prefix
-    if n_prefix and ring_prefix_part:
-        return f"{n_prefix}-{ring_prefix_part}benzamide"
-    elif n_prefix:
-        return f"{n_prefix}benzamide"
-    else:
-        return f"{ring_prefix_part}benzamide"
+    return f"{_build_prefix_string_with_locants(merged, mono_needs_locant=True)}benzamide"
 
 
 def _name_substituted_benzenesulfonamide(
@@ -4861,9 +4882,15 @@ def _build_prefix_string_with_locants(
     if not prefix_groups:
         return ""
 
+    from ..assembly.naming_utils import locant_sort_key
+
     prefixes = []
     for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
-        locants = prefix_groups[name]
+        # P-14.3.3 (:2869): the whole locant set of the group is cited, in order.
+        # A MERGED group may hold italic ('N') and numeric locants together, and
+        # sorted(['N', 4]) raises TypeError -- locant_sort_key puts the italic
+        # letters first, matching `N,N,N,1-tetramethyl...` (:42213).
+        locants = sorted(prefix_groups[name], key=locant_sort_key)
         count = len(locants)
 
         prefix_str = format_substituent_prefix(name, locants, count)
@@ -4985,11 +5012,18 @@ def _join_benzene_prefixes(prefixes: List[str]) -> str:
             last_char = result[-1]
             first_char = current[0]
 
-            # Hyphen needed between alpha/closing-mark and digit
+            # Hyphen needed between alpha/closing-mark and a following LOCANT
             # e.g. "1-(N,N-dimethylamino)" + "4-amino" needs a hyphen after ")";
             # likewise after a bracket/brace-closed complex prefix
             # ("1-[4-(1-chloroethyl)phenoxy]" + "4-methyl", P-45.6).
-            if (last_char.isalpha() or last_char in ')]}') and first_char.isdigit():
+            #
+            # The test used to be `first_char.isdigit()`, which misses an ITALIC
+            # locant because it starts with a LETTER: "3-chloro" + "N-methyl"
+            # glued into "3-chloroN-methylbenzamide". OPSIN parsed that to the
+            # correct InChIKey, so no structural oracle could catch it.
+            from ..assembly.naming_utils import starts_with_locant
+            if ((last_char.isalpha() or last_char in ')]}')
+                    and (first_char.isdigit() or starts_with_locant(current))):
                 result += "-"
 
         result += current

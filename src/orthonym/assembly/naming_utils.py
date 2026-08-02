@@ -2507,6 +2507,84 @@ def _is_fully_enclosed(name: str) -> bool:
     return False
 
 
+_ITALIC_LOCANT_LETTERS = frozenset({
+    "N", "O", "S", "P", "C", "B", "Si", "Se", "Te", "As", "Sb", "Bi", "Al",
+})
+
+
+def _is_locant_token(token: str) -> bool:
+    """True iff ``token`` is a single locant: ``4``, ``N``, ``N'``, ``N1``."""
+    text = token.strip().rstrip("'′″")
+    if not text:
+        return False
+    if text.isdigit():
+        return True
+    # An italic heteroatom locant, optionally with a superscripted index (N1, N3).
+    head = text.rstrip("0123456789")
+    return bool(head) and head in _ITALIC_LOCANT_LETTERS
+
+
+def starts_with_locant(prefix: str) -> bool:
+    """True iff a formatted substituent prefix opens with a locant set.
+
+    ``'4-chloro'`` and ``'N-methyl'`` and ``'N,4-dimethyl'`` -> True;
+    ``'chloro'`` and ``'methyl'`` -> False.
+
+    WHY: a locant is always separated from the preceding prefix by a hyphen, and
+    the benzene joiner used to test only ``first_char.isdigit()``. An ITALIC
+    locant starts with a letter, so a merged prefix list glued together as
+    ``3-chloroN-methylbenzamide`` -- which OPSIN parsed to the correct InChIKey,
+    the documented failure mode where a structural oracle cannot see a spelling
+    defect. Deciding a separator during assembly is not a post-processor; nothing
+    here rewrites a finished name.
+
+    Fails SAFE: an unrecognised head returns False, i.e. the previous behaviour.
+    """
+    head, sep, _rest = prefix.partition("-")
+    if not sep or not head:
+        return False
+    return all(_is_locant_token(tok) for tok in head.split(","))
+
+
+def locant_sort_key(locant) -> Tuple[int, int, str]:
+    """Order one locant within a substituent group's locant set.
+
+    ITALIC LETTER locants (``N``, ``N'``, ``O``, ``S``) sort BEFORE arabic
+    numerals; numerals then sort numerically, and same-letter italics
+    lexically. The Blue Book's own mixed sets are the authority:
+
+    * ``:42213`` ``*N*,*N*,*N*,1-tetramethylquinolin-1-ium-3-aminium (PIN)``
+    * ``:42460`` ``*N*,1,4-triphenyl-1*H*-1,2,4-triazol-4-ium-3-aminide (PIN)``
+
+    Both show the italic letters leading and ONE multiplying prefix spanning the
+    whole set -- which is P-16.3.3 (``:7038``) clause (b) (``:7067``), "the basic
+    numerical prefixes 'di', 'tri', 'tetra', etc. are used to indicate a
+    multiplicity of: ... simple substituent prefixes", whose own example list
+    prints ``dimethyl``. Multiplicity is a property of the substituent NAME, not
+    of which atom carries it, so an ``N``-methyl and a ring/chain ``methyl`` are
+    ONE group of two. P-14.3.3 "Citation of locants" (``:2869``) is then
+    deny-by-default and requires the whole locant set to be cited.
+
+    WHY THIS EXISTS AS A SHARED HELPER: a merged group holds ``int`` and ``str``
+    locants together, and ``sorted(["N", 4])`` raises TypeError. Every producer
+    that merges an italic bucket into a numeric one needs exactly this key, so it
+    lives here rather than being re-derived per producer.
+
+    ``format_substituent_prefix`` already renders a merged set correctly once it
+    is ordered -- it reproduces both Blue Book examples byte-exactly -- so NO new
+    prefix formatter is introduced. (That function's own docstring records "do
+    NOT add a 4th" predicate; this helper deliberately obeys that.)
+    """
+    if isinstance(locant, bool):  # bool is an int subclass; never a locant
+        raise TypeError(f"bad locant {locant!r}")
+    if isinstance(locant, int):
+        return (1, locant, "")
+    text = str(locant)
+    if text.isdigit():
+        return (1, int(text), "")
+    return (0, 0, text)
+
+
 def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     """Format a substituent with locants and multiplier prefix.
 
