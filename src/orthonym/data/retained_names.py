@@ -158,6 +158,17 @@ RETAINED_NAMES = {
     "c1cnsc1": "1,2-thiazole",  # PIN (was 'isothiazole')
     "c1ccsn1": "1,2-thiazole",  # Alternate input form
     "c1nnn[nH]1": "1H-tetrazole",  # this tautomer = 1H- (OPSIN-RT verified)
+    # The OPSIN import surface carries this key as 's-triazole', a general
+    # (CAS-style) name that is NOT a PIN, and it was live: `c1nc[nH]n1` emitted
+    # `s-triazole`, and once the N-substituted form began resolving here it
+    # assembled as the malformed `1-methyls-triazole`. The PIN is the HW name
+    # plus its indicated hydrogen: P-14.7.1 (`BlueBookV2.md:3721`) "in a
+    # preferred IUPAC name a locant and the symbol 'H' must be cited", over the
+    # HW name the Blue Book's own glossary spells out at `:1832`
+    # ("for example 1,2,4-triazole and 1,2-oxazole"); `:42460` prints the parent
+    # inside a PIN verbatim -- `N,1,4-triphenyl-1H-1,2,4-triazol-4-ium-3-aminide
+    # (PIN)`. Hand-curated wins the merge, so this row is what ships.
+    "c1nc[nH]n1": "1H-1,2,4-triazole",
     # 5-membered heteroarenes with THREE heteroatoms (>=1 N): Hantzsch-Widman
     # PINs (P-25.2.1; furazan is general-only, PIN = 1,2,5-oxadiazole per
     # P-31.1.4.2.4 / BlueBookV2 line 14717). No indicated H (all ring N are
