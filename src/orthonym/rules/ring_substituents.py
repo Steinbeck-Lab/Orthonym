@@ -3131,9 +3131,36 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
             return None  # mixed-saturation carbocycle: ene-locants needed
 
     # --- per-atom substituent detection (whole-ring guard) ------------------
-    parent_nbrs = {nbr.GetIdx() for nbr in
-                   mol.GetAtomWithIdx(attachment_atom).GetNeighbors()
-                   if nbr.GetIdx() not in ring_set}
+    # Only the ONE bond that leaves the fragment is the free valence to the
+    # parent; every other exocyclic neighbour of the attachment atom is a
+    # genuine decoration and must be named.
+    #
+    # This used to skip ALL exocyclic neighbours of the attachment atom. On a
+    # mono-substituted attachment carbon there is exactly one, so "skip them
+    # all" and "skip the parent bond" coincide and the defect is invisible --
+    # which is why it survived. On a GEM-DISUBSTITUTED attachment carbon the
+    # ring's own substituent was discarded together with the parent bond,
+    # `atom_prefixes` came back empty, and the "nothing to decorate" guard
+    # below returned None: `N-(1-methylcyclohexyl)acetamide` was unreachable
+    # while `N-(4,4-dimethylcyclohexyl)acetamide` (gem AWAY from the
+    # attachment) always worked.
+    #
+    # The parent bond is identified STRUCTURALLY -- the exocyclic neighbour
+    # lying outside the fragment being named -- never by a count or an index
+    # ().
+    _exo_nbrs = {nbr.GetIdx() for nbr in
+                 mol.GetAtomWithIdx(attachment_atom).GetNeighbors()
+                 if nbr.GetIdx() not in ring_set and nbr.GetAtomicNum() > 1}
+    if expected_atoms is not None:
+        parent_nbrs = _exo_nbrs - set(expected_atoms)
+    elif len(_exo_nbrs) > 1:
+        # No fragment scope was supplied, so which of these bonds leaves the
+        # fragment is genuinely undecidable here. Treating them all as the
+        # parent bond would DROP a decoration and name a different molecule,
+        # so fail closed and let the caller keep its legacy form.
+        return None
+    else:
+        parent_nbrs = _exo_nbrs
     atom_prefixes: Dict[int, List[str]] = {}
     covered_all: Set[int] = set()
     for idx in ring_list:

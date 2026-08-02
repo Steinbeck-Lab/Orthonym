@@ -278,7 +278,20 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
     # Also exclude FG atoms for non-principal-group FGs that are already
     # in the handler's detection key (e.g., isocyanate, urea, guanidine,
     # carbamate). These handlers fire via functional_groups.get(fg) checks.
-    for _fg_key in ('isocyanate', 'isothiocyanate', 'carbamic_acid',
+    #
+    # The tuple below is a HAND-MAINTAINED list and it went stale: it carries
+    # 'urea' but not 'thiourea', so the chalcogen sibling's own core -- already
+    # spelled by its handler as `N-cyclohexylthiourea` -- was re-discovered as a
+    # ring substituent and prepended, giving
+    # `1-(carbamothioylamino)N-cyclohexylthiourea`: the single thiourea unit
+    # spelled TWICE, a different molecule, which only SELF-01 suppressed.
+    # `cyanamide`, `imidate` and `chalcogen_ester` were missing for the same
+    # reason. A handler ALWAYS consumes the FG it is keyed on, so derive that
+    # one from `handler_id` instead of remembering to extend a list; the tuple
+    # stays for the handlers that additionally consume a DIFFERENT FG key than
+    # their own id (e.g. the carbamate handler and 'carbamic_acid').
+    for _fg_key in (handler_id,
+                    'isocyanate', 'isothiocyanate', 'carbamic_acid',
                      'carbamate', 'urea', 'guanidine', 'boronic_acid',
                      'oxime', 'hydrazone', 'sulfoxide', 'sulfone', 'thioether'):
         if _fg_key in features.functional_groups and _fg_key != getattr(features, 'principal_group', None):
