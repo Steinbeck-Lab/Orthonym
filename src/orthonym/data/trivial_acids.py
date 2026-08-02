@@ -44,13 +44,27 @@ TRIVIAL_ACID_TO_ACYLATE = {
     "linolenic": "linolenate",    # C18:3
     "arachidic": "arachidate",    # C20:0
     "arachidonic": "arachidonate", # C20:4
-    # Systematic names for saturated fatty acids (ensures decomposition engine
-    # also uses trivial acylate forms when it encounters systematic acid names)
-    "dodecanoic": "laurate",      # C12:0 systematic
-    "tetradecanoic": "myristate", # C14:0 systematic
-    "hexadecanoic": "palmitate",  # C16:0 systematic
-    "octadecanoic": "stearate",   # C18:0 systematic
-    "icosanoic": "arachidate",    # C20:0 systematic
+    # NOTE: there are deliberately NO rows keyed on the SYSTEMATIC stems
+    # dodecanoic / tetradecanoic / hexadecanoic / octadecanoic / icosanoic.
+    #
+    # Five such rows used to live here, mapping the systematic stem onto the
+    # trivial ester word ("hexadecanoic" -> "palmitate") so that "the
+    # decomposition engine also uses trivial acylate forms when it encounters
+    # systematic acid names". That is backwards for a preferred IUPAC name: it
+    # takes a stem that is ALREADY the PIN and converts it into one that is not.
+    #
+    # P-65.1.2 "Systematic names" (BlueBookV2.md heading :29858, rule :29860) --
+    # "Except for formic acid, acetic acid, oxalic acid (see P-65.1.1.1), and
+    # oxamic acid (see P-65.1.1.1), systematically formed names are preferred
+    # IUPAC names; the names given in P-65.1.1.2 are retained names for use in
+    # general nomenclature." The Blue Book prints (PIN) on the systematic side
+    # of every fatty row: :29787 "palmitic acid  hexadecanoic acid (PIN)".
+    #
+    # Re-adding any of them silently reverts the fix: with the count map in
+    # rules/esters.py corrected but these rows present, all five esters STILL
+    # emitted the trivial word (measured -- 5/5 unchanged). Both halves are
+    # load-bearing. A systematic stem now falls through to the "-oic" -> "-oate"
+    # branch below, which is the PIN.
 }
 
 # Chain length to systematic acylate form

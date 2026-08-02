@@ -102,9 +102,14 @@ CFR_DISPATCH_CANARY: "OrderedDict[StoutClass, Tuple[str, str]]" = OrderedDict([
     (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOC",                 "2,5-dioxahexane")),
     (StoutClass.CYCLOPHANE,              ("C1CCc2ccccc2CCCc2ccccc21",
                                           "[3.3]orthocyclophane")),
+    # v29 Task J2: was 'propyl palmitate'. The ester acyl word follows the PIN
+    # acid stem -- P-65.1.1.1 (BlueBookV2.md:29715) retains only formic/oxalic/
+    # acetic/benzoic/oxamic as PINs, P-65.1.2 (:29860) sends the rest to general
+    # nomenclature, and :29787 prints '(PIN)' on 'hexadecanoic acid'. This row
+    # pins DISPATCH byte-identity, so the spelling is incidental to its purpose.
     (StoutClass.DECOMPOSITION_PRE_GENERAL,
                                           ("CCCCCCCCCCCCCCCC(=O)OCCC",
-                                          "propyl palmitate")),
+                                          "propyl hexadecanoate")),
     (StoutClass.GENERAL,                 ("CCCCCCCO",               "heptan-1-ol")),
 ])
 

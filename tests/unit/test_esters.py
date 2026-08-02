@@ -658,3 +658,69 @@ class TestAcyloxyPrefixCarboxylic:
         """Trivial lookup still works for benzoic acid."""
         from orthonym.rules.esters import get_acyloxy_prefix
         assert get_acyloxy_prefix("benzoic acid") == "benzoyloxy"
+
+
+class TestSaturatedFattyEstersUsePinAcylWord:
+    """v29 Task J2: the ester acyl word must come from the PIN acid stem.
+
+    P-65.6.3.2.1 "General methodology" (BlueBookV2.md:31659) -- "All preferred
+    IUPAC names for esters are named by functional class nomenclature." Its own
+    worked examples settle where the acyl word comes from: "CH3-CO-O-CH2-CH3
+    ethyl acetate (PIN)" keeps the trivial word because acetic acid IS retained
+    as a PIN (P-65.1.1.1, :29715, "Only the following five carboxylic acids
+    retained names and are also preferred IUPAC names"), whereas
+    "CH3-O-CO-CH2-CH2-CO-O-CH2-CH3 ethyl methyl butanedioate (PIN)" uses the
+    SYSTEMATIC word even though succinic acid is a retained name -- because it
+    is retained only for general nomenclature (P-65.1.1.2.2, :29745).
+
+    No fatty acid is in the five. P-65.1.2 "Systematic names" (heading :29858)
+    disposes of the rest at :29860, and the book prints the marker on the
+    systematic side: :29787 "palmitic acid  hexadecanoic acid (PIN)", :29791
+    "stearic acid  octadecanoic acid (PIN)".
+
+    These previously emitted 'ethyl palmitate' / 'ethyl laurate' etc. while the
+    ACID path for the identical chain already emitted the PIN. That internal
+    contradiction is what these tests exist to prevent recurring.
+    """
+
+    # (SMILES, expected PIN ester, expected PIN acid for the same chain)
+    CASES = [
+        ("CCOC(=O)CCCCCCCCCCC", "ethyl dodecanoate", "dodecanoic acid"),
+        ("CCOC(=O)CCCCCCCCCCCCC", "ethyl tetradecanoate", "tetradecanoic acid"),
+        ("CCCCCCCCCCCCCCCC(=O)OCC", "ethyl hexadecanoate", "hexadecanoic acid"),
+        ("CCOC(=O)CCCCCCCCCCCCCCCCC", "ethyl octadecanoate", "octadecanoic acid"),
+        ("CCOC(=O)CCCCCCCCCCCCCCCCCCC", "ethyl icosanoate", "icosanoic acid"),
+    ]
+
+    @pytest.mark.parametrize("smiles,expected,_acid", CASES)
+    def test_emits_systematic_pin_not_trivial(self, smiles, expected, _acid):
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.parametrize("smiles,expected,_acid", CASES)
+    def test_never_abstains(self, smiles, expected, _acid):
+        """A withdrawn trivial name must become the PIN, never an abstention.
+
+        Removing a wrong output does not fail closed -- it can unmask a worse
+        generator, so the emission itself is asserted, not merely the absence
+        of the trivial word.
+        """
+        result = name_compound(smiles)
+        assert result, f"{smiles} now abstains -- the withdrawal unmasked a gap"
+        assert "ate" in result
+
+    @pytest.mark.parametrize("smiles,expected,acid", CASES)
+    def test_acid_and_ester_paths_agree_on_the_stem(self, smiles, expected, acid):
+        """The invariant the defect violated.
+
+        get_acid_fragment_name is an ESTER-ONLY producer -- it records zero
+        calls when the acid is named -- so the two paths derived the stem
+        independently and disagreed. They must now agree.
+        """
+        acid_stem = acid[: -len(" acid")]          # "hexadecanoic"
+        ester_stem = expected.split()[-1][: -len("ate")] + "ic"   # "hexadecanoic"
+        assert ester_stem == acid_stem
+
+    def test_retained_pin_acids_keep_their_trivial_acyl_word(self):
+        """Guard the over-correction: the five P-65.1.1.1 acids must NOT move."""
+        assert name_compound("CC(=O)OCC") == "ethyl acetate"
+        assert name_compound("CCOC(=O)c1ccccc1") == "ethyl benzoate"

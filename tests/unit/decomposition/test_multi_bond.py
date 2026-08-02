@@ -85,9 +85,9 @@ class TestPerformanceGuard:
 
         Task Z3: on the DEFAULT path `try_decompose` now returns None for this
         molecule, because the quality gate proves the pipeline name
-        ("phenyl palmitate") already denotes it exactly and decomposition is not
-        needed. Measured: decomposition used to run and RE-DERIVE the identical
-        string, and the emitted name is byte-identical either way.
+        ("phenyl hexadecanoate") already denotes it exactly and decomposition is
+        not needed. Measured: decomposition used to run and RE-DERIVE the
+        identical string, and the emitted name is byte-identical either way.
 
         None is therefore ambiguous on the default path -- "guard blocked" and
         "gate said no decomposition needed" look the same -- so the performance
@@ -112,16 +112,25 @@ class TestPerformanceGuard:
 
         # The molecule should be decomposed (not blocked by performance guard)
         result = try_decompose(mol)
-        # phenyl palmitate -- decomposition should produce a name
+        # phenyl hexadecanoate -- decomposition should produce a name
         assert result is not None, (
             "Single-bond ester should not be blocked by performance guard"
         )
 
     def test_single_bond_ester_still_named_on_the_default_path(self):
         """The output-level half of the test above: skipping a decomposition
-        that would only re-derive the same string must not change the name."""
+        that would only re-derive the same string must not change the name.
+
+        v29 Task J2 corrected the acyl word from the non-PIN 'palmitate':
+        P-65.1.2 "Systematic names" (BlueBookV2.md:29860) -- "Except for formic
+        acid, acetic acid, oxalic acid ..., and oxamic acid ..., systematically
+        formed names are preferred IUPAC names; the names given in P-65.1.1.2
+        are retained names for use in general nomenclature." What this test
+        asserts -- that the name is unchanged by skipping decomposition -- is
+        unaffected by the spelling.
+        """
         from orthonym import name_compound
-        assert name_compound("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1") == "phenyl palmitate"
+        assert name_compound("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1") == "phenyl hexadecanoate"
 
 
 # ---------------------------------------------------------------------------

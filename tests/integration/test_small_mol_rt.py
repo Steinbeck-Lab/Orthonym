@@ -181,9 +181,17 @@ class TestMissingSubstituent:
         """#35: CC(C)Cc1cccc(CC(C)C)c1O -> 2,6-diisobutylphenol [RT]."""
         assert name_compound("CC(C)Cc1cccc(CC(C)C)c1O") == "2,6-diisobutylphenol"  # ASML-13: phenol suffix routing
 
-    def test_036_cyclohexyl_arachidate(self):
-        """#36: CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1 -> cyclohexyl arachidate [RT]."""
-        assert name_compound("CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1") == "cyclohexyl arachidate"
+    def test_036_cyclohexyl_icosanoate(self):
+        """#36: CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1 -> cyclohexyl icosanoate [RT].
+
+        v29 Task J2: was 'cyclohexyl arachidate'. Arachidic acid is not among
+        the five acids retained AS PINs -- P-65.1.1.1 (BlueBookV2.md:29715),
+        "Only the following five carboxylic acids retained names and are also
+        preferred IUPAC names" (formic, oxalic, acetic, benzoic, oxamic) -- and
+        P-65.1.2 (:29860) makes the systematic name the PIN for everything else.
+        C20 is 'icosane (PIN)' (:10043), not 'eicosane'.
+        """
+        assert name_compound("CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1") == "cyclohexyl icosanoate"
 
     def test_040_trimethoxybenzene(self):
         """#40: COc1ccc(OC)c(OC)c1 -> 1,2,4-trimethoxybenzene [RT]."""

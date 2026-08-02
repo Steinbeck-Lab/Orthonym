@@ -231,9 +231,17 @@ class TestPipelineIntegrity:
         assert name_compound("CCCCOC(=O)c1ccccc1") == "butyl benzoate"
 
     @pytest.mark.integration
-    def test_methyl_palmitate_unchanged(self):
-        """Long-chain ester that the existing pipeline names correctly (trivial name)."""
-        assert name_compound("CCCCCCCCCCCCCCCC(=O)OC") == "methyl palmitate"
+    def test_methyl_hexadecanoate_unchanged(self):
+        """Long-chain ester that the existing pipeline names correctly.
+
+        v29 Task J2: the expectation was 'methyl palmitate'. The acyl word must
+        follow the PIN acid stem -- P-65.1.1.1 (BlueBookV2.md:29715) retains
+        only formic/oxalic/acetic/benzoic/oxamic as PINs and P-65.1.2 (:29860)
+        makes systematic names preferred for the rest; :29787 prints '(PIN)' on
+        'hexadecanoic acid'. What this test guards -- that decomposition leaves
+        the pipeline name untouched -- is unaffected by the spelling.
+        """
+        assert name_compound("CCCCCCCCCCCCCCCC(=O)OC") == "methyl hexadecanoate"
 
     @pytest.mark.integration
     def test_propyl_butanoate_unchanged(self):

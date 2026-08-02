@@ -310,14 +310,23 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
     second no-op like the documented 'indane' row (the contributor guide invariant 10:
     presence in a lookup table is not evidence the table is reached).
 
-    THE FIX IS OUT OF SCOPE HERE, and the reason is blast radius, not effort.
-    The map has 9 rows and 6 of them (lauric, myristic, linoleic, linolenic,
-    arachidic, arachidonic) are retained nowhere; the other 3 (palmitic,
-    stearic, oleic) are general-only under P-65.1.1.2.2, so on --style pin all 9
-    are wrong. But 'palmitate' is asserted by 
-    (row WSC-01-PROTECT, expected_pin 'ethyl palmitate') and by ~20 canary CSVs,
-    so correcting the class moves GOLD ROWS and requires a full gate run. That
-    makes it a gated milestone task of its own, not a test-expectation change.
+    RESOLVED for the SATURATED straight-chain rows by v29 Task J2. The analysis
+    above stands; only its "out of scope" conclusion is superseded. The fix was
+    made in the two tables, NOT via a deny row, exactly as this class predicted.
+
+    ONE THING THE EARLIER ANALYSIS MISSED, and it is the load-bearing detail:
+    the count map is only HALF the producer. data/trivial_acids.py also carried
+    five rows keyed on the SYSTEMATIC stem ("hexadecanoic" -> "palmitate"), so
+    correcting the count map ALONE changed 0 of 5 names -- measured. Both halves
+    had to go. See 
+
+    The UNSATURATED rows (oleic, linoleic, linolenic, arachidonic) are non-PIN
+    under the same P-65.1.2 disposal rule and are still present in the map. They
+    were left deliberately: a saturated row that falls through lands on the
+    correct systematic stem, but an unsaturated row that fell through would land
+    on the SATURATED get_acid_stem() and name a different molecule. Withdrawing
+    them therefore needs the unsaturated producer proven first, which is a
+    separate task with a wrong-molecule risk rather than a spelling risk.
     """
 
     def test_methyl_laurate_has_no_deny_row_because_one_would_be_inert(self):
@@ -328,12 +337,41 @@ class TestFattyAcidEsterStemsAreOutOfDenyListReach:
             "FATTY_ACID_TRIVIAL_BY_STRUCTURE in rules/esters.py, not from a "
             "deny-list-governed surface. Fix the map, not this file.")
 
-    def test_the_carbon_count_map_is_still_the_site(self):
-        """Pins the site so the next session does not re-derive it."""
+    def test_saturated_fatty_stems_are_gone_from_the_count_map(self):
+        """The count map must not hand a non-PIN stem to the ester acyl word.
+
+        P-65.1.2 (BlueBookV2.md:29860): "Except for formic acid, acetic acid,
+        oxalic acid ..., and oxamic acid ..., systematically formed names are
+        preferred IUPAC names; the names given in P-65.1.1.2 are retained names
+        for use in general nomenclature."
+        """
         from pathlib import Path
         import orthonym.rules.esters as esters
         src = Path(esters.__file__).read_text()
-        assert '(12, 0): "lauric"' in src, (
-            "the fatty-acid trivial-stem map changed -- re-check whether "
-            "--style pin still emits 'methyl laurate', and if it now emits "
-            "'methyl dodecanoate', retire this class")
+        for stem in ("lauric", "myristic", "palmitic", "stearic", "arachidic"):
+            assert f': "{stem}"' not in src, (
+                f"the non-PIN saturated fatty stem {stem!r} is back in "
+                "rules/esters.py. It feeds the ester acyl word and makes the "
+                "ester path contradict the acid path for the same chain.")
+
+    def test_systematic_stems_are_not_remapped_to_the_trivial_acylate(self):
+        """The second half of the producer -- measured to be load-bearing.
+
+        With the count map corrected but these rows present, all five esters
+        STILL emitted the trivial word (5/5 unchanged).
+        """
+        from orthonym.data.trivial_acids import TRIVIAL_ACID_TO_ACYLATE
+        for stem in ("dodecanoic", "tetradecanoic", "hexadecanoic",
+                     "octadecanoic", "icosanoic"):
+            assert stem not in TRIVIAL_ACID_TO_ACYLATE, (
+                f"{stem!r} is mapped to a trivial acylate again -- this takes a "
+                "stem that is ALREADY the PIN and converts it to one that is "
+                "not, silently reverting the Task J2 fix.")
+
+    def test_the_five_retained_pin_acids_are_untouched(self):
+        """P-65.1.1.1 (:29715): exactly five acids are retained AS PINs."""
+        from orthonym.data.trivial_acids import get_acylate_name
+        assert get_acylate_name("acetic") == "acetate"
+        assert get_acylate_name("benzoic") == "benzoate"
+        assert get_acylate_name("formic") == "formate"
+        assert get_acylate_name("oxalic") == "oxalate"

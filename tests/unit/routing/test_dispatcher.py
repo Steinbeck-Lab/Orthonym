@@ -78,9 +78,14 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
         # G0 UNSUPPORTED_RING_SYSTEM signal.
         (StoutClass.CYCLOPHANE,              ("C1CCc2ccccc2CCCc2ccccc21",
                                               "unknown organic compound")),
+        # v29 Task J2: the acyl word was 'palmitate'. Corrected to the PIN --
+        # P-65.1.1.1 (BlueBookV2.md:29715) retains only formic/oxalic/acetic/
+        # benzoic/oxamic as PINs, and P-65.1.2 (:29860) sends the rest to
+        # general nomenclature; :29787 prints '(PIN)' on 'hexadecanoic acid'.
+        # The row exists to pin DISPATCH, so the spelling is incidental to it.
         (StoutClass.DECOMPOSITION_PRE_GENERAL,
                                               ("CCCCCCCCCCCCCCCC(=O)OCCC",
-                                              "propyl palmitate")),
+                                              "propyl hexadecanoate")),
         # GENERAL: a SMILES whose final dispatch class (after cascade fall-through)
         # is GENERAL.  Heptan-1-ol is not in retained names and falls through
         # to the GENERAL pipeline after DECOMPOSITION_PRE_GENERAL declines.

@@ -22,7 +22,17 @@ from orthonym.perception.functional_groups import detect_functional_groups
 
 @pytest.mark.integration
 class TestFattyAcidLookups:
-    """Fatty acid retained names in acylate and acyloxy tables."""
+    """Fatty acid retained names in acylate and acyloxy tables.
+
+    NOTE (v29 Task J2): these assert a SPELLING conversion, stem -> acyl word,
+    and are NOT an endorsement of the trivial name as a PIN. P-65.1.1.2.2
+    (BlueBookV2.md:29745) retains these "for general nomenclature with
+    functionalization ... the formation of esters leads to names such as methyl
+    butyrate", so the conversion itself is legitimate general nomenclature.
+    The PIN decision belongs at the STEM PRODUCER, not here: no PIN-path
+    producer hands 'palmitic' to this table any more. See
+    TestFattyAcidEsterNaming below for what the default path must emit.
+    """
 
     def test_get_acylate_palmitic(self):
         """Palmitic -> palmitate."""
@@ -80,31 +90,54 @@ class TestFattyAcidLookups:
 
 @pytest.mark.integration
 class TestFattyAcidEsterNaming:
-    """Methyl esters of fatty acids use trivial acid names."""
+    """Methyl esters of saturated fatty acids use the SYSTEMATIC acid stem.
 
-    def test_methyl_palmitate_name(self):
-        """Methyl palmitate (16C acid + methyl ester) uses trivial name."""
+    This class formerly asserted the opposite -- "Methyl esters of fatty acids
+    use trivial acid names" -- and so codified a non-PIN emission as the spec.
+    Corrected by v29 Task J2.
+
+    P-65.1.1.1 "Retained names as preferred IUPAC names" (BlueBookV2.md:29715)
+    -- "Only the following five carboxylic acids retained names and are also
+    preferred IUPAC names": formic, oxalic, acetic, benzoic, oxamic. No fatty
+    acid is among them.
+
+    P-65.1.2 "Systematic names" (heading :29858, rule :29860) -- "Except for
+    formic acid, acetic acid, oxalic acid (see P-65.1.1.1), and oxamic acid
+    (see P-65.1.1.1), systematically formed names are preferred IUPAC names;
+    the names given in P-65.1.1.2 are retained names for use in general
+    nomenclature."
+
+    The book prints the marker on the systematic side: :29787 "palmitic acid
+    hexadecanoic acid (PIN)", :29791 "stearic acid  octadecanoic acid (PIN)".
+
+    P-65.6.3.2.1 (:31659) -- "All preferred IUPAC names for esters are named by
+    functional class nomenclature" -- takes the acyl word from the PIN acid,
+    which is why it prints "ethyl methyl butanedioate (PIN)" and not
+    "succinate" even though succinic acid is a retained name.
+
+    The ACID path already emitted "hexadecanoic acid" for the same chain, so
+    the two paths contradicted each other; these assertions were the wrong half.
+    """
+
+    def test_methyl_hexadecanoate_name(self):
+        """C16:0 methyl ester -- PIN stem, not 'palmitate'."""
         result = name_compound("CCCCCCCCCCCCCCCC(=O)OC")
-        assert result is not None
-        assert "palmitate" in result, f"Expected 'palmitate' in: {result!r}"
+        assert result == "methyl hexadecanoate", f"got: {result!r}"
 
-    def test_methyl_stearate_name(self):
-        """Methyl stearate (18C acid + methyl ester) uses trivial name."""
+    def test_methyl_octadecanoate_name(self):
+        """C18:0 methyl ester -- PIN stem, not 'stearate'."""
         result = name_compound("CCCCCCCCCCCCCCCCCC(=O)OC")
-        assert result is not None
-        assert "stearate" in result, f"Expected 'stearate' in: {result!r}"
+        assert result == "methyl octadecanoate", f"got: {result!r}"
 
-    def test_methyl_laurate_name(self):
-        """Methyl laurate (12C acid + methyl ester) uses trivial name."""
+    def test_methyl_dodecanoate_name(self):
+        """C12:0 methyl ester -- PIN stem, not 'laurate'."""
         result = name_compound("CCCCCCCCCCCC(=O)OC")
-        assert result is not None
-        assert "laurate" in result, f"Expected 'laurate' in: {result!r}"
+        assert result == "methyl dodecanoate", f"got: {result!r}"
 
-    def test_methyl_myristate_name(self):
-        """Methyl myristate (14C acid + methyl ester) uses trivial name."""
+    def test_methyl_tetradecanoate_name(self):
+        """C14:0 methyl ester -- PIN stem, not 'myristate'."""
         result = name_compound("CCCCCCCCCCCCCC(=O)OC")
-        assert result is not None
-        assert "myristate" in result, f"Expected 'myristate' in: {result!r}"
+        assert result == "methyl tetradecanoate", f"got: {result!r}"
 
     def test_regression_methyl_acetate(self):
         """Methyl acetate is unchanged."""

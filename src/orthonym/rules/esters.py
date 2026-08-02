@@ -339,17 +339,41 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
                     cc_double_bond_count += 1
     has_cc_double_bond = cc_double_bond_count > 0
 
-    # Fatty acid trivial names by (carbon_count, double_bond_count)
-    # Saturated (0 double bonds)
+    # Fatty acid trivial names by (carbon_count, double_bond_count).
+    #
+    # P-65.1.1.1 "Retained names as preferred IUPAC names" (BlueBookV2.md:29715)
+    # -- "Only the following five carboxylic acids retained names and are also
+    # preferred IUPAC names": formic, oxalic, acetic, benzoic, oxamic. No fatty
+    # acid is among them.
+    #
+    # P-65.1.2 "Systematic names" (heading :29858) states the disposal rule at
+    # :29860 -- "Except for formic acid, acetic acid, oxalic acid (see
+    # P-65.1.1.1), and oxamic acid (see P-65.1.1.1), systematically formed names
+    # are preferred IUPAC names; the names given in P-65.1.1.2 are retained
+    # names for use in general nomenclature."
+    #
+    # The Blue Book prints the (PIN) marker on the SYSTEMATIC name in every
+    # fatty row it lists -- :29787 "palmitic acid  hexadecanoic acid (PIN)",
+    # :29791 "stearic acid  octadecanoic acid (PIN)".
+    #
+    # This stem feeds the ester acyl word, and P-65.6.3.2.1 (:31659) -- "All
+    # preferred IUPAC names for esters are named by functional class
+    # nomenclature" -- takes that word from the PIN acid, e.g. "ethyl acetate
+    # (PIN)" (acetic IS retained) but "ethyl methyl butanedioate (PIN)" (NOT
+    # succinate). So the saturated straight-chain rows C12/C14/C16/C18/C20 are
+    # REMOVED: they made the ester path emit 'ethyl palmitate' while the acid
+    # path for the same chain already emitted the PIN 'hexadecanoic acid'.
+    # Falling through to get_acid_stem() below yields the PIN stem.
+    #
+    # The unsaturated rows are non-PIN under the same rule, but they are LEFT IN
+    # PLACE here deliberately -- withdrawing them is a separate change with a
+    # different risk profile (an unsaturated acid that fell through to the
+    # saturated get_acid_stem() would be a WRONG MOLECULE, not a misspelling).
+    # See 
     FATTY_ACID_TRIVIAL_BY_STRUCTURE = {
-        (12, 0): "lauric",
-        (14, 0): "myristic",
-        (16, 0): "palmitic",
-        (18, 0): "stearic",
         (18, 1): "oleic",           # C18:1
         (18, 2): "linoleic",        # C18:2
         (18, 3): "linolenic",       # C18:3
-        (20, 0): "arachidic",
         (20, 4): "arachidonic",     # C20:4
     }
 

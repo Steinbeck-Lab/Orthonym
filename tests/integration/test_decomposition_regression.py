@@ -96,7 +96,13 @@ ESTER_CANARIES = [
     ("CC(=O)OCCCC", "butyl acetate"),
     ("CCCCCCCC(=O)OC", "methyl octanoate"),
     ("CC(=O)OC(C)C", "propan-2-yl acetate"),
-    ("CCCCCCCCCCCCCCCC(=O)OC", "methyl palmitate"),
+    # v29 Task J2: was "methyl palmitate". P-65.1.1.1 (BlueBookV2.md:29715)
+    # retains only formic/oxalic/acetic/benzoic/oxamic AS PINs; P-65.1.2
+    # (:29860) makes systematic names preferred for all other acids, and
+    # :29787 prints "(PIN)" on "hexadecanoic acid". Note the neighbouring
+    # acetate/benzoate/formate rows are correct AS-IS -- those three acids
+    # ARE retained as PINs, which is exactly the distinction that matters.
+    ("CCCCCCCCCCCCCCCC(=O)OC", "methyl hexadecanoate"),
     # Ester on aromatic (acetyloxy pattern)
     ("CC(=O)Oc1ccccc1", "acetyloxybenzene"),
     # Formate esters

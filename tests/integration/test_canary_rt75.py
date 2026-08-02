@@ -484,7 +484,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1",
-        "cyclohexyl arachidate",
+        # v29 Task J2: was "cyclohexyl arachidate". Per this file's own rule --
+        # "check whether the NEW name is also valid IUPAC nomenclature ... only
+        # revert if the new name is wrong" -- the new name is not merely valid,
+        # it is the PIN and the old one is not. P-65.1.1.1 (BlueBookV2.md:29715)
+        # retains only formic/oxalic/acetic/benzoic/oxamic AS PINs; P-65.1.2
+        # (:29860) makes systematic names preferred for every other acid. C20 is
+        # "icosane (PIN)" (:10043). Round-trip re-verified: OPSIN returns the
+        # input structure.
+        "cyclohexyl icosanoate",
     ),
     (
         "CC(N)=O",
