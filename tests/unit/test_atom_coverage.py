@@ -46,8 +46,15 @@ class TestCoverageResult:
         assert result.claimed_atom_indices == {0, 1, 2, 3, 4, 5, 6, 7}
         assert result.unclaimed_atom_indices == {8, 9}
 
-    def test_is_complete_threshold_at_boundary(self):
-        """is_complete is True at exactly 0.80 ratio."""
+    def test_is_complete_field_roundtrips_true(self):
+        """The dataclass stores is_complete=True as given.
+
+        NOTE: this asserts only the value passed in -- it does NOT exercise
+        any completeness RULE.  It used to be named for a "0.80 ratio
+        threshold" that no longer exists: completeness is now decided by
+        constitution, in validate_atom_coverage.  The real rule is tested in
+        tests/unit/validation/test_atom_coverage_structural.py.
+        """
         result = CoverageResult(
             total_heavy_atoms=10,
             claimed_atoms=8,
@@ -58,8 +65,12 @@ class TestCoverageResult:
         )
         assert result.is_complete is True
 
-    def test_is_complete_below_threshold(self):
-        """is_complete is False below 0.80 ratio."""
+    def test_is_complete_field_roundtrips_false(self):
+        """The dataclass stores is_complete=False as given.
+
+        As above: a field round-trip, not a rule.  See
+        tests/unit/validation/test_atom_coverage_structural.py.
+        """
         result = CoverageResult(
             total_heavy_atoms=10,
             claimed_atoms=7,
