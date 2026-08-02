@@ -931,30 +931,122 @@ def _mancude_max_matching(mol, oriented: List[int]) -> Tuple[int, List[bool]]:
     return max_match, eligible
 
 
-def _nonaromatizable_hydro_fallback(mol, ring_set: Set[int], mol_unsat: Set[int]) -> Optional[str]:
-    """P-54.4.1 pure-hydro HW name for a NON-aromatizable monocycle (1,2-dihydro-
-    phosphete, 1,2-dihydroazete).
+# P-22.2.1 retained mancude stems (BlueBookV2.md:8141 — "pyran (2H-isomer
+# shown; the PIN is 2H-pyran) thiopyran ... the PIN is 2H-thiopyran ...
+# selenopyran ... telluropyran"; BlueBookV2.md:2164 — "2H-pyran (PIN) (not
+# 2H-oxine, see P-22.2.2.1.1)"; the 5-ring row at :8165/:8174 gives
+# "selenophene (PIN)" / "thiophene (PIN)").  EXACT-name substitution only: the
+# key is the whole Hantzsch-Widman stem, so '1,3-oxazole' can never become
+# '1,3-furan'.
+_MANCUDE_RETAINED_STEM: Dict[str, str] = {
+    'azole': 'pyrrole',
+    'oxole': 'furan',
+    'thiole': 'thiophene',
+    'selenole': 'selenophene',
+    'tellurole': 'tellurophene',
+    'azine': 'pyridine',
+    'oxine': 'pyran',
+    'thiine': 'thiopyran',
+    'selenine': 'selenopyran',
+    'tellurine': 'telluropyran',
+}
 
-    Runs only when :func:`_mancude_monocycle_parent` declined — a 4-pi ring can
-    never be RDKit-aromatized, so the aromatization-based mancude-parent path
-    silently fails and the plain HW path would emit the bare over-unsaturated
-    mancude stem ('phosphete'). The mancude maximum is computed here by exact
-    matching instead (P-14.7.1 = max noncumulative double bonds).
 
-    v1 scope (fail closed / return None otherwise — never a wrong name, SELF-01
-    safe): a genuine hydro form (``1 <= d < max_match``); the mancude parent needs
-    ZERO indicated hydrogen (``n_eligible - 2*max_match == 0``); a single
-    heteroatom (multi-het parents carry a leading locant -> digit-initial gate
-    declines them); no exocyclic ring double bond (lambda rings are intercepted
-    upstream in ``name_heterocycle`` before this namer runs). BB P-54.4.1:24169.
+def _ring_perfect_matchings(n: int, allowed: Set[int], eligible: List[bool]) -> List[frozenset]:
+    """Every perfect matching of the ring-cycle subgraph induced by ``allowed``.
+
+    ``allowed`` is a set of ring POSITIONS (0..n-1). An edge joins consecutive
+    positions ``p`` and ``(p+1) % n`` when both are in ``allowed`` and both are
+    double-bond eligible. A *perfect* matching covers every allowed position.
+    Returned as frozensets of edge start-positions. Ring size <= 10, so the
+    exhaustive enumeration is cheap and deterministic.
+
+    Used for two different structure proofs, never for counting:
+      * the molecule's own ring double bonds must be the UNIQUE perfect matching
+        over the unsaturated positions — otherwise the hydro name would denote
+        more than one molecule and we must fail closed;
+      * a candidate indicated-hydrogen set is legitimate only if removing it
+        leaves a perfect matching, i.e. a real mancude parent exists.
+    """
+    from itertools import combinations
+    if any(not eligible[p] for p in allowed):
+        return []
+    if not allowed:
+        return [frozenset()]
+    if len(allowed) % 2:
+        return []
+    edges = [p for p in range(n)
+             if p in allowed and ((p + 1) % n) in allowed]
+    out: List[frozenset] = []
+    for combo in combinations(edges, len(allowed) // 2):
+        used: Set[int] = set()
+        ok = True
+        for p in combo:
+            a, b = p, (p + 1) % n
+            if a in used or b in used:
+                ok = False
+                break
+            used.add(a)
+            used.add(b)
+        if ok and used == allowed:
+            out.append(frozenset(combo))
+    return out
+
+
+def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
+    """P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle,
+    INCLUDING the case where the mancude parent itself needs indicated hydrogen.
+
+    Examples this closes: ``5,6-dihydro-4H-1,3-oxazine``, ``3,4-dihydro-2H-1,4-
+    oxazine``, ``3,4-dihydro-2H-pyrrole``, ``2,3-dihydro-1H-azepine``,
+    ``2,3-dihydro-1,4-dioxine``.  Supersedes the earlier v1 fallback, whose
+    gates admitted only parents needing ZERO indicated hydrogen and a single
+    heteroatom (``1,2-dihydrophosphete``).
+
+    Rules (each opened; heading + decisive sentence):
+
+    * **P-54.4.1 "Hantzsch-Widman heteromonocycles"** (``BlueBookV2.md:24170``),
+      sentence ``:24171`` — "'Hydro' prefixes added to names of fully
+      unsaturated Hantzsch-Widman rings lead to preferred IUPAC names for
+      partially unsaturated rings."
+    * **P-31.2.2 "General methodology"** (``:16879``) — "Indicated hydrogen
+      atoms have priority over 'hydro' prefixes for low locants. If indicated
+      hydrogen atoms are present in a name, the 'hydro' prefixes precede them."
+      That single sentence fixes BOTH the numbering rank and the spelling order.
+    * **P-14.4 "NUMBERING"** (``:3219``) — decreasing seniority for low locants:
+      (a) fixed numbering ``:3225``, (b) indicated hydrogen ``:3246``, …
+      (e)(i) hydro/dehydro prefixes ``:3287``.
+    * **P-14.7.1 "Indicated hydrogen"** (``:3557``), sentence ``:3721`` — "in a
+      preferred IUPAC name a locant and the symbol 'H' must be cited", so the
+      indicated-hydrogen term is never dropped once the parent requires one.
+
+    ⚠ The hydro positions are NOT "the parent's double-bonded atoms that lost
+    their bond".  The Blue Book's own ``2,7-dihydro-1H-azepine`` (``:16903``)
+    refutes that reading: 1H-azepine is unsaturated at 2-3/4-5/6-7 while the
+    molecule is unsaturated at 3-4/5-6, so the remaining double bonds RELOCATE
+    when hydrogen is added.  What is therefore verified here is the reader's
+    reconstruction: saturating exactly (indicated-H ∪ hydro) must leave one and
+    only one way to place the remaining noncumulative double bonds, and it must
+    be the molecule's.  Fail closed otherwise — never a wrong name.
+
+    Nothing in this function counts hydrogens; saturation and every candidate
+    indicated-hydrogen position are decided by matchings on the ring graph.
     """
     from .partial_saturation import SATURATION_PREFIXES
+
     n = len(ring_set)
+    if n < 4 or n > 10:
+        return None
     ordered = _macrocycle_ordered_ring(mol, ring_set)
     if ordered is None or len(ordered) != n:
         return None
-
-    # Gate (c): no exocyclic double bond from any ring atom.
+    # RDKit-aromatic rings carry no DOUBLE ring bonds, so the saturation census
+    # below would be meaningless -> leave them to the mancude namers.
+    if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
+        return None
+    # An exocyclic double bond makes its ring atom neither unsaturated-in-ring
+    # nor a hydro position (it is a ketone / methylidene carbon, P-14.7.2
+    # 'added indicated hydrogen' territory) -> fail closed.
     for i in ring_set:
         for bond in mol.GetAtomWithIdx(i).GetBonds():
             if bond.GetBondType() == Chem.BondType.DOUBLE:
@@ -962,140 +1054,137 @@ def _nonaromatizable_hydro_fallback(mol, ring_set: Set[int], mol_unsat: Set[int]
                     return None
 
     max_match, eligible = _mancude_max_matching(mol, ordered)
+    if max_match < 1:
+        return None
     n_eligible = sum(eligible)
+    ih_count = n_eligible - 2 * max_match
 
-    # Actual ring double bonds + the atoms they touch.
-    db_atoms: Set[int] = set()
+    pos_of = {a: k for k, a in enumerate(ordered)}
+    # The molecule's own ring double bonds, as ring-edge start positions.
+    mol_edges: Set[int] = set()
+    unsat_pos: Set[int] = set()
     for bond in mol.GetBonds():
-        if bond.GetBondType() == Chem.BondType.DOUBLE:
-            a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-            if a in ring_set and b in ring_set:
-                db_atoms.add(a)
-                db_atoms.add(b)
-    d = sum(
-        1 for bond in mol.GetBonds()
-        if bond.GetBondType() == Chem.BondType.DOUBLE
-        and bond.GetBeginAtomIdx() in ring_set
-        and bond.GetEndAtomIdx() in ring_set
-    )
+        if bond.GetBondType() != Chem.BondType.DOUBLE:
+            continue
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i not in ring_set or j not in ring_set:
+            continue
+        pi, pj = pos_of[i], pos_of[j]
+        if (pi + 1) % n == pj:
+            p = pi
+        elif (pj + 1) % n == pi:
+            p = pj
+        else:
+            return None  # not a ring-cycle edge -> refuse
+        if pi in unsat_pos or pj in unsat_pos:
+            return None  # cumulated ring double bonds -> refuse
+        mol_edges.add(p)
+        unsat_pos.update((pi, pj))
+    d = len(mol_edges)
+    # A genuine hydro form: some ring unsaturation left, but fewer double bonds
+    # than the mancude maximum. ``d == max_match`` is the mancude parent itself
+    # (indicated-hydrogen namer's job); ``d == 0`` is the saturated HW stem's.
+    if not (1 <= d < max_match):
+        return None
+    if any(not eligible[p] for p in unsat_pos):
+        return None
 
-    # Gate (a): a true hydro form (fewer ring double bonds than the mancude max);
-    # d == max_match is the indicated-H namer's scope (2H-thiete), d == 0 the
-    # saturated stem's.
-    if not (d >= 1 and d < max_match):
+    sp3_pos = {p for p in range(n) if eligible[p] and p not in unsat_pos}
+    n_hydro = len(sp3_pos) - ih_count
+    if n_hydro < 2 or n_hydro % 2:
         return None
-    # Gate (b): v1 covers ONLY mancude parents with zero indicated hydrogen. A
-    # non-aromatizable parent that WOULD need indicated H (azepine 7-ring: 7
-    # eligible, max 3 -> 1 IH) stays fail-closed.
-    if n_eligible - 2 * max_match != 0:
-        return None
-
-    hydro = {ordered[k] for k in range(n)
-             if eligible[k] and ordered[k] not in db_atoms}
-    if not hydro:
-        return None
-    prefix = SATURATION_PREFIXES.get(len(hydro))
+    prefix = SATURATION_PREFIXES.get(n_hydro)
     if prefix is None:
         return None
 
-    het = {i for i in ordered if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
-    if not het:
+    # Reconstruction proof: with every (indicated-H ∪ hydro) position saturated,
+    # the remaining eligible positions must admit exactly ONE perfect matching,
+    # and it must be the molecule's. Otherwise the name is ambiguous -> refuse.
+    reconstructed = _ring_perfect_matchings(n, set(unsat_pos), eligible)
+    if len(reconstructed) != 1 or reconstructed[0] != frozenset(mol_edges):
         return None
 
-    # Number the ring: heteroatom set lowest -> heteroatom seniority -> hydro set
-    # lowest (P-31.1.4.3.4). The parent carries no indicated H (gate b), so no ih
-    # term participates.
+    # Candidate indicated-hydrogen sets: a subset of the saturated positions
+    # whose removal still leaves a real mancude parent (a perfect matching over
+    # the rest of the eligible positions).
+    from itertools import combinations
+    all_eligible = {p for p in range(n) if eligible[p]}
+    ih_candidates: List[frozenset] = []
+    for combo in combinations(sorted(sp3_pos), ih_count):
+        rest = all_eligible - set(combo)
+        if _ring_perfect_matchings(n, rest, eligible):
+            ih_candidates.append(frozenset(combo))
+    if not ih_candidates:
+        return None
+
+    het_pos = [p for p in range(n)
+               if mol.GetAtomWithIdx(ordered[p]).GetSymbol() != 'C']
+    if not het_pos:
+        return None
+
+    # P-14.4 / P-31.2.2 numbering cascade: heteroatom locants as a set, then
+    # heteroatom seniority, then indicated hydrogen, then the hydro prefixes.
     best_key = None
-    best_map: Optional[Dict[int, int]] = None
+    best: Optional[Tuple[Dict[int, int], frozenset]] = None
     for start in range(n):
         for direction in (1, -1):
-            seq = [ordered[(start + k * direction) % n] for k in range(n)]
-            loc = {a: idx + 1 for idx, a in enumerate(seq)}
-            het_locs = tuple(sorted(loc[a] for a in het))
+            loc = {(start + k * direction) % n: k + 1 for k in range(n)}
+            het_locs = tuple(sorted(loc[p] for p in het_pos))
             seniority = tuple(sorted(
-                (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
-                for a in het
+                (get_heteroatom_priority(mol.GetAtomWithIdx(ordered[p]).GetSymbol()),
+                 loc[p])
+                for p in het_pos
             ))
-            hydro_locs = tuple(sorted(loc[a] for a in hydro))
-            key = (het_locs, seniority, hydro_locs)
-            if best_key is None or key < best_key:
-                best_key = key
-                best_map = loc
-    if best_map is None:
+            for ih in ih_candidates:
+                ih_locs = tuple(sorted(loc[p] for p in ih))
+                hydro_locs = tuple(sorted(loc[p] for p in sp3_pos - set(ih)))
+                key = (het_locs, seniority, ih_locs, hydro_locs)
+                if best_key is None or key < best_key:
+                    best_key = key
+                    best = (loc, ih)
+    if best is None:
         return None
+    loc, ih = best
 
     het_pairs = sorted(
-        (best_map[a], mol.GetAtomWithIdx(a).GetSymbol()) for a in het
+        (loc[p], mol.GetAtomWithIdx(ordered[p]).GetSymbol()) for p in het_pos
     )
-    parent_name = build_hw_name(het_pairs, n, is_saturated=False, is_aromatic=False)
-    if not parent_name:
+    stem = build_hw_name(het_pairs, n, is_saturated=False, is_aromatic=False)
+    if not stem:
         return None
-    # v1: only bare (0-IH, single-het) parents. A digit-initial parent means either
-    # an intrinsic indicated H this numbering did not place OR a multi-heteroatom
-    # locant prefix (e.g. '1,2-diazete') -> out of v1 scope, fail closed.
-    if parent_name[:1].isdigit():
-        return None
+    stem = _MANCUDE_RETAINED_STEM.get(stem, stem)
 
-    locant_str = ','.join(str(loc) for loc in sorted(best_map[a] for a in hydro))
-    return f"{locant_str}-{prefix}{parent_name}"
+    # P-14.7.1 (:3721): in a PIN the locant and the symbol 'H' must be cited.
+    if ih:
+        stem = ','.join(f"{loc[p]}H" for p in sorted(ih, key=lambda q: loc[q])) + '-' + stem
+    # P-31.2.2 (:16879): "the 'hydro' prefixes precede them" -> hydro locants,
+    # then the indicated-hydrogen term, then the stem. A hyphen is needed only
+    # when what follows starts with a digit (2,3-dihydrofuran vs
+    # 5,6-dihydro-4H-1,3-oxazine).
+    hydro_locants = ','.join(
+        str(loc[p]) for p in sorted(sp3_pos - set(ih), key=lambda q: loc[q])
+    )
+    sep = '-' if stem[:1].isdigit() else ''
+    return f"{hydro_locants}-{prefix}{sep}{stem}"
 
 
-def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional[str]:
-    """Name a partially-saturated monocyclic mancude heterocycle (IUPAC P-31.1.4).
+def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[str]:
+    """Hydro name via the RDKit-AROMATIZABLE mancude parent (1,2-dihydropyridine,
+    2,3-dihydro-1H-pyrrole).
 
-    Example: ``C1C=CC=CN1`` -> ``1,2-dihydropyridine`` (the systematic HW path
-    would otherwise drop the hydrogenation and emit the mancude parent
-    ``pyridine``). Works by (1) building the mancude aromatic parent and naming
-    it, (2) finding the ring atoms that carry a ring double bond in the mancude
-    parent but have LOST it in the molecule (the hydro positions — detected by
-    bond topology, NOT hybridization, so a conjugated enamine N still counts),
-    (3) numbering the ring with the heteroatom set lowest then the hydro set
-    lowest (P-31.1.4.3.4), and (4) emitting ``<locants>-<prefix>hydro<parent>``.
-
-    Scope (fail closed otherwise — never a wrong name, SELF-01-safe):
-      * the mancude parent must aromatize and carry NO leading indicated
-        hydrogen (parents like ``1H-pyrrole`` / ``2H-pyran`` whose hydro form
-        interleaves added-indicated-H are deferred to a follow-on);
-      * the molecule must retain >= 1 ring unsaturation (a fully saturated ring
-        is named by its retained / HW saturated stem, not as a hydro prefix);
-      * the hydro count must be a standard di/tetra/hexa... value.
+    Split out of :func:`name_partially_saturated_monocyclic_heterocycle` so that
+    every one of its fail-closed exits can hand off to the matching-based
+    :func:`_mancude_hydro_name` instead of abstaining outright. Behaviour of
+    this path is unchanged; only what happens after it declines is new.
     """
     from .partial_saturation import SATURATION_PREFIXES
 
-    ring_set = set(ring_atoms)
     n = len(ring_set)
-    if n < 4:
-        return None
-
-    # Ring atoms still unsaturated in the MOLECULE (ring double bond or aromatic)
-    # — these are NOT hydro positions.
-    mol_unsat: Set[int] = set()
-    for bond in mol.GetBonds():
-        if bond.GetBondType() == Chem.BondType.DOUBLE:
-            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-            if i in ring_set and j in ring_set:
-                mol_unsat.add(i)
-                mol_unsat.add(j)
-    for i in ring_set:
-        if mol.GetAtomWithIdx(i).GetIsAromatic():
-            mol_unsat.add(i)
-    if not mol_unsat:
-        # Fully saturated -> retained / HW saturated stem handles it.
-        return None
-    # A fully-aromatic (mancude) ring has NO hydro positions. Bail now: the
-    # mancude parent of an aromatic ring is itself, so naming it (below) would
-    # re-enter name_heterocycle -> here -> infinite recursion for an aromatic
-    # ring that lacks a retained name (e.g. a HW-named azine).
-    if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
-        return None
-
     parent, old_to_new = _mancude_monocycle_parent(mol, ring_atoms)
     if parent is None:
-        # P-54.4.1: a non-aromatizable (4-pi) HW ring can never be RDKit-
-        # aromatized, so the aromatization-based mancude parent above declines.
-        # Recover the pure-hydro PIN via matching-based mancude counting
-        # (1,2-dihydrophosphete). Fail-closed for anything outside its v1 scope.
-        return _nonaromatizable_hydro_fallback(mol, ring_set, mol_unsat)
+        # A 4-pi / indicated-hydrogen parent can never be RDKit-aromatized.
+        # The caller falls through to the matching-based namer.
+        return None
     parent_ring = parent.GetRingInfo().AtomRings()
     if len(parent_ring) != 1:
         return None
@@ -1173,6 +1262,66 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
     # Hyphen before a digit-initial (intrinsic-IH) parent: 2,3-dihydro-1H-pyrrole.
     sep = '-' if parent_name[:1].isdigit() else ''
     return f"{locant_str}-{prefix}{sep}{parent_name}"
+
+
+def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional[str]:
+    """Name a partially-saturated monocyclic mancude heterocycle (IUPAC P-31.1.4).
+
+    Example: ``C1C=CC=CN1`` -> ``1,2-dihydropyridine`` (the systematic HW path
+    would otherwise drop the hydrogenation and emit the mancude parent
+    ``pyridine``). Works by (1) building the mancude aromatic parent and naming
+    it, (2) finding the ring atoms that carry a ring double bond in the mancude
+    parent but have LOST it in the molecule (the hydro positions — detected by
+    bond topology, NOT hybridization, so a conjugated enamine N still counts),
+    (3) numbering the ring with the heteroatom set lowest then the hydro set
+    lowest (P-31.1.4.3.4), and (4) emitting ``<locants>-<prefix>hydro<parent>``.
+
+    Scope (fail closed otherwise — never a wrong name, SELF-01-safe):
+      * the mancude parent must aromatize and carry NO leading indicated
+        hydrogen (parents like ``1H-pyrrole`` / ``2H-pyran`` whose hydro form
+        interleaves added-indicated-H are deferred to a follow-on);
+      * the molecule must retain >= 1 ring unsaturation (a fully saturated ring
+        is named by its retained / HW saturated stem, not as a hydro prefix);
+      * the hydro count must be a standard di/tetra/hexa... value.
+    """
+    from .partial_saturation import SATURATION_PREFIXES
+
+    ring_set = set(ring_atoms)
+    n = len(ring_set)
+    if n < 4:
+        return None
+
+    # Ring atoms still unsaturated in the MOLECULE (ring double bond or aromatic)
+    # — these are NOT hydro positions.
+    mol_unsat: Set[int] = set()
+    for bond in mol.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring_set and j in ring_set:
+                mol_unsat.add(i)
+                mol_unsat.add(j)
+    for i in ring_set:
+        if mol.GetAtomWithIdx(i).GetIsAromatic():
+            mol_unsat.add(i)
+    if not mol_unsat:
+        # Fully saturated -> retained / HW saturated stem handles it.
+        return None
+    # A fully-aromatic (mancude) ring has NO hydro positions. Bail now: the
+    # mancude parent of an aromatic ring is itself, so naming it (below) would
+    # re-enter name_heterocycle -> here -> infinite recursion for an aromatic
+    # ring that lacks a retained name (e.g. a HW-named azine).
+    if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
+        return None
+
+    # (1) the RDKit-aromatizable mancude parent (pyridine, 1H-pyrrole, ...).
+    named = _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat)
+    if named:
+        return named
+    # (2) P-54.4.1 matching-based namer: parents that cannot aromatize, and
+    # parents that themselves require indicated hydrogen (4H-1,3-oxazine,
+    # 2H-pyran, 2H-pyrrole) or carry a multi-heteroatom locant prefix
+    # (1,4-dioxine). Fail-closed; returns None rather than a mancude name.
+    return _mancude_hydro_name(mol, ring_set)
 
 
 def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Optional[str]:
