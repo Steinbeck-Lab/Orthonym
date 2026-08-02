@@ -187,7 +187,11 @@ class TestLactamE2E:
             ("C1CC(=O)N1", "azetidin-2-one"),
             ("C1CCC(=O)N1", "pyrrolidin-2-one"),
             ("C1CCCC(=O)N1", "piperidin-2-one"),
-            ("C1CCCCC(=O)N1", "caprolactam"),  # retained name (P-31.1.4)
+            # v29 Task A: was "caprolactam" cited to "P-31.1.4", which is
+            # "Bi- and polycyclic von Baeyer parent hydrides" (BB:16619) and
+            # licenses nothing here. The PIN is the pseudoketone form, P-64.3.1
+            # (BB:29314), printed at BB:29323 as `azepan-2-one (PIN)`.
+            ("C1CCCCC(=O)N1", "azepan-2-one"),
         ],
         ids=["beta-lactam", "gamma-lactam", "delta-lactam", "epsilon-lactam"],
     )
@@ -288,7 +292,7 @@ LACTAM_ROUNDTRIP = [
     ("C1CC(=O)N1", "azetidin-2-one"),
     ("C1CCC(=O)N1", "pyrrolidin-2-one"),
     ("C1CCCC(=O)N1", "piperidin-2-one"),
-    ("C1CCCCC(=O)N1", "caprolactam"),  # retained name (P-31.1.4)
+    ("C1CCCCC(=O)N1", "azepan-2-one"),  # v29 Task A; PIN per P-64.3.1 (BB:29323)
 ]
 
 # Ring assembly names for OPSIN round-trip

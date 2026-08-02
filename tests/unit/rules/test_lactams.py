@@ -196,8 +196,15 @@ class TestLactamEndToEnd:
         assert name_compound("C1CCCC(=O)N1") == "piperidin-2-one"
 
     def test_epsilon_lactam_e2e(self):
-        """Epsilon-lactam through name_compound (returns retained name caprolactam)."""
-        assert name_compound("C1CCCCC(=O)N1") == "caprolactam"
+        """Epsilon-lactam through name_compound.
+
+        v29 Task A: was the retained name `caprolactam`, withdrawn from the PIN
+        path as unlicensed (0 BlueBookV2.md hits). P-64.3.1 (BB:29314) -- "Cyclic
+        anhydrides, esters and amides are named as pseudoketones; the resulting
+        names are preferred IUPAC names" -- and its example list prints
+        `azepan-2-one (PIN) hexano-6-lactam` at BB:29323.
+        """
+        assert name_compound("C1CCCCC(=O)N1") == "azepan-2-one"
 
     def test_succinimide_not_lactam_e2e(self):
         """Succinimide does NOT produce a lactam name."""

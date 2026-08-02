@@ -576,7 +576,17 @@ RETAINED_NAMES = {
     "c1ccc(-c2ccccc2)cc1": "biphenyl",  # P-31.1.2.4 general nomenclature
     "C#C": "acetylene",  # P-31.1.2.1 PIN for unsubstituted ethyne
     "COc1ccccc1": "anisole",  # P-34.1.1.4 PIN
-    "O=C1CCCCCN1": "caprolactam",  # P-31.1.4 retained lactam name
+    # v29 Task A: "caprolactam" WITHDRAWN from the PIN path (demoted to
+    # GENERAL_RETAINED_NAMES by the pin:false row in iupac_2013_pin_list.json).
+    # The PIN is `azepan-2-one` -- P-64.3.1 (BB:29314) "Cyclic anhydrides, esters
+    # and amides are named as pseudoketones; the resulting names are preferred
+    # IUPAC names", whose own example prints it at BB:29323: `azepan-2-one (PIN)
+    # hexano-6-lactam (see P-66.1.5.1)`. It was the only break in the systematic
+    # series azetidin-2-one / pyrrolidin-2-one / piperidin-2-one / _ / azocan-2-one.
+    # ⚠ The former inline citation here read "P-31.1.4 retained lactam name";
+    # P-31.1.4 (BB:16619) is "Bi- and polycyclic von Baeyer parent hydrides" and
+    # licenses nothing of the sort. `caprolactam` has 0 BlueBookV2.md hits.
+    "O=C1CCCCCN1": "caprolactam",
 
     # === NUCLEOSIDES (Phase 94) ===
     # Retained names per carbohydrate nomenclature conventions

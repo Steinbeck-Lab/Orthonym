@@ -87,7 +87,12 @@ class TestSimpleRetainedNames:
         ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
         ("C#C", "acetylene"),
         ("COc1ccccc1", "methoxybenzene"),
-        ("O=C1CCCCCN1", "caprolactam"),
+        # v29 Task A: same treatment as biphenyl/anisole above -- 'caprolactam'
+        # is general-only (0 BlueBookV2.md hits) and the PIN headline is the
+        # systematic pseudoketone, P-64.3.1 (BB:29314), printed `azepan-2-one
+        # (PIN)` at BB:29323. The raw hand-curated dict still carries the trivial
+        # name, which is why the two tests above are unchanged.
+        ("O=C1CCCCCN1", "azepan-2-one"),
     ], ids=["biphenyl-e2e", "acetylene-e2e", "anisole-e2e", "caprolactam-e2e"])
     def test_name_compound_e2e(self, smiles, expected):
         """name_compound() should return the PIN headline (retained PIN or systematic)."""

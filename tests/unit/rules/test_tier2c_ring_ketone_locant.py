@@ -64,7 +64,12 @@ class TestSingleHeteroatomDirectionNonDefect:
         # the amino-C is ADJACENT to the ring N, so 7- is the correct PIN
         # (the '3-amino' expectation belonged to a different structure)
         ("O=C1C[Se]CCCCCCCCCC1", "1-selenacyclotridecan-3-one"),
-        ("O=C1CCCCCN1", "caprolactam"),
+        # v29 Task A: was "caprolactam" -- a non-PIN trivial name (0 BlueBookV2.md
+        # hits) now withdrawn from the PIN path. P-64.3.1 (BB:29314) makes cyclic
+        # amides pseudoketones and its own example prints `azepan-2-one (PIN)`
+        # (BB:29323). Note the two rows above already assert `...azepan-2-one` as
+        # the SUBSTITUTED parent, so this row was internally inconsistent.
+        ("O=C1CCCCCN1", "azepan-2-one"),
         ("O=C1CCCCN1", "piperidin-2-one"),
         ("C1COCCN1", "morpholine"),
     ])
