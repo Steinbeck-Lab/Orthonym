@@ -22,6 +22,7 @@ Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
 """
 
 import logging
+import re
 from typing import Dict, List, Tuple, Optional, Set
 from collections import Counter, deque
 
@@ -1005,23 +1006,24 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
 
     Rules (each opened; heading + decisive sentence):
 
-    * **P-54.4.1 "Hantzsch-Widman heteromonocycles"** (``BlueBookV2.md:24170``),
+    * **P-54.4.1 "Hantzsch-Widman heteromonocycles"** (``BlueBookV2.md:24169``),
       sentence ``:24171`` — "'Hydro' prefixes added to names of fully
       unsaturated Hantzsch-Widman rings lead to preferred IUPAC names for
       partially unsaturated rings."
-    * **P-31.2.2 "General methodology"** (``:16879``) — "Indicated hydrogen
-      atoms have priority over 'hydro' prefixes for low locants. If indicated
-      hydrogen atoms are present in a name, the 'hydro' prefixes precede them."
-      That single sentence fixes BOTH the numbering rank and the spelling order.
+    * **P-31.2.2 "General methodology"** (``:16878``), sentence ``:16880`` —
+      "Indicated hydrogen atoms have priority over 'hydro' prefixes for low
+      locants. If indicated hydrogen atoms are present in a name, the 'hydro'
+      prefixes precede them."  That single sentence fixes BOTH the numbering
+      rank and the spelling order.
     * **P-14.4 "NUMBERING"** (``:3219``) — decreasing seniority for low locants:
-      (a) fixed numbering ``:3225``, (b) indicated hydrogen ``:3246``, …
-      (e)(i) hydro/dehydro prefixes ``:3287``.
+      (a) fixed numbering ``:3227``, (b) indicated hydrogen ``:3246``, …
+      (e)(i) hydro/dehydro prefixes ``:3289``.
     * **P-14.7.1 "Indicated hydrogen"** (``:3557``), sentence ``:3721`` — "in a
       preferred IUPAC name a locant and the symbol 'H' must be cited", so the
       indicated-hydrogen term is never dropped once the parent requires one.
 
     ⚠ The hydro positions are NOT "the parent's double-bonded atoms that lost
-    their bond".  The Blue Book's own ``2,7-dihydro-1H-azepine`` (``:16903``)
+    their bond".  The Blue Book's own ``2,7-dihydro-1H-azepine`` (``:16920``)
     refutes that reading: 1H-azepine is unsaturated at 2-3/4-5/6-7 while the
     molecule is unsaturated at 3-4/5-6, so the remaining double bonds RELOCATE
     when hydrogen is added.  What is therefore verified here is the reader's
@@ -1254,14 +1256,52 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
     if ordered is None or len(ordered) != n:
         return None
     het = {i for i in ordered if mol.GetAtomWithIdx(i).GetSymbol() != 'C'}
-    # The indicated-H atom(s) of the kept parent (the N-H carrying the parent's
-    # nH-, when present) must take the LOWEST locant (P-31.1.4.3) — this fixes
-    # the 1H position for 2-N azoles (1H-pyrazole N1 = the N-H, not the =N-),
-    # ranked before the hydro set.
-    indicated_nh = ({i for i in het
-                     if mol.GetAtomWithIdx(i).GetSymbol() == 'N'
-                     and mol.GetAtomWithIdx(i).GetTotalNumHs() >= 1}
-                    if parent_name[:1].isdigit() else set())
+    # The indicated-hydrogen atom(s) of the kept parent must take the LOWEST
+    # locant, ranked ahead of the hydro set.
+    #
+    # P-14.4 "NUMBERING" (BlueBookV2.md:3219) fixes the order: "low locants are
+    # assigned to them in the following decreasing order of seniority ...
+    # (b) indicated hydrogen for unsubstituted compounds" (:3246) ... "(e)
+    # saturation/unsaturation: (i) low locants are given to hydro/dehydro
+    # prefixes ... and 'ene' and 'yne' endings" (:3288).  P-31.2.2 "General
+    # methodology" (:16878) states the consequence outright, and — as so often
+    # — in the LAST two sentences of its paragraph (:16880): "Indicated
+    # hydrogen atoms have priority over 'hydro' prefixes for low locants. If
+    # indicated hydrogen atoms are present in a name, the 'hydro' prefixes
+    # precede them."
+    #
+    # WHICH atom carries the indicated hydrogen is a property of the mancude
+    # PARENT, not of the molecule: per P-22.2.2.1.2 (:8320) it is the ring atom
+    # "with a bonding number of three or higher connected to adjacent ring
+    # atoms by single bonds only, and carrying one or more hydrogen atoms" —
+    # i.e. a parent ring atom that holds no parent ring double bond and still
+    # has an H.  Deriving it from the parent also makes it element-agnostic
+    # (2H-pyran's is a CARBON, 2,3-dihydro-1H-phosphole's a PHOSPHORUS).
+    #
+    # This used to be guessed from the MOLECULE instead, as "any ring N bearing
+    # an H".  That guess cannot tell two N-H apart, so for every 2-N parent
+    # whose hydro form saturates the second nitrogen — pyrazole, imidazole and
+    # all four diazonines — the tie-break went slack and the hydro criterion,
+    # ranked below it, was free to put locant 1 on a HYDRO nitrogen.  The result
+    # cited locant 1 as a hydro position and as indicated hydrogen in the same
+    # name ('1,2,6,7,8,9-hexahydro-1H-1,5-diazonine', '1,5-dihydro-1H-pyrazole').
+    # A position can never be both: an indicated-hydrogen atom holds no double
+    # bond in the parent, so it has none to lose.  Every (PIN) example in
+    # P-31.2.2 / P-31.2.3.1 keeps the two sets disjoint — 4,5-dihydro-3H-azepine
+    # (:16888), 3,4-dihydro-2H-pyrrole (:16896), 2,7-dihydro-1H-azepine
+    # (:16920), 2,3-dihydro-1H-phosphole (:16924).
+    #
+    # (The rule this block used to cite, P-31.1.4.3, is "Bi- and polycyclic von
+    # Baeyer structures with both double and triple bonds" (:16675) and governs
+    # none of this.)
+    new_to_old = {v: k for k, v in old_to_new.items()}
+    indicated_atoms = {
+        new_to_old[p]
+        for p in parent_ring[0]
+        if p in new_to_old
+        and p not in parent_db_atoms
+        and parent.GetAtomWithIdx(p).GetTotalNumHs() >= 1
+    }
     best_key = None
     best_map: Optional[Dict[int, int]] = None
     for start in range(n):
@@ -1293,7 +1333,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
                 (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a])
                 for a in het
             ))
-            ih_locs = tuple(sorted(loc[a] for a in indicated_nh))
+            ih_locs = tuple(sorted(loc[a] for a in indicated_atoms))
             hydro_locs = tuple(sorted(loc[a] for a in hydro))
             key = (senior_at_one, het_locs, seniority, ih_locs, hydro_locs)
             if best_key is None or key < best_key:
@@ -1302,7 +1342,26 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
     if best_map is None:
         return None
 
-    locant_str = ','.join(str(loc) for loc in sorted(best_map[a] for a in hydro))
+    # Two structural post-conditions on the name we are about to concatenate.
+    # Both are invariants of P-14.4/P-31.2.2, not preferences, so violating
+    # either means the numbering disagrees with the parent name being appended
+    # and the composite would be malformed. Fail closed (the caller falls
+    # through to _mancude_hydro_name) rather than emit it.
+    hydro_locants = sorted(best_map[a] for a in hydro)
+    ih_locants = {best_map[a] for a in indicated_atoms}
+    # (1) A hydro locant can never also be an indicated-hydrogen locant.
+    if ih_locants & set(hydro_locants):
+        return None
+    # (2) The locants this numbering gives the parent's indicated-hydrogen
+    #     atoms must be exactly the ones parent_name already cites, or the
+    #     'nH-' in the appended parent name points at a different ring atom
+    #     than the hydro prefixes do.
+    cited = re.match(r'^((?:\d+H,)*\d+H)-', parent_name)
+    cited_ih = {int(t) for t in re.findall(r'\d+', cited.group(1))} if cited else set()
+    if cited_ih != ih_locants:
+        return None
+
+    locant_str = ','.join(str(loc) for loc in hydro_locants)
     # Hyphen before a digit-initial (intrinsic-IH) parent: 2,3-dihydro-1H-pyrrole.
     sep = '-' if parent_name[:1].isdigit() else ''
     return f"{locant_str}-{prefix}{sep}{parent_name}"
@@ -1378,6 +1437,34 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     different lambda values (P-22.2.7.2 tie-break unbuilt); any unsaturated
     ring that is not a perfect mancude matching with only HETEROATOM
     saturated positions (hydro forms); >1 indicated-H position.
+
+    MEASURED RESIDUE (Task AA re-measurement; enumerate 27,687 bare
+    heteromonocycles: sizes 3-14 x N/O/S/O+N/S+N/2N at every heteroatom
+    position x every independent-edge set of the ring).  Of the 2,848 rings of
+    size <= 10, **707 abstain at producer level and all 707 fail on ONE branch**
+    — the "hydro form of a lambda ring" refusal below.  Not two gaps, one.
+    It spans sizes 3-10 (2/4/13/24/53/96/185/330), so it is not a boundary
+    effect: c3413078 only made sizes 7-10 *visible* by routing them here; sizes
+    3-6 abstained before it and were untouched by it.  (The other half of the
+    residue recorded in 06093de6 — "4 nine-membered 2-N rings" — was never a
+    producer abstention at all.  Those emitted a malformed name that only the
+    OPSIN validity gate suppressed downstream; the real class was 51 rings and
+    is fixed in _aromatizable_hydro_name.)
+
+    The class IS licensed, so this is a coverage gap, not a correctness one.
+    P-66.1.5.2.3 "Intramolecular amides of amino sulfinic acids." (``:33282``)
+    gives ``3,4,5,6-tetrahydro-1<lambda>4,2-thiazin-1-ol (PIN)`` (``:33292``),
+    and P-66.1.5.2.1 (``:33246``) gives
+    ``1-hydroxy-4,5-dihydro-3H-1<lambda>6,2-thiazol-1-one (PIN)`` (``:33268``)
+    — hydro prefixes on a lambda Hantzsch-Widman ring, one of them also
+    carrying indicated hydrogen, both marked (PIN).  Building it means making
+    ``_mancude_max_matching`` lambda-aware (a lambda atom's spare valence
+    changes which ring positions are matchable) and adding P-14.4(h) (``:3320``
+    — "When a choice is needed between the same skeletal atom in different
+    valence states, the one in a nonstandard valence state is assigned the
+    lower locant") to the numbering key.  Deliberately left fail-closed rather
+    than half-built: a partial lambda-hydro producer would emit names for
+    hypervalent rings that nothing in the tree can currently check.
     """
     from .lambda_convention import nonstandard_bonding_number, STANDARD_BONDING_NUMBER
     ring_size = info['ring_size']
