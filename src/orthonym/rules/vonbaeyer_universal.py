@@ -312,6 +312,20 @@ def audit_von_baeyer_descriptor(
     total, asserted = rebuilt
     if total != len(cage):
         return False
+    # P-23.1.9, under P-23.1 "DEFINITIONS AND TERMINOLOGY"
+    # (``BlueBookV2/BlueBookV2.md:9558``): *"A 'polycyclic system' contains a
+    # number of rings equal to the minimum number of scissions required to
+    # convert the system into an acyclic skeleton. The number of rings is
+    # indicated by the nondetachable prefix 'bicyclo' (not dicyclo), 'tricyclo',
+    # 'tetracyclo', etc."*  The word is part of the name, so a descriptor whose
+    # brackets are right but whose ring-count word is wrong still denotes the
+    # wrong system -- ``tetracyclo[3.3.1.1^3,7]`` for adamantane passed every
+    # other clause of this audit.
+    from .polycyclic import cyclo_ring_count_word
+    circuit_rank = len(asserted) - total + 1
+    head = descriptor.strip().split('[', 1)[0]
+    if head != cyclo_ring_count_word(circuit_rank):
+        return False
     # the numbering must be a bijection of the cage onto 1..N; anything else
     # cannot be read against the descriptor's locants at all.
     locants = [numbering.get(i) for i in cage]

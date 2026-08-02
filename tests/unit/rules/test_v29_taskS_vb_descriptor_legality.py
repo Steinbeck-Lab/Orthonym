@@ -165,6 +165,30 @@ def test_audit_rejects_wrong_size_descriptor():
         mol, ring, desc.numbering, "bicyclo[2.2.2]") is False   # 8 atoms
 
 
+@pytest.mark.parametrize("wrong_word", [
+    "bicyclo[3.3.1.1^3,7]",       # 3 rings spelled as 2
+    "tetracyclo[3.3.1.1^3,7]",    # 3 rings spelled as 4
+    "pentacyclo[3.3.1.1^3,7]",
+])
+def test_audit_rejects_wrong_ring_count_word(wrong_word):
+    """The ring-count word is part of the name and must match the skeleton.
+
+    P-23.1.9, under P-23.1 "DEFINITIONS AND TERMINOLOGY"
+    (``BlueBookV2.md:9558``): *"A 'polycyclic system' contains a number of rings
+    equal to the minimum number of scissions required to convert the system into
+    an acyclic skeleton. The number of rings is indicated by the nondetachable
+    prefix 'bicyclo' (not dicyclo), 'tricyclo', 'tetracyclo', etc."*
+
+    Found by mutation testing: with the bracket body left correct, every other
+    clause of the audit passed, so ``tetracyclo[3.3.1.1^3,7]decane`` for
+    adamantane was accepted before this check existed.
+    """
+    mol, ring, desc = _cage("C1C2CC3CC1CC(C2)C3")
+    assert desc.descriptor_string == "tricyclo[3.3.1.1^3,7]"
+    assert audit_von_baeyer_descriptor(
+        mol, ring, desc.numbering, wrong_word) is False
+
+
 def test_audit_rejects_non_bijective_numbering():
     """Two cage atoms sharing a locant cannot be read against the descriptor."""
     mol, ring, desc = _cage("C1CC2CCC1C2")
