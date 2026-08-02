@@ -190,10 +190,29 @@ def test_name_r_group_never_spells_a_ring_as_a_straight_chain():
 
 
 def test_blocker_1_1_disubstituted_cycloalkyl_substituent_is_unnameable():
-    """Pins WHY R3 abstains. NOT thiourea-specific -- 1-methylcyclohexyl fails too.
+    """``name_substituent_fragment`` (the Tier-4 recursive namer) declines a
+    gem-disubstituted ring fragment.
 
-    When this starts failing the substituent gap has been closed and R3's
-    exact-PIN expectation above should be reinstated.
+    ⚠ CORRECTION (2026-08-02). This test's original docstring claimed the gap
+    was general -- *"NOT thiourea-specific -- 1-methylcyclohexyl fails too"* --
+    and that R3's PIN would be reachable the day it started failing. Both
+    claims are REFUTED by measurement:
+
+    * ``(1-methylcyclohexyl)methanol``, ``1-methylcyclohexan-1-amine``,
+      ``1,1-dimethylcyclohexane`` and ``1-methylcyclohexane-1-carboxylic acid``
+      all named correctly even when this test was written, so the gem-
+      disubstituted cycloalkyl substituent was never globally unnameable.
+    * ``N-(1-methylcyclohexyl)acetamide`` and ``N-(1-methylcyclohexyl)thiourea``
+      now name (``b4705533``), yet THIS assertion still holds -- because
+      ``name_substituent_fragment`` is a DIFFERENT tier from the Tier-1.6
+      ``decorated_ring_substituent_name`` that was actually repaired. A test
+      going green is not evidence that the tier it exercises was the blocker.
+
+    R3 remains unreachable for a further, unrelated reason: its ring decoration
+    is a ``tert-butyldiazenyl`` group, which is outside the supported table in
+    ``_ring_atom_simple_substituents`` (oxo, cyano, carboxy, halogen, hydroxy,
+    alkoxy, amino, nitro, unbranched alkyl, alkoxycarbonyl). It abstains; it
+    does not emit a wrong constitution.
     """
     from orthonym.assembly.substituent_naming import name_substituent_fragment
     m = Chem.MolFromSmiles("NC(=S)NC1(C)CCCCC1")          # 1-methylcyclohexyl

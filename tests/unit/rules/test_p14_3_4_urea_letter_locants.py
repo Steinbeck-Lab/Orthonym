@@ -70,9 +70,10 @@ def test_urea_keeps_letter_locants(namer, smiles, expected):
     """The WHOLE name is asserted, per session invariant 11.
 
     Asserting only "the numeral is absent" would be satisfied by an abstention
-    ('unknown organic compound') and by a dropped substituent alike. Two of the four
-    chalcogen/N-substituted siblings below abstain today, which is precisely why the
-    whole string has to be pinned.
+    ('unknown organic compound') and by a dropped substituent alike -- which is
+    precisely why the whole string is pinned. (The two chalcogen siblings below
+    DID abstain when this was written; they now name, and the xfail marker that
+    recorded the gap has been retired.)
     """
     assert namer.name(smiles) == expected
 
@@ -81,21 +82,29 @@ def test_urea_keeps_letter_locants(namer, smiles, expected):
     "smiles,expected_pin,citation",
     [
         # Chalcogen analogues are in scope of P-66.1.6.1.3.1 (:33439) and take the same
-        # letter locants, but Orthonym abstains on both today (measured 2026-07-29:
-        # 'unknown organic compound', OPSIN-UNPARSEABLE). Recorded as strict xfail so the
-        # day either becomes nameable this test XPASSes -> FAILS -> and whoever built it
-        # is forced to confirm the spelling rather than discovering it years later.
+        # letter locants. These ABSTAINED when this test was written (measured
+        # 2026-07-29) and were recorded as a strict xfail so that the day either
+        # became nameable the test would XPASS -> FAIL -> and force whoever built
+        # it to confirm the SPELLING rather than discovering it years later.
+        #
+        # That day came: `bbec0a76` added the retained chalcogen-urea parent
+        # (assembly/handlers/thiourea.py) and both rows became nameable. The
+        # marker's own instruction has been carried out -- the letter locants
+        # were verified surviving before it was removed:
+        #
+        #     CNC(=S)N        -> N-methylthiourea
+        #     CC(C)NC(=[Se])N -> N-(propan-2-yl)selenourea
+        #
+        # Both carry the italic letter locant `N` and no numeral, as
+        # P-66.1.6.1.3.1 (:33439) requires -- *"Preferred IUPAC names use the
+        # letter locants N, and N'. Numerical locants may be used for thiourea in
+        # general nomenclature."* -- restated at :33446 *"Numerical locants are no
+        # longer used for thiourea in the IUPAC preferred name."*  The second row
+        # is the Blue Book's OWN worked example for the rule, `N-(butan-2-yl)-
+        # selenourea (PIN)` (:33451), in its propan-2-yl homologue.
         ("CNC(=S)N", "N-methylthiourea", "P-66.1.6.1.3.1 :33439"),
-        # ★ This is the Blue Book's OWN worked example for the rule (:33451) and we cannot
-        # produce it. A coverage gap, not a spelling gap -- Phase 5 material.
         ("CC(C)NC(=[Se])N", "N-(propan-2-yl)selenourea", "P-66.1.6.1.3.1 :33451"),
     ],
-)
-@pytest.mark.xfail(
-    strict=True,
-    reason="coverage gap measured 2026-07-29: Orthonym abstains on urea chalcogen "
-           "analogues (OPSIN-UNPARSEABLE). Not a locant defect. When this XPASSes, "
-           "verify the letter locants survived before removing the marker.",
 )
 def test_urea_chalcogen_analogues_keep_letter_locants(namer, smiles, expected_pin, citation):
     assert namer.name(smiles) == expected_pin
