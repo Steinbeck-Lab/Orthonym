@@ -155,6 +155,44 @@ def test_indicated_hydrogen_outranks_the_suffix_in_numbering(smiles, expected):
 
 
 # --------------------------------------------------------------------------
+# 2c. An isotopic descriptor has to be able to land in front of an
+#     indicated-hydrogen prefix.
+#
+# The P-82 decorator enumerates insertion offsets with ``skel[i].isalpha()``, so
+# the slot before ``1H-`` -- a digit -- was never offered.  With a bare parent
+# the front offset (0) covers it, but once substituent prefixes are present the
+# descriptor has to sit between them and the parent, and the molecule failed
+# closed instead.
+#
+# P-82 prints this construction four times, every one a PIN
+# (``BlueBookV2.md:43790``-``:43796``)::
+#
+#     (15N)-1H-indole (PIN)
+#     2,3-dihydro(15N)-1H-indole (PIN)
+#     2,3-dihydro(2,3-2H2,15N)-1H-indole (PIN)
+#
+# -- descriptor, then a hyphen, then the indicated-hydrogen prefix.
+# --------------------------------------------------------------------------
+
+def test_isotopic_descriptor_reaches_an_indicated_hydrogen_parent():
+    """The descriptor sits between the prefixes and the ``1H-`` parent.
+
+    The UNLOCANTED descriptor form ``(2H1)`` is this module's own pre-existing
+    P-45.4.1 preference -- the no-locant form is tried first and kept when it
+    round-trips -- and is not affected by this fix: before it, the same molecule
+    was named ``1-methyl-2-nitro(2H1)azole``, carrying the identical ``(2H1)``
+    against the (wrong) Hantzsch-Widman parent.  Only the parent moved.
+    """
+    assert name_compound("[2H]C1=C(N(C=C1)C)[N+](=O)[O-]") == \
+        "1-methyl-2-nitro(2H1)-1H-pyrrole"
+
+
+def test_isotopic_front_placement_unchanged():
+    """No substituent prefix -> the front offset already covered it."""
+    assert name_compound("[2H]c1cc[nH]c1") == "(3-2H1)1H-pyrrole"
+
+
+# --------------------------------------------------------------------------
 # 3. Fused controls -- a ring that merely CONTAINS the pattern is a different
 #    ring system.  The repair must not cross a fusion bond.
 # --------------------------------------------------------------------------

@@ -17,7 +17,8 @@ positions; then to higher atomic number; then to higher mass number.
 """
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+import re
+from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
@@ -147,6 +148,47 @@ def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol) -> bool:
         return Chem.MolToSmiles(parsed) == Chem.MolToSmiles(original_mol)
     except Exception:
         return False
+
+
+#: A parent hydride's indicated-hydrogen prefix, e.g. the ``1H-`` of
+#: ``1H-pyrrole``. The hyphen is part of the match because the descriptor goes
+#: *in place of* it -- see ``_insertion_offsets``.
+_INDICATED_H_PREFIX_RE = re.compile(r"-\d+H-")
+
+
+def _insertion_offsets(skel: str) -> List[int]:
+    """Offsets in ``skel`` at which an isotopic descriptor may be inserted.
+
+    P-82.2.1: the descriptor "is inserted before the part of the compound that is
+    isotopically substituted".  The enumeration does not parse the skeleton's
+    grammar -- it offers every plausible offset and lets the OPSIN round-trip
+    oracle pick the one that is right -- so the only thing that matters here is
+    that no legal placement is left out of the candidate set.
+
+    Alphabetic starts cover a bare parent stem.  They do NOT cover a parent
+    carrying an indicated hydrogen: the slot before ``1H-pyrrole`` begins with a
+    digit, so a labelled molecule that also has substituent prefixes had nowhere
+    legal to put the descriptor and failed closed -- ``[2H]C1=C(N(C=C1)C)[N+](=O)[O-]``
+    named nothing at all, though its unlabelled skeleton names fine.
+
+    P-82 prints the construction four times, every one a PIN
+    (``BlueBookV2/BlueBookV2.md:43790``-``:43796``)::
+
+        (15N)-1H-indole (PIN)
+        2,3-dihydro(15N)-1H-indole (PIN)
+        2,3-dihydro(2,3-2H2,15N)-1H-indole (PIN)
+
+    -- descriptor, then a hyphen, then the indicated-hydrogen prefix.  So the
+    descriptor replaces the hyphen that introduces that prefix, and the offset to
+    offer is the hyphen's own index: ``1-methyl-2-nitro`` + ``(3-2H1)`` +
+    ``-1H-pyrrole``.
+
+    Every candidate built from these offsets is still OPSIN-round-trip gated by
+    the caller, so a surplus offset can only ever be discarded, never shipped.
+    """
+    offsets = [i for i in range(1, len(skel)) if skel[i].isalpha()]
+    offsets.extend(m.start() for m in _INDICATED_H_PREFIX_RE.finditer(skel))
+    return sorted(offsets)
 
 
 def _p4542_p4543_key(groups) -> tuple:
@@ -390,9 +432,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # lets the OPSIN round-trip oracle pick the unique correct one (probe: only
     # ONE offset round-trips per (structure, descriptor)). Front (0) is tried
     # first so the front placement is preferred when it is valid.
-    insert_offsets = [0] + [
-        i for i in range(1, len(skeleton) + 1) if i < len(skeleton) and skeleton[i].isalpha()
-    ]
+    insert_offsets = [0] + _insertion_offsets(skeleton)
     # dedupe preserving order (front-first)
     seen_off = set()
     offsets = []
@@ -411,10 +451,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         ``loc_rank`` is -1 when the winning descriptor needs NO locant, else the
         locant. That value is the P-82.6.1.1 trigger: see below.
         """
-        _offs = [0] + [
-            i for i in range(1, len(skel) + 1)
-            if i < len(skel) and skel[i].isalpha()
-        ]
+        _offs = [0] + _insertion_offsets(skel)
         _seen, _o = set(), []
         for x in _offs:
             if x not in _seen:
