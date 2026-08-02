@@ -119,25 +119,34 @@ class TestDetectAxialChiralityNone:
 class TestDetectAxialChiralityAtropisomer:
     """Tests for atropisomeric biaryl detection."""
 
-    def test_stereoatropcw_returns_sa(self):
-        """STEREOATROPCW bond -> CIP M -> IUPAC Sa."""
+    def test_stereoatropcw_returns_m(self):
+        """STEREOATROPCW bond -> RDKit helicity 'M' -> PIN descriptor 'M'.
+
+        P-91.2.1.1 (:44582) lists under *"used as preferred stereodescriptors"*
+        clause (c) (:44588) *"'M' and 'P', to specify the absolute configuration
+        of an axial or planar entity using the helicity rule"*; 'Sa' is
+        *"recommended for general nomenclature"* (:44594) and is reachable via
+        ``style='general'``."""
         mol = _make_biaryl_atropisomer(Chem.BondStereo.STEREOATROPCW)
         result = detect_axial_chirality(mol)
         assert len(result) == 1
         entry = result[0]
         assert entry['type'] == 'atropisomer'
-        assert entry['cip'] == 'Sa'
+        assert entry['cip'] == 'M'
         assert entry['locant_atom'] is not None
+        # The general-nomenclature form stays available behind the style gate.
+        assert detect_axial_chirality(mol, style='general')[0]['cip'] == 'Sa'
 
-    def test_stereoatropccw_returns_ra(self):
-        """STEREOATROPCCW bond -> CIP P -> IUPAC Ra."""
+    def test_stereoatropccw_returns_p(self):
+        """STEREOATROPCCW bond -> RDKit helicity 'P' -> PIN descriptor 'P'."""
         mol = _make_biaryl_atropisomer(Chem.BondStereo.STEREOATROPCCW)
         result = detect_axial_chirality(mol)
         assert len(result) == 1
         entry = result[0]
         assert entry['type'] == 'atropisomer'
-        assert entry['cip'] == 'Ra'
+        assert entry['cip'] == 'P'
         assert entry['locant_atom'] is not None
+        assert detect_axial_chirality(mol, style='general')[0]['cip'] == 'Ra'
 
     def test_atropisomer_has_correct_keys(self):
         """Atropisomer result dict has all required keys."""
@@ -195,14 +204,15 @@ class TestDetectAxialChiralityAllene:
         assert len(result) == 1
         entry = result[0]
         assert entry['type'] == 'allene'
-        assert entry['cip'] is not None  # manual CIP should determine Ra or Sa
+        assert entry['cip'] is not None  # manual CIP should determine M or P
 
-    def test_allene_returns_ra_or_sa(self):
-        """Allene CIP is either 'Ra' or 'Sa' (not None, R, S, P, M)."""
+    def test_allene_returns_m_or_p(self):
+        """Allene CIP is the PIN helicity letter 'M' or 'P' (not None, R, S)."""
         mol = _make_allene_with_chi_allene()
         result = detect_axial_chirality(mol)
         assert len(result) == 1
-        assert result[0]['cip'] in ('Ra', 'Sa')
+        assert result[0]['cip'] in ('M', 'P')
+        assert detect_axial_chirality(mol, style='general')[0]['cip'] in ('Ra', 'Sa')
 
 
 # =============================================================================
@@ -212,8 +222,12 @@ class TestDetectAxialChiralityAllene:
 class TestManualAlleneCIP:
     """Tests for manual allene CIP determination."""
 
-    def test_manual_cip_returns_ra_or_sa(self):
-        """Manual CIP for chiral allene returns 'Ra' or 'Sa'."""
+    def test_manual_cip_returns_m_or_p(self):
+        """Manual CIP for a chiral allene returns the helicity letter 'M'/'P'.
+
+        P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'" (:44812):
+        *"the chirality is described by the symbols 'M' if the path is
+        anticlockwise; the symbol is 'P' if the path is clockwise"*."""
         mol = _make_allene_with_chi_allene()
         # Find the central allene C (has CHI_ALLENE)
         central_idx = None
@@ -223,7 +237,7 @@ class TestManualAlleneCIP:
                 break
         assert central_idx is not None
         result = _manual_allene_cip(mol, central_idx)
-        assert result in ('Ra', 'Sa')
+        assert result in ('M', 'P')
 
     def test_manual_cip_symmetrical_allene_returns_none(self):
         """Symmetrical allene (identical terminal groups) -> None (achiral)."""
@@ -260,7 +274,7 @@ class TestManualAlleneCIP:
                     break
         final_mol = mol.GetMol()
         result = _manual_allene_cip(final_mol, central_idx)
-        assert result in ('Ra', 'Sa')
+        assert result in ('M', 'P')
 
 
 # =============================================================================
@@ -334,24 +348,30 @@ class TestCollectStereodescriptorsAxial:
 
         descriptors = collect_stereodescriptors(mol, atom_to_locant)
         assert descriptors, "no stereodescriptor at all -- the axis was lost"
-        # STEREOATROPCW -> RDKit helicity 'M' -> axial descriptor 'Sa'.
-        assert descriptors == [(7, 'Sa')], (
+        # STEREOATROPCW -> RDKit helicity 'M', which IS the PIN axial descriptor
+        # (P-91.2.1.1(c), :44588). It used to be re-lettered to 'Sa', the form
+        # P-91.2.1.1 reserves for general nomenclature (:44594).
+        assert descriptors == [(7, 'M')], (
             f"expected exactly one axial descriptor, got {descriptors}"
         )
-        assert format_stereodescriptor_string(descriptors) == '(7Sa)-'
+        assert format_stereodescriptor_string(descriptors) == '(7M)-'
 
-    def test_atropisomer_emits_no_bare_helicity_letter(self):
-        """No bare 'M'/'P' may reach the descriptor list.
+    def test_atropisomer_axis_emits_exactly_one_descriptor(self):
+        """One axis -> exactly one descriptor, at one locant.
 
-        RDKit reports axial configuration as the helicity letter 'M'/'P' in the
-        bond's `_CIPCode`. Orthonym spells axial chirality with the Ra/Sa
-        forms, so a bare 'M' or 'P' in the output is always a leak from the E/Z
-        channel rather than a deliberate emission. Both rotation senses are
+        This guard was written when a bare 'M'/'P' in the output could only be a
+        leak from the E/Z channel, and it asserted their ABSENCE. 'M'/'P' are
+        now the deliberate PIN emission (P-91.2.1.1(c), :44588), so that
+        assertion would today forbid the correct answer. The defect it was
+        protecting against is unchanged and is still caught: the E/Z leak
+        emitted the single axis TWICE, as [(7, 'M'), (7, 'Sa')] spelled
+        '(7M,7Sa)-'. What detects that is the exact-set comparison plus the
+        duplicate-locant check below -- not the letter. Both rotation senses are
         checked so the guard cannot pass by only handling one.
         """
         for stereo, expected in (
-            (Chem.BondStereo.STEREOATROPCW, [(7, 'Sa')]),
-            (Chem.BondStereo.STEREOATROPCCW, [(7, 'Ra')]),
+            (Chem.BondStereo.STEREOATROPCW, [(7, 'M')]),
+            (Chem.BondStereo.STEREOATROPCCW, [(7, 'P')]),
         ):
             mol = _make_biaryl_atropisomer(stereo)
             atom_to_locant = {i: i + 1 for i in range(mol.GetNumAtoms())}
@@ -360,15 +380,16 @@ class TestCollectStereodescriptorsAxial:
             assert descriptors, f"{stereo}: axis lost entirely"
             assert descriptors == expected, f"{stereo}: got {descriptors}"
 
-            codes = [cip for _loc, cip in descriptors]
-            assert 'M' not in codes and 'P' not in codes, (
-                f"{stereo}: bare helicity letter leaked into the descriptor "
-                f"list: {descriptors}"
+            locants = [loc for loc, _cip in descriptors]
+            assert len(locants) == len(set(locants)), (
+                f"{stereo}: one axis produced two descriptors at the same "
+                f"locant -- the E/Z channel is leaking again: {descriptors}"
             )
-            # And it must not reach the spelled name either.
+            # And the spelled name carries that one descriptor, not a
+            # duplicate-locant block like '(7M,7Sa)-'.
             rendered = format_stereodescriptor_string(descriptors)
-            assert 'M' not in rendered and 'P' not in rendered, (
-                f"{stereo}: bare helicity letter reached the name: {rendered!r}"
+            assert rendered == f"({expected[0][0]}{expected[0][1]})-", (
+                f"{stereo}: unexpected spelled form {rendered!r}"
             )
 
     def test_ez_descriptors_still_collected(self):
@@ -430,12 +451,12 @@ class TestCollectStereodescriptorsAxial:
         # Exact set, not membership: a membership check here could not tell a
         # correct [(2,'S'),(9,'Ra')] from the defective
         # [(2,'S'),(9,'P'),(9,'Ra')] that this code path used to produce.
-        assert descriptors == [(2, 'S'), (9, 'Ra')], (
+        assert descriptors == [(2, 'S'), (9, 'P')], (
             f"expected one point centre and one axis, got {descriptors}"
         )
-        assert format_stereodescriptor_string(descriptors) == '(2S,9Ra)-'
+        assert format_stereodescriptor_string(descriptors) == '(2S,9P)-'
 
-    def test_end_to_end_format_ra_with_s(self):
+    def test_end_to_end_format_axial_with_s(self):
         """End-to-end: collect_stereodescriptors -> format produces '(NRa,MS)-' style."""
         # Create a molecule with both types and format the output
         mol = Chem.RWMol(Chem.MolFromSmiles('C[C@H](O)c1ccccc1-c1ccccc1C'))
@@ -461,7 +482,7 @@ class TestCollectStereodescriptorsAxial:
         # Should be a parenthesized prefix like "(2S,7Ra)-" or similar
         assert result.startswith('(')
         assert result.endswith(')-')
-        assert 'Ra' in result or 'Sa' in result, "Should contain axial descriptor"
+        assert 'P' in result or 'M' in result, "Should contain axial descriptor"
         # Should also have R or S for the point chirality
         # (need to check for R/S not preceded by another letter to avoid matching Ra/Sa)
         import re

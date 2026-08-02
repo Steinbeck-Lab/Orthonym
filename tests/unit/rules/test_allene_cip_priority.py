@@ -216,8 +216,8 @@ class TestTerminalIsAchiral:
         # _manual_allene_cip should return Ra or Sa (not None)
         result = _manual_allene_cip(mol, central_idx)
         # With true CIP priority, methyl != ethyl, so not achiral
-        assert result in ('Ra', 'Sa'), (
-            f"Expected Ra or Sa for allene with methyl+ethyl terminal, got {result}"
+        assert result in ('M', 'P'), (
+            f"Expected M or P for allene with methyl+ethyl terminal, got {result}"
         )
 
 
@@ -232,7 +232,7 @@ class TestManualAlleneCipAssignment:
         """Test 7: Allene with Cl and H on each terminal gives Ra or Sa."""
         mol, central_idx = _make_allene_mol('ClC=C=CBr')
         result = _manual_allene_cip(mol, central_idx)
-        assert result in ('Ra', 'Sa'), f"Expected Ra or Sa, got {result}"
+        assert result in ('M', 'P'), f"Expected M or P, got {result}"
 
     def test_identical_terminal_substituents_returns_none(self):
         """Test 8: Allene with identical substituents on one terminal is achiral."""
@@ -256,5 +256,5 @@ class TestEndToEndAlleneCip:
         assert len(results) == 1
         entry = results[0]
         assert entry['type'] == 'allene'
-        assert entry['cip'] in ('Ra', 'Sa')
+        assert entry['cip'] in ('M', 'P')
         assert entry['locant_atom'] == central_idx

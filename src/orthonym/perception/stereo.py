@@ -280,7 +280,22 @@ def get_undefined_stereocenters(mol) -> List[int]:
 # Axial Chirality Detection (IUPAC P-93.5)
 # =============================================================================
 
-def detect_axial_chirality(mol) -> List[Dict]:
+#: The axial descriptor in GENERAL nomenclature, keyed by the PIN (helicity)
+#: descriptor. P-91.2.1.1 "Cahn-Ingold-Prelog (CIP) stereodescriptors"
+#: (BlueBookV2.md:44582) lists under *"The following stereodescriptors are used
+#: as preferred stereodescriptors"* clause (c) (:44588) *"'M' and 'P', to specify
+#: the absolute configuration of an axial or planar entity using the helicity
+#: rule"*; 'Ra'/'Sa' appear only under *"The following stereodescriptors are
+#: recommended for general nomenclature"* (:44594). The two describe the same
+#: sense: P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'" (:44812)
+#: -- *"the chirality is described by the symbols 'M' if the path is
+#: anticlockwise; the symbol is 'P' if the path is clockwise"* -- is the same
+#: clockwise/anticlockwise test the Ra/Sa elongated-tetrahedron model applies,
+#: so Ra == P and Sa == M.
+AXIAL_GENERAL_FORM = {"P": "Ra", "M": "Sa"}
+
+
+def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
     """
     Detect allene and atropisomer axial chirality in a molecule.
 
@@ -292,20 +307,27 @@ def detect_axial_chirality(mol) -> List[Dict]:
     representation. Does NOT attempt to infer chirality where the input
     is silent.
 
-    CIP mapping (IUPAC P-93.5.3):
-        RDKit CIP P -> Ra (clockwise in elongated tetrahedron)
-        RDKit CIP M -> Sa (anticlockwise in elongated tetrahedron)
+    Descriptor (P-91.2.1.1, :44582 -- see ``AXIAL_GENERAL_FORM``): the helicity
+    letters 'M'/'P' are the PREFERRED (PIN) stereodescriptors for an axial
+    entity, so they are what this returns by default. 'Ra'/'Sa' are recommended
+    for GENERAL nomenclature only and are produced with ``style="general"``.
 
     Args:
         mol: RDKit Mol object
+        style: 'pin' (default) -> 'M'/'P'; 'general' -> 'Sa'/'Ra'.
 
     Returns:
         List of dicts with keys:
         - type: 'allene' or 'atropisomer'
         - idx: atom index (allene) or bond index (atropisomer)
-        - cip: 'Ra' or 'Sa' (or None if undetermined)
+        - cip: 'M'/'P' ('Sa'/'Ra' when style='general'), or None if undetermined
         - locant_atom: atom index to use for IUPAC locant mapping
     """
+    def _styled(code):
+        if code is None:
+            return None
+        return AXIAL_GENERAL_FORM.get(code, code) if style == "general" else code
+
     # Ensure CIP labels are assigned (needed for atropisomer P/M)
     assign_stereochemistry(mol)
 
@@ -316,14 +338,14 @@ def detect_axial_chirality(mol) -> List[Dict]:
         stereo = bond.GetStereo()
         if stereo in (Chem.BondStereo.STEREOATROPCW,
                       Chem.BondStereo.STEREOATROPCCW):
-            # RDKit CIP: P -> Ra, M -> Sa
+            # RDKit already reports the helicity letter for an atropisomeric
+            # bond, which IS the PIN descriptor (P-91.2.1.1(c), :44588) -- it is
+            # passed through rather than re-lettered to Ra/Sa.
             cip = None
             if bond.HasProp('_CIPCode'):
                 rdkit_cip = bond.GetProp('_CIPCode')
-                if rdkit_cip == 'P':
-                    cip = 'Ra'
-                elif rdkit_cip == 'M':
-                    cip = 'Sa'
+                if rdkit_cip in ('P', 'M'):
+                    cip = _styled(rdkit_cip)
             results.append({
                 'type': 'atropisomer',
                 'idx': bond.GetIdx(),
@@ -336,7 +358,7 @@ def detect_axial_chirality(mol) -> List[Dict]:
         if atom.GetChiralTag() == Chem.ChiralType.CHI_ALLENE:
             # rdCIPLabeler does not assign CIP to allene atoms in RDKit 2025.09
             # Use manual CIP determination
-            cip = _manual_allene_cip(mol, atom.GetIdx())
+            cip = _styled(_manual_allene_cip(mol, atom.GetIdx()))
             results.append({
                 'type': 'allene',
                 'idx': atom.GetIdx(),
@@ -377,12 +399,18 @@ def _cip_priority_key(mol_h, atom_idx: int, exclude_idx: int) -> tuple:
 
 def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
     """
-    Determine Ra/Sa for an allene by comparing terminal substituent priorities.
+    Determine the axial helicity descriptor M/P for an allene.
 
     For an allene C1=C=C2, view along the C=C=C axis. The allene is treated
     as an elongated tetrahedron with 4 substituents (2 on each terminal carbon).
-    If the arrangement from highest-priority-near to highest-priority-far
-    is clockwise: Ra. If counterclockwise: Sa.
+    P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'"
+    (BlueBookV2.md:44812): *"Looking along the chirality axis the ligands are
+    arranged in pairs. When proceeding from the nearer ligand having priority in
+    the pair to the further away atom or group having priority in the pair, the
+    chirality is described by the symbols 'M' if the path is anticlockwise; the
+    symbol is 'P' if the path is clockwise."*  So clockwise -> P, anticlockwise
+    -> M; these are the PIN descriptors (P-91.2.1.1(c), :44588). The general
+    forms Ra/Sa are derived by the caller via ``AXIAL_GENERAL_FORM``.
 
     Uses true CIP priority based on atomic number (primary) and neighbor
     atomic number sums (secondary), per IUPAC P-92.1.3.
@@ -392,7 +420,7 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
         central_idx: Atom index of the central allene carbon
 
     Returns:
-        'Ra', 'Sa', or None (if achiral -- fewer than 4 distinct groups)
+        'P', 'M', or None (if achiral -- fewer than 4 distinct groups)
     """
     central_atom = mol.GetAtomWithIdx(central_idx)
 
@@ -487,11 +515,10 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
 
     # Determine sense based on the elongated tetrahedron model:
     # View along the allene axis from the near terminal to the far terminal.
-    # If high-priority-near to high-priority-far is clockwise: Ra
-    # If counterclockwise: Sa
+    # P-92.1.2.2 (:44812): clockwise -> 'P', anticlockwise -> 'M'.
     if near_high_priority > far_high_priority:
-        return 'Ra'
+        return 'P'
     elif near_high_priority < far_high_priority:
-        return 'Sa'
+        return 'M'
     else:
         return None  # Identical priorities -- achiral
