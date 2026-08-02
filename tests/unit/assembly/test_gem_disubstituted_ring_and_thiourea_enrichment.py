@@ -327,6 +327,11 @@ def test_decorated_ring_on_a_retained_urea_parent(namer, smiles, expected):
     # and turned this correct name into
     # `1-[(1S)-ethyl]((S)-1-cyclohexylethyl)cyanamide`.
     ("C[C@@H](C1CCCCC1)NC#N", "((S)-1-cyclohexylethyl)cyanamide"),
+    # A ring bonded DIRECTLY to the cyanamide N: enrichment corrupted both of
+    # these into abstentions, so they also pin that the handler skips it.
+    # (Both round-trip through OPSIN 2.9.0 to the input constitution.)
+    ("N#CNC1CCCCC1",          "cyclohexylcyanamide"),
+    ("N#CNC1(C)CCCCC1",       "(1-methylcyclohexyl)cyanamide"),
 ])
 def test_cyanamide_complete_names_are_not_enriched(namer, smiles, expected):
     assert _name(namer, smiles) == expected
