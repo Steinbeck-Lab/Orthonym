@@ -80,32 +80,90 @@ def _characterize_substituent(mol, start_idx: int, exclude: set) -> Optional[Tup
         # Unrecognized aromatic system
         return None
 
-    # Not aromatic: count carbons via BFS (same as old _count_alkyl_carbons)
-    visited = set()
-    queue = deque([start_idx])
-    count = 0
+    # Not aromatic: the only alkyl name reachable from here is the unbranched
+    # ``get_alkyl_name(n)`` stem, so PROVE the fragment is the one shape that
+    # stem can spell before counting anything. A count cannot distinguish a
+    # branched alkyl from its straight-chain isomer, a ring from a chain, an
+    # alkene from an alkane, or a chain carrying a heteroatom from a bare one --
+    # and the old walker followed C-C bonds ONLY, so every such fragment was
+    # renamed as the straight chain of the same carbon count and any hanging
+    # heteroatom was silently DROPPED:
+    #   isopropyl -> 'propyl', cyclohexyl -> 'hexyl', benzyl -> 'heptyl',
+    #   allyl -> 'propyl', -CH2CH2CH2OH -> 'propyl' (the -OH vanishes).
+    # Each produced a well-formed name for a DIFFERENT MOLECULE. Fail closed
+    # instead; the callers all treat None as "cannot characterize".
+    subtree = _prove_unbranched_terminal_alkyl(mol, start_idx, exclude)
+    if subtree is None:
+        return None
 
-    while queue:
-        atom_idx = queue.popleft()
-        if atom_idx in visited or atom_idx in exclude:
-            continue
-        visited.add(atom_idx)
-
-        atom = mol.GetAtomWithIdx(atom_idx)
-        if atom.GetSymbol() == 'C':
-            count += 1
-
-            for neighbor in atom.GetNeighbors():
-                nbr_idx = neighbor.GetIdx()
-                if nbr_idx not in visited and nbr_idx not in exclude:
-                    # Only follow C-C bonds for simple alkyls
-                    if neighbor.GetSymbol() == 'C':
-                        queue.append(nbr_idx)
-
+    count = len(subtree)
     if count == 0 or count > 10:
         return None
 
     return ("alkyl", get_alkyl_name(count))
+
+
+def _prove_unbranched_terminal_alkyl(mol, start_idx: int, exclude: set) -> Optional[List[int]]:
+    """Return the fragment's carbon indices iff ``get_alkyl_name(len(...))`` is
+    an HONEST name for it, else None.
+
+    ``get_alkyl_name(n)`` can only ever spell an unbranched, saturated, acyclic,
+    all-carbon chain attached at one of its two ends. This walks the WHOLE
+    substituent subtree -- every element, not just the carbon skeleton -- so a
+    fragment carrying a heteroatom is refused rather than counted past. That
+    whole-subtree walk is the part a carbon-only counter structurally cannot do:
+    it never visits the atom it drops.
+
+    This is a structure proof, not a count. Anything it cannot prove is refused.
+    """
+    subtree: List[int] = []
+    seen = set(exclude)
+    stack = [start_idx]
+    while stack:
+        idx = stack.pop()
+        if idx in seen:
+            continue
+        seen.add(idx)
+        atom = mol.GetAtomWithIdx(idx)
+        # Any non-carbon anywhere in the substituent means the alkyl stem would
+        # claim atoms it cannot spell (the dropped-heteroatom class).
+        if atom.GetSymbol() != 'C':
+            return None
+        if atom.IsInRing():                    # a ring is not a chain
+            return None
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+        subtree.append(idx)
+        for nbr in atom.GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx in exclude or nbr.GetSymbol() == 'H':
+                continue
+            stack.append(nbr_idx)
+
+    if not subtree:
+        return None
+
+    sub_set = set(subtree)
+
+    def _in_sub_carbons(idx: int) -> int:
+        return sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                   if n.GetIdx() in sub_set)
+
+    # The free valence must sit at a chain TERMINUS -- an internal attachment is
+    # 'propan-2-yl', which the unlocanted stem cannot express.
+    if _in_sub_carbons(start_idx) > 1:
+        return None
+
+    for idx in subtree:
+        if _in_sub_carbons(idx) > 2:           # branch point
+            return None
+        for bond in mol.GetAtomWithIdx(idx).GetBonds():
+            begin, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if begin in sub_set and end in sub_set:
+                if bond.GetBondType() != Chem.BondType.SINGLE:
+                    return None                # alkenyl / alkynyl
+
+    return subtree
 
 
 def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
