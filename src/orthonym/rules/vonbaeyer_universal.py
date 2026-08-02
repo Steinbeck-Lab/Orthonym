@@ -15,13 +15,20 @@ indices via GetSubstructMatch.
 """
 from __future__ import annotations
 
+import itertools
 import logging
+import re
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
 
 logger = logging.getLogger(__name__)
+
+
+class _Malformed(Exception):
+    """Internal: a descriptor whose numbered path is degenerate (an edge from a
+    locant to itself). Raised inside the reconstructor, never propagated."""
 
 #: Implementation ceilings on the cage this module will analyse. The Blue Book
 #: sets NO upper size limit on von Baeyer nomenclature (P-23 is construction
@@ -106,53 +113,232 @@ class UniversalCage(RingAnalysis):
     """
 
 
-def audit_von_baeyer_descriptor(
-    mol, cage_atoms, numbering: Dict[int, int], bridge_info_list,
-) -> bool:
-    """Java-free structural correctness floor for a von-Baeyer descriptor.
+#: ``bicyclo[`` / ``tricyclo[`` / ... head, capturing the bracket body.
+_VB_HEAD_RE = re.compile(r'^[a-z]+cyclo\[(.+)\]$')
+#: one secondary-bridge term: ``2^3,7`` (PIN typography) or ``2(3,7)`` (the
+#: older parenthesis form ``_build_descriptor`` also emits; OPSIN parses both).
+_VB_SEC_RE = re.compile(r'^(\d+)(?:\^(\d+),(\d+)|\((\d+),(\d+)\))$')
 
-    Reconstruct the EXACT set of ring/bridge bonds the descriptor + its
-    numbering ASSERTS -- every main-ring branch, the main bridge and each
-    secondary bridge is a numbered path ``start_bh -> atoms... -> end_bh``,
-    so the union of its consecutive-atom edges is precisely the skeleton the
-    emitted name encodes -- and require SET-EQUALITY with the actual
-    molecular-graph ring/bridge bond set over the cage. Any mismatch (a cage
-    bond the name fails to assert, or a numbering that breaks path adjacency)
-    -> ``False`` so the caller fails closed.
+#: Cost bound on the tie-break search in ``reconstruct_von_baeyer_skeleton``
+#: (see the ``secondary_order`` note there). 6! = 720 orderings is the ceiling.
+_MAX_SECONDARY_PERMUTED = 6
 
-    This is intentionally independent of OPSIN: the downstream SELF-01
-    (name->structure round-trip) fails OPEN when Java/OPSIN is unavailable, so
-    a structurally-wrong descriptor would otherwise ship unchecked. Every
-    bridge path is a real graph walk, so the asserted set is always a subset
-    of the graph set; equality therefore reduces to COMPLETE coverage of the
-    cage bonds (no ring bond silently dropped). Locant space is used on both
-    sides (relabelled through ``numbering``), which additionally rejects a
-    numbering that maps two graph-adjacent atoms to the same locant.
+
+def parse_von_baeyer_descriptor(descriptor: str):
+    """``'tricyclo[3.3.1.1^3,7]'`` -> ``([3, 3, 1], [(1, 3, 7)])``; None if
+    the string is not a well-formed von Baeyer descriptor.
+
+    The three leading integers are the bicyclic system (two main-ring branches
+    then the main bridge, P-23.2.2 "cited in descending numerical order"); each
+    remaining term is ``length^low,high`` for one secondary bridge.
     """
+    if not descriptor:
+        return None
+    m = _VB_HEAD_RE.match(descriptor.strip())
+    if not m:
+        return None
+    toks = m.group(1).split('.')
+    if len(toks) < 3:
+        return None
+    try:
+        primary = [int(t) for t in toks[:3]]
+    except ValueError:
+        return None
+    secondary = []
+    for tok in toks[3:]:
+        sm = _VB_SEC_RE.match(tok)
+        if not sm:
+            return None
+        d = int(sm.group(1))
+        lo_s, hi_s = (sm.group(2), sm.group(3)) if sm.group(2) else (
+            sm.group(4), sm.group(5))
+        lo, hi = int(lo_s), int(hi_s)
+        secondary.append((d, min(lo, hi), max(lo, hi)))
+    return primary, secondary
+
+
+def reconstruct_von_baeyer_skeleton(descriptor: str, secondary_order=None):
+    """Rebuild the ring skeleton a von Baeyer descriptor STRING denotes.
+
+    Returns ``(total_atoms, frozenset{(low_locant, high_locant)})`` -- the exact
+    bond set the emitted name encodes, in locant space -- or ``None`` when the
+    string is malformed.
+
+    The numbering is not a convention of ours; it is read straight off the Blue
+    Book, which is what makes this a proof rather than a heuristic:
+
+    * **P-23.2.3 "Numbering bicyclic alicyclic hydrocarbons"**
+      (``BlueBookV2/BlueBookV2.md:9589``): *"The bicyclic ring system is numbered
+      starting with one of the bridgeheads and proceeding first along the longer
+      segment of the main ring to the second bridgehead, then back to the first
+      bridgehead along the unnumbered segment of the main ring. Numbering is
+      completed by numbering the main bridge beginning with the atom next to the
+      first bridgehead."*
+    * **P-23.2.5.2 "Numbering the secondary bridge"** (``:9623``): *"After the
+      main ring and main bridge have been numbered, the independent secondary
+      bridge is numbered continuing from the higher numbered bridgehead of the
+      main ring."*
+    * **P-23.2.6.3 "Numbering of secondary bridges"** (``:9711``): *"the
+      numbering continues from the highest number of the main ring and main
+      bridge. Each secondary bridge is numbered in turn starting with the
+      independent secondary bridge linked to the highest numbered bridgehead
+      atom of the main ring, then the independent secondary bridge linked to the
+      next highest bridgehead atom, and so on. Each atom of a secondary bridge
+      is numbered starting with the atom next to the higher numbered
+      bridgehead."*
+
+    ``secondary_order`` overrides the order in which the secondary bridges
+    consume locants. P-23.2.6.3 fixes that order by descending attachment
+    bridgehead, but leaves ties to P-23.2.6.4; the caller uses this to try the
+    remaining orderings rather than false-reject a cage whose only deviation is
+    a tie-break, which is a *preference* question and not a legality one.
+    """
+    parsed = parse_von_baeyer_descriptor(descriptor)
+    if parsed is None:
+        return None
+    (a, b, c), secondary = parsed
+    if a < 0 or b < 0 or c < 0:
+        return None
+    # P-23.2.2: the bicyclic numbers are cited in descending order, and the
+    # numbering rule above ("first along the LONGER segment") depends on it.
+    if a < b or b < c:
+        return None
+    n_main = a + b + c + 2
+    bh1, bh2 = 1, a + 2
+    edges = set()
+
+    def walk(path):
+        for x, y in zip(path, path[1:]):
+            if x == y:
+                raise _Malformed()
+            edges.add((min(x, y), max(x, y)))
+
+    try:
+        # longer main-ring segment: 1 -> 2..a+1 -> a+2
+        walk([bh1] + list(range(2, a + 2)) + [bh2])
+        # back along the unnumbered segment: a+2 -> a+3..a+b+2 -> 1
+        walk([bh2] + list(range(a + 3, a + b + 3)) + [bh1])
+        # main bridge, "beginning with the atom next to the first bridgehead"
+        walk([bh1] + list(range(a + b + 3, a + b + c + 3)) + [bh2])
+    except _Malformed:
+        return None
+
+    if secondary_order is None:
+        # independent bridges before dependent (P-23.2.6.1.3); within each,
+        # the one linked to the highest numbered bridgehead first.
+        secondary_order = sorted(
+            range(len(secondary)),
+            key=lambda i: (1 if secondary[i][2] > n_main else 0,
+                           -secondary[i][2], -secondary[i][1]))
+    elif sorted(secondary_order) != list(range(len(secondary))):
+        return None
+
+    nxt = n_main + 1
+    try:
+        for i in secondary_order:
+            d, lo, hi = secondary[i]
+            segment = list(range(nxt, nxt + d))
+            nxt += d
+            # "numbered starting with the atom next to the higher numbered
+            # bridgehead" -- hi first, then the new atoms, ending at lo.
+            walk([hi] + segment + [lo])
+    except _Malformed:
+        return None
+    total = nxt - 1
+    for d, lo, hi in secondary:
+        if lo < 1 or hi > total:
+            return None
+    return total, frozenset(edges)
+
+
+def _cage_edges_in_locant_space(mol, cage_atoms, numbering: Dict[int, int]):
+    """The molecule's OWN cage bond set, relabelled through ``numbering``.
+    None when a cage atom is unnumbered or two bonded atoms share a locant."""
     cage = set(cage_atoms)
-    asserted = set()
-    for bridge in bridge_info_list:
-        path = [bridge.start_bh] + list(bridge.atoms) + [bridge.end_bh]
-        for a, b in zip(path, path[1:]):
-            if a not in numbering or b not in numbering:
-                return False
-            la, lb = numbering[a], numbering[b]
-            if la == lb:
-                return False
-            # each asserted edge must be a REAL molecular bond (guards a
-            # bridge path that jumps a non-bonded pair)
-            if mol.GetBondBetweenAtoms(a, b) is None:
-                return False
-            asserted.add((min(la, lb), max(la, lb)))
-    actual = set()
+    out = set()
     for bond in mol.GetBonds():
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if i in cage and j in cage:
-            if i not in numbering or j not in numbering:
-                return False
-            li, lj = numbering[i], numbering[j]
-            actual.add((min(li, lj), max(li, lj)))
-    return asserted == actual
+            li, lj = numbering.get(i), numbering.get(j)
+            if li is None or lj is None or li == lj:
+                return None
+            out.add((min(li, lj), max(li, lj)))
+    return frozenset(out)
+
+
+def audit_von_baeyer_descriptor(
+    mol, cage_atoms, numbering: Dict[int, int], descriptor: str,
+) -> bool:
+    """Java-free structural correctness floor for a von-Baeyer descriptor.
+
+    Rebuild the ring skeleton the EMITTED DESCRIPTOR STRING denotes (Blue Book
+    numbering rules, ``reconstruct_von_baeyer_skeleton``) and require SET
+    EQUALITY with the input's actual cage bond set in locant space. Any mismatch
+    -- a bridge the descriptor fails to cite, an atom count the brackets do not
+    account for, or a numbering inconsistent with the string -- returns
+    ``False`` so the caller fails closed.
+
+    Why the string and not our own bridge list
+    ------------------------------------------
+    This audit used to reconstruct from ``PolycyclicDescriptor.bridge_info_list``
+    -- internal bookkeeping -- rather than from the descriptor that actually gets
+    spelled. Measured over 8,201 enumerated cages (N<=12) and 1,623 corpus cages,
+    that was wrong in both directions at once:
+
+    * **False rejections.** ``BridgeInfo.atoms`` for a secondary bridge is stored
+      in the opposite order to the bond path (numbering runs from the *higher*
+      numbered bridgehead, P-23.2.6.3), so the walk crossed a non-bonded pair and
+      the audit refused **556/8,201** enumerated and **14/1,623** corpus cages
+      whose emitted name was perfectly correct.
+    * **False acceptances.** The bridge list can agree with itself while the
+      spelled string does not describe the cage at all -- 6 corpus cages passed
+      the old audit with a descriptor denoting a different skeleton.
+
+    Set-equality against the string catches both, and is what the name is
+    actually judged on. It is deliberately independent of OPSIN: both downstream
+    gates (the validity gate and SELF-01) are documented FAIL-OPEN when Java is
+    unavailable (``namer.py:588``, ``:608``), and with them off **30** enumerated
+    cages ship a descriptor whose brackets account for fewer atoms than its own
+    stem counts (e.g. ``tetracyclo[5.1.1.2^3,6]dodecane`` -- 11 bracketed atoms,
+    ``dodecane`` = 12). This floor refuses those without asking Java.
+
+    This proves LEGALITY (the name denotes this molecule under this numbering),
+    never PREFERENCE (that it is the PIN among legal alternatives).
+    """
+    rebuilt = reconstruct_von_baeyer_skeleton(descriptor)
+    if rebuilt is None:
+        return False
+    cage = set(cage_atoms)
+    total, asserted = rebuilt
+    if total != len(cage):
+        return False
+    # the numbering must be a bijection of the cage onto 1..N; anything else
+    # cannot be read against the descriptor's locants at all.
+    locants = [numbering.get(i) for i in cage]
+    if any(l is None for l in locants):
+        return False
+    if sorted(locants) != list(range(1, total + 1)):
+        return False
+    actual = _cage_edges_in_locant_space(mol, cage, numbering)
+    if actual is None:
+        return False
+    if actual == asserted:
+        return True
+    # P-23.2.6.4 leaves a tie-break when two secondary bridges attach to the
+    # same bridgehead. A cage that matches under some other ordering IS legally
+    # described by this string; only the numbering preference differs, so
+    # refusing it would lose a correct name (the failure mode this audit had).
+    parsed = parse_von_baeyer_descriptor(descriptor)
+    if parsed is None:
+        return False
+    n_secondary = len(parsed[1])
+    if 2 <= n_secondary <= _MAX_SECONDARY_PERMUTED:
+        for order in itertools.permutations(range(n_secondary)):
+            alt = reconstruct_von_baeyer_skeleton(descriptor,
+                                                  secondary_order=list(order))
+            if alt is not None and alt[0] == total and alt[1] == actual:
+                return True
+    return False
 
 
 def analyze_cage_universal(
@@ -241,7 +427,7 @@ def analyze_cage_universal(
     # AUDIT: descriptor+numbering must assert the exact molecular ring/bridge
     # bond set (Java-free skeleton floor; SELF-01 fails open without Java).
     if not audit_von_baeyer_descriptor(
-            kek, cage_canon, desc.numbering, desc.bridge_info_list):
+            kek, cage_canon, desc.numbering, desc.descriptor_string):
         logger.info("vonbaeyer_universal: descriptor edge-audit failed; refuse")
         return None
 

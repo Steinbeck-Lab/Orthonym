@@ -51,14 +51,23 @@ AROMATIC_FUSED_CASES = [
      "bicyclo[6.4.0]dodeca-1,3,5,7,9,11-hexaene"),
     ("C1=Cc2cc3ccccc3cc2C1",            # as-indacene
      "tricyclo[7.4.0.0^3,7]trideca-1(13),2,5,7,9,11-hexaene"),
+    # v29 Task S: was asserted as '8-oxa...-1(13),2,4,6,9,11-hexaene'. Both
+    # numberings are legal bicyclo[7.4.0] hydrocarbon numberings (either fusion
+    # carbon may be locant 1), so P-23.3.2 "When there is a choice for numbering"
+    # decides -- P-23.3.2.1 (BlueBookV2.md:9777): "Low locants are assigned to
+    # the heteroatoms considered together as a set compared in increasing
+    # numerical order." 2 < 8, so the heteroatom takes locant 2 and the ene set
+    # follows it. The old expectation was the higher-locant form.
     ("O1C=CC=CC=Cc2ccccc21",            # 1-benzoxonine (O fused to benzene)
-     "8-oxabicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene"),
+     "2-oxabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene"),
     ("C1=CC=Cc2ccccc2C1",               # benzocycloheptene (benzene + 7-ring enes)
      "bicyclo[5.4.0]undeca-1(11),3,5,7,9-pentaene"),
     ("C1CCCc2ccccc2C1",                 # benzosuberane (benzene + saturated 7-ring)
      "bicyclo[5.4.0]undeca-1(11),7,9-triene"),
     ("S1C=CC=CC=Cc2ccccc21",            # 1-benzothionine (S fused to benzene)
-     "8-thiabicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene"),
+     # v29 Task S: same P-23.3.2.1 (:9777) low-locant-to-heteroatom correction
+     # as the oxa sibling above.
+     "2-thiabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene"),
     ("C1=CC=CC=Cc2ccccc2C1",            # benzocyclooctene
      "bicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene"),
 ]
@@ -98,12 +107,17 @@ FAIL_CLOSED_ENGINE = {
     # "coronene (PIN)" at BlueBookV2.md:11346 and both listed at P-25.8.2
     # (":14776") -- so the retained fusion name IS the PIN and a von-Baeyer
     # polyene construction can never be preferred for them.
-    # The operative code cause is the structural floor, not a cap: both fail
-    # audit_von_baeyer_descriptor ("descriptor edge-audit failed; refuse"), and
-    # they still refuse with both caps set to 200. Ovalene's ring count (10) does
-    # trip the ring cap first, but its refusal is over-determined.
-    "retained fusion PIN; fails the descriptor edge-audit (coronene)":
-        "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61",
+    # v29 Task S CORRECTION: the note above said the operative cause was the
+    # structural floor. For coronene that was true but it was a BUG -- the old
+    # audit reconstructed from ``bridge_info_list`` (internal bookkeeping whose
+    # secondary-bridge atom order is reversed relative to the bond path), so it
+    # false-rejected 556/8201 enumerated cages, coronene among them. Coronene's
+    # descriptor is perfectly legal; the retained name wins on PREFERENCE
+    # (P-25.1 Table 2.7, "coronene (PIN)" at BlueBookV2.md:11346), not because
+    # the cage is unbuildable. With the audit fixed the engine no longer refuses
+    # coronene -- it emits the RETAINED PIN, which is the correct outcome and is
+    # asserted in ``test_engine_emits_retained_pin_for_coronene`` below.
+    # Ovalene stays here: its 10 rings trip MAX_CAGE_RINGS independently.
     "retained fusion PIN; 10 rings > cap AND fails the edge-audit (ovalene)":
         "c1cc2ccc3ccc4ccc5ccc6ccc7ccc8ccc1c1c2c3c4c2c5c6c7c8c12",
 }
@@ -201,21 +215,21 @@ def test_edge_audit_known_good_and_bad():
     desc = VonBaeyerAnalyzer().analyze(mol, ring)
     assert desc.descriptor_string == "bicyclo[2.2.1]"
 
-    # GOOD: the true decomposition asserts exactly the molecular bond set.
+    # GOOD: the emitted string rebuilds exactly the molecular bond set.
     assert audit_von_baeyer_descriptor(
-        mol, ring, desc.numbering, desc.bridge_info_list) is True
+        mol, ring, desc.numbering, desc.descriptor_string) is True
 
-    # BAD 1: drop the last bridge -> a real ring bond goes un-asserted.
-    dropped = list(desc.bridge_info_list[:-1])
+    # BAD 1: drop the main bridge from the descriptor -> the string now denotes
+    # a 6-atom cage while the molecule has 7, so a ring bond goes un-asserted.
     assert audit_von_baeyer_descriptor(
-        mol, ring, desc.numbering, dropped) is False
+        mol, ring, desc.numbering, "bicyclo[2.2.0]") is False
 
     # BAD 2: a numbering that maps two graph-adjacent atoms to one locant.
     bad_num = dict(desc.numbering)
     ks = sorted(bad_num)
     bad_num[ks[0]] = bad_num[ks[1]]
     assert audit_von_baeyer_descriptor(
-        mol, ring, bad_num, desc.bridge_info_list) is False
+        mol, ring, bad_num, desc.descriptor_string) is False
 
 
 def test_edge_audit_accepts_aromatic_cage():
@@ -234,6 +248,21 @@ def test_edge_audit_accepts_aromatic_cage():
 def test_engine_fail_closed(desc, smiles):
     _mol, res = _engine_ring(smiles)
     assert res is None, f"expected engine refusal for {desc}, got {res.name!r}"
+
+
+def test_engine_emits_retained_pin_for_coronene():
+    """A retained fused-ring parent must come out as its retained name.
+
+    P-25.1 Table 2.7 "Retained names for hydrocarbon parent ring components"
+    lists *"coronene (PIN)"* (``BlueBookV2.md:11346``), so no von-Baeyer polyene
+    construction can ever be preferred for it. Before v29 Task S this molecule
+    was merely REFUSED, and only because the descriptor edge-audit was
+    mis-implemented; the guarantee that actually matters is that the retained
+    PIN is what gets emitted.
+    """
+    _mol, res = _engine_ring("c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61")
+    assert res is not None
+    assert res.name == "coronene"
 
 
 # --------------------------------------------------------------------------

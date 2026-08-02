@@ -58,6 +58,11 @@ from .polycyclic_bridged import classify_bridged_system
 # Engine — VonBaeyerAnalyzer (audit verdict THIN_WRAPPER per 151-AUDIT-A.md).
 from .polycyclic import VonBaeyerAnalyzer
 
+# v29 Task S — the Java-free legality floor: the emitted descriptor STRING must
+# rebuild the input's cage. Shared with ``vonbaeyer_universal`` so the PIN-side
+# wrapper and the general-engine cage analyzer apply ONE proof, not two.
+from .vonbaeyer_universal import audit_von_baeyer_descriptor
+
 # D-08 retained-name passthrough (HERITAGE §4 hybrid pattern).
 # adamantane / twistane stay served by tricyclo.get_retained_tricyclo_name
 # regardless of cycle-rank. Plan 151-01 keeps this delegation explicit.
@@ -166,6 +171,20 @@ def name_higher_polycyclo(mol) -> Optional[str]:
         descriptor = result.descriptor_string
         total_atoms = result.total_atoms
         numbering = result.numbering
+        # Legality floor (v29 Task S): the descriptor STRING must rebuild this
+        # exact cage. ``analyze`` can return a descriptor whose bridges do not
+        # account for every skeletal atom -- the P-23.2.6.1.1 invariant at
+        # ``polycyclic.py:640`` is only ``logger.error``-ed, never enforced, and
+        # the fallback branch of ``analyze`` runs no validity check at all -- so
+        # without this a name like ``tetracyclo[5.1.1.2^3,6]dodecane`` (11
+        # bracketed atoms, ``dodecane`` = 12) can be built here. Both OPSIN gates
+        # are documented FAIL-OPEN with no Java, so this must not rely on them.
+        if not audit_von_baeyer_descriptor(
+                mol, ring_atoms, numbering, descriptor):
+            logger.info(
+                "name_higher_polycyclo: descriptor %s does not rebuild the "
+                "cage; refuse", descriptor)
+            return None
         parent_name = _get_alkane_name(total_atoms)
 
         # Heteroatom 'a'-prefix per D-12 (delegate to existing helper that
@@ -232,6 +251,16 @@ def get_higher_polycyclo_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
             return None
         # Pitfall 7 lock: full coverage required.
         if not (set(numbering.keys()) >= ring_atoms):
+            return None
+        # Same legality floor as ``name_higher_polycyclo``: these locants are
+        # only meaningful if the descriptor they belong to actually describes
+        # this cage. A numbering handed out against a bridge-dropping descriptor
+        # would place every downstream substituent locant on the wrong atom.
+        if not audit_von_baeyer_descriptor(
+                mol, ring_atoms, numbering, result.descriptor_string):
+            logger.info(
+                "get_higher_polycyclo_iupac_locants: descriptor %s does not "
+                "rebuild the cage; refuse", result.descriptor_string)
             return None
         # Filter to ring atoms only (analyzer may include non-ring entries
         # for some downstream uses; the cascade gate cares about ring set).
