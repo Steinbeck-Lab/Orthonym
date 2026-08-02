@@ -422,12 +422,25 @@ def name_bicyclo_system(mol) -> Optional[str]:
             heteroatoms.append((idx, symbol))
 
     if heteroatoms:
-        # Heterobicyclic - needs aza/oxa prefix
-        # For now, return systematic name with descriptor only
-        # Full hetero naming is more complex and deferred
-        total_ring = len(ring_atoms)
-        parent_name = _get_alkane_name(total_ring)
-        return f"{descriptor}{parent_name}"
+        # FAIL CLOSED. This branch used to build `_get_alkane_name(len(ring_atoms))`
+        # and return `f"{descriptor}{parent_name}"` -- i.e. it DETECTED the
+        # heteroatoms and then spelled a name that omits them. Quinuclidine
+        # (`C1CN2CCC1CC2`) came back as `bicyclo[2.2.2]octane`: the ring size is
+        # right, the ring NITROGEN is silently dropped, and the name denotes
+        # C8H14, a different compound. The comment called it "deferred", but a
+        # deferral that emits is not a deferral.
+        #
+        # Replacement nomenclature (P-23.3, `aza`/`oxa`/`thia` prefixes) is what
+        # this branch owes, and a live producer already builds it -- the default
+        # path names quinuclidine `1-azabicyclo[2.2.2]octane` and
+        # `C1CC2CCC1O2` `7-oxabicyclo[2.2.1]heptane` -- so returning None here
+        # routes to that producer rather than withholding a name. Measured over
+        # 11 hetero/carbo bicyclics: every default-path emission is byte-
+        # identical before and after this change, so the branch was dead for
+        # them and is a landmine only for a caller that reaches it directly
+        # (`composer.py:4084` uses it as a fallback; `tricyclo.py:624` returns
+        # it verbatim).
+        return None
 
     # All-carbon bicyclic
     parent_name = _get_alkane_name(carbon_count)
