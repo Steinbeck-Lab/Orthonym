@@ -403,6 +403,25 @@ def _stereo_is_implied_by_name(name: str) -> bool:
 
     _low = name.lower()
 
+    # Family 6 — `chalcone` (v29 Task L).  `**P-64.2.1.1**` (:28297), under the
+    # heading `### **P-64.2.1** Retained names`, ends: "*Chalcone refers only to
+    # the trans- or (E)- stereoisomer.*"  The retained name therefore IS the
+    # descriptor for its one E/Z unit — exactly the "channel the R/S + E/Z
+    # counter cannot see" this predicate exists to cover.  Without this leg every
+    # chalcone emission logs "has 0 R/S + 1 E/Z but name lacks descriptors",
+    # which is a FALSE POSITIVE: the name is configurationally complete, and
+    # P-101.2.6's completeness obligation is met because the molecule has exactly
+    # one stereogenic unit and the name implies it.
+    #
+    # EXACT equality, not a substring: it is anchored to the sole producer, the
+    # `"O=C(/C=C/c1ccccc1)c1ccccc1": "chalcone"` row in `data/retained_names.py`,
+    # which is keyed on the whole-molecule isomeric canonical SMILES and so can
+    # only ever emit this one bare name.  A substring test would wrongly exempt a
+    # substituted `...chalcone...` name if that class is ever built — and those
+    # names may legitimately need descriptors for ADDITIONAL stereogenic units.
+    if _low == "chalcone":
+        return True
+
     # Family 4 — steroid/terpenoid alpha/beta: the name DOES carry descriptors
     # (`cholest-5-en-3beta-yl hydrogen sulfate`, `5alpha-cholestan-3beta-ol`).
     # Produced by `rules.steroid_stereo.collect_steroid_alpha_beta`, whose own

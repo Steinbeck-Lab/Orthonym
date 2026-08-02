@@ -150,6 +150,29 @@ class TestChalconeEmission:
         assert namer.name(smiles) == expected
 
 
+class TestChalconeImpliesItsOwnStereo:
+    """P-64.2.1.1 (:28297): "Chalcone refers only to the trans- or (E)-
+    stereoisomer." — so the retained name IS the descriptor for its one E/Z
+    unit, and the stereo backstop's "name lacks descriptors" warning would be a
+    FALSE POSITIVE. `_stereo_is_implied_by_name` is diagnostic-only (both
+    branches at namer.py:182 return the name unchanged), so this changes no
+    emitted name."""
+
+    def test_chalcone_is_recognised_as_self_describing(self):
+        from orthonym.namer import _stereo_is_implied_by_name
+
+        assert _stereo_is_implied_by_name("chalcone") is True
+
+    def test_leg_is_exact_not_a_substring(self):
+        """A substituted chalcone may carry ADDITIONAL stereogenic units that do
+        need descriptors, so the exemption must not swallow them."""
+        from orthonym.namer import _stereo_is_implied_by_name
+
+        for n in ("4-hydroxychalcone", "2',4'-dihydroxychalcone-4-carboxamide",
+                  "chalcones", "dihydrochalcone"):
+            assert _stereo_is_implied_by_name(n) is False, n
+
+
 class TestChalconeUnderTheRealGate:
     """The default shipping path runs the OPSIN validity gate; chalcone must
     survive it (OPSIN 2.9.0 parses `chalcone` natively)."""
