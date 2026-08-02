@@ -2816,6 +2816,53 @@ def name_substituted_heterocycle(
                     c_groups[sub_name] = []
                 c_groups[sub_name].append(locant)
 
+    # ------------------------------------------------------------------ #
+    # P-16.3.3 (BB:7038) -- ONE multiplying prefix over the WHOLE locant set. #
+    # ------------------------------------------------------------------ #
+    # P-16.3.3 "The basic numerical prefixes 'di', 'tri', 'tetra', etc. are used to
+    # indicate a multiplicity of:", clause (b) (BB:7067) "simple substituent
+    # prefixes ...", whose own example list prints `dimethyl` (BB:7069). The
+    # multiplicity is a property of the SUBSTITUENT NAME, not of which ring atom
+    # carries it -- so a `methyl` on the ring N and a `methyl` on a ring C are ONE
+    # group of two, and P-14.3.3 (BB:2869, deny-by-default) then requires the whole
+    # locant set to be cited: `1,2-dimethyl-1H-imidazole`.
+    #
+    # ⚠ This is NOT a name-string repair. `n_groups`/`c_groups` were two name-keyed
+    # dicts split by `is_on_nitrogen`, which is a RING-ATOM test (`:2060`,
+    # `ring_atom.GetSymbol() == 'N'`) -- not a locant-KIND test. Each dict took its
+    # own `count = len(locants)`, which is the whole defect: `Cn1c(C)nc(C)c1C` gave
+    # `1-methyl-2,4,5-trimethyl-...`, i.e. the C-side collapse ALREADY worked and only
+    # the ring-N methyl stood outside it. The multiplier machinery was never broken.
+    #
+    # A ring nitrogen inside the ring numbering takes an ARABIC NUMERAL, never an
+    # italic 'N': P-65.2.3.1.2.1 (BB:31041) reserves the italic form for nitrogens
+    # "that are not ... part of the chain for which arabic numbers are used as
+    # locants". The Blue Book multiplies across exactly such mixed sets --
+    # BB:42460 `N,1,4-triphenyl-1H-1,2,4-triazol-4-ium-3-aminide (PIN)` and
+    # BB:42213 `N,N,N,1-tetramethylquinolin-1-ium-3-aminium (PIN)`.
+    #
+    # The sibling producers already do this and are the model: `fused_rings.py`
+    # leaves its `n_substituents` bucket EMPTY and routes ring-N locants as ordinary
+    # numerals (measured: `_format_n_prefix` 0 calls for `1,2-dimethyl-1H-
+    # benzimidazole`), and `benzene.py` uses one flat name-keyed bucket.
+    #
+    # Merge only when EVERY locant of the group is a number -- that is precisely the
+    # `len(numeric) == count` test the N formatter applies below to choose the
+    # numeral citation over the italic-'N' fallback, so a group that would have been
+    # spelled `N-`/`N,N-` is left in `n_groups` and its spelling is untouched.
+    #
+    # ⚠ The P-14.3.4.3 licence below tested `not n_groups` to mean "this scope holds
+    # no substituent on a ring nitrogen". After the merge an N-substituent can sit in
+    # `c_groups`, so that dict is no longer the right witness and reading it would
+    # silently WIDEN the licence (`4-methylmorpholine` -> `methylmorpholine`). The
+    # question the licence asks is recorded here, before the buckets move.
+    _has_n_substituent = bool(n_groups)
+    for _n_name in list(n_groups):
+        _n_locants = n_groups[_n_name]
+        if _n_locants and all(loc is not None for loc in _n_locants):
+            c_groups.setdefault(_n_name, []).extend(_n_locants)
+            del n_groups[_n_name]
+
     # Build prefix parts
     prefix_parts = []
 
@@ -2865,7 +2912,9 @@ def name_substituted_heterocycle(
     # The `_het_loc_prefix` injection cannot apply here: it is computed only inside
     # the `if suffix_fg:` block below, which this branch excludes.
     #
-    # ⚠ `not suffix_fg` and `not n_groups` are MUTATION-SURVIVING and DELIBERATELY
+    # ⚠ `not suffix_fg` and `not _has_n_substituent` (the pre-merge witness recorded
+    # above; it was `not n_groups` before P-16.3.3 merging moved numerically-locanted
+    # ring-N groups into `c_groups`) are MUTATION-SURVIVING and DELIBERATELY
     # KEPT. Measured 2026-07-30: removing either changes no name, because the
     # licence's own STRUCTURAL monosubstitution proof
     # (`locant_omission._one_substituent_removed`) already refuses any scope holding
@@ -2878,7 +2927,7 @@ def name_substituted_heterocycle(
     # P-14.3.3's *"then all locants must be cited"* for the halves of the scope this
     # branch is not allowed to inspect.
     _l3_omit_prefix_locant = False
-    if (not n_groups and len(c_groups) == 1 and not suffix_fg
+    if (not _has_n_substituent and len(c_groups) == 1 and not suffix_fg
             and parent_name and parent_name.isalpha()
             and not stereo_descriptors):
         _only_locants = next(iter(c_groups.values()))
