@@ -35,11 +35,28 @@ Mixing a ring-N locant with ring-C locants changes **nothing**, because a ring n
 that is part of the ring numbering does not take an italic ``N`` locant at all -- it
 takes its ring number.  The Blue Book draws that line explicitly:
 
-* **P-65.2.3.1.2.1** (``:31041``): "Superscripted italic letter locants *N*\\ :sup:`2`,
-  *N*\\ :sup:`3`, etc. are used to designate substitution on nitrogen atoms **that are
-  not** amide linkages that are part of the chain **for which arabic numbers are used as
-  locants**."  The italic form is the fallback for a nitrogen with *no* number; a ring N
-  in ``1H-imidazole`` has the number ``1``.
+* **P-66.1.3** "'Hidden' amides" (``:33125``): naming an acyl group as a substituent on
+  a heterocyclic ring nitrogen "is allowed but only in general nomenclature", because
+  "preferred IUPAC names are constructed" as pseudoketones -- on the numbered ring.
+  ``:33129`` prints ``1-(piperidin-1-yl)ethan-1-one (PIN)`` against ``1-acetylpiperidine``.
+* **P-66.1.5.1** "Lactams and lactims" (``:33224``): of its two methods, "(1) as
+  heterocyclic pseudoketones" is the one that "generates preferred IUPAC names".
+* The ``(PIN)`` examples spell the ring N as a numeral and demote the italic form to the
+  general name: ``:27249`` ``pyrrolidine-1,2-diol (PIN)`` (alternatives
+  ``1-hydroxypyrrolidin-2-ol``, ``*N*-hydroxypyrrolidin-2-ol``); ``:40645``
+  ``2,5-dioxopyrrolidin-1-yl (PIN)``; ``:33847`` ``1-bromopyrrolidine-2,5-dione (PIN)``.
+
+.. warning::
+
+   This docstring used to rest the crux on **P-65.2.3.1.2.1** (``:31041``) alone.  The
+   quote was verbatim, but the emphasis bolded *around* "amide linkages" and so
+   reconstructed the very elision that inverts the sentence -- and the section governs
+   **superscripted** locants (*N*\\ :sup:`2`, *N*\\ :sup:`3`) under P-65.2.3, "di-, tri-,
+   tetra-, and polycarbonic acids", not ring nitrogens.  Its neighbour **P-65.2.3.1.4**
+   (``:31107``) states the convention cleanly -- italic letter locants "are used to
+   designate substitution on nitrogen atoms that are not amide linkages for which
+   numerical locants are used" -- but carries the same chapter scope, so it corroborates
+   rather than governs.  Corrected 2026-08-02; do not re-derive this from P-65.2.3.
 
 And the Blue Book prints multiplied prefixes over exactly such mixed locant sets:
 
@@ -182,9 +199,11 @@ def test_non_identical_substituents_must_not_collapse(smiles, expected):
 def test_italic_n_fallback_is_untouched():
     """A ring N with no numeric locant keeps the italic-'N' citation.
 
-    P-65.2.3.1.2.1 (BB:31041) -- the italic form is for a nitrogen that does NOT
-    receive an arabic number. The merge is conditioned on every locant being a
-    number, so this branch must be unreachable from it.
+    P-66.1.3 (BB:33125) / P-66.1.5.1 (BB:33224) -- a ring N that IS numbered takes
+    its numeral in a PIN, so the italic form is left to a nitrogen that receives no
+    arabic number. The merge is conditioned on every locant being a number, so this
+    branch must be unreachable from it. (Not P-65.2.3.1.2.1 -- see the module
+    docstring's warning; that section is polycarbonic-acid superscripts.)
     """
     assert _format_n_substituent("methyl", 1, locants=None) == "N-methyl"
     assert _format_n_substituent("methyl", 2, locants=None) == "N,N-dimethyl"

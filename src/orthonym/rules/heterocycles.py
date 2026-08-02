@@ -2834,12 +2834,35 @@ def name_substituted_heterocycle(
     # `1-methyl-2,4,5-trimethyl-...`, i.e. the C-side collapse ALREADY worked and only
     # the ring-N methyl stood outside it. The multiplier machinery was never broken.
     #
-    # A ring nitrogen inside the ring numbering takes an ARABIC NUMERAL, never an
-    # italic 'N': P-65.2.3.1.2.1 (BB:31041) reserves the italic form for nitrogens
-    # "that are not ... part of the chain for which arabic numbers are used as
-    # locants". The Blue Book multiplies across exactly such mixed sets --
+    # A ring nitrogen that is a NUMBERED SKELETAL ATOM of the parent hydride takes an
+    # ARABIC NUMERAL in a PIN; the italic 'N' belongs to a nitrogen that is not itself
+    # numbered. P-66.1.3 "'Hidden' amides" (BB:33125) is decisive on the direction:
+    # naming an acyl group as a substituent on a heterocyclic ring nitrogen "is allowed
+    # but only in general nomenclature", because "preferred IUPAC names are constructed"
+    # as pseudoketones -- i.e. on the numbered ring. P-66.1.5.1 "Lactams and lactims"
+    # (BB:33224) says the same for this shape: of its two methods, "(1) as heterocyclic
+    # pseudoketones" is the one that "generates preferred IUPAC names".
+    #
+    # The `(PIN)` examples spell the ring N as a numeral and print the italic form only
+    # as the general-nomenclature alternative:
+    #   BB:27249  `pyrrolidine-1,2-diol (PIN)  1-hydroxypyrrolidin-2-ol
+    #              N-hydroxypyrrolidin-2-ol`   <- N is ring locant 1
+    #   BB:33847  `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide; ...)`
+    #   BB:40645  `2,5-dioxopyrrolidin-1-yl (PIN)  succinimidyl`
+    #
+    # And the Blue Book multiplies across MIXED italic/numeral sets -- in both of these
+    # the ring N is the numeral and the exocyclic amine N keeps the italic letter:
     # BB:42460 `N,1,4-triphenyl-1H-1,2,4-triazol-4-ium-3-aminide (PIN)` and
     # BB:42213 `N,N,N,1-tetramethylquinolin-1-ium-3-aminium (PIN)`.
+    #
+    # ⚠ Do NOT re-derive any of this from P-65.2.3.1.2.1 (BB:31041), which this comment
+    # cited until 2026-08-02. Two independent faults: that sentence governs SUPERSCRIPTED
+    # locants (N^2, N^3) and its section sits under P-65.2.3, "di-, tri-, tetra-, and
+    # polycarbonic acids" -- not ring nitrogens at all; and it reads "nitrogen atoms that
+    # are not AMIDE LINKAGES that are part of the chain ...", so quoting it with "amide
+    # linkages" elided inverts the sentence. Its neighbour P-65.2.3.1.4 (BB:31107) states
+    # the italic-N convention cleanly but is scoped by the same chapter heading
+    # ("Replacement by NH2 and NHNH2 groups"), so it is not the general rule either.
     #
     # The sibling producers already do this and are the model: `fused_rings.py`
     # leaves its `n_substituents` bucket EMPTY and routes ring-N locants as ordinary

@@ -360,21 +360,30 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     #
     # The Blue Book prints the numeral for a substituted ring amide nitrogen and
     # marks the italic form "not":
-    #   BB:33847  `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide)`
-    #   BB:40645  `2,5-dioxopyrrolidin-1-yl (PIN) succinimidyl`  (N = locant 1)
-    #   BB:27249  `pyrrolidine-1,2-diol (PIN) 1-hydroxypyrrolidin-2-ol
-    #              N-hydroxypyrrolidin-2-ol`
-    #   BB:4679   `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine` (nicotine)
-    # The general statement is P-65.2.3.1.4 (BB:31107): italic letter locants "are
-    # used to designate substitution on nitrogen atoms that are NOT amide linkages
-    # for which numerical locants are used."  A ring N that HAS a numeral is
-    # exactly such an amide linkage, so it does not take the italic form.
+    #   BB:27249  `pyrrolidine-1,2-diol (PIN)  1-hydroxypyrrolidin-2-ol
+    #              N-hydroxypyrrolidin-2-ol`   <- the italic form is the GENERAL name
+    #   BB:40645  `2,5-dioxopyrrolidin-1-yl (PIN)  succinimidyl`  (N = locant 1)
+    #   BB:4679   `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine` (nicotine; no `(PIN)`
+    #              marker on that line -- it is an example in the salts list)
+    #   BB:33847  `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide;
+    #              substitution is not allowed on succinimide)`
+    # ⚠ Read that last one whole. Its parenthetical was once quoted here truncated at
+    # `(not N-bromosuccinimide)`, which reads as the Blue Book rejecting the italic
+    # form -- but the reason it actually gives is the RETAINED-NAME restriction on
+    # `succinimide`. It is sound as an example of a PIN citing the ring N as `1-`;
+    # it is NOT a statement of the rule. The rule is P-66.1.3 / P-66.1.5.1 above.
     #
-    # ⚠ Do NOT re-derive this from P-65.2.3.1.2.1 (BB:31041), which a sibling fix
-    # cited. That sentence reads "...nitrogen atoms that are not amide linkages
-    # that are part of the chain..." and is about SUPERSCRIPTED locants (N^2, N^3)
-    # in polycarbonic acid chains; quoting it with "amide linkages" elided inverts
-    # what it says. The conclusion above stands on P-66.1.5.1/P-66.1.3 instead.
+    # ⚠ Do NOT re-derive this from anywhere in P-65.2.3 ("di-, tri-, tetra-, and
+    # polycarbonic acids"). P-65.2.3.1.2.1 (BB:31041) governs SUPERSCRIPTED locants
+    # (N^2, N^3) in polycarbonic-acid chains, and reads "nitrogen atoms that are not
+    # AMIDE LINKAGES that are part of the chain ..." -- a sibling fix quoted it with
+    # "amide linkages" elided, which inverts it (corrected 2026-08-02). Its neighbour
+    # P-65.2.3.1.4 (BB:31107) does state the italic-N convention cleanly -- "italic
+    # letter locants N, N', etc. are used to designate substitution on nitrogen atoms
+    # that are not amide linkages for which numerical locants are used" -- and this
+    # comment called it "the general statement", but its own section heading is
+    # "Replacement by NH2 and NHNH2 groups", i.e. the same polycarbonic-acid chapter.
+    # It corroborates; it does not govern. The conclusion stands on P-66.1.5.1/P-66.1.3.
     #
     # None of the four P-14.3.4.2 (BB:2891) "the locant '1' is omitted" licences
     # reaches here -- (a) mononuclear parent hydrides, (b) two-identical-atom
