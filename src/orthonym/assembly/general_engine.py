@@ -339,56 +339,35 @@ def _elide_before_ionic_suffix(name: str, cs: str) -> str:
     return stem + cs
 
 
-# Elements that form a SEMIPOLAR (dative) bond to a terminal oxygen, i.e. whose
-# ``[X+]-[O-]`` depiction is the charge-separated form of a NEUTRAL ``X=O``
-# functional group (P-59 internal charge): N-oxide, phosphine/phosphoryl oxide,
-# sulfoxide/sulfone, arsine oxide, selenoxide, iodoso/iodoxy.
-_SEMIPOLAR_OXIDE_ELEMENTS = frozenset({'N', 'P', 'S', 'As', 'Se', 'Sb', 'Te',
-                                       'Cl', 'Br', 'I', 'Xe'})
-
-
 def _genuine_ion_sites(mol):
-    """``get_ion_sites`` minus the semipolar ``[X+]-[O-]`` oxide pairs.
+    """The molecule's genuine ionic centres, as ``(cations, anions)``.
 
-    ``get_ion_sites`` already masks the P-59 internal charges it knows about
-    (nitro drawn ``[N+](=O)[O-]``, azide, N-oxide, diazo) -- verified: it
-    reports ZERO sites for ``C[N+](=O)[O-]``, ``[N-]=[N+]=NC``,
-    ``C[N+]([O-])(C)C`` and ``[O-][n+]1ccccc1``. But the mask does not cover
-    every element, and a P-oxide written ``[PH+]...[O-]`` leaks through as a
-    "zwitterion" although RDKit/InChI treat it as the SAME species as ``P(=O)``
-    (measured: ``CC1CO[PH+](C1)[O-]`` and OPSIN's ``CC1CP(OC1)=O`` share
-    InChIKey ``DWXZAVJWXATXAG-UHFFFAOYSA-N``). Treating such a pair as an ionic
-    centre suppressed the correct, round-tripping name
-    ``4-methyl-2-oxo-1,2-oxaphospholane``.
+    This used to subtract semipolar ``[X+]-[O-]`` oxide pairs itself, from a
+    hand-written list of cation elements, because ``get_ion_sites`` reported
+    such a pair as a genuine ionic centre and that suppressed the correct name
+    ``4-methyl-2-oxo-1,2-oxaphospholane`` for ``CC1CO[PH+](C1)[O-]``.
 
-    So a cation directly bonded to a TERMINAL, H-free oxide anion is an internal
-    (semipolar) charge, not an ionic centre. The R7 mesoionic target is
-    unaffected: its ``[O-]`` sits on a ring CARBON, not on the cation.
+    That subtraction has moved to its root cause,
+    ``perception/ions.py::_semipolar_chalcogenide_atoms`` (P-74.2.1.2 /
+    P-74.2.1.4), so ``get_ion_sites`` no longer reports the pair at all and
+    every other caller is fixed too, not just this one.
+
+    The local version is not merely redundant, it was WRONG, and it is worth
+    recording why so it is not reintroduced. Keying on a cation element list
+    cannot distinguish a semipolar oxide from a genuine oxoanion: measured over
+    the three corpora plus 307 synthetic probes, the old code still fired on 14
+    molecules after the perception fix landed, and the two of those that are
+    real corpus rows -- ``[O-][I+]([O-])(O)(O)(O)O`` and
+    ``[O-][I+]([O-])([O-])(O)(O)O`` -- are genuine iodine oxoanions whose
+    charges it wrongly erased. The replacement proves the bonding pattern
+    instead: the positive charge must be balanced locally by its terminal
+    chalcogenide anions, and the uncharged multiple-bond depiction must both
+    sanitise and carry the same standard InChIKey.
     """
     from ..perception.ions import get_ion_sites
 
     sites = get_ion_sites(mol)
-    cations = list(sites.get('cations') or [])
-    anions = list(sites.get('anions') or [])
-
-    semipolar_c: set = set()
-    semipolar_a: set = set()
-    cation_idxs = {c['atom_idx'] for c in cations}
-    for site in anions:
-        idx = site['atom_idx']
-        atom = mol.GetAtomWithIdx(idx)
-        if (atom.GetSymbol() != 'O' or atom.GetDegree() != 1
-                or atom.GetTotalNumHs() or atom.GetFormalCharge() != -1):
-            continue
-        nbr = atom.GetNeighbors()[0]
-        if (nbr.GetIdx() in cation_idxs
-                and nbr.GetFormalCharge() == 1
-                and nbr.GetSymbol() in _SEMIPOLAR_OXIDE_ELEMENTS):
-            semipolar_a.add(idx)
-            semipolar_c.add(nbr.GetIdx())
-
-    return ([c for c in cations if c['atom_idx'] not in semipolar_c],
-            [a for a in anions if a['atom_idx'] not in semipolar_a])
+    return (list(sites.get('cations') or []), list(sites.get('anions') or []))
 
 
 def _has_ionic_centres(mol) -> bool:
