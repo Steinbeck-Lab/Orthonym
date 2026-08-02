@@ -2198,19 +2198,34 @@ def _name_carbamate(features: Any) -> Optional[str]:
         # Unsubstituted: "ethyl carbamate"
         return f"{r_name} carbamate"
 
-    # Build N-substitution prefix
-    sub_counts = Counter(n_subs)
-    n_prefix_parts = []
-    for name in sorted(sub_counts.keys()):
-        count = sub_counts[name]
-        if count == 1:
-            n_prefix_parts.append(f"N-{_wrap_n_substituent(name)}")
-        else:
-            mult = get_multiplier_prefix(count, name)
-            n_prefix_parts.append(f"N,N-{mult}{_wrap_n_substituent(name)}")
-
-    n_prefix = ",".join(n_prefix_parts)
-    return f"{r_name} {n_prefix}carbamate"
+    # Build the N-substitution prefix with the SHARED builder.
+    #
+    # This site used to hand-roll it as f"N-{_wrap_n_substituent(name)}".
+    # _wrap_n_substituent only ESCALATES an enclosure that is already there
+    # (parentheses -> square brackets); it never adds the first-level marks. So
+    # a COMPOUND substituent came out bare and 'COC(=O)NCCOC' shipped
+    # 'methyl N-2-methoxyethylcarbamate' on the DEFAULT path -- the numeral
+    # abutting the N-locant, which is precisely what the enclosure prevents.
+    #
+    # P-16.5 "ENCLOSING MARKS" (BlueBookV2.md:7216), P-16.5.1.1 (:7232):
+    #   "Parentheses are used around compound (see P-29.1.2) and complex (see
+    #    P-29.1.3) prefixes; ..."
+    # P-29.1.2 (:15762): "A compound substituent group consists of a simple
+    #   substituent group (the parent substituent group) to which is attached
+    #   one or more simple substituent groups."
+    # '2-methoxyethyl' is 'ethyl' bearing 'methoxy' -> compound -> enclosed.
+    # PIN exemplar (:33336): 'N-[1-cyano-3-(methylsulfanyl)propyl]-N'-methylurea
+    # (PIN)' -- the compound N-substituent is enclosed, the simple 'methyl' is
+    # not.
+    #
+    # _build_n_substituted_name already implements exactly this (needs_brackets
+    # + apply_enclosing_marks) and is what the carbamic-acid sibling uses, which
+    # is why 'OC(=O)NCCOC' has always given the well-formed
+    # 'N-(2-methoxyethyl)carbamic acid'. Reusing it rather than re-deriving the
+    # rule here keeps the two spellings from drifting again; simple substituents
+    # are byte-identical (needs_brackets False).
+    n_prefix = _build_n_substituted_name([("N", s) for s in n_subs], "carbamate")
+    return f"{r_name} {n_prefix}"
 
 
 def _try_name_semicarbazone(features: Any) -> Optional[str]:
