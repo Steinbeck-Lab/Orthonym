@@ -222,16 +222,60 @@ def _parent_hydride_is_unsubstituted(mol: Any, s_idx: int) -> bool:
 
         ``N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)``
 
-    -- ``N,4-dimethyl``, NOT ``N-methyl-4-methyl``. This module names the parent
-    by delegating to the pipeline and prefixing the result, so it CANNOT merge
-    the two lists; for 4-methylbenzenesulfonamide + N-methyl it produced the
-    malformed ``N-methyl4-methylbenzenesulfonamide``. OPSIN round-tripped that
-    string to the correct InChIKey and reported OK -- a round trip proves the
-    STRUCTURE, never the preferred SPELLING -- so only this structural refusal
-    keeps the wrong name off the output.
+    -- ``N,4-dimethyl``, NOT ``N-methyl-4-methyl``. The ordering is
+    alphanumerical across the MERGED list, not "N first": ``:32881`` names a
+    substituted-parent SULFONAMIDE
+    ``3-chloro-N-(2-chlorophenyl)naphthalene-2-sulfonamide (PIN)``, citing the
+    parent's ``3-chloro`` BEFORE the N-prefix. This module names the parent by
+    delegating to the pipeline and prefixing the result, so it CANNOT merge or
+    re-order the two lists; for 4-methylbenzenesulfonamide + N-methyl it
+    produced the malformed ``N-methyl4-methylbenzenesulfonamide``. OPSIN
+    round-tripped that string to the correct InChIKey and reported OK -- a round
+    trip proves the STRUCTURE, never the preferred SPELLING -- so only this
+    structural refusal keeps the wrong name off the output.
 
-    The proof is structural, never a test on the parent's name string: R must be
-    either exactly one whole ring, or an unbranched acyclic chain.
+    THE INVARIANT (state it as the invariant, not as a shape list)
+    --------------------------------------------------------------
+    True only when the delegated parent name is guaranteed to carry NO
+    DETACHABLE SUBSTITUENT PREFIX. Suffix locants and unsaturation locants are
+    fine -- they are part of the parent hydride's own name and nothing has to be
+    merged with them, so ``N-methylbut-2-ene-1-sulfonamide`` is legal.
+
+    The acyclic test used to be "an unbranched chain rooted at the attachment",
+    and that was wrong in BOTH directions:
+
+    * TOO PERMISSIVE -- a terminal heteroatom has degree 1, so it read as a
+      chain terminus and passed. Measured on 2026-08-02, five malformed names
+      were shipping, every one of them reported OK by OPSIN + InChIKey:
+      ``N-methyl2-chloroethane-1-sulfonamide``,
+      ``N-methyl2-methoxyethane-1-sulfonamide``,
+      ``N-methyl2-fluoroethane-1-sulfonamide``,
+      ``N-methyl2-cyanoethane-1-sulfonamide``,
+      ``N,N-dimethyl3-bromopropane-1-sulfonamide``. A heteroatom in an acyclic R
+      ALWAYS surfaces as a detachable prefix (chloro/methoxy/cyano...), so R
+      must be all-carbon.
+    * TOO RESTRICTIVE -- it forced the sulfonyl onto a chain TERMINUS by giving
+      the root a degree limit of 1, refusing ``CC(C)S(=O)(=O)NC`` and
+      ``CCC(C)S(=O)(=O)NC``. Their parents are ``propane-2-sulfonamide`` and
+      ``butane-2-sulfonamide`` -- a suffix locant, no prefix -- so they were
+      always safe. Interior attachment is fine; a BRANCH POINT is not.
+
+    So the acyclic condition is exactly: R is all-carbon AND R is a PATH graph.
+    r_atoms is connected by construction (BFS from the root) and ring-free in
+    this branch, so "every degree within R is <= 2" is equivalent to "R is a
+    path", and a path attached to S at any position is a parent hydride whose
+    name has no prefix. A branch point (degree 3) means a real substituent --
+    ``CC(C)(C)S(=O)(=O)NC`` is ``N,2-dimethylpropane-2-sulfonamide``, a merged
+    list -- and stays refused.
+
+    The ring case is left alone deliberately. Widening it to fused ring SYSTEMS
+    was measured to have ZERO reachable targets: the PRIMARY parents themselves
+    already fail upstream (``NS(=O)(=O)c1ccc2ccccc2c1`` and
+    ``c1ccncc1S(=O)(=O)N`` both name ``unknown organic compound``), so
+    ``_excised_parent_name`` would refuse regardless.
+
+    The proof is structural throughout, never a test on the parent's name
+    string.
     """
     s_atom = mol.GetAtomWithIdx(s_idx)
     roots = [nb.GetIdx() for nb in s_atom.GetNeighbors()
@@ -245,20 +289,26 @@ def _parent_hydride_is_unsubstituted(mol: Any, s_idx: int) -> bool:
     ring_info = mol.GetRingInfo()
     if any(mol.GetAtomWithIdx(i).IsInRing() for i in r_atoms):
         # R is ring-based: it must be EXACTLY one ring and nothing else, so the
-        # ring bears no substituent other than the sulfonyl.
+        # ring bears no substituent other than the sulfonyl. A heteroatom INSIDE
+        # the ring is part of the parent hydride's own name (pyridine...), not a
+        # prefix, so it is not excluded here.
         for ring in ring_info.AtomRings():
             if r_atoms == set(ring):
                 return True
         return False
 
-    # R is acyclic: it must be an unbranched chain rooted at the attachment.
+    # R is acyclic. (a) all-carbon: any heteroatom becomes a detachable prefix.
+    if any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in r_atoms):
+        return False
+
+    # (b) a PATH graph: no atom may branch. The root's limit is 2, not 1 --
+    # attachment at an INTERIOR chain position is still an unsubstituted parent.
     for idx in r_atoms:
         neighbours_in_r = sum(
             1 for nb in mol.GetAtomWithIdx(idx).GetNeighbors()
             if nb.GetIdx() in r_atoms
         )
-        limit = 1 if idx == roots[0] else 2
-        if neighbours_in_r > limit:
+        if neighbours_in_r > 2:
             return False
     return True
 

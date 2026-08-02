@@ -142,7 +142,10 @@ def test_fails_closed_outside_the_class(smiles, why):
     "Cc1ccc(cc1)S(=O)(=O)NC",   # 4-methyl on the ring + N-methyl
     "CNS(=O)(=O)c1ccc(O)cc1",   # 4-hydroxy on the ring + N-methyl
     "CNS(=O)(=O)c1ccc(Cl)cc1",  # 4-chloro on the ring + N-methyl
-    "CC(C)S(=O)(=O)NC",         # branched chain parent
+    # A genuine BRANCH POINT in R: the parent is 2-methylpropane-2-sulfonamide,
+    # which really does carry a '2-methyl' prefix, so 'N-methyl' would have to
+    # merge into 'N,2-dimethylpropane-2-sulfonamide'. Still refused.
+    "CC(C)(C)S(=O)(=O)NC",
 ])
 def test_substituted_parent_hydride_fails_closed(smiles):
     """P-66.1.1.3.1.1 / BB:32879 ``N,4-dimethyl-N-(3-methylphenyl)benzamide``:
@@ -166,3 +169,57 @@ def test_never_drops_the_n_substituent_carbon():
     """The v29 defect this class fixes: the producer used to emit the parent
     name `methanesulfonamide` for CS(=O)(=O)NC, silently dropping a carbon."""
     assert _name("CS(=O)(=O)NC") != "methanesulfonamide"
+
+
+# --------------------------------------------------------------------------
+# Task Y (2026-08-02): a HETEROATOM in an acyclic R always surfaces as a
+# detachable prefix, so the parent-hydride guard must refuse it.
+#
+# These five were MEASURED shipping malformed on 2026-08-02, and every one of
+# them was reported OK by OPSIN + InChIKey -- a round trip proves the STRUCTURE,
+# never the SPELLING. The old guard tested graph DEGREE only, and a terminal
+# heteroatom has degree 1, so it read as an ordinary chain terminus and passed.
+#
+# Independent corroboration that the emitted form was not merely non-preferred
+# but malformed: the PubChem reference corpus ()
+# contains ZERO occurrences of 'N-methyl4-methyl' and ZERO of 'N-methyl2-chloro',
+# while the merged form 'N,4-dimethylbenzenesulfonamide' is present (CID 12543).
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("smiles,was", [
+    ("ClCCS(=O)(=O)NC",     "N-methyl2-chloroethane-1-sulfonamide"),
+    ("COCCS(=O)(=O)NC",     "N-methyl2-methoxyethane-1-sulfonamide"),
+    ("FCCS(=O)(=O)NC",      "N-methyl2-fluoroethane-1-sulfonamide"),
+    ("N#CCCS(=O)(=O)NC",    "N-methyl2-cyanoethane-1-sulfonamide"),
+    ("BrCCCS(=O)(=O)N(C)C", "N,N-dimethyl3-bromopropane-1-sulfonamide"),
+])
+def test_heteroatom_in_acyclic_parent_fails_closed(smiles, was):
+    """The PIN needs ONE merged, alphanumerically ordered prefix list
+    (2-chloro-N-methylethane-1-sulfonamide), which this module cannot build."""
+    out = _name(smiles)
+    assert out is None, f"expected refusal, got {out!r} (previously {was!r})"
+
+
+# --------------------------------------------------------------------------
+# Task Y: INTERIOR attachment is not substitution.
+#
+# P-66.1.1.2 (BlueBookV2.md:32748): "These suffixes may be assigned to any
+# position of a parent hydride." The worked (PIN) at :32754 is
+# ``butane-2-sulfinamide (PIN)`` for CH3-CH2-CH(-SO-NH2)-CH3 -- the attachment
+# carbon is a branch point in SMILES terms, yet the PIN is a bare parent hydride
+# plus a SUFFIX locant, carrying no substituent prefix at all. So nothing has to
+# be merged and the N-prefix may simply precede the parent name.
+#
+# These previously returned None. The corpus writes this construction 33,160
+# times (grep -c "N.*propane-2-sulfonamide" ).
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("smiles,expected", [
+    ("CC(C)S(=O)(=O)NC",  "N-methylpropane-2-sulfonamide"),
+    ("CCC(C)S(=O)(=O)NC", "N-methylbutane-2-sulfonamide"),
+])
+def test_interior_chain_attachment_is_an_unsubstituted_parent(smiles, expected):
+    assert _name(smiles) == expected
+
+
+def test_unsaturation_locant_is_not_a_substituent_prefix():
+    """A parent hydride's own unsaturation locant needs no merging either."""
+    assert _name("CC=CCS(=O)(=O)NC") == "N-methylbut-2-ene-1-sulfonamide"
