@@ -52,15 +52,29 @@ def name_thiourea(
     if not name:
         return None
 
-    name = _enrich_handler_name(features, name, "thiourea")
+    # `_try_name_thiourea` builds a COMPLETE name (retained parent + every
+    # N-substituent; it REFUSES rather than skipping an un-nameable one), so
+    # enrichment can only spell an atom twice -- it re-discovered the handler's
+    # own core and produced `1-(carbamothioylamino)N-cyclohexylthiourea`, the
+    # single thiourea unit spelled TWICE. Not enriched.
 
     pool = get_current_pool()
     cand = pool.add(name, "thiourea", features)
     if cand is None:
         return None
 
+    # The retained chalcogen-urea parent has NO numbered skeleton -- its only
+    # locants are the italic letters N / N' (P-66.1.6.1.3.1, BB:33439; :33446
+    # "Numerical locants are no longer used for thiourea in the IUPAC preferred
+    # name"). Declaring that scope stops a numeric front-of-name stereo block
+    # being prepended: `(1S,3R,5S)-N-[1-(bicyclo[2.2.1]heptan-2-yl)ethyl]-N'-
+    # (prop-2-en-1-yl)thiourea` cites 1/3/5 against a parent that has no atom
+    # 1, 3 or 5, and is OPSIN-unparseable. Stereo inside an N-substituent is
+    # still cited there by the substituent namer
+    # (`N-[(S)-1-cyclohexylethyl]-N'-(prop-2-en-1-yl)thiourea`).
     final_name = _inject_stereo_if_missing(features, cand.name,
-                                           atom_to_locant=None)
+                                           atom_to_locant=None,
+                                           parent_scope='retained_no_locants')
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(

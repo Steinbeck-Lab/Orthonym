@@ -38,19 +38,34 @@ def name_urea(
     # FG with principal_group None; name it substitutively BEFORE the plain
     # urea path (which would drop the ylidene). Fail-closed -> falls through.
     urea_name = _try_name_semicarbazone(features)
+    # `_try_name_urea` builds a COMPLETE name: the retained parent plus every
+    # N-substituent it walked itself. Enrichment can therefore only spell an
+    # atom a second time -- it turned `N-(1-methylcyclohexyl)urea` into
+    # `1-methylN-(1-methylcyclohexyl)urea`, numbering the gem-methyl against a
+    # parent (urea) that has no atom 1 at all. Only the semicarbazone branch,
+    # which names a different parent, is enriched.
+    _complete_name = False
     if not urea_name:
         urea_name = _try_name_urea(features)
+        _complete_name = bool(urea_name)
     if not urea_name:
         return None
 
-    urea_name = _enrich_handler_name(features, urea_name, "urea")
+    if not _complete_name:
+        urea_name = _enrich_handler_name(features, urea_name, "urea")
 
     pool = get_current_pool()
     cand = pool.add(urea_name, "urea", features)
     if cand is None:
         return None
 
-    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    # The retained urea parent has NO numbered skeleton -- its only locants
+    # are the italic letters N / N' (P-66.1.6.1.1.1). Declare that scope so a
+    # numeric front-of-name stereo block, which could not resolve against it,
+    # is never prepended. See _inject_stereo_if_missing for the measurement.
+    final_name = _inject_stereo_if_missing(features, cand.name,
+                                           atom_to_locant=None,
+                                           parent_scope='retained_no_locants')
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="urea", iupac_section_cite="P-66.4.1", fragment_legacy=final_name),

@@ -3148,6 +3148,13 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     # The parent bond is identified STRUCTURALLY -- the exocyclic neighbour
     # lying outside the fragment being named -- never by a count or an index
     # ().
+    # The `> 1` filter is DEFENSIVE and is a proven EQUIVALENT MUTANT today:
+    # every production caller passes a heavy-atom `expected_atoms`, and the
+    # production molecules carry implicit hydrogens, so there is no H neighbour
+    # to filter. Measured under `Chem.AddHs` the function declines for an
+    # unrelated reason with or without the filter. Kept because the signature
+    # admits an explicit-H mol, in which case an H would otherwise be counted
+    # as a candidate parent bond below.
     _exo_nbrs = {nbr.GetIdx() for nbr in
                  mol.GetAtomWithIdx(attachment_atom).GetNeighbors()
                  if nbr.GetIdx() not in ring_set and nbr.GetAtomicNum() > 1}

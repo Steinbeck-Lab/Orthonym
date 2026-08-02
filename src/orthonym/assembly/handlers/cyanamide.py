@@ -36,14 +36,21 @@ def name_cyanamide(
     if not cyanamide_name:
         return None
 
-    cyanamide_name = _enrich_handler_name(features, cyanamide_name, "cyanamide")
+    # `_try_name_cyanamide` builds a COMPLETE name (retained parent + every
+    # N-substituent, failing closed if any is un-nameable), so enrichment can
+    # only spell an atom twice: it turned `((S)-1-cyclohexylethyl)cyanamide`
+    # into `1-[(1S)-ethyl]((S)-1-cyclohexylethyl)cyanamide`. Not enriched.
 
     pool = get_current_pool()
     cand = pool.add(cyanamide_name, "cyanamide", features)
     if cand is None:
         return None
 
-    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    # 'cyanamide' is a retained parent with no numbered skeleton (P-66.1.6.2);
+    # a numeric front-of-name stereo block cannot resolve against it.
+    final_name = _inject_stereo_if_missing(features, cand.name,
+                                           atom_to_locant=None,
+                                           parent_scope='retained_no_locants')
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(

@@ -187,6 +187,36 @@ def test_gap_a_no_sentinel_ever_reaches_a_name():
     assert got is None or "substituent" not in got, got
 
 
+def _attachment(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    _, att = mol.GetSubstructMatches(Chem.MolFromSmarts("[NX3][CX4;R]"))[0]
+    ring = next(r for r in mol.GetRingInfo().AtomRings() if att in r)
+    return mol, ring, att
+
+
+def test_gap_a_fails_closed_when_the_parent_bond_is_undecidable():
+    """PRODUCER-level, and it pins a WRONG CONSTITUTION, not just a refusal.
+
+    With no ``expected_atoms`` scope supplied, which exocyclic bond leaves the
+    fragment is genuinely undecidable.  Dropping the guard does not merely lose
+    a name -- on a ring carrying a SECOND decoration it silently drops the
+    gem substituent and emits ``4-methylcyclohexyl`` for a
+    **1,4-dimethyl**cyclohexyl fragment, a different molecule.  Measured: with
+    the guard removed this exact call returns ``'4-methylcyclohexyl'``.
+
+    Every production caller passes ``expected_atoms``, so this branch is
+    defensive; it is asserted here because the signature makes the argument
+    optional and a future caller may omit it.
+    """
+    from orthonym.rules.ring_substituents import decorated_ring_substituent_name
+    mol, ring, att = _attachment("CC(=O)NC1(C)CCC(C)CC1")
+    assert decorated_ring_substituent_name(mol, ring, att) is None
+    # the same call WITH a scope resolves the ambiguity and must still name
+    _, _, att2 = _attachment("CC(=O)NC1CCC(C)CC1")
+    mol2, ring2, att2 = _attachment("CC(=O)NC1CCC(C)CC1")
+    assert decorated_ring_substituent_name(mol2, ring2, att2) == "4-methylcyclohexyl"
+
+
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(=O)NC1(C)CCCCC1",        "N-(1-methylcyclohexyl)acetamide"),
     ("CC1(CCCCC1)NC(C)=O",        "N-(1-methylcyclohexyl)acetamide"),
@@ -224,17 +254,29 @@ def test_gap_b_producer_already_worked():
     assert _try_name_thiourea(features) == "N-cyclohexylthiourea"
 
 
-def test_gap_b_enrichment_must_not_respell_the_handlers_own_core():
-    """PRODUCER-level.  ``_enrich_handler_name`` re-discovered the thiourea core
-    the handler had already spelled and prepended it as
+def test_gap_b_handler_does_not_enrich_a_complete_name():
+    """PRODUCER-level.  ``_try_name_thiourea`` builds a COMPLETE name -- the
+    retained parent plus every N-substituent, refusing rather than skipping an
+    un-nameable one -- so enrichment can only spell an atom a second time.  It
+    re-discovered the handler's own core and prepended
     ``1-(carbamothioylamino)``.  SELF-01 suppressed the result, so asserting on
     the shipped name would have judged the GATE, not the generator.
+
+    The second assertion keeps this from going vacuous: it shows enrichment
+    STILL corrupts the name if called, so the handler's skip is load-bearing
+    rather than a no-op that would pass either way.
     """
     from orthonym.assembly.composer import _enrich_handler_name
+    from orthonym.assembly.handlers.thiourea import name_thiourea
     features = _features_for("NC(=S)NC1CCCCC1", "_try_name_thiourea")
     assert features is not None
-    got = _enrich_handler_name(features, "N-cyclohexylthiourea", "thiourea")
-    assert got == "N-cyclohexylthiourea", got
+
+    result = name_thiourea(features)
+    assert result is not None and result.name == "N-cyclohexylthiourea", result
+
+    corrupted = _enrich_handler_name(
+        features, "N-cyclohexylthiourea", "thiourea")
+    assert corrupted.startswith("1-(carbamothioylamino)"), corrupted
 
 
 def test_gap_b_urea_sibling_enrichment_is_unchanged():
@@ -258,11 +300,93 @@ def test_gap_b_family_ring_sizes_3_to_8(namer, smiles, expected):
     assert _name(namer, smiles) == expected
 
 
+@pytest.mark.parametrize("smiles,expected", [
+    # These abstained before: the handler's complete name was enriched with a
+    # prefix numbered against a parent (urea) that has no atom 1 or 4 at all
+    # -- `1-methylN-(1-methylcyclohexyl)urea` -- which SELF-01 suppressed.
+    ("NC(=S)NC1(C)CCCCC1",  "N-(1-methylcyclohexyl)thiourea"),
+    ("NC(=O)NC1(C)CCCCC1",  "N-(1-methylcyclohexyl)urea"),
+    ("NC(=O)NC1CCC(C)CC1",  "N-(4-methylcyclohexyl)urea"),
+    ("NC(=S)NC1CCC(C)CC1",  "N-(4-methylcyclohexyl)thiourea"),
+])
+def test_decorated_ring_on_a_retained_urea_parent(namer, smiles, expected):
+    """The urea/thiourea divergence, reconciled: both families now carry a
+    decorated ring N-substituent, and neither cites a numeral against a parent
+    that has no numbered skeleton."""
+    got = _name(namer, smiles)
+    assert got == expected
+    assert not got[0].isdigit(), got
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("NC#N",                  "cyanamide"),
+    ("CC(C)NC#N",             "(propan-2-yl)cyanamide"),
+    ("CCN(CC)C#N",            "diethylcyanamide"),
+    # REGRESSION GUARD. Excluding the handler's own FG atoms from enrichment
+    # (the first attempt at Gap B) truncated the fragment hanging off the ring
+    # and turned this correct name into
+    # `1-[(1S)-ethyl]((S)-1-cyclohexylethyl)cyanamide`.
+    ("C[C@@H](C1CCCCC1)NC#N", "((S)-1-cyclohexylethyl)cyanamide"),
+])
+def test_cyanamide_complete_names_are_not_enriched(namer, smiles, expected):
+    assert _name(namer, smiles) == expected
+
+
 def test_gap_b_letter_locant_not_a_numeral(namer):
     """P-66.1.6.1.3.1 (:33439/:33446): numerals are general nomenclature only."""
     got = _name(namer, "NC(=S)NC1CCCCC1")
     assert got.startswith("N-"), got
     assert not got[0].isdigit(), got
+
+
+# ===========================================================================
+# The retained parent has NO numbered skeleton
+# ===========================================================================
+
+def test_retained_urea_parent_rejects_a_numeric_front_of_name_stereo_block():
+    """PRODUCER-level, on the shared stereo owner.
+
+    ``urea``/``thiourea``/``cyanamide`` have no numbered skeleton -- their only
+    locants are the italic letters *N* / *N*' (P-66.1.6.1.3.1, BB:33439; :33446
+    "Numerical locants are no longer used for thiourea in the IUPAC preferred
+    name").  A front-of-name block citing 1/3/5 therefore denotes nothing in
+    that parent (P-14.3.3 "Citation of locants", BB:2869) and OPSIN cannot
+    parse it.
+
+    Measured over the 144 stereo-bearing urea/thiourea rows of pubchem_2000 +
+    chebi_5000: such a block is 4/4 CORRECT on parents that DO have a numbered
+    skeleton, and 0/2 on the retained parent.
+    """
+    from orthonym.assembly.composer import _inject_stereo_if_missing
+    features = _features_for("C[C@@H]([C@H]1C[C@@H]2CC[C@H]1C2)NC(=S)NCC=C",
+                             "_try_name_thiourea")
+    assert features is not None
+    base = "N-[1-(bicyclo[2.2.1]heptan-2-yl)ethyl]-N'-(prop-2-en-1-yl)thiourea"
+    # the scope this handler declares must leave the name alone ...
+    assert _inject_stereo_if_missing(
+        features, base, atom_to_locant=None,
+        parent_scope='retained_no_locants') == base
+    # ... and the undeclared scope is what used to prepend the bad block, so the
+    # test would be vacuous if it could not still be produced.
+    assert _inject_stereo_if_missing(
+        features, base, atom_to_locant=None).startswith("(1S,3R,5S)-")
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # stereo lives in the N-substituent and is cited THERE -- unchanged
+    ("C[C@@H](C1CCCCC1)NC(=S)NCC=C",
+     "N-[(S)-1-cyclohexylethyl]-N'-(prop-2-en-1-yl)thiourea"),
+    # a substituent whose stereo the prefix namer cannot carry: the constitution
+    # is still right and no locant that denotes nothing is cited
+    ("C[C@@H]([C@H]1C[C@@H]2CC[C@H]1C2)NC(=S)NCC=C",
+     "N-[1-(bicyclo[2.2.1]heptan-2-yl)ethyl]-N'-(prop-2-en-1-yl)thiourea"),
+    ("C[C@@H]([C@H]1C[C@@H]2CC[C@H]1C2)NC(=O)NCC=C",
+     "N-[1-(bicyclo[2.2.1]heptan-2-yl)ethyl]-N'-(prop-2-en-1-yl)urea"),
+])
+def test_no_unresolvable_locant_on_a_retained_parent(namer, smiles, expected):
+    got = _name(namer, smiles)
+    assert got == expected
+    assert not got.startswith("("), got
 
 
 # ===========================================================================

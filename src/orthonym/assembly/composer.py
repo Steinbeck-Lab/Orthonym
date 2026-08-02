@@ -279,19 +279,16 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
     # in the handler's detection key (e.g., isocyanate, urea, guanidine,
     # carbamate). These handlers fire via functional_groups.get(fg) checks.
     #
-    # The tuple below is a HAND-MAINTAINED list and it went stale: it carries
-    # 'urea' but not 'thiourea', so the chalcogen sibling's own core -- already
-    # spelled by its handler as `N-cyclohexylthiourea` -- was re-discovered as a
-    # ring substituent and prepended, giving
-    # `1-(carbamothioylamino)N-cyclohexylthiourea`: the single thiourea unit
-    # spelled TWICE, a different molecule, which only SELF-01 suppressed.
-    # `cyanamide`, `imidate` and `chalcogen_ester` were missing for the same
-    # reason. A handler ALWAYS consumes the FG it is keyed on, so derive that
-    # one from `handler_id` instead of remembering to extend a list; the tuple
-    # stays for the handlers that additionally consume a DIFFERENT FG key than
-    # their own id (e.g. the carbamate handler and 'carbamic_acid').
-    for _fg_key in (handler_id,
-                    'isocyanate', 'isothiocyanate', 'carbamic_acid',
+    # NOTE: deriving this key from `handler_id` was tried and REVERTED. It fixed
+    # the thiourea double-spell but destroyed a correct name: excluding the
+    # cyanamide core truncated the fragment hanging off the ring, so
+    # `((S)-1-cyclohexylethyl)cyanamide` became
+    # `1-[(1S)-ethyl]((S)-1-cyclohexylethyl)cyanamide` -- the CH(CH3) spelled a
+    # second time with the N-C#N cut out from under it. Excluding a handler's
+    # own atoms is not the invariant; NOT ENRICHING A COMPLETE NAME is. The
+    # retained whole-molecule builders (urea / thiourea / cyanamide) therefore
+    # skip this function entirely -- see handlers/thiourea.py.
+    for _fg_key in ('isocyanate', 'isothiocyanate', 'carbamic_acid',
                      'carbamate', 'urea', 'guanidine', 'boronic_acid',
                      'oxime', 'hydrazone', 'sulfoxide', 'sulfone', 'thioether'):
         if _fg_key in features.functional_groups and _fg_key != getattr(features, 'principal_group', None):
@@ -10120,6 +10117,33 @@ def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional
     # where it is not declared we fail closed on disagreement rather than cite a
     # locant that may not resolve. Cf. composer.py:2685 D-09, "better a missing stereo
     # block than a wrong one".
+    if parent_scope == 'retained_no_locants':
+        # The caller built a RETAINED parent that has no numbered skeleton at
+        # all -- urea / thiourea / selenourea / tellurourea / cyanamide, whose
+        # only locants are the italic letters N and N' (P-66.1.6.1.3.1,
+        # BB:33439 "Preferred IUPAC names use the letter locants N, and N'";
+        # :33446 "Numerical locants are no longer used for thiourea in the
+        # IUPAC preferred name"). A front-of-name block carrying NUMERIC
+        # locants can therefore never resolve in this parent's numbering
+        # (P-14.3.3 "Citation of locants", BB:2869 -- locants are scoped per
+        # enclosing-mark unit); the stereocentres such a molecule has live
+        # inside the bracketed N-substituents and must be cited THERE, which
+        # the substituent namer already does when it can
+        # ("N-[(S)-1-cyclohexylethyl]-N'-(prop-2-en-1-yl)thiourea").
+        #
+        # Measured over the 144 stereo-bearing urea/thiourea rows of
+        # pubchem_2000 + chebi_5000: a front-of-name numeric block is 4/4
+        # CORRECT on parents that do have a numbered skeleton (a
+        # piperazine-2,5-dione ring, three carboxylic acids carrying a
+        # `carbamoylamino` prefix) and 0/2 correct on the retained parent --
+        # both `(1S,3R,5S)-N-[1-(bicyclo[2.2.1]heptan-2-yl)ethyl]-...` forms
+        # are OPSIN-unparseable. So the split is exactly "does the parent have
+        # numbers", which is what this scope declares.
+        #
+        # Per D-09 (composer.py:2685) "better a missing stereo block than a
+        # wrong one": the constitution stays right and the name is merely
+        # under-specified, rather than carrying a locant that denotes nothing.
+        return name
     if atom_to_locant:
         # Caller handed us the exact numbering of the name it built -- the priority
         # chain is bypassed entirely, so caller_selects_parent cannot matter
