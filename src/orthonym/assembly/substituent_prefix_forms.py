@@ -44,7 +44,8 @@ import threading
 from collections import deque
 from typing import List, Optional, Set
 
-from .naming_utils import ALKYL_NAMES, alpha_sort_key, get_alkyl_name
+from .naming_utils import (
+    ALKYL_NAMES, alpha_sort_key, enclose_if_compound, get_alkyl_name)
 from ..rules.seniority import PREFIX_FORMS
 
 
@@ -1054,10 +1055,10 @@ def _name_alkyl_branch_from_atom(
     ``"hexyl"`` — different constitutions, found while building the R3
     thiourea prefix (this is the count-anti-pattern class of
     ``). The count
-    path is now gated on the fragment actually BEING an unbranched acyclic
-    chain attached at one of its termini — a walk over the real bonds, not a
-    tally — and everything else is routed to the substituent chokepoint that
-    already produces located PINs (``tert-butyl``, ``phenyl``,
+    path is now gated on the fragment actually BEING an unbranched SATURATED
+    acyclic chain attached at one of its termini — a walk over the real bonds,
+    not a tally — and everything else is routed to the substituent chokepoint
+    that already produces located PINs (``tert-butyl``, ``phenyl``,
     ``propan-2-yl``). Un-nameable there -> None (fail closed).
     """
     # Reject heteroatom-bearing alkyl side per IUPAC P-66.6.1 substituent
@@ -1077,27 +1078,22 @@ def _name_alkyl_branch_from_atom(
             if nbr_idx not in visited and nbr_idx not in exclude:
                 queue.append(nbr_idx)
 
-    # Structure proof that the count is a faithful description: every fragment
-    # carbon must be acyclic, and the fragment must be a simple path whose end
-    # is the attachment atom. Walk the actual bonds inside the fragment.
-    def _is_unbranched_acyclic_chain() -> bool:
-        for i in visited:
-            a = mol.GetAtomWithIdx(i)
-            if a.IsInRing():
-                return False
-            degree_in_frag = sum(
-                1 for nbr in a.GetNeighbors() if nbr.GetIdx() in visited
-            )
-            # interior atoms have 2 neighbours in-fragment, termini have 1
-            if degree_in_frag > 2:
-                return False
-        attach = mol.GetAtomWithIdx(alkyl_atom)
-        attach_degree = sum(
-            1 for nbr in attach.GetNeighbors() if nbr.GetIdx() in visited
-        )
-        return attach_degree <= 1
+    # Structure proof that the count is a faithful description. This used to be
+    # a local walk that checked rings, branching and the attachment terminus but
+    # NEVER BOND ORDER, so an allyl / propargyl / butenyl fragment -- an
+    # unbranched acyclic all-carbon chain attached at a terminus -- passed and
+    # was spelled as the saturated alkane stem: 'OC(=O)CCNC(=O)NCCC' (propyl),
+    # '...NCC=C' (allyl) and '...NCC#C' (propargyl) all emitted the identical
+    # '3-[(propylcarbamoyl)amino]propanoic acid'. Three molecules, one name --
+    # no function of (fragment, carbon-count) can be right there.
+    #
+    # ``fragment_is_linear_terminal_alkyl`` is the shared primitive that already
+    # asks exactly this question ("is get_alkyl_name(n) an HONEST name for this
+    # fragment?") and it DOES check bond order, so route through it rather than
+    # grow a second guard list that can drift out of step with the first.
+    from .substituent_naming import fragment_is_linear_terminal_alkyl
 
-    if _is_unbranched_acyclic_chain():
+    if fragment_is_linear_terminal_alkyl(mol, list(visited), alkyl_atom):
         carbon_count = _count_fragment_atoms(
             mol, alkyl_atom, exclude, carbons_only=True
         )
@@ -1187,7 +1183,16 @@ def get_n_alkyl_carbamoyl_prefix(
     if not alkyl_name:
         return None
 
-    return f"N-{alkyl_name}carbamoyl"
+    # P-16.3.4 (BlueBookV2.md:7085) "Parentheses (round brackets) ... are used
+    # to enclose multiplied components that are: ... (b) simple substituent
+    # prefixes modified by 'ene' and 'yne' endings and that have locants"
+    # (:7104, example 'di(prop-1-en-2-yl)' (preferred prefix)). Until the bond-
+    # order guard above was fixed, every name reaching this interpolation was a
+    # bare saturated stem ('propyl') that needs no marks; now that an alkenyl /
+    # alkynyl / located prefix can arrive, it must be enclosed or the locant
+    # runs into the 'carbamoyl' that follows it. enclose_if_compound is a no-op
+    # for a simple stem, so every pre-existing name stays byte-identical.
+    return f"N-{enclose_if_compound(alkyl_name)}carbamoyl"
 
 
 def get_n_n_dialkyl_carbamoyl_prefix(
@@ -1237,15 +1242,21 @@ def get_n_n_dialkyl_carbamoyl_prefix(
     if not alkyl1 or not alkyl2:
         return None
 
+    # 'di', NOT 'bis': P-16.3.5 (BlueBookV2.md:7104) reserves 'bis'/'tris' for
+    # "(a) compound or complex (i.e. substituted) prefixes" -- every clause of
+    # it is gated on the component being SUBSTITUTED, and an unsubstituted
+    # alkenyl prefix is not. P-16.3.4(b) (:7104) supplies the parentheses, and
+    # BB :38230 carries the PIN '1,1-dimethyl-3,4-di(prop-1-en-2-yl)germolane'.
     if alkyl1 == alkyl2:
-        return f"N,N-di{alkyl1}carbamoyl"
+        return f"N,N-di{enclose_if_compound(alkyl1)}carbamoyl"
 
     # Alphabetize ascending: N-{lower}-N-{higher}carbamoyl
     if alpha_sort_key(alkyl1) < alpha_sort_key(alkyl2):
         first, second = alkyl1, alkyl2
     else:
         first, second = alkyl2, alkyl1
-    return f"N-{first}-N-{second}carbamoyl"
+    return (f"N-{enclose_if_compound(first)}"
+            f"-N-{enclose_if_compound(second)}carbamoyl")
 
 
 def _urea_distal_n(mol, urea_atoms, principal_chain) -> Optional[int]:
@@ -1509,7 +1520,8 @@ def _compute_branch_b_carbamoyloxy_name(
         )
         if not alkyl_name:
             return None
-        return f"(N-{alkyl_name}carbamoyl)oxy"
+        # Same P-16.3.4 / P-16.3.5 reasoning as get_n_alkyl_carbamoyl_prefix.
+        return f"(N-{enclose_if_compound(alkyl_name)}carbamoyl)oxy"
 
     # Di-N-substituted: -OC(=O)NR1R2 → (N,N-(R1)(R2)carbamoyl)oxy
     if len(n_alkyl_neighbors) == 2:
@@ -1519,12 +1531,13 @@ def _compute_branch_b_carbamoyloxy_name(
         if not alkyl1 or not alkyl2:
             return None
         if alkyl1 == alkyl2:
-            return f"(N,N-di{alkyl1}carbamoyl)oxy"
+            return f"(N,N-di{enclose_if_compound(alkyl1)}carbamoyl)oxy"
         if alpha_sort_key(alkyl1) < alpha_sort_key(alkyl2):
             first, second = alkyl1, alkyl2
         else:
             first, second = alkyl2, alkyl1
-        return f"(N-{first}-N-{second}carbamoyl)oxy"
+        return (f"(N-{enclose_if_compound(first)}"
+                f"-N-{enclose_if_compound(second)}carbamoyl)oxy")
 
     return None
 

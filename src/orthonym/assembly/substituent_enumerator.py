@@ -3605,49 +3605,67 @@ def _name_sulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
         Sulfanyl prefix name, or None if not a simple case.
     """
     frag_set = set(frag_atoms)
+    parent_set = set(parent_atoms) if parent_atoms else set()
     s_atom = mol.GetAtomWithIdx(attach_idx)
 
-    # Collect carbon atoms bonded to S (excluding parent)
-    alkyl_atoms = []
-    for nbr in s_atom.GetNeighbors():
-        nbr_idx = nbr.GetIdx()
-        if nbr_idx in parent_atoms:
+    # Collect the WHOLE S-side fragment -- every heavy atom reachable from S
+    # inside frag_set without crossing S or the parent.
+    #
+    # This walk used to stop at the first heteroatom, because it only pushed
+    # neighbours from INSIDE an ``if symbol == 'C'`` block. That had two
+    # consequences, and the second is the defect:
+    #
+    #   1. ``alkyl_atoms`` held carbons BY CONSTRUCTION, so the guard below it
+    #      ("any atom in alkyl_atoms that is not C or H -> defer") could never
+    #      be True. It was VACUOUS -- dead code wearing the costume of a check.
+    #   2. Because the walk never crossed a heteroatom, it never VISITED the
+    #      atoms it was dropping, so nothing downstream could notice the loss.
+    #      On CHEBI:131797 the S-side is a whole cysteinyl-glycine arm and this
+    #      returned 'propylsulfanyl' while silently discarding 7 heavy atoms
+    #      (C,C,N,N,O,O,O) -- a name asserting -S-CH2CH2CH3 for something else.
+    #
+    # Walking the real fragment first is what makes the proof below possible:
+    # you cannot check atoms you never looked at.
+    side_atoms = set()
+    stack = [
+        n.GetIdx() for n in s_atom.GetNeighbors()
+        if n.GetIdx() in frag_set and n.GetIdx() not in parent_set
+        and n.GetIdx() != attach_idx
+    ]
+    while stack:
+        idx = stack.pop()
+        if idx in side_atoms or idx == attach_idx or idx in parent_set:
             continue
-        if nbr_idx in frag_set and nbr.GetSymbol() == 'C':
-            # BFS from this C to collect all connected carbons in fragment
-            visited = set()
-            stack = [nbr_idx]
-            while stack:
-                idx = stack.pop()
-                if idx in visited or idx == attach_idx:
-                    continue
-                if idx not in frag_set:
-                    continue
-                atom = mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() == 'C':
-                    visited.add(idx)
-                    for n in atom.GetNeighbors():
-                        if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
-                            stack.append(n.GetIdx())
-            alkyl_atoms.extend(visited)
+        if idx not in frag_set:
+            continue
+        if mol.GetAtomWithIdx(idx).GetAtomicNum() <= 1:
+            continue
+        side_atoms.add(idx)
+        for n in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if n.GetIdx() not in side_atoms:
+                stack.append(n.GetIdx())
 
-    if not alkyl_atoms:
+    if not side_atoms:
         return None
 
-    # Check for non-C non-H atoms in the alkyl portion
-    has_hetero_in_alkyl = any(
-        mol.GetAtomWithIdx(idx).GetSymbol() not in ('C', 'H')
-        for idx in alkyl_atoms
-    )
-    if has_hetero_in_alkyl:
-        return None  # Complex case, defer
+    # The alkyl stem must attach to S at exactly one atom, and that atom must be
+    # the terminus of a genuine unbranched saturated acyclic all-carbon chain --
+    # the ONLY shape ``get_alkyl_name(n)`` can spell. ``fragment_is_linear_
+    # terminal_alkyl`` is the shared primitive for exactly that question; use it
+    # rather than re-deriving a guard list here.
+    from .substituent_naming import fragment_is_linear_terminal_alkyl
 
-    carbon_count = len(alkyl_atoms)
-    if carbon_count == 0:
+    anchors = [
+        idx for idx in side_atoms
+        if mol.GetBondBetweenAtoms(idx, attach_idx) is not None
+    ]
+    if len(anchors) != 1:
+        return None
+    if not fragment_is_linear_terminal_alkyl(mol, list(side_atoms), anchors[0]):
         return None
 
     try:
-        alkyl_name = get_alkyl_name(carbon_count)
+        alkyl_name = get_alkyl_name(len(side_atoms))
         return f"{alkyl_name}sulfanyl"
     except (ValueError, KeyError):
         return None

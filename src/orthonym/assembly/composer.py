@@ -1880,11 +1880,46 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
             except Exception:
                 pass
 
-    # Default: linear alkyl name
+    # Default: linear alkyl name -- but ONLY when that name is honest for this
+    # fragment. Two escapes used to reach this line with a fragment
+    # get_alkyl_name() cannot describe:
+    #
+    #   * the O/S/Se/Te branch above is explicitly "Fall through to simple alkyl
+    #     if name_substituent failed", so a declined chokepoint left the COUNT
+    #     as the answer; and
+    #   * nitrogen is excluded from _is_chain_fg_heteroatom by design, so an
+    #     N-bearing fragment never even enters that branch.
+    #
+    # Both drop every non-carbon atom on the floor. 'CCCCCCCCCCCCCCCCCC(=O)-
+    # NCCS(=O)(=O)[O-]' (N-octadecanoyltaurine) counted the -CH2CH2SO3- R-group
+    # as 2 carbons -> 'ethyl' and re-attached the sulfonate to the fatty chain,
+    # giving '1-(ethylamino)-1-oxooctadecanesulfonate' -- a DIFFERENT
+    # constitution; and a phospholipid's phosphate-bearing arm was counted and
+    # spelled 'N-tritetracontyl', a straight C43 chain the molecule does not
+    # contain. A carbon-only count drops a heteroatom at EVERY n, so the n>=3
+    # isomer-ambiguity bar does not excuse the n=2 case.
+    #
+    # fragment_is_linear_terminal_alkyl is the shared primitive for exactly this
+    # question and is a no-op for the genuine linear terminal alkyls that have
+    # always taken this path, so those names stay byte-identical.
+    _heavy_frag_atoms = [
+        i for i in frag_atoms if mol.GetAtomWithIdx(i).GetAtomicNum() > 1
+    ]
     try:
-        return get_alkyl_name(carbon_count)
-    except (ValueError, KeyError):
-        pass
+        from .substituent_naming import fragment_is_linear_terminal_alkyl
+        _count_is_honest = fragment_is_linear_terminal_alkyl(
+            mol, _heavy_frag_atoms, start_idx
+        )
+    except Exception:
+        # Fail CLOSED: if the proof could not be evaluated we do not know the
+        # count is honest, and invariant #1 is never emit a wrong name. The
+        # chokepoint fallback below still gets its chance.
+        _count_is_honest = False
+    if _count_is_honest:
+        try:
+            return get_alkyl_name(carbon_count)
+        except (ValueError, KeyError):
+            pass
 
     # Phase 86: Universal pipeline fallback for complex R groups that
     # cannot be named by the simple alkyl/phenyl/benzyl classification above.
