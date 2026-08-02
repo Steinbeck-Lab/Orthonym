@@ -139,6 +139,64 @@ def test_completeness_is_not_a_function_of_the_ratio():
 
 
 # ---------------------------------------------------------------------------
+# 3b. coverage is counted PER ELEMENT, and the ratio is not a bare count
+# ---------------------------------------------------------------------------
+
+
+@needs_opsin
+def test_element_substitution_is_not_covered():
+    """``CCO`` named ``ethylamine``: 3 heavy atoms on both sides, 2 shared.
+
+    OPSIN parses ``ethylamine`` to ``CCN``.  A bare count says 3 of 3 and
+    calls the oxygen covered by the nitrogen; only a per-ELEMENT multiset
+    intersection sees that the O is unaccounted for and the N is invented.
+    Added after mutation testing: mutants that restored the bare count, and
+    that restored the clamped ``min(parsed/total, 1.0)`` ratio, both survived
+    the suite without this case.
+    """
+    r = _cov("CCO", "ethylamine")
+    assert r.method == "parse_back"
+    assert r.total_heavy_atoms == 3 and r.parsed_heavy_atoms == 3
+    assert r.claimed_atoms == 2, "only the two carbons are shared"
+    assert r.unclaimed_atoms == 1, "the oxygen has no counterpart"
+    assert r.extra_atoms == 1, "the nitrogen is invented"
+    assert r.coverage_ratio == pytest.approx(2 / 3), (
+        "a bare count, clamped or not, would report 1.0 here"
+    )
+    assert r.is_complete is False
+
+
+# ---------------------------------------------------------------------------
+# 3c. no constitution evidence => no completeness claim
+# ---------------------------------------------------------------------------
+
+
+@needs_opsin
+def test_inchi_failure_is_fail_closed(monkeypatch):
+    """If InChI cannot be generated, the verdict must be 'not complete'.
+
+    The hazard is specific: a helper that returned some CONSTANT on failure
+    would make both sides compare equal and pass everything.  Added after
+    mutation testing -- a mutant doing exactly that survived, as did one
+    that reported the no-InChI exit as complete.
+    """
+    from orthonym.validation import atom_coverage as mod
+
+    def boom(*a, **kw):
+        raise RuntimeError("InChI unavailable")
+
+    monkeypatch.setattr(mod.Chem, "MolToInchiKey", boom)
+
+    assert mod._inchikey(Chem.MolFromSmiles("CCO")) == "", (
+        "a failed InChI must yield the empty string, never a sentinel key"
+    )
+    r = _cov("CCO", "ethanol")
+    assert r.method == "parse_back_no_inchi"
+    assert r.is_complete is False, "no evidence is not evidence of completeness"
+    assert r.constitution_match is False
+
+
+# ---------------------------------------------------------------------------
 # 4. the exact case must keep working (the contributor guide #9 -- do not unmask worse)
 # ---------------------------------------------------------------------------
 
