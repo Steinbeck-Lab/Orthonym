@@ -336,7 +336,70 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     # Name each substituent and track N-substitution
     from collections import defaultdict
     from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
-    groups = defaultdict(list)  # key: (sub_name, is_on_nitrogen) -> list of locants
+
+    # ------------------------------------------------------------------ #
+    # A lactam's ring nitrogen is NUMBERED, so its substituent takes the  #
+    # arabic ring locant -- not an italic 'N'.  (P-66.1.5.1 / P-66.1.3.)  #
+    # ------------------------------------------------------------------ #
+    # P-66.1.5 "Lactams, lactims, sultams, and sultims" -> P-66.1.5.1 "Lactams and
+    # lactims" (BB:33222, :33224): "Lactams are named in two ways: (1) as
+    # heterocyclic pseudoketones; (2) ...". The decisive sentence is the LAST one
+    # (BB:33229): "Method (1) generates preferred IUPAC names."  The PIN parent is
+    # therefore a HETEROCYCLE carrying ring numbering, not an amide -- and the
+    # rule's own examples number the lactam nitrogen '1': BB:33232
+    # `pyrrolidin-2-one (PIN) butano-4-lactam` and BB:33236
+    # `1-azacyclotridecan-2-one (PIN)`, where the '1' of `1-aza` IS that nitrogen.
+    #
+    # P-66.1.3 "'Hidden' amides" (BB:33125) settles the N/C crux head-on: naming a
+    # substituent on "a nitrogen atom of a heterocyclic system" as an N-substituted
+    # amide "is allowed but only in general nomenclature. Such compounds are now
+    # considered as pseudoketones (see P-64.3) and preferred IUPAC names are
+    # constructed accordingly" -- BB:33129 `1-(piperidin-1-yl)ethan-1-one (PIN)`
+    # `1-acetylpiperidine`, i.e. the ring nitrogen is cited `-1-`, and the italic-N
+    # reading is explicitly DEMOTED out of PIN territory.
+    #
+    # The Blue Book prints the numeral for a substituted ring amide nitrogen and
+    # marks the italic form "not":
+    #   BB:33847  `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide)`
+    #   BB:40645  `2,5-dioxopyrrolidin-1-yl (PIN) succinimidyl`  (N = locant 1)
+    #   BB:27249  `pyrrolidine-1,2-diol (PIN) 1-hydroxypyrrolidin-2-ol
+    #              N-hydroxypyrrolidin-2-ol`
+    #   BB:4679   `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine` (nicotine)
+    # The general statement is P-65.2.3.1.4 (BB:31107): italic letter locants "are
+    # used to designate substitution on nitrogen atoms that are NOT amide linkages
+    # for which numerical locants are used."  A ring N that HAS a numeral is
+    # exactly such an amide linkage, so it does not take the italic form.
+    #
+    # ⚠ Do NOT re-derive this from P-65.2.3.1.2.1 (BB:31041), which a sibling fix
+    # cited. That sentence reads "...nitrogen atoms that are not amide linkages
+    # that are part of the chain..." and is about SUPERSCRIPTED locants (N^2, N^3)
+    # in polycarbonic acid chains; quoting it with "amide linkages" elided inverts
+    # what it says. The conclusion above stands on P-66.1.5.1/P-66.1.3 instead.
+    #
+    # None of the four P-14.3.4.2 (BB:2891) "the locant '1' is omitted" licences
+    # reaches here -- (a) mononuclear parent hydrides, (b) two-identical-atom
+    # chains, (c) monosubstituted HOMOGENEOUS monocyclic rings, (d) unsubstituted
+    # unsaturated systems. A lactam ring is heterogeneous and bears the '-2-one'
+    # suffix, so P-14.3.3 (BB:2869, deny-by-default) requires the '1' to be cited.
+    #
+    # Consequence -- P-16.3.3 (BB:7038) clause (b) (BB:7067): multiplicity is a
+    # property of the substituent NAME, not of which ring atom carries it. Once the
+    # ring-N locant is a numeral, a `methyl` on N and a `methyl` on a ring C are ONE
+    # group of two: `1,5-dimethylpyrrolidin-2-one`, not `N-methyl-5-methyl...`.
+    #
+    # ⚠ The old key was `(sub_name, is_on_nitrogen)` -- and `is_on_nitrogen` is a
+    # RING-ATOM test (`:347`), not a locant-KIND test. That split gave each side its
+    # own `count = len(locants)`, which is why the two methyls could never meet. It
+    # also made the name INPUT-ORDER DEPENDENT: `CN1C(C)CC1=O` and `CC1CC(=O)N1C`
+    # are the same molecule (both InChIKey IYTPSDMCQSELPF-UHFFFAOYSA-N) yet gave
+    # `N-methyl-4-methyl...` and `4-methyl-N-methyl...` respectively.
+    #
+    # A ring-N group is merged into the shared numeric bucket only when it actually
+    # HAS a numeral. A locant-less ring N keeps the italic-'N' spelling byte for
+    # byte -- routing it into `format_substituent_prefix` would render its missing
+    # locant, so this fallback is load-bearing, not decorative.
+    groups = defaultdict(list)    # sub_name -> [numeric locants]  (N and C alike)
+    n_groups = defaultdict(list)  # sub_name -> [locants]  italic-'N' fallback only
 
     for sub_info in subs:
         attach_idx = _find_attach_idx_in_frag(mol, sub_info, effective_parent)
@@ -345,30 +408,37 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
             # Determine if substituent is on nitrogen
             attach_parent_atom = mol.GetAtomWithIdx(sub_info.attach_mol_idx)
             is_on_nitrogen = attach_parent_atom.GetSymbol() == "N"
-            groups[(sub_name, is_on_nitrogen)].append(sub_info.locant)
+            if is_on_nitrogen and sub_info.locant is None:
+                n_groups[sub_name].append(sub_info.locant)
+            else:
+                groups[sub_name].append(sub_info.locant)
 
-    if not groups:
+    if not groups and not n_groups:
         if stereo_descriptors:
             stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
             return f"{stereo_prefix}{parent_name}"
         return parent_name
 
     # Sort locants within each group
-    for key in groups:
-        groups[key].sort()
+    for locants in groups.values():
+        locants.sort()
 
-    # Build prefix parts, sorted alphabetically
-    prefix_parts = []
-    for (sub_name, is_on_nitrogen), locants in sorted(
-        groups.items(), key=lambda x: alpha_sort_key(x[0][0])
-    ):
-        count = len(locants)
-        if is_on_nitrogen:
-            # N-substitution: N-methyl, N,N-dimethyl
-            prefix_str = _format_n_prefix(sub_name, count)
-        else:
-            prefix_str = format_substituent_prefix(sub_name, locants, count)
-        prefix_parts.append(prefix_str)
+    # Build prefix parts, sorted alphabetically (P-14.5)
+    formatted = []  # (sub_name, prefix_str)
+    for sub_name, locants in groups.items():
+        formatted.append(
+            (sub_name, format_substituent_prefix(sub_name, locants, len(locants)))
+        )
+    for sub_name, locants in n_groups.items():
+        # N-substitution with no ring numeral: N-methyl, N,N-dimethyl
+        formatted.append((sub_name, _format_n_prefix(sub_name, len(locants))))
+
+    prefix_parts = [
+        prefix_str
+        for _sub_name, prefix_str in sorted(
+            formatted, key=lambda x: alpha_sort_key(x[0])
+        )
+    ]
 
     if not prefix_parts:
         return parent_name

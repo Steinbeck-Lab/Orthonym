@@ -143,10 +143,20 @@ class TestLactamNaming:
         assert name_monocyclic_lactam(mol) == "azepan-2-one"
 
     def test_n_methyl_beta_lactam_name(self):
-        """N-methyl-beta-lactam named correctly."""
+        """A beta-lactam's ring N is locant 1, so its methyl cites '1-'.
+
+        CORRECTED 2026-08-02 (Task W). This asserted `N-methylazetidin-2-one`.
+        A lactam's PIN is a heterocyclic pseudoketone -- P-66.1.5.1
+        (`BlueBookV2.md:33224`), decisive last sentence at `:33229` "Method (1)
+        generates preferred IUPAC names." -- so the ring nitrogen is numbered and
+        its substituent cites that numeral. P-66.1.3 "'Hidden' amides" (`:33125`)
+        demotes the italic-N reading of a heterocyclic ring nitrogen to "general
+        nomenclature" only; `:33847` prints
+        `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide)`.
+        """
         mol = Chem.MolFromSmiles("CN1CCC1=O")
         name = name_monocyclic_lactam(mol)
-        assert name == "N-methylazetidin-2-one"
+        assert name == "1-methylazetidin-2-one"
 
     def test_c_methyl_gamma_lactam_name(self):
         """C-methylated gamma-lactam named correctly with locant."""

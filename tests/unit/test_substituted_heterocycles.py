@@ -2,11 +2,25 @@
 Tests for substituted heterocycle naming (Plan 03-04).
 
 Tests N-substitution (HETERO-09) and C-substitution for heterocyclic compounds:
-- N-substitution uses N-locant format (N-methyl, N,N-dimethyl)
+- A substituent on a NUMBERED ring nitrogen uses that ring numeral
+  (1-methylpyrrolidine, 4-methylmorpholine) -- NOT an italic 'N' locant
 - C-substitution uses numeric locants (2-methyl, 3-ethyl)
 - Saturation prefixes (dihydro-, tetrahydro-) with explicit locants
 
 Reference: IUPAC 2013 Blue Book, Section P-22 (Heterocycles)
+
+CORRECTED 2026-08-02 (Task W). This file previously asserted the italic form for
+all seven saturated rings below -- "N-substitution uses N-locant format" -- and
+those 8 assertions had been RED since the ring-N producer was corrected. The
+italic 'N' is for a nitrogen that receives NO numeral; a ring nitrogen inside the
+ring numbering takes its numeral. P-65.2.3.1.4 (`BlueBookV2.md:31107`): italic
+letter locants "are used to designate substitution on nitrogen atoms that are not
+amide linkages for which numerical locants are used."  Per-name citations are on
+each row. Two committed gold PIN-oracle rows (,
+`bluebook_ref: P-73.4`, `category: target`) independently assert the same thing and
+were curated without this code path: `1,1-dimethylpiperidin-1-ium` ("both methyls
+at the N locant") and `4,4-dimethylmorpholin-4-ium` ("O=1 senior, N=4; 4,4-dimethyl
+at the ring-N locant").
 """
 
 import pytest
@@ -30,23 +44,28 @@ class TestNSubstitution:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
-        # N-methylpyrrolidine
-        ("CN1CCCC1", "N-methylpyrrolidine"),
-        # N-ethylpyrrolidine
-        ("CCN1CCCC1", "N-ethylpyrrolidine"),
-        # N-methylpiperidine
-        ("CN1CCCCC1", "N-methylpiperidine"),
-        # N-ethylpiperidine
-        ("CCN1CCCCC1", "N-ethylpiperidine"),
-        # N-methylmorpholine (N is at position 4 in morpholine, but uses N-locant)
-        ("CN1CCOCC1", "N-methylmorpholine"),
-        # N-methylazetidine
-        ("CN1CCC1", "N-methylazetidine"),
-        # N-methylaziridine
-        ("CN1CC1", "N-methylaziridine"),
+        # Pyrrolidine ring N is locant 1. BB:4679 prints the exact string in
+        # nicotine: `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine`. BB:33847
+        # `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide)` marks
+        # the italic form "not"; BB:27249 `pyrrolidine-1,2-diol (PIN)
+        # 1-hydroxypyrrolidin-2-ol` over `N-hydroxypyrrolidin-2-ol`.
+        ("CN1CCCC1", "1-methylpyrrolidine"),
+        ("CCN1CCCC1", "1-ethylpyrrolidine"),
+        # Piperidine ring N is locant 1: BB:56630 `piperidin-1-yl*`,
+        # BB:33129 `1-(piperidin-1-yl)ethan-1-one (PIN)`.
+        ("CN1CCCCC1", "1-methylpiperidine"),
+        ("CCN1CCCCC1", "1-ethylpiperidine"),
+        # Morpholine ring N is locant 4 (O=1 is the senior heteroatom):
+        # BB:56400 `morpholin-4-yl* (not morpholino)`. The old expectation's own
+        # comment conceded "N is at position 4 ... but uses N-locant" -- that
+        # concession was the defect.
+        ("CN1CCOCC1", "4-methylmorpholine"),
+        # Azetidine / aziridine ring N is locant 1 (BB:8402 `azetidine (PIN)`).
+        ("CN1CCC1", "1-methylazetidine"),
+        ("CN1CC1", "1-methylaziridine"),
     ])
     def test_n_substituted_saturated(self, smiles, expected):
-        """Test N-substituted saturated heterocycles."""
+        """A substituent on a numbered ring nitrogen cites that ring numeral."""
         assert name_compound(smiles) == expected
 
     @pytest.mark.unit
@@ -198,7 +217,9 @@ class TestSubstituentFunctions:
         result = name_substituted_heterocycle(
             mol, ring, parent, subs, atom_to_locant
         )
-        assert result == "N-methylpyrrolidine"
+        # Ring N is locant 1 -- see the module docstring and BB:4679
+        # (`1-methylpyrrolidin-2-yl` in nicotine). Not `N-methylpyrrolidine`.
+        assert result == "1-methylpyrrolidine"
 
     @pytest.mark.unit
     def test_name_substituted_heterocycle_c_single(self):
