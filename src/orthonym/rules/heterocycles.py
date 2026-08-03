@@ -929,14 +929,76 @@ def _mancude_bond_eligible(mol, oriented: List[int]) -> List[bool]:
     """
     from .lambda_convention import nonstandard_bonding_number
     _DIVALENT = frozenset({'O', 'S', 'Se', 'Te'})
+    ring = set(oriented)
     out: List[bool] = []
     for i in oriented:
         lam = nonstandard_bonding_number(mol, i)
         if lam is None:
-            out.append(mol.GetAtomWithIdx(i).GetSymbol() not in _DIVALENT)
+            ok = mol.GetAtomWithIdx(i).GetSymbol() not in _DIVALENT
         else:
-            out.append(lam >= 3)
+            ok = lam >= 3
+        out.append(ok and _has_room_for_ring_double_bond(mol, i, ring, lam))
     return out
+
+
+# Default bonding numbers, used ONLY by the exocyclic veto below and only for an
+# atom that actually carries an exocyclic multiple bond. Deliberately not a
+# general valence table: an element missing here simply skips the veto and keeps
+# the element-based verdict above.
+_STANDARD_BONDING_NUMBER = {
+    'C': 4, 'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+    'N': 3, 'P': 3, 'As': 3, 'Sb': 3, 'Bi': 3, 'B': 3, 'Al': 3,
+    'O': 2, 'S': 2, 'Se': 2, 'Te': 2,
+}
+
+
+def _has_room_for_ring_double_bond(mol, idx: int, ring: Set[int], lam) -> bool:
+    """False when the atom's valence is already fully spent OUTSIDE the ring.
+
+    :func:`_mancude_bond_eligible`'s own opening sentence is the whole rule --
+    "A ring atom already spends two of its valences on ring sigma bonds, so it
+    can take a ring double bond only if its BONDING NUMBER is three or more" --
+    but it was applied as if the only other claim on an atom's valences were
+    those two sigma bonds.  An **exocyclic double bond** is a third claim, and
+    it is not removable by hydrogenation the way a hydrogen is: in
+    ``pyridin-2(1H)-one`` the C-2 carbon spends 2 valences on ring sigma bonds
+    and 2 on the exocyclic ``C=O``, so it cannot carry a ring double bond at
+    all, and the ring's mancude maximum is 2 rather than pyridine's 3.
+
+    Without this, that ring reads as "2 double bonds where the parent has 3",
+    i.e. as a HYDRO FORM, and the ``1 <= _d < _max_match`` guard in
+    :func:`name_heterocycle` refuses it.  That is what withdrew the correct
+    ``5-(3-fluorophenyl)-1H-pyridin-2-one`` (regression from `65a2206e`,
+    ).  The compound is a
+    **pseudoketone**, not a hydro form: P-66.1.3 "'Hidden' amides"
+    (``BlueBookV2.md:33125``) and P-66.1.5.1 "Lactams and lactims" (``:33224``)
+    both name this shape on the numbered mancude ring with an added suffix, and
+    ``:33224``'s method (1) "generates preferred IUPAC names".
+
+    ⚠ Only bonds of order **>= 2** are counted, and only to atoms OUTSIDE this
+    ring.  Counting single bonds would veto an N-methyl ring nitrogen, and
+    counting RDKit's aromatic order 1.5 would veto the fusion carbons of
+    naphthalene -- measured: both stay eligible under this test, as they must.
+    An atom with no exocyclic multiple bond returns True immediately, so
+    :func:`_mancude_bond_eligible` keeps its previous expression **verbatim**
+    for every such atom -- which is every atom in every ring the mancude
+    machinery handled before this change.
+    """
+    atom = mol.GetAtomWithIdx(idx)
+    exo = 0.0
+    for bond in atom.GetBonds():
+        if bond.GetOtherAtomIdx(idx) in ring:
+            continue
+        order = bond.GetBondTypeAsDouble()
+        if order >= 2:
+            exo += order
+    if exo == 0.0:
+        return True
+    bn = lam if lam is not None else _STANDARD_BONDING_NUMBER.get(atom.GetSymbol())
+    if bn is None:
+        return True  # unknown element -> keep the element-based verdict
+    # 2 valences go to the ring sigma bonds; a ring double bond needs 1 more.
+    return (bn - 2 - exo) >= 1
 
 
 def _monocycle_numberings(mol, ordered: List[int]):
