@@ -58,6 +58,7 @@ from typing import Any, Optional, Set
 from rdkit import Chem
 
 from ..assembly.coverage_scoring import CandidateName
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ def _opsin_to_smi(name: str) -> Optional[str]:
     """
     try:
         p = subprocess.run(
-            ["java", "-jar", str(OPSIN_JAR), "-o", "smi"],
+            ["java", *JVM_HYGIENE_FLAGS, "-jar", str(OPSIN_JAR), "-o", "smi"],
             input=name + "\n",
             capture_output=True,
             text=True,

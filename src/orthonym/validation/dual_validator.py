@@ -22,6 +22,7 @@ from rdkit import Chem
 from rdkit.Chem.inchi import MolToInchi
 
 from .pubchem_validator import lookup_name_pubchem
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 
 @dataclass
@@ -73,7 +74,7 @@ def _parse_name_with_opsin(
             f.write(name + "\n")
             temp_input = f.name
 
-        cmd = ["java", "-jar", opsin_jar, "-osmi", temp_input]
+        cmd = ["java", *JVM_HYGIENE_FLAGS, "-jar", opsin_jar, "-osmi", temp_input]
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=30
         )
@@ -119,7 +120,7 @@ def _parse_batch_with_opsin(
                 f.write(name + "\n")
             temp_input = f.name
 
-        cmd = ["java", "-jar", opsin_jar, "-osmi", temp_input]
+        cmd = ["java", *JVM_HYGIENE_FLAGS, "-jar", opsin_jar, "-osmi", temp_input]
         proc = subprocess.run(
             cmd, capture_output=True, text=True, timeout=timeout
         )

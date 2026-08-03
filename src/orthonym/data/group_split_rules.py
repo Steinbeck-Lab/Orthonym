@@ -47,6 +47,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import rdkit
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +167,7 @@ def _opsin_rt_validate_examples(entries) -> None:
             tf.write(example + "\n")
             path = tf.name
         try:
-            out = subprocess.run(["java", "-jar", str(jar), "-osmi", path],
+            out = subprocess.run(["java", *JVM_HYGIENE_FLAGS, "-jar", str(jar), "-osmi", path],
                                  capture_output=True, text=True, timeout=20)
             if not out.stdout.strip():
                 raise ValueError(

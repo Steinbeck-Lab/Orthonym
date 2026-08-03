@@ -14,6 +14,7 @@ import subprocess
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 
 # Project root: 4 levels up from this file
@@ -50,7 +51,7 @@ def _java_available() -> bool:
     """
     try:
         proc = subprocess.run(
-            ["java", "-version"],
+            ["java", *JVM_HYGIENE_FLAGS, "-version"],
             capture_output=True, text=True, timeout=5,
         )
         return proc.returncode == 0
@@ -96,7 +97,7 @@ def opsin_parse(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     if not served:
         try:
             result = subprocess.run(
-                ["java", "-jar", jar_path, "-osmi"],
+                ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path, "-osmi"],
                 input=name,
                 capture_output=True,
                 text=True,

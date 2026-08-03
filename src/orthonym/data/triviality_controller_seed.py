@@ -35,6 +35,7 @@ from typing import Dict, Optional, Tuple
 
 from rdkit import Chem
 import rdkit
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +199,7 @@ def _t1_opsin_rt_validate_all(entries: Dict[str, SeedEntry]) -> None:
             # P-29.6.1 substituent prefix — OPSIN molecule round-trip N/A.
             continue
         result = subprocess.run(
-            ["java", "-jar", opsin_jar, "-osmi"],
+            ["java", *JVM_HYGIENE_FLAGS, "-jar", opsin_jar, "-osmi"],
             input=entry.retained_pin_name + "\n",
             capture_output=True,
             text=True,

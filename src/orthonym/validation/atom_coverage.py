@@ -52,6 +52,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Set
 
 from rdkit import Chem
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 
 @dataclass
@@ -160,7 +161,7 @@ def _parse_name_with_opsin(name: str, opsin_jar: str) -> Optional[str]:
         return None
 
     try:
-        cmd = ["java", "-jar", opsin_jar, "-osmi", temp_input]
+        cmd = ["java", *JVM_HYGIENE_FLAGS, "-jar", opsin_jar, "-osmi", temp_input]
         proc = subprocess.run(
             cmd,
             capture_output=True,

@@ -64,6 +64,7 @@ from .naming_utils import (
     get_multiplier_prefix,
     is_complex_substituent,
 )
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 # Lazy import of SEED_TABLE / SubstitutionType inside function bodies (Pattern S3)
 # to avoid circular-import risk if data/ initialization is not finished.
@@ -148,7 +149,7 @@ class OpsinOracle:
                     # -r (--allowRadicals): add consistently with _invoke_opsin so the
                     # oracle accepts radical names; proven strictly additive over 11,668
                     # names (66 gains / 0 changes / 0 regressions; 184-RESEARCH §WS-E-RADICAL).
-                    ["java", "-jar", self._jar, "-r", "-osmi"],
+                    ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar, "-r", "-osmi"],
                     input=post_swap_subtree_str + "\n",
                     capture_output=True, text=True, timeout=10,
                 )
@@ -226,7 +227,7 @@ class OpsinOracle:
                 # 184-RESEARCH §WS-E-RADICAL(a)) — byte-identical on all non-radical
                 # names. NOT a blanket gate bypass: OPSIN itself still validates the
                 # name (the heptanolate-class suppression hole stays closed).
-                ["java", "-jar", self._jar, "-r", "-osmi"],
+                ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar, "-r", "-osmi"],
                 input=name + "\n",
                 capture_output=True, text=True, timeout=10,
             )

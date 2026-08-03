@@ -29,6 +29,7 @@ import queue
 import subprocess
 import threading
 from typing import Dict, List, Optional, Tuple
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class PersistentOpsin:
         self._kill()
         try:
             self._proc = subprocess.Popen(
-                ["java", "-jar", self._jar, *self._args],
+                ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar, *self._args],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL, text=True, bufsize=1,
             )

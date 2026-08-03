@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from rdkit import Chem
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +128,7 @@ def _java_available() -> bool:
     """
     try:
         proc = subprocess.run(
-            ["java", "-version"],
+            ["java", *JVM_HYGIENE_FLAGS, "-version"],
             capture_output=True, text=True, timeout=5,
         )
         return proc.returncode == 0
@@ -247,7 +248,7 @@ def centres_label_batch(
             # In-process unavailable or Java raised -> the original subprocess.
             if not _java_available():
                 return None
-            cmd = ["java", "-jar", jar, "-i", "smi", temp_input]
+            cmd = ["java", *JVM_HYGIENE_FLAGS, "-jar", jar, "-i", "smi", temp_input]
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout
             )

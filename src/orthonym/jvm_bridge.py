@@ -78,6 +78,8 @@ import os
 import threading
 from typing import Optional, Sequence, Tuple
 
+from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
+
 logger = logging.getLogger(__name__)
 
 # One re-entrant lock guards BOTH the start-up decision and every call into Java.
@@ -167,7 +169,13 @@ def _start(pid: int) -> bool:
             return False
     else:
         xmx = os.environ.get("ORTHONYM_JVM_XMX", DEFAULT_XMX)
-        base = [f"-Xmx{xmx}", "-Djava.awt.headless=true"]
+        # JVM_HYGIENE_FLAGS carries -Djava.awt.headless plus -XX:-UsePerfData.
+        # The perf-data flag matters most HERE: this is the highest-churn JVM in
+        # the tree (12 pool workers x maxtasksperchild=25 means a fresh JVM every
+        # 25 molecules per worker), and a JVM killed by a SIGALRM guard leaks its
+        # /tmp/hsperfdata_<user>/<pid> file, which is what lets a later JVM print
+        # a warning onto stdout. See orthonym/jvm_flags.py for the mechanism.
+        base = [f"-Xmx{xmx}", *JVM_HYGIENE_FLAGS]
         # JDK 24+ prints a 4-line "restricted method ... System::load" warning to
         # stderr for JPype's own native load. Harmless, but every worker process
         # would emit it, so silence it where supported. The flag is UNKNOWN to
