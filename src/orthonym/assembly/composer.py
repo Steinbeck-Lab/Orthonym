@@ -7179,6 +7179,37 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     if not ring_groups:
         return prefixes
 
+    # v30 P3-T1c: the AMBIENT engine tier.
+    #
+    # This function is the one place a ring becomes a name COMPONENT, and it
+    # called both ring chokepoints with ``allow_mancude`` left at its default
+    # False. So the complete / best-effort tiers could never reach the audited
+    # terminal ring namer from here, and the class abstained instead: measured
+    # 0 of 44 ``needs_engine`` rows converted, with the generator entered on
+    # exactly 1 of them.
+    #
+    # No parameter threading is needed because the flag is already ambient.
+    # ``namer.py:2437-2438`` publishes the top-level engine flag on
+    # ``general_fallback_ctx`` precisely so downstream consumers can inherit it,
+    # and ``name_compound`` (``namer.py:4979-4982``) already reads it this exact
+    # way. Measured at THIS function's entry, fresh process per molecule, over
+    # ``needs_engine`` rows reaching both of its callers
+    # (``handlers/_handler_shared.py:919`` and ``rules/polyfunctional.py:2264``):
+    # ``True`` on the best-effort tier and ``False`` on the pin tier, every time.
+    # The PIN path is therefore unchanged by construction rather than by
+    # argument -- and the paired 500-row A/B says 0 churn.
+    #
+    # Fails closed to False: a consumer that somehow runs outside a top-level
+    # naming call gets the contextvar's own default, which is False.
+    from ..metrics.provenance import (
+        general_fallback_ctx,
+        record_general_ring_prefix as _pv_general_ring_prefix,
+    )
+    try:
+        _tier_general = bool(general_fallback_ctx.get())
+    except Exception:  # noqa: BLE001 - a tier read must never break naming
+        _tier_general = False
+
     # Group ring substituents by name for multiplier handling
     ring_sub_groups: Dict[str, List[int]] = defaultdict(list)
     # W8-P6 Cluster E (P-93.6 Ex6 fail-closed guard): parallel tracking of the
@@ -7392,9 +7423,23 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 from ..rules.ring_substituents import (
                     name_ring_system_substituent as _rc_nrss,
                 )
+                # ADDITIVE-ONLY: the PIN route gets first refusal, exactly as
+                # before. The general tier is consulted only when it produced
+                # nothing at all, so no currently-emitting molecule can change
+                # its ring prefix. (The naive version -- passing the ambient tier
+                # straight in -- moved two already-emitting molecules from T3 to
+                # T1 and flipped ``is_pin`` to True on a von Baeyer form whose
+                # ring PIN is the retained name *adamantane*.)
                 _rc_name = _rc_nrss(
-                    features.mol, sorted(_rc_frag), _ring_attach_atom
+                    features.mol, sorted(_rc_frag), _ring_attach_atom,
                 )
+                if not _rc_name and _tier_general:
+                    _rc_name = _rc_nrss(
+                        features.mol, sorted(_rc_frag), _ring_attach_atom,
+                        allow_mancude=True,
+                    )
+                    if _rc_name:
+                        _pv_general_ring_prefix()
                 if (_rc_name and ' ' not in _rc_name
                         and any(_ch.isdigit() for _ch in _rc_name)):
                     # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): a decorated ring name that
@@ -7415,7 +7460,14 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # a porphyrin as "cyclononacosyl").
         if len(ring_atom_set) > len(ring_atoms):
             _full_ring = tuple(sorted(ring_atom_set))
-            _full_name = get_ring_substituent_name(features.mol, _full_ring, _ring_attach_atom)
+            _full_name = get_ring_substituent_name(
+                features.mol, _full_ring, _ring_attach_atom)
+            if _full_name is None and _tier_general:
+                _full_name = get_ring_substituent_name(
+                    features.mol, _full_ring, _ring_attach_atom,
+                    allow_mancude=True)
+                if _full_name is not None:
+                    _pv_general_ring_prefix()
             # Accept the full-system name only if it produced a retained / routed
             # name (not a generic cyclo-name). Phase 4 SUBST-01: get_ring_substituent_name
             # may now return None (fail-closed for an unnameable polycyclic) — fall
@@ -7424,9 +7476,19 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 base_name = _full_name
             else:
                 # Full system produced generic cyclo-name / None; use SSSR ring
-                base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
+                base_name = get_ring_substituent_name(
+                    features.mol, ring_atoms, _ring_attach_atom)
         else:
-            base_name = get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom)
+            base_name = get_ring_substituent_name(
+                features.mol, ring_atoms, _ring_attach_atom)
+        # ADDITIVE-ONLY general-tier retry, same contract as the decorated-ring
+        # branch above: only where the PIN route named nothing.
+        if base_name is None and _tier_general:
+            base_name = get_ring_substituent_name(
+                features.mol, ring_atoms, _ring_attach_atom,
+                allow_mancude=True)
+            if base_name is not None:
+                _pv_general_ring_prefix()
         # Phase 4 SUBST-01: a None base_name (unnameable ring) must not reach the
         # string assembly below — emit the honest fallback marker so the molecule
         # surfaces as unknown rather than crashing / dropping the ring.

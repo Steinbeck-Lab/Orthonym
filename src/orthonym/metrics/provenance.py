@@ -87,6 +87,10 @@ _STEREO_UNEXPRESSED = contextvars.ContextVar(
 # component recursion (name_compound inherits it).
 general_fallback_ctx = contextvars.ContextVar(
     "orthonym_general_fallback", default=False)
+# v30 P3-T1c: a composer (``pin_path``) name whose ring substituent prefix could
+# only be produced by the GENERAL tier -- see ``record_general_ring_prefix``.
+_GENERAL_RING_PREFIX = contextvars.ContextVar(
+    "orthonym_prov_general_ring_prefix", default=False)
 # v29 P7 T1: the validity gate's per-name outcome, and the name string it was
 # recorded FOR. Defaults fail closed (NOT_RUN / no name).
 _GATE_OUTCOME = contextvars.ContextVar(
@@ -103,6 +107,9 @@ def clear_provenance() -> None:
     # mislabel this one, so it resets with the rest of the provenance.
     _GATE_OUTCOME.set(GATE_OUTCOME_NOT_RUN)
     _GATE_OUTCOME_NAME.set(None)
+    # v30 P3-T1c: same reason -- a flag left from the previous molecule would
+    # demote this one's tier for a prefix it does not contain.
+    _GENERAL_RING_PREFIX.set(False)
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
@@ -168,6 +175,25 @@ def gate_token_for_gate_outcome(outcome: Optional[str]) -> Optional[str]:
     return _GATE_TOKENS.get(outcome)
 
 
+def record_general_ring_prefix() -> None:
+    """v30 P3-T1c: mark that a PIN-path (``composer``) name contains a ring
+    substituent prefix that only the GENERAL tier could produce.
+
+    Tier and ``is_pin`` are decided from ``source`` alone (``namer.py:2728``),
+    and every composer emission reports ``source='pin_path'`` -> ``T1``,
+    ``is_pin=True``. A systematic replacement / von Baeyer substituent form is a
+    VALID name but not the PREFERRED one, so shipping it under that label would
+    assert PIN status for a non-PIN name -- measured on
+    ``OC(=O)CC12CC3CC(O)(CC(C3)C1)C2``, whose ring PIN is the retained name
+    *adamantane*, not ``tricyclo[3.3.1.1^3,7]decane``.
+
+    This flag lets ``name_tiered`` demote exactly those emissions to the general
+    tier while leaving every other composer emission untouched. It is
+    deliberately one-way (never cleared) for the duration of a naming call.
+    """
+    _GENERAL_RING_PREFIX.set(True)
+
+
 def get_provenance() -> dict:
     return {
         "source": _SOURCE.get(),
@@ -175,4 +201,5 @@ def get_provenance() -> dict:
         "stereo_unexpressed": _STEREO_UNEXPRESSED.get(),
         "gate_outcome": _GATE_OUTCOME.get(),
         "gate_outcome_name": _GATE_OUTCOME_NAME.get(),
+        "general_ring_prefix": _GENERAL_RING_PREFIX.get(),
     }

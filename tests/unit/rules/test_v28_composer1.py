@@ -84,14 +84,44 @@ def test_decorated_ring_substituent_emits_via_engine(smi):
 # ============================================================================
 
 
-@pytest.mark.parametrize("smi", [
-    "OC(=O)Cc1ccc2cc(Cl)ccc2c1",              # (6-chloronaphthalen-2-yl)acetic acid — FUSED decorated core
-    "OC(=O)CC12CC3CC(O)(CC(C3)C1)C2",         # (3-hydroxyadamantan-1-yl)acetic acid — BRIDGED decorated core
+@pytest.mark.parametrize("smi,expected", [
+    # FUSED decorated core
+    ("OC(=O)Cc1ccc2cc(Cl)ccc2c1", "(6-chloronaphthalen-2-yl)acetic acid"),
+    # BRIDGED decorated core
+    ("OC(=O)CC12CC3CC(O)(CC(C3)C1)C2", "(3-hydroxyadamantan-1-yl)acetic acid"),
 ])
-def test_polycyclic_decorated_substituent_emits_via_engine(smi):
+def test_polycyclic_decorated_substituent_is_named(smi, expected):
+    """A decorated polycyclic ring substituent must be NAMED, and named
+    correctly.
+
+    v30 P3-T1c: this test used to assert ``row["source"] == "general_engine"``.
+    That pinned an internal ROUTE, and the route changed when the composer's
+    ring-substituent path gained access to the general tier -- these molecules are
+    now named earlier, by the composer. The PROVENANCE NOTE at :101-104 of this
+    file already documented route assertions as fragile for exactly this reason,
+    so the assertion is now on the NAME, which is the property that matters.
+
+    Both expected names are the ones this test's own parametrisation comments
+    named from the start, and neither route ever produced the second one before:
+
+    * ``acetic acid`` is the PIN, not ``ethanoic acid``. **P-21.1.1 / Table 28.1
+      context, stated at ``BlueBookV2/BlueBookV2.md:2004``**: *"A special class of
+      parent structures having retained names ... is called functional parent
+      compounds, for example, phenol and acetic acid. These two names are
+      preferred IUPAC names; the corresponding systematic alternatives, benzenol
+      and ethanoic acid, may be used in general IUPAC nomenclature."*
+    * ``adamantan-1-yl`` is the PIN stem, not ``tricyclo[3.3.1.1^3,7]decan-3-yl``.
+      **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"** (``:9879``):
+      *"The retained names adamantane and cubane are used in general nomenclature
+      and as preferred IUPAC names."* Table 2.6 (``:9885``) prints *"adamantane
+      (PIN) tricyclo[3.3.1.1^3,7]decane"* -- retained name PIN, descriptor the
+      alternative.
+    * Both names round-trip through OPSIN 2.9.0 to the input's FULL InChIKey
+      (not skeleton-only): verified this session.
+    """
     row = _be().name_tiered(smi)
-    assert row["source"] == "general_engine", row
-    assert row["name"] and "unknown" not in row["name"] and " substituent" not in row["name"]
+    assert row["name"] == expected, row
+    assert "unknown" not in row["name"] and " substituent" not in row["name"]
 
 
 # ============================================================================
@@ -325,10 +355,23 @@ def test_general_substituent_never_returns_sentinel_when_decomposable():
     # a space-bearing token.
     name = name_substituent(mol, ring_atoms, attach, allow_mancude=True)
     assert name is None or (name != "substituent" and " " not in name)
-    assert name == "tricyclo[3.3.1.1^3,7]decan-3-yl", name
+    # v30 P3-T1c: was ``tricyclo[3.3.1.1^3,7]decan-3-yl``. The retained name is
+    # the PIN -- **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    # (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and
+    # cubane are used in general nomenclature and as preferred IUPAC names."*
+    # Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]
+    # decane"*, i.e. the descriptor is the ALTERNATIVE. The locant also drops
+    # 3 -> 1 because the free valence now takes the lowest locant (P-29.3.2);
+    # OPSIN resolves ``adamantan-N-ol`` and ``tricyclo[3.3.1.1^3,7]decan-N-ol``
+    # to the same InChIKey for all N in 1..10, so the two numberings coincide
+    # and the stem swap is locant-safe.
+    assert name == "adamantan-1-yl", name
 
-    # End-to-end: the general engine (not the PIN path) wins this molecule.
-    assert _be().name_tiered(smi)["source"] == "general_engine"
+    # End-to-end: assert the NAME, not the route. This used to require
+    # ``source == "general_engine"``; the composer now names it first (P3-T1c
+    # gave its ring path access to the general tier), so the route is no longer a
+    # stable property -- the name is. Round-trips to the input's FULL InChIKey.
+    assert _be().name_tiered(smi)["name"] == "(adamantan-1-yl)acetic acid"
 
 
 # ============================================================================
@@ -349,9 +392,21 @@ def test_general_substituent_never_returns_sentinel_when_decomposable():
 
 def test_substituent_off_amide_nitrogen_is_partitioned():
     smi = "CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1"
-    row = _be().name_tiered(smi)     # must NOT raise; source==general_engine OR clean abstain (multi-blocked)
+    row = _be().name_tiered(smi)     # must NOT raise
     assert row is not None
-    assert (row["source"] == "general_engine") or (not row.get("name"))  # named via engine OR cleanly abstained
+    # v30 P3-T1c: was ``(row["source"] == "general_engine") or (not
+    # row.get("name"))`` -- a route assertion with an abstain escape hatch. The
+    # molecule is no longer multi-blocked (the composer's ring path reaches the
+    # general tier now), so it NAMES, and the property this test exists to
+    # protect is stated directly instead: the N-aryl ring that hangs off the
+    # amide nitrogen must still be in the name. Dropping the fluorophenyl was
+    # the wrong-structure failure the test was written against.
+    assert row["name"], row
+    assert "N-(3-fluorophenyl)" in row["name"], row
+    assert "unknown" not in row["name"] and " substituent" not in row["name"]
+    assert row["name"] == (
+        "2-({4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl})"
+        "-2-methyl-N-(3-fluorophenyl)propanamide"), row
 
 
 # ============================================================================

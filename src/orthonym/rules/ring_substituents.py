@@ -1279,6 +1279,113 @@ def _fused_hydro_substituent_name(sub, attach_sub) -> Optional[str]:
         return None
 
 
+#: v30 P3-T1c lead 1: the von Baeyer parent hydrides whose RETAINED name is the
+#: PIN, keyed by the descriptor string the cage analyzer emits.
+#:
+#: **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+#: (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and cubane
+#: are used in general nomenclature and as preferred IUPAC names. The name
+#: quinuclidine is retained for general nomenclature only (see Table 2.6)."*
+#: Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]decane"*
+#: and *"cubane (PIN) pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane"* — so the
+#: retained name is the PIN and the von Baeyer descriptor is the ALTERNATIVE,
+#: which is the direction this table restores.
+#:
+#: ⚠ Only these two. ``tricyclo.TRICYCLO_RETAINED_NAMES`` also carries
+#: ``twistane``, which Table 2.6 does NOT retain, and ``quinuclidine``, which
+#: Table 2.6 retains for general nomenclature ONLY. Neither may be used as a PIN
+#: stem, so this table is keyed off P-23.7 rather than reusing that dict.
+#:
+#: The key is the DESCRIPTOR, not a SMILES: by the time it is consulted the
+#: descriptor has already passed ``audit_von_baeyer_descriptor``, so it is proven
+#: to denote this cage — a canonical-SMILES compare proves nothing of the kind.
+#:
+#: Locant safety is PROVEN, not assumed: OPSIN 2.9.0 resolves
+#: ``tricyclo[3.3.1.1^3,7]decan-N-ol`` and ``adamantan-N-ol`` to the same
+#: InChIKey for every N in 1..10, and the cubane pair for every N in 1..5 —
+#: 15/15. So the retained stem can take the analyzer's own von Baeyer locants
+#: unchanged.
+_VB_RETAINED_PIN_STEM = {
+    'tricyclo[3.3.1.1^3,7]': ('decan', 'adamantan'),
+    'pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]': ('octan', 'cuban'),
+}
+
+
+def _retained_pin_cage_stem(cage, stem: str) -> Optional[str]:
+    """The P-23.7 retained PIN stem for ``cage``, or None.
+
+    Applies only to an all-carbon, fully saturated cage whose audited descriptor
+    is in ``_VB_RETAINED_PIN_STEM``: a heteroatom or a ring multiple bond makes
+    it a different parent hydride, for which Table 2.6 asserts nothing.
+    """
+    entry = _VB_RETAINED_PIN_STEM.get(cage.descriptor)
+    if entry is None:
+        return None
+    expected_stem, retained = entry
+    if stem != expected_stem:
+        return None
+    if cage.hetero_prefix:
+        return None
+    unsat = cage.unsaturation or {}
+    if unsat.get('double_bonds') or unsat.get('triple_bonds'):
+        return None
+    return retained
+
+
+def _lowest_locant_cage_numbering(sub, cage, cage_atoms, attach_sub,
+                                  deco_carriers_sub=()):
+    """Re-map ``cage.atom_to_locant`` through the cage's own AUTOMORPHISMS to give
+    the free valence (P-29.3.2) and then the substituents the lowest locants.
+
+    Returns a ``{sub_idx: locant}`` dict, never None — the analyzer's own
+    numbering is the fallback, so this can only improve the locant set.
+
+    Why an automorphism and not a re-derivation: a graph automorphism preserves
+    adjacency, so the relabelled numbering asserts the SAME bond set in locant
+    space and the descriptor still describes the cage. That is re-proven, not
+    assumed — every candidate is put back through
+    ``audit_von_baeyer_descriptor`` and a candidate that fails is discarded.
+
+    ⚠ Deliberately applied ONLY on the retained-PIN path (adamantane / cubane).
+    Applying it to every von Baeyer substituent would relabel names that already
+    ship. That generalisation is P-29.3.3, which
+    ``_universal_cage_substituent_name``'s own docstring already defers.
+    """
+    from rdkit import Chem
+    from .vonbaeyer_universal import audit_von_baeyer_descriptor
+    base = {i: cage.atom_to_locant[i] for i in cage_atoms}
+    best_key = (base[attach_sub],
+                tuple(sorted(base[a] for a in deco_carriers_sub
+                             if a in base)))
+    best = base
+    try:
+        autos = sub.GetSubstructMatches(sub, uniquify=False, maxMatches=256)
+    except Exception:  # noqa: BLE001 - a symmetry search must never break naming
+        return best
+    kek = Chem.RWMol(sub)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+        kekmol = kek.GetMol()
+    except Exception:  # noqa: BLE001
+        kekmol = sub
+    for sigma in autos:
+        try:
+            cand = {i: base[sigma[i]] for i in cage_atoms}
+        except (KeyError, IndexError):
+            continue
+        if sorted(cand.values()) != sorted(base.values()):
+            continue
+        key = (cand[attach_sub],
+               tuple(sorted(cand[a] for a in deco_carriers_sub if a in cand)))
+        if key >= best_key:
+            continue
+        if not audit_von_baeyer_descriptor(
+                kekmol, set(cage_atoms), cand, cage.descriptor):
+            continue
+        best_key, best = key, cand
+    return best
+
+
 def _universal_cage_substituent_name(
     sub, attach_sub, allow_mancude: bool = False
 ) -> Optional[str]:
@@ -1328,6 +1435,18 @@ def _universal_cage_substituent_name(
         # pentadec-1(15)-en-8-yl). _build_parent_with_unsaturation always
         # returns an 'e'-terminal stem (…ane / …ene / …yne / …diene).
         stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
+        # v30 P3-T1c lead 1: P-23.7 retained PIN stem in place of the von Baeyer
+        # descriptor. Until now this function emitted `tricyclo[3.3.1.1^3,7]
+        # decan-N-yl` for a cage whose PIN stem is `adamantan-`, so the ONE thing
+        # this project claims over -- a retained name where
+        # a retained name exists -- was missing on the substituent side while the
+        # parent side already had it (`tricyclo.get_retained_tricyclo_name`).
+        _retained = _retained_pin_cage_stem(cage, stem)
+        if _retained is not None:
+            _numbering = _lowest_locant_cage_numbering(
+                sub, cage, cage_atoms, attach_sub)
+            _loc = _numbering.get(attach_sub, loc)
+            return f'{_retained}-{_loc}-yl'
         return f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
     except Exception:
         return None
@@ -1521,11 +1640,28 @@ def _cage_core_numbering(mol, ring_atoms, attach, deco_carriers=()):
     if not parent_block:
         return None
     stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
-    tail = f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
+    # v30 P3-T1c lead 1: the same P-23.7 retained-PIN substitution as
+    # ``_universal_cage_substituent_name``, applied here so a DECORATED cage core
+    # (the composer's route) gets it too. Both the tail and ``pos`` below are read
+    # off the SAME numbering, so the decoration locants stay consistent with the
+    # free-valence locant by construction. Here the decoration carriers are known,
+    # so the lowest-locant re-map minimises the free valence FIRST (P-29.3.2) and
+    # then the substituent set -- which is what turns `7-hydroxyadamantan-3-yl`
+    # into the PIN `3-hydroxyadamantan-1-yl`.
+    _retained = _retained_pin_cage_stem(cage, stem)
+    _numbering = dict(cage.atom_to_locant)
+    if _retained is not None:
+        _deco_sub = [s for s, o in sub_to_orig.items() if o in set(deco_carriers)]
+        _numbering = _lowest_locant_cage_numbering(
+            sub, cage, cage_atoms, attach_sub, _deco_sub)
+        loc = _numbering.get(attach_sub, loc)
+        tail = f'{_retained}-{loc}-yl'
+    else:
+        tail = f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
     if ' ' in tail:
         return None
     pos: Dict[int, int] = {}
-    for s_idx, lc in cage.atom_to_locant.items():
+    for s_idx, lc in _numbering.items():
         if s_idx in sub_to_orig and isinstance(lc, int):
             pos[sub_to_orig[s_idx]] = lc
     # Coverage guard (M2, defensive symmetry with the PAH / fused-heterocycle

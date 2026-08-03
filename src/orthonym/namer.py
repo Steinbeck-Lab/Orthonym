@@ -2737,6 +2737,16 @@ class Orthonym:
         elif source == "trivial_retained":
             tier, is_pin = "T3", False
             opsin = gate_opsin_label
+        elif prov.get("general_ring_prefix"):
+            # v30 P3-T1c: a composer name carrying a ring substituent prefix only
+            # the GENERAL tier could build (a systematic replacement / von Baeyer
+            # substituent form). Valid, but not PREFERRED -- the ring PIN may be a
+            # retained name -- so it must not ship as T1/is_pin. Demoted on the
+            # same verified/unverified split the general engine uses, so the tier
+            # still means what it means everywhere else.
+            opsin = gate_opsin_label
+            tier = "T3" if opsin == "verified" else "T4"
+            is_pin = False
         else:
             tier, is_pin = "T1", True
             opsin = gate_opsin_label

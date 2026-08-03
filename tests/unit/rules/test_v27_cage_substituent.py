@@ -68,10 +68,22 @@ def _ring_frag(smiles):
 def test_adamantane_cage_substituent():
     """Adamantane (tricyclo, >2 bridgeheads) is declined by
     ``_vonbaeyer_substituent_name`` (not ``is_bicyclo_system``); the universal
-    namer produces the systematic P-23 cage form."""
+    namer names it -- and for adamantane it must use the RETAINED PIN stem.
+
+    v30 P3-T1c: was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``.
+    **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and
+    cubane are used in general nomenclature and as preferred IUPAC names."*
+    Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]decane"*
+    -- retained name PIN, descriptor the ALTERNATIVE. The LOCANT is unchanged (2,
+    a CH2 position): OPSIN 2.9.0 resolves ``adamantan-N-ol`` and
+    ``tricyclo[3.3.1.1^3,7]decan-N-ol`` to the same InChIKey for every N in 1..10,
+    so the two numberings coincide. Both whole-molecule forms
+    (``2-(adamantan-2-yl)ethanol`` and the descriptor form) round-trip to this
+    input's FULL InChIKey -- the change is the PREFERENCE, not the structure.
+    """
     sub, attach = _detach("C12C(C3CC(CC(C1)C3)C2)CCO")  # 2-(adamantan-2-yl)ethanol
-    assert _universal_cage_substituent_name(sub, attach) == \
-        "tricyclo[3.3.1.1^3,7]decan-2-yl"
+    assert _universal_cage_substituent_name(sub, attach) == "adamantan-2-yl"
 
 
 def test_tricyclo_bridged_cage_substituent():
@@ -160,17 +172,32 @@ def test_name_substituent_default_declines_cage():
 
 
 def test_name_substituent_complete_names_cage():
-    """Complete tier (``allow_mancude=True``): the cage substituent is named."""
+    """Complete tier (``allow_mancude=True``): the cage substituent is named.
+
+    v30 P3-T1c: was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``; adamantane's retained
+    name is the PIN per **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    (``BlueBookV2/BlueBookV2.md:9879``, Table 2.6 at ``:9885``). Same locant, same
+    structure -- see ``test_adamantane_cage_substituent`` for the full
+    justification and the OPSIN locant-equivalence evidence.
+    """
     mol, frag, attach = _ring_frag("C12C(C3CC(CC(C1)C3)C2)CCO")
     result = name_substituent(mol, frag, attach, allow_mancude=True)
-    assert result == "tricyclo[3.3.1.1^3,7]decan-2-yl"
+    assert result == "adamantan-2-yl"
 
 
 def test_name_ring_system_substituent_threads_flag():
+    """The FLAG THREADING is the property under test here -- ``allow_mancude=False``
+    must decline and ``True`` must name -- so the route assertion stays.
+
+    v30 P3-T1c: the expected name was ``"tricyclo[3.3.1.1^3,7]decan-2-yl"``;
+    adamantane's retained name is the PIN per **P-23.7 "RETAINED NAMES FOR VON
+    BAEYER PARENT HYDRIDES"** (``BlueBookV2/BlueBookV2.md:9879``, Table 2.6 at
+    ``:9885``). See ``test_adamantane_cage_substituent`` for the evidence.
+    """
     mol, frag, attach = _ring_frag("C12C(C3CC(CC(C1)C3)C2)CCO")
     assert name_ring_system_substituent(
         mol, sorted(frag), attach, allow_enumerator_fallback=False,
         allow_mancude=False) is None
     assert name_ring_system_substituent(
         mol, sorted(frag), attach, allow_enumerator_fallback=False,
-        allow_mancude=True) == "tricyclo[3.3.1.1^3,7]decan-2-yl"
+        allow_mancude=True) == "adamantan-2-yl"

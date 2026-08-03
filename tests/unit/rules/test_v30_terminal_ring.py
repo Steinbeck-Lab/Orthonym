@@ -300,6 +300,119 @@ def test_pin_default_is_untouched(smiles):
         mol, tuple(ring), attach, allow_mancude=False) == expected[smiles]
 
 
+def test_general_ring_prefix_emission_is_not_labelled_a_pin():
+    """v30 P3-T1c: the composer stamps every emission ``source='pin_path'`` ->
+    ``T1``, ``is_pin=True`` (``namer.py:2728``). A ring substituent prefix only
+    the GENERAL tier could build is a valid but NOT preferred form -- the ring PIN
+    here is the retained name *adamantane*, not ``tricyclo[3.3.1.1^3,7]decane`` --
+    so it must be demoted rather than shipped as a PIN.
+
+    MUTATION: delete the ``elif prov.get("general_ring_prefix")`` branch in
+    ``namer.py`` -> the demoted molecule comes back ``T1`` / ``is_pin=True`` and
+    the first two assertions fail.
+
+    The assertion is on the DEMOTION, not on the shape of the name: this test
+    originally required ``tricyclo[3.3.1.1^3,7]`` in the name, and the P-23.7
+    retained-stem fix in the same session turned that molecule into the PIN
+    ``(3-hydroxyadamantan-1-yl)acetic acid``. A name-shape assertion here was
+    testing the wrong thing -- the flag records *which tier produced the prefix*,
+    not what the prefix looks like. The contrast against a PIN-route molecule is
+    what makes it meaningful.
+    """
+    from orthonym import Orthonym
+    namer = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                      allow_aromatic_general=True)
+    demoted = namer.name_tiered('OC(=O)CC12CC3CC(O)(CC(C3)C1)C2')
+    assert demoted['name'], demoted
+    assert demoted['is_pin'] is False, demoted
+    assert demoted['tier'] in ('T3', 'T4'), demoted
+    # CONTRAST: a composer emission whose ring prefix the PIN route produced is
+    # untouched -- still T1 / is_pin. Without this the test would also pass if the
+    # demotion fired for every composer emission.
+    pin_route = namer.name_tiered('OCc1ccc2ccccc2c1')
+    assert pin_route['name'] == '(naphthalen-2-yl)methanol', pin_route
+    assert pin_route['is_pin'] is True, pin_route
+    assert pin_route['tier'] == 'T1', pin_route
+
+
+@pytest.mark.parametrize('smiles,expected', [
+    # adamantane cage as a substituent
+    ('OC(=O)CC12CC3CC(CC(C3)C1)C2', 'adamantan-1-yl'),
+    # cubane cage as a substituent
+    ('OC(=O)CC12C3C4C1C1C4C3C21', 'cuban-1-yl'),
+])
+def test_retained_pin_stem_beats_the_von_baeyer_descriptor(smiles, expected):
+    """P-23.7: a cage with a RETAINED PIN name must use it, not the descriptor.
+
+    **P-23.7 "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES"**
+    (``BlueBookV2/BlueBookV2.md:9879``): *"The retained names adamantane and
+    cubane are used in general nomenclature and as preferred IUPAC names."*
+    Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]decane"*
+    and *"cubane (PIN) pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane"* -- the retained
+    name is the PIN and the descriptor is the ALTERNATIVE. Emitting the descriptor
+    where a retained name exists is the one thing this project claims over , and the substituent side was missing it while the parent
+    side (``tricyclo.get_retained_tricyclo_name``) already had it.
+
+    MUTATION: make ``_retained_pin_cage_stem`` return None -> both cases come back
+    as ``tricyclo[…]decan-N-yl`` / ``pentacyclo[…]octan-N-yl`` and fail.
+    """
+    from orthonym.assembly.substituent_enumerator import name_substituent
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None
+    ring = [a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()]
+    attach = next(i for i in ring
+                  if any(not mol.GetAtomWithIdx(n.GetIdx()).IsInRing()
+                         for n in mol.GetAtomWithIdx(i).GetNeighbors()))
+    got = name_substituent(mol, ring, attach, allow_mancude=True)
+    assert got == expected, got
+    # PIN default unchanged: still the fail-closed sentinel.
+    assert name_substituent(mol, ring, attach,
+                            allow_mancude=False) == 'substituent'
+
+
+def test_retained_stem_is_refused_for_a_hetero_or_unsaturated_cage():
+    """Table 2.6 asserts nothing about a cage carrying a heteroatom or a ring
+    multiple bond, so the retained stem must NOT be borrowed for one -- an
+    ``adamantan-`` stem on an aza cage would drop the nitrogen.
+
+    MUTATION: delete the ``if cage.hetero_prefix: return None`` guard in
+    ``_retained_pin_cage_stem`` -> the aza cage below names as ``adamantan-…-yl``
+    and the assertion fails.
+    """
+    from orthonym.rules.ring_substituents import _retained_pin_cage_stem
+
+    class _Cage:
+        descriptor = 'tricyclo[3.3.1.1^3,7]'
+        hetero_prefix = '2-aza'
+        unsaturation = {'double_bonds': [], 'triple_bonds': []}
+
+    assert _retained_pin_cage_stem(_Cage(), 'decan') is None
+    _Cage.hetero_prefix = ''
+    assert _retained_pin_cage_stem(_Cage(), 'decan') == 'adamantan'
+    _Cage.unsaturation = {'double_bonds': ['2'], 'triple_bonds': []}
+    assert _retained_pin_cage_stem(_Cage(), 'decan') is None
+
+
+def test_pin_tier_never_sees_the_ambient_general_flag():
+    """The ambient-tier read is what makes the reachability fix work; this is the
+    other half -- on the pin tier the contextvar is False, so the composer's ring
+    path behaves exactly as before.
+
+    MUTATION: make ``_tier_general`` unconditionally True in
+    ``composer._generate_ring_substituent_prefixes`` -> the pin-tier row below
+    gains a name (or changes one) and the equality against the general tier's
+    own PIN-route answer breaks.
+    """
+    from orthonym import Orthonym
+    pin = Orthonym(general_fallback=False, general_fallback_unverified=False,
+                    allow_aromatic_general=False)
+    row = pin.name_tiered('OC(=O)CC12CC3CC(O)(CC(C3)C1)C2')
+    # the PIN tier declines this ring rather than reaching the general-tier route
+    name = row.get('name') or ''
+    assert 'tricyclo' not in name, row
+    assert 'adamantan' not in name, row
+
+
 def test_bare_ring_guard_refuses_a_decorated_fragment():
     """The atom-conservation guard: the generator names a RING, so calling it on
     a decorated fragment would silently DROP the decorations.
