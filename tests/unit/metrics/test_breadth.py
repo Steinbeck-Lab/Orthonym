@@ -15,6 +15,8 @@ from orthonym.metrics.breadth import (
     classify_outcome,
     molecule_components,
     parse_refusal_codes,
+    refusal_structure,
+    residual_refusal_code,
     ring_systems,
 )
 
@@ -119,10 +121,57 @@ def test_parse_refusal_codes_captures_drop_codes_that_carry_no_reason_field():
     assert any(c.startswith("DROP-HYG04") for c in codes)
 
 
-def test_parse_refusal_codes_ignores_unrelated_log_noise():
+def test_parse_refusal_codes_ignores_log_lines_that_do_not_refuse():
+    """Only lines that actually END the naming attempt may become codes.
+
+    Both of these log and then continue: the stereo backstop is detection-only,
+    and `namer.py:568` "OPSIN grammar validation failed" is followed by
+    `return name` at `namer.py:572` — it ships the original name unchanged.
+    Counting either would manufacture blockers that block nothing.
+
+    SUPERSEDES an earlier version of this test which also listed
+    "OPSIN validity gate suppressed unparseable name" as noise. Measurement
+    refuted that: the OPSIN validity gate SUPPRESSES to the failure fallback
+    (`namer.py:1224-1230`) and was the terminal site for a real abstainer
+    (`[NH2-]x5.[Ru+2]` -> 'ruthenium(II) pentaamide'), which is why 9 of the 11
+    uncoded abstainers were unattributable. It is now a code; see
+    test_parse_refusal_codes_captures_the_opsin_validity_gate.
+    """
     lines = ["orthonym.x|Stereo backstop: 'alanine' has 1 R/S but name lacks descriptors",
-             "orthonym.y|OPSIN validity gate suppressed unparseable name: 'xyz'"]
+             "orthonym.y|OPSIN grammar validation failed: handler=chain name='xyz'"]
     assert parse_refusal_codes(lines) == []
+
+
+def test_parse_refusal_codes_captures_the_self01_gate_suppression():
+    """SELF-01 is a REFUSAL SITE, and the census was blind to it.
+
+    Measured on the v30 P0 best-effort run, one fresh process per molecule: 8 of
+    the 11 abstainers that logged no refusal code died here — a name was built and
+    then rejected as a different molecule. Ranking a build order without this site
+    ranks the producers only, while the project record says the 0-wrong margin is
+    the GATE.
+    """
+    lines = ["orthonym.namer|SELF-01 suppressed (different molecule): "
+             "'palladium(II) acetate' (opsin=CC(=O)[O-].CC(=O)[O-].[Pd+2])"]
+    assert parse_refusal_codes(lines) == ["GATE-SELF01:different_molecule"]
+
+
+def test_parse_refusal_codes_captures_the_opsin_validity_gate():
+    """`namer.py:1224` suppresses to the failure fallback — a terminal refusal.
+
+    Terminal site for `[NH2-]x5.[Ru+2]` ('ruthenium(II) pentaamide'), one of the
+    11 uncoded abstainers.
+    """
+    lines = ["orthonym.namer|OPSIN validity gate suppressed unparseable name: "
+             "'ruthenium(II) pentaamide'"]
+    assert parse_refusal_codes(lines) == ["GATE-OPSIN:unparseable"]
+
+
+def test_parse_refusal_codes_dedups_a_gate_that_fires_on_several_candidates():
+    """SELF-01 rejecting four candidates is still ONE blocker for the molecule."""
+    line = ("orthonym.namer|SELF-01 suppressed (different molecule): 'x' (opsin=C)")
+    assert parse_refusal_codes([line, line, line, line]) == [
+        "GATE-SELF01:different_molecule"]
 
 
 # -------------------------------------------------------- molecule_components
@@ -331,3 +380,240 @@ def test_aggregate_handles_empty_input_without_dividing_by_zero():
     assert out["n"] == 0
     assert out["emit_rate"] == 0.0
     assert out["per_fragment_p"] == 0.0
+
+
+def test_aggregate_carries_the_only_ranked_structure_into_the_summary():
+    """v30 P0-T2 item 5: queryable from the run JSON without re-measuring.
+
+    The measurement costs ~675 s, so a census that lives only in stdout is a
+    census whose numbers cannot be re-checked.
+    """
+    rows = [_row("EMIT", "T1"), _row("ABSTAIN", codes=["DROP-24:x"])]
+    st = aggregate(rows)["refusal_structure"]
+    assert st["single_site_ceiling"] == pytest.approx(1.0)
+    assert st["sites"][0]["site"] == "DROP-24:x"
+
+
+# --------------------------------------------------------- residual attribution
+
+def test_residual_refusal_code_names_an_exception_by_its_type():
+    """An EXC row is a CRASH, not a refusal — and must not read as one.
+
+    One row on the v30 P0 run: TypeError "'<' not supported between instances of
+    'str' and 'int'" on CC1(CCCC2(C1CC(=O)C3=C2CCC(C3)(C)C=C)C)C. The instrument's
+    own `except` turned it into an abstainer, so the census inherited a row no
+    producer ever refused.
+    """
+    row = {"outcome": "EXC", "refusal_codes": [],
+           "exc": "TypeError:'<' not supported between instances of 'str' and 'int'"}
+    assert residual_refusal_code(row) == "EXC:TypeError"
+
+
+def test_residual_refusal_code_reads_the_limit_catalog_code_when_nothing_logged():
+    """The unsupported-element classifier returns BEFORE the namer logs anything.
+
+    Measured: the [99Tc]-labelled sorbitol row produced ZERO log lines of any
+    kind, so there is no log stream to parse and the mechanism is only knowable
+    from the returned limit_code.
+    """
+    row = {"outcome": "ABSTAIN", "refusal_codes": [],
+           "limit_code": "UNSUPPORTED_ELEMENT"}
+    assert residual_refusal_code(row) == "LIMIT:UNSUPPORTED_ELEMENT"
+
+
+def test_residual_refusal_code_distinguishes_its_mechanisms_rather_than_bucketing():
+    """No catch-all: a single bucket would absorb the next instrument gap.
+
+    Each mechanism gets its own name, and anything unrecognised returns None so
+    it is COUNTED as a gap instead of being quietly filed.
+    """
+    codes = {
+        residual_refusal_code({"outcome": "TIMEOUT", "refusal_codes": []}),
+        residual_refusal_code({"outcome": "SKIP", "refusal_codes": [],
+                               "reason": "unparseable_input"}),
+        residual_refusal_code({"outcome": "ABSTAIN", "refusal_codes": [],
+                               "limit_code": "UNNAMEABLE"}),
+    }
+    assert codes == {"TIMEOUT:per_molecule_alarm", "SKIP:unparseable_input",
+                     "LIMIT:UNNAMEABLE"}
+    # unrecognised -> None, never a bucket
+    assert residual_refusal_code({"outcome": "ABSTAIN", "refusal_codes": []}) is None
+
+
+def test_residual_refusal_code_never_displaces_a_producer_attributed_site():
+    """Residual attribution is for depth-0 rows ONLY.
+
+    If it could fire on a coded row it would inflate that row's blocker count and
+    corrupt both the depth histogram and every ONLY count.
+    """
+    row = {"outcome": "ABSTAIN", "refusal_codes": ["DROP-24:x"],
+           "limit_code": "UNNAMEABLE"}
+    assert residual_refusal_code(row) is None
+
+
+def test_refusal_structure_attributes_every_uncoded_abstainer():
+    """T3 acceptance: unattributed abstainers -> 0, and a leftover is LOUD."""
+    rows = [_row("EMIT", "T1"),
+            {"outcome": "ABSTAIN", "refusal_codes": [],
+             "limit_code": "UNSUPPORTED_ELEMENT", "smiles": "[Pd+2]"},
+            {"outcome": "EXC", "refusal_codes": [], "exc": "TypeError:x",
+             "smiles": "C"}]
+    st = refusal_structure(rows)
+    assert st["uncoded_abstainers"] == 2
+    assert st["residual_attribution"] == {"LIMIT:UNSUPPORTED_ELEMENT": 1,
+                                          "EXC:TypeError": 1}
+    assert st["unattributed_abstainers"] == 0
+
+
+def test_refusal_structure_reports_an_unattributable_abstainer_as_a_gap():
+    """A row no branch recognises must be counted and NAMED, not absorbed.
+
+    This is the anti-catch-all guarantee: the next instrument gap shows up as a
+    nonzero unattributed count with its SMILES, instead of swelling a bucket.
+    """
+    rows = [{"outcome": "ABSTAIN", "refusal_codes": [], "smiles": "CCO"}]
+    st = refusal_structure(rows)
+    assert st["unattributed_abstainers"] == 1
+    assert st["unattributed_smiles"] == ["CCO"]
+    assert st["residual_attribution"] == {}
+
+
+# ------------------------------------------------------ ONLY-ranked structure
+
+def test_refusal_structure_credits_only_to_a_single_blocked_abstainer():
+    """One code -> that site is the SOLE blocker, so ONLY == 1. (Acceptance 5a)"""
+    rows = [_row("ABSTAIN", codes=["REFUSE:unsupported suffix for pg='ester'"])]
+    st = refusal_structure(rows)
+    site = st["sites"][0]
+    assert site["touched"] == 1
+    assert site["first"] == 1
+    assert site["only"] == 1
+    assert st["single_blocked_total"] == 1
+
+
+def test_refusal_structure_credits_no_only_to_any_site_on_a_four_blocker_row():
+    """Four codes -> all four are touched, NONE is single-blocked. (Acceptance 5b)
+
+    This is the whole point of the metric: a molecule blocked by four sites needs
+    all four cleared, so no one-site fix converts it. Under the touched ranking
+    such a row credits all four sites equally, which is how DROP-24 became a
+    milestone target at 116 touched while being the sole blocker on 1 molecule.
+    """
+    codes = ["DROP-24:ring_declined", "DROP-01:fg_only",
+             "REFUSE:not an analyzable spiro ring system", "DROP-22:pf_none"]
+    st = refusal_structure([_row("ABSTAIN", codes=codes)])
+    assert {s["site"] for s in st["sites"]} == set(codes)
+    assert all(s["touched"] == 1 for s in st["sites"])
+    assert all(s["only"] == 0 for s in st["sites"])
+    assert st["single_blocked_total"] == 0
+    assert st["multi_blocked_total"] == 1
+    assert st["depth_histogram"] == {"4": 1}
+    assert st["mean_blockers_per_abstainer"] == pytest.approx(4.0)
+
+
+def test_refusal_structure_never_counts_an_uncoded_abstainer_as_single_blocked():
+    """Zero codes is UNCODED, which is the opposite of known-single. (Acceptance 5c)
+
+    Folding depth-0 rows into ONLY would raise the ceiling using rows whose
+    blocker is unknown — the exact way this instrument would lie in the
+    optimistic direction.
+    """
+    rows = [_row("EMIT", "T1"),
+            {"outcome": "ABSTAIN", "refusal_codes": [],
+             "limit_code": "UNNAMEABLE", "smiles": "C"}]
+    st = refusal_structure(rows)
+    assert st["depth_histogram"]["0"] == 1
+    assert st["single_blocked_total"] == 0
+    assert st["sites"] == []
+    # ceiling counts the emission only, NOT the uncoded abstainer
+    assert st["single_site_ceiling"] == pytest.approx(0.5)
+
+
+def test_refusal_structure_ceiling_is_emitted_plus_only_over_n():
+    """(emitted + SUM ONLY) / n. (Acceptance 5d)
+
+    2 emitted + 2 single-blocked + 1 double-blocked over n=5 -> 4/5.
+    The double-blocked row must contribute NOTHING to the ceiling.
+    """
+    rows = [_row("EMIT", "T1"), _row("EMIT", "T1"),
+            _row("ABSTAIN", codes=["A:1"]),
+            _row("ABSTAIN", codes=["B:1"]),
+            _row("ABSTAIN", codes=["A:1", "B:1"])]
+    st = refusal_structure(rows)
+    assert st["single_blocked_total"] == 2
+    assert st["single_site_ceiling"] == pytest.approx(4 / 5)
+    by = {s["site"]: s for s in st["sites"]}
+    assert by["A:1"]["touched"] == 2 and by["A:1"]["only"] == 1
+    assert by["B:1"]["touched"] == 2 and by["B:1"]["only"] == 1
+
+
+def test_refusal_structure_ranks_by_only_not_by_touched():
+    """The ordering IS the deliverable: touched cannot size a fix.
+
+    Mirrors the live contrast — a high-touch site that is almost never the sole
+    blocker must rank BELOW a low-touch site that usually is. On the v30 P0 run
+    that is DROP-24 (116 touched, ONLY 1) below pg='ester' (36 touched, ONLY 10).
+    """
+    rows = ([_row("ABSTAIN", codes=["HIGH_TOUCH", "OTHER"]) for _ in range(9)]
+            + [_row("ABSTAIN", codes=["HIGH_TOUCH"])]
+            + [_row("ABSTAIN", codes=["LOW_TOUCH"]) for _ in range(3)])
+    st = refusal_structure(rows)
+    order = [s["site"] for s in st["sites"]]
+    assert order[0] == "LOW_TOUCH", order
+    assert order.index("LOW_TOUCH") < order.index("HIGH_TOUCH")
+    by = {s["site"]: s for s in st["sites"]}
+    assert by["HIGH_TOUCH"]["touched"] == 10 and by["HIGH_TOUCH"]["only"] == 1
+    assert by["LOW_TOUCH"]["touched"] == 3 and by["LOW_TOUCH"]["only"] == 3
+
+
+def test_refusal_structure_only_is_computed_over_all_abstainers_not_a_subset():
+    """Invariant 14's trap: a signature computed over a subset is not a defect size.
+
+    A site that is single-blocking on some abstainers and co-occurring on others
+    must report the ONLY count from the WHOLE abstainer set. Restricting to, say,
+    the depth-1 rows would report ONLY == touched for every site and make every
+    site look individually unlockable.
+    """
+    rows = [_row("ABSTAIN", codes=["S"]),
+            _row("ABSTAIN", codes=["S", "T"]),
+            _row("ABSTAIN", codes=["S", "T", "U"])]
+    by = {s["site"]: s for s in refusal_structure(rows)["sites"]}
+    assert by["S"]["touched"] == 3
+    assert by["S"]["only"] == 1
+    assert by["T"]["touched"] == 2 and by["T"]["only"] == 0
+
+
+def test_refusal_structure_excludes_emitted_rows_from_every_count():
+    """A code can fire and the molecule still name — that site blocks nothing."""
+    rows = [_row("EMIT", "T1", codes=["SURVIVABLE"]),
+            _row("EMIT", "T1", codes=["SURVIVABLE"]),
+            _row("ABSTAIN", codes=["BLOCKING"])]
+    st = refusal_structure(rows)
+    assert {s["site"] for s in st["sites"]} == {"BLOCKING"}
+    assert st["n_abstain"] == 1
+    assert st["mean_blockers_per_abstainer"] == pytest.approx(1.0)
+
+
+def test_refusal_structure_treats_a_repeated_code_as_one_blocker():
+    """['X','X'] is single-blocked. Guards a legacy or hand-built row.
+
+    Without the dedup, len(codes)==2 would exile the row to multi-blocked and
+    silently lower the ceiling.
+    """
+    st = refusal_structure([_row("ABSTAIN", codes=["X:1", "X:1"])])
+    assert st["single_blocked_total"] == 1
+    assert st["sites"][0]["only"] == 1
+    assert st["total_site_hits"] == 1
+    # the histogram must agree, or multi_blocked_total stops reconciling
+    assert st["depth_histogram"] == {"1": 1}
+    assert st["multi_blocked_total"] == 0
+
+
+def test_refusal_structure_site_order_is_independent_of_row_order():
+    """Determinism: Counter iteration follows corpus order, so ties need a
+    value-based tie-break or the same run reorders under a reshuffled corpus."""
+    rows = [_row("ABSTAIN", codes=["B:1"]), _row("ABSTAIN", codes=["A:1"]),
+            _row("ABSTAIN", codes=["C:1"])]
+    fwd = [s["site"] for s in refusal_structure(rows)["sites"]]
+    rev = [s["site"] for s in refusal_structure(list(reversed(rows)))["sites"]]
+    assert fwd == rev == ["A:1", "B:1", "C:1"]
