@@ -2340,6 +2340,31 @@ def get_ring_substituent_name(
                     if locant is not None:
                         return f'{stem}-{locant}-yl'
 
+        # v30 P3-T1b: the AUDITED systematic terminal ring namer, complete /
+        # best-effort tier only. This is the "downgrade, don't refuse" end of the
+        # cascade: every retained / fused / von-Baeyer / spiro / hydro / HW
+        # producer above has declined, so the choice here is between an uglier
+        # systematic name and an abstention.
+        #
+        # It is what makes the GENERAL version of the narrow rescue above safe.
+        # That rescue is deliberately restricted to withdrawn-stem rings because
+        # the obvious generalisation was measured WRONG on a large share of 1660
+        # newly-named stems -- "the independently computed attachment locant
+        # lands on a ring OXYGEN, and OPSIN either refuses the name outright or
+        # resolves it to a different structure". ``terminal_ring`` closes exactly
+        # that hole: its reconstruction audit re-reads the emitted string and
+        # requires the free-valence locant to land on THIS attachment atom and
+        # every locant's element to match the graph, so a locant that drifted
+        # onto a ring oxygen is refused rather than shipped.
+        #
+        # Gated on ``allow_mancude`` so the PIN default keeps the fail-closed
+        # refusal below, byte-identical.
+        if allow_mancude and attachment_point is not None:
+            from .terminal_ring import terminal_ring_name
+            _t = terminal_ring_name(mol, sorted(ring_atoms), attachment_point)
+            if _t is not None:
+                return _t.name
+
         # Fail-closed: an unidentifiable ring system (the old generic
         # ``cyclo{N}yl`` size-guess named a DIFFERENT molecule — norbornane as
         # cycloheptyl, tetralin as cyclodecyl). Decline so the caller emits a
@@ -2382,6 +2407,20 @@ def get_ring_substituent_name(
                 if _j in _ring_set_t6 and _i < _j:
                     _b = mol.GetBondBetweenAtoms(_i, _j)
                     if _b.GetBondTypeAsDouble() >= 2.0:
+                        # v30 P3-T1b: this refusal exists because the SATURATED
+                        # dictionary stem would silently drop the ring double bond
+                        # ('oxanyl' for a dihydropyranyl fragment = a different
+                        # molecule). The systematic generator cites every ring
+                        # multiple bond explicitly and proves it by reconstruction
+                        # audit, so under the complete / best-effort tier it can
+                        # answer here instead of abstaining. The PIN default keeps
+                        # the refusal, byte-identical.
+                        if allow_mancude and attachment_point is not None:
+                            from .terminal_ring import terminal_ring_name
+                            _t6 = terminal_ring_name(
+                                mol, sorted(ring_atoms), attachment_point)
+                            if _t6 is not None:
+                                return _t6.name
                         return None
 
     # IUPAC P-31.1.4.3.4: a monocyclic heteroaryl substituent takes

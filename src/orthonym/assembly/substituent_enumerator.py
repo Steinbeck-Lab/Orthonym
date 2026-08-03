@@ -1849,11 +1849,79 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             mol, frag_atoms_set, attach_idx, allow_mancude=True)
         if _rec is not None:
             return _rec
+        # ---- Tier 4.9 (v30 P3-T1b): the AUDITED systematic ring generator ----
+        # The polarity inversion, localised. Every narrow producer AND the
+        # recursive composer have declined, so the next line used to be the
+        # ``'substituent'`` refusal sentinel (``errors.py:224``: "a REFUSAL, not
+        # a name"). Put the systematic generator there instead: a von
+        # Baeyer/spiro descriptor or a P-22.2.3 replacement monocycle, with a
+        # locant for every skeletal heteroatom (λ where hypervalent) and every
+        # ring multiple bond, gated on a RECONSTRUCTION AUDIT of the emitted
+        # string (``rules/terminal_ring``).
+        #
+        # Restricted to a fragment that IS exactly one connected ring system:
+        # this generator names a RING, so calling it on a decorated fragment
+        # would silently DROP the decorations (a wrong structure, not an uglier
+        # name). Decorated fragments are the composer's job above -- and its
+        # monocycle core tail now falls through to the same generator, so they
+        # are covered there rather than here.
+        _term = _terminal_bare_ring_substituent(
+            mol, frag_atoms_set, attach_idx)
+        if _term is not None:
+            return _term
         _desc = _descriptive_fallback(mol, frag_atoms_set, attach_idx)
         return None if _desc == 'substituent' else _desc
 
     # ---- Tier 5: Descriptive fallback (guaranteed non-None) ----
+    #
+    # ⚠ v30 P3-T1b, deliberately NOT the wiring site for the systematic ring
+    # generator, although this is where the sentinel is returned from. Reaching
+    # here means ``allow_mancude`` is False -- the general-fallback branch above
+    # returns unconditionally -- i.e. this is the PIN/DEFAULT path. A von Baeyer
+    # polyene or an 'a'-replacement monocycle is a VALID name but not the
+    # PREFERRED one (``thian-3-yl`` is the PIN, ``1-thiacyclohexan-3-yl`` is
+    # not), so emitting one here would assert PIN status for a non-PIN name and
+    # would break PIN byte-identity. The generator is wired on the
+    # ``allow_mancude`` (complete / best-effort tier) side only, three lines up.
     return _descriptive_fallback(mol, frag_atoms_set, attach_idx)
+
+
+def _terminal_bare_ring_substituent(mol, frag_atoms, attach_idx):
+    """``rules.terminal_ring`` applied to a fragment that is exactly ONE
+    connected ring system, or ``None``.
+
+    The atom-conservation guard is the point: this returns a name for the RING,
+    so it may only be used when the fragment has no non-ring heavy atom. A
+    decorated fragment returns ``None`` here and is handled by the recursive
+    composer, which owns the decorations.
+    """
+    if attach_idx is None:
+        return None
+    frag = {a for a in frag_atoms
+            if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if not frag or attach_idx not in frag:
+        return None
+    ri = mol.GetRingInfo()
+    if any(ri.NumAtomRings(a) == 0 for a in frag):
+        return None  # a non-ring heavy atom -> not a bare ring system
+    if ri.NumAtomRings(attach_idx) == 0:
+        return None
+    # one CONNECTED ring system (a fragment holding two separate rings joined by
+    # nothing is not a single ring system and has no single descriptor)
+    seen = {attach_idx}
+    stack = [attach_idx]
+    while stack:
+        cur = stack.pop()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nb.GetIdx()
+            if j in frag and j not in seen and ri.NumAtomRings(j) > 0:
+                seen.add(j)
+                stack.append(j)
+    if seen != frag:
+        return None
+    from ..rules.terminal_ring import terminal_ring_name
+    result = terminal_ring_name(mol, sorted(frag), attach_idx)
+    return result.name if result is not None else None
 
 
 def _descriptive_fallback(mol, frag_atoms, attach_idx):
@@ -2296,6 +2364,44 @@ def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
     return f'{ih_prefix}{stem}-{pos[attach_idx]}-yl'
 
 
+def _terminal_monocycle_core_tail(mol, core, attach_idx, pos):
+    """v30 P3-T1b: the AUDITED P-22.2.3 replacement tail for a monocyclic core
+    the PIN stem tables declined, on the caller's OWN ``pos`` numbering.
+
+    ``None`` on any refusal, including a failed reconstruction audit. Kekulizes
+    an index-preserving copy first -- RDKit reports an aromatic bond order as
+    **1.5**, so an un-kekulized mancude ring would lose every double bond and the
+    emitted name would denote the saturated ring (a wrong structure). The audit
+    also refuses order 1.5 outright, so this is proven twice.
+    """
+    from rdkit import Chem
+    from ..rules.terminal_ring import (
+        audit_monocycle_replacement_name, build_monocycle_replacement_name,
+    )
+    core_set = set(core)
+    if attach_idx not in core_set or set(pos) != core_set:
+        return None
+    try:
+        rw = Chem.RWMol(mol)
+        Chem.Kekulize(rw, clearAromaticFlags=True)
+        kek = rw.GetMol()
+    except Exception:  # noqa: BLE001 - kekulization must degrade, never raise
+        return None
+    for i in core_set:
+        if kek.GetAtomWithIdx(i).GetFormalCharge() != 0:
+            return None  # P-73 class; no 'a'-prefix name expresses a ring ion
+    name = build_monocycle_replacement_name(
+        kek, sorted(core_set), pos, pos[attach_idx])
+    if name is None:
+        return None
+    if not audit_monocycle_replacement_name(
+            kek, sorted(core_set), pos, name, attach_idx):
+        logger.info("terminal monocycle tail %r failed the reconstruction "
+                    "audit; refuse", name)
+        return None
+    return name
+
+
 def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
                                           allow_mancude: bool = False):
     """General recursive composer: name a ring-bearing substituent fragment as
@@ -2367,7 +2473,16 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     if pos is not None:
         core_tail = _monocycle_core_tail(mol, core, attach_idx, pos, ring_info)
         if not core_tail or ' ' in core_tail:
-            return None
+            # v30 P3-T1b: the PIN stem tables declined -- a mixed-saturation
+            # carbocycle (needs ene locants), a non-aromatic heterocycle with a
+            # ring multiple bond, or a stem no table carries. That used to abstain
+            # for the WHOLE fragment. Fall through to the AUDITED systematic
+            # replacement name instead, on THIS SAME ``pos`` numbering, so the
+            # decoration locants read off ``pos`` below stay consistent with the
+            # core tail by construction rather than by two numberings agreeing.
+            core_tail = _terminal_monocycle_core_tail(mol, core, attach_idx, pos)
+            if not core_tail or ' ' in core_tail:
+                return None
     else:
         # v28 Task 2b: POLYCYCLIC (fused / bridged / cage) decorated core. The
         # monocycle numberer declined, so route the core through the shared
