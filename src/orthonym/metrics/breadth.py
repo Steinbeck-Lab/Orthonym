@@ -24,6 +24,10 @@ __all__ = [
     "classify_outcome",
     "parse_refusal_codes",
     "residual_refusal_code",
+    "terminal_site",
+    "terminal_stage",
+    "terminal_basis_available",
+    "row_attribution",
     "refusal_structure",
     "molecule_components",
     "aggregate",
@@ -186,9 +190,179 @@ def residual_refusal_code(row: Dict[str, Any]) -> str | None:
     return None
 
 
+# -------------------------------------------------- TERMINAL attribution (T4)
+
+#: The two attribution bases, and WHY there are two rather than one.
+#:
+#: ``log``      — every ``DROP-*`` / ``REFUSE:*`` / ``GATE-*`` code scraped from
+#:                the engine's own log stream for that molecule.
+#: ``terminal`` — the ONE mechanism the typed abstention channel
+#:                (``metrics.abstention``) recorded as having ended the naming.
+_BASES = ("log", "terminal")
+
+#: Prefix for a site attributed by the typed abstention channel.
+_TERM_PREFIX = "TERM:"
+#: Prefix for a site attributed from the LOG because the channel RAN and
+#: recorded nothing specific. Deliberately a DIFFERENT prefix: it is a weaker
+#: inference and a reader must be able to tell the two apart at a glance.
+_TERMGAP_PREFIX = "TERMGAP:"
+#: Prefix for a site attributed from the LOG because the channel was never read
+#: for that row at all (a pre-T4 run, or a crash/timeout). A THIRD prefix, not a
+#: reuse of TERMGAP:, because "the instrument did not look" and "the engine did
+#: not record" are different findings and only the second is an engine gap.
+_TERMUNMEASURED_PREFIX = "TERMGAP-UNMEASURED:"
+
+
+def terminal_site(row: Dict[str, Any]) -> str | None:
+    """The single TERMINAL site for one abstaining ``row``, or ``None``.
+
+    Why a terminal basis exists at all — and why it is not merely "the log
+    codes, deduplicated". Producer ``DROP-*`` / ``REFUSE:*`` codes are
+    **EXPLORATORY**: they fire while the engine searches candidates (five
+    substituent tiers, a ring engine, a chain engine) and are frequently NOT
+    the mechanism that ended the molecule. Measured instance, the class this
+    function exists for::
+
+        [I-](CCO)c1ccccc1
+          log codes : DROP-01:fg_only, DROP-24:ring_fragment_declined…,
+                      DROP-18, REFUSE:branch unnameable
+          terminal  : GATE_SUPPRESSED / charge_dropped   (namer.py:3916)
+
+    A name WAS built for that molecule; a structure-conservation veto removed
+    it. On the log basis four innocent sites collect ``first``/``ONLY`` credit
+    they did not earn, and ``ONLY`` is what the build order is ranked by — so
+    the log basis aims a milestone at four sites whose fix would convert
+    nothing. Hence: ``ONLY`` and ``first`` are computed on TERMINAL
+    attribution; ``touched`` stays the UNION of both bases, because the
+    exploratory codes did fire and the multi-blocking depth histogram (the
+    evidence that the census is non-additive) is built from that union.
+
+    Three honest caveats, stated because they bound what the terminal basis
+    can be used for:
+
+    1. "Terminal" means *the channel's single attribution*, not
+       *chronologically last*. ``metrics.abstention`` is first-writer-wins
+       among generation-stage codes and among post-generation codes, with one
+       documented override: a post-generation site holding a REAL (not
+       failure-marked) candidate overrides a speculative generation-stage
+       record, because the candidate's existence proves generation completed.
+    2. It is coarse — five ``AbstentionCode`` values. ``detail`` is therefore
+       part of the site key, which splits ``GATE_SUPPRESSED`` into the six
+       structure-conservation vetoes plus SELF-01 and the OPSIN validity gate.
+    3. Not every post-generation termination is instrumented. The general
+       engine's inline E1-certificate rejection (``namer.py:3586``) and its
+       no-jar / dropped-stereo discards (``namer.py:3634``) throw a generated
+       candidate away without recording, leaving the channel at ``OTHER`` with
+       no detail. Those rows get a ``TERMGAP:`` site naming the best available
+       log code — never folded into a silent catch-all.
+
+    Returns ``None`` when the row carries no channel observation at all (an
+    EMIT, a run recorded before the channel was wired, or a crash/timeout in
+    which the namer never returned). Those rows are attributed by the existing
+    :func:`residual_refusal_code` machinery instead.
+    """
+    if row.get("outcome") == "EMIT":
+        return None
+    code = row.get("terminal_code")
+    if not code:
+        return None
+    detail = row.get("terminal_detail")
+    if code == "OTHER" and not detail:
+        # The channel ran and recorded NOTHING specific: an uninstrumented
+        # post-generation termination (caveat 3). Name the gap with the log's
+        # own first code rather than inventing a bucket; a bare
+        # 'TERM:OTHER' bin would absorb exactly the instrument gaps this
+        # attribution exists to expose.
+        codes = list(row.get("refusal_codes") or ())
+        return f"{_TERMGAP_PREFIX}{codes[0]}" if codes else None
+    return f"{_TERM_PREFIX}{code}:{detail or 'no_detail'}"
+
+
+#: Site prefix -> the operational bucket the abstention lands in. The names are
+#: taken VERBATIM from `::_stage`` so the two
+#: censuses cannot drift into two vocabularies for the same axis:
+#:
+#: * ``needs_engine`` — the pipeline produced NO candidate. Only new naming
+#:   CAPABILITY recovers these.
+#: * ``suppressed``   — a candidate WAS built and a gate/downgrade removed it.
+#: * ``other``        — the channel fired but named no specific mechanism.
+#: * ``uninstrumented`` — no channel record; the site came from the log stream.
+#:
+#: ⚠ ``suppressed`` is NOT the same as "recoverable by re-emitting". A
+#: ``self01_mismatch`` row means the built name denoted a DIFFERENT molecule, so
+#: its lever is an upstream CORRECTNESS fix, never a looser gate. Reading
+#: ``suppressed`` as free breadth is how a milestone gets aimed at the gate that
+#: is the only thing holding 0-wrong.
+_STAGE_BY_CODE = {
+    "NO_PARENT": "needs_engine",
+    "BRANCH_UNNAMEABLE": "needs_engine",
+    "GATE_SUPPRESSED": "suppressed",
+    "COVERAGE_DOWNGRADE": "suppressed",
+    "OTHER": "other",
+}
+
+
+def terminal_stage(site: str) -> str:
+    """The operational bucket for a terminal ``site`` label."""
+    if site.startswith(_TERM_PREFIX):
+        return _STAGE_BY_CODE.get(site[len(_TERM_PREFIX):].split(":", 1)[0],
+                                  "other")
+    if site.startswith((_TERMGAP_PREFIX, _TERMUNMEASURED_PREFIX)):
+        return "uninstrumented"
+    return "other"
+
+
+def terminal_basis_available(rows: Sequence[Dict[str, Any]]) -> bool:
+    """True when ``rows`` were measured with the abstention channel wired.
+
+    Checked explicitly rather than inferred from "are there any terminal
+    codes": a run recorded before T4 carries none, and censusing it on the
+    terminal basis would print a clean-looking all-residual zero — the
+    project's standing "a PERFECT harness result means it did not RUN"
+    failure mode. ``run_worker`` stamps ``terminal_measured`` on every row it
+    processes, so its ABSENCE is the signal.
+    """
+    return any("terminal_measured" in r for r in rows)
+
+
+def row_attribution(row: Dict[str, Any],
+                    basis: str = "log") -> tuple[List[str], List[str]]:
+    """``(union, attribution)`` site lists for one row under ``basis``.
+
+    ``union`` feeds ``touched`` and the depth histogram; ``attribution`` feeds
+    ``first`` (its head) and ``ONLY`` (when it names exactly one site). On the
+    ``log`` basis the two are the same list, which is why the log basis
+    credits ``ONLY`` to whichever exploratory code happened to fire alone.
+    """
+    if basis not in _BASES:
+        raise ValueError(f"basis must be one of {_BASES}, got {basis!r}")
+    log_codes = list(row.get("refusal_codes") or ())
+    if basis == "log":
+        return log_codes, log_codes
+    if row.get("outcome") == "EMIT":
+        # An emission has no terminal mechanism by definition. Guarded here as
+        # well as in terminal_site so a direct caller cannot get an emitted row
+        # labelled as an unmeasured gap.
+        return log_codes, []
+    term = terminal_site(row)
+    if term is None and log_codes:
+        # No channel observation at all, but the log named something. Attribute
+        # to the log's first code under a DISTINCT prefix so it can never be
+        # mistaken for a channel attribution: this is the pre-T4 shape (a run
+        # recorded before the channel was wired) and the crash/timeout shape.
+        term = f"{_TERMUNMEASURED_PREFIX}{log_codes[0]}"
+    if term is None:
+        # Nothing from either source: claim NO attribution and let the residual
+        # machinery name the mechanism (SKIP / EXC / TIMEOUT / LIMIT).
+        return log_codes, []
+    union = log_codes + ([term] if term not in log_codes else [])
+    return union, [term]
+
+
 # ----------------------------------------------------- ONLY-ranked structure
 
-def refusal_structure(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+def refusal_structure(rows: Sequence[Dict[str, Any]],
+                      basis: str = "log") -> Dict[str, Any]:
     """Rank refusal sites by ``ONLY`` — what a ONE-SITE fix can actually convert.
 
     The ``touched`` census cannot size a fix and has already mis-aimed a
@@ -217,31 +391,54 @@ def refusal_structure(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     separately via :func:`residual_refusal_code`. They are NEVER folded into
     ``only`` or the ceiling: uncoded is the opposite of known-single, and
     counting them would inflate the ceiling with rows whose blocker is unknown.
+
+    ``basis`` (v30 P0-T4) selects the ATTRIBUTION source; see
+    :func:`row_attribution` and :func:`terminal_site` for why there are two.
+
+    * ``"log"`` (default, unchanged) — every code the engine logged. ``first``
+      and ``ONLY`` therefore go to whichever EXPLORATORY producer code fired
+      alone, even when a post-hoc gate is what actually killed the molecule.
+    * ``"terminal"`` — ``touched`` stays the UNION (log ∪ terminal) so the
+      depth histogram keeps its multi-blocking evidence, but ``first`` and
+      ``ONLY`` are credited to the single terminal mechanism.
+
+    ⚠ ``single_site_ceiling`` is VACUOUS on the terminal basis and the returned
+    ``ceiling_is_vacuous`` flag says so. Terminal attribution names exactly one
+    site per row by construction, so every attributed abstainer is
+    "single-blocked" and the ceiling collapses to
+    ``(emitted + attributed abstainers) / n`` — a property of the attribution,
+    not a finding about the engine. Use the log-basis ceiling for the
+    multi-blocking bound and the terminal-basis per-site ``ONLY`` for the build
+    order; that split is the whole point of carrying both.
     """
     n = len(rows)
     emits = [r for r in rows if r.get("outcome") == "EMIT"]
     abst = [r for r in rows if r.get("outcome") != "EMIT"]
     n_ab = len(abst)
 
-    # DISTINCT sites per molecule. Must use the same dedup'd basis as `only`,
-    # or a row carrying ["X","X"] reports depth 2 while being counted
-    # single-blocked, and multi_blocked_total stops reconciling.
+    # Parallel to `abst` by INDEX, not keyed by id(): a caller may legitimately
+    # pass the same row dict twice, and an id() key would silently merge them.
+    attributions = [row_attribution(r, basis) for r in abst]
+
+    # DISTINCT sites per molecule, over the UNION. Must use the same dedup'd
+    # basis as total_site_hits, or a row carrying ["X","X"] reports depth 2
+    # while being counted single-blocked, and multi_blocked_total stops
+    # reconciling.
     depth: Dict[int, int] = collections.Counter(
-        len(set(r.get("refusal_codes") or ())) for r in abst)
+        len(set(union)) for union, _ in attributions)
 
     touched: Dict[str, int] = collections.Counter()
     first: Dict[str, int] = collections.Counter()
     only: Dict[str, int] = collections.Counter()
-    for r in abst:
-        codes = list(r.get("refusal_codes") or ())
-        for code in set(codes):
+    for union, attribution in attributions:
+        for code in set(union):
             touched[code] += 1
-        if codes:
-            first[codes[0]] += 1
+        if attribution:
+            first[attribution[0]] += 1
         # dedup guard: parse_refusal_codes already dedups, but a hand-built or
         # legacy row could repeat a code, and ["X","X"] is single-blocked.
-        if len(set(codes)) == 1:
-            only[codes[0]] += 1
+        if len(set(attribution)) == 1:
+            only[attribution[0]] += 1
 
     # ONLY descending. Tie-breaks are total and value-based (touched, then
     # first, then the site name) so the ordering is deterministic across runs —
@@ -259,8 +456,11 @@ def refusal_structure(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     residual: Dict[str, int] = collections.Counter()
     residual_rows: List[Dict[str, Any]] = []
     unattributed: List[str] = []
-    for r in abst:
-        if r.get("refusal_codes"):
+    for r, (_union, attribution) in zip(abst, attributions):
+        # Keyed on "this basis produced NO attribution", not on "refusal_codes
+        # is empty": on the terminal basis a row can carry log codes and still
+        # have nothing to attribute, and such a row must not vanish.
+        if attribution:
             continue
         code = residual_refusal_code(r)
         if code is None:
@@ -271,7 +471,9 @@ def refusal_structure(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 
     solo = sum(only.values())
     site_hits = sum(touched.values())
+    n_unattributed_rows = sum(1 for _u, a in attributions if not a)
     return {
+        "basis": basis,
         "n": n,
         "n_emit": len(emits),
         "n_abstain": n_ab,
@@ -286,9 +488,24 @@ def refusal_structure(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "sites": sites,
         "sites_total": len(sites),
         "single_blocked_total": solo,
-        "multi_blocked_total": n_ab - solo - depth.get(0, 0),
+        # Subtracts rows THIS basis could not attribute, which on the log basis
+        # is exactly depth-0 (identical numbers) but on the terminal basis also
+        # covers a row that logged codes yet carries no channel observation.
+        "multi_blocked_total": n_ab - solo - n_unattributed_rows,
         "uncoded_abstainers": depth.get(0, 0),
+        "no_attribution_rows": n_unattributed_rows,
         "single_site_ceiling": ((len(emits) + solo) / n) if n else 0.0,
+        # ⚠ see the docstring: on the terminal basis every attributed abstainer
+        # is single-blocked BY CONSTRUCTION, so the ceiling is a restatement of
+        # the attribution rate and must never be quoted as a build-order bound.
+        "ceiling_is_vacuous": basis == "terminal",
+        # Molecules per operational bucket, on the terminal basis only. This is
+        # the number P1 must be sized from: `needs_engine` is the only bucket a
+        # new naming capability converts.
+        "terminal_stage_rollup": (
+            dict(collections.Counter(
+                terminal_stage(a[0]) for _u, a in attributions if a
+            ).most_common()) if basis == "terminal" else None),
         "residual_attribution": dict(residual.most_common()),
         "residual_rows": residual_rows,
         "unattributed_abstainers": len(unattributed),
@@ -380,6 +597,8 @@ def aggregate(rows: Sequence[Dict[str, Any]],
             "opsin_unparseable": 0, "tautomer_differs": 0,
             "refusal_census": {}, "refusal_census_abstain": {},
             "refusal_structure": refusal_structure(rows),
+            "refusal_structure_terminal": None,
+            "terminal_basis_available": False,
             "per_fragment_p": 0.0, "mean_components": 0.0,
             "projected_emit_independent": 0.0, "context_loss": 0.0,
         }
@@ -437,6 +656,14 @@ def aggregate(rows: Sequence[Dict[str, Any]],
         # v30 P0-T2: the ONLY-ranked structure. Carried into the run JSON so the
         # build order is queryable without re-running a 675 s measurement.
         "refusal_structure": refusal_structure(rows),
+        # v30 P0-T4: the same structure on TERMINAL attribution. `None`, not an
+        # empty-looking structure, when the rows were measured before the
+        # abstention channel was wired -- a zero here would be indistinguishable
+        # from "the channel found nothing".
+        "refusal_structure_terminal": (
+            refusal_structure(rows, basis="terminal")
+            if terminal_basis_available(rows) else None),
+        "terminal_basis_available": terminal_basis_available(rows),
         "per_fragment_p": p,
         "mean_components": mean_comp,
         "projected_emit_independent": projected,

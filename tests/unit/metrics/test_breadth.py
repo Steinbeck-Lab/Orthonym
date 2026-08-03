@@ -18,6 +18,10 @@ from orthonym.metrics.breadth import (
     refusal_structure,
     residual_refusal_code,
     ring_systems,
+    row_attribution,
+    terminal_basis_available,
+    terminal_site,
+    terminal_stage,
 )
 
 pytestmark = pytest.mark.unit
@@ -617,3 +621,242 @@ def test_refusal_structure_site_order_is_independent_of_row_order():
     fwd = [s["site"] for s in refusal_structure(rows)["sites"]]
     rev = [s["site"] for s in refusal_structure(list(reversed(rows)))["sites"]]
     assert fwd == rev == ["A:1", "B:1", "C:1"]
+
+
+# ------------------------------------------- v30 P0-T4: TERMINAL attribution
+
+def _term_row(outcome="ABSTAIN", codes=(), code=None, detail=None,
+              measured=True, **kw):
+    """A row as ``run_worker`` writes it once the abstention channel is wired."""
+    row = _row(outcome, codes=codes, **kw)
+    if measured:
+        row["terminal_measured"] = True
+        row["terminal_code"] = code
+        row["terminal_detail"] = detail
+    return row
+
+
+def test_terminal_attribution_does_not_credit_the_exploratory_producer_codes():
+    """The measured [I-](CCO)c1ccccc1 leak class.
+
+    Log-scraped, that molecule names four sites -- DROP-01:fg_only,
+    DROP-24:ring_fragment_declined_by_ring_engine, DROP-18 and
+    REFUSE:branch unnameable -- none of which ended it: a name WAS built and
+    the P10 charge-conservation veto (namer.py:3916) removed it. Those four
+    codes are EXPLORATORY (they fire while the engine searches candidates), so
+    on the terminal basis they must keep `touched` and lose `first`/`ONLY`.
+    Crediting ONLY to any of them aims the build order at a fix that converts
+    nothing, which is the whole reason this basis exists.
+    """
+    row = _term_row(
+        codes=["DROP-01:fg_only", "DROP-24:ring_fragment_declined_by_ring_engine",
+               "DROP-18:<no_reason>", "REFUSE:branch unnameable"],
+        code="GATE_SUPPRESSED", detail="charge_dropped")
+    log = refusal_structure([row])
+    term = refusal_structure([row], basis="terminal")
+
+    innocent = {"DROP-01:fg_only",
+                "DROP-24:ring_fragment_declined_by_ring_engine",
+                "DROP-18:<no_reason>", "REFUSE:branch unnameable"}
+    by_site = {s["site"]: s for s in term["sites"]}
+
+    # the four keep `touched` (hazard 3: the union must survive)
+    assert innocent <= set(by_site)
+    assert all(by_site[s]["touched"] == 1 for s in innocent)
+    # ... and lose every scrap of first/ONLY credit
+    assert all(by_site[s]["first"] == 0 for s in innocent)
+    assert all(by_site[s]["only"] == 0 for s in innocent)
+
+    # the veto that actually terminated it owns first and ONLY
+    veto = "TERM:GATE_SUPPRESSED:charge_dropped"
+    assert by_site[veto]["first"] == 1
+    assert by_site[veto]["only"] == 1
+    assert term["single_blocked_total"] == 1
+
+    # and the LOG basis is left untouched -- it credited nobody with ONLY
+    # (four blockers) but did credit DROP-01 with `first`
+    assert log["single_blocked_total"] == 0
+    assert {s["site"]: s["first"] for s in log["sites"]}["DROP-01:fg_only"] == 1
+
+
+def test_terminal_and_log_bases_disagree_on_the_same_row():
+    """A row whose log codes and terminal code name DIFFERENT mechanisms.
+
+    Measured on CC1=NC(C=N1)CO: the last thing logged is
+    GATE-OPSIN:unparseable, but the channel recorded
+    BRANCH_UNNAMEABLE/enumerator_ring_fallback -- a GENERATION-stage failure.
+    So the terminal site is not "the last log line" and cannot be derived from
+    the log stream at all; the two bases must be able to disagree, and the
+    disagreement must be visible rather than reconciled away.
+    """
+    row = _term_row(
+        codes=["DROP-24:ring_fragment_declined_by_ring_engine",
+               "REFUSE:chain too short", "GATE-OPSIN:unparseable"],
+        code="BRANCH_UNNAMEABLE", detail="enumerator_ring_fallback")
+    union, attribution = row_attribution(row, basis="terminal")
+    assert attribution == ["TERM:BRANCH_UNNAMEABLE:enumerator_ring_fallback"]
+    # the terminal site is NOT any of the logged codes
+    assert attribution[0] not in (row["refusal_codes"])
+    # the union carries all four so depth still reports 4 blockers touched
+    assert len(set(union)) == 4
+    term = refusal_structure([row], basis="terminal")
+    assert term["depth_histogram"] == {"4": 1}
+    # log basis on the same row attributes the FIRST log code instead
+    log_union, log_attr = row_attribution(row, basis="log")
+    assert log_attr[0] == "DROP-24:ring_fragment_declined_by_ring_engine"
+    assert log_union == row["refusal_codes"]
+
+
+def test_terminal_attribution_never_leaks_between_consecutive_rows():
+    """Row N must not inherit row N-1's terminal code.
+
+    The channel is a MODULE-LEVEL ``threading.local`` slot, so a missing
+    per-molecule reset would make molecule N report molecule N-1's mechanism
+    and the census would be confidently wrong -- worse than the log basis it
+    replaces. Two guards are needed and both are asserted here:
+
+    * the census must read each row's OWN stamped code (never a shared
+      cursor), and
+    * a row the channel could not attribute must fall through to its own
+      residual mechanism, not borrow the previous row's site.
+    """
+    first = _term_row(codes=["DROP-01:fg_only"],
+                      code="GATE_SUPPRESSED", detail="charge_dropped")
+    # named right after `first`, attributed by the channel to something else
+    second = _term_row(codes=["REFUSE:branch unnameable"],
+                       code="BRANCH_UNNAMEABLE", detail="enumerator_last_resort")
+    # and a row the channel ran on but could not attribute at all
+    third = _term_row(codes=[], code="OTHER", detail=None, ncomp=1)
+    third["limit_code"] = "UNSUPPORTED_ELEMENT"
+
+    assert (row_attribution(first, "terminal")[1]
+            == ["TERM:GATE_SUPPRESSED:charge_dropped"])
+    assert (row_attribution(second, "terminal")[1]
+            == ["TERM:BRANCH_UNNAMEABLE:enumerator_last_resort"])
+    assert row_attribution(third, "terminal")[1] == []
+
+    term = refusal_structure([first, second, third], basis="terminal")
+    only = {s["site"]: s["only"] for s in term["sites"]}
+    assert only["TERM:GATE_SUPPRESSED:charge_dropped"] == 1
+    assert only["TERM:BRANCH_UNNAMEABLE:enumerator_last_resort"] == 1
+    # the third row borrowed nothing -- it is named by its OWN mechanism
+    assert term["residual_attribution"] == {"LIMIT:UNSUPPORTED_ELEMENT": 1}
+    assert term["unattributed_abstainers"] == 0
+    assert term["no_attribution_rows"] == 1
+
+
+def test_terminal_basis_is_refused_for_rows_measured_without_the_channel():
+    """A pre-T4 run must NOT silently census as an empty terminal basis.
+
+    `aggregate` returns None for the terminal structure rather than a
+    zero-looking one: an all-residual census over unstamped rows is
+    indistinguishable from "the channel found nothing", which is the project's
+    standing 'a PERFECT harness result means it did not RUN' failure mode.
+    """
+    old = [_row("EMIT"), _row("ABSTAIN", codes=["DROP-01:fg_only"])]
+    assert terminal_basis_available(old) is False
+    out = aggregate(old, components_measured=False)
+    assert out["refusal_structure_terminal"] is None
+    assert out["terminal_basis_available"] is False
+
+    new = [_row("EMIT"), _term_row(codes=["DROP-01:fg_only"],
+                                   code="GATE_SUPPRESSED", detail="self01_mismatch")]
+    assert terminal_basis_available(new) is True
+    out2 = aggregate(new, components_measured=False)
+    assert out2["refusal_structure_terminal"]["basis"] == "terminal"
+    assert out2["refusal_structure"]["basis"] == "log"
+
+
+def test_terminal_site_names_the_gap_when_the_channel_recorded_nothing():
+    """An UNINSTRUMENTED post-generation termination stays visible and NAMED.
+
+    The general engine's inline E1-certificate rejection (namer.py:3586) and
+    its no-jar / dropped-stereo discards (namer.py:3634) throw a generated
+    candidate away without recording, so the channel reports OTHER with no
+    detail. Measured example: [Ni+2].[Bi+3] logs
+    REFUSE:multi-fragment (G3 scope) and records nothing. A bare TERM:OTHER
+    bucket would absorb exactly the instrument gaps this attribution exists to
+    expose, so the site is prefixed TERMGAP: -- named, countable, and
+    impossible to mistake for a channel attribution.
+    """
+    row = _term_row(codes=["REFUSE:multi-fragment (G3 scope)"],
+                    code="OTHER", detail=None)
+    assert (terminal_site(row)
+            == "TERMGAP:REFUSE:multi-fragment (G3 scope)")
+    # a detail-bearing OTHER is a real named site, not a gap
+    named = _term_row(codes=[], code="OTHER", detail="isotope_decorator_failed")
+    assert terminal_site(named) == "TERM:OTHER:isotope_decorator_failed"
+    # an unmeasured row is a THIRD, separately labelled case
+    unmeasured = _row("ABSTAIN", codes=["DROP-01:fg_only"])
+    assert (terminal_site(unmeasured) is None)
+    assert (row_attribution(unmeasured, "terminal")[1]
+            == ["TERMGAP-UNMEASURED:DROP-01:fg_only"])
+    # an EMIT row never has a terminal site, whatever it carries
+    assert terminal_site(_term_row("EMIT", code="GATE_SUPPRESSED")) is None
+
+
+def test_terminal_ceiling_is_flagged_vacuous_and_log_ceiling_is_not():
+    """The ceiling must not be quoted as a build-order bound on the terminal
+    basis. Terminal attribution names exactly one site per row, so every
+    attributed abstainer is 'single-blocked' by construction and the ceiling
+    collapses to the attribution rate. The flag is what stops a reader
+    treating a 100% ceiling as a finding about the engine.
+    """
+    rows = [_row("EMIT")] + [
+        _term_row(codes=["DROP-01:fg_only", "DROP-03:pg_branch_overlap"],
+                  code="GATE_SUPPRESSED", detail="self01_mismatch")
+        for _ in range(3)]
+    log = refusal_structure(rows)
+    term = refusal_structure(rows, basis="terminal")
+    assert log["ceiling_is_vacuous"] is False
+    assert term["ceiling_is_vacuous"] is True
+    # log: two blockers each -> nobody is single-blocked -> ceiling = emit only
+    assert log["single_site_ceiling"] == pytest.approx(0.25)
+    assert log["multi_blocked_total"] == 3
+    # terminal: all three collapse onto one terminal site
+    assert term["single_site_ceiling"] == pytest.approx(1.0)
+    assert term["multi_blocked_total"] == 0
+
+
+def test_row_attribution_rejects_an_unknown_basis():
+    """A typo'd basis must raise, not silently fall through to `log` and
+    report log numbers under a terminal heading."""
+    with pytest.raises(ValueError, match="basis must be one of"):
+        row_attribution(_term_row(codes=["DROP-01:fg_only"]), basis="termnial")
+
+
+def test_terminal_stage_rollup_separates_capability_from_correctness():
+    """The bucket P1 must be sized from — and the trap it exists to prevent.
+
+    `needs_engine` (NO_PARENT / BRANCH_UNNAMEABLE) is the only bucket new
+    naming CAPABILITY converts: no candidate was produced. `suppressed`
+    (GATE_SUPPRESSED / COVERAGE_DOWNGRADE) means a candidate WAS produced and a
+    gate removed it -- and for a self01_mismatch that candidate denoted a
+    DIFFERENT molecule, so its lever is an upstream correctness fix, never a
+    looser gate. Sizing a capability milestone off `suppressed` would aim it at
+    the gate that is the only thing holding the 0-wrong invariant.
+
+    The bucket names are shared verbatim with  so
+    the two censuses cannot drift into two vocabularies for one axis.
+    """
+    assert terminal_stage("TERM:GATE_SUPPRESSED:self01_mismatch") == "suppressed"
+    assert terminal_stage("TERM:COVERAGE_DOWNGRADE:garbled") == "suppressed"
+    assert terminal_stage("TERM:BRANCH_UNNAMEABLE:x") == "needs_engine"
+    assert terminal_stage("TERM:NO_PARENT:UNSUPPORTED_RING_SYSTEM") == "needs_engine"
+    assert terminal_stage("TERM:OTHER:isotope_decorator_failed") == "other"
+    # a log-derived site is NOT silently promoted into an engine bucket
+    assert terminal_stage("TERMGAP:REFUSE:multi-fragment (G3 scope)") == "uninstrumented"
+    assert terminal_stage("TERMGAP-UNMEASURED:DROP-01:fg_only") == "uninstrumented"
+
+    rows = [_row("EMIT"),
+            _term_row(code="GATE_SUPPRESSED", detail="self01_mismatch"),
+            _term_row(code="GATE_SUPPRESSED", detail="opsin_unparseable"),
+            _term_row(code="BRANCH_UNNAMEABLE", detail="enumerator_last_resort"),
+            _term_row(codes=["REFUSE:multi-fragment (G3 scope)"],
+                      code="OTHER", detail=None)]
+    term = refusal_structure(rows, basis="terminal")
+    assert term["terminal_stage_rollup"] == {
+        "suppressed": 2, "needs_engine": 1, "uninstrumented": 1}
+    # the rollup exists ONLY on the terminal basis -- a log-basis rollup would
+    # imply the log codes carry a stage, and they do not
+    assert refusal_structure(rows)["terminal_stage_rollup"] is None
