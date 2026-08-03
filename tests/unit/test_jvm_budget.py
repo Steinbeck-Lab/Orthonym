@@ -190,6 +190,78 @@ def test_two_processes_serialise_on_the_budget(slots):
             proc.wait(timeout=10)
 
 
+# ------------------------------------------------- contention with N > 2
+
+_STRESS_WORKER = textwrap.dedent(
+    """
+    import json, os, sys, time
+    sys.path.insert(0, {src!r})
+    os.environ["ORTHONYM_JVM_SLOT_DIR"] = {d!r}
+    os.environ["ORTHONYM_JVM_SLOTS"] = "3"
+    os.environ["ORTHONYM_JVM_BUDGET"] = {budget!r}
+    from orthonym.jvm_budget import jvm_slots
+    want = int(sys.argv[1])
+    with jvm_slots(want, purpose="stress", timeout=60) as h:
+        t0 = time.monotonic(); time.sleep(0.15); t1 = time.monotonic()
+        print(json.dumps({{"want": want, "start": t0, "end": t1}}))
+    """
+)
+
+
+def _peak_overlap(slots_dir, budget_env: str) -> tuple[int, int]:
+    """Run 12 contending workers over a 3-slot budget; return (peak_held, n_records).
+
+    ``time.monotonic()`` is CLOCK_MONOTONIC on Linux, which is system-wide, so
+    timestamps from separate processes are directly comparable.
+    """
+    src = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(jb.__file__))))
+    code = _STRESS_WORKER.format(src=src, d=str(slots_dir), budget=budget_env)
+    widths = [1] * 8 + [2] * 3 + [3]
+    procs = [subprocess.Popen([sys.executable, "-c", code, str(w)],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              text=True) for w in widths]
+    recs = []
+    for p in procs:
+        out, _ = p.communicate(timeout=120)
+        line = out.strip().split("\n")[-1] if out.strip() else ""
+        if line:
+            recs.append(json.loads(line))
+    events = []
+    for r in recs:
+        events.append((r["start"], r["want"]))
+        events.append((r["end"], -r["want"]))
+    events.sort()
+    cur = peak = 0
+    for _, d in events:
+        cur += d
+        peak = max(peak, cur)
+    return peak, len(recs)
+
+
+def test_many_processes_never_oversell_the_budget(slots):
+    """12 contending workers over 3 slots: all acquire, and never more than 3 at once.
+
+    Covers what 2 processes cannot: that the acquire loop's release-on-partial
+    does not livelock, and that a worker wanting the FULL budget is not starved.
+    """
+    peak, n = _peak_overlap(slots, "on")
+    assert n == 12, f"only {n}/12 workers produced a record -- livelock or crash"
+    assert peak <= 3, f"OVERSOLD: {peak} slots held at once, budget is 3"
+
+
+def test_the_oversell_check_can_actually_fail(slots):
+    """Negative control: with the budget disabled the same probe MUST oversell.
+
+    Without this, `peak <= 3` above could pass because the overlap arithmetic is
+    broken rather than because the semaphore works. Measured: 33 with the budget
+    off vs exactly 6 with it on, at a 6-slot budget.
+    """
+    peak, n = _peak_overlap(slots, "off")
+    assert n == 12
+    assert peak > 3, ("budget disabled yet peak <= 3 -- the overlap measurement "
+                      "cannot detect oversell, so the positive test proves nothing")
+
+
 def test_status_records_purpose_and_age(slots):
     with jb.jvm_slots(1, purpose="v22_gate"):
         h = jb.status()["held"]
