@@ -537,12 +537,52 @@ def _classify_phosphane_subs(mol, hub) -> Optional[List[str]]:
 _HETERONE_STEMS = {'Si': 'silanone', 'Ge': 'germanone',
                    'P': 'phosphanone', 'As': 'arsanone'}
 
+# P-61.6 "HETERONES" (BlueBookV2.md:25977) enumerates the heterone class as
+# exactly four groups, mapped 1:1 onto four preselected prefixes:
+#   "Compounds containing the -PO, -PO2, -AsO or -AsO2 are called heterones
+#    (see P-64.1.2.2, P-64.4). In the presence of a more senior characteristic
+#    group they are described by the compound prefixes oxophosphanyl,
+#    dioxo-lambda5-phosphanyl, oxoarsanyl, and dioxo-lambda5-arsanyl."
+# The two -XO2 members are DIONES. P-64.1.2.2 "Heterones" (:28281) supplies the
+# suffix: "Heterones are compounds having an oxygen atom formally doubly bonded
+# to a heteroatom ... They are named in the same way as ketones" -- so two oxo
+# groups on one parent take the multiplied '-dione', and the hub's bonding
+# number of 5 supplies the lambda descriptor (P-31.1.4.2). Worked (PIN)
+# examples, both re-opened at write time:
+#   CH3-PO2   methyl-lambda5-phosphanedione (PIN)   :28287, under P-64.1.2.2
+#   C6H5-PO2  phenyl-lambda5-phosphanedione (PIN)   :25983, under P-61.6
+#
+# Membership of THIS dict is the element gate for the dione, and it is
+# deliberately narrower than _HETERONE_STEMS:
+#   * Si/Ge are absent -- P-61.6 does not place them in the class, and RDKit
+#     rejects a two-oxo Si/Ge hub outright (valence), so there is no molecule.
+#   * 'arsanedione' is not printed verbatim in the Blue Book, but it is fully
+#     DETERMINED by the two rules above: P-61.6 declares -AsO2 a heterone in the
+#     same sentence as -PO2 and prints its preselected prefix
+#     dioxo-lambda5-arsanyl (:25977, and the prefix table :55895 with structure
+#     O2As-), while the 'arsane' stem, its lambda5 form and the mononuclear
+#     '-one'/'-dione' suffix are each printed elsewhere (arsanone PIN :25985,
+#     trimethyl-lambda5-arsanone :43057, phosphanedione PIN x2). Every morpheme
+#     is printed and the elision follows phosphane+dione exactly.
+#   * The CHALCOGEN analogue (R-PS2, R3P=S) is deliberately NOT built. The Blue
+#     Book prints no worked example of a thione suffix on a phosphane stem, so
+#     its spelling would have to be invented; it stays fail-closed via the
+#     terminal-oxygen check below. See 
+_HETERONE_DIONE_STEMS = {'P': 'phosphanedione', 'As': 'arsanedione'}
+
 
 def name_heterone(mol) -> Optional[str]:
     """P-64.1.2.2 / P-64.4.1 heterone parents (Wave-2 completion C):
     (CH3)2Si=O -> dimethylsilanone (BB verbatim), CH3SiH=O -> methylsilanone,
     R3P=O -> lambda5-phosphanone forms. Chalcogens are EXCLUDED (sulfoxides /
     sulfones are P-63.6 compulsory-prefix exceptions per P-64.4), as is N.
+
+    Covers BOTH oxo counts of the P-61.6 heterone class -- the mono-oxo -PO/-AsO
+    ('-one') and the DIONE -PO2/-AsO2 ('-dione'), CH3-PO2 ->
+    methyl-lambda5-phosphanedione (PIN, BB :28287). The oxo count selects the
+    stem dict; see _HETERONE_DIONE_STEMS for the derivation and for why Si/Ge
+    and the P=S chalcogen analogue stay fail-closed.
+
     Fail-closed; pure."""
     if mol is None:
         return None
@@ -560,15 +600,27 @@ def name_heterone(mol) -> Optional[str]:
         return None
     doubles = [b for b in hub.GetBonds()
                if b.GetBondType() == Chem.BondType.DOUBLE]
-    if len(doubles) != 1:
+    if not 1 <= len(doubles) <= 2:
         return None
-    oxo = doubles[0].GetOtherAtom(hub)
-    if oxo.GetSymbol() != 'O' or oxo.GetDegree() != 1:
+    oxos = [b.GetOtherAtom(hub) for b in doubles]
+    # Every doubly-bonded partner must be a TERMINAL oxygen. This is the single
+    # check that keeps =S, =N and =C partners out, so the out-of-scope P=S
+    # chalcogen heterone and the phosphanimines stay fail-closed, and a bridging
+    # (degree-2) oxygen -- e.g. the P-O-P of a metaphosphate -- is rejected.
+    if any(o.GetSymbol() != 'O' or o.GetDegree() != 1 for o in oxos):
         return None
+    if len(oxos) == 2:
+        # -PO2 / -AsO2: P-61.6 + P-64.1.2.2, see _HETERONE_DIONE_STEMS.
+        stem = _HETERONE_DIONE_STEMS.get(hub.GetSymbol())
+        if stem is None:
+            return None
+    else:
+        stem = _HETERONE_STEMS[hub.GetSymbol()]
+    oxo_idxs = {o.GetIdx() for o in oxos}
     from .substituent_purity import organyl_prefix_name
     prefixes = []
     for nb in hub.GetNeighbors():
-        if nb.GetIdx() == oxo.GetIdx():
+        if nb.GetIdx() in oxo_idxs:
             continue
         name = organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
         if name is None:
@@ -585,7 +637,7 @@ def name_heterone(mol) -> Optional[str]:
         return None
     from .phosphorus import _build_substituent_string
     prefix_str = _build_substituent_string(prefixes)
-    return _assemble(prefix_str, lam, _HETERONE_STEMS[hub.GetSymbol()])
+    return _assemble(prefix_str, lam, stem)
 
 
 _HETEROIMINE_STEMS = {'P': 'phosphan', 'As': 'arsan', 'Si': 'silan'}

@@ -8,19 +8,28 @@ three different substituents, and the P-74.2.1.5 heterimine next door. The
 producer is ``rules/mononuclear_hydrides.py::name_heterone``, dispatched from
 ``routing/dispatch_table.py``'s ``HETERONE`` entry.
 
-Two members of the class ARE still unnameable, and both are recorded in
-`` with their exact blocking guard:
+**Task R2 (2026-08-03) closed the DIONE half.** The ``-PO2``/``-AsO2`` members
+were blocked by ``name_heterone``'s ``len(doubles) != 1``, verified on the
+execution path by a line-level trace (line 564, the ``return None`` under that
+guard, was the last line executed for both targets, against line 588 — the
+success return — for the mono-oxo control). The guard is now a *window*
+``1 <= len(doubles) <= 2`` plus a terminal-oxygen requirement, and the oxo count
+selects the stem. Derivation and evidence:
+``.
 
-  * the **λ⁵-heterone DIONE** (two ``=O`` on one hub) — ``phenyl-λ⁵-
-    phosphanedione`` (``:25983``) and ``methyl-λ⁵-phosphanedione``
-    (``:28287``), both blocked by ``name_heterone``'s ``len(doubles) != 1``;
-  * the **chalcogen analogue** ``R3P=S`` — blocked by the same function's
-    ``oxo.GetSymbol() != 'O'``.
+One member remains deliberately unbuilt, and it is a **spelling** gap, not a
+perception gap:
 
-They are NOT asserted here (not even as xfail): ``mononuclear_hydrides.py`` is
-outside this task's file surface, so the gap is reported rather than fixed, and
-a change-detector test would break whoever fixes it. This file pins the
-WORKING half so that half cannot regress unnoticed.
+  * the **chalcogen analogue** ``R3P=S`` / ``R-PS2`` — the Blue Book prints no
+    worked example of a thione suffix on a phosphane stem, so its spelling
+    would have to be invented. It stays fail-closed through the terminal-oxygen
+    check, and that refusal is ASSERTED below so it cannot be widened by
+    accident.
+
+The refusals are asserted at **producer** level (``name_heterone(mol) is None``)
+rather than through the CLI, because ``conftest`` disables the OPSIN gate
+suite-wide: a whole-pipeline "must stay refused" assertion is gate-dependent and
+would silently measure the gate instead of this guard.
 
 Blue Book, ``BlueBookV2/BlueBookV2.md`` (every pointer re-opened with
 ``sed -n '<N>p'`` at write time):
@@ -38,11 +47,27 @@ Blue Book, ``BlueBookV2/BlueBookV2.md`` (every pointer re-opened with
 * **P-61.6 "HETERONES"** (heading, above ``:25983``).
 * Definition, ``:1844``: *"**Heterone.** A compound having an oxygen atom
   doubly bonded to a heteroatom, for example methylsilanone."*
+* **P-61.6 "HETERONES"** body, ``:25977``: *"Compounds containing the –PO,
+  –PO2, –AsO or –AsO2 are called heterones (see P-64.1.2.2, P-64.4). In the
+  presence of a more senior characteristic group they are described by the
+  compound prefixes oxophosphanyl, dioxo-λ⁵-phosphanyl, oxoarsanyl, and
+  dioxo-λ⁵-arsanyl."* — four groups, four prefixes, 1:1. This is the sentence
+  that makes the dione a member of the same class as the mono-oxo heterone, and
+  that puts ``–AsO2`` in it alongside ``–PO2``.
+* **P-64.1.2.2 "Heterones"** body, ``:28281``: *"Heterones are compounds having
+  an oxygen atom formally doubly bonded to a heteroatom ... They are named in
+  the same way as ketones except when expressed as compulsory prefixes"* — the
+  clause that supplies the multiplied ``-dione`` suffix.
 """
 
 import pytest
+from rdkit import Chem
 
 from orthonym.namer import Orthonym
+from orthonym.rules.mononuclear_hydrides import (
+    _HETERONE_DIONE_STEMS,
+    name_heterone,
+)
 
 
 @pytest.fixture(scope="module")
@@ -102,6 +127,93 @@ BUILT_HETERONES = [
         "P-21.2.2 germane series + the P-61.6/P-64.1.2.2 heterone suffix; the "
         "fourth hub element the producer supports.",
     ),
+    # --- the DIONE half, shipped by Task R2 ---
+    (
+        "O=P(=O)c1ccccc1",
+        "phenyl-lambda5-phosphanedione",
+        "P-61.6 :25983 VERBATIM (PIN): 'phenyl-lambda5-phosphanedione (PIN) "
+        "dioxo(phenyl)-lambda5-phosphane (not phosphobenzene)'.",
+    ),
+    (
+        "CP(=O)=O",
+        "methyl-lambda5-phosphanedione",
+        "P-64.1.2.2 :28287 VERBATIM (PIN): 'CH3-PO2 methyl-lambda5-"
+        "phosphanedione (PIN) methyldi(oxo)-lambda5-phosphane (not "
+        "phosphomethane)'.",
+    ),
+    (
+        "O=[As](=O)c1ccccc1",
+        "phenyl-lambda5-arsanedione",
+        "DERIVED, not printed verbatim -- 'arsanedione' has 0 hits in the Blue "
+        "Book. P-61.6 :25977 declares -AsO2 a heterone in the same sentence as "
+        "-PO2 and prints its preselected prefix dioxo-lambda5-arsanyl (also the "
+        "prefix table :55895, structure O2As-, source P-61.6); P-64.1.2.2 "
+        ":28281 gives the suffix ('named in the same way as ketones'); the "
+        "arsane stem, its lambda5 form and the mononuclear -one/-dione suffix "
+        "are each printed (arsanone PIN :25985, trimethyl-lambda5-arsanone "
+        ":43057, phosphanedione PIN x2). Elision follows phosphane+dione. OPSIN "
+        "2.9.0 parses it to the exact input structure (validity, not PIN "
+        "authority).",
+    ),
+    (
+        "C[As](=O)=O",
+        "methyl-lambda5-arsanedione",
+        "Same derivation as the phenyl arsanedione above; the methyl member is "
+        "the exact -AsO2 analogue of the printed CH3-PO2 PIN at :28287.",
+    ),
+]
+
+
+# (SMILES, why it MUST stay refused). Asserted at producer level: the OPSIN gate
+# is off under pytest, so a CLI-level refusal assertion would measure the gate.
+FAIL_CLOSED = [
+    (
+        "S=P(c1ccccc1)(c1ccccc1)c1ccccc1",
+        "P=S chalcogen heterone. P-74.2.1.4 :43043-:43049 does make method (3) "
+        "the PIN for phosphine sulfides, but the Blue Book prints NO worked "
+        "example of a thione suffix on a phosphane stem ('phosphanethione' has "
+        "0 hits), so the spelling would have to be invented. Deliberately not "
+        "built -- see ",
+    ),
+    (
+        "O=P(=S)c1ccccc1",
+        "Mixed =O/=S on one hub: the dione widening must not admit it just "
+        "because the double-bond COUNT is now 2. This is the row that pins the "
+        "terminal-oxygen requirement as separate from the count window.",
+    ),
+    (
+        "C=P(=O)c1ccccc1",
+        "A =C partner. Count is 2, so only the terminal-oxygen check refuses "
+        "it; a widening that only counted doubles would emit a name here.",
+    ),
+    (
+        "CP(=O)=N",
+        "A =N partner (phosphanimine territory, P-74.2.1.5). Same trap as the "
+        "=C row.",
+    ),
+    (
+        "OP(=O)=O",
+        "Metaphosphoric acid HO-PO2: two terminal oxo groups AND a P-OH, so it "
+        "passes the oxo census and is refused only by the organyl purity loop. "
+        "Inorganic (P-67 acid), never a 'hydroxy-lambda5-phosphanedione'.",
+    ),
+    (
+        "COP(=O)=O",
+        "Methyl metaphosphate: the hub's third neighbour is an ESTER oxygen, "
+        "not an organyl. Same purity-loop refusal as the acid.",
+    ),
+    (
+        "O=P(=O)OP(=O)=O",
+        "Two hubs -- refused by the pre-existing len(hubs) != 1, upstream of "
+        "the oxo census.",
+    ),
+    (
+        "O=P(=O)CCC(=O)O",
+        "A carboxylic acid on the organyl. The COOH is senior, so the heterone "
+        "must NOT capture the molecule as a dione parent; P-61.6 :25977 says "
+        "that in the presence of a more senior characteristic group the group "
+        "is cited by the prefix dioxo-lambda5-phosphanyl instead.",
+    ),
 ]
 
 
@@ -136,6 +248,64 @@ def test_lambda_descriptor_tracks_the_hub_bonding_number(namer):
     """
     assert "lambda5" not in _norm(namer.name("O=Pc1ccccc1"))
     assert "lambda5" in _norm(namer.name("O=P(c1ccccc1)(c1ccccc1)c1ccccc1"))
+
+
+@pytest.mark.parametrize(
+    "smiles,reason", FAIL_CLOSED, ids=[s for s, _ in FAIL_CLOSED]
+)
+def test_heterone_stays_fail_closed(smiles, reason):
+    """The dione widening must not admit anything but a TERMINAL oxygen.
+
+    Four of these rows have a double-bond count of exactly 2, so a widening that
+    only relaxed the count would emit a name for them.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, f"fixture SMILES itself is invalid: {smiles}"
+    assert name_heterone(mol) is None, reason
+
+
+def test_lambda_is_computed_for_the_dione_too(namer):
+    """P-31.1.4.2 -- the λ⁵ on the dione comes from the hub's bonding number
+    (2 oxo double bonds + 1 organyl = 5), not from the suffix.
+
+    Paired with ``phenylphosphanone`` (λ³, no descriptor) this shows the same
+    computation drives both oxo counts.
+    """
+    assert _norm(namer.name("CP(=O)=O")) == "methyl-lambda5-phosphanedione"
+    assert "lambda" not in _norm(namer.name("O=Pc1ccccc1"))
+
+
+def test_the_dione_element_gate_is_the_bluebook_class_not_the_hub_list():
+    """P-61.6 :25977 puts exactly ``-PO``, ``-PO2``, ``-AsO``, ``-AsO2`` in the
+    heterone class, so the DIONE gate is narrower than the mono-oxo hub list:
+    Si and Ge take ``-one`` but never ``-dione``.
+
+    The gate can be this narrow safely because a two-oxo Si or Ge hub is not a
+    molecule at all -- RDKit rejects the valence outright, which is asserted
+    here so the reason survives rather than being re-derived.
+    """
+    assert set(_HETERONE_DIONE_STEMS) == {"P", "As"}
+    for impossible in ("C[Si](=O)=O", "O=[SiH2]=O", "O=[Ge](=O)C"):
+        assert Chem.MolFromSmiles(impossible) is None, impossible
+
+
+def test_a_three_oxo_hub_is_outside_the_count_window():
+    """The guard is a WINDOW (1..2), not ``>= 1``. Nothing in P-61.6's class has
+    three oxo groups on one mononuclear hub, so a third must fail closed.
+
+    Built with an explicit RWMol because such a hub has no valid SMILES -- which
+    is itself the point: the window's upper bound is the fail-closed edge.
+    """
+    rw = Chem.RWMol()
+    p = rw.AddAtom(Chem.Atom(15))
+    for _ in range(3):
+        o = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(p, o, Chem.BondType.DOUBLE)
+    c = rw.AddAtom(Chem.Atom(6))
+    rw.AddBond(p, c, Chem.BondType.SINGLE)
+    mol = rw.GetMol()
+    mol.UpdatePropertyCache(strict=False)
+    assert name_heterone(mol) is None
 
 
 def test_p74_2_1_5_heterimine_also_emits(namer):
