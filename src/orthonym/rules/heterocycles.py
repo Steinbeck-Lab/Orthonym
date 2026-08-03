@@ -3082,12 +3082,31 @@ def _bfs_substituent(mol, start_idx: int, excluded: Set[int]) -> List[int]:
 # saturated hetero-ring parents when they carry a characteristic-group suffix).
 # Bare parent names ('thiazolidine') carry the numbering implicitly, but a
 # suffixed PIN must cite the heteroatom locant set immediately before the parent
-# stem: '1,3-thiazolidin-4-one', '1,3-oxazolidin-2-one'. Curated + OPSIN-verified:
-# only these two retained stems BOTH require and accept the explicit locant
-# citation in OPSIN 2.9. The 'iso' (1,2-) forms and the all-nitrogen
-# imidazolidine/pyrazolidine and the retained morpholine/piperazine/piperidine
-# families do NOT take (and OPSIN rejects) an explicit heteroatom-locant prefix,
-# so they are deliberately excluded. Value = expected element-ordered heteroatom
+# stem: '1,3-thiazolidin-4-one', '1,3-oxazolidin-2-one'. Only these two retained
+# stems need the explicit locant citation, because only for them is the BARE stem
+# non-preferred: P-22.2.1 (``BlueBookV2.md:8182``) prints "oxazolidine
+# 1,3-oxazolidine (PIN) thiazolidine (S instead of O) 1,3-thiazolidine (PIN)".
+#
+# ⚠ CORRECTED 2026-08-03. This comment used to justify the exclusions with
+# "(and OPSIN rejects) an explicit heteroatom-locant prefix". **That is false.**
+# Measured against OPSIN 2.9 (oracle validated on two known positives plus a
+# negative control): `1,2-thiazolidine`, `1,2-oxazolidine`, `1,2-diazolidine`,
+# `1,3-diazolidine`, `1,3-thiazolidine`, `1,3-oxazolidine`, `1,4-oxazinane` and
+# `1,4-diazinane` **all eight parse**. OPSIN rejects none of them.
+#
+# The EXCLUSIONS are nonetheless correct, on the real reason -- those families
+# already spell their PIN without a locant, so there is nothing to add:
+#   * the 1,2- forms are handled upstream and already emit their PINs
+#     (``C1CNSC1`` -> `1,2-thiazolidine`, ``C1CNOC1`` -> `1,2-oxazolidine`,
+#     both marked (PIN) at ``:8184`` against the non-preferred `isothiazolidine`
+#     / `isoselenazolidine`);
+#   * `pyrazolidine`, `imidazolidine`, `morpholine`, `piperidine`, `piperazine`
+#     are retained Table 2.3 names that ARE the preferred names, and are emitted
+#     as such (``C1CNNC1`` -> `pyrazolidine`, ``C1CNCN1`` -> `imidazolidine`,
+#     ``C1COCCN1`` -> `morpholine`).
+# Behaviour is unchanged by this correction; only the stated rationale was wrong.
+# A false rationale is how a missing check survives review, which is why it is
+# corrected rather than deleted. Value = expected element-ordered heteroatom
 # locant set; the fix is gated on a match against the actual ring numbering so it
 # fails closed if the numbering is not deterministically the canonical one.
 _RETAINED_HETERO_LOCANT_CITATION = {
