@@ -52,14 +52,32 @@ class TestBranchedAcidAcyloxy:
         result = _get_acyloxy_prefix("CCCC(=O)Oc1ccccc1")
         assert result == "butanoyloxy"
 
-    def test_trivial_fatty_acid_preserved(self):
-        """Palmitic acid ester: 16C linear -> 'palmitoyloxy' (trivial name).
+    def test_straight_chain_fatty_acid_stem_preserved(self):
+        """C16:0 linear ester -> 'hexadecanoyloxy'.
 
-        The branched naming path should NOT override trivial acid names.
+        Purpose of this test (unchanged): the branched naming path must NOT
+        override the straight-chain stem -- a branch-decomposition bug would
+        show up as a methyl/shorter-chain stem here.
+
+        Asserted word changed from 'palmitoyloxy' to the PIN in Task J3.
+        P-65.6.3.2.3 "Esters cited as prefixes" (BlueBookV2.md:31696) prints the
+        trivial-derived acyloxy prefix as the NON-preferred alternative when the
+        acid is retained for general nomenclature only -- ':31723
+        3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)   3-(nicotinoyloxy)-
+        propanoic acid'.  Palmitic acid is in that same general-only list
+        (P-65.1.1.2.2 heading :29745; row :29787 'palmitic acid  hexadecanoic
+        acid (PIN)').  Appendix 2, whose legend at :55416 reads "The symbol *
+        designates the preferred prefix", prints 'hexadecanoyl* = palmitoyl'
+        (:56482, :56511).  'palmitoyloxy' occurs 0 times in the Blue Book;
+        'hexadecanoyloxy' occurs at :31846, :55170, :55199.
         """
         result = _get_acyloxy_prefix("CCCCCCCCCCCCCCCC(=O)OC")
         assert result is not None
-        assert "palmitoyloxy" in result, f"Expected palmitoyloxy in {result}"
+        assert "hexadecanoyloxy" in result, f"Expected hexadecanoyloxy in {result}"
+        assert "palmitoyloxy" not in result, (
+            f"'palmitoyloxy' is non-PIN (Appendix 2 :56482 'hexadecanoyl* = "
+            f"palmitoyl'); got {result}"
+        )
 
     def test_isovalerate_branched(self):
         """Isovaleric acid: 3-methylbutanoic acid (4C chain + 1 branch).

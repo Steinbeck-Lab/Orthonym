@@ -81,10 +81,20 @@ class TestAlkoxycarbonylNegative:
         assert "oxycarbonyl" not in result.lower()
 
     def test_acyloxy_ester_no_double_naming(self):
-        """Palmitoyloxy ester: acyloxy orientation, not alkoxycarbonyl."""
+        """C16:0 acyloxy ester: acyloxy orientation, not alkoxycarbonyl.
+
+        Purpose of this test (unchanged): the ester must be cited as an 'acyloxy'
+        prefix, never as 'alkoxycarbonyl'.
+
+        Asserted word changed from 'palmitoyloxy' to the PIN in Task J3 --
+        P-65.6.3.2.3 (BlueBookV2.md:31696), whose :31723 example prints a
+        trivial-derived acyloxy prefix as the non-preferred alternative, and
+        Appendix 2 :56482 'hexadecanoyl* = palmitoyl' (legend :55416, "The symbol
+        * designates the preferred prefix").
+        """
         result = name_compound("CCCCCCCCCCCCCCCC(=O)OC(CCCCC)CCCCCCCCCCCC(=O)[O-]")
         assert "oxycarbonyl" not in result.lower()
-        assert "palmitoyloxy" in result.lower()
+        assert "hexadecanoyloxy" in result.lower()
 
     def test_heteroatom_alkyl_no_alkoxycarbonyl(self):
         """Ester with nitrogen-containing OR fragment: skip alkoxycarbonyl."""

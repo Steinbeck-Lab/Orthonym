@@ -360,29 +360,45 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     # preferred IUPAC names for esters are named by functional class
     # nomenclature" -- takes that word from the PIN acid, e.g. "ethyl acetate
     # (PIN)" (acetic IS retained) but "ethyl methyl butanedioate (PIN)" (NOT
-    # succinate). So the saturated straight-chain rows C12/C14/C16/C18/C20 are
-    # REMOVED: they made the ester path emit 'ethyl palmitate' while the acid
-    # path for the same chain already emitted the PIN 'hexadecanoic acid'.
+    # succinate). So the saturated straight-chain rows C12/C14/C16/C18/C20 were
+    # REMOVED (Task J2): they made the ester path emit 'ethyl palmitate' while the
+    # acid path for the same chain already emitted the PIN 'hexadecanoic acid'.
     # Falling through to get_acid_stem() below yields the PIN stem.
     #
-    # The unsaturated rows are non-PIN under the same rule, but they are LEFT IN
-    # PLACE here deliberately -- withdrawing them is a separate change with a
-    # different risk profile (an unsaturated acid that fell through to the
-    # saturated get_acid_stem() would be a WRONG MOLECULE, not a misspelling).
+    # Task J3 removed the four remaining (unsaturated) rows -- (18,1) 'oleic',
+    # (18,2) 'linoleic', (18,3) 'linolenic', (20,4) 'arachidonic' -- so the whole
+    # table is gone. This stem ALSO feeds the acyl PREFIX via
+    # get_acyloxy_prefix(), and P-65.6.3.2.3 "Esters cited as prefixes" (:31696)
+    # settles that position directly. Its worked examples straddle the boundary:
+    #   :31711  3-(benzoyloxy)propanoic acid (PIN)
+    #           -- benzoic IS retained as a PIN (P-65.1.1.1), so 'benzoyloxy' is
+    #              preferred and MUST survive;
+    #   :31723  3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
+    #             3-(nicotinoyloxy)propanoic acid
+    #           -- nicotinic acid is retained for GENERAL nomenclature only
+    #              (P-65.1.1.2.2 list, 'nicotinic acid pyridine-3-carboxylic acid
+    #              (PIN)' at :29773), and the trivial-derived acyloxy prefix is
+    #              printed as the NON-preferred alternative.
+    # 'oleic acid' sits in that same general-only list (:29785, 'oleic acid
+    # (9Z)-octadec-9-enoic acid (PIN)'), so 'oleoyloxy' is non-PIN for the same
+    # reason 'nicotinoyloxy' is. Appendix 2 confirms per row -- its legend
+    # (:55416) reads "The symbol * designates the preferred prefix", and it
+    # prints '(9Z)-octadec-9-enoyl* = oleoyl' (:56443), 'hexadecanoyl* =
+    # palmitoyl' (:56482), 'octadecanoyl* = stearoyl' (:56441).
+    #
+    # J2 deferred these four rows fearing that an unsaturated acid falling
+    # through would be caught by the SATURATED get_acid_stem() and become a WRONG
+    # MOLECULE. Measured: it is not. The unsaturation branch immediately below
+    # runs FIRST and returns the full systematic stem with double-bond locants and
+    # E/Z descriptors -- '(9Z)-octadec-9-enoic', '(9Z,12Z)-octadeca-9,12-dienoic',
+    # '(9Z,12Z,15Z)-octadeca-9,12,15-trienoic',
+    # '(5Z,8Z,11Z,14Z)-icosa-5,8,11,14-tetraenoic' -- which are verbatim the Blue
+    # Book PINs. get_acid_stem() is reached for an unsaturated acid only if that
+    # branch returns falsy, which was already true for every unsaturated chain
+    # outside the four deleted rows, so the rows were never the guard.
     # See 
-    FATTY_ACID_TRIVIAL_BY_STRUCTURE = {
-        (18, 1): "oleic",           # C18:1
-        (18, 2): "linoleic",        # C18:2
-        (18, 3): "linolenic",       # C18:3
-        (20, 4): "arachidonic",     # C20:4
-    }
 
-    if not has_ring:
-        key = (carbon_count, cc_double_bond_count)
-        if key in FATTY_ACID_TRIVIAL_BY_STRUCTURE:
-            return FATTY_ACID_TRIVIAL_BY_STRUCTURE[key]
-
-    # For unsaturated acids not matching a known trivial name, extract the
+    # For unsaturated acids, extract the
     # fragment and name it via the naming pipeline to get the full systematic
     # name including double bond positions (e.g., "octadeca-9,12-dienoic").
     # This prevents unsaturated acids from being named with saturated stems.
@@ -1481,60 +1497,122 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
 
 
 # ============================================================================
-# Acyloxy Prefix Naming (IUPAC P-65.6.3.2.2)
+# Acyloxy Prefix Naming (IUPAC P-65.6.3.2.3)
 # ============================================================================
 #
 # When an ester is named as a substituent prefix (e.g., on a ring parent),
 # the R-CO-O- portion is named as an "acyloxy" group:
 #   acid name (drop "-ic") + "-yloxy"
 #
-# Examples:
-#   formic    -> formyloxy
-#   acetic    -> acetyloxy
-#   benzoic   -> benzoyloxy
-#   propanoic -> propanoyloxy
-
-# Explicit mapping for trivial acid names to acyloxy prefixes.
-# These are common acids whose acyloxy forms have established trivial stems.
+# P-65.6.3.2.3 "Esters cited as prefixes" (BlueBookV2.md:31696) is the governing
+# rule -- "an ester group is indicated by prefixes as 'acyloxy' for the group
+# R-CO-O-" -- and it is also the rule cited by every acyloxy row of Appendix 2.
+# (The section heading P-65.6.3.2.2 previously named here does not exist in the
+# book; grep returns the .2.3 heading only.)
+#
+# THE RULE, in one line: the acyloxy prefix is the PIN ACYL GROUP name + 'oxy'.
+# It is NOT "the trivial form if one exists". P-65.6.3.2.3's own examples give
+# both sides of the boundary:
+#   :31711  3-(benzoyloxy)propanoic acid (PIN)
+#           benzoic acid IS retained as a preferred IUPAC name (P-65.1.1.1
+#           :29715, "Only the following five carboxylic acids retained names and
+#           are also preferred IUPAC names"), so 'benzoyloxy' is PREFERRED.
+#   :31723  3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
+#             3-(nicotinoyloxy)propanoic acid
+#           nicotinic acid is retained for GENERAL nomenclature only
+#           (P-65.1.1.2.2 heading :29745; its row at :29773 reads "nicotinic acid
+#           pyridine-3-carboxylic acid (PIN)"), so the trivial-derived acyloxy
+#           prefix is the NON-preferred alternative.
+# Also from the same rule: "The systematic name 'acetyloxy' is preferred to the
+# contracted name 'acetoxy'."
+#
+# Per-row PIN status. The preferred ACYL prefixes are enumerated by P-65.1.7.2
+# (:30432) "Acyl groups derived from carboxylic acids having retained names that
+# are preferred IUPAC names ... i.e., carboacyl groups" and listed under
+# P-65.1.7.2.1 (:30438): acetyl (:30442), formyl (:30444), benzoyl (:30446),
+# oxalyl (:30450), oxalo (:30454). Appendix 2 confirms each row independently --
+# its legend (:55416) reads "The symbol * designates the preferred prefix":
+#
+#   PIN, must survive:  formyloxy* (:56044), acetyloxy* (:55432 "acetoxy =
+#                       acetyloxy*"), benzoyloxy* (:55589, :56544)
+#   NON-PIN:            propionyloxy -- Appendix 2 prints "propanoyloxy* =
+#                       propionyloxy" (:56658, :56680), so propanoyloxy is
+#                       preferred; propionic acid is general-only (:29789)
+#   NON-PIN:            palmitic/stearic/oleic -- general-only (P-65.1.1.2.2
+#                       :29745; rows :29787, :29791, :29785). Appendix 2:
+#                       "hexadecanoyl* = palmitoyl" (:56482, :56511),
+#                       "octadecanoyl* = stearoyl" (:56441, :56491, :56760),
+#                       "(9Z)-octadec-9-enoyl* = oleoyl" (:56443, :56452, :56489)
+#   NOT IN THE BOOK AT ALL (0 hits, controls prove the grep finds known
+#   positives): lauric, myristic, arachidic, arachidonic, linoleic, linolenic,
+#                       valeric, caproic -- and 'butyryloxy', 'valeryloxy',
+#                       'caproyloxy', 'oxalyloxy', 'lactyloxy',
+#                       'palmitoyloxy', 'lauroyloxy', 'stearoyloxy',
+#                       'oleoyloxy', 'arachidoyloxy' are each 0 hits, while
+#                       'hexadecanoyloxy' (:31846, :55170, :55199) and
+#                       'octadecanoyloxy' (:55162) do appear.
+#
+# ⚠ WHY THE NON-PIN ROWS BELOW ARE STILL HERE. This function is a SPELLING
+# CONVERTER: it turns a stem that a caller ALREADY CHOSE into its 'oxy' form. It
+# is not the PIN decision point -- that is get_acid_fragment_name(), which is
+# where Tasks J2 and J3 made the fix. Measured (fresh process per molecule, spy
+# on this function): after J3 no namer path supplies ANY of the trivial keys
+# below except formic/acetic/benzoic, which are the three PIN rows. Deleting the
+# non-PIN rows would therefore change no emitted name, and would make this
+# function strictly WORSE for a direct caller, because the generic '-ic' ->
+# '-yloxy' rule below FABRICATES rather than failing closed:
+# 'palmitic' -> 'palmityloxy', 'oleic' -> 'oleyloxy'. That is the contributor guide #9
+# ("removing a wrong output can unmask a worse generator") at function level.
+#
+# ⚠ DO NOT ADD A ROW KEYED ON A SYSTEMATIC STEM. Five such rows
+# ('dodecanoic'/'tetradecanoic'/'hexadecanoic'/'octadecanoic'/'icosanoic' ->
+# 'lauroyloxy'/'myristoyloxy'/'palmitoyloxy'/'stearoyloxy'/'arachidoyloxy') were
+# removed in Task J3. They were the LIVE defect: they took a stem that was
+# already the PIN and converted it BACK to the non-PIN word, which is how
+# '(palmitoyloxy)acetic acid' survived the Task J2 fix to the ester word. A
+# systematic key here cannot ever be correct -- by construction its input is
+# already preferred. See 
 TRIVIAL_ACID_TO_ACYLOXY = {
-    "formic": "formyloxy",
-    "acetic": "acetyloxy",
-    "propionic": "propionyloxy",
+    # --- preferred prefixes (PIN); these MUST survive ---
+    "formic": "formyloxy",           # formyloxy*  Appendix 2 :56044
+    "acetic": "acetyloxy",           # acetyloxy*  Appendix 2 :55432
+    "benzoic": "benzoyloxy",         # benzoyloxy* Appendix 2 :55589, :56544
+    # --- general-nomenclature spellings only; NON-PIN, and unreachable from the
+    # --- namer after J2/J3. Retained solely so a direct caller gets the
+    # --- documented general form instead of a fabrication (see note above).
+    "propionic": "propionyloxy",     # non-PIN: propanoyloxy* :56658
     "butyric": "butyryloxy",
     "valeric": "valeryloxy",
     "caproic": "caproyloxy",
-    "benzoic": "benzoyloxy",
     "oxalic": "oxalyloxy",
     "lactic": "lactyloxy",
-    # Fatty acids (common long-chain acids with retained names)
-    "lauric": "lauroyloxy",          # C12:0
-    "myristic": "myristoyloxy",      # C14:0
-    "palmitic": "palmitoyloxy",      # C16:0
-    "stearic": "stearoyloxy",        # C18:0
-    "oleic": "oleoyloxy",            # C18:1
-    "linoleic": "linoleoyloxy",      # C18:2
-    "linolenic": "linolenoyloxy",    # C18:3
-    "arachidic": "arachidoyloxy",    # C20:0
-    "arachidonic": "arachidonoyloxy", # C20:4
-    # Systematic names for saturated fatty acids (ensures decomposition path
-    # also uses trivial acyloxy forms)
-    "dodecanoic": "lauroyloxy",      # C12:0 systematic
-    "tetradecanoic": "myristoyloxy", # C14:0 systematic
-    "hexadecanoic": "palmitoyloxy",  # C16:0 systematic
-    "octadecanoic": "stearoyloxy",   # C18:0 systematic
-    "icosanoic": "arachidoyloxy",    # C20:0 systematic
+    "lauric": "lauroyloxy",          # C12:0  non-PIN: dodecanoyl*  :55953
+    "myristic": "myristoyloxy",      # C14:0  non-PIN: tetradecanoyl
+    "palmitic": "palmitoyloxy",      # C16:0  non-PIN: hexadecanoyl* :56482
+    "stearic": "stearoyloxy",        # C18:0  non-PIN: octadecanoyl* :56441
+    "oleic": "oleoyloxy",            # C18:1  non-PIN: (9Z)-octadec-9-enoyl* :56443
+    "linoleic": "linoleoyloxy",      # C18:2  non-PIN
+    "linolenic": "linolenoyloxy",    # C18:3  non-PIN
+    "arachidic": "arachidoyloxy",    # C20:0  non-PIN: icosanoyl
+    "arachidonic": "arachidonoyloxy", # C20:4 non-PIN
 }
 
 
 def get_acyloxy_prefix(acid_name: str) -> str:
     """
-    Convert an acid name to its acyloxy prefix form (IUPAC P-65.6.3.2.2).
+    Convert an acid name to its acyloxy prefix form (IUPAC P-65.6.3.2.3).
 
     Used when an ester group is named as a substituent prefix rather than
     the principal characteristic group. The R-CO-O- portion becomes an
     "acyloxy" prefix.
 
     Conversion rule: drop "-ic" (or "-ic acid"), add "-yloxy".
+
+    ⚠ This is a SPELLING converter, not the PIN decision point. It converts the
+    stem its caller already chose; whether that stem is preferred is decided by
+    get_acid_fragment_name(). See the note on TRIVIAL_ACID_TO_ACYLOXY above --
+    the table deliberately retains non-PIN general-nomenclature spellings, and
+    they are unreachable from the namer.
 
     Args:
         acid_name: The acid name without "acid" suffix

@@ -724,3 +724,139 @@ class TestSaturatedFattyEstersUsePinAcylWord:
         """Guard the over-correction: the five P-65.1.1.1 acids must NOT move."""
         assert name_compound("CC(=O)OCC") == "ethyl acetate"
         assert name_compound("CCOC(=O)c1ccccc1") == "ethyl benzoate"
+
+
+class TestAcylPrefixUsesPinAcidStem:
+    """v29 Task J3: the acyl PREFIX must come from the PIN acid stem.
+
+    Task J2 fixed the ester *word* ('ethyl palmitate' -> 'ethyl hexadecanoate').
+    The acyl *prefix* is a different producer and survived that fix, because
+    TRIVIAL_ACID_TO_ACYLOXY carried five rows keyed on the SYSTEMATIC stem
+    ('hexadecanoic' -> 'palmitoyloxy') which took the already-preferred stem and
+    converted it back to the non-PIN word.
+
+    THE RULE. P-65.6.3.2.3 "Esters cited as prefixes" (BlueBookV2.md:31696) --
+    "an ester group is indicated by prefixes as 'acyloxy' for the group
+    R-CO-O-". Its worked examples give both sides of the boundary:
+
+      :31711  3-(benzoyloxy)propanoic acid (PIN)
+              -- benzoic acid IS retained as a preferred IUPAC name
+                 (P-65.1.1.1 :29715), so 'benzoyloxy' is PREFERRED and must
+                 survive.
+      :31723  3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
+                3-(nicotinoyloxy)propanoic acid
+              -- nicotinic acid is retained for GENERAL nomenclature only
+                 (P-65.1.1.2.2 heading :29745; row :29773), so its
+                 trivial-derived acyloxy prefix is the NON-preferred alternative.
+
+    palmitic/stearic/oleic sit in that same general-only list (:29787, :29791,
+    :29785), so their acyloxy prefixes are non-PIN for exactly the reason
+    'nicotinoyloxy' is. Appendix 2 confirms row by row -- its legend at :55416
+    reads "The symbol * designates the preferred prefix" -- printing
+    'hexadecanoyl* = palmitoyl' (:56482), 'octadecanoyl* = stearoyl' (:56441)
+    and '(9Z)-octadec-9-enoyl* = oleoyl' (:56443).
+
+    ⚠ OPSIN cannot adjudicate any of this: it round-trips both spellings to the
+    same structure, so a clean round-trip passes before AND after and has no
+    force on PIN preference. These assertions rest on the Blue Book.
+    """
+
+    # (SMILES, expected acyloxy prefix, withdrawn word that must not reappear)
+    SATURATED = [
+        ("CCCCCCCCCCCC(=O)OCC(=O)O", "dodecanoyloxy", "lauroyloxy"),
+        ("CCCCCCCCCCCCCC(=O)OCC(=O)O", "tetradecanoyloxy", "myristoyloxy"),
+        ("CCCCCCCCCCCCCCCC(=O)OCC(=O)O", "hexadecanoyloxy", "palmitoyloxy"),
+        ("CCCCCCCCCCCCCCCCCC(=O)OCC(=O)O", "octadecanoyloxy", "stearoyloxy"),
+        ("CCCCCCCCCCCCCCCCCCCC(=O)OCC(=O)O", "icosanoyloxy", "arachidoyloxy"),
+    ]
+
+    # The unsaturated rows. J2 deferred these fearing the fall-through would hit
+    # the SATURATED get_acid_stem() and yield a WRONG MOLECULE. Measured: the
+    # unsaturation branch runs first and returns the full systematic stem, which
+    # is verbatim the Blue Book PIN -- e.g. oleic acid is
+    # '(9Z)-octadec-9-enoic acid (PIN)' at :29785.
+    UNSATURATED = [
+        (r"CCCCCCCC/C=C\CCCCCCCC(=O)OCC(=O)O",
+         "(9Z)-octadec-9-enoyloxy", "oleoyloxy"),
+        (r"CCCCC/C=C\C/C=C\CCCCCCCC(=O)OCC(=O)O",
+         "(9Z,12Z)-octadeca-9,12-dienoyloxy", "linoleoyloxy"),
+        (r"CC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)OCC(=O)O",
+         "(9Z,12Z,15Z)-octadeca-9,12,15-trienoyloxy", "linolenoyloxy"),
+        (r"CCCCC/C=C\C/C=C\C/C=C\C/C=C\CCCC(=O)OCC(=O)O",
+         "(5Z,8Z,11Z,14Z)-icosa-5,8,11,14-tetraenoyloxy", "arachidonoyloxy"),
+    ]
+
+    @pytest.mark.parametrize("smiles,expected,withdrawn", SATURATED + UNSATURATED)
+    def test_acyl_prefix_is_pin(self, smiles, expected, withdrawn):
+        name = name_compound(smiles)
+        assert expected in name, f"expected {expected!r} in {name!r}"
+        assert withdrawn not in name, (
+            f"non-PIN acyl prefix {withdrawn!r} re-emitted in {name!r}"
+        )
+
+    @pytest.mark.parametrize("smiles,expected,withdrawn", SATURATED + UNSATURATED)
+    def test_no_withdrawn_prefix_became_an_abstention(self, smiles, expected,
+                                                      withdrawn):
+        """the contributor guide #9: withdrawing a wrong name must not fail closed instead."""
+        name = name_compound(smiles)
+        assert name, f"empty name for {smiles}"
+        assert "unknown" not in name.lower(), (
+            f"withdrawing {withdrawn!r} turned {smiles} into an abstention: "
+            f"{name!r}"
+        )
+
+    def test_preferred_acyl_prefixes_survive(self):
+        """Guard the over-correction -- the P-65.1.7.2.1 preferred prefixes.
+
+        acetyl (:30442), formyl (:30444), benzoyl (:30446) are preferred
+        prefixes and MUST NOT be systematised. Appendix 2: 'acetyloxy*'
+        (:55432), 'formyloxy*' (:56044), 'benzoyloxy*' (:55589, :56544).
+        """
+        assert "acetyloxy" in name_compound("CC(=O)OCC(=O)O")
+        assert "formyloxy" in name_compound("C(=O)OCC(=O)O")
+        assert "benzoyloxy" in name_compound("c1ccccc1C(=O)OCC(=O)O")
+        # ethanoyloxy/methanoyloxy/benzenecarbonyloxy are the non-preferred forms
+        for wrong in ("ethanoyloxy", "methanoyloxy", "benzenecarbonyloxy"):
+            assert wrong not in name_compound("CC(=O)OCC(=O)O")
+
+    def test_aromatic_parent_path_also_uses_the_pin_stem(self):
+        """The second live producer (rules/benzene.py), not just the composer."""
+        name = name_compound("CCCCCCCCCCCCCCCC(=O)Oc1ccccc1C(=O)O")
+        assert "hexadecanoyloxy" in name, name
+        assert "palmitoyloxy" not in name, name
+        # aspirin: the acetyl control on the same producer
+        assert "acetyloxy" in name_compound("CC(=O)Oc1ccccc1C(=O)O")
+
+    def test_no_systematic_stem_key_in_the_acyloxy_table(self):
+        """A systematic key can never be correct -- its input is already the PIN.
+
+        This is the structural invariant behind the fix: if someone re-adds
+        'hexadecanoic' -> 'palmitoyloxy', the J3 fix silently reverts.
+        """
+        from orthonym.rules.esters import TRIVIAL_ACID_TO_ACYLOXY
+        offenders = sorted(
+            k for k in TRIVIAL_ACID_TO_ACYLOXY
+            if k.endswith("anoic") or k.endswith("enoic")
+        )
+        assert offenders == [], (
+            f"systematic-stem keys re-introduced into TRIVIAL_ACID_TO_ACYLOXY: "
+            f"{offenders}. Such a row takes a stem that is already the PIN and "
+            f"converts it back to a non-PIN word (P-65.6.3.2.3 :31696)."
+        )
+
+    def test_acid_and_prefix_paths_agree_on_the_stem(self):
+        """Internal consistency: the two independent producers must not disagree.
+
+        This is the check that exposed the defect -- the acid path already said
+        'hexadecanoic acid' while the prefix path said 'palmitoyloxy'.
+        """
+        for acid_smiles, ester_smiles, stem in [
+            ("CCCCCCCCCCCCCCCC(=O)O",
+             "CCCCCCCCCCCCCCCC(=O)OCC(=O)O", "hexadecano"),
+            (r"CCCCCCCC/C=C\CCCCCCCC(=O)O",
+             r"CCCCCCCC/C=C\CCCCCCCC(=O)OCC(=O)O", "octadec-9-eno"),
+        ]:
+            acid_name = name_compound(acid_smiles)
+            prefix_name = name_compound(ester_smiles)
+            assert stem in acid_name, f"{stem!r} not in acid {acid_name!r}"
+            assert stem in prefix_name, f"{stem!r} not in prefix {prefix_name!r}"

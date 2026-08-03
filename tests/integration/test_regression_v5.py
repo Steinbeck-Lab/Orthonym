@@ -298,7 +298,14 @@ class TestFattyAcidIdentification:
     @pytest.mark.integration
     @pytest.mark.xfail(
         reason="OPSIN cannot parse linolenoyloxy/icosadienoyloxy; "
-        "systematic naming is correct IUPAC but OPSIN vocabulary limit"
+        "systematic naming is correct IUPAC but OPSIN vocabulary limit. "
+        "⚠ STALE AS OF v29 Task J3: 'linolenoyloxy' is no longer emitted at all "
+        "-- the acyl prefix now comes from the PIN acid stem "
+        "((9Z,12Z,15Z)-octadeca-9,12,15-trienoyloxy), which OPSIN DOES parse, "
+        "and this test flips XFAIL->XPASS because of that fix. The marker is a "
+        "candidate for removal, but it also XPASSes without J3 when this file is "
+        "run alone, i.e. the outcome is test-ORDER dependent -- resolve that "
+        "before unmarking. See "
     )
     def test_regression_3_phospholipid_opsin_parse(self):
         """Phospholipid fatty acid chains: correct IUPAC but OPSIN-unparseable.
