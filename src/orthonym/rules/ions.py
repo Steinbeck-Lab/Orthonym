@@ -2295,7 +2295,7 @@ def _order_ring_cycle(mol, ring_system):
     return order if len(order) == len(ring) else None
 
 
-def _charged_ring_locants(mol, ring_system, center_idx):
+def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None):
     """Full single-ring IUPAC numbering for a charged ring centre, choosing the
     orientation that gives lowest locants in P-31.1.4.3 / P-73.1.2 order:
       (a) all heteroatoms as a set;
@@ -2305,6 +2305,24 @@ def _charged_ring_locants(mol, ring_system, center_idx):
       (d) the charged centre (the principal characteristic group, the -ium/-ide) —
           P-73.1.2.4 / P-31.1.4.3.4 — so a symmetric di-N azinium gets the cation
           at the LOWEST locant (pyridazin-1-ium, not -2-ium);
+      (d2) OPTIONAL, only when ``anion_attach_idx`` is given: the ring position
+          bearing an ANIONIC-SUFFIX characteristic group (a ``-carboxylate``).
+          **P-74.1.2 "Zwitterionic compounds with at least one ionic center on a
+          characteristic group"** (heading ``BlueBookV2.md:42445``), sentence
+          ``:42447``, final clause: *"For assignment of lower locants, ionic
+          centers on skeletal atoms of the parent hydride are preferred to the
+          locants for positions of attachment of characteristic groups denoted by
+          ionic suffixes."*  So it ranks AFTER (d) and — being a suffix —
+          BEFORE (e): **P-14.4 "NUMBERING"** (heading ``:3219``) clause (c)
+          ``:3256`` *"principal characteristic groups and free valences
+          (suffixes);"* outranks clause (f) ``:3301`` *"detachable alphabetized
+          prefixes …"*.  Without this criterion the substituted case is decided
+          by the canonical-rank tiebreak instead of by the rule, because the
+          substituted-position SET (e) is direction-symmetric in exactly the
+          Blue Book's own worked example (``:42456``
+          ``1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate``: both directions
+          give substituents at {1,2,4,6}).  Default ``None`` leaves the key, and
+          therefore every pre-existing caller, byte-identical.
       (e) other substituents; with a canonical-rank final deterministic tiebreak.
     Returns ``(atom_to_locant, indicated_h_locant)`` keyed by the SAME atom indices
     as ``mol`` (index-preserving), or ``(None, None)`` for a fused/multi ring
@@ -2354,7 +2372,10 @@ def _charged_ring_locants(mol, ring_system, center_idx):
             indh = tuple(sorted(loc[i] for i in indicated_atoms))
             subst = tuple(sorted(loc[i] for i in subst_atoms))
             canonkey = tuple(canon[i] for i in order)
-            key = (het_set, senior, indh, loc[center_idx], subst, canonkey)
+            anion_key = ((loc[anion_attach_idx],)
+                         if anion_attach_idx is not None else ())
+            key = (het_set, senior, indh, loc[center_idx], anion_key,
+                   subst, canonkey)
             if best is None or key < best[0]:
                 best = (key, loc, indh[0] if indh else None)
     return best[1], best[2]
@@ -2788,18 +2809,148 @@ def _carboxyl_ring_anchor(mol, anion_idx, ring_system):
     return cC.GetIdx(), ring_attach[0]
 
 
+def _p74_ring_substituent_prefix(mol, ring_system, locants, skip_atoms):
+    """Every exo substituent on ``ring_system``, locanted in the caller's ONE
+    numbering, alphabetised into a ready-to-splice prefix string ('' when the ring
+    is bare). Returns ``None`` to FAIL CLOSED.
+
+    Assembly is delegated, not reinvented: ``format_substituent_prefix`` is
+    documented as "the ONE correct substituent-prefix + needs-parens reference"
+    (P-16.3.5 / P-16.3.3) and ``alpha_sort_key`` is the P-14.5 alphanumerical key.
+
+    The substituent token comes from ``name_substituent`` — the authoritative
+    P-29.2 namer, and the SAME primitive ``emit_cumulative_ium_ide`` already uses
+    in this module. It is deliberately preferred over
+    ``perception.chains.classify_substituent``, which counts carbons: that one
+    returns 'propyl' for isopropyl and 'methyl' for -C#N, and it is how HEAD came
+    to emit '1-propylpyridin-1-ium-2-carboxylate' for an isopropyl group — a
+    DIFFERENT molecule, intercepted only by SELF-01.
+
+    ``name_substituent`` is corroborated here for carbon-attached fragments and
+    for a LONE heteroatom (halogen / -OH / -NH2 -> bromo / hydroxy / amino, via
+    its ``_HALOGEN_MAP`` and single-atom branches). It is NOT corroborated for a
+    MULTI-atom heteroatom-rooted fragment: measured, it spells -O-CH3
+    'hydroxymethyl' and -S-CH3 'thiomethyl', both of which name a different
+    group. That is a defect in the shared primitive, not something to paper over
+    here, so such substituents FAIL CLOSED and are recorded in
+    ``."""
+    from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
+    from ..assembly.substituent_enumerator import name_substituent
+    ring = set(ring_system)
+    groups = {}
+    for ring_atom in sorted(ring):
+        if ring_atom not in locants:
+            return None
+        for nb in mol.GetAtomWithIdx(ring_atom).GetNeighbors():
+            nbi = nb.GetIdx()
+            if nbi in ring or nb.GetSymbol() == 'H' or nbi in skip_atoms:
+                continue
+            sub_atoms = _collect_substituent_atoms(mol, ring_atom, nbi, ring)
+            if sub_atoms is None:
+                return None
+            if sub_atoms & skip_atoms:
+                continue
+            if nb.GetSymbol() != 'C' and len(sub_atoms) != 1:
+                return None
+            if any(mol.GetAtomWithIdx(k).GetFormalCharge() for k in sub_atoms):
+                return None
+            token = name_substituent(mol, sorted(sub_atoms), nbi)
+            # 'substituent' is the module's documented unnameable sentinel.
+            if not token or token == 'substituent':
+                return None
+            groups.setdefault(token, []).append(locants[ring_atom])
+    if not groups:
+        return ''
+    parts = []
+    for token in sorted(groups, key=alpha_sort_key):
+        locs = sorted(groups[token])
+        parts.append(format_substituent_prefix(token, locs, len(locs)))
+    return '-'.join(parts)
+
+
+def _p74_bare_ring_stem(mol, ring_system, cation_idx):
+    """Name the parent ring hydride with EVERY exo substituent deleted and the
+    ring cation neutralized -> 'pyridine'. Returns '' on failure.
+
+    Stripping ALL substituents is the point: the predecessor named a ring that
+    still carried them, so the stem came back as '2,4-diphenylpyridine' — a name
+    whose locants belong to the neutral ring's own numbering and therefore
+    disagree with the P-74.1.2 numbering the suffixes are cited in."""
+    ring = sorted(set(ring_system))
+    work = Chem.RWMol(mol)
+    for idx in sorted((a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in ring),
+                      reverse=True):
+        work.RemoveAtom(idx)
+    try:
+        ca = work.GetAtomWithIdx(ring.index(cation_idx))
+        ca.SetFormalCharge(0)
+        ca.SetNumExplicitHs(0)
+        ca.SetNoImplicit(False)
+        bare = work.GetMol()
+        Chem.SanitizeMol(bare)
+        from ..namer import Orthonym
+        name = Orthonym(
+            style='pin', _disable_opsin_validity_gate=True
+        ).name(Chem.MolToSmiles(bare))
+    except (RuntimeError, ValueError, RecursionError):
+        return ''
+    if not name or 'unknown' in name.lower():
+        return ''
+    return name
+
+
 def emit_zwitterion_ring_carboxylate(mol, cation_idx: int, anion_idx: int) -> str:
     """F-T6 (DD3, P-74.1.2): a zwitterion whose cationic centre is a RING atom of
     the same ring that bears a carboxylate anion -> the cumulative
-    ``<ring>-<cation-locant>-ium-<carboxyl-locant>-carboxylate`` suffix (cation
-    suffix cited before anion). `[O-]C(=O)c1ccc[nH+]c1` -> pyridin-1-ium-3-
-    carboxylate; `C[n+]1ccccc1C(=O)[O-]` -> 1-methylpyridin-1-ium-2-carboxylate.
+    ``<prefixes><ring>-<cation-locant>-ium-<carboxyl-locant>-carboxylate`` name,
+    the cationic suffix cited before the anionic one.
 
-    The ring numbering (which fixes both the cation locant and the carboxyl
-    locant) is derived on the neutralized, carboxyl-bearing ring via the namer's
-    authoritative supplier; the bare ring stem is named with the carboxyl removed.
-    Returns '' on any decline (caller falls through to the legacy path)."""
+        [O-]C(=O)c1ccc[nH+]c1                        -> pyridin-1-ium-3-carboxylate
+        C[n+]1ccccc1C(=O)[O-]                        -> 1-methylpyridin-1-ium-2-carboxylate
+        C[n+]1c(C(=O)[O-])cc(-c2ccccc2)cc1-c1ccccc1  -> 1-methyl-4,6-diphenylpyridin-1-ium-2-carboxylate
+
+    the last being the Blue Book's own worked (PIN) example, ``:42456``, under
+    **P-74.1.2 "Zwitterionic compounds with at least one ionic center on a
+    characteristic group"** (heading ``:42445``).
+
+    **ONE numbering for the whole name.**  This emitter previously ran two
+    branches that each took the ring numbering from the namer's *neutral*-ring
+    supplier and then concatenated a separately-built cation-substituent prefix
+    onto the resulting *substituted* ring name.  Two different numberings met in
+    one string.  Measured consequences on the DEFAULT path, all of which
+    round-trip cleanly through OPSIN — the molecule is right and only the spelling
+    is wrong, so neither the round-trip metric nor SELF-01 could see them:
+
+      * ``1-methyl4-methylpyridin-1-ium-2-carboxylate`` — no hyphen, and
+        ``1-methyl`` + ``4-methyl`` never merged to ``1,4-dimethyl``;
+      * ``1-methyl4-bromopyridin-1-ium-2-carboxylate`` — 'bromo' must precede
+        'methyl' (P-14.5.2 alphanumerical order);
+      * ``1-methyl2,4-dimethylpyridin-1-ium-6-carboxylate`` — the carboxylate
+        numbered 6 where P-74.1.2 ``:42447`` requires 2.
+
+    and one that SELF-01 did catch, turning it into an abstention rather than a
+    wrong molecule: ``1-propylpyridin-1-ium-2-carboxylate`` for an **isopropyl**
+    group, because the old branch named substituents with the carbon-counting
+    ``classify_substituent``.
+
+    So the numbering is now derived ONCE over the ORIGINAL charged mol, with the
+    P-74.1.2 anion-attachment criterion
+    (``_charged_ring_locants(..., anion_attach_idx=...)``); every ring substituent
+    is located in THAT numbering by ``_p74_ring_substituent_prefix``; and the stem
+    comes from a ring stripped of all of them.
+
+    Fails closed ('') whenever a part is uncorroborated — a fused/bridged ring (no
+    simple cycle, so no P-74.1.2 numbering), a substituent the authoritative namer
+    cannot spell, or a formal charge anywhere outside the cation/anion pair.  The
+    caller then falls through to the legacy path."""
     from ..perception.rings import get_ring_systems
+    # Only the cation/anion pair may carry charge. A third charged atom means a
+    # further ionic centre, which P-74 requires to be expressed as its own suffix
+    # rather than swept into a prefix -- and a charged substituent is exactly what
+    # `name_substituent` would silently spell as its neutral form.
+    charged = [a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge()]
+    if set(charged) != {cation_idx, anion_idx}:
+        return ''
     ring_system = None
     try:
         for rs in get_ring_systems(mol, include_spiro=True):
@@ -2815,114 +2966,30 @@ def emit_zwitterion_ring_carboxylate(mol, cation_idx: int, anion_idx: int) -> st
         return ''
     carboxyl_c, ring_attach = anchor
 
-    cation = mol.GetAtomWithIdx(cation_idx)
-    cation_has_h = cation.GetTotalNumHs() > 0
-    sub_prefix = ''
-
-    if cation_has_h:
-        # IN-PLACE: protonated ring N. Neutralize cation (-1 H) and anion (->COOH).
-        work = Chem.RWMol(mol)
-        try:
-            ca = work.GetAtomWithIdx(cation_idx)
-            ca.SetFormalCharge(0)
-            ca.SetNoImplicit(True)
-            ca.SetNumExplicitHs(ca.GetTotalNumHs() - 1)
-            ao = work.GetAtomWithIdx(anion_idx)
-            ao.SetFormalCharge(0)
-            ao.SetNoImplicit(True)
-            ao.SetNumExplicitHs(ao.GetTotalNumHs() + 1)
-            neutral = work.GetMol()
-            Chem.SanitizeMol(neutral)
-        except (RuntimeError, ValueError):
-            return ''
-        locants = _ring_iupac_locants(neutral)
-        if not locants:
-            return ''
-        cation_locant = locants.get(cation_idx)
-        carboxyl_locant = locants.get(ring_attach)
-        stem = _name_bare_ring_after_removing(neutral, carboxyl_c)
-    else:
-        # DEMOTE: 0-H N-substituted aromatic ring cation. Sever exo substituent(s),
-        # neutralize cation in place, neutralize anion -> COOH; then work on the
-        # ring fragment that keeps the carboxyl substituent.
-        from ..perception.chains import classify_substituent
-        exo = [n.GetIdx() for n in cation.GetNeighbors()
-               if n.GetIdx() not in ring_system]
-        sub_names = []
-        for e in exo:
-            sub_atoms = _collect_substituent_atoms(mol, cation_idx, e, ring_system)
-            if sub_atoms is None:
-                return ''
-            info = classify_substituent(mol, sorted(sub_atoms), set(ring_system))
-            if not info.get('name'):
-                return ''
-            sub_names.append(info['name'])
-        if len(sub_names) != 1:
-            return ''
-        work = Chem.RWMol(mol)
-        try:
-            for e in exo:
-                work.RemoveBond(cation_idx, e)
-            ca = work.GetAtomWithIdx(cation_idx)
-            ca.SetFormalCharge(0)
-            ca.SetNoImplicit(False)
-            ao = work.GetAtomWithIdx(anion_idx)
-            ao.SetFormalCharge(0)
-            ao.SetNoImplicit(True)
-            ao.SetNumExplicitHs(ao.GetTotalNumHs() + 1)
-            severed = work.GetMol()
-            frag_mols = Chem.GetMolFrags(severed, asMols=True, sanitizeFrags=True)
-            frag_idxs = Chem.GetMolFrags(severed, asMols=False, sanitizeFrags=True)
-        except (RuntimeError, ValueError):
-            return ''
-        ring_k = [k for k, ix in enumerate(frag_idxs) if cation_idx in ix]
-        if not ring_k:
-            return ''
-        ring_frag = frag_mols[ring_k[0]]
-        ring_orig = list(frag_idxs[ring_k[0]])
-        if carboxyl_c not in ring_orig or ring_attach not in ring_orig:
-            return ''
-        cation_locant_idx = ring_orig.index(cation_idx)
-        attach_frag_idx = ring_orig.index(ring_attach)
-        carboxyl_frag_idx = ring_orig.index(carboxyl_c)
-        locants = _ring_iupac_locants(ring_frag)
-        if not locants:
-            return ''
-        cation_locant = locants.get(cation_locant_idx)
-        carboxyl_locant = locants.get(attach_frag_idx)
-        stem = _name_bare_ring_after_removing(ring_frag, carboxyl_frag_idx)
-        if stem and cation_locant is not None:
-            sub_prefix = f"{cation_locant}-{sub_names[0]}"
-
-    if not stem or cation_locant is None or carboxyl_locant is None:
+    locants, _indicated_h = _charged_ring_locants(
+        mol, ring_system, cation_idx, anion_attach_idx=ring_attach)
+    if not locants:
         return ''
-    return (f"{sub_prefix}{_elide_terminal_e(stem)}"
-            f"-{cation_locant}-ium-{carboxyl_locant}-carboxylate")
+    cation_locant = locants.get(cation_idx)
+    carboxyl_locant = locants.get(ring_attach)
+    if cation_locant is None or carboxyl_locant is None:
+        return ''
 
-
-def _name_bare_ring_after_removing(ring_mol, carboxyl_c_idx):
-    """Name the bare ring stem of ``ring_mol`` after deleting the carboxyl group
-    (the carboxyl carbon + its bonded oxygens). Returns the ring parent name
-    ('pyridine') or '' on failure."""
-    work = Chem.RWMol(ring_mol)
-    to_remove = {carboxyl_c_idx}
-    for nb in ring_mol.GetAtomWithIdx(carboxyl_c_idx).GetNeighbors():
+    # The carboxyl group is expressed by the '-carboxylate' suffix, so it must not
+    # also be enumerated as a prefix.
+    carboxyl_atoms = {carboxyl_c}
+    for nb in mol.GetAtomWithIdx(carboxyl_c).GetNeighbors():
         if nb.GetSymbol() == 'O':
-            to_remove.add(nb.GetIdx())
-    try:
-        for idx in sorted(to_remove, reverse=True):
-            work.RemoveAtom(idx)
-        bare = work.GetMol()
-        Chem.SanitizeMol(bare)
-        from ..namer import Orthonym
-        name = Orthonym(
-            style='pin', _disable_opsin_validity_gate=True
-        ).name(Chem.MolToSmiles(bare))
-    except (RuntimeError, ValueError, RecursionError):
+            carboxyl_atoms.add(nb.GetIdx())
+
+    prefix = _p74_ring_substituent_prefix(mol, ring_system, locants, carboxyl_atoms)
+    if prefix is None:
         return ''
-    if not name or 'unknown' in name.lower():
+    stem = _p74_bare_ring_stem(mol, ring_system, cation_idx)
+    if not stem:
         return ''
-    return name
+    return (f"{prefix}{_elide_terminal_e(stem)}"
+            f"-{cation_locant}-ium-{carboxyl_locant}-carboxylate")
 
 
 def _ionize_acid_name(neutral_name: str, total_charge: int,
