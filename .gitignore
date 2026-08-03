@@ -72,3 +72,16 @@ opsin/
 # Gate run artifacts ( + v22_gate.py completion sentinel)
 gate_verdict.json
 gate_run.log
+# Concurrency locks guarding those artifacts against a second gate. flock-based,
+# so they are never stale -- the kernel releases them even on SIGKILL.
+*.lock
+
+# JVM crash dumps. 19 of these had accumulated untracked in the repo root and
+# were acknowledged in NO doc or commit; they are all from the JPype in-process
+# JVM (argv `-Xmx512m -Djava.awt.headless=true --enable-native-access=ALL-UNNAMED`,
+# no `-jar`), 15 within three days. Ignoring them keeps `git status` readable --
+# it does NOT mean they are benign. The open investigation and what is and is not
+# established about their cause:  §H4.
+hs_err_pid*.log
+replay_pid*.log
+core.[0-9]*
