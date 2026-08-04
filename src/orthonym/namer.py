@@ -2422,6 +2422,20 @@ class Orthonym:
                 clear_abstention()
             except Exception:
                 pass
+            # v30 PE-1: same per-top-level-molecule invariant as the clears above.
+            # A batch consumer names hundreds of inputs in one process; without
+            # this reset, molecule N's audit would carry molecule N-1's discarded
+            # candidates and manufacture selection failures that never happened.
+            # Stays ENABLED across the reset (clear_ledger, not disable).
+            try:
+                from .metrics.candidate_ledger import (
+                    clear_ledger as _clear_cand_ledger,
+                    is_enabled as _cand_ledger_on,
+                )
+                if _cand_ledger_on():
+                    _clear_cand_ledger()
+            except Exception:
+                pass
             # v29 P1: reset the binding-proof ledger per top-level molecule,
             # for the same reason as the three clears above. Without it a
             # molecule that records no spine would finalize against the
@@ -3127,6 +3141,22 @@ class Orthonym:
         two arguments -- so the isotope exit (which sits before that block)
         can route through it unchanged.
         """
+        # v30 PE-1: record the name actually returned, in its OWN try/except and
+        # BEFORE the ``off`` short-circuit below -- otherwise the emitted record
+        # would be silently absent in the default binding-proof mode, which is the
+        # mode every measurement runs in.
+        #
+        # Recorded explicitly rather than inferred by looking the string up among
+        # the candidates, because measured (PE1 plan §1, C10): the pool held
+        # '(2R)-piperidine-2-carboxylic acid' while naming emitted
+        # '(2R)-piperidine-2-carboxylate'. A lookup would report "emitted name not
+        # among candidates" for every anion row.
+        try:
+            from .metrics import candidate_ledger as _cl
+            if _cl.is_enabled():
+                _cl.record_candidate("namer._finish", _cl.Stage.EMITTED, name)
+        except Exception:  # pragma: no cover - telemetry must never break naming
+            pass
         try:
             if self._binding_proof == "off":
                 return name

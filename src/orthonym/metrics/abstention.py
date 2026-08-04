@@ -38,6 +38,7 @@ from enum import Enum
 from typing import NamedTuple, Optional
 
 from ..errors import is_failure_name
+from . import candidate_ledger
 
 __all__ = [
     "AbstentionCode",
@@ -118,6 +119,19 @@ def record_suppression(code: AbstentionCode, detail: Optional[str] = None,
     overridden (first-wins among themselves). Never raises.
     """
     try:
+        # v30 PE-1: mirror into the candidate ledger BEFORE the first-writer-wins
+        # logic below discards this event. That precedence rule is right for "which
+        # site declined" and wrong for "what was thrown away" -- a suppression that
+        # loses the race here still destroyed a candidate, and the ledger must see
+        # it. Off unless a consumer enabled it.
+        if candidate and candidate_ledger.is_enabled():
+            # Scope/depth come from candidate_ledger.resolve_scope() (the one
+            # place that answers it), so a gate suppressing a nested fragment
+            # naming is not scored against the whole input.
+            candidate_ledger.record_candidate(
+                f"{code}", candidate_ledger.Stage.SUPPRESSED, candidate,
+                detail=detail,
+            )
         existing = getattr(_slot, "record", None)
         if existing is None:
             _slot.record = AbstentionRecord(code, detail)

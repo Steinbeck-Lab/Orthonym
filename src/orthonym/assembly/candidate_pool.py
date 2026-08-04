@@ -102,6 +102,16 @@ except ImportError:
 # contract test).
 from .name_tree import is_coarse_node
 
+# v30 PE-1 candidate ledger. ``metrics.candidate_ledger`` is a leaf module
+# (threading + typing only), so this is cycle-free for the same reason the
+# ``name_tree`` import above is. The ledger is OFF unless a consumer calls
+# ``enable()``, so the cost on the production path is one boolean test per
+# ``add()`` return; the byte-identical contract is asserted in
+# tests/unit/metrics/test_candidate_ledger.py.
+from ..metrics.candidate_ledger import Stage as _LedgerStage
+from ..metrics.candidate_ledger import is_enabled as _ledger_on
+from ..metrics.candidate_ledger import record_candidate as _ledger_record
+
 logger = logging.getLogger(__name__)
 
 
@@ -827,6 +837,11 @@ class CandidatePool:
                 "handler=%s name=%r ratio=%.3f < floor=%.3f",
                 handler_id, name, ratio_val, RATIO_REJECT_FLOOR,
             )
+            # v30 PE-1 ledger: a candidate WAS built and this floor threw it away.
+            # Recorded after the decision so it cannot influence it.
+            if _ledger_on():
+                _ledger_record(handler_id, _LedgerStage.GATE_REJECTED, name,
+                               detail=f"ratio_reject_floor:{ratio_val:.3f}")
             return None
         # Tier B gate enforcement (preserves _confidence_gate behavior).
         # Phase 146 SC-8: the gate threshold is read from the module-level
@@ -836,6 +851,9 @@ class CandidatePool:
         if policy is not None and policy.tier == 'ring_b':
             if cand.confidence < CONFIDENCE_GATE_THRESHOLD:
                 # Gate rejected — return None so caller falls through
+                if _ledger_on():
+                    _ledger_record(handler_id, _LedgerStage.GATE_REJECTED, name,
+                                   detail=f"tier_b_confidence:{cand.confidence:.3f}")
                 return None
         # Set parent_atom_indices POST-HOC (Risk 1)
         cand.parent_atom_indices = parent_atom_indices
@@ -950,6 +968,9 @@ class CandidatePool:
         if policy is not None and policy.direct_return:
             if self._direct_return_winner is None:
                 self._direct_return_winner = cand
+        if _ledger_on():
+            _ledger_record(handler_id, _LedgerStage.PRODUCED, name,
+                           detail=f"confidence:{cand.confidence:.3f}")
         return cand
 
     def best(self) -> Optional[CandidateName]:

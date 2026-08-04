@@ -41,6 +41,11 @@ from .naming_utils import get_alkyl_name, SIMPLE_MULTIPLIERS
 from .substituent_naming import name_substituent_fragment, _name_aryl_methyl_ether
 from .substituent_prefix_forms import _check_substituent_prefix_form
 from ..rules.seniority import get_prefix
+# v30 PE-1 candidate ledger. Leaf module (threading + typing only), so cycle-free;
+# OFF unless a consumer calls enable(), so the production cost is one boolean test.
+from ..metrics.candidate_ledger import Scope as _LedgerScope
+from ..metrics.candidate_ledger import Stage as _LedgerStage
+from ..metrics.candidate_ledger import record_candidate as _ledger_record
 
 logger = logging.getLogger(__name__)
 
@@ -789,6 +794,23 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
 
     token = _name_substituent_cascade(
         mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
+
+    # v30 PE-1 candidate ledger: FRAGMENT scope, recorded at the cascade's single
+    # production call site rather than by wrapping the cascade itself (a rename
+    # would break the AST assertions in
+    # tests/unit/assembly/test_substituent_enumerator_tier_05.py).
+    #
+    # Scope matters more here than anywhere else in the instrument. Measured
+    # (PE1 plan §1): this cascade produces genuinely CORRECT names like
+    # 'N,N-diethylethanamine' for a fragment of a molecule whose whole-molecule
+    # candidate was sentinel-spliced. Round-tripping a fragment name against the
+    # whole input would file it as a wrong molecule and manufacture a large fake
+    # producer-correctness class, so consumers must filter on scope.
+    if token is not None:
+        _ledger_record("substituent_enumerator._name_substituent_cascade",
+                       _LedgerStage.PRODUCED, token,
+                       scope=_LedgerScope.FRAGMENT,
+                       detail=f"allow_mancude:{allow_mancude}")
 
     if free_valence in (2, 3) and _token_asserts_single_free_valence(token):
         from ..metrics.abstention import AbstentionCode, record_abstention
