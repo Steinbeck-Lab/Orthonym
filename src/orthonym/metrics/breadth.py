@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import collections
 import re
-from typing import Any, Dict, Iterable, List, Sequence, Set
+from typing import Any, Dict, Iterable, List, Sequence, Set, Tuple
 
 from ..errors import is_failure_name
 
@@ -23,6 +23,7 @@ __all__ = [
     "ring_systems",
     "classify_outcome",
     "parse_refusal_codes",
+    "parse_suppressed_candidates",
     "residual_refusal_code",
     "terminal_site",
     "terminal_stage",
@@ -112,6 +113,54 @@ _GATE_RES = (
     (re.compile(r"OPSIN validity gate suppressed unparseable name"),
      "GATE-OPSIN:unparseable"),
 )
+
+
+# The SELF-01 line's payload. ``_GATE_RES`` above matches the same line to
+# ATTRIBUTE the abstention but has no capture groups, so the built candidate and
+# the constitution OPSIN read it as were both discarded -- which is why the 162
+# ``GATE_SUPPRESSED:self01_mismatch`` rows could be counted but never split by
+# mechanism.
+#
+# The name group is greedy and terminated by "' (opsin=", NOT ``[^']+``: IUPAC
+# names routinely contain primes (2,2'-bi-3,1,5-benzoxadiarsepine), and a
+# first-apostrophe match would report a truncated string as the suppressed
+# candidate. ``re.search`` rather than ``match`` so a logger prefix
+# ("WARNING:orthonym.namer:") does not defeat it.
+_SELF01_PAYLOAD_RE = re.compile(
+    r"SELF-01 suppressed \(different molecule\): '(.*)' \(opsin=(.*)\)\s*$"
+)
+
+
+def parse_suppressed_candidates(log_lines: Iterable[str]) -> Dict[str, Any]:
+    """The candidate(s) SELF-01 rejected for ONE molecule, from its log lines.
+
+    Returns ``{}`` when nothing was suppressed, so a caller can ``row.update()``
+    it without introducing null keys onto rows the gate never touched.
+
+    The LAST suppression is reported as *the* suppressed candidate because the
+    retry cascade (``namer.py:2323-2354``) re-submits alternatives and each is
+    re-gated, so the final rejection is the one that ended the molecule. All of
+    them are kept under ``suppressed_all`` as well: "one bad candidate" and "the
+    producer kept offering variants of the same wrong structure" need different
+    fixes, and only the full list distinguishes them.
+
+    Scope: this reads the SELF-01 line ONLY. The OPSIN validity gate suppresses
+    names too, but for a different reason (unparseable, not wrong molecule), and
+    conflating the two would size a grammar defect as a constitution defect.
+    """
+    found: List[Tuple[str, str]] = []
+    for line in log_lines:
+        m = _SELF01_PAYLOAD_RE.search(line)
+        if m:
+            found.append((m.group(1), m.group(2)))
+    if not found:
+        return {}
+    return {
+        "suppressed_name": found[-1][0],
+        "suppressed_opsin_smiles": found[-1][1],
+        "suppressed_count": len(found),
+        "suppressed_all": found,
+    }
 
 
 def parse_refusal_codes(log_lines: Iterable[str]) -> List[str]:
