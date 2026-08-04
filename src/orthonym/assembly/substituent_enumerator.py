@@ -1800,6 +1800,59 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                 except Exception:
                     pass
 
+    # ---- Tier 1.9: the intact -C(=O)OH group is `carboxy`, never `formyl` ----
+    # P-65.1.1.2. A graph-shape guard, and it has to be here rather than in
+    # `parent_to_prefix`, because that function receives only a NAME.
+    #
+    # Without it, Tier 4 names the fragment recursively as a whole compound --
+    # ``O=CO`` names as *formic acid* -- and `parent_to_prefix` then converts that
+    # through ``_ACID_TO_ACYL_PREFIX = {'formic acid': 'formyl', ...}``
+    # (`substituent_naming.py:3460`). That mapping is right for an ACYL group and
+    # wrong for an intact acid, and the reasoning is decisive rather than stylistic:
+    # `formyl` is ``HC(=O)-``, whose fragment is two atoms and names as
+    # *formaldehyde*. If the recursive namer said *formic acid*, the fragment still
+    # carries its hydroxyl, so `carboxy` is right and `formyl` cannot be.
+    #
+    # Measured cost of not having it: composing von Baeyer parents with these
+    # prefixes emitted ``5,7-diformyl-...`` for an input whose only such group is
+    # ``C(=O)O`` -- a name two oxygens short, i.e. a different molecule that SELF-01
+    # then has to suppress. One confirmed cause of 34/71 wrong composed rows
+    # ().
+    #
+    # `rules/ring_assemblies.py:1526` already does exactly this for the ring-assembly
+    # path and is the model; this is the same predicate reused on the shared
+    # substituent path rather than a second implementation of it.
+    #
+    # `parent_to_prefix` is deliberately left alone: `rules/acid_halides.py:16`
+    # documents ``formic acid -> formyl`` as correct for acid halides,
+    # `decomposition/fragment_assembly.py:136` holds its own copy, and
+    # `tests/unit/rules/test_v29_phase7_prefix_vocabulary.py:51` asserts its current
+    # return value.
+    # ⚠ TWO attachment conventions circulate and the guard must survive both.
+    # `_is_carboxyl_substituent` wants the FRAGMENT-side carbon; several callers pass
+    # the PARENT-side atom instead (`SubstituentInfo.attach_mol_idx`), which
+    # `rules/ring_substituents.py:1869-1879` normalizes with the same three lines.
+    # My first version of this guard used the raw value, so it fired in a unit test
+    # that happened to pass a fragment-side index and NEVER fired in production --
+    # green for the wrong reason, and the corpus measurement was unchanged, which is
+    # what exposed it.
+    try:
+        from ..rules.ring_assemblies import _is_carboxyl_substituent
+        _cx_attach = attach_idx
+        if _cx_attach not in frag_atoms_set:
+            _cx_attach = next(
+                (n.GetIdx()
+                 for n in mol.GetAtomWithIdx(_cx_attach).GetNeighbors()
+                 if n.GetIdx() in frag_atoms_set),
+                None,
+            )
+        if (_cx_attach is not None
+                and _is_carboxyl_substituent(
+                    mol, list(frag_atoms_set), _cx_attach)):
+            return _stereo_route('carboxy')
+    except Exception:  # pragma: no cover - a guard must never break naming
+        pass
+
     # ---- Tier 2: Static fragment cache (O(1)) ----
     try:
         frag_smiles = Chem.MolFragmentToSmiles(mol, list(frag_atoms_set))
