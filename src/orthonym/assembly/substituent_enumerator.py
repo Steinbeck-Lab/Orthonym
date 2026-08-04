@@ -787,6 +787,41 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # declines to CONSTRUCT for those), so the heteroatom guard further down is
     # unchanged.
     frag_atoms_set = set(frag_atoms)
+    # ⚠ NORMALIZE the attachment, so the documented contract is self-enforcing.
+    #
+    # This function's contract is that ``attach_idx`` is the atom WITHIN
+    # ``frag_atoms`` that bonds to the parent, but nothing enforced it, and TWO
+    # conventions circulate in this tree: ``SubstituentInfo.attach_mol_idx`` is the
+    # PARENT-side atom. Production callers each normalize on their own -- explicitly
+    # at ``rules/ring_substituents.py:1869-1879``, implicitly at
+    # ``assembly/general_engine.py:760`` (neighbours of ``attach_mol_idx``
+    # restricted to the fragment) -- so this is a NO-OP for them, verified by an
+    # unchanged dev500.
+    #
+    # It is here because an unenforced convention silently returns a WRONG or None
+    # token instead of failing, and it already cost real work twice in one session:
+    # a `carboxy` guard that was green in a unit test and dead in production, and a
+    # measurement that overstated the substituent-coverage bucket by 34 rows
+    # (109 real vs 143 reported) because probe scripts passed the raw parent-side
+    # atom. Measured on 8 probes with the raw value: only 2 named; after
+    # normalising, 8 named -- `2-oxoethyl`, `2-carboxyethyl`, `8-oxooctyl` and
+    # `1-hydroxyethyl` (locant present) among them.
+    # Wrapped, because `attach_idx` is not guaranteed to be a valid atom index:
+    # `test_invalid_attach_idx_does_not_crash` passes an out-of-range one on
+    # purpose, and `GetAtomWithIdx` raises `RuntimeError: Range Error` rather than
+    # returning None. Leaving it to raise turned a documented degradation contract
+    # into a crash -- caught by that test, which is exactly why it exists.
+    if attach_idx is not None and attach_idx not in frag_atoms_set:
+        try:
+            _fs = next(
+                (n.GetIdx() for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+                 if n.GetIdx() in frag_atoms_set),
+                None,
+            )
+        except Exception:  # noqa: BLE001 - an invalid index is a decline, not a crash
+            _fs = None
+        if _fs is not None:
+            attach_idx = _fs
     verdict = carbon_free_valence_prefix(mol, frag_atoms_set, attach_idx)
     if verdict.prefix is not None:
         return verdict.prefix
@@ -1850,6 +1885,63 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                 and _is_carboxyl_substituent(
                     mol, list(frag_atoms_set), _cx_attach)):
             return _stereo_route('carboxy')
+    except Exception:  # pragma: no cover - a guard must never break naming
+        pass
+
+    # ---- Tier 1.95: an ESTER-OXYGEN attachment is `<acyl>oxy` (P-65.6.3.2.3) ----
+    # The sibling of the carboxy guard above, and the SAME root cause: the acid
+    # name -> acyl prefix table (`substituent_naming.py:3460`) is applied to a
+    # fragment that retains an oxygen the acyl group does not have. Which oxygen
+    # is lost depends only on where the fragment attaches:
+    #
+    #     attached via the carbonyl C, keeping -OH  -> `carboxy`   (guard above)
+    #     attached via the ester O,    keeping -O-  -> `<acyl>oxy` (here)
+    #
+    # Measured: `-O-C(=O)CH3` came out `acetyl`, which is `-C(=O)CH3`, an oxygen
+    # SHORT -- and OPSIN confirms the two differ, `(acetyl)benzene` parsing to
+    # `C(C)(=O)C1=CC=CC=C1` against `(acetyloxy)benzene`'s
+    # `C(C)(=O)OC1=CC=CC=C1`. So this is a wrong molecule, not a spelling choice.
+    #
+    # Composing acyl + `oxy` is the nomenclature operation P-65.6.3.2.3 specifies
+    # for an ester cited as a prefix, NOT string surgery on an emitted name: the
+    # acyl morpheme is looked up for the fragment and the `oxy` morpheme is
+    # appended, which is how the prefix is formed.
+    #
+    # Longer acyloxy chains (`-OC(=O)CH2CH3`) never reach here -- the chain path
+    # already spells them `2-oxo-1-oxabutyl`, verified RT-exact -- so this fires
+    # only for the short acids the retained table intercepts first.
+    try:
+        if len(frag_atoms_set) >= 3:
+            _o = mol.GetAtomWithIdx(attach_idx)
+            if (_o.GetSymbol() == 'O' and _o.GetFormalCharge() == 0
+                    and _o.GetTotalNumHs() == 0):
+                _nbrs = [n.GetIdx() for n in _o.GetNeighbors()
+                         if n.GetIdx() in frag_atoms_set]
+                if len(_nbrs) == 1:
+                    _c = mol.GetAtomWithIdx(_nbrs[0])
+                    _has_oxo = any(
+                        b.GetBondType() == Chem.BondType.DOUBLE
+                        and b.GetOtherAtom(_c).GetSymbol() == 'O'
+                        and b.GetOtherAtom(_c).GetIdx() in frag_atoms_set
+                        for b in _c.GetBonds())
+                    if _c.GetSymbol() == 'C' and _has_oxo:
+                        from .fragment_naming import FRAGMENT_NAME_CACHE
+                        from .substituent_naming import (
+                            ATTACH_LOCANT_UNKNOWN, parent_to_prefix,
+                        )
+                        _fs = Chem.MolFragmentToSmiles(
+                            mol, list(frag_atoms_set))
+                        _acid = FRAGMENT_NAME_CACHE.get(Chem.CanonSmiles(_fs))
+                        if _acid:
+                            _n_c = sum(
+                                1 for i in frag_atoms_set
+                                if mol.GetAtomWithIdx(i).GetAtomicNum() == 6)
+                            _acyl = parent_to_prefix(
+                                _acid, chain_length=_n_c,
+                                attach_locant=ATTACH_LOCANT_UNKNOWN)
+                            if (_acyl and _acyl.endswith('yl')
+                                    and 'oxy' not in _acyl):
+                                return _stereo_route(f'{_acyl}oxy')
     except Exception:  # pragma: no cover - a guard must never break naming
         pass
 
