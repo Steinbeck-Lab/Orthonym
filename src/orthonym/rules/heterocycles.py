@@ -800,14 +800,24 @@ def build_hw_name(
     # Aromatic = unsaturated for HW naming purposes
     saturated_for_stem = is_saturated and not is_aromatic
 
-    # Stem selection (P-22.2.2.1.2, Table 2.3): the saturated 3-6-ring stem
-    # takes its N-containing form (-iridine/-etidine/-olidine/-inane) whenever
-    # NITROGEN is present ANYWHERE in the ring — not merely when the senior
-    # heteroatom is N. So 1,3-oxazolidine (O senior, N present) uses -olidine
-    # and 1,4-oxazinane uses -inane, while N-free rings (1,3-oxathiolane,
-    # 1,4-oxathiane) keep -olane/-ane. get_hw_stem selects the N-form when its
-    # `heteroatom` arg is 'N', so pass 'N' iff any ring heteroatom is nitrogen;
-    # otherwise pass the senior element (which drives the 6-ring O/S -ane form).
+    # Stem selection. TWO DIFFERENT RULES, by ring size — do not merge them:
+    #
+    # 3-, 4- and 5-membered rings — P-22.2.2.1.5.2 (BlueBookV2.md:8394):
+    #   "The stems 'iridine', 'etidine', and 'olidine' are used when nitrogen
+    #   atoms are present in the ring; otherwise the 'ane' stems are used."
+    # So the N-form is keyed on nitrogen being present ANYWHERE, not on nitrogen
+    # being the senior heteroatom: 1,3-oxazolidine (O senior, N present) uses
+    # -olidine, while N-free 1,3-oxathiolane keeps -olane. `stem_heteroatom`
+    # below carries that "is there an N" answer, and get_hw_stem keys on it.
+    #
+    # 6-membered rings — P-22.2.2.1.6 (:8411): "The stem for six-membered rings
+    # depends on the least senior heteroatom in the ring, i.e., the heteroatom
+    # whose name directly precedes the stem." That is a property of the SET, so
+    # get_hw_stem derives it itself from `ring_heteroatoms` and IGNORES
+    # `stem_heteroatom` for size 6. Passing the senior element here used to
+    # decide the 6-ring stem, which emitted 'oxarsane' for the O+As ring whose
+    # PIN is 1,3-oxarsinane (:8455); nitrogen rings were right only because N
+    # and the least senior atom happen to share Table 2.5 group B.
     has_nitrogen = 'N' in element_locants
     dominant_elem = elements_by_priority[0] if elements_by_priority else 'O'
     stem_heteroatom = 'N' if has_nitrogen else dominant_elem
