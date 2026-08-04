@@ -79,10 +79,15 @@ def test_off_table_element_refuses_rather_than_inventing_a_morpheme():
     assert got is None
 
 
-def test_ring_fragments_are_still_declined_in_this_task():
-    """Branched acyclic fragments now name (Task 2); ring-bearing ones are Task 4."""
+def test_ring_fragments_now_name_via_the_composite_branch():
+    """RETIRED SCOPE TEST. Tasks 1-3 declined ring-bearing fragments and this test
+    pinned that intermediate limitation; Task 4 deliberately removes it. Kept as a
+    positive assertion rather than deleted, so the transition is visible in history
+    instead of a test simply vanishing. Ring coverage proper lives in
+    tests/unit/rules/test_terminal_fragment_composite.py."""
     mol = Chem.MolFromSmiles("C1CCCCC1")
-    assert terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0) is None
+    got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0)
+    assert got is not None and got.name == "cyclohexan-1-yl"
 
 
 def test_never_raises_on_degenerate_input():

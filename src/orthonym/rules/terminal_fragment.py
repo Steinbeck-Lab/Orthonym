@@ -115,15 +115,50 @@ def _is_acyclic(mol, atoms: Set[int]) -> bool:
     return not any(ri.NumAtomRings(a) > 0 for a in atoms)
 
 
-def _branches_off(mol, frag: Set[int], backbone: Sequence[int]):
-    """(backbone_locant, branch_attachment_atom, branch_atom_set) per branch.
+def _has_defined_stereo(mol, frag: Set[int]) -> bool:
+    """True if any atom or wholly-internal bond of ``frag`` carries DEFINED stereo.
 
-    A branch is a connected component of ``frag - backbone`` together with the
-    backbone atom it hangs from. Collected by BFS so a branch of any depth comes
-    out whole -- a depth cap here would silently truncate atoms.
+    ⚠ **Do not relax this to raise coverage.** This module emits no
+    stereodescriptors at all, and SELF-01 -- the gate that delivers 0-wrong --
+    suppresses only on a *verified constitutional* mismatch
+    (``namer.py:920-924``). A stereocentre is not a constitutional difference, so
+    an achiral token emitted for a stereocentred fragment ships a DIFFERENT
+    COMPOUND with every gate green. Nothing downstream catches it.
+
+    Keys on DEFINED stereo, not on the presence of a double bond: an undefined
+    double bond is ordinary Task 3 unsaturation and must still name, or the guard
+    would swallow that whole feature.
+
+    Only stereo INSIDE the fragment matters. A centre elsewhere in the molecule
+    belongs to whatever names that part; blocking on it would refuse fragments
+    this module handles correctly.
     """
-    on_backbone = set(backbone)
-    locant_of = {a: i + 1 for i, a in enumerate(backbone)}
+    for idx in frag:
+        if mol.GetAtomWithIdx(idx).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+            return True
+    for bond in mol.GetBonds():
+        if (bond.GetBeginAtomIdx() in frag and bond.GetEndAtomIdx() in frag
+                and bond.GetStereo() != Chem.BondStereo.STEREONONE):
+            return True
+    return False
+
+
+def _branches_off(mol, frag: Set[int], skeleton: Sequence[int],
+                  locant_of: Dict[int, int]):
+    """(locant, branch_attachment_atom, branch_atom_set) per branch.
+
+    A branch is a connected component of ``frag - skeleton`` together with the
+    skeleton atom it hangs from. Collected by BFS so a branch of any depth comes
+    out whole -- a depth cap here would silently truncate atoms.
+
+    ``locant_of`` is SUPPLIED, never derived from list position. For a chain it is
+    position-based; for a ring system it is the ring's own numbering, which skips
+    ``4 -> 4a -> 5``, so a position-derived locant would silently disagree with
+    the numbering the ring name was actually spelled from -- the same defect class
+    as ``.
+    """
+    on_backbone = set(skeleton)
+    backbone = skeleton
     out = []
     claimed: Set[int] = set()
     for b in backbone:
@@ -282,6 +317,90 @@ def terminal_fragment_name(
         return None
 
 
+def _ring_system_of(mol, frag: Set[int], seed: int) -> Set[int]:
+    """The connected ring SYSTEM containing ``seed``, restricted to ``frag``.
+
+    Union of every SSSR ring sharing an atom with the growing set, so ortho-fused,
+    bridged and spiro systems come out as ONE system -- the same grouping
+    ``metrics/breadth.ring_systems`` uses. Rings joined only by a bond (biphenyl)
+    stay separate, which is correct: they are two systems, and the second is a
+    decoration of the first.
+    """
+    rings = [set(r) & frag for r in mol.GetRingInfo().AtomRings()]
+    system = {seed}
+    changed = True
+    while changed:
+        changed = False
+        for r in rings:
+            if r & system and not r <= system:
+                system |= r
+                changed = True
+    return system
+
+
+def _composite_fragment_name(
+    mol, frag: Set[int], attach_idx: int,
+) -> Optional[TerminalFragmentName]:
+    """A fragment containing at least one ring system.
+
+    The ring system carrying the attachment is named by
+    ``terminal_ring.terminal_ring_name`` -- reused unchanged, so P-22.2.3 skeletal
+    replacement, lambda, ring multiple-bond locants and its own reconstruction
+    audit all apply -- and every remaining branch recurses through
+    ``_terminal_fragment_name``.
+
+    Refuses whole if the ring refuses or ANY decoration refuses: emitting the ring
+    alone would drop the decoration's atoms, which is the defect this module
+    exists to remove.
+
+    Scope, stated: when the attachment atom is NOT itself a ring atom (a chain
+    leading to a ring), this declines rather than half-naming. Handling it needs a
+    chain backbone that terminates in a ring system, which is a separate build.
+    """
+    from .terminal_ring import terminal_ring_name
+
+    ri = mol.GetRingInfo()
+    if ri.NumAtomRings(attach_idx) < 1:
+        logger.info("terminal_fragment: attachment is acyclic but the fragment "
+                    "carries a ring; out of implemented scope, refuse")
+        return None
+
+    core = _ring_system_of(mol, frag, attach_idx)
+    tr = terminal_ring_name(mol, sorted(core), attach_idx)
+    if tr is None:
+        logger.info("terminal_fragment: terminal_ring declined the %d-atom ring "
+                    "system; refuse", len(core))
+        return None
+
+    accounted = set(core)
+    prefix_tokens: List[tuple] = []
+    # The RING's own numbering is authoritative -- it skips 4 -> 4a -> 5, so a
+    # position-derived locant would disagree with the name it was spelled from.
+    for locant, battach, comp in _branches_off(mol, frag, sorted(core),
+                                               tr.numbering):
+        sub = _terminal_fragment_name(mol, comp, battach)
+        if sub is None:
+            logger.info("terminal_fragment: ring decoration at locant %s "
+                        "unnameable; refusing the whole fragment", locant)
+            return None
+        accounted |= set(sub.atoms)
+        token = enclose_if_compound(sub.name)
+        prefix_tokens.append((alpha_sort_key(sub.name), locant, token))
+
+    name = tr.name
+    if prefix_tokens:
+        name = _join_prefix_block(_assemble_prefixes(prefix_tokens), name)
+
+    if accounted != frag:
+        logger.error("terminal_fragment: composite completeness violated "
+                     "(%d of %d); refuse", len(accounted), len(frag))
+        return None
+    return TerminalFragmentName(
+        name=name, numbering=dict(tr.numbering),
+        basis="composite" if prefix_tokens else "ring",
+        atoms=frozenset(accounted))
+
+
 def _terminal_fragment_name(
     mol, frag_atoms, attach_idx: int,
 ) -> Optional[TerminalFragmentName]:
@@ -301,12 +420,21 @@ def _terminal_fragment_name(
     # species.
     if any(mol.GetAtomWithIdx(a).GetFormalCharge() != 0 for a in frag):
         return None
+    # Stereochemistry: refuse rather than emit an achiral token for a fragment
+    # that carries a defined centre or configuration. See _has_defined_stereo --
+    # SELF-01 is constitution-only and cannot catch this.
+    if _has_defined_stereo(mol, frag):
+        logger.info("terminal_fragment: fragment carries defined stereo and this "
+                    "module emits no stereodescriptors; refuse")
+        return None
+
     if not _is_acyclic(mol, frag):
-        return None                      # Task 4 adds ring systems
+        return _composite_fragment_name(mol, frag, attach_idx)
 
     ranks = _canonical_ranks(mol)
     backbone = _backbone_from(mol, frag, attach_idx, ranks)
-    branches = _branches_off(mol, frag, backbone)
+    numbering_for_branches = {a: i + 1 for i, a in enumerate(backbone)}
+    branches = _branches_off(mol, frag, backbone, numbering_for_branches)
 
     # Backbone unsaturation: every bond order must have an admitted morpheme,
     # or the fragment refuses -- spelling an unrepresentable bond as single
