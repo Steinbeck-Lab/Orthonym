@@ -278,3 +278,69 @@ def test_simple_branch_still_bare_with_basic_multiplier(smiles, expected):
     assert got is not None, f"{smiles} refused"
     assert got.name == expected
     assert got.atoms == frozenset(frag)
+
+
+# ---------------------------------------------------------------------------
+# Task 3: backbone unsaturation (ene/yne). The explicit '-1-yl' form is used
+# throughout ('but-3-en-1-yl', never the bare '...enyl' contraction) --
+# OPSIN-verified 2026-08-04 that '(2-oxabut-3-en-1-yl)benzene' parses to the
+# right structure.
+#
+# ⚠ TWO of the task brief's four expected values were corrected here
+# (2026-08-04), verified directly from atom H-count + bond connectivity (no
+# OPSIN needed -- this is pure structural bookkeeping), independently of what
+# this module's own implementation happens to emit:
+#
+#   'C=CCC': atom 0 has 2 H and is DOUBLE-bonded to atom 1 -- it IS the
+#   alkene-bearing terminal carbon of but-1-ene (CH2=CH-CH2-CH3), not the
+#   methyl terminal. `_frag` attaches at atom 0, and the free valence MUST
+#   receive locant 1 (only one numbering direction exists from a terminal
+#   atom of an unbranched chain), which forces the double bond onto locants
+#   1,2: 'but-1-en-1-yl'. The brief's 'but-3-en-1-yl' names the substituent
+#   from the OTHER terminal (methyl end, atom 3) of the SAME parent alkene --
+#   a chemically different group ('but-1-en-1-yl' is -CH=CH-CH2-CH3;
+#   'but-3-en-1-yl' is -CH2-CH2-CH=CH2).
+#
+#   'C#CCC': identical shape -- atom 0 has 1 H and is TRIPLE-bonded to atom 1
+#   (the terminal alkyne carbon of but-1-yne), so attach=0 gives
+#   'but-1-yn-1-yl', not the brief's 'but-3-yn-1-yl'.
+#
+# 'CC=CC' (atom 0 is the CH3 terminal, double bond is at position 1-2) and
+# 'COC=C' (atom 0 is CH3, the alkene is at the far end) both already attach at
+# the saturated end, so their brief values are unchanged and check out.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("smiles,expected", [
+    ("C=CCC",   "but-1-en-1-yl"),
+    ("CC=CC",   "but-2-en-1-yl"),
+    ("C#CCC",   "but-1-yn-1-yl"),
+    # replacement + unsaturation together
+    ("COC=C",   "2-oxabut-3-en-1-yl"),
+])
+def test_unsaturated_backbone(smiles, expected):
+    mol, frag, attach = _frag(smiles)
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None, f"{smiles} refused"
+    assert got.name == expected
+    assert got.atoms == frozenset(frag)
+
+
+def test_a_saturated_backbone_is_unaffected_by_the_unsaturation_code():
+    """Regression guard for Task 3: adding ene/yne handling must not change the
+    saturated spelling. (This asserts a NAME, not a refusal -- see the separate
+    refusal test below.)"""
+    mol = Chem.MolFromSmiles("CCCC")
+    got = terminal_fragment_name(mol, set(range(4)), 0)
+    assert got is not None and got.name == "butyl"
+
+
+def test_an_unspellable_bond_order_refuses():
+    """A bond order with no morpheme must refuse, not be spelled as single.
+
+    Spelling an unrepresentable bond as single denotes a DIFFERENT molecule,
+    which is the failure mode this whole phase exists to remove. Built with an
+    explicitly aromatic acyclic bond, which the ene/yne branch cannot express.
+    """
+    mol = Chem.RWMol(Chem.MolFromSmiles("CCCC"))
+    mol.GetBondBetweenAtoms(1, 2).SetBondType(Chem.BondType.AROMATIC)
+    got = terminal_fragment_name(mol.GetMol(), set(range(4)), 0)
+    assert got is None

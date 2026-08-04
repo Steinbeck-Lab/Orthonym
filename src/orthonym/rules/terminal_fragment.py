@@ -187,6 +187,28 @@ def _assemble_prefixes(tokens) -> str:
     return "-".join(parts)
 
 
+def _chain_stem_with_unsaturation(n: int, ene: List[int], yne: List[int]) -> str:
+    """'butyl' / 'but-3-en-1-yl' / 'but-3-yn-1-yl' / 'but-1-en-3-yn-1-yl'.
+
+    P-31.1.1.1: 'ene' always precedes 'yne', with elision of the final 'e' of
+    'ene'. The attachment locant is cited explicitly ('-1-yl') whenever an
+    unsaturation locant is present -- OPSIN-verified: '(2-oxabut-3-en-1-yl)benzene'
+    parses, and the bare '...enyl' contraction is not used here because the
+    explicit form is unambiguous for every chain length.
+    """
+    from ..data.chain_names import get_chain_prefix    # 'but' for 4
+
+    if not ene and not yne:
+        return get_alkyl_name(n)
+    stem = get_chain_prefix(n)
+    parts = [stem]
+    if ene:
+        parts.append("-" + ",".join(str(x) for x in sorted(ene)) + "-en")
+    if yne:
+        parts.append("-" + ",".join(str(x) for x in sorted(yne)) + "-yn")
+    return "".join(parts) + "-1-yl"
+
+
 def _join_prefix_block(block: str, stem: str) -> str:
     """Concatenate a substituent-prefix block onto the stem it qualifies.
 
@@ -248,12 +270,26 @@ def _terminal_fragment_name(
     backbone = _backbone_from(mol, frag, attach_idx, ranks)
     branches = _branches_off(mol, frag, backbone)
 
-    # Saturated only in this task: an unspelled multiple bond would denote a
-    # different molecule, so refuse rather than emit the saturated name.
+    # Backbone unsaturation: every bond order must have an admitted morpheme,
+    # or the fragment refuses -- spelling an unrepresentable bond as single
+    # would denote a DIFFERENT molecule, the exact defect this module exists
+    # to remove.
+    ene, yne = [], []
     for i in range(len(backbone) - 1):
         b = mol.GetBondBetweenAtoms(backbone[i], backbone[i + 1])
-        if b is None or b.GetBondType() != Chem.BondType.SINGLE:
-            return None                  # Task 3 adds unsaturation
+        if b is None:
+            return None
+        bt = b.GetBondType()
+        if bt == Chem.BondType.SINGLE:
+            continue
+        if bt == Chem.BondType.DOUBLE:
+            ene.append(i + 1)            # cite the LOWER locant (P-31.1.1.1)
+        elif bt == Chem.BondType.TRIPLE:
+            yne.append(i + 1)
+        else:
+            # AROMATIC or DATIVE on an acyclic backbone: no morpheme, and
+            # spelling it single would denote a different molecule.
+            return None
 
     numbering = {a: i + 1 for i, a in enumerate(backbone)}
     rp = build_replacement_prefix(mol, numbering, set(backbone))
@@ -266,7 +302,7 @@ def _terminal_fragment_name(
     # The stem counts EVERY skeletal atom, carbon and heteroatom alike -- that is
     # what makes replacement nomenclature complete (2-oxabutyl has 4 skeletal
     # atoms: C-O-C-C). Verified against OPSIN.
-    stem = get_alkyl_name(len(backbone))
+    stem = _chain_stem_with_unsaturation(len(backbone), ene, yne)
     name = f"{rp.prefix}{stem}" if rp.prefix else stem
 
     accounted = set(backbone)
