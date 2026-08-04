@@ -143,6 +143,56 @@ def _has_defined_stereo(mol, frag: Set[int]) -> bool:
     return False
 
 
+def _single_heteroatom_branch_prefix(mol, comp: Set[int]) -> Optional[str]:
+    """The standard prefix for a branch that is ONE heteroatom, or None.
+
+    ⚠ Without this, the branch loops below recurse ``_terminal_fragment_name`` on a
+    lone ``=O`` and get back a one-atom oxa-replacement chain, ``1-oxamethyl`` --
+    which is a **wrong molecule**, not merely an ugly name. Asked what it denotes,
+    OPSIN answers:
+
+        (1-oxamethyl)benzene           -> OC1=CC=CC=C1        i.e. PHENOL
+        (2-(1-oxamethyl)butyl)benzene  -> OC(CC1=CC=CC=C1)CC  i.e. an ALCOHOL
+
+    So ``1-oxamethyl`` denotes ``-OH``: emitting it for ``=O`` loses the double bond
+    *and* the carbon, turning a ketone into an alcohol. Measured, the construction was
+    wrong wherever it appeared and right nowhere -- while the same oxygen placed in the
+    BACKBONE (``3-oxaprop-2-en-1-yl`` for ``-CH2CHO``) round-trips exactly. Chain
+    handling was sound; only branch handling was not.
+
+    The vocabulary is REUSED, not re-tabled: ``_descriptive_fallback`` already maps a
+    single heteroatom to its standard prefix and already discriminates ``oxo`` from
+    ``hydroxy`` by hydrogen count (``substituent_enumerator.py:2101``), which is exactly
+    the distinction needed. Imported lazily because ``substituent_enumerator`` imports
+    THIS module, so a module-level import would be a cycle.
+
+    Returns None for anything that is not a single non-carbon atom, so a carbon branch
+    (``methyl``, ``ethyl``, a compound branch) still goes through the recursion that
+    handles it correctly.
+    """
+    if len(comp) != 1:
+        return None
+    idx = next(iter(comp))
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetAtomicNum() == 6:
+        return None
+    # A charged or isotopically-labelled branch atom is out of the prefix
+    # vocabulary's scope; let the recursion refuse it rather than guess.
+    if atom.GetFormalCharge() != 0 or atom.GetIsotope():
+        return None
+    try:
+        from ..assembly.substituent_enumerator import _descriptive_fallback
+        prefix = _descriptive_fallback(mol, {idx}, idx)
+    except Exception:  # pragma: no cover - never break naming for a prefix lookup
+        return None
+    if not isinstance(prefix, str) or not prefix.strip():
+        return None
+    # The cascade placeholder is a refusal, not a name (errors.py:223).
+    if prefix.strip() == 'substituent':
+        return None
+    return prefix
+
+
 def _branches_off(mol, frag: Set[int], skeleton: Sequence[int],
                   locant_of: Dict[int, int]):
     """(locant, branch_attachment_atom, branch_atom_set) per branch.
@@ -378,6 +428,12 @@ def _composite_fragment_name(
     # position-derived locant would disagree with the name it was spelled from.
     for locant, battach, comp in _branches_off(mol, frag, sorted(core),
                                                tr.numbering):
+        _het = _single_heteroatom_branch_prefix(mol, comp)
+        if _het is not None:
+            accounted |= set(comp)
+            prefix_tokens.append((alpha_sort_key(_het), locant,
+                                  enclose_if_compound(_het)))
+            continue
         sub = _terminal_fragment_name(mol, comp, battach)
         if sub is None:
             logger.info("terminal_fragment: ring decoration at locant %s "
@@ -480,6 +536,15 @@ def _terminal_fragment_name(
     accounted = set(backbone)
     prefix_tokens: List[tuple] = []          # (alpha_key, locant, token)
     for locant, battach, comp in branches:
+        # A lone heteroatom branch takes its STANDARD prefix. Recursing on it
+        # yields `1-oxamethyl` for `=O`, which OPSIN reads as `-OH` -- a wrong
+        # molecule. See _single_heteroatom_branch_prefix.
+        _het = _single_heteroatom_branch_prefix(mol, comp)
+        if _het is not None:
+            accounted |= set(comp)
+            prefix_tokens.append((alpha_sort_key(_het), locant,
+                                  enclose_if_compound(_het)))
+            continue
         sub = _terminal_fragment_name(mol, comp, battach)
         if sub is None:
             # Refuse the WHOLE fragment. Emitting the backbone alone would drop
