@@ -115,11 +115,6 @@ def _is_acyclic(mol, atoms: Set[int]) -> bool:
     return not any(ri.NumAtomRings(a) > 0 for a in atoms)
 
 
-def _unbranched(mol, atoms: Set[int], backbone: Sequence[int]) -> bool:
-    """True when the backbone IS the whole fragment (no side branches)."""
-    return set(backbone) == set(atoms)
-
-
 def _branches_off(mol, frag: Set[int], backbone: Sequence[int]):
     """(backbone_locant, branch_attachment_atom, branch_atom_set) per branch.
 
