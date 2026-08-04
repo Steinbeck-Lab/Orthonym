@@ -38,7 +38,7 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Set
 
 from rdkit import Chem
 
-from ..assembly.naming_utils import get_alkyl_name
+from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name
 from .ring_replacement import build_replacement_prefix
 
 logger = logging.getLogger(__name__)
@@ -120,6 +120,84 @@ def _unbranched(mol, atoms: Set[int], backbone: Sequence[int]) -> bool:
     return set(backbone) == set(atoms)
 
 
+def _branches_off(mol, frag: Set[int], backbone: Sequence[int]):
+    """(backbone_locant, branch_attachment_atom, branch_atom_set) per branch.
+
+    A branch is a connected component of ``frag - backbone`` together with the
+    backbone atom it hangs from. Collected by BFS so a branch of any depth comes
+    out whole -- a depth cap here would silently truncate atoms.
+    """
+    on_backbone = set(backbone)
+    locant_of = {a: i + 1 for i, a in enumerate(backbone)}
+    out = []
+    claimed: Set[int] = set()
+    for b in backbone:
+        for nb in mol.GetAtomWithIdx(b).GetNeighbors():
+            j = nb.GetIdx()
+            if j in on_backbone or j not in frag or j in claimed:
+                continue
+            comp, stack = set(), [j]
+            while stack:
+                cur = stack.pop()
+                if cur in comp:
+                    continue
+                comp.add(cur)
+                for nb2 in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    k = nb2.GetIdx()
+                    if k in frag and k not in on_backbone and k not in comp:
+                        stack.append(k)
+            claimed |= comp
+            out.append((locant_of[b], j, comp))
+    return out
+
+
+def _assemble_prefixes(tokens) -> str:
+    """'2-methyl', '2,2-dimethyl', '1-ethyl-2-methyl' from (key, locant, name).
+
+    Identical tokens collapse onto one multiplied prefix with their locants
+    ascending; distinct tokens are ordered by the project's P-14.5 key, which
+    already strips multiplying prefixes, Greek letters and CIP descriptors.
+
+    NO trailing hyphen. Hyphens separate one prefix from the NEXT prefix, never a
+    prefix from the stem it qualifies: the substituent group CC(C)C- is
+    ``2-methylpropyl`` (isobutyl), not ``2-methyl-propyl``. Two prefixes still
+    read ``1-ethyl-2-methylpropyl`` because the join supplies the internal
+    hyphen. An earlier draft appended '-' here and produced the malformed form on
+    all four branched cases.
+    """
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+
+    grouped: Dict[str, List[int]] = {}
+    keys: Dict[str, str] = {}
+    for key, locant, tok in tokens:
+        grouped.setdefault(tok, []).append(locant)
+        keys[tok] = key
+    parts = []
+    for tok in sorted(grouped, key=lambda t: keys[t]):
+        locs = sorted(grouped[tok])
+        mult = SIMPLE_MULTIPLIERS.get(len(locs), str(len(locs))) if len(locs) > 1 else ""
+        parts.append(f"{','.join(str(x) for x in locs)}-{mult}{tok}")
+    return "-".join(parts)
+
+
+def _join_prefix_block(block: str, stem: str) -> str:
+    """Concatenate a substituent-prefix block onto the stem it qualifies.
+
+    A hyphen goes in IFF the stem begins with a LOCANT, because a locant is
+    always separated from preceding alphabetic text:
+
+        '2-methyl'  + 'propyl'      -> '2-methylpropyl'     (isobutyl)
+        '3-methyl'  + '2-oxabutyl'  -> '3-methyl-2-oxabutyl'
+
+    Both malformed directions were produced while getting this right: always
+    appending a hyphen gave '2-methyl-propyl', and never appending one gave
+    '3-methyl2-oxabutyl', which runs a letter straight into a digit.
+    """
+    if not block:
+        return stem
+    return f"{block}-{stem}" if stem[:1].isdigit() else f"{block}{stem}"
+
+
 def terminal_fragment_name(
     mol, frag_atoms, attach_idx: int,
 ) -> Optional[TerminalFragmentName]:
@@ -161,8 +239,7 @@ def _terminal_fragment_name(
 
     ranks = _canonical_ranks(mol)
     backbone = _backbone_from(mol, frag, attach_idx, ranks)
-    if not _unbranched(mol, frag, backbone):
-        return None                      # Task 2 adds branches
+    branches = _branches_off(mol, frag, backbone)
 
     # Saturated only in this task: an unspelled multiple bond would denote a
     # different molecule, so refuse rather than emit the saturated name.
@@ -185,8 +262,24 @@ def _terminal_fragment_name(
     stem = get_alkyl_name(len(backbone))
     name = f"{rp.prefix}{stem}" if rp.prefix else stem
 
+    accounted = set(backbone)
+    prefix_tokens: List[tuple] = []          # (alpha_key, locant, token)
+    for locant, battach, comp in branches:
+        sub = _terminal_fragment_name(mol, comp, battach)
+        if sub is None:
+            # Refuse the WHOLE fragment. Emitting the backbone alone would drop
+            # this branch's atoms -- the exact defect this module removes.
+            logger.info("terminal_fragment: branch at locant %d unnameable; "
+                        "refusing the whole fragment", locant)
+            return None
+        accounted |= set(sub.atoms)
+        prefix_tokens.append((alpha_sort_key(sub.name), locant, sub.name))
+
+    if prefix_tokens:
+        name = _join_prefix_block(_assemble_prefixes(prefix_tokens), name)
+
     result = TerminalFragmentName(name=name, numbering=numbering,
-                                  basis="chain", atoms=frozenset(backbone))
+                                  basis="chain", atoms=frozenset(accounted))
     if result.atoms != frozenset(frag):
         logger.error("terminal_fragment: completeness invariant violated "
                      "(%d named of %d); refuse",
