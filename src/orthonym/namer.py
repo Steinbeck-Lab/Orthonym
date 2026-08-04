@@ -24,6 +24,7 @@ from .errors import (
     classify_scope_limit,
     classify_failure_limit,
     is_failure_name,
+    is_refusal_sentinel,
     _ORGANIC_ELEMENTS,
     _METAL_NAMES,
 )
@@ -2600,6 +2601,26 @@ class Orthonym:
             # already treats '' and the fallback as equivalent, so gold matching
             # is unchanged.
             if not (result and result.strip()):
+                result = _descriptive_fallback(smiles)
+            # v31: a WELDED refusal sentinel is not a name.
+            #
+            # `is_failure_name` matches the 'unknown…' and '… (not supported)'
+            # families by SUBSTRING, so a decorated occurrence of those is already
+            # caught here. The substituent cascade's placeholder was not: it
+            # arrives with a locant or italic element prefix attached
+            # ('N-substituentformamide'), so the slot-level equality checks let it
+            # through and the welded string shipped as a name with a real tier.
+            # Measured over 10,000 rows: 310 such emissions, and 0 of the 3,616
+            # round-tripping names contain the substring.
+            #
+            # Normalised to the descriptive fallback HERE, *above* the recovery
+            # attempts below, precisely so the general-engine and decomposition
+            # fallbacks still get their shot — invariant 9: removing a wrong
+            # output must never be the last step, because it can unmask a worse
+            # generator or a silent atom drop. So this can only turn a welded
+            # non-name into either a REAL name (recovery succeeds) or an honest
+            # labelled abstention, never into silence.
+            if result and is_refusal_sentinel(result) and not is_failure_name(result):
                 result = _descriptive_fallback(smiles)
             # v25 G2 (opt-in): a candidate suppressed by a downstream gate
             # (SELF-01 / vetoes) left only the failure sentinel; give the

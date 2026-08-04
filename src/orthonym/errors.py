@@ -245,10 +245,22 @@ def is_refusal_sentinel(name: Optional[str]) -> bool:
     silently welded into a name — ``CCS[Zn]SCC`` produced
     ``'zinc compound (not supported)ylethane'``, which every "did I get a
     non-empty string?" caller reads as success.
+
+    ⚠ **The placeholder leg is a SUBSTRING test, not equality.** Measured
+    2026-08-04 over the 10,000-row head-to-head: exact equality missed every
+    *decorated* occurrence, because the placeholder reaches a slot check with a
+    locant or italic element prefix already attached —
+    ``'N-substituentformamide'``, ``'N-substituenthydroxyphosphonooxytricos…'``,
+    ``'…-3-amino-sulfanyl-N-substituentpropanamide'``. 310 rows shipped such a
+    name. Widening is safe by measurement, not by assumption: **0 of the 3,616
+    round-tripping names in that corpus contain the substring**, so the
+    predicate cannot fire on a name known to be correct (the ``check-target``
+    bar). The other three families were already substring-matched by
+    :func:`is_failure_name`, which is why only this leg leaked.
     """
     if is_failure_name(name):
         return True
-    return name.strip().lower() == CASCADE_PLACEHOLDER
+    return CASCADE_PLACEHOLDER in name.lower()
 
 
 def classify_scope_limit(mol: Chem.Mol) -> Optional[OrthonymLimitError]:
