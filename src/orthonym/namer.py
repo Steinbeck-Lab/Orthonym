@@ -2735,6 +2735,11 @@ class Orthonym:
         # name actually shipped (the contextvar could be set by an emission the
         # downstream constitutional gate later suppressed -> failure row).
         stereo_unexpressed = False
+        # v30: same guard, same reason -- the contextvar can be set by an
+        # assembly-tier candidate that the constitutional gate then SUPPRESSED,
+        # and tagging an abstention row as an ill-formed emission would corrupt
+        # the very census this field exists to make possible.
+        suffix_free_prefix_name = False
         if not name or is_failure_name(name):
             tier, is_pin, opsin = "T5", False, "n/a"
             source = prov["source"] or "abstain"
@@ -2769,6 +2774,7 @@ class Orthonym:
             tier = "T3" if opsin == "verified" else "T4"
             is_pin = False
             stereo_unexpressed = bool(prov.get("stereo_unexpressed"))
+            suffix_free_prefix_name = bool(prov.get("suffix_free_prefix_name"))
         elif source == "trivial_retained":
             tier, is_pin = "T3", False
             opsin = gate_opsin_label
@@ -2804,7 +2810,8 @@ class Orthonym:
                 "source": source, "opsin": opsin, "gates_passed": gates,
                 "gate_outcome": gate_outcome,
                 "formula": formula, "limit_code": limit_code,
-                "stereo_unexpressed": stereo_unexpressed}
+                "stereo_unexpressed": stereo_unexpressed,
+                "suffix_free_prefix_name": suffix_free_prefix_name}
 
     def _retained_structural_preference(self, mol) -> Optional[str]:
         """v26 P6 (Heritage A3): retained/fusion structural-recognizer
@@ -2983,7 +2990,8 @@ class Orthonym:
                 self._classify(feats)
                 eng = name_general(
                     mol, feats,
-                    allow_aromatic_general=self._allow_aromatic_general)
+                    allow_aromatic_general=self._allow_aromatic_general,
+                    allow_suffix_free=self._general_fallback_unverified)
                 # v26 P5: charge is lifted only under complete
                 # (allow_aromatic_general); the E1 cert must accept the charged
                 # partition there too (the charge is a suffix on a bound atom).
@@ -3643,7 +3651,8 @@ class Orthonym:
                 try:
                     _eng = name_general(
                         mol, features,
-                        allow_aromatic_general=self._allow_aromatic_general)
+                        allow_aromatic_general=self._allow_aromatic_general,
+                        allow_suffix_free=self._general_fallback_unverified)
                     if _eng is not None and verify_certificate(
                             mol, _eng,
                             allow_charged=self._allow_aromatic_general).ok:

@@ -1810,8 +1810,285 @@ def name_general_spiro(
         mol, features, spiro, allow_aromatic_general, allow_charged)
 
 
+#: Ledger site id for the parent-hydride tier below. Exported so a test can
+#: prove the tier EXECUTED rather than infer it from the emitted string --
+#: the emitted string cannot distinguish "this tier built it" from "an existing
+#: producer happened to build the same words".
+TERMINAL_RING_PARENT_SITE = "general_engine._name_terminal_ring_parent"
+
+
+def _name_terminal_ring_parent(
+    mol, features, allow_aromatic_general: bool = False,
+) -> Optional[GeneralEngineResult]:
+    """v30: the LAST-RESORT whole-molecule PARENT-HYDRIDE tier.
+
+    ``rules.terminal_ring.terminal_ring_name(mol, ring, free_valence_atom=None)``
+    returns an audited von Baeyer / spiro / P-22.2.3-replacement parent hydride
+    and has done since v30 PB -- but it was reachable ONLY as a ``-yl``
+    substituent namer, so a bare ring system no catalog covers abstained even
+    though the generator could name it. This is the parent-side sibling of the
+    substituent-side wiring in
+    ``substituent_enumerator._terminal_bare_ring_substituent`` (cited by symbol,
+    not line: that file is edited often and a line number goes stale), and the
+    same three constraints apply, each for a measured reason:
+
+    * **Best-effort branch only** (``allow_aromatic_general``, True for
+      ``complete``/``best-effort`` and False for ``pin`` --
+      ``cli._emit_tier_flags``). These are valid **non-preferred** names:
+      ``bicyclo[4.4.0]deca-1,3,5,7,9-pentaene`` is not the PIN for naphthalene,
+      so putting them on the PIN return would break PIN byte-identity.
+    * **LAST resort.** Called only after ``name_general_ring``,
+      ``name_general_spiro`` and ``name_general_monocycle`` have ALL declined,
+      i.e. where the molecule would otherwise abstain. v30 PB measured that
+      running its generator ahead of the existing fallback destroyed two correct
+      names while ``structure_wrong`` stayed 0 in both runs, so only a
+      row-by-row paired diff caught it. Order is load-bearing.
+    * **Atom conservation, asserted here and not delegated.** The generator
+      names a RING, so a decorated molecule named by its bare ring parent would
+      DROP the decoration -- a wrong constitution, which is strictly worse than
+      an abstention. E1 (``verify_certificate``) would also catch it downstream,
+      but E1 is measured to be reached on a small fraction of rows, so the
+      invariant is stated at the producer.
+
+    ``allow_mancude`` is not a parameter of ``terminal_ring_name``: it delegates
+    to ``analyze_cage_universal``/``analyze_spiro_universal`` with
+    ``allow_mancude=True`` unconditionally (``terminal_ring.py:645``, ``:650``),
+    which is what lets it express fused aromatics. No existing default changes.
+
+    Every guard inside ``terminal_ring`` stays in force -- the reconstruction
+    audit, the charged-skeletal-atom (P-73) refusal, ``MAX_CAGE_ATOMS`` and
+    ``MAX_CAGE_RINGS``. A refused ring system abstains, and that is correct.
+    """
+    if not allow_aromatic_general:
+        return None
+    if mol is None:
+        return _refuse("no mol")
+    # This tier states its own scope rather than reusing ``_common_refusal``,
+    # which was written for the chain/ring producers. Three of that function's
+    # four refusals are ALREADY enforced more strictly below or inside
+    # ``terminal_ring``, and the fourth is wrong for this tier:
+    #
+    # * multi-fragment -- impossible here: the ``ring == heavy`` test plus the
+    #   connectivity walk below admit only ONE connected ring system, so a second
+    #   fragment refuses either as a non-ring heavy atom or as a disjoint system.
+    # * net/atom charge -- ``terminal_ring_name`` refuses ANY charged skeletal
+    #   ring atom (P-73 is a different naming class), and every heavy atom here
+    #   IS a skeletal ring atom, so its guard is the stricter of the two.
+    # * isotope -- kept, explicitly: a parent hydride expresses no isotope, so
+    #   naming an isotopologue with it would denote a different species.
+    # * radical -- DELIBERATELY NOT refused, and this is the whole reason the
+    #   tier could not fire without saying so. RDKit reports a skeletal atom in a
+    #   non-standard valence state as carrying radical electrons: in
+    #   ``C1CC[Al]CC1`` the ring aluminium has two bonds against a default
+    #   valence of three, so ``GetNumRadicalElectrons()`` is 1. That is not a
+    #   radical, it is exactly the case the lambda convention exists to express
+    #   (P-15.4.1.3), and ``build_replacement_prefix`` already emits it --
+    #   ``1lambda2-aluminacyclohexane``, which round-trips through OPSIN to the
+    #   input. A radical on a skeletal CARBON is a genuine radical and belongs to
+    #   P-71 radical nomenclature, which this tier does not build, so it refuses.
+    if any(a.GetIsotope() for a in mol.GetAtoms()):
+        return _refuse("isotope (a parent hydride expresses none)")
+    if any(a.GetNumRadicalElectrons() and a.GetAtomicNum() == 6
+           for a in mol.GetAtoms()):
+        return _refuse("radical on a skeletal carbon (P-71, not this tier)")
+
+    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    ring_info = mol.GetRingInfo()
+    ring = {i for i in heavy if ring_info.NumAtomRings(i) > 0}
+    if not ring:
+        return _refuse("acyclic (parent-hydride tier names a ring)")
+    if ring != heavy:
+        return _refuse("decorated ring (parent-hydride tier names the ring "
+                       "only; naming it would drop the decoration)")
+    # ONE connected ring system: two ring systems joined by nothing have no
+    # single von Baeyer / replacement descriptor between them.
+    seed = min(ring)
+    seen = {seed}
+    stack = [seed]
+    while stack:
+        for nb in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+            j = nb.GetIdx()
+            if j in ring and j not in seen:
+                seen.add(j)
+                stack.append(j)
+    if seen != ring:
+        return _refuse("two disjoint ring systems (no single descriptor)")
+    # A principal characteristic group needs a SUFFIX on the parent, which this
+    # tier does not build; the ring is bare by the ``ring != heavy`` test above,
+    # so a PG here can only be a skeletal one the suffix machinery owns.
+    if getattr(features, 'principal_group', None):
+        return _refuse("principal characteristic group needs a parent suffix")
+
+    from ..rules.terminal_ring import terminal_ring_name
+    try:
+        result = terminal_ring_name(mol, sorted(ring), None)
+    except Exception as e:  # noqa: BLE001 - a generator bug must degrade
+        logger.info("terminal-ring parent raised %s; refuse", type(e).__name__)
+        return None
+    if result is None:
+        return _refuse("terminal ring namer declined (out of scope or the "
+                       "reconstruction audit failed)")
+
+    from ..metrics.candidate_ledger import (
+        Scope as _LScope, Stage as _LStage, record_candidate as _lrecord)
+    _lrecord(TERMINAL_RING_PARENT_SITE, _LStage.PRODUCED, result.name,
+             scope=_LScope.MOLECULE, detail=f"basis:{result.basis}")
+    return GeneralEngineResult(
+        name=result.name,
+        bindings=(TokenBinding(tuple(sorted(ring)), result.name, 'parent'),))
+
+
+#: Ledger site id for the assembly tier below.
+TERMINAL_RING_ASSEMBLY_SITE = "general_engine._name_terminal_ring_assembly"
+
+
+def _name_terminal_ring_assembly(
+    mol, features, allow_aromatic_general: bool = False,
+    allow_suffix_free: bool = False,
+) -> Optional[GeneralEngineResult]:
+    """v30: the LAST-RESORT ASSEMBLY tier -- a nameable von Baeyer ring parent
+    PLUS its substituents, with every functional group cited as a PREFIX.
+
+    Why this exists, measured rather than assumed. Of the abstaining dev500
+    rows, **0** are bare ring systems (so the parent-hydride tier above can
+    never fire on them) but **71** have a nameable ring system AND every
+    substituent nameable. Those rows need no new generator: the ring half and
+    the decoration half both already work and nothing joins them. What blocks
+    them is the SUFFIX logic in the ring producer -- `ester not a clean acyclic
+    ring-acid mono-ester` (41), `PG instance not attached to cage` (21),
+    `unsupported suffix for pg='ester'` (19), `inline suffix characteristic atom
+    off cage` (13). Suppress the principal group and every one of those
+    functional groups becomes a detachable prefix, which the existing tail can
+    already spell.
+
+    **So this reuses ``_emit_ring_from_analysis`` verbatim rather than composing
+    a name.** That is not tidiness, it is the difference between working and
+    not: a hand-rolled join of the same parents and prefixes was measured at
+    **5 RT_EXACT of 71**, and routing the identical inputs through the existing
+    tail gives **44 of 71**. The tail owns the three things a hand join gets
+    wrong -- ``_mult_prefix`` (enclosing marks and ``bis``/``tris``, so
+    ``15-(2-methylpropyl)`` rather than ``15-2-methylpropyl``), ``_alpha_key``
+    (P-14.5.2 order), and ``_stereo_prefix``. The last one is why the gain
+    lands in **rt_exact and not merely rt_constitutional**.
+
+    ⚠ **Conformance debt, deliberately incurred and recorded.** A PG-suppressed
+    name cites a ketone as ``3-oxo-…`` with NO suffix. P-33 requires the
+    principal characteristic group to be the suffix, so these are valid
+    descriptions of the right structure that are **not well-formed PINs**. That
+    is licit on T4 -- invariant 1: "a table miss must degrade to an uglier name,
+    never to a refusal" -- and it is confined to the best-effort branch, but it
+    is invisible to round-trip, SELF-01 and E1, which is exactly the spelling
+    layer the BB-conformance audit sized. It is v31's axis, not a defect here.
+
+    Order and gating are identical to the parent tier above and load-bearing for
+    the same measured reasons: best-effort only, strictly last, and every
+    ``terminal_ring`` guard in force -- ``terminal_ring_name`` is called as the
+    GATE precisely so its emission-point re-proof of
+    ``audit_von_baeyer_descriptor`` (plus the charge, ``MAX_CAGE_ATOMS`` and
+    ``MAX_CAGE_RINGS`` refusals) decides whether the ring may be spelled at all.
+    """
+    if not allow_aromatic_general or mol is None:
+        return None
+    # T4 ONLY for a suffix-free name. `allow_suffix_free` is the best-effort
+    # discriminator (`general_fallback_unverified`), NOT `allow_aromatic_general`
+    # -- the latter is True for `complete` as well, and a suffix-free name on
+    # `complete` would assert RT-VERIFIED status for an ill-formed name.
+    #
+    # Scoped to the case that is actually ill-formed: with no principal
+    # characteristic group there is no required suffix to omit (P-41 only
+    # mandates a suffix when such a group is present), so that name is
+    # well-formed and may run wherever this tier runs. Suppressing a PG that
+    # DOES exist is the ill-formed construction, and that needs T4.
+    _pg = getattr(features, 'principal_group', None)
+    if _pg and not allow_suffix_free:
+        return _refuse("suffix-free prefix name is T4-only (P-41 requires the "
+                       "principal characteristic group as suffix)")
+    if any(a.GetIsotope() for a in mol.GetAtoms()):
+        return _refuse("isotope (assembly tier expresses none)")
+    if any(a.GetNumRadicalElectrons() and a.GetAtomicNum() == 6
+           for a in mol.GetAtoms()):
+        return _refuse("radical on a skeletal carbon (P-71, not this tier)")
+    if len(Chem.GetMolFrags(mol)) > 1:
+        return _refuse("multi-fragment (adduct namer's scope)")
+    if getattr(features, 'chain_is_parent', False):
+        return _refuse("chain parent (chain path owns it)")
+
+    from ..rules.ring_selection import select_principal_ring_system
+    from ..rules.terminal_ring import terminal_ring_name
+    from ..rules.vonbaeyer_universal import analyze_cage_universal
+
+    ring_systems = list(getattr(features, 'ring_systems', None) or [])
+    if not ring_systems:
+        return _refuse("no ring system (assembly tier needs a ring parent)")
+    senior = select_principal_ring_system(mol, ring_systems)
+    if not senior:
+        return _refuse("no senior ring system")
+    senior = sorted(set(senior))
+
+    # GATE. terminal_ring_name is the authority on whether this ring system may
+    # be spelled at all: it kekulizes, refuses a charged skeletal atom (P-73),
+    # enforces MAX_CAGE_ATOMS / MAX_CAGE_RINGS, and RE-PROVES the von Baeyer
+    # reconstruction audit at the emission point. Its answer is not merely a
+    # hint -- if it declines, this tier declines.
+    try:
+        gate = terminal_ring_name(mol, senior, None)
+    except Exception as e:  # noqa: BLE001 - a generator bug must degrade
+        logger.info("assembly gate raised %s; refuse", type(e).__name__)
+        return None
+    if gate is None:
+        return _refuse("terminal ring namer declined the parent ring system")
+
+    cage = analyze_cage_universal(mol, cage_atoms=set(senior),
+                                  allow_mancude=True)
+    if cage is None:
+        # rank 1: von Baeyer starts at two rings, so the cage analyzer has no
+        # descriptor for a monocycle and the tail cannot spell one. The
+        # monocycle parent is name_general_monocycle's job, which has already
+        # declined by the time we get here.
+        return _refuse("monocycle (no von Baeyer descriptor for one ring)")
+
+    # The invariant that makes the reuse legitimate: the map the parent was
+    # AUDITED under and the map the substituent locants are spelled from must be
+    # the same map. They are the same object today (terminal_ring_name delegates
+    # to this very analyzer for rank >= 2), and if that ever stops being true a
+    # substituent locant would be placed against a different numbering than the
+    # parent was proven under -- a wrong name, not an ugly one. So it is checked
+    # rather than trusted.
+    if dict(gate.numbering) != dict(cage.atom_to_locant):
+        return _refuse("parent audit numbering != spelling numbering")
+
+    # Every functional group becomes a detachable prefix. Copied, never mutated
+    # in place: the caller owns `features` and reuses it.
+    import copy as _copy
+    prefix_only = _copy.copy(features)
+    try:
+        prefix_only.principal_group = None
+        prefix_only.principal_group_atoms = []
+    except (AttributeError, TypeError) as e:
+        logger.info("assembly tier: features not clonable (%s); refuse",
+                    type(e).__name__)
+        return None
+
+    result = _emit_ring_from_analysis(
+        mol, prefix_only, cage, allow_aromatic_general, allow_aromatic_general)
+    if result is None:
+        return None  # the tail already logged its own refusal reason
+
+    from ..metrics.candidate_ledger import (
+        Scope as _LScope, Stage as _LStage, record_candidate as _lrecord)
+    _lrecord(TERMINAL_RING_ASSEMBLY_SITE, _LStage.PRODUCED, result.name,
+             scope=_LScope.MOLECULE,
+             detail=f"basis:{gate.basis} suffix_free:{bool(_pg)}")
+    if _pg:
+        # TAG, do not merely count: v31 must be able to ENUMERATE these rows.
+        from ..metrics.provenance import record_suffix_free_prefix_name
+        record_suffix_free_prefix_name(True)
+    return result
+
+
 def name_general(
     mol, features, allow_aromatic_general: bool = False,
+    allow_suffix_free: bool = False,
 ) -> Optional[GeneralEngineResult]:
     """v25 engine dispatcher: chain parent -> G1 path, ring parent -> G2 path.
 
@@ -1844,6 +2121,26 @@ def name_general(
         allow_charged=allow_charged)
     if spiro_result is not None:
         return spiro_result
-    return name_general_monocycle(
+    mono_result = name_general_monocycle(
         mol, features, allow_aromatic_general=allow_aromatic_general,
         allow_charged=allow_charged)
+    if mono_result is not None:
+        return mono_result
+    # v30: LAST resort, and the two must stay last -- see the docstrings on
+    # _name_terminal_ring_parent / _name_terminal_ring_assembly. Both are inert
+    # under the PIN default (allow_aromatic_general False) -> byte-identical.
+    #
+    # Parent-hydride FIRST, then assembly. Not interchangeable: the parent tier
+    # only accepts a molecule that IS one bare ring system, and for such a
+    # molecule the assembly tier would produce the identical string by a longer
+    # route (no substituents to place). Trying assembly first would therefore
+    # spend the cage analysis and the whole emission tail to reach the same
+    # answer, and would route a bare ring through substituent discovery for no
+    # reason.
+    parent_result = _name_terminal_ring_parent(
+        mol, features, allow_aromatic_general=allow_aromatic_general)
+    if parent_result is not None:
+        return parent_result
+    return _name_terminal_ring_assembly(
+        mol, features, allow_aromatic_general=allow_aromatic_general,
+        allow_suffix_free=allow_suffix_free)

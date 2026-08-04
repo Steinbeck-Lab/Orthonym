@@ -83,6 +83,24 @@ _OPSIN = contextvars.ContextVar("orthonym_prov_opsin", default=None)
 # tiers abstain on dropped stereo — P-91.2.1).
 _STEREO_UNEXPRESSED = contextvars.ContextVar(
     "orthonym_prov_stereo_unexpressed", default=False)
+# v30: this emission cites the principal characteristic group as a detachable
+# PREFIX with NO suffix (``…-5-oxo-…-4-oxabicyclo[6.4.0]dodeca-…`` for a ketone).
+#
+# That is ILL-FORMED, not merely non-preferred. `BlueBookV2.md:25009`, P-41
+# "Seniority order of classes": *"If characteristic groups other than those
+# given in Table 5.1 are present, one (and only one) kind must be cited as
+# suffix (the principal characteristic group) for classes other than radicals"*.
+# So the suffix is REQUIRED and these names omit it; OPSIN tolerates them and
+# they denote the right structure, but they are not valid IUPAC.
+#
+# Shipped deliberately on T4 ONLY, where the alternative is silence (the contributor guide
+# invariant 1: for T4 an abstention is a DEFECT and a table miss must degrade to
+# an uglier name). Recorded per row rather than merely counted, because a number
+# in a report is not recoverable and a field is: this is precisely the spelling
+# blind spot the BB-conformance audit sized at 516 rows, and the reason it went
+# unnoticed is that nothing marked the rows. v31 must be able to ENUMERATE them.
+_SUFFIX_FREE_PREFIX_NAME = contextvars.ContextVar(
+    "orthonym_prov_suffix_free_prefix_name", default=False)
 # v25 G3: top-level general_fallback flag propagated into fragment /
 # component recursion (name_compound inherits it).
 general_fallback_ctx = contextvars.ContextVar(
@@ -110,6 +128,9 @@ def clear_provenance() -> None:
     # v30 P3-T1c: same reason -- a flag left from the previous molecule would
     # demote this one's tier for a prefix it does not contain.
     _GENERAL_RING_PREFIX.set(False)
+    # v30: same reason again -- a suffix-free flag left from the previous
+    # molecule would tag this one's name as ill-formed when it is not.
+    _SUFFIX_FREE_PREFIX_NAME.set(False)
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
@@ -123,6 +144,14 @@ def record_stereo_unexpressed(flag: bool) -> None:
     defined on the input but not expressed in the name). Set at the flagged
     best-effort ship site; read by ``name_tiered``."""
     _STEREO_UNEXPRESSED.set(bool(flag))
+
+
+def record_suffix_free_prefix_name(flag: bool) -> None:
+    """v30: mark the current emission as citing the principal characteristic
+    group as a PREFIX with no suffix -- ill-formed per P-41 (see the ContextVar
+    comment). Set only at the T4 PG-suppressed assembly site; read by
+    ``name_tiered`` and surfaced per row so v31 can enumerate the debt."""
+    _SUFFIX_FREE_PREFIX_NAME.set(bool(flag))
 
 
 def record_gate_outcome(outcome: str, name: Optional[str]) -> None:
@@ -202,4 +231,5 @@ def get_provenance() -> dict:
         "gate_outcome": _GATE_OUTCOME.get(),
         "gate_outcome_name": _GATE_OUTCOME_NAME.get(),
         "general_ring_prefix": _GENERAL_RING_PREFIX.get(),
+        "suffix_free_prefix_name": _SUFFIX_FREE_PREFIX_NAME.get(),
     }
