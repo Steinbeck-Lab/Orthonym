@@ -452,4 +452,19 @@ class TestWSD02TetralinNoPhantomAlkyl:
     @pytest.mark.unit
     def test_substituted_tetralin_keeps_real_substituent_no_butyl(self):
         # A real substituent on the saturated ring is kept; no phantom butyl.
-        assert name_compound('CC1CCc2ccccc2C1') == '1-methyl-1,2,3,4-tetrahydronaphthalene'
+        #
+        # VALUE CORRECTED (was '1-methyl-...'). The old expectation was
+        # STRUCTURALLY IMPOSSIBLE for this input, not merely unpreferred:
+        #  * In `1,2,3,4-tetrahydronaphthalene` the hydro prefix occupies
+        #    naphthalene's fixed positions 1-4, whose 1 and 4 are the sp3
+        #    carbons ADJACENT to the fusion carbons 8a/4a -- cf. the BB PINs
+        #    `1,2,3,4-tetrahydronaphthalen-1-amine` (BlueBookV2.md:26489) and
+        #    `5,6,7,8-tetrahydronaphthalen-2-amine` (:26495).
+        #  * The methyl-bearing carbon of `CC1CCc2ccccc2C1` is bonded to two
+        #    sp3 carbons and NO aromatic carbon, so it cannot be locant 1.
+        #  * Independent check (OPSIN 2.9.0, not the code under test):
+        #    '1-methyl-1,2,3,4-tetrahydronaphthalene' -> CC1CCCc2ccccc21,
+        #    a DIFFERENT molecule; '2-methyl-...' -> CC1CCc2ccccc2C1 == input.
+        # The locant was incidental to this test's phantom-butyl intent, which
+        # is unchanged. See tests/unit/rules/test_hydro_fused_substituent_locants.py.
+        assert name_compound('CC1CCc2ccccc2C1') == '2-methyl-1,2,3,4-tetrahydronaphthalene'

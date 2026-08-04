@@ -47,6 +47,7 @@ from typing import Any, Optional
 
 def enrich_handler_name(
     features: Any, base_name: str, handler_id: str = "unknown",
+    atom_to_locant: Optional[Any] = None,
 ) -> str:
     """Enrich a handler's base name with non-principal substituents.
 
@@ -60,6 +61,9 @@ def enrich_handler_name(
         features: MolecularFeatures object.
         base_name: The handler's base name (e.g., "carbamic acid").
         handler_id: Handler identifier for logging.
+        atom_to_locant: Optional producer-supplied ``{atom idx -> locant}``
+            numbering — THE one ``base_name`` was spelled from. Overrides the
+            ``features``-derived fallback; ``None`` keeps existing behaviour.
 
     Returns:
         Enriched name with prefixes, or base_name if no enrichment needed.
@@ -71,7 +75,9 @@ def enrich_handler_name(
     # Lazy import per PATTERNS § Lazy Import (avoid composer.py -> handlers
     # -> composer.py cycle at module load).
     from ..composer import _enrich_handler_name
-    return _enrich_handler_name(features, base_name, handler_id)
+    return _enrich_handler_name(
+        features, base_name, handler_id, atom_to_locant=atom_to_locant,
+    )
 
 
 def integrate_universal_prefixes(
@@ -81,6 +87,7 @@ def integrate_universal_prefixes(
     oriented_ring: Optional[Any] = None,
     principal_chain: Optional[Any] = None,
     atom_to_locant: Optional[Any] = None,
+    ring_atom_to_locant: Optional[Any] = None,
     exclude_atoms: Optional[Any] = None,
 ) -> str:
     """Discover and format all substituents on a parent structure.
@@ -94,7 +101,10 @@ def integrate_universal_prefixes(
         parent_type: ``"ring"``, ``"chain"``, or ``"auto"`` (auto-detects).
         oriented_ring: Ring atom indices in IUPAC order (for ring parents).
         principal_chain: Chain atom indices in order (for chain parents).
-        atom_to_locant: Optional mapping of atom idx -> IUPAC locant.
+        atom_to_locant: Optional mapping of atom idx -> IUPAC locant (CHAIN
+            parents only).
+        ring_atom_to_locant: Optional inherited mapping for a RING parent —
+            overrides the ``oriented_ring`` position arithmetic per atom.
         exclude_atoms: Atoms already accounted for.
 
     Returns:
@@ -112,6 +122,7 @@ def integrate_universal_prefixes(
         oriented_ring=oriented_ring,
         principal_chain=principal_chain,
         atom_to_locant=atom_to_locant,
+        ring_atom_to_locant=ring_atom_to_locant,
         exclude_atoms=exclude_atoms,
     )
 

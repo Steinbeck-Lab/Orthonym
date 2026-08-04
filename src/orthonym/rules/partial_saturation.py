@@ -573,6 +573,102 @@ def _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms: Set[int]) -> Set[int]:
     return out
 
 
+# P-63.1 "HYDROXY COMPOUNDS AND CHALCOGEN ANALOGUES": a ring carbon bearing an
+# exocyclic -OH is a ring 'ol' PCG, named with the '-ol' suffix on the
+# hydro-prefixed parent. BB verbatim PIN (BlueBookV2.md:26880):
+# "(1) 5,6,7,8-tetrahydronaphthalen-2-ol (PIN)". The hydroxy oxygen is
+# exocyclic, so the ring carbon it hangs off is the locant-bearing atom.
+_RING_OH_SMARTS = Chem.MolFromSmarts('[#6;R][OX2H1]')
+
+# Suffix spelling per PCG kind. The '-ol' form elides the parent's terminal 'e'
+# only when no multiplying prefix intervenes (P-16.7.1(a)): the Blue Book prints
+# BOTH `naphthalen-4a(2H)-ol (PIN)` and `naphthalene-4a,8a-diol (PIN)`
+# (BlueBookV2.md:26866/:26868).
+_PARTIAL_SAT_PCG_SUFFIX = {
+    'carboxylic_acid': ('carboxylic acid', False),
+    'ol': ('ol', True),
+}
+
+
+def _partial_sat_pcg(
+    mol, fused_ring_atoms: Set[int]
+) -> Tuple[Optional[str], Set[int]]:
+    """The SENIOR ring principal-characteristic-group of a partially-saturated
+    fused carbocycle, as ``(kind, ring_atoms)`` — ``(None, set())`` when there
+    is none.
+
+    ``kind`` is ``'carboxylic_acid'`` (P-65.1.1.1) or ``'ol'`` (P-63.1). P-41
+    seniority puts acids above alcohols, so a ring -COOH wins outright and any
+    ring -OH then stays a detachable ``hydroxy`` prefix — two suffixes are never
+    produced.
+
+    The ``'ol'`` class is scoped FAIL-CLOSED to molecules whose only heteroatoms
+    are the ring-attached hydroxy oxygens, one per ring carbon. That makes -ol
+    provably the senior characteristic group present (P-41), so the suffix
+    choice cannot be wrong, and it keeps out of scope an -OH on an EXOCYCLIC
+    carbon — which makes that carbon the parent instead
+    (``(1,2,3,4-tetrahydronaphthalen-2-yl)methanol``, not an ``-ol``).
+
+    Single source of truth: both the numbering primitive (which must give the
+    PCG the lowest locants, P-58.2.5) and the assembler (which spells the
+    suffix) read this one answer, so the two can never disagree.
+    """
+    acid = _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms)
+    if acid:
+        return ('carboxylic_acid', acid)
+    if _RING_OH_SMARTS is None:
+        return (None, set())
+    ol_ring: Set[int] = set()
+    ol_oxygens: Set[int] = set()
+    for match in mol.GetSubstructMatches(_RING_OH_SMARTS):
+        ring_c, oxygen = match[0], match[1]
+        if ring_c in fused_ring_atoms:
+            ol_ring.add(ring_c)
+            ol_oxygens.add(oxygen)
+    if not ol_ring:
+        return (None, set())
+    # Exactly one -OH per PCG ring carbon: a geminal diol would need a
+    # different construction than one locant per suffix position.
+    if len(ol_oxygens) != len(ol_ring):
+        return (None, set())
+    # Every heteroatom in the molecule must be one of those hydroxy oxygens,
+    # and the species must be neutral and non-radical — otherwise -ol is not
+    # provably the senior group and this path must not claim the suffix.
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return (None, set())
+        if atom.GetAtomicNum() != 6 and atom.GetIdx() not in ol_oxygens:
+            return (None, set())
+    return ('ol', ol_ring)
+
+
+def _partial_sat_pcg_exocyclic_atoms(
+    mol, ring_set: Set[int], pcg_kind: Optional[str], pcg_ring_atoms: Set[int]
+) -> Set[int]:
+    """The off-ring atoms consumed by the PCG suffix — the carboxyl C plus its
+    two oxygens for ``'carboxylic_acid'``, the hydroxy oxygen for ``'ol'``.
+
+    Shared by the assembler (so they are not ALSO named as detachable prefixes)
+    and by the ``partial_sat_sp3_substituent_drop`` conservation veto (so an
+    atom the suffix already accounts for is not counted as a silent drop)."""
+    out: Set[int] = set()
+    if not pcg_kind or not pcg_ring_atoms:
+        return out
+    for rc in pcg_ring_atoms:
+        for n in mol.GetAtomWithIdx(rc).GetNeighbors():
+            if n.GetIdx() in ring_set:
+                continue
+            if pcg_kind == 'carboxylic_acid' and n.GetSymbol() == 'C':
+                # the carboxyl carbon + its two oxygens
+                out.add(n.GetIdx())
+                for nn in n.GetNeighbors():
+                    if nn.GetIdx() != rc and nn.GetSymbol() == 'O':
+                        out.add(nn.GetIdx())
+            elif pcg_kind == 'ol' and n.GetSymbol() == 'O':
+                out.add(n.GetIdx())
+    return out
+
+
 def detect_carbocyclic_partial_saturation(
     mol: Chem.Mol,
     fused_ring_atoms: Set[int]
@@ -610,7 +706,13 @@ def detect_carbocyclic_partial_saturation(
         - 'sp3_count': Number of sp3 atoms
         - 'hydrogen_count': Number of added hydrogens (sp3_count * 2)
         - 'is_perhydro': True if fully saturated
-        - 'atom_to_locant': Mapping from atom index to IUPAC locant (if available)
+        - 'atom_to_locant': Mapping from atom index to IUPAC locant (if
+          available). This IS the numbering the name is spelled from —
+          consumers must inherit it rather than re-derive one.
+        - 'pcg_kind': 'carboxylic_acid' | 'ol' | None — the senior ring
+          principal characteristic group, which was given the lowest locants
+          (see :func:`_partial_sat_pcg`)
+        - 'pcg_ring_atoms': the ring atoms carrying it (empty when None)
 
     Examples:
         >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
@@ -716,12 +818,16 @@ def detect_carbocyclic_partial_saturation(
         if any(n.GetIdx() not in fused_ring_atoms
                for n in mol.GetAtomWithIdx(idx).GetNeighbors())
     }
-    # P-59.2.3.2: ring atoms bearing a principal-characteristic-group suffix
-    # (here a ring-attached carboxylic acid -> '-carboxylic acid') must be
-    # numbered LOWEST, before the hydro set. Detected here so the numbering
-    # primitive can prioritise them; the assembly reads them back off the
-    # locant map. Scoped to the ring-carboxylic-acid PCG.
-    pcg_ring_atoms = _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms)
+    # P-58.2.5 "Nondetachable hydro prefixes vs. indicated hydrogen"
+    # (BlueBookV2.md:24890), on the PIN `5,8-dioxo-5,6,7,8-tetrahydro-
+    # naphthalene-2-carboxylic acid`: "detachable but nonalphabetized hydro
+    # prefixes do not have precedence over the principal characteristic group
+    # for low numbering, but has precedence over other detachable prefixes."
+    # So the PCG ring atoms must be numbered LOWEST — before the hydro set,
+    # which in turn outranks the detachable substituent prefixes. Detected
+    # ONCE here so the numbering primitive can prioritise them and the
+    # assembler can spell the suffix from the SAME answer.
+    pcg_kind, pcg_ring_atoms = _partial_sat_pcg(mol, fused_ring_atoms)
     matched = _match_mancude_parent_numbering(
         mol, fused_ring_atoms, sp3_set, ring_double_bonds, candidates,
         substituent_ring_atoms=substituent_ring_atoms,
@@ -756,6 +862,8 @@ def detect_carbocyclic_partial_saturation(
         'hydrogen_count': hydrogen_count,
         'is_perhydro': is_perhydro,
         'atom_to_locant': atom_to_locant,
+        'pcg_kind': pcg_kind,
+        'pcg_ring_atoms': pcg_ring_atoms,
     }
 
 

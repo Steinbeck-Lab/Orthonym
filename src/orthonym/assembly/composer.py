@@ -146,6 +146,7 @@ def _integrate_universal_prefixes(
     oriented_ring=None,
     principal_chain=None,
     atom_to_locant=None,
+    ring_atom_to_locant=None,
     exclude_atoms=None,
 ):
     """Discover and format all substituents on a parent structure.
@@ -161,7 +162,15 @@ def _integrate_universal_prefixes(
         parent_type: ``"ring"``, ``"chain"``, or ``"auto"`` (auto-detects).
         oriented_ring: Ring atom indices in IUPAC order (for ring parents).
         principal_chain: Chain atom indices in order (for chain parents).
-        atom_to_locant: Optional mapping of atom idx -> IUPAC locant.
+        atom_to_locant: Optional mapping of atom idx -> IUPAC locant. Consumed
+            by the CHAIN discovery path only (the ring path locates
+            substituents by position in ``oriented_ring``).
+        ring_atom_to_locant: Optional mapping of atom idx -> IUPAC locant for a
+            RING parent, inherited from the producer that spelled the parent
+            name. Overrides the ``oriented_ring`` position arithmetic per atom,
+            which is the only way to express a fused parent's numbering
+            (``'4a'``/``'8a'`` are not positions). ``None`` -> today's
+            behaviour exactly.
         exclude_atoms: Atoms already accounted for (e.g., carbonyl O of
             lactone, halogen of acid halide) -- added to parent set so
             they are not discovered as substituents.
@@ -193,6 +202,7 @@ def _integrate_universal_prefixes(
             oriented_ring=oriented_ring,
             principal_chain=principal_chain,
             atom_to_locant=atom_to_locant,
+            ring_atom_to_locant=ring_atom_to_locant,
         )
     except (AssertionError, Exception) as exc:
         logger.debug("_integrate_universal_prefixes discovery failed: %s", exc)
@@ -221,7 +231,8 @@ def _integrate_universal_prefixes(
 # ============================================================================
 
 
-def _enrich_handler_name(features, base_name, handler_id="unknown"):
+def _enrich_handler_name(features, base_name, handler_id="unknown",
+                         atom_to_locant=None, already_spelled_atoms=None):
     """Enrich a handler's base name with non-principal substituents.
 
     Standard enrichment wrapper for Tier B handlers (Phase 139 ARCH-03/04).
@@ -232,26 +243,46 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
         features: MolecularFeatures object.
         base_name: The handler's base name (e.g., "carbamic acid").
         handler_id: Handler identifier for logging.
+        atom_to_locant: OPTIONAL ``{atom idx -> IUPAC locant}`` from the
+            handler's own producer — THE numbering ``base_name`` was spelled
+            from. When supplied it OVERRIDES the ``features``-derived fallback
+            below, because that fallback is a SECOND, independent numbering and
+            a substituent locant read off it can disagree with the parent name
+            (the `1-methyl-` vs `2-methyl-1,2,3,4-tetrahydronaphthalene` class).
+            When absent, behaviour is exactly as before — every handler that
+            does not pass it is unaffected.
+        already_spelled_atoms: OPTIONAL set of off-parent atoms ``base_name``
+            ALREADY spells, reported by the producer. Enrichment must not cite
+            them a second time (`6-methyl-6-methyl-1,2,3,4-tetrahydro-
+            naphthalene`). Only the producer can know this set — it is the thing
+            that decided which substituents to spell itself and which to leave
+            to enrichment. ``None`` -> unchanged behaviour.
 
     Returns:
         Enriched name with prefixes, or base_name if no enrichment needed.
     """
     # Determine parent atoms based on what the handler named
     parent_atoms = None
-    atom_to_locant = None
+    derived_atom_to_locant = None
 
     if getattr(features, 'chain_is_parent', False) and features.principal_chain:
         parent_atoms = set(features.principal_chain)
-        atom_to_locant = features.atom_to_locant
+        derived_atom_to_locant = features.atom_to_locant
     elif getattr(features, 'oriented_ring', None):
         parent_atoms = set(features.oriented_ring)
-        atom_to_locant = (
+        derived_atom_to_locant = (
             getattr(features, 'heterocycle_atom_to_locant', None)
             or features.atom_to_locant
         )
     elif getattr(features, 'principal_ring', None):
         parent_atoms = set(features.principal_ring)
-        atom_to_locant = features.atom_to_locant
+        derived_atom_to_locant = features.atom_to_locant
+
+    # Producer-supplied numbering wins; otherwise keep today's fallback.
+    inherited = atom_to_locant
+    effective_atom_to_locant = (
+        inherited if inherited is not None else derived_atom_to_locant
+    )
 
     # WSD-02 (RING-04): a partially-saturated fused carbocycle's parent name
     # (e.g. `1,2,3,4-tetrahydronaphthalene`) covers the ENTIRE fused ring system.
@@ -298,6 +329,9 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
     for n_sub in getattr(features, 'n_substituents', []):
         if isinstance(n_sub, dict) and 'atoms' in n_sub:
             exclude_atoms.update(n_sub['atoms'])
+    # Atoms the producer reports its own name already spells.
+    if already_spelled_atoms:
+        exclude_atoms.update(already_spelled_atoms)
 
     prefix_str = _integrate_universal_prefixes(
         features.mol, parent_atoms,
@@ -308,7 +342,14 @@ def _enrich_handler_name(features, base_name, handler_id="unknown"):
             if getattr(features, 'chain_is_parent', False)
             else None
         ),
-        atom_to_locant=atom_to_locant,
+        atom_to_locant=effective_atom_to_locant,
+        # Ring parents locate their substituents by POSITION in oriented_ring,
+        # which cannot express a fused parent's numbering at all (no '4a'), so
+        # `atom_to_locant` above is consumed for CHAIN parents only. An
+        # inherited map is therefore also handed over on the ring channel —
+        # and only ever when a handler actually supplied one, so no existing
+        # caller's locants move.
+        ring_atom_to_locant=inherited,
         exclude_atoms=exclude_atoms,
     )
 
@@ -3097,6 +3138,33 @@ def _try_partially_saturated_carbocycle(mol) -> Optional[str]:
     from ..rules.polycyclics import name_partially_saturated_carbocycle
 
     return name_partially_saturated_carbocycle(mol)
+
+
+def _try_partially_saturated_carbocycle_with_locants(mol):
+    """As :func:`_try_partially_saturated_carbocycle`, but returns
+    ``(name, atom_to_locant)`` — the name together with the numbering it was
+    spelled from.
+
+    A caller that places its own substituent locants must inherit this map
+    instead of re-deriving one from ``features``: the re-derived numbering is
+    not the numbering the parent name was spelled from, which is how a
+    2-substituted tetralin came out as ``1-methyl-1,2,3,4-tetrahydro-
+    naphthalene`` (a different molecule, suppressed by SELF-01, correct name
+    lost).
+
+    Returns:
+        ``(name, atom_to_locant)`` or ``None``.
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
+        >>> _try_partially_saturated_carbocycle_with_locants(mol)[0]
+        '1,2,3,4-tetrahydronaphthalene'
+    """
+    from ..rules.polycyclics import (
+        name_partially_saturated_carbocycle_with_locants,
+    )
+
+    return name_partially_saturated_carbocycle_with_locants(mol)
 
 
 def _is_complex_ring_system(mol) -> bool:

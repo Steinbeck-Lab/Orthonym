@@ -102,14 +102,33 @@ def name_partial_sat(
     """Tier-B partial_sat handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _enrich_handler_name, _try_partially_saturated_carbocycle,
+        _enrich_handler_name,
+        _try_partially_saturated_carbocycle_with_locants,
     )
 
-    partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
-    if not partial_sat_name:
+    produced = _try_partially_saturated_carbocycle_with_locants(features.mol)
+    if not produced:
         return None
+    partial_sat_name = produced.name
+    atom_to_locant = produced.atom_to_locant
 
-    partial_sat_name = _enrich_handler_name(features, partial_sat_name, "partial_sat")
+    # Inherit BOTH halves of the producer's answer:
+    #
+    #  * its numbering -- the parent name, its hydro locants and any
+    #    principal-characteristic-group suffix were all spelled from THIS map,
+    #    so enrichment must place its substituent prefixes on the same one or it
+    #    spells a different molecule (`1-methyl-` for a 2-substituted tetralin);
+    #  * what it already spelled -- this producer names AROMATIC-ring
+    #    substituents itself and leaves only the sp3-ring ones to enrichment,
+    #    so re-citing them yields `6-methyl-6-methyl-...`.
+    #
+    # Both were suppressed by SELF-01 rather than shipped, i.e. each cost a
+    # correct name. P-58.2.5 / P-15.1.5.3.
+    partial_sat_name = _enrich_handler_name(
+        features, partial_sat_name, "partial_sat",
+        atom_to_locant=atom_to_locant or None,
+        already_spelled_atoms=produced.spelled_offring_atoms or None,
+    )
 
     # Phase 145.1: route through pool.add() — Tier B gate-fall-through.
     pool = get_current_pool()
@@ -122,7 +141,7 @@ def name_partial_sat(
     return NamingResult(
         name=cand.name,
         tree=NameTreeNode(parent_stem=cand.name, class_id="partial_sat", iupac_section_cite="P-25.3", fragment_legacy=cand.name),
-        atom_to_locant_hint=None,
+        atom_to_locant_hint=atom_to_locant or None,
     )
 
 

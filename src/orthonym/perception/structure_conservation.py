@@ -222,34 +222,34 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     """R12 spillover (2026-07-17, W8-P1/R12 adversarial-verify workflow;
     closed here per W8-P10).
 
-    ``rules.polycyclics.name_partially_saturated_carbocycle`` (the
-    "tetralin"-class emitter: one fully-aromatic ring fused to one fully-sp3
-    ring, e.g. 1,2,3,4-tetrahydronaphthalene) NEVER bakes a saturated
-    (sp3)-ring substituent into its own bare parent name -- by construction,
-    its ``_partial_sat_substituent_prefix`` helper explicitly skips every
-    atom in ``sat_set`` (``if idx in sat_set: continue``) and its own
-    docstring records the design: "the composer's normal decoration path
-    already carries substituents on the SATURATED (sp3) ring" / "It must NOT
-    add sp3-ring substituents (the composer does that)". The ONLY way an
-    sp3-ring substituent (the -CH3/-NH2/-OH/... at e.g. tetralin C2) reaches
-    the shipped name is the downstream composer enrichment pass
-    (``_enrich_handler_name`` -> ``_integrate_universal_prefixes``).
+    ⚠ **This veto's ORIGINAL premise no longer holds, and the rewrite is the
+    point.** It used to reason: ``rules.polycyclics.name_partially_saturated_-
+    carbocycle`` "NEVER bakes a saturated (sp3)-ring substituent into its own
+    bare parent name -- by construction, its ``_partial_sat_substituent_prefix``
+    helper explicitly skips every atom in ``sat_set``", so the ONLY route for an
+    sp3-ring substituent was the composer's enrichment pass, and
+    ``name == bare`` alongside an sp3-ring off-ring substituent was therefore a
+    deterministic proof of drop.
 
-    That hand-off is where the leak lives: enrichment can silently return an
-    EMPTY prefix (``_integrate_universal_prefixes`` catches any discovery
-    exception/None and returns ``""``) when its ``oriented_ring``/
-    ``exclude_atoms`` plumbing for the ``partial_sat`` branch does not match
-    the parent atom set it is given -- confirmed live for a plain second
-    ring-methyl (``oriented_ring=None``) and for a heteroatom substituent
-    whose own principal-group match incorrectly gets folded into
-    ``exclude_atoms`` even though the bare name never represents it.
+    The hand-off that premise described was itself the defect. It derived a
+    SECOND numbering (placing tetralin's 2-methyl at locant 1) and it split one
+    substituent set across two prefix formatters (``2-methyl-6-methyl-`` where
+    P-16.3.3 requires ``2,6-dimethyl-``). Both faults are fixed by making the
+    producer the single speller of every ring substituent prefix, so ``bare``
+    NOW encodes sp3-ring substituents, and the old test would false-veto every
+    correct name in the class.
 
-    Detection (structural, not a heuristic): because ``bare`` provably NEVER
-    encodes an sp3-ring substituent, ``name == bare`` in the presence of a
-    structurally-confirmed sp3-ring off-ring substituent is a DETERMINISTIC
-    proof of drop, not a guess -- there is no other route by which that
-    substituent could be missing from the string while a distinct heavy atom
-    hangs off an sp3 ring position.
+    Detection, restated for the current construction and still structural
+    rather than heuristic: the producer publishes the off-ring atoms its name
+    actually spells (``PartialSatName.spelled_offring_atoms`` -- prefixes plus
+    the exocyclic atoms of any principal-characteristic-group suffix such as
+    ``-2-carboxylic acid`` / ``-2-ol``). An off-ring heavy atom on an sp3 ring
+    position that is in NEITHER that set NOR the enrichment the shipped name
+    added is unaccounted for, and that is a drop. Subtracting the published set
+    is not a loosening: before it was subtracted, this veto suppressed the very
+    names that carry those atoms -- every ring-COOH member of the class emitted
+    ``unknown organic compound`` while ``bare`` already held the correct
+    ``1,2,3,4-tetrahydronaphthalene-2-carboxylic acid``.
 
     Scope guard (precision-over-recall): restricted to the exact
     "fully-aromatic-ring + fully-saturated-ring" (tetralin-class) shape --
@@ -258,10 +258,9 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     guard) FALSE-VETOED 17 of 25 real hits on a corpus sweep of
     ``benchmark_multi_corpus_results.csv`` -- all of them mixed alkene/hydro
     systems (hexahydro-/octahydronaphthalene, hydroazulene, ...) whose
-    substituents are, in fact, already correctly enriched; those go through a
-    materially different mechanism (``_partial_sat_substituent_prefix``
-    itself bakes in substituents on any NON-sat_set ring atom, aromatic or
-    not) that this function must not second-guess. Narrowing to the clean
+    substituents are, in fact, already correctly spelled by
+    ``_partial_sat_substituent_prefix`` and which this function must not
+    second-guess. Narrowing to the clean
     two-ring aromatic/saturated split eliminated every false positive found
     (0/91 on the combined synthetic + corpus validation set) while still
     catching the 3 documented target leaks plus 2 additional real-corpus
@@ -277,22 +276,19 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     if not name:
         return False
     from ..rules.polycyclics import (
-        name_partially_saturated_carbocycle, _offring_substituent_atoms,
+        name_partially_saturated_carbocycle_with_locants,
+        _offring_substituent_atoms,
     )
     from ..rules.partial_saturation import detect_carbocyclic_partial_saturation
 
-    bare = name_partially_saturated_carbocycle(mol)
-    if not bare:
-        return False  # not this emitter's molecule at all
-    if name != bare:
-        return False  # enrichment added something -- not (this) leak
+    produced = name_partially_saturated_carbocycle_with_locants(mol)
 
     ring_atoms = set()
     for ring in mol.GetRingInfo().AtomRings():
         ring_atoms.update(ring)
     sat_info = detect_carbocyclic_partial_saturation(mol, ring_atoms)
     if sat_info is None:
-        return False
+        return False  # not this emitter's class at all
     atom_to_locant = sat_info.get('atom_to_locant') or {}
     sat_set = set(sat_info.get('saturated_indices') or [])
     if not atom_to_locant or not sat_set:
@@ -306,7 +302,44 @@ def partial_sat_sp3_substituent_drop(mol: Chem.Mol, name: str) -> bool:
     if leftover:
         return False
 
+    # Ring-FUSION atom substituents belong to the producer's own R12 fusion
+    # veto, and this function has always been a no-op on them (the producer
+    # declines, so there was no `bare` to compare against). Keep it that way
+    # explicitly now that the None case below is no longer an early exit.
+    ri = mol.GetRingInfo()
+    for idx in atom_to_locant:
+        if ri.NumAtomRings(idx) < 2:
+            continue
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() not in atom_to_locant and nb.GetAtomicNum() > 1:
+                return False
+
     offring = _offring_substituent_atoms(mol, atom_to_locant, sat_set)
+    if not offring:
+        return False  # nothing on the saturated ring that could be dropped
+
+    if produced is None:
+        # The tetralin-class producer REFUSED. It fails closed exactly when it
+        # cannot account for a ring substituent, so nothing downstream has a
+        # verified hydro-fused parent to hang this substituent on.
+        #
+        # This branch is NOT optional. Before the producer learned to spell
+        # sp3-ring substituents it emitted its bare parent here, and the veto
+        # caught the drop by string equality against it. Once the producer
+        # refuses instead, an early `return False` turns the refusal into a
+        # LICENCE for a worse generator: measured Java-free on
+        # `NC1CCc2ccccc2C1` -> `4-butylcyclohexan-1-amine`, a wrong molecule
+        # (the aromatic half of the tetralin re-spelled as a butyl chain on a
+        # monocycle) where the answer had been a clean abstention.
+        # Removing a wrong output must never unmask a worse one.
+        return True
+
+    if name != produced.name:
+        return False  # something else composed this name -- not (this) leak
+
+    # Atoms the parent name itself already spells are not dropped -- the
+    # producer publishes exactly which ones those are.
+    offring -= produced.spelled_offring_atoms
     return bool(offring)
 
 

@@ -3247,9 +3247,12 @@ def name_polycyclic_complete(mol, features=None):
             from .polycyclics import _assemble_partially_saturated_carbocycle_name
             _sat_name = _assemble_partially_saturated_carbocycle_name(mol, _sat)
             if _sat_name:
-                # substituents_included=False -> the complex-ring caller enriches
-                # any ring substituents via the stored atom_to_locant.
-                return (_sat_name, _sat_ring_atoms, _sat['atom_to_locant'], False)
+                # substituents_included=True: the partial-saturation assembler
+                # is now the SINGLE speller of every ring substituent prefix
+                # (P-16.3.3 multiplicity cannot be split across two formatters)
+                # and it fails closed on any it cannot name, so there is nothing
+                # left for the caller to enrich and enriching would double-cite.
+                return (_sat_name, _sat_ring_atoms, _sat['atom_to_locant'], True)
         # IN-01: no smiles arg — Orthonym.name back-fills the original input SMILES.
         from ..errors import unsupported_ring_system
         raise unsupported_ring_system()

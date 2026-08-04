@@ -304,10 +304,22 @@ def name_tier_a_ring(
             )
 
         if features.is_cyclic and not getattr(features, 'chain_is_parent', False):
-            partial_sat_name = _try_partially_saturated_carbocycle(features.mol)
-            if partial_sat_name:
+            # SECOND partial_sat enrichment site (the first is
+            # handlers/partial_sat.py). It must inherit the producer's numbering
+            # and its already-spelled atom set for the same reasons -- measured
+            # on a 7,500-row corpus sweep, this site was the one emitting
+            # `1,2-dimethyl-6,7-dimethyl-1,2,3,5,8,8a-hexahydronaphthalene` and
+            # `1,2-dimethyl-2,3-dimethyl-perhydronaphthalene`, i.e. every ring
+            # methyl cited TWICE, on two different numberings.
+            from ..composer import (
+                _try_partially_saturated_carbocycle_with_locants,
+            )
+            produced = _try_partially_saturated_carbocycle_with_locants(features.mol)
+            if produced:
                 partial_sat_name = _enrich_handler_name(
-                    features, partial_sat_name, "partial_sat",
+                    features, produced.name, "partial_sat",
+                    atom_to_locant=produced.atom_to_locant or None,
+                    already_spelled_atoms=produced.spelled_offring_atoms or None,
                 )
                 pool = get_current_pool()
                 cand = pool.add(partial_sat_name, "partial_sat", features)
@@ -315,7 +327,7 @@ def name_tier_a_ring(
                     return NamingResult(
                         name=cand.name,
                         tree=NameTreeNode(parent_stem=cand.name, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=cand.name),
-                        atom_to_locant_hint=None,
+                        atom_to_locant_hint=produced.atom_to_locant or None,
                     )
 
     # === Sub-paths 3 & 4: heterocycle + benzene (composer.py:1116-1173) ===

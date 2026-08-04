@@ -77,6 +77,7 @@ def discover_substituents(
     oriented_ring=None,
     principal_chain=None,
     atom_to_locant=None,
+    ring_atom_to_locant=None,
     general_fallback=False,
 ):
     """Discover ALL substituents on a parent structure.
@@ -91,7 +92,13 @@ def discover_substituents(
         parent_type: ``"ring"``, ``"chain"``, or ``"auto"`` (auto-detects).
         oriented_ring: Ring atom indices in IUPAC order (required for ring parents).
         principal_chain: Chain atom indices in order (required for chain parents).
-        atom_to_locant: Optional mapping of atom idx -> IUPAC locant.
+        atom_to_locant: Optional mapping of atom idx -> IUPAC locant. Consumed
+            by the CHAIN path only.
+        ring_atom_to_locant: Optional mapping of atom idx -> IUPAC locant for a
+            RING parent, inherited from whichever producer spelled the parent
+            name. Overrides the ``oriented_ring`` position arithmetic per atom
+            (``'4a'``/``'8a'`` and any fused-parent numbering cannot be
+            expressed as a position). ``None`` -> unchanged behaviour.
         general_fallback: v28 Composer1 Task 5 gating flag. Passed ``True`` ONLY
             from the general-engine (complete/best-effort) call sites. Controls
             the failure mode when a non-parent heavy atom cannot be assigned to
@@ -121,7 +128,8 @@ def discover_substituents(
 
     if parent_type == "ring":
         results = extract_ring_substituents(
-            mol, tuple(parent_set), oriented_ring
+            mol, tuple(parent_set), oriented_ring,
+            atom_to_locant=ring_atom_to_locant,
         )
     else:
         results = _discover_chain_substituents(
@@ -2560,7 +2568,8 @@ _HALOGEN_MAP = {
 # ============================================================================
 
 
-def extract_ring_substituents(mol, ring_atoms, oriented_ring):
+def extract_ring_substituents(mol, ring_atoms, oriented_ring,
+                              atom_to_locant=None):
     """Extract all substituent fragments from a ring parent using ReplaceCore.
 
     Builds a core mol from ring_atoms, calls ReplaceCore to extract all
@@ -2571,10 +2580,19 @@ def extract_ring_substituents(mol, ring_atoms, oriented_ring):
         mol: RDKit Mol object.
         ring_atoms: Tuple or list of ring atom indices (from principal_ring).
         oriented_ring: List of ring atom indices in IUPAC numbering order.
+        atom_to_locant: Optional ``{atom idx -> IUPAC locant}`` INHERITED from
+            the producer that spelled the parent name. Where it covers an
+            attachment atom it decides that atom's locant; elsewhere the
+            ``oriented_ring`` position arithmetic below is used, unchanged.
 
-    Returns:
-        List of SubstituentInfo namedtuples, one per substituent fragment.
-        Empty list if ring has no substituents.
+            This exists because ``oriented_ring`` is a bare ordering and
+            ``_get_locant_from_oriented_ring`` can only ever return ``pos + 1``.
+            A fused parent's numbering is not a position sequence -- it skips
+            (``4`` -> ``4a`` -> ``5``) and it depends on which of several
+            automorphic numberings the parent name was spelled from. Deriving a
+            substituent locant from position arithmetic while the parent name
+            was spelled from a different numbering names a DIFFERENT molecule,
+            which is exactly what happened to 2-substituted tetralins.
     """
     ring_set = set(ring_atoms)
 
@@ -2634,10 +2652,14 @@ def extract_ring_substituents(mol, ring_atoms, oriented_ring):
                 if core_pos < len(match):
                     mol_atom_idx = match[core_pos]
 
-                    # Map to IUPAC locant via oriented_ring
-                    locant = _get_locant_from_oriented_ring(
-                        mol_atom_idx, oriented_ring
-                    )
+                    # Inherited numbering wins where it covers this atom;
+                    # otherwise map to a locant via oriented_ring as before.
+                    if atom_to_locant is not None and mol_atom_idx in atom_to_locant:
+                        locant = atom_to_locant[mol_atom_idx]
+                    else:
+                        locant = _get_locant_from_oriented_ring(
+                            mol_atom_idx, oriented_ring
+                        )
 
                     # Collect original mol atom indices for this fragment
                     # Use per-branch disambiguation for geminal substituents

@@ -30,7 +30,7 @@ Integration with fused_rings.py:
 - This module can delegate to fused_rings for heterocyclic detection
 """
 
-from typing import Dict, List, Optional, Tuple, Set, Any
+from typing import Dict, List, NamedTuple, Optional, Tuple, Set, Any
 from collections import defaultdict, deque
 from rdkit import Chem
 
@@ -1635,6 +1635,12 @@ def name_partially_saturated_carbocycle(mol) -> Optional[str]:
     """
     Generate IUPAC name for a partially saturated carbocyclic fused system.
 
+    Thin wrapper over :func:`name_partially_saturated_carbocycle_with_locants`
+    that discards the numbering. Prefer the sibling whenever the caller has to
+    place its own locants — re-deriving a second numbering for the same name is
+    a defect class, not an implementation detail (see that function's
+    docstring).
+
     Handles compounds like tetrahydronaphthalene, dihydroanthracene, etc.
     These are PAH systems with some ring atoms saturated (sp3).
 
@@ -1651,6 +1657,57 @@ def name_partially_saturated_carbocycle(mol) -> Optional[str]:
     Examples:
         >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
         >>> name_partially_saturated_carbocycle(mol)
+        '1,2,3,4-tetrahydronaphthalene'
+    """
+    result = name_partially_saturated_carbocycle_with_locants(mol)
+    return result[0] if result is not None else None
+
+
+class PartialSatName(NamedTuple):
+    """What the partially-saturated fused-carbocycle producer publishes.
+
+    ``name`` alone is not enough to decorate: a consumer that adds substituent
+    prefixes needs the numbering the name was spelled from AND the set of atoms
+    the name already spells. Withholding either one produced a wrong name --
+    the first gave `1-methyl-` for a 2-substituted tetralin, the second gave
+    `6-methyl-6-methyl-...`. Both were caught by SELF-01, i.e. both cost a
+    correct name rather than shipping a wrong one.
+    """
+    name: str
+    #: ORIGINAL atom idx -> IUPAC ring locant, incl. ``'4a'``/``'8a'``.
+    atom_to_locant: Dict[int, Any]
+    #: Off-ring atoms ``name`` already accounts for (aromatic-ring substituent
+    #: prefixes it built itself + the exocyclic atoms of its PCG suffix).
+    spelled_offring_atoms: Set[int]
+
+
+def name_partially_saturated_carbocycle_with_locants(
+    mol,
+) -> Optional[PartialSatName]:
+    """The partially-saturated fused-carbocycle name TOGETHER WITH the
+    ``atom_to_locant`` map it was spelled from and the off-ring atoms it
+    already spells.
+
+    The map is the one :func:`detect_carbocyclic_partial_saturation` chose (ORIGINAL
+    atom idx -> IUPAC ring locant, including the lettered fusion locants ``'4a'``
+    / ``'8a'``), never a re-derivation. A consumer that has to place its own
+    substituent or suffix locants MUST inherit this map: the hydro locants, the
+    stereodescriptors, the PCG suffix and any downstream substituent prefix all
+    have to agree on one numbering, and two independently-derived numberings for
+    one name spell a different molecule. This mirrors the standing contract
+    stated verbatim in ``vonbaeyer_universal.RingAnalysis.atom_to_locant`` and
+    ``terminal_ring.TerminalRingName.numbering``.
+
+    Args:
+        mol: RDKit Mol object
+
+    Returns:
+        A :class:`PartialSatName`, or ``None`` when this is not a partially
+        saturated fused carbocycle this path can name correctly (fail closed).
+
+    Examples:
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
+        >>> name_partially_saturated_carbocycle_with_locants(mol).name
         '1,2,3,4-tetrahydronaphthalene'
     """
     from .partial_saturation import (
@@ -1692,13 +1749,22 @@ def name_partially_saturated_carbocycle(mol) -> Optional[str]:
             if nb.GetIdx() not in ring_atoms and nb.GetAtomicNum() > 1:
                 return None
 
-    # Build the name
-    return _assemble_partially_saturated_carbocycle_name(mol, sat_info)
+    # Build the name from -- and return it alongside -- the ONE numbering
+    # `detect_carbocyclic_partial_saturation` chose, plus the off-ring atoms the
+    # assembler reports having spelled.
+    spelled: Set[int] = set()
+    name = _assemble_partially_saturated_carbocycle_name(
+        mol, sat_info, spelled_out=spelled,
+    )
+    if not name:
+        return None
+    return PartialSatName(name, sat_info.get('atom_to_locant') or {}, spelled)
 
 
 def _assemble_partially_saturated_carbocycle_name(
     mol,
-    saturation_info: Dict[str, Any]
+    saturation_info: Dict[str, Any],
+    spelled_out: Optional[Set[int]] = None,
 ) -> str:
     """
     Assemble IUPAC name for partially saturated carbocyclic system.
@@ -1709,6 +1775,13 @@ def _assemble_partially_saturated_carbocycle_name(
     Args:
         mol: RDKit Mol object
         saturation_info: Dict from detect_carbocyclic_partial_saturation
+        spelled_out: Optional set, FILLED with every off-ring atom this name
+            already accounts for — the aromatic-ring substituent prefixes it
+            builds itself plus the exocyclic atoms of the principal-
+            characteristic-group suffix. A decorator that enriches this name
+            must exclude them; nothing else can know the set, because this
+            function is the only thing that decides which substituents it
+            spells and which it leaves to the composer.
 
     Returns:
         Complete IUPAC name
@@ -1730,71 +1803,108 @@ def _assemble_partially_saturated_carbocycle_name(
 
     # Get locants for saturated positions
     if is_perhydro:
-        # Perhydro doesn't need locants
-        formatted_prefix = 'perhydro'
+        # Fully saturated: cite the COUNT-form prefix with NO per-position hydro
+        # locants -> `decahydronaphthalene`. NOT the literal 'perhydro': the
+        # string `perhydro` occurs **0 times** in BlueBookV2.md while
+        # `decahydronaphthalene` occurs 6, so `perhydronaphthalene` is a
+        # general-nomenclature form and must not ship on the PIN path.
+        # `ring_substituents.py:1265` already takes exactly this decision for
+        # the SUBSTITUENT form (`decahydronaphthalen-2-yl`); this is the same
+        # rule applied to the parent. Fail closed on a non-standard count.
+        from .partial_saturation import get_saturation_prefix
+        formatted_prefix = get_saturation_prefix(
+            saturation_info.get('hydrogen_count', len(saturated_indices))
+        )
+        if not formatted_prefix:
+            return None
     else:
         locants = get_saturation_locants(mol, saturated_indices, atom_to_locant)
         formatted_prefix = format_saturation_prefix(prefix, locants)
 
-    # P-59.2.3.2: a ring principal-characteristic-group suffix (here a
-    # ring-attached carboxylic acid -> '-carboxylic acid') at its lowest locant.
-    # The acid carbon/oxygens are exocyclic, so they must be EXCLUDED from the
-    # detachable-prefix discovery below (otherwise the acid is mis-flagged an
-    # un-nameable prefix and the whole candidate declines). Scoped to the
-    # ring-COOH PCG + named-carbocycle-table parents; fail-closed otherwise.
-    from .partial_saturation import _partial_sat_pcg_ring_atoms
+    # The ring principal-characteristic-group suffix at its lowest locants.
+    # P-58.2.5 (BlueBookV2.md:24890), on the PIN `5,8-dioxo-5,6,7,8-tetrahydro-
+    # naphthalene-2-carboxylic acid`: "detachable but nonalphabetized hydro
+    # prefixes do not have precedence over the principal characteristic group
+    # for low numbering, but has precedence over other detachable prefixes."
+    # The numbering primitive already honoured that when it built
+    # `atom_to_locant`, so the suffix is spelled straight off THAT map — the
+    # kind and the ring atoms are inherited too, never recomputed here.
+    #
+    # The suffix's exocyclic atoms must be EXCLUDED from the detachable-prefix
+    # discovery below (otherwise they are mis-flagged un-nameable prefixes and
+    # the whole candidate declines). Scoped to the ring-COOH (P-65.1.1.1) and
+    # ring-OH (P-63.1) PCGs + named-carbocycle-table parents; fail closed
+    # otherwise.
+    from .partial_saturation import (
+        _PARTIAL_SAT_PCG_SUFFIX, _elide_terminal_e, _locant_display,
+        _locant_key, _partial_sat_pcg_exocyclic_atoms,
+    )
     ring_set = set(atom_to_locant)
-    pcg_ring_atoms = _partial_sat_pcg_ring_atoms(mol, ring_set)
+    pcg_kind = saturation_info.get('pcg_kind')
+    pcg_ring_atoms = set(saturation_info.get('pcg_ring_atoms') or ())
     pcg_suffix = ""
     pcg_exclude: Set[int] = set()
-    if pcg_ring_atoms:
-        # Collect the exocyclic acid atoms (C, =O, -OH) hanging off each PCG ring
-        # carbon so they are not treated as detachable prefixes.
+    if pcg_kind and pcg_ring_atoms:
         pcg_locants: List[Any] = []
         for rc in sorted(pcg_ring_atoms):
             loc = atom_to_locant.get(rc)
             if loc is None:
                 return None
             pcg_locants.append(loc)
-            for n in mol.GetAtomWithIdx(rc).GetNeighbors():
-                if n.GetIdx() in ring_set:
-                    continue
-                if n.GetSymbol() == 'C':
-                    # the carboxyl carbon + its two oxygens
-                    pcg_exclude.add(n.GetIdx())
-                    for nn in n.GetNeighbors():
-                        if nn.GetIdx() != rc and nn.GetSymbol() == 'O':
-                            pcg_exclude.add(nn.GetIdx())
-        pcg_locants.sort(key=lambda x: (isinstance(x, str), x))
+        pcg_exclude = _partial_sat_pcg_exocyclic_atoms(
+            mol, ring_set, pcg_kind, pcg_ring_atoms
+        )
+        if not pcg_exclude:
+            return None  # suffix atoms not found -> never spell a bare parent
+        pcg_locants.sort(key=_locant_key)
         _mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(len(pcg_locants))
         if _mult is None:
-            return None  # too many acid groups for this scoped path
-        _loc_str = ",".join(str(l) for l in pcg_locants)
-        pcg_suffix = f"-{_loc_str}-{_mult}carboxylic acid"
+            return None  # too many suffix groups for this scoped path
+        _stem, _elides = _PARTIAL_SAT_PCG_SUFFIX[pcg_kind]
+        _loc_str = ",".join(_locant_display(l) for l in pcg_locants)
+        pcg_suffix = f"-{_loc_str}-{_mult}{_stem}"
+        # P-16.7.1(a): elide the parent's terminal 'e' before a vowel-initial
+        # suffix. A multiplying prefix ('di', 'tri', 'tetra') is
+        # consonant-initial, so it keeps the 'e' -- `naphthalen-2-ol` but
+        # `naphthalene-1,3-diol`.
+        if _elides and not _mult:
+            parent_name = _elide_terminal_e(parent_name)
 
-    # P-15.1.5.3: detachable substituent prefixes on the AROMATIC (non-hydro)
-    # ring of a partially-saturated fused carbocycle, cited (alphanumerically)
-    # BEFORE the nondetachable 'hydro' prefix. The composer's normal decoration
-    # path already carries substituents on the SATURATED (sp3) ring, so this
-    # assembler only supplies the aromatic-ring substituents it would otherwise
-    # DROP (5-methyl-1,2,3,4-tetrahydronaphthalene). It must NOT add sp3-ring
-    # substituents (the composer does that; double-citing would leak a wrong
-    # name that SELF-01 suppresses). Fail-closed only when an aromatic-ring
-    # substituent that WOULD be dropped cannot be named.
-    sat_set = set(saturation_info['saturated_indices'])
+    # P-15.1.5.3: the detachable substituent prefixes of the whole fused ring
+    # system, cited (alphanumerically) BEFORE the nonalphabetised 'hydro'
+    # prefix. ALL of them are built here, aromatic ring and saturated ring
+    # alike, by ONE formatter: P-16.3.3 makes multiplicity a property of the
+    # substituent NAME, so a methyl on each ring is one group of two
+    # (`2,6-dimethyl-`), which two formatters splitting the set by ring can
+    # never produce. This also leaves exactly one numbering in play.
+    #
+    # Fail-closed: if any off-ring substituent cannot be named, decline rather
+    # than drop it.
+    _sub_spelled: Set[int] = set()
     sub_prefix = _partial_sat_substituent_prefix(
-        mol, atom_to_locant, sat_set, exclude_atoms=pcg_exclude
+        mol, atom_to_locant, exclude_atoms=pcg_exclude,
+        spelled_out=_sub_spelled,
     )
-    # An aromatic-ring off-ring substituent (other than the excluded PCG) that
-    # could not be named -> decline (never drop it).
     _remaining = _offring_substituent_atoms(
-        mol, atom_to_locant, set(atom_to_locant) - sat_set
+        mol, atom_to_locant
     ) - pcg_exclude
     if sub_prefix is None and _remaining:
-        return None  # aromatic-ring substituent present but not nameable
+        return None  # ring substituent present but not nameable
 
-    # Assemble final name
-    name = f"{sub_prefix or ''}{formatted_prefix}{parent_name}{pcg_suffix}"
+    if spelled_out is not None:
+        spelled_out |= pcg_exclude
+        spelled_out |= _sub_spelled
+
+    # Assemble final name. P-16.3.3 (L2): the hyphen between the substituent
+    # prefixes and the hydro prefix is required only when the hydro prefix leads
+    # with a LOCANT (`2,6-dimethyl-1,2,3,4-tetrahydronaphthalene`, cf. the PIN
+    # `5,6,7,8-tetrabromo-1,2,3,4-tetrahydronaphthalene`, BlueBookV2.md:25856)
+    # and must be absent when it does not (`2,3-dimethyldecahydronaphthalene`).
+    # Route it through the shared primitive instead of concatenating, which
+    # emitted the spurious `2,3-dimethyl-decahydronaphthalene`.
+    from ..assembly.composition_primitives import _join_prefix_to_name
+    stem = f"{formatted_prefix}{parent_name}{pcg_suffix}"
+    name = _join_prefix_to_name((sub_prefix or '').rstrip('-'), stem)
     return f"{stereo_prefix}{name}" if stereo_prefix else name
 
 
@@ -1829,17 +1939,36 @@ def _offring_substituent_atoms(
 
 
 def _partial_sat_substituent_prefix(
-    mol, atom_to_locant: Dict[int, Any], sat_set: Set[int],
+    mol, atom_to_locant: Dict[int, Any],
     exclude_atoms: Optional[Set[int]] = None,
+    spelled_out: Optional[Set[int]] = None,
 ) -> Optional[str]:
     """Build the alphanumerically-sorted detachable-substituent prefix string
-    (with trailing hyphen) for substituents on the AROMATIC (non-sp3) ring of a
-    partially-saturated fused carbocycle, or None if there are none / any cannot
-    be named (fail-closed). P-15.1.5.3 / P-14.5.2.
+    (with trailing hyphen) for EVERY substituent on a partially-saturated fused
+    carbocycle, or None if there are none / any cannot be named (fail-closed).
+    P-15.1.5.3 / P-14.5.2.
+
+    This used to skip the SATURATED (sp3) ring, leaving those substituents to
+    the composer's enrichment pass. That split could not be made correct:
+    multiplicity is a property of the substituent NAME, not of which ring atom
+    carries it (**P-16.3.3** ``:7038`` clause (b) ``:7067`` — "the basic
+    numerical prefixes 'di', 'tri', 'tetra', etc. are used to indicate a
+    multiplicity of: ... simple substituent prefixes"), so a methyl on each ring
+    is ONE group of two and must be cited ``2,6-dimethyl-``. Two independent
+    prefix formatters, each holding half the set, can only ever concatenate
+    (``2-methyl-6-methyl-``). One formatter over the whole ring system is the
+    only construction that can obey P-16.3.3, and it also removes the second
+    numbering that the enrichment hand-off was deriving.
 
     ``exclude_atoms`` are off-ring atoms already accounted for elsewhere (e.g.
     the exocyclic atoms of a ring principal-characteristic-group suffix) and are
-    skipped so they are not mis-named as prefixes."""
+    skipped so they are not mis-named as prefixes.
+
+    ``spelled_out``, when a set is passed, is FILLED with every off-ring atom
+    this prefix string spells (whole fragments, not just the attachment
+    neighbour), so a downstream decorator can exclude them instead of citing
+    them twice. It is an out-parameter rather than a recomputation so there is
+    exactly one answer to "what does this name already account for"."""
     from ..assembly.substituent_naming import name_substituent_fragment
     from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
 
@@ -1847,10 +1976,9 @@ def _partial_sat_substituent_prefix(
     ring_set = set(atom_to_locant)
     from collections import defaultdict
     grouped: Dict[str, List[Any]] = defaultdict(list)
+    spelled: Set[int] = set()
     found_any = False
     for idx in atom_to_locant:
-        if idx in sat_set:
-            continue  # sp3-ring substituents are the composer path's job
         ring_atom = mol.GetAtomWithIdx(idx)
         for n in ring_atom.GetNeighbors():
             if n.GetIdx() in ring_set or n.GetIdx() in exclude:
@@ -1862,6 +1990,7 @@ def _partial_sat_substituent_prefix(
             _HALO = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
             if n.GetSymbol() in _HALO and n.GetDegree() == 1:
                 grouped[_HALO[n.GetSymbol()]].append(atom_to_locant[idx])
+                spelled.add(n.GetIdx())
                 continue
             sub_atoms: List[int] = []
             seen = set(ring_set) | exclude
@@ -1881,6 +2010,7 @@ def _partial_sat_substituent_prefix(
             if not sub_name or ' ' in sub_name:
                 return None  # un-nameable substituent -> fail closed
             grouped[sub_name].append(atom_to_locant[idx])
+            spelled.update(sub_atoms)
     if not found_any:
         return None
     parts = []
@@ -1891,6 +2021,8 @@ def _partial_sat_substituent_prefix(
         return None
     from .benzene import _join_benzene_prefixes
     joined = _join_benzene_prefixes(parts)
+    if spelled_out is not None:
+        spelled_out.update(spelled)
     return joined if joined.endswith('-') else joined + '-'
 
 

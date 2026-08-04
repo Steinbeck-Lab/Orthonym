@@ -180,9 +180,11 @@ def test_charge_dropped_false_for_empty_name():
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,bad_name", [
-    ("Cc1ccc2c(c1)CC(C)CC2", "7-methyl-1,2,3,4-tetrahydronaphthalene"),
+    # Still a leak: no producer can name a 2-aminotetralin (the amine wants a
+    # SUFFIX, `1,2,3,4-tetrahydronaphthalen-2-amine`, BlueBookV2.md:26489 shows
+    # the 1-isomer as PIN), so the hydro-fused producer fails closed and this
+    # veto is what keeps the Java-free path from shipping a substitute.
     ("NC1CCc2ccccc2C1", "1,2,3,4-tetrahydronaphthalene"),
-    ("OC1CCc2ccccc2C1", "1,2,3,4-tetrahydronaphthalene"),
 ])
 def test_partial_sat_drop_true_for_documented_leaks(smiles, bad_name):
     mol = Chem.MolFromSmiles(smiles)
@@ -190,8 +192,38 @@ def test_partial_sat_drop_true_for_documented_leaks(smiles, bad_name):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("smiles,pin", [
+    # WAS asserted as leaks that this veto had to SUPPRESS. Both are now named
+    # correctly at the source, which is strictly better than being vetoed: the
+    # hydro-fused producer became the single speller of every ring substituent
+    # prefix (P-16.3.3 multiplicity cannot be split across two formatters) and
+    # grew the P-63.1 ring '-ol' suffix. A veto that still fired here would be
+    # suppressing the correct answer.
+    #
+    # Independent check (OPSIN 2.9.0, not the code under test) -- each name
+    # parses back to its own input:
+    #   '2,7-dimethyl-1,2,3,4-tetrahydronaphthalene' -> Cc1ccc2c(c1)CC(C)CC2
+    #   '1,2,3,4-tetrahydronaphthalen-2-ol'          -> OC1CCc2ccccc2C1
+    # The old expectations asserted an ABSTENTION, so they cannot have been
+    # encoding these molecules' correct names.
+    ("Cc1ccc2c(c1)CC(C)CC2", "2,7-dimethyl-1,2,3,4-tetrahydronaphthalene"),
+    ("OC1CCc2ccccc2C1", "1,2,3,4-tetrahydronaphthalen-2-ol"),
+])
+def test_former_leaks_are_now_named_at_the_source(smiles, pin):
+    mol = Chem.MolFromSmiles(smiles)
+    assert partial_sat_sp3_substituent_drop(mol, pin) is False
+    # and Java-free, so the fix is in the producer rather than in the gate
+    raw = Orthonym(style="pin", _disable_opsin_validity_gate=True)
+    assert raw.name(smiles) == pin
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("smiles,good_name", [
-    ("CC1CCc2ccccc2C1", "1-methyl-1,2,3,4-tetrahydronaphthalene"),
+    # VALUE CORRECTED (was '1-methyl-...' for this input -- see the note in
+    # test_veto_does_not_regress_correct_names). Note this row is now doing
+    # real work in the OPPOSITE direction: a veto that fired on the CORRECT
+    # `2-methyl-` name would suppress the very fix.
+    ("CC1CCc2ccccc2C1", "2-methyl-1,2,3,4-tetrahydronaphthalene"),
     ("c1ccc2c(c1)CCCC2", "1,2,3,4-tetrahydronaphthalene"),
     ("Cc1ccc2c(c1)CCCC2", "6-methyl-1,2,3,4-tetrahydronaphthalene"),
 ])
@@ -231,9 +263,15 @@ def test_partial_sat_drop_false_for_mixed_hydro_shape():
     # metalloid charge-NORMALIZATIONs (borate-olate coincidence; over-coordinated
     # silane/stannane named neutral per test_charged_suffixes_ft6.py) are
     # gated-safe no-Java residuals, NOT vetoed here (precision-over-recall).
-    "Cc1ccc2c(c1)CC(C)CC2",  # R12 partial-sat sp3-substituent drop
-    "NC1CCc2ccccc2C1",       # R12: amino dropped
-    "OC1CCc2ccccc2C1",       # R12: hydroxy dropped
+    # R12: the amine wants a SUFFIX no producer builds yet, so the hydro-fused
+    # producer fails closed and this veto keeps the Java-free path from
+    # shipping the substitute it otherwise reaches (measured:
+    # `4-butylcyclohexan-1-amine` -- the aromatic half re-spelled as a butyl
+    # chain on a monocycle, a wrong molecule).
+    "NC1CCc2ccccc2C1",
+    # `Cc1ccc2c(c1)CC(C)CC2` and `OC1CCc2ccccc2C1` MOVED OUT of this list:
+    # both are now named correctly at the source, see
+    # test_former_leaks_are_now_named_at_the_source.
 ])
 def test_veto_fails_closed_on_documented_leaks_no_java(smiles):
     raw = Orthonym(style="pin", _disable_opsin_validity_gate=True)
@@ -244,7 +282,12 @@ def test_veto_fails_closed_on_documented_leaks_no_java(smiles):
 @pytest.mark.parametrize("smiles,expected", [
     ("C1CC2CCC1C=C2", "bicyclo[2.2.2]oct-2-ene"),
     ("C=C1CCCCC1", "methylidenecyclohexane"),
-    ("CC1CCc2ccccc2C1", "1-methyl-1,2,3,4-tetrahydronaphthalene"),
+    # VALUE CORRECTED (was '1-methyl-...', structurally impossible for this
+    # input: locants 1 and 4 of `1,2,3,4-tetrahydronaphthalene` are the sp3
+    # carbons adjacent to fusion carbons 8a/4a, and this methyl-bearing carbon
+    # has no aromatic neighbour. OPSIN 2.9.0: '1-methyl-...' -> CC1CCCc2ccccc21,
+    # a DIFFERENT molecule; '2-methyl-...' -> CC1CCc2ccccc2C1 == input.)
+    ("CC1CCc2ccccc2C1", "2-methyl-1,2,3,4-tetrahydronaphthalene"),
     ("[O-]S(=O)(=O)[O-]", "sulfate"),
     ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),
 ])
