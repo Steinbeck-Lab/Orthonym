@@ -23,9 +23,9 @@ SELF01 = "SELF-01 suppressed (different molecule): {!r} (opsin={})"
 def test_extracts_name_and_opsin_smiles():
     lines = [SELF01.format("cholest-5-ene", "CC1CCC2C1")]
     got = parse_suppressed_candidates(lines)
-    assert got["suppressed_name"] == "cholest-5-ene"
-    assert got["suppressed_opsin_smiles"] == "CC1CCC2C1"
-    assert got["suppressed_count"] == 1
+    assert got["self01_suppressed_name"] == "cholest-5-ene"
+    assert got["self01_suppressed_opsin_smiles"] == "CC1CCC2C1"
+    assert got["self01_suppressed_count"] == 1
 
 
 def test_a_name_containing_primes_is_not_truncated():
@@ -34,8 +34,8 @@ def test_a_name_containing_primes_is_not_truncated():
     lines = ["SELF-01 suppressed (different molecule): "
              f"'{name}' (opsin=C1CC[As]OC1)"]
     got = parse_suppressed_candidates(lines)
-    assert got["suppressed_name"] == name
-    assert got["suppressed_opsin_smiles"] == "C1CC[As]OC1"
+    assert got["self01_suppressed_name"] == name
+    assert got["self01_suppressed_opsin_smiles"] == "C1CC[As]OC1"
 
 
 def test_last_suppression_wins_and_all_are_kept():
@@ -50,10 +50,10 @@ def test_last_suppression_wins_and_all_are_kept():
         SELF01.format("second-wrong", "CCC"),
     ]
     got = parse_suppressed_candidates(lines)
-    assert got["suppressed_name"] == "second-wrong"
-    assert got["suppressed_opsin_smiles"] == "CCC"
-    assert got["suppressed_count"] == 2
-    assert got["suppressed_all"] == [("first-wrong", "CCO"),
+    assert got["self01_suppressed_name"] == "second-wrong"
+    assert got["self01_suppressed_opsin_smiles"] == "CCC"
+    assert got["self01_suppressed_count"] == 2
+    assert got["self01_suppressed_all"] == [("first-wrong", "CCO"),
                                      ("second-wrong", "CCC")]
 
 
@@ -69,8 +69,27 @@ def test_an_unrelated_gate_line_is_not_mistaken_for_self01():
     assert parse_suppressed_candidates(lines) == {}
 
 
+def test_every_key_is_self01_prefixed_so_the_gate_cannot_be_mistaken():
+    """The prefix IS the guard against cross-gate misattribution.
+
+    A molecule can be suppressed by SELF-01 mid-cascade and then terminate at a
+    DIFFERENT gate, so a row whose terminal cause is `opsin_unparseable` can still
+    carry a SELF-01 payload from earlier in its own cascade. Under the original
+    generic key names (`suppressed_name`) that read as "the candidate this row
+    died on", and an investigator consuming the 500-row census had to monkeypatch
+    `record_suppression` to recover the real candidates. Measured there: 39 of 200
+    payload-carrying rows terminated somewhere other than `self01_mismatch`.
+
+    A generic key name would let the next consumer make the same inference, so
+    this test fails if the prefix is ever dropped.
+    """
+    got = parse_suppressed_candidates([SELF01.format("wrong", "CCO")])
+    assert got, "expected a payload"
+    assert all(k.startswith("self01_") for k in got), sorted(got)
+
+
 def test_a_logger_prefix_does_not_break_the_match():
     """Handlers may hand over formatted records, not bare messages."""
     lines = ["WARNING:orthonym.namer:" + SELF01.format("wrong", "CCO")]
     got = parse_suppressed_candidates(lines)
-    assert got["suppressed_name"] == "wrong"
+    assert got["self01_suppressed_name"] == "wrong"

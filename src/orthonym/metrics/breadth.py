@@ -147,6 +147,18 @@ def parse_suppressed_candidates(log_lines: Iterable[str]) -> Dict[str, Any]:
     Scope: this reads the SELF-01 line ONLY. The OPSIN validity gate suppresses
     names too, but for a different reason (unparseable, not wrong molecule), and
     conflating the two would size a grammar defect as a constitution defect.
+
+    ⚠ The keys are ``self01_``-prefixed ON PURPOSE, and the prefix is the guard.
+    A molecule can be suppressed by SELF-01 mid-cascade and then terminate at a
+    DIFFERENT gate, so a row whose terminal cause is ``opsin_unparseable`` can
+    still carry a SELF-01 payload from earlier in its own cascade. Under the
+    earlier generic names (``suppressed_name``) that read as "the candidate this
+    row died on", and an investigator consuming it had to monkeypatch
+    ``record_suppression`` to recover the real one. Measured on the 500-row
+    census: 39 of 200 payload-carrying rows terminated somewhere other than
+    ``self01_mismatch`` (6 ``opsin_unparseable``, 5 ``enumerator_last_resort``,
+    1 ``enumerator_ring_fallback``, 27 with no terminal cause recorded).
+    **Only trust this payload when ``terminal_detail == 'self01_mismatch'``.**
     """
     found: List[Tuple[str, str]] = []
     for line in log_lines:
@@ -156,10 +168,10 @@ def parse_suppressed_candidates(log_lines: Iterable[str]) -> Dict[str, Any]:
     if not found:
         return {}
     return {
-        "suppressed_name": found[-1][0],
-        "suppressed_opsin_smiles": found[-1][1],
-        "suppressed_count": len(found),
-        "suppressed_all": found,
+        "self01_suppressed_name": found[-1][0],
+        "self01_suppressed_opsin_smiles": found[-1][1],
+        "self01_suppressed_count": len(found),
+        "self01_suppressed_all": found,
     }
 
 
