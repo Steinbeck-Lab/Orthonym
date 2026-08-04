@@ -1877,6 +1877,24 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             mol, frag_atoms_set, attach_idx)
         if _term is not None:
             return _term
+        # v30 PB-5: the DECORATED-fragment sibling of the generator above. Where
+        # ``_terminal_bare_ring_substituent`` requires the fragment to BE exactly
+        # one bare ring system, this one names a ring system PLUS its decorations,
+        # or a complex acyclic fragment, and is complete by construction: it
+        # returns None rather than any name that fails its own atom-coverage
+        # invariant, so it cannot do the silent-drop that the comment above warns
+        # about.
+        #
+        # Wired on THIS side only -- ``allow_mancude`` is True here, i.e. the
+        # complete/best-effort tier. Deliberately NOT wired at the Tier-5 return
+        # below, which is the PIN/DEFAULT path: emitting a systematic
+        # 'a'-replacement name there would assert PIN status for a non-PIN name
+        # (``1-oxacyclohexan-4-yl`` where the PIN is ``oxan-4-yl``) and break PIN
+        # byte-identity. See the comment on that return.
+        from ..rules.terminal_fragment import terminal_fragment_name
+        _tf = terminal_fragment_name(mol, frag_atoms_set, attach_idx)
+        if _tf is not None:
+            return _tf.name
         _desc = _descriptive_fallback(mol, frag_atoms_set, attach_idx)
         return None if _desc == 'substituent' else _desc
 
