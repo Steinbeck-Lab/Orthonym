@@ -1891,12 +1891,23 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         # 'a'-replacement name there would assert PIN status for a non-PIN name
         # (``1-oxacyclohexan-4-yl`` where the PIN is ``oxan-4-yl``) and break PIN
         # byte-identity. See the comment on that return.
+        # ORDER IS LOAD-BEARING: LAST resort, never first.
+        # ``_descriptive_fallback`` is not only a sentinel factory -- it produces
+        # the CORRECT specific prefix for small fragments (``hydroxy``, ``amino``,
+        # ``oxo``, ``cyano``, the halogens) and returns the bare word
+        # ``substituent`` only when everything else has declined. Calling the
+        # systematic generator BEFORE it preempts those: measured on the 500-row
+        # census, that ordering rewrote ``2-hydroxy-…`` to ``2-(1-oxamethyl)-…``,
+        # emitted ``1-oxa-2,3-diphosphapropyl`` where specific prefixes existed,
+        # and LOST two correct names outright (EMIT -> ABSTAIN). Textbook
+        # invariant 9: removing a refusal path unmasked a worse generator.
+        # So it runs only where the sentinel would otherwise be returned.
+        _desc = _descriptive_fallback(mol, frag_atoms_set, attach_idx)
+        if _desc != 'substituent':
+            return _desc
         from ..rules.terminal_fragment import terminal_fragment_name
         _tf = terminal_fragment_name(mol, frag_atoms_set, attach_idx)
-        if _tf is not None:
-            return _tf.name
-        _desc = _descriptive_fallback(mol, frag_atoms_set, attach_idx)
-        return None if _desc == 'substituent' else _desc
+        return _tf.name if _tf is not None else None
 
     # ---- Tier 5: Descriptive fallback (guaranteed non-None) ----
     #
