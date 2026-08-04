@@ -187,26 +187,64 @@ def _assemble_prefixes(tokens) -> str:
     return "-".join(parts)
 
 
-def _chain_stem_with_unsaturation(n: int, ene: List[int], yne: List[int]) -> str:
-    """'butyl' / 'but-3-en-1-yl' / 'but-3-yn-1-yl' / 'but-1-en-3-yn-1-yl'.
+def _chain_stem_with_unsaturation(n: int, ene: List[int],
+                                  yne: List[int]) -> Optional[str]:
+    """'butyl' / 'but-3-en-1-yl' / 'penta-1,3-dien-1-yl' / 'hexa-1,3-dien-5-yn-1-yl'.
 
     P-31.1.1.1: 'ene' always precedes 'yne', with elision of the final 'e' of
     'ene'. The attachment locant is cited explicitly ('-1-yl') whenever an
     unsaturation locant is present -- OPSIN-verified: '(2-oxabut-3-en-1-yl)benzene'
     parses, and the bare '...enyl' contraction is not used here because the
     explicit form is unambiguous for every chain length.
+
+    Multiplied bonds: when TWO OR MORE double (or triple) bonds share the
+    backbone, the suffix takes its own multiplying prefix ('di'/'tri'/...,
+    SIMPLE_MULTIPLIERS -- the SAME table ``_assemble_prefixes`` uses, never a
+    second copy) immediately before that suffix, and the STEM gains a single
+    terminal linking 'a' -- once, regardless of how many of {ene, yne} are
+    multiplied: 'penta-1,3-dien-1-yl', 'hexa-1,3-dien-5-yn-1-yl' (the 'dien' is
+    multiplied, the 'yn' is not, and 'a' still appears exactly once, at the
+    stem). A single bond of a type never gets a multiplier or the 'a':
+    'pent-1-en-3-yn-1-yl' is unchanged by this rule (neither suffix is
+    multiplied). All required strings OPSIN-verified 2026-08-04 by wrapping in
+    a parent, e.g. '(hexa-1,3-dien-5-yn-1-yl)benzene' -> C#CC=CC=Cc1ccccc1.
+
+    Returns ``None`` -- never an unparseable string -- if a bond-type count has
+    no entry in the multiplier table (Table unspellable past 'icosa'/20); the
+    caller must refuse the whole fragment rather than emit a name denoting
+    nothing.
     """
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
     from ..data.chain_names import get_chain_prefix    # 'but' for 4
 
     if not ene and not yne:
         return get_alkyl_name(n)
     stem = get_chain_prefix(n)
-    parts = [stem]
-    if ene:
-        parts.append("-" + ",".join(str(x) for x in sorted(ene)) + "-en")
-    if yne:
-        parts.append("-" + ",".join(str(x) for x in sorted(yne)) + "-yn")
-    return "".join(parts) + "-1-yl"
+
+    def _suffix_part(locants: List[int], suffix: str) -> Optional[tuple]:
+        """(needs_linking_a, '-<locants>-<mult><suffix>') for one bond type.
+
+        ``None`` if a real 2+ multiplicity has no admitted multiplier.
+        """
+        if not locants:
+            return (False, "")
+        locs = sorted(locants)
+        if len(locs) == 1:
+            return (False, f"-{locs[0]}-{suffix}")
+        mult = SIMPLE_MULTIPLIERS.get(len(locs))
+        if mult is None:
+            return None
+        return (True, "-" + ",".join(str(x) for x in locs) + "-" + mult + suffix)
+
+    ene_part = _suffix_part(ene, "en")
+    if ene_part is None:
+        return None
+    yne_part = _suffix_part(yne, "yn")
+    if yne_part is None:
+        return None
+
+    needs_a = ene_part[0] or yne_part[0]
+    return stem + ("a" if needs_a else "") + ene_part[1] + yne_part[1] + "-1-yl"
 
 
 def _join_prefix_block(block: str, stem: str) -> str:
@@ -303,6 +341,12 @@ def _terminal_fragment_name(
     # what makes replacement nomenclature complete (2-oxabutyl has 4 skeletal
     # atoms: C-O-C-C). Verified against OPSIN.
     stem = _chain_stem_with_unsaturation(len(backbone), ene, yne)
+    if stem is None:
+        logger.info(
+            "terminal_fragment: %d ene / %d yne locants have no admitted "
+            "multiplier; refuse rather than emit an unparseable name",
+            len(ene), len(yne))
+        return None
     name = f"{rp.prefix}{stem}" if rp.prefix else stem
 
     accounted = set(backbone)

@@ -344,3 +344,71 @@ def test_an_unspellable_bond_order_refuses():
     mol.GetBondBetweenAtoms(1, 2).SetBondType(Chem.BondType.AROMATIC)
     got = terminal_fragment_name(mol.GetMol(), set(range(4)), 0)
     assert got is None
+
+
+# ---------------------------------------------------------------------------
+# Fix wave 1: MULTIPLIED backbone unsaturation. Before this fix, two-or-more
+# double (or triple) bonds of the SAME type on a backbone omitted BOTH the
+# multiplying prefix ('di'/'tri') AND the linking vowel 'a', e.g.
+# 'pent-1,3-en-1-yl' instead of 'penta-1,3-dien-1-yl' -- a string OPSIN 2.9.0
+# cannot parse at all, even though `terminal_fragment_name` still returned a
+# populated result with a COMPLETE `atoms` set (the worst outcome: a clean
+# success carrying a name that denotes nothing).
+#
+# Every expected value below was OPSIN-verified 2026-08-04 by wrapping the
+# token in a parent and comparing the canonical SMILES to the independently
+# built expected structure:
+#   (penta-1,3-dien-1-yl)benzene         -> CC=CC=Cc1ccccc1
+#   (buta-1,2-dien-1-yl)benzene          -> CC=C=Cc1ccccc1      (allene)
+#   (penta-1,3-diyn-1-yl)benzene         -> CC#CC#Cc1ccccc1
+#   (hexa-1,3,5-trien-1-yl)benzene       -> C=CC=CC=Cc1ccccc1
+#   (hexa-1,3-dien-5-yn-1-yl)benzene     -> C#CC=CC=Cc1ccccc1
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("smiles,expected", [
+    # two double bonds -> 'di' + linking 'a'
+    ("C=CC=CC",     "penta-1,3-dien-1-yl"),
+    # two double bonds, CUMULATED (allene) at the far end -> adjacent locants
+    ("C=C=CC",      "buta-1,2-dien-1-yl"),
+    # two triple bonds -> 'di' + linking 'a', same rule as ene
+    ("C#CC#CC",     "penta-1,3-diyn-1-yl"),
+    # three double bonds -> 'tri' + linking 'a'
+    ("C=CC=CC=C",   "hexa-1,3,5-trien-1-yl"),
+    # mixed: TWO enes (multiplied, 'di') + ONE yne (not multiplied) -- 'ene'
+    # precedes 'yne' (P-31.1.1.1) and the linking 'a' appears ONCE, on the stem
+    ("C=CC=CC#C",   "hexa-1,3-dien-5-yn-1-yl"),
+])
+def test_multiplied_backbone_unsaturation(smiles, expected):
+    mol, frag, attach = _frag(smiles)
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None, f"{smiles} refused"
+    assert got.name == expected
+    assert got.atoms == frozenset(frag)
+
+
+def test_single_of_each_type_is_byte_identical_to_before_the_fix():
+    """Regression pin: ONE ene and ONE yne together must NOT gain a
+    multiplier or a linking 'a' -- neither suffix is multiplied here, so
+    'pent-1-en-3-yn-1-yl' is unchanged (no 'a', no 'di'/'tri'). This is the
+    case invariant 1's "must not change" clause protects.
+    """
+    mol, frag, attach = _frag("C=CC#CC")
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None
+    assert got.name == "pent-1-en-3-yn-1-yl"
+    assert got.atoms == frozenset(frag)
+
+
+def test_replacement_prefix_with_multiplied_ene():
+    """A replacement prefix composes normally with a MULTIPLIED ene: the
+    heteroatom's own locant ('2-oxa') is unaffected by the linking 'a' the
+    multiplied suffix adds to the hydrocarbon stem it's fused onto.
+
+    Fragment: C(attach)-O-CH=C=CH2 -- a cumulated diene (locants 3,4) past an
+    oxa replacement at backbone position 2. OPSIN-verified: parses inside
+    '(2-oxapenta-3,4-dien-1-yl)benzene' -> C=C=COCc1ccccc1.
+    """
+    mol, frag, attach = _frag("COC=C=C")
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None
+    assert got.name == "2-oxapenta-3,4-dien-1-yl"
+    assert got.atoms == frozenset(frag)
