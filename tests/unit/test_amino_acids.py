@@ -41,8 +41,22 @@ class TestStandardAminoAcids:
         assert result == "cysteine"
 
     def test_methionine(self):
-        """Methionine: 2-amino-4-(methylthio)butanoic acid."""
-        result = name_compound("CSCC(N)C(=O)O")
+        """Methionine: 2-amino-4-(methylthio)butanoic acid.
+
+        The SMILES was `CSCC(N)C(=O)O` and that is NOT methionine -- it is
+        S-methylcysteine, and the docstring above says so itself: 4-(methylthio)
+        puts the sulfur on C4, so the chain needs three carbons before the
+        alpha-carbon's carboxyl, not two. Formulae settle it: methionine is
+        C5H11NO2S, the old fixture is C4H9NO2S. OPSIN (independent of our code)
+        parses `S-methylcysteine` to the old fixture's exact constitution
+        (skeleton IDIDJDIHTAOVLG) and `methionine` to a different one
+        (FFEARJCKVFRZRR).
+
+        So Orthonym was RIGHT to answer 'S-methylcysteine' and this expectation
+        was impossible. Fixed by correcting the input, not the expected name,
+        because the test's purpose is to cover methionine.
+        """
+        result = name_compound("CSCCC(N)C(=O)O")
         assert result == "methionine"
 
     def test_phenylalanine(self):
@@ -382,7 +396,9 @@ class TestOPSINSimpleGroupAminoAcids:
             "NC(CO)C(=O)O": "serine",
             "CC(O)C(N)C(=O)O": "threonine",
             "NC(CS)C(=O)O": "cysteine",
-            "CSCC(N)C(=O)O": "methionine",
+            # was CSCC(N)C(=O)O, which is S-methylcysteine (C4H9NO2S), not
+            # methionine (C5H11NO2S) -- see test_methionine's docstring.
+            "CSCCC(N)C(=O)O": "methionine",
             "NC(CC(=O)O)C(=O)O": "aspartic acid",
             "NC(CCC(=O)O)C(=O)O": "glutamic acid",
             "NC(CC(N)=O)C(=O)O": "asparagine",
@@ -531,7 +547,8 @@ class TestExpandedAminoAcidPipeline:
             ("NC(CO)C(=O)O", "serine"),
             ("CC(O)C(N)C(=O)O", "threonine"),
             ("NC(CS)C(=O)O", "cysteine"),
-            ("CSCC(N)C(=O)O", "methionine"),
+            # was CSCC(N)C(=O)O = S-methylcysteine; see test_methionine.
+            ("CSCCC(N)C(=O)O", "methionine"),
             ("NC(CC(=O)O)C(=O)O", "aspartic acid"),
             ("NC(CCC(=O)O)C(=O)O", "glutamic acid"),
             ("NC(CC(N)=O)C(=O)O", "asparagine"),
