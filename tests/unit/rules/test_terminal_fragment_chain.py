@@ -212,3 +212,69 @@ def test_embedded_branched_fragment_bonded_to_an_outside_ring():
     assert got is not None
     assert got.name == "2-methylpropyl"
     assert got.atoms == frozenset(frag)
+
+
+# ---------------------------------------------------------------------------
+# Fix wave 1: a branch that is ITSELF compound (a branched sub-fragment, not a
+# single simple substituent) must be spliced in with P-16.5.1.1 enclosing
+# marks, and TWO IDENTICAL compound branches must use the DERIVED multiplier
+# (bis/tris/...) rather than the basic one (di/tri/...) -- P-16.3.3(b)/
+# P-16.3.5(a) (BlueBookV2.md:4857). Before this fix, the module spliced the
+# recursive branch name in bare and always used SIMPLE_MULTIPLIERS, so the
+# multi-locant case emitted a name OPSIN 2.9.0 cannot even parse:
+# '(5,6-di1-methylethyldecyl)benzene' fails; '(5,6-bis(1-methylethyl)decyl)
+# benzene' parses. Every expected value below was verified directly against
+# `terminal_fragment_name` (2026-08-04) and matches the reproduction that
+# motivated the fix.
+#
+# `_frag` always attaches at atom index 0 -- the first atom written in the
+# SMILES -- so for 'CCCCC(C(C)C)CCCC' that is a TERMINAL carbon of the main
+# chain, making the longest path from it the full 9-carbon backbone (nonyl)
+# with the branch hanging at locant 5, matching Task 2's already-established
+# deterministic longest-path backbone selection.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("smiles,expected", [
+    # one compound branch (isopropyl-shaped), single locant
+    ("CCCCC(C(C)C)CCCC",   "5-(1-methylethyl)nonyl"),
+    # one compound branch that is itself a longer compound (isobutyl-shaped)
+    ("CCCCC(CC(C)C)CCCC",  "5-(2-methylpropyl)nonyl"),
+    # a tert-butyl-shaped branch
+    ("CCCCC(C(C)(C)C)CCCC", "5-(1,1-dimethylethyl)nonyl"),
+])
+def test_compound_branch_gets_enclosing_marks(smiles, expected):
+    mol, frag, attach = _frag(smiles)
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None, f"{smiles} refused"
+    assert got.name == expected
+    assert got.atoms == frozenset(frag)
+
+
+def test_two_identical_compound_branches_use_derived_multiplier():
+    """TWO IDENTICAL compound branches -> 'bis', not 'di', AND each occurrence
+    still carries its own enclosing marks: '5,6-bis(1-methylethyl)decyl'.
+
+    This is the exact shape that produced an OPSIN-UNPARSEABLE name before the
+    fix ('5,6-di1-methylethyldecyl'): the multi-locant case is the critical
+    one, since a single-locant compound branch happened to still parse via
+    OPSIN leniency even though it was not a legal Blue Book spelling.
+    """
+    mol, frag, attach = _frag("CCCCC(C(C)C)C(C(C)C)CCCC")
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None
+    assert got.name == "5,6-bis(1-methylethyl)decyl"
+    assert got.atoms == frozenset(frag)
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # regression guard: a SIMPLE branch (bare 'methyl') is still cited bare,
+    # with the BASIC multiplier -- these must NOT gain enclosing marks or
+    # switch to bis/tris just because compound-branch handling now exists.
+    ("CC(C)C",    "2-methylpropyl"),
+    ("CC(C)(C)C", "2,2-dimethylpropyl"),
+])
+def test_simple_branch_still_bare_with_basic_multiplier(smiles, expected):
+    mol, frag, attach = _frag(smiles)
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None, f"{smiles} refused"
+    assert got.name == expected
+    assert got.atoms == frozenset(frag)

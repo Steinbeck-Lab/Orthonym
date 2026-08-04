@@ -38,7 +38,7 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Set
 
 from rdkit import Chem
 
-from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name
+from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_alkyl_name
 from .ring_replacement import build_replacement_prefix
 
 logger = logging.getLogger(__name__)
@@ -158,6 +158,14 @@ def _assemble_prefixes(tokens) -> str:
     ascending; distinct tokens are ordered by the project's P-14.5 key, which
     already strips multiplying prefixes, Greek letters and CIP descriptors.
 
+    Multiplier table selection is P-16.3.3(b)/P-16.3.5(a) (BlueBookV2.md:4857):
+    a compound/complex branch token -- already wrapped in P-16.5.1.1 marks by
+    the caller (``enclose_if_compound``), so it opens with '(', '[' or '{' --
+    is multiplied with the DERIVED table (``bis``/``tris``/...), never the
+    basic ``di``/``tri`` table reserved for simple prefixes. Reusing
+    ``get_bracket_depth`` here keeps the compound test the SAME decision
+    ``enclose_if_compound`` already made, rather than re-deriving it.
+
     NO trailing hyphen. Hyphens separate one prefix from the NEXT prefix, never a
     prefix from the stem it qualifies: the substituent group CC(C)C- is
     ``2-methylpropyl`` (isobutyl), not ``2-methyl-propyl``. Two prefixes still
@@ -165,7 +173,7 @@ def _assemble_prefixes(tokens) -> str:
     hyphen. An earlier draft appended '-' here and produced the malformed form on
     all four branched cases.
     """
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS, get_bracket_depth
 
     grouped: Dict[str, List[int]] = {}
     keys: Dict[str, str] = {}
@@ -175,7 +183,11 @@ def _assemble_prefixes(tokens) -> str:
     parts = []
     for tok in sorted(grouped, key=lambda t: keys[t]):
         locs = sorted(grouped[tok])
-        mult = SIMPLE_MULTIPLIERS.get(len(locs), str(len(locs))) if len(locs) > 1 else ""
+        if len(locs) > 1:
+            table = COMPLEX_MULTIPLIERS if get_bracket_depth(tok) > 0 else SIMPLE_MULTIPLIERS
+            mult = table.get(len(locs), str(len(locs)))
+        else:
+            mult = ""
         parts.append(f"{','.join(str(x) for x in locs)}-{mult}{tok}")
     return "-".join(parts)
 
@@ -273,7 +285,15 @@ def _terminal_fragment_name(
                         "refusing the whole fragment", locant)
             return None
         accounted |= set(sub.atoms)
-        prefix_tokens.append((alpha_sort_key(sub.name), locant, sub.name))
+        # P-16.5.1.1 (BlueBookV2.md:7232): "Parentheses (round brackets) ...
+        # are used around compound (P-29.1.2) and complex (P-29.1.3) prefixes"
+        # -- a recursively-named branch must be enclosed BEFORE it is spliced
+        # in as a token, or the assembled name reads as an unparseable run-on
+        # (e.g. '5-1-methylethylnonyl' instead of '5-(1-methylethyl)nonyl').
+        # The sort key is computed on the pre-enclosure name; alpha_sort_key
+        # strips enclosing marks itself, so this is not an approximation.
+        token = enclose_if_compound(sub.name)
+        prefix_tokens.append((alpha_sort_key(sub.name), locant, token))
 
     if prefix_tokens:
         name = _join_prefix_block(_assemble_prefixes(prefix_tokens), name)
