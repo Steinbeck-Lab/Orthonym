@@ -863,14 +863,54 @@ _build_carbohydrate_suffix_rules()
 # This handles sugar SMILES that lack stereochemistry
 _NON_STEREO_SUGAR_FALLBACK = {}
 
+#: Stereo-free skeletons that more than one configurational base name shares.
+#: Kept as data (not discarded) so the ambiguity is inspectable and testable.
+_AMBIGUOUS_NONSTEREO_SKELETONS: dict = {}
+
+
 def _build_nonstereo_fallback():
     """Build fallback dict mapping non-stereo canonical SMILES to base names.
 
     Only includes cyclic sugars (those containing a ring). Acyclic sugar
     derivatives (sorbitol, meglumine, etc.) require stereochemistry for
     correct identification, so they should only match via exact stereo lookup.
+
+    ⚠ **A skeleton shared by two different base names maps to NOTHING** (v30 PF).
+    This loop used to be first-wins -- ``if nonstereo not in seen`` -- which meant
+    whichever catalog entry happened to be iterated first claimed the skeleton.
+    That is not a tie-break, it is dictionary insertion order deciding a
+    stereochemical question, and it was measurably wrong: alpha-D-glucopyranose,
+    alpha-D-mannopyranose and alpha-D-galactopyranose all reduce to the single
+    skeleton ``OCC1OC(O)C(O)C(O)C1O``, so ``lookup_sugar`` answered
+    ``glucopyranose`` for a ring that is equally 8 different hexopyranoses.
+
+    The base name is itself a CONFIGURATIONAL prefix -- ``gluco`` and ``manno``
+    differ *only* in the arrangement of the ring stereocentres -- so dropping the
+    ``alpha``/``D`` descriptors (which this function correctly does) is not enough
+    to make the answer stereochemistry-free. Naming a stereo-free ring
+    ``glucopyranose`` asserts four stereocentres the input never defined, and
+    SELF-01 cannot see it because it compares the InChIKey skeleton block.
+
+    Failing closed here is safe rather than lossy: ``recognize_sugar_skeleton``
+    already returns None for a stereo-free ring, so the whole sugar path declines
+    and the systematic namer supplies a name that is actually true of the input
+    (measured: ``2-(hydroxymethyl)-6-(3-methylbutoxy)oxane-3,4,5-triol``, which
+    round-trips exactly where ``3-methylbutyl glucopyranoside`` did not).
+
+    Unambiguous skeletons keep their fallback: the capability is preserved exactly
+    where it is sound. Measured at this commit: **20 skeletons refused** (8-way for
+    the hexopyranoses and hexofuranoses, 4-way for the pentoses, 2-way for
+    ``CC1OC(O)C(O)C(O)C1O`` = fuco/rhamno), **13 kept**.
+
+    ⚠ **Residual weakness, deliberately not overstated:** "unambiguous" here means
+    unambiguous *within this catalog*, which is weaker than chemically unique. A
+    kept skeleton such as ``O=C(O)C1OC(O)C(O)C(O)C1O`` -> ``glucuronopyranose`` is
+    unique only because the catalog holds no manno-/galacturonic sibling; adding one
+    would correctly move it to the ambiguous set, but until then it can still assert
+    a configuration. The check to settle it is to enumerate each kept skeleton's
+    stereoisomers and confirm only one is a named sugar.
     """
-    seen = set()
+    by_skeleton: dict = {}
     for smi, (anomer, config, base_name) in ALL_SUGAR_NAMES.items():
         mol = Chem.MolFromSmiles(smi)
         if mol is None:
@@ -884,9 +924,13 @@ def _build_nonstereo_fallback():
         # Remove stereochemistry
         Chem.RemoveStereochemistry(mol)
         nonstereo = Chem.MolToSmiles(mol)
-        if nonstereo not in seen:
-            seen.add(nonstereo)
-            _NON_STEREO_SUGAR_FALLBACK[nonstereo] = ("", "", base_name)
+        by_skeleton.setdefault(nonstereo, set()).add(base_name)
+
+    for nonstereo, base_names in by_skeleton.items():
+        if len(base_names) == 1:
+            _NON_STEREO_SUGAR_FALLBACK[nonstereo] = ("", "", next(iter(base_names)))
+        else:
+            _AMBIGUOUS_NONSTEREO_SKELETONS[nonstereo] = sorted(base_names)
 
 _build_nonstereo_fallback()
 
@@ -898,9 +942,16 @@ _build_nonstereo_fallback()
 def lookup_sugar(canonical_smiles: str) -> Optional[Tuple[str, str, str]]:
     """Look up a sugar retained name by canonical SMILES.
 
-    First tries exact match (stereo-specific). If no match and the SMILES
-    has no @ characters, falls back to connectivity-only matching which
-    returns the base sugar name without anomer/config descriptors.
+    First tries exact match (stereo-specific). If no match and the SMILES has no
+    @ characters, falls back to connectivity-only matching — but **only for a
+    skeleton that exactly one configurational base name occupies**.
+
+    ⚠ The connectivity-only fallback is NOT a general "drop the descriptors you
+    cannot determine" rule, and treating it as one was a real defect (v30 PF). The
+    sugar base name is itself configurational: all 8 hexopyranoses share the single
+    skeleton ``OCC1OC(O)C(O)C(O)C1O``, so answering ``glucopyranose`` for it picks
+    one of 8 by dictionary order. Ambiguous skeletons now return None and the
+    systematic namer handles them. See ``_build_nonstereo_fallback``.
 
     Args:
         canonical_smiles: RDKit canonical SMILES of the sugar fragment.
@@ -912,8 +963,8 @@ def lookup_sugar(canonical_smiles: str) -> Optional[Tuple[str, str, str]]:
     Examples:
         >>> lookup_sugar("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
         ('beta', 'D', 'glucopyranose')
-        >>> lookup_sugar("OCC1OC(O)C(O)C(O)C1O")  # non-stereo
-        ('', '', 'glucopyranose')
+        >>> lookup_sugar("OCC1OC(O)C(O)C(O)C1O")  # non-stereo hexopyranose
+        None
         >>> lookup_sugar("CCCC")
         None
     """

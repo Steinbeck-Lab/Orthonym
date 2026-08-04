@@ -519,12 +519,40 @@ RETAINED_NAMES = {
     # NOTE: pivalic acid removed -- PIN is "2,2-dimethylpropanoic acid"
 
     # === UNSATURATED ACIDS (Phase 8 expansion) ===
-    "CC=CC(=O)O": "crotonic acid",
-    "CC=CC=CC(=O)O": "sorbic acid",
+    # v30 PF sweep: `crotonic acid` and `sorbic acid` DELETED, and `crotonaldehyde`
+    # below with them. Two independent reasons, either sufficient:
+    #
+    #  1. NOT BLUE BOOK NAMES. All three occur **0** times in BlueBookV2.md under a
+    #     markup/OCR-tolerant search whose known-positive control passes in the same
+    #     run (acetic acid 178, benzoic acid 185, but-2-enoic acid 4). Their PIN
+    #     status is therefore unestablished -- the same ground on which `isobutyric
+    #     acid`, `isovaleric acid`, `pivalic acid` and `pinacolone` were removed
+    #     above. And the replacement is not merely systematic, it is marked PIN
+    #     verbatim: "but-2-enoic acid (PIN)".
+    #  2. EACH OVER-ASSERTS DOUBLE-BOND GEOMETRY THE KEY LEAVES UNDEFINED. The keys
+    #     `CC=CC(=O)O` / `CC=CC=CC(=O)O` / `CC=CC=O` specify no geometry, while
+    #     crotonic acid IS (E)-but-2-enoic acid (the Z isomer is isocrotonic acid)
+    #     and sorbic acid IS (2E,4E). So the name named a stereoisomer the input
+    #     never claimed -- invisible to SELF-01, which compares the InChIKey
+    #     skeleton block and is stereo-insensitive by design.
+    #
+    # Measured at 27160d6a: all three now emit the PIN and round-trip EXACTLY to the
+    # input (but-2-enoic acid, hexa-2,4-dienoic acid, but-2-enal); +3 round-trip, 0
+    # lost, and 0 gold-oracle rows assert any of the three names.
+    #
+    # ⚠ DO NOT extend this deletion to the 19 unqualified amino-acid entries
+    # (alanine, leucine, isoleucine, threonine, ...). They look identical to a
+    # round-trip metric -- OPSIN resolves a bare `isoleucine` to the L-form, so they
+    # fail RT too -- but they are BLUE-BOOK-CORRECT. P-103.1.3.1 "The
+    # stereodescriptors 'D' and 'L'" (BlueBookV2.md:54291) spells configuration with
+    # the prefix: ":54324  L-isoleucine (symbols 'Ile', 'I') (2S,3S)-2-amino-3-
+    # methylpentanoic acid", and the P-103 amino-acid table at :54191 lists bare
+    # `alanine` against a structure drawn WITHOUT stereochemistry
+    # ("CH3-CH(NH2)-COOH"). Deleting them would buy 2 round-trip points by emitting
+    # a less preferred name -- Goodharting the metric against conformance.
 
     # === ALDEHYDES (Phase 8 expansion) ===
     # Note: butanal/pentanal preferred over butyraldehyde/valeraldehyde for consistency
-    "CC=CC=O": "crotonaldehyde",
 
     # === KETONES (Phase 8 expansion) ===
     # PA1 sweep: the row `"CC(=O)CC(C)(C)C": "pinacolone"` was DELETED. WRONG
