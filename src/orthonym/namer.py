@@ -2454,6 +2454,17 @@ class Orthonym:
                     self._general_fallback)
             except Exception:
                 self._gf_ctx_token = None
+            # v30: publish the BEST-EFFORT discriminator for the same reason and
+            # with the same lifetime -- read by
+            # `composer._integrate_universal_prefixes` to pick the substituent
+            # VOCABULARY, which it cannot do from its own arguments because its
+            # callers are tier-unaware PIN handlers.
+            try:
+                from .metrics.provenance import best_effort_ctx
+                self._be_ctx_token = best_effort_ctx.set(
+                    self._general_fallback_unverified)
+            except Exception:
+                self._be_ctx_token = None
         # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
         # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
         # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
@@ -2696,6 +2707,17 @@ class Orthonym:
                 except Exception:
                     pass
                 self._gf_ctx_token = None
+            # v30: torn down with its sibling. A leaked best-effort flag would
+            # put best-effort vocabulary on a LATER pin naming in the same
+            # process -- an H3 break that no single-molecule test would show.
+            _be_tok = getattr(self, '_be_ctx_token', None)
+            if _be_tok is not None:
+                try:
+                    from .metrics.provenance import best_effort_ctx
+                    best_effort_ctx.reset(_be_tok)
+                except Exception:
+                    pass
+                self._be_ctx_token = None
             end_naming_session()
 
     def name_tiered(self, smiles: str) -> dict:

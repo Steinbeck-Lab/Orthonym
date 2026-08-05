@@ -148,6 +148,7 @@ def _integrate_universal_prefixes(
     atom_to_locant=None,
     ring_atom_to_locant=None,
     exclude_atoms=None,
+    allow_mancude=None,
 ):
     """Discover and format all substituents on a parent structure.
 
@@ -174,6 +175,26 @@ def _integrate_universal_prefixes(
         exclude_atoms: Atoms already accounted for (e.g., carbonyl O of
             lactone, halogen of acid halide) -- added to parent set so
             they are not discovered as substituents.
+        allow_mancude: Substituent VOCABULARY. ``None`` (the default, and what
+            every existing caller passes) resolves it from the tier the namer
+            published in ``provenance.best_effort_ctx`` -- True only on
+            best-effort, so ``pin``/``valid``/``complete`` are byte-identical.
+            Pass an explicit bool only to override that in a test.
+
+            Why it is resolved here rather than threaded: this helper is called
+            by ``acid_halides``, ``anhydrides``, ``esters``, ``lactones`` and
+            ``polyfunctional`` -- all PIN-path handlers, none of which knows the
+            tier -- so a parameter would have to cross every one of their
+            signatures to move one boolean. It used to pass nothing at all, i.e.
+            the PIN-default vocabulary even while naming on best-effort, which
+            made it REFUSE substituents that tier can name (measured, same mol
+            and attachment: ``NS(=O)=O`` -> ``'substituent'`` at False,
+            ``1-amino-1-oxo-2-oxa-1lambda6-thiaeth-1-en-1-yl`` at True), and a
+            refused substituent is dropped silently by the ``if`` below.
+
+            ⚠ It is gated on the best-effort discriminator, NOT on
+            ``allow_aromatic_general``: that one is True for ``complete`` too,
+            and widening ``complete``'s vocabulary would break H3 one tier up.
 
     Returns:
         Prefix string (e.g., ``"3-methyl-"`` or ``"2-chloro-3-methyl-"``)
@@ -186,6 +207,15 @@ def _integrate_universal_prefixes(
         Phase 85: ``name_substituent()``
     """
     from .substituent_enumerator import discover_substituents, name_substituent
+
+    if allow_mancude is None:
+        # Fail CLOSED to today's behaviour: any failure to read the tier leaves
+        # the PIN-default vocabulary, never the wider one.
+        try:
+            from ..metrics.provenance import best_effort_ctx
+            allow_mancude = bool(best_effort_ctx.get())
+        except Exception:
+            allow_mancude = False
 
     parent_set = set(parent_atoms)
 
@@ -215,7 +245,8 @@ def _integrate_universal_prefixes(
     prefix_groups = defaultdict(list)
     for sub_info in subs:
         attach_idx = _find_attach_idx_in_frag(mol, sub_info, effective_parent)
-        prefix_name = name_substituent(mol, sub_info.frag_atoms, attach_idx)
+        prefix_name = name_substituent(mol, sub_info.frag_atoms, attach_idx,
+                                       allow_mancude=allow_mancude)
         if prefix_name and prefix_name != "substituent":
             prefix_groups[prefix_name].append(sub_info.locant)
 

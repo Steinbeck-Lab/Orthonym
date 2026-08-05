@@ -105,6 +105,23 @@ _SUFFIX_FREE_PREFIX_NAME = contextvars.ContextVar(
 # component recursion (name_compound inherits it).
 general_fallback_ctx = contextvars.ContextVar(
     "orthonym_general_fallback", default=False)
+# v30: the BEST-EFFORT discriminator (`general_fallback_unverified`), published
+# for code that must choose a VOCABULARY by tier but is called from handlers that
+# do not know the tier.
+#
+# `composer._integrate_universal_prefixes` is the case that forced this. It names
+# every substituent for every enriching handler, and it is called from
+# `acid_halides`, `anhydrides`, `esters`, `lactones` and `polyfunctional` -- all
+# PIN-path handlers, none of which receives a tier. Threading a parameter through
+# all of them would mean touching every handler signature to move one boolean, so
+# the flag is published once here and read where it is needed, exactly as
+# `general_fallback_ctx` already does for fragment recursion.
+#
+# ⚠ This is deliberately NOT `allow_aromatic_general`: that flag is True for
+# `complete` as well as `best-effort`, so using it would change `complete` output
+# and break hard bound H3 (PIN default byte-identical) at the tier above PIN.
+best_effort_ctx = contextvars.ContextVar(
+    "orthonym_best_effort", default=False)
 # v30 P3-T1c: a composer (``pin_path``) name whose ring substituent prefix could
 # only be produced by the GENERAL tier -- see ``record_general_ring_prefix``.
 _GENERAL_RING_PREFIX = contextvars.ContextVar(
