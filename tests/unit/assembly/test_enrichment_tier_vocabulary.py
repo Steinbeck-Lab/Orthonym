@@ -41,6 +41,32 @@ from orthonym.cli import _emit_tier_flags
 # the contract: what value reaches name_substituent, per tier
 # --------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _clean_naming_session():
+    """Start every test from naming depth 0.
+
+    Not hygiene theatre -- it is load-bearing for these tests, and it documents a
+    real fragility. The namer publishes the tier flag only inside
+    ``if is_top_level_naming():``, and ``is_top_level_naming()`` is
+    ``len(_fragment_guard.visited) == 0``. ``end_naming_session`` clears that set
+    only when it is ALREADY empty, so if an exception ever escapes a fragment
+    naming without discarding its SMILES, the set stays non-empty for the rest of
+    the thread's life and the flag is never published again -- best-effort then
+    silently falls back to the PIN vocabulary.
+
+    Observed: this file passed alone and failed in a 17-file run that took 54 s
+    instead of 25 s (my own background harness jobs were loading the machine), so
+    a leaked session is reachable in practice, not just in theory.
+
+    ⚠ The pre-existing ``general_fallback_ctx`` is published under the SAME guard
+    and has the same exposure. That is a separate defect, not this change's.
+    """
+    from orthonym.assembly.fragment_naming import _fragment_guard
+    _fragment_guard.visited = set()
+    _fragment_guard.cache = None
+    yield
+
+
 def _allow_mancude_values_for(smiles: str, tier: str, monkeypatch) -> list:
     """Every ``allow_mancude`` value ``_integrate_universal_prefixes`` passes to
     ``name_substituent`` while naming ``smiles`` on ``tier``.
@@ -68,6 +94,13 @@ def _allow_mancude_values_for(smiles: str, tier: str, monkeypatch) -> list:
                 am = a[1]
             seen.append(bool(am))
         return orig_ns(mol, frag, attach, *a, **k)
+
+    from orthonym.assembly.fragment_naming import is_top_level_naming
+    assert is_top_level_naming(), (
+        "a previous test leaked a naming session (fragment_naming._fragment_guard"
+        ".visited is non-empty), so the namer will skip publishing the tier flag "
+        "and this test would fail for a reason that has nothing to do with the "
+        "code under test")
 
     monkeypatch.setattr(comp, "_integrate_universal_prefixes", spy_iup)
     monkeypatch.setattr(se, "name_substituent", spy_ns)
