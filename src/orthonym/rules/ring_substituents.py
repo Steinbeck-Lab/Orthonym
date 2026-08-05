@@ -735,6 +735,166 @@ def _decorated_heteroaryl_substituent_name(
     return f"{body}{sep}{core}"
 
 
+def _decorated_fused_substituent_name(
+    mol,
+    frag_atoms,
+    ring_atoms: Tuple[int, ...],
+    attachment_atom: int,
+) -> Optional[str]:
+    """v30 Piece 2: PIN substituent name for a FUSED ring system carrying its
+    OWN decorations, free valence on a ring atom — e.g. ``6-methoxynaphthalen-2-yl``.
+
+    The monocyclic sibling ``_decorated_heteroaryl_substituent_name`` declines
+    the moment the ring system is fused (a ring atom with != 2 in-ring
+    neighbours, ``:574``). The bare fused substituent (``naphthalen-2-yl``)
+    already names, so the only gap was the DECORATED fused case — which fell
+    through to a silent atom drop.
+
+    Reuses the fused-ring PARENT numbering, not a per-atom locant: the naive
+    ``_get_polycyclic_attachment_locant`` optimises each atom independently and
+    returns 2 for BOTH the attach and the methoxy carbon of 6-methoxynaphthalene
+    (inconsistent). Instead ``compute_fused_numbering`` gives ONE canonical
+    atom->locant map and ``_ring_system_automorphisms`` gives the residual ring
+    symmetry; among the symmetry-equivalent numberings we take the one giving
+    the FREE VALENCE the lowest locant (P-31.1.4.3.4 free-valence priority),
+    then the decorations the lowest set (P-59.2.3), and read every locant off
+    that single numbering so they are mutually consistent.
+
+    Fail closed (None) on anything not provably correct — an unnameable or
+    unaccounted decoration, a system ``compute_fused_numbering`` declines, a
+    ring with no retained fused stem. SELF-01 then backstops a mis-numbering
+    (abstain, never a wrong molecule).
+    """
+    from rdkit import Chem
+    from .fusion_numbering import compute_fused_numbering
+    from .fused_rings import (
+        _ring_system_automorphisms,
+        _identify_fused_substituent,
+        _fused_locant_to_output,
+        _fused_locant_num,
+    )
+    from ..assembly.naming_utils import (
+        alpha_sort_key as _alpha,
+        enclose_if_compound as _enclose_if_compound,
+    )
+
+    ring_set = set(ring_atoms)
+    frag_set = set(frag_atoms)
+    if attachment_atom not in ring_set or len(ring_set) < 6:
+        return None
+
+    # Retained fused stem (naphthalene -> 'naphthalen'). Same derivation as
+    # get_ring_substituent_name's bare-fused branch, so the stems agree.
+    frag_smi = Chem.MolFragmentToSmiles(mol, list(ring_atoms), canonical=True)
+    if not frag_smi:
+        return None
+    from ..data import get_retained_name
+    retained = get_retained_name(frag_smi)
+    try:
+        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        _fh = FUSED_HETEROCYCLE_DATA.get(frag_smi)
+        if _fh and _fh.get('name'):
+            retained = _fh['name']
+    except ImportError:
+        pass
+    if not retained:
+        return None
+    stem = retained[:-1] if retained.endswith('e') else retained
+
+    # One canonical numbering + the ring system's residual symmetry.
+    canonical = compute_fused_numbering(mol, ring_set)
+    if not canonical:
+        return None
+    perms = _ring_system_automorphisms(mol, ring_set)
+
+    # Collect + identify decorations (heavy exocyclic atoms hanging off a ring
+    # atom). The attachment atom's parent bond leaves the fragment and is NOT a
+    # decoration. Mirrors _decorated_heteroaryl_substituent_name's collection.
+    decorations = []  # (ring_atom_idx, substituent_name)
+    accounted: Set[int] = set()
+    has_parent_bond = False
+    for ra in ring_atoms:
+        for nb in mol.GetAtomWithIdx(ra).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in ring_set or nb.GetAtomicNum() <= 1:
+                continue
+            if ni not in frag_set:
+                if ra != attachment_atom:
+                    return None
+                has_parent_bond = True
+                continue
+            info = _identify_fused_substituent(mol, ni, ring_set)
+            if info is None:
+                return None
+            nm = info.get('name')
+            if not nm or ' ' in nm:
+                return None
+            decorations.append((ra, nm))
+            accounted.update(
+                a for a in info.get('atoms', [])
+                if mol.GetAtomWithIdx(a).GetAtomicNum() > 1
+            )
+    if not has_parent_bond:
+        return None
+    if not decorations:
+        return None  # bare fused ring -> get_ring_substituent_name handles it
+    exo = {a for a in frag_set
+           if a not in ring_set and mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if accounted != exo:
+        return None  # a heavy atom unaccounted -> fail closed
+
+    # Enumerate symmetry-equivalent numberings; pick lowest FREE VALENCE first
+    # (P-31.1.4.3.4), then lowest decoration set (P-59.2.3), then the alpha tie.
+    deco_atoms = [ra for ra, _ in decorations]
+    best_key = None
+    best_pos = None
+    for perm in perms:
+        try:
+            cand = {a: _fused_locant_to_output(canonical[perm[a]])
+                    for a in ring_set}
+        except KeyError:
+            continue
+        fv = cand.get(attachment_atom)
+        if not isinstance(fv, int):
+            continue  # free valence cannot sit on a fusion (letter) atom
+        deco_locs = tuple(sorted(_fused_locant_num(cand[ra]) for ra in deco_atoms))
+        deco_named = tuple(
+            (_fused_locant_num(cand[ra]), _alpha(nm))
+            for ra, nm in sorted(decorations,
+                                 key=lambda t: _fused_locant_num(cand[t[0]]))
+        )
+        key = (fv, deco_locs, deco_named)
+        if best_key is None or key < best_key:
+            best_key = key
+            best_pos = cand
+    if best_pos is None:
+        return None
+
+    attach_locant = best_pos[attachment_atom]
+
+    # Group decorations by name; assemble alphabetised, multiplied, enclosed
+    # prefixes (shared primitive, same as the monocyclic path).
+    from collections import defaultdict as _dd
+    groups = _dd(list)
+    for ra, nm in decorations:
+        groups[nm].append(_fused_locant_num(best_pos[ra])[0])
+    prefix_parts = []  # (alpha_key, text)
+    for nm, locs in groups.items():
+        locs = sorted(locs)
+        mult = _DECO_MULT.get(len(locs))
+        if mult is None:
+            return None
+        text = f"{','.join(str(l) for l in locs)}-{mult}{_enclose_if_compound(nm)}"
+        prefix_parts.append((_alpha(nm), text))
+    prefix_parts.sort(key=lambda x: x[0])
+    body = '-'.join(p[1] for p in prefix_parts)
+    # The prefix body ends in a letter (or a closing bracket) and the retained
+    # fused stem is letter-initial, so they abut with no hyphen
+    # ('...methoxynaphthalen...') — the same rule the monocyclic sibling applies
+    # via its ``sep`` term. The free-valence locant then follows with a hyphen.
+    return f"{body}{stem}-{attach_locant}-yl"
+
+
 # Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra...).
 _UNSAT_MULT: Dict[int, str] = {
     2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa',
@@ -1912,6 +2072,24 @@ def name_ring_system_substituent(
             )
         except Exception:
             name = None
+        if name is None and allow_mancude:
+            # v30 Piece 2: the monocyclic producer declines a FUSED decorated
+            # ring-substituent (e.g. 6-methoxynaphthalen-2-yl). Reuse the
+            # fused-ring parent numbering to place the decorations + free
+            # valence. BEST-EFFORT ONLY (allow_mancude): fused-substituent
+            # numbering is a NEW capability that has not been proven byte-
+            # identical against the PIN gold set, so — exactly as Piece 1 —
+            # gate it behind the best-effort tier to keep PIN byte-identical by
+            # construction (the v30 axis is best-effort breadth, invariant 16).
+            # Fail closed (None -> enumerator fallback -> DROP-24), so this only
+            # ADDS successful best-effort emissions; SELF-01 backstops a
+            # mis-numbering (abstain, never a wrong molecule).
+            try:
+                name = _decorated_fused_substituent_name(
+                    mol, frag_atoms, tuple(frag_ring_atoms), attach_idx
+                )
+            except Exception:
+                name = None
     elif frag_ring_atoms and ring_info.NumAtomRings(attach_idx) == 0:
         # Chain-ROOTED fragment carrying a ring system, e.g. -CH2-naphthalene.
         # P-29.1.2 compound substituent: '(naphthalen-2-yl)methyl'. The
