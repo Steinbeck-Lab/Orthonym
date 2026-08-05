@@ -213,6 +213,10 @@ FRAGMENT_NAME_CACHE: Dict[str, str] = {
 }
 
 
+def _session_depth() -> int:
+    return getattr(_fragment_guard, 'session_depth', 0)
+
+
 def start_naming_session():
     """Initialize runtime fragment cache and visited set for a naming call.
 
@@ -220,25 +224,44 @@ def start_naming_session():
     during a single top-level naming call. The visited set tracks which
     SMILES are currently being named to detect cycles.
 
-    Only the outermost call (visited set empty) should start a session.
-    Nested calls inherit the parent's cache and visited set.
+    Only the outermost call starts a session; nested calls inherit the parent's
+    cache and visited set.
+
+    ⚠ **"Outermost" is an EXPLICIT COUNTER, not `len(visited) == 0`.** Inferring it
+    from the visited set was a latent defect with five milestones of exposure: if an
+    exception escaped a fragment naming without discarding its SMILES, `visited`
+    stayed non-empty for the rest of the thread, so `is_top_level_naming()` never
+    returned True again and `namer.name()` stopped publishing
+    ``general_fallback_ctx`` / ``best_effort_ctx`` — **best-effort silently reverted
+    to the PIN substituent vocabulary, with no error anywhere.** It surfaced as a
+    test that passed alone and failed in a 17-file run under load, i.e. it needs a
+    real interruption, which is what made it rare and long-lived.
+
+    The counter cannot get stuck: it is decremented in ``end_naming_session``, which
+    every caller invokes from a ``finally``, and it floors at 0.
     """
-    visited = getattr(_fragment_guard, 'visited', None)
-    if visited is None or len(visited) == 0:
+    depth = _session_depth() + 1
+    _fragment_guard.session_depth = depth
+    if depth == 1:
         _fragment_guard.cache = {}
         _fragment_guard.visited = set()
 
 
 def end_naming_session():
-    """Clear runtime fragment cache and visited set after naming completes.
+    """Close one naming call; the OUTERMOST one clears the session state.
 
-    Only the outermost call (visited set empty) should end the session to
-    avoid clearing a parent session's state during nested calls.
+    Nested calls must not clear their parent's cycle-detection state, which is why
+    this is depth-guarded at all. But the outermost call now clears
+    **unconditionally** rather than asking ``visited`` for permission — see
+    ``start_naming_session`` for the defect that asking caused.
     """
-    visited = getattr(_fragment_guard, 'visited', None)
-    if visited is None or len(visited) == 0:
+    depth = _session_depth() - 1
+    if depth <= 0:
+        _fragment_guard.session_depth = 0
         _fragment_guard.cache = None
         _fragment_guard.visited = set()
+    else:
+        _fragment_guard.session_depth = depth
 
 
 def get_naming_depth() -> int:
