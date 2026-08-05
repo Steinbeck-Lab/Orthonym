@@ -20,6 +20,56 @@ from orthonym.perception.rings import get_ring_systems
 
 
 # ============================================================================
+# P-44.1 principal-group priority in ring-system selection (v30 vB engine Piece 1)
+# ============================================================================
+
+
+class TestPrincipalGroupBearingRing:
+    """P-44.1: the senior parent bears the principal characteristic group,
+    BEFORE the P-44.2 ring-type hierarchy is applied as a tiebreaker.
+
+    ``ring_system_score`` sees only the ring atoms, so it cannot honour P-44.1.
+    ``select_principal_ring_system`` takes an optional ``principal_group_atoms``
+    hint: when exactly one ring system bears the group, that system wins.
+    """
+
+    # 4-(pyridin-2-yl)benzoic acid: the benzene bears -COOH (the principal
+    # characteristic group); the pyridine is more senior by ring score (an
+    # N-heterocycle). Per P-44.1 the COOH-bearing benzene must be the parent.
+    SMILES = "OC(=O)c1ccc(-c2ccccn2)cc1"
+
+    def _rings(self):
+        mol = Chem.MolFromSmiles(self.SMILES)
+        systems = get_ring_systems(mol)
+        pg = mol.GetSubstructMatch(Chem.MolFromSmarts("C(=O)O"))
+        carboxyl_c = pg[0]
+        benzene = set(next(
+            s for s in systems
+            if any(carboxyl_c in [n.GetIdx()
+                                  for n in mol.GetAtomWithIdx(a).GetNeighbors()]
+                   for a in s)))
+        return mol, systems, [pg], benzene
+
+    def test_pg_hint_selects_the_group_bearing_ring(self):
+        """With the principal-group hint, the COOH-bearing benzene wins."""
+        mol, systems, pg_atoms, benzene = self._rings()
+        picked = set(select_principal_ring_system(
+            mol, systems, principal_group_atoms=pg_atoms))
+        assert picked == benzene
+
+    def test_without_hint_behaviour_is_unchanged(self):
+        """No hint -> current P-44.2 scoring (the N-heterocycle) -- byte-identical.
+
+        Guards against the hint silently changing the default: without it the
+        pyridine still wins, proving the hint (not some side effect) drives the
+        new behaviour.
+        """
+        mol, systems, _pg, benzene = self._rings()
+        picked = set(select_principal_ring_system(mol, systems))
+        assert picked != benzene  # pyridine, as before
+
+
+# ============================================================================
 # A. Ring System Type Classification Tests
 # ============================================================================
 

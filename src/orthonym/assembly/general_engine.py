@@ -1056,7 +1056,14 @@ def name_general_ring(
 
     ring_systems = list(getattr(features, 'ring_systems', None) or [])
     if ring_systems:
-        senior = select_principal_ring_system(mol, ring_systems)
+        # v30 vB-engine Piece 1 (P-44.1): under best-effort, honour the
+        # principal-group-bearing ring system in selection so the true parent is
+        # not orphaned into an unnameable substituent. Passed ONLY when
+        # allow_aromatic_general (best-effort) -> PIN gets no hint -> byte-identical.
+        pg_hint = (list(getattr(features, 'principal_group_atoms', None) or [])
+                   if allow_aromatic_general else None)
+        senior = select_principal_ring_system(
+            mol, ring_systems, principal_group_atoms=pg_hint)
         cage_seed = set(senior) if senior else None
     else:
         cage_seed = None

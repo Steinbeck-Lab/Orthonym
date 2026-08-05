@@ -763,7 +763,8 @@ def _ylidene_linked_parent_ring(
 
 def select_principal_ring_system(
     mol: Chem.Mol,
-    ring_systems: List[Set[int]]
+    ring_systems: List[Set[int]],
+    principal_group_atoms=None,
 ) -> Tuple[int, ...]:
     """Select the most senior ring system from a list of candidates.
 
@@ -784,6 +785,39 @@ def select_principal_ring_system(
 
     if len(ring_systems) == 1:
         return tuple(sorted(ring_systems[0]))
+
+    # P-44.1: the senior parent bears the principal characteristic group, and
+    # that outranks the P-44.2 ring-type hierarchy scored below. ``ring_system_
+    # score`` takes only the ring atoms, so it cannot honour P-44.1; the optional
+    # ``principal_group_atoms`` hint supplies it. POSITIVE EVIDENCE only -- the
+    # override fires ONLY when EXACTLY ONE ring system bears the group, so an
+    # absent, empty, or ambiguous hint falls through to the unchanged scoring
+    # (every pre-existing caller passes no hint -> byte-identical). A ring system
+    # "bears" the group when a group atom is in it OR is bonded to it (covers a
+    # ring-form suffix and an appended suffix like a ring -carboxylic acid).
+    if principal_group_atoms:
+        pg_atoms: Set[int] = set()
+        for m in principal_group_atoms:
+            if isinstance(m, int):
+                pg_atoms.add(m)
+            else:
+                try:
+                    pg_atoms.update(int(a) for a in m)
+                except TypeError:
+                    pass
+        n_atoms = mol.GetNumAtoms()
+        pg_atoms = {a for a in pg_atoms if 0 <= a < n_atoms}
+        if pg_atoms:
+            bearing = []
+            for sy in ring_systems:
+                sset = set(sy)
+                if any(a in sset
+                       or any(nb.GetIdx() in sset
+                              for nb in mol.GetAtomWithIdx(a).GetNeighbors())
+                       for a in pg_atoms):
+                    bearing.append(sy)
+            if len(bearing) == 1:
+                return tuple(sorted(bearing[0]))
 
     # W2E-D2 (P-29.6.1 / P-31.1.4): a substituent attached to a ring by an
     # exocyclic DOUBLE bond (ylidene) belongs to the ring on the double-bond
