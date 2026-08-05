@@ -4848,6 +4848,55 @@ class Orthonym:
                     features.principal_chain
                 )
 
+        # v30 ATOM-PARTITION invariant: a principal-group occurrence is a PARENT SUFFIX, not a
+        # substituent's group. get_principal_group() (:4123) gathers every same-prefix-class
+        # occurrence molecule-wide (the SEN-03 alcohol-class union), so the tertiary OH of a
+        # C(C)(C)O arm ON A RING is otherwise emitted as a second ring -ol, double-assigning its
+        # atom (it is ALSO in ring_substituents) -> an atom-short, wrong parent
+        # (cyclohexane-1,2-diol for a mono-ol ring). decide suffix-vs-
+        # prefix by atom<->parent membership (filter_component_groups_to_parent;
+        # core_set membership); the off-parent group's atoms already flow to the
+        # substituent enumerator and are named there.
+        # .
+        #
+        # ⚠ POSITIVE EVIDENCE, not parent-absence. Applied AFTER parent selection, BEFORE
+        # assemble_name reads principal_group_atoms (:3623). An earlier "strip if locant NOT in
+        # my computed parent set" over-stripped legitimate suffixes whenever the parent-set
+        # computation was incomplete (fused/spiro/orientation): it regressed 6 then 2 PIN gold
+        # rows. This instead removes an occurrence ONLY when its locant carbon is provably inside
+        # an ENUMERATED SUBSTITUENT -- a legitimate parent suffix carbon never is, so this cannot
+        # regress a correct name. Scoped to SKELETAL suffixes (-ol/-amine/-thiol/-imine/-one),
+        # whose locant IS a skeletal atom (parent_selection.py:45-52); appended suffixes
+        # (-carboxylic acid/-carbaldehyde/...) have an exocyclic locant by design and are left
+        # alone. Never empties the suffix set. E1 disjointness stays the backstop.
+        # ⚠ Excludes amines/imine: N-suffixes carry special multi-N locant handling (P-62,
+        # N1/N2 locants) and the composer already runs its OWN diamine principal_group_atoms
+        # filter (composer.py:6461-6493). A generic strip here runs first and breaks it -- it
+        # regressed exactly two amine PIN gold rows to abstention (NCCNCN, CN(C)CCN(C)CCN;
+        # target_passes 1650). Alcohols/thiols/ketones have no such special handling. Measured.
+        from .rules.parent_selection import SKELETAL_SUFFIX_PGS as _SKEL_SFX
+        _PARTITION_SAFE = _SKEL_SFX - {
+            "primary_amine", "secondary_amine", "tertiary_amine", "imine"}
+        if (not os.environ.get("ORTHONYM_DISABLE_PARTITION_FILTER")
+                and features.principal_group in _PARTITION_SAFE
+                and features.principal_group_atoms):
+            from .rules.parent_selection import _pg_attachment_atoms as _pgaa
+            _sub_atoms: set = set()
+            for _subdict in (getattr(features, 'ring_substituents', None),
+                             getattr(features, 'substituents', None)):
+                if not _subdict:
+                    continue
+                for _sublist in _subdict.values():
+                    for _sub in _sublist:  # each _sub is a list of atom indices
+                        _sub_atoms.update(_sub)
+            if _sub_atoms:
+                _kept = [
+                    _m for _m in features.principal_group_atoms
+                    if not (set(_pgaa(features.principal_group, tuple(_m))) <= _sub_atoms)
+                ]
+                if _kept and len(_kept) < len(features.principal_group_atoms):
+                    features.principal_group_atoms = _kept
+
         # INST-05: Naming decision trace
         if logger.isEnabledFor(logging.DEBUG):
             parent_type = 'chain' if getattr(features, 'chain_is_parent', False) else 'ring'
