@@ -2531,7 +2531,8 @@ def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
     # misdescribe them; fail closed (callers keep their legacy fallback).
     if low.endswith(('thioic acid', 'selenoic acid', 'telluroic acid',
                      'peroxoic acid', 'imidic acid', 'ohydroximic acid',
-                     'thioacetic acid', 'selenoacetic acid', 'telluroacetic acid')):
+                     'thioacetic acid', 'selenoacetic acid', 'telluroacetic acid',
+                     'peracetic acid', 'peroxyacetic acid')) or 'perox' in low:
         return None
     if low.endswith('carboxylic acid'):
         stem = name[:-len('carboxylic acid')]
@@ -2543,17 +2544,24 @@ def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
         return None  # two acid groups — not describable by one amido prefix
     if low.endswith('oic acid'):
         return name[:-len('oic acid')] + 'amido'
-    # Retained acetamide family (P-66.1.1.4.3): 'acetamide' is a retained amide
-    # PIN, so a SUBSTITUTED acetic acid maps to '<subst>acetamido'
-    # ('phenylacetic acid' -> 'phenylacetamido', 'chloroacetic acid' ->
-    # 'chloroacetamido'). Bare 'acetic acid' is handled by the retained table
-    # above. A multiplied stem ('diacetic acid', 'oxydiacetic acid') is a
-    # poly-acid one amido prefix cannot describe -> fail closed, mirroring the
-    # 'carboxylic acid' / 'dioic acid' guards.
+    # Retained acetamide family (P-66.1.1.4.3 method (1), BB:32995): the prefix is
+    # the AMIDE name with final 'e'->'o'. 'acetamide' is a retained amide PIN, and
+    # its substituted amide REQUIRES the C2 locant (acetamide has two substitutable
+    # sites, N and C2, and 'N-phenylacetamide' = acetanilide is a DIFFERENT molecule,
+    # BB:32859) -- so 'phenylacetic acid' -> '2-phenylacetamide' -> '2-phenylacetamido'
+    # (verified: the amide of NC(=O)Cc1ccccc1 is named '2-phenylacetamide'; the acid
+    # legitimately omits the locant per P-14.3.4.6, the amide may not). The acid name
+    # already carries an explicit locant when systematic ('2-phenylacetic acid'), so
+    # insert '2-' ONLY when the stem has no leading locant of its own. Bare
+    # 'acetic acid' is the retained table above. A multiplied stem ('diacetic acid',
+    # 'oxydiacetic acid') is a poly-acid one amido prefix cannot describe -> fail
+    # closed, mirroring the 'carboxylic acid' / 'dioic acid' guards.
     if low.endswith('acetic acid'):
         stem = name[:-len('acetic acid')]
         if re.search(r'(?:di|tri|tetra|penta|hexa)[-,\d]*$', stem.lower()):
             return None
+        if stem and not stem[0].isdigit():
+            stem = '2-' + stem
         return stem + 'acetamido'
     return None
 
