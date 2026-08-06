@@ -65,6 +65,7 @@ from ..assembly.naming_utils import get_multiplier_prefix
 from .lambda_convention import nonstandard_bonding_number
 from .phosphorus import _build_substituent_string
 from .substituent_purity import organyl_prefix_name
+from ..metrics.provenance import best_effort_ctx
 
 # Hub element -> parent-hydride stem (P-68 / P-21.1 substitutive parent hydrides).
 _HUB_STEMS = {
@@ -505,6 +506,16 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
         if subs is not None and 'silyl' in subs:
             prefix_block = _build_substituent_string(subs)
             return _assemble(prefix_block, lam, stem)
+        # v30 T4 degrade floor (best-effort ONLY): a pure-organyl phosphane whose
+        # substituent is a RING (tricyclododecylphosphane) is never reached by
+        # name_phosphine -- the ring routing bypasses it -- and would otherwise
+        # abstain (measured DEGRADE row). _classify_phosphane_subs already names the
+        # ring organyls, so emit the substitutive phosphane. Gated on best_effort_ctx
+        # so the PIN path stays byte-identical (name_phosphine still owns acyclic
+        # phosphanes on the PIN cascade; a phosphane-with-ring-substituent PIN
+        # spelling is a separate refinement). 0-wrong: SELF-01 backstops the emission.
+        if subs is not None and best_effort_ctx.get():
+            return _assemble(_build_substituent_string(subs), lam, stem)
 
     return None
 
