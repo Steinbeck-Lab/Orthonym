@@ -59,3 +59,13 @@ def test_neutral_input_charge_ambiguous_name_still_ok():
 def test_charged_input_charge_drop_is_mismatch():
     # a charged input whose name drops the charge IS a leak.
     assert namer._self_consistency_verdict("[O-]O", "OO") == "mismatch"
+
+
+def test_tautomer_difference_with_same_stereo_is_ok():
+    # 5'-inosinic acid: input is the 6-oxo purine, OPSIN parses the retained name
+    # to the 6-hydroxy tautomer; the sugar stereo is IDENTICAL. A tautomer diff
+    # must NOT read as a stereo conflict (regression guard — this broke the 1652
+    # gold row before TAUTOMER_HASH replaced CANONICAL_SMILES).
+    inp = "O=c1[nH]cnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O"
+    opsin = "O=P(O)(O)OC[C@H]1O[C@@H](n2cnc3c(O)ncnc32)[C@H](O)[C@@H]1O"
+    assert namer._self_consistency_verdict(inp, opsin) == "ok"

@@ -892,14 +892,18 @@ def _rh_prep(mol):
 
 
 def _registration_stereo_layer(smiles: str):
-    """The stereo-bearing RegistrationHash canonical layer for ``smiles`` (None if
-    unparseable). Distinguishes stereoisomers the InChIKey skeleton block cannot."""
+    """The stereo-bearing, TAUTOMER-CANONICAL RegistrationHash layer for ``smiles``
+    (None if unparseable). Uses ``TAUTOMER_HASH`` — NOT ``CANONICAL_SMILES`` — so a
+    pure TAUTOMER difference (e.g. the 6-oxo vs 6-hydroxy purine of ``5'-inosinic
+    acid``, whose stereo is identical) is normalized away and only a genuine
+    STEREO difference remains. Distinguishes stereoisomers the InChIKey skeleton
+    block cannot, while staying tautomer-tolerant like that block."""
     try:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             return None
         layers = _RegistrationHash.GetMolLayers(_rh_prep(mol))
-        return layers.get(_RegistrationHash.HashLayer.CANONICAL_SMILES)
+        return layers.get(_RegistrationHash.HashLayer.TAUTOMER_HASH)
     except Exception:
         return None
 
