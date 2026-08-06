@@ -8971,27 +8971,29 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
         _exc = chain_set | {idx}
         if carbonyl_o is not None:
             _exc.add(carbonyl_o)
-        _ccs = set()
+        # Walk the WHOLE acyl fragment (ALL atoms, not just carbons) so a ring
+        # HETEROATOM (proline's ring N, oxolane's ring O) or a heteroatom
+        # decoration is not dropped. v30 Slice C slice-2: a carbon-only walk
+        # LINEARIZES proline's ring to 'pentanoic acid' and emits the WRONG
+        # '(pentanoylamino)' (measured; suppressed to 'unknown' by SELF-01).
+        # Staying inside `sub_set` and outside `_exc` cannot reach the parent
+        # chain or the N-side, so this is exactly the acyl group.
+        _af = set()
         _qq = _dq([carbonyl_c])
         while _qq:
             _aa = _qq.popleft()
-            if _aa in _ccs or _aa in _exc:
+            if _aa in _af or _aa in _exc:
                 continue
-            _at = mol.GetAtomWithIdx(_aa)
-            if _at.GetSymbol() != 'C':
-                continue
-            _ccs.add(_aa)
-            for _nb in _at.GetNeighbors():
+            _af.add(_aa)
+            for _nb in mol.GetAtomWithIdx(_aa).GetNeighbors():
                 _ni = _nb.GetIdx()
-                if (_ni not in _ccs and _ni not in _exc
-                        and _nb.GetSymbol() == 'C'):
+                if _ni not in _af and _ni not in _exc:
                     _qq.append(_ni)
-        _acyl_has_ring = any(_ri.NumAtomRings(c) > 0 for c in _ccs)
+        _acyl_has_ring = any(_ri.NumAtomRings(c) > 0 for c in _af)
 
         if _acyl_has_ring:
             # Ring in the acyl subtree: extract acyl fragment as acid
             # SMILES, name it, convert to acyl prefix.
-            _af = _ccs.copy()
             if carbonyl_o is not None:
                 _af.add(carbonyl_o)
             try:
@@ -9009,15 +9011,28 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                     if _an:
                         # Wave2 T1c (P-66.1.1.4.3): method (1) amido prefix
                         # is the PIN — benzamido, (4-methylbenzamido),
-                        # (naphthalene-1-carboxamido). Only when the walked
-                        # acyl fragment covers the whole substituent (the
-                        # carbon BFS above drops heteroatom decorations, and
-                        # a name must never claim atoms it dropped).
+                        # (naphthalene-1-carboxamido). The acyl walk now covers
+                        # every acyl atom, so the completeness gate holds and no
+                        # atom is dropped.
                         if set(sub_atoms) == _af | {idx}:
                             from .substituent_naming import (
                                 acid_name_to_amido_prefix,
                             )
                             _amido = acid_name_to_amido_prefix(_an)
+                            if _amido is None:
+                                # A RETAINED amino-acid acid name ('proline',
+                                # 'L-proline') has no direct amido form and its
+                                # 'prolyl' peptide form implies L (breaks RT,
+                                # BB:54717). The SYSTEMATIC acid name does
+                                # convert: 'pyrrolidine-2-carboxylic acid' ->
+                                # 'pyrrolidine-2-carboxamido' (stereo preserved).
+                                # Self-scoping: only reached when the default
+                                # amido failed, and only yields a name when the
+                                # systematic acid name is convertible.
+                                _sys = name_fragment_recursively(
+                                    _fs, style='systematic')
+                                if _sys:
+                                    _amido = acid_name_to_amido_prefix(_sys)
                             if _amido:
                                 if (any(ch.isdigit() for ch in _amido)
                                         or '-' in _amido):

@@ -286,7 +286,8 @@ def is_top_level_naming() -> bool:
     return get_naming_depth() == 0
 
 
-def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
+def name_fragment_recursively(smiles: str, style: str = 'pin',
+                              **_kwargs) -> Optional[str]:
     """Name a molecular fragment with cycle-detection guard.
 
     Uses a visited-SMILES set to detect and break circular recursion.
@@ -314,15 +315,24 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
     if canonical is None:
         return None
 
+    # Cache key is style-aware so a systematic name never poisons the pin cache
+    # (or vice versa). For the default 'pin' style the key IS ``canonical`` and
+    # every cache read/write below is byte-identical to the pre-style behaviour;
+    # the static FRAGMENT_NAME_CACHE holds pin names, so a 'systematic' key never
+    # hits it and the systematic path falls through to name_compound. (v30 Slice C
+    # slice-2: the amido converter needs the systematic acid name for amino-acid
+    # rings — 'pyrrolidine-2-carboxylic acid', not the retained 'proline'.)
+    cache_key = canonical if style == 'pin' else f"{canonical}\x00{style}"
+
     # Tier 1: static fragment cache — always available, cycle-independent
-    cached = FRAGMENT_NAME_CACHE.get(canonical)
+    cached = FRAGMENT_NAME_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
     # Tier 2: runtime dynamic cache — populated during this naming session
     runtime_cache = getattr(_fragment_guard, 'cache', None)
     if runtime_cache is not None:
-        dynamic = runtime_cache.get(canonical)
+        dynamic = runtime_cache.get(cache_key)
         if dynamic is not None:
             return dynamic
 
@@ -366,7 +376,7 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
     try:
         from ..errors import is_refusal_sentinel
         from ..namer import name_compound
-        result = name_compound(canonical)
+        result = name_compound(canonical, style=style)
         # THE chokepoint where a WHOLE-MOLECULE naming becomes a NAME COMPONENT.
         # `name_compound` is always-emit: when it cannot name the input it returns
         # a refusal sentinel STRING ('zinc compound (not supported)',
@@ -384,7 +394,7 @@ def name_fragment_recursively(smiles: str, **_kwargs) -> Optional[str]:
         if result:
             # Populate runtime cache with successful result
             if runtime_cache is not None:
-                runtime_cache[canonical] = result
+                runtime_cache[cache_key] = result
             return result
         # v25 P0 Task 0.1: fragment could not be named (empty result).
         from ..metrics.abstention import AbstentionCode, record_abstention
