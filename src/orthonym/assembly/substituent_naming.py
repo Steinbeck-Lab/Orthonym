@@ -2530,7 +2530,8 @@ def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
     # Functional-replacement / peroxy acids: the plain amido transform would
     # misdescribe them; fail closed (callers keep their legacy fallback).
     if low.endswith(('thioic acid', 'selenoic acid', 'telluroic acid',
-                     'peroxoic acid', 'imidic acid', 'ohydroximic acid')):
+                     'peroxoic acid', 'imidic acid', 'ohydroximic acid',
+                     'thioacetic acid', 'selenoacetic acid', 'telluroacetic acid')):
         return None
     if low.endswith('carboxylic acid'):
         stem = name[:-len('carboxylic acid')]
@@ -2542,6 +2543,18 @@ def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
         return None  # two acid groups — not describable by one amido prefix
     if low.endswith('oic acid'):
         return name[:-len('oic acid')] + 'amido'
+    # Retained acetamide family (P-66.1.1.4.3): 'acetamide' is a retained amide
+    # PIN, so a SUBSTITUTED acetic acid maps to '<subst>acetamido'
+    # ('phenylacetic acid' -> 'phenylacetamido', 'chloroacetic acid' ->
+    # 'chloroacetamido'). Bare 'acetic acid' is handled by the retained table
+    # above. A multiplied stem ('diacetic acid', 'oxydiacetic acid') is a
+    # poly-acid one amido prefix cannot describe -> fail closed, mirroring the
+    # 'carboxylic acid' / 'dioic acid' guards.
+    if low.endswith('acetic acid'):
+        stem = name[:-len('acetic acid')]
+        if re.search(r'(?:di|tri|tetra|penta|hexa)[-,\d]*$', stem.lower()):
+            return None
+        return stem + 'acetamido'
     return None
 
 

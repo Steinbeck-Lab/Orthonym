@@ -8957,41 +8957,40 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                     carbonyl_o = nbr.GetIdx()
                     break
 
-        # PEP-04 fix: Check if carbonyl_c is directly bonded to a ring
-        # carbon. This detects aromatic acyl groups (benzoyl, naphthoyl)
-        # and cycloalkane-carbonyl groups (cyclopentanecarbonyl) where
-        # _count_carbon_chain() would incorrectly linearize ring C-C bonds.
+        # PEP-04 fix: an aromatic/cycloalkane acyl (benzoyl, naphthoyl,
+        # cyclopentanecarbonyl, and — v30 Slice C — phenylacetyl and any acyl
+        # whose carbon subtree CONTAINS a ring) must not be linearized by
+        # _count_carbon_chain(). Extract the acyl carbon subtree first, then
+        # trigger the recursive acid-name -> amido path when a ring lies
+        # ANYWHERE in it (not only DIRECTLY on the carbonyl). A plain linear
+        # acyl (no ring in the subtree) still takes the linear fast path below,
+        # unchanged; the completeness gate `set(sub_atoms) == _af | {idx}`
+        # prevents any atom drop.
         _ri = mol.GetRingInfo()
-        _has_ring_neighbor = False
-        for _cn in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors():
-            if (_cn.GetSymbol() == 'C' and _cn.GetIdx() in sub_set
-                    and _cn.GetIdx() != idx
-                    and _ri.NumAtomRings(_cn.GetIdx()) > 0):
-                _has_ring_neighbor = True
-                break
+        from collections import deque as _dq
+        _exc = chain_set | {idx}
+        if carbonyl_o is not None:
+            _exc.add(carbonyl_o)
+        _ccs = set()
+        _qq = _dq([carbonyl_c])
+        while _qq:
+            _aa = _qq.popleft()
+            if _aa in _ccs or _aa in _exc:
+                continue
+            _at = mol.GetAtomWithIdx(_aa)
+            if _at.GetSymbol() != 'C':
+                continue
+            _ccs.add(_aa)
+            for _nb in _at.GetNeighbors():
+                _ni = _nb.GetIdx()
+                if (_ni not in _ccs and _ni not in _exc
+                        and _nb.GetSymbol() == 'C'):
+                    _qq.append(_ni)
+        _acyl_has_ring = any(_ri.NumAtomRings(c) > 0 for c in _ccs)
 
-        if _has_ring_neighbor:
-            # Ring directly on carbonyl: extract acyl fragment as acid
+        if _acyl_has_ring:
+            # Ring in the acyl subtree: extract acyl fragment as acid
             # SMILES, name it, convert to acyl prefix.
-            from collections import deque as _dq
-            _exc = chain_set | {idx}
-            if carbonyl_o is not None:
-                _exc.add(carbonyl_o)
-            _ccs = set()
-            _qq = _dq([carbonyl_c])
-            while _qq:
-                _aa = _qq.popleft()
-                if _aa in _ccs or _aa in _exc:
-                    continue
-                _at = mol.GetAtomWithIdx(_aa)
-                if _at.GetSymbol() != 'C':
-                    continue
-                _ccs.add(_aa)
-                for _nb in _at.GetNeighbors():
-                    _ni = _nb.GetIdx()
-                    if (_ni not in _ccs and _ni not in _exc
-                            and _nb.GetSymbol() == 'C'):
-                        _qq.append(_ni)
             _af = _ccs.copy()
             if carbonyl_o is not None:
                 _af.add(carbonyl_o)
