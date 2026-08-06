@@ -870,13 +870,68 @@ def _self_consistency_net_charge(smiles: str) -> Optional[int]:
         return None
 
 
-def _self_consistency_verdict(input_smiles: str, opsin_smiles: str) -> str:
+# v30 C6: RegistrationHash-backed stereo layer for SELF-01. The InChIKey skeleton
+# block used by _self_consistency_skeleton EXCLUDES stereo by construction
+# (ADR-18-07), so a name that encodes the WRONG stereoisomer (right constitution)
+# passes the skeleton compare. RegistrationHash.GetMolLayers gives a stereo-bearing
+# canonical layer that distinguishes enantiomers/diastereomers. Prep is normalize-only
+# (no Cleanup, no tautomer/charge standardization) per spec §4; NO stereo-assignment
+# call — GetMolLayers reads the parsed mol's stereo directly (assign is inert for it).
+from rdkit.Chem import RegistrationHash as _RegistrationHash
+from rdkit.Chem.MolStandardize import rdMolStandardize as _rdMolStandardize
+_RH_NORMALIZER = _rdMolStandardize.Normalizer()
+
+
+def _rh_prep(mol):
+    m = Chem.Mol(mol)
+    Chem.SanitizeMol(m)
+    m = _RH_NORMALIZER.normalize(m)   # normalize ONLY — no Cleanup / tautomer / charge std
+    for a in m.GetAtoms():
+        a.SetAtomMapNum(0)
+    return m
+
+
+def _registration_stereo_layer(smiles: str):
+    """The stereo-bearing RegistrationHash canonical layer for ``smiles`` (None if
+    unparseable). Distinguishes stereoisomers the InChIKey skeleton block cannot."""
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        layers = _RegistrationHash.GetMolLayers(_rh_prep(mol))
+        return layers.get(_RegistrationHash.HashLayer.CANONICAL_SMILES)
+    except Exception:
+        return None
+
+
+def _specified_stereo_count(mol) -> int:
+    """Count of EXPLICITLY-specified stereo features (assigned chiral centres +
+    directional double bonds). Used to tell a stereo CONFLICT (same count, different
+    canonical) from stereo OMISSION (one side under-specifies)."""
+    try:
+        n = len(Chem.FindMolChiralCenters(
+            mol, includeUnassigned=False, useLegacyImplementation=False))
+    except TypeError:  # older RDKit signature
+        n = len(Chem.FindMolChiralCenters(mol, includeUnassigned=False))
+    for b in mol.GetBonds():
+        if b.GetStereo() in (Chem.BondStereo.STEREOE, Chem.BondStereo.STEREOZ,
+                             Chem.BondStereo.STEREOCIS, Chem.BondStereo.STEREOTRANS):
+            n += 1
+    return n
+
+
+def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
+                              ignore_stereo: bool = False) -> str:
     """``"ok"`` | ``"mismatch"`` | ``"inconclusive"`` — does the OPSIN re-perception of
-    the emitted name encode the SAME constitution as the input structure?
+    the emitted name encode the SAME molecule as the input structure?
 
     Constitution = InChIKey skeleton block (formula + connectivity + mobile-H;
-    stereo- and charge-insensitive) PLUS net formal charge (the skeleton block
-    excludes the charge layer, so a charge-dropping name would otherwise pass)."""
+    stereo- and charge-insensitive) PLUS net formal charge. On the stereo-strict
+    primary path this ALSO fails a stereo CONFLICT (same amount of specified stereo,
+    different RegistrationHash canonical layer). ``ignore_stereo=True`` (the BBR-GATE
+    stereo carve-out, which judges a stereo-STRIPPED OPSIN parse) compares constitution
+    only — a stereo-strict compare there would suppress every stereo-bearing input by
+    construction (see the BBR-GATE block below)."""
     a = _self_consistency_skeleton(input_smiles)
     b = _self_consistency_skeleton(opsin_smiles)
     if a is None or b is None:
@@ -887,14 +942,29 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str) -> str:
     # input's net charge (the skeleton block excludes the charge layer).
     ca = _self_consistency_net_charge(input_smiles)
     cb = _self_consistency_net_charge(opsin_smiles)
-    if ca is None or cb is None:
-        return "ok"  # cannot compare charge -> trust the skeleton (fail-OPEN on charge)
     # Only a genuinely CHARGED input whose charge the name drops/changes is a leak
     # (e.g. [O-]O, -1, named 'dioxidane', 0). A NEUTRAL input is exempt: acid/ester
     # names are protonation-ambiguous in OPSIN (e.g. 'methyl phosphate' round-trips
-    # to the -2 phosphate dianion) — that is not a wrong-molecule error, and firing
-    # on it wrongly suppresses correct names.
-    if ca != 0 and ca != cb:
+    # to the -2 phosphate dianion) — that is not a wrong-molecule error.
+    if ca is not None and cb is not None and ca != 0 and ca != cb:
+        return "mismatch"
+    if ignore_stereo:
+        return "ok"
+    # v30 C6: constitution + charge match. Catch a name whose OPSIN re-perception
+    # encodes a DIFFERENT stereoisomer. Stereo OMISSION (one side under-specifies) is
+    # not a constitutional error and is tolerated; only a CONFLICT (same amount of
+    # specified stereo, different stereo canonical) suppresses. Gold PINs round-trip
+    # their stereo exactly, so this never fires on them.
+    sa = _registration_stereo_layer(input_smiles)
+    sb = _registration_stereo_layer(opsin_smiles)
+    if sa is None or sb is None or sa == sb:
+        return "ok"
+    mi = Chem.MolFromSmiles(input_smiles)
+    mo = Chem.MolFromSmiles(opsin_smiles)
+    if mi is None or mo is None:
+        return "ok"
+    na = _specified_stereo_count(mi)
+    if na > 0 and na == _specified_stereo_count(mo):
         return "mismatch"
     return "ok"
 
@@ -918,18 +988,21 @@ def _record_gate_outcome(outcome: str, name: Optional[str]) -> None:
 
 
 def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: str,
-                               stats: Optional[Dict[str, int]]) -> str:
+                               stats: Optional[Dict[str, int]],
+                               ignore_stereo: bool = False) -> str:
     """SELF-01: OPSIN already PARSED ``name``; verify it parses to the SAME molecule.
 
-    Suppresses (mode "on") only on a VERIFIED constitutional mismatch — never on a
-    stereo-only / tautomer difference, never when the comparison is inconclusive
-    (fail-OPEN). In mode "warn" it logs + counts the would-suppression but ships the
-    name unchanged (behaviour-neutral); in mode "off" it is a no-op."""
+    Suppresses (mode "on") only on a VERIFIED constitutional (or, on the stereo-strict
+    primary path, stereo-CONFLICT) mismatch — never on a stereo-omission / tautomer
+    difference, never when the comparison is inconclusive (fail-OPEN). In mode "warn"
+    it logs + counts the would-suppression but ships the name unchanged; in mode "off"
+    it is a no-op. ``ignore_stereo=True`` is used by the BBR-GATE stereo carve-out,
+    which judges a stereo-STRIPPED parse and must stay stereo-insensitive."""
     from .metrics import provenance as _pv
     if _SC_MODE == "off" or not smiles:
         _record_gate_outcome(_pv.GATE_OUTCOME_SELF01_SKIPPED, name)
         return name
-    verdict = _self_consistency_verdict(smiles, opsin_smiles)
+    verdict = _self_consistency_verdict(smiles, opsin_smiles, ignore_stereo=ignore_stereo)
     if verdict != "mismatch":
         # v29 P7 T1: "ok" is the ONE state that earns SELF-01. "inconclusive"
         # ships by failing OPEN — the comparison could not be made, so nothing
@@ -1170,8 +1243,11 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         if _stripped_status == "parsed":
             _stripped_smiles = _validity_gate_name_to_smiles(_stripped)
             if _stripped_smiles is not None:
+                # ignore_stereo: this carve-out judges the stereo-STRIPPED parse, so
+                # the verdict MUST stay stereo-insensitive (a stereo-strict compare
+                # would suppress every stereo-bearing input here by construction).
                 _decided = _self_consistency_decision(name, smiles, _stripped_smiles,
-                                                      stats)
+                                                      stats, ignore_stereo=True)
                 if _decided != name:
                     # Own counter: _self_consistency_decision bumps the SHARED
                     # self_consistency_{mismatch,suppressed} counters for both the
