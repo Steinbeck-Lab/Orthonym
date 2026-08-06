@@ -55,10 +55,26 @@ def _composite_locant_sort_key(
     locant = item[0]
     if isinstance(locant, int):
         return (locant, '')
+    # Primed locant from a MULTI-COMPONENT ring: atom_to_locant returns tuples
+    # like (5, "'") / (3, "''") for the primed component (fused_rings /
+    # multi-component numbering). Per P-14.3.2 a primed locant sorts AFTER its
+    # unprimed twin at the same number ('' < "'" < "''"), so key on
+    # (number, prime-suffix). Fixes a TypeError crash (Fable review RISK 6):
+    # int(locant) on a tuple raised instead of failing closed.
+    if isinstance(locant, tuple):
+        num = locant[0] if locant and isinstance(locant[0], int) else 0
+        return (num, ''.join(str(x) for x in locant[1:]))
     # str path -- '3a' / '7a' / '12b'
-    if locant and locant[-1].isalpha():
+    if isinstance(locant, str) and locant and locant[-1].isalpha():
         return (int(locant[:-1]), locant[-1])
-    return (int(locant), '')
+    # Fail closed, never crash: an unparseable locant sorts last. The descriptor
+    # ORDER only affects the emitted string (OPSIN parses the descriptor set
+    # order-independently), so a defensive last-sort degrades spelling at worst,
+    # never structure -- and the whole name is still RT/SELF-01 gated.
+    try:
+        return (int(locant), '')
+    except (TypeError, ValueError):
+        return (float('inf'), str(locant))
 
 
 def _is_true_exocyclic(mol, in_scope_idx: int, other_idx: int) -> bool:
