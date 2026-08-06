@@ -360,10 +360,15 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         )
         from ..errors import is_refusal_sentinel
         from ..namer import name_pipeline_only
-        fallback_name = name_pipeline_only(canonical)
-        if not is_refusal_sentinel(fallback_name):
+        # name_pipeline_only has no `style` parameter, so it can only honour the
+        # default 'pin' request; for a 'systematic' request skip it (returning a
+        # pin fallback would answer the wrong question) and fall through to the
+        # abstention below. Cache under the style-aware key. (Fable review NIT 9.)
+        fallback_name = (name_pipeline_only(canonical) if style == 'pin'
+                         else None)
+        if fallback_name is not None and not is_refusal_sentinel(fallback_name):
             if runtime_cache is not None:
-                runtime_cache[canonical] = fallback_name
+                runtime_cache[cache_key] = fallback_name
             return fallback_name
         # v25 P0 Task 0.1: fragment could not be named (depth safety net).
         from ..metrics.abstention import AbstentionCode, record_abstention

@@ -22,8 +22,17 @@ from orthonym.assembly.fragment_naming import name_fragment_recursively
 class TestSystematicStyleThreadedThroughFragmentNamer:
     """name_fragment_recursively must honour style='systematic' (was discarded)."""
 
-    def test_default_style_retains(self):
-        assert name_fragment_recursively("OC(=O)C1CCCN1") == "proline"
+    def test_default_and_systematic_differ_for_amino_acid(self):
+        # The default (pin) path returns the retained name; systematic bypasses
+        # it. We do NOT assert the retained string as a golden value — OPSIN reads
+        # 'proline' as L-proline, a different molecule from the stereo-unspecified
+        # fragment (BB:54717), which is exactly why the amido path needs the
+        # systematic form. Assert only the contract: the two styles diverge and
+        # the systematic one is the convertible acid.
+        default = name_fragment_recursively("OC(=O)C1CCCN1")
+        systematic = name_fragment_recursively("OC(=O)C1CCCN1", style="systematic")
+        assert default != systematic
+        assert systematic == "pyrrolidine-2-carboxylic acid"
 
     def test_systematic_style_bypasses_retained(self):
         assert (name_fragment_recursively("OC(=O)C1CCCN1", style="systematic")
@@ -43,12 +52,24 @@ class TestRingAcylAmidoPIN:
         ("OC(=O)CNC(=O)C1CCCO1", "(oxolane-2-carboxamido)acetic acid"),
         # proline N-ring: tests ring-walk + systematic retry
         ("OC(=O)CNC(=O)C1CCCN1", "(pyrrolidine-2-carboxamido)acetic acid"),
-        # regression: benzoyl (all-carbon ring) unchanged
+        # P-16.5.4 nesting: a compound amido prefix that itself contains marks
+        # escalates ()->[]  (Fable review of cbb28539).
+        ("OC(=O)CNC(=O)Cc1ccncc1", "[2-(pyridin-4-yl)acetamido]acetic acid"),
+        # regression: benzoyl (all-carbon ring) unchanged, bare (no marks)
         ("OC(=O)CNC(=O)c1ccccc1", "benzamidoacetic acid"),
+        # regression: slice-1 mark-free prefix stays single parens (depth 0)
+        ("OC(=O)CNC(=O)Cc1ccccc1", "(2-phenylacetamido)acetic acid"),
     ])
     def test_exact_pin(self, smiles, expected):
         from orthonym import name_compound
         assert name_compound(smiles) == expected
+
+    def test_nested_stereo_uses_square_brackets_not_parens(self):
+        # P-16.5.4: a stereodescriptor-bearing amido prefix nests to []
+        from orthonym import name_compound
+        name = name_compound("OC(=O)CNC(=O)[C@@H]1CCCN1")
+        assert "[(2S)-pyrrolidine-2-carboxamido]" in name, name
+        assert "((2S)-pyrrolidine-2-carboxamido)" not in name, name
 
     @pytest.mark.parametrize("smiles", [
         "OC(=O)CNC(=O)C1CCCN1",

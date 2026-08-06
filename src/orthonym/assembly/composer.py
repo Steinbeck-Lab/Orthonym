@@ -9036,7 +9036,19 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                             if _amido:
                                 if (any(ch.isdigit() for ch in _amido)
                                         or '-' in _amido):
-                                    return f"({_amido})"
+                                    # P-16.5.4 nesting: a compound amido prefix
+                                    # that itself contains enclosing marks
+                                    # (`(2S)-…`, `2-(pyridin-4-yl)…`) must escalate
+                                    # ()->[]->{}. apply_enclosing_marks(-1)
+                                    # auto-detects the depth from the name's own
+                                    # marks, so a mark-free prefix (`2-phenyl…`)
+                                    # stays `(…)` byte-identical. (Fable review of
+                                    # cbb28539: the hard-coded `f"({_amido})"`
+                                    # shipped `(2-(pyridin-4-yl)acetamido)…` at T1.)
+                                    from .naming_utils import (
+                                        apply_enclosing_marks as _aem,
+                                    )
+                                    return _aem(_amido, -1)
                                 return _amido
                         from ..decomposition.fragment_assembly import (
                             _acid_to_acyl,
