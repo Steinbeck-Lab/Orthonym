@@ -3631,20 +3631,8 @@ def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
             if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
                 stack.append(n.GetIdx())
 
-    # v30 Slice C.5: a ring/heteroatom-bearing ether R -- an (oxan-2-yl)oxy glycoside,
-    # a (pyridin-3-yl)oxy, a (cyclohexyl)oxy -- is named by RECURSING the ring-capable
-    # substituent namer on R (the fragment minus the ether O) and wrapping as (R-yl)oxy
-    # with enclosing marks (P-63.2.3 + P-14.5.2). The recursion attaches at R's own atom,
-    # never the ether O, so it cannot re-enter this O-branch (terminates); each recursion
-    # is a strictly smaller fragment. Fail CLOSED (return None -> abstain, never a wrong
-    # molecule) unless R names as a clean '-yl'; SELF-01 is the backstop.
-    if has_heteroatom or has_ring:
-        r_sub_atoms = [a for a in frag_atoms if a != attach_idx]
-        r_name = name_substituent(mol, r_sub_atoms, alkyl_start)
-        if r_name and r_name not in ("substituent", "") and r_name.endswith("yl"):
-            return f"({r_name}oxy)"
-        return None
-    if carbon_count == 0:
+    # Only name as alkoxy if the R group is a pure alkyl chain (no heteroatoms, no rings)
+    if has_heteroatom or has_ring or carbon_count == 0:
         return None
 
     # P-63.2.3.2 + P-14.5.2: branched alkyl groups must use (alkan-n-yl)oxy form
