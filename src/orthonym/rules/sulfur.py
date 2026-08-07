@@ -332,13 +332,24 @@ def _acid_stem_unsaturated_oxide_prefix(
             j = nb.GetIdx()
             if j not in arm and j != sulfur_idx:
                 q.append(j)
-    # The single parent-side C neighbour of S (the one we detach).
+    # The single parent-side neighbour of S (the one we detach). Historically this
+    # was restricted to CARBON (the R-S(=O)x-R' sulfone/sulfoxide shape). Extended
+    # to also accept a NITROGEN parent so an R-SO2-N< sulfonamide (whose other side
+    # of S is the amide N, not a carbon) can have its R-sulfonyl stem built: cap S
+    # with -OH after detaching the N and the arm names as the R-sulfonic acid
+    # (`4-aminobenzene-1-sulfonic acid`), rewritten to `...sulfonyl` (task #28,
+    # unblocks the substituted-arene `{Ar}sulfonamido` PIN, BB P-66.1.1.4.3 :33034).
+    # Purely additive: sulfone/sulfoxide callers require two-carbon S (SMARTS), so
+    # this branch only fires where the old carbon-only filter returned None. The
+    # cap-name-rewrite is fail-closed (a non-clean `... sulfonic/sulfinic acid`
+    # yields None), so a non-nameable R never emits. Restricted to C/N to leave
+    # sulfonate-ester (parent = O) and other heteroatom shapes failing closed.
     parent_c = [
         n.GetIdx() for n in s_atom.GetNeighbors()
-        if n.GetSymbol() == "C" and n.GetIdx() not in arm
+        if n.GetSymbol() in ("C", "N") and n.GetIdx() not in arm
     ]
     if len(parent_c) != 1:
-        return None  # not the R-S(=O)x-R' shape we cap
+        return None  # not the R-S(=O)x-R'/N< shape we cap
     rw = Chem.RWMol(mol)
     oh = rw.AddAtom(Chem.Atom(8))
     rw.AddBond(sulfur_idx, oh, Chem.BondType.SINGLE)

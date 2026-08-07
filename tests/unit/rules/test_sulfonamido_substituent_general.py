@@ -60,13 +60,61 @@ def test_helper_methanesulfonamido():
     assert sulfonamido_prefix_from_n_branch(m, 4, {0, 1, 2, 3, 4}, parent) == "methanesulfonamido"
 
 
-def test_helper_substituted_arene_fails_closed():
-    # 4-methylbenzenesulfonyl (tosyl) R -> the acid-stem primitive returns None (locanted
-    # substituted arene not built) -> fail closed, NOT a mis-named or atom-dropped prefix.
-    m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)c2ccc(C)cc2")
+def test_helper_substituted_arene_now_named():
+    # ASSERTION FLIP (was None / fail-closed, task #28): a SUBSTITUTED arene R is now
+    # named `{substituted-arene}-<n>-sulfonamido` -- this is the sulfa-drug scaffold and
+    # a BB verbatim PIN class (P-66.1.1.4.3, BlueBookV2.md:33034
+    # `2-(4-aminobenzene-1-sulfonamido)-1,3-thiazole-5-carboxylic acid (PIN)`).
+    # The old None was a LIMITATION (`_acid_stem_unsaturated_oxide_prefix` detached only a
+    # CARBON parent-side of S; a sulfonamide's other side is the N), not a correctness fact.
+    # New value independently confirmed: `4-(4-methylbenzene-1-sulfonamido)benzoic acid`
+    # round-trips OPSIN InChIKey-EXACT to the input (OPSIN = independent inverse engine).
+    m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)c2ccc(C)cc2")  # -NH-SO2-(4-methylphenyl)
     parent = {4, 5, 6, 7, 8, 9}
     frag = {0, 1, 2, 3, 10, 11, 12, 13, 14, 15, 16}
-    assert sulfonamido_prefix_from_n_branch(m, 3, frag, parent) is None
+    assert sulfonamido_prefix_from_n_branch(m, 3, frag, parent) == "4-methylbenzene-1-sulfonamido"
+
+
+def test_helper_sulfanilamide_arene_named():
+    # the canonical sulfa-drug scaffold: R = 4-aminophenyl -> `4-aminobenzene-1-sulfonamido`
+    # (BB verbatim PIN prefix, BlueBookV2.md:33034). RT-EXACT verified end-to-end.
+    m = Chem.MolFromSmiles("Nc1ccc(S(=O)(=O)Nc2ccccc2)cc1")
+    assert sulfonamido_prefix_from_n_branch(
+        m, 8, {0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 16}, {9, 10, 11, 12, 13, 14}
+    ) == "4-aminobenzene-1-sulfonamido"
+
+
+def test_helper_naphthalene_arene_named():
+    # a fused-arene R names via the acid-stem engine reuse -> `naphthalene-1-sulfonamido`.
+    m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)c2cccc3ccccc23")
+    n_idx = next(a.GetIdx() for a in m.GetAtoms()
+                 if a.GetSymbol() == 'N')
+    # parent = the plain N-phenyl; frag = everything else
+    ri = m.GetRingInfo()
+    benz = next(set(r) for r in ri.AtomRings()
+                if len(r) == 6
+                and all(m.GetAtomWithIdx(i).GetIsAromatic() for i in r)
+                and any(nb.GetIdx() in r for nb in m.GetAtomWithIdx(n_idx).GetNeighbors())
+                and not any(len(rr) == 6 and set(rr) != set(r) and set(rr) & set(r)
+                            for rr in ri.AtomRings()))
+    frag = set(range(m.GetNumAtoms())) - benz
+    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) == "naphthalene-1-sulfonamido"
+
+
+def test_helper_unnameable_hetarene_fails_closed():
+    # pyridine-3-sulfonyl: the acid namer returns `unknown organic compound` (not a clean
+    # `... sulfonic acid`), so the stem builder fails closed -> None. No wrong/atom-dropped
+    # emission for an R the engine cannot honestly name.
+    m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)c2cccnc2")  # -NH-SO2-(pyridin-3-yl)
+    n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
+                 and any(nb.GetSymbol() == 'S' for nb in a.GetNeighbors()))
+    ri = m.GetRingInfo()
+    benz = next(set(r) for r in ri.AtomRings()
+                if len(r) == 6
+                and all(m.GetAtomWithIdx(i).GetSymbol() == 'C' for i in r)
+                and any(nb.GetIdx() in r for nb in m.GetAtomWithIdx(n_idx).GetNeighbors()))
+    frag = set(range(m.GetNumAtoms())) - benz
+    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) is None
 
 
 def test_helper_nn_disubstituted_fails_closed():
