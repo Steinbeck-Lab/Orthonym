@@ -2773,6 +2773,94 @@ def linear_acyl_amido_prefix(mol, carbonyl_c: int, n_idx: int,
     return acyl_carbons_to_amido_prefix(len(carbons))
 
 
+def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
+                                     parent_atoms) -> Optional[str]:
+    """P-66.1.1.4.3 (BB:32995): an N-attached ``-NH-SO2-R`` branch is the
+    ``{R}sulfonamido`` PREFIX (methanesulfonamido / ethanesulfonamido /
+    benzenesulfonamido / cyclohexanesulfonamido) — NOT an ``amino`` split of the
+    N, and NOT the cascade's ``carbamoyl`` misroot (which swaps S->C and DROPS
+    S, the two =O and R: a different molecule).
+
+    The stem is built by the SAME acid-stem sulfonyl primitive the sulfone-prefix
+    path uses (``_acid_stem_oxide_prefix(mol, r_carbon, s_idx, 'sulfonyl')`` ->
+    'methanesulfonyl' / 'benzenesulfonyl' / 'cyclohexanesulfonyl'), with the
+    suffix rewrite sulfonyl -> sulfonamido. That primitive returns None (so this
+    fails closed) for a substituted-arene / CF3 / branched-hetero R -> those keep
+    abstaining rather than shipping a wrong or atom-dropped name.
+
+    Strict / fail-closed. Fires ONLY when, with FULL atom coverage:
+      * N carries exactly ONE non-parent heavy neighbour, the sulfonyl S (a bare
+        ``-NH-``, never N,N-disubstituted); N-S is a single bond,
+      * S is a clean sulfonyl: exactly two terminal ``=O`` (both in the fragment)
+        and exactly one further heavy neighbour R, a carbon,
+      * the fragment is EXACTLY {N, S, the two =O} plus the R subtree — nothing
+        dropped.
+
+    Returns the BARE prefix core (e.g. 'methanesulfonamido'), matching every
+    sibling return in ``_name_amino_branch``; None otherwise.
+    """
+    from .substituent_prefix_forms import _acid_stem_oxide_prefix
+
+    sub_set = set(sub_atoms)
+    parent_set = set(parent_atoms)
+    if n_idx not in sub_set:
+        return None
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetSymbol() != 'N' or n_atom.GetFormalCharge():
+        return None
+    branches = [nb.GetIdx() for nb in n_atom.GetNeighbors()
+                if nb.GetIdx() not in parent_set and nb.GetIdx() in sub_set]
+    if len(branches) != 1:
+        return None
+    s_idx = branches[0]
+    s_atom = mol.GetAtomWithIdx(s_idx)
+    if s_atom.GetSymbol() != 'S' or s_atom.GetFormalCharge():
+        return None
+    ns_bond = mol.GetBondBetweenAtoms(n_idx, s_idx)
+    if ns_bond is None or ns_bond.GetBondTypeAsDouble() != 1.0:
+        return None
+    dbl_o = []
+    r_side = []
+    for nb in s_atom.GetNeighbors():
+        ni = nb.GetIdx()
+        if ni == n_idx:
+            continue
+        bond = mol.GetBondBetweenAtoms(s_idx, ni)
+        if (nb.GetSymbol() == 'O' and nb.GetDegree() == 1
+                and bond.GetBondTypeAsDouble() == 2.0):
+            dbl_o.append(ni)
+            continue
+        r_side.append(ni)
+    if len(dbl_o) != 2 or len(r_side) != 1:
+        return None
+    if any(o not in sub_set for o in dbl_o):
+        return None
+    r_idx = r_side[0]
+    if r_idx not in sub_set or mol.GetAtomWithIdx(r_idx).GetSymbol() != 'C':
+        return None
+    # Atom coverage: the fragment must be EXACTLY {N, S, two =O} + the R subtree
+    # (reachable from R without recrossing S). Any leftover atom -> silent drop.
+    r_subtree = set()
+    stack = [r_idx]
+    while stack:
+        a = stack.pop()
+        if a in r_subtree or a == s_idx:
+            continue
+        if a not in sub_set:
+            return None  # R escapes the fragment
+        r_subtree.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() != s_idx:
+                stack.append(nb.GetIdx())
+    if sub_set != {n_idx, s_idx, dbl_o[0], dbl_o[1]} | r_subtree:
+        return None
+
+    stem = _acid_stem_oxide_prefix(mol, r_idx, s_idx, 'sulfonyl')
+    if not stem or not stem.endswith('sulfonyl'):
+        return None
+    return stem[:-len('sulfonyl')] + 'sulfonamido'
+
+
 def acyl_amido_prefix_from_branch(mol, n_idx: int, carbonyl_c: int,
                                   sub_atoms) -> Optional[str]:
     """P-66.1.1.4.3 method (1) amido prefix for a full N-attached acyl branch.

@@ -4029,6 +4029,18 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             # The count includes the carbonyl C, which is the stem's C1.
             return get_chain_prefix(_n) + "anoylamino"
 
+    # P-66.1.1.4.3 (BB:32995): -NH-SO2-R -> '{R}sulfonamido' (methanesulfonamido
+    # / benzenesulfonamido / cyclohexanesulfonamido). The sulfonyl S is not a
+    # carbon, so the acylamino loop above skips it; without this branch the
+    # cascade re-roots the fragment as `carbamoyl` (swaps S->C, drops S, the two
+    # =O and R -- a different molecule). Shared primitive; fails closed (None)
+    # for substituted-arene / CF3 / N,N-disubstituted R (those keep abstaining).
+    from .substituent_naming import sulfonamido_prefix_from_n_branch
+    _sulfonamido = sulfonamido_prefix_from_n_branch(
+        mol, attach_idx, frag_atoms, parent_atoms)
+    if _sulfonamido:
+        return _sulfonamido
+
     # Check for anilino: -NH-phenyl (isolated benzene ring directly on N).
     # P-62.2.1.1.1 (BB:26139) 'anilino' is the retained PREFERRED PREFIX for
     # C6H5-NH- WITH FULL SUBSTITUTION ALLOWED (BB:26153 '4-chloroanilino
