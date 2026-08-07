@@ -3654,7 +3654,11 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # above them moves them, and v29 P7 alone shifted this file three times.
     # Class-specific to functional residues — never touches
     # -ene/-yne/-ane/-ine/-yl.
-    if (' acid' in name
+    if (' ' in name             # v30 RISK 5 Class 3: a SPACE marks a functional-class
+                                # multi-word name ('urea oxime', 'taxifoline acetate') --
+                                # never a valid single substituent token; the '-e'->'-yl'
+                                # fallback below would fabricate the unparseable 'urea oximyl'.
+            or ' acid' in name
             or name.endswith('ate')      # functional-class / residual ester (formate, carbamate, ...)
             or name.endswith('urea')
             or name.endswith('al')):     # unconverted (unsaturated) aldehyde residue (prop-2-enal)
