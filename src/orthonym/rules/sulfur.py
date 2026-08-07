@@ -365,18 +365,61 @@ def _acid_stem_unsaturated_oxide_prefix(
     except Exception:
         return None
     acid_smiles = None
+    acid_piece = None
     for p in pieces:
         if any(a.GetSymbol() == "S" for a in p.GetAtoms()):
             acid_smiles = Chem.MolToSmiles(p)
+            acid_piece = p
             break
     if acid_smiles is None:
         return None
+    # The N-parent branch is the NEWLY-enabled path (task #28); the carbon-parent
+    # sulfone/sulfoxide-prefix path is unchanged and left byte-identical below. The
+    # two extra soundness guards fire ONLY for the N-parent (sulfonamido) case, which
+    # a fable review of 7c621b84 showed could otherwise emit a wrong constitution.
+    _parent_is_n = mol.GetAtomWithIdx(parent_c[0]).GetSymbol() == "N"
+    if _parent_is_n:
+        # Guard 1: if R itself carries a COMPETING S-oxo-acid (-SO3H / -SO2H), the
+        # capped fragment has >=2 acid groups and the acid namer spells it as a
+        # MULTIPLIED acid ('ethane-1,2-disulfonic acid'). Stripping the 'sulfonic
+        # acid' suffix then leaves the multiplier ('ethane-1,2-di') re-bound to a
+        # meaning it never had -> 'ethane-1,2-disulfonamido' (OPSIN-unparseable, a
+        # wrong constitution asserting two sulfonamido linkages). Fail closed unless
+        # exactly ONE S bears an -OH/-O- (the one we just capped) -- an RT-invisible
+        # defect (unparseable name), so a structural guard, not a round-trip, catches it.
+        _acid_s = sum(
+            1 for a in acid_piece.GetAtoms()
+            if a.GetSymbol() == "S"
+            and any(nb.GetSymbol() == "O"
+                    and acid_piece.GetBondBetweenAtoms(
+                        a.GetIdx(), nb.GetIdx()).GetBondTypeAsDouble() == 1.0
+                    for nb in a.GetNeighbors())
+        )
+        if _acid_s != 1:
+            return None
     from ..namer import Orthonym
     acid_name = Orthonym(style="pin", _disable_opsin_validity_gate=True).name(
         acid_smiles
     )
     if not isinstance(acid_name, str) or not acid_name.endswith(acid_suffix):
         return None  # fail closed: not a clean sulfinic/sulfonic acid
+    if _parent_is_n:
+        # Guard 2: the acid sub-namer runs with its OPSIN validity gate DISABLED, so
+        # an acid-namer defect that still ends in 'sulfonic acid' (SO3H migrating onto
+        # a ring -> 'methylcyclohexanesulfonic acid'; an -NHC(=O)R arm dropped ->
+        # 'ethanesulfonic acid') would become a wrong sulfonamido prefix. RE-ANCHOR the
+        # accepted acid name explicitly (gate-INDEPENDENT: does not rely on the global
+        # SELF-01 setting, which is off in tests and absent with no jar): OPSIN-parse it
+        # and require the same constitutional skeleton as the capped fragment; fail
+        # closed on mismatch or when OPSIN is unavailable.
+        from ..namer import _validity_gate_name_to_smiles, _self_consistency_skeleton
+        _reparsed = _validity_gate_name_to_smiles(acid_name)
+        if _reparsed is None:
+            return None
+        _sk_name = _self_consistency_skeleton(_reparsed)
+        _sk_frag = _self_consistency_skeleton(acid_smiles)
+        if _sk_name is None or _sk_frag is None or _sk_name != _sk_frag:
+            return None
     return acid_name[: -len(acid_suffix)] + oxide_kind
 
 

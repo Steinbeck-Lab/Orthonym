@@ -101,6 +101,49 @@ def test_helper_naphthalene_arene_named():
     assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) == "naphthalene-1-sulfonamido"
 
 
+def test_helper_competing_sulfonic_acid_R_fails_closed():
+    # fable review of 7c621b84: R itself carrying a 2nd -SO3H makes the capped acid a
+    # MULTIPLIED name (`ethane-1,2-disulfonic acid`); the suffix-strip then corrupts to
+    # `ethane-1,2-disulfonamido` (OPSIN-unparseable wrong constitution). Guard 1 (exactly
+    # one S-oxo-acid in the capped fragment) must fail closed -> the cascade names the
+    # correct skeletal `...dithia-1-azahexyl` form instead.
+    m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)CCS(O)(=O)=O")  # -NH-SO2-CH2CH2-SO3H
+    n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
+                 and any(nb.GetSymbol() == 'S' for nb in a.GetNeighbors()))
+    benz = next(set(r) for r in m.GetRingInfo().AtomRings()
+                if len(r) == 6 and all(m.GetAtomWithIdx(i).GetIsAromatic() for i in r)
+                and any(nb.GetIdx() in r for nb in m.GetAtomWithIdx(n_idx).GetNeighbors()))
+    frag = set(range(m.GetNumAtoms())) - benz
+    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) is None
+
+
+def test_helper_acidnamer_migration_R_fails_closed():
+    # fable review: R = cyclohexylmethyl -> the gate-disabled acid namer mis-placed the
+    # SO3H onto the ring (`methylcyclohexanesulfonic acid`), a wrong constitution. Guard 2
+    # (run the acid sub-namer gate-ON) makes its own SELF-01 reject it -> fail closed.
+    m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)CC2CCCCC2")  # -NH-SO2-CH2-cyclohexyl
+    n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
+                 and any(nb.GetSymbol() == 'S' for nb in a.GetNeighbors()))
+    benz = next(set(r) for r in m.GetRingInfo().AtomRings()
+                if len(r) == 6 and all(m.GetAtomWithIdx(i).GetIsAromatic() for i in r)
+                and any(nb.GetIdx() in r for nb in m.GetAtomWithIdx(n_idx).GetNeighbors()))
+    frag = set(range(m.GetNumAtoms())) - benz
+    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) is None
+
+
+def test_helper_acidnamer_drop_R_fails_closed():
+    # fable review: R = acetamidomethyl -> the gate-disabled acid namer DROPPED the
+    # acetamido (`ethanesulfonic acid`). Guard 2 (gate-ON) rejects it -> fail closed.
+    m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)CNC(C)=O")  # -NH-SO2-CH2-NHC(=O)CH3
+    n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
+                 and any(nb.GetSymbol() == 'S' for nb in a.GetNeighbors()))
+    benz = next(set(r) for r in m.GetRingInfo().AtomRings()
+                if len(r) == 6 and all(m.GetAtomWithIdx(i).GetIsAromatic() for i in r)
+                and any(nb.GetIdx() in r for nb in m.GetAtomWithIdx(n_idx).GetNeighbors()))
+    frag = set(range(m.GetNumAtoms())) - benz
+    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) is None
+
+
 def test_helper_unnameable_hetarene_fails_closed():
     # pyridine-3-sulfonyl: the acid namer returns `unknown organic compound` (not a clean
     # `... sulfonic acid`), so the stem builder fails closed -> None. No wrong/atom-dropped
