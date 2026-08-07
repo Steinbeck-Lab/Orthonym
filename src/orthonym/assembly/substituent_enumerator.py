@@ -827,6 +827,46 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
         return verdict.prefix
     free_valence = verdict.free_valence
 
+    # v30 breadth (P-63.2.2.2): an O-ROOTED ether substituent -O-R is an ALKOXY
+    # prefix ('methoxy'/'ethoxy'/'phenoxy'), NOT the cascade's carbon-rooted
+    # 'hydroxy(R)'. `carbon_free_valence_prefix` declines a non-carbon root, so
+    # without this the cascade mis-roots -O-CH3 as `hydroxymethyl` -- a DIFFERENT
+    # molecule (-O-CH3 vs -CH2-OH), which SELF-01 then abstains on (breadth loss,
+    # latent wrong-molecule). The PIN path already names it correctly via a
+    # different entry; this fixes the general-engine `name_substituent` path.
+    # Delegates to the existing `get_alkoxy_prefix` (handles alkyl/aryl R and
+    # fails closed on shapes it cannot name). Learned from     # element-dispatched `name_oxygen_subgraph`/`oxy_prefix_from_branch` (refR5).
+    if attach_idx is not None:
+        _root = mol.GetAtomWithIdx(attach_idx)
+        if (_root.GetSymbol() == 'O' and _root.GetFormalCharge() == 0
+                and _root.GetTotalNumHs() == 0
+                and not _root.IsInRing()):  # a ring O spanning the parent would
+                # cut the ring if named as an acyclic alkoxy -> a DIFFERENT
+                # molecule; exclude by construction (fable finding 5 -- no
+                # reachable case found, but this makes the intercept airtight
+                # rather than relying on the recovery-lane RT to catch it).
+            _o_nbrs = list(_root.GetNeighbors())
+            _parent = [n.GetIdx() for n in _o_nbrs
+                       if n.GetIdx() not in frag_atoms_set]
+            _rside = [n.GetIdx() for n in _o_nbrs
+                      if n.GetIdx() in frag_atoms_set]
+            if (len(_parent) == 1 and len(_rside) == 1
+                    and mol.GetAtomWithIdx(_rside[0]).GetSymbol() == 'C'
+                    and all(mol.GetBondBetweenAtoms(attach_idx, x).GetBondType()
+                            == Chem.BondType.SINGLE
+                            for x in (_parent[0], _rside[0]))):
+                # The frag-side neighbour MUST be carbon -- a true alkoxy -O-C(...).
+                # A peroxide -O-O-R has an O frag-side and its PIN is '(alkylperoxy)'
+                # (P-63.4), NOT '(alkoxyoxy)': feeding the O side to get_alkoxy_prefix
+                # regressed the (ethylperoxy)benzene / (methylperoxy) golds
+                # (same molecule, wrong PIN). Peroxides fall through to the cascade,
+                # which already names them correctly.
+                from .substituent_prefix_forms import get_alkoxy_prefix
+                _alk = get_alkoxy_prefix(
+                    mol, (attach_idx, _parent[0], _rside[0]), [_parent[0]])
+                if _alk:
+                    return _alk
+
     token = _name_substituent_cascade(
         mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
 
