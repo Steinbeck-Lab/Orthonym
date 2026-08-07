@@ -848,6 +848,45 @@ _RING_SUFFIX_STYLES = {
 }
 
 
+def _detect_ring_lactone(mol, pg_matches, ring_set):
+    """A LACTONE (cyclic ester) on THIS ring, or ``None``.
+
+    v30 RISK 5 Class 1. Returns ``(carbonyl_c, exo_o)`` -- the ring carbonyl carbon
+    and its exocyclic double-bonded O -- when an ``ester`` match's carbonyl carbon
+    AND its single-bonded (ester) O are BOTH in ``ring_set`` (the ester is
+    ring-internal). The double-bonded O must be exocyclic. Fail-closed (``None``)
+    for an acyclic/aryl ester (ester O off-ring), a thioester, or a malformed match
+    -- those keep the existing ester/carboxylate handling. Mirrors the carbonyl-C /
+    ester-O identification in ``_extract_ring_ester`` (:876-893), applied per match.
+    """
+    for match in pg_matches:
+        carbonyl_c = dbl_o = single_o = None
+        for i in match:
+            a = mol.GetAtomWithIdx(i)
+            if a.GetSymbol() != 'C':
+                continue
+            _d = _s = None
+            for b in a.GetBonds():
+                o = b.GetOtherAtom(a)
+                if o.GetSymbol() != 'O':
+                    continue
+                if b.GetBondType() == Chem.BondType.DOUBLE:
+                    _d = o.GetIdx()
+                elif b.GetBondType() == Chem.BondType.SINGLE:
+                    _s = o.GetIdx()
+            if _d is not None and _s is not None:
+                carbonyl_c, dbl_o, single_o = i, _d, _s
+                break
+        if carbonyl_c is None:
+            continue
+        # lactone <=> the carbonyl C and the ESTER (single-bond) O are both in-ring,
+        # and the carbonyl (=O) O is exocyclic.
+        if (carbonyl_c in ring_set and single_o in ring_set
+                and dbl_o not in ring_set):
+            return (carbonyl_c, dbl_o)
+    return None
+
+
 def _extract_ring_ester(mol, pg_matches, ring_set, allow_mancude):
     """v27 P2 (P-65.6.3.2.1): decompose a ring carboxylic-acid ESTER for the
     functional-class two-word PIN ``<R-yl> <ring>carboxylate``.
@@ -1588,6 +1627,22 @@ def name_general_monocycle(
     suffix_atoms: set = set()
     pg_locants: List[int] = []
     pg_ring_atoms: set = set()
+    # v30 RISK 5 Class 1 (P-66.6.1): a ring ester (LACTONE) -- carbonyl C AND the
+    # single-bonded ester O both in THIS ring -- is the oxa-heterocycle bearing a
+    # ring '-one', never a '<ring>-carboxylate' (the ester producer emits an
+    # impossible ring-O locant + an anion suffix on a neutral: '2,5-dihydrofuran-1-
+    # carboxylate'). Reclassify to a ring KETONE: the ring O stays the parent's
+    # heteroatom (named by `name_heterocycle`), the exocyclic =O is the '-one'.
+    # Both references decompose the ring ester at perception the same way (refR5).
+    # The synthetic match `(exo_o, carbonyl_c)` puts the carbonyl C at index 1 for
+    # `_pg_attachment_atoms('ketone', ...)` and leaves the exocyclic O as the sole
+    # off-ring suffix atom. Verified RT: O=C1OCC=C1 -> 2,5-dihydrofuran-2-one.
+    if pg == 'ester' and pg_matches:
+        _lac = _detect_ring_lactone(mol, pg_matches, ring_set)
+        if _lac is not None:
+            _carbonyl_c, _exo_o = _lac
+            pg = 'ketone'
+            pg_matches = [(_exo_o, _carbonyl_c)]
     if pg:
         suffix_core = get_suffix(pg, is_ring=True)
         if suffix_core not in _RING_SUFFIX_STYLES:
