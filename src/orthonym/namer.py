@@ -956,21 +956,43 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
         return "ok"
     # v30 C6: constitution + charge match. Catch a name whose OPSIN re-perception
     # encodes a DIFFERENT stereoisomer. Stereo OMISSION (one side under-specifies) is
-    # not a constitutional error and is tolerated; only a CONFLICT (same amount of
-    # specified stereo, different stereo canonical) suppresses. Gold PINs round-trip
+    # not a constitutional error and is tolerated; only a CONFLICT (same AMOUNT of
+    # specified stereo, different configuration) suppresses. Gold PINs round-trip
     # their stereo exactly, so this never fires on them.
-    sa = _registration_stereo_layer(input_smiles)
-    sb = _registration_stereo_layer(opsin_smiles)
-    if sa is None or sb is None or sa == sb:
-        return "ok"
     mi = Chem.MolFromSmiles(input_smiles)
     mo = Chem.MolFromSmiles(opsin_smiles)
     if mi is None or mo is None:
         return "ok"
     na = _specified_stereo_count(mi)
-    if na > 0 and na == _specified_stereo_count(mo):
-        return "mismatch"
-    return "ok"
+    nb = _specified_stereo_count(mo)
+    # Only an EQUAL, non-zero amount of specified stereo can be a genuine CONFLICT.
+    # na != nb is OMISSION (a less-specific name is valid). na == 0 (a stereo-
+    # UNSPECIFIED input named by a stereo-implying retained name) is a SEPARATE Blue
+    # Book question tracked in  — intentionally tolerated here.
+    if na == 0 or na != nb:
+        return "ok"
+    # Equal specified-stereo count. When the two are the EXACT same constitution
+    # (isomeric-stripped canonical equal — NOT merely mobile-H/tautomer-equivalent),
+    # decide by a SOUND per-element atom-mapped compare: the name's asserted structure
+    # as a chiral substructure query into the input. This covers tetrahedral R/S AND
+    # double-bond E/Z. The prior RegistrationHash TAUTOMER_HASH layer was E/Z-BLIND on
+    # conjugated systems (fumarate vs maleate hashed EQUAL), so it silently shipped a
+    # wrong geometric isomer. Probes: *.py; audit and
+    # derivation:  (RISK 3 / C6).
+    _mi2, _mo2 = Chem.Mol(mi), Chem.Mol(mo)
+    Chem.RemoveStereochemistry(_mi2)
+    Chem.RemoveStereochemistry(_mo2)
+    if Chem.MolToSmiles(_mi2) == Chem.MolToSmiles(_mo2):
+        return "ok" if mi.HasSubstructMatch(mo, useChirality=True) else "mismatch"
+    # Different EXACT constitution but the InChIKey skeleton already matched => a
+    # tautomer / mobile-H difference. Stay tautomer-tolerant: fall back to the
+    # TAUTOMER_HASH stereo layer (it normalizes the tautomer, leaving only a genuine
+    # tetrahedral stereo difference to catch on this rare same-count path).
+    sa = _registration_stereo_layer(input_smiles)
+    sb = _registration_stereo_layer(opsin_smiles)
+    if sa is None or sb is None or sa == sb:
+        return "ok"
+    return "mismatch"
 
 
 def _record_gate_outcome(outcome: str, name: Optional[str]) -> None:
