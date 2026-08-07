@@ -1610,6 +1610,110 @@ def _name_polyfunctional_acyclic_substituent(
                 consumed.add(o_single.GetIdx())
                 _add_prefix(c_nbr[0], _POLYFUNC_CARBOXY_PREFIX)
 
+    # ---- Pass 1b (v30 RISK 5 Class 2, P-16.5.1.3.1 / P-62.2.1.1): a SUBSTITUTED
+    # amine -N(R)(R') on a backbone carbon -> a composed '(dialkylamino)' PREFIX,
+    # consuming the N and its alkyl branches so they never enter the backbone.
+    # Delegates every ordering/marking decision to the ONE amino-prefix assembler
+    # (`_assemble_amino_prefix_core`), the same one the PIN path uses -- so the
+    # general-engine substituent path stops fabricating the OPSIN-unparseable
+    # `amino-N,N-diethylethyl` string-surgery token. Primary -NH2 (no branch) is
+    # left for the Pass-2 'amino' branch below. Fail-closed (skip this N, leaving
+    # the fragment to decline as before) for anything outside the v1 envelope:
+    # charged / ring / imine-or-amide N, >1 carbon host, or a branch the composer
+    # cannot name (ring/hetero/complex). ----
+    _amine_import_ok = True
+    try:
+        from .substituent_enumerator import (
+            _assemble_amino_prefix_core, composed_prefix_organyl_name,
+            carbon_free_valence_prefix)
+    except Exception:
+        _amine_import_ok = False
+    _ring_info_pf = mol.GetRingInfo()
+    if _amine_import_ok:
+        for idx in list(sub_set):
+            if idx in consumed:
+                continue
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetSymbol() != 'N' or a.GetFormalCharge() != 0:
+                continue
+            if _ring_info_pf.NumAtomRings(idx) > 0:
+                continue  # ring N -> not this handler
+            if any(b.GetBondType() != Chem.BondType.SINGLE for b in a.GetBonds()):
+                continue  # imine / amide-C=N / nitrile N -> other tiers
+            in_frag = [n.GetIdx() for n in a.GetNeighbors()
+                       if n.GetIdx() in sub_set and n.GetIdx() not in consumed]
+
+            def _component(seed):
+                # atoms reachable from `seed` within sub_set WITHOUT crossing this N
+                comp: Set[int] = set()
+                st = [seed]
+                while st:
+                    x = st.pop()
+                    if x in comp or x == idx or x not in sub_set:
+                        continue
+                    comp.add(x)
+                    for n in mol.GetAtomWithIdx(x).GetNeighbors():
+                        nj = n.GetIdx()
+                        if nj != idx and nj not in comp:
+                            st.append(nj)
+                return comp
+
+            # The HOST is the N-neighbour whose side holds the free valence; every
+            # other N-neighbour is a BRANCH of the amino prefix.
+            host = None
+            host_multi = False
+            branch_seeds = []
+            for nb in in_frag:
+                comp = _component(nb)
+                if attach_idx in comp:
+                    if host is not None:
+                        host_multi = True
+                    host = nb
+                else:
+                    branch_seeds.append((nb, comp))
+            if host is None or host_multi:
+                continue  # N in-chain/aza (not a pendant amine) -> decline
+            if mol.GetAtomWithIdx(host).GetSymbol() != 'C':
+                continue  # amino prefix must sit on a carbon
+            host_atom = mol.GetAtomWithIdx(host)
+            if any(bb.GetBondType() == Chem.BondType.DOUBLE
+                   and bb.GetOtherAtom(host_atom).GetSymbol() == 'O'
+                   for bb in host_atom.GetBonds()):
+                continue  # host is a carbonyl carbon -> amide, not amine
+            if not branch_seeds:
+                continue  # primary -NH2 -> Pass-2 'amino' branch handles it
+            entries = []
+            branch_atoms: Set[int] = set()
+            ok = True
+            for b0, visited in branch_seeds:
+                if any(mol.GetAtomWithIdx(v).GetSymbol() != 'C'
+                       or _ring_info_pf.NumAtomRings(v) > 0
+                       or mol.GetAtomWithIdx(v).GetFormalCharge() != 0
+                       for v in visited):
+                    ok = False
+                    break
+                _fv = carbon_free_valence_prefix(mol, visited, b0)
+                nm = _fv.prefix
+                if nm is None:
+                    if _fv.must_fail_closed:
+                        ok = False
+                        break
+                    nm = composed_prefix_organyl_name(mol, visited, b0)
+                if nm is None:
+                    ok = False
+                    break
+                _complex = bool(re.search(r"[()\-]", nm)) or nm[:1].isdigit()
+                entries.append((nm, _complex))
+                branch_atoms |= visited
+            if not ok or not entries:
+                continue
+            core = _assemble_amino_prefix_core(entries)
+            if not core:
+                continue
+            consumed.add(idx)
+            consumed.update(branch_atoms)
+            _add_prefix(host, f"({core})")
+
     # Backbone = every carbon not consumed by a carboxy group.
     backbone = [
         i for i in sub_set
