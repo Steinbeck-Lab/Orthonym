@@ -3025,18 +3025,25 @@ class Orthonym:
         """v27 P6 T6.3: SELF-01 round-trip compare at the granularity the name
         asserts.
 
-        For a ``stereo_unexpressed``-flagged emission the compare is
-        LAYER-SELECTIVE, not stereo-stripped. ``_stereo_emit_decision`` flags a
-        name whenever it is stereo-INCOMPLETE, which INCLUDES a name that asserts
-        PARTIAL stereo — so the old stereo-stripped compare left any asserted
-        stereo verified by nobody, and a wrong stereoisomer could ship at T3
-        (v30 RISK 3, inside the T1-T3 0-wrong scope). Route the flagged compare
-        through the C6 ``_self_consistency_verdict`` (RegistrationHash): it
-        tolerates stereo OMISSION (a differing stereo-element COUNT — the
-        sanctioned superset per P-91.2.2) but catches a stereo CONFLICT (same
-        count, different configuration) and any constitution difference. A
-        RegistrationHash-inconclusive pair falls back to the prior stereo-
-        stripped constitution compare so a rare hash failure never drops breadth.
+        For a ``stereo_unexpressed``-flagged emission this compares
+        stereo-STRIPPED canonical SMILES on BOTH sides (constitution only).
+
+        ⚠ KNOWN UNCLOSED HOLE — v30 RISK 3 (do NOT re-"fix" with RegistrationHash;
+        that was tried at ca6bb3de and REVERTED here). ``_stereo_emit_decision``
+        flags a name whenever it is stereo-INCOMPLETE, which INCLUDES a name that
+        asserts PARTIAL stereo, so this stripped compare leaves any asserted
+        stereo verified by nobody: a wrong stereoisomer can ship at T3 for a
+        flagged emission (0 instances measured on dev500, but by luck not
+        architecture). Routing through C6 ``_self_consistency_verdict`` does NOT
+        close it — a flagged emission is BY CONSTRUCTION stereo-count-mismatched
+        (``general_engine_stereo_complete`` ⟺ flagged=False), and C6's conflict
+        check only fires on EQUAL counts, so it can never catch a flagged
+        partial-conflict; and its RegistrationHash is E/Z-blind on conjugated
+        systems (TAUTOMER_HASH erases double-bond stereo — a latent hole in C6's
+        primary SELF-01 path too). The correct fix is a per-element atom-mapped
+        stereo compare (verify each element the name ASSERTS against the input's
+        corresponding element, tolerate only OMISSION), NOT a whole-molecule hash.
+        Fable review record: ``.
 
         For every other emission use the EXACT isomeric comparison (byte-
         identical to the pre-P6 ``Chem.CanonSmiles`` == ``Chem.CanonSmiles``).
@@ -3044,15 +3051,6 @@ class Orthonym:
         """
         try:
             if stereo_flagged:
-                verdict = _self_consistency_verdict(
-                    input_smiles, opsin_smiles, ignore_stereo=False)
-                if verdict == "ok":
-                    return True
-                if verdict == "mismatch":
-                    return False
-                # inconclusive: RegistrationHash could not decide -> preserve the
-                # prior constitution-only behaviour (no breadth loss on a rare
-                # hash failure; both sides already parsed at the call site).
                 _o = Chem.MolFromSmiles(opsin_smiles)
                 _i = Chem.MolFromSmiles(input_smiles)
                 if _o is None or _i is None:
