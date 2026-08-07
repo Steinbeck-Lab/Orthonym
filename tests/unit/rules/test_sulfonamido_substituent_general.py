@@ -77,6 +77,39 @@ def test_helper_nn_disubstituted_fails_closed():
     assert sulfonamido_prefix_from_n_branch(m, 1, frag, parent) is None
 
 
+# ---- fable-review (b5e4d3da) self-guard holes: a SHARED primitive must fail closed on
+# every non-'-NH-' attachment, since one caller guards only GetSymbol()=='N'.
+
+def test_helper_double_bonded_n_fails_closed():
+    # =N-SO2R (sulfonimidoyl-like attach): different bond order / H count from -NH-.
+    m = Chem.MolFromSmiles("CS(=O)(=O)N=C1CCCCC1")  # C0-S1(=O2)(=O3)-N4=C5(ring)
+    assert sulfonamido_prefix_from_n_branch(m, 4, {0, 1, 2, 3, 4}, {5, 6, 7, 8, 9, 10}) is None
+
+
+def test_helper_ring_member_n_fails_closed():
+    # a RING nitrogen is not an exocyclic pendant; naming it as one cuts the ring.
+    m = Chem.MolFromSmiles("CS(=O)(=O)N1CCCCC1")  # C0-S1(=O2)(=O3)-N4(ring)
+    assert sulfonamido_prefix_from_n_branch(m, 4, {0, 1, 2, 3, 4}, {5, 6, 7, 8, 9}) is None
+
+
+def test_helper_bridging_n_fails_closed():
+    # N with TWO parent attachments is divalent -> not a monovalent prefix.
+    m = Chem.MolFromSmiles("CS(=O)(=O)N(c1ccccc1)c1ccccc1")
+    n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N')
+    frag = {0, 1, 2, 3, n_idx}
+    parent = set(range(m.GetNumAtoms())) - frag
+    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, parent) is None
+
+
+def test_helper_charged_and_isotopic_r_fail_closed():
+    # a charged / isotopically-labelled R would be spelled as the plain stem and
+    # drop the label -> a different molecule.
+    m1 = Chem.MolFromSmiles("[CH2-]S(=O)(=O)Nc1ccccc1")
+    assert sulfonamido_prefix_from_n_branch(m1, 4, {0, 1, 2, 3, 4}, {5, 6, 7, 8, 9, 10}) is None
+    m2 = Chem.MolFromSmiles("[13CH3]S(=O)(=O)Nc1ccccc1")
+    assert sulfonamido_prefix_from_n_branch(m2, 4, {0, 1, 2, 3, 4}, {5, 6, 7, 8, 9, 10}) is None
+
+
 # ---- regression: pre-existing N-branch names unchanged by the new branch
 
 def test_acetamido_unchanged():

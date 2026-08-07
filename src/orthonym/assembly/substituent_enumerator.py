@@ -4012,6 +4012,17 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             # 'butanoylamino' (n-butyryl) -- constitutionally DIFFERENT acyls.
             # The carbonyl's own =O must be excluded, or the predicate reads it
             # as a hetero decoration and refuses every acyl.
+            #
+            # Coverage guard (fable review of 9bb3a532): the count fallback below
+            # spells ONLY this one acyl branch as `{stem}anoylamino`, so if the N
+            # carries a SECOND substituent (`-N(CH3)C(=O)R`, or the diacyl imide
+            # `-N(C(=O)R)2`) that substituent is silently DROPPED -> a different
+            # molecule (`ethanoylamino` for `-N(CH3)COCH3`, the whole N-methyl
+            # gone). The strict sibling `linear_acyl_amido_prefix` already proves
+            # full coverage; this legacy count path did not. Fail closed unless
+            # the N is mono-substituted (the sole heavy branch is this acyl C).
+            if len(branches) != 1:
+                return None
             _co = next(
                 (nb.GetIdx() for nb in branch_atom.GetNeighbors()
                  if nb.GetSymbol() == 'O'

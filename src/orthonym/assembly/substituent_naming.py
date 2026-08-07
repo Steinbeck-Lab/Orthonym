@@ -2806,7 +2806,21 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
     if n_idx not in sub_set:
         return None
     n_atom = mol.GetAtomWithIdx(n_idx)
-    if n_atom.GetSymbol() != 'N' or n_atom.GetFormalCharge():
+    # This is a SHARED primitive: one caller (`_name_compound_substituent`) guards
+    # only `GetSymbol()=='N'`, so the helper must self-guard every way a fragment
+    # can be a non-`-NH-` attachment (fable review of b5e4d3da). A monovalent
+    # `-NH-SO2R` prefix requires: uncharged/unradical/unlabelled N, NOT a ring
+    # member, ALL single bonds (an `=N-SO2R` sulfonimidoyl is a different bond
+    # order / H count), and EXACTLY one bond into the parent (a bridging
+    # `parent-N(-parent')-SO2R` is divalent, not a prefix).
+    if (n_atom.GetSymbol() != 'N' or n_atom.GetFormalCharge()
+            or n_atom.GetNumRadicalElectrons() or n_atom.GetIsotope()
+            or n_atom.IsInRing()):
+        return None
+    if any(b.GetBondTypeAsDouble() != 1.0 for b in n_atom.GetBonds()):
+        return None
+    if sum(1 for nb in n_atom.GetNeighbors()
+           if nb.GetIdx() in parent_set) != 1:
         return None
     branches = [nb.GetIdx() for nb in n_atom.GetNeighbors()
                 if nb.GetIdx() not in parent_set and nb.GetIdx() in sub_set]
@@ -2814,7 +2828,8 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
         return None
     s_idx = branches[0]
     s_atom = mol.GetAtomWithIdx(s_idx)
-    if s_atom.GetSymbol() != 'S' or s_atom.GetFormalCharge():
+    if (s_atom.GetSymbol() != 'S' or s_atom.GetFormalCharge()
+            or s_atom.GetNumRadicalElectrons() or s_atom.GetIsotope()):
         return None
     ns_bond = mol.GetBondBetweenAtoms(n_idx, s_idx)
     if ns_bond is None or ns_bond.GetBondTypeAsDouble() != 1.0:
@@ -2840,6 +2855,10 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
         return None
     # Atom coverage: the fragment must be EXACTLY {N, S, two =O} + the R subtree
     # (reachable from R without recrossing S). Any leftover atom -> silent drop.
+    # `_acid_stem_oxide_prefix` guards the R constitution by ELEMENT only, so a
+    # charged / radical / isotopically-labelled R would be spelled as the plain
+    # stem and drop the label -> a different molecule; reject it here (the sibling
+    # `linear_acyl_amido_prefix` rejects charge/radical the same way).
     r_subtree = set()
     stack = [r_idx]
     while stack:
@@ -2848,8 +2867,11 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
             continue
         if a not in sub_set:
             return None  # R escapes the fragment
+        _ra = mol.GetAtomWithIdx(a)
+        if _ra.GetFormalCharge() or _ra.GetNumRadicalElectrons() or _ra.GetIsotope():
+            return None
         r_subtree.add(a)
-        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+        for nb in _ra.GetNeighbors():
             if nb.GetIdx() != s_idx:
                 stack.append(nb.GetIdx())
     if sub_set != {n_idx, s_idx, dbl_o[0], dbl_o[1]} | r_subtree:

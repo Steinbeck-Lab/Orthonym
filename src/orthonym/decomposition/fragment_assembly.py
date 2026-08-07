@@ -363,14 +363,26 @@ def _assemble_by_bond_type(
         for acid_frag, acid_name in acid_frags:
             for alk_frag, alk_name in alkyl_frags:
                 # Build fragment_names dict matching what assemblers expect
+                fs = None
                 if bt in ("amide", "sulfonamide", "sec_amine"):
                     fn = {"acid": acid_name, "amine": alk_name}
+                    # fable review of 8d8c84f7: the floating-N-acyl ambiguity guard
+                    # in `_assemble_amide` only fires when it can see the amine
+                    # SMILES. The single-bond path threads it (engine.py:1354); this
+                    # mixed-decomposition path did NOT, so the guard silently no-oped
+                    # here and an ambiguous bare N-acyl could float ungated. Thread
+                    # the amine/acid SMILES (available on the frag dicts) so the guard
+                    # runs on this path too. Scoped to the amide family: glycosidic /
+                    # ester assemblers read fragment_smiles differently and must stay
+                    # on their existing no-SMILES back-compat path.
+                    fs = {"acid": acid_frag.get("smiles"),
+                          "amine": alk_frag.get("smiles")}
                 elif bt == "glycosidic":
                     fn = {"sugar": acid_name, "aglycone": alk_name}
                 else:
                     fn = {"acid": acid_name, "alkyl": alk_name}
 
-                result = assemble_fragment_name(bt, fn, style)
+                result = assemble_fragment_name(bt, fn, style, fragment_smiles=fs)
                 if result:
                     assembled_parts.append(result)
                 else:
