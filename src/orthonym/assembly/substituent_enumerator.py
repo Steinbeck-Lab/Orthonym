@@ -2756,15 +2756,17 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     return result
 
 
-def _longest_saturated_carbon_path_from(mol, frag_set, start):
+def _longest_carbon_path_from(mol, frag_set, start):
     """Longest simple path of ACYCLIC carbons in ``frag_set`` beginning at
-    ``start``, with every backbone bond SINGLE, or ``None``.
+    ``start``, or ``None``.
 
     ``start`` is the free-valence atom and becomes one endpoint of the returned
     path, so it takes locant 1 (P-29.3.2 lowest locant for the free valence).
-    The all-single-bond guard is load-bearing for 0-wrong: a saturated alkyl
-    stem placed over an unsaturated backbone would name a DIFFERENT molecule.
-    Acyclic carbons form a forest, so the DFS terminates.
+    Backbone bonds may be single, double or triple: the stem is spelled by
+    ``_stem_block``, which encodes the ene/yne locants from the SAME numbering,
+    so an unsaturated backbone is named correctly rather than as a saturated
+    stem (which would be a different molecule). Acyclic carbons form a forest,
+    so the DFS terminates.
     """
     carbons = {i for i in frag_set
                if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
@@ -2781,9 +2783,6 @@ def _longest_saturated_carbon_path_from(mol, frag_set, start):
             j = nb.GetIdx()
             if j not in carbons or j in visited:
                 continue
-            bond = mol.GetBondBetweenAtoms(node, j)
-            if bond.GetBondType() != Chem.BondType.SINGLE:
-                continue  # unsaturated backbone -> deferred (fail closed)
             visited.add(j)
             path.append(j)
             _dfs(j, path, visited)
@@ -2837,7 +2836,7 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     if a.GetAtomicNum() != 6 or a.IsInRing():
         return None  # ring / heteroatom attach -> not this composer's job
 
-    chain = _longest_saturated_carbon_path_from(mol, frag_set, attach_idx)
+    chain = _longest_carbon_path_from(mol, frag_set, attach_idx)
     if chain is None or len(chain) < 2:
         return None
     pos = {atom: i + 1 for i, atom in enumerate(chain)}
@@ -2865,7 +2864,21 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     if covered != heavy:
         return None  # an unaccounted heavy atom -> fail closed
 
-    core_tail = get_alkyl_name(len(chain))  # 'pentyl' (fv=1, elided) etc.
+    # Core stem, free valence at locant 1. _stem_block spells the ene/yne
+    # locants from the SAME `pos`, so an unsaturated backbone is named correctly;
+    # a saturated backbone reuses get_alkyl_name (byte-identical to the prior
+    # saturated-only path). Import lazily -- general_engine imports this module.
+    from .general_engine import _stem_block
+    _stem = _stem_block(mol, chain, pos)
+    if _stem is None:
+        return None  # unsupported backbone bond pattern -> fail closed
+    _base, _hydride = _stem
+    if _hydride == _base + "ane":
+        core_tail = get_alkyl_name(len(chain))  # 'pentyl' (fv=1, elided)
+    elif _hydride.endswith("e"):
+        core_tail = _hydride[:-1] + "-1-yl"      # 'pent-2-ene' -> 'pent-2-en-1-yl'
+    else:
+        return None
     if not core_tail:
         return None
     if not decorations:

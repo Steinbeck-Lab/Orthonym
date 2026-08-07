@@ -100,15 +100,20 @@ def test_isoleucinamide_names_as_covering_substituent(opsin_proof):
         f"prefix {prefix!r} names a DIFFERENT constitution than the fragment"
 
 
-def test_chain_composer_defers_unsaturated_backbone():
-    # 0-wrong deferral: a saturated alkyl stem over an unsaturated backbone would
-    # name a DIFFERENT molecule, so the composer MUST fail closed (return None).
+def test_chain_composer_handles_unsaturated_backbone(opsin_proof):
+    # the backbone stem carries the ene/yne locants (via _stem_block), so an
+    # unsaturated chain substituent gets a covering name, not a saturated-stem
+    # mis-name. `C/C=C/CC(N)=O` attach at atom 0 -> a pent-2-en-...-yl-family name.
     from orthonym.assembly.substituent_enumerator import (
         _recursive_chain_fragment_substituent_name)
-    mol = Chem.MolFromSmiles("C=CCC(N)C(N)=O")  # C1=C2 double bond in the backbone
+    mol = Chem.MolFromSmiles("C/C=C/CC(N)=O")
     frag = set(range(mol.GetNumAtoms()))
-    assert _recursive_chain_fragment_substituent_name(
-        mol, frag, 0, allow_mancude=True) is None
+    prefix = _recursive_chain_fragment_substituent_name(
+        mol, frag, 0, allow_mancude=True)
+    assert prefix is not None, "unsaturated backbone deferred"
+    assert ("en-" in prefix or "yn-" in prefix), f"no unsaturation locant: {prefix!r}"
+    assert opsin_proof(mol, frag, 0, prefix) in (True, None), \
+        f"prefix {prefix!r} names a DIFFERENT constitution"
 
 
 def test_chain_composer_requires_carbon_acyclic_attach():
