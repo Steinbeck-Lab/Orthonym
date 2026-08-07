@@ -112,7 +112,8 @@ def test_chain_composer_handles_unsaturated_backbone(opsin_proof):
         mol, frag, 0, allow_mancude=True)
     assert prefix is not None, "unsaturated backbone deferred"
     assert ("en-" in prefix or "yn-" in prefix), f"no unsaturation locant: {prefix!r}"
-    assert opsin_proof(mol, frag, 0, prefix) in (True, None), \
+    # OPSIN parses `5-amino-5-oxopent-2-en-1-yl`, so the proof is not vacuous.
+    assert opsin_proof(mol, frag, 0, prefix) is True, \
         f"prefix {prefix!r} names a DIFFERENT constitution"
 
 
