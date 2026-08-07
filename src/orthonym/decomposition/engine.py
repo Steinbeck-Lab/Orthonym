@@ -443,6 +443,28 @@ def _name_covers_molecule(name: str, mol) -> bool:
 # Quality gate
 # ---------------------------------------------------------------------------
 
+def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
+    """True when a bare ``N-<acyl>-`` float onto this amine fragment is AMBIGUOUS.
+
+    v30 task 24 (acylspy). The float prepends ``N-`` to the amine PARENT name without
+    saying WHICH nitrogen carries the acyl. If the amine fragment has >=2 ACYLATABLE
+    nitrogens (an N bearing >=1 hydrogen, i.e. one that could accept the acyl), the
+    name denotes >=2 distinct molecules -- OPSIN resolves it to one by its own rule, so
+    the float ships an ambiguous name (and, with the OPSIN jar absent, ships it
+    unverified). Refuse the float in that case. Fail-open (False) on an unparseable
+    fragment -- the caller then relies on its existing quality/SELF-01 gates, exactly as
+    before this guard existed.
+    """
+    try:
+        m = Chem.MolFromSmiles(amine_smiles)
+        if m is None:
+            return False
+        return sum(1 for a in m.GetAtoms()
+                   if a.GetSymbol() == 'N' and a.GetTotalNumHs() >= 1) >= 2
+    except Exception:
+        return False
+
+
 def _name_quality_is_acceptable(name: str, mol) -> bool:
     """Check if an existing name is good enough (no decomposition needed).
 
@@ -1310,7 +1332,15 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                     acid_name = fragment_names.get("acid", "")
                     amine_name = fragment_names.get("amine", "")
                     acyl = _acid_to_acyl(acid_name)
-                    if acyl and amine_name:
+                    # v30 task 24: a bare 'N-<acyl>-' prefix names WHICH nitrogen bears
+                    # the acyl only by position in the parent name -- so if the amine
+                    # fragment has >=2 ACYLATABLE nitrogens (N with >=1 H) the float is
+                    # AMBIGUOUS (denotes >=2 molecules; OPSIN guesses one). Refuse to
+                    # float and fall through -> honest abstention / a locant-anchored
+                    # inline candidate, never an ambiguous name. Closes the ORIG/MIRROR
+                    # ambiguity + the no-jar fail-open hole (acylspy, PIN-tier T1).
+                    if acyl and amine_name and not _amine_acyl_ambiguous(
+                            amine_frag["smiles"]):
                         wrapped_acyl = _wrap_n_substituent(acyl)
                         sub_name = f"N-{_join_components(wrapped_acyl, amine_name)}"
                         if sub_name and _name_quality_is_acceptable(sub_name, mol):

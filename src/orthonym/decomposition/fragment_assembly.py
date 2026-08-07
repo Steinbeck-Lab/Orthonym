@@ -279,6 +279,13 @@ def assemble_fragment_name(
             fragment_names, style, fragment_smiles=fragment_smiles
         )
 
+    # v30 task 24: the amide assembler needs the amine SMILES for the acyl-float
+    # ambiguity guard (a bare 'N-<acyl>-' onto an amine with >=2 acylatable N is
+    # ambiguous). Special-cased like the glycoside above so every other assembler
+    # keeps its two-arg signature byte-identical.
+    if bond_type == "amide":
+        return _assemble_amide(fragment_names, style, fragment_smiles=fragment_smiles)
+
     assemblers = {
         "ester": _assemble_ester,
         "amide": _assemble_amide,
@@ -638,7 +645,8 @@ def _expand_n_locant_for_multiplier(prefix: str) -> str:
     return "N-"
 
 
-def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+def _assemble_amide(fragment_names: Dict[str, str], style: str,
+                    fragment_smiles: Optional[Dict[str, str]] = None) -> Optional[str]:
     """Assemble amide name as 'N-[substituent][acid-amide]'.
 
     For simple amines, uses amide suffix: "N-methylacetamide".
@@ -687,6 +695,15 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str) -> Optional[str]
     if result is None:
         # Complex amine: use acyl prefix pattern
         # "N-acetylcyclohexanamine"
+        # v30 task 24: refuse the bare 'N-<acyl>-' float when the amine fragment
+        # has >=2 acylatable N -- the float would not say which N bears the acyl
+        # (ambiguous name / no-jar fail-open). Same guard as engine.py's amide
+        # branch. Needs the amine SMILES (threaded from assemble_fragment_name).
+        _amine_smi = (fragment_smiles or {}).get("amine")
+        if _amine_smi:
+            from .engine import _amine_acyl_ambiguous
+            if _amine_acyl_ambiguous(_amine_smi):
+                return None
         acyl_prefix = _acid_to_acyl(acid_name)
         if acyl_prefix and amine_name:
             if amine_name.startswith("N-") or amine_name.startswith("N,"):
