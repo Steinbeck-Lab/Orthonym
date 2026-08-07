@@ -867,6 +867,30 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 if _alk:
                     return _alk
 
+        # v30 breadth (P-62.2.3 / P-66.1.1.4.3): an N-ROOTED substituent -NH-R /
+        # -N(R)R' / -NH-C(=O)R is an amino/amido PREFIX (methylamino / dimethylamino
+        # / acetamido), NOT the cascade's carbon-rooted misroot -- `carbon_free_valence_
+        # prefix` declines the non-carbon root, so the cascade re-roots -NH-CH3 as
+        # `aminomethyl` (that is -CH2-NH2, a DIFFERENT molecule), -N(CH3)2 as the
+        # unparseable `amino-N-methylmethyl`, -NH-C(=O)CH3 as `carbamoylmethyl`. Same
+        # class the alkoxy intercept above fixes; delegates to the existing
+        # `_name_amino_branch` (the builder the PIN path already uses). It returns None
+        # for hydrazinyl / diazenyl / N-oxide / sulfonamido, which then fall through
+        # unchanged (already handled elsewhere, or a named follow-up). Guards mirror the
+        # alkoxy/peroxide ones: uncharged, not in a ring, all single bonds (an imine /
+        # diazo N is double-bonded and must not be read as an amine).
+        elif (_root.GetSymbol() == 'N' and _root.GetFormalCharge() == 0
+                and not _root.IsInRing()
+                and all(b.GetBondType() == Chem.BondType.SINGLE
+                        for b in _root.GetBonds())):
+            _parent_n = {n.GetIdx() for n in _root.GetNeighbors()
+                         if n.GetIdx() not in frag_atoms_set}
+            if _parent_n:
+                _amino = _name_amino_branch(
+                    mol, frag_atoms_set, attach_idx, _parent_n)
+                if _amino:
+                    return _amino
+
     token = _name_substituent_cascade(
         mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
 
