@@ -3025,14 +3025,18 @@ class Orthonym:
         """v27 P6 T6.3: SELF-01 round-trip compare at the granularity the name
         asserts.
 
-        For a ``stereo_unexpressed``-flagged (constitution-only) emission the
-        name makes NO stereo claim, so an isomeric compare would wrongly reject
-        a correct constitution -> compare stereo-STRIPPED canonical SMILES on
-        BOTH sides (identical granularity to
-        ``coverage_metrics.strict_match``'s stereo-insensitive constitutional
-        key). A name with no stereo tokens cannot make OPSIN invent a specific
-        wrong stereoisomer (the parse is stereo-less), so the compare is exact
-        at the granularity asserted — never crediting a stereo-bearing parse.
+        For a ``stereo_unexpressed``-flagged emission the compare is
+        LAYER-SELECTIVE, not stereo-stripped. ``_stereo_emit_decision`` flags a
+        name whenever it is stereo-INCOMPLETE, which INCLUDES a name that asserts
+        PARTIAL stereo — so the old stereo-stripped compare left any asserted
+        stereo verified by nobody, and a wrong stereoisomer could ship at T3
+        (v30 RISK 3, inside the T1-T3 0-wrong scope). Route the flagged compare
+        through the C6 ``_self_consistency_verdict`` (RegistrationHash): it
+        tolerates stereo OMISSION (a differing stereo-element COUNT — the
+        sanctioned superset per P-91.2.2) but catches a stereo CONFLICT (same
+        count, different configuration) and any constitution difference. A
+        RegistrationHash-inconclusive pair falls back to the prior stereo-
+        stripped constitution compare so a rare hash failure never drops breadth.
 
         For every other emission use the EXACT isomeric comparison (byte-
         identical to the pre-P6 ``Chem.CanonSmiles`` == ``Chem.CanonSmiles``).
@@ -3040,6 +3044,15 @@ class Orthonym:
         """
         try:
             if stereo_flagged:
+                verdict = _self_consistency_verdict(
+                    input_smiles, opsin_smiles, ignore_stereo=False)
+                if verdict == "ok":
+                    return True
+                if verdict == "mismatch":
+                    return False
+                # inconclusive: RegistrationHash could not decide -> preserve the
+                # prior constitution-only behaviour (no breadth loss on a rare
+                # hash failure; both sides already parsed at the call site).
                 _o = Chem.MolFromSmiles(opsin_smiles)
                 _i = Chem.MolFromSmiles(input_smiles)
                 if _o is None or _i is None:
