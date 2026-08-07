@@ -3025,25 +3025,44 @@ class Orthonym:
         """v27 P6 T6.3: SELF-01 round-trip compare at the granularity the name
         asserts.
 
-        For a ``stereo_unexpressed``-flagged emission this compares
-        stereo-STRIPPED canonical SMILES on BOTH sides (constitution only).
-
-        ⚠ KNOWN UNCLOSED HOLE — v30 RISK 3 (do NOT re-"fix" with RegistrationHash;
-        that was tried at ca6bb3de and REVERTED here). ``_stereo_emit_decision``
+        For a ``stereo_unexpressed``-flagged emission this is a PER-ELEMENT
+        atom-mapped stereo compare (v30 RISK 3, closed here). ``_stereo_emit_decision``
         flags a name whenever it is stereo-INCOMPLETE, which INCLUDES a name that
-        asserts PARTIAL stereo, so this stripped compare leaves any asserted
-        stereo verified by nobody: a wrong stereoisomer can ship at T3 for a
-        flagged emission (0 instances measured on dev500, but by luck not
-        architecture). Routing through C6 ``_self_consistency_verdict`` does NOT
-        close it — a flagged emission is BY CONSTRUCTION stereo-count-mismatched
-        (``general_engine_stereo_complete`` ⟺ flagged=False), and C6's conflict
-        check only fires on EQUAL counts, so it can never catch a flagged
-        partial-conflict; and its RegistrationHash is E/Z-blind on conjugated
-        systems (TAUTOMER_HASH erases double-bond stereo — a latent hole in C6's
-        primary SELF-01 path too). The correct fix is a per-element atom-mapped
-        stereo compare (verify each element the name ASSERTS against the input's
-        corresponding element, tolerate only OMISSION), NOT a whole-molecule hash.
-        Fable review record: ``.
+        asserts PARTIAL stereo — so the compare must verify every element the name
+        DOES assert while tolerating the ones it omits. It does this in two steps:
+
+          1. a constitution guard — same molecular graph modulo stereo. Both sides
+             are copied, ``RemoveStereochemistry``'d, and compared as ISOMERIC
+             canonical SMILES. Removing only stereo (not ``isomericSmiles=False``,
+             which also erases isotope labels) keeps BOTH charge AND isotope, so
+             neutral != anion and a ``13C``-labelled input != its plain name (P-82;
+             the reverted ca6bb3de loosening dropped charge — we must not reintroduce
+             it, and the old ``isomericSmiles=False`` guard silently dropped isotope);
+          2. a CHIRAL SUBSTRUCTURE match with the name's asserted structure
+             (``opsin_smiles``) as the QUERY and the input as the TARGET. A query
+             element WITHOUT stereo matches any target element (tolerate OMISSION);
+             a query element WITH stereo forces the target to agree (catch CONFLICT
+             and FABRICATION). ``useChirality=True`` enforces BOTH tetrahedral R/S
+             and double-bond E/Z on the pinned RDKit (verified — the whole-molecule
+             RegistrationHash of the reverted ca6bb3de was E/Z-blind and could not).
+             Existence over valid mappings is the correct criterion, so a symmetric
+             molecule (meso / C2 / enantiomer pair) is not spuriously rescued — no
+             automorphism maps a wrong configuration onto the input.
+
+        Because step 1 forces an atom-count bijection (same constitution), the
+        step-2 match is a full isomorphism, not a fragment embedding. Soundness
+        is scoped to the stereo classes RDKit's mol representation RETAINS from
+        SMILES — tetrahedral R/S (incl. ring cis/trans, epoxide, S=O/P=O/N+) and
+        double-bond E/Z. AXIAL stereo (allene/cumulene/atropisomer/helicene) is
+        dropped by ``MolFromSmiles`` on BOTH sides, so it is invisible here — but
+        also unreachable, as no producer can assert a descriptor RDKit will not
+        carry (if that ever changes this silently un-closes). Enhanced-stereo
+        CXSMILES groups (``|&1:..|``) are likewise ignored by ``MolFromSmiles``
+        (as they are on the unflagged path). The compare is a strict tightening of
+        the old constitution-only guard (NEW-accepts ⊆ OLD-accepts, verified), so
+        it can never introduce a wrong-acceptance — only reject more. Derivation
+        and probes: `` (RISK 3),
+        `*.py``.
 
         For every other emission use the EXACT isomeric comparison (byte-
         identical to the pre-P6 ``Chem.CanonSmiles`` == ``Chem.CanonSmiles``).
@@ -3055,8 +3074,14 @@ class Orthonym:
                 _i = Chem.MolFromSmiles(input_smiles)
                 if _o is None or _i is None:
                     return False
-                return (Chem.MolToSmiles(_o, isomericSmiles=False)
-                        == Chem.MolToSmiles(_i, isomericSmiles=False))
+                # constitution guard on COPIES (RemoveStereochemistry mutates; the
+                # originals must keep their stereo for the step-2 chiral match).
+                _oc, _ic = Chem.Mol(_o), Chem.Mol(_i)
+                Chem.RemoveStereochemistry(_oc)
+                Chem.RemoveStereochemistry(_ic)
+                if Chem.MolToSmiles(_oc) != Chem.MolToSmiles(_ic):
+                    return False
+                return _i.HasSubstructMatch(_o, useChirality=True)
             return Chem.CanonSmiles(opsin_smiles) == Chem.CanonSmiles(input_smiles)
         except Exception:
             return False
