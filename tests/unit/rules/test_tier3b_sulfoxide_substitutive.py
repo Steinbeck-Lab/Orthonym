@@ -178,6 +178,43 @@ class TestConservation:
 
 
 @pytest.mark.unit
+class TestCarbonPathMultipliedAcidGuard:
+    """F6 (v30): the carbon-path sulfone/sulfoxide PREFIX builder must NOT emit a
+    corrupted 'multiplied acid' stem when the R' arm itself carries a SECOND
+    S-oxo-acid group. For CS(=O)(=O)CCS(O)(=O)=O (CH3-SO2-CH2CH2-SO3H), capping
+    the sulfone S with -OH forms 'ethane-1,2-disulfonic acid'; stripping the
+    'sulfonic acid' suffix then corrupts to 'ethane-1,2-disulfonyl' -- asserting
+    the whole ethane-1,2-diyl is a disulfonyl (a wrong constitution).
+
+    The two soundness guards from 8afa533c (guard 1 = exactly one S-oxo-acid in the
+    capped fragment; guard 2 = gate-independent OPSIN re-anchor), previously scoped
+    to the N-parent sulfonamido branch, must now fire for the CARBON parent too.
+    Fail closed (None) -> the caller drops to its own fail-closed handling; never
+    the corrupted stem. Legit arms (saturated methyl / unsaturated allyl) unchanged.
+    """
+
+    def test_competing_sulfonic_acid_arm_fails_closed(self):
+        from orthonym.assembly.substituent_prefix_forms import _acid_stem_oxide_prefix
+        # CH3-SO2-CH2CH2-SO3H: sulfone S = idx1; SO3H-bearing arm carbon = idx4.
+        mol = Chem.MolFromSmiles("CS(=O)(=O)CCS(O)(=O)=O")
+        assert _acid_stem_oxide_prefix(mol, 4, 1, "sulfonyl") is None
+
+    def test_plain_methyl_arm_unchanged(self):
+        from orthonym.assembly.substituent_prefix_forms import _acid_stem_oxide_prefix
+        # The CH3 side (idx0) of the same molecule is a clean methanesulfonyl.
+        mol = Chem.MolFromSmiles("CS(=O)(=O)CCS(O)(=O)=O")
+        assert _acid_stem_oxide_prefix(mol, 0, 1, "sulfonyl") == "methanesulfonyl"
+
+    def test_unsaturated_arm_unchanged(self):
+        from orthonym.assembly.substituent_prefix_forms import _acid_stem_oxide_prefix
+        # Allyl methyl sulfone: the prop-2-ene arm still builds via the acid path
+        # (guard 2's re-anchor accepts the clean 'prop-2-ene-1-sulfonic acid').
+        m = Chem.MolFromSmiles("C=CCS(=O)(=O)C")
+        s = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == "S")
+        assert _acid_stem_oxide_prefix(m, 2, s, "sulfonyl") == "prop-2-ene-1-sulfonyl"
+
+
+@pytest.mark.unit
 class TestTrivialAndControls:
     def test_sulfide_functional_class_unchanged(self):
         assert name_compound("CSC") == "dimethyl sulfide"
