@@ -2074,7 +2074,16 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             return _desc
         from ..rules.terminal_fragment import terminal_fragment_name
         _tf = terminal_fragment_name(mol, frag_atoms_set, attach_idx)
-        return _tf.name if _tf is not None else None
+        if _tf is not None:
+            return _tf.name
+        # ---- C4 (v30): decorated acyclic-chain substituent -----------------
+        # LAST resort for a chain-rooted multi-functional fragment the narrow
+        # tiers, the ring composer, the descriptive fallback and the terminal
+        # chain namer all declined. Demotes every characteristic group to a
+        # prefix (structure-based), so a fragment that names standalone only via
+        # a SUFFIX stops dropping its atoms. None -> clean abstain (unchanged).
+        return _recursive_chain_fragment_substituent_name(
+            mol, frag_atoms_set, attach_idx, allow_mancude=True)
 
     # ---- Tier 5: Descriptive fallback (guaranteed non-None) ----
     #
@@ -2740,6 +2749,157 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     body = '-'.join(p[1] for p in parts)
     # Hyphen before the tail only when the tail is digit-initial (indicated H,
     # e.g. '2-methyl-1H-pyrrol-2-yl'); elide before a letter-initial stem.
+    sep = '-' if core_tail[0].isdigit() else ''
+    result = f"{body}{sep}{core_tail}"
+    if ' ' in result or result == 'substituent':
+        return None
+    return result
+
+
+def _longest_saturated_carbon_path_from(mol, frag_set, start):
+    """Longest simple path of ACYCLIC carbons in ``frag_set`` beginning at
+    ``start``, with every backbone bond SINGLE, or ``None``.
+
+    ``start`` is the free-valence atom and becomes one endpoint of the returned
+    path, so it takes locant 1 (P-29.3.2 lowest locant for the free valence).
+    The all-single-bond guard is load-bearing for 0-wrong: a saturated alkyl
+    stem placed over an unsaturated backbone would name a DIFFERENT molecule.
+    Acyclic carbons form a forest, so the DFS terminates.
+    """
+    carbons = {i for i in frag_set
+               if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
+               and not mol.GetAtomWithIdx(i).IsInRing()}
+    if start not in carbons:
+        return None
+    best = [start]
+
+    def _dfs(node, path, visited):
+        nonlocal best
+        if len(path) > len(best):
+            best = list(path)
+        for nb in mol.GetAtomWithIdx(node).GetNeighbors():
+            j = nb.GetIdx()
+            if j not in carbons or j in visited:
+                continue
+            bond = mol.GetBondBetweenAtoms(node, j)
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                continue  # unsaturated backbone -> deferred (fail closed)
+            visited.add(j)
+            path.append(j)
+            _dfs(j, path, visited)
+            path.pop()
+            visited.discard(j)
+
+    _dfs(start, [start], {start})
+    return best
+
+
+def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
+                                               allow_mancude: bool = False):
+    """Acyclic sibling of :func:`_recursive_fragment_substituent_name`: name a
+    CHAIN-rooted multi-functional substituent as ``{decorations}{alkyl}-yl`` by
+    demoting every characteristic group to a detachable prefix.
+
+    v30 C4 (keystone). Reached from ``name_substituent`` ONLY under the
+    general-fallback context (``allow_mancude=True``) after every narrow tier,
+    the ring composer, the descriptive fallback and ``terminal_fragment_name``
+    have declined, so the PIN default path is byte-identical. The gap this fills:
+    a fragment whose principal characteristic group would be a SUFFIX standalone
+    (``…-amide``/``…-amine``/``…-oic acid``) has no suffix as a substituent, so
+    the group must become a prefix (``carbamoyl``/``amino``/``carboxy``) and the
+    attach carbon carries the free valence. The dead ``parent_to_prefix`` string
+    surgery could not do that demotion; this composer does it from STRUCTURE.
+
+    Algorithm (mirrors the ring composer, chain core instead of ring core):
+
+    1. CORE = the longest all-single-bond acyclic carbon path with the attach
+       atom as an endpoint (free valence = locant 1). Requires an acyclic carbon
+       attach and a backbone of >= 2 carbons; else ``None`` (earlier tiers /
+       ``terminal_fragment_name`` own the mono-carbon and ring cases).
+    2. DECORATIONS = each maximal branch hanging off a core carbon, via the
+       shared ``_bfs_collect_fragment`` walk. Every non-core heavy atom MUST land
+       in exactly one decoration (coverage contract) or fail closed.
+    3. Name each decoration by RE-ENTERING ``name_substituent`` on a strictly
+       smaller atom set; an unnameable / multi-word / sentinel decoration -> fail
+       closed (never a silent drop).
+    4. Assemble one hyphenated ``-yl`` token: alphabetized, multiplied,
+       enclosing-marked decoration prefixes + the ``get_alkyl_name`` core stem.
+
+    Returns the composed token, or ``None`` (clean abstain). NEVER the
+    ``'substituent'`` sentinel and NEVER a multi-word token.
+    """
+    if not allow_mancude:
+        return None
+    frag_set = set(frag_atoms)
+    if not frag_set or attach_idx is None or attach_idx not in frag_set:
+        return None
+    a = mol.GetAtomWithIdx(attach_idx)
+    if a.GetAtomicNum() != 6 or a.IsInRing():
+        return None  # ring / heteroatom attach -> not this composer's job
+
+    chain = _longest_saturated_carbon_path_from(mol, frag_set, attach_idx)
+    if chain is None or len(chain) < 2:
+        return None
+    pos = {atom: i + 1 for i, atom in enumerate(chain)}
+    chain_set = set(chain)
+
+    # ---- decorations (shared fragment walk) --------------------------------
+    assigned = set(chain_set)
+    decorations = []  # (carrier_chain_atom, decoration_attach_atom, atom_set)
+    for ca in chain:
+        for nb in mol.GetAtomWithIdx(ca).GetNeighbors():
+            ni = nb.GetIdx()
+            if (ni in chain_set or ni not in frag_set or nb.GetAtomicNum() <= 1
+                    or ni in assigned):
+                continue
+            branch = _bfs_collect_fragment(mol, ni, chain_set, assigned)
+            if not branch:
+                continue
+            assigned |= branch
+            decorations.append((ca, ni, branch))
+
+    # COVERAGE CONTRACT: every non-core heavy atom covered by exactly one
+    # decoration (the shared walk already prevents overlap).
+    heavy = {x for x in frag_set if mol.GetAtomWithIdx(x).GetAtomicNum() > 1}
+    covered = set(chain_set) | {x for _, _, branch in decorations for x in branch}
+    if covered != heavy:
+        return None  # an unaccounted heavy atom -> fail closed
+
+    core_tail = get_alkyl_name(len(chain))  # 'pentyl' (fv=1, elided) etc.
+    if not core_tail:
+        return None
+    if not decorations:
+        return core_tail
+
+    # ---- name each decoration by recursion ---------------------------------
+    from collections import defaultdict
+    from .naming_utils import (
+        apply_enclosing_marks, is_complex_substituent, get_multiplier_prefix,
+        alpha_sort_key)
+    groups = defaultdict(list)
+    for ca, ni, branch in decorations:
+        if not len(branch) < len(frag_set):
+            return None  # termination invariant: strictly smaller
+        dname = name_substituent(
+            mol, sorted(branch), ni, allow_mancude=allow_mancude)
+        if (not dname or dname == 'substituent' or ' ' in dname
+                or 'unknown' in dname.lower()):
+            return None  # unnameable decoration -> fail closed
+        groups[dname].append(pos[ca])
+
+    # ---- assemble one hyphenated token -------------------------------------
+    parts = []  # (alpha_key, text)
+    for dname, locs in groups.items():
+        locs = sorted(locs)
+        token = (apply_enclosing_marks(dname, -1)
+                 if is_complex_substituent(dname) else dname)
+        mult = get_multiplier_prefix(len(locs), dname)
+        text = f"{','.join(str(l) for l in locs)}-{mult}{token}"
+        parts.append((alpha_sort_key(dname), text))
+    parts.sort(key=lambda x: x[0])
+    body = '-'.join(p[1] for p in parts)
+    # elide before a letter-initial stem ('...5-oxopentyl'); keep the hyphen only
+    # before a digit-initial tail (mirrors the ring composer's separator rule).
     sep = '-' if core_tail[0].isdigit() else ''
     result = f"{body}{sep}{core_tail}"
     if ' ' in result or result == 'substituent':
