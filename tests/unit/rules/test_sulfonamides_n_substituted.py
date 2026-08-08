@@ -138,25 +138,29 @@ def test_fails_closed_outside_the_class(smiles, why):
     assert _name(smiles) is None, why
 
 
-@pytest.mark.parametrize("smiles", [
-    "Cc1ccc(cc1)S(=O)(=O)NC",   # 4-methyl on the ring + N-methyl
-    "CNS(=O)(=O)c1ccc(O)cc1",   # 4-hydroxy on the ring + N-methyl
-    "CNS(=O)(=O)c1ccc(Cl)cc1",  # 4-chloro on the ring + N-methyl
-    # A genuine BRANCH POINT in R: the parent is 2-methylpropane-2-sulfonamide,
-    # which really does carry a '2-methyl' prefix, so 'N-methyl' would have to
-    # merge into 'N,2-dimethylpropane-2-sulfonamide'. Still refused.
-    "CC(C)(C)S(=O)(=O)NC",
+@pytest.mark.parametrize("smiles,expected", [
+    # F-B (2026-08-08): a substituted BENZENE-ring parent now MERGES the italic-N
+    # and ring locants into one alphanumerical list and cites the suffix '1', via
+    # the benzene suffix path (the same machinery that builds N,4-dimethylbenzamide).
+    # Each output is OPSIN round-trip InChIKey-verified.
+    ("Cc1ccc(cc1)S(=O)(=O)NC", "N,4-dimethylbenzene-1-sulfonamide"),
+    ("CNS(=O)(=O)c1ccc(O)cc1", "4-hydroxy-N-methylbenzene-1-sulfonamide"),
+    ("CNS(=O)(=O)c1ccc(Cl)cc1", "4-chloro-N-methylbenzene-1-sulfonamide"),
 ])
-def test_substituted_parent_hydride_fails_closed(smiles):
-    """P-66.1.1.3.1.1 / BB:32879 ``N,4-dimethyl-N-(3-methylphenyl)benzamide``:
-    when the parent is itself substituted the N and numerical locants form ONE
-    ordered prefix list. This module prefixes a delegated parent name and cannot
-    merge them, so it must refuse rather than emit ``N-methyl4-methyl...``.
+def test_substituted_benzene_parent_merges_locants(smiles, expected):
+    """P-66.1.1.3.1.1 + P-14.3.2 / P-14.3.4.2(c) (BB:32879, :2913): the N and ring
+    locants are ONE ordered prefix list and a di-substituted ring cites the '1'."""
+    assert _name(smiles) == expected
 
-    Regression guard: that malformed string ROUND-TRIPPED through OPSIN to the
-    correct InChIKey, so no round-trip test can catch it.
-    """
-    assert _name(smiles) is None
+
+def test_substituted_chain_parent_still_fails_closed():
+    """A genuine BRANCH POINT in a CHAIN R: the parent is
+    2-methylpropane-2-sulfonamide, which really carries a '2-methyl' prefix, so
+    'N-methyl' would have to merge into 'N,2-dimethylpropane-2-sulfonamide'. The
+    F-B merge is built for arene parents only; the chain-branch case stays refused
+    (the delegated-parent path cannot merge, and no wrong name is ever emitted --
+    'N-methyl2-methyl...' round-tripped through OPSIN, so only this refusal stops it)."""
+    assert _name("CC(C)(C)S(=O)(=O)NC") is None
 
 
 def test_never_emits_a_concatenated_locant_run():

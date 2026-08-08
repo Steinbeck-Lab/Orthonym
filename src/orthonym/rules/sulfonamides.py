@@ -157,6 +157,35 @@ def _sulfonyl_nitrogen(mol: Any) -> Optional[Tuple[int, int]]:
     return s_idx, n_idx
 
 
+def _sulfonyl_on_benzene(mol: Any, s_idx: int) -> bool:
+    """True iff the sulfonyl sulfur is bonded to a benzene ring carbon.
+
+    F-B: the benzene suffix path owns the N,ring-locant merge, but only when the
+    RING is the parent hydride. An N-aryl substituent on a chain parent
+    (``N-phenylmethanesulfonamide``, S bonded to a methyl) must NOT be rerouted to
+    a benzene parent, so this checks the atom the sulfonyl is actually attached to.
+    """
+    s_atom = mol.GetAtomWithIdx(s_idx)
+    ring_info = mol.GetRingInfo()
+    for nb in s_atom.GetNeighbors():
+        if nb.GetAtomicNum() != 6 or not nb.GetIsAromatic():
+            continue
+        for ring in ring_info.AtomRings():
+            if nb.GetIdx() not in ring or len(ring) != 6:
+                continue
+            # An ISOLATED benzene only: every ring atom aromatic carbon AND a member
+            # of exactly one ring. A FUSED arene (naphthalene, indane, ...) has a
+            # shared bond -> NumAtomRings > 1 for the bridgeheads, and delegating it
+            # to the benzene namer would rename it as benzene, DROPPING the fused
+            # carbons (a wrong molecule; F-B fable BLOCKER 1). Reject those here.
+            if all(mol.GetAtomWithIdx(i).GetAtomicNum() == 6
+                   and mol.GetAtomWithIdx(i).GetIsAromatic()
+                   and ring_info.NumAtomRings(i) == 1
+                   for i in ring):
+                return True
+    return False
+
+
 def _branch_atoms(mol: Any, start: int, blocked: int) -> List[int]:
     """Atoms of the substituent branch rooted at ``start``, in BFS order.
 
@@ -366,6 +395,24 @@ def n_substituted_sulfonamide_name(
     branches = _collect_n_substituents(mol, s_idx, n_idx)
     if branches is None:
         return None
+
+    # F-B (P-66.1.1.3.1.1 + P-14.3.4.2): when the parent hydride is a BENZENE ring
+    # the italic-N and ring locants must be merged into ONE alphanumerical prefix
+    # list and the suffix '1' cited on a di-substituted ring
+    # (`N,4-dimethylbenzene-1-sulfonamide`). Prefixing a delegated parent name
+    # cannot merge the two lists, but the benzene suffix path builds it
+    # structurally -- the same machinery that produces `N,4-dimethylbenzamide` --
+    # so delegate to it. Restricted to a sulfonyl bonded to a benzene ring so an
+    # N-aryl substituent on a CHAIN parent (`N-phenylmethanesulfonamide`) is never
+    # misrouted to a benzene parent. Fail-safe: accept only a result that is still
+    # a sulfonamide name (the excision-class check, mirrored here).
+    if _sulfonyl_on_benzene(mol, s_idx):
+        from .benzene import name_benzene_derivative
+        ring_name = name_benzene_derivative(mol)
+        if ring_name and ring_name.endswith(_PARENT_SUFFIX):
+            return ring_name
+        # Fall through: the bare-ring excise path below is the proven backstop and
+        # a substituted-ring parent is refused there anyway (never a wrong name).
 
     # A substituted parent hydride needs the N and numerical locants merged into
     # one ordered prefix list (P-66.1.1.3.1.1; `N,4-dimethyl...` at :32879),

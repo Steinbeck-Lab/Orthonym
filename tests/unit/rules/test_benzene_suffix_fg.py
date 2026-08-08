@@ -40,10 +40,15 @@ def test_benzene_amide_suffix(smiles, expected):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected", [
-    # Basic sulfonamide
+    # Basic sulfonamide -- MONOsubstituted ring, so no '1' (P-14.3.4.2(c) :2913).
     ("NS(=O)(=O)c1ccccc1", "benzenesulfonamide"),
-    # Substituted sulfonamide
-    ("NS(=O)(=O)c1ccc(C)cc1", "4-methylbenzenesulfonamide"),
+    # Substituted sulfonamide -- a RING substituent makes the ring DI-substituted,
+    # so P-14.3.3 (:2869, deny-by-default) cites the suffix '1' (F-B, 2026-08-08).
+    # Corrected from the non-PIN ' 4-methylbenzenesulfonamide' (locant omitted): the
+    # whole arenesulfon* family carries -1- in the Blue Book (e.g. :31174
+    # 4-aminobenzene-1-sulfonic acid; :33034 4-aminobenzene-1-sulfonamido), and the
+    # sibling sulfonic-acid path already emits 4-methylbenzene-1-sulfonic acid.
+    ("NS(=O)(=O)c1ccc(C)cc1", "4-methylbenzene-1-sulfonamide"),
 ])
 def test_benzene_sulfonamide_suffix(smiles, expected):
     """Test sulfonamide suffix naming on benzene ring."""

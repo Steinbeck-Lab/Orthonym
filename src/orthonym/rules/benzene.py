@@ -353,6 +353,11 @@ _BENZENE_FG_SMARTS = {
     'acid_cl': Chem.MolFromSmarts('[CX3](=O)[Cl]'),
     'thio_acid': Chem.MolFromSmarts('[CX3](=O)[SX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
+    # F-B (P-66.1.1.3.1.1): N-substituted ring sulfonamide -S(=O)(=O)-NR'R''. The
+    # NX3 has fewer than two H, so it is disjoint from the primary 'sulfonamide'
+    # (NX3H2) above and matched only after it. The italic-N substituents are named
+    # by _detect_sulfonamide_n_substituents and merged with the ring locants.
+    'n_sub_sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3;!H2;!$([NX3]~[!#6;!S])]'),
     # Task Y (P-66.1.1.2 @32746): ring-attached sulfinamide -S(=O)-NH2. SX3 (one
     # fewer O) keeps it disjoint from every SX4 pattern here; the carbon guard
     # parallels sulfinic_acid and excludes H2N-S(=O)-OH (@36500 "the name
@@ -873,6 +878,27 @@ def _identify_suffix_fg_on_benzene(
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
+        # F-B (P-66.1.1.3.1.1): N-substituted ring sulfonamide -S(=O)(=O)-NR'R''.
+        # Detected AFTER the primary (disjoint NX3 H-count). The italic-N
+        # substituents are carried on 'n_substituents' and merged with the ring
+        # locants by _name_substituted_benzenesulfonamide, exactly as the amide
+        # path does for N,4-dimethylbenzamide. If the N-shape is outside the class
+        # (ring N / heteroatom N-substituent / unnameable branch) the detector
+        # returns None and this FG is marked unnameable so the whole name fails
+        # closed rather than dropping the N-substituent's atoms.
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['n_sub_sulfonamide']):
+            if match[0] == start_idx:
+                n_subs = _detect_sulfonamide_n_substituents(mol, start_idx, ring_atoms)
+                if n_subs is None:
+                    return {
+                        'name': 'sulfonamide', 'suffix_name': 'sulfonamide',
+                        'is_suffix': True, 'atoms': sub_atoms, 'unnameable': True,
+                    }
+                return {
+                    'name': 'sulfonamide', 'suffix_name': 'sulfonamide',
+                    'is_suffix': True, 'atoms': sub_atoms, 'n_substituents': n_subs,
+                }
+
         # Task Y: sulfinamide S(=O)(NH2) -- checked after sulfonamide; the SX3/SX4
         # split means neither can steal the other's match.
         for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['sulfinamide']):
@@ -978,6 +1004,65 @@ def _detect_n_substituents(mol, amide_match: Tuple[int, ...], ring_atoms: Set[in
 
     alkyl_names.sort()
     return alkyl_names
+
+
+def _detect_sulfonamide_n_substituents(
+    mol, s_idx: int, ring_atoms: Set[int]
+) -> Optional[List[str]]:
+    """N-substituent names on a sulfonamide nitrogen, or None to FAIL CLOSED.
+
+    F-B (P-66.1.1.3.1.1). The amide detector above walks from the carbonyl
+    carbon; a sulfonamide N hangs off the SULFONYL sulfur, so this is its
+    S-rooted twin. It returns None (never a partial list) whenever the shape is
+    outside the class the merge is built for, so ``name_substituted_benzene``
+    marks the substituent ``unnameable`` and declines rather than dropping an
+    N-substituent's atoms:
+
+    * the N is in a ring (a sultam is a ring parent, 1-(arenesulfonyl)…), or
+      charged / isotopically labelled;
+    * an N-substituent is a heteroatom (N-hydroxy / N-amino / N-N is
+      P-66.1.1.3.2 territory, a different construction);
+    * an N-substituent branch loops back into the ring or the sulfur;
+    * a branch cannot be named by the shared fragment namer;
+    * more than two N-substituents (a trivalent amide N cannot carry three).
+
+    An unsubstituted N (primary sulfonamide) returns None too — the primary
+    suffix path names it and this twin must not compete.
+    """
+    from ..assembly.substituent_naming import name_substituent_fragment
+
+    s_atom = mol.GetAtomWithIdx(s_idx)
+    n_idx = next(
+        (nb.GetIdx() for nb in s_atom.GetNeighbors() if nb.GetAtomicNum() == 7),
+        None,
+    )
+    if n_idx is None:
+        return None
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.IsInRing() or n_atom.GetFormalCharge() != 0 or n_atom.GetIsotope():
+        return None
+
+    blocked = set(ring_atoms) | {n_idx, s_idx}
+    names: List[str] = []
+    for nb in n_atom.GetNeighbors():
+        nb_idx = nb.GetIdx()
+        if nb_idx == s_idx:
+            continue
+        if nb.GetAtomicNum() != 6:
+            return None
+        branch = _bfs_substituent_atoms(mol, nb_idx, blocked)
+        if s_idx in branch or any(a in ring_atoms for a in branch):
+            return None
+        nm = name_substituent_fragment(
+            mol, branch, nb_idx, [n_idx, s_idx] + list(ring_atoms)
+        )
+        if not nm:
+            return None
+        names.append(nm)
+
+    if not names or len(names) > 2:
+        return None
+    return names
 
 
 def _identify_boron_group(
@@ -3823,6 +3908,13 @@ def _assemble_benzene_with_suffix(
                 n_prefix = _build_amidine_n_prefix(n_subs)
                 if n_prefix:
                     prefix_form = f"{n_prefix}{prefix_form}"
+        # F-B 0-wrong: a demoted sulfonamide becomes the bare 'sulfamoyl' prefix,
+        # which carries NO italic-N slot. If this sulfonamide has N-substituents,
+        # demoting it would silently DROP them (a wrong constitution). No
+        # 'N-methylsulfamoyl'-style prefix is built here, so fail closed instead —
+        # gate-independent honesty (the producer must not rely on SELF-01).
+        if sfx_name == 'sulfonamide' and n_substituents_map.get('sulfonamide'):
+            return None
         if prefix_form:
             remaining_prefix_groups[prefix_form] = sfx_locants
 
@@ -3925,10 +4017,27 @@ def _assemble_benzene_with_suffix(
     # Check for benzenesulfonamide-based naming:
     # Single sulfonamide -> "benzenesulfonamide"
     if chosen_suffix == 'sulfonamide' and chosen_count == 1:
-        return _name_substituted_benzenesulfonamide(
+        _n_subs = n_substituents_map.get('sulfonamide', [])
+        _nm = _name_substituted_benzenesulfonamide(
             remaining_prefix_groups, chosen_locants[0],
-            atom_to_locant, oriented_ring
+            atom_to_locant, oriented_ring, n_substituents=_n_subs,
         )
+        # When N-substituents were merged in, the fragment namer may have dropped a
+        # stereodescriptor or mis-named a functional-group branch -> gate-independent
+        # re-anchor (fail closed on any mismatch). A PRIMARY ring sulfonamide (no
+        # N-substituents) is purely structural and needs no OPSIN call.
+        if _n_subs:
+            return _reanchor_name_to_mol(mol, _nm)
+        return _nm
+
+    # F-B 0-wrong: a MULTI-instance sulfonamide (di/poly) carrying N-substituents
+    # needs the superscripted N^1/N^3 locants of P-66.1.1.3.1.1, which are not
+    # built here. The general multi-suffix assembler below cannot cite them and
+    # would silently DROP the N-substituents (benzene-1,4-disulfonamide for an
+    # N,N'-dimethyl input -- a wrong constitution). Fail closed. A PRIMARY
+    # disulfonamide (no N-substituents) is unaffected and still names below.
+    if chosen_suffix == 'sulfonamide' and n_substituents_map.get('sulfonamide'):
+        return None
 
     # Task Y (P-66.1.1.2 @32746): single sulfinamide on benzene ->
     # 'benzenesulfinamide'. Mirrors the sulfonimidamide rule immediately below:
@@ -4535,36 +4644,98 @@ def _name_substituted_benzamide(
     return f"{_build_prefix_string_with_locants(merged, mono_needs_locant=True)}benzamide"
 
 
+def _reanchor_name_to_mol(mol, name: Optional[str]) -> Optional[str]:
+    """Gate-INDEPENDENT OPSIN InChIKey re-anchor (the 8afa533c guard-2 precedent).
+
+    Returns ``name`` iff it OPSIN-parses to the SAME molecule as ``mol``
+    (InChIKey-exact, so stereo- and atom-count-sensitive), else None.
+
+    F-B needs this because the italic-N substituent names come from
+    ``name_substituent_fragment``, a shared helper that can DROP a benzylic
+    stereodescriptor (``1-phenylethyl`` for a chiral centre), MIS-NAME a
+    functional-group branch (``-C(=O)OH`` -> ``formyl``), or otherwise yield a
+    name that denotes a DIFFERENT molecule which still OPSIN-parses cleanly. Such
+    a name is invisible to the OPSIN-validity gate and, for stereo, even ships at
+    the default gate via the BBR stereo carve-out. The producer must therefore be
+    honest ON ITS OWN: re-anchor, and fail closed on mismatch / no-parse / no-jar
+    (the cascade then supplies a valid fallback, never a wrong molecule).
+    """
+    if not name:
+        return None
+    try:
+        ref_key = Chem.MolToInchiKey(mol)
+        if not ref_key:
+            return None
+        from ..namer import _validity_gate_name_to_smiles
+        smi = _validity_gate_name_to_smiles(name)
+        if not smi:
+            return None
+        got = Chem.MolFromSmiles(smi)
+        if got is None:
+            return None
+        return name if Chem.MolToInchiKey(got) == ref_key else None
+    except Exception:
+        return None
+
+
 def _name_substituted_benzenesulfonamide(
     prefix_groups: Dict[str, List[int]],
     sulfonamide_locant: int,
     atom_to_locant: Dict[int, int],
     oriented_ring: List[int],
+    n_substituents: Optional[List[str]] = None,
 ) -> str:
     """
-    Name substituted benzenesulfonamide derivatives.
+    Name substituted benzenesulfonamide derivatives (F-B).
 
-    Uses "benzenesulfonamide" as the base name. Position 1 is the
-    sulfonamide position.
+    Uses "benzenesulfonamide" as the base name. Position 1 is the sulfonamide
+    position. Two Blue Book rules are applied here:
+
+    * **P-14.3.4.2(c) / P-14.3.3** (``BlueBookV2.md:2913`` / ``:2869``): the
+      suffix locant ``1`` is omitted ONLY on a MONOSUBSTITUTED homogeneous
+      monocyclic ring. A RING substituent makes the ring DI-substituted, so the
+      ``1`` is cited — ``4-methylbenzene-1-sulfonamide`` — exactly as the
+      sulfonic-acid sibling path already emits ``4-methylbenzene-1-sulfonic
+      acid``. An N-substituent alone does not substitute the RING, so the bare
+      ``N-methylbenzenesulfonamide`` keeps no ``1``.
+    * **P-66.1.1.3.1.1 + P-14.3.2** (``:32879`` ``N,4-dimethyl…benzamide (PIN)``):
+      the italic-``N`` substituents and the ring numerals form ONE merged,
+      alphanumerically ordered prefix list. This is the identical structural move
+      ``_name_substituted_benzamide`` makes — the N-substituents go into the
+      SAME name-keyed bucket carrying the italic locant ``N`` and
+      ``_build_prefix_string_with_locants`` does the pooling (``N,4-dimethyl``)
+      and the ``N``-before-numeral ordering.
 
     Args:
-        prefix_groups: Non-sulfonamide substituent groups
-        sulfonamide_locant: Locant of the sulfonamide in original numbering
-        atom_to_locant: Mapping from atom index to locant
-        oriented_ring: The oriented ring
+        prefix_groups: Non-sulfonamide RING substituent groups.
+        sulfonamide_locant: Locant of the sulfonamide in original numbering.
+        atom_to_locant: Mapping from atom index to locant.
+        oriented_ring: The oriented ring.
+        n_substituents: Italic-N substituent names (e.g. ['methyl']).
 
     Returns:
-        IUPAC name like "4-methylbenzenesulfonamide"
+        IUPAC name like "4-methylbenzene-1-sulfonamide",
+        "N,4-dimethylbenzene-1-sulfonamide", or "N-methylbenzenesulfonamide".
     """
-    if not prefix_groups:
+    n_substituents = n_substituents or []
+
+    # Renumber ring prefixes so the sulfonamide sits at position 1, then merge in
+    # the italic-N substituents (locant 'N') as one alphabetised list.
+    renumbered_groups = _renumber_relative_to(prefix_groups, sulfonamide_locant)
+    merged: Dict[str, List] = {
+        name: list(locants) for name, locants in renumbered_groups.items()
+    }
+    for sub_name in n_substituents:
+        merged.setdefault(sub_name, []).append("N")
+
+    if not merged:
         return "benzenesulfonamide"
 
-    # Renumber relative to sulfonamide position
-    renumbered_groups = _renumber_relative_to(prefix_groups, sulfonamide_locant)
+    prefix_part = _build_prefix_string_with_locants(merged, mono_needs_locant=True)
 
-    # Build prefixes
-    prefix_part = _build_prefix_string_with_locants(renumbered_groups, mono_needs_locant=True)
-
+    # A RING substituent (prefix_groups) — not merely an N-substituent — cites '1'.
+    if prefix_groups:
+        return f"{prefix_part}benzene-1-sulfonamide"
     return f"{prefix_part}benzenesulfonamide"
 
 
