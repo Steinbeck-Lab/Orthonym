@@ -1773,7 +1773,14 @@ def _identify_fused_substituent(
                             )
                             if rec_name:
                                 if rec_name.endswith('yl'):
-                                    alkoxy_name = rec_name[:-2] + 'oxy'
+                                    # composed_alkoxy_prefix: a ring/locant-bearing
+                                    # '-yl' keeps its marks ('naphthalen-1-yl' ->
+                                    # '(naphthalen-1-yl)oxy', NOT 'naphthalen-1-oxy')
+                                    # (F-spell-oxy).
+                                    from ..assembly.substituent_enumerator import (
+                                        alkoxy_prefix_from_substituent,
+                                    )
+                                    alkoxy_name = alkoxy_prefix_from_substituent(rec_name)
                                 else:
                                     alkoxy_name = f'{rec_name}oxy'
                             if alkoxy_name is None:

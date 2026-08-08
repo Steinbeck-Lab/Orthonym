@@ -1559,24 +1559,25 @@ def _alcohol_to_alkoxy(name: str) -> Optional[str]:
     if stripped in _RETAINED_ALKOXY:
         return _RETAINED_ALKOXY[stripped]
 
-    # Fallback: convert alcohol -> alkyl -> alkoxy
+    # Fallback: convert alcohol -> alkyl -> alkoxy via the shared BB-verbatim
+    # morphology primitive: the retained set contracts (methoxy/ethoxy/propoxy/
+    # butoxy, + substituted primary members), a ring / C5+ / locant-bearing free
+    # valence keeps the whole '-yl' ('cyclohexyloxy', 'pentyloxy', '(oxan-2-yl)oxy'
+    # -- never the mangled 'cyclohexoxy'/'pentoxy'/'oxan-2-oxy'), a decorated
+    # benzene -> 'phenoxy' (F-spell-oxy).
+    from ..assembly.substituent_enumerator import alkoxy_prefix_from_substituent
     alkyl = _alcohol_to_alkyl(name)
     if alkyl and alkyl.endswith("yl"):
-        import re as _re
-        if _re.search(r'[0-9]', alkyl):
-            # P-16.5.1.1: locant-bearing name requires enclosing marks
-            candidate = f"({alkyl})oxy"
-        else:
-            candidate = alkyl[:-2] + "oxy"
-        if candidate not in ("oxy", "()oxy"):  # Guard: never return bare "oxy"
+        candidate = alkoxy_prefix_from_substituent(alkyl)
+        if candidate and candidate not in ("oxy", "()oxy"):  # never bare "oxy"
             return candidate
 
     # Phase 86 fallback: for complex fragments where _alcohol_to_alkyl fails,
     # attempt direct suffix conversion. If the name already ends in "yl"
     # (from decomposition engine naming), convert to "oxy".
     if stripped.endswith("yl") and len(stripped) > 2:
-        candidate = stripped[:-2] + "oxy"
-        if candidate != "oxy":  # Guard: never return bare "oxy"
+        candidate = alkoxy_prefix_from_substituent(stripped)
+        if candidate and candidate != "oxy":  # Guard: never return bare "oxy"
             return candidate
 
     # Last resort: if the name ends in common alcohol-like patterns, try

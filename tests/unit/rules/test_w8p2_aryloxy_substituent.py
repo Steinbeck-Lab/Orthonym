@@ -20,11 +20,14 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw na
 
 # No `2-` locant: acetic acid has ONE substitutable position, so the substituent
 # locant is omitted in the PIN (P-16.5.1.3.2; cf. `(1H-indol-1-yl)acetic acid (PIN)`
-# BB line 2039). Compound (parenthesised) substituents keep their enclosing marks.
+# BB line 2039). The locant-bearing heteroaryl/fused '-yl' keeps its OWN enclosing
+# marks (P-63.2.2.2, BB:27641 '(pyridin-2-yl)oxy (preferred prefix)'; BB:22098
+# '(naphthalen-2-yl)oxy'), so the citation escalates to `[(...)oxy]acetic acid`
+# (F-spell-oxy 2026-08-08: was the non-PIN unenclosed `(pyridin-2-yloxy)…`).
 @pytest.mark.parametrize("smiles,expected", [
-    ("OC(=O)COc1ccccn1",       "(pyridin-2-yloxy)acetic acid"),    # bare heteroaryl-oxy
-    ("OC(=O)COc1cccc2ccccc12", "(naphthalen-1-yloxy)acetic acid"), # bare fused-aryl-oxy
-    ("OC(=O)COc1ccc2ccccc2c1", "(naphthalen-2-yloxy)acetic acid"),
+    ("OC(=O)COc1ccccn1",       "[(pyridin-2-yl)oxy]acetic acid"),    # bare heteroaryl-oxy
+    ("OC(=O)COc1cccc2ccccc12", "[(naphthalen-1-yl)oxy]acetic acid"), # bare fused-aryl-oxy
+    ("OC(=O)COc1ccc2ccccc2c1", "[(naphthalen-2-yl)oxy]acetic acid"),
 ])
 def test_bare_aryloxy_named_not_dropped(smiles, expected):
     assert RAW.name(smiles) == expected

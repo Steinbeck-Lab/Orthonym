@@ -47,8 +47,6 @@ class TestGlycosideNaming:
     @pytest.mark.parametrize("smiles,expected_fragment", [
         # B2: ASML-13 phenol routing changes decomposition path, now uses oxane acid + diol
         ("Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1", "oxane"),
-        # B5: non-stereo rhamnose matches sugar lookup -> retained name
-        ("COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1", "rhamnopyranosyloxy"),
         # B7 - ring boundary fix: benzene BFS no longer walks into fused lactone
         # ASML-13: phenol suffix routing changes to dimethylphenol
         (
@@ -63,6 +61,21 @@ class TestGlycosideNaming:
         assert expected_fragment in name, (
             f"Expected '{expected_fragment}' in name, got: {name}"
         )
+
+    # B3 (trigalloyl ester) and B5 (thiocarbamate + rhamnose glycoside) are
+    # complex molecules the T4 best-effort decomposition can only name WRONGLY
+    # (both were RT-WRONG snapshots gate-off; the pre-existing SELF-01 gate is
+    # what makes them safe). In PRODUCTION (gate ON) both abstain — the 0-wrong
+    # pin. This is unchanged by F-spell-oxy (the gate-off raw string moved, the
+    # production behaviour did not); asserted gate-on so it is meaningful.
+    @pytest.mark.opsin_gate
+    @pytest.mark.parametrize("smiles,test_id", [
+        ("O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1", "B3-tetradecoxy"),
+        ("COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1", "B5-glycosyloxy"),
+    ])
+    def test_complex_ether_abstains_in_production(self, smiles, test_id):
+        """Gate-ON: SELF-01 suppresses the RT-WRONG T4 best-effort name."""
+        assert name_compound(smiles) == "unknown organic compound", test_id
 
 
 # ---------------------------------------------------------------------------
@@ -129,44 +142,31 @@ class TestBGroupRegression:
             "4-(2,3-dihydroxy-5-methylphenoxy)-3-methoxy-5-methylphenol",
             "B1-phenoxy",
         ),
-        # B2: Glycoside -> (oxan-2-yl)oxy
+        # B2: aryloxy-on-oxane. F-spell-oxy (2026-08-08): the aryloxy linkage
+        # now names in FULL. The old snapshot was RT-WRONG ('6-phenyl' dropped
+        # the ring's 2-OH + 4-methyl — "known emitter guard-out"); routing the
+        # alkoxy morphology through composed_alkoxy_prefix now emits the complete
+        # '6-(2-hydroxy-4-methylphenoxy)' — VERIFIED RT-EXACT (was RT-WRONG).
         (
             "Cc1ccc(O[C@H]2O[C@@H](C(=O)O)C(O)[C@@H](O)C2O)c(O)c1",
-            # v21 WS-A.1 S2: the oxane bearing the acid PCG is now the parent
-            # (P-44.1.1; the old snapshot was a malformed parent-as-prefix
-            # form). The aryloxy linkage is still mis-expressed ('6-phenyl' --
-            # known emitter guard-out); RT-False both before and after.
-            "(2R,4R,6R)-3,4,5-trihydroxy-6-phenyloxane-2-carboxylic acid",
+            "(2R,4R,6R)-3,4,5-trihydroxy-6-(2-hydroxy-4-methylphenoxy)oxane-2-carboxylic acid",
             "B2-oxanyloxy",
         ),
-        # B3: Galloyl ester chain -> tetradecoxy
-        (
-            "O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1",
-            "3-tetradecoxy-4,5-dihydroxybenzoic acid",
-            "B3-tetradecoxy",
-        ),
-        # B4: Complex ether chain. Wave2 T3a: the old snapshot
-        # '1-decoxy-3-fluorobenzene' was a wrong-molecule fabrication (the
-        # walker linearised the N-bearing chain into 'decoxy' and dropped
-        # the whole bromobenzoyl arm); the constitution-conservation guard
-        # now fails it closed. Deterministic honest refusal is the pin.
+        # B4: benzophenone with an aminohexyloxy chain. F-spell-oxy: the correct
+        # 'hexyloxy' morphology lets the WHOLE structure name and pass SELF-01 —
+        # abstain -> VERIFIED RT-EXACT (breadth gain, 0-wrong preserved).
         (
             "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
-            "unknown organic compound",
+            "(4-bromophenyl)({2-fluoro-4-[6-(methyl(prop-2-en-1-yl)amino)hexyloxy]phenyl})methanone",
             "B4-decoxy",
         ),
-        # B5: Sugar glycoside -> rhamnopyranosyloxy (retained sugar name)
-        # Phase 86: benzene universal fallback now names the COC(=S)NC-
-        # chain as a substituent (previously silently dropped).
-        (
-            "COC(=S)NCc1ccc(OC2OC(C)C(O)C(O)C2O)cc1",
-            "(rhamnopyranosyloxy)-4-(1-methoxy-1-(methylamino)methyl)phenol",  # ASML-13: phenol suffix routing
-            "B5-glycosyloxy",
-        ),
-        # B6: Fused ring system -> xanthone (correctly identified after Phase 101 xanthone entry)
+        # B6: substituted xanthone. F-spell-oxy: now emits the PIN
+        # '9H-xanthen-9-one' core (matching gold rings_numbering.json:1146 where
+        # IH-01g de-headlined the retained 'xanthone'); the old snapshot was the
+        # non-PIN retained name. Both RT-EXACT; new form is the conformant PIN.
         (
             "COc1cc(OC)c2c(=O)c3c(O)cc(C)cc3oc2c1",
-            "8-hydroxy-1,3-dimethoxy-6-methylxanthone",  # Phase 101: xanthone core now recognized
+            "8-hydroxy-1,3-dimethoxy-6-methyl-9H-xanthen-9-one",
             "B6-phenoxy",
         ),
         # B7: Dimethyl benzene with glycoside -> (oxan-2-yl)oxy

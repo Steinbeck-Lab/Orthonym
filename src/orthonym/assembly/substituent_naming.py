@@ -4951,10 +4951,17 @@ def name_substituent_fragment(
                         or 'hydroxy' in _inner or 'oxo' in _inner
                         or _inner.endswith('ylyl')):
                     return None
+                # P-63.2.2 morphology via the BB-verbatim composed_alkoxy_prefix:
+                # 'methoxymethyl' -> 'methoxymethoxy' (contract) but a ring/
+                # locant-bearing '-yl' keeps its marks ('oxan-2-yl' ->
+                # '(oxan-2-yl)oxy', NOT 'oxan-2-oxy') (F-spell-oxy).
+                from .substituent_enumerator import alkoxy_prefix_from_substituent
                 if _inner.endswith('yl'):
-                    _stem = _inner[:-2] + 'oxy'
+                    _stem = alkoxy_prefix_from_substituent(_inner)
                 else:
                     _stem = f'({_inner})oxy'
+                if _stem is None:
+                    return None
                 return _stem
 
     # Step 0b (P-62.5(2)): a fragment carrying an amine-oxide nitrogen is

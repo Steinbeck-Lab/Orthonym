@@ -2087,11 +2087,17 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     except (ValueError, KeyError):
                         alkyl_name = None
                 if alkyl_name:
-                    # methyl -> methoxy, ethyl -> ethoxy, propyl -> propoxy, etc.
+                    # P-63.2.2 morphology via composed_alkoxy_prefix: retained
+                    # set contracts (butyl->butoxy), C5+ and rings keep the whole
+                    # '-yl' ('pentyl'->'pentyloxy', 'cyclohexyl'->'cyclohexyloxy',
+                    # NOT the mangled 'pentoxy'/'cyclohexoxy') (F-spell-oxy).
                     if alkyl_name.endswith('yl'):
-                        oxy_name = alkyl_name[:-2] + 'oxy'
+                        from ..assembly.substituent_enumerator import alkoxy_prefix_from_substituent
+                        oxy_name = alkoxy_prefix_from_substituent(alkyl_name)
                     else:
                         oxy_name = alkyl_name + 'oxy'
+                    if oxy_name is None:
+                        return None
                     return {'name': oxy_name, 'atoms': [o_idx] + alkyl_atoms}
 
             # P-57.1.6.2 / P-46.1.3: _collect_pure_alkyl declines when the R
@@ -2125,9 +2131,15 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     mol, r_side, c_atom.GetIdx(), list(ring_atoms | {o_idx})
                 )
                 if r_name and ' ' not in r_name:
-                    # alkyl -> alkoxy: the terminal '...yl' becomes '...oxy'
-                    # (2-methoxyethyl -> 2-methoxyethoxy, NOT '...ethyloxy').
-                    r_oxy = r_name[:-2] + 'oxy' if r_name.endswith('yl') else r_name + 'oxy'
+                    # R -> R-oxy via composed_alkoxy_prefix: '2-methoxyethyl' ->
+                    # '2-methoxyethoxy' (contract) but a ring/locant-bearing
+                    # '-yl' keeps its marks ('oxan-2-yl' -> '(oxan-2-yl)oxy',
+                    # NOT 'oxan-2-oxy') (F-spell-oxy).
+                    from ..assembly.substituent_enumerator import alkoxy_prefix_from_substituent
+                    r_oxy = (alkoxy_prefix_from_substituent(r_name)
+                             if r_name.endswith('yl') else r_name + 'oxy')
+                    if r_oxy is None:
+                        return None
                     return {'name': apply_enclosing_marks(r_oxy, 0),
                             'atoms': [o_idx] + r_side,
                             'is_complex': True}
@@ -2263,11 +2275,15 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
             if total_c > 0:
                 try:
                     alkyl_name = get_alkyl_name(total_c)
+                    # composed_alkoxy_prefix: C5+ concatenates ('pentyl' ->
+                    # 'pentyloxy', NOT 'pentoxy') (F-spell-oxy).
                     if alkyl_name.endswith('yl'):
-                        oxy_name = alkyl_name[:-2] + 'oxy'
+                        from ..assembly.substituent_enumerator import alkoxy_prefix_from_substituent
+                        oxy_name = alkoxy_prefix_from_substituent(alkyl_name)
                     else:
                         oxy_name = alkyl_name + 'oxy'
-                    return {'name': oxy_name, 'atoms': [o_idx] + all_sub}
+                    if oxy_name is not None:
+                        return {'name': oxy_name, 'atoms': [o_idx] + all_sub}
                 except (ValueError, KeyError):
                     from ..data.chain_names import get_chain_prefix
                     try:

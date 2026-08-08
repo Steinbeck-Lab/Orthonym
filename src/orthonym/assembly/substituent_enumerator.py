@@ -1169,11 +1169,40 @@ def composed_alkoxy_prefix(token):
     for stem, contracted in _ALKOXY_CONTRACTED_STEMS.items():
         if token == stem:
             return contracted
-        if token.endswith(stem):
+        # The contraction is a straight-CHAIN morphology: it applies only when
+        # 'propyl'/'butyl' is the parent chain stem, not when it is the tail of a
+        # RING name. 'cyclopropyl'/'cyclobutyl' end in the stem but are rings
+        # attached at a ring carbon -> concatenate ('cyclopropyloxy', like
+        # 'cyclohexyloxy' BB:27768; 'cyclopropoxy'/'cyclobutoxy' occur 0x in the
+        # BB). A genuine substituent prefix before the stem ('2-methylpropyl',
+        # 'cyclopropylmethyl') does NOT end in 'cyclo', so it still contracts.
+        if token.endswith(stem) and not token[:-len(stem)].endswith('cyclo'):
             # '2-methylpropyl' -> '2-methyl' + 'propoxy' = '2-methylpropoxy'
             return token[:-len(stem)] + contracted
-    # C5+ keeps the alkyl name whole ('pentyloxy', '3-methylpentyloxy').
+    # C5+ and cycloalkyls keep the whole name ('pentyloxy', 'cyclopropyloxy').
     return f"{token}oxy"
+
+
+def alkoxy_prefix_from_substituent(token):
+    """A '...yl' substituent NAME -> its P-63.2.2 R-oxy prefix.
+
+    Thin wrapper over :func:`composed_alkoxy_prefix` that ALSO applies the
+    decorated-phenyl -> phenoxy contraction the primitive deliberately declines.
+    ``composed_alkoxy_prefix`` stays conservative on any '...phenyl' token
+    (the biphenyl '4-phenylphenyl' shape, BB 24607 -> '([1,1'-biphenyl]-4-yl)oxy')
+    and leaves the contraction to the caller. A DECORATED benzene is the retained,
+    fully-substitutable 'phenoxy' (P-63.2.2.2 / BB 17796 "phenoxy ... full
+    substitution"): '4-methylphenyl' -> '4-methylphenoxy'. A locant-bearing
+    biphenyl reaches us as '[1,1'-biphenyl]-4-yl' (a '-N-yl' token, routed by
+    composed_alkoxy_prefix's locant branch), never as '...phenyl', so contracting
+    a bare '...phenyl' here is safe. Use this at every alkoxy emitter that hands
+    in a general substituent name (F-spell-oxy).
+    """
+    if not token:
+        return None
+    if token.endswith('phenyl'):
+        return token[:-2] + 'oxy'   # '4-methylphenyl' -> '4-methylphenoxy'
+    return composed_alkoxy_prefix(token)
 
 
 # P-63.3.2 (BB 27914) / P-63.6: the free valence each NON-oxygen divalent

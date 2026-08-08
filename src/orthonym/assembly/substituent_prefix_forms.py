@@ -220,8 +220,12 @@ def get_alkoxy_prefix(
                 # '4-chlorophenyl' -> '4-chlorophenoxy' (retained contraction)
                 return dec[:-6] + "phenoxy"
             if dec.endswith("yl"):
-                # decorated heteroaryl: 'pyridin-2-yl' -> 'pyridin-2-yloxy'
-                return dec + "oxy"
+                # decorated heteroaryl: 'pyridin-2-yl' -> '(pyridin-2-yl)oxy'
+                # (P-63.2.2.2 / BB:27641 "(pyridin-2-yl)oxy (preferred prefix)";
+                # BB:6267 "(5-chloropyridin-2-yl)oxy"). The locant-bearing free
+                # valence keeps the whole '-yl' inside marks (F-spell-oxy).
+                from .substituent_enumerator import alkoxy_prefix_from_substituent
+                return alkoxy_prefix_from_substituent(dec)
             return None
         # dec is None -> a BARE ring (decorated_ring_substituent_name only handles
         # DECORATED rings). Bare benzene contracts to the retained 'phenoxy'; a bare
@@ -247,7 +251,12 @@ def get_alkoxy_prefix(
         from ..rules.ring_substituents import get_ring_substituent_name
         _nm = get_ring_substituent_name(mol, tuple(_sys), sub_carbon)
         if _nm and _nm.endswith("yl") and _nm != "phenyl":
-            return _nm + "oxy"
+            # '(naphthalen-1-yl)oxy' / '(quinolin-2-yl)oxy' — the bare ring
+            # '-yl' keeps its enclosing marks (P-63.2.2.2, BB:27641/22098);
+            # a locant-free carbocycle concatenates ('cyclohexyloxy', BB:27768)
+            # (F-spell-oxy).
+            from .substituent_enumerator import alkoxy_prefix_from_substituent
+            return alkoxy_prefix_from_substituent(_nm)
         return None
 
     # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
@@ -289,9 +298,18 @@ def get_alkoxy_prefix(
         # name with a space (a full compound name) means the R side is not a
         # nameable substituent here -> fall through / fail-closed.
         if _r_name and ' ' not in _r_name:
-            # alkyl -> alkoxy ('methoxymethyl' -> 'methoxymethoxy'); the
-            # compound '{R}oxy' prefix is always enclosed.
-            _r_oxy = _r_name[:-2] + 'oxy' if _r_name.endswith('yl') else _r_name + 'oxy'
+            # R -> R-oxy via the BB-verbatim P-63.2.2 morphology
+            # (composed_alkoxy_prefix): the retained set contracts
+            # ('methoxymethyl' -> 'methoxymethoxy'), a locant-bearing / ring
+            # free valence keeps the whole '-yl' inside marks
+            # ('oxan-2-yl' -> '(oxan-2-yl)oxy', NOT the mangled 'oxan-2-oxy'),
+            # and C5+ concatenates ('pentyl' -> 'pentyloxy'). The compound
+            # '{R}oxy' prefix is then enclosed by the caller (F-spell-oxy).
+            from .substituent_enumerator import alkoxy_prefix_from_substituent
+            _r_oxy = (alkoxy_prefix_from_substituent(_r_name)
+                      if _r_name.endswith('yl') else _r_name + 'oxy')
+            if _r_oxy is None:
+                return None
             return apply_enclosing_marks(_r_oxy, 0)
         return None  # un-nameable ether-bearing R -> fail closed (never drop a hetero)
 
