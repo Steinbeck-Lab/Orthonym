@@ -2773,6 +2773,193 @@ def linear_acyl_amido_prefix(mol, carbonyl_c: int, n_idx: int,
     return acyl_carbons_to_amido_prefix(len(carbons))
 
 
+def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
+                                    parent_atoms) -> Optional[str]:
+    """P-66.1.1.4.3 method (1): an N-SUBSTITUTED acylamino branch
+    ``-N(R')-C(=O)-R`` is the ``{N-R'}{acyl}amido`` PREFIX -- N-methylacetamido,
+    N-methylformamido, N-ethylpropanamido (BB:32995; verbatim
+    ``2-(N-methylpropanamido)benzene-1-sulfonic acid (PIN)`` :33040).
+
+    The unsubstituted sibling ``linear_acyl_amido_prefix`` fails closed on a
+    substituted N (its ``sub_set == branch | {n_idx}`` check), and the legacy
+    count fallback in ``_name_amino_branch`` refuses a non-mono-substituted N
+    (37cd122d F1), so before this builder the whole ``-N(R')C(=O)R`` fragment
+    dropped to the ugly general replacement name (``1,2-dimethyl-3-oxa-1-
+    azaprop-2-en-1-yl``) or abstained.
+
+    PIN ONLY as a PREFIX: this fires in ``_name_amino_branch`` (a substituent
+    namer), reached only when parent selection already made the amide a prefix
+    (a senior characteristic group is elsewhere). When the amide is the
+    PRINCIPAL group it is the SUFFIX -- BB:33048 marks ``4-(N-methylacetamido)
+    quinoline`` explicitly NOT PIN, and Orthonym already names that molecule
+    ``N-methyl-N-(quinolin-2-yl)acetamide`` via the suffix path, which this
+    builder never sees.
+
+    Strict / fail-closed. Fires ONLY when, with FULL atom coverage:
+      * N is uncharged/unradical/unlabelled, NOT a ring member, all single
+        bonds, and has EXACTLY one bond into the parent (a bare tertiary amide N);
+      * N carries EXACTLY two non-parent heavy branches -- the acyl C (a clean
+        C=O) and one other substituent R';
+      * the acyl side names via ``linear_acyl_amido_prefix`` (an unbranched
+        saturated acyclic all-carbon acyl -> formamido/acetamido/{stem}anamido);
+      * R' names via the recursive substituent namer;
+      * the fragment is EXACTLY {N} + acyl-subtree + R'-subtree (nothing dropped).
+
+    Returns the BARE prefix core ``'N-{R'}{amido}'`` (the caller applies the
+    P-16.5.1.1 enclosing marks -- ``needs_brackets('N-methylacetamido')`` is
+    True, so it renders ``(N-methylacetamido)``); None otherwise.
+    """
+    sub_set = set(sub_atoms)
+    parent_set = set(parent_atoms)
+    if n_idx not in sub_set:
+        return None
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    # A bare tertiary amide N usable as a prefix (mirror the sulfonamido self-guards).
+    if n_atom.GetAtomicNum() != 7 or n_atom.GetIsAromatic() or n_atom.IsInRing():
+        return None
+    if (n_atom.GetFormalCharge() or n_atom.GetNumRadicalElectrons()
+            or n_atom.GetIsotope()):
+        return None
+    if any(b.GetBondTypeAsDouble() != 1.0 for b in n_atom.GetBonds()):
+        return None
+    parent_nbrs = [nb.GetIdx() for nb in n_atom.GetNeighbors()
+                   if nb.GetIdx() in parent_set]
+    if len(parent_nbrs) != 1:
+        return None
+    branches = [nb.GetIdx() for nb in n_atom.GetNeighbors()
+                if nb.GetIdx() not in parent_set and nb.GetIdx() in sub_set]
+    if len(branches) != 2:
+        return None
+
+    def _is_acyl_c(i):
+        a = mol.GetAtomWithIdx(i)
+        if a.GetAtomicNum() != 6:
+            return False
+        return any(
+            nb.GetAtomicNum() == 8
+            and mol.GetBondBetweenAtoms(i, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+            for nb in a.GetNeighbors()
+        )
+
+    acyl_candidates = [b for b in branches if _is_acyl_c(b)]
+    if len(acyl_candidates) != 1:
+        return None  # 0 (no acyl) or 2 (an imide -N(C=O)(C=O)) -> not this class
+    acyl_c = acyl_candidates[0]
+    r_prime = next(b for b in branches if b != acyl_c)
+
+    def _subtree(start):
+        seen = set()
+        stack = [start]
+        while stack:
+            i = stack.pop()
+            if i in seen or i == n_idx:
+                continue
+            seen.add(i)
+            for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+                if nb.GetIdx() != n_idx and nb.GetIdx() not in seen:
+                    stack.append(nb.GetIdx())
+        return seen
+
+    acyl_sub = _subtree(acyl_c)
+    rp_sub = _subtree(r_prime)
+    # Disjoint, and together with N exactly the fragment (no atom dropped/shared).
+    if acyl_sub & rp_sub:
+        return None
+    if ({n_idx} | acyl_sub | rp_sub) != sub_set:
+        return None
+
+    # Isotope hole (fable review of the first F-amido cut): `linear_acyl_amido_prefix`
+    # checks charge/radical on chain carbons but NOT isotope, and this producer must be
+    # honest without the gate (the 8afa533c lesson). An amido stem drops any label, so a
+    # labelled fragment would name a wrong isotopologue -- fail closed.
+    if any(mol.GetAtomWithIdx(i).GetIsotope() for i in sub_set):
+        return None
+
+    # R' must be a plain substituent, NOT a second acyl-like group -- a carbon
+    # double-bonded to a chalcogen (=O/=S/=Se/=Te). `-N(C=O)(C=S)` is a mixed imide,
+    # not P-66.1.1.4.3 method (1); `name_substituent` would spell the thioacyl as
+    # replacement-nomenclature junk (`1-methyl-2-thiaeth-1-en-1-yl`, non-PIN, gate-blind
+    # because it round-trips). Mirror the 2-acyl imide refusal (fable review).
+    rp_atom = mol.GetAtomWithIdx(r_prime)
+    if rp_atom.GetAtomicNum() == 6 and any(
+        nb.GetAtomicNum() in (8, 16, 34, 52)
+        and mol.GetBondBetweenAtoms(
+            r_prime, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+        for nb in rp_atom.GetNeighbors()
+    ):
+        return None
+
+    amido_core = linear_acyl_amido_prefix(mol, acyl_c, n_idx, {n_idx} | acyl_sub)
+    if not amido_core:
+        return None  # branched / unsaturated / ring / hetero acyl -> fail closed
+
+    # Name R' AND enclose it with the SAME machinery the amide-SUFFIX path uses
+    # (`_name_n_substituent` + `format_n_substitution`): it applies the P-16.5.1.1
+    # enclosing marks, the P-16.5.4 nesting escalation, and embeds/escalates a stereo
+    # descriptor (`N-[(S)-1-phenylethyl]`) correctly -- verified identical to
+    # `CC(=O)N(C)[C@@H](C)c1ccccc1 -> N-methyl-N-[(S)-1-phenylethyl]acetamide`. The first
+    # F-amido cut interpolated R' RAW (`f"N-{r_name}..."`), which left it UNBRACKETED and
+    # (a) regressed a valid RT-exact emission to an abstention (unparseable
+    # `N-2,2-dimethylpropylacetamido` -> SELF-01 suppressed -> the general fallback never
+    # ran) and (b) shipped an OPSIN-unparseable stereo name via the stereo carve-out
+    # (fable review). `_name_n_substituent` wants the attach atom first in the list.
+    from ..rules.amides import _name_n_substituent, format_n_substitution
+    rp_list = [r_prime] + [i for i in rp_sub if i != r_prime]
+    carbon_count = sum(
+        1 for i in rp_sub if mol.GetAtomWithIdx(i).GetAtomicNum() == 6)
+    r_name = _name_n_substituent(mol, rp_list, carbon_count)
+    if not r_name:
+        return None
+    from ..errors import is_refusal_sentinel
+    if is_refusal_sentinel(r_name):
+        return None  # recursion/depth fallback placeholder -> never splice `N-substituent...`
+    n_seg = format_n_substitution(
+        [{"atoms": rp_sub, "name": r_name, "carbon_count": carbon_count}])
+    if not n_seg or is_refusal_sentinel(n_seg):
+        return None
+    prefix = f"{n_seg}{amido_core}"
+
+    # Gate-INDEPENDENT re-anchor (the 8afa533c / F6 guard-2 precedent, mandatory because
+    # best-effort T4 ships on the certificate, NOT on OPSIN-RT -- the producer must be
+    # honest on its own). `name_substituent` can MIS-NAME R': e.g. `-CH2-S-CH3` ->
+    # `methylsulfanyl` (a pre-existing fragment-namer defect that drops the CH2; the O
+    # analog `-CH2-O-CH3` -> `methoxymethyl` is correct), so the composed prefix would
+    # denote a DIFFERENT molecule (fable re-review BLOCKER: gate-on it regressed 2
+    # HEAD-RT-exact rows to abstention, gate-off it shipped the wrong molecule). Re-anchor:
+    # build the corresponding AMIDE (this prefix's parent characteristic group,
+    # `...amido`->`...amide`), OPSIN-parse it, and require the SAME InChIKey as the
+    # substituent fragment capped at N with an implicit H. Fail closed on mismatch or when
+    # OPSIN is unavailable -> the cascade/general fallback then supplies a valid
+    # replacement name (restoring HEAD behaviour), never a wrong or atom-dropped prefix.
+    try:
+        capped_smiles = Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(sub_set))
+        capped = Chem.MolFromSmiles(capped_smiles)
+        if capped is None:
+            return None
+        capped_key = Chem.MolToInchiKey(capped)
+    except Exception:
+        return None
+    if not amido_core.endswith("amido"):
+        return None
+    amide_name = prefix[:-1] + "e"  # trailing '...amido' -> '...amide'
+    from ..namer import _validity_gate_name_to_smiles
+    reparsed = _validity_gate_name_to_smiles(amide_name)
+    if reparsed is None:
+        return None
+    # The InChIKey compare inherits InChI mobile-H (tautomer) equivalence -- a
+    # wrong-TAUTOMER R' name would pass. That is the same equivalence the headline
+    # round-trip metric uses (SELF-01's skeleton is looser still), so the guard sits
+    # AT the project's correctness bar, not below it; no tautomer-divergent R' name is
+    # reachable today (the R' namer refuses those with the `substituent` sentinel).
+    try:
+        rp_key = Chem.MolToInchiKey(Chem.MolFromSmiles(reparsed))
+    except Exception:
+        return None
+    if not rp_key or rp_key != capped_key:
+        return None
+    return prefix
+
+
 def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
                                      parent_atoms) -> Optional[str]:
     """P-66.1.1.4.3 (BB:32995): an N-attached ``-NH-SO2-R`` branch is the

@@ -3990,6 +3990,21 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             if amido_name:
                 return amido_name
 
+            # v30 F-amido (P-66.1.1.4.3 method (1), BB:33040): the strict builder
+            # above refuses a SUBSTITUTED amide N (`-N(R')-C(=O)-R`), and the legacy
+            # count fallback below refuses a non-mono-substituted N (37cd122d F1), so
+            # `-N(CH3)C(=O)CH3` dropped to the ugly general replacement name. Build the
+            # `{N-R'}{acyl}amido` PIN prefix (N-methylacetamido / N-methylformamido).
+            # Fail-closed on a branched/unsaturated/ring/hetero acyl or an unnameable
+            # R'. PIN only as a prefix -- reached only when parent selection already
+            # made the amide a prefix (the amide-as-principal case is the suffix path).
+            from .substituent_naming import n_substituted_acyl_amido_prefix
+            _n_amido = n_substituted_acyl_amido_prefix(
+                mol, attach_idx, frag_atoms, parent_atoms
+            )
+            if _n_amido:
+                return _n_amido
+
             # C4d (P-35.4.2): an acyl rooted on a CHALCOGEN -- the carbamate
             # class R-X-CO-NH- covering every alkoxycarbonyl -- has no
             # hydrocarbyl acyl name. The count below cannot express it and,
