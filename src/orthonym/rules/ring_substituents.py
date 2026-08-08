@@ -2121,6 +2121,57 @@ def name_ring_system_substituent(
     return None
 
 
+def _fold_nonring_decorations(mol, frag_set, frag_ring_atoms, attach_idx):
+    """v30 sub-lever A / Composer #2: fold every non-carrier decoration subgraph
+    of a chain-rooted ring branch into the ring-yl atom set.
+
+    The CARRIER is the connected component of ``frag_set - frag_ring_atoms`` that
+    contains the free-valence ``attach_idx``; every OTHER non-ring component hangs
+    off a ring atom and is a RING DECORATION (methoxy ``-O-CH3``, isopropyl, ...),
+    which the degree-1-only folder leaves behind so it lands in the carrier and
+    breaks the all-carbon carrier-path guard. Fold each such component into
+    ``frag_ring_atoms`` so the decorated ring-yl is named as a unit by the
+    ``name_ring_system_substituent`` recursion.
+
+    Returns the widened ``frag_ring_atoms`` set, or ``None`` (fail closed) when a
+    NON-carrier component leaves the fragment (a second attachment to the parent —
+    not a simple substituent) or does not touch a ring atom (unexpected topology).
+    """
+    ring_set = set(frag_ring_atoms)
+    non_ring = set(frag_set) - ring_set
+    seen: Set[int] = set()
+    widened = set(ring_set)
+    for start in non_ring:
+        if start in seen:
+            continue
+        comp: Set[int] = set()
+        stack = [start]
+        while stack:
+            a = stack.pop()
+            if a in comp:
+                continue
+            comp.add(a)
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nb.GetIdx()
+                if ni in non_ring and ni not in comp:
+                    stack.append(ni)
+        seen |= comp
+        if attach_idx in comp:
+            continue  # the carrier — never part of the ring-yl
+        touches_ring = False
+        for a in comp:
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nb.GetIdx()
+                if ni in ring_set:
+                    touches_ring = True
+                elif ni not in frag_set:
+                    return None  # a second parent bond -> not a simple substituent
+        if not touches_ring:
+            return None  # a non-carrier component not anchored to the ring
+        widened |= comp
+    return widened
+
+
 def _compound_ring_on_chain_substituent(
     mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info,
     allow_mancude: bool = False,
@@ -2172,6 +2223,17 @@ def _compound_ring_on_chain_substituent(
                 continue
             ring_substituent_atoms.add(ni)
     frag_ring_atoms = set(frag_ring_atoms) | ring_substituent_atoms
+    if allow_mancude:
+        # v30 sub-lever A / Composer #2: also fold MULTI-ATOM ring decorations
+        # (methoxy, isopropyl, ...) into the ring-yl, so '(4-methoxyphenyl)methyl'
+        # and the decorated-aryl/-cycloalkyl-on-a-simple-carrier class names via
+        # the name_ring_system_substituent recursion below. Best-effort only; the
+        # PIN default keeps the degree-1-only folding above, byte-identical.
+        _widened = _fold_nonring_decorations(
+            mol, frag_set, frag_ring_atoms, attach_idx)
+        if _widened is None:
+            return None
+        frag_ring_atoms = _widened
     raw_carrier = frag_set - frag_ring_atoms
     # w2f p1 (P-29.6.2.1, BB 16322 'bromo(4-methylphenyl)methyl (preferred
     # prefix)'): an α-HALOGEN on the carrier is a carrier DECORATION cited
@@ -2424,8 +2486,15 @@ def _compound_ring_on_chain_substituent(
     # is concatenated bare ('cyclohexylmethyl', 'phenylmethyl' is retained
     # 'benzyl' elsewhere). The old unconditional parens produced the non-PIN
     # '(cyclohexyl)methyl'.
-    from ..assembly.naming_utils import is_complex_substituent
-    inner = f'({ring_name})' if is_complex_substituent(ring_name) else ring_name
+    from ..assembly.naming_utils import (
+        is_complex_substituent, apply_enclosing_marks)
+    # P-16.3.3 enclosing-mark nesting: escalate the outer mark to brackets when a
+    # DECORATED ring-yl already carries an inner enclosure ('4-(propan-2-yl)phenyl'
+    # -> '[4-(propan-2-yl)phenyl]methyl'). apply_enclosing_marks is byte-identical
+    # to the old f'({ring_name})' for every mark-free ring-yl (naphthalen-2-yl,
+    # 4-methoxyphenyl, 4-chlorophenyl), so PIN-reachable cases are unchanged.
+    inner = (apply_enclosing_marks(ring_name, -1)
+             if is_complex_substituent(ring_name) else ring_name)
     if len(path) == 1:
         # P-29.6.1 (BB 16270): the UNSUBSTITUTED -CH2-C6H5 group is the retained
         # PREFERRED prefix 'benzyl', not 'phenylmethyl'. Gated tightly to the
