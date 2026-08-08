@@ -890,6 +890,15 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                     mol, frag_atoms_set, attach_idx, _parent_n)
                 if _amino:
                     return _amino
+                # v30 sub-lever A: best-effort -NH-R with a RING-bearing R
+                # (cyclohexylamino, benzylamino, [(4-fluorophenyl)methyl]amino).
+                # _name_amino_branch declines a saturated-ring/ring-on-chain R;
+                # mirror the O-rooted alkoxy path which already recurses ring R.
+                if allow_mancude:
+                    _amino_ring = _name_amino_ring_branch(
+                        mol, frag_atoms_set, attach_idx, _parent_n)
+                    if _amino_ring:
+                        return _amino_ring
 
     token = _name_substituent_cascade(
         mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
@@ -3947,6 +3956,71 @@ def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
     elif carbon_count > 10:
         return get_chain_prefix(carbon_count) + "yloxy"
     return None
+
+
+def _name_amino_ring_branch(mol, frag_set, root_idx, parent_set):
+    """Best-effort: a MONO-substituted N carrying a RING-bearing R -> '(R-yl)amino'
+    (cyclohexylamino, benzylamino, [(4-fluorophenyl)methyl]amino,
+    (4-hydroxycyclohexyl)amino).
+
+    ``_name_amino_branch`` names alkyl/aryl/acyl R but declines a saturated-ring or
+    ring-on-chain R, so a secondary amine whose R contains a ring fell through to the
+    ugly replacement name. This mirrors the O-rooted ``get_alkoxy_prefix`` path (which
+    already recurses ring R -> ``cyclohexyloxy``) by recursing ``name_substituent`` on
+    R and wrapping the connective 'amino'.
+
+    Reached only under the best-effort tier (the caller gates on ``allow_mancude``), so
+    the PIN default is byte-identical. v1 scope: exactly ONE fragment-side branch on a
+    neutral, single-bonded N; the branch CONTAINS a ring and is nameable by the
+    recursion; the whole fragment is covered by N + the branch. Fail closed (None) on a
+    disubstituted N, an acyl branch (owned by ``_name_amino_branch``), a charged/
+    multivalent N, an unnameable R, or a coverage gap -> never a wrong or partial name.
+    """
+    root = mol.GetAtomWithIdx(root_idx)
+    if (root.GetSymbol() != 'N' or root.GetFormalCharge() != 0
+            or root.GetNumRadicalElectrons() != 0):
+        return None
+    if any(b.GetBondTypeAsDouble() != 1.0 for b in root.GetBonds()):
+        return None
+    branches = [n.GetIdx() for n in root.GetNeighbors()
+                if n.GetIdx() in frag_set and n.GetIdx() not in parent_set]
+    if len(branches) != 1:
+        return None  # v1: mono-substituted N only (disubstituted deferred)
+    b = branches[0]
+    # Collect the branch atoms WITHIN the fragment, boundary = the root N.
+    batoms = set()
+    stack = [b]
+    while stack:
+        a = stack.pop()
+        if a in batoms:
+            continue
+        batoms.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni != root_idx and ni in frag_set and ni not in batoms:
+                stack.append(ni)
+    # Coverage: root + branch must account for every heavy fragment atom.
+    heavy = {a for a in frag_set if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if ({root_idx} | batoms) & heavy != heavy:
+        return None
+    ring_info = mol.GetRingInfo()
+    if not any(ring_info.NumAtomRings(a) > 0 for a in batoms):
+        return None  # no ring -> _name_amino_branch's alkyl/aryl path owns it
+    # An acyl branch (-NH-C(=O)-R) is the amido family, owned by _name_amino_branch.
+    battach = mol.GetAtomWithIdx(b)
+    if battach.GetSymbol() == 'C' and any(
+            nb.GetSymbol() == 'O'
+            and mol.GetBondBetweenAtoms(b, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+            for nb in battach.GetNeighbors()):
+        return None
+    ryl = name_substituent(mol, sorted(batoms), b, allow_mancude=True)
+    if (not ryl or ryl == 'substituent' or ' ' in ryl
+            or 'unknown' in ryl.lower()):
+        return None
+    from .naming_utils import is_complex_substituent, apply_enclosing_marks
+    inner = (apply_enclosing_marks(ryl, -1)
+             if is_complex_substituent(ryl) else ryl)
+    return f'{inner}amino'
 
 
 def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
