@@ -3698,9 +3698,18 @@ def name_substituted_benzene(
             # other one (P-14.3.3, BB:2869). The suffix assembler could not see them.
             stereo_descriptors=stereo_descriptors,
         )
-        if stereo_descriptors:
+        if name and stereo_descriptors:
             stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
             name = f"{stereo_prefix}{name}"
+        # F-B / RISK-7 gate-independent re-anchor: whenever an N-substituted
+        # sulfonamide contributed to the name -- as the suffix (N,4-dimethyl...
+        # sulfonamide) or demoted to a '{N-subs}sulfamoyl' prefix -- the italic-N
+        # substituent names come from name_substituent_fragment, which can DROP a
+        # benzylic stereodescriptor or MIS-NAME a functional-group branch and yield
+        # a name for a DIFFERENT molecule that still OPSIN-parses. Require the whole
+        # name to round-trip InChIKey-exact; fail closed otherwise (8afa533c).
+        if name and n_substituents_map.get('sulfonamide'):
+            name = _reanchor_name_to_mol(mol, name)
         return name
 
     # === PREFIX-ONLY PATH (existing logic) ===
@@ -3908,13 +3917,19 @@ def _assemble_benzene_with_suffix(
                 n_prefix = _build_amidine_n_prefix(n_subs)
                 if n_prefix:
                     prefix_form = f"{n_prefix}{prefix_form}"
-        # F-B 0-wrong: a demoted sulfonamide becomes the bare 'sulfamoyl' prefix,
-        # which carries NO italic-N slot. If this sulfonamide has N-substituents,
-        # demoting it would silently DROP them (a wrong constitution). No
-        # 'N-methylsulfamoyl'-style prefix is built here, so fail closed instead —
-        # gate-independent honesty (the producer must not rely on SELF-01).
+        # RISK-7 (P-66.1.1.4.2): a demoted N-substituted sulfonamide is the
+        # '{N-substituents}sulfamoyl' substituent prefix, the N-substituents cited
+        # WITHOUT the italic N -- BB '2-(dimethylsulfamoyl)benzene-1-sulfonic acid'
+        # (PIN, :32982), 'phenylsulfamoyl' (:32985). The bare 'sulfamoyl' would DROP
+        # them (a wrong constitution). Build it; fail closed on a shape the builder
+        # does not cover (distinct N-substituents -> the nested 'ethyl(methyl)-'
+        # form). The caller re-anchors the whole name gate-independently, so a
+        # fragment-namer mis-spelling of an N-substituent fails closed, never ships.
         if sfx_name == 'sulfonamide' and n_substituents_map.get('sulfonamide'):
-            return None
+            prefix_form = _build_n_substituted_sulfamoyl_prefix(
+                n_substituents_map['sulfonamide'])
+            if not prefix_form:
+                return None
         if prefix_form:
             remaining_prefix_groups[prefix_form] = sfx_locants
 
@@ -4015,20 +4030,14 @@ def _assemble_benzene_with_suffix(
         )
 
     # Check for benzenesulfonamide-based naming:
-    # Single sulfonamide -> "benzenesulfonamide"
+    # Single sulfonamide -> "benzenesulfonamide". The whole name is re-anchored by
+    # the caller (name_substituted_benzene) whenever N-substituents are present.
     if chosen_suffix == 'sulfonamide' and chosen_count == 1:
-        _n_subs = n_substituents_map.get('sulfonamide', [])
-        _nm = _name_substituted_benzenesulfonamide(
+        return _name_substituted_benzenesulfonamide(
             remaining_prefix_groups, chosen_locants[0],
-            atom_to_locant, oriented_ring, n_substituents=_n_subs,
+            atom_to_locant, oriented_ring,
+            n_substituents=n_substituents_map.get('sulfonamide', []),
         )
-        # When N-substituents were merged in, the fragment namer may have dropped a
-        # stereodescriptor or mis-named a functional-group branch -> gate-independent
-        # re-anchor (fail closed on any mismatch). A PRIMARY ring sulfonamide (no
-        # N-substituents) is purely structural and needs no OPSIN call.
-        if _n_subs:
-            return _reanchor_name_to_mol(mol, _nm)
-        return _nm
 
     # F-B 0-wrong: a MULTI-instance sulfonamide (di/poly) carrying N-substituents
     # needs the superscripted N^1/N^3 locants of P-66.1.1.3.1.1, which are not
@@ -4676,6 +4685,33 @@ def _reanchor_name_to_mol(mol, name: Optional[str]) -> Optional[str]:
         return name if Chem.MolToInchiKey(got) == ref_key else None
     except Exception:
         return None
+
+
+def _build_n_substituted_sulfamoyl_prefix(
+    n_substituents: List[str],
+) -> Optional[str]:
+    """RISK-7 (P-66.1.1.4.2): the '{N-substituents}sulfamoyl' substituent prefix.
+
+    The N-substituents are cited WITHOUT the italic N (BB:32982
+    ``dimethylsulfamoyl``, :32985 ``phenylsulfamoyl``). CONSERVATIVE: only the
+    single-substituent (``methylsulfamoyl``, ``phenylsulfamoyl``) and
+    identical-multiplied (``dimethylsulfamoyl``) cases are built. DISTINCT
+    N-substituents need the nested ``ethyl(methyl)sulfamoyl`` form, which is not
+    built -> return None (fail closed). The caller re-anchors the whole name, so a
+    fragment-namer mis-spelling is caught regardless.
+    """
+    names = [n for n in (n_substituents or []) if n]
+    if not names or len(names) > 2:
+        return None
+    if len(set(names)) != 1:
+        return None  # distinct N-substituents: nested form not built
+    base = names[0]
+    if len(names) == 2:
+        base = f"{get_multiplier_prefix(2, base)}{base}"
+    # A substituted substituent -> enclosed per P-16.3.3 ('(methylsulfamoyl)',
+    # '(dimethylsulfamoyl)'). Pre-enclose here; the downstream formatter leaves an
+    # already-bracketed name alone, so there is no double-enclosing.
+    return f"({base}sulfamoyl)"
 
 
 def _name_substituted_benzenesulfonamide(

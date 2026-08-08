@@ -102,21 +102,28 @@ def test_part2_bare_ring_n_substituted_unchanged(smiles, expected):
 
 
 # ----------------------------------------------------------------------------
-# 0-WRONG — producer honesty (gate-independent). This whole module runs with the
-# OPSIN self-consistency gate OFF (the conftest default), so every emission is the
-# producer's own output, unmasked. A demoted N-substituted sulfonamide would lose
-# its N-substituent to the bare `sulfamoyl` prefix, so the benzene producer must
-# FAIL CLOSED rather than name a different molecule.
+# RISK-7 (P-66.1.1.4.2, BB:32982 `2-(dimethylsulfamoyl)benzene-1-sulfonic acid`,
+# :32985 `phenylsulfamoyl`): a demoted N-substituted sulfonamide is the ENCLOSED
+# `{N-substituents}sulfamoyl` prefix, the N-substituents cited WITHOUT the italic N.
+# (Supersedes F-B's earlier fail-closed stopgap for this class -- building the whole
+# class per invariant 1. Each expected string is OPSIN round-trip InChIKey-verified.)
 # ----------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles", [
-    "OC(=O)c1ccc(S(=O)(=O)NC)cc1",    # senior carboxylic acid + N-methylsulfonamide
-    "OC(=O)c1ccc(S(=O)(=O)N(C)C)cc1",  # + N,N-dimethyl
+@pytest.mark.parametrize("smiles,expected", [
+    ("OC(=O)c1ccc(S(=O)(=O)NC)cc1",       "4-(methylsulfamoyl)benzoic acid"),
+    ("OC(=O)c1ccc(S(=O)(=O)N(C)C)cc1",     "4-(dimethylsulfamoyl)benzoic acid"),
+    ("OS(=O)(=O)c1ccccc1S(=O)(=O)N(C)C",   "2-(dimethylsulfamoyl)benzene-1-sulfonic acid"),
+    ("OC(=O)c1ccc(S(=O)(=O)Nc2ccccc2)cc1", "4-(phenylsulfamoyl)benzoic acid"),
 ])
-def test_demotion_of_n_substituted_sulfonamide_fails_closed(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    out = name_benzene_derivative(mol)
-    # Either declines, or names WITHOUT a bare sulfamoyl that dropped the N-carbon.
-    assert out is None or "sulfamoyl" not in out
+def test_risk7_n_substituted_sulfamoyl_prefix(smiles, expected):
+    assert name_compound(smiles) == expected
+
+
+def test_distinct_n_substituents_sulfamoyl_fails_closed():
+    """Distinct N-substituents need the nested `ethyl(methyl)sulfamoyl` form, which
+    is not built -> fail closed (abstains), never a wrong molecule."""
+    from orthonym.errors import is_failure_name
+    out = name_compound("OC(=O)c1ccc(S(=O)(=O)N(C)CC)cc1")
+    assert not out or is_failure_name(out)
 
 
 # The PRIMARY sulfonamide demotion (`4-sulfamoylbenzoic acid`) must survive: it has
