@@ -4020,6 +4020,28 @@ def _name_amino_ring_branch(mol, frag_set, root_idx, parent_set):
     from .naming_utils import is_complex_substituent, apply_enclosing_marks
     inner = (apply_enclosing_marks(ryl, -1)
              if is_complex_substituent(ryl) else ryl)
+    # Gate-INDEPENDENT honesty (8afa533c guard-2 / F-B _reanchor precedent, fable
+    # review of ff00bf1f): name_substituent can return a yl-LESS PARENT-HYDRIDE for
+    # a ring ASSEMBLY (a biphenyl fragment -> "1,1'-biphenyl", no free-valence
+    # locant) that the token checks above cannot detect ("biphenyl" ends in "yl",
+    # has no space, is not the sentinel). Wrapping it as "(...)amino" then ships an
+    # OPSIN-UNPARSEABLE T4 name (the F1 shipped-malformed class, SELF-01-blind
+    # because T4 ships unparseable names unverified). Re-anchor a probe amine
+    # H2N-R, named "{inner}amine", against the standalone R-amine molecule; a
+    # genuine ring substituent round-trips (cyclohexyl -> cyclohexylamine ==
+    # cyclohexanamine), the parent-hydride does not. Fail closed on mismatch /
+    # no-parse / NO-JAR so the producer stays honest even with the gate off.
+    from rdkit import Chem as _Chem
+    try:
+        _probe_smi = _Chem.MolFragmentToSmiles(mol, sorted({root_idx} | batoms))
+        _probe_mol = _Chem.MolFromSmiles(_probe_smi) if _probe_smi else None
+    except Exception:  # noqa: BLE001 - a malformed probe is a decline, not a crash
+        _probe_mol = None
+    if _probe_mol is None:
+        return None
+    from ..rules.benzene import _reanchor_name_to_mol
+    if _reanchor_name_to_mol(_probe_mol, f'{inner}amine') is None:
+        return None
     return f'{inner}amino'
 
 

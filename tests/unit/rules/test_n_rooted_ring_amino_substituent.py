@@ -63,3 +63,17 @@ def test_existing_amino_unchanged(smi, expected, am):
 def test_deferred_shapes_fail_closed(smi):
     m, frag, fv = _frag(smi)
     assert name_substituent(m, frag, fv, allow_mancude=True) is None
+
+
+# Fable review of ff00bf1f: a ring-ASSEMBLY R (biphenyl) makes name_substituent
+# return the yl-LESS parent hydride "1,1'-biphenyl"; wrapping it shipped an
+# OPSIN-unparseable T4 name on previously-abstaining molecules (the 8afa533c F1
+# class). The gate-independent probe re-anchor must reject it -> fail closed.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", [
+    "[*]Nc1ccc(-c2ccccc2)cc1",     # -NH-(biphenyl-4-yl)
+    "[*]NCc1ccc(-c2ccccc2)cc1",    # -NH-CH2-(biphenyl-4-yl)
+])
+def test_ring_assembly_R_fails_closed_not_malformed(smi):
+    m, frag, fv = _frag(smi)
+    assert name_substituent(m, frag, fv, allow_mancude=True) is None
