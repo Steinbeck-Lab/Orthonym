@@ -216,7 +216,16 @@ def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
             pos = iupac
     if pos is None:
         pos = _build_ring_pos(set(cand.atoms), ring_info=ring_info)
-    return sorted(pos[a] for a in targets if a in pos)
+    # Phase 147 homogeneity: raw iupac_locants (and thus the fast path
+    # above) can mix int locants (2) with (int, str) fusion/prime tuples
+    # ((4, 'a'), (2, "'")). Coerce ints to (n, '') when any tuple is
+    # present so BOTH this sort AND the downstream compare_locant_sets stay
+    # type-safe (same idiom as _build_ring_pos:180-184 and
+    # compare_locant_sets). v30 #40: fused ring assembly Tier-5 non-crash.
+    locs = [pos[a] for a in targets if a in pos]
+    if any(isinstance(v, tuple) for v in locs):
+        locs = [(v, '') if isinstance(v, int) else v for v in locs]
+    return sorted(locs)
 
 
 def _substituent_positions(mol, cand: ParentCandidate):

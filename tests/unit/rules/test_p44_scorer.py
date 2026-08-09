@@ -188,3 +188,34 @@ class TestSelectParentUnified:
         res = select_parent_unified(mol, _ring_systems(mol),
                                     list(range(7)), None, [])
         assert "P-44" in res.reasoning
+
+
+class TestCandidateLocantsMixedTuple:
+    """v30 #40: _candidate_locants must not TypeError on mixed int/tuple
+    fusion locants (Tier-5 non-crash). Naphthalene ring_info carries int
+    locants (1-8) and (int,str) fusion tuples ((4,'a'),(8,'a')); the raw
+    fast-path fed sorted() a mixed list -> '<' not supported tuple vs int."""
+
+    def test_mixed_int_tuple_locants_no_typeerror(self):
+        from orthonym.rules.p44_scorer import _candidate_locants, ParentCandidate
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
+        atoms = tuple(range(10))
+        cand = ParentCandidate(kind="ring", atoms=atoms, pg_count=0)
+        iupac = {0: 1, 1: 2, 2: 3, 3: 4, 4: (4, 'a'),
+                 5: 5, 6: 6, 7: 7, 8: 8, 9: (8, 'a')}
+        ring_info = {"iupac_locants": iupac}
+        # targets deliberately span both int and tuple locants
+        out = _candidate_locants(mol, cand, [3, 4, 5, 9], ring_info=ring_info)
+        # homogenised to (n, '') tuples when any tuple present, sorted
+        assert out == [(4, ''), (4, 'a'), (5, ''), (8, 'a')]
+
+    def test_fused_ring_assembly_names_without_crash(self):
+        """Integration: the fable-found molecule names or abstains cleanly,
+        never raises. best-effort tier exercises the general engine."""
+        from orthonym import Orthonym
+        nm = Orthonym(style="pin", general_fallback=True,
+                       general_fallback_unverified=True,
+                       allow_aromatic_general=True)
+        # must not raise TypeError
+        res = nm.name("OCc1ccc2cc(-c3ccc4ccccc4c3)ccc2c1")
+        assert isinstance(res, str)
