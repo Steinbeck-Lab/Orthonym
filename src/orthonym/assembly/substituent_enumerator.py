@@ -900,6 +900,22 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                     if _amino_ring:
                         return _amino_ring
 
+        # v30 sub-lever A: best-effort -S-R with a RING-bearing R
+        # (cyclohexylsulfanyl, benzylsulfanyl, (4-hydroxycyclohexyl)sulfanyl).
+        # The chalcogen-rooted sulfanyl cascade tier declines a saturated-ring /
+        # ring-on-chain R; mirror the O-rooted alkoxy + N-rooted amino ring paths.
+        # A non-ring -S-R never matches (the helper requires a ring) -> falls
+        # through to the cascade unchanged; PIN default is byte-identical.
+        elif (allow_mancude and _root.GetSymbol() == 'S'
+                and _root.GetFormalCharge() == 0
+                and _root.GetDegree() == 2
+                and all(b.GetBondType() == Chem.BondType.SINGLE
+                        for b in _root.GetBonds())):
+            _thio_ring = _name_thio_ring_branch(
+                mol, frag_atoms_set, attach_idx)
+            if _thio_ring:
+                return _thio_ring
+
     token = _name_substituent_cascade(
         mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
 
@@ -4043,6 +4059,72 @@ def _name_amino_ring_branch(mol, frag_set, root_idx, parent_set):
     if _reanchor_name_to_mol(_probe_mol, f'{inner}amine') is None:
         return None
     return f'{inner}amino'
+
+
+def _name_thio_ring_branch(mol, frag_set, root_idx):
+    """Best-effort: a divalent -S-R with a RING-bearing R -> '(R-yl)sulfanyl'
+    (cyclohexylsulfanyl, benzylsulfanyl, (4-hydroxycyclohexyl)sulfanyl, phenylsulfanyl).
+
+    The chalcogen-rooted sulfanyl cascade tier declines a saturated-ring /
+    ring-on-chain R, so a thioether whose R contains a ring fell through to the
+    ugly replacement name. Mirrors the O-rooted alkoxy (`cyclohexyloxy`) and
+    N-rooted amino (`cyclohexylamino`) ring paths: recurse `name_substituent` on R
+    and wrap the connective 'sulfanyl'. Gated best-effort (caller checks
+    allow_mancude) -> PIN byte-identical. Fail closed (None) on a disubstituted /
+    higher-valence S, an R with no ring, an unnameable R, a coverage gap, or a
+    gate-independent re-anchor mismatch (the yl-less ring-assembly F1 class).
+    """
+    root = mol.GetAtomWithIdx(root_idx)
+    branches = [n.GetIdx() for n in root.GetNeighbors() if n.GetIdx() in frag_set]
+    if len(branches) != 1:
+        return None  # -S- must bridge exactly one in-fragment R and the parent
+    b = branches[0]
+    batoms = set()
+    stack = [b]
+    while stack:
+        a = stack.pop()
+        if a in batoms:
+            continue
+        batoms.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni != root_idx and ni in frag_set and ni not in batoms:
+                stack.append(ni)
+    heavy = {a for a in frag_set if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if ({root_idx} | batoms) & heavy != heavy:
+        return None
+    if not any(mol.GetRingInfo().NumAtomRings(a) > 0 for a in batoms):
+        return None  # no ring -> the cascade's simple-sulfanyl tier owns it
+    ryl = name_substituent(mol, sorted(batoms), b, allow_mancude=True)
+    if (not ryl or ryl == 'substituent' or ' ' in ryl
+            or 'unknown' in ryl.lower()):
+        return None
+    from .naming_utils import is_complex_substituent, apply_enclosing_marks
+    inner = (apply_enclosing_marks(ryl, -1)
+             if is_complex_substituent(ryl) else ryl)
+    # Gate-INDEPENDENT honesty (the ed52fa98 / 8afa533c precedent): name_substituent
+    # can return a yl-LESS PARENT-HYDRIDE for a ring ASSEMBLY (biphenyl ->
+    # "1,1'-biphenyl") that the token checks miss; wrapping it ships an
+    # OPSIN-unparseable T4 name. Re-anchor a probe thioether CH3-S-R named
+    # "({inner}sulfanyl)methane" against the standalone CH3-S-R molecule; a genuine
+    # ring substituent round-trips, the parent hydride does not. Fail closed on
+    # mismatch / no-parse / NO-JAR so the producer stays honest gate-off.
+    from rdkit import Chem as _Chem
+    try:
+        _rw = _Chem.RWMol(mol)
+        _newc = _rw.AddAtom(_Chem.Atom(6))
+        _rw.AddBond(root_idx, _newc, _Chem.BondType.SINGLE)
+        _probe_smi = _Chem.MolFragmentToSmiles(
+            _rw.GetMol(), sorted(batoms | {root_idx, _newc}))
+        _probe_mol = _Chem.MolFromSmiles(_probe_smi) if _probe_smi else None
+    except Exception:  # noqa: BLE001 - a malformed probe is a decline, not a crash
+        _probe_mol = None
+    if _probe_mol is None:
+        return None
+    from ..rules.benzene import _reanchor_name_to_mol
+    if _reanchor_name_to_mol(_probe_mol, f'({inner}sulfanyl)methane') is None:
+        return None
+    return f'{inner}sulfanyl'
 
 
 def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
