@@ -3064,6 +3064,12 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
     if sub_set != {n_idx, s_idx, dbl_o[0], dbl_o[1]} | r_subtree:
         return None
 
+    # `_acid_stem_oxide_prefix` already delegates to `_acid_stem_unsaturated_oxide_prefix`
+    # for a substituted / unsaturated R (substituent_prefix_forms.py), so a substituted-
+    # arene R (4-aminobenzene) reaches that builder here. v30 #29 gap-a fixed that
+    # builder's piece-selection (it now picks the capped-sulfonyl-S fragment, not a
+    # detached ring-sulfur host), which unblocks `2-(4-aminobenzene-1-sulfonamido)-
+    # 1,3-thiazole-5-carboxylic acid`.
     stem = _acid_stem_oxide_prefix(mol, r_idx, s_idx, 'sulfonyl')
     if not stem or not stem.endswith('sulfonyl'):
         return None

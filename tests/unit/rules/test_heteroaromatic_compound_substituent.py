@@ -36,8 +36,17 @@ def test_baseline_amino_unchanged():
     assert _pin().name("OC(=O)c1cnc(N)s1") == "2-amino-1,3-thiazole-5-carboxylic acid"
 
 
-def test_arene_sulfonamido_still_fails_closed_at_pin():
-    # gap (a): the 2-ring arenesulfonamido substituent is NOT yet nameable;
-    # it must abstain (fail closed), NEVER ship a wrong atom-dropped 'amino'.
-    r = _pin().name("OC(=O)c1cnc(NS(=O)(=O)c2ccc(N)cc2)s1")
-    assert r == "unknown organic compound"
+@pytest.mark.parametrize("smi,expected", [
+    # v30 #29 gap-a (was abstaining): the substituted-arene arenesulfonamido
+    # substituent now names at PIN — the exact BB row P-66.1.1.4.3 :33034 —
+    # after the _acid_stem_unsaturated_oxide_prefix piece-selection fix. Generalises
+    # across heteroaromatic hosts (thiazole/thiophene/pyridine).
+    ("OC(=O)c1cnc(NS(=O)(=O)c2ccc(N)cc2)s1",
+     "2-(4-aminobenzene-1-sulfonamido)-1,3-thiazole-5-carboxylic acid"),
+    ("OC(=O)c1cnc(NS(=O)(=O)c2ccc(C)cc2)s1",
+     "2-(4-methylbenzene-1-sulfonamido)-1,3-thiazole-5-carboxylic acid"),
+    ("OC(=O)c1ccc(NS(=O)(=O)c2ccc(N)cc2)s1",
+     "5-(4-aminobenzene-1-sulfonamido)thiophene-2-carboxylic acid"),
+])
+def test_arene_sulfonamido_names_at_pin(smi, expected):
+    assert _pin().name(smi) == expected

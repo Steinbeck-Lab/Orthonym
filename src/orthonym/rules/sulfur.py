@@ -359,15 +359,23 @@ def _acid_stem_unsaturated_oxide_prefix(
         Chem.SanitizeMol(frag)
     except Exception:
         return None
-    # Isolate the S-bearing fragment (the parent side is now disconnected).
+    # Isolate the fragment bearing the CAPPED SULFONYL S. Selecting the first piece
+    # that contains ANY sulfur mis-picks the detached PARENT when that parent itself
+    # holds a ring sulfur (a thiazole / thiophene host): the wrong piece has _acid_s=0
+    # so guard 1 spuriously fires. v30 #29 gap-a: `2-(4-aminobenzene-1-sulfonamido)-
+    # 1,3-thiazole-5-carboxylic acid` abstained because the thiazole piece `Nc1nccs1`
+    # was chosen over the arene sulfonic acid `Nc1ccc(S(=O)(=O)O)cc1`. RWMol.AddAtom
+    # appends and RemoveBond does not reindex, so ``sulfur_idx`` is still valid in
+    # ``frag``; pick the piece whose atom-index tuple contains it.
     try:
+        _idx_tuples = Chem.GetMolFrags(frag, asMols=False)
         pieces = Chem.GetMolFrags(frag, asMols=True, sanitizeFrags=True)
     except Exception:
         return None
     acid_smiles = None
     acid_piece = None
-    for p in pieces:
-        if any(a.GetSymbol() == "S" for a in p.GetAtoms()):
+    for _tup, p in zip(_idx_tuples, pieces):
+        if sulfur_idx in _tup:
             acid_smiles = Chem.MolToSmiles(p)
             acid_piece = p
             break
