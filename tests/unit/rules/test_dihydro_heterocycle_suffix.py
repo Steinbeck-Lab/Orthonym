@@ -62,3 +62,20 @@ def test_dihydro_heterocycle_suffix_rt_exact():
 ])
 def test_no_regression_bare_and_saturated_rings(smi, expected):
     assert _pin().name(smi) == expected
+
+
+# ---- fable-dihydro BLOCKER: -ol/-amine ring-atom suffix over-inclusion (fixed) ----
+
+@pytest.mark.parametrize("smi,expected", [
+    # For -ol/-amine the pg tuple carries the RING bearing-carbon; the neighbor
+    # clause must NOT leak onto its ring neighbours (which flipped same-element-
+    # adjacent rings pyridazine/1,2-dithiine, regressing them to abstain and, gate
+    # off, to a wrong enol/enamine isomer). The exocyclic-only neighbor clause keeps
+    # these correct.
+    ("NC1CC=CNN1", "1,2,3,4-tetrahydropyridazin-3-amine"),
+    ("OC1CC=CNN1", "1,2,3,4-tetrahydropyridazin-3-ol"),
+    ("OC1CC=CSS1", "3,4-dihydro-1,2-dithiin-3-ol"),
+    ("NC1CC=CSS1", "3,4-dihydro-1,2-dithiin-3-amine"),
+])
+def test_ol_amine_ring_suffix_not_over_included(smi, expected):
+    assert _pin().name(smi) == expected

@@ -1360,11 +1360,20 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
     # byte-identical (additive). Mirrors the carbocyclic sibling
     # `partial_saturation.py:546`, which already carries a pcg term.
     pcg_atoms = set(principal_group_atoms or ())
+    # The neighbor clause counts ONLY pg atoms OUTSIDE the ring (a `-carboxylic
+    # acid` carbon), so a ring atom is marked as a PCG position when it either IS
+    # a ring-atom suffix (`-ol`/`-amine`: the bearing C is itself in the tuple) or
+    # BEARS an exocyclic suffix. Counting the whole `pcg_atoms` in the neighbor
+    # clause over-included: for `-ol`/`-amine` the tuple carries the ring bearing
+    # carbon, so its two RING neighbours were spuriously marked, flipping the
+    # numbering of same-element-adjacent rings (pyridazine, 1,2-dithiine) and
+    # regressing them (fable-dihydro BLOCKER; invariant 9).
+    exo_pcg = pcg_atoms - ring_set
     pcg_pos: Set[int] = set()
     if pcg_atoms:
         for p, a in enumerate(ordered):
             if a in pcg_atoms or any(
-                    nb.GetIdx() in pcg_atoms
+                    nb.GetIdx() in exo_pcg
                     for nb in mol.GetAtomWithIdx(a).GetNeighbors()):
                 pcg_pos.add(p)
     # The molecule's own ring double bonds, as ring-edge start positions.
@@ -1614,6 +1623,11 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     best_key = None
     best_map: Optional[Dict[int, int]] = None
     _pcg_atoms = set(principal_group_atoms or ())
+    # Only EXOCYCLIC pg atoms participate in the neighbor clause (see the twin
+    # comment in _mancude_hydro_name): a ring-atom suffix self-marks, an exocyclic
+    # suffix marks its ring-attachment atom, and a ring bearing-carbon in the
+    # tuple never leaks onto its ring neighbours (fable-dihydro BLOCKER).
+    _exo_pcg = _pcg_atoms - set(ring_atoms)
     for start in range(n):
         for direction in (1, -1):
             seq = [ordered[(start + k * direction) % n] for k in range(n)]
@@ -1651,7 +1665,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
             pcg_locs = tuple(sorted(
                 loc[a] for a in ring_atoms
                 if a in loc and (a in _pcg_atoms or any(
-                    nb.GetIdx() in _pcg_atoms
+                    nb.GetIdx() in _exo_pcg
                     for nb in mol.GetAtomWithIdx(a).GetNeighbors()))))
             hydro_locs = tuple(sorted(loc[a] for a in hydro))
             key = (senior_at_one, het_locs, seniority, ih_locs, pcg_locs, hydro_locs)
