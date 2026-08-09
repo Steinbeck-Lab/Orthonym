@@ -34,8 +34,15 @@ from ..data.amino_acids import (
 # [CX3](=O)[NX3;H1][CX4] matches C(=O)-NH-CH pattern
 _PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H1][CX4]"
 
-# Terminal primary amine (free NH2, not part of amide C(=O)N)
-_TERMINAL_NH2_SMARTS = "[NX3;H2;!$([NX3][CX3]=O)]"
+# Terminal FREE amine (not part of an amide C(=O)N). H2 is the ordinary
+# alpha-amino N-terminus; H1 also admits a SECONDARY free amine so a cyclic
+# imino-acid N-terminus (proline, hydroxyproline) is recognised — its ring N is
+# H1, so the H2-only form rejected every Pro-N-terminal peptide. The
+# !$([NX3][CX3]=O) exclusion still bars an ACYLATED N, so an N-acyl amino acid
+# (N-acetylglycine: its only N is the amide) keeps failing this check; a
+# non-peptide secondary amine (sarcosine) is already excluded upstream by the
+# peptide-bond requirement.
+_TERMINAL_NH2_SMARTS = "[NX3;H1,H2;!$([NX3][CX3]=O)]"
 
 # Terminal carboxylic acid
 _TERMINAL_COOH_SMARTS = "[CX3](=O)[OX2H1]"

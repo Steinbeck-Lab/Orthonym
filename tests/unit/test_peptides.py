@@ -91,6 +91,29 @@ class TestTautomerRobustResidues:
         assert result == "alanylhistidylglycine"
 
 
+# ── N-terminal proline (secondary-amine free N-terminus) ─────────────────
+# _is_valid_peptide required a PRIMARY terminal NH2; N-terminal proline's ring N
+# is a secondary amine, so every Pro-N-terminal peptide was rejected. The free-
+# amine test now admits H1 as well, still barring an acylated N.
+
+@pytest.mark.unit
+class TestProlineNTerminus:
+    """Peptides whose N-terminal residue is the cyclic imino acid proline."""
+
+    def test_prolylglycine(self):
+        result = name_compound("OC(=O)CNC(=O)[C@@H]1CCCN1")
+        assert result == "prolylglycine"
+
+    def test_prolylalanine(self):
+        result = name_compound("C[C@@H](C(=O)O)NC(=O)[C@@H]1CCCN1")
+        assert result == "prolylalanine"
+
+    def test_n_acetylglycine_still_excluded(self):
+        """The relaxation must NOT admit an N-acyl amino acid (acylated N)."""
+        result = name_compound("CC(=O)NCC(=O)O")
+        assert "glycyl" not in result.lower()
+
+
 # ── Edge cases: should NOT trigger peptide naming ─────────────────────
 
 @pytest.mark.unit
