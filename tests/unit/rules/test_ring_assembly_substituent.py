@@ -82,3 +82,13 @@ def test_terphenyl_detected_as_assembly():
     mol, ring_atoms, _, _ = _biphenyl_attach(
         "Cc1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
     assert _fragment_is_ring_assembly(mol, ring_atoms) is True
+
+
+def test_terphenyl_substituent_middle_ring_locant():
+    """151-03 D-18/D-19 bug fixed on the substituent path too: para-terphenyl's
+    MIDDLE ring back-attachment locant must be 4' ('1,1':4',1'''), not the buggy
+    per-pair '1,1':1',1''' that OPSIN parses to a different (spiro) molecule."""
+    mol, ring_atoms, attach, _ = _biphenyl_attach(
+        "Cc1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
+    assert get_ring_substituent_name(mol, ring_atoms, attach) \
+        == "[1,1':4',1''-terphenyl]-4-yl"

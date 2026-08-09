@@ -2368,16 +2368,35 @@ def name_ring_assembly_prefix(
     if _INDICATED_H_EMBEDDED_RE.search(ring_name):
         return None
 
-    # Build connection locant string (reuse existing logic from name_ring_assembly)
-    connection_parts = []
+    # Build connection locant string per IUPAC P-28.2.1, using PER-SYSTEM
+    # numbering exactly as ``name_ring_assembly`` (the parent path) does. The
+    # legacy per-pair ``_get_connection_locant`` returned 1 for every
+    # carbocyclic connection atom, so a ter-/quater- assembly SUBSTITUENT
+    # emitted the buggy '1,1':1',1''-terphenyl' (the middle ring's back-
+    # attachment locant must be 4' for para-terphenyl). This bug was fixed on
+    # the parent path (151-03 D-18/D-19) but the substituent-prefix path kept
+    # the old code; a biphenyl (single junction) is unaffected either way.
+    per_system_locants = _compute_per_system_ring_locants(mol, assembly_info)
+
+    def _lookup_locant(sys_idx, atom_idx, sys_atoms):
+        if (per_system_locants is not None
+                and 0 <= sys_idx < len(per_system_locants)
+                and atom_idx in per_system_locants[sys_idx]):
+            return per_system_locants[sys_idx][atom_idx]
+        return _get_connection_locant(mol, atom_idx, sys_atoms)
+
+    sorted_connections = []
     for a1, a2, s1, s2 in connections:
         if s1 > s2:
             a1, a2, s1, s2 = a2, a1, s2, s1
-        loc1 = _get_connection_locant(mol, a1, ring_systems[s1])
-        loc2 = _get_connection_locant(mol, a2, ring_systems[s2])
-        prime1 = _format_prime(s1)
-        prime2 = _format_prime(s2)
-        connection_parts.append(f"{loc1}{prime1},{loc2}{prime2}")
+        sorted_connections.append((a1, a2, s1, s2))
+    sorted_connections.sort(key=lambda c: (c[2], c[3]))
+    connection_parts = []
+    for a1, a2, s1, s2 in sorted_connections:
+        loc1 = _lookup_locant(s1, a1, ring_systems[s1])
+        loc2 = _lookup_locant(s2, a2, ring_systems[s2])
+        connection_parts.append(
+            f"{loc1}{_format_prime(s1)},{loc2}{_format_prime(s2)}")
     connection_str = ":".join(connection_parts)
 
     # Find which ring system the attachment atom belongs to
