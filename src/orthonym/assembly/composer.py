@@ -4626,8 +4626,19 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     """
     from ..rules.heterocycles import name_heterocycle, name_substituted_heterocycle
 
-    # Get the heterocycle parent name
-    parent_name = name_heterocycle(features.mol, features.principal_ring)
+    # Get the heterocycle parent name. Pass the principal-group atoms so a
+    # PARTIALLY-SATURATED ring numbers its hydro/indicated-H prefix consistently
+    # with the suffix locant the substituted path appends (P-14.4(c): PCG low
+    # locants after indicated-H, before hydro). Flatten the per-match tuples;
+    # None/empty -> byte-identical (additive). Fixes the dihydro-heterocycle +
+    # carboxylic-acid class (`5,6-dihydro-2H-1,4-thiazine-3-carboxylic acid`).
+    _pcg_flat = {
+        a for tup in (getattr(features, "principal_group_atoms", None) or [])
+        for a in (tup if isinstance(tup, (list, tuple)) else (tup,))
+    }
+    parent_name = name_heterocycle(
+        features.mol, features.principal_ring,
+        principal_group_atoms=_pcg_flat or None)
     if parent_name is None:
         # A ring heteroatom has no replacement prefix in the governing table, so
         # the parent cannot be spelled. Refuse before decorating it with

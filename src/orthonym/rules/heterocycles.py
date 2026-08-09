@@ -1256,7 +1256,8 @@ def _ring_double_bond_count(mol, ring_set) -> Optional[int]:
     return n
 
 
-def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
+def _mancude_hydro_name(mol, ring_set: Set[int],
+                        principal_group_atoms=None) -> Optional[str]:
     """P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle,
     INCLUDING the case where the mancude parent itself needs indicated hydrogen.
 
@@ -1348,6 +1349,24 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     ih_count = n_eligible - 2 * max_match
 
     pos_of = {a: k for k, a in enumerate(ordered)}
+    # P-14.4(c): the ring position(s) bearing the principal characteristic group
+    # (the suffix) get low locants AFTER indicated hydrogen (b) and BEFORE hydro
+    # prefixes (e). Without this term the stem was numbered PCG-blind and the
+    # dihydro locants disagreed with the suffix numbering the caller appends
+    # (`3,6-dihydro-2H-1,4-thiazine`+`-3-carboxylic acid` vs the correct
+    # `5,6-dihydro-2H`). `principal_group_atoms` may be exocyclic (a `-carboxylic
+    # acid` carbon), so map to the ring atom that bears it. Default None ->
+    # `pcg_pos` empty -> the key term is `()` and every bare-ring name is
+    # byte-identical (additive). Mirrors the carbocyclic sibling
+    # `partial_saturation.py:546`, which already carries a pcg term.
+    pcg_atoms = set(principal_group_atoms or ())
+    pcg_pos: Set[int] = set()
+    if pcg_atoms:
+        for p, a in enumerate(ordered):
+            if a in pcg_atoms or any(
+                    nb.GetIdx() in pcg_atoms
+                    for nb in mol.GetAtomWithIdx(a).GetNeighbors()):
+                pcg_pos.add(p)
     # The molecule's own ring double bonds, as ring-edge start positions.
     mol_edges: Set[int] = set()
     unsat_pos: Set[int] = set()
@@ -1442,8 +1461,9 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     for het_key, loc in _monocycle_numberings(mol, ordered):
         for ih in ih_candidates:
             ih_locs = tuple(sorted(loc[p] for p in ih))
+            pcg_locs = tuple(sorted(loc[p] for p in pcg_pos))
             hydro_locs = tuple(sorted(loc[p] for p in sp3_pos - set(ih)))
-            key = (het_key, ih_locs, hydro_locs)
+            key = (het_key, ih_locs, pcg_locs, hydro_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best = (loc, ih)
@@ -1482,7 +1502,8 @@ def _mancude_hydro_name(mol, ring_set: Set[int]) -> Optional[str]:
     return f"{hydro_locants}-{prefix}{sep}{stem}"
 
 
-def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[str]:
+def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
+                             principal_group_atoms=None) -> Optional[str]:
     """Hydro name via the RDKit-AROMATIZABLE mancude parent (1,2-dihydropyridine,
     2,3-dihydro-1H-pyrrole).
 
@@ -1592,6 +1613,7 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
     }
     best_key = None
     best_map: Optional[Dict[int, int]] = None
+    _pcg_atoms = set(principal_group_atoms or ())
     for start in range(n):
         for direction in (1, -1):
             seq = [ordered[(start + k * direction) % n] for k in range(n)]
@@ -1622,8 +1644,17 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
                 for a in het
             ))
             ih_locs = tuple(sorted(loc[a] for a in indicated_atoms))
+            # P-14.4(c): PCG/suffix ring atoms get low locants after indicated
+            # hydrogen (b) and before hydro prefixes (e). Ring atoms bearing the
+            # (possibly exocyclic) principal group; default None -> `()` -> every
+            # bare-ring/substituent name byte-identical (additive).
+            pcg_locs = tuple(sorted(
+                loc[a] for a in ring_atoms
+                if a in loc and (a in _pcg_atoms or any(
+                    nb.GetIdx() in _pcg_atoms
+                    for nb in mol.GetAtomWithIdx(a).GetNeighbors()))))
             hydro_locs = tuple(sorted(loc[a] for a in hydro))
-            key = (senior_at_one, het_locs, seniority, ih_locs, hydro_locs)
+            key = (senior_at_one, het_locs, seniority, ih_locs, pcg_locs, hydro_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best_map = loc
@@ -1655,7 +1686,8 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat) -> Optional[s
     return f"{locant_str}-{prefix}{sep}{parent_name}"
 
 
-def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional[str]:
+def name_partially_saturated_monocyclic_heterocycle(
+        mol, ring_atoms, principal_group_atoms=None) -> Optional[str]:
     """Name a partially-saturated monocyclic mancude heterocycle (IUPAC P-31.1.4).
 
     Example: ``C1C=CC=CN1`` -> ``1,2-dihydropyridine`` (the systematic HW path
@@ -1720,17 +1752,18 @@ def name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms) -> Optional
     # _mancude_hydro_name returns None unless ``1 <= d < max_match``, so a
     # genuinely mancude aromatic ring still declines here exactly as before.
     if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
-        return _mancude_hydro_name(mol, ring_set)
+        return _mancude_hydro_name(mol, ring_set, principal_group_atoms)
 
     # (1) the RDKit-aromatizable mancude parent (pyridine, 1H-pyrrole, ...).
-    named = _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat)
+    named = _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
+                                     principal_group_atoms)
     if named:
         return named
     # (2) P-54.4.1 matching-based namer: parents that cannot aromatize, and
     # parents that themselves require indicated hydrogen (4H-1,3-oxazine,
     # 2H-pyran, 2H-pyrrole) or carry a multi-heteroatom locant prefix
     # (1,4-dioxine). Fail-closed; returns None rather than a mancude name.
-    return _mancude_hydro_name(mol, ring_set)
+    return _mancude_hydro_name(mol, ring_set, principal_group_atoms)
 
 
 def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Optional[str]:
@@ -1937,7 +1970,7 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     return ih_prefix + _apply_retained_stem(hw)
 
 
-def name_heterocycle(mol, ring_atoms) -> Optional[str]:
+def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[str]:
     """
     Generate IUPAC name for a heterocyclic ring.
 
@@ -1991,7 +2024,8 @@ def name_heterocycle(mol, ring_atoms) -> Optional[str]:
     # pyridine): the systematic HW path below drops the hydrogenation and emits
     # the mancude parent ('pyridine'). Detect + name the hydro form first
     # (P-31.1.4); fails closed for anything it cannot number correctly.
-    partial = name_partially_saturated_monocyclic_heterocycle(mol, ring_atoms)
+    partial = name_partially_saturated_monocyclic_heterocycle(
+        mol, ring_atoms, principal_group_atoms)
     if partial:
         return partial
 
