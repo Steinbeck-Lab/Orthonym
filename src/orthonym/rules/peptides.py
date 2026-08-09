@@ -44,6 +44,47 @@ _TERMINAL_COOH_SMARTS = "[CX3](=O)[OX2H1]"
 _ALPHA_AA_CORE_SMARTS = "[NX3;H2,H1][CX4][CX3](=O)"
 
 
+# Constitution-robust residue identification (InChIKey first block = the skeleton
+# layer). Exact-SMILES matching in get_amino_acid_name misses a residue whose
+# reconstructed guanidine/imidazole TAUTOMER, or a FragmentOnBonds isotope label,
+# differs from the table's spelling: reconstructed arginine
+# ``NC(N)=NCCC[C@H](N)C(=O)O`` and the table's ``N=C(N)NCCCC(N)C(=O)O`` are the
+# same constitution but different strings, so a genuine arginine-bearing tri+
+# peptide failed to name at all. The InChIKey first block ignores tautomer,
+# isotope and stereo, so it matches by CONSTITUTION; the L/D descriptor is
+# recovered separately from CIP in _get_stereo_prefix. Built lazily once.
+_AA_INCHIKEY1_TO_NAME: Optional[Dict[str, str]] = None
+
+
+def _residue_inchikey1(mol) -> str:
+    """First InChIKey block (skeleton) of a residue mol, or '' on failure."""
+    from rdkit.Chem import inchi
+    try:
+        key = inchi.MolToInchiKey(mol)
+    except Exception:
+        return ""
+    return key.split("-")[0] if key else ""
+
+
+def _aa_inchikey1_map() -> Dict[str, str]:
+    """{InChIKey-first-block -> trivial amino-acid name} over the standard set."""
+    global _AA_INCHIKEY1_TO_NAME
+    if _AA_INCHIKEY1_TO_NAME is None:
+        built: Dict[str, str] = {}
+        for smi, name in STANDARD_AMINO_ACIDS.items():
+            aa_mol = Chem.MolFromSmiles(smi)
+            if aa_mol is None:
+                continue
+            key = _residue_inchikey1(aa_mol)
+            if key:
+                # A standard amino acid is one constitution, so a first-block
+                # collision across DIFFERENT names cannot occur; first-wins is a
+                # no-op safety over the alternate-SMILES rows that share a name.
+                built.setdefault(key, name)
+        _AA_INCHIKEY1_TO_NAME = built
+    return _AA_INCHIKEY1_TO_NAME
+
+
 def name_peptide(mol) -> Optional[str]:
     """
     Name a peptide molecule using the acylamino convention.
@@ -325,6 +366,16 @@ def _identify_residues(
             if nostereo_mol is not None:
                 nostereo_can = Chem.MolToSmiles(nostereo_mol, canonical=True)
                 aa_name = get_amino_acid_name(nostereo_can)
+
+        if aa_name is None:
+            # Constitution fallback (purely additive: only fires where the
+            # string lookups already returned None). Matches the residue by its
+            # InChIKey skeleton, so a tautomer/isotope spelling that the exact
+            # SMILES table missed (arginine guanidine, a FragmentOnBonds isotope
+            # label) still resolves to its standard name. A wrong constitution
+            # cannot collide here (distinct skeleton), and the whole-peptide name
+            # still faces the downstream SELF-01 validity gate, so 0-wrong holds.
+            aa_name = _aa_inchikey1_map().get(_residue_inchikey1(mol))
 
         if aa_name is None:
             # Non-standard residue: cannot name with acylamino convention

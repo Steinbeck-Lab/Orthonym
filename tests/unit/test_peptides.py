@@ -64,6 +64,33 @@ class TestTripeptides:
         assert result == "glycylalanylleucine"
 
 
+# ── Constitution-robust residue identification (InChIKey skeleton match) ──
+# A residue whose reconstructed guanidine/imidazole tautomer differs from the
+# table's SMILES spelling (arginine, histidine) used to fail exact-string lookup,
+# so the WHOLE peptide returned None. Identification now falls back to the
+# InChIKey first block (constitution), which is tautomer/isotope-invariant.
+
+@pytest.mark.unit
+class TestTautomerRobustResidues:
+    """Peptides whose residues are guanidine/imidazole tautomer-sensitive."""
+
+    def test_arginylglycine(self):
+        """Arg-Gly: arginine's guanidine tautomer must still identify."""
+        result = name_compound("N=C(N)NCCC[C@H](N)C(=O)NCC(=O)O")
+        assert result == "arginylglycine"
+
+    def test_glutaminylarginyltyrosine(self):
+        """Gln-Arg-Tyr: an internal arginine in a tripeptide (was None)."""
+        result = name_compound(
+            "NC(=O)CC[C@H](N)C(=O)N[C@@H](CCCN=C(N)N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O")
+        assert result == "glutaminylarginyltyrosine"
+
+    def test_alanylhistidylglycine(self):
+        """Ala-His-Gly: histidine's imidazole tautomer must still identify."""
+        result = name_compound("C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)NCC(=O)O")
+        assert result == "alanylhistidylglycine"
+
+
 # ── Edge cases: should NOT trigger peptide naming ─────────────────────
 
 @pytest.mark.unit
