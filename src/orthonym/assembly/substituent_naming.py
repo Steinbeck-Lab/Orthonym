@@ -2044,11 +2044,18 @@ def _unsaturated_substituent_name(
         ez_bits.sort()
         descriptor = "(" + ",".join(f"{lc}{ez}" for lc, ez in ez_bits) + ")-"
 
-    # A chain R/S stereocentre can only be merged when we do NOT lead with an E/Z
-    # block (else _stereo_route's double-apply guard silently drops it).
-    if descriptor and any(
-            mol.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
-            for i in sub_set):
+    # Chain R/S stereocentres: `_stereo_route` (the caller's post-processor) can add
+    # a descriptor for exactly ONE centre and ONLY when we do not already lead with
+    # an E/Z block. So fail closed when EITHER we emit an E/Z descriptor and any R/S
+    # exists (double-apply guard would drop the R/S), OR there are >=2 R/S centres
+    # (`_add_substituent_stereo`'s multi-centre branch returns the name UNCHANGED,
+    # dropping ALL R/S -> a stereo-dropped WRONG molecule; fable-polyene BLOCKER 2,
+    # invariant 9). A single centre with no descriptor is left for `_stereo_route`
+    # to locate (RT-verified, e.g. `(S)-...`).
+    n_chiral = sum(
+        1 for i in sub_set
+        if mol.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED)
+    if n_chiral >= 2 or (descriptor and n_chiral >= 1):
         return None
 
     # Build the ene stem: mono -> 'prop-1-en'; poly -> euphonic-'a' 'penta-1,3-dien'.

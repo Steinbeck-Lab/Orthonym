@@ -1652,6 +1652,12 @@ _HYDRIDE_YL_SHAPE_RE = re.compile(
     r"(?P<end>[a-z]+)$"                 # the yl-type ending
 )
 
+# A multiplied-unsaturation infix (`-1,3-dien`, `-2,4,6-trien`, `-1,3-diyn`) — the
+# marker that a euphonic 'a' was inserted after the chain root. Used by
+# `_is_bare_hydride_yl` to confirm a `<root>a` head is genuinely a multiplied-ene
+# stem before dropping the 'a', never a coincidental trailing 'a'.
+_MULTIPLIED_UNSAT_MARKER_RE = re.compile(r"-\d[\d,'′]*-(?:di|tri|tetra|penta)(?:en|yn)")
+
 # Bracketed descriptors that belong to a STEM, not to a substituent: fusion
 # locants `[1,5-a]`, von Baeyer/spiro descriptors `[3.2.1]`, isotope descriptors
 # `[4-2H]`, and leading heteroatom-position sets `[1,2,4]`.  P-16.3.4 clause (f)
@@ -1833,6 +1839,15 @@ def _stem_splits_into_prefix_plus_stem(stem: str) -> bool:
             tail = rest[len(unit):].lstrip('-')
             if tail in _HYDRIDE_STEMS or tail in _SIMPLE_PREFIX_VOCABULARY:
                 return True
+            # Euphonic-'a' multiplied-unsaturation stem root (`hydroxypenta` ->
+            # `hydroxy` + `penta`, where `penta` = `pent` + euphonic 'a' before a
+            # `dien`/`triyn` ending the flat stem table does not carry). Symmetric
+            # with the same accept in `_is_bare_hydride_yl`; only fires on the
+            # euphonic shape the v30 polyene substituent newly emits (fable-polyene
+            # BLOCKER 1). Additive -- no front-prefix + `<root>a` head occurs in
+            # any pre-existing emitted name (gold-diff 0/1888).
+            if tail.endswith('a') and tail[:-1] in _CHAIN_STEM_ROOTS:
+                return True
     return False
 
 
@@ -1865,7 +1880,23 @@ def _is_bare_hydride_yl(token: str, require_known_stem: bool = False) -> bool:
         # exactly the I2 defect, reintroduced from the other side.  Being strict
         # here makes an incomplete stem table fail toward "SIMPLE", i.e. toward
         # the pre-existing behaviour, never toward a newly-wrong `bis`.
-        return stem in _HYDRIDE_STEMS
+        if stem in _HYDRIDE_STEMS:
+            return True
+        # Euphonic-'a' multiplied-unsaturation stem: `penta`(-1,3-dien),
+        # `hexa`(-2,4-dien), `buta`(-1,3-diyn). The 'a' is inserted before a
+        # consonant-initial multiplied 'diene'/'triyne' ending, so the flat table
+        # (built from `pent`/`penten`/... in _build_hydride_stems) lacks it.
+        # Accept when dropping the euphonic 'a' yields a known chain-stem root AND
+        # the ORIGINAL token actually carries the `-<locs>-di|tri|tetraen/yn`
+        # marker that produced the 'a' -- so this only ever fires on the shape the
+        # v30 polyene substituent newly emits (fable-polyene BLOCKER 1: a
+        # SUBSTITUTED polyene prefix must take `bis`, not `di`, per P-16.3.5(a);
+        # the UNSUBSTITUTED form stays `di` via the loose/_is_single_simple_unit
+        # path and P-16.3.4(b)). Additive by construction.
+        if (stem.endswith('a') and stem[:-1] in _CHAIN_STEM_ROOTS
+                and _MULTIPLIED_UNSAT_MARKER_RE.search(token)):
+            return True
+        return False
     return not _stem_splits_into_prefix_plus_stem(stem)
 
 

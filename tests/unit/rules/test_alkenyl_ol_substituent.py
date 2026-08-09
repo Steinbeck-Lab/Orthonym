@@ -138,3 +138,47 @@ def test_polyene_rt_exact():
                     style="pin", use_opsin=True)
     assert all(r.get("verdict") == "OK" for r in rows), [
         (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
+
+
+# ---- fable-polyene review (bfc960f7) BLOCKERs, resolved ----
+
+def test_polyene_blocker2_two_stereocentres_fail_closed():
+    """fable-polyene BLOCKER 2 / invariant 9: >=2 chain R/S centres + undefined C=C
+    geometry would ship a stereo-DROPPED wrong molecule (_stereo_route drops multi-
+    centre R/S). Must fail closed (abstain), not emit the stereo-bare name."""
+    import sys
+    sys.path.insert(0, "scripts")
+    from diagnose import diagnose
+    smis = ["OC(=O)c1ccc(C=CC=C[C@@H](O)[C@@H](O)CO)cc1",
+            "OC(=O)c1ccc(C=CC=C[C@@H](N)[C@@H](O)CO)cc1"]
+    rows = diagnose(smis, style="pin", use_opsin=True)
+    for r in rows:
+        assert r.get("verdict") != "RT-MISMATCH", (r["smiles"], r.get("name"))
+    # single centre + undefined C=C still names (RT-OK)
+    assert _pin().name("OC(=O)c1ccc(C=CC=C[C@@H](O)CCO)cc1") == \
+        "4-[(S)-5,7-dihydroxyhepta-1,3-dien-1-yl]benzoic acid"
+
+
+@pytest.mark.parametrize("name,count,want", [
+    # fable-polyene BLOCKER 1 / P-16.3.5(a): a SUBSTITUTED polyene prefix takes bis
+    ("5-hydroxypenta-1,3-dien-1-yl", 2, "bis"),
+    ("6-hydroxyhexa-2,4-dien-1-yl", 2, "bis"),
+    # P-16.3.4(b): the UNSUBSTITUTED polyene keeps di (the trap — must not flip)
+    ("penta-1,3-dien-1-yl", 2, "di"),
+    ("hexa-2,4-dien-1-yl", 2, "di"),
+    # controls unchanged
+    ("methyl", 2, "di"), ("naphthalen-2-yl", 2, "di"),
+    ("bromomethyl", 2, "bis"), ("propan-2-yl", 2, "di"),
+])
+def test_polyene_blocker1_di_vs_bis(name, count, want):
+    from orthonym.assembly.naming_utils import get_multiplier_prefix
+    assert get_multiplier_prefix(count, name) == want
+
+
+def test_polyene_blocker1_full_molecule_bis():
+    """The symmetric bis-dienol arene names with bis (P-16.3.5(a)); the bare-polyene
+    analogue keeps di (P-16.3.4(b))."""
+    assert _pin().name("OC(=O)c1cc(C=CC=CCO)cc(C=CC=CCO)c1") == \
+        "3,5-bis(5-hydroxypenta-1,3-dien-1-yl)benzoic acid"
+    assert _pin().name("OC(=O)c1cc(/C=C/C=C/C)cc(/C=C/C=C/C)c1") == \
+        "3,5-di[(1E,3E)-penta-1,3-dien-1-yl]benzoic acid"
