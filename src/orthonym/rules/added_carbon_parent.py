@@ -230,16 +230,6 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     named_subs: List[tuple] = []  # (chain_atom_idx, bare_prefix_name)
     if substituents:
         from ..assembly.substituent_enumerator import name_substituent
-        # v30 fable BLOCKER 3: a flat added-carbon name cannot express stereo, so a
-        # stereo-defined input (e.g. natural isocitric acid) would emit a stereo-less
-        # name that the BBR-GATE stereo carve-out ships as a WRONG (stereo) molecule.
-        # Abstain when this SUBSTITUTED path meets defined stereo (restores the
-        # pre-substituent behaviour; a stereo-expressing parent is a separate feature).
-        has_stereo = any(
-            a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms()
-        ) or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds())
-        if has_stereo:
-            return None
         for chain_atom, ni, frag in substituents:
             sub_name = name_substituent(mol, sorted(frag), ni)
             if not sub_name or sub_name == "substituent":
@@ -272,6 +262,30 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     reverse = key_for(True) < key_for(False)
     suffix_locants = sorted(loc(attach[ac], reverse) for ac in added)
 
+    # Stereo (v30, resolves the fable BLOCKER-3 abstain into EXPRESSION): the core is
+    # saturated (unsaturation rejected above), so stereo here is R/S CHAIN stereocentres.
+    # Emit them as a `(<locant><CIP>,...)` prefix in the chosen numbering. Fail CLOSED if
+    # any DEFINED stereocentre is off the parent chain (would live inside a substituent —
+    # conservative), is unassignable (no CIP code), or any stereo double bond exists
+    # (out of this saturated-core scope) — a flat name would drop that stereo -> wrong
+    # molecule. Uses the vendored-`centres` CIP path via assign_stereochemistry.
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(mol)
+    stereo_bits = []
+    for a in mol.GetAtoms():
+        if a.GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED:
+            continue
+        aidx = a.GetIdx()
+        if aidx not in pos or not a.HasProp("_CIPCode"):
+            return None
+        stereo_bits.append((loc(aidx, reverse), a.GetProp("_CIPCode")))
+    if any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()):
+        return None
+    stereo_prefix = ""
+    if stereo_bits:
+        stereo_bits.sort()
+        stereo_prefix = "(" + ",".join(f"{lc}{cip}" for lc, cip in stereo_bits) + ")-"
+
     # Assemble the substituent-prefix string (P-16.3.3 enclosure, P-14.5.2 alpha
     # order, P-16.3.4 multipliers). P-14.3.4.2(a): the locant '1' is omitted for a
     # substituted MONONUCLEAR (methane) parent hydride.
@@ -298,9 +312,9 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         # the parent stem starts with a letter, so no hyphen needed after prefix_str.
 
     if length == 1:
-        return f"{prefix_str}{parent}{multiplier}{carbo}"
+        return f"{stereo_prefix}{prefix_str}{parent}{multiplier}{carbo}"
     locant_str = ",".join(str(x) for x in suffix_locants)
-    return f"{prefix_str}{parent}-{locant_str}-{multiplier}{carbo}"
+    return f"{stereo_prefix}{prefix_str}{parent}-{locant_str}-{multiplier}{carbo}"
 
 
 __all__ = ["requires_added_carbon_suffix", "name_added_carbon_parent"]

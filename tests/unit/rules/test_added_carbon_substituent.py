@@ -78,13 +78,22 @@ def test_fable_b2_p14_4_g_tiebreak_deterministic():
     assert a == b == "1-amino-3-hydroxypropane-1,2,3-tricarboxylic acid", (a, b)
 
 
-def test_fable_b3_stereo_defined_declined_by_added_carbon_path():
-    """BLOCKER 3: a flat added-carbon name cannot express stereo, so the added-carbon
-    path must DECLINE a stereo-defined input (isolate it: no `...tricarboxylic acid`
-    output). At PIN (SELF-01 on) the molecule abstains; the pytest env runs SELF-01
-    off, so the pre-existing pentane path may still surface its (stereo) pentanetrioic
-    candidate — that is NOT this path and abstains under SELF-01."""
-    n = _pin().name("OC(=O)[C@H](O)[C@@H](CC(=O)O)C(=O)O") or ""
+@pytest.mark.parametrize("smi,expected", [
+    # BLOCKER 3 resolved into EXPRESSION: chain R/S stereocentres are now emitted with
+    # locants in the chosen numbering. Natural chiral TCA metabolites name RT-exact.
+    ("OC(=O)[C@H](O)[C@@H](CC(=O)O)C(=O)O", "(1R,2R)-1-hydroxypropane-1,2,3-tricarboxylic acid"),
+    ("O[C@@H]([C@@H](CC(O)=O)C(O)=O)C(O)=O", "(1S,2R)-1-hydroxypropane-1,2,3-tricarboxylic acid"),  # D-isocitric
+    ("OC(=O)[C@@H](O)[C@](O)(CC(=O)O)C(=O)O", "(1S,2R)-1,2-dihydroxypropane-1,2,3-tricarboxylic acid"),
+])
+def test_chain_stereocentres_expressed(smi, expected):
+    assert _pin().name(smi) == expected
+
+
+def test_off_chain_stereo_fails_closed():
+    """A stereocentre OFF the parent chain (inside a substituent) can't be mapped to a
+    chain locant -> the added-carbon path declines (no `...tricarboxylic acid` output);
+    at PIN the molecule abstains rather than shipping unexpressed stereo."""
+    n = _pin().name("OC(=O)CC(O[C@@H](C)CC)(CC(=O)O)C(=O)O") or ""
     assert "tricarboxylic" not in n, n
 
 
