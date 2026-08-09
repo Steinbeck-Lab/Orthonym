@@ -138,6 +138,28 @@ def _substituent_constitution_ok(mol, frag_atoms, attach_idx, sub_name: str) -> 
     return sk_named is not None and sk_named == sk_actual
 
 
+def _whole_name_stereo_ok(mol, name: str) -> bool:
+    """Gate-INDEPENDENT stereo-aware re-anchor for the UNSATURATED added-carbon
+    branch (aconitic family). The ene locant and the E/Z descriptor are spelled by
+    this namer, so a spelling slip could ship a wrong constitution/geometry gate-off
+    (T4 producers must re-anchor or fail closed -- ed52fa98 / 8afa533c). OPSIN-parse
+    the WHOLE name and require its InChIKey (constitution AND stereo, full key) to
+    equal the input's; fail CLOSED on no-jar / parse-fail / mismatch."""
+    from rdkit import Chem
+    from ..namer import _validity_gate_name_to_smiles
+
+    smi = _validity_gate_name_to_smiles(name)
+    if not smi:
+        return False
+    parsed = Chem.MolFromSmiles(smi)
+    if parsed is None:
+        return False
+    try:
+        return Chem.MolToInchiKey(parsed) == Chem.MolToInchiKey(mol)
+    except Exception:
+        return False
+
+
 def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]:
     """Name an acyclic >=3-group added-carbon multi-suffix molecule, or ``None``
     to fall through to the legacy path when the structure is outside the clean
@@ -205,17 +227,24 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
                         stack.append(j)
             substituents.append((c, ni, frozenset(frag)))
 
-    # Reject any non-single bond inside the parent chain (unsaturated parents are
-    # out of this clean-saturated-skeleton scope; aconitic-family needs a separate
-    # unsaturated extension).
+    # Parent-chain unsaturation. SINGLE bonds are the saturated (propane) core;
+    # DOUBLE bonds make the aconitic family (prop-1-ene-1,2,3-tricarboxylic acid).
+    # Triple / aromatic parent bonds are out of scope -> fail closed.
+    core_double_bonds = []  # (chain_atom_a, chain_atom_b, bond)
     for i in range(len(chain) - 1):
         bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
-        if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        if bond is None:
             return None
+        bt = bond.GetBondType()
+        if bt == Chem.BondType.SINGLE:
+            continue
+        if bt == Chem.BondType.DOUBLE:
+            core_double_bonds.append((chain[i], chain[i + 1], bond))
+        else:
+            return None  # triple / aromatic parent bond -> out of scope
 
     length = len(chain)
     stem = get_chain_prefix(length)
-    parent = f"{stem}ane"
     multiplier = SIMPLE_MULTIPLIERS.get(n_groups)
     if multiplier is None:
         return None
@@ -241,10 +270,11 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
                 return None
             named_subs.append((chain_atom, sub_name))
 
-    # P-31.1.4 / P-14.4 numbering: lowest locants to (a) the added-carbon (suffix)
-    # attachments, then (b) all substituents as a set, then (g) the substituent cited
+    # P-14.4 NUMBERING (L3219): lowest locants to (c) the added-carbon (suffix)
+    # attachments, then (f) all substituents as a set, then (g) the substituent cited
     # FIRST in alphanumerical order (P-14.4(g), BB: "1-methyl-4-nitronaphthalene, not
     # 4-methyl-1-nitro..."). Without (g) the PIN depended on SMILES atom order.
+    # (Not P-31.1.4 -- that section is von Baeyer parent hydrides, L16619.)
     pos = {atom_idx: i for i, atom_idx in enumerate(chain)}
 
     def loc(atom_idx: int, reverse: bool) -> int:
@@ -265,8 +295,27 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     # repopulation. Tracked as a follow-up.)
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)
-    if any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()):
-        return None
+    # A stereogenic double bond ON the parent chain is EXPRESSED as (locant)E/Z; any
+    # OTHER stereo bond (inside a substituent) cannot be mapped to a chain locant ->
+    # fail closed. (Was: reject ALL stereo bonds; now scoped to the core.)
+    core_bond_ids = {bond.GetIdx() for _, _, bond in core_double_bonds}
+    for b in mol.GetBonds():
+        if (b.GetStereo() != Chem.BondStereo.STEREONONE
+                and b.GetIdx() not in core_bond_ids):
+            return None
+    # E/Z of each core double bond -- only when a geometry is DEFINED; an undefined
+    # core double bond names flat (matching an input that left it unspecified).
+    db_cip = {}  # (chain_atom_a, chain_atom_b) -> 'E' | 'Z'
+    for a_idx, b_idx, bond in core_double_bonds:
+        if bond.GetStereo() == Chem.BondStereo.STEREONONE:
+            continue
+        if not bond.HasProp("_CIPCode"):
+            return None
+        ez = bond.GetProp("_CIPCode")
+        if ez not in ("E", "Z"):
+            return None
+        db_cip[(a_idx, b_idx)] = ez
+
     chain_cip = {}  # chain_atom_idx -> 'R' | 'S'
     for a in mol.GetAtoms():
         if a.GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED:
@@ -280,24 +329,39 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         chain_cip[aidx] = cip
 
     _CIP_RANK = {"R": 0, "S": 1}  # P-14.4(j): R preferred (lower) over S
+    _EZ_RANK = {"Z": 0, "E": 1}   # P-14.4(j): Z preferred (lower) over E
+
+    def _db_loc(a_idx, b_idx, reverse):
+        return min(loc(a_idx, reverse), loc(b_idx, reverse))
+
+    def ene_locants(reverse):
+        return sorted(_db_loc(a, b, reverse) for a, b, _ in core_double_bonds)
 
     def key_for(reverse: bool):
         suf = sorted(loc(attach[ac], reverse) for ac in added)
+        ene = ene_locants(reverse)          # P-14.4(e)(i): ene after suffix P-14.4(c)
         sub = sorted(loc(ca, reverse) for ca, _ in named_subs)
         alpha = [loc(ca, reverse) for ca, _ in subs_alpha]  # P-14.4(g)
-        # P-14.4(j): lower locants to the preferred CIP descriptor (R before S),
-        # ordered by locant — breaks the meso/tie case deterministically to the PIN.
-        stereo = [_CIP_RANK[chain_cip[x]]
-                  for x in sorted(chain_cip, key=lambda x: loc(x, reverse))]
-        return (suf, sub, alpha, stereo)
+        # P-14.4(j): lowest locants to the preferred stereodescriptor; R/S and E/Z
+        # descriptors ordered together by locant.
+        st_items = [(loc(x, reverse), _CIP_RANK[chain_cip[x]]) for x in chain_cip]
+        st_items += [(_db_loc(a, b, reverse), _EZ_RANK[db_cip[(a, b)]])
+                     for (a, b) in db_cip]
+        stereo = [r for _, r in sorted(st_items)]
+        return (suf, ene, sub, alpha, stereo)
 
     reverse = key_for(True) < key_for(False)
     suffix_locants = sorted(loc(attach[ac], reverse) for ac in added)
 
+    # Merge R/S and E/Z stereodescriptors into one locant-ordered leading paren.
+    # BB: fumaric acid = "(2E)-but-2-enedioic acid" (PIN) -> the descriptor carries
+    # its locant even for a single double bond.
     stereo_prefix = ""
-    if chain_cip:
-        bits = sorted((loc(x, reverse), chain_cip[x]) for x in chain_cip)
-        stereo_prefix = "(" + ",".join(f"{lc}{cip}" for lc, cip in bits) + ")-"
+    st_bits = [(loc(x, reverse), chain_cip[x]) for x in chain_cip]
+    st_bits += [(_db_loc(a, b, reverse), db_cip[(a, b)]) for (a, b) in db_cip]
+    if st_bits:
+        st_bits.sort()
+        stereo_prefix = "(" + ",".join(f"{lc}{d}" for lc, d in st_bits) + ")-"
 
     # Assemble the substituent-prefix string (P-16.3.3 enclosure, P-14.5.2 alpha
     # order, P-16.3.4 multipliers). P-14.3.4.2(a): the locant '1' is omitted for a
@@ -324,10 +388,42 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         prefix_str = "-".join(parts) if len(parts) > 1 else parts[0]
         # the parent stem starts with a letter, so no hyphen needed after prefix_str.
 
+    # Parent hydride string, built AFTER numbering so ene locants use the chosen
+    # direction. Monoene inserts "-<loc>-ene" (prop-1-ene); polyene inserts the
+    # euphonic 'a' before the consonant-initial multiplied ending (buta-1,3-diene).
+    if core_double_bonds:
+        elocs = ene_locants(reverse)
+        emult = {1: "", 2: "di", 3: "tri", 4: "tetra"}.get(len(elocs))
+        if emult is None:
+            return None
+        eloc_str = ",".join(str(x) for x in elocs)
+        if length == 2:
+            # Dinuclear chain: the double bond can only be 1-2, so its locant is
+            # structurally redundant (deny-by-default P-14.3.3 omits an unnecessary
+            # locant). BB writes ethene-1,1,2-triyl / ethene-1,2-diyl even when
+            # substituted, and `eth-1-ene` 0 times -> "ethene" (never "eth-1-ene").
+            # A stereogenic dinuclear C=C keeps its DESCRIPTOR locant, e.g. BB
+            # `(1E)-...ethene-1,2-diyl`, which stereo_prefix already carries.
+            parent_core = f"{stem}ene"
+        elif len(elocs) == 1:
+            parent_core = f"{stem}-{eloc_str}-ene"
+        else:
+            parent_core = f"{stem}a-{eloc_str}-{emult}ene"
+    else:
+        parent_core = f"{stem}ane"
+
     if length == 1:
-        return f"{stereo_prefix}{prefix_str}{parent}{multiplier}{carbo}"
-    locant_str = ",".join(str(x) for x in suffix_locants)
-    return f"{stereo_prefix}{prefix_str}{parent}-{locant_str}-{multiplier}{carbo}"
+        name = f"{stereo_prefix}{prefix_str}{parent_core}{multiplier}{carbo}"
+    else:
+        locant_str = ",".join(str(x) for x in suffix_locants)
+        name = f"{stereo_prefix}{prefix_str}{parent_core}-{locant_str}-{multiplier}{carbo}"
+
+    # Gate-INDEPENDENT re-anchor for the NEW unsaturated branch only (saturated path
+    # stays byte-identical). Fails closed if OPSIN cannot confirm the whole name
+    # denotes the exact input (constitution + stereo).
+    if core_double_bonds and not _whole_name_stereo_ok(mol, name):
+        return None
+    return name
 
 
 __all__ = ["requires_added_carbon_suffix", "name_added_carbon_parent"]

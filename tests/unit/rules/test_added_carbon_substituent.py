@@ -118,3 +118,42 @@ def test_stereo_pseudoasymmetric_fails_closed():
     ship stereo-unvalidated via the carve-out; fail closed (no `...tricarboxylic` output)."""
     n = _pin().name("OC(=O)C[C@H](O)[C@H](C(O)=O)[C@H](O)CC(O)=O") or ""
     assert "carboxylic" not in n, n
+
+
+# ---- aconitic family: UNSATURATED added-carbon polycarboxylic core (v30 breadth) ----
+
+@pytest.mark.parametrize("smi,expected", [
+    # flat (no defined geometry) -> constitutional name, no descriptor
+    ("OC(=O)CC(=CC(=O)O)C(=O)O",       "prop-1-ene-1,2,3-tricarboxylic acid"),
+    # trans-aconitic: core C=C is CIP-E (bond _CIPCode 'E') -> (1E)
+    ("OC(=O)C/C(=C\\C(=O)O)C(=O)O",    "(1E)-prop-1-ene-1,2,3-tricarboxylic acid"),
+    # cis-aconitic: core C=C is CIP-Z -> (1Z)
+    ("OC(=O)C/C(=C/C(=O)O)C(=O)O",     "(1Z)-prop-1-ene-1,2,3-tricarboxylic acid"),
+])
+def test_aconitic_unsaturated_added_carbon(smi, expected):
+    # BB: fumaric acid = (2E)-but-2-enedioic acid (PIN) -> the E/Z descriptor carries
+    # the ene locant even for a single double bond. Aconitic mirrors that.
+    assert _pin().name(smi) == expected
+
+
+def test_aconitic_numbering_deterministic_by_atom_order():
+    # ene gets the lowest locant (P-31.1.4, after the tied 1,2,3 suffixes); the name
+    # must not depend on SMILES atom order.
+    a = _pin().name("OC(=O)C/C(=C\\C(=O)O)C(=O)O")
+    b = _pin().name("OC(=O)/C=C(\\CC(=O)O)C(=O)O")
+    assert a == b == "(1E)-prop-1-ene-1,2,3-tricarboxylic acid", (a, b)
+
+
+def test_saturated_added_carbon_unchanged_by_unsaturated_branch():
+    # the saturated core path must stay byte-identical (no regression)
+    assert _pin().name("OC(=O)CC(O)(CC(=O)O)C(=O)O") == "2-hydroxypropane-1,2,3-tricarboxylic acid"
+    assert _pin().name("OC(=O)CC(C(=O)O)CC(=O)O") == "propane-1,2,3-tricarboxylic acid"
+
+
+def test_dinuclear_ethene_core_omits_ene_locant():
+    """Fable BLOCKER: a 2-carbon (dinuclear) unsaturated core must be `ethene-...`,
+    NOT `eth-1-ene-...`. For a dinuclear chain the double-bond locant is structurally
+    redundant (P-14.3.3 deny-by-default; BB `ethene-1,1,2-triyl`, `eth-1-ene` 0x).
+    The OPSIN re-anchor cannot catch it (both spellings parse to one InChIKey), so it
+    is fixed at the emitter."""
+    assert _pin().name("OC(=O)C(C(=O)O)=CC(=O)O") == "ethene-1,1,2-tricarboxylic acid"
