@@ -459,8 +459,18 @@ def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
         m = Chem.MolFromSmiles(amine_smiles)
         if m is None:
             return False
+        # A bare italic `N-` locant binds to whichever nitrogen OPSIN's own rule
+        # picks. An `N` is a candidate target if it is H-bearing (can accept the
+        # acyl) OR an AROMATIC RING nitrogen: OPSIN will DEAROMATIZE a ring N to
+        # host the acyl (measured: `N-formyl-2-(methylamino)-1,3-thiazole-5-
+        # carboxylic acid` parsed with the formyl on the thiazole ring N, not the
+        # exocyclic amino N). v30 #29-fable-BLOCKER: the H-only count missed the
+        # 0-H aromatic ring N, so a heteroaromatic amine parent + an exocyclic
+        # amino floated an ambiguous `N-<acyl>` that shipped a WRONG constitution
+        # at gate-off. Counting aromatic ring N as a target fails the float closed.
         return sum(1 for a in m.GetAtoms()
-                   if a.GetSymbol() == 'N' and a.GetTotalNumHs() >= 1) >= 2
+                   if a.GetSymbol() == 'N'
+                   and (a.GetTotalNumHs() >= 1 or a.GetIsAromatic())) >= 2
     except Exception:
         return False
 
