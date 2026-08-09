@@ -836,7 +836,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # different entry; this fixes the general-engine `name_substituent` path.
     # Delegates to the existing `get_alkoxy_prefix` (handles alkyl/aryl R and
     # fails closed on shapes it cannot name). Learned from     # element-dispatched `name_oxygen_subgraph`/`oxy_prefix_from_branch` (refR5).
-    if attach_idx is not None:
+    if attach_idx is not None and 0 <= attach_idx < mol.GetNumAtoms():
         _root = mol.GetAtomWithIdx(attach_idx)
         if (_root.GetSymbol() == 'O' and _root.GetFormalCharge() == 0
                 and _root.GetTotalNumHs() == 0
@@ -3975,9 +3975,10 @@ def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
 
 
 def _name_amino_ring_branch(mol, frag_set, root_idx, parent_set):
-    """Best-effort: a MONO-substituted N carrying a RING-bearing R -> '(R-yl)amino'
-    (cyclohexylamino, benzylamino, [(4-fluorophenyl)methyl]amino,
-    (4-hydroxycyclohexyl)amino).
+    """Best-effort: a MONO- or DI-substituted N carrying a RING-bearing R ->
+    '(R-yl)amino' / 'R1(R2)amino' (cyclohexylamino, benzylamino,
+    [(4-fluorophenyl)methyl]amino, (4-hydroxycyclohexyl)amino; and disubstituted:
+    cyclohexyl(methyl)amino, dicyclohexylamino, benzyl(cyclohexyl)amino).
 
     ``_name_amino_branch`` names alkyl/aryl/acyl R but declines a saturated-ring or
     ring-on-chain R, so a secondary amine whose R contains a ring fell through to the
@@ -4000,65 +4001,83 @@ def _name_amino_ring_branch(mol, frag_set, root_idx, parent_set):
         return None
     branches = [n.GetIdx() for n in root.GetNeighbors()
                 if n.GetIdx() in frag_set and n.GetIdx() not in parent_set]
-    if len(branches) != 1:
-        return None  # v1: mono-substituted N only (disubstituted deferred)
-    b = branches[0]
-    # Collect the branch atoms WITHIN the fragment, boundary = the root N.
-    batoms = set()
-    stack = [b]
-    while stack:
-        a = stack.pop()
-        if a in batoms:
-            continue
-        batoms.add(a)
-        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
-            ni = nb.GetIdx()
-            if ni != root_idx and ni in frag_set and ni not in batoms:
-                stack.append(ni)
-    # Coverage: root + branch must account for every heavy fragment atom.
-    heavy = {a for a in frag_set if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
-    if ({root_idx} | batoms) & heavy != heavy:
-        return None
+    if len(branches) not in (1, 2):
+        return None  # -NH-R (mono) or -N(R)(R') (di); v2 stops at two branches
     ring_info = mol.GetRingInfo()
-    if not any(ring_info.NumAtomRings(a) > 0 for a in batoms):
-        return None  # no ring -> _name_amino_branch's alkyl/aryl path owns it
-    # An acyl branch (-NH-C(=O)-R) is the amido family, owned by _name_amino_branch.
-    battach = mol.GetAtomWithIdx(b)
-    if battach.GetSymbol() == 'C' and any(
-            nb.GetSymbol() == 'O'
-            and mol.GetBondBetweenAtoms(b, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
-            for nb in battach.GetNeighbors()):
+    # Collect each branch's fragment atoms (boundary = the root N).
+    branch_atomsets = []
+    all_batoms = set()
+    for b in branches:
+        batoms = set()
+        stack = [b]
+        while stack:
+            a = stack.pop()
+            if a in batoms:
+                continue
+            batoms.add(a)
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                ni = nb.GetIdx()
+                if ni != root_idx and ni in frag_set and ni not in batoms:
+                    stack.append(ni)
+        branch_atomsets.append(batoms)
+        all_batoms |= batoms
+    # Coverage: root + all branches must account for every heavy fragment atom.
+    heavy = {a for a in frag_set if mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if ({root_idx} | all_batoms) & heavy != heavy:
         return None
-    ryl = name_substituent(mol, sorted(batoms), b, allow_mancude=True)
-    if (not ryl or ryl == 'substituent' or ' ' in ryl
-            or 'unknown' in ryl.lower()):
+    # At least ONE branch must contain a ring — otherwise this is the pure-alkyl
+    # amino case _name_amino_branch already owns (it declined for another reason,
+    # and this ring extension must not silently re-claim it).
+    if not any(any(ring_info.NumAtomRings(a) > 0 for a in bs)
+               for bs in branch_atomsets):
         return None
+
     from .naming_utils import is_complex_substituent, apply_enclosing_marks
-    inner = (apply_enclosing_marks(ryl, -1)
-             if is_complex_substituent(ryl) else ryl)
-    # Gate-INDEPENDENT honesty (8afa533c guard-2 / F-B _reanchor precedent, fable
-    # review of ff00bf1f): name_substituent can return a yl-LESS PARENT-HYDRIDE for
-    # a ring ASSEMBLY (a biphenyl fragment -> "1,1'-biphenyl", no free-valence
-    # locant) that the token checks above cannot detect ("biphenyl" ends in "yl",
-    # has no space, is not the sentinel). Wrapping it as "(...)amino" then ships an
-    # OPSIN-UNPARSEABLE T4 name (the F1 shipped-malformed class, SELF-01-blind
-    # because T4 ships unparseable names unverified). Re-anchor a probe amine
-    # H2N-R, named "{inner}amine", against the standalone R-amine molecule; a
-    # genuine ring substituent round-trips (cyclohexyl -> cyclohexylamine ==
-    # cyclohexanamine), the parent-hydride does not. Fail closed on mismatch /
-    # no-parse / NO-JAR so the producer stays honest even with the gate off.
-    from rdkit import Chem as _Chem
-    try:
-        _probe_smi = _Chem.MolFragmentToSmiles(mol, sorted({root_idx} | batoms))
-        _probe_mol = _Chem.MolFromSmiles(_probe_smi) if _probe_smi else None
-    except Exception:  # noqa: BLE001 - a malformed probe is a decline, not a crash
-        _probe_mol = None
-    if _probe_mol is None:
-        return None
     from ..rules.benzene import _reanchor_name_to_mol
-    if _reanchor_name_to_mol(_probe_mol, f'{inner}amine') is None:
-        return None
-    return f'{inner}amino'
+    from rdkit import Chem as _Chem
+
+    names = []
+    for b, batoms in zip(branches, branch_atomsets):
+        # An acyl branch (-N-C(=O)-R) is the amido family, owned by
+        # _name_amino_branch — never build 'amino' over it.
+        battach = mol.GetAtomWithIdx(b)
+        if battach.GetSymbol() == 'C' and any(
+                nb.GetSymbol() == 'O'
+                and mol.GetBondBetweenAtoms(
+                    b, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+                for nb in battach.GetNeighbors()):
+            return None
+        ryl = name_substituent(mol, sorted(batoms), b, allow_mancude=True)
+        if (not ryl or ryl == 'substituent' or ' ' in ryl
+                or 'unknown' in ryl.lower()):
+            return None
+        # Gate-INDEPENDENT honesty, applied PER BRANCH (8afa533c guard-2 / F-B
+        # _reanchor precedent): re-anchor a probe amine H2N-R, named
+        # "{cited}amine", against the standalone R-amine molecule. A genuine ring
+        # substituent round-trips (cyclohexyl -> cyclohexylamine == cyclohexanamine);
+        # a mis-numbered or yl-less ring-yl does not. Fail closed on mismatch /
+        # no-parse / NO-JAR so the producer stays honest even with the gate off.
+        cited = (apply_enclosing_marks(ryl, -1)
+                 if is_complex_substituent(ryl) else ryl)
+        try:
+            _probe_smi = _Chem.MolFragmentToSmiles(
+                mol, sorted({root_idx} | batoms))
+            _probe_mol = _Chem.MolFromSmiles(_probe_smi) if _probe_smi else None
+        except Exception:  # noqa: BLE001 - a malformed probe is a decline
+            _probe_mol = None
+        if (_probe_mol is None
+                or _reanchor_name_to_mol(_probe_mol, f'{cited}amine') is None):
+            return None
+        names.append(ryl)
+
+    if len(names) == 1:
+        inner = (apply_enclosing_marks(names[0], -1)
+                 if is_complex_substituent(names[0]) else names[0])
+        return f'{inner}amino'
+    # Disubstituted N: hand BOTH R names to the ONE amino-prefix assembler
+    # (P-16.5.1.3.1 ordering + marking + di/bis multiplicity):
+    # cyclohexyl(methyl)amino, dicyclohexylamino, benzyl(cyclohexyl)amino.
+    return _assemble_amino_prefix_core([(nm, False) for nm in names])
 
 
 def _name_thio_ring_branch(mol, frag_set, root_idx):

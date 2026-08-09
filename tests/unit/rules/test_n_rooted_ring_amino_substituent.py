@@ -57,23 +57,43 @@ def test_existing_amino_unchanged(smi, expected, am):
     assert name_substituent(m, frag, fv, allow_mancude=am) == expected
 
 
-# safely deferred (must NOT fabricate a partial/wrong name): a disubstituted N and
-# an acyl branch both fall through to the sentinel, never a dropped-atom name.
-@pytest.mark.parametrize("smi", ["[*]N(C)C1CCCCC1", "[*]NC(=O)C1CCCCC1"])
+# DISUBSTITUTED N with a ring-bearing R — the v2 extension (was v1-deferred). The
+# ONE amino-prefix assembler (P-16.5.1.3.1) orders + marks + multiplies the two R
+# names; each ring R is per-branch re-anchor-verified. OPSIN RT-exact on real
+# molecules (3-(cyclohexyl(methyl)amino)propanoic acid etc.).
+DISUBSTITUTED = [
+    ("[*]N(C)C1CCCCC1", "cyclohexyl(methyl)amino"),
+    ("[*]N(C1CCCCC1)C1CCCCC1", "dicyclohexylamino"),
+    ("[*]N(Cc1ccccc1)C1CCCCC1", "benzyl(cyclohexyl)amino"),
+]
+
+
+@pytest.mark.parametrize("smi,expected", DISUBSTITUTED)
+def test_disubstituted_n_ring_amino(smi, expected):
+    m, frag, fv = _frag(smi)
+    assert name_substituent(m, frag, fv, allow_mancude=True) == expected
+
+
+# STILL deferred (must NOT fabricate a partial/wrong name): an acyl branch is the
+# amido family, owned by _name_amino_branch — never 'amino' over it.
+@pytest.mark.parametrize("smi", ["[*]NC(=O)C1CCCCC1"])
 def test_deferred_shapes_fail_closed(smi):
     m, frag, fv = _frag(smi)
     assert name_substituent(m, frag, fv, allow_mancude=True) is None
 
 
-# Fable review of ff00bf1f: a ring-ASSEMBLY R (biphenyl) makes name_substituent
-# return the yl-LESS parent hydride "1,1'-biphenyl"; wrapping it shipped an
-# OPSIN-unparseable T4 name on previously-abstaining molecules (the 8afa533c F1
-# class). The gate-independent probe re-anchor must reject it -> fail closed.
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smi", [
-    "[*]Nc1ccc(-c2ccccc2)cc1",     # -NH-(biphenyl-4-yl)
-    "[*]NCc1ccc(-c2ccccc2)cc1",    # -NH-CH2-(biphenyl-4-yl)
+# Ring-ASSEMBLY R (biphenyl): the v30 blocker fix (3a70c6c0) routes the assembly
+# substituent through name_ring_assembly_prefix, so instead of the yl-LESS parent
+# hydride "1,1'-biphenyl" (OPSIN-unparseable — the 8afa533c F1 class it used to
+# fail closed on) it now emits the CORRECT P-28.3 bracketed free-valence form.
+# OPSIN RT-exact: 3-(([1,1'-biphenyl]-4-yl)amino)propanoic acid etc.
+@pytest.mark.parametrize("smi,expected", [
+    ("[*]Nc1ccc(-c2ccccc2)cc1", "([1,1'-biphenyl]-4-yl)amino"),
+    ("[*]NCc1ccc(-c2ccccc2)cc1", "[([1,1'-biphenyl]-4-yl)methyl]amino"),
 ])
-def test_ring_assembly_R_fails_closed_not_malformed(smi):
+def test_ring_assembly_R_named_not_malformed(smi, expected):
     m, frag, fv = _frag(smi)
-    assert name_substituent(m, frag, fv, allow_mancude=True) is None
+    out = name_substituent(m, frag, fv, allow_mancude=True)
+    assert out == expected
+    # the whole point of the old fail-closed guard: NEVER the yl-less hydride
+    assert out != "(1,1'-biphenyl)amino"
