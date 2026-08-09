@@ -1264,19 +1264,25 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
         if len(subs) < 2:
             continue  # single substituent: per-atom min is already correct
         sys_atoms = ring_systems[sys_idx]
-        conn = None
+        # ALL inter-system junction atoms for this system. A MIDDLE ring in a
+        # linear assembly has TWO junctions; either may be numbered locant 1
+        # when the flanking rings are equivalent, so both must be enumerated
+        # as origins for a deterministic, lowest-locant choice. Using only the
+        # first junction made the disubstituted-middle-ring numbering
+        # SMILES-order dependent (2'-carboxy-3'-chloro vs 3'-carboxy-2'-chloro;
+        # v30 #41, the >=2-substituent sibling of the single-substituent fix in
+        # _get_substituent_info).
+        conn_atoms = []
         for a1, a2, s1, s2 in connections:
             if s1 == sys_idx:
-                conn = a1
-                break
-            if s2 == sys_idx:
-                conn = a2
-                break
-        if conn is None:
+                conn_atoms.append(a1)
+            elif s2 == sys_idx:
+                conn_atoms.append(a2)
+        if not conn_atoms:
             continue
         ring = None
         for r in ri.AtomRings():
-            if conn in r and set(r) <= sys_atoms:
+            if conn_atoms[0] in r and set(r) <= sys_atoms:
                 ring = r
                 break
         if ring is None:
@@ -1292,7 +1298,7 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
                 adj[x].append(y)
                 adj[y].append(x)
 
-        def _positions(first):
+        def _positions(conn, first):
             visited = [conn]
             cur = first
             while cur != conn:
@@ -1303,15 +1309,27 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
                 cur = nxt[0]
             return {a: i + 1 for i, a in enumerate(visited)}
 
-        nbrs = adj.get(conn, [])
-        if len(nbrs) < 2:
+        # Every candidate numbering: each junction origin x each ring
+        # direction. Choose by IUPAC P-31.1.4.3: (1) lowest locant SET to the
+        # substituents together (P-14.4), then (2) lowest locant to the
+        # substituent cited first in alphanumerical order (P-14.5.2).
+        candidates = []
+        for conn in conn_atoms:
+            for nb in adj.get(conn, []):
+                candidates.append(_positions(conn, nb))
+        if not candidates:
             continue
-        pa = _positions(nbrs[0])
-        pb = _positions(nbrs[1])
         big = len(ring) + 1
-        set_a = sorted(pa.get(s['ring_atom'], big) for s in subs)
-        set_b = sorted(pb.get(s['ring_atom'], big) for s in subs)
-        chosen = pa if set_a <= set_b else pb
+        from ..assembly.naming_utils import alpha_sort_key
+        subs_alpha = sorted(subs, key=lambda s: alpha_sort_key(s.get('name') or ''))
+
+        def _rank(p):
+            return (
+                sorted(p.get(s['ring_atom'], big) for s in subs),
+                [p.get(s['ring_atom'], big) for s in subs_alpha],
+            )
+
+        chosen = min(candidates, key=_rank)
         for s in subs:
             if s['ring_atom'] in chosen:
                 s['locant'] = chosen[s['ring_atom']]
@@ -1372,21 +1390,29 @@ def _get_substituent_info(
             # Name the substituent
             sub_name = _name_substituent(mol, sub_atoms, n_idx)
 
-            # Get the connection atom for this ring system
-            conn_atom = None
+            # Get the inter-system connection atoms for this ring system.
+            # A MIDDLE ring in a linear assembly (e.g. terphenyl) has TWO
+            # junctions; either may be numbered locant 1 when the flanking
+            # rings are equivalent, so the substituent's lowest achievable
+            # locant is the min over all junction origins. Using only the
+            # FIRST connection made the locant SMILES-order-dependent
+            # (2' vs 3'; v30 #41, fable a998bea712). Taking the min is both
+            # deterministic and the IUPAC lowest-locant choice.
+            conn_atoms = []
             for a1, a2, s1, s2 in connections:
                 if s1 == sys_idx:
-                    conn_atom = a1
-                    break
+                    conn_atoms.append(a1)
                 elif s2 == sys_idx:
-                    conn_atom = a2
-                    break
+                    conn_atoms.append(a2)
 
-            if conn_atom is None:
-                conn_atom = atom_idx
+            if not conn_atoms:
+                conn_atoms = [atom_idx]
 
-            locant = _get_substituent_locant(
-                mol, atom_idx, atom_idx, ring_systems[sys_idx], conn_atom
+            locant = min(
+                _get_substituent_locant(
+                    mol, atom_idx, atom_idx, ring_systems[sys_idx], c
+                )
+                for c in conn_atoms
             )
 
             substituents.append({
