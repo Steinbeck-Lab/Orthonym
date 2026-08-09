@@ -1331,6 +1331,17 @@ def is_complex_substituent(name: str) -> bool:
     # Acylamino compound substituents: "ethanoylamino", "propanoylamino" etc.
     if name.endswith('amino') and 'oyl' in name:
         return True
+    # S-amido compound substituents per IUPAC P-16.3.3: a `<parent-hydride>sulfonamido`
+    # / `sulfinamido` prefix (methanesulfonamido, benzenesulfonamido, ethanesulfonamido)
+    # is a compound substituent (its stem is a sulfonyl/sulfinyl acyl) and is enclosed
+    # -> the gold-oracle PIN `3-(methanesulfonamido)propanoic acid`,
+    # `3-(benzenesulfonamido)propanoic acid`. The bare retained `sulfonamido`/`sulfinamido`
+    # (no stem) and the acyl-amido family (`acetamido`, `benzamido`) stay SIMPLE.
+    # v30 #29: without this the heterocycle _format_c_substituent path emitted the
+    # non-PIN bare `2-methanesulfonamido-1,3-thiazole-5-carboxylic acid`.
+    if (name_lower.endswith(('sulfonamido', 'sulfinamido'))
+            and name_lower not in ('sulfonamido', 'sulfinamido')):
+        return True
     # W3-P10 (P-16.3.3): a SUBSTITUTED pnictogen-yl prefix (dihydroxyarsanyl /
     # dimethylarsanyl / ...stibanyl / ...bismuthanyl) is a compound substituent
     # requiring enclosing marks -> '4-(dihydroxyarsanyl)benzoic acid'. The bare

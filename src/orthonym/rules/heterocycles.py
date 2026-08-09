@@ -3149,6 +3149,31 @@ def _retained_heteroatom_locant_prefix(
     return ",".join(str(loc) for loc in expected) + "-"
 
 
+def _n_anchored_substituent_covers(mol, sub_name: str, sub_atoms) -> bool:
+    """Gate-INDEPENDENT atom-coverage check for an N/O/S-anchored ring substituent
+    named by the recursive ``name_substituent``.
+
+    v30 #29: the recursive namer roots N-anchored compound substituents correctly
+    (acetamido / methylamino / methanesulfonamido) but can also degrade a shape it
+    only partly understands to a shorter prefix (an arenesulfonamido collapsing to
+    bare ``amino``), which would drop atoms. Verify the prefix accounts for exactly
+    the fragment's heavy atoms by OPSIN-parsing ``<sub_name>benzene`` and comparing
+    the heavy-atom count minus benzene's 6. Fail CLOSED on any parse failure /
+    missing jar / mismatch, so a partial name never ships (honest without SELF-01)."""
+    if not sub_name:
+        return False
+    frag_heavy = sum(1 for i in sub_atoms
+                     if mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
+    from ..namer import _validity_gate_name_to_smiles
+    probe = _validity_gate_name_to_smiles(f"{sub_name}benzene")
+    if not probe:
+        return False
+    pm = Chem.MolFromSmiles(probe)
+    if pm is None:
+        return False
+    return pm.GetNumHeavyAtoms() - 6 == frag_heavy
+
+
 def name_substituted_heterocycle(
     mol,
     ring_atoms,
@@ -3317,6 +3342,27 @@ def name_substituted_heterocycle(
                     sub_name = name_substituent_fragment(
                         mol, sub_atoms, attach_idx, list(ring_set_local)
                     )
+                # v30 #29: an N/O/S-anchored COMPOUND substituent (acetamido,
+                # methylamino, methanesulfonamido, ...). name_substituent_fragment
+                # above is carbon-anchored only and mis-roots these (an N-attached
+                # -NHC(=O)CH3 came back 'carbamoylmethyl'), which is why the block
+                # above excludes them and the fail-closed below used to decline the
+                # whole heterocycle -> the 2-<N-substituent>-1,3-thiazole-5-carboxylic
+                # acid class abstained at PIN (named only at best-effort by the general
+                # aromatic engine). The recursive name_substituent (C4 keystone) roots
+                # them correctly; route through it, GUARDED by a gate-independent
+                # atom-coverage check so a partial name (an arenesulfonamido degrading
+                # to bare 'amino') fails closed instead of shipping a dropped
+                # constitution at T4. Enclosing marks are applied downstream by
+                # _format_c_substituent (methylamino -> (methylamino)).
+                if (sub_name is None and sub_atoms and len(sub_atoms) > 1
+                        and not attach_is_carbon and not all_c_h):
+                    from ..assembly.substituent_enumerator import (
+                        name_substituent as _rec_name_substituent,
+                    )
+                    _cand = _rec_name_substituent(mol, list(sub_atoms), sub_atoms[0])
+                    if _cand and _n_anchored_substituent_covers(mol, _cand, sub_atoms):
+                        sub_name = _cand
                 if sub_name is None:
                     if not all_c_h:
                         # A heteroatom-bearing substituent the fragment namer
