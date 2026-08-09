@@ -15,6 +15,7 @@ the non-preferred ``4-phenylphenyl``; the bracketed primed ``[1,1'-biphenyl]-4-y
 is a net PIN-correctness edge for Orthonym (connector-seeded
 prime-the-second-ring numbering, but the brackets + free-valence demotion are ours).
 """
+import pytest
 from rdkit import Chem
 
 from orthonym.rules.ring_substituents import (
@@ -82,6 +83,34 @@ def test_terphenyl_detected_as_assembly():
     mol, ring_atoms, _, _ = _biphenyl_attach(
         "Cc1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
     assert _fragment_is_ring_assembly(mol, ring_atoms) is True
+
+
+@pytest.mark.parametrize("smi,expected", [
+    ("CC1CCCCC1C1CCCCC1", "[1,1'-bi(cyclohexan)]-2-yl"),
+    ("CC1CCC1C1CCC1", "[1,1'-bi(cyclobutan)]-2-yl"),
+    ("CC1CC1C1CC1", "[1,1'-bi(cyclopropan)]-2-yl"),
+])
+def test_saturated_assembly_component_is_parenthesised(smi, expected):
+    """P-28.2.1 (BB:16122 '[1,1'-bi(cyclohexan)]-4-yl' preferred prefix): a
+    NON-retained (cycloalkane / von Baeyer) assembly component takes parentheses
+    in the SUBSTITUENT prefix too, mirroring the parent path's _enclose_component
+    — not the buggy paren-less '[1,1'-bicyclohexan]-2-yl' (RT-valid, so it was
+    invisible to every gate; the spelling-layer blind spot, fable-found)."""
+    m = Chem.MolFromSmiles(smi)
+    ri = m.GetRingInfo()
+    ring = tuple(a.GetIdx() for a in m.GetAtoms() if ri.NumAtomRings(a.GetIdx()) > 0)
+    ch3 = [a.GetIdx() for a in m.GetAtoms()
+           if a.GetSymbol() == 'C' and ri.NumAtomRings(a.GetIdx()) == 0][0]
+    att = [n.GetIdx() for n in m.GetAtomWithIdx(ch3).GetNeighbors()
+           if n.GetIdx() in ring][0]
+    assert get_ring_substituent_name(m, ring, att) == expected
+
+
+def test_retained_mancude_assembly_stays_bare():
+    """The parens fix must NOT touch retained mancude stems — biphenyl is
+    '[1,1'-biphenyl]-4-yl' with NO parens (byte-identical)."""
+    mol, ring_atoms, attach, _ = _biphenyl_attach("Cc1ccc(-c2ccccc2)cc1")
+    assert get_ring_substituent_name(mol, ring_atoms, attach) == "[1,1'-biphenyl]-4-yl"
 
 
 def test_terphenyl_substituent_middle_ring_locant():

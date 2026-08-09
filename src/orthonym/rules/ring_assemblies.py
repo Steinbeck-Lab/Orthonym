@@ -2467,7 +2467,19 @@ def name_ring_assembly_prefix(
         if display_name.endswith('e'):
             display_name = display_name[:-1]
 
-        # Assembly base: "1,1'-biphenyl" or "2,2'-bipyridin"
+        # P-28.2.1: a NON-retained component (cycloalkane / von Baeyer / spiro)
+        # is enclosed in parentheses to disambiguate from a von Baeyer name,
+        # EXACTLY as the parent path does via _enclose_component (line ~2168) —
+        # 'cyclohexan' -> '(cyclohexan)', so '[1,1'-bi(cyclohexan)]-2-yl'
+        # (BB:16122 preferred prefix), not the buggy '[1,1'-bicyclohexan]-2-yl'.
+        # Retained mancude stems (phenyl/pyridin/thiophen) never match and stay
+        # bare -> '[1,1'-biphenyl]-4-yl' byte-identical. The decision keys off the
+        # ORIGINAL ring_name (the predicate matches 'cyclohexane', not the elided
+        # stem); the marks wrap the elided display_name.
+        if _needs_von_baeyer_parens(ring_name):
+            display_name = f"({display_name})"
+
+        # Assembly base: "1,1'-biphenyl", "2,2'-bipyridin", "1,1'-bi(cyclohexan)"
         assembly_base = f"{connection_str}-{multiplier}{display_name}"
 
     # Full prefix: "[1,1'-biphenyl]-4-yl" or "[1H,1'H-2,2'-biindol]-5-yl"
