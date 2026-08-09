@@ -2116,6 +2116,18 @@ def name_ring_system_substituent(
         from ..assembly.substituent_enumerator import name_substituent
         name = name_substituent(
             mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
+        # Fail-closed backstop: if this fragment IS a ring assembly but the
+        # P-28.3 builder in get_ring_substituent_name declined it above (an
+        # assembly it cannot number — e.g. >5 rings, replacement class), the
+        # generic cascade returns the yl-LESS parent hydride ('1,1'-biphenyl',
+        # '4-chloro-1,1'-biphenyl'). That token ends in 'yl' and carries no
+        # space, so the check below cannot catch it, yet it is OPSIN-unparseable
+        # as a substituent. Reject it (honest abstention) unless it already is a
+        # proper bracketed free-valence form. Only a fragment the detector
+        # claims as an assembly is affected; every other fallback name stands.
+        if (name and ']' not in name
+                and _fragment_is_ring_assembly(mol, frag_atoms)):
+            return None
     if name and name != 'substituent' and ' ' not in name:
         return name
     return None
@@ -2568,6 +2580,71 @@ def _heteromonocycle_parent_name(mol, ring_atoms: Tuple[int, ...]) -> Optional[s
     return name
 
 
+def _ring_assembly_substituent_prefix(
+    mol, ring_atoms: Tuple[int, ...], attachment_point: Optional[int]
+) -> Optional[str]:
+    """P-28.3 substituent prefix for a RING ASSEMBLY fragment, or ``None``.
+
+    A ring assembly is a set of identical (or single-heteroatom-replacement)
+    ring systems joined directly by single bonds — biphenyl, terphenyl,
+    2,2'-bipyridine. As a substituent it takes the PRIMED free-valence form
+    ``[1,1'-biphenyl]-4-yl``, NOT the yl-less parent hydride ``1,1'-biphenyl``
+    that the generic ``name_substituent`` cascade returns for such a fragment
+    (an OPSIN-UNPARSEABLE substituent token — the elevated-blocker F1 class).
+
+    Delegates to the SAME P-28.3 builder the whole-molecule composer already
+    trusts on the PIN path (``composer.py`` ->
+    ``4-([1,1'-biphenyl]-4-yl)butanoic acid``): restrict the whole molecule's
+    ring systems to those lying wholly inside this fragment, require the free
+    valence to sit in one of them, and let ``detect_ring_assembly`` /
+    ``name_ring_assembly_prefix`` build the token. Fail closed (``None``) on
+    anything that is not a numberable identical-ring assembly — a fused
+    polycycle (one system), a mixed pair, or an assembly the builder cannot
+    number — so this only ADDS correct emissions and never overrides the
+    fused/retained/von-Baeyer producers below.
+    """
+    if attachment_point is None:
+        return None
+    from ..perception.rings import get_ring_systems
+    from .ring_assemblies import detect_ring_assembly, name_ring_assembly_prefix
+
+    ring_set = set(ring_atoms)
+    frag_systems = [s for s in get_ring_systems(mol) if s <= ring_set]
+    if len(frag_systems) < 2:
+        return None  # a single (possibly fused) ring system — not an assembly
+    if sum(len(s) for s in frag_systems) != len(ring_set):
+        return None  # some fragment ring atom is not in a captured system
+    if not any(attachment_point in s for s in frag_systems):
+        return None  # free valence must lie in one assembly ring system
+    info = detect_ring_assembly(mol, frag_systems)
+    if info is None:
+        return None  # non-identical / branched / atom-bridged — not P-28.3
+    try:
+        return name_ring_assembly_prefix(mol, info, attachment_point)
+    except Exception:  # noqa: BLE001 — a builder error is a decline, not a crash
+        return None
+
+
+def _fragment_is_ring_assembly(mol, frag_atoms) -> bool:
+    """True iff ``frag_atoms`` is exactly a ring assembly (biphenyl-like).
+
+    Detection only, independent of whether the P-28.3 prefix builder can NUMBER
+    it — used as the fail-closed backstop so the generic cascade's yl-less
+    parent hydride can never leak for an assembly the builder declined.
+    """
+    from ..perception.rings import get_ring_systems
+    from .ring_assemblies import detect_ring_assembly
+
+    ring_info = mol.GetRingInfo()
+    frag_set = set(frag_atoms)
+    if any(ring_info.NumAtomRings(a) == 0 for a in frag_set):
+        return False  # a chain-rooted / decorated fragment is not a bare assembly
+    frag_systems = [s for s in get_ring_systems(mol) if s <= frag_set]
+    if len(frag_systems) < 2 or sum(len(s) for s in frag_systems) != len(frag_set):
+        return False
+    return detect_ring_assembly(mol, frag_systems) is not None
+
+
 def get_ring_substituent_name(
     mol,
     ring_atoms: Tuple[int, ...],
@@ -2617,6 +2694,16 @@ def get_ring_substituent_name(
     ring_name = identify_ring_system(mol, ring_atoms)
 
     if ring_name is None:
+        # P-28.3: a RING ASSEMBLY (identical rings joined by single bonds —
+        # biphenyl, terphenyl, bipyridine) takes the primed free-valence
+        # substituent form '[1,1'-biphenyl]-4-yl'. Try it BEFORE the retained /
+        # polycyclic producers: those decline an assembly and the generic
+        # enumerator fallback then ships the yl-less parent hydride
+        # '1,1'-biphenyl' (OPSIN-unparseable as a substituent). Fail closed
+        # (falls through) on anything not a numberable identical-ring assembly.
+        _asm = _ring_assembly_substituent_prefix(mol, ring_atoms, attachment_point)
+        if _asm is not None:
+            return _asm
         # Multi-ring system (fused polycyclic): check retained names
         # identify_ring_system() only handles single rings (up to 8 atoms).
         # For multi-ring systems (naphthalene=10, anthracene=14, etc.),
