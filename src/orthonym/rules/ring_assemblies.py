@@ -2408,9 +2408,31 @@ def name_ring_assembly_prefix(
     if attach_system_idx is None:
         return None
 
-    # Find the inter-ring connection atom in the attachment ring system.
-    # The assembly numbering starts from the inter-ring bond (locant 1),
-    # so we need to compute the attachment locant relative to that point.
+    # Free-valence (-yl) locant. Two fable BLOCKERs live here because the legacy
+    # _get_substituent_locant numbered the attachment ring in ISOLATION:
+    #   (1) for a HETEROCYCLE it used orient_heterocycle ignorant of the junction
+    #       and placed the -yl on a JUNCTION atom ('[2,2'-bithiophen]-2-yl',
+    #       correct '5-yl'); and
+    #   (3) for a MULTI-RING FUSED component it emitted a PARSEABLE-WRONG name
+    #       ('[1,1'-binaphthalen]-2-yl' for a 2,2'-binaphthalene) that SELF-01
+    #       masks — the producer must be honest WITHOUT the gate (8afa533c).
+    # Fix, by attachment-ring kind (carbocyclic monocycle is UNCHANGED, so
+    # '[1,1'-biphenyl]-3-yl' etc. stay byte-identical):
+    #   * fused / multi-ring          -> fail closed (never guess, finding 3);
+    #   * heterocyclic monocycle      -> the per-system heteroatom-priority map,
+    #     which numbers junction-aware and consistent with the connection string
+    #     (finding 1: bithiophene 5, bipyridine 5);
+    #   * carbocyclic monocycle       -> the existing _get_substituent_locant,
+    #     which applies the P-31.1.4.3.4 lowest-free-valence-locant rule the
+    #     per-system connection-locant minimiser does not.
+    _attach_sys_atoms = ring_systems[attach_system_idx]
+    _attach_sys_rings = [
+        r for r in mol.GetRingInfo().AtomRings() if set(r) <= _attach_sys_atoms]
+    if len(_attach_sys_rings) != 1:
+        return None  # fused / multi-ring attachment system -> fail closed (BLOCKER 3)
+    _is_hetero_attach = any(
+        mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in _attach_sys_rings[0])
+
     inter_ring_conn_atom = None
     for a1, a2, s1, s2 in connections:
         if s1 == attach_system_idx:
@@ -2420,16 +2442,18 @@ def name_ring_assembly_prefix(
             inter_ring_conn_atom = a2
             break
 
-    if inter_ring_conn_atom is not None:
-        # Use _get_substituent_locant which numbers from the inter-ring
-        # connection point (locant 1) and gives the correct position for
-        # the chain attachment point
+    if _is_hetero_attach:
+        if (per_system_locants is None
+                or attach_system_idx >= len(per_system_locants)
+                or attachment_atom_idx not in per_system_locants[attach_system_idx]):
+            return None  # heteroatom ring not numbered -> fail closed (BLOCKER 1)
+        attach_locant = per_system_locants[attach_system_idx][attachment_atom_idx]
+    elif inter_ring_conn_atom is not None:
         attach_locant = _get_substituent_locant(
             mol, attachment_atom_idx, attachment_atom_idx,
             ring_systems[attach_system_idx], inter_ring_conn_atom
         )
     else:
-        # Fallback: use _get_connection_locant (for single-ring edge cases)
         attach_locant = _get_connection_locant(
             mol, attachment_atom_idx, ring_systems[attach_system_idx]
         )

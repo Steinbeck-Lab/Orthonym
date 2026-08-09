@@ -4038,9 +4038,18 @@ def _name_amino_ring_branch(mol, frag_set, root_idx, parent_set):
 
     names = []
     for b, batoms in zip(branches, branch_atomsets):
+        battach = mol.GetAtomWithIdx(b)
+        # A HETEROATOM-rooted branch on the amino N is not a simple amino
+        # substituent — it is hydrazine (-N-N-), hydroxylamine (-N-O-), nitroso
+        # (-N=O) etc., a different retained nomenclature class. name_substituent
+        # names such a branch with an OPSIN-lenient but INVALID replacement string
+        # ('2-oxa-1-azaeth-1-en-1-yl' for -N=O; fable RISK 5) that the per-branch
+        # re-anchor accepts (constitution-correct). Require each R to be
+        # carbon-rooted so those classes fall through to their own producers.
+        if battach.GetSymbol() != 'C':
+            return None
         # An acyl branch (-N-C(=O)-R) is the amido family, owned by
         # _name_amino_branch — never build 'amino' over it.
-        battach = mol.GetAtomWithIdx(b)
         if battach.GetSymbol() == 'C' and any(
                 nb.GetSymbol() == 'O'
                 and mol.GetBondBetweenAtoms(

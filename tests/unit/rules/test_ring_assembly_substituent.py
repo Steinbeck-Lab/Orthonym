@@ -79,6 +79,39 @@ def test_fused_polycycle_is_not_an_assembly():
     assert _fragment_is_ring_assembly(mol, ring_atoms) is False
 
 
+@pytest.mark.parametrize("smi,expected", [
+    ("Cc1ccc(-c2ccccn2)nc1", "[2,2'-bipyridin]-5-yl"),
+    ("Cc1ccc(-c2cccs2)s1", "[2,2'-bithiophen]-5-yl"),
+])
+def test_heteroaromatic_assembly_free_valence_not_on_junction(smi, expected):
+    """Fable BLOCKER 1: the -yl locant must use the junction-aware per-system
+    numbering, not orient_heterocycle-in-isolation which placed it ON the 2,2'
+    junction ('[2,2'-bithiophen]-2-yl'). Correct is 5-yl (the far position)."""
+    m = Chem.MolFromSmiles(smi)
+    ri = m.GetRingInfo()
+    ring = tuple(a.GetIdx() for a in m.GetAtoms() if ri.NumAtomRings(a.GetIdx()) > 0)
+    ch3 = [a.GetIdx() for a in m.GetAtoms()
+           if a.GetSymbol() == 'C' and ri.NumAtomRings(a.GetIdx()) == 0][0]
+    att = [n.GetIdx() for n in m.GetAtomWithIdx(ch3).GetNeighbors()
+           if n.GetIdx() in ring][0]
+    assert get_ring_substituent_name(m, ring, att) == expected
+
+
+def test_fused_component_assembly_fails_closed():
+    """Fable BLOCKER 3: a MULTI-RING FUSED assembly component (binaphthalene)
+    degrades the per-system numbering to the unreliable per-atom fallback and
+    emitted a PARSEABLE-WRONG '[1,1'-binaphthalen]-2-yl' (a 2,2'-binaphthalene).
+    Never guess a fused-system attachment locant — fail closed."""
+    m = Chem.MolFromSmiles("Cc1ccc2cc(-c3ccc4ccccc4c3)ccc2c1")
+    ri = m.GetRingInfo()
+    ring = tuple(a.GetIdx() for a in m.GetAtoms() if ri.NumAtomRings(a.GetIdx()) > 0)
+    ch3 = [a.GetIdx() for a in m.GetAtoms()
+           if a.GetSymbol() == 'C' and ri.NumAtomRings(a.GetIdx()) == 0][0]
+    att = [n.GetIdx() for n in m.GetAtomWithIdx(ch3).GetNeighbors()
+           if n.GetIdx() in ring][0]
+    assert get_ring_substituent_name(m, ring, att) is None
+
+
 def test_terphenyl_detected_as_assembly():
     mol, ring_atoms, _, _ = _biphenyl_attach(
         "Cc1ccc(-c2ccc(-c3ccccc3)cc2)cc1")

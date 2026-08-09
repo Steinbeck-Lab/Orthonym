@@ -75,8 +75,16 @@ def test_disubstituted_n_ring_amino(smi, expected):
 
 
 # STILL deferred (must NOT fabricate a partial/wrong name): an acyl branch is the
-# amido family, owned by _name_amino_branch — never 'amino' over it.
-@pytest.mark.parametrize("smi", ["[*]NC(=O)C1CCCCC1"])
+# amido family; a HETEROATOM-rooted branch is hydrazine/nitroso/hydroxylamine
+# (fable RISK 5 — name_substituent gives OPSIN-lenient INVALID replacement names
+# like '2-oxa-1-azaeth-1-en-1-yl' for -N=O that the re-anchor accepts). Both must
+# fall through to their own producers, never 'amino' over them.
+@pytest.mark.parametrize("smi", [
+    "[*]NC(=O)C1CCCCC1",       # acyl -> amido family
+    "[*]N(N=O)C1CCCCC1",       # -N=O nitroso branch
+    "[*]N(N)C1CCCCC1",         # -NH2 hydrazine branch
+    "[*]N(OC)C1CCCCC1",        # -O-CH3 hydroxylamine branch
+])
 def test_deferred_shapes_fail_closed(smi):
     m, frag, fv = _frag(smi)
     assert name_substituent(m, frag, fv, allow_mancude=True) is None
