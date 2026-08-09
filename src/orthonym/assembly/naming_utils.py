@@ -1199,6 +1199,18 @@ def enclose_if_compound(name: str) -> str:
     two-prefix compound; ``is_complex_substituent`` catches the two-prefix
     compound (``cyclohexylmethyl``) but not the fused functional prefix.
 
+    A prefix that is NOT fully enclosed yet CONTAINS an inner enclosing mark is
+    also compound and takes an OUTER (escalating) mark — ``cyclohexyl(methyl)amino``
+    (an N,N-disubstituted amino core, P-16.3.3) -> ``[cyclohexyl(methyl)amino]``.
+    Neither ``needs_brackets`` nor ``is_complex_substituent`` sees this when the
+    core carries no locant or hyphen, so the inner-mark test is the third arm of
+    the union. (The same gap was patched inline at one call site with
+    ``'(' in name or '[' in name``; this centralises it — after the
+    ``_is_fully_enclosed`` early return above, any residual ``([{`` is a genuine
+    inner mark, and every leading-mark exception — indicated H ``(1H)``, stereo
+    ``(R)-``, fusion ``[2,3-b]`` — already carries a digit and is caught by
+    ``is_complex_substituent``, so this arm only newly fires on marks-without-locant.)
+
     Idempotent: an already fully-enclosed token is returned untouched.
 
     Examples:
@@ -1210,10 +1222,13 @@ def enclose_if_compound(name: str) -> str:
         '[(4-bromophenyl)methyl]'
         >>> enclose_if_compound("(2-chloroethyl)")
         '(2-chloroethyl)'
+        >>> enclose_if_compound("cyclohexyl(methyl)amino")
+        '[cyclohexyl(methyl)amino]'
     """
     if not name or _is_fully_enclosed(name):
         return name
-    if needs_brackets(name) or is_complex_substituent(name):
+    if (needs_brackets(name) or is_complex_substituent(name)
+            or any(mark in name for mark in '([{')):
         return apply_enclosing_marks(name, -1)
     return name
 

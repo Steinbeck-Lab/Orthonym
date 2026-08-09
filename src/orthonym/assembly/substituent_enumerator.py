@@ -2840,7 +2840,7 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # ---- Step 4: name each decoration by recursion -------------------------
     from collections import defaultdict
     from .naming_utils import (
-        apply_enclosing_marks, is_complex_substituent, get_multiplier_prefix,
+        enclose_if_compound, get_multiplier_prefix,
         alpha_sort_key)
     groups = defaultdict(list)
     for ra, ni, branch in decorations:
@@ -2858,8 +2858,7 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     parts = []  # (alpha_key, text)
     for dname, locs in groups.items():
         locs = sorted(locs)
-        token = (apply_enclosing_marks(dname, -1)
-                 if is_complex_substituent(dname) else dname)
+        token = enclose_if_compound(dname)
         mult = get_multiplier_prefix(len(locs), dname)
         text = f"{','.join(str(l) for l in locs)}-{mult}{token}"
         parts.append((alpha_sort_key(dname), text))
@@ -3005,7 +3004,7 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # ---- name each decoration by recursion ---------------------------------
     from collections import defaultdict
     from .naming_utils import (
-        apply_enclosing_marks, is_complex_substituent, get_multiplier_prefix,
+        enclose_if_compound, get_multiplier_prefix,
         alpha_sort_key)
     groups = defaultdict(list)
     for ca, ni, branch in decorations:
@@ -3022,8 +3021,7 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     parts = []  # (alpha_key, text)
     for dname, locs in groups.items():
         locs = sorted(locs)
-        token = (apply_enclosing_marks(dname, -1)
-                 if is_complex_substituent(dname) else dname)
+        token = enclose_if_compound(dname)
         mult = get_multiplier_prefix(len(locs), dname)
         text = f"{','.join(str(l) for l in locs)}-{mult}{token}"
         parts.append((alpha_sort_key(dname), text))
