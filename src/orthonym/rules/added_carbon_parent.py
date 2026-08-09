@@ -111,9 +111,15 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     if not chain:
         return None
 
-    # All non-added carbons must lie ON this single chain (no branches), and every
-    # parent carbon's heavy neighbours must be parent carbons or added carbons
-    # only (no other substituents / heteroatoms / unsaturation we cannot express).
+    # All non-added carbons must lie ON this single chain (no branches). Every
+    # parent carbon's heavy neighbour must be a parent/added carbon OR a nameable
+    # exocyclic SUBSTITUENT (v30: citric-acid family -- a 2-hydroxy on the core;
+    # previously ANY extra neighbour returned None -> the molecule fell to a wrong
+    # pentanedioic-chain candidate). Collect each substituent fragment and name it
+    # via the recursive substituent namer; fail closed on anything un-nameable so a
+    # wrong/atom-dropped name is never emitted.
+    from rdkit import Chem
+
     skeleton_carbons = {
         a.GetIdx()
         for a in mol.GetAtoms()
@@ -122,54 +128,103 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     chain_set = set(chain)
     if skeleton_carbons != chain_set:
         return None
+    # substituent = (chain_atom_idx, attach_neighbour_idx, frozenset(frag_atoms))
+    substituents: List[tuple] = []
     for c in chain:
         catom = mol.GetAtomWithIdx(c)
         if catom.IsInRing():
             return None
         for nbr in catom.GetNeighbors():
             ni = nbr.GetIdx()
-            if ni in chain_set or ni in added_set:
+            if ni in chain_set or ni in added_set or nbr.GetSymbol() == "H":
                 continue
-            if nbr.GetSymbol() == "H":
-                continue
-            return None  # an extra substituent/heteroatom we do not own here
-    # Reject any non-single bond inside the parent chain (unsaturated parents are
-    # out of this clean-saturated-skeleton scope).
-    from rdkit import Chem
+            # BFS the substituent fragment from ni, never crossing back into the
+            # parent chain or the added (suffix) carbons.
+            frag = set()
+            stack = [ni]
+            while stack:
+                a = stack.pop()
+                if a in frag or a in chain_set or a in added_set:
+                    continue
+                frag.add(a)
+                for nn in mol.GetAtomWithIdx(a).GetNeighbors():
+                    j = nn.GetIdx()
+                    if j not in frag and j not in chain_set and j not in added_set:
+                        stack.append(j)
+            substituents.append((c, ni, frozenset(frag)))
 
+    # Reject any non-single bond inside the parent chain (unsaturated parents are
+    # out of this clean-saturated-skeleton scope; aconitic-family needs a separate
+    # unsaturated extension).
     for i in range(len(chain) - 1):
         bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
         if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
             return None
 
     length = len(chain)
-
-    # Lowest locants to the added-carbon attachment points (P-31.1.4): choose the
-    # numbering direction giving the lexicographically smallest sorted locant set.
-    pos = {atom_idx: i for i, atom_idx in enumerate(chain)}
-
-    def locants_for(reverse: bool) -> List[int]:
-        out = []
-        for ac in added:
-            p = pos[attach[ac]]
-            out.append((length - 1 - p) + 1 if reverse else p + 1)
-        return sorted(out)
-
-    fwd = locants_for(reverse=False)
-    rev = locants_for(reverse=True)
-    locants = min(fwd, rev)
-
     stem = get_chain_prefix(length)
     parent = f"{stem}ane"
     multiplier = SIMPLE_MULTIPLIERS.get(n_groups)
     if multiplier is None:
         return None
 
-    # methane (single-carbon parent): no locants possible/required.
+    # Name every substituent (fail closed if any is un-nameable) BEFORE choosing
+    # the numbering, so a molecule this namer cannot fully express is declined here
+    # rather than emitting a partial (atom-dropping) name.
+    named_subs: List[tuple] = []  # (chain_atom_idx, bare_prefix_name)
+    if substituents:
+        from ..assembly.substituent_enumerator import name_substituent
+        for chain_atom, ni, frag in substituents:
+            sub_name = name_substituent(mol, sorted(frag), ni)
+            if not sub_name or sub_name == "substituent":
+                return None  # un-nameable substituent -> fail closed (0-wrong)
+            named_subs.append((chain_atom, sub_name))
+
+    # P-31.1.4 / P-14.4 numbering: lowest locants to the added-carbon (suffix)
+    # attachments FIRST, then to the substituents. Choose the direction minimising
+    # (sorted suffix locants, then sorted substituent locants).
+    pos = {atom_idx: i for i, atom_idx in enumerate(chain)}
+
+    def loc(atom_idx: int, reverse: bool) -> int:
+        p = pos[atom_idx]
+        return (length - 1 - p) + 1 if reverse else p + 1
+
+    def key_for(reverse: bool):
+        suf = sorted(loc(attach[ac], reverse) for ac in added)
+        sub = sorted(loc(ca, reverse) for ca, _ in named_subs)
+        return (suf, sub)
+
+    reverse = key_for(True) < key_for(False)
+    suffix_locants = sorted(loc(attach[ac], reverse) for ac in added)
+
+    # Assemble the substituent-prefix string (P-16.3.3 enclosure, P-14.5.2 alpha
+    # order, P-16.3.4 multipliers) via the shared naming utilities.
+    prefix_str = ""
+    if named_subs:
+        from collections import defaultdict
+        from ..assembly.naming_utils import (
+            alpha_sort_key, is_complex_substituent, get_multiplier_prefix,
+        )
+        by_name: dict = defaultdict(list)
+        for ca, nm in named_subs:
+            by_name[nm].append(loc(ca, reverse))
+        parts = []
+        for nm in sorted(by_name, key=alpha_sort_key):
+            locs = sorted(by_name[nm])
+            complex_ = is_complex_substituent(nm)
+            disp = f"({nm})" if complex_ and not (nm.startswith("(") and nm.endswith(")")) else nm
+            mult = get_multiplier_prefix(len(locs), complex_)
+            locstr = ",".join(str(x) for x in locs)
+            parts.append(f"{locstr}-{mult}{disp}")
+        # P-16.3.4: hyphen-join the ordered prefix fragments.
+        prefix_str = "-".join(parts) if len(parts) > 1 else parts[0]
+        # a trailing enclosure/letter meets a digit of the parent locant run below;
+        # the parent stem starts with a letter, so no hyphen needed after prefix_str.
+
     if length == 1:
-        return f"{parent}{multiplier}{carbo}"
-    locant_str = ",".join(str(loc) for loc in locants)
-    return f"{parent}-{locant_str}-{multiplier}{carbo}"
+        return f"{prefix_str}{parent}{multiplier}{carbo}"
+    locant_str = ",".join(str(x) for x in suffix_locants)
+    return f"{prefix_str}{parent}-{locant_str}-{multiplier}{carbo}"
 
 
 __all__ = ["requires_added_carbon_suffix", "name_added_carbon_parent"]
