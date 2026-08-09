@@ -57,3 +57,37 @@ def test_added_carbon_substituent_path_declines_complex_substituents():
                 "OC(=O)CC(NS(=O)(=O)c1ccc(N)cc1)(CC(=O)O)C(=O)O"):
         n = _pin().name(smi) or ""
         assert "tricarboxylic" not in n, f"my added-carbon path must decline, got {n}"
+
+
+# ---- fable review 7daf8b68 findings, now fixed ----
+
+def test_fable_b1_isomer_constitution_guard():
+    """BLOCKER 1: name_substituent's symbols-only fallback mis-named a nitrite
+    -O-N=O as 'nitro' (same {N,O,O} count). The gate-independent constitution
+    re-anchor must reject it -> the added-carbon path does NOT emit a nitro name."""
+    for smi in ("OC(=O)CC(ON=O)(CC(=O)O)C(=O)O", "OC(=O)CC(N(O)O)(CC(=O)O)C(=O)O"):
+        n = _pin().name(smi) or ""
+        assert "nitropropane" not in n and "tricarboxylic" not in n, n
+
+
+def test_fable_b2_p14_4_g_tiebreak_deterministic():
+    """BLOCKER 2: P-14.4(g) — lowest locant to the alphabetically-first substituent;
+    the same molecule must get ONE name regardless of SMILES atom order."""
+    a = _pin().name("NC(C(=O)O)C(C(=O)O)C(O)C(=O)O")
+    b = _pin().name("OC(C(=O)O)C(C(=O)O)C(N)C(=O)O")
+    assert a == b == "1-amino-3-hydroxypropane-1,2,3-tricarboxylic acid", (a, b)
+
+
+def test_fable_b3_stereo_defined_declined_by_added_carbon_path():
+    """BLOCKER 3: a flat added-carbon name cannot express stereo, so the added-carbon
+    path must DECLINE a stereo-defined input (isolate it: no `...tricarboxylic acid`
+    output). At PIN (SELF-01 on) the molecule abstains; the pytest env runs SELF-01
+    off, so the pre-existing pentane path may still surface its (stereo) pentanetrioic
+    candidate — that is NOT this path and abstains under SELF-01."""
+    n = _pin().name("OC(=O)[C@H](O)[C@@H](CC(=O)O)C(=O)O") or ""
+    assert "tricarboxylic" not in n, n
+
+
+def test_fable_r6_mononuclear_locant_omitted():
+    """RISK 6 / P-14.3.4.2(a): locant '1' omitted on a substituted mononuclear core."""
+    assert _pin().name("OC(C(=O)O)(C(=O)O)C(=O)O") == "hydroxymethanetricarboxylic acid"

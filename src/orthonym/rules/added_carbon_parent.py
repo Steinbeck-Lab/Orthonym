@@ -86,6 +86,58 @@ def _added_carbons_and_attachments(mol, pg_matches):
     return added, attach
 
 
+def _frag_on_benzene_smiles(mol, frag_atoms, attach_idx) -> Optional[str]:
+    """Build the SMILES of the substituent fragment attached to a benzene ring, in
+    RDKit (no OPSIN). Used to CONSTITUTION-check a substituent name gate-independently."""
+    from rdkit import Chem
+
+    rw = Chem.RWMol()
+    idxmap = {}
+    for a in sorted(frag_atoms):
+        src = mol.GetAtomWithIdx(a)
+        na = Chem.Atom(src.GetAtomicNum())
+        na.SetFormalCharge(src.GetFormalCharge())
+        idxmap[a] = rw.AddAtom(na)
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in idxmap and j in idxmap:
+            rw.AddBond(idxmap[i], idxmap[j], b.GetBondType())
+    ring = [rw.AddAtom(Chem.Atom(6)) for _ in range(6)]
+    for k in range(6):
+        rw.AddBond(ring[k], ring[(k + 1) % 6], Chem.BondType.AROMATIC)
+        rw.GetAtomWithIdx(ring[k]).SetIsAromatic(True)
+    rw.AddBond(ring[0], idxmap[attach_idx], Chem.BondType.SINGLE)
+    try:
+        m = rw.GetMol()
+        Chem.SanitizeMol(m)
+        return Chem.MolToSmiles(m)
+    except Exception:
+        return None
+
+
+def _substituent_constitution_ok(mol, frag_atoms, attach_idx, sub_name: str) -> bool:
+    """Gate-INDEPENDENT CONSTITUTION re-anchor for a substituent prefix name.
+
+    `name_substituent` has a SYMBOLS-ONLY multi-atom fallback that mis-names
+    constitutional isomers (a nitrite ``-O-N=O`` came back ``nitro`` — same {N,O,O}
+    heavy-atom count, different connectivity), so a None/sentinel check (and even a
+    heavy-COUNT check) is insufficient. OPSIN-parse ``<sub_name>benzene`` and require
+    its InChIKey skeleton to equal that of the REAL fragment-on-benzene; fail CLOSED
+    on any parse failure / missing jar / mismatch. Fixes the fable BLOCKER 1 (a
+    nitrite shipping as a nitro compound gate-off) without depending on SELF-01."""
+    from ..namer import _validity_gate_name_to_smiles, _self_consistency_skeleton
+
+    probe = _validity_gate_name_to_smiles(f"{sub_name}benzene")
+    if not probe:
+        return False
+    actual = _frag_on_benzene_smiles(mol, frag_atoms, attach_idx)
+    if actual is None:
+        return False
+    sk_named = _self_consistency_skeleton(probe)
+    sk_actual = _self_consistency_skeleton(actual)
+    return sk_named is not None and sk_named == sk_actual
+
+
 def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]:
     """Name an acyclic >=3-group added-carbon multi-suffix molecule, or ``None``
     to fall through to the legacy path when the structure is outside the clean
@@ -168,43 +220,65 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     if multiplier is None:
         return None
 
-    # Name every substituent (fail closed if any is un-nameable) BEFORE choosing
-    # the numbering, so a molecule this namer cannot fully express is declined here
-    # rather than emitting a partial (atom-dropping) name.
+    from ..assembly.naming_utils import (
+        alpha_sort_key, is_complex_substituent, get_multiplier_prefix,
+    )
+
+    # Name every substituent (fail closed if any is un-nameable OR mis-named) BEFORE
+    # choosing the numbering, so a molecule this namer cannot fully+correctly express
+    # is declined here rather than emitting a partial/wrong name.
     named_subs: List[tuple] = []  # (chain_atom_idx, bare_prefix_name)
     if substituents:
         from ..assembly.substituent_enumerator import name_substituent
+        # v30 fable BLOCKER 3: a flat added-carbon name cannot express stereo, so a
+        # stereo-defined input (e.g. natural isocitric acid) would emit a stereo-less
+        # name that the BBR-GATE stereo carve-out ships as a WRONG (stereo) molecule.
+        # Abstain when this SUBSTITUTED path meets defined stereo (restores the
+        # pre-substituent behaviour; a stereo-expressing parent is a separate feature).
+        has_stereo = any(
+            a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms()
+        ) or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds())
+        if has_stereo:
+            return None
         for chain_atom, ni, frag in substituents:
             sub_name = name_substituent(mol, sorted(frag), ni)
             if not sub_name or sub_name == "substituent":
                 return None  # un-nameable substituent -> fail closed (0-wrong)
+            # v30 fable BLOCKER 1: name_substituent's symbols-only fallback mis-names
+            # constitutional isomers (nitrite -O-N=O -> 'nitro'); a gate-independent
+            # CONSTITUTION re-anchor rejects that before it can ship gate-off.
+            if not _substituent_constitution_ok(mol, frag, ni, sub_name):
+                return None
             named_subs.append((chain_atom, sub_name))
 
-    # P-31.1.4 / P-14.4 numbering: lowest locants to the added-carbon (suffix)
-    # attachments FIRST, then to the substituents. Choose the direction minimising
-    # (sorted suffix locants, then sorted substituent locants).
+    # P-31.1.4 / P-14.4 numbering: lowest locants to (a) the added-carbon (suffix)
+    # attachments, then (b) all substituents as a set, then (g) the substituent cited
+    # FIRST in alphanumerical order (P-14.4(g), BB: "1-methyl-4-nitronaphthalene, not
+    # 4-methyl-1-nitro..."). Without (g) the PIN depended on SMILES atom order.
     pos = {atom_idx: i for i, atom_idx in enumerate(chain)}
 
     def loc(atom_idx: int, reverse: bool) -> int:
         p = pos[atom_idx]
         return (length - 1 - p) + 1 if reverse else p + 1
 
+    subs_alpha = sorted(named_subs, key=lambda t: alpha_sort_key(t[1]))
+
     def key_for(reverse: bool):
         suf = sorted(loc(attach[ac], reverse) for ac in added)
         sub = sorted(loc(ca, reverse) for ca, _ in named_subs)
-        return (suf, sub)
+        alpha = [loc(ca, reverse) for ca, _ in subs_alpha]  # P-14.4(g)
+        return (suf, sub, alpha)
 
     reverse = key_for(True) < key_for(False)
     suffix_locants = sorted(loc(attach[ac], reverse) for ac in added)
 
     # Assemble the substituent-prefix string (P-16.3.3 enclosure, P-14.5.2 alpha
-    # order, P-16.3.4 multipliers) via the shared naming utilities.
+    # order, P-16.3.4 multipliers). P-14.3.4.2(a): the locant '1' is omitted for a
+    # substituted MONONUCLEAR (methane) parent hydride.
     prefix_str = ""
     if named_subs:
         from collections import defaultdict
-        from ..assembly.naming_utils import (
-            alpha_sort_key, is_complex_substituent, get_multiplier_prefix,
-        )
+        omit_locants = (length == 1)
         by_name: dict = defaultdict(list)
         for ca, nm in named_subs:
             by_name[nm].append(loc(ca, reverse))
@@ -214,11 +288,13 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             complex_ = is_complex_substituent(nm)
             disp = f"({nm})" if complex_ and not (nm.startswith("(") and nm.endswith(")")) else nm
             mult = get_multiplier_prefix(len(locs), complex_)
-            locstr = ",".join(str(x) for x in locs)
-            parts.append(f"{locstr}-{mult}{disp}")
+            if omit_locants:
+                parts.append(f"{mult}{disp}")
+            else:
+                locstr = ",".join(str(x) for x in locs)
+                parts.append(f"{locstr}-{mult}{disp}")
         # P-16.3.4: hyphen-join the ordered prefix fragments.
         prefix_str = "-".join(parts) if len(parts) > 1 else parts[0]
-        # a trailing enclosure/letter meets a digit of the parent locant run below;
         # the parent stem starts with a letter, so no hyphen needed after prefix_str.
 
     if length == 1:
