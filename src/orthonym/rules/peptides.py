@@ -158,6 +158,57 @@ def _is_valid_peptide(mol) -> bool:
     return True
 
 
+def _bears_carboxyl_carbon(atom, exclude_idx: int) -> bool:
+    """True iff ``atom`` neighbours a carbon carrying a double-bonded O (a C=O),
+    other than the atom at ``exclude_idx`` — i.e. it is an alpha-carbon bearing a
+    carboxyl/amide carbon."""
+    for c in atom.GetNeighbors():
+        if c.GetIdx() == exclude_idx or c.GetSymbol() != 'C':
+            continue
+        if any(o.GetSymbol() == 'O'
+               and c.GetOwningMol().GetBondBetweenAtoms(c.GetIdx(), o.GetIdx()) is not None
+               and c.GetOwningMol().GetBondBetweenAtoms(
+                   c.GetIdx(), o.GetIdx()).GetBondType() == Chem.BondType.DOUBLE
+               for o in c.GetNeighbors()):
+            return True
+    return False
+
+
+def _is_alpha_carboxyl_bond(mol, carbonyl_c: int, amide_n: int) -> bool:
+    """True iff the amide bond ``carbonyl_c``-``amide_n`` is an ALPHA-peptide bond
+    on BOTH sides — the only bond an alpha-acylamino peptide name may describe.
+
+    Acyl (C=O) side: ``carbonyl_c`` must be a residue's alpha-carboxyl — its
+    alpha-carbon (a carbon neighbour that is not the amide N) bears that residue's
+    backbone amino nitrogen. A side-chain carboxyl amide (glutathione's
+    gamma-glutamyl) fails here.
+
+    Amine (N) side: ``amide_n`` must be a residue's alpha-amino N — its
+    alpha-carbon (a carbon neighbour that is not the carbonyl) bears a carboxyl
+    carbon (its own alpha-carboxyl or the next peptide carbonyl). A side-chain
+    amine amide (an epsilon-lysine isopeptide, ``Gly-eps-Lys``) fails here.
+
+    Either failure => the caller fails closed rather than emit a mis-linked
+    alpha name like ``glutamylcysteinylglycine`` / ``glycyllysine``.
+    """
+    c = mol.GetAtomWithIdx(carbonyl_c)
+    acyl_alpha = any(
+        nbr.GetSymbol() == 'C' and nbr.GetIdx() != amide_n
+        and any(nn.GetSymbol() == 'N' for nn in nbr.GetNeighbors()
+                if nn.GetIdx() != carbonyl_c)
+        for nbr in c.GetNeighbors()
+    )
+    if not acyl_alpha:
+        return False
+    n = mol.GetAtomWithIdx(amide_n)
+    amine_alpha = any(
+        nbr.GetSymbol() == 'C' and nbr.GetIdx() != carbonyl_c
+        and _bears_carboxyl_carbon(nbr, amide_n)
+        for nbr in n.GetNeighbors()
+    )
+    return amine_alpha
+
+
 def _extract_residues(mol) -> Optional[List[str]]:
     """
     Extract amino acid residues from a linear peptide by walking from
@@ -181,6 +232,15 @@ def _extract_residues(mol) -> Optional[List[str]]:
     for m in matches:
         carbonyl_c = m[0]
         amide_n = m[2]
+        # Only an ALPHA-peptide bond is in scope: the carbonyl must be a residue's
+        # ALPHA-carboxyl, i.e. its carbon neighbour (the alpha-carbon) itself bears
+        # a nitrogen (that residue's backbone amino N). An ISOPEPTIDE bond formed
+        # from a side-chain carboxyl (glutathione's gamma-glutamyl) has the carbonyl
+        # on a side-chain carbon whose neighbour bears no amino N — naming it with
+        # the alpha acylamino convention (`glutamyl...`) is a WRONG constitution, so
+        # fail closed on ANY non-alpha bond rather than emit a mis-linked name.
+        if not _is_alpha_carboxyl_bond(mol, carbonyl_c, amide_n):
+            return None
         peptide_bond_cn_pairs.append((carbonyl_c, amide_n))
 
     # Get the actual bond indices to cleave
@@ -204,66 +264,75 @@ def _extract_residues(mol) -> Optional[List[str]]:
     if not frags or len(frags) < 2:
         return None
 
-    # Reconstruct each fragment as a free amino acid
-    # and determine N->C ordering
+    # Reconstruct each fragment as a free amino acid and record, per fragment, the
+    # cleaved-bond LABELS on each side. FragmentOnBonds stamps each cleaved bond's
+    # index (dummyLabels=[(i,i)...]) as the ISOTOPE of the two dummies it creates,
+    # so the C(=O)-side dummy of residue X and the N-side dummy of residue X+1
+    # carry the SAME label i — that shared label is the backbone edge X->X+1.
     residue_data = []
     for frag in frags:
         aa_smi = _reconstruct_free_amino_acid(frag)
         if aa_smi is None:
             return None
 
-        # Classify fragment position based on what dummies it has
-        has_c_terminal_dummy = False  # Dummy replacing N (on C-terminal side of bond)
-        has_n_terminal_dummy = False  # Dummy replacing C(=O) (on N-terminal side)
+        cside_labels = set()  # labels on THIS residue's carbonyl C (its C-terminus)
+        nside_labels = set()  # labels on THIS residue's amide N  (its N-terminus)
         for atom in frag.GetAtoms():
-            if atom.GetAtomicNum() == 0:  # Dummy
-                for nbr in atom.GetNeighbors():
-                    if nbr.GetSymbol() == 'C':
-                        # Check if this C has a double-bond O neighbor (carbonyl)
-                        has_carbonyl = any(
-                            n2.GetSymbol() == 'O' and
-                            frag.GetBondBetweenAtoms(nbr.GetIdx(), n2.GetIdx()).GetBondType() == Chem.BondType.DOUBLE
-                            for n2 in nbr.GetNeighbors()
-                            if n2.GetIdx() != atom.GetIdx() and n2.GetSymbol() == 'O'
-                            and frag.GetBondBetweenAtoms(nbr.GetIdx(), n2.GetIdx()) is not None
-                        )
-                        if has_carbonyl:
-                            # Dummy is on the C(=O) side -> this is the C-terminal end of this fragment
-                            has_c_terminal_dummy = True
-                        else:
-                            has_n_terminal_dummy = True
-                    elif nbr.GetSymbol() == 'N':
-                        has_n_terminal_dummy = True
-
-        # Determine fragment position:
-        # N-terminal fragment: has c_terminal_dummy only (original N-term)
-        # C-terminal fragment: has n_terminal_dummy only (original C-term)
-        # Internal fragment: has both
-        if has_c_terminal_dummy and not has_n_terminal_dummy:
-            position = 'n_terminal'
-        elif has_n_terminal_dummy and not has_c_terminal_dummy:
-            position = 'c_terminal'
-        elif has_c_terminal_dummy and has_n_terminal_dummy:
-            position = 'internal'
-        else:
-            position = 'unknown'
+            if atom.GetAtomicNum() != 0:  # dummy only
+                continue
+            label = atom.GetIsotope()
+            for nbr in atom.GetNeighbors():
+                if nbr.GetSymbol() == 'C':
+                    has_carbonyl = any(
+                        n2.GetSymbol() == 'O'
+                        and frag.GetBondBetweenAtoms(nbr.GetIdx(), n2.GetIdx()) is not None
+                        and frag.GetBondBetweenAtoms(
+                            nbr.GetIdx(), n2.GetIdx()).GetBondType() == Chem.BondType.DOUBLE
+                        for n2 in nbr.GetNeighbors()
+                        if n2.GetIdx() != atom.GetIdx() and n2.GetSymbol() == 'O'
+                    )
+                    (cside_labels if has_carbonyl else nside_labels).add(label)
+                elif nbr.GetSymbol() == 'N':
+                    nside_labels.add(label)
 
         residue_data.append({
             'smiles': aa_smi,
-            'position': position,
-            'frag': frag,
+            'cside': cside_labels,
+            'nside': nside_labels,
         })
 
-    # Order: N-terminal first, then internal (by original atom index), C-terminal last
-    n_terms = [r for r in residue_data if r['position'] == 'n_terminal']
-    c_terms = [r for r in residue_data if r['position'] == 'c_terminal']
-    internals = [r for r in residue_data if r['position'] == 'internal']
-
-    if len(n_terms) != 1 or len(c_terms) != 1:
-        # Fallback: can't determine order
+    # Order residues by WALKING the backbone N->C via the shared bond labels — NOT
+    # by fragment/atom index. Atom-index order is SMILES-spelling-dependent, so it
+    # scrambled the two internal residues of any tetrapeptide+ (Val-Glu-Ile-Arg was
+    # emitted Val-Ile-Glu-Arg on some spellings) — a wrong CONSTITUTION that only
+    # SELF-01 stopped. A LINEAR peptide has exactly one N-terminal residue (no
+    # N-side label), one C-terminal residue (no C-side label), and <=1 label per
+    # side on every residue; a branch/fork (an isopeptide side-chain amide) breaks
+    # one of those and fails closed here rather than emitting a mis-linked name.
+    if any(len(r['cside']) > 1 or len(r['nside']) > 1 for r in residue_data):
         return None
+    n_terms = [r for r in residue_data if not r['nside']]
+    c_terms = [r for r in residue_data if not r['cside']]
+    if len(n_terms) != 1 or len(c_terms) != 1:
+        return None
+    by_nside = {}
+    for r in residue_data:
+        for lbl in r['nside']:
+            by_nside[lbl] = r  # each label appears on exactly one N-side (checked above)
 
-    ordered = [n_terms[0]] + internals + [c_terms[0]]
+    ordered, seen = [], set()
+    cur = n_terms[0]
+    while cur is not None:
+        key = id(cur)
+        if key in seen:      # cycle -> not a linear peptide
+            return None
+        seen.add(key)
+        ordered.append(cur)
+        if not cur['cside']:
+            break            # reached the C-terminus
+        cur = by_nside.get(next(iter(cur['cside'])))
+    if len(ordered) != len(residue_data):
+        return None          # disconnected: the walk did not cover every residue
     return [r['smiles'] for r in ordered]
 
 

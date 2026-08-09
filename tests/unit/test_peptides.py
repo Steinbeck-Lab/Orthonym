@@ -64,6 +64,66 @@ class TestTripeptides:
         assert result == "glycylalanylleucine"
 
 
+# ── Tetrapeptide residue ORDER (backbone walk, not atom index) ────────────
+# _extract_residues used to order internal residues by atom index, which is
+# SMILES-spelling-dependent, so a tetrapeptide's two internal residues could
+# swap (Val-Glu-Ile-Arg -> Val-Ile-Glu-Arg) — a wrong constitution that only
+# SELF-01 stopped. Residues are now ordered by walking the amide backbone N->C.
+
+@pytest.mark.unit
+class TestTetrapeptideOrder:
+    """Internal-residue order must follow the backbone, deterministically."""
+
+    def _canon_from(self, name):
+        # OPSIN-independent: name must denote the input's constitution; here we
+        # assert the residue ORDER directly via the produced string.
+        return name
+
+    def test_val_glu_ile_arg_order(self):
+        """L-Val-L-Glu-L-Ile-L-Arg: internals Glu,Ile must stay in backbone order."""
+        smi = ("CC(C)[C@@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H]"
+               "([C@@H](C)CC)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O")
+        result = name_compound(smi)
+        # glutamyl (Glu) MUST precede isoleucyl (Ile) — the backbone order
+        assert result is not None and "glutamyl" in result and "isoleucyl" in result
+        assert result.index("glutamyl") < result.index("isoleucyl"), result
+
+    def test_tetrapeptide_order_is_spelling_stable(self):
+        """The same molecule in different SMILES spellings gives ONE name."""
+        smi = "C[C@H](N)C(=O)N[C@@H](CO)C(=O)N[C@@H](Cc1ccccc1)C(=O)NCC(=O)O"
+        m = Chem.MolFromSmiles(smi)
+        names = set()
+        for _ in range(200):
+            names.add(name_compound(Chem.MolToSmiles(m, canonical=False, doRandom=True)))
+            if len(names) >= 15:
+                break
+        names.add(name_compound(Chem.MolToSmiles(m, canonical=True)))
+        # 'seryl' before 'phenylalanyl' in every spelling
+        assert len(names) == 1, names
+
+
+# ── Isopeptide (non-alpha linkage) must fail closed ──────────────────────
+# Glutathione is gamma-Glu-Cys-Gly: its first amide is on the glutamate SIDE-chain
+# carboxyl, not the alpha-carboxyl. Naming it alpha ("glutamylcysteinylglycine")
+# is a WRONG constitution, so the alpha-carboxyl check makes it abstain.
+
+@pytest.mark.unit
+class TestIsopeptideFailClosed:
+    def test_glutathione_not_named_alpha(self):
+        result = name_compound("NC(CCC(=O)NC(CS)C(=O)NCC(=O)O)C(=O)O")
+        assert result != "glutamylcysteinylglycine"
+
+    def test_gamma_glutamyl_glycine_not_named_alpha(self):
+        """gamma-Glu-Gly: side-chain (gamma) carboxyl amide, not alpha."""
+        result = name_compound("N[C@@H](CCC(=O)NCC(=O)O)C(=O)O")
+        assert result != "glutamylglycine"
+
+    def test_epsilon_lysine_isopeptide_not_named_alpha(self):
+        """Gly-eps-Lys: amide on lysine's side-chain (epsilon) amine, not alpha."""
+        result = name_compound("NCC(=O)NCCCC[C@H](N)C(=O)O")
+        assert result != "glycyllysine"
+
+
 # ── Constitution-robust residue identification (InChIKey skeleton match) ──
 # A residue whose reconstructed guanidine/imidazole tautomer differs from the
 # table's SMILES spelling (arginine, histidine) used to fail exact-string lookup,
