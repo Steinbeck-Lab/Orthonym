@@ -427,13 +427,29 @@ def _acid_stem_unsaturated_oxide_prefix(
     # setting, which is off in tests and absent with no jar): OPSIN-parse it and require
     # the same constitutional skeleton as the capped fragment; fail closed on mismatch or
     # when OPSIN is unavailable.
-    from ..namer import _validity_gate_name_to_smiles, _self_consistency_skeleton
+    from ..namer import (
+        _validity_gate_name_to_smiles, _self_consistency_skeleton,
+        _registration_stereo_layer,
+    )
     _reparsed = _validity_gate_name_to_smiles(acid_name)
     if _reparsed is None:
         return None
     _sk_name = _self_consistency_skeleton(_reparsed)
     _sk_frag = _self_consistency_skeleton(acid_smiles)
     if _sk_name is None or _sk_frag is None or _sk_name != _sk_frag:
+        return None
+    # v30 #36 (fable F6 finding 3): the skeleton block above is the InChIKey first
+    # block, which EXCLUDES stereo (ADR-18-07), so a WRONG CIP descriptor (E/Z, R/S)
+    # from the gate-disabled acid sub-namer would re-anchor skeleton-exact and ship a
+    # wrong-stereo `...sulfinyl/sulfonyl` prefix. Also require the C6 RegistrationHash
+    # stereo layer (stereo-bearing, tautomer-canonical) to match — gate-INDEPENDENT,
+    # fail-closed on mismatch/unhashable. No live witness today (the sub-namer routes
+    # stereo through the standard CIP path, so its descriptors are correct), so this is
+    # defence-in-depth closing the gap invariant 2 requires: honest WITHOUT the gate,
+    # for both the N-parent (8afa533c) and carbon-parent (F6) paths.
+    _st_name = _registration_stereo_layer(_reparsed)
+    _st_frag = _registration_stereo_layer(acid_smiles)
+    if _st_name is None or _st_frag is None or _st_name != _st_frag:
         return None
     return acid_name[: -len(acid_suffix)] + oxide_kind
 
