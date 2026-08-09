@@ -1983,58 +1983,85 @@ def _unsaturated_substituent_name(
     ``(nE)/(nZ)`` descriptor when the double bond geometry is defined
     (``3-hydroxyprop-1-en-1-yl`` / ``(1E)-3-hydroxyprop-1-en-1-yl``).
 
-    v1 envelope -- fail closed (return None -> the cascade falls through unchanged):
-      * more than one backbone C=C (polyene substituent);
+    Handles a mono-ene (``prop-1-en-1-yl``) OR a polyene chain (``penta-1,3-dien-1-yl``,
+    the euphonic-'a' multiplied form, mirroring the aconitic branch in
+    ``added_carbon_parent``). Each stereogenic C=C contributes one ``(nE)/(nZ)`` to a
+    single locant-ordered leading descriptor block (``(1E,3E)``).
+
+    Fail closed (return None -> the cascade falls through unchanged):
+      * >4 double bonds (multiplier table caps at tetraene);
       * a defined R/S stereocentre in the fragment ONLY WHEN we also emit an E/Z
         descriptor -- the caller's ``_stereo_route`` double-apply guard drops the
         R/S once this name leads with a ``(...)`` block, so a merged R/S+E/Z case
-        can't be expressed and must fail closed. When the C=C geometry is undefined
+        can't be expressed and must fail closed. When no C=C geometry is defined
         (no descriptor emitted) the R/S is left for ``_stereo_route`` to add, so it
         is ALLOWED (fable-b2 RISK 3: e.g. ``(S)-3-hydroxybut-1-en-1-yl``);
-      * a stereo bond that is not the backbone C=C (off-chain geometry);
+      * a stereo bond that is not a backbone C=C (off-chain geometry);
       * a stereogenic C=C whose CIP code is neither E nor Z.
     Constitution is correct by construction (the prefixes were enumerated from the
     real bonds, like the saturated sibling), and E/Z follows deterministically from
     the bond CIP code, so no separate re-anchor is needed; the exact spelling is
     covered by unit tests + the substituent gold-diff.
     """
-    if len(core_double_bonds) != 1:
-        return None  # v1: single backbone double bond only
     from ..perception.stereo import assign_stereochemistry
 
     assign_stereochemistry(mol)
-    (a_idx, b_idx) = tuple(next(iter(core_double_bonds)))
-    core_bond = mol.GetBondBetweenAtoms(a_idx, b_idx)
-    # No stereo bond other than the backbone C=C (off-chain geometry can't be
+    core_bond_ids = set()
+    ene_locs = []          # lowest locant of each backbone C=C
+    for pair in core_double_bonds:
+        a_idx, b_idx = tuple(pair)
+        bond = mol.GetBondBetweenAtoms(a_idx, b_idx)
+        core_bond_ids.add(bond.GetIdx())
+        ene_locs.append(min(pos[a_idx], pos[b_idx]))
+    ene_locs.sort()
+
+    # No stereo bond other than a backbone C=C (off-chain geometry can't be
     # mapped to a chain locant).
     for bnd in mol.GetBonds():
         if (bnd.GetStereo() != Chem.BondStereo.STEREONONE
-                and bnd.GetIdx() != core_bond.GetIdx()
+                and bnd.GetIdx() not in core_bond_ids
                 and bnd.GetBeginAtomIdx() in sub_set
                 and bnd.GetEndAtomIdx() in sub_set):
             return None
 
-    ene_loc = min(pos[a_idx], pos[b_idx])
     yl_loc = pos[ordered[0]]  # free valence = locant 1 (P-29.2)
 
-    descriptor = ""
-    if core_bond.GetStereo() != Chem.BondStereo.STEREONONE:
-        if not core_bond.HasProp('_CIPCode'):
+    # One (locant, E/Z) per stereogenic backbone C=C -> merged leading block.
+    ez_bits = []
+    for pair in core_double_bonds:
+        a_idx, b_idx = tuple(pair)
+        bond = mol.GetBondBetweenAtoms(a_idx, b_idx)
+        if bond.GetStereo() == Chem.BondStereo.STEREONONE:
+            continue
+        if not bond.HasProp('_CIPCode'):
             return None
-        ez = core_bond.GetProp('_CIPCode')
+        ez = bond.GetProp('_CIPCode')
         if ez not in ('E', 'Z'):
             return None
-        descriptor = f"({ene_loc}{ez})-"
+        ez_bits.append((min(pos[a_idx], pos[b_idx]), ez))
+    descriptor = ""
+    if ez_bits:
+        ez_bits.sort()
+        descriptor = "(" + ",".join(f"{lc}{ez}" for lc, ez in ez_bits) + ")-"
 
     # A chain R/S stereocentre can only be merged when we do NOT lead with an E/Z
-    # block (else _stereo_route's double-apply guard silently drops it). With no
-    # descriptor, _stereo_route adds the R/S; with one, fail closed.
+    # block (else _stereo_route's double-apply guard silently drops it).
     if descriptor and any(
             mol.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
             for i in sub_set):
         return None
 
-    return f"{descriptor}{joined}{stem}-{ene_loc}-en-{yl_loc}-yl"
+    # Build the ene stem: mono -> 'prop-1-en'; poly -> euphonic-'a' 'penta-1,3-dien'.
+    eloc_str = ",".join(str(x) for x in ene_locs)
+    if len(ene_locs) == 1:
+        ene_stem = f"{stem}-{eloc_str}-en"
+    else:
+        emult = {2: "di", 3: "tri", 4: "tetra"}.get(len(ene_locs))
+        if emult is None:
+            return None  # > tetraene -> out of scope
+        ene_stem = f"{stem}a-{eloc_str}-{emult}en"
+
+    return f"{descriptor}{joined}{ene_stem}-{yl_loc}-yl"
 
 
 # --- P-16.2.4.1(a): the hyphen between a word fragment and a following locant --

@@ -116,3 +116,25 @@ def test_risk3_ez_plus_rs_still_abstains():
     merged (the _stereo_route double-apply guard drops the R/S) -> fail closed."""
     n = _pin().name("C[C@H](O)/C=C/c1ccc(O)cc1") or ""
     assert "but-1-en" not in n, n  # abstains rather than ship stereo-incomplete
+
+
+# ---- polyene substituent extension (v30 B2 follow-on) ----
+
+@pytest.mark.parametrize("smi,expected", [
+    # dienyl-ol arm on phenol: euphonic-'a' multiplied ene stem + merged (nE,nE) block
+    ("OC/C=C/C=C/c1ccc(O)cc1", "4-[(1E,3E)-5-hydroxypenta-1,3-dien-1-yl]phenol"),
+    ("OC/C=C\\C=C/c1ccc(O)cc1", "4-[(1Z,3Z)-5-hydroxypenta-1,3-dien-1-yl]phenol"),
+])
+def test_polyene_hydroxy_alkenyl_substituent(smi, expected):
+    assert _pin().name(smi) == expected
+
+
+def test_polyene_rt_exact():
+    """Both diene geometries round-trip (0-wrong)."""
+    import sys
+    sys.path.insert(0, "scripts")
+    from diagnose import diagnose
+    rows = diagnose(["OC/C=C/C=C/c1ccc(O)cc1", "OC/C=C\\C=C/c1ccc(O)cc1"],
+                    style="pin", use_opsin=True)
+    assert all(r.get("verdict") == "OK" for r in rows), [
+        (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
