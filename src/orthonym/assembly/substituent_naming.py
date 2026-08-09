@@ -1985,9 +1985,12 @@ def _unsaturated_substituent_name(
 
     v1 envelope -- fail closed (return None -> the cascade falls through unchanged):
       * more than one backbone C=C (polyene substituent);
-      * ANY defined R/S stereocentre in the fragment (the caller's ``_stereo_route``
-        double-apply guard drops a descriptor once this name carries a leading
-        ``(...)``, so a merged R/S+E/Z case must not reach it here);
+      * a defined R/S stereocentre in the fragment ONLY WHEN we also emit an E/Z
+        descriptor -- the caller's ``_stereo_route`` double-apply guard drops the
+        R/S once this name leads with a ``(...)`` block, so a merged R/S+E/Z case
+        can't be expressed and must fail closed. When the C=C geometry is undefined
+        (no descriptor emitted) the R/S is left for ``_stereo_route`` to add, so it
+        is ALLOWED (fable-b2 RISK 3: e.g. ``(S)-3-hydroxybut-1-en-1-yl``);
       * a stereo bond that is not the backbone C=C (off-chain geometry);
       * a stereogenic C=C whose CIP code is neither E nor Z.
     Constitution is correct by construction (the prefixes were enumerated from the
@@ -2000,11 +2003,6 @@ def _unsaturated_substituent_name(
     from ..perception.stereo import assign_stereochemistry
 
     assign_stereochemistry(mol)
-    # No R/S in the fragment (see docstring -- _stereo_route would drop it).
-    for i in sub_set:
-        if mol.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
-            return None
-
     (a_idx, b_idx) = tuple(next(iter(core_double_bonds)))
     core_bond = mol.GetBondBetweenAtoms(a_idx, b_idx)
     # No stereo bond other than the backbone C=C (off-chain geometry can't be
@@ -2027,6 +2025,14 @@ def _unsaturated_substituent_name(
         if ez not in ('E', 'Z'):
             return None
         descriptor = f"({ene_loc}{ez})-"
+
+    # A chain R/S stereocentre can only be merged when we do NOT lead with an E/Z
+    # block (else _stereo_route's double-apply guard silently drops it). With no
+    # descriptor, _stereo_route adds the R/S; with one, fail closed.
+    if descriptor and any(
+            mol.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+            for i in sub_set):
+        return None
 
     return f"{descriptor}{joined}{stem}-{ene_loc}-en-{yl_loc}-yl"
 

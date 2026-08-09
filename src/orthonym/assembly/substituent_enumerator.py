@@ -945,6 +945,29 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             token, free_valence, attach_idx)
         return None if allow_mancude else "substituent"
 
+    # v30 B2 stereo-completeness guard: a substituent whose fragment carries a
+    # DEFINED-stereo double bond MUST cite its E/Z descriptor, else the token names
+    # a different (stereo-dropped) molecule. Legacy alkenyl tiers emit an
+    # `Xethenyl` form without the descriptor (e.g. -CH=CH-OMe -> `methoxyethenyl`);
+    # the OPSIN validity gate's stereo carve-out then SHIPS it as a wrong molecule
+    # (invariant 9 -- fable-b2 BLOCKER 1). Decline so the caller fails closed. The
+    # descriptor block is `(1E)`/`(E)`/`(1E,2R)`; a legitimate stereogenic-C=C name
+    # always carries it, so this can only turn a wrong output into an abstention.
+    if token and token != "substituent":
+        import re as _re
+        if not _re.search(r"[(,]\d*[EZ][),]", token) and any(
+                b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetStereo() in (Chem.BondStereo.STEREOE,
+                                      Chem.BondStereo.STEREOZ,
+                                      Chem.BondStereo.STEREOCIS,
+                                      Chem.BondStereo.STEREOTRANS)
+                and b.GetBeginAtomIdx() in frag_atoms_set
+                and b.GetEndAtomIdx() in frag_atoms_set
+                for b in mol.GetBonds()):
+            logger.debug("B2 stereo-completeness: refused %r (defined C=C, no E/Z)",
+                         token)
+            return None if allow_mancude else "substituent"
+
     return token
 
 

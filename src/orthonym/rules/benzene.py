@@ -5200,23 +5200,18 @@ def _name_substituted_benzonitrile(
             best_locant_set = all_locants
             best_groups = dict(converted_groups)
 
-    # Build prefix strings
-    total_substituents = sum(len(locs) for locs in best_groups.values())
-    is_monosubstituted = total_substituents == 1
-
+    # Build prefix strings. Both mono- and poly-substituted use the shared
+    # formatter, which cites the locant (the other substituent is never at
+    # position 1 -- the nitrile is) AND applies P-16.5.2.4 enclosing marks to a
+    # complex name. (BLOCKER 2: the old monosubstituted f-string
+    # `f"{locants[0]}-{name}"` never bracketed, shipping the malformed
+    # `4-(1E)-3-hydroxyprop-1-en-1-ylbenzonitrile`; siblings via
+    # format_substituent_prefix bracketed correctly.)
     prefixes = []
     for name in sorted(best_groups.keys(), key=alpha_sort_key):
         locants = best_groups[name]
         count = len(locants)
-
-        if is_monosubstituted:
-            # Single other substituent: include locant (e.g., "4-chloro")
-            prefix_str = f"{locants[0]}-{name}"
-        else:
-            # Multiple substituents
-            prefix_str = format_substituent_prefix(name, locants, count)
-
-        prefixes.append(prefix_str)
+        prefixes.append(format_substituent_prefix(name, locants, count))
 
     # Join prefixes
     prefix_part = _join_benzene_prefixes(prefixes)

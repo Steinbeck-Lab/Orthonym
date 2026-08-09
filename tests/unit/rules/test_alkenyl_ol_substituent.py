@@ -74,3 +74,45 @@ def test_alkenyl_ol_substituent_unit():
 ])
 def test_no_regression_vinyl_and_alkyl(smi, expected):
     assert _pin().name(smi) == expected
+
+
+# ---- fable-b2 review findings (all resolved) ----
+
+@pytest.mark.parametrize("smi", [
+    "CO/C=C/c1ccc(O)cc1",             # enol ether -CH=CH-OMe
+    "O=[N+]([O-])/C=C/c1ccc(O)cc1",   # nitrovinyl
+    "CS/C=C/c1ccc(O)cc1",             # vinyl thioether
+])
+def test_blocker1_stereo_completeness_abstains(smi):
+    """fable-b2 BLOCKER 1 / invariant 9: a substituent with a DEFINED-stereo C=C
+    whose name would drop the E/Z descriptor (legacy `Xethenyl` tier) must NOT ship
+    (the gate's stereo carve-out would pass a wrong-molecule name). The stereo-
+    completeness guard declines -> abstain (0-wrong), never a `...ethenylphenol`."""
+    n = _pin().name(smi) or ""
+    assert "ethenylphenol" not in n and n != "", None  # abstains, not the wrong name
+    assert n == "unknown organic compound", n
+
+
+def test_blocker2_benzonitrile_brackets_complex_substituent():
+    """fable-b2 BLOCKER 2: a monosubstituted benzonitrile must bracket a complex
+    substituent (P-16.5.2.4), not ship the markless `4-(1E)-...ylbenzonitrile`."""
+    assert _pin().name("N#Cc1ccc(/C=C/CO)cc1") == "4-[(1E)-3-hydroxyprop-1-en-1-yl]benzonitrile"
+    # simple substituents unchanged
+    assert _pin().name("N#Cc1ccc(Cl)cc1") == "4-chlorobenzonitrile"
+    assert _pin().name("N#Cc1ccccc1") == "benzonitrile"
+
+
+@pytest.mark.parametrize("smi,expected", [
+    # fable-b2 RISK 3: a chain R/S centre with an UNDEFINED-geometry core C=C names
+    # (the descriptor-less name lets _stereo_route add the R/S).
+    ("C[C@H](O)C=Cc1ccc(O)cc1", "4-[(S)-3-hydroxybut-1-en-1-yl]phenol"),
+])
+def test_risk3_geometryless_rs_names(smi, expected):
+    assert _pin().name(smi) == expected
+
+
+def test_risk3_ez_plus_rs_still_abstains():
+    """When BOTH an E/Z descriptor and an R/S centre are present they can't be
+    merged (the _stereo_route double-apply guard drops the R/S) -> fail closed."""
+    n = _pin().name("C[C@H](O)/C=C/c1ccc(O)cc1") or ""
+    assert "but-1-en" not in n, n  # abstains rather than ship stereo-incomplete
