@@ -100,3 +100,21 @@ def test_off_chain_stereo_fails_closed():
 def test_fable_r6_mononuclear_locant_omitted():
     """RISK 6 / P-14.3.4.2(a): locant '1' omitted on a substituted mononuclear core."""
     assert _pin().name("OC(C(=O)O)(C(=O)O)C(=O)O") == "hydroxymethanetricarboxylic acid"
+
+
+# ---- stereo fable review (a4240802) findings, now fixed ----
+
+def test_stereo_fable_b1_p14_4_j_tiebreak():
+    """BLOCKER: P-14.4(j) — when suffix/substituent locants tie, the lower locant goes
+    to the preferred CIP descriptor (R over S). A meso molecule must get ONE PIN name
+    regardless of input atom order (was nondeterministic (2S,3R) vs (2R,3S))."""
+    a = _pin().name("OC(=O)C[C@H](C(O)=O)[C@H](C(O)=O)CC(O)=O")
+    b = _pin().name("OC(=O)C[C@@H](C(O)=O)[C@@H](C(O)=O)CC(O)=O")
+    assert a == b == "(2R,3S)-butane-1,2,3,4-tetracarboxylic acid", (a, b)
+
+
+def test_stereo_pseudoasymmetric_fails_closed():
+    """RISK: a pseudo-asymmetric r/s centre yields an OPSIN-unparseable name that would
+    ship stereo-unvalidated via the carve-out; fail closed (no `...tricarboxylic` output)."""
+    n = _pin().name("OC(=O)C[C@H](O)[C@H](C(O)=O)[C@H](O)CC(O)=O") or ""
+    assert "carboxylic" not in n, n

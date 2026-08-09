@@ -253,38 +253,51 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
 
     subs_alpha = sorted(named_subs, key=lambda t: alpha_sort_key(t[1]))
 
-    def key_for(reverse: bool):
-        suf = sorted(loc(attach[ac], reverse) for ac in added)
-        sub = sorted(loc(ca, reverse) for ca, _ in named_subs)
-        alpha = [loc(ca, reverse) for ca, _ in subs_alpha]  # P-14.4(g)
-        return (suf, sub, alpha)
-
-    reverse = key_for(True) < key_for(False)
-    suffix_locants = sorted(loc(attach[ac], reverse) for ac in added)
-
-    # Stereo (v30, resolves the fable BLOCKER-3 abstain into EXPRESSION): the core is
-    # saturated (unsaturation rejected above), so stereo here is R/S CHAIN stereocentres.
-    # Emit them as a `(<locant><CIP>,...)` prefix in the chosen numbering. Fail CLOSED if
-    # any DEFINED stereocentre is off the parent chain (would live inside a substituent —
-    # conservative), is unassignable (no CIP code), or any stereo double bond exists
-    # (out of this saturated-core scope) — a flat name would drop that stereo -> wrong
-    # molecule. Uses the vendored-`centres` CIP path via assign_stereochemistry.
+    # Stereo — computed BEFORE numbering so P-14.4(j) can break a locant tie (fable
+    # review of a4240802). The core is saturated (unsaturation rejected above), so this
+    # is R/S CHAIN stereocentres. Fail CLOSED if any DEFINED stereocentre is off the
+    # parent chain (would live inside a substituent), is unassignable, is pseudo-
+    # asymmetric r/s or axial M/P (OPSIN-unparseable / out of scope), or any stereo
+    # double bond exists — a flat name would drop or mis-spell it. Uses the vendored-
+    # `centres` CIP path. (Fable RISK 3 — a stale parse-time legacy _CIPCode surviving
+    # for an atom centres declined — is LATENT (no witness in the >=3-COOH acyclic class,
+    # invariant 10); NOT hardened here because clearing _CIPCode breaks assign's
+    # repopulation. Tracked as a follow-up.)
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)
-    stereo_bits = []
+    if any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()):
+        return None
+    chain_cip = {}  # chain_atom_idx -> 'R' | 'S'
     for a in mol.GetAtoms():
         if a.GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED:
             continue
         aidx = a.GetIdx()
         if aidx not in pos or not a.HasProp("_CIPCode"):
             return None
-        stereo_bits.append((loc(aidx, reverse), a.GetProp("_CIPCode")))
-    if any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()):
-        return None
+        cip = a.GetProp("_CIPCode")
+        if cip not in ("R", "S"):
+            return None  # pseudo-asymmetric (r/s) / axial (M/P) -> fail closed
+        chain_cip[aidx] = cip
+
+    _CIP_RANK = {"R": 0, "S": 1}  # P-14.4(j): R preferred (lower) over S
+
+    def key_for(reverse: bool):
+        suf = sorted(loc(attach[ac], reverse) for ac in added)
+        sub = sorted(loc(ca, reverse) for ca, _ in named_subs)
+        alpha = [loc(ca, reverse) for ca, _ in subs_alpha]  # P-14.4(g)
+        # P-14.4(j): lower locants to the preferred CIP descriptor (R before S),
+        # ordered by locant — breaks the meso/tie case deterministically to the PIN.
+        stereo = [_CIP_RANK[chain_cip[x]]
+                  for x in sorted(chain_cip, key=lambda x: loc(x, reverse))]
+        return (suf, sub, alpha, stereo)
+
+    reverse = key_for(True) < key_for(False)
+    suffix_locants = sorted(loc(attach[ac], reverse) for ac in added)
+
     stereo_prefix = ""
-    if stereo_bits:
-        stereo_bits.sort()
-        stereo_prefix = "(" + ",".join(f"{lc}{cip}" for lc, cip in stereo_bits) + ")-"
+    if chain_cip:
+        bits = sorted((loc(x, reverse), chain_cip[x]) for x in chain_cip)
+        stereo_prefix = "(" + ",".join(f"{lc}{cip}" for lc, cip in bits) + ")-"
 
     # Assemble the substituent-prefix string (P-16.3.3 enclosure, P-14.5.2 alpha
     # order, P-16.3.4 multipliers). P-14.3.4.2(a): the locant '1' is omitted for a
