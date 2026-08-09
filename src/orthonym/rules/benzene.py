@@ -2627,10 +2627,14 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     for idx in all_atoms:
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetSymbol() not in ('C', 'H'):
-            # Contains heteroatom - not a simple alkyl
-            # Check for vinyl (ethenyl) - C=C attached to ring
-            if _is_vinyl_group(mol, start_idx, ring_atoms):
-                return {'name': 'ethenyl', 'atoms': all_atoms}
+            # Contains a heteroatom -> not a simple alkyl. DECLINE so the recursive
+            # `name_substituent` fallback (below, ~line 1401) names it from
+            # structure. (v30 B2 bug 2: a vinyl-STARTED fragment carrying a
+            # downstream heteroatom -- -CH=CH-CH2OH in p-coumaryl alcohol -- was
+            # mislabelled 'ethenyl' here with all_atoms, DROPPING the CH2OH tail ->
+            # `4-ethenylphenol` (atom drop, SELF-01-suppressed). A true vinyl
+            # -CH=CH2 is all-carbon, never enters this branch, and is named by the
+            # multiple-bond decline below + the recursive fallback.)
             return None
 
     # Wave2 T3c constitution-conservation guard: the carbon-count name below
@@ -2640,8 +2644,9 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     # the phenyl + the C=C both dropped — a different molecule that kept a
     # nonsensical (4E) descriptor). Ring membership or any multiple bond in the
     # fragment -> decline; the shared substituent namer (name_substituent_
-    # fragment) or fail-closed handles it. _is_vinyl_group already returned the
-    # plain-ethenyl case above.
+    # fragment) or fail-closed handles it. A plain vinyl -CH=CH2 is declined here
+    # too (its C=C trips the multiple-bond guard below) and named 'ethenyl' by the
+    # recursive `name_substituent` fallback.
     ri = mol.GetRingInfo()
     if any(ri.NumAtomRings(i) > 0 for i in all_atoms):
         return None
@@ -2659,23 +2664,6 @@ def _identify_alkyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         return {'name': name, 'atoms': all_atoms}
 
     return None
-
-
-def _is_vinyl_group(mol, start_idx: int, ring_atoms: Set[int]) -> bool:
-    """Check if the group is a vinyl (ethenyl) group."""
-    start_atom = mol.GetAtomWithIdx(start_idx)
-
-    # Check for C=C where start is attached to ring
-    for neighbor in start_atom.GetNeighbors():
-        if neighbor.GetIdx() in ring_atoms:
-            continue
-
-        bond = mol.GetBondBetweenAtoms(start_idx, neighbor.GetIdx())
-        if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
-            if neighbor.GetSymbol() == 'C':
-                return True
-
-    return False
 
 
 def _get_alkyl_name(mol, start_idx: int, carbon_count: int, ring_atoms: Set[int],

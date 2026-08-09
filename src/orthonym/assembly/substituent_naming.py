@@ -1731,8 +1731,11 @@ def _name_polyfunctional_acyclic_substituent(
             return None
 
     # ---- Pass 2: every remaining (non-consumed) atom must be a recognised
-    # single-atom prefix on a backbone carbon; backbone carbons must be saturated
-    # and bond only to backbone carbons / recognised prefix atoms. ----
+    # single-atom prefix on a backbone carbon; backbone carbons bond only to
+    # backbone carbons / recognised prefix atoms. A backbone C=C is RECORDED (v30
+    # B2: unsaturated substituent chains, the aconitic/lignin-monomer family) and
+    # named below; any other multiplicity (C#C / C=N / branch-C=C) still declines.
+    core_double_bonds: Set[frozenset] = set()
     fg_count = sum(len(v) for v in prefix_on.values())  # carboxy groups so far
     for idx in sub_set:
         if idx in consumed:
@@ -1762,7 +1765,11 @@ def _name_polyfunctional_acyclic_substituent(
                         and nb.GetSymbol() in ('S', 'Se', 'Te')
                         and ni not in backbone_set):
                     continue             # C=S/Se/Te ylidene (Wave-2 C) — handled below
-                return None              # C=C / C#C / C#N / C=N etc. -> decline
+                if (bt == Chem.BondType.DOUBLE and nb.GetSymbol() == 'C'
+                        and ni in backbone_set):
+                    core_double_bonds.add(frozenset((idx, ni)))  # backbone C=C -> named below
+                    continue
+                return None              # C#C / C#N / C=N / branch-C=C etc. -> decline
             continue
         # Non-backbone, non-consumed heavy atom -> must be a simple prefix.
         if a.GetIsotope():
@@ -1892,6 +1899,8 @@ def _name_polyfunctional_acyclic_substituent(
             if n.GetIdx() in backbone_set) > 2
         for idx in backbone
     )
+    if core_double_bonds and is_branched:
+        return None  # v30 B2 v1: an unsaturated substituent chain is linear-only
     if is_branched:
         # Branched acyclic FG-bearing substituent: select a principal chain from
         # the free valence and name off-chain sub-branches (the "located
@@ -1949,7 +1958,77 @@ def _name_polyfunctional_acyclic_substituent(
     stem = get_chain_prefix(len(backbone))
     # Join consecutive prefix parts; a leading digit after a non-digit needs a
     # hyphen ("...amino-2-carboxy..."), handled by the locant prefix itself.
-    return f"{''.join(_joined_prefix_parts(parts))}{stem}yl"
+    joined = ''.join(_joined_prefix_parts(parts))
+    if not core_double_bonds:
+        return f"{joined}{stem}yl"
+    # v30 B2: unsaturated substituent chain (aconitic/lignin-monomer family).
+    # Add the 'ene' infix + free-valence yl locant + (nE/nZ) descriptor, numbered
+    # from the free valence (locant 1, P-29.2 -- NOT the references' longest-chain
+    # OPSIN-optimisation, which mis-roots the free valence: refconsult-b2 Q4.2).
+    return _unsaturated_substituent_name(
+        mol, ordered, pos, sub_set, core_double_bonds, joined, stem,
+    )
+
+
+def _unsaturated_substituent_name(
+    mol, ordered, pos, sub_set, core_double_bonds, joined, stem,
+):
+    """Finish an UNSATURATED acyclic-chain substituent prefix (v30 B2).
+
+    Called only from :func:`_name_polyfunctional_acyclic_substituent` once the
+    backbone, the detachable prefixes and the chain trace are already validated and
+    the backbone carries >=1 C=C. Numbering is from the free valence (``ordered[0]``
+    is locant 1, P-29.2), so the ene locant and the yl (attachment) locant are read
+    from ``pos``. Emits ``{prefixes}{stem}-{ene}-en-{yl}-yl`` with a leading
+    ``(nE)/(nZ)`` descriptor when the double bond geometry is defined
+    (``3-hydroxyprop-1-en-1-yl`` / ``(1E)-3-hydroxyprop-1-en-1-yl``).
+
+    v1 envelope -- fail closed (return None -> the cascade falls through unchanged):
+      * more than one backbone C=C (polyene substituent);
+      * ANY defined R/S stereocentre in the fragment (the caller's ``_stereo_route``
+        double-apply guard drops a descriptor once this name carries a leading
+        ``(...)``, so a merged R/S+E/Z case must not reach it here);
+      * a stereo bond that is not the backbone C=C (off-chain geometry);
+      * a stereogenic C=C whose CIP code is neither E nor Z.
+    Constitution is correct by construction (the prefixes were enumerated from the
+    real bonds, like the saturated sibling), and E/Z follows deterministically from
+    the bond CIP code, so no separate re-anchor is needed; the exact spelling is
+    covered by unit tests + the substituent gold-diff.
+    """
+    if len(core_double_bonds) != 1:
+        return None  # v1: single backbone double bond only
+    from ..perception.stereo import assign_stereochemistry
+
+    assign_stereochemistry(mol)
+    # No R/S in the fragment (see docstring -- _stereo_route would drop it).
+    for i in sub_set:
+        if mol.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+            return None
+
+    (a_idx, b_idx) = tuple(next(iter(core_double_bonds)))
+    core_bond = mol.GetBondBetweenAtoms(a_idx, b_idx)
+    # No stereo bond other than the backbone C=C (off-chain geometry can't be
+    # mapped to a chain locant).
+    for bnd in mol.GetBonds():
+        if (bnd.GetStereo() != Chem.BondStereo.STEREONONE
+                and bnd.GetIdx() != core_bond.GetIdx()
+                and bnd.GetBeginAtomIdx() in sub_set
+                and bnd.GetEndAtomIdx() in sub_set):
+            return None
+
+    ene_loc = min(pos[a_idx], pos[b_idx])
+    yl_loc = pos[ordered[0]]  # free valence = locant 1 (P-29.2)
+
+    descriptor = ""
+    if core_bond.GetStereo() != Chem.BondStereo.STEREONONE:
+        if not core_bond.HasProp('_CIPCode'):
+            return None
+        ez = core_bond.GetProp('_CIPCode')
+        if ez not in ('E', 'Z'):
+            return None
+        descriptor = f"({ene_loc}{ez})-"
+
+    return f"{descriptor}{joined}{stem}-{ene_loc}-en-{yl_loc}-yl"
 
 
 # --- P-16.2.4.1(a): the hyphen between a word fragment and a following locant --
