@@ -1177,6 +1177,14 @@ def _emit_ring_from_analysis(
     n_sub_bindings: List[TokenBinding] = []
     if pg:
         suffix_core = get_suffix(pg, is_ring=True)
+        # v31 composition lever: carbamic acid on a RING nitrogen is the ring
+        # '-carboxylic acid' suffix at the N locant (see the monocycle path). The
+        # N stays in the cage; the C(=O)OH is the appended suffix. Remap when the
+        # carbamic N is a cage atom. Best-effort only -> PIN byte-identical.
+        if suffix_core == 'carbamic acid' and any(
+                mol.GetAtomWithIdx(i).GetAtomicNum() == 7 and i in cage_set
+                for match in pg_matches for i in match):
+            suffix_core = 'carboxylic acid'
         if suffix_core not in _RING_SUFFIX_STYLES:
             return _refuse(f"unsupported ring suffix for pg={pg!r}")
         if suffix_core == 'carboxylate':
@@ -1645,6 +1653,18 @@ def name_general_monocycle(
             pg_matches = [(_exo_o, _carbonyl_c)]
     if pg:
         suffix_core = get_suffix(pg, is_ring=True)
+        # v31 composition lever: carbamic acid on a RING nitrogen ->
+        # ring '-carboxylic acid' suffix at the N locant (piperazine-1-carboxylic
+        # acid, morpholine-4-carboxylic acid, piperidine-1-carboxylic acid). The N
+        # stays in the ring; the C(=O)OH is the appended suffix. get_suffix maps
+        # carbamic_acid -> 'carbamic acid' (not a ring style), so remap when the
+        # carbamic N is a ring atom. Acyclic carbamic acid never reaches this ring
+        # path; an exocyclic carbamic N (not in ring_set) still refuses. Best-effort
+        # only (name_general is recovery-lane gated) -> PIN byte-identical.
+        if suffix_core == 'carbamic acid' and any(
+                mol.GetAtomWithIdx(i).GetAtomicNum() == 7 and i in ring_set
+                for match in pg_matches for i in match):
+            suffix_core = 'carboxylic acid'
         if suffix_core not in _RING_SUFFIX_STYLES:
             return _refuse(f"unsupported ring suffix for pg={pg!r}")
 
