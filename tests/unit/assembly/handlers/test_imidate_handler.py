@@ -349,3 +349,13 @@ class TestImidatePredicateDefersToHigherPG:
         assert actual == "4-(C-methoxycarbonimidoyl)benzoic acid", (
             f"expected 4-(C-methoxycarbonimidoyl)benzoic acid; got {actual!r}"
         )
+
+    def test_ester_parent_with_imidate_substituent(self):
+        """ester-principal + imidate substituent (the ester_family dispatch route
+        the iminoester registration also reaches): the imidate is still the
+        ``C-methoxycarbonimidoyl`` prefix on the methyl-benzoate parent."""
+        from orthonym import name_compound
+        actual = name_compound("COC(=O)c1ccc(C(=N)OC)cc1", style="pin")
+        assert actual == "methyl 4-(C-methoxycarbonimidoyl)benzoate", (
+            f"expected methyl 4-(C-methoxycarbonimidoyl)benzoate; got {actual!r}"
+        )
