@@ -66,6 +66,22 @@ class TestAlkoxycarbonyl:
         result = get_alkoxycarbonyl_prefix(mol, (0, 1), principal_chain=None)
         assert result is None
 
+    def test_reversed_orientation_not_routed(self):
+        """Tier-0.5 attach guard (parity with the iminoester row): a fragment
+        attaching via the ALKYL carbon (a reversed formate, attach = match[3])
+        must NOT be named alkoxycarbonyl — the producer would BFS-swallow the
+        parent as the OR side (wrong constitution, e.g. the double-benzene
+        '4-[(benzyloxy)carbonyl]benzoic acid')."""
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+        mol = Chem.MolFromSmiles("O=COCC")  # ethyl formate; attach via the CH2
+        atoms = _match_atoms(mol, "ester")
+        result = _check_substituent_prefix_form(mol, set(atoms), attach_idx=atoms[3])
+        assert result is None, (
+            f"reversed-orientation ester must not route to alkoxycarbonyl; got {result!r}"
+        )
+
 
 # ====================================================================
 # Row 2: ester (aryl) - same generator; phenoxycarbonyl branch

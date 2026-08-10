@@ -359,3 +359,29 @@ class TestImidatePredicateDefersToHigherPG:
         assert actual == "methyl 4-(C-methoxycarbonimidoyl)benzoate", (
             f"expected methyl 4-(C-methoxycarbonimidoyl)benzoate; got {actual!r}"
         )
+
+
+class TestChainImidateSplit:
+    """v31 F-imidate-2: a CHAIN-parent imidate ``-C(=NH)-O-R`` (its carbon in the
+    acid chain) is named with the SIMPLE prefixes ``imino`` + ``{alkoxy}``, NOT
+    the compound ``carbonimidoyl`` prefix — P-65.1.3.1.2(2), whose verbatim (PIN)
+    hydroxy template is ``4-hydroxy-4-iminobutanoic acid`` (BB 30035). Previously
+    the imidate decorations were dropped (``butanoic acid``). Fixed by adding an
+    ``iminoester -> imino + alkoxy`` row to the group-splitting table (gated by
+    the per-split OPSIN-RT oracle, so 0-wrong).
+    """
+
+    def test_butanoic_chain_imidate_methoxy(self):
+        from orthonym import name_compound
+        actual = name_compound("OC(=O)CCC(=N)OC", style="pin")
+        assert actual == "4-imino-4-methoxybutanoic acid", f"got {actual!r}"
+
+    def test_propanoic_chain_imidate_methoxy(self):
+        from orthonym import name_compound
+        actual = name_compound("OC(=O)CC(=N)OC", style="pin")
+        assert actual == "3-imino-3-methoxypropanoic acid", f"got {actual!r}"
+
+    def test_pentanoic_chain_imidate_ethoxy(self):
+        from orthonym import name_compound
+        actual = name_compound("OC(=O)CCCC(=N)OCC", style="pin")
+        assert actual == "5-ethoxy-5-iminopentanoic acid", f"got {actual!r}"

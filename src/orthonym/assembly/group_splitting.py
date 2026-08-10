@@ -186,9 +186,67 @@ def _decompose_carbonyl_ester(
     ]
 
 
+def _resolve_imino() -> Optional[str]:
+    """The ``=NH`` ylidene prefix, resolved through the existing PREFIX_FORMS authority."""
+    from ..rules.seniority import get_prefix  # Pattern-S3 lazy import
+    return get_prefix("imine")  # == "imino" — single source of truth, NOT a literal
+
+
+def _decompose_iminoester(
+    mol: Any, match: tuple, principal_chain: Optional[List[int]]
+) -> Optional[List[SplitComponent]]:
+    """Decompose a chain-end imidate ``-C(=NH)-O-R`` into imino + alkoxy.
+
+    P-65.1.3.1.2(2): at the end of a carbon chain the SIMPLE prefixes ``imino``
+    (=NH) + the alkoxy are preferred over the compound ``C-...carbonimidoyl``
+    prefix (that compound form is the RING-parent PIN, built separately by
+    ``get_alkoxycarbonimidoyl_prefix``). The BB (PIN) hydroxy template is
+    ``4-hydroxy-4-iminobutanoic acid`` (BB 30035).
+
+    SMARTS match order (iminoester ``[CX3](=[NX2H1])[OX2][#6]``):
+    ``(carbonyl_C, imino_N, ester_O, alkyl_C)`` — the same positional shape the
+    ester decomposer uses, with ``=NH`` occupying the ``=O`` slot. Mirror of
+    :func:`_decompose_carbonyl_ester` with ``oxo``->``imino``.
+    """
+    if mol is None or match is None or len(match) < 4:
+        return None
+    carbonyl_c, _imino_n, ester_o, alkyl_c = match[0], match[1], match[2], match[3]
+
+    # The imino locant is only meaningful for a CHAIN-MEMBER imidoyl carbon; an
+    # off-chain imidoyl carbon is the compound-prefix (carbonimidoyl) case.
+    if principal_chain is not None and carbonyl_c not in set(principal_chain):
+        return None
+
+    imino = _resolve_imino()
+    if not imino:
+        return None
+
+    from ..assembly.substituent_prefix_forms import get_alkoxy_prefix  # Pattern-S3
+    # The linker O + the two carbons it bridges, in the (O, C, C) order the
+    # dispatcher expects; it names the alkyl (OR) side -> the alkoxy prefix.
+    linker_prefix = get_alkoxy_prefix(mol, (ester_o, carbonyl_c, alkyl_c), principal_chain)
+    if not linker_prefix:
+        return None
+    # Same v1 conservatism as the ester split: a not-fully-wrapped compound
+    # alkoxy needs nested brackets the single-level emit path cannot render ->
+    # fail closed (the molecule then stays 'unknown' via the validity gate).
+    _fully_wrapped = (
+        (linker_prefix.startswith("(") and linker_prefix.endswith(")"))
+        or (linker_prefix.startswith("[") and linker_prefix.endswith("]"))
+    )
+    if ("(" in linker_prefix or "[" in linker_prefix) and not _fully_wrapped:
+        return None
+
+    return [
+        SplitComponent(role="chalcogen", prefix_form=imino, locants=None, count=1),
+        SplitComponent(role="linker", prefix_form=linker_prefix, locants=None, count=1),
+    ]
+
+
 _DECOMPOSERS = {
     "ester": lambda mol, m, pc: _decompose_carbonyl_ester(mol, m, pc, sulfur=False),
     "thioester": lambda mol, m, pc: _decompose_carbonyl_ester(mol, m, pc, sulfur=True),
+    "iminoester": _decompose_iminoester,
 }
 
 

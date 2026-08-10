@@ -2125,19 +2125,20 @@ def _check_substituent_prefix_form(
                     and len(match) >= 1 and attach_idx != match[0]):
                 continue
             # v31 (same bug shape as the ether/isocyanate/sulfoxide guards above,
-            # P-65.2.1.5): the {alkoxy}carbonimidoyl prefix attaches through the
-            # imidoyl CARBON (match[0] of the iminoester SMARTS
-            # [CX3](=[NX2H1])[OX2][#6]). When the 4-atom fragment attaches via the
-            # ALKYL carbon instead (match[3], e.g. Ar-CH2-O-CH=NH, a benzyl
-            # formimidate), get_alkoxycarbonimidoyl_prefix would BFS-swallow the
-            # PARENT as the "OR" side and emit a wrong-constitution name (and,
-            # from a set-ordered BFS, one that varies with SMILES numbering).
-            # Valid only when the fragment attaches through the imidoyl carbon;
-            # otherwise fall through. (The 'ester' row has the identical
-            # pre-existing hole but adding it here risks the arbitrary-attach
-            # fallback at the enumerator call site regressing gold ester rows —
-            # left as a documented follow-up, scoped to the new iminoester row.)
-            if (fg_name == "iminoester"
+            # P-65.6.3 / P-65.2.1.5): the {alkoxy}carbonyl / {alkoxy}carbonimidoyl
+            # prefix attaches through the carbonyl/imidoyl CARBON (match[0] of the
+            # ester [CX3](=O)[OX2][#6] and iminoester [CX3](=[NX2H1])[OX2][#6]
+            # SMARTS). When the 4-atom fragment attaches via the ALKYL carbon
+            # instead (match[3], e.g. a reversed formate Ar-CH2-O-C(=O)H or a
+            # benzyl formimidate Ar-CH2-O-CH=NH), the producer would BFS-swallow
+            # the PARENT as the "OR" side and emit a wrong-constitution name
+            # ('4-[(benzyloxy)carbonyl]benzoic acid', a double-counted benzene)
+            # — and, from a set-ordered BFS, one that varies with SMILES
+            # numbering. Valid only when the fragment attaches through the
+            # carbonyl/imidoyl carbon; otherwise fall through. Covers BOTH rows:
+            # 0/77 ester-bearing gold rows change (the enumerator always sets a
+            # real attach_mol_idx, so the arbitrary-attach fallback is dead code).
+            if (fg_name in ("ester", "iminoester")
                     and attach_idx is not None
                     and len(match) >= 1 and attach_idx != match[0]):
                 continue

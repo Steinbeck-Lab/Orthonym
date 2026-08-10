@@ -2156,13 +2156,15 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             # has no clean strict-IUPAC prefix (the DROP-23 case), decompose it into
             # its ordered sub-group prefix components instead of dropping it. Gated
             # behind the default-OFF flag (Stage A byte-identical); the split only
-            # fires for table-listed composites (ester/thioester) and is OPSIN-RT
-            # gated (FAIL-CLOSED, D-05). Lazy import (Pattern-S3) avoids a cycle.
+            # fires for table-listed composites (ester/thioester/iminoester) and is
+            # OPSIN-RT gated (FAIL-CLOSED, D-05). Lazy import (Pattern-S3) avoids a
+            # cycle. v31: iminoester -> imino + alkoxy (P-65.1.3.1.2(2), the chain-
+            # end simple-prefix form '4-imino-4-methoxybutanoic acid').
             components = None
             _anchored = []
             _split_default = (
                 principal_group in _SPLIT_DEFAULT_PGS
-                and fg_name in ("ester", "thioester")
+                and fg_name in ("ester", "thioester", "iminoester")
             )
             if getattr(features, "_enable_group_splitting", False) or _split_default:
                 from ..assembly.group_splitting import (
