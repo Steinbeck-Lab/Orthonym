@@ -1048,7 +1048,14 @@ class TestPhase160_2_Registrations:
         # assertion (the phase gate does not run unit tests): hydroximic_acid@5211,
         # sulfonimidic_n_hydroxy@5212, noncarbon_ester@1495, sulfonyl_halide@1150.
         # Live count 48 + azine = 49.
-        assert len(INNER_DISPATCH_TABLE) == 49
+        # v31 reconciliation [49 -> 55]: six further handlers were registered
+        # without updating this assertion (same phase-gate-doesn't-run-unit-tests
+        # drift): the P-67.1.1.2 organo-oxoacids of As/Sb —
+        # arsonic_acid@2352, arsinic_acid@2354, stibonic_acid@2356,
+        # stibinic_acid@2358 — plus n_substituted_sulfonamide@2970 (P-66.1.1.3.1.1,
+        # commit 89e69442). All are committed, intentionally-registered handlers;
+        # this is benign registry growth, not a dispatch defect.
+        assert len(INNER_DISPATCH_TABLE) == 55
 
     def test_table_frozen_after_import(self):
         """WR-06: freeze_inner_table() called at module-import bottom;
@@ -1088,8 +1095,10 @@ class TestPhase160_2_Registrations:
         # (hydroximic_acid@5211, sulfonimidic_n_hydroxy@5212, noncarbon_ester@1495,
         # sulfonyl_halide@1150) were added without updating this assertion; W3-P15
         # reconciles it and adds azine@5240 (P-68.3.1.2.3): 48 + 1 = 49.
+        # v31 [49 -> 55]: + arsonic/arsinic/stibonic/stibinic_acid (P-67.1.1.2 As/Sb
+        # oxoacids) + n_substituted_sulfonamide@2970 (89e69442). Benign registry growth.
         assert _SORTED_ENTRIES_CACHE is not None
-        assert len(_SORTED_ENTRIES_CACHE) == 49
+        assert len(_SORTED_ENTRIES_CACHE) == 55
         # Priorities monotonically non-decreasing per sorted() contract
         priorities = [e.priority for e in _SORTED_ENTRIES_CACHE]
         assert priorities == sorted(priorities)
