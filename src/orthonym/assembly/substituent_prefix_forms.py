@@ -1942,6 +1942,20 @@ def _check_substituent_prefix_form(
                     and attach_idx is not None
                     and len(match) >= 2 and attach_idx != match[1]):
                 continue
+            # v31 (same bug shape as the ether + isocyanate guards above, P-63.6):
+            # the (R)sulfinyl / (R)sulfonyl prefix form attaches through the SULFUR
+            # (match[0] for both the sulfoxide `[SX3](=O)([#6])[#6]` and sulfone
+            # SMARTS). When the fragment attaches via a CARBON CARRIER instead
+            # (e.g. -CH2-S(=O)-CH3, benzyl methyl sulfoxide), the S(=O)x is internal
+            # and this prefix would DROP the carrier carbon -> 'methanesulfinyl' for
+            # -CH2-S(=O)-CH3, a DIFFERENT molecule (CS(=O)c…). Valid only when the
+            # fragment attaches through the sulfur; otherwise fall through to the
+            # recursive namer, which names the carrier carbon bearing an
+            # (alkylsulfinyl)/(alkylsulfonyl) decoration ((methanesulfinylmethyl)).
+            if (fg_name in ("sulfoxide", "sulfone")
+                    and attach_idx is not None
+                    and len(match) >= 1 and attach_idx != match[0]):
+                continue
             prefix = get_substituent_prefix_form(
                 fg_name, mol, tuple(match), principal_chain=None
             )
