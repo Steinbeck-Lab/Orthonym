@@ -1666,7 +1666,13 @@ _MULTIPLIED_UNSAT_MARKER_RE = re.compile(r"-\d[\d,'′]*-(?:di|tri|tetra|penta)(
 # `8,8′Goxydi(spiro[4.5]decane)!(PIN)`.
 _STEM_BRACKET_RE = re.compile(r"\[[^\[\]]*\]")
 # A leading indicated-hydrogen descriptor: `1H-`, `2H-`, `4H-`.
-_INDICATED_H_RE = re.compile(r"^\d+[hH]-")
+# NB: distinct from the module-level ``_INDICATED_H_RE`` (the ADDED-indicated-H
+# PAREN form ``(2H)`` used by compute_nesting_depth / apply_enclosing_marks).
+# Renamed to end a name-collision: this leading-prefix pattern used to shadow the
+# paren form as ``_INDICATED_H_RE``, so compute_nesting_depth silently counted
+# ``(2H)`` as a nesting level and escalated `(...)` enclosures to `[...]`
+# (P-16.5.4.1.1: added-indicated-H parentheses are IGNORED).
+_LEADING_IH_PREFIX_RE = re.compile(r"^\d+[hH]-")
 
 # P-16.3.3 clause (a) (BlueBookV2.md:7040): "*The basic numerical prefixes 'di',
 # 'tri', 'tetra', etc. are used to indicate a multiplicity of: (a) functional and
@@ -1811,7 +1817,7 @@ def _strip_stem_decorations(stem: str) -> str:
     ``1H-imidazol`` -> ``imidazol``.
     """
     out = _STEM_BRACKET_RE.sub('', stem)
-    out = _INDICATED_H_RE.sub('', out)
+    out = _LEADING_IH_PREFIX_RE.sub('', out)
     m = _LEADING_LOCANT_RE.match(out)
     if m:
         out = out[m.end():]
