@@ -54,19 +54,28 @@ def test_functional_class_oxime_ez_expressed():
     assert name.startswith("(E)") or name.startswith("(Z)")
 
 
-# --- FAIL-CLOSED residual: valid superset, never a wrong stereoisomer --------
+# --- Internal acyclic-substituent E/Z now FULLY expressed (v31) --------------
 
-def test_internal_acyclic_subst_ez_is_superset_not_wrong():
-    """but-2-en-1-yl on a ring: E/Z dropped -> the name is a valid CONSTITUTION
-    superset (both E and Z), never a specific wrong stereoisomer."""
+def test_internal_acyclic_subst_ez_now_fully_expressed():
+    """but-2-en-1-yl on a ring: the substituent-local E/Z anchoring (v31) now
+    expresses the descriptor with its own locant -> `(2E)-but-2-en-1-yl`, an
+    isomeric-EXACT name (no longer the E/Z-dropped superset the v27-era design
+    fell back to). This was change-asserted-value'd from the old
+    `count_expressed < count_defined` superset assertion: the engine improved to
+    full expression, verified RT-exact below."""
     smi = "OC(=O)C1CCC(CC1)C/C=C/C"
     name = _mk().name(smi)
     assert not is_failure_name(name)
-    # constitution correct; the dropped E/Z makes it a superset (0-wrong)
-    ref = Chem.MolToSmiles(Chem.MolFromSmiles(smi), isomericSmiles=False)
-    # the emitted name carries no spurious E/Z it cannot anchor
     mol = Chem.MolFromSmiles(smi)
-    assert count_expressed_stereo_descriptors(name) < count_defined_stereo_elements(mol)
+    # every defined stereo element is now expressed (no longer a superset)
+    assert count_expressed_stereo_descriptors(name) == count_defined_stereo_elements(mol)
+    assert "2E" in name  # the substituent-local located E descriptor
+    # and the fully-specified name round-trips to the EXACT isomer (production
+    # gate off in _mk, so verify the isomeric identity independently)
+    from orthonym.namer import _validity_gate_name_to_smiles
+    opsin_smi = _validity_gate_name_to_smiles(name)
+    assert opsin_smi is not None
+    assert Chem.CanonSmiles(opsin_smi) == Chem.CanonSmiles(smi)
 
 
 def test_general_engine_flags_unanchorable_subst_ez():
