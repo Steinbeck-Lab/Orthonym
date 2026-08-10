@@ -44,6 +44,46 @@ from ..name_tree import NamingResult, NameTreeNode
 logger = logging.getLogger(__name__)
 
 
+def _spiro_principal_suffix_preference(features: Any, current_name: str) -> Optional[str]:
+    """v31 PIN conformance (P-33.3): return the general-engine SUFFIX-form name for
+    a spiro parent whose principal characteristic group the complex_ring assembly
+    demoted to a prefix (`9-carboxyspiro[5.5]undecane` -> `spiro[5.5]undecane-3-
+    carboxylic acid`), or None to keep ``current_name``.
+
+    Root cause (measured 2026-08-10): complex_ring names a suffixable PG as a
+    detachable prefix on a spiro parent; von-Baeyer parents already suffix
+    correctly, so only spiro is affected. The general engine builds the correct
+    suffix form. Prefer it ONLY when OPSIN parses it back to the input structure
+    (re-anchored + RT-gated => 0-wrong). Jar-absent -> None (fail closed, keep the
+    existing name). Scoped to spiro so von-Baeyer/fused and PG-free spiro are
+    byte-identical.
+    """
+    try:
+        from ...rules.spiro import is_spiro_system
+        if not is_spiro_system(features.mol):
+            return None
+        from ..general_engine import name_general
+        eng = name_general(
+            features.mol, features,
+            allow_aromatic_general=False, allow_suffix_free=False)
+        if eng is None or not eng.name or eng.name == current_name:
+            return None
+        from ...namer import (
+            _validity_gate_name_to_smiles, _validity_gate_jar_present)
+        if not _validity_gate_jar_present():
+            return None  # fail closed: never ship an unverified rewrite
+        smi = _validity_gate_name_to_smiles(eng.name)
+        if smi is None:
+            return None
+        from rdkit import Chem
+        if Chem.CanonSmiles(smi) == Chem.CanonSmiles(
+                Chem.MolToSmiles(features.mol)):
+            return eng.name
+    except Exception as e:
+        logger.debug("spiro principal-suffix preference skipped: %s", e)
+    return None
+
+
 def _is_tier_a_ring(features: Any) -> bool:
     """Predicate: matches if features.is_cyclic AND not chain_is_parent.
 
@@ -254,6 +294,19 @@ def name_tier_a_ring(
                     complex_result.ring_atoms,
                     complex_result.atom_to_locant,
                 )
+            # v31 PIN conformance (P-33.3): the complex_ring assembly demotes a
+            # suffixable principal characteristic group to a PREFIX on a SPIRO
+            # parent (`9-carboxyspiro[5.5]undecane`), where the PIN cites it as the
+            # principal SUFFIX (`spiro[5.5]undecane-3-carboxylic acid`). von-Baeyer
+            # parents already suffix correctly -- only spiro demotes (measured).
+            # The general engine builds the correct suffix form; prefer it IFF it
+            # OPSIN-round-trips to the input (re-anchored + RT-gated => 0-wrong;
+            # jar-absent keeps the existing name, fail-closed). Scoped to spiro+PG,
+            # so von-Baeyer / fused parents and PG-free spiro stay byte-identical.
+            if getattr(features, 'principal_group', None) is not None:
+                _alt = _spiro_principal_suffix_preference(features, complex_name)
+                if _alt is not None:
+                    complex_name = _alt
             _complex_result_for_injection = complex_result
             _complex_cand = _tier_a_pool.add(
                 complex_name, 'complex_ring', features,
