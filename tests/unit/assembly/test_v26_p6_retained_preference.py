@@ -282,8 +282,13 @@ def test_preference_inert_without_general_fallback():
 # --------------------------------------------------------------------------
 def test_preference_fails_closed_when_candidate_mismatches(monkeypatch):
     """Direct recovery-method call (see the PIN-PATH CONFOUND note on
-    ``test_preference_fires_under_complete``)."""
-    smi, _expected, general_name = ACCEPT_CASES[0]
+    ``test_preference_fires_under_complete``).
+
+    v31: the engine's own candidate for ACCEPT_CASES[0] is now the retained
+    ``expected`` name (name_general recognizes it directly), so the fake oracle
+    maps THAT (not the old von-Baeyer general_name) and the invariant asserts the
+    fabricated retained preference is rejected -> the engine's real candidate ships."""
+    smi, expected, _general_name = ACCEPT_CASES[0]
     canon = Chem.CanonSmiles(smi)
     monkeypatch.setattr(
         Orthonym, "_retained_structural_preference",
@@ -294,8 +299,8 @@ def test_preference_fails_closed_when_candidate_mismatches(monkeypatch):
     def _fake_oracle(name):
         if name == "totally-fabricated-name":
             return "C"  # deliberately the WRONG structure
-        if name == general_name:
-            return canon  # the general name verifies normally (real result)
+        if name == expected:
+            return canon  # the engine's own candidate verifies normally
         return None
 
     monkeypatch.setattr(_namer_mod, "_validity_gate_name_to_smiles",
@@ -303,15 +308,15 @@ def test_preference_fails_closed_when_candidate_mismatches(monkeypatch):
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     got = comp._try_general_engine_recovery(canon)
-    assert got == general_name, (
+    assert got == expected, (
         f"a non-round-tripping retained candidate must never override the "
-        f"general name: got {got!r}, expected {general_name!r}")
+        f"engine's own candidate: got {got!r}, expected {expected!r}")
 
 
 def test_preference_fails_closed_when_jar_absent(monkeypatch):
     """Direct recovery-method call (see the PIN-PATH CONFOUND note on
     ``test_preference_fires_under_complete``)."""
-    smi, _expected, general_name = ACCEPT_CASES[0]
+    smi, expected, _general_name = ACCEPT_CASES[0]
     canon = Chem.CanonSmiles(smi)
     monkeypatch.setattr(
         Orthonym, "_retained_structural_preference",
@@ -322,20 +327,29 @@ def test_preference_fails_closed_when_jar_absent(monkeypatch):
                      allow_aromatic_general=True,
                      general_fallback_unverified=True)
     got = comp._try_general_engine_recovery(canon)
-    assert got == general_name, (
-        f"no-JAR must never ship an unverified retained guess: got {got!r}, "
-        f"expected {general_name!r}")
+    # v31: jar absent -> the P6 retained-preference swap is skipped (it needs the
+    # oracle), so the fabricated preference never overrides the engine's own
+    # candidate, which is now the retained ``expected`` name.
+    assert got == expected, (
+        f"no-JAR must never ship an unverified retained guess over the engine's "
+        f"own candidate: got {got!r}, expected {expected!r}")
 
 
 # --------------------------------------------------------------------------
 # FULL-NAMER, real molecules, production gate (needs Java/OPSIN).
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected,_general", ACCEPT_CASES)
-def test_pin_abstains_accept_cases(smiles, expected, _general, production_gate):
+def test_pin_names_accept_cases_directly(smiles, expected, _general, production_gate):
+    """v31 change-asserted-value (was test_pin_abstains_accept_cases): the PIN
+    path has since gained direct recognition of these fused-heterocycle / bridged
+    retained parents, so it NO LONGER abstains — it names them (benzo[f]quinoline,
+    quinolizidine) at pin, RT-verified. A conformance improvement: the P6
+    recovery-lane preference (still exercised by the recognizer/recovery tests
+    above) is simply no longer NEEDED for these two, because pin handles them."""
     pin = Orthonym(style="pin")
     out = pin.name(Chem.CanonSmiles(smiles))
-    assert (not out) or is_failure_name(out), (
-        f"expected pin abstention for {smiles!r}, got {out!r}")
+    assert out == expected, (
+        f"expected pin to name {smiles!r} as {expected!r}, got {out!r}")
 
 
 @pytest.mark.parametrize("smiles,expected,_general", ACCEPT_CASES)
@@ -347,15 +361,16 @@ def test_complete_prefers_retained_name(smiles, expected, _general,
     assert out == expected, f"{smiles}: complete gave {out!r} != {expected!r}"
 
 
-def test_valid_tier_keeps_von_baeyer_name_documented_scope(production_gate):
-    """P6 is complete-tier only (brief scope): `valid` keeps shipping the
-    von-Baeyer name for quinolizidine -- a documented, deliberate residual,
-    not a regression this phase introduces."""
-    smi, _expected, general_name = ACCEPT_CASES[1]  # quinolizidine
+def test_valid_tier_names_quinolizidine_directly(production_gate):
+    """v31 change-asserted-value (was ...keeps_von_baeyer_name...): the PIN/valid
+    parent path now recognizes quinolizidine directly, so `valid` ships the
+    retained name 'quinolizidine' (RT-exact), NOT the old von-Baeyer residual
+    '1-azabicyclo[4.4.0]decane'. A conformance improvement, tier-independent."""
+    smi, expected, _general_name = ACCEPT_CASES[1]  # quinolizidine
     valid = Orthonym(style="pin", general_fallback=True,
                       allow_aromatic_general=False)
     out = valid.name(Chem.CanonSmiles(smi))
-    assert out == general_name
+    assert out == expected
 
 
 @pytest.mark.parametrize("smiles,retained_candidate,general_name",
