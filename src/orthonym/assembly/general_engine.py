@@ -647,10 +647,20 @@ def _is_complex_prefix(name: str) -> bool:
     here, a 'tert-butyl' got BOTH wrong at once ('bis(tert-butyl)' where the Blue
     Book writes 'di-tert-butyl'). The carve-out is the shared primitive.
     """
-    from .naming_utils import italicized_prefix_is_bare
+    from .naming_utils import italicized_prefix_is_bare, is_complex_substituent
     if italicized_prefix_is_bare(name):
         return False
-    return bool(_COMPLEX_PREFIX_RE.search(name))
+    # v31 (P-16.3.3): the regex catches locant/hyphen/bracket composites but MISSES
+    # the "internal multiplying prefix" its own comment claims (a substituted
+    # substituent whose locants are omitted leaves no marks) -- so a compound
+    # substituent like 'pentafluoroethoxy'/'trifluoromethyl'/'dimethylamino'/
+    # 'chloromethyl' went BARE where the Blue Book encloses it ((trifluoromethyl)
+    # ×7, (pentafluoroethyl) verbatim). Fall back to the shared is_complex_substituent
+    # predicate (which already powers substituent enclosure elsewhere and returns
+    # False for methyl/ethoxy/phenyl/cyclohexyl and the tert-/sec- italic carve-outs
+    # handled above), so the enclosure AND the di->bis multiplier both fire for a
+    # true compound substituent.
+    return bool(_COMPLEX_PREFIX_RE.search(name)) or is_complex_substituent(name)
 
 
 def _mult_prefix(n: int, name: str) -> Optional[str]:

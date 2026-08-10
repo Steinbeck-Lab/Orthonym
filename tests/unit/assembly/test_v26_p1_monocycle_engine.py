@@ -47,10 +47,15 @@ pytestmark = pytest.mark.unit
 # (SMILES, expected complete-tier name) — pin ABSTAINS, complete EMITS, RT-OK.
 # All are benzene aryl-ethers: the concrete P1 coverage win (benzene vocab miss).
 NEWCOV_CASES = [
-    ("FC(F)(F)Oc1ccccc1", "1-trifluoromethoxybenzene"),
+    # v31 change-asserted-value (P-16.3.3): a fluoro-substituted alkoxy is a
+    # COMPOUND substituent and takes enclosing marks (the Blue Book encloses
+    # (trifluoromethyl)/(pentafluoroethyl) verbatim). The multiplied-fluoro
+    # locants are omitted when unambiguous (P-14.3.4.5, all positions substituted:
+    # 'pentafluoroethoxy' not '1,1,2,2,2-pentafluoroethoxy'). All RT-exact.
+    ("FC(F)(F)Oc1ccccc1", "1-(trifluoromethoxy)benzene"),
     ("FC(F)(F)COc1ccccc1", "1-(2,2,2-trifluoroethoxy)benzene"),
-    ("FC(F)Oc1ccccc1", "1-difluoromethoxybenzene"),
-    ("FC(F)(F)C(F)(F)Oc1ccccc1", "1-(1,1,2,2,2-pentafluoroethoxy)benzene"),
+    ("FC(F)Oc1ccccc1", "1-(difluoromethoxy)benzene"),
+    ("FC(F)(F)C(F)(F)Oc1ccccc1", "1-(pentafluoroethoxy)benzene"),
     ("ClCCOc1ccccc1", "1-(2-chloroethoxy)benzene"),
     ("FCCOc1ccccc1", "1-(2-fluoroethoxy)benzene"),
     ("FC(F)(F)CCOc1ccccc1", "1-(3,3,3-trifluoropropoxy)benzene"),

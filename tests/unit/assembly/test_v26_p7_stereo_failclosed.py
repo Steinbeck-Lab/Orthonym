@@ -52,8 +52,10 @@ TRIENYL_DROPPED_NAME = "5-(heptadeca-5,8,11-trien-1-yl)benzene-1,3-diol"
 STEREO_EXPRESSED = [
     ("C[C@H](Cl)COc1ccccc1", "1-((S)-2-chloropropoxy)benzene"),
     ("ClCC[C@@H](Cl)Oc1ccccc1", "1-((1R)-1,3-dichloropropoxy)benzene"),
+    # v31 change-asserted-value (P-16.3.3): trimethylsilyl is a compound
+    # substituent -> enclosed '(trimethylsilyl)'. RT-exact.
     ("C[Si](C)(C)[n+]1ccc([C@@H](Cl)C)cc1",
-     "4-((1S)-1-chloroethyl)-1-trimethylsilylpyridin-1-ium"),
+     "4-((1S)-1-chloroethyl)-1-(trimethylsilyl)pyridin-1-ium"),
 ]
 
 # Routes through the INLINE _name_impl general-engine block (NOT late-recovery),
