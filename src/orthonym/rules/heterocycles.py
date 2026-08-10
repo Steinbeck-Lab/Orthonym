@@ -335,6 +335,29 @@ def orient_heterocycle_with_substituents(
     if n == 0:
         return [], {}
 
+    # RISK 2 unification: a partially-saturated mancude heteromonocycle is
+    # numbered by ONE authority carrying the FULL P-14.4 ladder — heteroatom
+    # cascade -> (b) indicated H `:3246` -> (c) suffix `:3256` -> (e) hydro
+    # `:3288` -> (f) detachable prefixes `:3300` -> canonical tie-break. The
+    # heteroatom cascade below carried (c)/(f) but NOT the indicated-H (b) or
+    # hydro (e) tiers, so it disagreed with the stem builder (which numbers with
+    # (b) first) and SELF-01 abstained (`2H-pyran-6-carboxylic acid`, the verbatim
+    # BB row `:3252`). ``_mancude_hydro_numbering`` returns the exact atom->locant
+    # map the stem builder (`_mancude_hydro_name`) uses, or None for any ring that
+    # is not one (aromatic / fully saturated / not mancude), leaving the cascade
+    # below unchanged for those. It supersedes the cascade for partially-saturated
+    # mancude rings; the added (f)/canon tiers keep decorated rings PIN-correct and
+    # representation-stable (fable BLOCKER 1/2).
+    _man = _mancude_hydro_numbering(mol, ring_set, principal_group_atoms)
+    if _man is None:
+        # Sibling for the fully-mancude indicated-H parent (2H-pyran-6-carboxylic
+        # acid, the verbatim BB row at :3252): the hydro namer declines it
+        # (d == max_match), but the suffix still had no indicated-H tier.
+        _man = _mancude_parent_suffix_numbering(mol, ring_set, principal_group_atoms)
+    if _man is not None:
+        oriented_r = sorted(_man, key=lambda a: _man[a])
+        return oriented_r, dict(_man)
+
     # Detect substituent positions if not provided
     if substituent_positions is None:
         substituent_positions = set()
@@ -1256,9 +1279,23 @@ def _ring_double_bond_count(mol, ring_set) -> Optional[int]:
     return n
 
 
-def _mancude_hydro_name(mol, ring_set: Set[int],
-                        principal_group_atoms=None) -> Optional[str]:
-    """P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle,
+def _mancude_hydro_select(mol, ring_set: Set[int],
+                          principal_group_atoms=None) -> Optional[dict]:
+    """Shared numbering + saturation analysis for a partially saturated mancude
+    heteromonocycle (P-54.4.1).  ONE selection, consumed by both
+    :func:`_mancude_hydro_name` (builds the stem string) and
+    :func:`_mancude_hydro_numbering` (hands the atom->locant map to the
+    composer's suffix/substituent placement).
+
+    This is the ROOT-CAUSE fix for the "two numbering authorities" class
+    (RISK 2): the indicated hydrogen OUTRANKS the suffix for low locants
+    (P-14.4(b) ``BlueBookV2.md:3246``, verbatim ``2H-pyran-6-carboxylic acid
+    (PIN)`` ``:3252``), so numbering the stem here and the suffix independently in
+    ``orient_heterocycle_with_substituents`` (which had no indicated-H tier) let
+    them disagree and SELF-01 abstained.  read the suffix
+    locant from the SAME numbering map the indicated-H prefix uses; so do we now.
+
+    P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle,
     INCLUDING the case where the mancude parent itself needs indicated hydrogen.
 
     Examples this closes: ``5,6-dihydro-4H-1,3-oxazine``, ``3,4-dihydro-2H-1,4-
@@ -1465,6 +1502,23 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
     # own -- P-14.4 (``:3219``) (b) indicated hydrogen (``:3246``) ahead of
     # (e)(i) hydro prefixes (``:3288``/``:3289``), restated for exactly this
     # combination by P-31.2.2 (``:16880``).
+    # P-14.4(f) `:3300` detachable prefixes (all together, lowest locant set),
+    # and an input-order-invariant canonical final tie-break. These sit BELOW
+    # hydro (e) in the key, so they never alter the stem string (which depends
+    # only on het/ih/hydro locants, equal across any tie) — they only settle
+    # WHICH numbering the shared map returns, so a decorated ring's substituent
+    # gets its P-14.4(f) lowest locant deterministically instead of one chosen by
+    # ring-atom iteration order (fable BLOCKER 1/2: `3-methyl-1,4-dihydropyridine`
+    # not `5-methyl`; representation-stable). Detachable = non-ring heavy
+    # neighbour, EXCLUDING the pcg-bearing atoms (the suffix, tier c).
+    sub_pos: Set[int] = set()
+    for p, a in enumerate(ordered):
+        if any(nb.GetIdx() not in ring_set
+               for nb in mol.GetAtomWithIdx(a).GetNeighbors()):
+            sub_pos.add(p)
+    sub_pos -= pcg_pos
+    canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+
     best_key = None
     best: Optional[Tuple[Dict[int, int], frozenset]] = None
     for het_key, loc in _monocycle_numberings(mol, ordered):
@@ -1472,13 +1526,50 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
             ih_locs = tuple(sorted(loc[p] for p in ih))
             pcg_locs = tuple(sorted(loc[p] for p in pcg_pos))
             hydro_locs = tuple(sorted(loc[p] for p in sp3_pos - set(ih)))
-            key = (het_key, ih_locs, pcg_locs, hydro_locs)
+            sub_locs = tuple(sorted(loc[p] for p in sub_pos))
+            canon_key = tuple(canon[ordered[p]]
+                              for p in sorted(range(n), key=lambda q: loc[q]))
+            key = (het_key, ih_locs, pcg_locs, hydro_locs, sub_locs, canon_key)
             if best_key is None or key < best_key:
                 best_key = key
                 best = (loc, ih)
     if best is None:
         return None
     loc, ih = best
+    return {
+        'mol': mol,          # NB: kekulised copy if the ring was aromatic
+        'ordered': ordered,
+        'loc': loc,          # ring position -> locant
+        'ih': ih,            # frozenset of ring positions carrying indicated H
+        'sp3_pos': sp3_pos,  # ring positions saturated in the molecule
+        'het_pos': het_pos,
+        'n': n,
+        'prefix': prefix,    # saturation prefix (di/tetra/hexa...)
+    }
+
+
+def _mancude_hydro_name(mol, ring_set: Set[int],
+                        principal_group_atoms=None) -> Optional[str]:
+    """P-54.4.1 'hydro' name for a partially saturated mancude heteromonocycle.
+
+    Thin builder over :func:`_mancude_hydro_select`, which owns the numbering
+    cascade and every fail-closed guard.  Emits ``<hydro-locants>-<prefix>
+    <indicated-H>-<HW stem>`` from the selected numbering, unchanged from before
+    the selection was factored out (the selection is byte-identical).
+    """
+    from .lambda_convention import nonstandard_bonding_number
+
+    sel = _mancude_hydro_select(mol, ring_set, principal_group_atoms)
+    if sel is None:
+        return None
+    mol = sel['mol']
+    ordered = sel['ordered']
+    loc = sel['loc']
+    ih = sel['ih']
+    sp3_pos = sel['sp3_pos']
+    het_pos = sel['het_pos']
+    n = sel['n']
+    prefix = sel['prefix']
 
     het_pairs = sorted(
         (loc[p], mol.GetAtomWithIdx(ordered[p]).GetSymbol()) for p in het_pos
@@ -1509,6 +1600,132 @@ def _mancude_hydro_name(mol, ring_set: Set[int],
     )
     sep = '-' if stem[:1].isdigit() else ''
     return f"{hydro_locants}-{prefix}{sep}{stem}"
+
+
+def _mancude_hydro_numbering(mol, ring_set: Set[int],
+                             principal_group_atoms=None) -> Optional[Dict[int, int]]:
+    """Atom-index -> locant map for a partially-saturated mancude heteromonocycle,
+    from the SAME selection :func:`_mancude_hydro_name` uses for the stem.
+
+    Returns ``None`` when the ring is not a partially-saturated mancude
+    heteromonocycle (aromatic / fully saturated / not mancude), so the caller
+    keeps its own numbering unchanged.  Consulted FIRST by
+    ``orient_heterocycle_with_substituents`` — this is what unifies the stem and
+    the suffix onto ONE numbering authority (RISK 2): the suffix locant now
+    honours P-14.4(b) indicated-H-outranks-suffix exactly as the stem does
+    (``3,4-dihydro-2H-pyran-6-carboxylic acid``, not ``...-2-carboxylic acid``).
+    """
+    sel = _mancude_hydro_select(mol, ring_set, principal_group_atoms)
+    if sel is None:
+        return None
+    ordered = sel['ordered']
+    loc = sel['loc']
+    n = sel['n']
+    return {ordered[p]: loc[p] for p in range(n)}
+
+
+def _mancude_parent_suffix_numbering(mol, ring_set: Set[int],
+                                     principal_group_atoms=None) -> Optional[Dict[int, int]]:
+    """Atom-index -> locant map for a FULLY-MANCUDE monocyclic heterocycle that
+    carries indicated hydrogen (2H-pyran, 4H-pyran, 6H-1,3-oxazine, ...) and a
+    suffix — the ``d == max_match`` sibling of :func:`_mancude_hydro_numbering`
+    (which handles only the hydro forms, ``1 <= d < max_match``).
+
+    The parent STEM is numbered by ``_monocycle_indicated_h_prefix`` (which
+    minimises the indicated-H locant), but the composer's suffix locant came from
+    ``orient_heterocycle_with_substituents`` with no indicated-H tier, so
+    ``2H-pyran`` + suffix collided at locant 2. This numbers with the indicated
+    hydrogen OUTRANKING the suffix — the verbatim BB example
+    ``2H-pyran-6-carboxylic acid (PIN)`` (``BlueBookV2.md:3252``, P-14.4(b)).
+
+    Returns ``None`` outside its tight scope (fail-closed): aromatic rings (so
+    pyridine/furan/thiophene numbering is untouched), rings that are NOT at the
+    mancude maximum of ring double bonds (a hydro form, owned by the sibling), a
+    ring with an exocyclic ring double bond (a ketone etc.), or a ring without
+    exactly ONE indicated-hydrogen atom (multi-IH rings are a follow-on). Its
+    indicated-H locant matches the stem's by construction (both minimise it), so
+    stem and suffix agree.
+    """
+    n = len(ring_set)
+    if n < 4 or n > 10:
+        return None
+    # Aromatic mancude rings (pyridine/furan/thiophene/...) are numbered by the
+    # heteroatom cascade, not here — leave them exactly as they were.
+    if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set):
+        return None
+    ordered = _macrocycle_ordered_ring(mol, ring_set)
+    if ordered is None or len(ordered) != n:
+        return None
+    # An exocyclic ring double bond is a ketone / methylidene carbon, not this
+    # rule (P-14.7.2 added-indicated-H territory) -> fail closed.
+    for i in ring_set:
+        for bond in mol.GetAtomWithIdx(i).GetBonds():
+            if (bond.GetBondType() == Chem.BondType.DOUBLE
+                    and bond.GetOtherAtomIdx(i) not in ring_set):
+                return None
+    max_match, eligible = _mancude_max_matching(mol, ordered)
+    if max_match < 1:
+        return None
+    pos_of = {a: k for k, a in enumerate(ordered)}
+    db_atoms: Set[int] = set()
+    d = 0
+    for bond in mol.GetBonds():
+        if bond.GetBondType() != Chem.BondType.DOUBLE:
+            continue
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring_set and j in ring_set:
+            db_atoms.update((i, j))
+            d += 1
+    if d != max_match:
+        return None  # hydro form (or over-perceived) -> sibling / not this rule
+    # The single indicated-H atom: sp3 (no ring double bond), double-bond
+    # eligible, bearing hydrogen (mirrors _monocycle_indicated_h_prefix scope).
+    sp3h = [idx for idx in ordered
+            if idx not in db_atoms and eligible[pos_of[idx]]
+            and mol.GetAtomWithIdx(idx).GetTotalNumHs() >= 1]
+    if len(sp3h) != 1:
+        return None
+    target = sp3h[0]
+    het_pos = [p for p in range(n)
+               if mol.GetAtomWithIdx(ordered[p]).GetSymbol() != 'C']
+    if not het_pos:
+        return None
+    pcg_atoms = set(principal_group_atoms or ())
+    exo_pcg = pcg_atoms - ring_set
+    pcg_pos: Set[int] = set()
+    if pcg_atoms:
+        for p, a in enumerate(ordered):
+            if a in pcg_atoms or any(
+                    nb.GetIdx() in exo_pcg
+                    for nb in mol.GetAtomWithIdx(a).GetNeighbors()):
+                pcg_pos.add(p)
+    # P-14.4(f) detachable prefixes + input-invariant canonical tie-break (below
+    # the suffix), so a decorated mancude parent numbers its plain substituents
+    # deterministically and per lowest-locant, mirroring the hydro sibling.
+    sub_pos: Set[int] = set()
+    for p, a in enumerate(ordered):
+        if any(nb.GetIdx() not in ring_set
+               for nb in mol.GetAtomWithIdx(a).GetNeighbors()):
+            sub_pos.add(p)
+    sub_pos -= pcg_pos
+    canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+
+    # P-14.4: (heteroatom cascade) -> (b) indicated H -> (c) suffix -> (f) prefixes.
+    best_key = None
+    best_loc = None
+    for het_key, loc in _monocycle_numberings(mol, ordered):
+        ih_loc = loc[pos_of[target]]
+        pcg_locs = tuple(sorted(loc[p] for p in pcg_pos))
+        sub_locs = tuple(sorted(loc[p] for p in sub_pos))
+        canon_key = tuple(canon[ordered[p]]
+                          for p in sorted(range(n), key=lambda q: loc[q]))
+        key = (het_key, ih_loc, pcg_locs, sub_locs, canon_key)
+        if best_key is None or key < best_key:
+            best_key = key
+            best_loc = loc
+    if best_loc is None:
+        return None
+    return {ordered[p]: best_loc[p] for p in range(n)}
 
 
 def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
