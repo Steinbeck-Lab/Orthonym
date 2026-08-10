@@ -3932,6 +3932,21 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         features.functional_groups.pop('ammonium', None)
         namer._classify(features)
 
+        # v31 (P-31.1.4.2.4): the amine is the principal characteristic group, so
+        # the N-attached carbon must be position 1 of the parent chain (lowest
+        # locant to the PG). find_principal_chain can orient a symmetric-length
+        # parent from the WRONG end when equal-length N-branches compete — e.g.
+        # CC[N+](CC)(CC)CCF returns the parent [CH2F, CH2-N], numbering fluoro at C1
+        # and emitting the wrong '1-fluoro-...ethanaminium' (RT-mismatch -> abstain).
+        # Re-orient so the single chain carbon bonded to N leads (C1); the
+        # F-/OH-/Cl- substituent then falls at C2 -> '2-fluoro-...' (RT-exact).
+        # Unsubstituted/single-competitor cases already lead with the N-carbon, so
+        # this is a no-op for them.
+        _pc = list(features.principal_chain or [])
+        _n_positions = [i for i, c in enumerate(_pc) if c in carbon_neighbors]
+        if len(_n_positions) == 1 and _n_positions[0] == len(_pc) - 1 and len(_pc) >= 2:
+            _pc.reverse()
+            features.principal_chain = _pc
         # Re-point the principal-group N-substituent set to EXCLUDE the carbon that
         # find_principal_chain chose as the parent chain anchor, so the N-prefix
         # multiplier counts exactly the off-chain branches (P-73.1.2.1 N-locants).
