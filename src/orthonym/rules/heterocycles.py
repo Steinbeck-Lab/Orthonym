@@ -3029,6 +3029,48 @@ def get_heterocycle_substituents(
                         })
                         continue
 
+            # v30 breadth (P-63.6): a ring-borne higher-oxide sulfur substituent
+            # -S(=O)R (sulfinyl) / -S(=O)(=O)R (sulfonyl) is an (R)sulfinyl /
+            # (R)sulfonyl PREFIX. The generic classify path below counts the R
+            # carbons and DROPS the S + its =O, so the whole molecule abstained
+            # (SELF-01 caught the atom-drop, e.g. 2-(methylsulfinyl)pyridine and the
+            # omeprazole/PPI benzimidazole-sulfinyl class -> `1H-benzimidazole`).
+            # The recursive name_substituent already builds these under
+            # allow_mancude (the benzene path emits `(methanesulfinyl)benzene`);
+            # route the whole fragment through it. best-effort only (allow_mancude
+            # read from context -> PIN default byte-identical, matching the existing
+            # sulfoxide/sulfone prefix conservatism); gate-INDEPENDENT coverage
+            # guard so a partial name never ships even with SELF-01 off.
+            _sx_root = mol.GetAtomWithIdx(nbr_idx)
+            if (carbon_count > 0 and not is_nitrogen
+                    and _sx_root.GetSymbol() in ('S', 'Se', 'Te')
+                    and _sx_root.GetFormalCharge() == 0
+                    and any(b.GetBondTypeAsDouble() == 2.0
+                            and b.GetOtherAtom(_sx_root).GetSymbol() == 'O'
+                            for b in _sx_root.GetBonds())):
+                from ..metrics.provenance import best_effort_ctx
+                if best_effort_ctx.get():
+                    from ..assembly.substituent_enumerator import name_substituent
+                    from ..assembly.naming_utils import (
+                        is_complex_substituent, apply_enclosing_marks)
+                    _sx_name = name_substituent(
+                        mol, list(sub_atoms), nbr_idx, allow_mancude=True)
+                    if (_sx_name and _sx_name != 'substituent'
+                            and _n_anchored_substituent_covers(
+                                mol, _sx_name, sub_atoms)):
+                        if is_complex_substituent(_sx_name):
+                            _sx_name = apply_enclosing_marks(_sx_name, 0)
+                        substituents.setdefault(locant, []).append({
+                            'atoms': sub_atoms,
+                            'is_on_nitrogen': False,
+                            'carbon_count': 0,
+                            'connecting_atom': ring_atom_idx,
+                            'is_ring': False,
+                            'ring_name': None,
+                            'hetero_name': _sx_name,
+                        })
+                        continue
+
             # Detect non-carbon functional substituents (amino, hydroxy, nitro, etc.)
             hetero_sub_name = None
             if carbon_count == 0:
