@@ -336,9 +336,12 @@ def orient_heterocycle_with_substituents(
         return [], {}
 
     # RISK 2 unification: a partially-saturated mancude heteromonocycle is
-    # numbered by ONE authority carrying the FULL P-14.4 ladder — heteroatom
-    # cascade -> (b) indicated H `:3246` -> (c) suffix `:3256` -> (e) hydro
-    # `:3288` -> (f) detachable prefixes `:3300` -> canonical tie-break. The
+    # numbered by ONE authority carrying the P-14.4 ladder (a)-(f) + a canonical
+    # tie-break — heteroatom cascade -> (b) indicated H `:3246` -> (c) suffix
+    # `:3256` -> (e) hydro `:3288` -> (f) detachable prefixes `:3300` -> canon.
+    # (P-14.4(g) `:3306` first-cited-prefix is NOT encoded — a KNOWN pre-existing
+    # gap shared with orient's own cascade tail; see risk2-numbering-unification.md.)
+    # The
     # heteroatom cascade below carried (c)/(f) but NOT the indicated-H (b) or
     # hydro (e) tiers, so it disagreed with the stem builder (which numbers with
     # (b) first) and SELF-01 abstained (`2H-pyran-6-carboxylic acid`, the verbatim
