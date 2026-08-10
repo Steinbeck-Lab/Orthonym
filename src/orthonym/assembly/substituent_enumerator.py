@@ -3480,8 +3480,17 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
         if attach_idx is not None and any(
                 _ri.NumAtomRings(a) > 0 for a in frag_atom_set):
             from ..rules.ring_substituents import name_ring_system_substituent
+            # v31 composition lever: under the best-effort tier, let the ring-
+            # substituent chokepoint name a decorated (hetero)aryl branch that
+            # name_substituent can only build with allow_mancude=True (e.g.
+            # [4-(methanesulfonyl)phenyl]methyl). PIN default leaves
+            # best_effort_ctx unset -> allow_mancude=False here -> byte-identical.
+            # A malformed / non-round-tripping name is still suppressed by the
+            # validity + rt_exact gate downstream, so 0-wrong holds.
+            from ..metrics.provenance import best_effort_ctx
             _ring_nm = name_ring_system_substituent(
-                mol, sorted(frag_atom_set), attach_idx
+                mol, sorted(frag_atom_set), attach_idx,
+                allow_mancude=bool(best_effort_ctx.get()),
             )
             if _ring_nm:
                 return _ring_nm
