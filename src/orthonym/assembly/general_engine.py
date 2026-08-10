@@ -1160,7 +1160,19 @@ def _emit_ring_from_analysis(
                 ('spiro', 'dispiro', 'trispiro', 'tetraspiro', 'pentaspiro'))):
         from .general_fusion import name_fusion_parent
         from ..rules.stereochemistry import general_engine_stereo_complete
-        _fusion_word = name_fusion_parent(mol, cage.cage_atoms)
+        from ..rules.ring_replacement import vb_lambda_for_atom
+        # v31: the bare fusion word (catalog match) carries NO lambda descriptor,
+        # so it CANNOT express a non-standard-valence ring atom -- e.g. the λ4
+        # sulfur of c1ccc2c(c1)O[SH2]O2, for which the catalog returns
+        # '[1,3,2]benzodioxathiole' (the DIVALENT-S ring = a different molecule,
+        # SELF-01-suppressed -> abstain, LOSING the valid von-Baeyer name
+        # '7,9-dioxa-8lambda4-thiabicyclo[4.3.0]nona-1,3,5-triene'). Mirrors the
+        # stereo carve-out below: fall through to the VB polyene tail (which emits
+        # the lambda descriptor and round-trips) when ANY cage atom needs a λ.
+        _has_lambda = any(vb_lambda_for_atom(mol, i) is not None
+                          for i in cage.cage_atoms)
+        _fusion_word = None if _has_lambda else name_fusion_parent(
+            mol, cage.cage_atoms)
         # v27 Phase S Task 2: the bare fusion word carries NO stereo block, so
         # take this early-return ONLY when the parent has no defined stereo
         # element (all-or-nothing, PS-1). If a mancude fused parent DID carry a
