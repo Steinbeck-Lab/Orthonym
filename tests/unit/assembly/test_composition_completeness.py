@@ -31,10 +31,10 @@ def test_decorated_aryl_methyl_branch_on_ring_parent(smiles):
 
 
 @pytest.mark.roundtrip
-@pytest.mark.xfail(reason="separate pre-existing partition bug: the sulfonyl S is "
-                          "double-counted (branch names [4-(methanesulfonyl)phenyl]methyl "
-                          "AND a spurious ring 'sulfonyl' prefix). rt_exact gate abstains "
-                          "(0-wrong); follow-up = ring-substituent partition dedup.",
-                   strict=True)
-def test_r1_sulfonylbenzyl_partition_followup():
+def test_r1_sulfonylbenzyl_no_partition_double_count():
+    """v31 FIXED (was xfail): the sulfonyl S was double-counted (branch named
+    [4-(methanesulfonyl)phenyl]methyl AND a spurious parent 'sulfonyl' prefix).
+    The unconditional ring-substituent containment filter in
+    _handler_shared._generate_prefixes now drops any FG entirely inside a ring
+    substituent from the parent prefix set -> RT-exact."""
     assert_rt_exact("OC(=O)C1CCC(Cc2ccc(S(C)(=O)=O)cc2)CC1")

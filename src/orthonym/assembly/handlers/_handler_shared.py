@@ -1082,6 +1082,23 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
         if handled_ring_fg_atoms:
             matches = [m for m in matches if not any(a in handled_ring_fg_atoms for a in m)]
 
+        # v31: an FG whose atoms are ENTIRELY within a RING substituent is already
+        # cited by that substituent's own compound name (name_substituent emits e.g.
+        # '4-carbamoylphenyl' / '4-acetylphenyl' — its decorations included,
+        # regardless of ring size), so it must NOT also leak as a stray parent-level
+        # prefix. That double-count produced the unparseable
+        # 'carbamoyl-4-(4-carbamoylphenyl)cyclohexane-1-carboxylic acid' (SELF-01 ->
+        # abstain). UNCONDITIONAL (any fg_name): the BUG-B block below only covers
+        # BRANCH_HANDLED_FGS, so amide/ketone/ester on a ring substituent leaked.
+        # The principal group is skipped (it is the SUFFIX, handled elsewhere, never
+        # a prefix). Atom loss stays impossible: a branch that fails to include the
+        # FG is caught by the whole-molecule SELF-01/E1 gate (abstain, 0-wrong).
+        if ring_substituents and fg_name != getattr(features, 'principal_group', None):
+            _ring_sub_sets = [set(sa) for _k, _sl in ring_substituents.items()
+                              for sa in _sl]
+            matches = [m for m in matches
+                       if not any(all(a in s for a in m) for s in _ring_sub_sets)]
+
         # BUG-B: Skip simple FG matches on small substituent branches (<=3 carbons)
         # that get named as compound substituents (hydroxymethyl, aminomethyl, etc.)
         # Uses shared BRANCH_HANDLED_FGS from naming_utils (unified in Phase 113).
