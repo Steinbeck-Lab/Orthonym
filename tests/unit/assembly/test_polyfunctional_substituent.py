@@ -170,11 +170,17 @@ class TestPhosphatidylserine:
         )
 
     def test_ps_L_serine_sn_glycero(self):
+        # v31 change-asserted-value: the engine now emits the substitutive
+        # L-serine-parent PIN (P-107.3.3 Phosphatidylserines), which is
+        # byte-identical to the Blue Book template at BlueBookV2.md:55162
+        # ("O-{[(2R)-2,3-bis(octadecanoyloxy)propoxy]hydroxyphosphoryl}-L-serine",
+        # here with hexadecanoyl for the C16 input) — the PIN, superseding the old
+        # functional-class "... hydrogen phosphate" diester expectation. Verified
+        # RT-exact (isomeric round-trip incl. the (2R)/L stereo).
         smi = ("CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(O)(=O)OC[C@H](N)C(=O)O)"
                "OC(=O)CCCCCCCCCCCCCCC")
         assert name_compound(smi) == (
-            "(2R)-2,3-bis(hexadecanoyloxy)propyl (S)-2-amino-2-carboxyethyl "
-            "hydrogen phosphate"
+            "O-{[(2R)-2,3-bis(hexadecanoyloxy)propoxy]hydroxyphosphoryl}-L-serine"
         )
 
     def test_ps_deterministic_across_renderings(self):

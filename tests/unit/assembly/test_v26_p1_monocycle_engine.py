@@ -87,7 +87,11 @@ ALL_RT_CASES = NEWCOV_CASES + DIRECT_ENGINE_CASES
 FAIL_CLOSED = {
     "charged (pyridin-1-ium)": "C[n+]1ccccc1",
     "fused cage (naphthalene)": "c1ccc2ccccc2c1",
-    "tier-5 ring-on-ring substituent": "c1ccc(cc1)C1CCC(CC1)C1CCCCC1",
+    # v31: the "tier-5 ring-on-ring" entry was REMOVED — the ring-assembly
+    # substituent namer (task #39) now names c1ccc(cc1)C1CCC(CC1)C1CCCCC1 as
+    # `1-([1,1'-bi(cyclohexan)]-4-yl)benzene` (RT-verified, E1-clean), exactly as
+    # test_complete_tier_names_spiro_acid was updated when v27 P3 gained spiro
+    # naming. See test_complete_tier_names_ring_assembly_substituent below.
     # v26 P1 critical-defect fix: a spiro co-ring is perceived as a
     # substituent that attaches to the parent ring's spiro atom at TWO
     # points; naming it via name_substituent's single-attachment recursion
@@ -220,13 +224,17 @@ def test_monocycle_fail_closed(desc, smiles):
     assert res is None, f"expected refusal for {desc}, got {res.name!r}"
 
 
-def test_complete_tier_abstains_on_tier5_substituent(production_gate):
-    """A molecule whose only monocycle path needs a tier-5 (unnameable)
-    substituent must ABSTAIN under complete -- never a wrong name."""
+def test_complete_tier_names_ring_assembly_substituent(production_gate):
+    """v31 change-asserted-value (was test_complete_tier_abstains_on_tier5_...):
+    a ring-on-ring substituent that once fell to tier-5 abstention is now named by
+    the ring-assembly substituent namer (task #39). The emission is RT-valid and
+    E1-clean, so complete NAMES it rather than abstaining -- mirroring
+    test_complete_tier_names_spiro_acid, updated when v27 P3 gained spiro naming."""
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles("c1ccc(cc1)C1CCC(CC1)C1CCCCC1"))
-    assert (not out) or is_failure_name(out), f"expected abstention, got {out!r}"
+    assert out == "1-([1,1'-bi(cyclohexan)]-4-yl)benzene", (
+        f"expected the ring-assembly substituent PIN, got {out!r}")
 
 
 def test_complete_tier_names_spiro_acid(production_gate):

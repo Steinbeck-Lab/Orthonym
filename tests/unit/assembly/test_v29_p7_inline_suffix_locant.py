@@ -104,21 +104,24 @@ class TestRingSuffixLocant:
 
 
 class TestOffChainCarbonylFailsClosed:
-    def test_general_chain_engine_refuses_an_acyl_off_the_parent_chain(self):
-        """C2-2: an acetyl off the chosen chain must not become a '-one' suffix.
-
-        Swallowing it would put the acyl carbon and its methyl into
-        ``suffix_atoms``, where they are never spelled -- the C19H38O name
-        ``5-butyl-2,4-dimethyltridecan-4-one`` for a C21H42O molecule.
-
-        SCOPE: this pins the GENERAL CHAIN ENGINE only.  Measured 2026-07-31,
-        the shipped name for this molecule is produced by ``composer.py``
-        (``DROP-09 substituent_skip: reason=universal_pipeline_unnameable
-        locant=4``), a different producer that still drops the acetyl.  That
-        remains open -- see 
-        residue R1.  Do not widen this test to the whole namer until DROP-09 is
-        fixed; it would then be asserting someone else's bug.
-        """
+    def test_general_chain_engine_names_acyl_off_chain_completely(self):
+        """C2-2, v31 change-asserted-value: an acetyl off the chosen chain must
+        never become a bare '-one' suffix that DROPS the acyl carbon+methyl (the
+        old C19 name for a C21 molecule). The general chain engine used to
+        fail-closed (return None) on this shape; it now names the WHOLE molecule
+        completely -- the ketone is the ``dodecan-2-one`` suffix and every carbon
+        is spelled: ``4-butyl-3-methyl-3-(2-methylpropyl)dodecan-2-one``. Verified
+        RT-exact (all 21 carbons; input canon == OPSIN canon). The invariant it
+        guarded (never drop the acyl) is now satisfied by CORRECT naming, not by
+        refusal."""
         from orthonym.assembly.general_engine import name_general_chain
+        from orthonym.namer import _validity_gate_name_to_smiles
         mol, feats = _features("CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C")
-        assert name_general_chain(mol, feats) is None
+        res = name_general_chain(mol, feats)
+        assert res is not None
+        assert res.name == "4-butyl-3-methyl-3-(2-methylpropyl)dodecan-2-one"
+        # complete, not atom-dropping: OPSIN round-trips to the exact input
+        opsin_smi = _validity_gate_name_to_smiles(res.name)
+        assert opsin_smi is not None
+        assert Chem.CanonSmiles(opsin_smi) == Chem.CanonSmiles(
+            "CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C")
