@@ -1202,7 +1202,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                      for nb in mol.GetAtomWithIdx(i).GetNeighbors())),
                 None,
             )
-            if _acyl_c is not None and _acyl_c not in set(principal_chain):
+            if _acyl_c is not None:
                 from .amides import (
                     name_amide as _rules_name_amide, get_n_substituents,
                 )
@@ -1244,7 +1244,19 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     _nm = _rules_name_amide(mol, tuple(_match))
                     if _nm:
                         return _nm
-                return None
+                # OFF-chain acyl (N-side is the chain): the chain-suffix
+                # machinery below is structurally wrong for this shape (double-
+                # expresses the amide) -> fail closed. ON-chain acyl (the
+                # ordinary N-aryl / N-alkyl amide, e.g. paracetamol
+                # CC(=O)Nc1ccc(O)cc1 whose junior phenol lives on the N-aryl):
+                # name_amide is the correct producer and was tried above; if its
+                # guards did not hold, fall through to the chain machinery (which
+                # correctly handles the cases the delegation does not cover).
+                # Previously the acyl-on-chain N-aryl amide fell straight through
+                # and the chain path mis-rooted the N-aryl as a C1 substituent
+                # ('1-(4-hydroxyanilino)ethanamide', OPSIN-unparseable -> abstain).
+                if _acyl_c not in set(principal_chain):
+                    return None
 
     # --- Ester is the most-senior group (P-41: esters outrank acyl halides,
     # amides, nitriles, aldehydes, ketones, alcohols) ---
