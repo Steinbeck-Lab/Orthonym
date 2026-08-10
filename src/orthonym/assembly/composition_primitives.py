@@ -417,6 +417,21 @@ def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> 
     function only performs the retained-name assembly.
     """
     unlocanted = [_ALPHA_LOCANT_RE.sub('', t) for t in prefix_texts]
+    # v31 (P-16.3.3): stripping the alpha locant can leave a COMPLEX substituent
+    # whose own enclosure no longer wraps the whole prefix -- e.g.
+    # '[(methylsulfanyl)carbonyl]amino' (the [...] wraps only the acyl, 'amino'
+    # trails outside). Joined bare it welds into '...aminoacetic acid'; P-16.3.3
+    # requires the whole prefix enclosed -> '{[(methylsulfanyl)carbonyl]amino}'.
+    # Wrap each unlocanted prefix that carries marks but is not already fully
+    # enclosed; a fully-enclosed prefix ('(4-chlorophenoxy)') and a mark-free one
+    # ('chloro') are left untouched (docstring examples preserved). Mirrors the
+    # substituent_naming.py:2487 pattern.
+    from .naming_utils import _is_fully_enclosed, apply_enclosing_marks
+    unlocanted = [
+        apply_enclosing_marks(t, -1)
+        if (('(' in t or '[' in t) and not _is_fully_enclosed(t)) else t
+        for t in unlocanted
+    ]
     name = _join_prefix_to_name(_join_prefixes(unlocanted), "acetic acid")
     return f"{stereo}{name}" if stereo else name
 
