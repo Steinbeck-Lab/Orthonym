@@ -141,13 +141,16 @@ class TestHalogenSubstitutedUrea:
         "O=C(NF)NF",        # N,N'-difluoro (ambiguous: needs N,N' locants)
         "O=C(N(F)F)N",      # N,N-difluoro (ambiguous: needs N,N locants)
     ])
-    def test_ambiguous_partial_falls_through(self, smiles):
+    def test_ambiguous_partial_falls_through(self, opsin_gate, smiles):
         """The scoped halogen branch claims ONLY the unambiguous mono/tetra cases.
 
-        Ambiguous partial patterns fall through to the pre-existing carbon path,
-        which drops the halogens to bare 'urea' — a structure-loss that the
-        production SELF-01 self-consistency gate suppresses to 'unknown' (the gate
-        is disabled in the unit suite, so the raw fall-through 'urea' is visible
-        here). Citing these with N,N'/N,N locants is a documented Phase-7 deferral
-        (needs the carbon-handler locant-omission rework)."""
-        assert Orthonym().name(smiles) == "urea"  # pre-existing raw fall-through
+        An ambiguous partial pattern must NOT be named by dropping the halogens (a
+        structure loss = wrong molecule). In PRODUCTION (SELF-01 gate ON, forced
+        here by ``opsin_gate``) the carbon-path fall-through — whatever raw
+        halogen-dropping string it builds ('urea' historically, now
+        'carbamoylaminomethane') — is suppressed to an honest abstention. That
+        0-wrong outcome is the invariant to pin; the exact raw gate-off string is
+        an implementation detail that must NOT be asserted (it drifts). Citing
+        these with N,N'/N,N locants is the documented Phase-7 deferral."""
+        from orthonym.errors import is_failure_name
+        assert is_failure_name(Orthonym().name(smiles))
