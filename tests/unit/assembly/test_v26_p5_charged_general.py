@@ -46,8 +46,15 @@ pytestmark = pytest.mark.unit
 ACCEPT_CASES = [
     ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
     ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),
+    # v31 change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
+    # (P-31.1.4: among valid von-Baeyer numberings of the equal-bridge
+    # bicyclo[4.4.0] cage, heteroatoms get lowest locants). N is separated from a
+    # bridgehead by one carbon, so its lowest attainable locant is 3, NOT 4. The
+    # old `4-silyl-4-aza` expectation was a stale higher-locant numbering; the
+    # engine now emits the lowest-locant form (deterministic across spellings,
+    # OPSIN round-trips to the input).
     ("[SiH3][n+]1ccc2ccccc2c1",
-     "4-silyl-4-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaen-4-ium"),
+     "3-silyl-3-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaen-3-ium"),
     ("[SiH3]C[CH-]C", "1-silylpropan-2-ide"),
     ("FC(F)(F)[CH-]C", "1,1,1-trifluoropropan-2-ide"),
     # Multi-charge dication: the multiplied suffix ("-1,4-diium") begins with

@@ -65,8 +65,14 @@ pytestmark = pytest.mark.unit
 # complete name.)
 COVERAGE_CASES = [
     ("[SiH3]c1ccccn1.O", "2-silylpyridine—water (1/1)"),
+    # v31 change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
+    # (P-31.1.4 heteroatoms-lowest over the equal-bridge bicyclo[4.4.0]). Here N
+    # is adjacent to a bridgehead, so it attains locant 2 and the silyl carbon 3;
+    # the old `4-silyl-5-aza` was a stale higher-locant numbering. Engine now
+    # emits `3-silyl-2-aza…` (deterministic; OPSIN round-trips). The pyridine
+    # component (monocyclic) is unchanged.
     ("[SiH3]c1ccccn1.[SiH3]c1ccc2ccccc2n1",
-     "4-silyl-5-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene"
+     "3-silyl-2-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene"
      "—2-silylpyridine (1/1)"),
 ]
 
