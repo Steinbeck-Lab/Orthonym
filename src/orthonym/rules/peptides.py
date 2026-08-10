@@ -30,9 +30,17 @@ from ..data.amino_acids import (
 
 
 # SMARTS patterns
-# Peptide bond: carbonyl_C - amide_N
-# [CX3](=O)[NX3;H1][CX4] matches C(=O)-NH-CH pattern
-_PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H1][CX4]"
+# Peptide bond: carbonyl_C - amide_N. H1 is the ordinary secondary-amide backbone
+# bond; H0 also admits the TERTIARY amide formed when a cyclic imino acid (proline,
+# hydroxyproline) is the AMINE component — its ring N loses its only H on bonding,
+# so `[NX3;H1]` alone missed every X-Pro / X-Pro-Y peptide (`alanyl-L-proline`,
+# `Glu-Pro-Phe`, ...). Proline as the ACYL (N-terminal) residue already worked.
+# Broadening to H0 is safe: `_is_alpha_carboxyl_bond` still requires the bond be
+# alpha on BOTH sides, and `_extract_residues`/`_identify_residues` fail closed
+# unless every cleaved fragment reconstructs to a STANDARD amino acid — so an
+# N-methyl backbone or any non-amino-acid tertiary amide declines rather than
+# emitting a mis-linked name.
+_PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 
 # Terminal FREE amine (not part of an amide C(=O)N). H2 is the ordinary
 # alpha-amino N-terminus; H1 also admits a SECONDARY free amine so a cyclic
@@ -232,6 +240,13 @@ def _extract_residues(mol) -> Optional[List[str]]:
     for m in matches:
         carbonyl_c = m[0]
         amide_n = m[2]
+        # Proline (and any cyclic imino acid) as the AMINE component: its ring N
+        # has TWO ring-carbon `[CX4]` neighbours, so the SMARTS matches the SAME
+        # C(=O)-N bond TWICE (once per ring carbon). Deduplicate before cleaving —
+        # a duplicate bond index passed to FragmentOnBonds crashes RDKit (segfault),
+        # and would also double-count the dummy labels.
+        if (carbonyl_c, amide_n) in peptide_bond_cn_pairs:
+            continue
         # Only an ALPHA-peptide bond is in scope: the carbonyl must be a residue's
         # ALPHA-carboxyl, i.e. its carbon neighbour (the alpha-carbon) itself bears
         # a nitrogen (that residue's backbone amino N). An ISOPEPTIDE bond formed
