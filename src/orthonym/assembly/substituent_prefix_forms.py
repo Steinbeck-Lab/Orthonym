@@ -503,6 +503,189 @@ def get_alkoxycarbonyl_prefix(
             return None
 
 
+def get_alkoxycarbonimidoyl_prefix(
+    mol,
+    iminoester_atoms: tuple,
+    principal_chain: Optional[List[int]] = None,
+) -> Optional[str]:
+    """Generate R-oxycarbonimidoyl prefix for an imidate (iminoester) as a
+    non-principal group (IUPAC P-65.2.1.5 / P-66).
+
+    Per the Blue Book, ``carbonimidoyl`` is the divalent acyl prefix
+    ``-C(=NH)-`` (cf. ``C-hydroxycarbonimidoyl`` for ``-C(=NH)-OH``,
+    BlueBookV2.md:30020). An imidate substituent ``-C(=NH)-O-R``, when not the
+    principal characteristic group (e.g. a senior carboxylic acid outranks it),
+    is therefore expressed as an ``R-oxycarbonimidoyl`` prefix::
+
+        -C(=NH)OCH3   -> methoxycarbonimidoyl
+        -C(=NH)OC2H5  -> ethoxycarbonimidoyl
+        -C(=NH)OPh    -> phenoxycarbonimidoyl
+        -C(=NH)OCH2Ph -> (benzyloxy)carbonimidoyl
+
+    This is the exact analogue of :func:`get_alkoxycarbonyl_prefix` (the ester
+    row): the OR fragment is named identically (that side is C=O vs C=NH
+    agnostic); only the double-bonded heteroatom differs, so the suffix is
+    ``carbonimidoyl`` instead of ``carbonyl``. All of the ester row's guards
+    (lactone, orientation, heteroatom OR, size, non-aromatic ring) are mirrored
+    verbatim.
+
+    Args:
+        mol: RDKit Mol object.
+        iminoester_atoms: Tuple from the iminoester SMARTS
+            ``[CX3](=[NX2H1])[OX2][#6]``:
+            ``(carbonyl_C, imino_N, ester_O, alkyl_C)``. Note position [1] is
+            the imino nitrogen (not a carbonyl oxygen); the shared ester helpers
+            :func:`parse_ester_fragments` / :func:`is_lactone` use only tuple
+            positions [0] and [2], so the tuple is directly reusable.
+        principal_chain: Atom indices of the principal chain; may be None for
+            the Tier-0.5 sub-fragment caller (mirrors the ester generator).
+
+    Returns:
+        The ``R-oxycarbonimidoyl`` prefix string, or None if this imidate should
+        not be named as such (cyclic imidate / imino-lactone, backbone,
+        heteroatom-bearing OR, oversized/ring OR, or an N-substituted imino
+        nitrogen -- fail closed).
+    """
+    from ..rules.esters import parse_ester_fragments, is_lactone
+
+    chain_set: Set[int] = set(principal_chain) if principal_chain else set()
+
+    carbonyl_c = iminoester_atoms[0]
+    imino_n = iminoester_atoms[1] if len(iminoester_atoms) > 1 else None
+    ester_o = iminoester_atoms[2] if len(iminoester_atoms) > 2 else None
+
+    # Imino-N guard: the double-bond partner must be a bare ``=NH`` nitrogen.
+    # An N-substituted imidate (``-C(=N-R)-O-R'``) or an N-hydroxy variant
+    # (``=N-OH``, amidoxime-ester) needs an N-locant/decorated form we do NOT
+    # emit here -> fail closed. The iminoester SMARTS ``[NX2H1]`` already
+    # excludes these on the perception path; this keeps the generator honest
+    # if called with a raw tuple.
+    if imino_n is None:
+        return None
+    n_atom = mol.GetAtomWithIdx(imino_n)
+    if n_atom.GetSymbol() != "N" or n_atom.GetTotalNumHs() != 1:
+        return None
+    n_heavy_nbrs = [nb.GetIdx() for nb in n_atom.GetNeighbors()]
+    if n_heavy_nbrs != [carbonyl_c]:
+        return None
+
+    # Guard 1: cyclic imidate (imino-lactone) is a ring system, not a prefix.
+    if is_lactone(mol, iminoester_atoms):
+        return None
+
+    # Guard 2: orientation check (mirrors the ester row). Only meaningful when
+    # a principal chain is supplied; the imino_n is the double-bond partner to
+    # exclude when testing chain-adjacency of the carbonyl carbon.
+    if chain_set and ester_o is not None:
+        c_on_chain = carbonyl_c in chain_set
+        o_on_chain = ester_o in chain_set
+        if c_on_chain:
+            return None
+        c_adj_chain = c_on_chain or any(
+            nbr.GetIdx() in chain_set
+            for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
+            if nbr.GetIdx() != imino_n
+            and nbr.GetIdx() != ester_o
+        )
+        if not c_adj_chain and o_on_chain:
+            return None
+        if not c_adj_chain and not o_on_chain:
+            return None
+        if c_on_chain and o_on_chain:
+            return None
+
+    # Split into imidic-acid and alkyl (OR) fragments (uses tuple [0]+[2]).
+    acid_atoms, alkyl_atoms = parse_ester_fragments(mol, iminoester_atoms)
+    if not alkyl_atoms:
+        return None
+
+    if ester_o is None:
+        return None
+
+    # Aromatic OR: phenoxycarbonimidoyl / (benzyloxy)carbonimidoyl.
+    first_alkyl = alkyl_atoms[0]
+    first_atom = mol.GetAtomWithIdx(first_alkyl)
+
+    if first_atom.GetIsAromatic():
+        ring_info = mol.GetRingInfo()
+        for ring in ring_info.AtomRings():
+            if first_alkyl in ring and len(ring) == 6:
+                if all(
+                    mol.GetAtomWithIdx(r).GetIsAromatic()
+                    and mol.GetAtomWithIdx(r).GetSymbol() == "C"
+                    for r in ring
+                ):
+                    return "phenoxycarbonimidoyl"
+        return "phenoxycarbonimidoyl"
+
+    if (
+        not first_atom.GetIsAromatic()
+        and first_atom.GetSymbol() == "C"
+        and first_atom.GetTotalNumHs() >= 1
+    ):
+        arom_nbrs = [
+            n
+            for n in first_atom.GetNeighbors()
+            if n.GetIdx() != ester_o and n.GetIsAromatic()
+        ]
+        non_h_non_arom = [
+            n
+            for n in first_atom.GetNeighbors()
+            if n.GetIdx() != ester_o
+            and not n.GetIsAromatic()
+            and n.GetSymbol() != "H"
+        ]
+        if arom_nbrs and not non_h_non_arom:
+            return "(benzyloxy)carbonimidoyl"
+
+    # Guard 3: the OR fragment must be pure carbon (no heteroatoms).
+    has_heteroatom = any(
+        mol.GetAtomWithIdx(a).GetSymbol() not in ("C", "H") for a in alkyl_atoms
+    )
+    if has_heteroatom:
+        return None
+
+    # Guard 4: size sanity -- an OR larger than the principal chain is handled
+    # by functional-class naming, not a prefix.
+    carbon_count = sum(
+        1 for a in alkyl_atoms if mol.GetAtomWithIdx(a).GetSymbol() == "C"
+    )
+    chain_len = len(principal_chain) if principal_chain else 0
+    if chain_len > 0 and carbon_count > chain_len:
+        return None
+    # Reject non-aromatic ring-containing OR (aromatic rings handled above).
+    ring_info = mol.GetRingInfo()
+    has_non_aromatic_ring = any(
+        ring_info.NumAtomRings(a) > 0 and not mol.GetAtomWithIdx(a).GetIsAromatic()
+        for a in alkyl_atoms
+    )
+    if has_non_aromatic_ring:
+        return None
+
+    if carbon_count == 0:
+        return None
+
+    # Build the name from ALKOXY_NAMES (same table as ethers / esters).
+    if carbon_count in ALKOXY_NAMES:
+        alkoxy = ALKOXY_NAMES[carbon_count]
+        return f"{alkoxy}carbonimidoyl"
+
+    # For larger/unknown sizes, build from the alkyl name.
+    try:
+        alkyl_name = get_alkyl_name(carbon_count)
+        if alkyl_name.endswith("yl"):
+            return f"{alkyl_name[:-2]}yloxy" + "carbonimidoyl"
+        return f"{alkyl_name}oxy" + "carbonimidoyl"
+    except (ValueError, KeyError):
+        try:
+            from ..data.chain_names import get_chain_prefix
+
+            prefix = get_chain_prefix(carbon_count)
+            return f"{prefix}yloxycarbonimidoyl"
+        except (ValueError, KeyError):
+            return None
+
+
 def get_sulfinyl_prefix(
     mol,
     sulfoxide_atoms: tuple,
@@ -1660,6 +1843,10 @@ def get_substituent_prefix_form(
     # --- Dynamic (lifted) generators — rows 1, 2, 7, 8, 9, 10 ---
     if fg_name == "ester":
         return get_alkoxycarbonyl_prefix(mol, atoms, principal_chain)
+    # v31 row 15 (P-65.2.1.5): imidate (iminoester) -C(=NH)OR ->
+    # R-oxycarbonimidoyl. Exact analogue of the ester row above.
+    if fg_name == "iminoester":
+        return get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain)
     if fg_name in ("ether", "vinyl_ether", "aromatic_ether"):
         return get_alkoxy_prefix(mol, atoms, principal_chain)
     if fg_name == "sulfoxide":
@@ -1746,6 +1933,7 @@ def get_substituent_prefix_form(
 # instead of ~ 14 × 50µs compile + match cost).
 _PREFIX_FORM_FG_NAMES = (
     "ester",
+    "iminoester",  # v31 row 15 (P-65.2.1.5): -C(=NH)OR -> R-oxycarbonimidoyl
     "ether", "vinyl_ether", "aromatic_ether",
     "primary_amide", "secondary_amide", "tertiary_amide",
     "nitrile",

@@ -1030,6 +1030,17 @@ def needs_brackets(name: str) -> bool:
         if rest == "oxy" or rest in _COMPOUND_S_SUFFIXES_COMPLEX:
             return True
 
+    # v31 (P-16.3.3): the alkoxycarbonyl / alkoxycarbonimidoyl compound-acyl
+    # family is a SUBSTITUTED acyl prefix (an alkoxy on -CO-/-C(=NH)-) and takes
+    # enclosing marks — '4-(methoxycarbonyl)benzoic acid',
+    # '4-(methoxycarbonimidoyl)benzoic acid'. This mirrors composer's local
+    # `_is_compound_prefix` `endswith('oxycarbonyl')` test and extends it to the
+    # `carbonimidoyl` analogue (P-65.2.1.5) so the imidate prefix is enclosed by
+    # the SAME rule the ester prefix uses. The '(benzyloxy)carbon(imidoyl)' forms
+    # already carry an inner mark and are enclosed by `enclose_if_compound`.
+    if name_lower.endswith("oxycarbonyl") or name_lower.endswith("oxycarbonimidoyl"):
+        return True
+
     return False
 
 

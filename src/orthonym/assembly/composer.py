@@ -6581,7 +6581,8 @@ def _assemble_aromatic_benzonitrile(mol, principal_ring, nitrile_atoms):
         from .naming_utils import italicized_prefix_is_bare
         if italicized_prefix_is_bare(nm):
             return False
-        return nm.endswith('oxycarbonyl') or any(c in nm for c in '-()[]0123456789')
+        return (nm.endswith('oxycarbonyl') or nm.endswith('oxycarbonimidoyl')
+                or any(c in nm for c in '-()[]0123456789'))
 
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
     for ra in principal_ring:

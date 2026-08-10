@@ -11,6 +11,7 @@ from rdkit import Chem
 
 from orthonym.assembly.substituent_prefix_forms import (
     get_alkoxy_prefix,
+    get_alkoxycarbonimidoyl_prefix,
     get_alkoxycarbonyl_prefix,
     get_carbamoyloxy_prefix,
     get_n_alkyl_carbamoyl_prefix,
@@ -110,6 +111,77 @@ class TestPhenoxycarbonyl:
         atoms = _match_atoms(mol, "ester")
         result = get_alkoxycarbonyl_prefix(mol, atoms, principal_chain=None)
         assert result == "methoxycarbonyl"
+
+
+# ====================================================================
+# Row 15 (v31): iminoester (imidate) - get_alkoxycarbonimidoyl_prefix
+# per IUPAC P-65.2.1.5 / P-66: -C(=NH)-O-R -> R-oxycarbonimidoyl.
+# Exact mirror of the ester row's guards; N-unsubstituted only (SMARTS
+# [NX2H1]), so N-substituted imidates are never perceived here.
+# ====================================================================
+
+
+class TestAlkoxycarbonimidoyl:
+    """Row 15: -C(=NH)OR -> R-oxycarbonimidoyl per IUPAC P-65.2.1.5."""
+
+    def test_methoxycarbonimidoyl_positive_minimal(self):
+        """-C(=NH)OCH3 -> methoxycarbonimidoyl per P-65.2.1.5."""
+        mol = Chem.MolFromSmiles("CCC(=N)OC")  # methyl propanimidate
+        atoms = _match_atoms(mol, "iminoester")
+        result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
+        assert result == "methoxycarbonimidoyl", f"got {result!r}"
+
+    def test_ethoxycarbonimidoyl_positive_variant(self):
+        """-C(=NH)OC2H5 -> ethoxycarbonimidoyl per P-65.2.1.5."""
+        mol = Chem.MolFromSmiles("CCC(=N)OCC")  # ethyl propanimidate
+        atoms = _match_atoms(mol, "iminoester")
+        result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
+        assert result == "ethoxycarbonimidoyl", f"got {result!r}"
+
+    def test_phenoxycarbonimidoyl_positive_aryl(self):
+        """-C(=NH)OPh -> phenoxycarbonimidoyl per P-65.2.1.5."""
+        mol = Chem.MolFromSmiles("CC(=N)Oc1ccccc1")  # phenyl ethanimidate
+        atoms = _match_atoms(mol, "iminoester")
+        result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
+        assert result == "phenoxycarbonimidoyl", f"got {result!r}"
+
+    def test_benzyloxycarbonimidoyl_positive_variant(self):
+        """-C(=NH)OCH2Ph -> (benzyloxy)carbonimidoyl per P-65.2.1.5."""
+        mol = Chem.MolFromSmiles("CC(=N)OCc1ccccc1")  # benzyl ethanimidate
+        atoms = _match_atoms(mol, "iminoester")
+        result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
+        assert result == "(benzyloxy)carbonimidoyl", f"got {result!r}"
+
+    def test_cyclic_imidate_lactone_returns_none(self):
+        """Cyclic imidate (imino-lactone) returns None per the lactone guard."""
+        mol = Chem.MolFromSmiles("N=C1OCCC1")  # exocyclic =NH, ring O + C
+        atoms = _match_atoms(mol, "iminoester")
+        assert atoms is not None
+        result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
+        assert result is None, f"expected None for cyclic imidate, got {result!r}"
+
+    def test_heteroatom_alkyl_returns_none(self):
+        """Heteroatom-bearing OR fragment rejected per the heteroatom guard."""
+        mol = Chem.MolFromSmiles("CC(=N)OCCN")  # 2-aminoethyl ethanimidate
+        atoms = _match_atoms(mol, "iminoester")
+        assert atoms is not None
+        result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
+        assert result is None, f"expected None for N-bearing OR, got {result!r}"
+
+    def test_short_tuple_negative(self):
+        """Match tuple < 3 atoms returns None per defensive guard."""
+        mol = Chem.MolFromSmiles("CCC")
+        result = get_alkoxycarbonimidoyl_prefix(mol, (0, 1), principal_chain=None)
+        assert result is None
+
+    def test_dispatcher_routes_iminoester(self):
+        """get_substituent_prefix_form('iminoester', ...) reaches the generator."""
+        mol = Chem.MolFromSmiles("CCC(=N)OC")
+        atoms = _match_atoms(mol, "iminoester")
+        result = get_substituent_prefix_form(
+            "iminoester", mol, atoms, principal_chain=None
+        )
+        assert result == "methoxycarbonimidoyl", f"got {result!r}"
 
 
 # ====================================================================
