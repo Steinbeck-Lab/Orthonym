@@ -1079,6 +1079,55 @@ def _get_ring_parent_name(mol, ring_atoms: list) -> Optional[str]:
     return None
 
 
+def _acyl_is_simple_saturated_chain(mol, acyl_c: int, n_atom: Optional[int]) -> bool:
+    """True iff the acyl carbon skeleton of an amide is an UNBRANCHED, fully
+    SATURATED, ACYCLIC carbon chain — the only shape ``rules.amides.name_amide``
+    names correctly.
+
+    ``name_amide``'s parent name comes from ``get_amide_chain_length`` (the
+    LONGEST carbon chain) mapped by count in ``get_amide_parent_name``; branches
+    and C=C/C#C bonds on the acyl side are structurally invisible to it, so a
+    branched acyl (isobutyryl -> 'propanamide') or an unsaturated acyl (acryloyl
+    -> 'propanamide') would be named as a straight-chain saturated FALSE FRIEND
+    (a different constitution). The polyfunctional amide-delegation must therefore
+    only hand such an amide to ``name_amide`` when the acyl is a simple chain;
+    otherwise it falls through to the chain machinery (on-chain) or fails closed
+    (off-chain). This is a producer-honesty guard that holds gate-OFF, per the
+    ``8afa533c`` lesson (honesty must not depend on the SELF-01 gate it backstops).
+    """
+    from collections import deque
+    from rdkit import Chem  # module has no top-level Chem import (only a local _Chem)
+    seen = {acyl_c}
+    q = deque([acyl_c])
+    while q:
+        cur = q.popleft()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nb.GetIdx()
+            if j == n_atom or j in seen or nb.GetSymbol() != 'C':
+                continue
+            seen.add(j)
+            q.append(j)
+    # acyclic
+    if any(mol.GetAtomWithIdx(c).IsInRing() for c in seen):
+        return False
+    # saturated: every C-C bond within the acyl skeleton is single
+    for c in seen:
+        for nb in mol.GetAtomWithIdx(c).GetNeighbors():
+            if nb.GetIdx() in seen and mol.GetBondBetweenAtoms(
+                    c, nb.GetIdx()).GetBondType() != Chem.BondType.SINGLE:
+                return False
+    # unbranched: the acyl carbons form a simple path (the carbonyl carbon has
+    # exactly one acyl-chain neighbour; every other carbon has at most two)
+    for c in seen:
+        deg = sum(1 for nb in mol.GetAtomWithIdx(c).GetNeighbors()
+                  if nb.GetIdx() in seen)
+        if c == acyl_c and deg > 1:
+            return False
+        if c != acyl_c and deg > 2:
+            return False
+    return True
+
+
 def name_polyfunctional(features: Any) -> Optional[str]:
     """
     Generate IUPAC name for a polyfunctional compound.
@@ -1240,7 +1289,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 )
                 if (not _has_stereo and _claimed
                         and len(_n_subs) == _expected_n_branches
-                        and _fgs_contained):
+                        and _fgs_contained
+                        and _acyl_is_simple_saturated_chain(
+                            mol, _acyl_c, _n_atom)):
                     _nm = _rules_name_amide(mol, tuple(_match))
                     if _nm:
                         return _nm
