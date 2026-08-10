@@ -122,35 +122,55 @@ class TestPhenoxycarbonyl:
 
 
 class TestAlkoxycarbonimidoyl:
-    """Row 15: -C(=NH)OR -> R-oxycarbonimidoyl per IUPAC P-65.2.1.5."""
+    """Row 15: -C(=NH)OR -> C-{alkoxy}carbonimidoyl per IUPAC P-65.2.1.5.
+
+    The italic ``C-`` locant is REQUIRED (P-66.1.6.1.2.2, BB 33425) to prevent
+    ambiguity with N-substitution; every BB substituted-carbonimidoyl prefix
+    carries it (the (PIN) example ``4-(C-hydroxycarbonimidoyl)benzoic acid``,
+    BB 30033). The OR is named by the audited composed primitive, never a carbon
+    count, so branched / compound-alkoxy OR fails closed rather than mis-naming.
+    """
 
     def test_methoxycarbonimidoyl_positive_minimal(self):
-        """-C(=NH)OCH3 -> methoxycarbonimidoyl per P-65.2.1.5."""
+        """-C(=NH)OCH3 -> C-methoxycarbonimidoyl per P-65.2.1.5."""
         mol = Chem.MolFromSmiles("CCC(=N)OC")  # methyl propanimidate
         atoms = _match_atoms(mol, "iminoester")
         result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "methoxycarbonimidoyl", f"got {result!r}"
+        assert result == "C-methoxycarbonimidoyl", f"got {result!r}"
 
     def test_ethoxycarbonimidoyl_positive_variant(self):
-        """-C(=NH)OC2H5 -> ethoxycarbonimidoyl per P-65.2.1.5."""
+        """-C(=NH)OC2H5 -> C-ethoxycarbonimidoyl per P-65.2.1.5."""
         mol = Chem.MolFromSmiles("CCC(=N)OCC")  # ethyl propanimidate
         atoms = _match_atoms(mol, "iminoester")
         result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "ethoxycarbonimidoyl", f"got {result!r}"
+        assert result == "C-ethoxycarbonimidoyl", f"got {result!r}"
 
     def test_phenoxycarbonimidoyl_positive_aryl(self):
-        """-C(=NH)OPh -> phenoxycarbonimidoyl per P-65.2.1.5."""
+        """-C(=NH)OPh -> C-phenoxycarbonimidoyl (phenoxy is a simple alkoxy)."""
         mol = Chem.MolFromSmiles("CC(=N)Oc1ccccc1")  # phenyl ethanimidate
         atoms = _match_atoms(mol, "iminoester")
         result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "phenoxycarbonimidoyl", f"got {result!r}"
+        assert result == "C-phenoxycarbonimidoyl", f"got {result!r}"
 
-    def test_benzyloxycarbonimidoyl_positive_variant(self):
-        """-C(=NH)OCH2Ph -> (benzyloxy)carbonimidoyl per P-65.2.1.5."""
+    def test_benzyloxy_compound_alkoxy_returns_none(self):
+        """-C(=NH)OCH2Ph: benzyloxy is a COMPOUND alkoxy (needs inner marks) ->
+        fail closed rather than emit a mis-enclosed prefix (unreachable at the
+        Tier-0.5 strict-scope caller anyway)."""
         mol = Chem.MolFromSmiles("CC(=N)OCc1ccccc1")  # benzyl ethanimidate
         atoms = _match_atoms(mol, "iminoester")
         result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
-        assert result == "(benzyloxy)carbonimidoyl", f"got {result!r}"
+        assert result is None, f"expected None for compound alkoxy, got {result!r}"
+
+    def test_branched_or_returns_none_not_count_based(self):
+        """Producer honesty: an isopropyl OR must NOT be named 'propoxy...' (the
+        refuted count-based collision). The composed primitive yields the
+        compound alkoxy '(propan-2-yl)oxy' -> fail closed here."""
+        mol = Chem.MolFromSmiles("CCC(=N)OC(C)C")  # isopropyl propanimidate
+        atoms = _match_atoms(mol, "iminoester")
+        result = get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain=None)
+        assert result != "propoxycarbonimidoyl"
+        assert result != "C-propoxycarbonimidoyl"
+        assert result is None, f"expected None for branched OR, got {result!r}"
 
     def test_cyclic_imidate_lactone_returns_none(self):
         """Cyclic imidate (imino-lactone) returns None per the lactone guard."""
@@ -181,7 +201,26 @@ class TestAlkoxycarbonimidoyl:
         result = get_substituent_prefix_form(
             "iminoester", mol, atoms, principal_chain=None
         )
-        assert result == "methoxycarbonimidoyl", f"got {result!r}"
+        assert result == "C-methoxycarbonimidoyl", f"got {result!r}"
+
+    def test_reversed_orientation_not_routed(self):
+        """Tier-0.5 attach guard: a fragment attaching via the ALKYL carbon (a
+        benzyl formimidate Ar-CH2-O-CH=NH, attach = match[3]) must NOT be named
+        as an imidoyl prefix — that would BFS-swallow the parent as the OR side
+        and emit a wrong (SMILES-order-dependent) constitution."""
+        from orthonym.assembly.substituent_prefix_forms import (
+            _check_substituent_prefix_form,
+        )
+        # N=C-O-CH2-<attach>: the fragment is the 4-atom imidate, attaching to a
+        # parent via the CH2 (the alkyl carbon = SMARTS match[3]).
+        mol = Chem.MolFromSmiles("N=COCC")  # ethyl == attach via terminal CH2/CH3
+        atoms = _match_atoms(mol, "iminoester")
+        # alkyl_C is atoms[3]; treat it as the parent-attach atom.
+        frag = set(atoms)
+        result = _check_substituent_prefix_form(mol, frag, attach_idx=atoms[3])
+        assert result is None, (
+            f"reversed-orientation must not route to carbonimidoyl; got {result!r}"
+        )
 
 
 # ====================================================================

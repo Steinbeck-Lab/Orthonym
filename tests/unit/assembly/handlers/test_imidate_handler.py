@@ -338,11 +338,14 @@ class TestImidatePredicateDefersToHigherPG:
 
     def test_acid_with_imidate_substituent_names_methoxycarbonimidoyl(self):
         """v31 imidate producer: the imidate substituent is expressed as the
-        IUPAC prefix ``methoxycarbonimidoyl`` (P-65.2.1.5, ``carbonimidoyl`` =
-        ``-C(=NH)-``) on the senior benzoic-acid parent. RT-verified.
+        IUPAC prefix ``C-methoxycarbonimidoyl`` on the senior benzoic-acid
+        parent. The italic ``C-`` locant is REQUIRED (P-66.1.6.1.2.2, BB 33425:
+        "to prevent possible ambiguity with N-substitution"); the parent form
+        ``4-(C-hydroxycarbonimidoyl)benzoic acid`` is a verbatim (PIN) example
+        at BB 30033. RT-verified.
         """
         from orthonym import name_compound
         actual = name_compound("OC(=O)c1ccc(C(=N)OC)cc1", style="pin")
-        assert actual == "4-(methoxycarbonimidoyl)benzoic acid", (
-            f"expected 4-(methoxycarbonimidoyl)benzoic acid; got {actual!r}"
+        assert actual == "4-(C-methoxycarbonimidoyl)benzoic acid", (
+            f"expected 4-(C-methoxycarbonimidoyl)benzoic acid; got {actual!r}"
         )

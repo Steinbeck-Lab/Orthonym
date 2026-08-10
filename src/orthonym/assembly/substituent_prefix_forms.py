@@ -602,88 +602,68 @@ def get_alkoxycarbonimidoyl_prefix(
     if ester_o is None:
         return None
 
-    # Aromatic OR: phenoxycarbonimidoyl / (benzyloxy)carbonimidoyl.
-    first_alkyl = alkyl_atoms[0]
-    first_atom = mol.GetAtomWithIdx(first_alkyl)
-
-    if first_atom.GetIsAromatic():
-        ring_info = mol.GetRingInfo()
-        for ring in ring_info.AtomRings():
-            if first_alkyl in ring and len(ring) == 6:
-                if all(
-                    mol.GetAtomWithIdx(r).GetIsAromatic()
-                    and mol.GetAtomWithIdx(r).GetSymbol() == "C"
-                    for r in ring
-                ):
-                    return "phenoxycarbonimidoyl"
-        return "phenoxycarbonimidoyl"
-
-    if (
-        not first_atom.GetIsAromatic()
-        and first_atom.GetSymbol() == "C"
-        and first_atom.GetTotalNumHs() >= 1
-    ):
-        arom_nbrs = [
-            n
-            for n in first_atom.GetNeighbors()
-            if n.GetIdx() != ester_o and n.GetIsAromatic()
-        ]
-        non_h_non_arom = [
-            n
-            for n in first_atom.GetNeighbors()
-            if n.GetIdx() != ester_o
-            and not n.GetIsAromatic()
-            and n.GetSymbol() != "H"
-        ]
-        if arom_nbrs and not non_h_non_arom:
-            return "(benzyloxy)carbonimidoyl"
-
-    # Guard 3: the OR fragment must be pure carbon (no heteroatoms).
+    # Guard 3: pure-carbon OR only (a heteroatom-bearing OR needs different
+    # naming and is out of scope for this prefix).
     has_heteroatom = any(
         mol.GetAtomWithIdx(a).GetSymbol() not in ("C", "H") for a in alkyl_atoms
     )
     if has_heteroatom:
         return None
-
-    # Guard 4: size sanity -- an OR larger than the principal chain is handled
-    # by functional-class naming, not a prefix.
+    # Guard 4: reject a non-aromatic ring-containing OR (macrocyclic imidate);
+    # an aromatic OR (phenyl) is named by the primitive below as 'phenoxy'.
+    ring_info = mol.GetRingInfo()
+    if any(
+        ring_info.NumAtomRings(a) > 0 and not mol.GetAtomWithIdx(a).GetIsAromatic()
+        for a in alkyl_atoms
+    ):
+        return None
+    # Guard 5: size sanity vs a supplied principal chain.
     carbon_count = sum(
         1 for a in alkyl_atoms if mol.GetAtomWithIdx(a).GetSymbol() == "C"
     )
+    if carbon_count == 0:
+        return None
     chain_len = len(principal_chain) if principal_chain else 0
     if chain_len > 0 and carbon_count > chain_len:
         return None
-    # Reject non-aromatic ring-containing OR (aromatic rings handled above).
-    ring_info = mol.GetRingInfo()
-    has_non_aromatic_ring = any(
-        ring_info.NumAtomRings(a) > 0 and not mol.GetAtomWithIdx(a).GetIsAromatic()
-        for a in alkyl_atoms
+
+    # Name the OR fragment by its CONSTITUTION via the audited primitive
+    # (composed_prefix_organyl_name -> composed_alkoxy_prefix), NEVER a carbon
+    # COUNT: a count cannot tell propyl from propan-2-yl / prop-2-en-1-yl, so the
+    # refuted ALKOXY_NAMES[count] table named four different C3/C4 groups with
+    # one string (this file's own C4d/F-spell-oxy notes, :319/:1213). The
+    # primitive returns the correct alkoxy or None (fail closed). ``sub_carbon``
+    # is the SMARTS alkyl_C (deterministic), NOT ``alkyl_atoms[0]`` — that is a
+    # set-ordered BFS whose first element varies with SMILES numbering.
+    sub_carbon = iminoester_atoms[3] if len(iminoester_atoms) > 3 else None
+    if sub_carbon is None:
+        return None
+    from .substituent_enumerator import (
+        composed_alkoxy_prefix,
+        composed_prefix_organyl_name,
     )
-    if has_non_aromatic_ring:
+    organyl = composed_prefix_organyl_name(mol, alkyl_atoms, sub_carbon)
+    if organyl is None:
         return None
-
-    if carbon_count == 0:
+    alkoxy = composed_alkoxy_prefix(organyl)
+    if alkoxy is None:
         return None
-
-    # Build the name from ALKOXY_NAMES (same table as ethers / esters).
-    if carbon_count in ALKOXY_NAMES:
-        alkoxy = ALKOXY_NAMES[carbon_count]
-        return f"{alkoxy}carbonimidoyl"
-
-    # For larger/unknown sizes, build from the alkyl name.
-    try:
-        alkyl_name = get_alkyl_name(carbon_count)
-        if alkyl_name.endswith("yl"):
-            return f"{alkyl_name[:-2]}yloxy" + "carbonimidoyl"
-        return f"{alkyl_name}oxy" + "carbonimidoyl"
-    except (ValueError, KeyError):
-        try:
-            from ..data.chain_names import get_chain_prefix
-
-            prefix = get_chain_prefix(carbon_count)
-            return f"{prefix}yloxycarbonimidoyl"
-        except (ValueError, KeyError):
-            return None
+    # Only a SIMPLE alkoxy (methoxy/ethoxy/phenoxy/tert-butoxy...) concatenates
+    # cleanly as 'C-{alkoxy}carbonimidoyl'. A COMPOUND alkoxy (benzyloxy,
+    # (propan-2-yl)oxy) would need inner enclosing marks around the alkoxy
+    # component; that shape is unreachable at the Tier-0.5 strict-scope caller
+    # (only the 4-atom methyl-OR match survives match_set==frag_atoms_set), so
+    # fail closed rather than mis-enclose.
+    from .naming_utils import needs_brackets
+    if needs_brackets(alkoxy):
+        return None
+    # P-65.1.3.1.2 / P-66.1.6.1.2.2 (BB 30020, 33425; the (PIN) example
+    # '4-(C-hydroxycarbonimidoyl)benzoic acid' at BB 30033): the italic 'C'
+    # locant is REQUIRED on a substituted carbonimidoyl prefix "to prevent
+    # possible ambiguity with N-substitution" (=N-OR). Every BB
+    # substituted-carbonimidoyl prefix carries it (C-hydroxy/C-amino/C-chloro/
+    # C,N-dihydroxy...), so the ring-parent PIN is 'C-{alkoxy}carbonimidoyl'.
+    return f"C-{alkoxy}carbonimidoyl"
 
 
 def get_sulfinyl_prefix(
@@ -2141,6 +2121,23 @@ def _check_substituent_prefix_form(
             # recursive namer, which names the carrier carbon bearing an
             # (alkylsulfinyl)/(alkylsulfonyl) decoration ((methanesulfinylmethyl)).
             if (fg_name in ("sulfoxide", "sulfone")
+                    and attach_idx is not None
+                    and len(match) >= 1 and attach_idx != match[0]):
+                continue
+            # v31 (same bug shape as the ether/isocyanate/sulfoxide guards above,
+            # P-65.2.1.5): the {alkoxy}carbonimidoyl prefix attaches through the
+            # imidoyl CARBON (match[0] of the iminoester SMARTS
+            # [CX3](=[NX2H1])[OX2][#6]). When the 4-atom fragment attaches via the
+            # ALKYL carbon instead (match[3], e.g. Ar-CH2-O-CH=NH, a benzyl
+            # formimidate), get_alkoxycarbonimidoyl_prefix would BFS-swallow the
+            # PARENT as the "OR" side and emit a wrong-constitution name (and,
+            # from a set-ordered BFS, one that varies with SMILES numbering).
+            # Valid only when the fragment attaches through the imidoyl carbon;
+            # otherwise fall through. (The 'ester' row has the identical
+            # pre-existing hole but adding it here risks the arbitrary-attach
+            # fallback at the enumerator call site regressing gold ester rows —
+            # left as a documented follow-up, scoped to the new iminoester row.)
+            if (fg_name == "iminoester"
                     and attach_idx is not None
                     and len(match) >= 1 and attach_idx != match[0]):
                 continue
