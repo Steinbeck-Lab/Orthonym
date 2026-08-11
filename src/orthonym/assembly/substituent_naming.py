@@ -4394,7 +4394,7 @@ def _check_retained_substituent(
 # ============================================================================
 
 
-def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
+def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False):
     """Name an acyclic, all-carbon, saturated substituent by its OWN principal
     chain, numbered from the free valence (P-29.2 / P-46.1.8 / P-46.1.12).
 
@@ -4403,6 +4403,14 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
     located prefix and ``k`` is the free-valence locant, or ``None`` when the
     substituent is not an acyclic, all-carbon, saturated alkyl (caller then
     falls through to the recursive path).
+
+    When ``with_pos`` is set the return is the 3-tuple ``(name, k, chain_pos)``
+    where ``chain_pos`` maps each principal-chain atom index to its substituent
+    locant (attach=1..n). This is the SANCTIONED numbering the name itself uses
+    (P-46.1.8), so a stereodescriptor can be cited at a stereocentre's true
+    locant even when that centre is not the attachment atom (P-91.3) -- without
+    the forbidden re-derived BFS-from-attachment heuristic. Only the stereo
+    adapter passes it; the two 2-tuple callers are unaffected.
 
     - The parent is the LONGEST carbon chain THROUGH the free-valence atom
       (P-29.2: a substituent's principal chain includes the atom with the free
@@ -4581,6 +4589,11 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
     chain_set_c = set(chain)
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
 
+    def _ret(nm, kk):
+        # Attach ``chain_pos`` only for the stereo adapter (``with_pos``); the
+        # two 2-tuple callers keep their ``(name, k)`` contract.
+        return (nm, kk, chain_pos) if with_pos else (nm, kk)
+
     # Off-chain branches -> the substituent's own substituents (P-46.1.12),
     # named by the shared substituent namer and located on this chain.
     from collections import defaultdict
@@ -4657,7 +4670,7 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
     if k == 1 and not branch_groups:
         # Unbranched primary alkyl (normally handled upstream); plain name.
         try:
-            return (get_alkyl_name(chain_len), 1)
+            return _ret(get_alkyl_name(chain_len), 1)
         except (ValueError, KeyError):
             return None
     try:
@@ -4685,8 +4698,8 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx):
             base = get_alkyl_name(chain_len)  # 'butyl', 'pentyl', ...
         except (ValueError, KeyError):
             base = f"{stem}yl"
-        return (f"{prefix}{base}", 1)
-    return (f"{prefix}{stem}an-{k}-yl", k)
+        return _ret(f"{prefix}{base}", 1)
+    return _ret(f"{prefix}{stem}an-{k}-yl", k)
 
 
 def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
@@ -4701,10 +4714,13 @@ def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
     ``s_idx == attach_idx`` check already restricts descriptor emission to the
     stereocentre-at-attachment case.
 
-    Worked examples (BlueBook P-29.6.2.3): ``[C@@H](C)CC`` -> ("butan-2-yl", 2),
-    ``[C@@H](C)CCC`` -> ("pentan-2-yl", 2).
+    Worked examples (BlueBook P-29.6.2.3): ``[C@@H](C)CC`` -> ("butan-2-yl", 2,
+    {...}), ``[C@@H](C)CCC`` -> ("pentan-2-yl", 2, {...}). Returns the 3-tuple
+    ``(name, k, chain_pos)`` so the emitter can cite a stereodescriptor at its
+    true substituent locant even off the attachment atom (P-91.3).
     """
-    return _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx)
+    return _located_acyclic_alkyl_name(
+        mol, sub_atoms, attach_idx, with_pos=True)
 
 
 def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
@@ -4785,9 +4801,22 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
         #   CC(=O)N[C@@H](C)CC  -> N-[(2S)-butan-2-yl]acetamide
         #   CC(=O)N[C@@H](C)CCC -> N-[(2S)-pentan-2-yl]acetamide
         located = _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
-        if located is not None and s_idx == attach_idx:
-            pin_form, loc = located
-            return f"({loc}{cip})-{pin_form}"
+        if located is not None:
+            # `_located_acyclic_alkyl_name` gives the substituent's OWN principal-
+            # chain numbering (attach=1..n). Cite the descriptor at the
+            # stereocentre's TRUE locant in that numbering -- P-91.3
+            # (`BlueBookV2.md:44686`, "## **P-91.3** NAMING OF STEREOISOMERS":
+            # a substituent-group stereodescriptor is "preceded by a numerical or
+            # letter locant to describe the position of the stereogenic unit when
+            # such locants are present"). This covers the stereocentre-at-
+            # attachment case (`butan-2-yl` -> `(2S)-butan-2-yl`, loc == k) AND
+            # the off-attachment case the old `s_idx == attach_idx` gate dropped
+            # (`3-hydroxybutyl` -> `(3S)-3-hydroxybutyl`). The locant comes from
+            # the SANCTIONED structure-derived chain, never a re-derived BFS.
+            pin_form, _k, pos = located
+            loc = pos.get(s_idx)
+            if loc is not None:
+                return f"({loc}{cip})-{pin_form}"
         # Otherwise: a single stereocenter on a parent-hydride-style substituent
         # (or any case where a structure-derived located form is not available)
         # takes the bare "(R)-"/"(S)-" (no locant) per the P-91 unique-position
