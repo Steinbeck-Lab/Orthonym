@@ -54,6 +54,17 @@ def name_t4_complete(mol, features) -> Optional[str]:
          unchecked -- E1 has nothing to verify.
       4. Otherwise the candidate must pass ``verify_certificate`` or it is
          discarded -- never patched, never shipped anyway.
+
+    Audit-coverage note (Fix 3a, final review): this returns a bare ``str``, not
+    the ``GeneralEngineResult`` with its atom->token ``bindings``. So when
+    ``namer.py`` ships a T4 name it CANNOT populate the binding-proof ledger --
+    ``_record_binding_proof`` runs only on the engine's own-name ``else`` branch,
+    never on the T4 branch. That is an audit-coverage gap, not a correctness one:
+    it is benign under the default (``binding_proof`` off), and T4's 0-wrong net
+    is E1 (proven internally here) + SELF-01 (the OPSIN round-trip in namer.py),
+    neither of which needs the ledger. A follow-on wanting T4 binding proofs
+    would return the ``_Candidate`` (which carries ``result_obj``) instead of a
+    bare string.
     """
     candidate = _best_effort_candidate(mol, features)
     if candidate is None:
@@ -140,6 +151,14 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     from-scratch re-implementation of ``_assemble`` -- it is to run the SAME
     engine and audit the bindings afterward (the Blue-Book-reference
     "re-anchor the bindings and audit afterward" pattern).
+
+    Feature-aliasing note (Fix 3b, final review): rung 0 passes the caller's
+    ORIGINAL ``features`` object to ``name_general`` (only the cascade rungs
+    below take a ``_clone_features_with`` COPY). This is safe -- ``name_general``
+    reads the perceived features and never mutates the shared containers
+    (``principal_group_atoms`` etc.), so rung 0 cannot corrupt the object the
+    caller reuses. The clones exist only because rungs 1-2 must OVERRIDE
+    ``principal_group`` / ``chain_is_parent`` without disturbing rung 0's view.
 
     The cascade (Task 5). When rung 0 DECLINES -- ``name_general`` returns
     ``None`` or its result is not atom-complete -- the molecule is NOT
@@ -240,7 +259,14 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
         # chosen and the acyl-oxy is cited as an ...oyloxy/acetyloxy prefix.
         dict(principal_group=None, principal_group_atoms=[],
              chain_is_parent=False),
-        # rung 2: keep the perceived parent, PG suppressed (ring-less esters).
+        # rung 2: keep the perceived parent, PG suppressed (ring-less /
+        # chain-preferred esters+amides). NOT redundant with rung 1: measured
+        # (final review, , 400-molecule
+        # pubchem_2000 sample) rung 2 is the SOLE producer for 5/400 molecules
+        # where rung 1's chain_is_parent=False forces a ring parent the engine
+        # cannot host -- e.g. cid 266765 CC(C)(CC(=O)NC1CCCCC1)CBr ->
+        # 4-bromo-1-(cyclohexylamino)-3,3-dimethyl-1-oxobutane. Locked by
+        # test_cascade_rung2_is_a_unique_producer.
         dict(principal_group=None, principal_group_atoms=[]),
     )
     for overrides in cascade:

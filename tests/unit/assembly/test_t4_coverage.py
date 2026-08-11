@@ -332,6 +332,45 @@ def test_t4_wiring_does_not_fire_without_unverified_optin():
         f"verified-only tier must not emit the aggressive T4 name: {name!r}")
 
 
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+def test_t4_unparseable_name_abstains_not_ships_unverified(monkeypatch):
+    """FINAL-REVIEW FIX 1: a T4 producer name OPSIN CANNOT PARSE must make the
+    T4 recovery path ABSTAIN (None), never ship it with opsin_status='unverified'.
+
+    The shared emit ladder's ``elif not general_fallback_unverified: return None``
+    is False for the T4 opt-in, so BEFORE the fix an unparseable T4 name shipped
+    unverified. The fix flags the T4 origin (``_cand_from_t4``) so that branch
+    rejects it -- a T4 name must POSITIVELY round-trip or abstain. E1 proves atom
+    COVERAGE (so never a wrong MOLECULE), but a name OPSIN cannot parse is
+    malformed and must not ship.
+
+    Uses the CLASS-A abstainer, which the acceptance probe confirms enters the
+    T4 branch of ``_try_general_engine_recovery`` (its own engine attempt
+    declines at allow_aromatic_general=False, so the T4 producer is invoked).
+    The first assertion proves the fix does NOT over-reject: the real producer's
+    positively-round-tripping name still ships.
+    """
+    from orthonym.assembly import t4_coverage
+    from orthonym.errors import is_failure_name
+    from orthonym.jvm_budget import jvm_slots
+
+    with jvm_slots(1, purpose="test-t4-fix1-unparseable"):
+        nm = Orthonym(general_fallback=True, general_fallback_unverified=True)
+        # (1) the real producer's valid name DOES ship (T4 branch entered; the
+        # fix leaves a positively-round-tripping T4 name untouched).
+        shipped = nm._try_general_engine_recovery(_ABSTAINER_SMILES)
+        assert shipped is not None and not is_failure_name(shipped), shipped
+        assert shipped == _T4_TARGET_EXPECTED, shipped
+        # (2) force the hole: an unparseable T4 name must now ABSTAIN, not ship.
+        monkeypatch.setattr(
+            t4_coverage, "name_t4_complete",
+            lambda mol, feats: "zzz-not-a-real-iupac-name-zzz")
+        got = nm._try_general_engine_recovery(_ABSTAINER_SMILES)
+    assert got is None, (
+        f"unparseable T4 name shipped unverified instead of abstaining: {got!r}")
+
+
 # --- Task 7: backbone acceptance PROBE (not a gate) --------------------------
 # 12 vetted T4-reaching abstainers (from the atom-drop class corpus, pulled by
 # CID from `` -- the CSV is authoritative, not the
@@ -442,3 +481,54 @@ def test_t4_backbone_acceptance_probe():
             for cid, name, rt in partials
         )
     )
+
+
+# --- Fix 4 (final review): rung 2 is a UNIQUE producer, not dead code ---------
+# Measured 2026-08-11 (, 400-molecule pubchem_2000
+# sample, short-circuited so rung 2 fires only when rungs 0 AND 1 both decline):
+# cascade rung 2 (suppress PG only, KEEP the perceived chain parent) is the SOLE
+# producer for 5/400 molecules -- the ring-less / chain-preferred class where
+# rung 1's chain_is_parent=False forces a ring parent the engine then cannot
+# host, so rung 1 declines while rung 2 succeeds. So rung 2 is NOT redundant
+# belt-and-braces and NOT dead code (invariants 8/17). Anchor: cid 266765, the
+# simplest (stereo-free) of the 5; its rung-2 name OPSIN-round-trips.
+_RUNG2_UNIQUE_SMILES = "CC(C)(CC(=O)NC1CCCCC1)CBr"  # cid 266765
+_RUNG2_UNIQUE_EXPECTED = "4-bromo-1-(cyclohexylamino)-3,3-dimethyl-1-oxobutane"
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+def test_cascade_rung2_is_a_unique_producer():
+    """Rung 2 (PG-suppressed, chain parent KEPT) converts a molecule NEITHER
+    rung 0 (perceived PG) NOR rung 1 (PG-suppressed + chain_is_parent=False)
+    can -- proving rung 2 is the sole producer for the ring-less/chain-preferred
+    class, not redundant with rung 1. Runs under ``opsin_gate`` so the general
+    engine's internal validity suppression matches how T4 is reached in
+    production (and how the measuring probe ran).
+    """
+    from orthonym.jvm_budget import jvm_slots
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+    mol, feats = _classified(_RUNG2_UNIQUE_SMILES)
+    with jvm_slots(1, purpose="test-rung2-unique"):
+        rung0 = t4_coverage._run_general_e1(mol, feats)
+        rung1 = t4_coverage._run_general_e1(
+            mol, t4_coverage._clone_features_with(
+                feats, principal_group=None, principal_group_atoms=[],
+                chain_is_parent=False))
+        rung2 = t4_coverage._run_general_e1(
+            mol, t4_coverage._clone_features_with(
+                feats, principal_group=None, principal_group_atoms=[]))
+        assert rung0 is None, (
+            f"rung 0 unexpectedly named it: {rung0.name!r}")
+        assert rung1 is None, (
+            f"rung 1 unexpectedly named it: {rung1.name!r}")
+        assert rung2 is not None, (
+            "rung 2 failed -- the unique-producer lock is broken; rung 2 is "
+            "dead code if this no longer converts")
+        # And it is a REAL conversion: the full producer emits it and it
+        # round-trips through OPSIN to the input constitution.
+        name = t4_coverage.name_t4_complete(mol, feats)
+        assert name == _RUNG2_UNIQUE_EXPECTED, name
+        rt = opsin_roundtrip_check(_RUNG2_UNIQUE_SMILES, name)
+    assert rt["passed"], f"rung-2 name did not round-trip: {rt!r}"

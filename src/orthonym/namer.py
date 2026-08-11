@@ -3132,6 +3132,12 @@ class Orthonym:
             from .assembly.general_engine import name_general
             from .validation.e1_certificate import verify_certificate
             canonical = Chem.MolToSmiles(mol, canonical=True)
+            # v31 T4 FINAL-REVIEW FIX 1: mark whether `cand` came from the
+            # aggressive T4 producer, so the shared ladder below can require it
+            # to POSITIVELY round-trip (never ship a T4 name OPSIN cannot parse).
+            # Stays False for the multi-fragment and engine-own-name paths, so
+            # their `general_fallback_unverified` semantics are byte-identical.
+            _cand_from_t4 = False
             if len(Chem.GetMolFrags(mol)) > 1:
                 # v26 P4: multi-fragment split-name-join, complete tier ONLY.
                 # `name_general` (and every single-component handler) refuses a
@@ -3200,6 +3206,22 @@ class Orthonym:
                     cand = name_t4_complete(mol, feats)
                     if cand is None:
                         return None
+                    # v31 T4 FINAL-REVIEW FIX 1: this T4 name must POSITIVELY
+                    # round-trip or the path ABSTAINS. The shared ladder below
+                    # ships a `general_fallback_unverified` emission even when
+                    # OPSIN CANNOT PARSE it (its `elif not
+                    # self._general_fallback_unverified` is False for the T4
+                    # opt-in) -- correct for the engine's OWN best-effort name,
+                    # but NOT for the aggressive T4 producer, which opens
+                    # von-Baeyer / mancude paths whose ONLY validity check is
+                    # this round-trip. E1 proves atom COVERAGE (so never a wrong
+                    # MOLECULE) but a name OPSIN cannot parse is malformed. Flag
+                    # the T4 origin so the ladder rejects an unparseable T4 name
+                    # instead of shipping it unverified; the parse-but-mismatch
+                    # case is already rejected there for every tier. T4-SCOPED:
+                    # the flag is False everywhere else, so the engine-own and
+                    # existing-tier paths are untouched.
+                    _cand_from_t4 = True
                 else:
                     cand = eng.name
                     # v29 P1 (audit-only): record the spine the certificate just
@@ -3285,8 +3307,13 @@ class Orthonym:
                     if not self._rt_match(smiles, _opsin_smi, _stereo_flagged):
                         return None  # wrong name: never ship
                     opsin_status = "verified"
-                elif not self._general_fallback_unverified:
-                    return None  # rejected/transient without the T4 opt-in
+                elif not self._general_fallback_unverified or _cand_from_t4:
+                    # rejected/transient: no unverified opt-in, OR a T4 name
+                    # that must POSITIVELY round-trip (FINAL-REVIEW FIX 1). For
+                    # a non-T4 name `_cand_from_t4` is False, so this reduces to
+                    # the pre-existing `not general_fallback_unverified` guard --
+                    # byte-identical for the engine-own and multi-fragment paths.
+                    return None
             if cand and not is_failure_name(cand):
                 from .metrics.provenance import (
                     record_source, record_stereo_unexpressed)
