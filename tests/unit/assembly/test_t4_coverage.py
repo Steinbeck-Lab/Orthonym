@@ -330,3 +330,115 @@ def test_t4_wiring_does_not_fire_without_unverified_optin():
         name = verified_only.name(_ABSTAINER_SMILES)
     assert is_failure_name(name), (
         f"verified-only tier must not emit the aggressive T4 name: {name!r}")
+
+
+# --- Task 7: backbone acceptance PROBE (not a gate) --------------------------
+# 12 vetted T4-reaching abstainers (from the atom-drop class corpus, pulled by
+# CID from `` -- the CSV is authoritative, not the
+# literal strings below). This is a PROBE, NOT a gate: it asserts the class
+# invariant (0-partial) and records the conversion count informationally.
+# NO threshold is asserted on how many of the 12 convert -- that number is
+# expected to grow as follow-on per-class sub-namers ship (see the brief's
+# follow-on roadmap), and asserting it here would turn a probe into a gate.
+_T4_PROBE_CIDS = [
+    "1542461", "581475", "118415", "639588", "107217", "60184",
+    "43057", "158257", "103172", "70868", "439233", "558120",
+]
+
+
+def _t4_probe_smiles_by_cid():
+    """Re-pull the 12 probe SMILES from the CSV by CID (authoritative source
+    -- never retyped, to avoid transcription risk)."""
+    import csv as _csv
+    from pathlib import Path as _Path
+
+    csv_path = (
+        _Path(__file__).parent.parent.parent.parent / "benchmarks" /
+        "pubchem_2000.csv"
+    )
+    wanted = set(_T4_PROBE_CIDS)
+    found = {}
+    with open(csv_path, newline="") as f:
+        for row in _csv.DictReader(f):
+            if row["cid"] in wanted:
+                found[row["cid"]] = row["smiles"]
+    missing = wanted - found.keys()
+    assert not missing, f"CIDs missing from {csv_path}: {sorted(missing)}"
+    return [(cid, found[cid]) for cid in _T4_PROBE_CIDS]
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+def test_t4_backbone_acceptance_probe():
+    """PROBE, NOT A GATE: names 12 T4-reaching abstainers in ONE process and
+    asserts the class invariant -- every molecule is either atom-complete AND
+    OPSIN-round-trips to the input, OR a clean ``unknown organic compound``
+    abstain. NEVER a partial (a name that emits but denotes the wrong
+    molecule, e.g. from a silently dropped fragment).
+
+    The only hard assertion is ``partial_count == 0`` -- the 0-wrong contract
+    for the T4 backbone. The converted count is recorded (printed, visible
+    with ``-s``) purely informationally; NO threshold is asserted on it,
+    because that number is expected to grow as the follow-on per-class
+    sub-namers (heterocyclic unsaturation, decorated-ring substituents, fused
+    polycyclic, spiro/bridged, peptide/sugar, acyclic exotic-FG, OPSIN-format)
+    ship independently -- pinning it here would make this probe a gate on
+    work that hasn't happened yet.
+
+    Both ``general_fallback`` and ``general_fallback_unverified`` are
+    required to reach the T4 tier (see
+    ``test_t4_wiring_does_not_fire_without_unverified_optin`` above -- the
+    verified-only tier does not run this producer). Runs under
+    ``opsin_gate`` so the PIN path's own SELF-01 round-trip gate is live,
+    matching how T4 is actually reached in production (T4 only fires once
+    the gated PIN/general path has honestly abstained).
+    """
+    from orthonym.errors import is_failure_name
+    from orthonym.jvm_budget import jvm_slots
+    from orthonym.namer import name_compound
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+    verdicts = []  # (cid, outcome, name_or_None)
+    partials = []  # (cid, name, opsin_smiles_or_None) for any 0-partial violation
+
+    with jvm_slots(1, purpose="t4-acceptance-probe"):
+        for cid, smi in _t4_probe_smiles_by_cid():
+            name = name_compound(
+                smi,
+                general_fallback=True,
+                general_fallback_unverified=True,
+            )
+            if is_failure_name(name):
+                verdicts.append((cid, "abstain", name))
+                continue
+
+            rt = opsin_roundtrip_check(smi, name)
+            if rt["passed"]:
+                verdicts.append((cid, "converted", name))
+            else:
+                verdicts.append((cid, "PARTIAL/WRONG", name))
+                partials.append((cid, name, rt))
+
+    converted = [v for v in verdicts if v[1] == "converted"]
+    abstained = [v for v in verdicts if v[1] == "abstain"]
+
+    summary_lines = [
+        f"  cid={cid:<9} {outcome:<14} {name!r}"
+        for cid, outcome, name in verdicts
+    ]
+    summary = (
+        "T4 backbone acceptance probe (INFORMATIONAL, not a gate):\n"
+        + "\n".join(summary_lines)
+        + f"\nconverted={len(converted)}/12 abstained={len(abstained)}/12 "
+        + f"partial={len(partials)}/12"
+    )
+    print("\n" + summary)
+
+    assert not partials, (
+        "0-partial invariant VIOLATED -- a T4 emission did not round-trip to "
+        "the input molecule:\n"
+        + "\n".join(
+            f"  cid={cid} name={name!r} opsin_roundtrip={rt!r}"
+            for cid, name, rt in partials
+        )
+    )
