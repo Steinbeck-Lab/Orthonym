@@ -622,13 +622,34 @@ def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
     try:
         from ..assembly.substituent_naming import name_substituent_fragment
         parent = sorted(set(range(mol.GetNumAtoms())) - alkyl_set)
-        return name_substituent_fragment(
+        word = name_substituent_fragment(
             mol, sorted(alkyl_set), attach, parent
         ) or None
+        if word:
+            return word
     except Exception:
         # The primitive is a large recursive surface; a failure here must
         # degrade to the legacy word, never break ester naming outright.
-        return None
+        word = None
+
+    # v31 breadth: name_substituent_fragment DECLINES a ring-bearing alcohol
+    # component (its DROP-24 guard). The legacy count path below then LINEARISES
+    # the ring -- `CC(=O)O[C@H]1CCCCC[C@@H]1O` came out `(1S,2S)-heptyl acetate`
+    # (cycloheptane counted as 7 chain carbons, the -OH silently dropped): a
+    # WRONG molecule that SELF-01 suppresses into a silent abstention. The
+    # recursive substituent namer (C4 keystone) names a decorated ring correctly
+    # (`(1S,2S)-2-hydroxycycloheptyl`). Fail-closed: this only runs after the old
+    # primitive already declined, so it can convert a currently-abstaining ester
+    # or stay declined -- it can never regress a name the old path emitted.
+    if any(mol.GetAtomWithIdx(i).IsInRing() for i in alkyl_set):
+        try:
+            from ..assembly.substituent_enumerator import name_substituent
+            ring_word = name_substituent(mol, sorted(alkyl_set), attach)
+            if ring_word and ring_word != "substituent":
+                return ring_word
+        except Exception:
+            return None
+    return None
 
 
 def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
@@ -2297,14 +2318,35 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     if aa_ester_name is not None:
         return aa_ester_name
 
-    # The removed alkyl side must carry no other functional atoms (else the
-    # acid analog would silently drop them -> a different molecule).
-    for a in alkyl_atoms:
-        if mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'H'):
+    # The acid-analog strategy only reconstructs the ACID side, so the alcohol
+    # side must be named as ONE complete substituent word or its atoms would be
+    # silently dropped into a different molecule. A plain hydrocarbon alkyl side
+    # takes the fast path; an alkyl side that carries its OWN junior functional
+    # groups (oxo, hydroxy, halo, ...) is legal (P-65.6.3 -- the ester stays
+    # senior, the alcohol side's groups are prefixes on that substituent) PROVIDED
+    # the recursive substituent namer expresses the whole fragment. That namer is
+    # complete-by-construction (it names the entire fragment or declines), so it
+    # is the fail-closed gate: `CC(=O)OCC1CCCC1=O` -> `(2-oxocyclopentyl)methyl
+    # acetate`, and anything it cannot fully name returns None (no atom drop).
+    alkyl_set = set(alkyl_atoms)
+    _alkyl_has_fg = any(
+        mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'H') for a in alkyl_set
+    )
+    if _alkyl_has_fg:
+        from ..assembly.substituent_enumerator import name_substituent
+        _attach = _ester_attachment_atom(mol, alkyl_set)
+        if _attach is None:
             return None
-    alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
-    if not alkyl_name:
-        return None
+        try:
+            alkyl_name = name_substituent(mol, sorted(alkyl_set), _attach)
+        except Exception:
+            return None
+        if not alkyl_name or alkyl_name == "substituent":
+            return None
+    else:
+        alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
+        if not alkyl_name:
+            return None
 
     # W8-P6 Cluster D (P-93.4.1.3): the alkyl (alcohol-side) component, cited
     # as a separate word, must carry its OWN stereodescriptor immediately
