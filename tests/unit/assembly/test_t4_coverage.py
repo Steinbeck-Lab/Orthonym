@@ -193,6 +193,93 @@ def test_t4_routes_around_ester_decline():
         f"cascade name did not round-trip: {rt!r}")
 
 
+# --- Task 6: polyfunctional complete-or-abstain invariant locks ---------------
+# Task 6 diagnosis (*.py, measured 2026-08-11): name_general is
+# ALL-OR-NOTHING (no partial-with-remainder to route), and the only feature-
+# override levers are principal_group / chain_is_parent, whose full toggle space
+# the rung 0-2 cascade already covers -- a chain_is_parent=True variant converts
+# 0/150 producer-None polyfunctional molecules. So there is NO buildable
+# t4_coverage rung that converts a polyfunctional molecule beyond Tasks 3-5
+# (DONE_WITH_CONCERNS). These two tests LOCK the contract Task 6 certifies for the
+# polyfunctional class: (a) the universal-decomposition path stays complete +
+# atom-covering for a molecule it CAN name, and (b) a molecule it cannot complete
+# abstains HONESTLY (None) -- never a partial. They are regression locks, GREEN
+# because the invariant already holds; a "conversion" assertion would be an
+# unsatisfiable target (invariant 16), so it is deliberately not asserted.
+
+# Polyfunctional (N-acetyl amide + aldehyde/oxo + carboxylic acid + one
+# stereocentre), all atoms covered. Converts today via rung 0 (perceived PG); the
+# lock guards that the polyfunctional complete-coverage path keeps working.
+_POLYFUNC_COMPLETE_SMILES = "CC(=O)N[C@@H](CCCC=O)C(=O)O"  # cid 6303498
+_POLYFUNC_COMPLETE_EXPECTED = "(2S)-2-acetamido-6-oxohexanoic acid"
+
+# Molecules the T4 producer cannot complete with existing capabilities, so it
+# HONESTLY abstains (None): perindopril's deep peptide-ester side chain hits
+# DROP-12 recursion_depth_fallback (peptide-residue follow-on), and the crotonyl
+# enamide branch is "branch unnameable" (unsaturated-acyl-substituent follow-on).
+# Neither is forced -- 0-partial holds (the design's honest-abstain bar).
+_POLYFUNC_ABSTAIN = [
+    "CCC[C@@H](C(=O)OCC)N[C@H](C)C(=O)N1[C@H]2CCCC[C@H]2C[C@H]1C(=O)O",  # 60184
+    "C/C=C/C(=O)NCC(=O)O",                                               # 2818292
+]
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+def test_t4_polyfunctional_complete_coverage_locks():
+    """A polyfunctional molecule (amide + aldehyde + acid + stereo) is named by
+    the T4 universal-decomposition path with EVERY heavy atom bound (E1-complete)
+    and the name OPSIN-round-trips. This locks the complete-coverage contract for
+    the polyfunctional class -- a fragment-drop here would fail E1, and a
+    constitution error would fail the round-trip.
+    """
+    from orthonym.jvm_budget import jvm_slots
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+    mol, feats = _classified(_POLYFUNC_COMPLETE_SMILES)
+    cand = t4_coverage._best_effort_candidate(mol, feats)
+    assert cand is not None and cand.result_obj is not None
+    verdict = verify_certificate(mol, cand.result_obj)
+    assert verdict.ok, verdict.reason
+    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    bound = set()
+    for b in cand.result_obj.bindings:
+        bound |= set(b.atom_ids)
+    assert bound >= heavy, f"unbound heavy atoms: {sorted(heavy - bound)}"
+
+    name = t4_coverage.name_t4_complete(mol, feats)
+    assert name == _POLYFUNC_COMPLETE_EXPECTED, name
+    with jvm_slots(1, purpose="test-t4-polyfunc-complete"):
+        rt = opsin_roundtrip_check(_POLYFUNC_COMPLETE_SMILES, name)
+    assert rt["passed"], f"polyfunctional name did not round-trip: {rt!r}"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smi", _POLYFUNC_ABSTAIN)
+def test_t4_polyfunctional_honest_abstain_no_partial(smi):
+    """A polyfunctional molecule the T4 producer cannot COMPLETE abstains
+    honestly (None) -- never a bare fragment / partial. This is the corrected,
+    strengthened form of the brief's Step-1 test: the atom-drop it worried about
+    (a scaffold named while side chains are dropped) does NOT happen here,
+    because the producer returns None rather than a partial. If it ever DOES
+    emit for one of these, E1 must still bind every heavy atom (0-partial).
+    """
+    mol, feats = _classified(smi)
+    name = t4_coverage.name_t4_complete(mol, feats)
+    if name is None:
+        return  # honest abstain -- the expected, complete-or-abstain outcome
+    # Emission is not expected today, but if it happens it must be atom-complete.
+    cand = t4_coverage._best_effort_candidate(mol, feats)
+    assert cand is not None and cand.result_obj is not None
+    verdict = verify_certificate(mol, cand.result_obj)
+    assert verdict.ok, f"emitted a PARTIAL name {name!r}: {verdict.reason}"
+    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    bound = set()
+    for b in cand.result_obj.bindings:
+        bound |= set(b.atom_ids)
+    assert bound >= heavy, f"unbound heavy atoms: {sorted(heavy - bound)}"
+
+
 # --- Task 4: the through-namer integration test (Tasks 2/3 deferred this) ---
 # The meaningful proof of the wiring: a molecule the PIN/default path abstains
 # on must EMIT a complete name once the best-effort/unverified T4 tier is opted

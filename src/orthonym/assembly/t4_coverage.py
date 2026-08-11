@@ -173,6 +173,59 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     a valid description of the right structure that is not a well-formed PIN;
     that is licit here (invariant 1: "a table miss must degrade to an uglier
     name, never to a refusal") and confined to this best-effort T4 branch.
+
+    Task 6 (measured 2026-08-11) -- WHY the cascade STOPS at rung 2, and where
+    the remaining polyfunctional breadth lives. Two facts were established, not
+    assumed (probes in *.py):
+
+      1. ``name_general`` is ALL-OR-NOTHING: it returns a complete E1-passing
+         result or ``None``, NEVER a partial with a leftover remainder. So the
+         "compute the unbound atoms of a partial and attach them" model does not
+         apply -- there is no partial to complete. This cascade of rungs already
+         IS the universal-decomposition mechanism (senior parent + every
+         off-parent fragment as a complete recursive ``name_substituent`` +
+         E1), because that is exactly what ``name_general`` does internally.
+
+      2. The ONLY feature-override levers the engine reads are
+         ``principal_group`` (+ ``principal_group_atoms``) and
+         ``chain_is_parent`` (grep-confirmed: no other toggle gates naming).
+         Rungs 0-2 plus a ``chain_is_parent=True`` variant cover the FULL 2x2+
+         toggle space, and the ``chain_is_parent=True`` rung converts **0 of
+         150** producer-``None`` polyfunctional molecules on a 400-molecule
+         pubchem_2000 sample. The feature-override lever is EXHAUSTED; adding a
+         further re-parametrisation rung would be dead code (invariants 8, 17).
+
+    So the remaining polyfunctional abstentions are NOT reachable by any feature
+    toggle here -- each needs an ENGINE-level capability that is a separate
+    follow-on, never a ``t4_coverage`` rung (the brief forbids reimplementing
+    ``name_substituent`` / ``_assemble``):
+
+      * an UNCONDITIONAL recursive-substituent base case (longest-path chain +
+        every off-path atom as a recursive prefix + skeletal heteroatoms as
+        aza/oxa replacement) so a hard branch degrades to an ugly-but-complete
+        prefix instead of "branch unnameable" -- the dominant class (~120/150,
+        many also charged/out-of-scope);
+      * acyl substituents built as ``name(R)`` + ``carbonyl`` / ``amino`` so an
+        internal C=C never blocks them (the ``C/C=C/C(=O)NCC(=O)O`` enamide
+        "branch unnameable" class);
+      * OFFER-not-RETURN parent competition (invariant 18): a parent choice that
+        leaves an unnameable fragment should lose to a competitor parent rather
+        than terminate the molecule;
+      * a peptide-residue namer for deep peptide/ester side chains (perindopril's
+        ``CCC[C@H](N[C@H](C)C=O)C(=O)OCC`` hits DROP-12 recursion_depth_fallback);
+      * charged-parent support (``allow_charged``, ~13/150, mostly out-of-scope
+        salts) and spiro/fused/monocycle ring-parent producers (~9/150).
+
+    Whichever of these ships, its output still flows through THIS producer's E1
+    gate + SELF-01 unchanged, so 0-wrong / 0-partial is preserved by
+    construction. NOTE (namer.py follow-on, symptom VERIFIED / cause a LEAD):
+    for ``CC(=O)NCN(C)N=O`` (cid 43057) this producer builds a complete,
+    OPSIN-round-tripping replacement name when called cleanly, but a DEGRADED
+    atom-dropping name when invoked from ``namer._try_general_engine_recovery``
+    after ``_name_impl`` has run -- the recovery path does not run the T4
+    producer in a clean naming state (ruled out: the fragment cache and the
+    ``best_effort_ctx`` / ``general_fallback_ctx`` contextvars). That is a
+    namer.py state-isolation fix, outside this module.
     """
     # Rung 0: the full engine with the perceived principal group (Task 3).
     candidate = _run_general_e1(mol, features)
