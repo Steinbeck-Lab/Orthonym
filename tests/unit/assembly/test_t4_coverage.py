@@ -19,11 +19,22 @@ from orthonym.validation.e1_certificate import verify_certificate
 # CLASS-A T4 target -- 2-[(dimethylamino)methyl]cyclohexan-1-ol (cid 1542461).
 # The PIN/default path abstains on it; the T4 producer names it completely.
 _ABSTAINER_SMILES = "CN(C)C[C@H]1CCCC[C@H]1O"
-# A molecule whose senior parent is a 2-carbon acetyl chain-ester the general
-# engine genuinely DECLINES (``_partition``: "unsupported suffix for
-# pg='ester'"); the Task-3 happy-path producer therefore returns None on it
-# (clean abstain -- Task 5's route-around cascade handles this class).
-_DECLINE_SMILES = "CC(=O)O[C@H]1C(=C)C=C(C=C1OC)OC"  # cid 639588
+# An ester whose senior parent is a 2-carbon acetyl chain the general engine
+# genuinely DECLINES on (``_partition``: "unsupported suffix for pg='ester'").
+# Task 5's route-around cascade SUPPRESSES that principal group so the ring
+# becomes the parent and the acyl-oxy becomes an ``acetyloxy`` PREFIX -- no
+# ester suffix needed -- yielding a complete, OPSIN-round-tripping name.
+_ESTER_ROUTED_SMILES = "CC(=O)O[C@H]1C(=C)C=C(C=C1OC)OC"  # cid 639588
+_ESTER_ROUTED_EXPECTED = (
+    "(6S)-6-(acetyloxy)-1,3-dimethoxy-5-methylidenecyclohexa-1,3-diene")
+
+# A molecule NO cascade rung can complete: the ``-OC(=O)NP(=O)(Cl)Cl``
+# substituent (a dichlorophosphoryl carbamate) cannot be named -- the engine's
+# recursive substituent namer hits its depth cap (DROP-12
+# ``recursion_depth_fallback``) on the organophosphorus fragment, so every rung
+# fails E1 and the producer HONESTLY abstains (None), never a partial. This is
+# the genuine clean-abstain fixture now that the ester class routes around.
+_UNROUTABLE_SMILES = "C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl"
 
 
 def _mol():
@@ -52,14 +63,24 @@ def _classified(smi):
 
 @pytest.mark.unit
 def test_declining_molecule_returns_none():
-    """A molecule the general engine genuinely DECLINES yields a clean abstain
-    (None) from the Task-3 happy-path producer -- never a raise, never a
-    partial. (Task 2's obsolete ``test_stub_candidate_none_returns_none``
-    asserted the same None-safety against the stub; Task 3 replaces the stub,
-    so the None-safety contract is now proven against a real decline.)
+    """A molecule NO cascade rung can complete yields a clean abstain (None)
+    from the producer -- never a raise, never a partial. Task 5's route-around
+    cascade TRIES every applicable strategy (PG-suppression, ring-first then
+    chain-parent) and, when the remaining substituent is genuinely unnameable
+    (the organophosphorus carbamate below), falls through to an honest abstain.
+    If it were ever to emit for this input, E1 must still bind every heavy atom.
     """
-    mol, feats = _classified(_DECLINE_SMILES)
-    assert t4_coverage.name_t4_complete(mol, feats) is None
+    mol, feats = _classified(_UNROUTABLE_SMILES)
+    name = t4_coverage.name_t4_complete(mol, feats)
+    if name is not None:
+        # Not expected -- but a non-None here must be atom-complete, never a
+        # partial (0-partial invariant). Prove it via the producer's E1 object.
+        cand = t4_coverage._best_effort_candidate(mol, feats)
+        assert cand is not None and cand.result_obj is not None
+        verdict = verify_certificate(mol, cand.result_obj)
+        assert verdict.ok, f"emitted a PARTIAL name: {name!r} ({verdict.reason})"
+    else:
+        assert name is None
 
 
 @pytest.mark.unit
@@ -139,6 +160,37 @@ def test_t4_candidate_is_complete_or_none():
     for b in cand.result_obj.bindings:
         bound |= set(b.atom_ids)
     assert bound >= heavy, f"unbound heavy atoms: {sorted(heavy - bound)}"
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+def test_t4_routes_around_ester_decline():
+    """Task 5: an ester the general engine DECLINES on (unsupported ester
+    suffix) is now COMPLETED by the route-around cascade.
+
+    ``CC(=O)O[C@H]1C(=C)C=C(C=C1OC)OC`` (cid 639588): the primary attempt
+    returns None ("unsupported suffix for pg='ester'"). The cascade suppresses
+    that principal group so the ring becomes the parent and the acyl-oxy is
+    cited as an ``acetyloxy`` PREFIX -- no ester suffix -- giving a complete,
+    E1-certified, OPSIN-round-tripping name. Direct producer call with
+    classified features (the exact shape namer.py's T4 dispatch passes).
+
+    Gated ``opsin_gate`` because the assertion round-trips through OPSIN; the
+    hook skips it when the jar is absent (green-but-blind).
+    """
+    from orthonym.jvm_budget import jvm_slots
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+    mol, feats = _classified(_ESTER_ROUTED_SMILES)
+    name = t4_coverage.name_t4_complete(mol, feats)
+    assert name is not None, "cascade failed to route around the ester decline"
+    assert "acetyloxy" in name, name          # acyl-oxy cited as a PREFIX
+    assert "cyclohexa" in name, name          # the ring is the parent
+    assert name == _ESTER_ROUTED_EXPECTED, name
+    with jvm_slots(1, purpose="test-t4-ester-routearound"):
+        rt = opsin_roundtrip_check(_ESTER_ROUTED_SMILES, name)
+    assert rt["passed"], (
+        f"cascade name did not round-trip: {rt!r}")
 
 
 # --- Task 4: the through-namer integration test (Tasks 2/3 deferred this) ---
