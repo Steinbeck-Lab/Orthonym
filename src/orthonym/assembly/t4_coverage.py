@@ -19,6 +19,7 @@ wire this namer into ``namer.py``.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
@@ -26,6 +27,8 @@ from ..validation.e1_certificate import verify_certificate
 
 if TYPE_CHECKING:  # type-only; no runtime dependency on general_engine
     from .general_engine import GeneralEngineResult
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -64,10 +67,64 @@ def name_t4_complete(mol, features) -> Optional[str]:
 
 
 def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
-    """The producer cascade. Stub for Task 2 -- returns ``None`` (clean
-    abstain) unconditionally. Task 3 fills this in with the parent +
-    complete-recursive-substituents producer; Task 5 adds the per-class
-    cascade (lactam-unsat, fused, spiro, peptide, sugar, acyclic,
-    OPSIN-format) on top of it.
+    """Senior parent + every other atom as a COMPLETE recursive substituent.
+
+    Task 3 (happy path). Diagnosed on the CLASS-A target
+    ``CN(C)C[C@H]1CCCC[C@H]1O``: the general engine's own ring/chain producers
+    ALREADY do exactly what this task requires -- select the senior parent
+    (``select_principal_ring_system`` / ``principal_chain``), name EVERY
+    off-parent fragment through the C4 recursive ``name_substituent`` (e.g.
+    ``-CH2N(CH3)2`` -> ``(dimethylamino)methyl``), and assemble the name with a
+    full atom->token ``bindings`` partition. Run under the T4-permissive flags
+    (``allow_aromatic_general=True`` opens the lone-monocycle / mancude-cage
+    paths; ``allow_suffix_free=True`` is the best-effort terminal-ring
+    assembly), they produced the complete, correct, E1-passing name
+    ``(1R,2R)-2-((dimethylamino)methyl)cyclohexan-1-ol``.
+
+    The molecule abstains in production only because the recovery lane runs the
+    engine with ``allow_aromatic_general=self._allow_aromatic_general`` (off by
+    default), gating off ``name_general_monocycle``. So the lever is NOT a
+    from-scratch re-implementation of ``_assemble`` (that would duplicate the
+    engine's parent-selection + ``name_substituent`` + ordering + stereo +
+    elision machinery and risk divergence) -- it is to run the SAME engine at
+    the most permissive T4 setting and audit the result with E1. This is the
+    Blue-Book-reference "re-anchor the bindings and audit afterward" pattern:
+    ``name_general`` builds the atom->token bindings, ``verify_certificate``
+    proves every heavy atom is covered before we hand the candidate up.
+
+    Bounded to the happy path: if the engine DECLINES (``name_general`` returns
+    ``None`` -- e.g. the unsupported-suffix ester ``pg='ester'`` on a short
+    acetyl chain) or its result is not atom-complete, return ``None`` (clean
+    abstain). Task 5 adds the route-around-declines cascade here; Task 6 routes
+    a polyfunctional remainder. We never hand up a partial: E1 is re-run in
+    ``name_t4_complete`` as the backstop, but the coverage check below means we
+    return ``None`` ourselves rather than rely on it.
     """
-    return None
+    from .general_engine import name_general
+
+    try:
+        # T4 best-effort: the most permissive engine setting, independent of
+        # the calling instance's flags. allow_aromatic_general=True opens the
+        # lone-monocycle and mancude-cage paths and lifts the charge/mancude
+        # refusals; allow_suffix_free=True is the best-effort terminal-ring
+        # assembly. name_general is fail-closed (returns None, never a wrong
+        # name), but wrap defensively so the T4 tier can never raise.
+        result = name_general(
+            mol, features,
+            allow_aromatic_general=True,
+            allow_suffix_free=True)
+    except Exception as exc:  # fail-closed: an engine error is a clean abstain
+        logger.info("t4 _best_effort_candidate: name_general raised: %s", exc)
+        return None
+
+    if result is None:
+        return None  # genuine engine decline -> Task 5 cascade territory
+
+    # Never hand up a partial. verify_certificate is the SAME E1 gate
+    # name_t4_complete re-runs; matching its default (allow_charged=False)
+    # keeps our accept/reject decision identical to the backstop's, so a
+    # candidate we approve is never voided one call later.
+    if not verify_certificate(mol, result).ok:
+        return None
+
+    return _Candidate(name=result.name, result_obj=result)
