@@ -3158,50 +3158,92 @@ class Orthonym:
                 if eng is None or not verify_certificate(
                         mol, eng,
                         allow_charged=self._allow_aromatic_general).ok:
-                    return None
-                cand = eng.name
-                # v29 P1 (audit-only): record the spine the certificate just
-                # accepted, so the exit of name() can re-assert it on the
-                # FINAL string. Deliberately placed BEFORE the retained-name
-                # preference below: when that swap fires, `eng.bindings`
-                # describe a name that is no longer shipped and the re-anchor
-                # is SUPPOSED to report TOKEN_ABSENT. That is a true positive
-                # about a real gap in today's proof coverage (the swap is
-                # independently OPSIN-RT-gated, so it is not a wrongness bug
-                # today; what is missing is bindings for the substituted
-                # name), and it must not be papered over by recording later.
-                self._record_binding_proof(
-                    mol, eng, stage="general_engine_recovery")
-                # v26 P6: retained-name preference (PIN-quality guardrail,
-                # `complete` tier only). A structural recognizer is about to
-                # be OVERRULED by an ugly von-Baeyer/replacement name the
-                # general engine just built -- before that ships, see
-                # whether a retained/fused-heterocycle name applies to the
-                # WHOLE input molecule and prefer it, but ONLY if it
-                # independently round-trips. This is a preference over an
-                # emission that already exists, never a precondition to
-                # naming: if the recognizer finds nothing, or its candidate
-                # fails to verify, `cand` is untouched and the shared
-                # verification ladder below runs on the general name exactly
-                # as it did before this phase.
-                if self._allow_aromatic_general:
-                    _retained_cand = self._retained_structural_preference(mol)
-                    if _retained_cand and _retained_cand != cand:
-                        if self._disable_opsin_validity_gate:
-                            cand = _retained_cand  # test/internal mode
-                        elif _validity_gate_jar_present():
-                            _r_smi = _validity_gate_name_to_smiles(_retained_cand)
-                            _r_ok = False
-                            if _r_smi is not None:
-                                try:
-                                    _r_ok = (Chem.CanonSmiles(_r_smi)
-                                             == Chem.CanonSmiles(smiles))
-                                except Exception:
-                                    _r_ok = False
-                            if _r_ok:
-                                cand = _retained_cand
-                        # jar missing: fail-closed -- keep the general `cand`
-                        # rather than ship an unverified retained guess.
+                    # v31 T4 (best-effort tier ONLY): the engine's own
+                    # flag-gated attempt just declined (name_general returned
+                    # None) or produced a non-atom-complete partition. Hand off
+                    # to the universal coverage-by-construction producer, which
+                    # re-runs name_general at the T4-PERMISSIVE flags
+                    # (allow_aromatic_general / allow_suffix_free) INDEPENDENT of
+                    # this instance's flags and E1-audits the result internally,
+                    # returning an atom-complete name or None (clean abstain).
+                    # PIN-isolated: this whole recovery is already
+                    # `_general_fallback`-gated (early `return None` at the top),
+                    # and T4 additionally requires the
+                    # `_general_fallback_unverified` opt-in -- so the PIN/default
+                    # path and the conservative verified-fallback tier never
+                    # reach it. The T4 name is NOT shipped raw: it falls through
+                    # to the SAME stereo-emit decision + OPSIN round-trip ladder
+                    # below that the engine's own name gets, so a T4 name whose
+                    # constitution does not round-trip is suppressed to abstain
+                    # (SELF-01). Task 4 (coverage-by-construction breadth).
+                    if not self._general_fallback_unverified:
+                        return None
+                    # T4 runs the engine at allow_aromatic_general=True
+                    # unconditionally, which OPENS the von-Baeyer / mancude-cage
+                    # path even for instances that deliberately kept
+                    # allow_aromatic_general OFF. E1 proves atom COVERAGE but not
+                    # ring-numbering validity / PIN-preference, so an aggressive
+                    # von-Baeyer name T4 opens can be caught ONLY by the OPSIN
+                    # round-trip ladder below -- and with no jar that gate fails
+                    # OPEN (D-13), so T4 would ship an UNVERIFIED (possibly
+                    # non-PIN or valence-illegal) name. Keep the abstention
+                    # without a jar, mirroring the inline site's v26 P7 FIX 1
+                    # abstain-without-Java contract. (Internal/test mode via
+                    # _disable_opsin_validity_gate is a controlled context and
+                    # keeps the ladder's own unverified-ship path.) This leaves
+                    # the engine's own-name path below byte-identical; it only
+                    # constrains the NEW T4 producer to a live SELF-01.
+                    if not (self._disable_opsin_validity_gate
+                            or _validity_gate_jar_present()):
+                        return None
+                    from .assembly.t4_coverage import name_t4_complete
+                    cand = name_t4_complete(mol, feats)
+                    if cand is None:
+                        return None
+                else:
+                    cand = eng.name
+                    # v29 P1 (audit-only): record the spine the certificate just
+                    # accepted, so the exit of name() can re-assert it on the
+                    # FINAL string. Deliberately placed BEFORE the retained-name
+                    # preference below: when that swap fires, `eng.bindings`
+                    # describe a name that is no longer shipped and the re-anchor
+                    # is SUPPOSED to report TOKEN_ABSENT. That is a true positive
+                    # about a real gap in today's proof coverage (the swap is
+                    # independently OPSIN-RT-gated, so it is not a wrongness bug
+                    # today; what is missing is bindings for the substituted
+                    # name), and it must not be papered over by recording later.
+                    self._record_binding_proof(
+                        mol, eng, stage="general_engine_recovery")
+                    # v26 P6: retained-name preference (PIN-quality guardrail,
+                    # `complete` tier only). A structural recognizer is about to
+                    # be OVERRULED by an ugly von-Baeyer/replacement name the
+                    # general engine just built -- before that ships, see
+                    # whether a retained/fused-heterocycle name applies to the
+                    # WHOLE input molecule and prefer it, but ONLY if it
+                    # independently round-trips. This is a preference over an
+                    # emission that already exists, never a precondition to
+                    # naming: if the recognizer finds nothing, or its candidate
+                    # fails to verify, `cand` is untouched and the shared
+                    # verification ladder below runs on the general name exactly
+                    # as it did before this phase.
+                    if self._allow_aromatic_general:
+                        _retained_cand = self._retained_structural_preference(mol)
+                        if _retained_cand and _retained_cand != cand:
+                            if self._disable_opsin_validity_gate:
+                                cand = _retained_cand  # test/internal mode
+                            elif _validity_gate_jar_present():
+                                _r_smi = _validity_gate_name_to_smiles(_retained_cand)
+                                _r_ok = False
+                                if _r_smi is not None:
+                                    try:
+                                        _r_ok = (Chem.CanonSmiles(_r_smi)
+                                                 == Chem.CanonSmiles(smiles))
+                                    except Exception:
+                                        _r_ok = False
+                                if _r_ok:
+                                    cand = _retained_cand
+                            # jar missing: fail-closed -- keep the general `cand`
+                            # rather than ship an unverified retained guess.
             # v26 P7 FIX 2: fail closed on DROPPED stereo (general-engine path).
             # The SELF-01 ladder below is CONSTITUTIONAL (atoms+bonds+charge,
             # stereo-blind), so a general emission that omits E/Z or R/S the

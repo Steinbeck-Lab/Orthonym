@@ -139,3 +139,55 @@ def test_t4_candidate_is_complete_or_none():
     for b in cand.result_obj.bindings:
         bound |= set(b.atom_ids)
     assert bound >= heavy, f"unbound heavy atoms: {sorted(heavy - bound)}"
+
+
+# --- Task 4: the through-namer integration test (Tasks 2/3 deferred this) ---
+# The meaningful proof of the wiring: a molecule the PIN/default path abstains
+# on must EMIT a complete name once the best-effort/unverified T4 tier is opted
+# in -- and it must round-trip OPSIN-exact (SELF-01), since the wiring routes
+# the T4 name through the same final round-trip ladder the engine's own name
+# gets. Kept in this file (not the isolation file) because it needs a live OPSIN
+# JVM; the isolation file stays JVM-cheap. The exact string is Task 3's verified
+# emission for cid 1542461.
+_T4_TARGET_EXPECTED = "(1R,2R)-2-((dimethylamino)methyl)cyclohexan-1-ol"
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+def test_t4_wired_into_namer_emits_for_abstainer():
+    """`Orthonym(general_fallback=True, general_fallback_unverified=True)`
+    emits the complete, atom-covering, OPSIN-round-tripping T4 name for the
+    CLASS-A abstainer that the default PIN path cannot name.
+
+    Runs with the OPSIN validity gate ON (``opsin_gate`` marker): under the
+    conftest default (gate OFF) the PIN path ships an atom-DROPPED wrong name
+    ((1R,2R)-2-aminocyclohexan-1-ol) that SELF-01 would suppress, so the
+    abstention path the T4 producer sits behind is only reached with the gate
+    live. The hook skips this test if the OPSIN jar is absent (green-but-blind).
+    """
+    from orthonym.jvm_budget import jvm_slots
+    with jvm_slots(1, purpose="test-t4-wiring"):
+        t4 = Orthonym(general_fallback=True, general_fallback_unverified=True)
+        name = t4.name(_ABSTAINER_SMILES)
+    assert name is not None
+    from orthonym.errors import is_failure_name
+    assert not is_failure_name(name), f"T4 abstained: {name!r}"
+    assert "cyclohex" in name, name
+    assert name == _T4_TARGET_EXPECTED, name
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+def test_t4_wiring_does_not_fire_without_unverified_optin():
+    """The T4 producer is gated on `general_fallback_unverified`: with only the
+    (conservative) verified general-fallback tier on, the abstainer still
+    abstains -- the aggressive T4 producer must not run for it. Gate ON for the
+    same reason as the emission test above.
+    """
+    from orthonym.jvm_budget import jvm_slots
+    from orthonym.errors import is_failure_name
+    with jvm_slots(1, purpose="test-t4-gate"):
+        verified_only = Orthonym(general_fallback=True)
+        name = verified_only.name(_ABSTAINER_SMILES)
+    assert is_failure_name(name), (
+        f"verified-only tier must not emit the aggressive T4 name: {name!r}")
