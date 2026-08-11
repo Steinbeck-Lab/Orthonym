@@ -231,6 +231,19 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
     if not frag_ring_atoms:
         return base_name  # No ring in fragment
 
+    # name_substituent already FULLY decorates an AROMATIC ring substituent
+    # (e.g. '(4-hydroxyphenyl)methyl', '(4-methylphenyl)methyl'), so
+    # re-discovering its ring substituents here and prepending them
+    # DOUBLE-COUNTS them: '4-hydroxy(4-hydroxyphenyl)methyl' — a parseable
+    # WRONG molecule (found by the v31 lever-A gate-OFF honesty sweep on the
+    # N-(4-hydroxybenzyl) amide). The enricher is only needed for ALIPHATIC
+    # ring stems that name_substituent returns bare (e.g. 'cyclohexyl' ->
+    # '4-methylcyclohexyl'); _extract_ring_base_name already returns the full
+    # name for aromatic rings, so this branch was pure double-count. Trust the
+    # aromatic decoration and return it unchanged.
+    if any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in frag_ring_atoms):
+        return base_name
+
     # Check if there are non-ring atoms in the fragment (sub-substituents)
     non_ring_in_frag = sub_set - frag_ring_atoms
     if not non_ring_in_frag:

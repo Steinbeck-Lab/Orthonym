@@ -5868,7 +5868,18 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         n_subs = get_n_substituents(mol, amide_atoms)
         n_prefix = format_n_substitution(n_subs)
         if n_prefix:
-            final_name = f"{n_prefix}{base_name}"
+            # A locant must be separated from the preceding N-substituent prefix
+            # by a hyphen (P-16.3.3 rendering). A BRANCHED or otherwise-substituted
+            # unsaturated acyl parent begins with a chain locant
+            # ('3-methylbut-2-enamide'), so a bare concatenation glues
+            # 'N-(4-hydroxyphenyl)3-methylbut-2-enamide' — the documented
+            # italic/numeral-glue defect that OPSIN accepts, so a round trip
+            # cannot see it (v31 lever-A honesty sweep). starts_with_locant
+            # leaves a plain stem ('prop-2-enamide') and a leading stereo
+            # descriptor ('(2E)-...') unhyphenated.
+            from .naming_utils import starts_with_locant as _starts_with_locant
+            _sep = "-" if _starts_with_locant(base_name) else ""
+            final_name = f"{n_prefix}{_sep}{base_name}"
 
     # Phase 165 SCORE-01 (Pitfall 2): stash a STRUCTURED tree from the chain
     # fragment list, with fragment_legacy overridden to the FINAL (post-N-prefix)

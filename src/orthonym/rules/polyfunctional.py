@@ -1128,6 +1128,153 @@ def _acyl_is_simple_saturated_chain(mol, acyl_c: int, n_atom: Optional[int]) -> 
     return True
 
 
+def _acyl_ring_is_simple_unsub_carbocycle(
+        mol, acyl_c: int, n_atom: Optional[int]) -> bool:
+    """True iff the amide's acyl carbon is attached to a SINGLE, unsubstituted,
+    all-carbon MONOCYCLIC ring (benzene or a fully-saturated cycloalkane) — the
+    only ring-attached shapes ``rules.amides.name_amide`` names correctly
+    (-> ``benzamide`` / ``cyclohexanecarboxamide``).
+
+    ``name_amide``'s ring-attached path keys only on the ipso ring's size +
+    benzene-aromaticity, so it (a) DROPS any substituent on the acyl ring
+    (3-chlorobenzoyl -> bare ``benzamide``), (b) gets the wrong stem for a FUSED
+    acyl ring, and (c) MISNAMES a heteroaromatic acyl ring as a carbocycle
+    (isonicotinoyl -> ``cyclohexanecarboxamide``, dropping the ring N). Those
+    must NOT be delegated — a producer-honesty guard that holds gate-OFF (the
+    ``8afa533c`` standard), exactly as ``_acyl_is_simple_saturated_chain`` guards
+    the chain path.
+    """
+    from rdkit import Chem  # module has no top-level Chem import (only a local _Chem)
+    ipso = None
+    for nb in mol.GetAtomWithIdx(acyl_c).GetNeighbors():
+        j = nb.GetIdx()
+        if j == n_atom:
+            continue
+        if (nb.GetSymbol() in ('O', 'S', 'Se', 'Te')
+                and mol.GetBondBetweenAtoms(acyl_c, j)
+                       .GetBondTypeAsDouble() == 2.0):
+            continue
+        if nb.IsInRing():
+            if ipso is not None:
+                return False
+            ipso = j
+        else:
+            # acyl carbon also bears an acyclic heavy neighbour -> not a plain
+            # ring-attached acyl (name_amide's ring branch would not apply).
+            if nb.GetAtomicNum() > 1:
+                return False
+    if ipso is None:
+        return False
+    ri = mol.GetRingInfo()
+    rings = [set(r) for r in ri.AtomRings() if ipso in r]
+    if len(rings) != 1:
+        return False  # fused / spiro ipso
+    ring = rings[0]
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in ring):
+        return False  # heteroaromatic / heterocyclic acyl ring
+    for other in ri.AtomRings():
+        if set(other) != ring and set(other) & ring:
+            return False  # ring is fused to another
+    aromatic = all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring)
+    if not aromatic:
+        for a in ring:
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                if nb.GetIdx() in ring and mol.GetBondBetweenAtoms(
+                        a, nb.GetIdx()).GetBondType() != Chem.BondType.SINGLE:
+                    return False  # unsaturated cycloalkene -> not '-ane'carboxamide
+    # unsubstituted: no ring atom bears a heavy non-ring neighbour except the
+    # ipso->acyl_c bond (a ring substituent would be silently dropped).
+    for a in ring:
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            j = nb.GetIdx()
+            if j in ring or nb.GetAtomicNum() <= 1:
+                continue
+            if a == ipso and j == acyl_c:
+                continue
+            return False
+    return True
+
+
+def _name_ring_attached_anilide(features: Any) -> Optional[str]:
+    """Lever C (v31, P-41 / P-66.1): a ring-attached secondary/tertiary amide
+    whose acyl ring is a simple unsubstituted carbocycle (benzoyl -> benzamide,
+    cyclohexanecarbonyl -> cyclohexanecarboxamide) and whose only junior FGs live
+    inside the N-substituent(s). Such an amide has an EMPTY principal_chain (the
+    parent is the ring-attached acyl), so name_polyfunctional's main body returns
+    None before the chain amide-delegation runs; without this the benzamide
+    candidate double-counts the junior phenol and is suppressed, so the benzene
+    handler wins the P-41-violating phenol-as-parent 'N-benzoyl-4-aminophenol'.
+
+    Delegate to rules.amides.name_amide (which names the ring-attached parent
+    correctly) under the SAME fail-closed coverage guards as the chain path:
+    single amide match, no defined stereo, every N-branch named, every junior FG
+    contained in the N-substituent fragments, and the acyl ring a simple
+    unsubstituted carbocycle. Returns None (fall through) otherwise.
+    """
+    mol = features.mol
+    pg = features.principal_group
+    if pg not in ('secondary_amide', 'tertiary_amide'):
+        return None
+    matches = (features.functional_groups or {}).get(pg, [])
+    if len(matches) != 1:
+        return None
+    match = list(matches[0])
+    from rdkit import Chem
+    acyl_c = next(
+        (i for i in match
+         if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+         and any(nb.GetSymbol() in ('O', 'S', 'Se', 'Te')
+                 and mol.GetBondBetweenAtoms(i, nb.GetIdx())
+                        .GetBondTypeAsDouble() == 2.0
+                 for nb in mol.GetAtomWithIdx(i).GetNeighbors())),
+        None)
+    if acyl_c is None:
+        return None
+    n_atom = next(
+        (i for i in match if mol.GetAtomWithIdx(i).GetSymbol() == 'N'), None)
+    from .amides import (
+        name_amide as _ramide, get_n_substituents, is_ring_attached_amide,
+    )
+    if not is_ring_attached_amide(mol, tuple(match)):
+        return None
+    # RISK-4 (v31 fable): name_amide names a C-amide (benzamide / carboxamide). An
+    # N-O amide (hydroxamic / Weinreb) or N-N amide (hydrazide) has a DIFFERENT
+    # suffix and would be MISNAMED. get_n_substituents collects only carbon
+    # subs, so these decline today via the branch-count mismatch below — make
+    # that intent EXPLICIT so a future get_n_substituents extension to O/N-subs
+    # cannot silently arm the intercept on an N-heteroatom amide.
+    if n_atom is not None and any(
+            nb.GetAtomicNum() > 1 and nb.GetSymbol() != 'C'
+            and nb.GetIdx() != acyl_c
+            for nb in mol.GetAtomWithIdx(n_atom).GetNeighbors()):
+        return None
+    if not _acyl_ring_is_simple_unsub_carbocycle(mol, acyl_c, n_atom):
+        return None
+    # fail closed on any DEFINED stereo (the delegated path emits no descriptors)
+    if (Chem.FindMolChiralCenters(mol, includeUnassigned=False)
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE
+                   for b in mol.GetBonds())):
+        return None
+    n_subs = get_n_substituents(mol, tuple(match))
+    claimed = set()
+    for s in n_subs:
+        claimed |= set(s.get('atoms') or [])
+    if not claimed:
+        return None
+    expected = 0
+    if n_atom is not None:
+        expected = sum(
+            1 for nb in mol.GetAtomWithIdx(n_atom).GetNeighbors()
+            if nb.GetAtomicNum() > 1 and nb.GetIdx() != acyl_c)
+    if len(n_subs) != expected:
+        return None
+    non_principal = getattr(features, 'non_principal_groups', {}) or {}
+    if not all(set(fm).issubset(claimed)
+               for fmatches in non_principal.values() for fm in fmatches):
+        return None
+    return _ramide(mol, tuple(match))
+
+
 def name_polyfunctional(features: Any) -> Optional[str]:
     """
     Generate IUPAC name for a polyfunctional compound.
@@ -1287,14 +1434,69 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     for _fg_matches in (non_principal or {}).values()
                     for _fm in _fg_matches
                 )
-                if (not _has_stereo and _claimed
-                        and len(_n_subs) == _expected_n_branches
-                        and _fgs_contained
-                        and _acyl_is_simple_saturated_chain(
-                            mol, _acyl_c, _n_atom)):
+                _amide_guards_ok = (
+                    not _has_stereo and _claimed
+                    and len(_n_subs) == _expected_n_branches
+                    and _fgs_contained
+                )
+                if _amide_guards_ok and _acyl_is_simple_saturated_chain(
+                        mol, _acyl_c, _n_atom):
                     _nm = _rules_name_amide(mol, tuple(_match))
                     if _nm:
                         return _nm
+                # A1 (v31 deeper-amide, P-66.1.1 / P-41): the count-based
+                # rules.amides.name_amide above names ONLY a simple saturated
+                # acyl. When the acyl is BRANCHED or UNSATURATED but ON the
+                # principal chain (paracetamol's isobutyryl / acryloyl cousins:
+                # CC(C)C(=O)Nc1ccc(O)cc1, C=CC(=O)Nc1ccc(O)cc1), route to the
+                # acyl-AWARE composer namer _assemble_amide_name instead of
+                # falling through. It names the acyl chain via the general chain
+                # machinery (branch prefixes + prop-2-en/-yn unsaturation come
+                # for free, exactly the unified acid/amide suffix-swap the
+                # use) and the N-substituent via
+                # get_n_substituents, whose fragment already contains the junior
+                # ring-FG scoped by disjoint atom ownership (no double-count —
+                # verified). SAME coverage guards as the simple path (single
+                # amide; no defined stereo; every N-branch named; every junior
+                # FG contained in the N-substituent fragments). Previously this
+                # fell through to the chain machinery, which mis-rooted the
+                # N-aryl and abstained. Prefix ORDER follows the existing uniform
+                # amide convention; the P-14.5.2/P-16.3.3 N/C merge-and-order fix
+                # is a separate conformance lever tracked by
+                # test_amide_merged_prefix_p16_3_3::test_chain_amide_merges_too.
+                if _amide_guards_ok and _acyl_c in set(principal_chain):
+                    from ..assembly.composer import (
+                        _assemble_amide_name as _composer_name_amide,
+                        _generate_prefixes as _gen_prefixes_am,
+                    )
+                    # Fable BLOCKER guard (v31): _assemble_amide_name appends
+                    # _generate_prefixes(features) at PARENT level. That set is
+                    # honest for a LOCATED acyl-chain substituent (a '2-methyl'
+                    # branch, locant 2) but RE-EXPRESSES a junior FG that lives
+                    # inside an N-substituent yet cannot be placed on the acyl
+                    # parent — it comes back UNLOCATED ('cyano', 'dihydroxy'),
+                    # double-counting it: C=CC(=O)NCC#N ->
+                    # 'N-(cyanomethyl)cyanoprop-2-enamide',
+                    # C=CC(=O)N(CCO)CCO -> 'N,N-bis(2-hydroxyethyl)dihydroxyprop-2-enamide'
+                    # (parseable WRONG molecules gate-OFF). The acyl carbon is C1,
+                    # so EVERY legitimate acyl-chain substituent carries a locant;
+                    # an unlocated prefix is the double-count signature. Delegate
+                    # only when every generated prefix is located, else fall
+                    # through (fail closed — restores the pre-change behaviour).
+                    _has_unlocated_prefix = any(
+                        (not getattr(_p, 'locants', None))
+                        and not str(getattr(_p, 'text', ''))[:1].isdigit()
+                        for _p in _gen_prefixes_am(features)
+                    )
+                    if not _has_unlocated_prefix:
+                        _nm2 = _composer_name_amide(features, "pin")
+                        if _nm2 and _nm2 != "amide":
+                            return _nm2
+                # (A ring-attached anilide — benzoyl / cyclohexanecarbonyl on an
+                # N-aryl bearing a junior FG — never reaches here: its acyl carbon
+                # is not on the principal chain and its principal_chain is empty,
+                # so it returns None at the top guard and is named by the lever-C
+                # intercept in handlers/tier_a_ring.py via _name_ring_attached_anilide.)
                 # OFF-chain acyl (N-side is the chain): the chain-suffix
                 # machinery below is structurally wrong for this shape (double-
                 # expresses the amide) -> fail closed. ON-chain acyl (the

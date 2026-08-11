@@ -245,18 +245,25 @@ ASSEMBLY_POSITIVES = [
     ("CN1C(=O)c2ccccc2NC(=O)[C@@H]1Cc1ccccc1",
      "(4S)-4-benzyl-5-methyl-3,6-dioxo-2,5-diazabicyclo[5.4.0]undeca-"
      "1(11),7,9-triene"),
+    # v31 lever B (P-16.3.3): 'hydroxymethyl' is a compound substituent and is now
+    # ENCLOSED -> '(hydroxymethyl)'; the perturbed candidate strings also let the
+    # PIN-preferred SUFFIX form win (ring 4-OH -> '-4-ol', not a '4-hydroxy'
+    # prefix), which this file's own header (lines ~238-243) marks as better.
+    # RT-verified identical InChIKey.
     ("C[C@@]12CCC[C@@]3(C)[C@@H](C1)[C@@](O)(CO)CC[C@@]23C",
-     "(1R,3R,4R,7S,8S)-4-hydroxy-4-hydroxymethyl-1,7,8-trimethyltricyclo"
-     "[5.4.0.0^3,8]undecane"),
+     "(1R,3R,4R,7S,8S)-4-(hydroxymethyl)-1,7,8-trimethyltricyclo"
+     "[5.4.0.0^3,8]undecan-4-ol"),
     ("CC1=CC(=O)C2=C(C)CC[C@@H]3[C@H](OC(=O)[C@@H]3C)[C@@H]12",
      "(5S,6R,9S,10S)-2,6,11-trimethyl-7,13-dioxo-8-oxatricyclo"
      "[8.3.0.0^5,9]trideca-1,11-diene"),
     ("O=C1NC2=Nc3ccc(Cl)c(Cl)c3CN2C1O",
      "10,11-dichloro-6-hydroxy-5-oxo-2,4,7-triazatricyclo[7.4.0.0^3,7]"
      "trideca-1(9),2,10,12-tetraene"),
+    # v31 lever B (P-16.3.3): '(hydroxymethyl)' now enclosed + PIN-preferred
+    # SUFFIX form (ring 1,5-diol, not a '1,5-dihydroxy' prefix). RT-verified.
     ("C=C1[C@@H](CO)C[C@H](O)[C@H](C)[C@@H]2CC(C)(C)C[C@]12O",
-     "(1R,3S,5S,6R,7S)-1,5-dihydroxy-3-hydroxymethyl-6,9,9-trimethyl-2-"
-     "methylidenebicyclo[5.3.0]decane"),
+     "(1R,3S,5S,6R,7S)-3-(hydroxymethyl)-6,9,9-trimethyl-2-"
+     "methylidenebicyclo[5.3.0]decane-1,5-diol"),
     ("CC1CCCC(O)/C=C/C2C(O)CC(O)CC2/C=C/C=C\\C/C=C/C=C\\C(=O)O1",
      "(2E,11Z,13E,16Z,18E)-4,22,24-trihydroxy-8-methyl-10-oxo-9-oxabicyclo"
      "[18.4.0]tetracosa-2,11,13,16,18-pentaene"),

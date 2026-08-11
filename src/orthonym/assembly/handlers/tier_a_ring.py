@@ -186,6 +186,30 @@ def name_tier_a_ring(
             atom_to_locant_hint=None,
         )
 
+    # Lever C (v31, P-41 / P-66.1): a ring-attached ANILIDE — a senior secondary/
+    # tertiary amide whose acyl is a simple unsubstituted carbocycle (benzoyl,
+    # cyclohexanecarbonyl) and whose only junior FGs live inside the N-aryl
+    # substituent — must be named as the amide parent (benzamide /
+    # cyclohexanecarboxamide), NOT with the junior N-aryl ring as parent. Tier-A
+    # otherwise picks the phenol/aniline ring and demotes the amide to an
+    # 'N-benzoyl' prefix ('N-benzoyl-4-aminophenol', a P-41 violation — the amide
+    # outranks the phenol). _name_ring_attached_anilide is tightly scoped +
+    # fail-closed (returns None for everything else — substituted/fused/hetero
+    # acyl rings, defined stereo, un-contained junior FGs), so it preempts only
+    # the cases it names correctly and never touches the pool for any other
+    # molecule (the same shape as the KIH preempt above).
+    from ...rules.polyfunctional import _name_ring_attached_anilide
+    _anilide_name = _name_ring_attached_anilide(features)
+    if _anilide_name:
+        return NamingResult(
+            name=_anilide_name,
+            tree=NameTreeNode(
+                parent_stem=_anilide_name, class_id="tier_a_ring",
+                iupac_section_cite="P-66.1", fragment_legacy=_anilide_name,
+            ),
+            atom_to_locant_hint=None,
+        )
+
     # =========================================================================
     # TIER A RING COMPETITION — Phase 145.1 routes through CandidatePool
     # =========================================================================

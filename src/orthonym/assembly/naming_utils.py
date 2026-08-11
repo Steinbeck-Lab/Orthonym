@@ -1335,6 +1335,22 @@ def is_complex_substituent(name: str) -> bool:
     # "fluoromethyl", "trifluoromethyl", "chloroethyl" etc.
     if _HALOALKYL_RE.match(name):
         return True
+    # Compound FG-prefix + alkyl substituents per IUPAC P-16.3.3: a simple
+    # functional prefix fused to an alkyl-yl root is a SUBSTITUTED (compound)
+    # substituent and takes enclosing marks — 'hydroxymethyl' -> '(hydroxymethyl)',
+    # 'cyanomethyl' -> '(cyanomethyl)', 'carboxymethyl', 'aminoethyl', 'oxoethyl'.
+    # BB PINs: '2-(hydroxymethyl)benzene-1,4-diol' (:6802),
+    # '6-(hydroxymethyl)oxane-2,3,4-triol' (:2688), '(cyanomethyl)' (:33087),
+    # '4-chloro-2-(hydroxymethyl)-5-oxohexyl' (:25293). This is the SAME set that
+    # needs_brackets() already recognises (~:961); is_complex_substituent was the
+    # divergent predicate that missed it, so an N-substituent 'cyanomethyl' or a
+    # ring sub-substituent 'hydroxymethyl' was cited BARE ('N-cyanomethylacetamide',
+    # 'N-(4-hydroxymethylphenyl)acetamide'). The di/bis MULTIPLIER is decided
+    # elsewhere (get_multiplier_prefix uses a graph test, a spy measured zero calls
+    # here), so this promotes only the ENCLOSURE decision.
+    for _fg in _COMPOUND_FG_PREFIXES:
+        if name_lower.startswith(_fg) and name_lower[len(_fg):] in _ALKYL_ROOTS_FULL:
+            return True
     # Alkyl+amino compound substituents per IUPAC P-31.1.2:
     # "methylamino", "ethylamino", "phenylamino" etc.
     if _ALKYLAMINO_RE.match(name):

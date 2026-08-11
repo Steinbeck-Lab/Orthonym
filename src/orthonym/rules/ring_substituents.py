@@ -3893,6 +3893,22 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         from ..assembly.naming_utils import italicized_prefix_is_bare
         if italicized_prefix_is_bare(nm):
             return False
+        # v31 lever B (P-16.3.3): a compound FG-prefix + alkyl ('hydroxymethyl',
+        # 'cyanomethyl', 'carboxymethyl', 'aminoethyl') is a SUBSTITUTED (compound)
+        # substituent and takes enclosing marks even though it carries no
+        # digit/hyphen/mark — the character-class heuristic below misses it, so a
+        # ring decoration 'hydroxymethyl' was cited bare ('4-hydroxymethylphenyl').
+        # BB PINs: '2-(hydroxymethyl)benzene-1,4-diol' (:6802), '(cyanomethyl)'
+        # (:33087). Same set naming_utils.needs_brackets / is_complex_substituent
+        # recognise; scoped to this class to keep every other decoration
+        # byte-identical.
+        from ..assembly.naming_utils import (
+            _COMPOUND_FG_PREFIXES as _CFG, _ALKYL_ROOTS_FULL as _ARF,
+        )
+        _nml = nm.lower()
+        for _fg in _CFG:
+            if _nml.startswith(_fg) and _nml[len(_fg):] in _ARF:
+                return True
         return any(c in nm for c in '-()[]0123456789')
 
     if not any(_is_complex_prefix(nm) for nm in groups):
