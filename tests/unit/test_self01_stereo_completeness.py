@@ -27,3 +27,22 @@ def test_overspecified_is_not_omission():
 
 def test_unparseable_is_not_omission():
     assert namer._name_omits_input_stereo("not a smiles", "also not") is False
+
+
+def test_verdict_rejects_omission():
+    # (E)-azobenzene input; a stereo-free diazene name is a stereo OMISSION -> mismatch
+    assert namer._self_consistency_verdict(
+        r"C(/N=N/c1ccccc1)1=CC=CC=C1",
+        "C1(=CC=CC=C1)N=NC1=CC=CC=C1") == "mismatch"
+
+
+def test_verdict_ok_when_complete():
+    s = r"C[C@H](N)C(=O)O"
+    assert namer._self_consistency_verdict(s, s) == "ok"
+
+
+def test_verdict_ignore_stereo_still_ok_on_omission():
+    # the BBR-GATE carve-out must stay stereo-insensitive
+    assert namer._self_consistency_verdict(
+        r"C(/N=N/c1ccccc1)1=CC=CC=C1",
+        "C1(=CC=CC=C1)N=NC1=CC=CC=C1", ignore_stereo=True) == "ok"

@@ -979,11 +979,17 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
         return "ok"
     na = _specified_stereo_count(mi)
     nb = _specified_stereo_count(mo)
-    # Only an EQUAL, non-zero amount of specified stereo can be a genuine CONFLICT.
-    # na != nb is OMISSION (a less-specific name is valid). na == 0 (a stereo-
-    # UNSPECIFIED input named by a stereo-implying retained name) is a SEPARATE Blue
-    # Book question tracked in  — intentionally tolerated here.
-    if na == 0 or na != nb:
+    # na == 0 (stereo-UNSPECIFIED input named by a stereo-implying retained name)
+    # is a SEPARATE Blue Book question tracked in  — tolerated here.
+    if na == 0:
+        return "ok"
+    # v27 Phase 0: a name that specifies FEWER stereo features than the input OMITS
+    # defined stereo -> it describes a less-specific WRONG molecule. Reject it (0-wrong);
+    # the tier degrades (abstain at default; best-effort/later phases re-name with full
+    # stereo). Structural count, never a name-string scan.
+    if _name_omits_input_stereo(input_smiles, opsin_smiles):
+        return "mismatch"
+    if na != nb:            # name OVER-specifies (nb > na) -> tolerated (separate case)
         return "ok"
     # Equal specified-stereo count. When the two are the EXACT same constitution
     # (isomeric-stripped canonical equal — NOT merely mobile-H/tautomer-equivalent),
