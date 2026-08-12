@@ -23,6 +23,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from ..validation.binding_spine import BindingSpine, verify_spine
 from ..validation.e1_certificate import verify_certificate
 
 if TYPE_CHECKING:  # type-only; no runtime dependency on general_engine
@@ -66,13 +67,25 @@ def name_t4_complete(mol, features) -> Optional[str]:
     would return the ``_Candidate`` (which carries ``result_obj``) instead of a
     bare string.
 
-    Phase 0c Task 2a note: a wired ``verify_spine`` (audit mode) additional
-    gate was tried here and REVERTED -- it measurably false-voided 3 correct,
+    Phase 0c Task 2b: ALSO requires ``verify_spine`` (audit mode) to pass.
+    ``verify_certificate`` proves only the flat atom partition (P1's job); the
+    binding spine additionally proves bond totality (P2), token-span anchoring
+    (P4/P5) and arity (P6) -- axes E1 cannot see at all (a name whose bindings
+    silently re-fragment a ring, e.g. spelling cyclohexane as two disjoint
+    propyl halves, passes E1 outright). ``mode="audit"`` (never "strict") is
+    load-bearing here: strict promotes ``CHARGE_UNVERIFIED`` to an error and
+    would reject every currently-shipping charged T4 name; ``allow_charged=False``
+    matches the ``verify_certificate`` call above so the two proofs never
+    disagree about scope. A spine failure voids the candidate exactly like an
+    E1 failure does -- no new control flow.
+
+    Task 2a first wired this and measurably false-voided 3 correct,
     OPSIN-round-tripping dev500 rows via a pre-existing P6 (``token_arity``)
-    false-positive on replacement-nomenclature substituent tokens (a `SUBST`
-    prefix preceding a skeletal-replacement chain in one composite token). See
+    false-positive on replacement-nomenclature substituent tokens; that bug is
+    fixed (Task 2b, ``name_morphemes.py::_evaluate``'s multiplier short-circuit
+    now also skips zero-atom REPL segments) and the dev500 best-effort
+    before/after re-measurement is BYTE-IDENTICAL emit/rt_exact -- see
     `.superpowers/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md`.
-    Re-attempted once the P6 bug is fixed (Task 2b).
     """
     candidate = _best_effort_candidate(mol, features)
     if candidate is None:
@@ -81,6 +94,11 @@ def name_t4_complete(mol, features) -> Optional[str]:
         return candidate.name
     verdict = verify_certificate(mol, candidate.result_obj)
     if not verdict.ok:
+        return None
+    spine = BindingSpine.from_token_bindings(candidate.result_obj.bindings)
+    proof = verify_spine(mol, spine, candidate.name, mode="audit",
+                         allow_charged=False)
+    if not proof.ok:
         return None
     return candidate.name
 
@@ -102,6 +120,12 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
     decision identical to the backstop's, so a candidate we approve is never
     voided one call later. The coverage check means we return ``None`` ourselves
     rather than rely on the backstop, so no partial is ever handed up.
+
+    Phase 0c Task 2b: the SAME additional ``verify_spine`` (audit mode) check as
+    ``name_t4_complete`` -- see that docstring for why. Duplicated here (not
+    only at the outer gate) so a rung this function rejects never reaches the
+    cascade's next rung believing it merely failed E1; it is rejected for
+    exactly the reason the outer gate would reject it, one call earlier.
     """
     from .general_engine import name_general
 
@@ -117,6 +141,11 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
     if result is None:
         return None
     if not verify_certificate(mol, result).ok:
+        return None
+    spine = BindingSpine.from_token_bindings(result.bindings)
+    proof = verify_spine(mol, spine, result.name, mode="audit",
+                         allow_charged=False)
+    if not proof.ok:
         return None
     return _Candidate(name=result.name, result_obj=result)
 

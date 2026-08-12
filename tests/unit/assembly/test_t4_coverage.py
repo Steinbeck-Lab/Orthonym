@@ -13,6 +13,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly import t4_coverage
+from orthonym.assembly.general_engine import GeneralEngineResult, TokenBinding
 from orthonym.namer import Orthonym
 from orthonym.validation.e1_certificate import verify_certificate
 
@@ -113,9 +114,14 @@ def test_e1_fail_returns_none(monkeypatch):
 
 @pytest.mark.unit
 def test_e1_pass_returns_name(monkeypatch):
-    """A candidate that passes E1 ships its name unchanged."""
+    """A candidate that passes E1 AND the wired binding-spine audit (Phase 0c
+    Task 2b) ships its name unchanged. ``result_obj`` needs a real (empty)
+    ``.bindings`` -- the wiring calls ``BindingSpine.from_token_bindings``
+    unconditionally once E1 passes -- and ``verify_spine`` itself is mocked so
+    this test isolates the CONTROL FLOW (E1 pass + spine pass -> ship) from
+    the spine's own proofs, which have their own dedicated tests."""
     mol = _mol()
-    sentinel_result_obj = object()
+    sentinel_result_obj = types.SimpleNamespace(bindings=())
     monkeypatch.setattr(
         t4_coverage, "_best_effort_candidate",
         lambda m, f: t4_coverage._Candidate(
@@ -124,7 +130,63 @@ def test_e1_pass_returns_name(monkeypatch):
         t4_coverage, "verify_certificate",
         lambda m, r, allow_charged=False: types.SimpleNamespace(
             ok=True, reason="ok"))
+    monkeypatch.setattr(
+        t4_coverage, "verify_spine",
+        lambda m, s, n, mode="audit", allow_charged=False:
+            types.SimpleNamespace(ok=True, findings=(), stats={}))
     assert t4_coverage.name_t4_complete(mol, None) == "good"
+
+
+@pytest.mark.unit
+def test_spine_fail_returns_none(monkeypatch):
+    """Phase 0c Task 2b: a candidate that passes E1 but FAILS the wired
+    binding-spine audit is discarded -- the spine is an ADDITIONAL gate, not a
+    substitute for E1, so a spine-only defect must still void the candidate."""
+    mol = _mol()
+    sentinel_result_obj = types.SimpleNamespace(bindings=())
+    monkeypatch.setattr(
+        t4_coverage, "_best_effort_candidate",
+        lambda m, f: t4_coverage._Candidate(
+            name="bad-structure", result_obj=sentinel_result_obj))
+    monkeypatch.setattr(
+        t4_coverage, "verify_certificate",
+        lambda m, r, allow_charged=False: types.SimpleNamespace(
+            ok=True, reason="ok"))
+    monkeypatch.setattr(
+        t4_coverage, "verify_spine",
+        lambda m, s, n, mode="audit", allow_charged=False:
+            types.SimpleNamespace(
+                ok=False, findings=("BOND_AMBIGUOUS_LINKAGE",), stats={}))
+    assert t4_coverage.name_t4_complete(mol, None) is None
+
+
+@pytest.mark.unit
+def test_e1_passes_but_bond_drop_is_caught_by_the_wired_spine(monkeypatch):
+    """A REAL (unmocked) verify_spine run on a genuine E1-blind structural
+    defect: cyclohexane spelled as two disjoint 3-atom halves ('prop' +
+    'propyl') is atom-complete (E1 passes -- E1 never looks at bonds at all)
+    but the two undeclared cross bonds CLOSE A CYCLE that no substituent
+    prefix spells (BOND_AMBIGUOUS_LINKAGE, mirroring
+    ``test_p2_two_undeclared_cross_bonds_are_ambiguous`` in
+    ``test_binding_spine.py``, exercised here through the actual T4 wiring).
+    Before Phase 0c Task 2 this candidate would have SHIPPED as
+    'propylpropane' for cyclohexane -- a wrong structural claim E1 cannot see.
+    """
+    mol = Chem.MolFromSmiles("C1CCCCC1")
+    bad_result = GeneralEngineResult(
+        name="propylpropane",
+        bindings=(
+            TokenBinding((0, 1, 2), "prop", "parent"),
+            TokenBinding((3, 4, 5), "propyl", "prefix"),
+        ),
+    )
+    monkeypatch.setattr(
+        t4_coverage, "_best_effort_candidate",
+        lambda m, f: t4_coverage._Candidate(
+            name="propylpropane", result_obj=bad_result))
+    # E1 itself must actually pass this (proving the defect is E1-invisible):
+    assert verify_certificate(mol, bad_result).ok
+    assert t4_coverage.name_t4_complete(mol, None) is None
 
 
 @pytest.mark.unit
