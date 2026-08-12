@@ -23,7 +23,9 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from ..validation.binding_spine import BindingSpine, verify_spine
+from ..validation.binding_spine import (BindingSpine,
+                                        STRICT_STEREO_CHARGE_AXES,
+                                        verify_spine)
 from ..validation.e1_certificate import verify_certificate
 
 if TYPE_CHECKING:  # type-only; no runtime dependency on general_engine
@@ -72,12 +74,26 @@ def name_t4_complete(mol, features) -> Optional[str]:
     binding spine additionally proves bond totality (P2), token-span anchoring
     (P4/P5) and arity (P6) -- axes E1 cannot see at all (a name whose bindings
     silently re-fragment a ring, e.g. spelling cyclohexane as two disjoint
-    propyl halves, passes E1 outright). ``mode="audit"`` (never "strict") is
-    load-bearing here: strict promotes ``CHARGE_UNVERIFIED`` to an error and
-    would reject every currently-shipping charged T4 name; ``allow_charged=False``
+    propyl halves, passes E1 outright). ``mode="audit"`` stays the base mode
+    (never "strict" here): a blanket strict flip would ALSO change P2's
+    bond-linkage inference policy and P5/P6's unrelated unproven-codes
+    severity, none of which this task's scope covers. ``allow_charged=False``
     matches the ``verify_certificate`` call above so the two proofs never
     disagree about scope. A spine failure voids the candidate exactly like an
     E1 failure does -- no new control flow.
+
+    Phase 0c Task 4: ``escalate=STRICT_STEREO_CHARGE_AXES`` promotes JUST the
+    P8 stereo axis and P3's ``CHARGE_UNVERIFIED`` to error severity, on top of
+    ``mode="audit"`` -- the coverage certificate's stereo axis was shipped
+    audit-only in Task 3 (findings recorded, `ok` never affected); the Task 4
+    diagnostic re-scan found 0 remaining false positives and 0 genuine stereo
+    drops, so this makes it enforcing. ``allow_charged=False`` means
+    ``NET_CHARGE_OUT_OF_SCOPE`` (unconditional "error", not mode/escalate-
+    gated) already voids any nonzero-net-charge candidate reaching this
+    point regardless of this promotion; what newly blocks is a T4 ZWITTERION
+    (net charge 0, but individual atoms charged) whose charges no producer
+    threaded through ``charge_atom_ids`` -- measured byte-identical on
+    dev500 best-effort (see the Task 4 report).
 
     Task 2a first wired this and measurably false-voided 3 correct,
     OPSIN-round-tripping dev500 rows via a pre-existing P6 (``token_arity``)
@@ -100,7 +116,8 @@ def name_t4_complete(mol, features) -> Optional[str]:
         stereo_atom_to_locant=getattr(
             candidate.result_obj, 'stereo_atom_to_locant', None))
     proof = verify_spine(mol, spine, candidate.name, mode="audit",
-                         allow_charged=False)
+                         allow_charged=False,
+                         escalate=STRICT_STEREO_CHARGE_AXES)
     if not proof.ok:
         return None
     return candidate.name
@@ -129,6 +146,9 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
     only at the outer gate) so a rung this function rejects never reaches the
     cascade's next rung believing it merely failed E1; it is rejected for
     exactly the reason the outer gate would reject it, one call earlier.
+
+    Phase 0c Task 4: the SAME ``escalate=STRICT_STEREO_CHARGE_AXES`` promotion
+    as ``name_t4_complete`` -- see that docstring.
     """
     from .general_engine import name_general
 
@@ -149,7 +169,8 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
         result.bindings,
         stereo_atom_to_locant=getattr(result, 'stereo_atom_to_locant', None))
     proof = verify_spine(mol, spine, result.name, mode="audit",
-                         allow_charged=False)
+                         allow_charged=False,
+                         escalate=STRICT_STEREO_CHARGE_AXES)
     if not proof.ok:
         return None
     return _Candidate(name=result.name, result_obj=result)

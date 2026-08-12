@@ -178,6 +178,46 @@ def test_charge_claims_are_declared_in_the_binding_spine(smiles, expected):
     assert proof.ok, proof.findings
 
 
+# --------------------------------------------------------------------------
+# Phase 0c Task 4 Part C: the T4 wiring now promotes P8's stereo axis and
+# P3's CHARGE_UNVERIFIED to error severity (``escalate=STRICT_STEREO_CHARGE_AXES``,
+# ``mode`` stays "audit"). These two ACCEPT_CASES are the task's named charge
+# witnesses -- confirm the promotion does not touch them: their
+# ``charge_atom_ids`` are already threaded (Task 2a), so CHARGE_UNVERIFIED
+# never fires for them regardless of severity, the proof stays ``ok``, and
+# the emitted name is unchanged.
+# --------------------------------------------------------------------------
+_TASK4_CHARGE_WITNESSES = [
+    ("C[n+]1cc[n+](C)cc1", "1,4-dimethyl-1,4-diazine-1,4-diium"),
+    ("[SiH3]C[CH-]C", "1-silylpropan-2-ide"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", _TASK4_CHARGE_WITNESSES)
+def test_charge_witnesses_still_verify_clean_under_task4_strict_axes(
+        smiles, expected):
+    got = _engine_name(smiles, allow_aromatic_general=True)
+    assert got == expected, f"{smiles}: {got!r} != {expected!r}"
+
+    canon = Chem.CanonSmiles(smiles)
+    mol = Chem.MolFromSmiles(canon)
+    nm = Orthonym(style="pin", general_fallback=True,
+                   allow_aromatic_general=True)
+    feats = nm._perceive(mol, canon, canon)
+    nm._classify(feats)
+    eng = name_general(mol, feats, allow_aromatic_general=True)
+    assert eng is not None and eng.name == expected
+
+    spine = BindingSpine.from_token_bindings(
+        eng.bindings,
+        stereo_atom_to_locant=getattr(eng, 'stereo_atom_to_locant', None))
+    proof = verify_spine(mol, spine, eng.name, mode="audit",
+                         allow_charged=True,
+                         escalate=bs.STRICT_STEREO_CHARGE_AXES)
+    assert bs.CHARGE_UNVERIFIED not in proof.codes()
+    assert proof.ok, proof.findings
+
+
 def test_e1_certificate_rejects_charge_by_default():
     smi = Chem.CanonSmiles("[SiH3][n+]1ccccc1")
     mol = Chem.MolFromSmiles(smi)

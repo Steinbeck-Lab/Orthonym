@@ -132,7 +132,7 @@ def test_e1_pass_returns_name(monkeypatch):
             ok=True, reason="ok"))
     monkeypatch.setattr(
         t4_coverage, "verify_spine",
-        lambda m, s, n, mode="audit", allow_charged=False:
+        lambda m, s, n, mode="audit", allow_charged=False, escalate=frozenset():
             types.SimpleNamespace(ok=True, findings=(), stats={}))
     assert t4_coverage.name_t4_complete(mol, None) == "good"
 
@@ -154,7 +154,7 @@ def test_spine_fail_returns_none(monkeypatch):
             ok=True, reason="ok"))
     monkeypatch.setattr(
         t4_coverage, "verify_spine",
-        lambda m, s, n, mode="audit", allow_charged=False:
+        lambda m, s, n, mode="audit", allow_charged=False, escalate=frozenset():
             types.SimpleNamespace(
                 ok=False, findings=("BOND_AMBIGUOUS_LINKAGE",), stats={}))
     assert t4_coverage.name_t4_complete(mol, None) is None
