@@ -96,13 +96,23 @@ def test_an_ACYCLIC_stereocentre_refuses():
     assert terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0) is None
 
 
-def test_an_ACYCLIC_defined_double_bond_refuses():
-    """Same isolation for E/Z: nameable by Task 3 but for the configuration."""
+def test_an_ACYCLIC_defined_backbone_double_bond_now_emits_ez():
+    """v30 internal-C=C lever: a defined BACKBONE C=C configuration is now
+    EMITTED as a leading (nE)/(nZ) block rather than refused (only R/S centres,
+    which this module still cannot spell, keep refusing -- see the sibling test).
+
+    OPSIN-verified in a parent: `[(2E)-pent-2-en-1-yl]benzene` -> CC/C=C/Cc1ccccc1
+    (RT-exact), while the stereo-less `pent-2-en-1-ylbenzene` parses to a
+    DIFFERENT molecule -- which is exactly why the achiral token had to refuse
+    before, and why emitting the E/Z form is the correct fix, not a relaxation.
+    """
     mol = Chem.MolFromSmiles(r"C/C=C/CC")
     assert mol is not None
     assert any(b.GetStereo() != Chem.BondStereo.STEREONONE
                for b in mol.GetBonds()), "fixture must actually carry stereo"
-    assert terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0) is None
+    got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0)
+    assert got is not None
+    assert got.name == "(2E)-pent-2-en-1-yl"
 
 
 def test_a_stereocentre_in_the_fragment_refuses():

@@ -132,15 +132,31 @@ def _has_defined_stereo(mol, frag: Set[int]) -> bool:
     Only stereo INSIDE the fragment matters. A centre elsewhere in the molecule
     belongs to whatever names that part; blocking on it would refuse fragments
     this module handles correctly.
+
+    Split (v30 internal-C=C lever) into an ATOM half and a BOND half. A defined
+    R/S centre is still never expressible here, but a defined BACKBONE C=C
+    configuration is now emitted as a leading ``(nE)/(nZ)`` block on the ACYCLIC
+    path, so only the atom half unconditionally refuses; the bond half still
+    guards the composite/ring path, which emits no stereodescriptor.
     """
-    for idx in frag:
-        if mol.GetAtomWithIdx(idx).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
-            return True
-    for bond in mol.GetBonds():
-        if (bond.GetBeginAtomIdx() in frag and bond.GetEndAtomIdx() in frag
-                and bond.GetStereo() != Chem.BondStereo.STEREONONE):
-            return True
-    return False
+    return _has_defined_atom_stereo(mol, frag) or _has_defined_bond_stereo(mol, frag)
+
+
+def _has_defined_atom_stereo(mol, frag: Set[int]) -> bool:
+    """True if any atom of ``frag`` carries a DEFINED chiral tag. This module
+    emits no R/S descriptor, so such a fragment always refuses (0-wrong)."""
+    return any(
+        mol.GetAtomWithIdx(idx).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+        for idx in frag)
+
+
+def _has_defined_bond_stereo(mol, frag: Set[int]) -> bool:
+    """True if any wholly-internal bond of ``frag`` carries a DEFINED
+    configuration (E/Z / cis-trans)."""
+    return any(
+        bond.GetStereo() != Chem.BondStereo.STEREONONE
+        and bond.GetBeginAtomIdx() in frag and bond.GetEndAtomIdx() in frag
+        for bond in mol.GetBonds())
 
 
 def _single_heteroatom_branch_prefix(mol, comp: Set[int]) -> Optional[str]:
@@ -476,15 +492,24 @@ def _terminal_fragment_name(
     # species.
     if any(mol.GetAtomWithIdx(a).GetFormalCharge() != 0 for a in frag):
         return None
-    # Stereochemistry: refuse rather than emit an achiral token for a fragment
-    # that carries a defined centre or configuration. See _has_defined_stereo --
-    # SELF-01 is constitution-only and cannot catch this.
-    if _has_defined_stereo(mol, frag):
-        logger.info("terminal_fragment: fragment carries defined stereo and this "
-                    "module emits no stereodescriptors; refuse")
+    # Stereochemistry (v30 internal-C=C lever). A defined R/S CENTRE is never
+    # expressible here (no R/S descriptor is emitted), so it always refuses --
+    # SELF-01 is constitution-only and cannot catch a dropped centre. A defined
+    # BACKBONE C=C configuration, by contrast, IS emitted as a leading
+    # (nE)/(nZ) block on the acyclic path below, so it no longer forces a refusal.
+    if _has_defined_atom_stereo(mol, frag):
+        logger.info("terminal_fragment: fragment carries a defined stereocentre "
+                    "and this module emits no R/S descriptor; refuse")
         return None
 
     if not _is_acyclic(mol, frag):
+        # The composite/ring path emits no stereodescriptor at all, so a defined
+        # ring or ring-adjacent double-bond configuration would be dropped (a
+        # wrong molecule SELF-01 cannot catch) -- keep refusing it here.
+        if _has_defined_bond_stereo(mol, frag):
+            logger.info("terminal_fragment: composite fragment carries defined "
+                        "bond stereo; refuse (no stereodescriptor on this path)")
+            return None
         return _composite_fragment_name(mol, frag, attach_idx)
 
     ranks = _canonical_ranks(mol)
@@ -514,6 +539,48 @@ def _terminal_fragment_name(
             return None
 
     numbering = {a: i + 1 for i, a in enumerate(backbone)}
+
+    # --- backbone C=C geometry -> leading (nE)/(nZ) block (v30 internal-C=C) ---
+    # A defined-stereo backbone double bond is now expressed rather than refused
+    # (the atom-stereo guard above already refused any R/S centre). Mirrors
+    # assembly.substituent_naming._unsaturated_substituent_name: E/Z from the
+    # bond CIP code, locant = the lower backbone locant, merged + locant-ordered.
+    # Any in-fragment bond stereo that is neither a backbone bond of THIS chain
+    # nor wholly inside a branch (named by the recursion below) fails closed.
+    descriptor = ""
+    _stereo_bonds = [
+        b for b in mol.GetBonds()
+        if b.GetStereo() != Chem.BondStereo.STEREONONE
+        and b.GetBeginAtomIdx() in frag and b.GetEndAtomIdx() in frag]
+    if _stereo_bonds:
+        _bb_bond_ids = set()
+        for i in range(len(backbone) - 1):
+            _bb = mol.GetBondBetweenAtoms(backbone[i], backbone[i + 1])
+            if _bb is not None:
+                _bb_bond_ids.add(_bb.GetIdx())
+        _branch_sets = [set(comp) for _, _, comp in branches]
+        from ..perception.stereo import assign_stereochemistry
+        if any(not b.HasProp('_CIPCode') for b in _stereo_bonds):
+            assign_stereochemistry(mol)
+        _ez_bits = []
+        for b in _stereo_bonds:
+            if b.GetIdx() in _bb_bond_ids:
+                if not b.HasProp('_CIPCode'):
+                    return None
+                _ez = b.GetProp('_CIPCode')
+                if _ez not in ('E', 'Z'):
+                    return None
+                _ez_bits.append((min(numbering[b.GetBeginAtomIdx()],
+                                     numbering[b.GetEndAtomIdx()]), _ez))
+            elif any(b.GetBeginAtomIdx() in s and b.GetEndAtomIdx() in s
+                     for s in _branch_sets):
+                continue  # inside a branch -> its own recursion emits the E/Z
+            else:
+                return None  # off-backbone geometry we cannot place -> refuse
+        if _ez_bits:
+            _ez_bits.sort()
+            descriptor = "(" + ",".join(f"{lc}{ez}" for lc, ez in _ez_bits) + ")-"
+
     rp = build_replacement_prefix(mol, numbering, set(backbone))
     if rp.unexpressed:
         logger.info(
@@ -566,7 +633,7 @@ def _terminal_fragment_name(
     if prefix_tokens:
         name = _join_prefix_block(_assemble_prefixes(prefix_tokens), name)
 
-    result = TerminalFragmentName(name=name, numbering=numbering,
+    result = TerminalFragmentName(name=descriptor + name, numbering=numbering,
                                   basis="chain", atoms=frozenset(accounted))
     if result.atoms != frozenset(frag):
         logger.error("terminal_fragment: completeness invariant violated "
