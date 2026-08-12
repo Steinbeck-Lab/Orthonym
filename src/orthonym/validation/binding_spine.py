@@ -103,7 +103,8 @@ from typing import (Any, Dict, Iterable, Iterator, List, Literal, NamedTuple,
 from rdkit import Chem
 
 from orthonym.rules.stereochemistry import (
-    _STEREO_PREFIX_RE, assign_stereochemistry, collect_stereodescriptors)
+    _STEREO_EMBEDDED_RE, _STEREO_PREFIX_RE, assign_stereochemistry,
+    collect_stereodescriptors)
 from orthonym.validation.name_morphemes import (free_valence_morphology,
                                                  token_arity)
 
@@ -148,6 +149,26 @@ SUBSTITUENT_STEREO_MISMATCH = "SUBSTITUENT_STEREO_MISMATCH"
 # spine claims was independently corroborated, so the proofs that ran have
 # established nothing about what the name spells.
 PROOF_UNSUBSTANTIATED = "PROOF_UNSUBSTANTIATED"
+
+# Phase 0c Task 4: the P8 stereo axis and P3's CHARGE_UNVERIFIED, as a named
+# set a caller can force to "error" via ``verify_spine(..., escalate=...)``
+# WITHOUT flipping the global ``mode`` (which also governs P2's bond-linkage
+# inference policy and P5/P6's UNBOUND_MORPHEME/ARITY_UNVERIFIED severity --
+# axes outside this task's scope, so a blanket ``mode="strict"`` would risk
+# an unrelated regression a caller wanting ONLY stereo+charge enforcement did
+# not ask for). ``SUBSTITUENT_STEREO_UNVERIFIED`` is deliberately EXCLUDED:
+# it is hardcoded ``"info"`` even in ``_p8b_substituent_stereo`` and never
+# mode-conditional -- ambiguous multiplicity (>=2 candidate bonds/descriptors)
+# is genuinely not resolvable here, "never confidently wrong" by design, not
+# an unproven-but-provable case like the others in this set.
+STRICT_STEREO_CHARGE_AXES = frozenset({
+    CHARGE_UNVERIFIED,
+    STEREO_UNVERIFIED,
+    STEREO_DESCRIPTOR_MISSING,
+    STEREO_DESCRIPTOR_MISMATCH,
+    SUBSTITUENT_STEREO_MISSING,
+    SUBSTITUENT_STEREO_MISMATCH,
+})
 
 
 class BindingKind(str, Enum):
@@ -1306,25 +1327,19 @@ def _p7_free_valence(mol, spine, findings, stats) -> None:
 _STEREO_TOKEN_RE = re.compile(r'^(\d*[a-z]?)([RSrsEZez])$')
 
 
-def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
-    """The leading ``(...)-``/``(...)`` stereodescriptor block of ``text``,
-    as ``[(locant, cip), ...]`` -- ``locant`` is ``int`` for a plain numeral,
-    the composite STRING for a lettered one (``'3a'``), or ``None`` for a
-    bare unlocanted descriptor (``(R)-``, a single-stereocentre molecule).
+def _parse_stereo_block_pairs(block: str) -> List[Tuple[Any, str]]:
+    """Parse ONE already-matched ``(...)`` stereodescriptor block's
+    comma-separated pieces into ``[(locant, cip), ...]`` -- ``locant`` is
+    ``int`` for a plain numeral, the composite STRING for a lettered one
+    (``'3a'``), or ``None`` for a bare unlocanted descriptor (``(R)``, a
+    single-stereocentre molecule). ``block`` is the full matched span
+    including its parentheses (a trailing ``-``, if any, is not part of it
+    and is not required).
 
-    Uses ``_STEREO_PREFIX_RE`` (REUSED VERBATIM, not reimplemented) only to
-    find the block; every pair is then parsed here so a caller can compare
-    against real atom/bond identity rather than merely counting matches --
-    the load-bearing difference from ``count_expressed_stereo_descriptors``
-    (``rules/stereochemistry.py:707``), which this function must never be
-    confused with: that one sums regex hits across the WHOLE name against a
-    bare integer, atom-blind; this one returns the actual (locant, cip) pairs
-    for identity resolution by the caller.
+    Shared by ``_parse_leading_stereo_block`` (name/token-START anchor) and
+    ``_iter_embedded_ez_pairs`` (anywhere in the text) so the two callers
+    can never drift on how a piece is parsed.
     """
-    m = _STEREO_PREFIX_RE.match(text or "")
-    if not m:
-        return []
-    block = m.group(0)
     inner = block[1:block.rindex(')')]
     pairs: List[Tuple[Any, str]] = []
     for part in inner.split(','):
@@ -1339,6 +1354,90 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
             pairs.append((loc_str, cip))
         else:
             pairs.append((int(loc_str), cip))
+    return pairs
+
+
+def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
+    """The leading ``(...)-``/``(...)`` stereodescriptor block of ``text``,
+    as ``[(locant, cip), ...]`` (see ``_parse_stereo_block_pairs``).
+
+    Uses ``_STEREO_PREFIX_RE`` (REUSED VERBATIM, not reimplemented) only to
+    find the block; every pair is then parsed here so a caller can compare
+    against real atom/bond identity rather than merely counting matches --
+    the load-bearing difference from ``count_expressed_stereo_descriptors``
+    (``rules/stereochemistry.py:707``), which this function must never be
+    confused with: that one sums regex hits across the WHOLE name against a
+    bare integer, atom-blind; this one returns the actual (locant, cip) pairs
+    for identity resolution by the caller.
+    """
+    m = _STEREO_PREFIX_RE.match(text or "")
+    if not m:
+        return []
+    return _parse_stereo_block_pairs(m.group(0))
+
+
+# Task 4 fix (root cause 3): a functional-class TWO-WORD name (P-65.6.3.2.1
+# ester, "methyl (1R,12R,19S)-...-3-carboxylate") puts the ester alkyl word
+# before the parent's leading descriptor block, so `_parse_leading_stereo_block`
+# anchored at index 0 finds nothing and P8a misreports every real centre as
+# MISSING. Rather than hardcode a list of alkyl/functional-class words, this
+# matches ANY single bare word (letters/digits/apostrophe/hyphen, no space)
+# followed by whitespace, and is only even tried after the position-0 match
+# has already failed -- so it changes nothing for the overwhelming majority
+# of names that already carry the block at index 0.
+_LEADING_WORD_RE = re.compile(r"^([A-Za-z][\w'-]*)\s+")
+
+
+def _find_leading_stereo_pairs(name: str) -> List[Tuple[Any, str]]:
+    """P8a's forward-parse entry point: the parent-scope leading
+    stereodescriptor block, tolerant of ONE preceding functional-class word.
+
+    Tries the position-0 match first (byte-identical to
+    ``_parse_leading_stereo_block`` for every ordinary name); only on
+    failure does it retry after skipping a single leading bare-word token,
+    which is what a two-word functional-class name puts before the parent's
+    own block. Still resolves every pair through the SAME
+    ``_parse_stereo_block_pairs`` used everywhere else -- this only changes
+    WHERE the block is looked for, never how a match is turned into
+    (locant, cip) identity.
+    """
+    pairs = _parse_leading_stereo_block(name)
+    if pairs:
+        return pairs
+    m = _LEADING_WORD_RE.match(name or "")
+    if m:
+        return _parse_leading_stereo_block(name[m.end():])
+    return []
+
+
+def _iter_embedded_ez_pairs(text: str) -> List[Tuple[Any, str]]:
+    """Every E/Z (bond) stereodescriptor pair embedded ANYWHERE in ``text``.
+
+    Task 4 fix (root causes 1 and 2). P8b's only ground truth is a PREFIX
+    binding's own internal E/Z bond(s) -- a substituent's own R/S atom
+    stereocentre is a different mechanism entirely (resolved elsewhere, or
+    refused upstream for the substituent-atom case; never P8b's to judge --
+    see the P8b docstring). The diagnostic found two independent bugs from
+    reusing the general leading-block parser here:
+
+    1. It admits R/S as well as E/Z, so a substituent that legitimately
+       carries its own embedded R/S descriptor from a different producer
+       (``(2R)-6-methylheptan-2-yl``, ``(R)-1-(1H-indol-3-yl)ethyl``) was
+       misread as a fabricated E/Z claim (6 of the 8 Task-4 false positives).
+    2. It only matches at index 0 (``_STEREO_PREFIX_RE.match``), so a real
+       embedded ``(1E)`` sitting mid-token -- inside a large flat composite
+       PREFIX binding with nested sub-fragment text before it -- was missed
+       entirely and reported as a dropped descriptor (1 more).
+
+    This scans with the UNANCHORED ``_STEREO_EMBEDDED_RE`` (finds a block
+    anywhere in the text, not only at its start) and keeps only the pairs
+    whose CIP letter is E or Z.
+    """
+    pairs: List[Tuple[Any, str]] = []
+    for m in _STEREO_EMBEDDED_RE.finditer(text or ""):
+        for locant, cip in _parse_stereo_block_pairs(m.group(0)):
+            if cip in ("E", "Z", "e", "z"):
+                pairs.append((locant, cip))
     return pairs
 
 
@@ -1386,14 +1485,29 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
 
     Severity is mode-conditional (``"warn"`` in ``"audit"``, ``"error"`` in
     ``"strict"``) for every P8 code, deliberately matching P3/P5/P6 rather
-    than P1/P2/P4's unconditional errors -- Phase 0c Task 3 is AUDIT-ONLY by
-    design (every production call site uses ``mode="audit"``, so this can
-    never change which T4 candidate ships this round); Task 4 promotes it
-    once the diagnostic scan this task also produces shows it is clean.
+    than P1/P2/P4's unconditional errors -- Phase 0c Task 3 shipped this
+    AUDIT-ONLY; Task 4 promotes it to ``"strict"`` on the T4 wiring once the
+    diagnostic scan this task also produces shows it is clean.
+
+    Task 4 fix: the forward parse uses ``_find_leading_stereo_pairs``, not
+    the bare ``_parse_leading_stereo_block``, so a functional-class two-word
+    name (``"methyl (1R,...)-...-carboxylate"``) resolves its block after
+    the alkyl word instead of reporting every real centre MISSING.
+
+    Task 4 fix (locant-omission guard, from the Task 3 review Minor): P-14.3.4
+    licenses dropping a stereocentre's locant when the molecule has exactly
+    one (``(R)-...`` rather than ``(2R)-...``). Today's formatter always
+    emits the locant, so ``emitted``/``expected`` never actually disagree
+    only on the locant in production -- but the raw set-compare below would
+    misread a future bare single-centre descriptor as BOTH a missing AND a
+    mismatched pair (same CIP letter, "different" locant). Normalise a
+    single bare descriptor against the molecule's one real centre BEFORE the
+    set comparison so that licensed omission resolves correctly whenever it
+    starts happening, not just when the omission is latent.
     """
     assign_stereochemistry(mol)
     locant_map = dict(spine.stereo_atom_to_locant)
-    emitted = _parse_leading_stereo_block(name or "")
+    emitted = _find_leading_stereo_pairs(name or "")
     severity = "error" if mode == "strict" else "warn"
 
     stats["stereo_locant_map_size"] = len(locant_map)
@@ -1413,6 +1527,16 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     stats["stereo_confident"] = True
     expected = collect_stereodescriptors(mol, locant_map)
     expected_set = set(expected)
+
+    # Locant-omission normalisation (P-14.3.4): a lone bare descriptor
+    # resolves to the molecule's one real centre when there IS exactly one,
+    # rather than being compared literally against its (real) locant.
+    if len(expected_set) == 1 and len(emitted) == 1:
+        (exp_locant, exp_cip) = next(iter(expected_set))
+        e_locant, e_cip = emitted[0]
+        if e_locant is None and e_cip == exp_cip:
+            emitted = [(exp_locant, exp_cip)]
+
     emitted_set = set(emitted)
 
     missing = sorted(expected_set - emitted_set, key=lambda t: str(t[0]))
@@ -1464,6 +1588,11 @@ def _p8b_substituent_stereo(mol, spine: BindingSpine, mode: str,
     letter. Zero-vs-one in either direction (a real bond with no embedded
     descriptor, or an embedded descriptor with no real bond backing it) is
     unambiguous and reported as a mismatch/missing finding, not "unverified".
+
+    Task 4 fix: ``embedded`` comes from ``_iter_embedded_ez_pairs``, not the
+    general leading-block parser -- see that function's docstring for the
+    two bugs (R/S mistaken for E/Z; index-0-only anchoring missing a
+    mid-token block) this closes.
     """
     severity = "error" if mode == "strict" else "warn"
     checked = 0
@@ -1479,7 +1608,7 @@ def _p8b_substituent_stereo(mol, spine: BindingSpine, mode: str,
             if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z')
             and bond.GetBeginAtomIdx() in atoms and bond.GetEndAtomIdx() in atoms
         ]
-        embedded = _parse_leading_stereo_block(binding.token)
+        embedded = _iter_embedded_ez_pairs(binding.token)
         if not internal_ez and not embedded:
             continue
         checked += 1
@@ -1519,7 +1648,8 @@ def _p8b_substituent_stereo(mol, spine: BindingSpine, mode: str,
 
 
 def verify_spine(mol, spine: BindingSpine, name: str, *,
-                 mode: str = "audit", allow_charged: bool = False) -> SpineProof:
+                 mode: str = "audit", allow_charged: bool = False,
+                 escalate: frozenset = frozenset()) -> SpineProof:
     """Prove that ``spine`` binds ``name`` to exactly the graph of ``mol``.
 
     Runs P1 (atom partition), P2 (bond totality), P3 (charge totality),
@@ -1531,6 +1661,15 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     unique undeclared cross-subtree bond as an attachment (what today's
     producers actually emit) and warns on the unproven, ``"strict"`` requires
     every bond to be declared or internal and leaves nothing unproven.
+
+    ``escalate`` (Phase 0c Task 4) force-promotes any listed finding CODE from
+    ``"warn"`` to ``"error"`` after every proof has run, independent of
+    ``mode`` -- the mechanism the T4 wiring uses to enforce JUST the P8
+    stereo axis and P3's ``CHARGE_UNVERIFIED`` (``STRICT_STEREO_CHARGE_AXES``)
+    without also flipping P2's bond-linkage inference policy or P5/P6's
+    unrelated unproven-codes, which a blanket ``mode="strict"`` would do too.
+    Never touches ``"info"``-severity findings (``SUBSTITUENT_STEREO_UNVERIFIED``
+    is never in ``STRICT_STEREO_CHARGE_AXES`` for exactly this reason).
 
     ``stats["proofs"]`` lists the proofs that actually ran, so ``ok`` is never
     mistaken for a stronger guarantee than was computed. A failed P1 drops
@@ -1588,6 +1727,15 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     _p8b_substituent_stereo(mol, spine, mode, findings, stats)
     proofs.append("P8")
     stats["proofs"] = tuple(proofs)
+
+    if escalate:
+        findings = [
+            Finding(f.code, f.detail, "error")
+            if f.code in escalate and f.severity == "warn" else f
+            for f in findings
+        ]
+    stats["escalated_axes"] = tuple(sorted(escalate))
+
     return SpineProof(
         ok=not any(f.severity == "error" for f in findings),
         findings=tuple(findings),
