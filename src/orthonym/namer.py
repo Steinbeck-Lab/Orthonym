@@ -924,6 +924,20 @@ def _specified_stereo_count(mol) -> int:
     return n
 
 
+def _name_omits_input_stereo(input_smiles: str, opsin_smiles: str) -> bool:
+    """True iff the name's OPSIN re-perception (``opsin_smiles``) specifies FEWER
+    stereo features than the input structure — a stereo OMISSION, i.e. the name
+    describes a less-specific (WRONG) molecule. Structural (counts on the parsed
+    mols), never a string scan of the name. Returns False when the two are equal,
+    when the name over-specifies, or when either is unparseable (fail-OPEN: an
+    inconclusive comparison never rejects)."""
+    mi = Chem.MolFromSmiles(input_smiles)
+    mo = Chem.MolFromSmiles(opsin_smiles)
+    if mi is None or mo is None:
+        return False
+    return _specified_stereo_count(mo) < _specified_stereo_count(mi)
+
+
 def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
                               ignore_stereo: bool = False) -> str:
     """``"ok"`` | ``"mismatch"`` | ``"inconclusive"`` — does the OPSIN re-perception of
