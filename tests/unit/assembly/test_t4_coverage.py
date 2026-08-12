@@ -205,6 +205,25 @@ def test_t4_ring_plus_offring_fg_is_complete():
 
 
 @pytest.mark.unit
+def test_t4_chiral_ester_alkyl_word_does_not_void_the_parent_stereo():
+    """Phase 0c Task 4 FIX-ROUND regression (reviewer-found, real end-to-end
+    reproduction): a functional-class two-word ester name whose ALKYL word
+    is itself chiral (built by the fully general substituent namer, so it
+    carries its OWN leading ``(nR)/(nS)`` block) used to make P8a select
+    that word's descriptor instead of the parent's -- reporting all 3 real
+    parent centres MISSING and, under
+    ``escalate=STRICT_STEREO_CHARGE_AXES``, voiding this otherwise fully
+    correct T4 candidate (an abstain, not a wrong name -- but a genuine
+    breadth regression this fix closes).
+    """
+    smi = "CC[C@]12C=CCN3CC[C@]4(C(=C(C(=O)O[C@@H](C)CC)C1)Nc1ccccc14)[C@@H]32"
+    mol, feats = _classified(smi)
+    name = t4_coverage.name_t4_complete(mol, feats)
+    assert name is not None, "the chiral-ester-alkyl candidate must not be voided"
+    assert name.startswith("(2S)-butan-2-yl (1R,12R,19S)-"), name
+
+
+@pytest.mark.unit
 def test_t4_candidate_is_complete_or_none():
     """Invariant: the producer NEVER hands up a partial. For the CLASS-A
     target it returns a candidate whose bindings cover EVERY heavy atom

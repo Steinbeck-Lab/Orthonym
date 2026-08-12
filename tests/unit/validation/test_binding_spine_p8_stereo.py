@@ -272,6 +272,43 @@ def test_p8a_still_flags_wrong_letters_after_functional_class_word():
     assert bs.STEREO_DESCRIPTOR_MISSING in codes, codes
 
 
+def test_p8a_selects_parent_block_when_first_word_has_its_own_stereo():
+    """FIX-ROUND regression (reviewer-found, real end-to-end reproduction):
+    a functional-class two-word name whose FIRST word is not a bare alkyl
+    identifier but a fully general substituent carrying ITS OWN leading
+    ``(nR)/(nS)`` block -- e.g. a chiral ester alkyl group -- must not be
+    mistaken for the parent's block. "First non-empty block found" used to
+    return the alkyl word's own descriptor and never reach the parent's
+    real block, reporting all 3 real parent centres MISSING and (once
+    escalated) voiding a fully correct T4 candidate.
+
+    Real witness:
+    ``CC[C@]12C=CCN3CC[C@]4(C(=C(C(=O)O[C@@H](C)CC)C1)Nc1ccccc14)[C@@H]32``
+    -> ``(2S)-butan-2-yl (1R,12R,19S)-12-ethyl-8,16-diazapentacyclo[...]
+    ...-10-carboxylate``. Reproduced on the existing parent-scope fixture:
+    a foreign ``(5R)-pentyl`` word (a locant/CIP that matches NEITHER real
+    parent centre, so a naive first-match would be unambiguously wrong)
+    precedes the parent's own real, correct block.
+    """
+    name = "(5R)-pentyl (2S,3R)-3-bromo-2-chlorobutanoate"
+    p = bs.verify_spine(_MOL, _parent_scope_spine(name), name, mode="audit")
+    codes = p.codes()
+    assert bs.STEREO_DESCRIPTOR_MISSING not in codes, codes
+    assert bs.STEREO_DESCRIPTOR_MISMATCH not in codes, codes
+
+
+def test_p8a_not_blinded_by_foreign_word_when_parent_block_is_wrong():
+    """Negative control for the same shape: the PARENT's block (not the
+    foreign alkyl word's) is genuinely wrong -- P8 must still catch it,
+    proving the identity-based selection locks onto the parent's own block
+    rather than merely refusing to be fooled by the alkyl word."""
+    name = "(5R)-pentyl (2S,3S)-3-bromo-2-chlorobutanoate"  # real is (2S,3R)
+    p = bs.verify_spine(_MOL, _parent_scope_spine(name), name, mode="audit")
+    codes = p.codes()
+    assert bs.STEREO_DESCRIPTOR_MISMATCH in codes, codes
+    assert bs.STEREO_DESCRIPTOR_MISSING in codes, codes
+
+
 def test_p8b_still_flags_genuine_mismatch_after_the_ez_only_fix():
     """The R/S-exclusion fix must not blind P8b to a genuine E/Z fabrication
     (the pre-existing (d) tests already cover this; this pins it survives

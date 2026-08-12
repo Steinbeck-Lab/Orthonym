@@ -1380,34 +1380,79 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # ester, "methyl (1R,12R,19S)-...-3-carboxylate") puts the ester alkyl word
 # before the parent's leading descriptor block, so `_parse_leading_stereo_block`
 # anchored at index 0 finds nothing and P8a misreports every real centre as
-# MISSING. Rather than hardcode a list of alkyl/functional-class words, this
-# matches ANY single bare word (letters/digits/apostrophe/hyphen, no space)
-# followed by whitespace, and is only even tried after the position-0 match
-# has already failed -- so it changes nothing for the overwhelming majority
-# of names that already carry the block at index 0.
-_LEADING_WORD_RE = re.compile(r"^([A-Za-z][\w'-]*)\s+")
+# MISSING.
+#
+# Task 4 FIX-ROUND (reviewer-found regression): "first non-empty block wins"
+# is wrong, not merely incomplete. The word preceding the parent is not
+# always a BARE identifier -- a chiral ester alkyl group built by the fully
+# general substituent namer can carry its OWN leading ``(nR)/(nS)`` block
+# (``(2S)-butan-2-yl (1R,12R,19S)-...-carboxylate``). There the position-0
+# match "succeeds" against the ALKYL word's descriptor and used to return
+# immediately, never reaching the parent's real block -- P8a then read the
+# parent's 3 real centres as MISSING and, once escalated to error, VOIDED a
+# fully correct T4 candidate (breadth regression, not a wrong-molecule one:
+# it abstained rather than mis-shipped). A "skip one bare word" retry does
+# not fix this either, since the leading word here is not bare -- it starts
+# with its own '('.
+#
+# The general shape a functional-class name can take is
+# ``<word> <word> ... <parent-name>``, each word/name separated by exactly
+# one space (P-65.6.3.2.1's grammar; no name-internal spaces exist outside
+# it), and ANY of those words -- alkyl group, salt cation, the parent name
+# itself -- may independently carry its own leading block. So a stereo
+# block can legitimately start at position 0 OR right after ANY space in
+# the name. "First one found" cannot disambiguate which is the PARENT's;
+# only identity can. See ``_find_leading_stereo_pairs``.
 
 
-def _find_leading_stereo_pairs(name: str) -> List[Tuple[Any, str]]:
-    """P8a's forward-parse entry point: the parent-scope leading
-    stereodescriptor block, tolerant of ONE preceding functional-class word.
+def _find_leading_stereo_pairs(
+        name: str,
+        expected_set: Optional[frozenset] = None) -> List[Tuple[Any, str]]:
+    """P8a's forward-parse entry point: the PARENT-scope leading
+    stereodescriptor block.
 
-    Tries the position-0 match first (byte-identical to
-    ``_parse_leading_stereo_block`` for every ordinary name); only on
-    failure does it retry after skipping a single leading bare-word token,
-    which is what a two-word functional-class name puts before the parent's
-    own block. Still resolves every pair through the SAME
-    ``_parse_stereo_block_pairs`` used everywhere else -- this only changes
-    WHERE the block is looked for, never how a match is turned into
-    (locant, cip) identity.
+    Collects every CANDIDATE block -- one parsed from position 0, plus one
+    parsed from right after each space in ``name`` (a word boundary is the
+    only place a block can legitimately start) -- via the SAME
+    ``_parse_leading_stereo_block``/``_parse_stereo_block_pairs`` used
+    everywhere else, so identity resolution never changes, only WHERE a
+    block is looked for.
+
+    When ``expected_set`` is supplied (the real ``(locant, cip)`` pairs the
+    molecule's mapped atoms/bonds assert, from
+    ``collect_stereodescriptors(mol, stereo_atom_to_locant)`` -- atom-
+    indexed, computed by the caller) the candidate kept is the one with the
+    LARGEST overlap against it: real identity picks the parent's block over
+    an alkyl/salt word's own, never a cardinality/position guess. Ties
+    (including 0-vs-0, e.g. every candidate is genuinely wrong) keep the
+    leftmost candidate, the same determinism a plain "first found" gave
+    before -- ``ok`` still ends up ``False`` for a genuine defect either
+    way, only which specific pair is cited as evidence can differ.
+
+    Without ``expected_set`` (no producer threaded a map at all, so P8a
+    cannot resolve through identity regardless) or with only one candidate,
+    there is nothing to disambiguate -- the first non-empty candidate is
+    kept, exactly as before this fix.
     """
-    pairs = _parse_leading_stereo_block(name)
-    if pairs:
-        return pairs
-    m = _LEADING_WORD_RE.match(name or "")
-    if m:
-        return _parse_leading_stereo_block(name[m.end():])
-    return []
+    text = name or ""
+    starts = [0]
+    idx = text.find(" ")
+    while idx != -1:
+        starts.append(idx + 1)
+        idx = text.find(" ", idx + 1)
+
+    candidates: List[List[Tuple[Any, str]]] = []
+    for start in starts:
+        pairs = _parse_leading_stereo_block(text[start:])
+        if pairs:
+            candidates.append(pairs)
+
+    if not candidates:
+        return []
+    if expected_set is None or len(candidates) == 1:
+        return candidates[0]
+
+    return max(candidates, key=lambda c: len(set(c) & expected_set))
 
 
 def _iter_embedded_ez_pairs(text: str) -> List[Tuple[Any, str]]:
@@ -1494,6 +1539,15 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     name (``"methyl (1R,...)-...-carboxylate"``) resolves its block after
     the alkyl word instead of reporting every real centre MISSING.
 
+    Task 4 FIX-ROUND: ``_find_leading_stereo_pairs`` is now called WITH the
+    real ``expected_set`` (computed here FIRST, before the forward parse,
+    reordering the original Task 4 flow) so it can select the candidate
+    block that is identity-consistent with the molecule's real parent-scope
+    centres, not merely the first block found in the string -- see that
+    function's docstring for the regression this closes (a chiral ester
+    alkyl word carrying its OWN leading block used to be mistaken for the
+    parent's).
+
     Task 4 fix (locant-omission guard, from the Task 3 review Minor): P-14.3.4
     licenses dropping a stereocentre's locant when the molecule has exactly
     one (``(R)-...`` rather than ``(2R)-...``). Today's formatter always
@@ -1507,13 +1561,12 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     """
     assign_stereochemistry(mol)
     locant_map = dict(spine.stereo_atom_to_locant)
-    emitted = _find_leading_stereo_pairs(name or "")
     severity = "error" if mode == "strict" else "warn"
 
-    stats["stereo_locant_map_size"] = len(locant_map)
-    stats["stereo_emitted_leading"] = len(emitted)
-
     if not locant_map:
+        emitted = _find_leading_stereo_pairs(name or "")
+        stats["stereo_locant_map_size"] = 0
+        stats["stereo_emitted_leading"] = len(emitted)
         stats["stereo_confident"] = False
         if emitted:
             findings.append(Finding(
@@ -1524,9 +1577,12 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
                 severity))
         return
 
+    stats["stereo_locant_map_size"] = len(locant_map)
     stats["stereo_confident"] = True
     expected = collect_stereodescriptors(mol, locant_map)
     expected_set = set(expected)
+    emitted = _find_leading_stereo_pairs(name or "", expected_set=expected_set)
+    stats["stereo_emitted_leading"] = len(emitted)
 
     # Locant-omission normalisation (P-14.3.4): a lone bare descriptor
     # resolves to the molecule's one real centre when there IS exactly one,
