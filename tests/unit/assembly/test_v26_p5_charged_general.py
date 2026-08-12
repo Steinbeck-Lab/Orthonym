@@ -34,6 +34,8 @@ from rdkit import Chem
 
 from orthonym.namer import Orthonym, is_failure_name
 from orthonym.assembly.general_engine import name_general
+from orthonym.validation import binding_spine as bs
+from orthonym.validation.binding_spine import BindingSpine, verify_spine
 from orthonym.validation.e1_certificate import verify_certificate
 
 
@@ -144,6 +146,36 @@ def _engine_name(smiles, *, allow_aromatic_general):
 @pytest.mark.parametrize("smiles,_name", ACCEPT_CASES)
 def test_pin_engine_inert_without_flag(smiles, _name):
     assert _engine_name(smiles, allow_aromatic_general=False) is None
+
+
+@pytest.mark.parametrize("smiles,expected", ACCEPT_CASES)
+def test_charge_claims_are_declared_in_the_binding_spine(smiles, expected):
+    """Phase 0c Task 2: the charge-suffix producer now threads
+    ``charge_atom_ids`` through a role='charge' binding, so P3's
+    charge-totality proof stops being a permanent ``CHARGE_UNVERIFIED`` warn
+    for every net-charged emission. The emitted NAME is unchanged (asserted
+    against the SAME pinned ``ACCEPT_CASES`` string every other test in this
+    file uses) -- only the binding ledger gained a new, E1-invisible entry.
+    """
+    got = _engine_name(smiles, allow_aromatic_general=True)
+    assert got == expected, f"{smiles}: {got!r} != {expected!r}"
+
+    canon = Chem.CanonSmiles(smiles)
+    mol = Chem.MolFromSmiles(canon)
+    nm = Orthonym(style="pin", general_fallback=True,
+                   allow_aromatic_general=True)
+    feats = nm._perceive(mol, canon, canon)
+    nm._classify(feats)
+    eng = name_general(mol, feats, allow_aromatic_general=True)
+    assert eng is not None and eng.name == expected
+
+    spine = BindingSpine.from_token_bindings(eng.bindings)
+    proof = verify_spine(mol, spine, eng.name, mode="audit",
+                         allow_charged=True)
+    assert proof.stats["charge_claims_declared"] > 0, (
+        f"{smiles}: charge_atom_ids not threaded onto the binding spine")
+    assert bs.CHARGE_UNVERIFIED not in proof.codes()
+    assert proof.ok, proof.findings
 
 
 def test_e1_certificate_rejects_charge_by_default():

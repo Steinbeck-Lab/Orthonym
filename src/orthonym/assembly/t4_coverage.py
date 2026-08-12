@@ -65,6 +65,14 @@ def name_t4_complete(mol, features) -> Optional[str]:
     neither of which needs the ledger. A follow-on wanting T4 binding proofs
     would return the ``_Candidate`` (which carries ``result_obj``) instead of a
     bare string.
+
+    Phase 0c Task 2a note: a wired ``verify_spine`` (audit mode) additional
+    gate was tried here and REVERTED -- it measurably false-voided 3 correct,
+    OPSIN-round-tripping dev500 rows via a pre-existing P6 (``token_arity``)
+    false-positive on replacement-nomenclature substituent tokens (a `SUBST`
+    prefix preceding a skeletal-replacement chain in one composite token). See
+    `.superpowers/sdd/2026-08-12-phase0c-coverage-certificate-and-locant/task-2-report.md`.
+    Re-attempted once the P6 bug is fixed (Task 2b).
     """
     candidate = _best_effort_candidate(mol, features)
     if candidate is None:

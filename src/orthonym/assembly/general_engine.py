@@ -177,10 +177,19 @@ class TokenBinding:
     """Atoms expressed by one emitted name token."""
     atom_ids: Tuple[int, ...]
     token: str
-    # 'parent' | 'prefix' | 'suffix' | 'replacement'. Every value here must be a
-    # key of ``binding_spine._LEGACY_ROLE_KINDS``, or the flat adapter coerces it
-    # to PREFIX and records it in ``legacy_role_coerced``.
+    # 'parent' | 'prefix' | 'suffix' | 'replacement' | 'charge'. Every value here
+    # must be a key of ``binding_spine._LEGACY_ROLE_KINDS``, or the flat adapter
+    # coerces it to PREFIX and records it in ``legacy_role_coerced``.
     role: str
+    # Phase 0c Task 2: charge-claim atom indices for a role='charge' binding.
+    # NEVER also listed in ``atom_ids`` -- ``e1_certificate.verify_certificate``
+    # treats every binding's ``atom_ids`` uniformly for its double-bind/phantom
+    # checks, so a charge binding must carry ZERO ``atom_ids`` of its own (the
+    # charged atom is already exclusively owned by the parent/suffix binding
+    # that names it). ``charge_atom_ids`` is a separate, E1-invisible slot that
+    # only ``BindingSpine.from_token_bindings`` reads, to populate P3's
+    # charge-totality proof (``validation/binding_spine.py``).
+    charge_atom_ids: Tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -217,7 +226,7 @@ def _common_refusal(mol, allow_charged: bool = False) -> Optional[str]:
     return None
 
 
-def _charge_suffix_text(mol, atom_to_locant) -> Optional[str]:
+def _charge_suffix_text(mol, atom_to_locant) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """v26 P5 (BB P-73 cations / P-74 anions): the charge-suffix string for
     skeletal charge(s) on the ALREADY-NUMBERED general parent --
     ``-1-ium`` / ``-2-ylium`` / ``-1-ide`` / ``-1-uide`` (or the multiplied
@@ -228,6 +237,12 @@ def _charge_suffix_text(mol, atom_to_locant) -> Optional[str]:
     backstop, which fails OPEN without Java). Reuses the proven ion perception
     (``get_ion_sites``) + classifiers (``classify_cation`` / ``classify_anion``)
     rather than reinventing charge typing.
+
+    Returns ``(suffix_text, charged_atom_ids)`` on success -- Phase 0c Task 2
+    threads the accepted sites' atom indices out so the caller can populate a
+    ``charge`` binding (``binding_spine``'s P3 charge-totality proof), a fact
+    this function already computes and used to discard once the suffix string
+    was built.
 
     FAIL CLOSED (return None -> the caller abstains, never a wrong/neutral name)
     on any charge that cannot be faithfully expressed as a suffix on THIS parent:
@@ -289,11 +304,14 @@ def _charge_suffix_text(mol, atom_to_locant) -> Optional[str]:
         mult = _MULT_SIMPLE.get(n)
         if mult is None:
             return None
-    return '-' + ','.join(map(str, locants)) + '-' + mult + base
+    text = '-' + ','.join(map(str, locants)) + '-' + mult + base
+    charged_atom_ids = tuple(sorted(site['atom_idx'] for site in charged))
+    return text, charged_atom_ids
 
 
 def _append_charge_suffix(name: str, mol, atom_to_locant,
-                          has_fg_suffix: bool) -> Optional[str]:
+                          has_fg_suffix: bool
+                          ) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """Splice the P5 charge suffix onto an assembled parent ``name`` (pre-stereo).
 
     Elides a single trailing parent 'e' only when the charge-suffix text
@@ -305,15 +323,16 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
     multiplier (di/tri/...), so the terminal 'e' must be RETAINED
     (P-16.7.1(a) elides only before a vowel or 'y'), e.g.
     ``1,4-diazine``->``1,4-diazine-1,4-diium`` (NOT
-    ``diazin-1,4-diium``). Returns the charged name, or None to FAIL CLOSED
-    (a charge that is not expressible, or a co-occurring FG suffix -- the
-    cumulative FG+charge construction is out of P5 scope)."""
+    ``diazin-1,4-diium``). Returns ``(charged_name, charged_atom_ids)``, or
+    None to FAIL CLOSED (a charge that is not expressible, or a co-occurring
+    FG suffix -- the cumulative FG+charge construction is out of P5 scope)."""
     if has_fg_suffix:
         return None  # FG suffix + skeletal charge (cumulative) -> out of P5 scope
-    cs = _charge_suffix_text(mol, atom_to_locant)
-    if cs is None:
+    result = _charge_suffix_text(mol, atom_to_locant)
+    if result is None:
         return None
-    return _elide_before_ionic_suffix(name, cs)
+    cs, charged_atom_ids = result
+    return _elide_before_ionic_suffix(name, cs), charged_atom_ids
 
 
 def _elide_before_ionic_suffix(name: str, cs: str) -> str:
@@ -813,11 +832,17 @@ def _assemble(mol, features, chain, part,
     name = ('-'.join(prefix_parts) + body) if prefix_parts else body
     # v26 P5: charge suffix on a chain skeletal atom (fail closed otherwise).
     if allow_charged and Chem.GetFormalCharge(mol) != 0:
-        name = _append_charge_suffix(
+        charge_result = _append_charge_suffix(
             name, mol, {a: atom_to_locant[a] for a in chain},
             has_fg_suffix=bool(part['suffix_core']))
-        if name is None:
+        if charge_result is None:
             return _refuse("charge not expressible as a chain-parent suffix")
+        name, charge_atom_ids = charge_result
+        # Phase 0c Task 2: a role='charge' binding with EMPTY atom_ids (see
+        # TokenBinding's docstring) -- it claims no atoms of its own, only the
+        # charge_atom_ids the P3 proof reads.
+        bindings.append(TokenBinding((), '', 'charge',
+                                     charge_atom_ids=charge_atom_ids))
     elif _has_ionic_centres(mol):
         # P-74.1.1 (:42419): a zwitterion is "not considered as a neutral
         # compound". The chain producer holds no atom out of discovery, so it
@@ -1381,10 +1406,13 @@ def _emit_ring_from_analysis(
             bindings.append(TokenBinding(tuple(sorted(zwit_held)),
                                          zwit_plan[1].lstrip('-'), 'suffix'))
     elif allow_charged and Chem.GetFormalCharge(mol) != 0:
-        name = _append_charge_suffix(name, mol, atom_to_locant,
-                                     has_fg_suffix=bool(suffix_core))
-        if name is None:
+        charge_result = _append_charge_suffix(name, mol, atom_to_locant,
+                                              has_fg_suffix=bool(suffix_core))
+        if charge_result is None:
             return _refuse("charge not expressible as a cage-parent suffix")
+        name, charge_atom_ids = charge_result
+        bindings.append(TokenBinding((), '', 'charge',
+                                     charge_atom_ids=charge_atom_ids))
     elif _has_ionic_centres(mol):
         return _refuse("ionic centres not expressible as a cage-parent suffix")
 
@@ -1832,10 +1860,13 @@ def name_general_monocycle(
 
     # v26 P5: charge suffix on a ring skeletal atom (fail closed otherwise).
     if allow_charged and Chem.GetFormalCharge(mol) != 0:
-        name = _append_charge_suffix(name, mol, atom_to_locant,
-                                     has_fg_suffix=bool(suffix_core))
-        if name is None:
+        charge_result = _append_charge_suffix(name, mol, atom_to_locant,
+                                              has_fg_suffix=bool(suffix_core))
+        if charge_result is None:
             return _refuse("charge not expressible as a monocycle-parent suffix")
+        name, charge_atom_ids = charge_result
+        bindings.append(TokenBinding((), '', 'charge',
+                                     charge_atom_ids=charge_atom_ids))
     elif _has_ionic_centres(mol):
         # P-74.1.1 (:42419) fail-closed backstop -- see the chain producer.
         return _refuse("ionic centres not expressible as a monocycle-parent "

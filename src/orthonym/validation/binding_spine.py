@@ -165,16 +165,21 @@ class BindingKind(str, Enum):
 #
 # v29 Phase 2 T5: ``replacement`` joined the map when the ring producer began
 # emitting one binding per skeletal-replacement morpheme ('oxa', 'aza', ...).
-# Only roles a producer actually emits are listed: an entry for a kind nobody
+# Phase 0c Task 2: ``charge`` joined the map when the charge-suffix producer
+# (``general_engine._append_charge_suffix``) began emitting a charge-claim
+# binding -- see ``from_token_bindings`` below for why its ``atom_ids`` route
+# to ``charge_atom_ids`` instead of the ordinary exclusive-claim slot. Only
+# roles a producer actually emits are listed: an entry for a kind nobody
 # emits would turn this map from "what the legacy producers say" into a mirror
 # of ``BindingKind``, and a future producer's typo would then be indistinguish-
-# able from a deliberate role. FUSION/CHARGE/HYDRO are therefore still absent
-# on purpose, and still land in ``legacy_role_coerced`` if they appear.
+# able from a deliberate role. FUSION/HYDRO are therefore still absent on
+# purpose, and still land in ``legacy_role_coerced`` if they appear.
 _LEGACY_ROLE_KINDS: Dict[str, BindingKind] = {
     "parent": BindingKind.PARENT,
     "suffix": BindingKind.SUFFIX,
     "prefix": BindingKind.PREFIX,
     "replacement": BindingKind.REPLACEMENT,
+    "charge": BindingKind.CHARGE,
 }
 
 
@@ -242,6 +247,18 @@ class BindingSpine:
         widening -- the flat spine proves exactly what the flat E1
         certificate proved, no more -- and it is deliberately NOT an
         attempt to infer structure the legacy binding never recorded.
+
+        Phase 0c Task 2: a ``role='charge'`` legacy binding
+        (``general_engine.TokenBinding``) carries the charged atom indices in
+        its OWN ``charge_atom_ids`` field, not in ``atom_ids`` -- E1
+        (``e1_certificate.verify_certificate``) treats every binding's
+        ``atom_ids`` uniformly for its double-bind/phantom checks, so putting
+        the already-parent-owned charged atom there would manufacture a false
+        ``ATOM_DOUBLE_BOUND``. This adapter therefore reads
+        ``getattr(binding, "charge_atom_ids", ())`` for every binding (empty
+        for the 12 legacy producers that have no such field/value, so their
+        behaviour is unchanged) and threads it onto ``SpineBinding``, which
+        already has that exact slot.
         """
         roots = []
         coerced = []
@@ -255,6 +272,8 @@ class BindingSpine:
                 token=binding.token,
                 kind=kind,
                 atom_ids=frozenset(binding.atom_ids),
+                charge_atom_ids=frozenset(
+                    getattr(binding, "charge_atom_ids", ()) or ()),
             ))
         return cls(roots=tuple(roots),
                    legacy_role_coerced=tuple(coerced))

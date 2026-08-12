@@ -98,6 +98,34 @@ def test_from_token_bindings_adapts_legacy_flat_result():
     assert bs.verify_spine(ETHANOL, spine, res.name).ok
 
 
+def test_from_token_bindings_routes_charge_role_atom_ids_to_charge_atom_ids():
+    """Phase 0c Task 2: a role='charge' legacy TokenBinding carries the
+    charged atom indices in its OWN ``atom_ids`` (TokenBinding has no separate
+    slot), and the adapter must route them to ``SpineBinding.charge_atom_ids``
+    -- NEVER to the exclusive-claim ``atom_ids`` -- or the charge binding would
+    double-claim an atom the parent/suffix binding already owns and E1 would
+    reject a currently-shipping charged name."""
+    mol = Chem.MolFromSmiles("CC[O-]")
+    res = GeneralEngineResult(name="ethanolate", bindings=(
+        TokenBinding((0, 1), "eth", "parent"),
+        TokenBinding((2,), "olate", "suffix"),
+        # atom_ids EMPTY -- the real producer never lists the charged atom
+        # here (it is already exclusively owned by the 'olate' suffix
+        # binding above); only charge_atom_ids carries it.
+        TokenBinding((), "", "charge", charge_atom_ids=(2,)),
+    ))
+    spine = bs.BindingSpine.from_token_bindings(res.bindings)
+    charge_bindings = [b for b in spine.walk() if b.kind == bs.BindingKind.CHARGE]
+    assert len(charge_bindings) == 1
+    assert charge_bindings[0].atom_ids == frozenset()
+    assert charge_bindings[0].charge_atom_ids == frozenset({2})
+    assert spine.legacy_role_coerced == ()          # 'charge' is now mapped
+    proof = bs.verify_spine(mol, spine, res.name, allow_charged=True)
+    assert proof.ok, proof.findings
+    assert proof.stats["charge_claims_declared"] == 1
+    assert bs.CHARGE_UNVERIFIED not in proof.codes()
+
+
 def test_from_token_bindings_coerces_unmapped_role_and_reports_it():
     # An unknown legacy role must widen to PREFIX (the only role a
     # substituent-shaped token can safely be assumed to play) and the RAW
