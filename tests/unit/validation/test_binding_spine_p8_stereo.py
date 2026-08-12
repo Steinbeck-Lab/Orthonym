@@ -309,6 +309,64 @@ def test_p8a_not_blinded_by_foreign_word_when_parent_block_is_wrong():
     assert bs.STEREO_DESCRIPTOR_MISSING in codes, codes
 
 
+def test_p8a_not_masked_when_parent_block_is_fabricated_and_foreign_word_overlaps():
+    """Task 4 FIX-ROUND 2 (reviewer-found, MORE SEVERE than the round-1
+    regression): the round-1 fix selected the candidate block by MAXIMUM
+    OVERLAP against ``expected_set``. That is exploitable: locants are
+    small ints and CIP is binary, so a foreign word can coincidentally
+    share a real ``(locant, cip)`` pair with the parent's true centres. If
+    the parent's OWN block is genuinely fabricated but scores WORSE on
+    overlap than a foreign word's, overlap-based selection would pick the
+    foreign word and the genuine ``STEREO_DESCRIPTOR_MISMATCH`` would never
+    fire -- SILENTLY HIDING a wrong name under the gate that is supposed to
+    BE the 0-wrong backstop (strictly worse than round 1's bug, which only
+    voided a correct name into a safe abstain).
+
+    Reviewer's exact witness: real centres are ``{(2,'S'),(3,'R')}``; the
+    parent's own block ``(4S,5R)`` is completely fabricated (0 overlap);
+    the foreign ``pentyl`` word's own block is ``(2S)`` (1 point of
+    overlap, since locant 2 CIP 'S' happens to be one of the real pairs).
+    Overlap-based selection would return the foreign ``(2S)`` and miss the
+    fabrication entirely. The fix (positional anchoring to the PARENT
+    binding's own P4 span) must select the PARENT's ``(4S,5R)`` regardless
+    of which candidate scores better, and correctly report the
+    fabrication.
+    """
+    name = "(2S)-pentyl (4S,5R)-3-bromo-2-chlorobutanoate"
+    p = bs.verify_spine(_MOL, _parent_scope_spine(name), name, mode="audit",
+                        escalate=bs.STRICT_STEREO_CHARGE_AXES)
+    codes = p.codes()
+    assert bs.STEREO_DESCRIPTOR_MISMATCH in codes, codes
+    assert bs.STEREO_DESCRIPTOR_MISSING in codes, codes
+    assert not p.ok, "a fabricated parent block must not be masked"
+
+
+def test_p8a_ambiguous_when_parent_span_unresolvable():
+    """Fail-safe branch: when the PARENT binding's own token cannot be
+    located among P4's resolved spans (e.g. a spine whose parent token
+    text does not actually occur in ``name``) AND there are 2+ candidate
+    blocks, P8a must never guess -- it reports
+    ``STEREO_PARENT_BLOCK_AMBIGUOUS`` (unproven, not disproven, exactly
+    like ``STEREO_UNVERIFIED``) rather than silently picking one."""
+    name = "(2S)-pentyl (2S,3R)-3-bromo-2-chlorobutanoate"  # real block, correct
+    spine = _spine(
+        _b("nonexistent-parent-token", bs.BindingKind.PARENT, [0, 1, 3, 5]),
+        _b("chloro", bs.BindingKind.PREFIX, [2]),
+        _b("bromo", bs.BindingKind.PREFIX, [4]),
+        stereo_atom_to_locant=_ATOM_TO_LOCANT,
+    )
+    p = bs.verify_spine(_MOL, spine, name, mode="audit")
+    assert bs.STEREO_PARENT_BLOCK_AMBIGUOUS in p.codes()
+    assert bs.STEREO_DESCRIPTOR_MISSING not in p.codes()
+    assert bs.STEREO_DESCRIPTOR_MISMATCH not in p.codes()
+
+    p_strict = bs.verify_spine(_MOL, spine, name, mode="strict")
+    ambiguous = [f for f in p_strict.findings
+                if f.code == bs.STEREO_PARENT_BLOCK_AMBIGUOUS]
+    assert ambiguous and all(f.severity == "error" for f in ambiguous)
+    assert not p_strict.ok
+
+
 def test_p8b_still_flags_genuine_mismatch_after_the_ez_only_fix():
     """The R/S-exclusion fix must not blind P8b to a genuine E/Z fabrication
     (the pre-existing (d) tests already cover this; this pins it survives

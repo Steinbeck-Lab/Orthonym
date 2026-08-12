@@ -145,6 +145,13 @@ STEREO_DESCRIPTOR_MISMATCH = "STEREO_DESCRIPTOR_MISMATCH"
 SUBSTITUENT_STEREO_UNVERIFIED = "SUBSTITUENT_STEREO_UNVERIFIED"
 SUBSTITUENT_STEREO_MISSING = "SUBSTITUENT_STEREO_MISSING"
 SUBSTITUENT_STEREO_MISMATCH = "SUBSTITUENT_STEREO_MISMATCH"
+# Task 4 fix-round 2: 2+ candidate leading-stereo-block positions exist (a
+# multi-word functional-class name) and the PARENT binding's own P4 span
+# could not be resolved to positionally anchor which one is its block --
+# unproven, not disproven (mirrors CHARGE_UNVERIFIED/STEREO_UNVERIFIED
+# exactly): never a silent pass, and never a guess that could pick a
+# foreign word's block over the parent's.
+STEREO_PARENT_BLOCK_AMBIGUOUS = "STEREO_PARENT_BLOCK_AMBIGUOUS"
 # Whole-proof residual, raised from P6's confidence bookkeeping: nothing the
 # spine claims was independently corroborated, so the proofs that ran have
 # established nothing about what the name spells.
@@ -168,6 +175,7 @@ STRICT_STEREO_CHARGE_AXES = frozenset({
     STEREO_DESCRIPTOR_MISMATCH,
     SUBSTITUENT_STEREO_MISSING,
     SUBSTITUENT_STEREO_MISMATCH,
+    STEREO_PARENT_BLOCK_AMBIGUOUS,
 })
 
 
@@ -1382,57 +1390,53 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # anchored at index 0 finds nothing and P8a misreports every real centre as
 # MISSING.
 #
-# Task 4 FIX-ROUND (reviewer-found regression): "first non-empty block wins"
-# is wrong, not merely incomplete. The word preceding the parent is not
-# always a BARE identifier -- a chiral ester alkyl group built by the fully
-# general substituent namer can carry its OWN leading ``(nR)/(nS)`` block
-# (``(2S)-butan-2-yl (1R,12R,19S)-...-carboxylate``). There the position-0
-# match "succeeds" against the ALKYL word's descriptor and used to return
-# immediately, never reaching the parent's real block -- P8a then read the
-# parent's 3 real centres as MISSING and, once escalated to error, VOIDED a
-# fully correct T4 candidate (breadth regression, not a wrong-molecule one:
-# it abstained rather than mis-shipped). A "skip one bare word" retry does
-# not fix this either, since the leading word here is not bare -- it starts
-# with its own '('.
+# Task 4 FIX-ROUND 1 (reviewer-found regression): "first non-empty block
+# wins" is wrong, not merely incomplete. The word preceding the parent is
+# not always a BARE identifier -- a chiral ester alkyl group built by the
+# fully general substituent namer can carry its OWN leading ``(nR)/(nS)``
+# block (``(2S)-butan-2-yl (1R,12R,19S)-...-carboxylate``). There the
+# position-0 match "succeeds" against the ALKYL word's descriptor and used
+# to return immediately, never reaching the parent's real block -- P8a then
+# read the parent's 3 real centres as MISSING and, once escalated to error,
+# VOIDED a fully correct T4 candidate.
 #
-# The general shape a functional-class name can take is
-# ``<word> <word> ... <parent-name>``, each word/name separated by exactly
-# one space (P-65.6.3.2.1's grammar; no name-internal spaces exist outside
-# it), and ANY of those words -- alkyl group, salt cation, the parent name
-# itself -- may independently carry its own leading block. So a stereo
-# block can legitimately start at position 0 OR right after ANY space in
-# the name. "First one found" cannot disambiguate which is the PARENT's;
-# only identity can. See ``_find_leading_stereo_pairs``.
+# Task 4 FIX-ROUND 2 (reviewer-found, MORE SEVERE): round 1's fix selected
+# the candidate with the largest OVERLAP against ``expected_set``. That is
+# an identity CORRELATION, not an identity PROOF -- locants are small ints
+# and CIP is binary, so a foreign word can coincidentally share a real
+# (locant, cip) pair with the parent's TRUE centres. If the parent's own
+# block is genuinely fabricated/wrong but a foreign word's block happens to
+# overlap the real set better, the foreign block would be selected and the
+# genuine ``STEREO_DESCRIPTOR_MISMATCH`` would never be raised -- SILENTLY
+# HIDING a wrong name under the very gate meant to be the 0-wrong backstop.
+# Witness: ``"(2S)-pentyl (4S,5R)-3-bromo-2-chlorobutanoate"`` with real
+# centres ``{(2,'S'),(3,'R')}`` and a FABRICATED parent block ``(4S,5R)`` --
+# overlap-based selection returns the foreign ``(2S)`` (1 point of overlap)
+# instead of the parent's own wrong ``(4S,5R)`` (0 points), so the
+# fabrication went uncaught.
+#
+# The fix does not use identity at all to SELECT the block -- only to
+# verify it once selected. Selection is now purely POSITIONAL: the parent
+# binding's own real character span is already known from P4
+# (``_p4_token_spans``, which always runs before P8), so the candidate kept
+# is the one anchored at the word boundary the parent's own text actually
+# sits inside -- i.e. the rightmost of the candidate positions (index 0,
+# or right after any space) that does not exceed the parent binding's span
+# start. A foreign word's block sits in a DIFFERENT word (a different, and
+# strictly earlier, candidate position) and can therefore never be
+# substituted for the parent's, regardless of what it happens to overlap.
+# See ``_find_leading_stereo_pairs`` and ``_parent_binding_span``.
 
 
-def _find_leading_stereo_pairs(
-        name: str,
-        expected_set: Optional[frozenset] = None) -> List[Tuple[Any, str]]:
-    """P8a's forward-parse entry point: the PARENT-scope leading
-    stereodescriptor block.
-
-    Collects every CANDIDATE block -- one parsed from position 0, plus one
-    parsed from right after each space in ``name`` (a word boundary is the
-    only place a block can legitimately start) -- via the SAME
-    ``_parse_leading_stereo_block``/``_parse_stereo_block_pairs`` used
-    everywhere else, so identity resolution never changes, only WHERE a
-    block is looked for.
-
-    When ``expected_set`` is supplied (the real ``(locant, cip)`` pairs the
-    molecule's mapped atoms/bonds assert, from
-    ``collect_stereodescriptors(mol, stereo_atom_to_locant)`` -- atom-
-    indexed, computed by the caller) the candidate kept is the one with the
-    LARGEST overlap against it: real identity picks the parent's block over
-    an alkyl/salt word's own, never a cardinality/position guess. Ties
-    (including 0-vs-0, e.g. every candidate is genuinely wrong) keep the
-    leftmost candidate, the same determinism a plain "first found" gave
-    before -- ``ok`` still ends up ``False`` for a genuine defect either
-    way, only which specific pair is cited as evidence can differ.
-
-    Without ``expected_set`` (no producer threaded a map at all, so P8a
-    cannot resolve through identity regardless) or with only one candidate,
-    there is nothing to disambiguate -- the first non-empty candidate is
-    kept, exactly as before this fix.
+def _iter_leading_stereo_candidates(
+        name: str) -> List[Tuple[int, List[Tuple[Any, str]]]]:
+    """Every CANDIDATE stereo-block position in ``name``, as
+    ``[(start, pairs), ...]`` in ascending ``start`` order: position 0, plus
+    the position right after every space -- the only places a NEW word's own
+    leading block can legitimately start (P-65.6.3.2.1's functional-class
+    grammar puts no space anywhere else; a compound substituent name is
+    always one hyphen-joined token with no space of its own). Only
+    candidates that actually parsed to a non-empty block are returned.
     """
     text = name or ""
     starts = [0]
@@ -1441,18 +1445,86 @@ def _find_leading_stereo_pairs(
         starts.append(idx + 1)
         idx = text.find(" ", idx + 1)
 
-    candidates: List[List[Tuple[Any, str]]] = []
+    candidates: List[Tuple[int, List[Tuple[Any, str]]]] = []
     for start in starts:
         pairs = _parse_leading_stereo_block(text[start:])
         if pairs:
-            candidates.append(pairs)
+            candidates.append((start, pairs))
+    return candidates
 
+
+def _parent_binding_span(
+        spine: BindingSpine,
+        spans: Sequence[Tuple[int, int, str]]) -> Optional[Tuple[int, int]]:
+    """The PARENT binding's own resolved P4 span ``(start, end)`` in the
+    name, or ``None`` when there is no PARENT binding, or P4 never resolved
+    a span for its token at all (e.g. a P4 finding already flagged it
+    absent/ambiguous -- P8 must not then guess where it is).
+
+    ``spans`` is P4's own output (``_p4_token_spans``, already computed
+    before P8 runs in ``verify_spine``) -- reused, not re-derived, so this
+    can never disagree with what P4 itself established. When more than one
+    binding carries ``BindingKind.PARENT`` (unusual, not structurally
+    forbidden), the leftmost resolved span is used.
+    """
+    parent_tokens = {
+        b.token.strip().lower() for b in spine.walk()
+        if b.kind == BindingKind.PARENT and b.token.strip()
+    }
+    if not parent_tokens:
+        return None
+    matches = [(start, end) for start, end, token in spans
+              if token in parent_tokens]
+    if not matches:
+        return None
+    return min(matches)
+
+
+# Sentinel: 2+ candidate blocks exist and the parent binding's own span
+# could not be resolved, so there is no positional evidence for which one
+# is the parent's -- distinct from "no block at all" ([]), which IS a
+# confident (empty) answer. Never guessed past; see _p8_stereo's handling.
+_STEREO_BLOCK_AMBIGUOUS = object()
+
+
+def _find_leading_stereo_pairs(name: str, parent_span_start: Optional[int]):
+    """P8a's forward-parse entry point: the PARENT-scope leading
+    stereodescriptor block, selected POSITIONALLY (Task 4 fix-round 2 --
+    see the comment above this function for why identity/overlap-based
+    selection was unsafe).
+
+    With 0 or 1 candidate blocks there is nothing to disambiguate -- the
+    only one (or the empty list) is returned regardless of
+    ``parent_span_start``. With 2+ candidates, the one selected is the
+    rightmost whose position does not exceed ``parent_span_start`` (the
+    real PARENT binding's own resolved P4 span) -- i.e. the block anchored
+    to the SAME word/name-region the parent binding's own text sits inside.
+    A foreign word's block sits at an earlier candidate position (a
+    DIFFERENT, prior word) and is structurally never eligible once a later
+    candidate qualifies.
+
+    When ``parent_span_start`` is ``None`` (P4 could not resolve the
+    parent's own span -- see ``_parent_binding_span``) and there ARE 2+
+    candidates, there is no positional evidence to choose between them:
+    returns the ``_STEREO_BLOCK_AMBIGUOUS`` sentinel rather than guessing.
+    The caller must fail safe on that (report a finding, never a silent
+    pass) -- picking any candidate here risks exactly the masking bug this
+    fix-round closes.
+    """
+    candidates = _iter_leading_stereo_candidates(name)
     if not candidates:
         return []
-    if expected_set is None or len(candidates) == 1:
-        return candidates[0]
+    if len(candidates) == 1:
+        return candidates[0][1]
+    if parent_span_start is None:
+        return _STEREO_BLOCK_AMBIGUOUS
 
-    return max(candidates, key=lambda c: len(set(c) & expected_set))
+    chosen = candidates[0][1]
+    for start, pairs in candidates:
+        if start > parent_span_start:
+            break
+        chosen = pairs
+    return chosen
 
 
 def _iter_embedded_ez_pairs(text: str) -> List[Tuple[Any, str]]:
@@ -1487,6 +1559,7 @@ def _iter_embedded_ez_pairs(text: str) -> List[Tuple[Any, str]]:
 
 
 def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
+              spans: Sequence[Tuple[int, int, str]],
               findings: list, stats: Dict[str, Any]) -> None:
     """P8: atom-indexed stereo completeness/correctness (Phase 0c Task 3).
 
@@ -1539,14 +1612,22 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     name (``"methyl (1R,...)-...-carboxylate"``) resolves its block after
     the alkyl word instead of reporting every real centre MISSING.
 
-    Task 4 FIX-ROUND: ``_find_leading_stereo_pairs`` is now called WITH the
-    real ``expected_set`` (computed here FIRST, before the forward parse,
-    reordering the original Task 4 flow) so it can select the candidate
-    block that is identity-consistent with the molecule's real parent-scope
-    centres, not merely the first block found in the string -- see that
-    function's docstring for the regression this closes (a chiral ester
-    alkyl word carrying its OWN leading block used to be mistaken for the
-    parent's).
+    Task 4 FIX-ROUND 2: ``_find_leading_stereo_pairs`` selects the PARENT's
+    candidate block POSITIONALLY now (anchored to the PARENT binding's own
+    resolved P4 ``spans`` entry, via ``_parent_binding_span``), never by
+    identity overlap against ``expected_set`` -- round 1's overlap-based
+    selection could be fooled by a foreign word that coincidentally shared
+    a real ``(locant, cip)`` pair with the parent's true centres, which
+    would SUPPRESS a genuine ``STEREO_DESCRIPTOR_MISMATCH`` on a fabricated
+    parent block -- strictly worse than round 1's own bug (a false void is
+    a safe abstain; a suppressed mismatch is a masked wrong name under the
+    gate that is supposed to BE the 0-wrong backstop). See the comment
+    above ``_iter_leading_stereo_candidates`` for the full derivation and
+    the reproduction witness. When the parent's span cannot be resolved AND
+    there are 2+ candidate blocks, ``_find_leading_stereo_pairs`` returns
+    ``_STEREO_BLOCK_AMBIGUOUS`` and this function reports
+    ``STEREO_PARENT_BLOCK_AMBIGUOUS`` (same unproven-not-disproven
+    discipline as ``STEREO_UNVERIFIED``) instead of guessing.
 
     Task 4 fix (locant-omission guard, from the Task 3 review Minor): P-14.3.4
     licenses dropping a stereocentre's locant when the molecule has exactly
@@ -1562,12 +1643,23 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     assign_stereochemistry(mol)
     locant_map = dict(spine.stereo_atom_to_locant)
     severity = "error" if mode == "strict" else "warn"
+    parent_span = _parent_binding_span(spine, spans)
+    parent_span_start = parent_span[0] if parent_span is not None else None
 
     if not locant_map:
-        emitted = _find_leading_stereo_pairs(name or "")
+        emitted = _find_leading_stereo_pairs(name or "", parent_span_start)
         stats["stereo_locant_map_size"] = 0
-        stats["stereo_emitted_leading"] = len(emitted)
         stats["stereo_confident"] = False
+        if emitted is _STEREO_BLOCK_AMBIGUOUS:
+            stats["stereo_emitted_leading"] = None
+            findings.append(Finding(
+                STEREO_PARENT_BLOCK_AMBIGUOUS,
+                "the name carries 2+ candidate leading stereodescriptor "
+                "blocks and the parent binding's own span could not be "
+                "resolved to anchor which one is the parent's",
+                severity))
+            return
+        stats["stereo_emitted_leading"] = len(emitted)
         if emitted:
             findings.append(Finding(
                 STEREO_UNVERIFIED,
@@ -1581,7 +1673,19 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     stats["stereo_confident"] = True
     expected = collect_stereodescriptors(mol, locant_map)
     expected_set = set(expected)
-    emitted = _find_leading_stereo_pairs(name or "", expected_set=expected_set)
+    emitted = _find_leading_stereo_pairs(name or "", parent_span_start)
+    if emitted is _STEREO_BLOCK_AMBIGUOUS:
+        stats["stereo_emitted_leading"] = None
+        findings.append(Finding(
+            STEREO_PARENT_BLOCK_AMBIGUOUS,
+            f"the name carries 2+ candidate leading stereodescriptor blocks "
+            f"asserting the molecule's {len(expected_set)} real parent-scope "
+            f"centre(s), and the parent binding's own span could not be "
+            f"resolved to anchor which one is the parent's -- never guessed, "
+            f"since a foreign word's block could otherwise mask a genuinely "
+            f"wrong parent block",
+            severity))
+        return
     stats["stereo_emitted_leading"] = len(emitted)
 
     # Locant-omission normalisation (P-14.3.4): a lone bare descriptor
@@ -1778,8 +1882,11 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     # P8 (Phase 0c Task 3): atom-indexed stereo, both halves. Like P4/P6/P7 it
     # needs nothing from the global atom partition (it reads the mol's real
     # stereo properties and the threaded locant map directly), so it still
-    # runs when P1 has failed.
-    _p8_stereo(mol, spine, name or "", mode, findings, stats)
+    # runs when P1 has failed. P8a additionally reuses P4's already-computed
+    # `spans` (Task 4 fix-round 2) to positionally anchor the parent's own
+    # leading stereo block -- P4 always runs above, so `spans` is available
+    # here regardless of whether P1 failed.
+    _p8_stereo(mol, spine, name or "", mode, spans, findings, stats)
     _p8b_substituent_stereo(mol, spine, mode, findings, stats)
     proofs.append("P8")
     stats["proofs"] = tuple(proofs)
