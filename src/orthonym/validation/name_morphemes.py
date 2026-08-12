@@ -1226,10 +1226,26 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
 
         following = segments[index]
 
-        # A zero-atom skeletal marker ("dihydro", "tetrahydro"): whatever the
-        # multiplier's true scope, it multiplies nothing, so the reading is
-        # unambiguous regardless.
-        if following.category == AFFIX and following.atoms == 0:
+        # A zero-atom skeletal marker ("dihydro", "tetrahydro") OR a zero-atom
+        # skeletal REPLACEMENT prefix ("dioxa", "diaza", "triphospha"):
+        # whatever the multiplier's true scope, it multiplies nothing, so the
+        # reading is unambiguous regardless. REPL is 0 NET atoms BY
+        # DEFINITION (it replaces an existing skeletal position the stem's own
+        # count already includes -- "heptyl" is 7 atoms whether or not two of
+        # them are relabelled O by "1,3-dioxa"), so a locant-count multiplier
+        # in front of one can never add atoms, unlike a multiplier in front of
+        # a genuine SUBST/ATTACH group ("dimethylamino"). Phase 0c Task 2b
+        # regression: without this, a SUBST prefix earlier in the SAME
+        # composite token (e.g. "2-hydroxy-2-oxo-1,3-dioxa-6-aza-2-phosphaheptyl")
+        # set ``seen_content`` before the multiplier was reached, so the
+        # general "internal multiplier" branch below fired and multiplied the
+        # REPL chain's atom count as if ``di`` were multiplying a real
+        # substituent -- a token claiming 9 real heavy atoms was confidently
+        # answered 16. Isolated (nothing preceding), the old code reached the
+        # same right answer by the ACCIDENT of the whole-token branch
+        # (``internal=False``); this makes it right for the right reason and
+        # for BOTH cases.
+        if following.atoms == 0 and following.category in (AFFIX, REPL):
             index += 1
             continue
 
