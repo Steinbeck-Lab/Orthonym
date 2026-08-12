@@ -339,6 +339,40 @@ def name_natural_product(mol) -> Optional[str]:
                 if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
                     return _assemble_unsat(_whole_graph_rs_prefix(mol, numbering), {})
                 return name_ab
+            else:
+                # Phase 0b: a SATURATED bare scaffold with defined stereo must emit its ring
+                # descriptors too, else Phase 0's SELF-01 gate abstains the whole molecule.
+                #
+                # Gate on `ring_ab` alone, NOT `stereo_prefix or ring_ab` (measured regression
+                # 2026-08-12): `_collect_np_stereo`'s non-steroid / converter-unavailable
+                # fallback (`collect_steroid_alpha_beta` -> None, or scaffold_class != "steroid")
+                # always returns `ring_ab={}` and dumps the UNCONDITIONAL whole-graph R/S string
+                # into `stereo_prefix` -- it has no notion of "matches the natural reference,
+                # suppress it". Gating on that broader OR wrongly re-decorated tropane/morphinan
+                # (alkaloids) and estrane (steroid whose α/β converter returns None for this
+                # exact canonical SMILES) with stereo they had never carried before, even though
+                # each is bit-identical to its NATURAL_PRODUCT_SCAFFOLDS reference SMILES. Only
+                # `ring_ab` (populated exclusively by a successful P-101.2.6 α/β resolution) is a
+                # reference-aware signal that a citation is actually owed.
+                stereo_prefix, ring_ab = _collect_np_stereo(mol, numbering, scaffold_info)
+                if ring_ab:
+                    def _assemble_sat(sp, rab):
+                        return _assemble_np_name(
+                            scaffold_info["scaffold_stem"],
+                            scaffold_info["scaffold_name"],
+                            hydroxyls=[],
+                            ketones=[],
+                            unsaturation=unsaturation,
+                            stereo_prefix=sp,
+                            modification_prefix=modification_prefix,
+                            ring_ab=rab,
+                        )
+
+                    name_ab = _assemble_sat(stereo_prefix, ring_ab)
+                    if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
+                        return _assemble_sat(_whole_graph_rs_prefix(mol, numbering), {})
+                    return name_ab
+                # no stereo to emit -> fall through to the existing bare-name path below
         # Coverage gate: reject bare scaffold if it covers too little
         total_heavy = mol.GetNumHeavyAtoms()
         if total_heavy > 10:

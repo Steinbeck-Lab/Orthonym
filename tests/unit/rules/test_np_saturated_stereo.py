@@ -1,0 +1,82 @@
+"""Phase 0b Fix 1 — ring stereo emission for SATURATED bare steroid scaffolds.
+
+Root cause (verified in the brief, `.superpowers/sdd/2026-08-12-phase0b-descriptor-kind-
+degradation/fix-1-brief.md`): `name_natural_product`'s Step 4 bare-scaffold branch only
+calls the alpha/beta stereo collector `_collect_np_stereo` inside the UNSATURATED
+(`ene`/`yne`) arm. A fully-saturated bare scaffold with a non-natural ring stereocentre
+(e.g. 5-beta rather than the reference 5-alpha) falls straight to
+`return scaffold_info["scaffold_name"]` -- a stereo-free bare name -- which Phase 0's
+SELF-01 gate then abstains as a stereo omission (the emitted name OPSIN-round-trips to a
+DIFFERENT, epimeric molecule).
+
+This test file locks:
+  1. RED->GREEN: the witness sterane (5-beta ring stereocentre) now emits
+     '5beta-pregnane' from the direct producer, and the full pipeline (OPSIN gate ON)
+     ships a stereo-carrying, non-failure name instead of abstaining.
+  2. Control (no regression): a bare steroid whose ring stereocentres ALL match the
+     natural reference configuration (`_collect_np_stereo` -> ('', {}), i.e. nothing to
+     emit) must keep shipping its existing bare name, unchanged, through the new `else`
+     branch's fall-through.
+"""
+
+import pytest
+
+from orthonym import name_compound
+from orthonym.errors import is_failure_name
+from orthonym.rules.natural_products import name_natural_product
+
+# The Phase 0b witness: a fully-saturated pregnane skeleton with the C-5 ring-fusion
+# stereocentre inverted relative to the natural (5-alpha) reference configuration in
+# data/natural_products.py, so it is legitimately named '5beta-pregnane' rather than
+# the bare, stereo-free 'pregnane'.
+WITNESS_5BETA_PREGNANE = (
+    "CC[C@H]1CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CC[C@H]4[C@@]3(CCCC4)C)C"
+)
+
+# Control: the exact canonical scaffold-table reference SMILES for androstane
+# (data/natural_products.py) -- every ring stereocentre matches the natural
+# configuration, so `_collect_np_stereo` must return ('', {}) and the bare name must
+# be emitted completely unchanged by the new saturated-branch code.
+CONTROL_ANDROSTANE = "C[C@@]12CCC[C@H]1[C@@H]1CCC3CCCC[C@]3(C)[C@H]1CC2"
+
+
+class TestSaturatedBareScaffoldStereoEmission:
+    def test_witness_sterane_direct_producer_emits_5beta(self):
+        """Direct `name_natural_product` unit assertion (brief's cheaper form)."""
+        from rdkit import Chem
+
+        mol = Chem.MolFromSmiles(WITNESS_5BETA_PREGNANE)
+        assert mol is not None
+        name = name_natural_product(mol)
+        assert name == "5beta-pregnane", name
+
+    @pytest.mark.opsin_gate
+    def test_witness_sterane_full_pipeline_names_with_stereo(self):
+        """End-to-end (OPSIN validity gate ON): must ship a stereo-carrying name,
+        not abstain to a failure signal ('unknown organic compound' etc.)."""
+        name = name_compound(WITNESS_5BETA_PREGNANE)
+        assert not is_failure_name(name), name
+        assert ("alpha" in name or "beta" in name
+                or "R)" in name or "S)" in name
+                or "R," in name or "S," in name), name
+
+    def test_control_androstane_bare_name_unchanged(self):
+        """No-regression control: a bare steroid whose ring centres all match the
+        natural reference configuration must keep emitting its plain bare name --
+        `_collect_np_stereo` returns ('', {}) for it, so the new `else` branch's
+        `if stereo_prefix or ring_ab:` is False and control falls through to the
+        pre-existing `return scaffold_info["scaffold_name"]` path, unchanged."""
+        from rdkit import Chem
+
+        mol = Chem.MolFromSmiles(CONTROL_ANDROSTANE)
+        assert mol is not None
+        name = name_natural_product(mol)
+        assert name == "androstane", name
+
+    @pytest.mark.opsin_gate
+    def test_control_androstane_full_pipeline_unchanged(self):
+        """Same control through the full pipeline with the OPSIN gate ON: verified
+        pre-fix to emit the clean bare name with no SELF-01 suppression; must stay
+        byte-identical after the fix."""
+        name = name_compound(CONTROL_ANDROSTANE)
+        assert name == "androstane", name
