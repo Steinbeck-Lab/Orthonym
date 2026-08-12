@@ -3445,7 +3445,10 @@ class Orthonym:
             from .validation.binding_spine import BindingSpine
             from .validation.proof_ledger import record_spine
             record_spine(
-                mol, BindingSpine.from_token_bindings(eng.bindings),
+                mol, BindingSpine.from_token_bindings(
+                    eng.bindings,
+                    stereo_atom_to_locant=getattr(
+                        eng, 'stereo_atom_to_locant', None)),
                 stage=stage,
                 name_at_record=eng.name,
                 allow_charged=self._allow_aromatic_general)

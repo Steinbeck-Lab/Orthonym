@@ -95,7 +95,10 @@ def name_t4_complete(mol, features) -> Optional[str]:
     verdict = verify_certificate(mol, candidate.result_obj)
     if not verdict.ok:
         return None
-    spine = BindingSpine.from_token_bindings(candidate.result_obj.bindings)
+    spine = BindingSpine.from_token_bindings(
+        candidate.result_obj.bindings,
+        stereo_atom_to_locant=getattr(
+            candidate.result_obj, 'stereo_atom_to_locant', None))
     proof = verify_spine(mol, spine, candidate.name, mode="audit",
                          allow_charged=False)
     if not proof.ok:
@@ -142,7 +145,9 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
         return None
     if not verify_certificate(mol, result).ok:
         return None
-    spine = BindingSpine.from_token_bindings(result.bindings)
+    spine = BindingSpine.from_token_bindings(
+        result.bindings,
+        stereo_atom_to_locant=getattr(result, 'stereo_atom_to_locant', None))
     proof = verify_spine(mol, spine, result.name, mode="audit",
                          allow_charged=False)
     if not proof.ok:

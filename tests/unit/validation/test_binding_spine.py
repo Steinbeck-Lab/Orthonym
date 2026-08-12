@@ -309,7 +309,9 @@ def test_p2_is_skipped_when_p1_fails():
     assert p.stats["p5_skipped"] is True
     # P7, like P4 and P6, reads each binding against the graph on its own and
     # needs nothing from the partition, so it still runs when P1 has failed.
-    assert p.stats["proofs"] == ("P1", "P3", "P4", "P6", "P7")
+    # P8 (Phase 0c Task 3), likewise, reads the mol's real stereo properties
+    # and the threaded locant map directly, so it too still runs.
+    assert p.stats["proofs"] == ("P1", "P3", "P4", "P6", "P7", "P8")
     assert "bonds_total" not in p.stats
     assert "residue_runs" not in p.stats
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -196,6 +196,17 @@ class TokenBinding:
 class GeneralEngineResult:
     name: str
     bindings: Tuple[TokenBinding, ...]
+    # Phase 0c Task 3: the SAME atom->locant map passed to ``_stereo_prefix``
+    # when this result's leading ``(nR,nS,...)-``/``(nE,nZ,...)-`` block was
+    # built -- threaded out so ``validation.binding_spine``'s P8 proof can
+    # resolve the block to real atom/bond identity instead of trusting the
+    # producer's string. Empty (the default) at every site that never calls
+    # ``_stereo_prefix`` (the bare-fusion-word shortcut, which the P5 guard
+    # only takes when the parent has NO defined stereo, and the terminal-ring
+    # bare-parent tier, `_name_terminal_ring_parent` -- see that function's
+    # docstring reference below for why an empty map there is a documented
+    # gap, not an oversight).
+    stereo_atom_to_locant: Dict[int, int] = field(default_factory=dict)
 
 
 def _refuse(reason: str) -> None:
@@ -851,10 +862,11 @@ def _assemble(mol, features, chain, part,
         return _refuse("ionic centres not expressible as a chain-parent suffix")
     # v25 G4: parent-scope stereo from structure (substituent-internal
     # stereo is already handled inside name_substituent's stereo route).
-    name = _stereo_prefix(
-        mol, {a: atom_to_locant[a] for a in chain}) + name
+    _stereo_locants = {a: atom_to_locant[a] for a in chain}
+    name = _stereo_prefix(mol, _stereo_locants) + name
     bindings.append(TokenBinding(tuple(chain), parent_token, 'parent'))
-    return GeneralEngineResult(name=name, bindings=tuple(bindings))
+    return GeneralEngineResult(name=name, bindings=tuple(bindings),
+                               stereo_atom_to_locant=_stereo_locants)
 
 
 # Ring suffix forms (get_suffix(pg, is_ring=True) values) -- all carry locants
@@ -1427,7 +1439,8 @@ def _emit_ring_from_analysis(
                                      ester_r_word, 'prefix'))
 
     bindings.extend(_ring_parent_bindings(cage, name, parent_block))
-    return GeneralEngineResult(name=name, bindings=tuple(bindings))
+    return GeneralEngineResult(name=name, bindings=tuple(bindings),
+                               stereo_atom_to_locant=dict(atom_to_locant))
 
 
 def _ring_parent_bindings(cage, name: str, parent_block: str
@@ -1878,7 +1891,8 @@ def name_general_monocycle(
     # E1 parent binding: a stem guaranteed to survive suffix elision.
     parent_token = parent_name[:-1] if parent_name.endswith('e') else parent_name
     bindings.append(TokenBinding(tuple(sorted(ring_set)), parent_token, 'parent'))
-    return GeneralEngineResult(name=name, bindings=tuple(bindings))
+    return GeneralEngineResult(name=name, bindings=tuple(bindings),
+                               stereo_atom_to_locant=dict(atom_to_locant))
 
 
 def name_general_spiro(
@@ -2068,6 +2082,28 @@ def _name_terminal_ring_parent(
         Scope as _LScope, Stage as _LStage, record_candidate as _lrecord)
     _lrecord(TERMINAL_RING_PARENT_SITE, _LStage.PRODUCED, result.name,
              scope=_LScope.MOLECULE, detail=f"basis:{result.basis}")
+    # Phase 0c Task 3 LEAD (raised by the Task 1 spy): ``terminal_ring_name``
+    # calls no ``_stereo_prefix`` at all, so ``stereo_atom_to_locant`` is left
+    # at its empty default here -- NOT an oversight, a measured non-fix.
+    # Witnessed (this task,  probes): called directly, this
+    # function's underlying namer DOES silently drop real, RDKit-detected
+    # ring stereo it structurally cannot express -- e.g. a bare
+    # 8/9-membered-ring endocyclic C=C carries a genuine defined E/Z
+    # ``_CIPCode`` (P-31.1.3 admits E/Z on rings >=8) and ``terminal_ring_name``
+    # emits no descriptor for it. But this tier is the LAST of five in
+    # ``name_general``'s dispatch (cage/spiro/monocycle all tried first), and
+    # ``name_general_monocycle`` -- which DOES thread stereo -- already
+    # accepts every plain carbocycle/simple-heterocycle case tested (all-carbon
+    # and the 18 Table-1.5 heteroatoms, ring sizes 3-30): a systematic sweep
+    # found ZERO molecules where monocycle/ring/spiro all decline yet this
+    # tier still accepts. That matches this module's own measurement elsewhere
+    # ("0 abstaining dev500 rows are bare ring systems") -- the capability gap
+    # is real in isolation but not known to be reachable on real input. Left
+    # empty rather than guessed at: P8 (``binding_spine.py``) still flags a
+    # future reachable case as ``STEREO_UNVERIFIED`` (unproven, not silently
+    # passed) because that check reads the real molecule's defined stereo
+    # under this binding's ``role='parent'`` atom_ids, independent of whether
+    # a locant map was ever threaded.
     return GeneralEngineResult(
         name=result.name,
         bindings=(TokenBinding(tuple(sorted(ring)), result.name, 'parent'),))

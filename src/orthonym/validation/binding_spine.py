@@ -94,13 +94,16 @@ fabricated pass is not.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import (Any, Dict, Iterable, Iterator, List, Literal, NamedTuple,
                     Optional, Sequence, Tuple)
 
 from rdkit import Chem
 
+from orthonym.rules.stereochemistry import (
+    _STEREO_PREFIX_RE, assign_stereochemistry, collect_stereodescriptors)
 from orthonym.validation.name_morphemes import (free_valence_morphology,
                                                  token_arity)
 
@@ -134,6 +137,13 @@ ARITY_UNVERIFIED = "ARITY_UNVERIFIED"
 # P7 -- free-valence morphology vs the real linkage bond order
 FREE_VALENCE_MISMATCH = "FREE_VALENCE_MISMATCH"
 FREE_VALENCE_UNVERIFIED = "FREE_VALENCE_UNVERIFIED"
+# P8 -- atom-indexed stereo completeness/correctness (Phase 0c Task 3)
+STEREO_UNVERIFIED = "STEREO_UNVERIFIED"
+STEREO_DESCRIPTOR_MISSING = "STEREO_DESCRIPTOR_MISSING"
+STEREO_DESCRIPTOR_MISMATCH = "STEREO_DESCRIPTOR_MISMATCH"
+SUBSTITUENT_STEREO_UNVERIFIED = "SUBSTITUENT_STEREO_UNVERIFIED"
+SUBSTITUENT_STEREO_MISSING = "SUBSTITUENT_STEREO_MISSING"
+SUBSTITUENT_STEREO_MISMATCH = "SUBSTITUENT_STEREO_MISMATCH"
 # Whole-proof residual, raised from P6's confidence bookkeeping: nothing the
 # spine claims was independently corroborated, so the proofs that ran have
 # established nothing about what the name spells.
@@ -226,10 +236,18 @@ class BindingSpine:
     that ``from_token_bindings`` could not map, so ``verify_spine`` can
     report them in ``stats`` instead of the adapter having to log out of
     band. It defaults to empty for hand-built spines.
+
+    ``stereo_atom_to_locant`` (Phase 0c Task 3) is the atom->locant map the
+    PARENT-scope stereodescriptor block (if any) was spelled from -- the SAME
+    dict ``general_engine._stereo_prefix`` was called with, threaded here so
+    P8 can resolve the block to real atom/bond identity. Empty for every
+    result whose producer never called ``_stereo_prefix`` (nothing to
+    resolve) and for hand-built spines that do not opt in.
     """
 
     roots: Tuple[SpineBinding, ...]
     legacy_role_coerced: Tuple[str, ...] = ()
+    stereo_atom_to_locant: Dict[int, int] = field(default_factory=dict)
 
     def walk(self) -> Iterator[SpineBinding]:
         """Pre-order traversal of every binding in every root."""
@@ -237,7 +255,9 @@ class BindingSpine:
             yield from root.walk()
 
     @classmethod
-    def from_token_bindings(cls, bindings) -> "BindingSpine":
+    def from_token_bindings(cls, bindings,
+                            stereo_atom_to_locant: Optional[Dict[int, int]] = None
+                            ) -> "BindingSpine":
         """Adapt legacy flat ``TokenBinding``s into a (flat) spine.
 
         The legacy producers claim a substituent's WHOLE branch subtree
@@ -259,6 +279,13 @@ class BindingSpine:
         for the 12 legacy producers that have no such field/value, so their
         behaviour is unchanged) and threads it onto ``SpineBinding``, which
         already has that exact slot.
+
+        Phase 0c Task 3: ``stereo_atom_to_locant`` is NOT carried per-binding
+        (unlike ``charge_atom_ids``) -- ``general_engine.GeneralEngineResult``
+        threads ONE map for the whole result (the map its single
+        ``_stereo_prefix`` call used), so the caller passes it here rather
+        than it living on any one ``TokenBinding``. Defaults to empty, which
+        is byte-identical to before this field existed.
         """
         roots = []
         coerced = []
@@ -276,7 +303,8 @@ class BindingSpine:
                     getattr(binding, "charge_atom_ids", ()) or ()),
             ))
         return cls(roots=tuple(roots),
-                   legacy_role_coerced=tuple(coerced))
+                   legacy_role_coerced=tuple(coerced),
+                   stereo_atom_to_locant=dict(stereo_atom_to_locant or {}))
 
 
 Severity = Literal["error", "warn", "info"]
@@ -1272,6 +1300,224 @@ def _p7_free_valence(mol, spine, findings, stats) -> None:
     stats["free_valence_unverified"] = unverified
 
 
+# ``_STEREO_PREFIX_RE`` matches at name/token START only (Pattern A in
+# ``rules/stereochemistry.py``); this pulls the (locant, cip) pairs out of
+# whatever it matched instead of trusting cardinality.
+_STEREO_TOKEN_RE = re.compile(r'^(\d*[a-z]?)([RSrsEZez])$')
+
+
+def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
+    """The leading ``(...)-``/``(...)`` stereodescriptor block of ``text``,
+    as ``[(locant, cip), ...]`` -- ``locant`` is ``int`` for a plain numeral,
+    the composite STRING for a lettered one (``'3a'``), or ``None`` for a
+    bare unlocanted descriptor (``(R)-``, a single-stereocentre molecule).
+
+    Uses ``_STEREO_PREFIX_RE`` (REUSED VERBATIM, not reimplemented) only to
+    find the block; every pair is then parsed here so a caller can compare
+    against real atom/bond identity rather than merely counting matches --
+    the load-bearing difference from ``count_expressed_stereo_descriptors``
+    (``rules/stereochemistry.py:707``), which this function must never be
+    confused with: that one sums regex hits across the WHOLE name against a
+    bare integer, atom-blind; this one returns the actual (locant, cip) pairs
+    for identity resolution by the caller.
+    """
+    m = _STEREO_PREFIX_RE.match(text or "")
+    if not m:
+        return []
+    block = m.group(0)
+    inner = block[1:block.rindex(')')]
+    pairs: List[Tuple[Any, str]] = []
+    for part in inner.split(','):
+        part = part.strip()
+        pm = _STEREO_TOKEN_RE.match(part)
+        if not pm:
+            continue  # malformed piece -- never crash, just skip it
+        loc_str, cip = pm.groups()
+        if not loc_str:
+            pairs.append((None, cip))
+        elif loc_str[-1].isalpha():
+            pairs.append((loc_str, cip))
+        else:
+            pairs.append((int(loc_str), cip))
+    return pairs
+
+
+def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
+              findings: list, stats: Dict[str, Any]) -> None:
+    """P8: atom-indexed stereo completeness/correctness (Phase 0c Task 3).
+
+    Two checks, both resolving a descriptor to real atom/bond identity via
+    ``spine.stereo_atom_to_locant`` -- NEVER a name-string cardinality count
+    (the explicitly forbidden anti-pattern is
+    ``rules/stereochemistry.count_expressed_stereo_descriptors`` /
+    ``general_engine_stereo_complete``, which compare a regex hit COUNT
+    against ``count_defined_stereo_elements(mol)``; two compensating errors
+    -- one dropped centre, one fabricated one elsewhere -- report ``True``
+    there. P8 instead recomputes the CANONICAL (locant, cip) pairs the real
+    molecule's mapped atoms/bonds assert -- ``collect_stereodescriptors`` is
+    the same atom-indexed function the producer itself calls to build the
+    block, so re-running it against the THREADED map and comparing the
+    resulting pairs, not counts, is resolution through identity, not a
+    tally).
+
+    1. **Forward** -- every (locant, cip) the real molecule's mapped atoms/
+       bonds assert (``collect_stereodescriptors(mol, stereo_atom_to_locant)``)
+       must appear in the name's leading descriptor block, or the centre was
+       silently dropped: ``STEREO_DESCRIPTOR_MISSING``.
+    2. **Reverse** -- every (locant, cip) in the leading block must be one of
+       those real pairs, or it does not resolve to any atom/bond that
+       actually carries that CIP label: ``STEREO_DESCRIPTOR_MISMATCH``. This
+       is the check that catches "right count, wrong atom" -- a name that
+       states the correct NUMBER of descriptors but assigns a CIP letter to
+       the wrong locant fails here even though nothing about the count is
+       wrong.
+
+    When ``stereo_atom_to_locant`` is EMPTY (no producer threaded a map for
+    this result -- e.g. the terminal-ring bare-parent tier, which structurally
+    cannot express the stereo it may carry), the comparison has no ground
+    truth to run on. Mirroring P3's ``CHARGE_UNVERIFIED`` discipline exactly:
+    a leading block present with nothing to verify it against is UNPROVEN,
+    not disproven -- ``STEREO_UNVERIFIED`` -- and P8 makes no claim at all
+    about completeness in that case (an untracked producer silently dropping
+    stereo it never mapped is a real, documented gap -- see
+    ``general_engine._name_terminal_ring_parent`` -- that this check cannot
+    see without a map; it can only avoid asserting the untrue "the name
+    passed P8" for it).
+
+    Severity is mode-conditional (``"warn"`` in ``"audit"``, ``"error"`` in
+    ``"strict"``) for every P8 code, deliberately matching P3/P5/P6 rather
+    than P1/P2/P4's unconditional errors -- Phase 0c Task 3 is AUDIT-ONLY by
+    design (every production call site uses ``mode="audit"``, so this can
+    never change which T4 candidate ships this round); Task 4 promotes it
+    once the diagnostic scan this task also produces shows it is clean.
+    """
+    assign_stereochemistry(mol)
+    locant_map = dict(spine.stereo_atom_to_locant)
+    emitted = _parse_leading_stereo_block(name or "")
+    severity = "error" if mode == "strict" else "warn"
+
+    stats["stereo_locant_map_size"] = len(locant_map)
+    stats["stereo_emitted_leading"] = len(emitted)
+
+    if not locant_map:
+        stats["stereo_confident"] = False
+        if emitted:
+            findings.append(Finding(
+                STEREO_UNVERIFIED,
+                f"name carries a leading stereodescriptor block {emitted!r} "
+                f"but no producer threaded a stereo_atom_to_locant map to "
+                f"resolve it against real atom/bond identity",
+                severity))
+        return
+
+    stats["stereo_confident"] = True
+    expected = collect_stereodescriptors(mol, locant_map)
+    expected_set = set(expected)
+    emitted_set = set(emitted)
+
+    missing = sorted(expected_set - emitted_set, key=lambda t: str(t[0]))
+    for locant, cip in missing:
+        findings.append(Finding(
+            STEREO_DESCRIPTOR_MISSING,
+            f"a defined stereocentre/bond resolved through "
+            f"stereo_atom_to_locant to locant {locant} (real CIP {cip!r}) is "
+            f"not discharged by any descriptor in the emitted name",
+            severity))
+
+    mismatch = sorted(emitted_set - expected_set, key=lambda t: str(t[0]))
+    for locant, cip in mismatch:
+        findings.append(Finding(
+            STEREO_DESCRIPTOR_MISMATCH,
+            f"the emitted descriptor ({locant}{cip}) does not resolve "
+            f"through stereo_atom_to_locant to any real atom/bond carrying "
+            f"that CIP label",
+            severity))
+
+    stats["stereo_missing"] = len(missing)
+    stats["stereo_mismatch"] = len(mismatch)
+
+
+def _p8b_substituent_stereo(mol, spine: BindingSpine, mode: str,
+                            findings: list, stats: Dict[str, Any]) -> None:
+    """P8 (second check): a PREFIX binding's own embedded ``(nE)/(nZ)`` block.
+
+    A substituent's backbone C=C configuration is expressed INSIDE that
+    binding's own composed token text (``terminal_fragment.py:576-602``,
+    e.g. ``(3E)-2-oxo-1-azapent-3-en-1-yl``), never in the parent-scope
+    ``stereo_atom_to_locant`` map -- that map only ever covers the ONE
+    parent-scope ``_stereo_prefix`` call, and a substituent's own internal
+    numbering is local to that substituent, not the parent's locants. So this
+    is a SEPARATE, per-binding check, mirroring P7's pattern of reading "this
+    binding's own bond geometry" rather than anything global.
+
+    Confident only at 1:1 multiplicity (mirrors P7's ``FREE_VALENCE_UNVERIFIED``
+    discipline): a binding whose subtree carries more than one internal
+    defined E/Z bond, or whose token embeds more than one descriptor, is
+    reported ``SUBSTITUENT_STEREO_UNVERIFIED`` at ``"info"`` rather than
+    guessed at -- disambiguating which bond maps to which embedded locant
+    would require re-deriving the substituent's own backbone numbering
+    algorithm, which this proof does not attempt (never confidently wrong).
+
+    At 1:1, the comparison is a real identity check, not a count: the ONE
+    internal E/Z bond's real CIP letter (from ``_CIPCode``, the same read
+    ``terminal_fragment.py`` uses) must equal the ONE embedded descriptor's
+    letter. Zero-vs-one in either direction (a real bond with no embedded
+    descriptor, or an embedded descriptor with no real bond backing it) is
+    unambiguous and reported as a mismatch/missing finding, not "unverified".
+    """
+    severity = "error" if mode == "strict" else "warn"
+    checked = 0
+    for binding in spine.walk():
+        if binding.kind != BindingKind.PREFIX:
+            continue
+        atoms = binding.atom_ids
+        if not atoms:
+            continue
+        internal_ez = [
+            bond.GetProp('_CIPCode')
+            for bond in mol.GetBonds()
+            if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z')
+            and bond.GetBeginAtomIdx() in atoms and bond.GetEndAtomIdx() in atoms
+        ]
+        embedded = _parse_leading_stereo_block(binding.token)
+        if not internal_ez and not embedded:
+            continue
+        checked += 1
+        if len(internal_ez) >= 2 or len(embedded) >= 2:
+            findings.append(Finding(
+                SUBSTITUENT_STEREO_UNVERIFIED,
+                f"token {binding.token!r} has {len(internal_ez)} internal "
+                f"defined E/Z bond(s) and {len(embedded)} embedded "
+                f"descriptor(s) -- multiplicity beyond 1:1 is not "
+                f"independently resolvable here",
+                "info"))
+            continue
+        if internal_ez and not embedded:
+            findings.append(Finding(
+                SUBSTITUENT_STEREO_MISSING,
+                f"token {binding.token!r} has a defined internal backbone "
+                f"E/Z bond ({internal_ez[0]!r}) but embeds no stereodescriptor",
+                severity))
+            continue
+        if embedded and not internal_ez:
+            findings.append(Finding(
+                SUBSTITUENT_STEREO_MISMATCH,
+                f"token {binding.token!r} embeds a stereodescriptor "
+                f"{embedded[0]!r} but no internal bond of its own claimed "
+                f"atoms carries a defined E/Z configuration",
+                severity))
+            continue
+        real_cip = internal_ez[0]
+        _, block_cip = embedded[0]
+        if real_cip != block_cip:
+            findings.append(Finding(
+                SUBSTITUENT_STEREO_MISMATCH,
+                f"token {binding.token!r} embeds {block_cip!r} but its own "
+                f"internal backbone bond is really {real_cip!r}",
+                severity))
+    stats["substituent_stereo_checked"] = checked
+
+
 def verify_spine(mol, spine: BindingSpine, name: str, *,
                  mode: str = "audit", allow_charged: bool = False) -> SpineProof:
     """Prove that ``spine`` binds ``name`` to exactly the graph of ``mol``.
@@ -1333,6 +1579,14 @@ def verify_spine(mol, spine: BindingSpine, name: str, *,
     # has failed -- a broken partition is often exactly a valence error.
     _p7_free_valence(mol, spine, findings, stats)
     proofs.append("P7")
+
+    # P8 (Phase 0c Task 3): atom-indexed stereo, both halves. Like P4/P6/P7 it
+    # needs nothing from the global atom partition (it reads the mol's real
+    # stereo properties and the threaded locant map directly), so it still
+    # runs when P1 has failed.
+    _p8_stereo(mol, spine, name or "", mode, findings, stats)
+    _p8b_substituent_stereo(mol, spine, mode, findings, stats)
+    proofs.append("P8")
     stats["proofs"] = tuple(proofs)
     return SpineProof(
         ok=not any(f.severity == "error" for f in findings),
