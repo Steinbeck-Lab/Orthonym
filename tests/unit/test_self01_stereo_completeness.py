@@ -1,4 +1,5 @@
 # tests/unit/test_self01_stereo_completeness.py
+import re
 import pytest
 from orthonym import namer
 from orthonym.namer import Orthonym
@@ -60,8 +61,7 @@ def test_azo_no_longer_ships_stereo_dropped_name():
     # either a stereo-complete name (contains E/Z) or a clean abstain -- never the
     # stereo-free wrong form.
     assert (not name or is_failure_name(name)
-            or "e)" in name.lower() or "(e" in name.lower()
-            or "z)" in name.lower() or "(z" in name.lower()), name
+            or re.search(r"\((?:\d+[a-z]?,?)*[EZ]\)", name)), name
 
 
 @pytest.mark.opsin_gate
