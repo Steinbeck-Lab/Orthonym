@@ -335,9 +335,18 @@ def name_natural_product(mol) -> Optional[str]:
                     )
 
                 name_ab = _assemble_unsat(stereo_prefix, ring_ab)
-                # Phase 181 D-08: ship α/β only if it OPSIN-round-trips, else whole-graph R/S.
+                # Phase 181 D-08: ship α/β only if it OPSIN-round-trips, else whole-graph R/S --
+                # but ONLY if THAT round-trips too (Fable BLOCKER, 2026-08-12): an unverified
+                # whole-graph fallback can OVER-specify an undefined centre (SELF-01 tolerates
+                # nb>na, namer.py:992) and ship a wrong stereoisomer. If neither candidate
+                # round-trips, honest-fail (None) so the systematic pipeline gets a chance
+                # instead of shipping a bare/unsaturated name that misrepresents the ene/yne
+                # position or an unverified stereoisomer.
                 if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
-                    return _assemble_unsat(_whole_graph_rs_prefix(mol, numbering), {})
+                    wg_name = _assemble_unsat(_whole_graph_rs_prefix(mol, numbering), {})
+                    if _alpha_beta_rt_ok(mol, wg_name):
+                        return wg_name
+                    return None  # Fall through to systematic naming
                 return name_ab
             else:
                 # Phase 0b: a SATURATED bare scaffold with defined stereo must emit its ring
@@ -369,10 +378,22 @@ def name_natural_product(mol) -> Optional[str]:
                         )
 
                     name_ab = _assemble_sat(stereo_prefix, ring_ab)
-                    if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
-                        return _assemble_sat(_whole_graph_rs_prefix(mol, numbering), {})
-                    return name_ab
-                # no stereo to emit -> fall through to the existing bare-name path below
+                    if _alpha_beta_rt_ok(mol, name_ab):
+                        return name_ab
+                    # α/β did not round-trip -> try the whole-graph R/S fallback, but ONLY ship
+                    # IT if it round-trips too (Fable BLOCKER, 2026-08-12): an unverified
+                    # whole-graph name can OVER-specify an undefined centre (SELF-01 tolerates
+                    # nb>na, namer.py:992) and ship a wrong stereoisomer -- the exact bug this
+                    # branch was built to fix, reproduced on
+                    # "CCC1CC[C@H]2[C@@H]3CC[C@@H]4CCCC[C@]4(C)[C@H]3CC[C@]12C" (shipped the
+                    # wrong '(5S,8S,9S,10S,13R,14S)-pregnane' pre-fix). Neither candidate
+                    # round-tripping -> fall through to the bare-name path below; SELF-01
+                    # catches the resulting stereo omission downstream (never a wrong molecule).
+                    wg_name = _assemble_sat(_whole_graph_rs_prefix(mol, numbering), {})
+                    if _alpha_beta_rt_ok(mol, wg_name):
+                        return wg_name
+                # no stereo to emit, or no stereo candidate round-tripped -> fall through to the
+                # existing bare-name path below
         # Coverage gate: reject bare scaffold if it covers too little
         total_heavy = mol.GetNumHeavyAtoms()
         if total_heavy > 10:
