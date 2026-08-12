@@ -341,6 +341,56 @@ def test_p8a_not_masked_when_parent_block_is_fabricated_and_foreign_word_overlap
     assert not p.ok, "a fabricated parent block must not be masked"
 
 
+# ---------------------------------------------------------------------------
+# Task 4 FIX-ROUND 3 (re-review-found residual, SAFE-SIDE false-abstain): a
+# chiral resolving group esterified to an ACHIRAL acid -- round 2's
+# "rightmost candidate at or before the parent's span" rule wrongly picked
+# the pentyl word's own descriptor for the achiral parent (it was the ONLY
+# candidate anywhere, since the achiral parent has none of its own), raising
+# a false STEREO_DESCRIPTOR_MISMATCH on a fully correct name.
+# ---------------------------------------------------------------------------
+_ACHIRAL_MOL = Chem.MolFromSmiles("CCCC")  # butane -- no real stereocentres
+_ACHIRAL_ATOM_TO_LOCANT = {0: 1, 1: 2, 2: 3, 3: 4}
+
+
+def test_p8a_no_false_mismatch_when_achiral_parent_precedes_by_foreign_word():
+    """The reviewer's exact shape: ``"(2S)-pentyl butanoate"``. The parent
+    (``butanoate``, achiral -- ``expected_set`` is empty) has no leading
+    block of its own; the ONLY block anywhere in the string is the pentyl
+    word's own ``(2S)``. ADJACENCY selection must recognise this block does
+    NOT sit at the parent's own word boundary and return ``[]`` for the
+    parent -- an empty ``emitted`` against an empty ``expected_set`` is a
+    clean pass, not a fabricated mismatch.
+    """
+    name = "(2S)-pentyl butanoate"
+    spine = _spine(
+        _b("but", bs.BindingKind.PARENT, [0, 1, 2, 3]),
+        stereo_atom_to_locant=_ACHIRAL_ATOM_TO_LOCANT,
+    )
+    p = bs.verify_spine(_ACHIRAL_MOL, spine, name, mode="audit",
+                        escalate=bs.STRICT_STEREO_CHARGE_AXES)
+    codes = [c for c in p.codes() if c.startswith("STEREO")]
+    assert codes == [], codes
+    assert p.ok, p.findings
+
+
+def test_p8a_still_flags_genuine_missing_when_parent_has_centres_but_no_block():
+    """Negative control: ``[]`` for "no block at the parent's own word" must
+    NOT become a blanket pass when the parent DOES have real centres --
+    only when it genuinely has none. Real centres are
+    ``{(2,'S'),(3,'R')}``; the name has a foreign ``(5R)-pentyl`` word but
+    NO block at all before the parent's own ``3-bromo-2-chlorobutanoate``
+    word -- the parent's stereo was genuinely dropped, and P8a must still
+    catch it (both centres MISSING)."""
+    name = "(5R)-pentyl 3-bromo-2-chlorobutanoate"
+    p = bs.verify_spine(_MOL, _parent_scope_spine(name), name, mode="audit",
+                        escalate=bs.STRICT_STEREO_CHARGE_AXES)
+    codes = p.codes()
+    assert codes.count(bs.STEREO_DESCRIPTOR_MISSING) == 2, codes
+    assert bs.STEREO_DESCRIPTOR_MISMATCH not in codes, codes
+    assert not p.ok
+
+
 def test_p8a_ambiguous_when_parent_span_unresolvable():
     """Fail-safe branch: when the PARENT binding's own token cannot be
     located among P4's resolved spans (e.g. a spine whose parent token

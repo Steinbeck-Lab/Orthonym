@@ -1413,30 +1413,49 @@ def _parse_leading_stereo_block(text: str) -> List[Tuple[Any, str]]:
 # centres ``{(2,'S'),(3,'R')}`` and a FABRICATED parent block ``(4S,5R)`` --
 # overlap-based selection returns the foreign ``(2S)`` (1 point of overlap)
 # instead of the parent's own wrong ``(4S,5R)`` (0 points), so the
-# fabrication went uncaught.
+# fabrication went uncaught. Fixed by selecting POSITIONALLY instead: the
+# parent binding's own real character span is already known from P4
+# (``_p4_token_spans``, which always runs before P8).
 #
-# The fix does not use identity at all to SELECT the block -- only to
-# verify it once selected. Selection is now purely POSITIONAL: the parent
-# binding's own real character span is already known from P4
-# (``_p4_token_spans``, which always runs before P8), so the candidate kept
-# is the one anchored at the word boundary the parent's own text actually
-# sits inside -- i.e. the rightmost of the candidate positions (index 0,
-# or right after any space) that does not exceed the parent binding's span
-# start. A foreign word's block sits in a DIFFERENT word (a different, and
-# strictly earlier, candidate position) and can therefore never be
-# substituted for the parent's, regardless of what it happens to overlap.
-# See ``_find_leading_stereo_pairs`` and ``_parent_binding_span``.
+# Task 4 FIX-ROUND 3 (re-review-found residual, SAFE-SIDE false-abstain):
+# round 2's "rightmost candidate whose start does not exceed
+# parent_span_start" rule (plus its unconditional single-candidate
+# shortcut) still misattributes a FOREIGN word's block to the parent when
+# the PARENT ITSELF has NO leading block of its own. Shape: a chiral
+# resolving group esterified to an ACHIRAL acid, e.g. ``"(2S)-pentyl
+# butanoate"``. ``butanoate`` (the parent) parses no block at its own word
+# boundary, so the ONLY candidate anywhere in the string is the pentyl
+# word's own ``(2S)``, at position 0 -- "some candidate exists whose start
+# is <= parent_span_start" is trivially true for EVERY earlier word's
+# candidate, not just the parent's own, so round 2 wrongly attributed
+# ``(2S)`` to the achiral parent and raised a false
+# ``STEREO_DESCRIPTOR_MISMATCH`` on a fully correct name (safe-side --
+# abstain, not mis-ship -- but a real breadth false-abstain on a common
+# ester shape).
+#
+# The fix requires ADJACENCY, not "somewhere at or before": a name is a
+# sequence of WORDS (P-65.6.3.2.1's grammar; ``_leading_word_boundaries``
+# enumerates every word-start position), and the parent's own block, if it
+# has one, sits at EXACTLY the word-boundary where the parent's own word
+# begins -- never at an earlier word's boundary, however close. So the
+# algorithm is: find the word boundary that begins the SAME word/name-
+# region the parent binding's real span sits inside (the largest boundary
+# not exceeding ``parent_span_start``), then look up a block AT THAT EXACT
+# boundary, never at any other. If that specific word has no block, the
+# parent has none -- P8a's forward check then correctly compares ``[]``
+# against ``expected_set``: empty (achiral parent) -> no finding; non-empty
+# (parent has real centres but emitted none) -> a genuine
+# ``STEREO_DESCRIPTOR_MISSING``, exactly the case P8a exists to catch.
+# Still purely positional; identity is still never used to SELECT.
 
 
-def _iter_leading_stereo_candidates(
-        name: str) -> List[Tuple[int, List[Tuple[Any, str]]]]:
-    """Every CANDIDATE stereo-block position in ``name``, as
-    ``[(start, pairs), ...]`` in ascending ``start`` order: position 0, plus
-    the position right after every space -- the only places a NEW word's own
-    leading block can legitimately start (P-65.6.3.2.1's functional-class
-    grammar puts no space anywhere else; a compound substituent name is
-    always one hyphen-joined token with no space of its own). Only
-    candidates that actually parsed to a non-empty block are returned.
+def _leading_word_boundaries(name: str) -> List[int]:
+    """Every position in ``name`` where a NEW word begins: 0, plus the
+    position right after every space. P-65.6.3.2.1's functional-class
+    grammar (and any other multi-word grammar this codebase emits) puts no
+    space anywhere else -- a compound substituent name is always one
+    hyphen-joined token with no space of its own -- so these are the ONLY
+    positions a leading stereo block can legitimately start at.
     """
     text = name or ""
     starts = [0]
@@ -1444,9 +1463,20 @@ def _iter_leading_stereo_candidates(
     while idx != -1:
         starts.append(idx + 1)
         idx = text.find(" ", idx + 1)
+    return starts
 
+
+def _iter_leading_stereo_candidates(
+        name: str) -> List[Tuple[int, List[Tuple[Any, str]]]]:
+    """Every CANDIDATE stereo-block position in ``name`` that actually
+    parsed to a non-empty block, as ``[(start, pairs), ...]`` in ascending
+    ``start`` order. ``start`` is always one of ``_leading_word_boundaries``'
+    positions -- a word that has no block of its own is simply absent here,
+    never guessed at.
+    """
+    text = name or ""
     candidates: List[Tuple[int, List[Tuple[Any, str]]]] = []
-    for start in starts:
+    for start in _leading_word_boundaries(text):
         pairs = _parse_leading_stereo_block(text[start:])
         if pairs:
             candidates.append((start, pairs))
@@ -1480,51 +1510,52 @@ def _parent_binding_span(
     return min(matches)
 
 
-# Sentinel: 2+ candidate blocks exist and the parent binding's own span
-# could not be resolved, so there is no positional evidence for which one
-# is the parent's -- distinct from "no block at all" ([]), which IS a
-# confident (empty) answer. Never guessed past; see _p8_stereo's handling.
+# Sentinel: at least one candidate block exists SOMEWHERE in the name, but
+# the parent binding's own span could not be resolved, so there is no
+# positional evidence for whether any of them is the parent's -- distinct
+# from "no block belongs to the parent" ([]), which IS a confident (empty)
+# answer reached by actually checking the parent's own word boundary. Never
+# guessed past; see _p8_stereo's handling.
 _STEREO_BLOCK_AMBIGUOUS = object()
 
 
 def _find_leading_stereo_pairs(name: str, parent_span_start: Optional[int]):
     """P8a's forward-parse entry point: the PARENT-scope leading
-    stereodescriptor block, selected POSITIONALLY (Task 4 fix-round 2 --
-    see the comment above this function for why identity/overlap-based
-    selection was unsafe).
+    stereodescriptor block, selected by ADJACENCY to the parent's own word
+    (Task 4 fix-round 3 -- see the comment above this function for the two
+    prior selection strategies this superseded and why each was unsafe).
 
-    With 0 or 1 candidate blocks there is nothing to disambiguate -- the
-    only one (or the empty list) is returned regardless of
-    ``parent_span_start``. With 2+ candidates, the one selected is the
-    rightmost whose position does not exceed ``parent_span_start`` (the
-    real PARENT binding's own resolved P4 span) -- i.e. the block anchored
-    to the SAME word/name-region the parent binding's own text sits inside.
-    A foreign word's block sits at an earlier candidate position (a
-    DIFFERENT, prior word) and is structurally never eligible once a later
-    candidate qualifies.
+    The word boundary that begins the SAME word/name-region the parent
+    binding's real span (``parent_span_start``) sits inside is the largest
+    entry of ``_leading_word_boundaries(name)`` not exceeding it. The
+    parent's own block, if it has one, is the candidate anchored at EXACTLY
+    that boundary -- never at any earlier one, however close, and never
+    chosen by identity/overlap. If no candidate exists at that exact
+    boundary, the parent has NO leading block: returns ``[]``, which
+    ``_p8_stereo`` then compares (correctly) against ``expected_set`` --
+    empty means an achiral parent (clean), non-empty means a genuine
+    dropped descriptor (``STEREO_DESCRIPTOR_MISSING``).
 
     When ``parent_span_start`` is ``None`` (P4 could not resolve the
-    parent's own span -- see ``_parent_binding_span``) and there ARE 2+
-    candidates, there is no positional evidence to choose between them:
-    returns the ``_STEREO_BLOCK_AMBIGUOUS`` sentinel rather than guessing.
-    The caller must fail safe on that (report a finding, never a silent
-    pass) -- picking any candidate here risks exactly the masking bug this
-    fix-round closes.
+    parent's own span -- see ``_parent_binding_span``) and at least one
+    candidate block exists ANYWHERE in the name, there is no positional
+    evidence for whether it is the parent's: returns the
+    ``_STEREO_BLOCK_AMBIGUOUS`` sentinel rather than guessing. With zero
+    candidates the answer is unambiguous regardless (nothing to attribute
+    either way), so that case returns ``[]`` even then.
     """
-    candidates = _iter_leading_stereo_candidates(name)
+    candidates = dict(_iter_leading_stereo_candidates(name))
     if not candidates:
         return []
-    if len(candidates) == 1:
-        return candidates[0][1]
     if parent_span_start is None:
         return _STEREO_BLOCK_AMBIGUOUS
 
-    chosen = candidates[0][1]
-    for start, pairs in candidates:
-        if start > parent_span_start:
-            break
-        chosen = pairs
-    return chosen
+    eligible = [s for s in _leading_word_boundaries(name)
+               if s <= parent_span_start]
+    if not eligible:
+        return []
+    parent_word_start = max(eligible)
+    return candidates.get(parent_word_start, [])
 
 
 def _iter_embedded_ez_pairs(text: str) -> List[Tuple[Any, str]]:
@@ -1621,10 +1652,19 @@ def _p8_stereo(mol, spine: BindingSpine, name: str, mode: str,
     would SUPPRESS a genuine ``STEREO_DESCRIPTOR_MISMATCH`` on a fabricated
     parent block -- strictly worse than round 1's own bug (a false void is
     a safe abstain; a suppressed mismatch is a masked wrong name under the
-    gate that is supposed to BE the 0-wrong backstop). See the comment
-    above ``_iter_leading_stereo_candidates`` for the full derivation and
-    the reproduction witness. When the parent's span cannot be resolved AND
-    there are 2+ candidate blocks, ``_find_leading_stereo_pairs`` returns
+    gate that is supposed to BE the 0-wrong backstop).
+
+    Task 4 FIX-ROUND 3: round 2's "rightmost candidate at or before the
+    parent's span" rule still misattributed a FOREIGN word's block to an
+    ACHIRAL parent that has none of its own (e.g. ``"(2S)-pentyl
+    butanoate"`` -- a real, safe-side breadth false-abstain). Selection now
+    requires ADJACENCY: the candidate must sit at EXACTLY the word boundary
+    that begins the parent's own word/name-region, never merely at or
+    before it. See the comment above ``_iter_leading_stereo_candidates``
+    for the full derivation and all three witnesses (the round-1
+    regression, the round-2 mask hole, and the round-3 false-abstain).
+    When the parent's span cannot be resolved AND at least one candidate
+    block exists anywhere, ``_find_leading_stereo_pairs`` returns
     ``_STEREO_BLOCK_AMBIGUOUS`` and this function reports
     ``STEREO_PARENT_BLOCK_AMBIGUOUS`` (same unproven-not-disproven
     discipline as ``STEREO_UNVERIFIED``) instead of guessing.
