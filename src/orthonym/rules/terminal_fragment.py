@@ -80,12 +80,18 @@ def _canonical_ranks(mol) -> Sequence[int]:
 
 
 def _backbone_from(mol, atoms: Set[int], start: int,
-                   ranks: Sequence[int]) -> List[int]:
+                   ranks: Sequence[int], stop_at_ring: bool = False) -> List[int]:
     """The deepest simple path from ``start`` inside ``atoms``.
 
     ``atoms`` is acyclic here, so the induced subgraph rooted at ``start`` is a
     tree and the deepest root-to-leaf path is the backbone. Ties are broken on
     the path's canonical-rank sequence, never on atom index.
+
+    ``stop_at_ring`` (v30 ring-branch lever): when the fragment carries ring
+    systems but the attachment is acyclic, the backbone is the ACYCLIC chain and
+    each ring system is a decoration. Ring atoms are then not valid backbone
+    steps -- the walk stops at the ring boundary and ``_branches_off`` collects
+    the whole ring system as one decoration component.
     """
     best_path: List[int] = [start]
     best_key = (1, tuple([ranks[start]]))
@@ -93,7 +99,9 @@ def _backbone_from(mol, atoms: Set[int], start: int,
     def walk(cur: int, path: List[int], seen: Set[int]) -> None:
         nonlocal best_path, best_key
         children = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
-                    if nb.GetIdx() in atoms and nb.GetIdx() not in seen]
+                    if nb.GetIdx() in atoms and nb.GetIdx() not in seen
+                    and not (stop_at_ring
+                             and mol.GetAtomWithIdx(nb.GetIdx()).IsInRing())]
         if not children:
             key = (len(path), tuple(ranks[i] for i in path))
             if key > best_key:
@@ -450,6 +458,16 @@ def _composite_fragment_name(
             prefix_tokens.append((alpha_sort_key(_het), locant,
                                   enclose_if_compound(_het)))
             continue
+        # 0-WRONG guard (mirrors the chain loop): a ring decoration joined by a
+        # NON-single bond (exocyclic =CH2 / =C<, an ylidene) recurses to a `-yl`
+        # token that asserts a single bond -- wrong constitution. Fail closed.
+        _cn = next((n.GetIdx() for n in mol.GetAtomWithIdx(battach).GetNeighbors()
+                    if n.GetIdx() in core), None)
+        if (_cn is not None and mol.GetBondBetweenAtoms(battach, _cn)
+                .GetBondType() != Chem.BondType.SINGLE):
+            logger.info("terminal_fragment: ring decoration at locant %s is "
+                        "joined by a non-single bond (ylidene); refuse", locant)
+            return None
         sub = _terminal_fragment_name(mol, comp, battach)
         if sub is None:
             logger.info("terminal_fragment: ring decoration at locant %s "
@@ -502,18 +520,32 @@ def _terminal_fragment_name(
                     "and this module emits no R/S descriptor; refuse")
         return None
 
-    if not _is_acyclic(mol, frag):
-        # The composite/ring path emits no stereodescriptor at all, so a defined
-        # ring or ring-adjacent double-bond configuration would be dropped (a
-        # wrong molecule SELF-01 cannot catch) -- keep refusing it here.
+    if mol.GetRingInfo().NumAtomRings(attach_idx) > 0:
+        # Attachment is ON a ring system -> the ring is the parent (composite
+        # path). It emits no stereodescriptor, so a defined ring / ring-adjacent
+        # double-bond configuration would be dropped (a wrong molecule SELF-01
+        # cannot catch) -- keep refusing it here.
         if _has_defined_bond_stereo(mol, frag):
             logger.info("terminal_fragment: composite fragment carries defined "
                         "bond stereo; refuse (no stereodescriptor on this path)")
             return None
         return _composite_fragment_name(mol, frag, attach_idx)
 
+    # Attachment is ACYCLIC -> the chain path names it. v30 ring-branch lever:
+    # when the fragment ALSO carries ring system(s) -- a chain leading to a ring,
+    # the case _composite_fragment_name explicitly declines ("attachment is
+    # acyclic but the fragment carries a ring; out of implemented scope") -- the
+    # backbone STOPS at the ring boundary and each ring system falls out as a
+    # decoration recursed through _composite_fragment_name. The ring is spelled
+    # by terminal_ring (REPLACEMENT nomenclature), so -C(=O)-Ph emits the
+    # ugly-but-RT-correct `1-(cyclohexa-1,3,5-trien-1-yl)-2-oxaeth-1-en-1-yl`
+    # and -CH2CH2-cyclohexyl emits `2-(cyclohexan-1-yl)ethyl` (invariant 1's T4
+    # clause; retained ring names are a follow-on). The pure-acyclic case (no
+    # ring) is stop_at_ring=False -> byte-identical.
+    _frag_has_ring = not _is_acyclic(mol, frag)
     ranks = _canonical_ranks(mol)
-    backbone = _backbone_from(mol, frag, attach_idx, ranks)
+    backbone = _backbone_from(mol, frag, attach_idx, ranks,
+                              stop_at_ring=_frag_has_ring)
     numbering_for_branches = {a: i + 1 for i, a in enumerate(backbone)}
     branches = _branches_off(mol, frag, backbone, numbering_for_branches)
 
@@ -601,17 +633,35 @@ def _terminal_fragment_name(
     name = f"{rp.prefix}{stem}" if rp.prefix else stem
 
     accounted = set(backbone)
+    _backbone_set = set(backbone)
     prefix_tokens: List[tuple] = []          # (alpha_key, locant, token)
     for locant, battach, comp in branches:
         # A lone heteroatom branch takes its STANDARD prefix. Recursing on it
         # yields `1-oxamethyl` for `=O`, which OPSIN reads as `-OH` -- a wrong
-        # molecule. See _single_heteroatom_branch_prefix.
+        # molecule. See _single_heteroatom_branch_prefix. (`=O` is spelled `oxo`
+        # here, which correctly encodes the double bond, so the ylidene guard
+        # below must not see it -- hence it runs only for the recursed branches.)
         _het = _single_heteroatom_branch_prefix(mol, comp)
         if _het is not None:
             accounted |= set(comp)
             prefix_tokens.append((alpha_sort_key(_het), locant,
                                   enclose_if_compound(_het)))
             continue
+        # 0-WRONG guard: a branch joined to the backbone by a NON-single bond is a
+        # =/# -attached substituent (methylidene, cyclohexylidene, ...). Recursing
+        # it yields a `-yl` (single free valence) token that ASSERTS a single bond
+        # -- a wrong CONSTITUTION (`-CH=C<ring` named `...(cyclohexan-1-yl)...`).
+        # This module has no -ylidene/-ylidyne constructor, so fail closed. Fixes
+        # the ring-ylidene class this lever newly reaches AND the pre-existing
+        # acyclic methylidene one (fable ring-review R1).
+        _bbn = next((n.GetIdx() for n in mol.GetAtomWithIdx(battach).GetNeighbors()
+                     if n.GetIdx() in _backbone_set), None)
+        if (_bbn is not None and mol.GetBondBetweenAtoms(battach, _bbn)
+                .GetBondType() != Chem.BondType.SINGLE):
+            logger.info("terminal_fragment: branch at locant %s is joined by a "
+                        "non-single bond (ylidene); no -ylidene constructor, "
+                        "refuse", locant)
+            return None
         sub = _terminal_fragment_name(mol, comp, battach)
         if sub is None:
             # Refuse the WHOLE fragment. Emitting the backbone alone would drop
