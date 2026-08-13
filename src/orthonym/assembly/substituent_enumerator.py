@@ -1004,6 +1004,26 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 if _alk:
                     return _alk
 
+            # v30 Phase1 B5: SILYLOXY -O-[Si]< is '{silyl}oxy'
+            # ('(trimethylsilyl)oxy'), NOT the cascade's mis-rooted
+            # 'hydroxy{silyl}' (a DIFFERENT molecule -Si-OH). Silicon is a
+            # substitutive-nomenclature parent hydride (silane -> silyl, P-21/P-29),
+            # and the DIRECT -Si case already names correctly, so this routes the
+            # O-attached case through the SAME recursive namer + an 'oxy' morpheme.
+            # Handles TMS/TBS/TIPS uniformly; RT-backstopped by SELF-01 downstream.
+            elif (len(_parent) == 1 and len(_rside) == 1
+                    and mol.GetAtomWithIdx(_rside[0]).GetSymbol() == 'Si'
+                    and all(mol.GetBondBetweenAtoms(attach_idx, x).GetBondType()
+                            == Chem.BondType.SINGLE
+                            for x in (_parent[0], _rside[0]))):
+                from ..errors import is_refusal_sentinel
+                from .naming_utils import enclose_if_compound
+                _si_frag = _subtree_atoms(
+                    mol, frag_atoms_set, _rside[0], {attach_idx})
+                _si = name_substituent(mol, sorted(_si_frag), _rside[0])
+                if _si and not is_refusal_sentinel(_si) and ' ' not in _si:
+                    return f"{enclose_if_compound(_si)}oxy"
+
         # v30 breadth (P-62.2.3 / P-66.1.1.4.3): an N-ROOTED substituent -NH-R /
         # -N(R)R' / -NH-C(=O)R is an amino/amido PREFIX (methylamino / dimethylamino
         # / acetamido), NOT the cascade's carbon-rooted misroot -- `carbon_free_valence_
