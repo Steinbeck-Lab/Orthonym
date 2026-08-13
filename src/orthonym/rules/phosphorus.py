@@ -720,71 +720,190 @@ def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str
     return _name_pnictogen_inic_acid(mol, phosphinic_atoms, 'P')
 
 
-def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
+def _p_ester_owner_group(mol, o_idx: int, p_idx: int) -> Optional[str]:
+    """Name the -O-R ester owner R as a substituent token (recursive namer).
+
+    Returns the owner '-yl' name (e.g. 'ethyl', 'propan-2-yl',
+    '2,3-dichloropropyl') and the set of owner atoms, or None if R is not a
+    clean carbon-anchored group the substituent namer can spell.
     """
-    Name a phosphate ester using functional class nomenclature.
-
-    Simple esters: "methyl phosphate", "dimethyl phosphate", "trimethyl phosphate"
-
-    Args:
-        mol: RDKit Mol object
-        phosphorus_idx: Index of phosphorus atom
-
-    Returns:
-        Functional class name, or None if not a simple phosphate
-    """
-    phosphorus = mol.GetAtomWithIdx(phosphorus_idx)
-
-    # Find O-C groups attached to P (not P=O, not P-OH)
-    ester_oxygens = []
-    for neighbor in phosphorus.GetNeighbors():
-        if neighbor.GetSymbol() == 'O':
-            # Check bond type - skip double-bonded oxygen (P=O)
-            bond = mol.GetBondBetweenAtoms(phosphorus_idx, neighbor.GetIdx())
-            if bond.GetBondTypeAsDouble() > 1.5:  # Double bond
-                continue
-
-            # Check if O is bonded to C (ester) vs H (acid)
-            o_neighbors = [n for n in neighbor.GetNeighbors() if n.GetIdx() != phosphorus_idx]
-            if o_neighbors and o_neighbors[0].GetSymbol() == 'C':
-                ester_oxygens.append(neighbor.GetIdx())
-
-    if not ester_oxygens:
-        return None  # Not an ester
-
-    # Get alkyl names for each ester group
-    alkyl_names = []
-    for o_idx in ester_oxygens:
-        o_atom = mol.GetAtomWithIdx(o_idx)
-        c_neighbors = [n for n in o_atom.GetNeighbors() if n.GetSymbol() == 'C']
-        if not c_neighbors:
+    from ..assembly.substituent_enumerator import name_substituent
+    o_atom = mol.GetAtomWithIdx(o_idx)
+    c_neighbors = [n for n in o_atom.GetNeighbors()
+                   if n.GetIdx() != p_idx and n.GetSymbol() == 'C']
+    if len(c_neighbors) != 1:
+        return None
+    c0 = c_neighbors[0].GetIdx()
+    # Collect R = everything reachable from c0 without crossing the ester O.
+    frag: set = set()
+    stack = [c0]
+    while stack:
+        a = stack.pop()
+        if a in frag or a == o_idx:
             continue
-        c_neighbor = c_neighbors[0]
-        carbon_count = _count_alkyl_carbons(mol, c_neighbor.GetIdx(), {o_idx, phosphorus_idx})
-        if carbon_count > 0:
-            alkyl_names.append(get_alkyl_name(carbon_count))
+        frag.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            j = nb.GetIdx()
+            if j == p_idx:                    # R loops back to P -> not a clean ester
+                return None
+            if j != o_idx and j not in frag:
+                stack.append(j)
+    try:
+        token = name_substituent(mol, frozenset(frag), c0)
+    except Exception:  # noqa: BLE001 - a producer bug must degrade, not crash
+        return None
+    if not token or token in ('substituent',) or not isinstance(token, str):
+        return None
+    return token, frozenset(frag)
 
-    if not alkyl_names:
+
+def _assemble_p_owner_text(owner_tokens: List[str]) -> str:
+    """Functional-class ester owner list -> multiplied, alphabetised word block.
+
+    Identical simple owners collapse with di/tri (``dimethyl``); a substituted /
+    compound owner takes bis/tris with enclosing marks (``bis(2-chloroethyl)``).
+    """
+    from ..assembly.naming_utils import (SIMPLE_MULTIPLIERS, COMPLEX_MULTIPLIERS,
+                                          alpha_sort_key)
+    from collections import Counter
+    counts = Counter(owner_tokens)
+    parts = []
+    for token in sorted(counts, key=alpha_sort_key):
+        k = counts[token]
+        is_complex = any(ch in token for ch in "()[]-, 0123456789")
+        if k == 1:
+            parts.append(f"({token})" if False else token)
+        elif is_complex:
+            parts.append(f"{COMPLEX_MULTIPLIERS[k]}({token})")
+        else:
+            parts.append(f"{SIMPLE_MULTIPLIERS[k]}{token}")
+    return " ".join(parts)
+
+
+# P-oxo-acid stem by (has_P_double_O/S, number of C ligands). Phosphite = no =O.
+_P_ACID_STEM = {
+    (True, 0): "phosphate",     # (RO)nP(=O) ...            -> "... phosphate"
+    (True, 1): "phosphonate",   # R-P(=O)(OR')(OR'')        -> "... {R}phosphonate"
+    (True, 2): "phosphinate",   # R2-P(=O)(OR')             -> "... {R,R}phosphinate"
+    (False, 0): "phosphite",    # (RO)3P                    -> "... phosphite"
+}
+_HYDROGEN_MULT = {0: "", 1: "hydrogen", 2: "dihydrogen"}
+
+
+def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
+    """Functional-class name for an ester of a phosphorus oxo-acid.
+
+    Covers phosphoric-acid esters (mono/di/tri: ``methyl dihydrogen phosphate``,
+    ``dimethyl hydrogen phosphate``, ``trimethyl phosphate``), phosphonate esters
+    (``dimethyl methylphosphonate`` — one P-C bond), phosphinate esters
+    (``methyl dimethylphosphinate`` — two P-C bonds), and phosphite triesters
+    (``triethyl phosphite`` — trivalent P, no P=O). The acidic H that remains on a
+    partial ester IS cited (``hydrogen``/``dihydrogen``, P-67 / P-68); the older
+    code dropped it and emitted the anion name ``dimethyl phosphate`` for a
+    NEUTRAL diester — a wrong (charged) structure SELF-01's skeleton block does
+    not catch. Fail-closed (``None``) off the clean neutral single-P shape, or if
+    any owner / C-ligand is not spellable or the name would not cover every atom.
+    Thio (P=S, P-S) is out of scope here -> ``None`` (honest defer).
+    """
+    if mol is None or sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+        return None
+    p = mol.GetAtomWithIdx(phosphorus_idx)
+    if p.GetSymbol() != 'P' or p.GetFormalCharge() != 0 or p.IsInRing():
         return None
 
-    # Sort alphabetically
-    alkyl_names.sort()
-
-    # Format based on count and symmetry
-    if len(alkyl_names) == 1:
-        return f"{alkyl_names[0]} phosphate"
-    elif len(alkyl_names) == 2:
-        if alkyl_names[0] == alkyl_names[1]:
-            return f"di{alkyl_names[0]} phosphate"
+    accounted = {phosphorus_idx}
+    ester_oxygens: List[int] = []
+    oh_count = 0
+    c_ligands: List[int] = []
+    dbl_oxo = 0
+    for b in p.GetBonds():
+        nb = b.GetOtherAtom(p)
+        bt = b.GetBondType()
+        sym = nb.GetSymbol()
+        if bt == Chem.BondType.DOUBLE and sym == 'O':
+            dbl_oxo += 1
+            accounted.add(nb.GetIdx())
+            continue
+        if bt != Chem.BondType.SINGLE:
+            return None                         # P=C / P#N / P=S etc. -> defer
+        if sym == 'C':
+            c_ligands.append(nb.GetIdx())
+            continue
+        if sym != 'O' or nb.GetFormalCharge() != 0:
+            return None                         # P-S / P-N / P-O-P bridge -> defer
+        others = [x for x in nb.GetNeighbors() if x.GetIdx() != phosphorus_idx]
+        if not others and nb.GetTotalNumHs() >= 1:
+            oh_count += 1
+            accounted.add(nb.GetIdx())
+        elif len(others) == 1 and others[0].GetSymbol() == 'C':
+            ester_oxygens.append(nb.GetIdx())
+            accounted.add(nb.GetIdx())
         else:
-            return f"{alkyl_names[0]} {alkyl_names[1]} phosphate"
-    elif len(alkyl_names) == 3:
-        if len(set(alkyl_names)) == 1:
-            return f"tri{alkyl_names[0]} phosphate"
-        else:
-            return f"{' '.join(alkyl_names)} phosphate"
+            return None                         # O bridging to non-C / P-O-P -> defer
 
-    return None
+    if not ester_oxygens:
+        return None                             # a free acid, not an ester
+    if dbl_oxo > 1:
+        return None
+
+    stem = _P_ACID_STEM.get((dbl_oxo == 1, len(c_ligands)))
+    if stem is None:
+        return None
+    if len(c_ligands) > 0 and stem == "phosphite":
+        return None
+
+    # Name each ester owner via the recursive substituent namer.
+    owner_tokens: List[str] = []
+    for o_idx in ester_oxygens:
+        got = _p_ester_owner_group(mol, o_idx, phosphorus_idx)
+        if got is None:
+            return None
+        token, frag = got
+        owner_tokens.append(token)
+        accounted |= frag
+    owner_text = _assemble_p_owner_text(owner_tokens)
+
+    # Phosphon/phosphin-ate: the P-C ligand(s) become the stem's carbon prefix.
+    stem_prefix = ""
+    if c_ligands:
+        from ..assembly.substituent_enumerator import name_substituent
+        c_tokens: List[str] = []
+        for c_idx in c_ligands:
+            frag: set = set()
+            stack = [c_idx]
+            while stack:
+                a = stack.pop()
+                if a in frag:
+                    continue
+                frag.add(a)
+                for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                    j = nb.GetIdx()
+                    if j == phosphorus_idx:
+                        continue
+                    if j not in frag:
+                        stack.append(j)
+            try:
+                tok = name_substituent(mol, frozenset(frag), c_idx)
+            except Exception:  # noqa: BLE001
+                return None
+            if not tok or not isinstance(tok, str) or tok == 'substituent':
+                return None
+            c_tokens.append(tok)
+            accounted |= frag
+        stem_prefix = _assemble_p_owner_text(c_tokens)
+
+    # Every heavy atom must be accounted for, or this is not a whole-molecule name.
+    if accounted != set(range(mol.GetNumAtoms())):
+        return None
+
+    hyd = _HYDROGEN_MULT.get(oh_count)
+    if hyd is None:
+        return None                             # >2 free OH is not an ester shape
+    pieces = [owner_text]
+    if hyd:
+        pieces.append(hyd)
+    pieces.append(f"{stem_prefix}{stem}")
+    return " ".join(pieces)
 
 
 def get_phosphanyl_prefix(mol, phosphorus_idx: int, exclude_atoms: set = None) -> Optional[str]:

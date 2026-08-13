@@ -126,9 +126,14 @@ class TestPhosphorusEdgeCases:
         assert result == "methylphosphane"
 
     def test_asymmetric_phosphate(self):
-        """Asymmetric phosphate diester."""
+        """Asymmetric phosphate diester -> cites the free -OH as 'hydrogen'.
+
+        The bare 'ethyl methyl phosphate' is the ANION (OPSIN full-InChIKey RT
+        FAILS vs the neutral input P(=O)(OCC)(OC)[O-]); the neutral diester acid
+        is 'ethyl methyl hydrogen phosphate' (P-67/P-68, RT-OK).
+        """
         result = name_compound("COP(=O)(OCC)O")
-        assert result == "ethyl methyl phosphate"
+        assert result == "ethyl methyl hydrogen phosphate"
 
     def test_dipropylphosphinic_acid(self):
         """Dipropylphosphinic acid."""

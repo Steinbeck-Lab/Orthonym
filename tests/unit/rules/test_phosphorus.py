@@ -194,7 +194,12 @@ class TestPhosphateEsterNaming:
     """Tests for phosphate ester naming."""
 
     def test_methyl_phosphate(self):
-        """COP(=O)(O)O -> methyl phosphate"""
+        """COP(=O)(O)O -> methyl dihydrogen phosphate.
+
+        The two acidic -OH are cited as 'dihydrogen' (P-67/P-68); the older
+        bare 'methyl phosphate' is the ANION name (OPSIN full-InChIKey RT FAILS
+        against the neutral input), so it named a different (charged) species.
+        """
         mol = Chem.MolFromSmiles("COP(=O)(O)O")
         # Find phosphorus index
         p_idx = None
@@ -203,10 +208,10 @@ class TestPhosphateEsterNaming:
                 p_idx = i
                 break
         result = name_phosphate_ester(mol, p_idx)
-        assert result == "methyl phosphate"
+        assert result == "methyl dihydrogen phosphate"
 
     def test_dimethyl_phosphate(self):
-        """COP(=O)(OC)O -> dimethyl phosphate"""
+        """COP(=O)(OC)O -> dimethyl hydrogen phosphate (1 free -OH cited)."""
         mol = Chem.MolFromSmiles("COP(=O)(OC)O")
         p_idx = None
         for i in range(mol.GetNumAtoms()):
@@ -214,7 +219,7 @@ class TestPhosphateEsterNaming:
                 p_idx = i
                 break
         result = name_phosphate_ester(mol, p_idx)
-        assert result == "dimethyl phosphate"
+        assert result == "dimethyl hydrogen phosphate"
 
     def test_trimethyl_phosphate(self):
         """COP(=O)(OC)OC -> trimethyl phosphate"""
@@ -228,7 +233,7 @@ class TestPhosphateEsterNaming:
         assert result == "trimethyl phosphate"
 
     def test_ethyl_phosphate(self):
-        """CCOP(=O)(O)O -> ethyl phosphate"""
+        """CCOP(=O)(O)O -> ethyl dihydrogen phosphate (2 free -OH cited)."""
         mol = Chem.MolFromSmiles("CCOP(=O)(O)O")
         p_idx = None
         for i in range(mol.GetNumAtoms()):
@@ -236,10 +241,10 @@ class TestPhosphateEsterNaming:
                 p_idx = i
                 break
         result = name_phosphate_ester(mol, p_idx)
-        assert result == "ethyl phosphate"
+        assert result == "ethyl dihydrogen phosphate"
 
     def test_diethyl_phosphate(self):
-        """CCOP(=O)(OCC)O -> diethyl phosphate"""
+        """CCOP(=O)(OCC)O -> diethyl hydrogen phosphate (1 free -OH cited)."""
         mol = Chem.MolFromSmiles("CCOP(=O)(OCC)O")
         p_idx = None
         for i in range(mol.GetNumAtoms()):
@@ -247,7 +252,7 @@ class TestPhosphateEsterNaming:
                 p_idx = i
                 break
         result = name_phosphate_ester(mol, p_idx)
-        assert result == "diethyl phosphate"
+        assert result == "diethyl hydrogen phosphate"
 
     def test_triethyl_phosphate(self):
         """CCOP(=O)(OCC)OCC -> triethyl phosphate"""
@@ -261,7 +266,7 @@ class TestPhosphateEsterNaming:
         assert result == "triethyl phosphate"
 
     def test_ethyl_methyl_phosphate(self):
-        """COP(=O)(OCC)O -> ethyl methyl phosphate"""
+        """COP(=O)(OCC)O -> ethyl methyl hydrogen phosphate (mixed diester, 1 -OH)."""
         mol = Chem.MolFromSmiles("COP(=O)(OCC)O")
         p_idx = None
         for i in range(mol.GetNumAtoms()):
@@ -269,7 +274,39 @@ class TestPhosphateEsterNaming:
                 p_idx = i
                 break
         result = name_phosphate_ester(mol, p_idx)
-        assert result == "ethyl methyl phosphate"
+        assert result == "ethyl methyl hydrogen phosphate"
+
+    def _pidx(self, smi):
+        mol = Chem.MolFromSmiles(smi)
+        for i in range(mol.GetNumAtoms()):
+            if mol.GetAtomWithIdx(i).GetSymbol() == 'P':
+                return mol, i
+        return mol, None
+
+    def test_diethyl_methylphosphonate(self):
+        """CCOP(=O)(C)OCC -> diethyl methylphosphonate (one P-C bond)."""
+        mol, p = self._pidx("CCOP(=O)(C)OCC")
+        assert name_phosphate_ester(mol, p) == "diethyl methylphosphonate"
+
+    def test_bis_isopropyl_methylphosphonate(self):
+        """CC(C)OP(=O)(C)OC(C)C -> complex owner takes bis(...)."""
+        mol, p = self._pidx("CC(C)OP(=O)(C)OC(C)C")
+        assert name_phosphate_ester(mol, p) == "bis(propan-2-yl) methylphosphonate"
+
+    def test_triethyl_phosphite(self):
+        """CCOP(OCC)OCC -> triethyl phosphite (trivalent P, no P=O)."""
+        mol, p = self._pidx("CCOP(OCC)OCC")
+        assert name_phosphate_ester(mol, p) == "triethyl phosphite"
+
+    def test_free_acid_is_not_an_ester(self):
+        """CP(=O)(O)O (methylphosphonic acid) has no O-C ester -> None (defer)."""
+        mol, p = self._pidx("CP(=O)(O)O")
+        assert name_phosphate_ester(mol, p) is None
+
+    def test_thio_defers(self):
+        """P=S / P-S is out of scope for this functional-class namer -> None."""
+        mol, p = self._pidx("CCOP(=S)(OCC)OCC")
+        assert name_phosphate_ester(mol, p) is None
 
 
 class TestPhosphorusPrefix:
