@@ -3158,6 +3158,11 @@ class Orthonym:
             # Stays False for the multi-fragment and engine-own-name paths, so
             # their `general_fallback_unverified` semantics are byte-identical.
             _cand_from_t4 = False
+            # B5 general lever: retained so the RT-mismatch rescue below can
+            # re-run the T4 cascade. Stays None on the multi-fragment path
+            # (which never perceives single-component features), so the rescue
+            # is single-component-only by construction.
+            feats = None
             if len(Chem.GetMolFrags(mol)) > 1:
                 # v26 P4: multi-fragment split-name-join, complete tier ONLY.
                 # `name_general` (and every single-component handler) refuses a
@@ -3333,7 +3338,19 @@ class Orthonym:
                     # -- constitution-only for a flagged emission, exact
                     # isomeric otherwise.
                     if not self._rt_match(smiles, _opsin_smi, _stereo_flagged):
-                        return None  # wrong name: never ship
+                        # v30 Phase1 B5 general lever: the recovery lane's own
+                        # (rung-0) general name denotes a DIFFERENT molecule, but
+                        # the T4 PG-suppressed cascade may build a complete,
+                        # correct one (measured: 9/45 in-scope suppressed rows).
+                        # Try it ONCE -- best-effort + live-jar only, positively
+                        # RT-verified -- rather than abstain. Never fires for a
+                        # name that was already T4 (`_cand_from_t4`) or on the
+                        # multi-fragment path (`feats is None`).
+                        _rescue = (None if (_cand_from_t4 or feats is None)
+                                   else self._try_t4_rescue(mol, feats, smiles))
+                        if _rescue is None:
+                            return None  # wrong name: never ship
+                        cand, _stereo_flagged = _rescue
                     opsin_status = "verified"
                 elif not self._general_fallback_unverified or _cand_from_t4:
                     # rejected/transient: no unverified opt-in, OR a T4 name
@@ -3351,6 +3368,43 @@ class Orthonym:
         except Exception as e:  # fail-closed: keep the abstention
             logger.info(
                 "general engine late recovery error (kept abstention): %s", e)
+        return None
+
+    def _try_t4_rescue(self, mol, feats, smiles):
+        """v30 Phase1 B5 general lever: build a T4 PG-suppressed cascade name when
+        the recovery lane's own rung-0 general name denoted a DIFFERENT molecule
+        (SELF-01 RT-mismatch). Returns ``(name, stereo_flagged)`` for a POSITIVELY
+        round-tripping T4 name, or ``None``.
+
+        Guarded exactly like the T4 handoff above -- best-effort opt-in
+        (``_general_fallback_unverified``) and a live OPSIN jar (or the test-mode
+        gate bypass) -- so PIN/complete/valid tiers and jarless runs never reach
+        it (the caller only invokes it on the best-effort RT-mismatch abstention
+        path). Cannot recurse: ``name_t4_complete`` is a direct producer call,
+        never ``name_tiered``. The T4 name is E1+spine certified inside
+        ``name_t4_complete`` AND re-verified by the positive RT check here, so a
+        rescue can only ever turn an abstention into a right-molecule emission.
+        """
+        if not self._general_fallback_unverified:
+            return None
+        if not (self._disable_opsin_validity_gate or _validity_gate_jar_present()):
+            return None
+        try:
+            from .assembly.t4_coverage import name_t4_complete
+            cand = name_t4_complete(mol, feats)
+        except Exception as e:  # fail-closed: a producer bug keeps the abstention
+            logger.info("t4 rescue error (kept abstention): %s", e)
+            return None
+        if not cand or is_failure_name(cand):
+            return None
+        _permitted, _flagged = self._stereo_emit_decision(mol, cand)
+        if not _permitted:
+            return None
+        if self._disable_opsin_validity_gate:
+            return (cand, _flagged)  # test/internal mode
+        smi = _validity_gate_name_to_smiles(cand)
+        if smi is not None and self._rt_match(smiles, smi, _flagged):
+            return (cand, _flagged)
         return None
 
     def _name_multifragment_complete(self, mol, canonical_smiles: str) -> Optional[str]:
