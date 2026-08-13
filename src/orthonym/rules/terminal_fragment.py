@@ -510,24 +510,20 @@ def _terminal_fragment_name(
     # species.
     if any(mol.GetAtomWithIdx(a).GetFormalCharge() != 0 for a in frag):
         return None
-    # Stereochemistry (v30 internal-C=C lever). A defined R/S CENTRE is never
-    # expressible here (no R/S descriptor is emitted), so it always refuses --
-    # SELF-01 is constitution-only and cannot catch a dropped centre. A defined
-    # BACKBONE C=C configuration, by contrast, IS emitted as a leading
-    # (nE)/(nZ) block on the acyclic path below, so it no longer forces a refusal.
-    if _has_defined_atom_stereo(mol, frag):
-        logger.info("terminal_fragment: fragment carries a defined stereocentre "
-                    "and this module emits no R/S descriptor; refuse")
-        return None
-
+    # Stereochemistry. The COMPOSITE path (ring parent, below) emits NO
+    # stereodescriptor, so it still refuses any defined stereo -- dropping a
+    # centre/geometry there names a different molecule SELF-01 cannot catch. The
+    # ACYCLIC path below now emits BOTH backbone C=C geometry (nE/nZ, v30
+    # internal-C=C) AND backbone R/S centres (v30 B3), so a defined atom
+    # stereocentre no longer forces a blanket refusal there -- it is cited in the
+    # leading (...) block, and any centre it cannot place (off-backbone) still
+    # refuses. Every emitted descriptor is RT-verified by SELF-01 downstream.
     if mol.GetRingInfo().NumAtomRings(attach_idx) > 0:
         # Attachment is ON a ring system -> the ring is the parent (composite
-        # path). It emits no stereodescriptor, so a defined ring / ring-adjacent
-        # double-bond configuration would be dropped (a wrong molecule SELF-01
-        # cannot catch) -- keep refusing it here.
-        if _has_defined_bond_stereo(mol, frag):
+        # path), which emits no stereodescriptor -- keep refusing defined stereo.
+        if _has_defined_atom_stereo(mol, frag) or _has_defined_bond_stereo(mol, frag):
             logger.info("terminal_fragment: composite fragment carries defined "
-                        "bond stereo; refuse (no stereodescriptor on this path)")
+                        "stereo; refuse (no stereodescriptor on this path)")
             return None
         return _composite_fragment_name(mol, frag, attach_idx)
 
@@ -572,19 +568,20 @@ def _terminal_fragment_name(
 
     numbering = {a: i + 1 for i, a in enumerate(backbone)}
 
-    # --- backbone C=C geometry -> leading (nE)/(nZ) block (v30 internal-C=C) ---
-    # A defined-stereo backbone double bond is now expressed rather than refused
-    # (the atom-stereo guard above already refused any R/S centre). Mirrors
-    # assembly.substituent_naming._unsaturated_substituent_name: E/Z from the
-    # bond CIP code, locant = the lower backbone locant, merged + locant-ordered.
-    # Any in-fragment bond stereo that is neither a backbone bond of THIS chain
-    # nor wholly inside a branch (named by the recursion below) fails closed.
+    # --- backbone stereo -> one leading (nR,nZ,...) block ------------------
+    # BOTH atom R/S centres (v30 B3) and backbone C=C geometry (v30 internal-C=C)
+    # are cited, merged and locant-ordered. Locant = the atom's backbone locant
+    # (for a C=C, the lower endpoint, P-31.1.1.1). A centre/geometry on the
+    # backbone is cited here; one wholly inside a branch is cited by that
+    # branch's own recursion (which routes back through this function); anything
+    # that can be placed on NEITHER fails closed. SELF-01's isomeric round-trip
+    # verifies the emitted descriptor, so a wrong CIP/locant abstains, never ships.
     descriptor = ""
     _stereo_bonds = [
         b for b in mol.GetBonds()
         if b.GetStereo() != Chem.BondStereo.STEREONONE
         and b.GetBeginAtomIdx() in frag and b.GetEndAtomIdx() in frag]
-    if _stereo_bonds:
+    if _has_defined_atom_stereo(mol, frag) or _stereo_bonds:
         _bb_bond_ids = set()
         for i in range(len(backbone) - 1):
             _bb = mol.GetBondBetweenAtoms(backbone[i], backbone[i + 1])
@@ -592,9 +589,23 @@ def _terminal_fragment_name(
                 _bb_bond_ids.add(_bb.GetIdx())
         _branch_sets = [set(comp) for _, _, comp in branches]
         from ..perception.stereo import assign_stereochemistry
-        if any(not b.HasProp('_CIPCode') for b in _stereo_bonds):
-            assign_stereochemistry(mol)
-        _ez_bits = []
+        assign_stereochemistry(mol)  # populate _CIPCode on atoms AND bonds
+        _bits = []  # (locant, letter) for atom R/S and bond E/Z together
+        # atom R/S centres
+        for a in frag:
+            atom = mol.GetAtomWithIdx(a)
+            if not atom.HasProp('_CIPCode'):
+                continue
+            cip = atom.GetProp('_CIPCode')
+            if a in numbering:
+                if cip not in ('R', 'S'):
+                    return None  # r/s/M/P etc. not placeable on this path
+                _bits.append((numbering[a], cip))
+            elif any(a in s for s in _branch_sets):
+                continue  # inside a branch -> its recursion cites it
+            else:
+                return None  # off-backbone centre we cannot place -> refuse
+        # backbone C=C geometry
         for b in _stereo_bonds:
             if b.GetIdx() in _bb_bond_ids:
                 if not b.HasProp('_CIPCode'):
@@ -602,16 +613,16 @@ def _terminal_fragment_name(
                 _ez = b.GetProp('_CIPCode')
                 if _ez not in ('E', 'Z'):
                     return None
-                _ez_bits.append((min(numbering[b.GetBeginAtomIdx()],
-                                     numbering[b.GetEndAtomIdx()]), _ez))
+                _bits.append((min(numbering[b.GetBeginAtomIdx()],
+                                  numbering[b.GetEndAtomIdx()]), _ez))
             elif any(b.GetBeginAtomIdx() in s and b.GetEndAtomIdx() in s
                      for s in _branch_sets):
                 continue  # inside a branch -> its own recursion emits the E/Z
             else:
                 return None  # off-backbone geometry we cannot place -> refuse
-        if _ez_bits:
-            _ez_bits.sort()
-            descriptor = "(" + ",".join(f"{lc}{ez}" for lc, ez in _ez_bits) + ")-"
+        if _bits:
+            _bits.sort()
+            descriptor = "(" + ",".join(f"{lc}{c}" for lc, c in _bits) + ")-"
 
     rp = build_replacement_prefix(mol, numbering, set(backbone))
     if rp.unexpressed:
