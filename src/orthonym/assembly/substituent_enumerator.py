@@ -2538,6 +2538,19 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
         # -NO2 (nitro)
         if symbols == ['N', 'O'] and heteroatoms.get('N', 0) == 1 and heteroatoms.get('O', 0) == 2:
             return 'nitro'
+        # -N=O (nitroso): attach is a NEUTRAL N carrying exactly one terminal,
+        # doubly-bonded O (P-66.5). Guarded on the attach atom + bond order so a
+        # nitrite -O-N=O (attach O, O count 2) or an N-oxide can never match.
+        if (symbols == ['N', 'O'] and heteroatoms.get('N', 0) == 1
+                and heteroatoms.get('O', 0) == 1):
+            _a = mol.GetAtomWithIdx(attach_idx)
+            if _a.GetSymbol() == 'N' and _a.GetFormalCharge() == 0:
+                _os = [n for n in _a.GetNeighbors() if n.GetSymbol() == 'O']
+                if (len(_os) == 1 and _os[0].GetDegree() == 1
+                        and _os[0].GetFormalCharge() == 0
+                        and mol.GetBondBetweenAtoms(attach_idx, _os[0].GetIdx())
+                            .GetBondType() == Chem.BondType.DOUBLE):
+                    return 'nitroso'
         # -N3 (azido)
         if symbols == ['N'] and heteroatoms.get('N', 0) == 3:
             return 'azido'
