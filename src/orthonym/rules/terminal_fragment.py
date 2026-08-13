@@ -448,10 +448,12 @@ def _composite_fragment_name(
 
     accounted = set(core)
     prefix_tokens: List[tuple] = []
+    branch_comps: List[Set[int]] = []
     # The RING's own numbering is authoritative -- it skips 4 -> 4a -> 5, so a
     # position-derived locant would disagree with the name it was spelled from.
     for locant, battach, comp in _branches_off(mol, frag, sorted(core),
                                                tr.numbering):
+        branch_comps.append(set(comp))
         _het = _single_heteroatom_branch_prefix(mol, comp)
         if _het is not None:
             accounted |= set(comp)
@@ -461,6 +463,7 @@ def _composite_fragment_name(
         # 0-WRONG guard (mirrors the chain loop): a ring decoration joined by a
         # NON-single bond (exocyclic =CH2 / =C<, an ylidene) recurses to a `-yl`
         # token that asserts a single bond -- wrong constitution. Fail closed.
+        # (§A2 follow-on converts this to the {ring}ylidene form; until then, refuse.)
         _cn = next((n.GetIdx() for n in mol.GetAtomWithIdx(battach).GetNeighbors()
                     if n.GetIdx() in core), None)
         if (_cn is not None and mol.GetBondBetweenAtoms(battach, _cn)
@@ -477,9 +480,56 @@ def _composite_fragment_name(
         token = enclose_if_compound(sub.name)
         prefix_tokens.append((alpha_sort_key(sub.name), locant, token))
 
+    # --- ring-system stereo -> one leading (nR,nZ,...) block (v30 §A) ----------
+    # Cite the RING SYSTEM's own atom R/S + ring-bond E/Z with the RING numbering
+    # (tr.numbering). Branch-internal stereo is ALREADY inside each branch token
+    # (its recursion emitted it). A defined centre/geometry that is neither on the
+    # ring system nor inside a placed branch cannot be cited here -> refuse
+    # (0-wrong: never drop a centre). SELF-01's C6 stereo layer verifies the
+    # emitted descriptor downstream, so a wrong CIP/locant abstains, never ships.
+    descriptor = ""
+    if _has_defined_atom_stereo(mol, frag) or _has_defined_bond_stereo(mol, frag):
+        from ..perception.stereo import assign_stereochemistry
+        assign_stereochemistry(mol)  # populate _CIPCode on atoms AND bonds
+        _bits: List[tuple] = []
+        for a in frag:
+            atom = mol.GetAtomWithIdx(a)
+            if not atom.HasProp('_CIPCode'):
+                continue
+            if a in core:
+                cip = atom.GetProp('_CIPCode')
+                if cip not in ('R', 'S') or a not in tr.numbering:
+                    return None  # r/s/M/P or a ring atom with no locant -> refuse
+                _bits.append((tr.numbering[a], cip))
+            elif any(a in bc for bc in branch_comps):
+                continue  # inside a branch -> its recursion cited it
+            else:
+                return None  # a centre on neither ring nor branch -> refuse
+        for b in mol.GetBonds():
+            if b.GetStereo() == Chem.BondStereo.STEREONONE:
+                continue
+            bi, bj = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if bi not in frag or bj not in frag:
+                continue
+            if bi in core and bj in core:
+                if (not b.HasProp('_CIPCode') or b.GetProp('_CIPCode') not in ('E', 'Z')
+                        or bi not in tr.numbering or bj not in tr.numbering):
+                    return None
+                _bits.append((min(tr.numbering[bi], tr.numbering[bj]),
+                              b.GetProp('_CIPCode')))
+            elif any(bi in bc and bj in bc for bc in branch_comps):
+                continue  # inside a branch -> its recursion cited it
+            else:
+                return None  # ring-to-branch / unplaceable geometry -> refuse
+        if _bits:
+            _bits.sort()
+            descriptor = "(" + ",".join(f"{lc}{c}" for lc, c in _bits) + ")-"
+
     name = tr.name
     if prefix_tokens:
         name = _join_prefix_block(_assemble_prefixes(prefix_tokens), name)
+    if descriptor:
+        name = descriptor + name
 
     if accounted != frag:
         logger.error("terminal_fragment: composite completeness violated "
@@ -520,11 +570,11 @@ def _terminal_fragment_name(
     # refuses. Every emitted descriptor is RT-verified by SELF-01 downstream.
     if mol.GetRingInfo().NumAtomRings(attach_idx) > 0:
         # Attachment is ON a ring system -> the ring is the parent (composite
-        # path), which emits no stereodescriptor -- keep refusing defined stereo.
-        if _has_defined_atom_stereo(mol, frag) or _has_defined_bond_stereo(mol, frag):
-            logger.info("terminal_fragment: composite fragment carries defined "
-                        "stereo; refuse (no stereodescriptor on this path)")
-            return None
+        # path). v30 §A: that path now cites the ring system's own R/S + E/Z in a
+        # leading (...) block from the ring numbering, and refuses INTERNALLY any
+        # centre it cannot place -- so the former blanket stereo refusal is gone.
+        # SELF-01's C6 RegistrationHash stereo layer verifies every emitted
+        # descriptor downstream, so a wrong CIP/locant abstains, never ships.
         return _composite_fragment_name(mol, frag, attach_idx)
 
     # Attachment is ACYCLIC -> the chain path names it. v30 ring-branch lever:

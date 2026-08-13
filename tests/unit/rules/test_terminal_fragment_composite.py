@@ -77,23 +77,20 @@ def test_a_ring_decoration_that_cannot_be_named_refuses_the_whole_fragment():
 
 # ------------------------------------------- the stereochemistry refusal guard
 
-def test_an_ACYCLIC_stereocentre_refuses():
-    """The load-bearing stereo test — the only one that cannot pass for the wrong
-    reason.
-
-    The ring-bearing stereo tests below passed BEFORE the guard existed, because
-    rings were declined for being rings. An acyclic stereocentred fragment is
-    otherwise fully nameable by Tasks 1-3, so this case isolates the guard itself.
+def test_an_ACYCLIC_stereocentre_emits_the_descriptor():
+    """The acyclic path EMITS the backbone R/S centre (v30 B3), it no longer
+    refuses. SELF-01's C6 stereo layer verifies the emitted descriptor, so a wrong
+    CIP/locant abstains rather than shipping a different compound.
     """
     # NB `CC[C@H](C)CC` looks like a stereocentre but is NOT one -- two identical
     # ethyl arms, so RDKit strips the tag and the case would pass vacuously. The
-    # first draft of this test used it. Verified with RDKit that the molecule below
-    # really does carry CHI_TETRAHEDRAL_CCW at atom 2.
+    # molecule below really does carry a defined centre at atom 2.
     mol = Chem.MolFromSmiles("CC[C@H](C)CCC")
     assert mol is not None
     assert any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
                for a in mol.GetAtoms()), "fixture must actually carry stereo"
-    assert terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0) is None
+    got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0)
+    assert got is not None and "(3S)" in got.name
 
 
 def test_an_ACYCLIC_defined_backbone_double_bond_now_emits_ez():
@@ -115,28 +112,32 @@ def test_an_ACYCLIC_defined_backbone_double_bond_now_emits_ez():
     assert got.name == "(2E)-pent-2-en-1-yl"
 
 
-def test_a_stereocentre_in_the_fragment_refuses():
-    """SELF-01 is CONSTITUTION-ONLY, so nothing downstream catches a lost centre.
+def test_a_stereocentre_in_the_fragment_emits_the_descriptor():
+    """v30 §A: the composite path now EMITS the stereodescriptor instead of the
+    former blanket refusal.
 
-    `namer.py:920-924` documents SELF-01 as suppressing only on a VERIFIED
-    CONSTITUTIONAL mismatch. This namer emits no stereodescriptors at all, so an
-    achiral token for a stereocentred fragment would ship a DIFFERENT COMPOUND
-    with every gate green. 10 of the 14 real target molecules for this phase carry
-    stereocentres, so this is live rather than theoretical.
-
-    Do not relax this guard to raise coverage; build stereodescriptor emission
-    first.
+    The old guard refused any defined stereo because the path emitted none and
+    SELF-01's skeleton block is constitution-only. That was resolved two ways: the
+    composite path cites the ring system's own R/S and every branch cites its own
+    (each branch recursion either emits its centre or REFUSES — no silent drop),
+    and SELF-01 now carries the C6 RegistrationHash stereo layer that catches a
+    WRONG descriptor. So the centre is cited, never dropped. Here the centre is in
+    the -CH2-CH(OH)-CH3 branch, cited by that branch's recursion as (2S).
     """
     mol = Chem.MolFromSmiles("C[C@H](O)CC1CCCCC1")
     assert mol is not None
-    assert terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 8) is None
+    got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 8)
+    assert got is not None
+    assert "(2S)" in got.name  # the centre is CITED, not dropped
 
 
-def test_a_defined_double_bond_configuration_in_the_fragment_refuses():
-    """Same reasoning as the stereocentre: E/Z is invisible to a constitution gate."""
+def test_a_defined_double_bond_configuration_in_the_fragment_emits_the_descriptor():
+    """Same as the stereocentre: the E/Z is now CITED (2E), not refused."""
     mol = Chem.MolFromSmiles(r"C/C=C/CC1CCCCC1")
     assert mol is not None
-    assert terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 5) is None
+    got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 5)
+    assert got is not None
+    assert "(2E)" in got.name
 
 
 def test_an_undefined_double_bond_still_names():
@@ -155,3 +156,13 @@ def test_stereo_outside_the_fragment_does_not_block_it():
     got = terminal_fragment_name(mol, {3, 4, 5, 6}, 3)
     assert got is not None, "a fragment free of stereo must still name"
     assert got.atoms == frozenset({3, 4, 5, 6})
+
+
+def test_ring_system_stereo_is_cited_in_leading_block():
+    """v30 §A: a chiral ring SUBSTITUTENT cites its ring R/S in a leading (...)
+    block using the ring numbering; the whole molecule round-trips (SELF-01 C6)."""
+    # 2-(2-hydroxyethyl)cyclohexan-1-ol as a substituent fragment (attach on ring)
+    mol = Chem.MolFromSmiles("OCC[C@H]1CCCC[C@@H]1O")
+    got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 3)
+    assert got is not None
+    assert got.name.startswith("(") and "R" in got.name.split(")")[0]  # cites ring R/S
