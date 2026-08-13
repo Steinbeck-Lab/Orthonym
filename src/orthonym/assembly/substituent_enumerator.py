@@ -536,6 +536,128 @@ def _carbon_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
     return f"{stem}an-{locant}-{suffix}"
 
 
+def _subtree_atoms(mol, frag, start, banned):
+    """Atoms of ``frag`` reachable from ``start`` without crossing ``banned``.
+
+    The fragment is a tree at the substituent level, so this is the branch
+    hanging off ``start`` once the bond back toward ``banned`` is cut.
+    """
+    seen = {start}
+    stack = [start]
+    while stack:
+        cur = stack.pop()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            k = nb.GetIdx()
+            if k in frag and k not in banned and k not in seen:
+                seen.add(k)
+                stack.append(k)
+    return seen
+
+
+def _nitrogen_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
+    """P-29.2 / BB(:1703) ``-ylidene`` prefix for a NITROGEN free valence, or ``None``.
+
+    A nitrogen attached to the parent by a DOUBLE bond is an ``ylidene`` free
+    valence (P-29.2), not a ``-yl``. Two shapes, both left unnamed by the carbon
+    constructor (non-carbon root) and by the ``-NH-R`` amino intercept (which
+    requires all-single bonds), which is why they used to reach the P-29.2 guard
+    as ``...hydrazinyl`` and fail closed -- the measured decorated-steroid /
+    hydrazone breadth class::
+
+        =N-N<        ->  '{2-substituents}hydrazin-1-ylidene'
+                          (the attached N takes locant 1 -- the free valence gets
+                          the lowest locant, P-46.1.8 -- and the OTHER nitrogen is
+                          locant 2 and carries its own substituents)
+        =N-R / =NH   ->  '{R}imino'  /  'imino'
+
+    The deprecated ``hydrazono`` prefix is NEVER emitted (BB "Changes from the
+    1979 edition" :1703 makes ``hydrazinylidene`` the systematic form). Every
+    result is a candidate that SELF-01 (``_rt_match``) round-trip-verifies
+    downstream, so a wrong locant assignment abstains rather than ships.
+
+    Returns ``None`` (caller fails closed) for a triple-bond N free valence, a
+    charged / isotopic / radical attachment, or any substituent the recursive
+    namer declines.
+    """
+    if free_valence != 2:
+        return None  # =N with a triple bond (nitrilo) is a separate, rare class
+    frag = set(frag_atoms)
+    if attach_idx not in frag:
+        return None
+    na = mol.GetAtomWithIdx(attach_idx)
+    if (na.GetSymbol() != 'N' or na.GetFormalCharge() != 0
+            or na.GetNumRadicalElectrons() or na.GetIsotope()):
+        return None
+
+    # The attached N's neighbours INSIDE the fragment (the parent is outside it).
+    inner = [nb.GetIdx() for nb in na.GetNeighbors() if nb.GetIdx() in frag]
+
+    from .naming_utils import (alpha_sort_key, enclose_if_compound,
+                               get_multiplier_prefix)
+
+    def _name_branch(root, banned):
+        """The recursive substituent name for the branch rooted at ``root``."""
+        sub = _subtree_atoms(mol, frag, root, banned)
+        token = name_substituent(mol, sub, root)
+        from ..errors import is_refusal_sentinel
+        if not token or is_refusal_sentinel(token) or ' ' in token:
+            return None
+        return token
+
+    # --- hydrazinylidene: the attached N bonds to exactly one other N -----
+    n_neighbours = [i for i in inner
+                    if mol.GetAtomWithIdx(i).GetSymbol() == 'N']
+    if len(inner) == 1 and len(n_neighbours) == 1:
+        nb_idx = n_neighbours[0]
+        nb = mol.GetAtomWithIdx(nb_idx)
+        if (nb.GetFormalCharge() != 0 or nb.GetNumRadicalElectrons()
+                or nb.GetIsotope()):
+            return None
+        # every bond inside the hydrazine backbone + its decorations must be
+        # single except the parent attachment (a =N-N= diylidene is a different
+        # class named on hydrazine as a whole).
+        if mol.GetBondBetweenAtoms(attach_idx, nb_idx).GetBondType() != \
+                Chem.BondType.SINGLE:
+            return None
+        # substituents on the FAR nitrogen (locant 2)
+        names = []
+        for r in nb.GetNeighbors():
+            k = r.GetIdx()
+            if k == attach_idx or k not in frag:
+                continue
+            token = _name_branch(k, {nb_idx})
+            if token is None:
+                return None
+            names.append(token)
+        if not names:
+            return "hydrazin-1-ylidene"
+        # group identical substituent tokens, all at locant 2
+        grouped = {}
+        for t in names:
+            grouped.setdefault(t, 0)
+            grouped[t] += 1
+        parts = []
+        for t, count in grouped.items():
+            mult = get_multiplier_prefix(count, t)
+            locs = ",".join(["2"] * count)
+            parts.append((alpha_sort_key(t), f"{locs}-{mult}{enclose_if_compound(t)}"))
+        block = "".join(p for _, p in sorted(parts))
+        return f"{block}hydrazin-1-ylidene"
+
+    # --- imino: the attached N bonds to zero further N (=N-R or =NH) -------
+    if len(n_neighbours) == 0:
+        if not inner:
+            return "imino"           # =NH
+        if len(inner) != 1:
+            return None              # a neutral =N cannot carry two single bonds
+        token = _name_branch(inner[0], {attach_idx})
+        if token is None:
+            return None
+        return f"{enclose_if_compound(token)}imino"
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # The ONE P-29.2 verdict every substituent detector asks for
 # ---------------------------------------------------------------------------
@@ -826,6 +948,21 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     if verdict.prefix is not None:
         return verdict.prefix
     free_valence = verdict.free_valence
+
+    # v30 Phase1 B1 (P-29.2 + BB :1703): a NITROGEN attached by a DOUBLE bond is
+    # an ylidene free valence (hydrazin-1-ylidene for =N-N<, {R}imino for =N-R),
+    # NOT a -yl. carbon_free_valence_prefix declines the non-carbon root and the
+    # -NH-R amino intercept below requires all-single bonds, so without this the
+    # cascade builds '...hydrazinyl' and the P-29.2 guard refuses it -> the whole
+    # branch abstains (the measured decorated-steroid / hydrazone class). The
+    # constructor is candidate-only; SELF-01 round-trip-verifies downstream.
+    if (free_valence == 2 and attach_idx is not None
+            and 0 <= attach_idx < mol.GetNumAtoms()
+            and mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'N'):
+        _nyl = _nitrogen_ylidene_prefix(
+            mol, frag_atoms_set, attach_idx, free_valence)
+        if _nyl is not None:
+            return _nyl
 
     # v30 breadth (P-63.2.2.2): an O-ROOTED ether substituent -O-R is an ALKOXY
     # prefix ('methoxy'/'ethoxy'/'phenoxy'), NOT the cascade's carbon-rooted
