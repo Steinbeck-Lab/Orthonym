@@ -705,8 +705,25 @@ def _p3_charge_totality(mol, spine, mode, allow_charged, findings, stats):
     ``Chem.GetFormalCharge``, which is the same number by definition and
     keeps this module free of an RDKit import (``mol`` stays duck-typed).
     """
+    # A charged heavy atom whose charge is cancelled by a DIRECTLY BONDED heavy
+    # neighbour of exactly opposite charge is a charge-SEPARATED representation
+    # of a NEUTRAL named functional group -- nitro [N+](=O)[O-], N-oxide, azide,
+    # diazo, an ylide -- named by the group's own morpheme (P-59), NOT by a
+    # charge suffix (P-73/P-74). Requiring a charge_atom_ids claim for it was a
+    # false positive (measured: nitro / N-oxide correct names voided when the
+    # spine gates a broad best-effort lane). A genuine zwitterion (betaine) has
+    # its opposite charges NON-adjacent, so it is NOT exempted and still requires
+    # a claim. SELF-01 (isomeric round-trip) independently verifies the whole
+    # constitution, so exempting an internal-FG charge here can never ship a
+    # wrong charge state.
+    def _internally_balanced(atom) -> bool:
+        q = atom.GetFormalCharge()
+        return any(nb.GetAtomicNum() > 1 and nb.GetFormalCharge() == -q
+                   for nb in atom.GetNeighbors())
+
     charged = {a.GetIdx() for a in mol.GetAtoms()
-               if a.GetAtomicNum() > 1 and a.GetFormalCharge() != 0}
+               if a.GetAtomicNum() > 1 and a.GetFormalCharge() != 0
+               and not _internally_balanced(a)}
     owner: Dict[int, str] = {}
     declared_count = 0
     for binding in spine.walk():

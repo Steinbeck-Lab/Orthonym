@@ -60,3 +60,37 @@ def test_e1_failure_short_circuits_to_false():
 
 def test_none_result_is_not_certified():
     assert certify_general_result(ETHANOL, None) is False
+
+
+# --- Phase 1 B4: P3 nitro FP fix + structural_only broad-lane policy ---------
+
+NITROCYCLOHEXANE = Chem.MolFromSmiles("C1CCC(CC1)[N+](=O)[O-]")  # 6 ring C, N, 2 O
+
+
+def test_internal_nitro_charge_not_falsely_voided():
+    """A nitro group's charge-separated [N+][O-] is a NEUTRAL named group
+    (P-59), not a skeletal charge -- the P3 charge axis must not require a
+    charge claim for it (was a false void of correct 'nitro' names)."""
+    res = GeneralEngineResult(name="nitrocyclohexane", bindings=(
+        TokenBinding((0, 1, 2, 3, 4, 5), "cyclohexane", "parent"),
+        TokenBinding((6, 7, 8), "nitro", "prefix"),
+    ))
+    assert certify_general_result(NITROCYCLOHEXANE, res) is True
+
+
+def test_structural_only_ignores_name_spelling_but_still_catches_bond_refragment():
+    """structural_only keeps the swap-witness catch (P2 bond) while treating the
+    name-spelling axes (P4/P5/P6) as advisory."""
+    # ring re-fragment: still voided under structural_only (P2 is structural)
+    bad = GeneralEngineResult(name="dipropyl", bindings=(
+        TokenBinding((0, 1, 2), "propyl", "prefix"),
+        TokenBinding((3, 4, 5), "propyl", "prefix"),
+    ))
+    assert certify_general_result(
+        CYCLOHEXANE, bad, structural_only=True) is False
+    # a clean result passes under both policies
+    good = GeneralEngineResult(name="cyclohexane", bindings=(
+        TokenBinding((0, 1, 2, 3, 4, 5), "cyclohexane", "parent"),
+    ))
+    assert certify_general_result(
+        CYCLOHEXANE, good, structural_only=True) is True

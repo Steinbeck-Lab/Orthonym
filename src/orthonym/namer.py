@@ -3150,7 +3150,7 @@ class Orthonym:
             if mol is None:
                 return None
             from .assembly.general_engine import name_general
-            from .validation.e1_certificate import verify_certificate
+            from .validation.coverage_gate import certify_general_result
             canonical = Chem.MolToSmiles(mol, canonical=True)
             # v31 T4 FINAL-REVIEW FIX 1: mark whether `cand` came from the
             # aggressive T4 producer, so the shared ladder below can require it
@@ -3181,9 +3181,17 @@ class Orthonym:
                 # v26 P5: charge is lifted only under complete
                 # (allow_aromatic_general); the E1 cert must accept the charged
                 # partition there too (the charge is a suffix on a bound atom).
-                if eng is None or not verify_certificate(
+                # Phase 1 B4: the shared best-effort certification gate (E1 +
+                # structural binding-spine axes: atom/bond/charge/stereo). A
+                # structural void routes to the T4 producer below exactly like an
+                # E1 failure -- catching a bad eng result EARLY so T4 gets a
+                # chance (the measured +1 breadth-routing gain). structural_only
+                # keeps the P4/P5/P6 name-spelling FPs advisory (SELF-01 covers
+                # name well-formedness downstream).
+                if eng is None or not certify_general_result(
                         mol, eng,
-                        allow_charged=self._allow_aromatic_general).ok:
+                        allow_charged=self._allow_aromatic_general,
+                        structural_only=True):
                     # v31 T4 (best-effort tier ONLY): the engine's own
                     # flag-gated attempt just declined (name_general returned
                     # None) or produced a non-atom-complete partition. Hand off
@@ -3899,15 +3907,20 @@ class Orthonym:
             # ============================================================
             if self._general_fallback and (not name or is_failure_name(name)):
                 from .assembly.general_engine import name_general
-                from .validation.e1_certificate import verify_certificate
+                from .validation.coverage_gate import certify_general_result
                 try:
                     _eng = name_general(
                         mol, features,
                         allow_aromatic_general=self._allow_aromatic_general,
                         allow_suffix_free=self._general_fallback_unverified)
-                    if _eng is not None and verify_certificate(
+                    # Phase 1 B4: shared best-effort certification gate (E1 +
+                    # structural binding-spine axes), replacing the E1-only
+                    # check so the inline G1 lane cannot ship a name that
+                    # re-fragments a ring or swaps a stereo feature.
+                    if _eng is not None and certify_general_result(
                             mol, _eng,
-                            allow_charged=self._allow_aromatic_general).ok:
+                            allow_charged=self._allow_aromatic_general,
+                            structural_only=True):
                         # v29 P1 (audit-only): record the certified spine here,
                         # at the inline site, for re-assertion at the exit of
                         # name(). Everything between this point and the return

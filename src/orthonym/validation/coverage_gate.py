@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from . import binding_spine as _bs
 from .binding_spine import (BindingSpine, STRICT_STEREO_CHARGE_AXES,
                             verify_spine)
 from .e1_certificate import verify_certificate
@@ -38,8 +39,46 @@ if TYPE_CHECKING:  # type-only; no runtime dependency on general_engine
 logger = logging.getLogger(__name__)
 
 
+#: The STRUCTURAL binding-spine axes -- the ones that decide whether the name
+#: denotes the right GRAPH: P1 atom partition, P2 bond totality, P3 charge
+#: totality, P8 stereo. An error in any of these means the name is about a
+#: different molecule (or drops/swaps a stereo feature), which is exactly the
+#: swap-witness class the broad-lane wiring exists to catch.
+#:
+#: The NAME-SPELLING axes (P4 token spans, P5 residue, P6 token arity) are
+#: DELIBERATELY EXCLUDED for the ``structural_only`` broad-lane gate: they are
+#: about whether the name STRING spells the bindings, which on the best-effort
+#: lanes the downstream SELF-01 OPSIN round-trip already proves (an ill-formed
+#: name does not parse / does not round-trip). They also carry two measured
+#: false-positive classes on legitimate general-engine output -- P6
+#: MULTIPLICITY/ARITY_MISMATCH on the engine's one-binding-per-multiplied-group
+#: convention (``carbonitrile`` claiming both C#N of a ``dicarbonitrile``), and
+#: the P5 residue on the same -- so blocking on them regressed correct names to
+#: uglier T4 fallbacks. t4_coverage keeps the FULL proof (``structural_only``
+#: False) -- its certified Phase-0c behaviour is unchanged.
+#: Only PROVABLE structural disagreements block -- the name demonstrably denotes
+#: a different graph. The "unproven, not disproven" codes (``CHARGE_UNVERIFIED``,
+#: the ``*_UNVERIFIED`` arity/valence/stereo codes, ``PROOF_UNSUBSTANTIATED``)
+#: are EXCLUDED: they fire because a legacy binding producer never threads the
+#: evidence (e.g. the charge-suffix path names a zwitterion's ``-ium``/``-olate``
+#: correctly but does not populate ``charge_atom_ids``), and SELF-01's isomeric
+#: round-trip already verifies charge/stereo on these lanes, so blocking on them
+#: false-voids correct names (measured: a mesoionic zwitterion) with no 0-wrong
+#: benefit.
+_STRUCTURAL_BLOCKING_CODES = frozenset({
+    _bs.ATOM_DOUBLE_BOUND, _bs.ATOM_UNBOUND, _bs.ATOM_PHANTOM,          # P1
+    _bs.BOND_UNCLAIMED, _bs.BOND_DOUBLE_CLAIMED, _bs.BOND_AMBIGUOUS_LINKAGE,  # P2
+    _bs.CHARGE_UNCLAIMED, _bs.CHARGE_DOUBLE_CLAIMED,                    # P3 (provable)
+    _bs.NET_CHARGE_OUT_OF_SCOPE,
+    _bs.STEREO_DESCRIPTOR_MISSING, _bs.STEREO_DESCRIPTOR_MISMATCH,
+    _bs.STEREO_PARENT_BLOCK_AMBIGUOUS, _bs.SUBSTITUENT_STEREO_MISSING,
+    _bs.SUBSTITUENT_STEREO_MISMATCH,                                    # P8 (provable)
+})
+
+
 def certify_general_result(mol, result: "GeneralEngineResult", *,
-                           allow_charged: bool = False) -> bool:
+                           allow_charged: bool = False,
+                           structural_only: bool = False) -> bool:
     """True iff ``result`` passes BOTH E1 and the binding-spine proof.
 
     ``allow_charged`` is threaded to BOTH proofs so they never disagree about
@@ -47,6 +86,16 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
     any net charge there); the namer complete-tier lanes pass
     ``self._allow_aromatic_general`` so a legitimately-charged complete-tier
     name (``-ylium``/``-ide`` suffix on a bound atom) is NOT voided.
+
+    ``structural_only`` (Phase 1 B4, the broad-lane wiring) blocks ONLY on the
+    structural axes (``_STRUCTURAL_BLOCKING_CODES``: atom partition / bond
+    totality / charge / stereo -- the swap-witness class) and treats the
+    name-spelling axes (P4/P5/P6) as advisory, because on the best-effort lanes
+    the downstream SELF-01 round-trip already proves the name is well-formed,
+    and P5/P6 carry measured false positives on the engine's multiplied-group
+    binding convention. E1 (the flat atom partition) is ALWAYS required either
+    way -- it is itself structural. Default ``False`` reproduces the full-proof
+    behaviour t4_coverage was certified on.
 
     Mirrors ``t4_coverage``'s two existing call sites exactly
     (``verify_certificate`` then ``verify_spine(mode="audit", escalate=
@@ -70,9 +119,22 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
         proof = verify_spine(mol, spine, result.name, mode="audit",
                              allow_charged=allow_charged,
                              escalate=STRICT_STEREO_CHARGE_AXES)
-        if not proof.ok:
-            logger.info("coverage_gate: verify_spine voided %r: %s",
-                        result.name, proof.codes())
+        if proof.ok:
+            return True
+        if structural_only:
+            blocking = [f.code for f in proof.findings
+                        if f.severity == "error"
+                        and f.code in _STRUCTURAL_BLOCKING_CODES]
+            if not blocking:
+                logger.info("coverage_gate: name-spelling-only findings on %r "
+                            "(structural gate passes): %s",
+                            result.name, proof.codes())
+                return True
+            logger.info("coverage_gate: structural void %r: %s",
+                        result.name, blocking)
+            return False
+        logger.info("coverage_gate: verify_spine voided %r: %s",
+                    result.name, proof.codes())
         return proof.ok
     except Exception as exc:  # fail-closed: never crash the naming path
         logger.info("coverage_gate: certification raised (voided): %s", exc)

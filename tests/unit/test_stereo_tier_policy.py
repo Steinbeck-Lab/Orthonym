@@ -106,15 +106,20 @@ _CONSTITUTION_NAME = "pentan-2-ol"
 
 
 def _patch_engine(monkeypatch, name=_CONSTITUTION_NAME):
-    """Force name_general to yield a constitution-only name; E1 always ok."""
+    """Force name_general to yield a constitution-only name; certification ok.
+
+    Phase 1 B4: both emission lanes certify the ``GeneralEngineResult`` through
+    ``coverage_gate.certify_general_result`` (E1 + structural binding spine).
+    These tests isolate the stereo-emit + SELF-01 policy DOWNSTREAM of
+    certification, so they fake certification as passing at that single seam."""
     import orthonym.assembly.general_engine as ge
-    import orthonym.validation.e1_certificate as e1
+    import orthonym.validation.coverage_gate as cg
     monkeypatch.setattr(
         ge, "name_general",
         lambda *a, **k: GeneralEngineResult(name=name, bindings=()))
     monkeypatch.setattr(
-        e1, "verify_certificate",
-        lambda *a, **k: E1Verdict(ok=True, reason="test"))
+        cg, "certify_general_result",
+        lambda *a, **k: True)
 
 
 def test_complete_abstains_best_effort_flags(monkeypatch):
