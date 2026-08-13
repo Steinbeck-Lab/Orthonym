@@ -77,3 +77,50 @@ def test_ring_assembly_R_fails_closed_in_this_producer():
     m, frag, S = _sulfanyl_frag("Cc1ccc(SCc2ccc(-c3ccccc3)cc2)cc1")
     assert SE._name_thio_ring_branch(m, set(frag), S) is None
 
+
+# --- v30 tail #23: the -S-X sulfenyl-halide substituent -> {halo}sulfanyl. ---
+# Tier 1.97 named -S-R only when the S continuation was carbon; a halogen fell
+# through, so decalin-SCl abstained. Extend to a terminal-halogen continuation.
+def _schalide_frag(mol_smi):
+    """(mol, frag_atoms={S,X}, attach_S) for a ring/chain -S-X substituent."""
+    m = Chem.MolFromSmiles(mol_smi)
+    assert m is not None, mol_smi
+    S = next(a.GetIdx() for a in m.GetAtoms()
+             if a.GetSymbol() == 'S' and a.GetDegree() == 2
+             and a.GetFormalCharge() == 0
+             and any(nb.GetSymbol() in ('F', 'Cl', 'Br', 'I')
+                     for nb in a.GetNeighbors()))
+    X = next(nb.GetIdx() for nb in m.GetAtomWithIdx(S).GetNeighbors()
+             if nb.GetSymbol() in ('F', 'Cl', 'Br', 'I'))
+    return m, sorted([S, X]), S
+
+
+SCHALIDE = [
+    ("ClSC1CCCCC1", "chlorosulfanyl"),
+    ("ClSCC", "chlorosulfanyl"),
+    ("BrSC1CCCCC1", "bromosulfanyl"),
+]
+
+
+@pytest.mark.parametrize("mol_smi,expected", SCHALIDE)
+def test_best_effort_names_sulfenyl_halide(mol_smi, expected):
+    m, frag, S = _schalide_frag(mol_smi)
+    assert name_substituent(m, frag, S, allow_mancude=True) == expected
+
+
+@pytest.mark.parametrize("mol_smi,_expected", SCHALIDE)
+def test_sulfenyl_halide_pin_default_byte_identical(mol_smi, _expected):
+    # best-effort-only scope: PIN default keeps the historical sentinel.
+    m, frag, S = _schalide_frag(mol_smi)
+    assert name_substituent(m, frag, S, allow_mancude=False) == "substituent"
+
+
+@pytest.mark.opsin_gate
+def test_decahydronaphthalene_sulfenyl_chloride_emits():
+    """#23 whole molecule round-trips under best-effort."""
+    from orthonym.namer import Orthonym
+    r = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                  allow_aromatic_general=True).name_tiered("C1CCC2C(C1)CCCC2SCl")
+    assert r.get("name")  # emits (not abstain)
+    assert "chlorosulfanyl" in r["name"]
+

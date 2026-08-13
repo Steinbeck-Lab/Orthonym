@@ -2132,6 +2132,20 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                         return _stereo_route(_sf)
                 except Exception:
                     pass
+            # Monovalent -S-X where the sole in-fragment continuation is a
+            # HALOGEN: the sulfenyl-halide substituent, spelled by substituting
+            # the sulfanyl (-SH, P-63.1.5) H with the halogen prefix -> e.g.
+            # -S-Cl 'chlorosulfanyl'. get_sulfanyl_prefix's two-carbon SMARTS
+            # cannot see this shape, so build it directly. OPSIN round-trips
+            # '(chlorosulfanyl)cyclohexane' / '1-(chlorosulfanyl)decahydro-
+            # naphthalene'; SELF-01 guards it. Halogen terminal (degree 1) only.
+            elif (len(_s_in) == 1 and len(_s_ext) == 1
+                    and mol.GetAtomWithIdx(_s_ext[0]).GetSymbol() == 'C'):
+                _x = mol.GetAtomWithIdx(_s_in[0])
+                if (_x.GetSymbol() in _HALOGEN_MAP and _x.GetDegree() == 1
+                        and _x.GetFormalCharge() == 0):
+                    return _stereo_route(
+                        f"{_HALOGEN_MAP[_x.GetSymbol()]}sulfanyl")
 
     # ---- Tier 1.9: the intact -C(=O)OH group is `carboxy`, never `formyl` ----
     # P-65.1.1.2. A graph-shape guard, and it has to be here rather than in

@@ -40,3 +40,26 @@ class TestNitrosoMorpheme:
         """CCON=O (ethyl nitrite, -O-N=O) must NOT be spelled nitroso."""
         r = Orthonym(**BE).name_tiered("CCON=O")
         assert "nitroso" not in (r.get("name") or "")
+
+
+class TestNitrosoOnHeterocycleWithSuffix:
+    """v30 tail #24: an N-nitroso ring that ALSO carries a principal-group
+    suffix (acid / ester). The heterocycle handler's hetero-substituent
+    identifier lacked a -N=O branch, so it flagged nitroso 'unnameable' and
+    the whole heterocycle candidate declined -- even though bare
+    1-nitrosopyrrolidine already named. Both now reach T1 (PIN)."""
+
+    def test_nitrosoproline_acid_pin(self):
+        # Default PIN tier: the acid is now a clean T1 PIN.
+        r = Orthonym().name_tiered("O=NN1CCCC1C(=O)O")
+        assert r.get("name") == "1-nitrosopyrrolidine-2-carboxylic acid"
+
+    def test_methyl_nitrosoprolinate_pin(self):
+        # The methyl ester (#24) — its acyl owner is the same ring acid.
+        r = Orthonym().name_tiered("COC(=O)C1CCCN1N=O")
+        assert r.get("name") == "methyl 1-nitrosopyrrolidine-2-carboxylate"
+
+    def test_n_methyl_analog_unchanged(self):
+        # Byte-identity guard: the N-methyl sibling is untouched.
+        r = Orthonym().name_tiered("CN1CCCC1C(=O)O")
+        assert r.get("name") == "1-methylpyrrolidine-2-carboxylic acid"

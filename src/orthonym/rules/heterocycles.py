@@ -3329,6 +3329,26 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
         if o_count == 2:
             return 'nitro'
 
+    # Nitroso (-N=O) -- P-66.6.1 / P-66.5. The attach atom is a NEUTRAL N
+    # carrying exactly one terminal, doubly-bonded O (and nothing else exocyclic
+    # to the ring). Mirrors the substituent_enumerator guard (BB nitroso morpheme)
+    # so a nitrite -O-N=O (attach O) or an N-oxide can never match. Without this
+    # branch an N-nitroso ring (e.g. N-nitrosoproline / its methyl ester) was
+    # flagged 'unnameable' and the whole heterocycle candidate declined, even
+    # though bare N-nitrosopyrrolidine already names — the acid/ester suffix path
+    # simply never reached the nitroso morpheme.
+    if (symbol == 'N' and first_atom.GetFormalCharge() == 0
+            and len(sub_atoms) == 2):
+        _o_idxs = [idx for idx in sub_atoms
+                   if mol.GetAtomWithIdx(idx).GetSymbol() == 'O']
+        if len(_o_idxs) == 1:
+            _o = mol.GetAtomWithIdx(_o_idxs[0])
+            _b = mol.GetBondBetweenAtoms(sub_atoms[0], _o_idxs[0])
+            if (_o.GetDegree() == 1 and _o.GetFormalCharge() == 0
+                    and _b is not None
+                    and _b.GetBondType() == Chem.BondType.DOUBLE):
+                return 'nitroso'
+
     # Sulfanyl (-SH)
     if symbol == 'S' and h_count == 1:
         return 'sulfanyl'
