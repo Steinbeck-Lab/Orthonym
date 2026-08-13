@@ -23,10 +23,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from ..validation.binding_spine import (BindingSpine,
-                                        STRICT_STEREO_CHARGE_AXES,
-                                        verify_spine)
-from ..validation.e1_certificate import verify_certificate
+from ..validation.coverage_gate import certify_general_result
 
 if TYPE_CHECKING:  # type-only; no runtime dependency on general_engine
     from .general_engine import GeneralEngineResult
@@ -108,17 +105,13 @@ def name_t4_complete(mol, features) -> Optional[str]:
         return None
     if candidate.result_obj is None:
         return candidate.name
-    verdict = verify_certificate(mol, candidate.result_obj)
-    if not verdict.ok:
-        return None
-    spine = BindingSpine.from_token_bindings(
-        candidate.result_obj.bindings,
-        stereo_atom_to_locant=getattr(
-            candidate.result_obj, 'stereo_atom_to_locant', None))
-    proof = verify_spine(mol, spine, candidate.name, mode="audit",
-                         allow_charged=False,
-                         escalate=STRICT_STEREO_CHARGE_AXES)
-    if not proof.ok:
+    # Phase 1 Part A: the shared best-effort certification gate (E1 + the
+    # binding spine). Behaviour-identical to the former inline
+    # verify_certificate + verify_spine(escalate=STRICT_STEREO_CHARGE_AXES)
+    # pair; now the ONE place all three lanes route through so they cannot
+    # drift (validation/coverage_gate.py). ``allow_charged=False`` preserves
+    # the T4 net-charge-out-of-scope contract.
+    if not certify_general_result(mol, candidate.result_obj, allow_charged=False):
         return None
     return candidate.name
 
@@ -163,15 +156,11 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
 
     if result is None:
         return None
-    if not verify_certificate(mol, result).ok:
-        return None
-    spine = BindingSpine.from_token_bindings(
-        result.bindings,
-        stereo_atom_to_locant=getattr(result, 'stereo_atom_to_locant', None))
-    proof = verify_spine(mol, spine, result.name, mode="audit",
-                         allow_charged=False,
-                         escalate=STRICT_STEREO_CHARGE_AXES)
-    if not proof.ok:
+    # Phase 1 Part A: the SAME shared certification gate as name_t4_complete
+    # (E1 + binding spine). Duplicated here so a rung this function rejects is
+    # rejected for exactly the reason the outer gate would reject it, one call
+    # earlier -- behaviour-identical to the former inline pair.
+    if not certify_general_result(mol, result, allow_charged=False):
         return None
     return _Candidate(name=result.name, result_obj=result)
 

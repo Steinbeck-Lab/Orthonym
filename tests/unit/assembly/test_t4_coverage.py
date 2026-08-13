@@ -15,6 +15,7 @@ from rdkit import Chem
 from orthonym.assembly import t4_coverage
 from orthonym.assembly.general_engine import GeneralEngineResult, TokenBinding
 from orthonym.namer import Orthonym
+from orthonym.validation import coverage_gate
 from orthonym.validation.e1_certificate import verify_certificate
 
 # CLASS-A T4 target -- 2-[(dimethylamino)methyl]cyclohexan-1-ol (cid 1542461).
@@ -106,7 +107,7 @@ def test_e1_fail_returns_none(monkeypatch):
         lambda m, f: t4_coverage._Candidate(
             name="bad", result_obj=sentinel_result_obj))
     monkeypatch.setattr(
-        t4_coverage, "verify_certificate",
+        coverage_gate, "verify_certificate",
         lambda m, r, allow_charged=False: types.SimpleNamespace(
             ok=False, reason="x"))
     assert t4_coverage.name_t4_complete(mol, None) is None
@@ -121,17 +122,20 @@ def test_e1_pass_returns_name(monkeypatch):
     this test isolates the CONTROL FLOW (E1 pass + spine pass -> ship) from
     the spine's own proofs, which have their own dedicated tests."""
     mol = _mol()
-    sentinel_result_obj = types.SimpleNamespace(bindings=())
+    # In production the _Candidate.name and its result_obj.name are the SAME
+    # string (_run_general_e1 builds _Candidate(name=result.name, ...)); the
+    # shared gate verifies result.name, so the sentinel carries it too.
+    sentinel_result_obj = types.SimpleNamespace(bindings=(), name="good")
     monkeypatch.setattr(
         t4_coverage, "_best_effort_candidate",
         lambda m, f: t4_coverage._Candidate(
             name="good", result_obj=sentinel_result_obj))
     monkeypatch.setattr(
-        t4_coverage, "verify_certificate",
+        coverage_gate, "verify_certificate",
         lambda m, r, allow_charged=False: types.SimpleNamespace(
             ok=True, reason="ok"))
     monkeypatch.setattr(
-        t4_coverage, "verify_spine",
+        coverage_gate, "verify_spine",
         lambda m, s, n, mode="audit", allow_charged=False, escalate=frozenset():
             types.SimpleNamespace(ok=True, findings=(), stats={}))
     assert t4_coverage.name_t4_complete(mol, None) == "good"
@@ -143,17 +147,17 @@ def test_spine_fail_returns_none(monkeypatch):
     binding-spine audit is discarded -- the spine is an ADDITIONAL gate, not a
     substitute for E1, so a spine-only defect must still void the candidate."""
     mol = _mol()
-    sentinel_result_obj = types.SimpleNamespace(bindings=())
+    sentinel_result_obj = types.SimpleNamespace(bindings=(), name="bad-structure")
     monkeypatch.setattr(
         t4_coverage, "_best_effort_candidate",
         lambda m, f: t4_coverage._Candidate(
             name="bad-structure", result_obj=sentinel_result_obj))
     monkeypatch.setattr(
-        t4_coverage, "verify_certificate",
+        coverage_gate, "verify_certificate",
         lambda m, r, allow_charged=False: types.SimpleNamespace(
             ok=True, reason="ok"))
     monkeypatch.setattr(
-        t4_coverage, "verify_spine",
+        coverage_gate, "verify_spine",
         lambda m, s, n, mode="audit", allow_charged=False, escalate=frozenset():
             types.SimpleNamespace(
                 ok=False, findings=("BOND_AMBIGUOUS_LINKAGE",), stats={}))
