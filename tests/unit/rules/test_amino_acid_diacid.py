@@ -50,3 +50,18 @@ class TestDicarboxylicAminoAcidBailout:
         """Alanine (1 COOH) should still produce 'alanine' -- regression guard."""
         result = name_compound("NC(C)C(=O)O")
         assert result == "alanine"
+
+
+@pytest.mark.unit
+def test_n_carboxymethyl_aspartic_counts_only_on_chain_acids():
+    """v30: a COOH inside a SUBSTITUENT must not inflate the parent acid-suffix
+    multiplicity. N-(carboxymethyl)aspartic acid's third COOH is the carboxymethyl
+    group, so the butanedioic parent stays 'dioic' -- it was mis-built as
+    'butanetrioic' (three -oic on a two-acid parent) and suppressed as unparseable.
+    """
+    assert name_compound("OC(=O)CNC(CC(=O)O)C(=O)O") == \
+        "2-[(carboxymethyl)amino]butanedioic acid"
+    # a GENUINE tricarboxylic acid (all three C on/attached to the chain) is
+    # unaffected -- still the carboxylic-acid suffix form, not a broken 'trioic'.
+    assert name_compound("OC(=O)C(CC(=O)O)CC(=O)O") == \
+        "propane-1,2,3-tricarboxylic acid"

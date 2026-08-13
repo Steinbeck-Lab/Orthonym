@@ -2670,12 +2670,25 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     if not suffix:
         return None
 
-    # Get locants for principal group
+    # Get locants for principal group.
+    # v30: count ONLY the principal-group instances that actually sit on the
+    # PARENT CHAIN. An instance wholly off the chain (all its atoms outside
+    # principal_chain) belongs to a substituent and is spelled by that
+    # substituent's own name -- counting it in the suffix multiplicity
+    # double-counts it (N-(carboxymethyl)aspartic acid
+    # `C([C@@H](C(=O)O)NCC(=O)O)C(=O)O` was named `...butanetrioic acid`, three
+    # -oic on a two-acid butane parent whose third COOH is the carboxymethyl
+    # substituent, then suppressed as OPSIN-unparseable). Defensive: fall back to
+    # the full list if the filter would leave nothing on the chain.
+    _chain_set = set(principal_chain)
+    _pga_all = features.principal_group_atoms or []
+    _pga_on_chain = [m for m in _pga_all if any(a in _chain_set for a in m)]
+    _pga_for_suffix = _pga_on_chain if _pga_on_chain else _pga_all
     suffix_locants = []
-    if features.principal_group_atoms:
+    if _pga_for_suffix:
         suffix_locants = get_functional_group_locants(
             principal_chain,
-            features.principal_group_atoms,
+            _pga_for_suffix,
             atom_to_locant,
             mol=mol
         )
@@ -2693,7 +2706,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
     # Determine multiplier for multiple principal groups
     # Validate: suffix count cannot exceed parent chain/ring capacity
-    count = len(features.principal_group_atoms)
+    count = len(_pga_for_suffix)  # on-chain instances only (see above)
     max_capacity = chain_length
     if count > max_capacity:
         count = max_capacity
