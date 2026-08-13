@@ -2693,6 +2693,28 @@ class Orthonym:
                 return self._finish(
                     self._apply_trivial_fallback(_limit.message, smiles),
                     smiles)
+            except Exception as _exc:  # noqa: BLE001
+                # v30 Phase1 B5: a producer raised an UNEXPECTED exception. A
+                # namer must never crash on a valid input -- degrade to the late
+                # general-engine recovery (RT-gated -> 0-wrong-safe), and if that
+                # too declines, to an honest abstention. Measured: a ring-ketone
+                # producer (name_cyclic_oxo_compound) raises on some fused cages
+                # the T4 systematic path names completely; before this the
+                # exception escaped name() and every caller without its own
+                # try/except crashed (only the eval harness's worker caught it).
+                # The strict opt-in still re-raises so a real bug is not masked
+                # in that mode.
+                logger.info("name_impl raised %s; routing to recovery: %s",
+                            type(_exc).__name__, _exc)
+                if raise_on_limit and is_top_level_naming():
+                    raise
+                try:
+                    _rec = self._try_general_engine_recovery(smiles)
+                except Exception:  # noqa: BLE001 - recovery must not re-crash
+                    _rec = None
+                if _rec is not None:
+                    return self._finish(_rec, smiles)
+                return self._finish(_descriptive_fallback(smiles), smiles)
             # Universal stereo backstop (Phase 140, STER-16)
             # Only apply at top level -- decomposition fragments handle stereo
             # through their own naming paths.
