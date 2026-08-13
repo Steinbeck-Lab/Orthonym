@@ -3236,7 +3236,15 @@ class Orthonym:
                             or _validity_gate_jar_present()):
                         return None
                     from .assembly.t4_coverage import name_t4_complete
-                    cand = name_t4_complete(mol, feats)
+                    from .assembly.fragment_naming import isolated_naming_session
+                    # v30 Phase1 B5: T4 is a fresh whole-molecule naming, but the
+                    # recovery lane invokes it mid-name() at session_depth >= 1, so
+                    # its recursion hits MAX_NAMING_DEPTH prematurely and DEGRADES
+                    # to an abstention (measured root cause). Run it in an isolated
+                    # depth-0 session so it gets the full recursion budget a
+                    # standalone call gets.
+                    with isolated_naming_session():
+                        cand = name_t4_complete(mol, feats)
                     if cand is None:
                         return None
                     # v31 T4 FINAL-REVIEW FIX 1: this T4 name must POSITIVELY
@@ -3391,7 +3399,12 @@ class Orthonym:
             return None
         try:
             from .assembly.t4_coverage import name_t4_complete
-            cand = name_t4_complete(mol, feats)
+            from .assembly.fragment_naming import isolated_naming_session
+            # v30 Phase1 B5: isolated depth-0 session (see the handoff site) so
+            # T4 gets the full recursion budget a standalone call gets, rather
+            # than the elevated session_depth of the enclosing name().
+            with isolated_naming_session():
+                cand = name_t4_complete(mol, feats)
         except Exception as e:  # fail-closed: a producer bug keeps the abstention
             logger.info("t4 rescue error (kept abstention): %s", e)
             return None

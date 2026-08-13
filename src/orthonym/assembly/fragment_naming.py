@@ -264,6 +264,39 @@ def end_naming_session():
         _fragment_guard.session_depth = depth
 
 
+import contextlib as _contextlib
+
+
+@_contextlib.contextmanager
+def isolated_naming_session():
+    """Run a nested naming as if it were a fresh TOP-LEVEL call.
+
+    Saves the current session state (``session_depth`` + cache + visited),
+    resets to a clean depth-0 session, and restores it on exit. Used by
+    ``namer``'s recovery-lane T4 producer: ``name_t4_complete`` is conceptually a
+    fresh whole-molecule naming, but the recovery lane invokes it mid-``name()``
+    with ``session_depth >= 1``, so its recursion consumes the shared
+    ``MAX_NAMING_DEPTH`` budget from an elevated floor and a deep substituent hits
+    the cap prematurely -- it then DEGRADES to an abstention where a standalone
+    call names the molecule completely (measured: ``CC(=O)NCN(C)N=O`` and the
+    in-scope suppressed cohort). Isolating the session gives T4 the full depth-0
+    budget, exactly as a direct call gets. Restores on exit so the enclosing
+    session continues unperturbed. Never raises out of the restore.
+    """
+    saved = (getattr(_fragment_guard, 'session_depth', 0),
+             getattr(_fragment_guard, 'cache', None),
+             getattr(_fragment_guard, 'visited', None))
+    _fragment_guard.session_depth = 0
+    _fragment_guard.cache = None
+    _fragment_guard.visited = set()
+    try:
+        yield
+    finally:
+        (_fragment_guard.session_depth,
+         _fragment_guard.cache,
+         _fragment_guard.visited) = saved
+
+
 def get_naming_depth() -> int:
     """Get current recursion depth proxy for fragment naming.
 
