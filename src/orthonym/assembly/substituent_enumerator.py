@@ -3148,21 +3148,59 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # Adds only descriptors the token lacks -> can only make a stereo-bearing
     # decorated ring MORE correct (a stereo-stripped token was a wrong molecule the
     # RT gate suppressed); SELF-01 backstops a wrong label.
-    result = _prepend_ring_substituent_stereo(mol, pos, result)
+    result = _prepend_ring_substituent_stereo(mol, pos, result, frag_set)
     return result
 
 
-def _prepend_ring_substituent_stereo(mol, pos, token):
-    """Prepend the ring CIP stereodescriptor prefix (``(3S,4S,5R)-``) to a
-    decorated ring-substituent token, using the substituent numbering ``pos``.
-    No-op when the ring has no cited stereo or the token already leads with a
-    descriptor."""
+def _prepend_ring_substituent_stereo(mol, pos, token, frag_set=None):
+    """Prepend the CIP stereodescriptor prefix (``(3S,4S,5R)-``) to a decorated
+    ring/chain-substituent token, using the substituent numbering ``pos``. No-op
+    when there is no cited stereo or the token already leads with a descriptor.
+
+    ``collect_stereodescriptors`` cites R/S centres + double bonds with BOTH ends
+    in ``pos`` (and ring-exocyclic bonds). A substituent's OWN characteristic
+    double bond -- an oxime/imine C=N, or a C=C -- has its carbon in ``pos`` but
+    its other end (the =N-OR nitrogen, or a decoration carbon) OUTSIDE ``pos``;
+    P-91.3 cites that E/Z on the substituent's prefix, at the carbon's locant.
+    ``collect_stereodescriptors`` fails closed on it (correct for PARENT scope, a
+    different rule), so this SUBSTITUENT-scoped emitter adds it here, guarded by
+    ``frag_set`` so the parent-attachment bond (other end NOT in the fragment) is
+    never cited.
+    """
     if not pos or not token or token.startswith('('):
         return token
     try:
         from ..rules.stereochemistry import (
             collect_stereodescriptors, format_stereodescriptor_string)
-        descr = collect_stereodescriptors(mol, pos)
+        descr = list(collect_stereodescriptors(mol, pos))
+        _seen = {loc for loc, _ in descr}
+        if frag_set is not None:
+            for bond in mol.GetBonds():
+                if not (bond.HasProp('_CIPCode')
+                        and bond.GetProp('_CIPCode') in ('E', 'Z')):
+                    continue
+                i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                # exactly one end in pos, the other a DECORATION atom of the same
+                # fragment (in frag_set) -> the substituent's own E/Z, cite on the
+                # in-pos carbon's locant. Excludes the parent-attachment bond
+                # (parent atom not in frag_set).
+                in_i, in_j = i in pos, j in pos
+                if in_i == in_j:
+                    continue
+                c_in = i if in_i else j
+                other = j if in_i else i
+                # Restrict to a HETEROATOM other-end (an oxime/imine C=N, C=N-N
+                # hydrazone, ...): that is the substituent's own characteristic
+                # double bond whose E/Z P-91.3 cites on the prefix and which
+                # collect_stereodescriptors skips. A C=C whose other end is a
+                # decoration CARBON is NOT cited here -- that bond belongs to the
+                # decoration's own recursively-built name (citing it on the core
+                # locant double-counted it and broke the secosteroid trienes).
+                if (other in frag_set
+                        and mol.GetAtomWithIdx(other).GetAtomicNum() != 6
+                        and pos[c_in] not in _seen):
+                    descr.append((pos[c_in], bond.GetProp('_CIPCode')))
+                    _seen.add(pos[c_in])
         if descr:
             sp = format_stereodescriptor_string(descr)
             if sp:
@@ -3339,7 +3377,7 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # connectivity). Cite the core's CIP descriptors on THIS numbering (pos; free
     # valence = locant 1). Adds only descriptors the token lacks -> can only make a
     # stereo-bearing chain substituent MORE correct; SELF-01 backstops a wrong label.
-    result = _prepend_ring_substituent_stereo(mol, pos, result)
+    result = _prepend_ring_substituent_stereo(mol, pos, result, frag_set)
     return result
 
 
