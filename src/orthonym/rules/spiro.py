@@ -3911,6 +3911,41 @@ def _name_carbocyclic_monocycle_component(
     return None
 
 
+def _tricyclo_plus_spiro_component(
+    mol, component_atoms: Set[int],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """P-24.5.1 spiro component that is a TRIcyclic+ von-Baeyer cage (possibly
+    hetero / unsaturated). Names it as the full parent hydride via the audited
+    ``analyze_cage_universal`` + ``_spell_ring_analysis``, returning
+    ``(name, {orig_idx: locant})`` or None (fail-closed). The spiro-atom locant
+    is read by the caller off the returned map; SELF-01 arbitrates numbering."""
+    from .vonbaeyer_universal import (
+        analyze_cage_universal, audit_von_baeyer_descriptor,
+    )
+    from .terminal_ring import _spell_ring_analysis
+    try:
+        res = analyze_cage_universal(
+            mol, cage_atoms=set(component_atoms), allow_mancude=True)
+    except Exception:
+        return None
+    if res is None:
+        return None
+    # Re-prove the reconstruction audit at the emission point (kekulized), the
+    # same guard terminal_ring applies before spelling a cage.
+    kek = Chem.RWMol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return None
+    if not audit_von_baeyer_descriptor(
+            kek.GetMol(), set(res.cage_atoms), res.atom_to_locant, res.descriptor):
+        return None
+    name = _spell_ring_analysis(res, None)  # full parent hydride (keeps the 'e')
+    if not name or ' ' in name:
+        return None
+    return name, dict(res.atom_to_locant)
+
+
 def _name_vonbaeyer_spiro_component(
     mol, component_atoms: Set[int], spiro_center: Optional[int] = None,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
@@ -4379,7 +4414,15 @@ def _name_spiro_component(
     carbopah = _name_carbopah_spiro_component(mol, component_atoms)
     if carbopah is not None:
         return carbopah
-    return _name_fused_het_spiro_component(mol, component_atoms)
+    fused_het = _name_fused_het_spiro_component(mol, component_atoms)
+    if fused_het is not None:
+        return fused_het
+    # P-24.5.1 LAST resort: a TRIcyclic+ von-Baeyer cage component (the
+    # fused-tricyclic half of a spiro terpenoid / alkaloid) that no retained /
+    # catalog fused name above covers. Systematic von Baeyer is the last resort
+    # for a fused system (P-25 retained names win), so this MUST sit after every
+    # catalog namer -- otherwise it intercepts e.g. benzo[1,2-c:4,5-c']dithiophene.
+    return _tricyclo_plus_spiro_component(mol, set(component_atoms))
 
 
 def _name_spiro_vonbaeyer_core(mol):
@@ -4416,8 +4459,12 @@ def _name_spiro_vonbaeyer_core(mol):
     b_vb = is_bicyclo_system(ext_b[0])
     lambda_spiro = _nonstandard_bonding_number(mol, spiro_center) is not None and \
         mol.GetAtomWithIdx(spiro_center).GetAtomicNum() not in (1, 6)
+    # P-24.5.1 extension: a TRIcyclic+ von-Baeyer cage side also admits this path
+    # (is_bicyclo is False for it), else the gate rejects a genuine P-24.5 monospiro.
+    a_poly = (not a_vb) and _tricyclo_plus_spiro_component(mol, atoms_a) is not None
+    b_poly = (not b_vb) and _tricyclo_plus_spiro_component(mol, atoms_b) is not None
     if not (
-        a_vb or b_vb
+        a_vb or b_vb or a_poly or b_poly
         or _name_carbopah_spiro_component(mol, atoms_a) is not None
         or _name_carbopah_spiro_component(mol, atoms_b) is not None
         or lambda_spiro

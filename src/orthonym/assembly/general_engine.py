@@ -1967,10 +1967,51 @@ def name_general_spiro(
     spiro = analyze_spiro_universal(
         mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general)
     if spiro is None:
+        # P-24.5.1 fallback: analyze_spiro_universal handles a PURE spiro system;
+        # a MIXED fused+spiro one (a fused/tricyclic cage spiro-joined to a
+        # monocycle -- a spiro terpenoid lactone / alkaloid) is named by the
+        # component-name method instead. name_spiro_vonbaeyer builds the two-
+        # component spiro parent; the enrich path adds every FG (incl. a demoted
+        # ester -> acetyloxy) as a prefix, and ring stereo is cited on the same
+        # numbering. Best-effort only; SELF-01 round-trip is the correctness gate.
+        _vb = _spiro_vonbaeyer_component_fallback(mol)
+        if _vb is not None:
+            return _vb
         return _refuse("not an analyzable spiro ring system")
 
     return _emit_ring_from_analysis(
         mol, features, spiro, allow_aromatic_general, allow_charged)
+
+
+def _spiro_vonbaeyer_component_fallback(mol) -> Optional[GeneralEngineResult]:
+    """P-24.5.1 component-name spiro (mixed fused+spiro) as a best-effort ring
+    parent: ``name_spiro_vonbaeyer`` core + ``_enrich_complex_ring_with_subs``
+    prefixes + ring stereo. Returns a GeneralEngineResult or None (fail-closed).
+    A single whole-molecule parent binding certifies atom coverage (E1); SELF-01
+    proves the name denotes the right structure."""
+    from ..rules.spiro import name_spiro_vonbaeyer
+    from .composer import _enrich_complex_ring_with_subs
+    r = name_spiro_vonbaeyer(mol)
+    if not r:
+        return None
+    core_name, ring_atoms, a2l, _ = r
+    if not core_name or not a2l:
+        return None
+    try:
+        name = _enrich_complex_ring_with_subs(mol, core_name, ring_atoms, a2l)
+    except Exception:
+        return None
+    if not name or ' ' in name:
+        return None
+    # Ring stereo on the int-locant (unprimed component) atoms; a primed-component
+    # stereocentre is out of this best-effort scope and would abstain via RT.
+    int_a2l = {a: l for a, l in a2l.items() if isinstance(l, int)}
+    name = _stereo_prefix(mol, int_a2l) + name
+    all_heavy = tuple(sorted(
+        a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1))
+    bindings = (TokenBinding(all_heavy, core_name, 'parent'),)
+    return GeneralEngineResult(name=name, bindings=bindings,
+                               stereo_atom_to_locant=int_a2l)
 
 
 #: Ledger site id for the parent-hydride tier below. Exported so a test can
