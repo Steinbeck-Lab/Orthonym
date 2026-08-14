@@ -1124,24 +1124,27 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             # loses its -HOWMLNFFSA stereo layer). Convert only when the fragment
             # carries NO defined stereo; a stereo case abstains safely until the
             # composite ring-substituent stereo path is built.
-            _frag_stereo = any(
-                mol.GetAtomWithIdx(_i).GetChiralTag()
-                != Chem.ChiralType.CHI_UNSPECIFIED
-                for _i in frag_atoms_set
-            ) or any(
-                b.GetStereo() in (Chem.BondStereo.STEREOE,
-                                  Chem.BondStereo.STEREOZ,
-                                  Chem.BondStereo.STEREOCIS,
-                                  Chem.BondStereo.STEREOTRANS)
-                and b.GetBeginAtomIdx() in frag_atoms_set
-                and b.GetEndAtomIdx() in frag_atoms_set
-                for b in mol.GetBonds())
             # A stereo-bearing fragment is safe to convert ONLY if the token
-            # already CARRIES its stereo (a leading '(...)' descriptor block from
-            # the composite ring-substituent stereo emitter) -- else the ylidene
-            # would strip it. When the token carries stereo, RT / SELF-01 arbitrate
-            # completeness, so a partial block simply RT-vetoes -> safe abstain.
-            _stereo_ok = (not _frag_stereo) or token.startswith('(')
+            # already CARRIES its stereo -- else the ylidene STRIPS it (and SELF-01
+            # does NOT catch a strip: its RT compares connectivity). Count the
+            # fragment's defined stereo (stereocentres + fully-internal stereo
+            # bonds) and the token's cited descriptors; convert only when the token
+            # COVERS them. The descriptor block may be NESTED ('2-[(1Z)-…]ethyl'),
+            # so a startswith('(') test is insufficient.
+            _frag_stereo_n = sum(
+                1 for _i in frag_atoms_set
+                if mol.GetAtomWithIdx(_i).GetChiralTag()
+                != Chem.ChiralType.CHI_UNSPECIFIED
+            ) + sum(
+                1 for b in mol.GetBonds()
+                if b.GetStereo() in (Chem.BondStereo.STEREOE,
+                                     Chem.BondStereo.STEREOZ,
+                                     Chem.BondStereo.STEREOCIS,
+                                     Chem.BondStereo.STEREOTRANS)
+                and b.GetBeginAtomIdx() in frag_atoms_set
+                and b.GetEndAtomIdx() in frag_atoms_set)
+            _token_descr_n = len(re.findall(r'[RSrsEZ](?=[,)])', token))
+            _stereo_ok = (_frag_stereo_n == 0) or (_token_descr_n >= _frag_stereo_n)
             # The free valence may sit on a RING carbon (cyclohexylidene) OR a
             # CHAIN carbon (a decorated '…ethyl' whose C1 double-bonds the parent,
             # e.g. a seco-steroid side chain '2-[…cyclohexylidene]ethylidene'). Both
