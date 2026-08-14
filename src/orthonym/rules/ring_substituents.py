@@ -238,6 +238,22 @@ def identify_ring_system(mol, ring_atoms: Tuple[int, ...]) -> Optional[str]:
                 return 'pyrrole'
             elif heteroatoms == ['N', 'N']:
                 return 'imidazole'
+            elif heteroatoms == ['N', 'N', 'N']:
+                # P-25.2.1 retained triazoles. 1,2,3-triazole has a MIDDLE N
+                # bonded to two ring N's (the N1-N2-N3 run); 1,2,4-triazole has
+                # no N with two N ring-neighbours (N1-N2-C3-N4-C5). The stem
+                # itself encodes the heteroatom positions, so the free-valence
+                # numbering cascade (which minimises the heteroatom locant set)
+                # must and does reproduce {1,2,3} / {1,2,4}.
+                _has_nnn = any(
+                    mol.GetAtomWithIdx(i).GetSymbol() == 'N'
+                    and sum(1 for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                            if nb.GetIdx() in ring_set
+                            and nb.GetSymbol() == 'N') == 2
+                    for i in ring_atoms)
+                return '1,2,3-triazole' if _has_nnn else '1,2,4-triazole'
+            elif heteroatoms == ['N', 'N', 'N', 'N']:
+                return 'tetrazole'
         else:
             # Saturated 5-membered
             if not heteroatoms:
@@ -299,6 +315,13 @@ _PIN_HETEROARYL_STEMS: Dict[str, str] = {
     'thiophene': 'thiophen',
     'pyrrole': 'pyrrol',
     'imidazole': 'imidazol',
+    # P-25.2.1 retained azole substituent stems. identify_ring_system
+    # distinguishes 1,2,3- vs 1,2,4-triazole by N-adjacency; the free-valence
+    # numbering cascade minimises the heteroatom locant set, reproducing the
+    # {1,2,3}/{1,2,4}/{1,2,3,4} positions the stem name asserts.
+    '1,2,3-triazole': '1,2,3-triazol',
+    '1,2,4-triazole': '1,2,4-triazol',
+    'tetrazole': 'tetrazol',
     # WS-A task 9: fully-SATURATED retained monocycles take the same
     # free-valence numbering (P-29.2): pyrrolidin-1-yl, morpholin-4-yl,
     # piperidin-1-yl, piperazin-1-yl.
@@ -518,6 +541,7 @@ def _decorated_heteroaryl_substituent_name(
     frag_atoms,
     ring_atoms: Tuple[int, ...],
     attachment_atom: int,
+    allow_mancude: bool = False,
 ) -> Optional[str]:
     """BP-3 cluster R: PIN substituent name for a monocyclic heteroaryl ring that
     carries its OWN decorations, with the free valence on a ring atom — e.g.
@@ -535,6 +559,16 @@ def _decorated_heteroaryl_substituent_name(
     """
     ring_list = list(ring_atoms)
     ring_set = set(ring_list)
+    # A ring DECORATION (e.g. an N-phenyl on a triazole) is a separate ring the
+    # caller lumps into ``ring_atoms`` (every ring atom of the fragment). This
+    # producer names ONE monocyclic core; restrict to the ring bearing the free
+    # valence so the decoration ring is instead cited as a recursive substituent
+    # (its atoms land in ``exo`` and are covered by the decoration pass below).
+    _ri_core = [r for r in mol.GetRingInfo().AtomRings()
+                if attachment_atom in r]
+    if len(_ri_core) == 1 and ring_set != set(_ri_core[0]):
+        ring_list = list(_ri_core[0])
+        ring_set = set(ring_list)
     n = len(ring_list)
     frag_set = set(frag_atoms)
     if attachment_atom not in ring_set or n < 3:
@@ -612,7 +646,34 @@ def _decorated_heteroaryl_substituent_name(
                 continue
             info = _identify_fused_substituent(mol, ni, ring_set)
             if info is None:
-                return None  # unnameable decoration -> fail closed
+                # v30 tail: a decoration that carries its OWN ring through a
+                # chain/hetero linker ((4-chlorophenoxy)methyl on a triazole) is
+                # declined by _identify_fused_substituent, which does not thread
+                # the best-effort ring-on-chain path. Fall back to the universal
+                # substituent namer (allow_mancude), collecting the decoration
+                # subgraph off this ring atom. Fail closed if it too declines.
+                from ..assembly.substituent_enumerator import name_substituent
+                from ..errors import is_refusal_sentinel
+                _deco: Set[int] = set()
+                _st = [ni]
+                while _st:
+                    _x = _st.pop()
+                    if _x in _deco or _x in ring_set:
+                        continue
+                    _deco.add(_x)
+                    for _n in mol.GetAtomWithIdx(_x).GetNeighbors():
+                        if _n.GetIdx() not in ring_set and _n.GetIdx() in frag_set:
+                            _st.append(_n.GetIdx())
+                _nm2 = name_substituent(mol, sorted(_deco), ni,
+                                        allow_mancude=allow_mancude)
+                if (not _nm2 or is_refusal_sentinel(_nm2)
+                        or _nm2 == 'substituent' or ' ' in _nm2):
+                    return None
+                decorations.append((ra, _nm2))
+                accounted.update(
+                    a for a in _deco
+                    if mol.GetAtomWithIdx(a).GetAtomicNum() > 1)
+                continue
             nm = info.get('name')
             if not nm or ' ' in nm:
                 return None
@@ -2068,7 +2129,8 @@ def name_ring_system_substituent(
         # provably correct, so this only ADDS successful emissions.
         try:
             name = _decorated_heteroaryl_substituent_name(
-                mol, frag_atoms, tuple(frag_ring_atoms), attach_idx
+                mol, frag_atoms, tuple(frag_ring_atoms), attach_idx,
+                allow_mancude=allow_mancude,
             )
         except Exception:
             name = None
