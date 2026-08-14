@@ -1142,8 +1142,13 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             # would strip it. When the token carries stereo, RT / SELF-01 arbitrate
             # completeness, so a partial block simply RT-vetoes -> safe abstain.
             _stereo_ok = (not _frag_stereo) or token.startswith('(')
-            if (_a.GetSymbol() == 'C' and _a.IsInRing()
-                    and not _a.GetIsAromatic() and _stereo_ok
+            # The free valence may sit on a RING carbon (cyclohexylidene) OR a
+            # CHAIN carbon (a decorated '…ethyl' whose C1 double-bonds the parent,
+            # e.g. a seco-steroid side chain '2-[…cyclohexylidene]ethylidene'). Both
+            # are P-29.2 ylidene; bare cases are owned by carbon_free_valence_prefix
+            # upstream, so only DECORATED tokens reach here. Aromatic ring carbons
+            # are excluded (a quinoid/mancude ylidene is a different construction).
+            if (_a.GetSymbol() == 'C' and not _a.GetIsAromatic() and _stereo_ok
                     and token.endswith('yl') and not token.endswith('idene')):
                 from ..validation.name_morphemes import free_valence_morphology
                 _cand = token[:-2] + 'ylidene'
