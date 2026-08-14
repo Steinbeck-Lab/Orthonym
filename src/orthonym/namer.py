@@ -2798,6 +2798,22 @@ class Orthonym:
                 _rec = self._try_general_engine_recovery(smiles)
                 if _rec is not None:
                     result = _rec
+            # v30 tail #7: best-effort DEMOTE-SENIOR-GROUP rescue. A ring system
+            # that names cleanly can be blocked because an ACYCLIC senior group
+            # (an ester/acid on a substituent) is selected as the principal group
+            # and its handler linearises or declines the ring parent (the
+            # spiro-quinone alkaloid #7: a pendant acetate makes pg='ester', which
+            # diverts the whole molecule from the spiro ring parent that would name
+            # it as '...spiro[...]' with the acetate demoted to (acetyloxy)methyl).
+            # Re-pick the principal group with the acyclic senior groups excluded
+            # and re-name via the _principal_group_override seam; RT-verified, so
+            # 0-wrong holds. Runs ONLY when we are about to ship a failure.
+            if (is_top_level_naming() and is_failure_name(result)
+                    and self._general_fallback_unverified
+                    and not self._disable_opsin_validity_gate):
+                _dr = self._try_demote_senior_group_rescue(smiles)
+                if _dr is not None:
+                    result = _dr
             # v28 (WSC-02): last-resort DECOMPOSITION before abstaining. A
             # NON-GENERAL handler (e.g. natural_products on a tropane scaffold)
             # can claim a molecule and emit a structure-DROPPING name (`tropane`,
@@ -3399,6 +3415,58 @@ class Orthonym:
             logger.info(
                 "general engine late recovery error (kept abstention): %s", e)
         return None
+
+    def _try_demote_senior_group_rescue(self, smiles: str):
+        """v30 tail #7: best-effort rescue that re-picks the principal group with
+        ACYCLIC senior characteristic groups (ester / carboxylic acid / their
+        chalcogen analogues) excluded, then re-names via the
+        ``_principal_group_override`` seam so a ring parent that was blocked by an
+        off-ring senior group can name (with that group demoted to a detachable
+        prefix). Returns a POSITIVELY round-tripping name or ``None`` (fail-closed).
+
+        Guarded: best-effort opt-in + live OPSIN jar (the caller already checks
+        both); only fires on the ship-a-failure path so it can never alter a
+        passing name. The re-perception mirrors what do --
+        cut the ester link atom out of parent selection, recompute seniority (see
+        findings in reference-findings-2026-08-14e.md) -- but here
+        via the existing override rather than a new parent-selection path.
+        """
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                return None
+            from .perception.functional_groups import detect_functional_groups
+            from .rules.seniority import get_principal_group
+            fgs = detect_functional_groups(mol)
+            # The acyclic senior groups that most often mis-own a ring parent.
+            _DEMOTE = ('ester', 'carboxylic_acid', 'thioester', 'thiocarboxylic_acid',
+                       'carbothioic_acid')
+            if not any(fgs.get(g) for g in _DEMOTE):
+                return None
+            _reduced = {k: v for k, v in fgs.items() if k not in _DEMOTE}
+            new_pg, _ = get_principal_group(mol, _reduced)
+            if new_pg is None:
+                return None  # nothing else to anchor on -> leave the abstention
+            # Re-name with the demoted principal group forced. A FRESH namer at
+            # the PIN style keeps the ring assembler on its normal path; the
+            # override is the same seam rules/ions.py / charged_router.py use.
+            inner = Orthonym(style=self.style,
+                              _principal_group_override=new_pg)
+            cand = inner.name(smiles)
+            if not cand or is_failure_name(cand):
+                return None
+            _permitted, _flagged = self._stereo_emit_decision(mol, cand)
+            if not _permitted:
+                return None
+            if self._disable_opsin_validity_gate:
+                return cand
+            smi = _validity_gate_name_to_smiles(cand)
+            if smi is not None and self._rt_match(smiles, smi, _flagged):
+                return cand
+            return None
+        except Exception as e:  # fail-closed: keep the abstention
+            logger.info("demote-senior-group rescue error (kept abstention): %s", e)
+            return None
 
     def _try_t4_rescue(self, mol, feats, smiles):
         """v30 Phase1 B5 general lever: build a T4 PG-suppressed cascade name when

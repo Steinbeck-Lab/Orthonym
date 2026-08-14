@@ -3861,10 +3861,19 @@ def find_monospiro_separation_atom(
 def _name_carbocyclic_monocycle_component(
     mol, component_atoms: Set[int], spiro_center: int,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
-    """Name a single SATURATED CARBOCYCLIC ring component of a spiro system,
-    numbering it with locant 1 at the spiro atom (the P-24.5 side-ring
-    convention). Returns ``(cyclo<N>ane, {orig_idx: locant})`` or None for a
-    heteroatom ring or an unsaturated ring (deferred follow-on -> fail-closed)."""
+    """Name a single CARBOCYCLIC ring component of a spiro system, numbering it
+    with locant 1 at the spiro atom (the P-24.5 side-ring convention). Returns
+    ``(cyclo<N>ane / cyclo<stem>a-<enes>-diene / -ene, {orig_idx: locant})`` or
+    None for a heteroatom ring (fail-closed).
+
+    v30 tail #7: a ring bearing C=C (the spiro-cyclohexadienone side of a
+    spiro-quinone alkaloid) is now rendered as the mancude ``cyclohexa-2,5-diene``
+    component. The double-bond locants are cited UNPRIMED here; the caller's spiro
+    assembler is responsible for the P-24.5.1 primed/unprimed placement of the
+    OTHER (non-first-cited) component and RT-verifies the whole name (SELF-01). The
+    numbering walks from the spiro atom (locant 1) in the direction giving the
+    C=C set the lowest locants (P-31.1.4.3.4); a saturated ring is byte-identical
+    to the old output (no ene infix)."""
     extracted = _extract_subfragment(mol, component_atoms)
     if extracted is None:
         return None
@@ -3878,11 +3887,18 @@ def _name_carbocyclic_monocycle_component(
         if frag.GetAtomWithIdx(fi).GetAtomicNum() != 6:
             return None
     ring_set = set(ring)
-    for bond in frag.GetBonds():  # saturated only
+    # Collect ring C=C bonds (frozenset pairs); any ring triple/aromatic bond is
+    # out of this v1 scope (fail-closed -> a richer namer or abstain).
+    double_pairs: Set[frozenset] = set()
+    for bond in frag.GetBonds():
         if (bond.GetBeginAtomIdx() in ring_set
-                and bond.GetEndAtomIdx() in ring_set
-                and bond.GetBondType() != Chem.BondType.SINGLE):
-            return None
+                and bond.GetEndAtomIdx() in ring_set):
+            bt = bond.GetBondType()
+            if bt == Chem.BondType.DOUBLE:
+                double_pairs.add(frozenset(
+                    (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())))
+            elif bt != Chem.BondType.SINGLE:
+                return None  # aromatic / triple ring bond -> out of scope
     fadj: Dict[int, List[int]] = {a: [] for a in ring}
     for bond in frag.GetBonds():
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -3890,25 +3906,51 @@ def _name_carbocyclic_monocycle_component(
             fadj[i].append(j)
             fadj[j].append(i)
     start = orig_to_frag[spiro_center]
-    # Walk the ring from the spiro atom (locant 1 at spiro). Deterministic:
-    # an unsubstituted monocycle is symmetric about the spiro atom, so either
-    # walk direction yields the same name; iterate sorted neighbours for a
-    # stable map.
+    n = len(ring)
+    stem = _get_chain_prefix(n)
+    best = None  # (ene_locant_tuple, path)
     for first in sorted(fadj[start]):
         path = [start, first]
         visited = {start, first}
         cur = first
-        while len(path) < len(ring):
+        while len(path) < n:
             nxt = next((nb for nb in fadj[cur] if nb not in visited), None)
             if nxt is None:
                 break
             path.append(nxt)
             visited.add(nxt)
             cur = nxt
-        if len(path) == len(ring):
-            a2l = {frag_to_orig[a]: i + 1 for i, a in enumerate(path)}
-            return f"cyclo{_get_chain_prefix(len(ring))}ane", a2l
-    return None
+        if len(path) != n:
+            continue
+        pos = {a: i + 1 for i, a in enumerate(path)}
+        # each ring C=C -> its lower endpoint locant; a bond closing n->1 is the
+        # ring-closure double bond and would be cited at locant n.
+        ene_locs = []
+        for pr in double_pairs:
+            a, b = tuple(pr)
+            la, lb = pos[a], pos[b]
+            # consecutive-in-ring endpoints: cite the lower, unless it is the
+            # 1<->n closure bond (locant n).
+            ene_locs.append(min(la, lb) if abs(la - lb) == 1 else n)
+        key = tuple(sorted(ene_locs))
+        if best is None or key < best[0]:
+            best = (key, path)
+    if best is None:
+        return None
+    ene_key, path = best
+    a2l = {frag_to_orig[a]: i + 1 for i, a in enumerate(path)}
+    if not double_pairs:
+        return f"cyclo{stem}ane", a2l
+    # mancude component: 'cyclohexa-2,5-diene' etc. Multiplied ene infix uses the
+    # euphonic 'a' (di/tri-ene); a single C=C is 'cyclohex-2-ene'.
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+    loc_str = ",".join(str(x) for x in ene_key)
+    if len(ene_key) == 1:
+        return f"cyclo{stem}-{loc_str}-ene", a2l
+    mult = SIMPLE_MULTIPLIERS.get(len(ene_key))
+    if mult is None:
+        return None
+    return f"cyclo{stem}a-{loc_str}-{mult}ene", a2l
 
 
 def _tricyclo_plus_spiro_component(
