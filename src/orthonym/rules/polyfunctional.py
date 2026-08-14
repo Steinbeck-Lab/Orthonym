@@ -42,6 +42,32 @@ from ..assembly.substituent_prefix_forms import (
     get_sulfonyl_prefix as _ASSEMBLY_get_sulfonyl_prefix,
     get_sulfanyl_prefix as _ASSEMBLY_get_sulfanyl_prefix,
 )
+from .ring_unsaturation import render_ring_unsaturation
+
+
+# Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra…), P-31.1.4.
+_RING_UNSAT_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+
+
+def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
+    """Assemble ``<stem>[a]-<locs>-[mult]en[-<locs>-[mult]yn]`` from DISPLAY
+    locant strings (``render_ring_unsaturation`` already applies the P-31.1.4.2(1)
+    compound ``lo(hi)`` form), leaving the trailing 'e' to the suffix formatter.
+
+    ``cyclohex`` + ene=['2']          -> ``cyclohex-2-en``
+    ``cyclohex`` + ene=['2','4']      -> ``cyclohexa-2,4-dien`` (euphonic 'a')
+    Per P-31.1.4: the stem keeps its 'a' before a multiplied unsaturation infix
+    but elides it before a single 'ene'.
+    """
+    has_mult = len(ene_locants) >= 2 or len(yne_locants) >= 2
+    out = stem + ('a' if has_mult else '')
+    if ene_locants:
+        m = _RING_UNSAT_MULT.get(len(ene_locants), '') if len(ene_locants) > 1 else ''
+        out += '-' + ','.join(ene_locants) + '-' + m + 'en'
+    if yne_locants:
+        m = _RING_UNSAT_MULT.get(len(yne_locants), '') if len(yne_locants) > 1 else ''
+        out += '-' + ','.join(yne_locants) + '-' + m + 'yn'
+    return out
 
 
 # W2F-P2 (P-65.6.3.3.5 method (1)): the composite-FG split runs by DEFAULT for
@@ -837,6 +863,28 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         for i, idx in enumerate(ring_atoms):
             atom_to_locant[idx] = i + 1
 
+    # --- Step 3b: Skeletal ring unsaturation (P-31.1.4) ---
+    # Render -ene/-yne onto the ring stem using the SAME numbering that drives
+    # the suffix and prefixes, so the name is self-consistent (round-trip valid)
+    # regardless of whether the numbering is the lowest-locant PIN choice. Only
+    # all-carbon monocycles are handled; a heterocyclic (Hantzsch-Widman) or
+    # non-consecutive-yne unsaturation fails closed to the deferred handlers.
+    _ring_numbering = {a: atom_to_locant[a] for a in ring_set
+                       if a in atom_to_locant}
+    _ru = render_ring_unsaturation(mol, _ring_numbering)
+    if _ru is None:
+        return None  # non-consecutively-numbered triple bond (soundness refuse)
+    if _ru.double_locants or _ru.triple_locants:
+        _all_carbon_ring = all(
+            mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms
+        )
+        if not _all_carbon_ring or not ring_parent_name.endswith('an'):
+            return None  # HW/heterocyclic or non-standard stem -> defer
+        ring_parent_name = _ring_stem_with_unsaturation(
+            ring_parent_name[:-2],  # 'cyclohexan' -> 'cyclohex'
+            list(_ru.double_locants), list(_ru.triple_locants),
+        )
+
     # --- Step 4: Generate principal group suffix with locants ---
     from .seniority import get_suffix
     suffix = get_suffix(principal_group, is_ring=True)
@@ -876,6 +924,36 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
     # Determine multiplier for multiple principal groups
     count = len(suffix_locants) if suffix_locants else 1
     multiplier = get_suffix_multiplier_prefix(count, suffix) if count > 1 else ""
+
+    # --- Step 4b: Ester functional-class O-alkyl word (P-65.6.3.2) ---
+    # An ester principal group on a RING parent is named
+    # '<alkyl> <ring>-carboxylate': get_suffix('ester') yields only the
+    # acid-side '-carboxylate', and the ring path previously DROPPED the O-alkyl
+    # word, emitting the bare carboxylate ANION — a DIFFERENT molecule that
+    # SELF-01 correctly vetoed, so the whole polyfunctional ring ester abstained
+    # ('methyl 4-oxocyclohexane-1-carboxylate' -> '4-oxocyclohexane-1-carboxylate').
+    # Extract the O-alkyl fragment, name it, consume its atoms, and prepend the
+    # word at assembly. Fail closed when the alkyl cannot be named faithfully.
+    _ester_alkyl_word = None
+    _ester_consumed: set = set()
+    if principal_group == 'ester':
+        _em = getattr(features, 'ester_match', None)
+        if not _em:
+            return None
+        from .esters import parse_ester_fragments, get_alkyl_fragment_name
+        _acid_atoms, _alkyl_atoms = parse_ester_fragments(mol, _em)
+        if not _alkyl_atoms:
+            return None
+        _ester_alkyl_word = get_alkyl_fragment_name(mol, _alkyl_atoms)
+        if not _ester_alkyl_word:
+            return None
+        # Consume the whole O-alkyl fragment plus both ester oxygens so the
+        # universal pipeline does not re-name them (the SMARTS match only
+        # carries the first alkyl carbon; a larger alkyl would otherwise leak).
+        _ester_consumed = set(_alkyl_atoms)
+        for _i in _em:
+            if _i not in ring_set:
+                _ester_consumed.add(_i)
 
     # --- Step 5: Generate non-principal FG prefixes with ring locants ---
     all_prefixes = []
@@ -979,6 +1057,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
                     consumed_atoms.add(idx)
     # WS-A task 9: see Step-5 plumbing comment.
     consumed_atoms |= _extra_consumed
+    consumed_atoms |= _ester_consumed
     consumed_atoms -= _do_not_consume
 
     try:
@@ -1024,6 +1103,11 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         if descriptors:
             stereo_prefix = format_stereodescriptor_string(descriptors)
             name = f"{stereo_prefix}{name}"
+
+    # Prepend the ester O-alkyl functional-class word (Step 4b): the leading
+    # 'methyl ' / 'ethyl ' / 'propan-2-yl ' token of '<alkyl> <ring>-carboxylate'.
+    if _ester_alkyl_word:
+        name = f"{_ester_alkyl_word} {name}"
 
     return name
 
@@ -1347,24 +1431,18 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         and not _pcg_on_ring):
                     pass  # Fall through to return None
                 else:
-                    # Check ring is fully saturated and non-aromatic
-                    has_ring_double = False
-                    is_aromatic = False
-                    for idx in ring_atoms:
-                        atom = mol.GetAtomWithIdx(idx)
-                        if atom.GetIsAromatic():
-                            is_aromatic = True
-                            break
-                        for bond in atom.GetBonds():
-                            other = bond.GetOtherAtomIdx(idx)
-                            if (other in ring_set
-                                    and bond.GetBondTypeAsDouble() == 2.0):
-                                has_ring_double = True
-                                break
-                        if has_ring_double:
-                            break
+                    # Check ring is non-aromatic. A NON-aromatic ring double/triple
+                    # bond is now allowed through: _name_ring_as_parent_polyfunctional
+                    # renders skeletal -ene/-yne (P-31.1.4) for an all-carbon
+                    # monocycle and fails closed (returns None) for anything it
+                    # cannot render faithfully. Aromatic monocycles still have
+                    # dedicated retained-name handlers and are excluded here.
+                    is_aromatic = any(
+                        mol.GetAtomWithIdx(idx).GetIsAromatic()
+                        for idx in ring_atoms
+                    )
 
-                    if not is_aromatic and not has_ring_double:
+                    if not is_aromatic:
                         ring_name = _name_ring_as_parent_polyfunctional(
                             features,
                         )
