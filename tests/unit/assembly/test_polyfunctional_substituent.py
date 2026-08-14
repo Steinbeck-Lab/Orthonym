@@ -103,15 +103,18 @@ class TestSingleFGSubstituent:
     def test_hydroxymethyl_one_carbon_byte_identical(self):
         assert _name_frag("CCO") == "hydroxymethyl"
 
-    def test_acyl_oxo_on_attachment_declined(self):
-        # -C(=O)CH3 : the oxo sits on the free-valence carbon = an acyl group;
-        # the structure namer DECLINES (acetyl/propanoyl is named elsewhere), so
-        # it must never emit '1-oxoethyl'.
+    def test_acyl_oxo_on_attachment_named_as_acyl(self):
+        # -C(=O)CH3 : the oxo sits on the free-valence carbon = an acyl group. A
+        # LINEAR SATURATED acyl is now named as the acyl PREFIX here (P-66.6,
+        # BB:17762 'acetyl (preferred prefix)'), NOT '1-oxoethyl' and NOT the old
+        # garbled '1-methyl-2-oxaeth-1-en-1-yl' (which the previous decline +
+        # acetaldehyde-cap downstream produced). RT-verified:
+        # methyl 4-acetylcyclohexane-1-carboxylate round-trips.
         from orthonym.assembly.substituent_naming import (
             _name_polyfunctional_acyclic_substituent as f,
         )
         mol = Chem.MolFromSmiles("CC(=O)C")  # parent-C0, attach=1 (carbonyl C)
-        assert f(mol, [1, 2, 3], 1, set()) is None
+        assert f(mol, [1, 2, 3], 1, set()) == "acetyl"
 
 
 class TestSingleFGRingParent:

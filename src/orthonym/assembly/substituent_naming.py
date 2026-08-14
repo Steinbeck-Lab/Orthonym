@@ -1887,6 +1887,30 @@ def _name_polyfunctional_acyclic_substituent(
     # left untouched: an acyl bearing a second detachable group is a rare edge that
     # those golds do not exercise -> follow-on.)
     if fg_count == 1 and _POLYFUNC_OXO_PREFIX in prefix_on.get(attach_idx, []):
+        # v30 tail: a bare acyl -C(=O)-R (the sole FG is the oxo on the
+        # free-valence carbon) is the acyl PREFIX -- 'acetyl'/'propanoyl'/... --
+        # per P-66.6 (BB:17762 'acetyl (preferred prefix)', :17944 "acyl groups
+        # such as 'acetyl', for -CO-CH3, derived from acetic acid"). Emit it
+        # directly for a LINEAR SATURATED backbone: the old fail-close left the
+        # 2-carbon case to cap to acetaldehyde and garble as the OPSIN-unparseable
+        # '1-methyl-2-oxaeth-1-en-1-yl' (SELF-01-vetoed -> abstain). Branched /
+        # unsaturated acyls (2-methylpropanoyl, prop-2-enoyl) still fail closed
+        # here -> handled by later tiers / a follow-on. attach must BE the
+        # carbonyl carbon (the oxo sits on it), so this never fires on the
+        # -CH2-C(=O)- '2-oxoethyl' orientation.
+        _bb_linear = all(
+            sum(1 for _n in mol.GetAtomWithIdx(_i).GetNeighbors()
+                if _n.GetIdx() in backbone_set) <= 2
+            for _i in backbone)
+        if (_bb_linear and not core_double_bonds
+                and attach_idx in backbone_set and len(backbone) >= 1):
+            from ..data.chain_names import get_chain_prefix as _gcp_acyl
+            _nac = len(backbone)
+            _acyl_pfx = {1: 'formyl', 2: 'acetyl'}.get(_nac)
+            if _acyl_pfx is None:
+                _acyl_pfx = f"{_gcp_acyl(_nac)}anoyl"
+            if _acyl_pfx and ' ' not in _acyl_pfx:
+                return _acyl_pfx
         return None
     # Same rule for a thioacyl attachment (-C(=S)-R = alkanethioyl, Wave-2 C).
     if fg_count == 1 and any(
