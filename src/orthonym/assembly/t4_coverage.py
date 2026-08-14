@@ -303,6 +303,24 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     if candidate is not None:
         return candidate
 
+    # Rung 0.5 (v30 tail #21): the acyclic polyol / polyether / POLYESTER class.
+    # name_general is a ring/von-Baeyer engine and returns None for an acyclic
+    # polyol chain (the composer names a plain polyol, but an ester's P-41
+    # seniority makes the composer commit to the ester and LINEARISE the polyol
+    # -- a wrong 'tricosyl 2-methylpropanoate' SELF-01 suppresses). This producer
+    # supplies the T4 degrade (P-65.6.3.2 method 2): choose the polyol chain as
+    # the parent, cite free -OH as the -ol suffix, and DEMOTE every ester to an
+    # (Racyloxy) prefix. It is coverage-complete by construction and, carrying no
+    # result_obj, is verified by the downstream SELF-01 round-trip (the 0-wrong
+    # net). Fail-closed (None) for every shape outside its tight scope.
+    try:
+        from ..rules.polyol_polyester import name_acyclic_polyol_polyester
+        _pp = name_acyclic_polyol_polyester(mol)
+        if _pp:
+            return _Candidate(name=_pp, result_obj=None)
+    except Exception as exc:  # fail-closed: a producer bug keeps the abstention
+        logger.info("t4 polyol-polyester producer raised: %s", exc)
+
     # Cascade: route around the decline. Each rung suppresses the principal
     # group so every FG becomes a detachable prefix; ordered most-specific
     # first. A fixed, bounded list -- no unbounded recursion.
