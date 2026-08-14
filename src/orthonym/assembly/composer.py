@@ -3871,30 +3871,40 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
             )
             continue
 
-        # Use locant from sub_info (assigned by discover_substituents using
-        # oriented_ring ordering). Convert to string for formatting.
-        locant = sub_info.locant
+        # Locant: prefer the AUTHORITATIVE atom_to_locant for the ring attach
+        # atom -- it carries the primed component locants of a spiro-VB / named-
+        # component system ((int, "'") tuples). discover_substituents' own
+        # sub_info.locant is a plain-int recomputed from oriented_ring position
+        # and LOSES the prime, so a substituent on a primed component
+        # (#5's tetrachlorocyclopropane -> 2',2',3',3') got a wrong locant and
+        # RT-vetoed. Fall back to sub_info.locant only when the attach atom is
+        # not in the map.
+        locant = atom_to_locant.get(sub_info.attach_mol_idx)
+        if locant is None:
+            locant = sub_info.locant
         if locant is not None:
             prefix_groups[prefix_name].append(locant)
-        else:
-            # Fallback: use atom_to_locant directly
-            attach_idx = sub_info.attach_mol_idx
-            if attach_idx in atom_to_locant:
-                prefix_groups[prefix_name].append(atom_to_locant[attach_idx])
 
     if not prefix_groups:
         return ring_name
 
+    # _Locant is an int (plain locant) OR an (int, primes) tuple (primed
+    # component locant, e.g. (2, "'") -> "2'"): render and sort both forms.
+    def _loc_render(l):
+        return f"{l[0]}{l[1]}" if isinstance(l, tuple) else str(l)
+
+    def _loc_sort_key(l):
+        return (len(l[1]), l[0]) if isinstance(l, tuple) else (0, l)
+
     # Build prefix parts with locants and multiplier prefixes
     prefix_parts = []
     for name, locants in prefix_groups.items():
-        # Sort locants numerically (int) then lexically (str)
-        locants.sort(key=lambda x: (0, x) if isinstance(x, int) else (1, str(x)))
+        locants.sort(key=_loc_sort_key)
         count = len(locants)
         if count == 1:
-            prefix_parts.append(f"{locants[0]}-{name}")
+            prefix_parts.append(f"{_loc_render(locants[0])}-{name}")
         else:
-            locant_str = ",".join(str(loc) for loc in locants)
+            locant_str = ",".join(_loc_render(loc) for loc in locants)
             multiplier = get_multiplier_prefix(count, name)
             prefix_parts.append(f"{locant_str}-{multiplier}{name}")
 

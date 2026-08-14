@@ -4390,10 +4390,13 @@ def _name_spiro_vonbaeyer_core(mol):
         return None
     spiro_center, (comp_a, comp_b) = found
     all_ring_atoms: Set[int] = comp_a | comp_b | {spiro_center}
-    # Unsubstituted only — substituted spiro-VB locant selection is a follow-on.
-    for atom in mol.GetAtoms():
-        if atom.GetAtomicNum() > 1 and atom.GetIdx() not in all_ring_atoms:
-            return None
+    # Substituents are ALLOWED: the parent name + combined_locants (incl. primed
+    # component locants) are numbered here, and the downstream cascade-step-6
+    # supplier places the detachable prefixes on that numbering exactly as it does
+    # for a simple spiro ('8-chlorospiro[4.5]decane'). The numbering is the spiro-
+    # nomenclature-fixed one (not re-optimised for lowest substituent locants), so
+    # a decorated spiro-VB is RT-valid but not guaranteed lowest-locant PIN; the
+    # SELF-01 round-trip gate backstops any misplacement.
     atoms_a = comp_a | {spiro_center}
     atoms_b = comp_b | {spiro_center}
     ext_a = _extract_subfragment(mol, atoms_a)
