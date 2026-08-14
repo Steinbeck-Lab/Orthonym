@@ -238,3 +238,32 @@ class TestCanaryRegression:
         assert result.returncode == 0, (
             f"Canary regression detected:\n{result.stdout}\n{result.stderr}"
         )
+
+
+class TestPhosphiteAndPhosphonateEsterE2E:
+    """v30 tail #16/#17: trivalent-P phosphite triesters and phosphonic-acid
+    diesters were entirely unperceived (no matching FG) -> a garbage skeletal-
+    replacement name or abstention. New perception routes them to the existing
+    functional-class namer's phosphite / phosphonate stems."""
+
+    def test_trimethyl_phosphite(self):
+        assert name_compound("COP(OC)OC") == "trimethyl phosphite"
+
+    def test_triethyl_phosphite(self):
+        assert name_compound("CCOP(OCC)OCC") == "triethyl phosphite"
+
+    def test_tris_dodecylsulfanyl_phosphite(self):
+        # #16: sulfenyl-ester oxygens (-O-S-R). The compound owner takes tris(...).
+        smi = "CCCCCCCCCCCCSOP(OSCCCCCCCCCCCC)OSCCCCCCCCCCCC"
+        assert name_compound(smi) == "tris(dodecylsulfanyl) phosphite"
+
+    def test_dimethyl_methylphosphonate(self):
+        assert name_compound("COP(=O)(C)OC") == "dimethyl methylphosphonate"
+
+    def test_diisopropyl_cyano_isocyano_ethylphosphonate(self):
+        # #17: phosphonate diester senior to the nitrile + isocyanide, which
+        # become cyano/isocyano prefixes on the P-C ligand.
+        smi = "CC(C)OP(=O)(C(C)(C#N)[N+]#[C-])OC(C)C"
+        r = name_compound(smi)
+        assert r is not None and "phosphonate" in r
+        assert "cyano" in r and "isocyano" in r

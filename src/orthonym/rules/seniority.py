@@ -265,6 +265,14 @@ SENIORITY_ORDER = [
     # adjacent to hydrazonamide (same amidrazone class, tautomer pair).
     "imidohydrazide",
 
+    # v30 tail #17: an ester of a phosphonic acid R-P(=O)(OR')2. Per P-41 an
+    # ester ranks above a nitrile, so the phosphonate diester is the senior
+    # parent when it co-occurs with a nitrile / isocyanide (diisopropyl
+    # (1-cyano-1-isocyanoethyl)phosphonate). Functional-class named via
+    # name_phosphate_ester (its phosphonate stem). Phosphonate diesters were
+    # otherwise UNPERCEIVED (no matching FG) -> garbage / abstain.
+    "phosphonate_diester",
+
     # Nitriles
     "nitrile",
     "isocyanide",
@@ -351,6 +359,7 @@ SENIORITY_ORDER = [
     "phosphate_triester",
     "phosphate_diester",
     "phosphate_monoester",
+    "phosphite_triester",
     "tertiary_phosphine",
     "secondary_phosphine",
     "primary_phosphine",
@@ -673,6 +682,8 @@ SUFFIX_FORMS = {
     "phosphate_triester": None,  # IUPAC P-68: functional class naming
     "phosphate_diester": None,   # IUPAC P-68: functional class naming
     "phosphate_monoester": None, # IUPAC P-68: substitutive prefix only (phosphonooxy)
+    "phosphite_triester": None,  # IUPAC P-67: functional class naming (... phosphite)
+    "phosphonate_diester": None, # IUPAC P-67: functional class naming (... phosphonate)
     "tertiary_phosphine": None,  # IUPAC P-68.3: parent hydride naming (phosphane)
     "secondary_phosphine": None, # IUPAC P-68.3: parent hydride naming
     "primary_phosphine": None,   # IUPAC P-68.3: parent hydride naming
@@ -889,6 +900,8 @@ PREFIX_FORMS = {
     "phosphate_triester": None,
     "phosphate_diester": None,
     "phosphate_monoester": "phosphonooxy",  # IUPAC P-67.1.3
+    "phosphite_triester": None,  # IUPAC P-67: functional class naming
+    "phosphonate_diester": None,  # IUPAC P-67: functional class naming
 
     "tertiary_phosphine": None,
     "secondary_phosphine": None,

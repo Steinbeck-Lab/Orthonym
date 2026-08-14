@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 
 _PHOSPHATE_ESTER_GROUPS = (
     'phosphate_triester', 'phosphate_diester', 'phosphate_monoester',
+    # v30 tail #16: the trivalent-P phosphite triester routes to the same
+    # functional-class namer (its "phosphite" stem was previously unreachable).
+    'phosphite_triester',
+    # v30 tail #17: the phosphonic-acid diester (one P-C ligand) -> same namer,
+    # its "phosphonate" stem carries the P-C ligand as the carbon prefix.
+    'phosphonate_diester',
 )
 
 

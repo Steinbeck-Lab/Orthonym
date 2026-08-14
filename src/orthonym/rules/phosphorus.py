@@ -729,11 +729,53 @@ def _p_ester_owner_group(mol, o_idx: int, p_idx: int) -> Optional[str]:
     """
     from ..assembly.substituent_enumerator import name_substituent
     o_atom = mol.GetAtomWithIdx(o_idx)
-    c_neighbors = [n for n in o_atom.GetNeighbors()
-                   if n.GetIdx() != p_idx and n.GetSymbol() == 'C']
-    if len(c_neighbors) != 1:
+    # The owner root is the O's single non-P heavy neighbour: a carbon (ordinary
+    # ester, -O-CR) or a sulfur (sulfenyl ester -O-S-R, v30 tail #16).
+    r_neighbors = [n for n in o_atom.GetNeighbors()
+                   if n.GetIdx() != p_idx and n.GetSymbol() in ('C', 'S')]
+    if len(r_neighbors) != 1:
         return None
-    c0 = c_neighbors[0].GetIdx()
+    root = r_neighbors[0]
+
+    if root.GetSymbol() == 'S':
+        # Sulfenyl ester -O-S-R -> the owner token is '{R}sulfanyl'
+        # ('dodecylsulfanyl'). name_substituent rooted at S mis-fires (its S-attach
+        # sulfanyl tier needs a CARBON parent side, but here the parent is the
+        # ester O), so name the carbon arm R directly and append 'sulfanyl'
+        # (P-63.2.5 / the composed-chalcogen morphology). Fail-closed off a clean
+        # single-carbon-arm sulfenyl.
+        s_idx = root.GetIdx()
+        s_arms = [n for n in root.GetNeighbors()
+                  if n.GetIdx() != o_idx and n.GetAtomicNum() > 1]
+        if len(s_arms) != 1 or s_arms[0].GetSymbol() != 'C':
+            return None
+        rc = s_arms[0].GetIdx()
+        r_frag: set = set()
+        stack = [rc]
+        while stack:
+            a = stack.pop()
+            if a in r_frag or a in (o_idx, s_idx):
+                continue
+            r_frag.add(a)
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                j = nb.GetIdx()
+                if j == p_idx:
+                    return None
+                if j not in (o_idx, s_idx) and j not in r_frag:
+                    stack.append(j)
+        try:
+            r_token = name_substituent(mol, frozenset(r_frag), rc)
+        except Exception:  # noqa: BLE001 - a producer bug must degrade, not crash
+            return None
+        if not r_token or r_token == 'substituent' or not isinstance(r_token, str):
+            return None
+        from ..assembly.naming_utils import (is_complex_substituent,
+                                             apply_enclosing_marks)
+        if is_complex_substituent(r_token):
+            r_token = apply_enclosing_marks(r_token, 0)
+        return f"{r_token}sulfanyl", frozenset(r_frag | {s_idx})
+
+    c0 = root.GetIdx()
     # Collect R = everything reachable from c0 without crossing the ester O.
     frag: set = set()
     stack = [c0]
@@ -764,13 +806,19 @@ def _assemble_p_owner_text(owner_tokens: List[str]) -> str:
     compound owner takes bis/tris with enclosing marks (``bis(2-chloroethyl)``).
     """
     from ..assembly.naming_utils import (SIMPLE_MULTIPLIERS, COMPLEX_MULTIPLIERS,
-                                          alpha_sort_key)
+                                          alpha_sort_key, is_complex_substituent)
     from collections import Counter
     counts = Counter(owner_tokens)
     parts = []
     for token in sorted(counts, key=alpha_sort_key):
         k = counts[token]
-        is_complex = any(ch in token for ch in "()[]-, 0123456789")
+        # A compound owner takes bis/tris with marks. The char scan catches
+        # locanted/parenthesised owners; is_complex_substituent additionally
+        # catches a char-free compound prefix such as 'dodecylsulfanyl' (v30 #16
+        # tris(dodecylsulfanyl) phosphite), which 'tridodecylsulfanyl' would
+        # otherwise render ambiguously.
+        is_complex = (any(ch in token for ch in "()[]-, 0123456789")
+                      or is_complex_substituent(token))
         if k == 1:
             parts.append(f"({token})" if False else token)
         elif is_complex:
@@ -835,11 +883,15 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
         if not others and nb.GetTotalNumHs() >= 1:
             oh_count += 1
             accounted.add(nb.GetIdx())
-        elif len(others) == 1 and others[0].GetSymbol() == 'C':
+        elif len(others) == 1 and others[0].GetSymbol() in ('C', 'S'):
+            # C: an ordinary ester owner (-O-CR). S: a sulfenyl-ester owner
+            # (-O-S-R, v30 tail #16 tris(dodecylsulfanyl) phosphite); both are
+            # named as a substituent token by _p_ester_owner_group. A P-O-P
+            # bridge (others[0]=='P') or O-N still defers.
             ester_oxygens.append(nb.GetIdx())
             accounted.add(nb.GetIdx())
         else:
-            return None                         # O bridging to non-C / P-O-P -> defer
+            return None                         # O bridging to non-C/S / P-O-P -> defer
 
     if not ester_oxygens:
         return None                             # a free acid, not an ester
@@ -883,7 +935,11 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
                     if j not in frag:
                         stack.append(j)
             try:
-                tok = name_substituent(mol, frozenset(frag), c_idx)
+                # allow_mancude so a complex P-C ligand (a cyano/isocyano-bearing
+                # carbon, v30 tail #17) is spelled instead of falling to the
+                # 'substituent' sentinel; a plain alkyl ligand is byte-identical.
+                tok = name_substituent(mol, frozenset(frag), c_idx,
+                                       allow_mancude=True)
             except Exception:  # noqa: BLE001
                 return None
             if not tok or not isinstance(tok, str) or tok == 'substituent':

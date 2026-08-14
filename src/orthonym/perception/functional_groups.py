@@ -502,6 +502,21 @@ FUNCTIONAL_GROUP_SMARTS = {
     "phosphate_triester": "[PX4](=O)([OX2][#6])([OX2][#6])[OX2][#6]",
     "phosphate_diester": "[PX4](=O)([OX2][#6])([OX2][#6])[OX2H1]",
     "phosphate_monoester": "[PX4](=O)([OX2][#6])([OX2H1])[OX2H1]",
+    # v30 tail #16 (P-67): phosphorous-acid TRIESTER -- a TRIVALENT P (no P=O)
+    # bearing three ester oxygens (distinct from the PX4 phosphates above). The
+    # ester O may carry a carbon (triethyl phosphite) or a sulfenyl -S-R
+    # (tris(dodecylsulfanyl) phosphite). Trivalent-P phosphites were otherwise
+    # UNPERCEIVED (pg=None) -> a garbage skeletal-replacement name / abstention.
+    # name_phosphate_ester already carries the phosphite stem ((False,0)); this
+    # is the perception that finally reaches it. Each OX2 excludes P-O-P bridges.
+    "phosphite_triester": "[PX3]([OX2][#6,#16])([OX2][#6,#16])[OX2][#6,#16]",
+    # v30 tail #17 (P-67): phosphonic-acid DIESTER R-P(=O)(OR')2 -- a P=O with
+    # exactly ONE P-C ligand and two ester oxygens (the '$([PX4][#6])' P-C guard
+    # separates it from a phosphate triester, which has none). name_phosphate_ester
+    # names the P-C ligand as the stem's carbon prefix (diisopropyl
+    # (1-cyano-1-isocyanoethyl)phosphonate). Phosphonate diesters were otherwise
+    # unperceived; the free-acid 'phosphonic_acid' row (2 OH) does not match.
+    "phosphonate_diester": "[PX4;$([PX4][#6])](=O)([OX2][#6])[OX2][#6]",
     # Phosphine oxide: R3P=O - three C attached to P(V)
     "phosphine_oxide": "[PX4](=O)([#6])([#6])[#6]",
     # Phosphines (P(III)) - check last as parent hydride
