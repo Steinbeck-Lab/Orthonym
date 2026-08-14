@@ -59,8 +59,12 @@ class TestPolyfunctionalSubstituentNamed:
         assert _name_frag("CCC(=O)CO") == "3-hydroxy-2-oxopropyl"
 
     def test_methyl_backbone_two_prefixes(self):
-        # -CH(NH2)COOH : 1-carbon backbone -> locants elided
-        assert _name_frag("CC(N)C(=O)O") == "aminocarboxymethyl"
+        # -CH(NH2)COOH : mononuclear (1-carbon) backbone, locants elided.
+        # P-16.5.1.3.1 / P-16.3.3: first prefix bare, the rest EACH enclosed. The
+        # bare concatenation 'aminocarboxymethyl' is RT-ambiguous -- OPSIN parses
+        # it as amino + carboxymethyl (amino ON THE RING), a DIFFERENT molecule;
+        # 'amino(carboxy)methyl' round-trips (BB witness '[amino(imino)methyl]').
+        assert _name_frag("CC(N)C(=O)O") == "amino(carboxy)methyl"
 
     def test_halo_hydroxy_mixed(self):
         assert _name_frag("CCC(Cl)O") == "2-chloro-2-hydroxyethyl"

@@ -1955,6 +1955,20 @@ def _name_polyfunctional_acyclic_substituent(
             loc_str = ",".join(str(loc) for loc in locs)
             parts.append(f"{loc_str}-{mult}{prefix}")
 
+    # v30 tail #22 (P-16.5.1.3.1 / P-16.3.3): a MONONUCLEAR substituent core
+    # (single backbone carbon, locants elided) bearing >=2 simple detachable
+    # prefixes must cite the FIRST bare and enclose EACH of the rest. The bare
+    # concatenation is ambiguous -- '-CH(NH2)(COOH)' spelled 'aminocarboxymethyl'
+    # RT-parses as amino + carboxymethyl (a different molecule), while
+    # 'amino(carboxy)methyl' round-trips. BB witnesses: '[amino(imino)methyl]',
+    # '[hydroxy(imino)methyl]' (:34268, :33425). Scoped to single_position: a
+    # multi-carbon backbone carries locants that already disambiguate
+    # ('2-amino-2-carboxyethyl', unchanged). The multiplied-simple carve-out
+    # (bromodichlorofluoromethyl) is preserved inside apply_mononuclear_enclosing.
+    if single_position and len(parts) >= 2:
+        from .composition_primitives import apply_mononuclear_enclosing
+        parts = apply_mononuclear_enclosing(parts, is_mononuclear=True)
+
     stem = get_chain_prefix(len(backbone))
     # Join consecutive prefix parts; a leading digit after a non-digit needs a
     # hyphen ("...amino-2-carboxy..."), handled by the locant prefix itself.

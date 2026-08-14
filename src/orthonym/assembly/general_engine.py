@@ -1282,12 +1282,26 @@ def _emit_ring_from_analysis(
                             for n in mol.GetAtomWithIdx(i).GetNeighbors()
                             if n.GetIdx() in cage_set]
                     if not nbrs:
-                        return _refuse("PG instance not attached to cage")
+                        # v30 tail #22: this PG instance sits >=2 bonds off the
+                        # cage (a SECOND carboxylic acid borne on an off-ring
+                        # methine). It is NOT a ring suffix -- leave its atoms
+                        # for discover_substituents to fold into a compound ring
+                        # substituent (P-44.1: ring is parent; the off-ring acid
+                        # becomes a `[...(carboxy)...]` prefix). Only ONE PG
+                        # instance need touch the cage for the ring to bear the
+                        # suffix (guarded post-loop). Previously refused whole.
+                        continue
                     loc = min(atom_to_locant[n] for n in nbrs)
                 pg_locants.append(loc)
                 suffix_atoms.update(i for i in match
                                     if i not in cage_set
                                     and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
+
+        # v30 tail #22: the appended-suffix loop may have folded every off-cage
+        # PG instance into substituents. At least ONE must remain a ring suffix
+        # -- otherwise the ring cannot carry this principal group; fail closed.
+        if pg and not pg_locants:
+            return _refuse("no principal group instance attached to cage")
 
         # v27 P2: N-substituents on a ring carboxamide / sulfonamide. Held out
         # of both the appended-suffix atoms and the ring-substituent set, cited
