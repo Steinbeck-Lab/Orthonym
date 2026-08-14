@@ -998,11 +998,24 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 # regressed the (ethylperoxy)benzene / (methylperoxy) golds
                 # (same molecule, wrong PIN). Peroxides fall through to the cascade,
                 # which already names them correctly.
-                from .substituent_prefix_forms import get_alkoxy_prefix
-                _alk = get_alkoxy_prefix(
-                    mol, (attach_idx, _parent[0], _rside[0]), [_parent[0]])
-                if _alk:
-                    return _alk
+                #
+                # v30 tail #25: -O-C(=O)-/-C(=S)-/-C(=N)- is an ACYLOXY (ester,
+                # carbamate, carbonate, thioester), NOT a plain alkoxy. Feeding it
+                # to get_alkoxy_prefix mis-names it -- -OC(=O)NHMe became the
+                # WRONG 'carbamoylmethoxy' (a different molecule, SELF-01-vetoed).
+                # Defer any acyloxy R-side carbonyl to the cascade, whose Tier-0.5
+                # prefix-form check names the carbamate '(N-Rcarbamoyl)oxy'.
+                _rc = mol.GetAtomWithIdx(_rside[0])
+                _is_acyloxy = any(
+                    b.GetBondTypeAsDouble() == 2.0
+                    and b.GetOtherAtom(_rc).GetSymbol() in ('O', 'S', 'N')
+                    for b in _rc.GetBonds())
+                if not _is_acyloxy:
+                    from .substituent_prefix_forms import get_alkoxy_prefix
+                    _alk = get_alkoxy_prefix(
+                        mol, (attach_idx, _parent[0], _rside[0]), [_parent[0]])
+                    if _alk:
+                        return _alk
 
             # v30 Phase1 B5: SILYLOXY -O-[Si]< is '{silyl}oxy'
             # ('(trimethylsilyl)oxy'), NOT the cascade's mis-rooted
