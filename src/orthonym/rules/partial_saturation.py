@@ -579,6 +579,10 @@ def _partial_sat_pcg_ring_atoms(mol, fused_ring_atoms: Set[int]) -> Set[int]:
 # "(1) 5,6,7,8-tetrahydronaphthalen-2-ol (PIN)". The hydroxy oxygen is
 # exocyclic, so the ring carbon it hangs off is the locant-bearing atom.
 _RING_OH_SMARTS = Chem.MolFromSmarts('[#6;R][OX2H1]')
+# A PRIMARY amine (-NH2) on a ring carbon -> the '-amine' suffix (P-62.2.1.2 /
+# P-63.1-adjacent; `1,2,3,4-tetrahydronaphthalen-1-amine` is the PIN at
+# BlueBookV2.md:26489). Neutral, exactly two H, single bond.
+_RING_NH2_SMARTS = Chem.MolFromSmarts('[#6;R][NX3;H2;+0]')
 
 # Suffix spelling per PCG kind. The '-ol' form elides the parent's terminal 'e'
 # only when no multiplying prefix intervenes (P-16.7.1(a)): the Blue Book prints
@@ -587,6 +591,9 @@ _RING_OH_SMARTS = Chem.MolFromSmarts('[#6;R][OX2H1]')
 _PARTIAL_SAT_PCG_SUFFIX = {
     'carboxylic_acid': ('carboxylic acid', False),
     'ol': ('ol', True),
+    # A vowel-initial suffix, so it elides the parent's terminal 'e'
+    # (`naphthalen-1-amine`); a multiplied form keeps it (`naphthalene-1,5-diamine`).
+    'amine': ('amine', True),
 }
 
 
@@ -626,7 +633,10 @@ def _partial_sat_pcg(
             ol_ring.add(ring_c)
             ol_oxygens.add(oxygen)
     if not ol_ring:
-        return (None, set())
+        # No ring -OH: the next-junior scoped suffix this path spells is the
+        # primary amine (P-41 puts amines below alcohols, so -ol above always
+        # wins when present).
+        return _partial_sat_pcg_amine(mol, fused_ring_atoms)
     # Exactly one -OH per PCG ring carbon: a geminal diol would need a
     # different construction than one locant per suffix position.
     if len(ol_oxygens) != len(ol_ring):
@@ -640,6 +650,36 @@ def _partial_sat_pcg(
         if atom.GetAtomicNum() != 6 and atom.GetIdx() not in ol_oxygens:
             return (None, set())
     return ('ol', ol_ring)
+
+
+def _partial_sat_pcg_amine(
+    mol, fused_ring_atoms: Set[int]
+) -> Tuple[Optional[str], Set[int]]:
+    """The '-amine' PCG of a partially-saturated fused carbocycle (P-62.2.1.2):
+    a ring carbon bearing a primary -NH2. Scoped FAIL-CLOSED, exactly like the
+    '-ol' path — the only heteroatoms present must be those amine nitrogens (so
+    -amine is provably the senior characteristic group, P-41 puts it below
+    alcohols/acids, both already handled above), one -NH2 per ring carbon,
+    neutral non-radical. An -NH2 on an EXOCYCLIC carbon is out of scope (that
+    carbon is the parent), and an N-substituted amine is deferred (v1 primary
+    only). ``(None, set())`` when it does not apply."""
+    if _RING_NH2_SMARTS is None:
+        return (None, set())
+    am_ring: Set[int] = set()
+    am_nitrogens: Set[int] = set()
+    for match in mol.GetSubstructMatches(_RING_NH2_SMARTS):
+        ring_c, nitrogen = match[0], match[1]
+        if ring_c in fused_ring_atoms:
+            am_ring.add(ring_c)
+            am_nitrogens.add(nitrogen)
+    if not am_ring or len(am_nitrogens) != len(am_ring):
+        return (None, set())
+    for atom in mol.GetAtoms():
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return (None, set())
+        if atom.GetAtomicNum() != 6 and atom.GetIdx() not in am_nitrogens:
+            return (None, set())
+    return ('amine', am_ring)
 
 
 def _partial_sat_pcg_exocyclic_atoms(
@@ -665,6 +705,8 @@ def _partial_sat_pcg_exocyclic_atoms(
                     if nn.GetIdx() != rc and nn.GetSymbol() == 'O':
                         out.add(nn.GetIdx())
             elif pcg_kind == 'ol' and n.GetSymbol() == 'O':
+                out.add(n.GetIdx())
+            elif pcg_kind == 'amine' and n.GetSymbol() == 'N':
                 out.add(n.GetIdx())
     return out
 
