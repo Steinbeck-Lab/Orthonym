@@ -8196,14 +8196,26 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         # BUT if the attachment point is a non-ring heteroatom linker
         # (e.g., N in N-quinolinylamino), let it through.
         if ring_atoms_to_skip and sub_info.frag_atoms & ring_atoms_to_skip:
-            _attach_is_hetero_linker = False
+            # v32 P1 Task 3 (Option C): a ring reached through ANY linker atom
+            # -- carbon (furan-2-ylmethyl's CH2) or heteroatom (the pre-existing
+            # N-quinolinylamino case) -- is NOT bonded directly onto the chain,
+            # so it must flow to the recursive extract_chain_substituents ->
+            # classify_and_name_fragment/name_substituent path below rather than
+            # being deferred to _generate_ring_substituent_prefixes, which only
+            # recognises a DIRECT ring-chain bond (rules/ring_substituents.py
+            # get_ring_attachment_locant) and silently drops anything else via
+            # its `except ValueError: continue`. Only a ring genuinely bonded
+            # straight onto the chain (attach atom itself IN ring_atoms_to_skip)
+            # stays deferred -- that case, and the heteroatom-linker case, are
+            # unchanged (see ).
+            _attach_via_linker = False
             for _idx in sub_info.frag_atoms:
                 _atom = mol.GetAtomWithIdx(_idx)
                 if any(nbr.GetIdx() in chain_set for nbr in _atom.GetNeighbors()):
-                    if _atom.GetSymbol() not in ('C', 'H') and _idx not in ring_atoms_to_skip:
-                        _attach_is_hetero_linker = True
+                    if _idx not in ring_atoms_to_skip:
+                        _attach_via_linker = True
                     break
-            if not _attach_is_hetero_linker:
+            if not _attach_via_linker:
                 logger.debug(
                     "DROP-02 substituent_skip: reason=ring_overlap locant=%d",
                     sub_info.locant,
