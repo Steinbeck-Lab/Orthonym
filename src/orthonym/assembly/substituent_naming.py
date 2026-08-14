@@ -1714,6 +1714,116 @@ def _name_polyfunctional_acyclic_substituent(
             consumed.update(branch_atoms)
             _add_prefix(host, f"({core})")
 
+    # ---- Pass 1c (v30 tail #7/#21, P-65.6.3.2.3 / P-16.3.3): an ester whose
+    # OXYGEN sits on a backbone carbon (-C-O-C(=O)-R) is the ACYLOXY detachable
+    # prefix '(Racyloxy)' -- '(acetyloxy)methyl' for -CH2-O-C(=O)CH3,
+    # '3-(2-methylprop-2-enoyloxy)propyl' for the #21 arm. Tier 1.95 already owns
+    # the case where the ester O IS the free valence (a bare '-O-C(=O)R'
+    # substituent); this pass is its INTERIOR sibling -- the ester O bridges two
+    # in-fragment carbons, so both neighbours live inside sub_set. The whole acyl
+    # side (carbonyl C + its =O + the R chain) is consumed; the acyl is named by
+    # the shared acid engine (`_acyloxy_for_site` -> full name_compound on the
+    # isolated acid, so branched/unsaturated acyls like methacryloyl name
+    # correctly), never a carbon count. Carbamate / carbonate / xanthate
+    # (-O-C(=O)-N / -O-C(=O)-O / -O-C(=S)-) are EXCLUDED here (the carbonyl C
+    # must carry exactly one terminal =O and at most one all-carbon R): those are
+    # owned by the Tier-0.5 carbamoyloxy path -- feeding them to the acyl namer
+    # would mis-spell them. Fail-closed on any non-plain-ester shape. ----
+    _acyloxy_import_ok = True
+    try:
+        from ..rules.lipids import _acyloxy_for_site
+        from .naming_utils import enclose_if_compound as _enclose_if_compound
+    except Exception:
+        _acyloxy_import_ok = False
+    if _acyloxy_import_ok:
+        _acyloxy_tokens: dict = {}   # token -> count (compound-multiplicity guard)
+        for idx in list(sub_set):
+            if idx in consumed:
+                continue
+            a = mol.GetAtomWithIdx(idx)
+            if (a.GetSymbol() != 'O' or a.GetFormalCharge() != 0
+                    or a.GetTotalNumHs() != 0
+                    or ring_info.NumAtomRings(idx) > 0):
+                continue
+            nbrs = [n.GetIdx() for n in a.GetNeighbors()]
+            if len(nbrs) != 2 or any(n not in sub_set for n in nbrs):
+                continue   # not an INTERIOR ester O (both sides in fragment)
+            if any(mol.GetBondBetweenAtoms(idx, n).GetBondType()
+                   != Chem.BondType.SINGLE for n in nbrs):
+                continue
+            # one neighbour is the carbonyl carbon C(=O), the other the host.
+            carbonyl_c = host_c = None
+            for n in nbrs:
+                na = mol.GetAtomWithIdx(n)
+                if na.GetSymbol() != 'C':
+                    carbonyl_c = host_c = None
+                    break
+                if any(b.GetBondType() == Chem.BondType.DOUBLE
+                       and b.GetOtherAtom(na).GetSymbol() == 'O'
+                       for b in na.GetBonds()):
+                    carbonyl_c = n
+                else:
+                    host_c = n
+            if carbonyl_c is None or host_c is None or host_c in consumed:
+                continue
+            # The carbonyl carbon must be a PLAIN acyl: exactly one terminal =O,
+            # at most one all-carbon R, nothing else (excludes carbamate/carbonate
+            # /thiono). Its whole R side must live inside the fragment.
+            cc = mol.GetAtomWithIdx(carbonyl_c)
+            oxo_n = []
+            r_side = []
+            bad = False
+            for b in cc.GetBonds():
+                o = b.GetOtherAtom(cc)
+                oi = o.GetIdx()
+                if oi == idx:
+                    continue
+                if (b.GetBondType() == Chem.BondType.DOUBLE
+                        and o.GetSymbol() == 'O' and o.GetDegree() == 1):
+                    oxo_n.append(oi)
+                elif (b.GetBondType() == Chem.BondType.SINGLE
+                      and o.GetSymbol() == 'C'):
+                    r_side.append(oi)
+                elif o.GetSymbol() == 'H':
+                    continue
+                else:
+                    bad = True
+                    break
+            if bad or len(oxo_n) != 1 or len(r_side) > 1:
+                continue
+            # Collect the entire acyl side (from the carbonyl C, not crossing the
+            # ester O); it must be self-contained and must not re-enter the host.
+            acyl_side: Optional[Set[int]] = set()
+            st = [carbonyl_c]
+            while st:
+                x = st.pop()
+                if x in acyl_side or x == idx:
+                    continue
+                if x not in sub_set:
+                    acyl_side = None
+                    break
+                acyl_side.add(x)
+                for n in mol.GetAtomWithIdx(x).GetNeighbors():
+                    ni = n.GetIdx()
+                    if ni != idx and ni not in acyl_side:
+                        st.append(ni)
+            if acyl_side is None or host_c in acyl_side:
+                continue
+            acyloxy = _acyloxy_for_site(mol, ("acyl", carbonyl_c, idx))
+            if not acyloxy or ' ' in acyloxy:
+                continue
+            token = _enclose_if_compound(acyloxy)
+            consumed.add(idx)
+            consumed.update(acyl_side)
+            _add_prefix(host_c, token)
+            _acyloxy_tokens[token] = _acyloxy_tokens.get(token, 0) + 1
+        # A COMPOUND acyloxy prefix that repeats needs bis/tris, which the simple
+        # assembly multiplier below cannot spell -- fail closed rather than emit
+        # the wrong 'di(acetyloxy)'. (Single occurrence per token is the tail-row
+        # shape; a multiplicative acyloxy is a follow-on.)
+        if any(cnt >= 2 for cnt in _acyloxy_tokens.values()):
+            return None
+
     # Backbone = every carbon not consumed by a carboxy group.
     backbone = [
         i for i in sub_set
