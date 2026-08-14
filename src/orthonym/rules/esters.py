@@ -1287,6 +1287,14 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
     if carbonyl_c is None:
         return []
 
+    # For a CHAIN acid, a ring inside the acid fragment is a ring SUBSTITUENT whose
+    # stereo is cited in the substituent's OWN descriptor block (P-91.3) -- numbering
+    # into it here double-cites those stereocenters at spurious parent locants
+    # ('ethyl (5R,5S,6S)-2-[(3S,4S,5R)-...cyclohexylidene]acetate'). Exclude ring
+    # atoms so the acid parent cites only its chain stereo. A RING acid (the ring IS
+    # the parent) still cites its ring stereo.
+    _chain_acid = not acid_is_ring_acid(mol, acid_atoms)
+
     # BFS from carbonyl C through the acid fragment to build chain ordering
     # (carbonyl C = locant 1, next C = locant 2, etc.)
     visited = {carbonyl_c}
@@ -1305,6 +1313,10 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
                 continue
             if nbr.GetSymbol() == 'O' and nbr.GetTotalNumHs() >= 1:
                 # Skip -OH of the acid/fragment (not numbered)
+                continue
+            if _chain_acid and nbr.IsInRing():
+                # ring substituent on a chain acid -> its stereo is the
+                # substituent's, not the parent's; do not number/descend into it.
                 continue
             visited.add(nbr_idx)
             next_locant = locant + 1 if nbr.GetSymbol() == 'C' else locant

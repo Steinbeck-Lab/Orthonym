@@ -1136,8 +1136,14 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 and b.GetBeginAtomIdx() in frag_atoms_set
                 and b.GetEndAtomIdx() in frag_atoms_set
                 for b in mol.GetBonds())
+            # A stereo-bearing fragment is safe to convert ONLY if the token
+            # already CARRIES its stereo (a leading '(...)' descriptor block from
+            # the composite ring-substituent stereo emitter) -- else the ylidene
+            # would strip it. When the token carries stereo, RT / SELF-01 arbitrate
+            # completeness, so a partial block simply RT-vetoes -> safe abstain.
+            _stereo_ok = (not _frag_stereo) or token.startswith('(')
             if (_a.GetSymbol() == 'C' and _a.IsInRing()
-                    and not _a.GetIsAromatic() and not _frag_stereo
+                    and not _a.GetIsAromatic() and _stereo_ok
                     and token.endswith('yl') and not token.endswith('idene')):
                 from ..validation.name_morphemes import free_valence_morphology
                 _cand = token[:-2] + 'ylidene'
@@ -3127,7 +3133,35 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     result = f"{body}{sep}{core_tail}"
     if ' ' in result or result == 'substituent':
         return None
+    # Composite ring-substituent stereo (P-91.3): cite the ring's CIP descriptors
+    # at the FRONT of the prefix, on THIS numbering (pos; free valence = locant 1).
+    # collect_stereodescriptors only cites atoms/bonds whose locants are in pos, so
+    # a boundary bond (an exocyclic ylidene attachment) is left to the caller.
+    # Adds only descriptors the token lacks -> can only make a stereo-bearing
+    # decorated ring MORE correct (a stereo-stripped token was a wrong molecule the
+    # RT gate suppressed); SELF-01 backstops a wrong label.
+    result = _prepend_ring_substituent_stereo(mol, pos, result)
     return result
+
+
+def _prepend_ring_substituent_stereo(mol, pos, token):
+    """Prepend the ring CIP stereodescriptor prefix (``(3S,4S,5R)-``) to a
+    decorated ring-substituent token, using the substituent numbering ``pos``.
+    No-op when the ring has no cited stereo or the token already leads with a
+    descriptor."""
+    if not pos or not token or token.startswith('('):
+        return token
+    try:
+        from ..rules.stereochemistry import (
+            collect_stereodescriptors, format_stereodescriptor_string)
+        descr = collect_stereodescriptors(mol, pos)
+        if descr:
+            sp = format_stereodescriptor_string(descr)
+            if sp:
+                return f"{sp}{token}"
+    except Exception:
+        pass
+    return token
 
 
 def _longest_carbon_path_from(mol, frag_set, start):
