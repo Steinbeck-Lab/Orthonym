@@ -69,13 +69,23 @@ def test_pin_default_byte_identical(mol_smi, _expected):
     assert name_substituent(m, frag, S, allow_mancude=False) == "substituent"
 
 
-# a yl-less ring-ASSEMBLY R (biphenyl) must fail closed in THIS producer -- the
-# probe re-anchor rejects it (the wrong-molecule leak stays out of the helper).
+# A ring-ASSEMBLY-bearing R (-CH2-[1,1'-biphenyl]-4-yl) is named as the proper
+# `([1,1'-biphenyl]-4-yl)methyl` (WITH the free-valence -yl), so its -S- form
+# `[([1,1'-biphenyl]-4-yl)methyl]sulfanyl` ROUND-TRIPS and the probe re-anchor
+# accepts it. (v30 tail: the re-anchor previously rejected EVERY ring R because
+# the probe thioether was built with a trivalent `C[SH]...` sulfur -- the S-parent
+# bond was cut and RDKit filled the freed valence with an H, so no divalent-S
+# name could ever match. The probe now detaches the parent bond first, giving a
+# clean divalent CH3-S-R, so a genuinely RT-valid ring R is named and only a name
+# that does NOT round-trip -- e.g. a yl-less parent-hydride leak -- still fails
+# closed. Whole molecule verified: 1-methyl-4-{[([1,1'-biphenyl]-4-yl)methyl]-
+# sulfanyl}benzene round-trips to the input.)
 @pytest.mark.opsin_gate
-def test_ring_assembly_R_fails_closed_in_this_producer():
+def test_ring_assembly_R_names_when_it_round_trips():
     import orthonym.assembly.substituent_enumerator as SE
     m, frag, S = _sulfanyl_frag("Cc1ccc(SCc2ccc(-c3ccccc3)cc2)cc1")
-    assert SE._name_thio_ring_branch(m, set(frag), S) is None
+    assert (SE._name_thio_ring_branch(m, set(frag), S)
+            == "[([1,1'-biphenyl]-4-yl)methyl]sulfanyl")
 
 
 # --- v30 tail #23: the -S-X sulfenyl-halide substituent -> {halo}sulfanyl. ---

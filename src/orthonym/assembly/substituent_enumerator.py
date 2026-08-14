@@ -4367,6 +4367,16 @@ def _name_thio_ring_branch(mol, frag_set, root_idx):
     from rdkit import Chem as _Chem
     try:
         _rw = _Chem.RWMol(mol)
+        # Detach the S from its PARENT-side neighbour (the atom outside the
+        # fragment) before adding the probe methyl. Without this the S keeps
+        # three bonds in the RWMol; MolFragmentToSmiles then cuts the excluded
+        # parent bond and RDKit fills the freed valence with an H, yielding a
+        # TRIVALENT `C[SH]...` probe (a thiol-like species the divalent-S name
+        # can never re-anchor to). Removing it first leaves a clean divalent
+        # thioether CH3-S-R. (Only reached under allow_mancude -> PIN-safe.)
+        for _pn in [n.GetIdx() for n in mol.GetAtomWithIdx(root_idx).GetNeighbors()
+                    if n.GetIdx() not in frag_set]:
+            _rw.RemoveBond(root_idx, _pn)
         _newc = _rw.AddAtom(_Chem.Atom(6))
         _rw.AddBond(root_idx, _newc, _Chem.BondType.SINGLE)
         _probe_smi = _Chem.MolFragmentToSmiles(
