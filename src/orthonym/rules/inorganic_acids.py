@@ -31,7 +31,7 @@ be round-trip-validated): the italic O/S/Se tautomer-locant acid words
 (``carbonothioic S-acid``, ``carbamothioic O-acid``, ``phosphorothioic O,O-acid``).
 Also out of scope: end-to-end di-/triphosphate-*ester* numbering.
 """
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from rdkit import Chem
 
@@ -869,6 +869,240 @@ def name_polyacid_anion(frag_mol) -> Optional[str]:
     return _POLYACID_ANION_WORD.get(parent)
 
 
+# --- Substituted / multiplicative hydrazinecarboxamide (semicarbazide) family ---
+# P-66.1.1.1.1.3 (BB 32675) 'carboxamide' + P-68.3.1.2.4 (systematic name is the
+# PIN) + P-15.3 (multiplicative). The exact base 'NNC(N)=O' -> 'hydrazinecarboxamide'
+# is tabled above, but every SUBSTITUTED form and the symmetric bis-form (two units
+# joined through their amide nitrogens by an alkanediyl) were mis-perceived as a
+# 'hydrazide' and garbled. This general namer perceives the
+# R2N-N(R)-C(=O)-N(R)R skeleton, assigns the N / 1 / 2 locants (carboxamide N = 'N',
+# hydrazine N1 = the C-bonded hydrazine N, hydrazine N2 = the terminal one), and
+# names either the substituted monomer or the P-15.3 multiplicative dimer. Fails
+# closed on any senior group, unaccounted atom, or unnameable substituent.
+_HZC_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+
+
+def _hzc_branch_atoms(mol, start, banned):
+    """Atoms of the branch reachable from ``start`` without crossing ``banned``."""
+    seen = {start}
+    stack = [start]
+    while stack:
+        cur = stack.pop()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nb.GetIdx()
+            if j not in banned and j not in seen:
+                seen.add(j)
+                stack.append(j)
+    return seen
+
+
+def _hzc_find_centers(mol):
+    """Each hydrazinecarboxamide center as ``{C,O,N,N1,N2}``. Fail-closed shape:
+    an acyclic sp2 C with exactly one =O, two single-bonded N neighbours, no other
+    heavy neighbour; one N carries a further N-N (hydrazine N1 -> its terminal
+    partner is N2), the other is the amide N."""
+    centers = []
+    for atom in mol.GetAtoms():
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
+            continue
+        ci = atom.GetIdx()
+        o_dbl, n_single, other = [], [], []
+        for n in atom.GetNeighbors():
+            j = n.GetIdx()
+            bt = mol.GetBondBetweenAtoms(ci, j).GetBondType()
+            if n.GetSymbol() == 'O' and mol.GetBondBetweenAtoms(
+                    ci, j).GetBondTypeAsDouble() == 2.0:
+                o_dbl.append(j)
+            elif n.GetSymbol() == 'N' and bt == Chem.BondType.SINGLE:
+                n_single.append(j)
+            elif n.GetAtomicNum() > 1:
+                other.append(j)
+        if len(o_dbl) != 1 or len(n_single) != 2 or other:
+            continue
+        hy = []
+        for ni in n_single:
+            n_neigh = [x.GetIdx() for x in mol.GetAtomWithIdx(ni).GetNeighbors()
+                       if x.GetSymbol() == 'N' and x.GetIdx() != ci]
+            hy.append((ni, n_neigh))
+        with_nn = [(ni, nn) for ni, nn in hy if nn]
+        without_nn = [ni for ni, nn in hy if not nn]
+        if len(with_nn) != 1 or len(without_nn) != 1:
+            continue
+        n1, n1_nn = with_nn[0]
+        if len(n1_nn) != 1:
+            continue
+        n2 = n1_nn[0]
+        a_n2 = mol.GetAtomWithIdx(n2)
+        if a_n2.IsInRing() or any(
+                x.GetSymbol() == 'N' and x.GetIdx() != n1
+                for x in a_n2.GetNeighbors()):
+            continue
+        # The hydrazine N2 is an amine nitrogen; its ONLY permitted multiple bond
+        # is a C=N (semicarbazone -> '2-ylidene'). A double bond to O (nitroso ->
+        # N-nitrosourea) or N (azo) is a DIFFERENT parent -- fail closed so those
+        # keep their own PIN. N1 must likewise be a plain amine (all single).
+        _bad_n2 = any(
+            b.GetBondTypeAsDouble() >= 2.0
+            and mol.GetAtomWithIdx(
+                b.GetOtherAtomIdx(n2)).GetSymbol() != 'C'
+            for b in a_n2.GetBonds())
+        _bad_n1 = any(
+            b.GetBondTypeAsDouble() >= 2.0 for b in mol.GetAtomWithIdx(n1).GetBonds())
+        if _bad_n2 or _bad_n1:
+            continue
+        centers.append({'C': ci, 'O': o_dbl[0],
+                        'N': without_nn[0], 'N1': n1, 'N2': n2})
+    return centers
+
+
+def _hzc_unit_substituents(mol, center, extra_banned):
+    """``[(locant, token), …]`` for the N/N1/N2 substituents of one unit, or None
+    if any is unnameable. ``extra_banned`` excludes the multiplicative bridge."""
+    from ..assembly.substituent_enumerator import name_substituent
+    from ..errors import is_refusal_sentinel
+    skeleton = {center['C'], center['O'], center['N'],
+                center['N1'], center['N2']}
+    out = []
+    for n_atom, locant in ((center['N'], 'N'), (center['N1'], '1'),
+                           (center['N2'], '2')):
+        for nb in mol.GetAtomWithIdx(n_atom).GetNeighbors():
+            j = nb.GetIdx()
+            if j in skeleton or j in extra_banned or nb.GetAtomicNum() <= 1:
+                continue
+            frag = _hzc_branch_atoms(mol, j, {n_atom} | extra_banned)
+            tok = name_substituent(mol, sorted(frag), j)
+            if not tok or is_refusal_sentinel(tok) or ' ' in tok:
+                return None
+            out.append((locant, tok, frozenset(frag)))
+    return out
+
+
+def _hzc_assemble_prefix(subs):
+    """Alpha-ordered multiplied substituent prefix (P-14.5.2). ``subs`` is a list
+    of ``(locant, token, …)``; identical tokens across N/1/2 combine."""
+    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for entry in subs:
+        groups[entry[1]].append(entry[0])
+
+    def _loc_key(l):
+        return (0, 0) if l == 'N' else (1, int(l))
+    items = []
+    for tok, locs in groups.items():
+        locs_sorted = sorted(locs, key=_loc_key)
+        mult = _HZC_MULT.get(len(locs), '')
+        # P-16.3.3: a compound/complex substituent (internal locant, two prefixes,
+        # inner mark) takes enclosing marks -- '2-(propan-2-ylidene)', not
+        # '2-propan-2-ylidene'.
+        rendered = enclose_if_compound(tok)
+        items.append((alpha_sort_key(tok),
+                      f"{','.join(locs_sorted)}-{mult}{rendered}"))
+    items.sort(key=lambda x: x[0])
+    return '-'.join(r for _, r in items)
+
+
+def _hzc_monomer_body(mol, center, extra_banned):
+    """The (substituent-prefix, is_bare) rendering of one hydrazinecarboxamide
+    unit, or None. ``is_bare`` -> use 'hydrazinecarboxamide' (no locant)."""
+    subs = _hzc_unit_substituents(mol, center, extra_banned)
+    if subs is None:
+        return None
+    if not subs:
+        return ("hydrazinecarboxamide", frozenset())
+    prefix = _hzc_assemble_prefix(subs)
+    consumed = frozenset().union(*(e[2] for e in subs))
+    return (f"{prefix}hydrazine-1-carboxamide", consumed)
+
+
+def name_hydrazinecarboxamide(mol) -> Optional[str]:
+    """PIN for a substituted / multiplicative hydrazinecarboxamide, or None."""
+    from ..data.chain_names import get_chain_prefix
+    if mol is None:
+        return None
+    centers = _hzc_find_centers(mol)
+    if not centers:
+        return None
+    total_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+
+    # Seniority guard (P-41): the carboxamide is only the PIN parent when nothing
+    # senior is present. A carbon carbonyl / nitrile / an S or P oxoacid OUTSIDE
+    # the center skeleton(s) would outrank the carboxamide, so fail closed and let
+    # the general seniority machinery own the molecule (avoids a wrong parent).
+    _center_c = {c['C'] for c in centers}
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtom(), bond.GetEndAtom()
+        dbl = bond.GetBondTypeAsDouble()
+        for x, y in ((a, b), (b, a)):
+            if (x.GetSymbol() == 'C' and x.GetIdx() not in _center_c
+                    and ((y.GetSymbol() in ('O', 'S') and dbl == 2.0)
+                         or (y.GetSymbol() == 'N' and dbl == 3.0))):
+                return None
+    if any(at.GetSymbol() in ('S', 'P') for at in mol.GetAtoms()):
+        return None
+
+    if len(centers) == 1:
+        c = centers[0]
+        body = _hzc_monomer_body(mol, c, set())
+        if body is None:
+            return None
+        name, consumed = body
+        accounted = {c['C'], c['O'], c['N'], c['N1'], c['N2']} | set(consumed)
+        if accounted != total_heavy:
+            return None  # unaccounted atom / senior group -> fail closed
+        return name
+
+    if len(centers) == 2:
+        c1, c2 = centers
+        # The bridge is a single unbranched all-carbon acyclic chain joining the
+        # two amide nitrogens (P-15.3 multiplicative linker).
+        start = next((x.GetIdx() for x in mol.GetAtomWithIdx(c1['N']).GetNeighbors()
+                      if x.GetSymbol() == 'C' and x.GetIdx() != c1['C']), None)
+        if start is None:
+            return None
+        chain = []
+        prev, cur = c1['N'], start
+        seen = {c1['N']}
+        while True:
+            a = mol.GetAtomWithIdx(cur)
+            if a.GetSymbol() != 'C' or a.IsInRing():
+                return None
+            chain.append(cur)
+            seen.add(cur)
+            nxt = [x.GetIdx() for x in a.GetNeighbors()
+                   if x.GetIdx() != prev and x.GetAtomicNum() > 1]
+            if len(nxt) != 1:
+                return None  # branch or dead-end -> not a clean diyl bridge
+            nn = nxt[0]
+            if nn == c2['N']:
+                break
+            if nn in seen:
+                return None
+            prev, cur = cur, nn
+        bridge = set(chain)
+        # each amide N attaches to the bridge only (no other substituent), and the
+        # two monomer bodies (N1/N2 substituents) must be identical -> 'bis'.
+        body1 = _hzc_monomer_body(mol, c1, bridge)
+        body2 = _hzc_monomer_body(mol, c2, bridge)
+        if body1 is None or body2 is None or body1[0] != body2[0]:
+            return None
+        name1, cons1 = body1
+        _, cons2 = body2
+        accounted = (bridge
+                     | {c1['C'], c1['O'], c1['N'], c1['N1'], c1['N2']}
+                     | {c2['C'], c2['O'], c2['N'], c2['N1'], c2['N2']}
+                     | set(cons1) | set(cons2))
+        if accounted != total_heavy:
+            return None
+        stem = get_chain_prefix(len(chain))
+        if not stem:
+            return None
+        diyl = f"{stem}ane-1,{len(chain)}-diyl"
+        return f"N,N'-({diyl})bis({name1})"
+
+    return None
+
+
 def name_inorganic_acid(mol) -> Optional[str]:
     """Return the PIN for a free inorganic oxoacid or its tabled functional-class
     derivative (acid halide / amide / carbonic-FRN acid), the tetraalkyl silicate
@@ -886,6 +1120,13 @@ def name_inorganic_acid(mol) -> Optional[str]:
     tabled = _ALL_INORGANIC.get(canonical)
     if tabled is not None:
         return tabled
+    # Substituted / multiplicative hydrazinecarboxamide (semicarbazide family):
+    # the exact base is tabled above; the substituted and P-15.3 bis forms are
+    # named here (fail-closed graph matcher, zero false positives by full atom
+    # accounting).
+    hzc = name_hydrazinecarboxamide(mol)
+    if hzc is not None:
+        return hzc
     # W3-P10 (P-67.1.2.4): mononuclear-P oxoacid functional-replacement (Engine A):
     # phosphoramidic / phosphonocyanatidic / phosphonochloridic acids. Fires only on
     # an acid (>=1 -OH) carrying a class replacement group, so plain phosphonic /
