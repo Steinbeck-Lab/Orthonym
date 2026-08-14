@@ -346,6 +346,15 @@ def name_salt(mol, style: str = 'pin') -> str:
                 cation_names.append(name)
             # Skip unnamed cations rather than using generic 'cation'
 
+    # FIND-2 fail-closed (0-wrong): every cation fragment IN SCOPE for this loop
+    # must have produced a name. `cation_list` already excludes H+ fragments
+    # that were merged/attempted above (:287-330), so this cannot fire on the
+    # legitimate hydroacid-salt H+ merge -- only on a cation this loop itself
+    # could not name (mirrors abort-whole, fragment_rules.py:60-61:
+    # name every fragment or emit nothing).
+    if len(cation_names) != len(cation_list):
+        return ''
+
     # Process anions. P-65.6.2.1 / P-63.8.1: name the ORGANIC anion via the
     # route_charged chokepoint (it owns the parent decision: -oate / -olate /
     # -sulfonate / -ide), falling back to name_anion and the INORGANIC_ANIONS
@@ -373,6 +382,13 @@ def name_salt(mol, style: str = 'pin') -> str:
         if name:
             anion_names.append(name)
         # Skip unnamed anions rather than using generic 'anion'
+
+    # FIND-2 fail-closed (0-wrong): every anion fragment must have produced a
+    # name. Silently dropping an unnameable anion (e.g. a chlorosilanolate) and
+    # joining only the subset that DID name is a silent atom-drop -- abstain
+    # (return '') instead, mirroring the cation-loop guard above and     # abort-whole (fragment_rules.py:60-61).
+    if len(anion_names) != len(frags['anions']):
+        return ''
 
     # --- Hydrogen prefix for partial salts (IUPAC P-72.2.1) ---
     # When an anion fragment still has protonated carboxylic acid groups

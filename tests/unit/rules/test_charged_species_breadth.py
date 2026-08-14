@@ -49,6 +49,20 @@ def test_simple_salt_unchanged():
 
 
 def test_inorganic_salt_fails_closed():
-    # out of scope -> must abstain, never a guessed/partial name.
-    assert _be().name_tiered("[Be+2].[O-][Si](=O)Cl.[Sr+2]").get("name") == \
-        "unknown organic compound"
+    # out of scope -> must abstain, never a guessed/partial name. FIND-2:
+    # name_salt used to silently drop the unnameable chlorosilanolate anion
+    # and emit the partial 'beryllium strontium'. With _be()
+    # (general_fallback=True), the correct abstain value is None, not a
+    # literal sentinel string: namer.py's documented "v28 Composer1 Task 5
+    # best-effort clean-abstain contract" (name_tiered, ~:2939-2949)
+    # deliberately nulls out ANY failure name under general_fallback to avoid
+    # leaking a descriptive fallback as if it were a real name (the contributor guide
+    # invariant 16, the sentinel-leak defect class). Verified this molecule's
+    # raw fallback text is actually 'beryllium compound (not supported)'
+    # (errors.py::classify_failure_limit's UNSUPPORTED_ELEMENT branch), not
+    # the generic 'unknown organic compound' literal this assertion
+    # originally guessed -- that string was unreachable for this SMILES
+    # under any configuration (confirmed by disabling the null-out and
+    # re-running: result is 'beryllium compound (not supported)', never
+    # 'unknown organic compound').
+    assert _be().name_tiered("[Be+2].[O-][Si](=O)Cl.[Sr+2]").get("name") is None
