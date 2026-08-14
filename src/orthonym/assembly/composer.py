@@ -5663,7 +5663,17 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                 None,
             )
             _pchain = set(features.principal_chain or [])
-            if _acyl_c is not None and _pchain and _acyl_c not in _pchain:
+            # v30 tail #8: fire the acyl-substituent recovery whenever the acyl
+            # carbon is NOT on the features principal chain -- INCLUDING when that
+            # chain is EMPTY. The old `and _pchain` guard skipped the empty-chain
+            # case, which is exactly when name_amide's prefixes are empty and an
+            # acyl-CHAIN substituent (e.g. the alpha-aryl of 2-phenyl-N-propyl-
+            # acetamide) is silently dropped -> the whole PIN candidate fails to
+            # be produced and a worse best-effort form wins. The block below
+            # reconstructs the acyl parent from `_acyl_locants` + the amide atoms,
+            # never from `_pchain`, so it is correct with an empty chain; it stays
+            # fail-closed (returns "amide") on any un-nameable / uncovered branch.
+            if _acyl_c is not None and _acyl_c not in _pchain:
                 _n_idx = next(
                     (i for i in amide_atoms
                      if mol.GetAtomWithIdx(i).GetSymbol() == 'N'), None)
