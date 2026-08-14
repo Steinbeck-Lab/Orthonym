@@ -390,6 +390,24 @@ def name_salt(mol, style: str = 'pin') -> str:
     if len(anion_names) != len(frags['anions']):
         return ''
 
+    # FIND-2 fail-closed (0-wrong): a genuine NEUTRAL fragment reaching this
+    # point is unaccounted for. The only two places a neutral fragment is
+    # legitimately consumed are the H+-merge hydroacid-salt branch above
+    # (:294-318, which RETURNS directly on success) and -- not applicable
+    # here -- a zwitterion, which `parse_salt_fragments` (ions.py:551) buckets
+    # by WHOLE-FRAGMENT net formal charge, so a net-neutral zwitterion is a
+    # SINGLE fragment with no separate cation/anion entries and never reaches
+    # `name_salt` at all (`is_salt` requires both `cations` and `anions`
+    # non-empty). So any survivor in `neutrals` here is a real extraneous
+    # organic/inorganic co-fragment (e.g. a solvate ``CCO.[Na+].[Cl-]``, or
+    # water of crystallization the H+-merge branch didn't consume) that this
+    # function has no mechanism to fold into the name -- joining only the
+    # ionic subset would silently drop it. Abstain instead, mirroring the
+    # cation/anion guards above and abort-whole
+    # (fragment_rules.py:60-61).
+    if neutrals:
+        return ''
+
     # --- Hydrogen prefix for partial salts (IUPAC P-72.2.1) ---
     # When an anion fragment still has protonated carboxylic acid groups
     # (-COOH), it is only partially deprotonated. Insert "hydrogen"
