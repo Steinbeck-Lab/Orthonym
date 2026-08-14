@@ -3566,6 +3566,47 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
                     covered.add(ni)
                     covered.update(_chain_atoms(o_nbrs[0].GetIdx(), ni))
                     continue
+            # v30 tail #13 (P-63.2.2.2): the ether-O's ligand is ANOTHER RING
+            # -- a glycosidic / inter-ring link (this ring atom bears
+            # -O-(anomeric C of a second ring)). Name that inner ring system
+            # RECURSIVELY as a substituent and cite '({inner-yl})oxy'. This is the
+            # nested-ring-oxy case reaches by unbounded recursion; here
+            # it routes back through name_substituent -> the ring chokepoint ->
+            # this function, so a di/tri-saccharide nests naturally (a
+            # trisaccharide is just one more level). ADDITIVE: only reached after
+            # the hydroxy + linear-alkoxy cases decline, so every simple ring keeps
+            # its byte-identical legacy form. Depth-bounded by the shrinking atom
+            # set (the inner subgraph excludes this ring), like .
+            if (len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C'
+                    and o_nbrs[0].IsInRing()
+                    and o_nbrs[0].GetIdx() not in ring_atom_set):
+                inner_attach = o_nbrs[0].GetIdx()
+                inner_frag: Set[int] = set()
+                _seen_r = set(ring_atom_set) | {ni}
+                _stack_r = [inner_attach]
+                while _stack_r:
+                    _a = _stack_r.pop()
+                    if _a in _seen_r:
+                        continue
+                    _seen_r.add(_a)
+                    inner_frag.add(_a)
+                    for _nn in mol.GetAtomWithIdx(_a).GetNeighbors():
+                        if _nn.GetIdx() not in _seen_r:
+                            _stack_r.append(_nn.GetIdx())
+                if inner_frag:
+                    from ..assembly.substituent_enumerator import (
+                        name_substituent, alkoxy_prefix_from_substituent)
+                    inner_name = name_substituent(
+                        mol, sorted(inner_frag), inner_attach)
+                    if (inner_name and inner_name != 'substituent'
+                            and ' ' not in inner_name
+                            and inner_name.endswith('yl')):
+                        _oxy = alkoxy_prefix_from_substituent(inner_name)
+                        if _oxy:
+                            prefixes.append(_oxy)
+                            covered.add(ni)
+                            covered.update(inner_frag)
+                            continue
             return None
         # amino (-NH2)
         if (sym == 'N' and order == 1.0 and charge == 0

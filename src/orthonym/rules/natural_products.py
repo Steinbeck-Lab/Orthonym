@@ -521,6 +521,17 @@ def name_natural_product_with_substituents(
     methoxys = _find_methoxys(mol, scaffold_info, numbering,
                               exclude_atoms=all_exclude)
 
+    # 0f (v30 tail #13): generic glycosyloxy / ring-oxy decorations — a scaffold
+    # -O-(ring system) the defined-sugar conjugate finder cannot match. Consumes
+    # the ether O + the whole ring subgraph so the OH finder and completeness
+    # invariant never double-count or drop them.
+    glycosyloxys = _find_generic_glycosyloxy(mol, scaffold_info, numbering,
+                                             exclude_atoms=all_exclude)
+    glycosyloxy_consumed: set = set()
+    for _loc, _pfx, _atoms in glycosyloxys:
+        glycosyloxy_consumed |= set(_atoms)
+    all_exclude = all_exclude | glycosyloxy_consumed
+
     # 1. Find hydroxyl groups (exocyclic -OH on scaffold atoms)
     hydroxyls = _find_hydroxyls(mol, scaffold_info, numbering,
                                 exclude_atoms=all_exclude)
@@ -577,7 +588,7 @@ def name_natural_product_with_substituents(
     if (not hydroxyls and not ketones and not methyls and not halogens
             and not unsaturation["ene"] and not unsaturation["yne"]
             and not epoxy_bridges and not n_alkyls and not methoxys
-            and not conjugates):
+            and not conjugates and not glycosyloxys):
         if modification_prefix:
             return modification_prefix + scaffold_name
         return scaffold_name
@@ -590,7 +601,7 @@ def name_natural_product_with_substituents(
     # name omitting atoms. Asserted over `substituent_atoms` (the get_scaffold_substituents
     # subgraphs), NEVER raw `non_scaffold_atoms` — the cholestane C20-C27 side chain folds
     # into the stem and would otherwise trigger a false honest-fail (Pitfall 3).
-    if conjugates:
+    if conjugates or glycosyloxys:
         # WARNING-4 atom exposure: the OH/ketone/methyl/methoxy/halogen/n_alkyl finders return
         # locants, not atom sets. Recompute each kind's consumed atoms locally from the SAME
         # get_scaffold_substituents subgraphs, claiming a sub's atoms only when it structurally
@@ -637,6 +648,7 @@ def name_natural_product_with_substituents(
                 n_alkyl_atoms |= atoms
 
         claimed = (ester_consumed_atoms | epoxy_consumed | conjugate_consumed_atoms
+                   | glycosyloxy_consumed
                    | hydroxyl_atoms | ketone_atoms | methyl_atoms | methoxy_atoms
                    | halogen_atoms | n_alkyl_atoms)
         substituent_atoms = set()
@@ -672,7 +684,20 @@ def name_natural_product_with_substituents(
             stereo_prefix=sp, methyls=methyls, halogens=halogens,
             epoxy_bridges=epoxy_bridges, n_alkyls=n_alkyls, methoxys=methoxys,
             modification_prefix=modification_prefix, ring_ab=rab,
+            glycosyloxys=glycosyloxys,
         )
+
+    # v30 tail #13: a generic glycosyloxy decoration is cited with a plain
+    # numeric substituent locant, which the steroid α/β assembly does not compose
+    # cleanly with the ring-face descriptors (it produced a malformed duplicate
+    # '3alpha-...oxy-3alpha-cholest'). Force the whole-graph R/S prefix for the
+    # glycosyloxy path -- it renders the sugar substituent + full CIP stereo
+    # without the α/β interleaving -- and require it to OPSIN-round-trip (0-wrong
+    # net); honest-fail if it does not (never ship a name that drops or
+    # mis-locates the sugar). Fail-OPEN when OPSIN is absent.
+    if glycosyloxys:
+        name_rs = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering), {})
+        return name_rs if _alpha_beta_rt_ok(mol, name_rs) else None
 
     name_ab = _assemble_steroid(stereo_prefix, ring_ab)
     if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
@@ -1360,6 +1385,71 @@ def _find_methoxys(
     return sorted(methoxys)
 
 
+def _find_generic_glycosyloxy(
+    mol, scaffold_info: Dict, numbering: Dict[int, int],
+    exclude_atoms: Optional[set] = None,
+) -> List[Tuple[int, str, frozenset]]:
+    """Find GENERIC (stereo-undefined) glycosyloxy / ring-oxy decorations
+    (v30 tail #13, P-63.2.2.2).
+
+    A scaffold atom bearing ``-O-(anomeric C of a ring system)`` — a glycosidic
+    or any ring-to-ring ether link — that the DEFINED-sugar conjugate finder
+    cannot match (no OPSIN carbohydrate template, e.g. a stereo-undefined sugar).
+    The ring system is named RECURSIVELY as a substituent via the ring
+    chokepoint (``name_substituent``, now nested-ring aware), then cited as a
+    ``[(inner-yl)oxy]`` detachable prefix. A di/tri-saccharide nests naturally
+    (the inner ring's own ``-O-(ring)`` recurses through the same path).
+
+    Returns ``[(locant, prefix_string, atom_set)]`` — the prefix_string is the
+    full ``{ring}oxy`` token (already enclosed by `alkoxy_prefix_from_substituent`
+    when compound), and atom_set is every atom the decoration consumes (the ether
+    O + the whole ring subgraph) so the completeness invariant and the OH finder
+    account for them. Fail-closed: a substituent whose ring cannot be named
+    (returns the sentinel) yields no entry, so the caller honest-fails rather
+    than dropping atoms.
+    """
+    from ..assembly.substituent_enumerator import (
+        name_substituent, alkoxy_prefix_from_substituent)
+    exclude = exclude_atoms or set()
+    out: List[Tuple[int, str, frozenset]] = []
+    for sub in get_scaffold_substituents(mol, scaffold_info["matched_atoms"]):
+        attach = sub["attachment_atom"]
+        if attach not in numbering:
+            continue
+        first_idx = sub["first_atom"]
+        if first_idx in exclude:
+            continue
+        fa = mol.GetAtomWithIdx(first_idx)
+        # ether O (no H), single bond to the scaffold, other side a ring atom
+        if fa.GetAtomicNum() != 8 or fa.GetTotalNumHs() != 0 or fa.GetDegree() != 2:
+            continue
+        bond = mol.GetBondBetweenAtoms(attach, first_idx)
+        if not bond or bond.GetBondType() != Chem.BondType.SINGLE:
+            continue
+        o_other = [n.GetIdx() for n in fa.GetNeighbors() if n.GetIdx() != attach]
+        if len(o_other) != 1:
+            continue
+        anomeric = o_other[0]
+        an_atom = mol.GetAtomWithIdx(anomeric)
+        if an_atom.GetAtomicNum() != 6 or not an_atom.IsInRing():
+            continue
+        # Guard: the scaffold attach atom must not be a carbonyl carbon (that is
+        # an ester, owned by the ester finder), and the whole substituent must be
+        # exactly O + the ring subgraph.
+        atoms = set(sub["substituent_atoms"])
+        if first_idx not in atoms or anomeric not in atoms:
+            continue
+        inner = name_substituent(mol, sorted(atoms - {first_idx}), anomeric)
+        if not inner or inner == 'substituent' or ' ' in inner \
+                or not inner.endswith('yl'):
+            continue
+        oxy = alkoxy_prefix_from_substituent(inner)
+        if not oxy:
+            continue
+        out.append((numbering[attach], oxy, frozenset(atoms)))
+    return sorted(out, key=lambda e: e[0])
+
+
 def _np_parent_e(next_word: str) -> str:
     """Return the parent-hydride terminal 'e' (``…ane``/``…ene``/``…yne``) that
     precedes a following suffix, applying IUPAC P-16.7.1(a) vowel elision.
@@ -1392,6 +1482,7 @@ def _assemble_np_name(
     methoxys: Optional[List[int]] = None,
     modification_prefix: str = "",
     ring_ab: Optional[Dict[int, str]] = None,
+    glycosyloxys: Optional[List[Tuple[int, str, frozenset]]] = None,
 ) -> str:
     """Assemble a decorated natural product name.
 
@@ -1428,6 +1519,7 @@ def _assemble_np_name(
     epoxy_bridges = epoxy_bridges or []
     n_alkyls = n_alkyls or []
     methoxys = methoxys or []
+    glycosyloxys = glycosyloxys or []
     ring_ab = ring_ab or {}
 
     # Phase 181 (WSC-02): render a ring locant with its ring-face α/β descriptor when one
@@ -1462,6 +1554,14 @@ def _assemble_np_name(
         count = len(methoxys)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("methoxy", f"{locant_str}-{multiplier}methoxy"))
+
+    # Generic glycosyloxy / ring-oxy prefixes (v30 tail #13): each is already a
+    # compound '{ring}oxy' token; cite it locant-first with enclosing marks, and
+    # alphabetize by the bare oxy token (multiple distinct sugars each cited
+    # separately -- no di/tri multiplier over compound prefixes).
+    for _loc, _oxy, _atoms in glycosyloxys:
+        _tok = _oxy if _oxy.startswith(('(', '[')) else f"({_oxy})"
+        prefix_entries.append((_oxy, f"{_greek_locant(_loc)}-{_tok}"))
 
     # Hydroxy prefix: added to prefix_entries for the ketone+hydroxyl path
     # (line 957-965) where hydroxyl is a non-principal group prefix.
