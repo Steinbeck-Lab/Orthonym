@@ -3332,6 +3332,14 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     result = f"{body}{sep}{core_tail}"
     if ' ' in result or result == 'substituent':
         return None
+    # Composite CHAIN-substituent stereo (P-91.3), symmetric with the ring sibling
+    # _recursive_fragment_substituent_name: this composer dropped a defined-stereo
+    # stereocentre in the chain core ('1-amino-3-(hydroxymethyl)pentyl' from a
+    # [C@@H] fragment), and SELF-01 does NOT catch a strip (its RT compares
+    # connectivity). Cite the core's CIP descriptors on THIS numbering (pos; free
+    # valence = locant 1). Adds only descriptors the token lacks -> can only make a
+    # stereo-bearing chain substituent MORE correct; SELF-01 backstops a wrong label.
+    result = _prepend_ring_substituent_stereo(mol, pos, result)
     return result
 
 
