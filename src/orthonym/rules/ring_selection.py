@@ -761,6 +761,50 @@ def _ylidene_linked_parent_ring(
     return ring_systems[dbl_ring]
 
 
+def _is_carbon_fused_system(mol, atoms: Set[int]) -> bool:
+    """True iff ``atoms`` form an all-carbon ring system of >=2 fused rings
+    (a triterpene/steroid-type aglycone core). Used ONLY by the best-effort
+    glycoside-parent preference in :func:`select_principal_ring_system`."""
+    ri = mol.GetRingInfo()
+    n_rings = sum(1 for r in ri.AtomRings() if set(r) <= set(atoms))
+    if n_rings < 2:
+        return False
+    return all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in atoms)
+
+
+def _is_monosaccharide_ring(mol, atoms: Set[int]) -> bool:
+    """True iff ``atoms`` form a single pyranose/furanose-like ring: one ring,
+    exactly one ring oxygen, no other ring heteroatom, and >=2 exocyclic
+    hydroxy / hydroxymethyl groups (a stereo-defined OR generic sugar). Used ONLY
+    by the best-effort glycoside-parent preference."""
+    ri = mol.GetRingInfo()
+    aset = set(atoms)
+    rings = [r for r in ri.AtomRings() if set(r) <= aset]
+    if len(rings) != 1 or len(aset) not in (5, 6):
+        return False
+    ring_o = [a for a in aset if mol.GetAtomWithIdx(a).GetSymbol() == 'O']
+    if len(ring_o) != 1:
+        return False
+    if any(mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'O') for a in aset):
+        return False
+    # count exocyclic -OH / -CH2OH on the ring carbons
+    oh = 0
+    for a in aset:
+        at = mol.GetAtomWithIdx(a)
+        if at.GetSymbol() != 'C':
+            continue
+        for nb in at.GetNeighbors():
+            if nb.GetIdx() in aset:
+                continue
+            if nb.GetSymbol() == 'O' and nb.GetTotalNumHs() >= 1:
+                oh += 1
+            elif (nb.GetSymbol() == 'C' and nb.GetTotalNumHs() == 2
+                  and any(x.GetSymbol() == 'O' and x.GetTotalNumHs() >= 1
+                          for x in nb.GetNeighbors())):
+                oh += 1  # -CH2OH
+    return oh >= 2
+
+
 def select_principal_ring_system(
     mol: Chem.Mol,
     ring_systems: List[Set[int]],
@@ -785,6 +829,42 @@ def select_principal_ring_system(
 
     if len(ring_systems) == 1:
         return tuple(sorted(ring_systems[0]))
+
+    # v30 tail (glycoside convention, best-effort only): a GLYCOSIDE names its
+    # AGLYCONE as the parent and every sugar as a glycosyloxy substituent
+    # (P-102 / the natural-product convention), even though strict P-44.2 makes
+    # a heterocyclic sugar ring senior to an all-carbon ring system. When exactly
+    # one all-carbon FUSED ring system (>=2 rings) competes with ONLY
+    # monosaccharide-like rings (a single ring, exactly one ring O, no other ring
+    # heteroatom, bearing >=2 exocyclic hydroxy/CH2OH -- i.e. a pyranose/furanose),
+    # prefer the carbon core so the sugars become substituents. GATED on the
+    # best-effort context so the PIN default is byte-identical (the 1652 gate is
+    # untouched); SELF-01 round-trip is the 0-wrong net. Verified: #11/#12 saponins
+    # name FULL-InChIKey only via this preference.
+    try:
+        from ..metrics.provenance import best_effort_ctx
+        if best_effort_ctx.get():
+            carbon_fused = [sy for sy in ring_systems
+                            if _is_carbon_fused_system(mol, sy)]
+            # A glycosylated large carbon core (triterpene/steroid, >=3 fused
+            # carbon rings) that is strictly the largest ring system present, with
+            # at least one bona-fide monosaccharide ring attached, is an aglycone:
+            # prefer it as parent so every sugar (and the aglycone's own small
+            # O-rings) becomes a substituent. The >=3-ring + largest + sugar-present
+            # trident keeps this to the glycoside class.
+            if len(carbon_fused) == 1:
+                core = carbon_fused[0]
+                others = [sy for sy in ring_systems if sy is not core]
+                core_rings = sum(
+                    1 for r in mol.GetRingInfo().AtomRings()
+                    if set(r) <= set(core))
+                if (others and core_rings >= 3
+                        and len(core) >= max(len(sy) for sy in others)
+                        and any(_is_monosaccharide_ring(mol, sy)
+                                for sy in others)):
+                    return tuple(sorted(core))
+    except Exception:  # pragma: no cover - a hint must never break selection
+        pass
 
     # P-44.1: the senior parent bears the principal characteristic group, and
     # that outranks the P-44.2 ring-type hierarchy scored below. ``ring_system_
