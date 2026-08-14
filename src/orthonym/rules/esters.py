@@ -1740,6 +1740,7 @@ def name_ester_as_prefix(mol, ester_match: tuple) -> Optional[str]:
     acid_has_ring = acid_fragment_has_ring(mol, acid_atoms)
 
     if not acid_has_ring:
+        acid_set_early = set(acid_atoms)
         acid_principal_chain = _find_acid_principal_chain(mol, acid_atoms)
         if acid_principal_chain and len(acid_principal_chain) >= 2:
             total_carbons = sum(
@@ -1752,6 +1753,26 @@ def name_ester_as_prefix(mol, ester_match: tuple) -> Optional[str]:
             # carbons, indicating true carbon branching (not just heteroatom
             # substituents like -OH, -OOH on a linear chain).
             has_carbon_branch = chain_carbons < total_carbons
+
+            # 0-WRONG (verified atom-order hazard): this branched carbon-COUNT
+            # path selects a principal chain and names every off-chain carbon as
+            # a saturated alkyl branch -- it is BLIND to a C=C/C#C that connects
+            # the branch. For methacrylic acid (C=C(C)C(=O)O) it named the
+            # =CH2 branch '2-methyl' (SATURATED, = a DIFFERENT molecule,
+            # isobutyryloxy) for one atom ordering while the standard path below
+            # correctly gives '2-methylprop-2-enoyloxy'. Same bug shape as this
+            # file's `_has_nonring_unsat` guard (:681). Defer ANY unsaturated acid
+            # fragment to the standard get_acid_fragment_name path, which handles
+            # unsaturation (ene/yne locants) correctly regardless of atom order.
+            _acid_unsaturated = any(
+                b.GetBondTypeAsDouble() in (2.0, 3.0)
+                and b.GetBeginAtomIdx() in acid_set_early
+                and b.GetEndAtomIdx() in acid_set_early
+                and b.GetBeginAtom().GetSymbol() == 'C'
+                and b.GetEndAtom().GetSymbol() == 'C'
+                for b in mol.GetBonds())
+            if _acid_unsaturated:
+                has_carbon_branch = False
 
             if has_carbon_branch:
                 chain_set = set(acid_principal_chain)

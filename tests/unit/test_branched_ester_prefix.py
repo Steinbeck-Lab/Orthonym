@@ -87,3 +87,31 @@ class TestBranchedAcidAcyloxy:
         result = _get_acyloxy_prefix("CC(C)CC(=O)OC")
         assert result is not None
         assert "butanoyl" in result, f"Expected butanoyl (4C chain) in {result}"
+
+
+class TestUnsaturatedAcidAcyloxyAtomOrderInvariance:
+    """0-wrong regression: name_ester_as_prefix must be atom-order-invariant for
+    an UNSATURATED acid. The branched carbon-COUNT path was blind to a C=C
+    connecting a branch and named methacrylate's =CH2 as a saturated 2-methyl
+    (isobutyryloxy, a DIFFERENT molecule) for one SMILES ordering."""
+
+    def _prefix(self, smiles: str) -> str:
+        mol = Chem.MolFromSmiles(smiles)
+        patt = Chem.MolFromSmarts("[CX3](=O)[OX2][#6]")
+        matches = mol.GetSubstructMatches(patt)
+        assert matches
+        return name_ester_as_prefix(mol, matches[0])
+
+    def test_methacrylate_atom_order_invariant(self):
+        # Same molecule, two SMILES atom orderings -> one correct name, never
+        # the C=C-dropped '(2-methylpropanoyl)oxy'.
+        a = self._prefix("CC(=C)C(=O)OC")
+        b = self._prefix("COC(=O)C(=C)C")
+        assert a == b == "2-methylprop-2-enoyloxy", (a, b)
+
+    def test_acrylate_keeps_double_bond(self):
+        assert self._prefix("C=CC(=O)OC") == "prop-2-enoyloxy"
+
+    def test_saturated_isobutyrate_unchanged(self):
+        # The saturated sibling must still take the branched-count path.
+        assert self._prefix("CC(C)C(=O)OC") == "(2-methylpropanoyl)oxy"
