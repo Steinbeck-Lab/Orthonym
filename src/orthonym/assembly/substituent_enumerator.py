@@ -1107,6 +1107,43 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                        detail=f"allow_mancude:{allow_mancude}")
 
     if free_valence in (2, 3) and _token_asserts_single_free_valence(token):
+        # Decorated ring-ylidene (P-29.2 / P-31.1.4.3): a DECORATED monocyclic
+        # carbocycle joined to its parent by a DOUBLE bond is an '-ylidene'.
+        # carbon_free_valence_prefix builds the BARE 'cyclohexylidene' but declines
+        # any decoration, so the cascade produced the '-yl' token
+        # ('4-fluorocyclohexyl'); the free valence sits on a NON-AROMATIC RING
+        # CARBON, so swap the TERMINAL free-valence morpheme (re-anchored to the
+        # SAME attachment atom -- nothing else moves) and VERIFY the result via the
+        # morphology reader. RT / SELF-01 backstop any error. Only free-valence 2:
+        # a ring carbon cannot carry an '-ylidyne' (free valence 3).
+        if free_valence == 2:
+            _a = mol.GetAtomWithIdx(attach_idx)
+            # 0-WRONG guard (invariant 9): the decorated-ring substituent namer
+            # DROPS defined ring stereo, so a stereo-bearing fragment would yield a
+            # stereo-STRIPPED '-ylidene' (a different molecule -- #18's full InChIKey
+            # loses its -HOWMLNFFSA stereo layer). Convert only when the fragment
+            # carries NO defined stereo; a stereo case abstains safely until the
+            # composite ring-substituent stereo path is built.
+            _frag_stereo = any(
+                mol.GetAtomWithIdx(_i).GetChiralTag()
+                != Chem.ChiralType.CHI_UNSPECIFIED
+                for _i in frag_atoms_set
+            ) or any(
+                b.GetStereo() in (Chem.BondStereo.STEREOE,
+                                  Chem.BondStereo.STEREOZ,
+                                  Chem.BondStereo.STEREOCIS,
+                                  Chem.BondStereo.STEREOTRANS)
+                and b.GetBeginAtomIdx() in frag_atoms_set
+                and b.GetEndAtomIdx() in frag_atoms_set
+                for b in mol.GetBonds())
+            if (_a.GetSymbol() == 'C' and _a.IsInRing()
+                    and not _a.GetIsAromatic() and not _frag_stereo
+                    and token.endswith('yl') and not token.endswith('idene')):
+                from ..validation.name_morphemes import free_valence_morphology
+                _cand = token[:-2] + 'ylidene'
+                _est = free_valence_morphology(_cand)
+                if _est.confident and _est.free_valences == 2:
+                    return _cand
         from ..metrics.abstention import AbstentionCode, record_abstention
         record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                           detail='p29_2_free_valence_morphology')
