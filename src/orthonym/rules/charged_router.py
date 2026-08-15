@@ -549,11 +549,22 @@ def _route_zwitterion(mol, sites, style: str) -> str:
 def _name_diazonium(mol, cation_idx: int, style: str) -> str:
     """P-73.2.2.3: name a diazonium cation R-N2+ as ``<parent-hydride>diazonium``.
 
-    The cationic N (``cation_idx``) is bonded to (a) the diazo partner N via a
-    double/triple bond and (b) the parent-attachment atom. Sever the cation from
-    the parent, cap the parent side with H, discard the -N#N+ fragment, name the
-    neutral parent hydride (benzene / methane), and append 'diazonium'
-    (``benzenediazonium`` / ``methanediazonium``). Returns '' on any decline.
+    The cationic N (``cation_idx``) sits somewhere in a terminal
+    -N#N+/-N=N+ pair; WHICH of the two N atoms carries the formal charge is
+    a resonance-drawing choice RDKit does not normalise (Phase 3B SPY,
+    `` Q4). The CANONICAL
+    drawing (``R-N+#N``) puts the charge on the PROXIMAL N -- directly
+    bonded to the parent-attachment atom. The charge-shifted TWIN
+    (``R-N=N+``) puts it on the TERMINAL N instead, whose only neighbour is
+    the other N -- ``classify_cation`` already returns ``'diazonium'`` for
+    both, but the parent-attachment atom is then two bonds away, not a
+    direct neighbour of ``cation_idx``. Locate it by walking from whichever
+    N is proximal to the parent, not by assuming ``cation_idx`` itself is.
+
+    Sever the parent from the -N#N+/-N=N+ pair, cap the parent side with H,
+    discard the diazo fragment, name the neutral parent hydride (benzene /
+    methane), and append 'diazonium' (``benzenediazonium`` /
+    ``methanediazonium``). Returns '' on any decline.
     """
     try:
         cat = mol.GetAtomWithIdx(cation_idx)
@@ -568,14 +579,29 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
             diazo_n = nb.GetIdx()
         else:
             parent_attach = nb.GetIdx()
-    if diazo_n is None or parent_attach is None:
+    if diazo_n is None:
         return ''
-    # The diazo partner must be the TERMINAL N of the -N2+ group (degree 1): a
-    # genuine R-N+#N / R-N+=N. Anything else (an internal azo / ring N) is out.
-    if mol.GetAtomWithIdx(diazo_n).GetDegree() != 1:
+
+    # proximal_n is whichever N of the pair is directly bonded to the parent;
+    # terminal_n is the OTHER one, and must have degree 1 (a genuine terminal
+    # -N#N+/-N=N+, not an internal azo / ring N).
+    proximal_n, terminal_n = cation_idx, diazo_n
+    if parent_attach is None:
+        # Resonance-shifted twin: cation_idx has no non-N neighbour (the
+        # charge sits on the TERMINAL N), so the parent-attachment atom is
+        # two bonds away -- reached via diazo_n's other neighbour, which
+        # makes diazo_n the PROXIMAL N here (not terminal).
+        dn = mol.GetAtomWithIdx(diazo_n)
+        others = [nb.GetIdx() for nb in dn.GetNeighbors() if nb.GetIdx() != cation_idx]
+        if len(others) != 1:
+            return ''
+        parent_attach = others[0]
+        proximal_n, terminal_n = diazo_n, cation_idx
+
+    if mol.GetAtomWithIdx(terminal_n).GetDegree() != 1:
         return ''
     rw = Chem.RWMol(mol)
-    rw.RemoveBond(cation_idx, parent_attach)
+    rw.RemoveBond(proximal_n, parent_attach)
     pa = rw.GetAtomWithIdx(parent_attach)
     pa.SetNumExplicitHs(pa.GetNumExplicitHs() + 1)
     built = rw.GetMol()
@@ -985,6 +1011,23 @@ def route_charged(mol, style: str = 'pin') -> str:
             cy = emit_chalcogen_ylium(mol, sites['cations'][0]['atom_idx'])
             if cy:
                 return cy
+
+    # Phase 3B (SPY  Q4): the SAME
+    # RDKit valence-model artifact documented above for R-S+/R-Se+ also hits
+    # the charge-shifted diazonium TWIN (R-N=N+). Its terminal N+ is degree-1
+    # with only a DOUBLE bond (valence contribution 2) against the
+    # +1-charged N's required valence of 4, so RDKit fills the shortfall
+    # with 2 SPURIOUS radical electrons -- the canonical drawing's proximal
+    # N+ (triple bond + single bond to the parent = valence 4, exact) gets 0.
+    # Chemically both drawings are the SAME closed-shell diazonium cation
+    # (BB P-73.2.2.3). Treat this one spurious site as not a radical at all,
+    # so the ordinary single-cation path below (unchanged; still runs
+    # _apply_guard3_reorder and every other guard) handles both drawings
+    # exactly alike via the existing 'diazonium' -> _name_diazonium branch.
+    if (len(radical_sites) == 1 and n_cations == 1 and not n_anions
+            and radical_sites[0]['atom_idx'] == sites['cations'][0]['atom_idx']
+            and classify_cation(mol, sites['cations'][0]) == 'diazonium'):
+        radical_sites = []
 
     # A charged AND radical species (radical ion) is out of scope here -> bail.
     if radical_sites and (n_anions or n_cations):

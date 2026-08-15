@@ -615,6 +615,43 @@ for _bk, _bsmarts in _ANHYDRIDE_BRIDGE_SMARTS.items():
         _COMPILED_ANHYDRIDE_BRIDGE[_bk] = _bpat
 
 
+def _add_resonance_twin_matches(mol, results: Dict[str, List[Tuple[int, ...]]]) -> None:
+    """ADD the resonance-shifted twins of ``azido``/``diazo`` that the fixed
+    single-bond-order SMARTS above (:568-569) cannot see (Phase 3B SPY,
+    `` Q1/Q2/Q3). Purely
+    additive: the existing SMARTS matches are kept untouched, and a chain the
+    SMARTS already found is skipped here (atom-set dedup), so canonical-
+    drawing detection -- and its downstream naming -- is byte-identical.
+
+    Match-tuple SHAPE mirrors each SMARTS exactly, so every existing consumer
+    (attach-point discovery, consumed-atom accounting) needs no changes:
+      * ``azido``: 3 N atoms, attach-adjacent first (the SMARTS never
+        includes the external attach atom).
+      * ``diazo``: attach atom + 2 N atoms (the SMARTS's ``[#6]=...`` DOES
+        include the attach carbon).
+
+    Diazonium is intentionally not added here -- see
+    ``perception.ions._resonance_twin_internal_atoms`` for why.
+    """
+    from ..data.resonance_templates import find_resonance_chains
+    already = {
+        'azido': {frozenset(m) for m in results.get('azido', ())},
+        'diazo': {frozenset(m) for m in results.get('diazo', ())},
+    }
+    for cls, chain in find_resonance_chains(mol):
+        if cls == 'azido':
+            match: Tuple[int, ...] = tuple(chain[1:])
+        elif cls == 'diazo':
+            match = tuple(chain)
+        else:
+            continue
+        key = frozenset(match)
+        if key in already[cls]:
+            continue
+        results[cls].append(match)
+        already[cls].add(key)
+
+
 def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
     """
     Detect all functional groups in a molecule.
@@ -640,6 +677,8 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
         matches = mol.GetSubstructMatches(pattern, uniquify=True)
         for match in matches:
             results[fg_name].append(match)
+
+    _add_resonance_twin_matches(mol, results)
 
     # A ring-internal C=N-N is the backbone of an azoline/azole ring (e.g.
     # 4,5-dihydro-1H-pyrazole), NOT a hydrazone principal group (a hydrazone is

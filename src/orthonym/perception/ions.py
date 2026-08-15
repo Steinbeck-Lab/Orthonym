@@ -213,6 +213,36 @@ def _get_internal_charge_atoms(mol) -> Set[int]:
                 if mol.GetAtomWithIdx(idx).GetFormalCharge() != 0:
                     internal.add(idx)
     internal |= _semipolar_chalcogenide_atoms(mol)
+    internal |= _resonance_twin_internal_atoms(mol)
+    return internal
+
+
+def _resonance_twin_internal_atoms(mol) -> Set[int]:
+    """Resonance-shifted azide/diazo drawings the fixed SMARTS above miss.
+
+    ``[N;+0]=[N+]=[N-]`` (azide) and ``[#6]=[N+]=[N-]`` (diazo) both assume
+    ONE literal bond-order pattern; RDKit does not normalise resonance forms,
+    so the charge-separated twin (``R-[N-]-[N+]#N``) is invisible to them and
+    used to fall through to the zwitterion path (Phase 3B SPY,
+    `` Q1/Q2). ADDITIVE: this is
+    consulted alongside the SMARTS above, not instead of them -- a molecule
+    the SMARTS already handle just gets the same atoms added again to a set
+    (a no-op).
+
+    Diazonium is deliberately EXCLUDED here: it is a genuine external cation
+    (net charge != 0), not a P-59 internal bonding feature, and both its
+    drawings are already routed correctly by ``detect_species_type``'s
+    non-zero-net-charge branch -- its remaining bug is downstream, in
+    ``rules.charged_router._name_diazonium``'s attach-atom walk, not here.
+    """
+    from ..data.resonance_templates import find_resonance_chains
+    internal: Set[int] = set()
+    for cls, chain in find_resonance_chains(mol):
+        if cls not in ('azido', 'diazo'):
+            continue
+        for idx in chain:
+            if mol.GetAtomWithIdx(idx).GetFormalCharge() != 0:
+                internal.add(idx)
     return internal
 
 
