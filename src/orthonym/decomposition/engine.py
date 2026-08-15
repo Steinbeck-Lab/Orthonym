@@ -2029,7 +2029,13 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     #     IT independently round-trips (`weave_is_verified`, Part C -- the
     #     atom-complete-or-abstain guard). A weave candidate that fails to
     #     verify is discarded; the function falls through unchanged.
-    if not (single_result and _weave_result_is_verified(mol, single_result)):
+    # Symmetric with site 1 (above): protect a round-tripping `existing_name`
+    # from being replaced too, not just `single_result` -- otherwise a
+    # correct-but-heuristically-"too short" existing_name could be swapped
+    # for a DIFFERENT-but-equally-correct weave name (a byte-level change,
+    # never a wrong molecule, but still an unverified override).
+    if (not (single_result and _weave_result_is_verified(mol, single_result))
+            and not (existing_name and _weave_result_is_verified(mol, existing_name))):
         try:
             from .weave import try_weave, weave_is_verified
             weave_result = try_weave(mol, style)
