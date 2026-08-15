@@ -610,13 +610,15 @@ _SC_MODE = os.environ.get("ORTHONYM_SELF_CONSISTENCY_GATE", _SC_DEFAULT).strip()
 if _SC_MODE not in ("off", "warn", "on"):
     _SC_MODE = _SC_DEFAULT
 
-# v33 Phase 0 L0: producer-agnostic coverage AUDIT (telemetry only) at the
-# `_finish` choke. "off" disables it entirely; "shadow" (the default) records
-# a verdict but NEVER changes the returned name; "veto" is reserved for a
-# later task (L1) and behaves exactly like "shadow" here. Read fresh on every
-# call (not cached at import like `_SC_MODE`/`_DISABLE_VALIDITY_GATE` above) so
-# a measurement script can flip it per-process without import-order games, and
-# so `monkeypatch.setenv` works per-test without a module reload.
+# v33 Phase 0 L0/L1: producer-agnostic coverage AUDIT at the `_finish` choke.
+# "off" disables it entirely; "shadow" (the default) records a verdict but
+# NEVER changes the returned name; "veto" (shipped in L1, `6e495eb1`) is a
+# REAL abstain -- it downgrades an incomplete winner (per `audit_coverage`,
+# except the fail-open `method="unavailable"` case) to the honest descriptive
+# fallback instead of shipping it. Read fresh on every call (not cached at
+# import like `_SC_MODE`/`_DISABLE_VALIDITY_GATE` above) so a measurement
+# script can flip it per-process without import-order games, and so
+# `monkeypatch.setenv` works per-test without a module reload.
 _COVERAGE_AUDIT_MODES = ("off", "shadow", "veto")
 
 
@@ -2668,6 +2670,13 @@ class Orthonym:
             # exception) must not report a PREVIOUS molecule's verdict.
             self._last_ger_result = None
             self._last_coverage_verdict = None
+            # v33 Phase 0 L2: same per-top-level-molecule invariant as the two
+            # resets above -- `self._offers` is rebuilt at `_finish` from
+            # THIS molecule's winner; without this reset a molecule whose
+            # audit never reaches the offer-building code (mode "off", an
+            # exception, or a non-top-level recursive call) would report the
+            # PREVIOUS molecule's offer pool instead of an empty one.
+            self._offers = []
             # v25 G3: publish the engine flag so fragment/component recursion
             # (name_compound builds FRESH namers) inherits it. Top-level only;
             # reset in the finally below.
@@ -3746,13 +3755,79 @@ class Orthonym:
                                 "abstaining instead of shipping %r",
                                 verdict.method, verdict.detail, name[:80])
                             name = _descriptive_fallback(smiles)
+                        # v33 Phase 0 L2: wrap the current winner (post-veto,
+                        # so its `.name` is exactly whatever `name` holds at
+                        # this point -- the fallback string if L1 just fired,
+                        # the original winner otherwise) as ONE `Offer` and
+                        # run it through `select_offer`. With a single offer
+                        # this is a provable IDENTITY: `select_offer` returns
+                        # `rank_offers([offer])[0]`, which is `offer` itself,
+                        # so `name = selected.name` reassigns `name` to the
+                        # exact value it already held -- byte-identical by
+                        # construction, not by coincidence of the ranking key.
+                        # This is the enabling structure for L3 (a second,
+                        # systematic-floor offer) and L4 (RT-gated retry
+                        # offers over the ranked pool); neither exists yet, so
+                        # today's pool size is always 0 or 1.
+                        #
+                        # `result_obj`/`is_pin`/`tier`/`source` are read from
+                        # the SAME provenance `name_tiered` derives its labels
+                        # from (`namer.py` `name_tiered`, ~:2984-3097) --
+                        # re-evaluated fresh against the (possibly post-veto)
+                        # `name` rather than reusing `_result_obj`/`_self01`
+                        # above, which were computed against the PRE-veto
+                        # name. `is_pin`/`tier` deliberately use the COARSE
+                        # form the brief sanctions for L2 (a `True`/"T1"
+                        # default with the 3 known demotions --
+                        # general_engine / trivial_retained /
+                        # general_ring_prefix -- to `False`), since with one
+                        # offer the ranking can never change the result
+                        # regardless of how precisely tier is graded; L3/L4
+                        # can sharpen this if a real second offer ever needs
+                        # to out-rank it on tier.
+                        _offer_ger = getattr(self, "_last_ger_result", None)
+                        _offer_result_obj = (
+                            _offer_ger if _offer_ger is not None
+                            and getattr(_offer_ger, "name", None) == name
+                            else None)
+                        from .metrics.provenance import (
+                            get_provenance as _offer_get_prov)
+                        _offer_prov = _offer_get_prov()
+                        _offer_source = _offer_prov.get("source") or "pin_path"
+                        if _offer_source == "general_engine":
+                            _offer_is_pin = False
+                            _offer_tier = (
+                                "T3" if _offer_prov.get("opsin") == "verified"
+                                else "T4")
+                        elif _offer_source == "trivial_retained":
+                            _offer_is_pin, _offer_tier = False, "T3"
+                        elif _offer_prov.get("general_ring_prefix"):
+                            _offer_is_pin = False
+                            _offer_tier = (
+                                "T3" if _offer_prov.get("opsin") == "verified"
+                                else "T4")
+                        else:
+                            _offer_is_pin, _offer_tier = True, "T1"
+                        from .assembly.offer_pool import Offer, select_offer
+                        self._offers = [Offer(
+                            name=name, result_obj=_offer_result_obj,
+                            is_pin=_offer_is_pin, tier=_offer_tier,
+                            source=_offer_source, complete=verdict.complete)]
+                        _offer_selected = select_offer(self._offers)
+                        if _offer_selected is not None:
+                            name = _offer_selected.name
         except Exception as _cae:  # pragma: no cover - defensive
             # SHADOW must never break a name regardless of what goes wrong
             # inside the audit; a VETO must fail OPEN on its own internal
-            # error too -- `name` is only ever reassigned above, inside this
-            # same try block, so an exception anywhere before that line
-            # (including inside `_descriptive_fallback` itself) leaves `name`
-            # at its original, un-vetoed value.
+            # error too; and (v33 Phase 0 L2) a failure while building/
+            # selecting the offer must never change or crash the name either.
+            # `name` is only ever reassigned above, inside this same try
+            # block, and each reassignment (veto, then offer-selection) fully
+            # completes before the next statement runs -- so an exception
+            # anywhere in this block leaves `name` at whichever of those
+            # values it last finished assigning (its original winner if
+            # nothing fired yet, the L1 fallback if veto fired and the
+            # exception came after, etc.), never a half-applied one.
             logger.info("coverage audit failed (shadow, ignored): %s", _cae)
         try:
             if self._binding_proof == "off":
