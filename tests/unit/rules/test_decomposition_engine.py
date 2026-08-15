@@ -653,11 +653,21 @@ class TestPartialAssembly:
         )
 
     def test_partial_assembly_two_of_three(self):
-        """When 2/3 fragments name successfully, partial assembly should return a name.
+        """When 2/3 fragments name successfully, the engine must FAIL CLOSED
+        (v32 Phase 2 -- ).
 
         Mock scenario: 3 fragments from multi-bond ester cleavage, where the
-        third fragment fails naming. The engine should still assemble a name
-        from the 2 successful fragments.
+        third fragment fails naming (even after the T4 rescue rung inside
+        `_name_fragment_with_fallback`, which this test bypasses entirely by
+        mocking that function directly). Shipping a name built from the 2
+        successful fragments would describe a SMALLER molecule than the
+        input -- exactly the SELF-01-suppressed-partial defect the phase
+        fixed. The engine must decline (return None) instead of ever
+        silently dropping the third fragment's atoms.
+
+        This assertion was intentionally FLIPPED from "should return a name"
+        to "must return None" -- see commit history for
+        `decomposition/engine.py`'s `_try_multi_bond_decompose`.
         """
         from unittest.mock import patch, MagicMock
         from orthonym.decomposition.engine import _try_multi_bond_decompose
@@ -699,9 +709,12 @@ class TestPartialAssembly:
                                return_value="ethyl acetate"):
                         result = _try_multi_bond_decompose(mol, bonds)
 
-        # Should NOT be None -- partial assembly should produce a name
-        assert result is not None, (
-            "Partial assembly should return a name when 2/3 fragments succeed"
+        # v32 Phase 2: must be None -- never ship a name for 2/3 fragments
+        # when the third genuinely fails (atom-drop / smaller-molecule name).
+        assert result is None, (
+            "Partial assembly must FAIL CLOSED (return None) when 1/3 "
+            "fragments still fails naming, even after the T4 rescue rung -- "
+            "never ship a name that silently drops that fragment's atoms"
         )
 
     def test_partial_assembly_one_of_three_aborts(self):

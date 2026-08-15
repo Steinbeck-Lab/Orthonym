@@ -32,15 +32,27 @@ MAX_DECOMP_LEVELS = 3  # Phase 107: max iterative decomposition levels for mixed
 
 
 def _name_fragment_with_fallback(smiles: str):
-    """Name a fragment: recursive naming first, pipeline-only fallback.
+    """Name a fragment: recursive naming first, pipeline-only fallback, then
+    a T4/general-engine best-effort rescue (v32 Phase 2).
 
     Per D-01: When name_fragment_recursively() returns None (depth/cycle limit hit),
     fall back to name_pipeline_only() instead of aborting the entire decomposition.
     name_pipeline_only() uses the full IUPAC pipeline without triggering decomposition
     recursion, preserving all substituents.
 
+    v32 Phase 2 (): when BOTH
+    PIN-tier attempts above fail, retry the fragment through a fresh best-effort
+    (T4) namer before giving up (`_name_fragment_t4_rescue`). This rung is
+    strictly SCOPED to run only after a PIN failure -- a fragment that already
+    names at PIN tier returns from one of the first two rungs and the rescue
+    never executes, so every currently-correct decomposition name stays
+    byte-identical. The rescue exists so the calling multi-fragment assemblers
+    (`_try_multi_bond_decompose`, `_try_iterative_mixed_decompose`) can try
+    harder before counting a fragment as failed, so their new fail-closed
+    guard doesn't abstain on a fragment that best-effort could have named.
+
     Returns:
-        IUPAC name string, or None if both attempts fail.
+        IUPAC name string, or None if all three attempts fail.
     """
     from ..assembly.fragment_naming import name_fragment_recursively
     from ..namer import name_pipeline_only
@@ -55,7 +67,83 @@ def _name_fragment_with_fallback(smiles: str):
     if name and "unknown" not in name.lower():
         return name
 
+    # Last resort (v32 Phase 2): best-effort T4/general-engine rescue --
+    # only reached when both PIN-tier attempts above already failed.
+    name = _name_fragment_t4_rescue(smiles)
+    if name and "unknown" not in name.lower():
+        return name
+
     return None
+
+
+def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
+    """Best-effort (T4/general-engine) rescue for a fragment PIN could not name.
+
+    v32 Phase 2 (, secondary
+    lever): every fragment named during decomposition previously went through
+    ``name_pipeline_only``, whose fresh ``Orthonym`` defaults
+    ``general_fallback=False`` (``namer.py:2047``) -- so the T4/general-engine
+    best-effort assist never fired for a fragment, even when the enclosing
+    molecule was itself being named at a best-effort tier. A fragment
+    unnameable at PIN tier but completable by T4 (an unusual branched acyl
+    chain, a decorated sugar ring) spuriously inflated ``failed_count`` in the
+    multi-fragment assemblers, feeding the partial-ship defect this phase
+    fixes.
+
+    Calls ``Orthonym._try_general_engine_recovery`` DIRECTLY (not a fresh
+    ``.name()``/``_name_impl`` pass) inside ``isolated_naming_session()`` --
+    the SAME mechanism ``namer.py``'s own T4 recovery lane uses (see
+    ``fragment_naming.isolated_naming_session``'s own docstring) to give the
+    call the full depth-0 recursion budget AND to satisfy
+    ``is_top_level_naming()``, which gates that recovery lane -- without the
+    isolated session this fragment is nested (non-zero fragment-naming depth),
+    so the T4 lane declines unconditionally regardless of these flags.
+
+    Calling ``_try_general_engine_recovery`` directly (per its own docstring:
+    "Re-perceives, runs the general engine, and re-applies the SAME E1 +
+    SELF-01 gates to the emission. Returns a verified name or None") is
+    deliberate rather than re-running the fragment through a fresh
+    ``Orthonym.name()``: that method is ALSO the entry point for PIN naming
+    AND decomposition, so a plain ``.name()`` call would redundantly redo the
+    PIN attempt this function's callers already made, and -- because
+    decomposition is not skipped on that path -- risks re-decomposing the
+    fragment into its own sub-fragments, each of which could again fail and
+    recurse into this same rescue. Measured: this caused multi-minute
+    slowdowns on real multi-residue fragments during phase development.
+    ``_try_general_engine_recovery`` is self-contained (own E1 + SELF-01
+    gates, no decomposition reentry), so this rescue is a single bounded
+    best-effort attempt, not a recursive one.
+
+    Every T4 emission still passes through the SAME E1 atom-coverage
+    certificate and SELF-01 OPSIN round-trip gates as any other T4 name
+    (the shared ladder in ``namer.py``) -- this rescue adds no new bypass of
+    either, so it can turn a fragment failure into a best-effort success but
+    can never ship a name the existing 0-wrong net would otherwise reject.
+
+    Scoping (PIN byte-identity): this is called ONLY as the third/last rung of
+    ``_name_fragment_with_fallback``, after both PIN-tier attempts already
+    failed. A fragment that names successfully at PIN tier never reaches this
+    function, so this rescue can only ever convert a fragment FAILURE into a
+    best-effort NAME -- it never replaces or competes with a PIN name.
+
+    Returns:
+        IUPAC name string (best-effort tier), or None (clean abstain -- never
+        a partial).
+    """
+    from ..assembly.fragment_naming import isolated_naming_session
+    from ..namer import Orthonym
+
+    try:
+        with isolated_naming_session():
+            namer = Orthonym(
+                style="pin",
+                general_fallback=True,
+                general_fallback_unverified=True,
+                allow_aromatic_general=True,
+            )
+            return namer._try_general_engine_recovery(smiles)
+    except Exception:
+        return None
 
 
 def _get_max_decomp_levels(mol) -> int:
@@ -1465,14 +1553,26 @@ def _try_multi_bond_decompose(
 
         named_fragments.append((frag, frag_name))
 
+    # v32 Phase 2 (fail-closed, invariants 1/9 -- never partial-ship): a
+    # fragment that STILL could not be named or adequately covered even after
+    # `_name_fragment_with_fallback`'s T4/general-engine rescue rung is a
+    # genuinely unnameable residue. Shipping a name built from `named_fragments`
+    # alone would describe a SMALLER molecule than the input -- exactly the
+    # SELF-01-suppressed-partial shape `phase2-shared-mechanism-spy.md`
+    # identified (a complete, well-formed name for the WRONG, smaller
+    # molecule). Decline the whole assembly instead of ever silently dropping
+    # atoms; the molecule then either abstains honestly or a different
+    # decomposition strategy still gets a chance upstream in `try_decompose`.
+    if failed_count > 0:
+        logger.info(
+            "Partial assembly REFUSED: %d/%d fragments named (%d failed) -- "
+            "declining rather than shipping a name for a smaller molecule",
+            len(named_fragments), len(fragments), failed_count)
+        return None
+
     # DECO-25: require at least 2 named fragments for assembly
     if len(named_fragments) < 2:
         return None  # Not enough fragments to assemble
-
-    # Log partial assembly if some fragments failed
-    if failed_count > 0:
-        logger.info("Partial assembly: %d/%d fragments named (%d failed)",
-                    len(named_fragments), len(fragments), failed_count)
 
     # Dispatch to bond-type-specific multi-fragment assembler
     if bond_type == "ester":
@@ -1628,13 +1728,25 @@ def _try_iterative_mixed_decompose(
 
         named_fragments.append((frag, frag_name))
 
+    # v32 Phase 2 (fail-closed, invariants 1/9 -- never partial-ship): same
+    # discipline as `_try_multi_bond_decompose` above -- a fragment that still
+    # could not be named/covered after the T4 rescue rung is genuinely
+    # unnameable, and shipping a name for `named_fragments` alone would
+    # describe a SMALLER molecule than the input (the exact
+    # "Mixed-decomp partial assembly" shape `phase2-shared-mechanism-spy.md`
+    # traced live: GPI-mannoside -> 3/4 named -> SELF-01-suppressed). Decline
+    # rather than silently drop atoms.
+    if failed_count > 0:
+        logger.info(
+            "Mixed-decomp partial assembly REFUSED: %d/%d fragments named "
+            "(%d failed) -- declining rather than shipping a name for a "
+            "smaller molecule",
+            len(named_fragments), len(all_fragments), failed_count)
+        return None
+
     # DECO-25: require at least 2 named fragments for assembly
     if len(named_fragments) < 2:
         return None  # Not enough fragments to assemble
-
-    if failed_count > 0:
-        logger.info("Mixed-decomp partial assembly: %d/%d fragments named (%d failed)",
-                    len(named_fragments), len(all_fragments), failed_count)
 
     # Bond-type-aware assembly (DECO-23): route fragment pairs through
     # bond-type-specific assemblers instead of naive space-join
