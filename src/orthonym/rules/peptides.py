@@ -16,9 +16,30 @@ Examples (P-103.3.4 omits the L descriptor for Table-10.4 amino acids):
     L-Ala-Gly       -> alanylglycine
     Gly-L-Ala-L-Leu -> glycylalanylleucine
     D-Ala-Gly       -> D-alanylglycine   (D IS cited)
+
+v32 Phase 2 (breadth, phase2e SPY -- ):
+two ADDITIVE fallbacks, tried only when the flat acylamino convention above
+declines, and gated behind an explicit OPSIN round-trip (``_rt_verified``) so
+a table/topology miss degrades to abstention, never a wrong or atom-dropping
+name (0-wrong ABSOLUTE):
+
+- Lever A (``_try_n_acyl_cap``): an N-terminus ACYLATED by a plain (nitrogen-
+  free) acyl group -- a fatty/simple acyl cap -- in front of an otherwise
+  fully standard >=2-residue alpha chain. The cap is named via the general/
+  systematic namer and prepended in ACYL form, e.g.
+  ``3-hydroxy-11-methyltridecanoylglycylglycine``.
+- Lever B (``_try_gamma_link_whole``): a single non-alpha ('gamma'/'beta')
+  bond formed from a standard amino acid's OWN side-chain carboxyl (only
+  glutamic acid's gamma- and aspartic acid's beta-carboxyl have this shape
+  among the standard 20) -- glutathione's linkage type. Builds the fully
+  SYSTEMATIC substitutive acyl/amido construction (P-66.1.1.4.3) instead of
+  the flat chain shorthand, because OPSIN's flat-chain grammar mis-parses a
+  non-retained continuing acyl word (SPY-verified) and a bare 'glutamyl'
+  shorthand imposes an L-configuration OPSIN does not know is undefined.
 """
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
+import re
 from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry
 from ..data.amino_acids import (
@@ -118,12 +139,20 @@ def name_peptide(mol) -> Optional[str]:
 
     # Step 1: Verify this is a true peptide
     if not _is_valid_peptide(mol):
-        return None
+        # v32 Lever A: an acylated (non-free) N-terminus may still be a
+        # nameable N-acyl-capped peptide (SPY §3a). Fails closed to None
+        # (unchanged behaviour) unless the cap is a genuine plain acyl group
+        # AND the residues behind it are a fully standard >=2-residue chain
+        # AND the assembled candidate OPSIN-round-trips to this exact mol.
+        return _rt_verified(mol, _try_n_acyl_cap(mol))
 
     # Step 2: Extract residue SMILES by walking the peptide chain
     residue_smiles_list = _extract_residues(mol)
     if residue_smiles_list is None or len(residue_smiles_list) < 2:
-        return None
+        # v32 Lever B: a single non-alpha ('gamma'/'beta') bond from a
+        # standard amino acid's own side-chain carboxyl (SPY §3b). Same
+        # fail-closed-to-None-unless-round-tripped guarantee as Lever A.
+        return _rt_verified(mol, _try_gamma_link_whole(mol))
 
     # Step 3: Identify residues and get stereo prefixes
     named_residues = _identify_residues(residue_smiles_list)
@@ -598,3 +627,353 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
             result += base
 
     return result
+
+
+# ============================================================================
+# v32 Phase 2 breadth: N-acyl cap (Lever A) + gamma/beta side-chain-carboxyl
+# donor (Lever B). Both are ADDITIVE fallbacks tried only after the ordinary
+# flat acylamino convention above declines, and both are gated by
+# ``_rt_verified`` -- a table/topology miss degrades to abstention, never a
+# wrong or atom-dropping name. See phase2e SPY for the derivation and the
+# corpus-scale sizing ().
+# ============================================================================
+
+
+def _rt_verified(mol, candidate: Optional[str]) -> Optional[str]:
+    """0-wrong guarantee for the v32 broadened paths (Lever A / Lever B).
+
+    Returns ``candidate`` unchanged iff it OPSIN-round-trips to the EXACT
+    input ``mol`` (full InChI match -- stricter than InChIKey, catches a
+    stereo-imposing bare acyl word like a default-L 'glutamyl'). Fails
+    CLOSED (returns None) on a mismatch, a parse error, or an unavailable
+    OPSIN/Java -- unlike several existing fail-OPEN gates elsewhere in this
+    codebase, there is no pre-fix default output to preserve here: the
+    pre-Phase-2 behaviour for every path that reaches this function was
+    already None, so "cannot verify" and "verified wrong" both correctly
+    resolve to the same pre-existing abstention.
+    """
+    if candidate is None:
+        return None
+    try:
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        smi = Chem.MolToSmiles(mol)
+        verdict = opsin_roundtrip_check(smi, candidate)
+    except Exception:
+        return None
+    return candidate if verdict.get("passed") else None
+
+
+def _is_plain_acyl_cap(mol, carbonyl_c: int, amide_n: int) -> bool:
+    """True iff ``carbonyl_c``-``amide_n`` is a Lever-A N-cap bond: the AMINE
+    side is a genuine peptide N-terminus (alpha, same test as
+    ``_is_alpha_carboxyl_bond``'s amine-side check) AND the ACYL side
+    contains NO nitrogen atom anywhere -- a plain acyl group (fatty acid,
+    acetyl, aroyl...), not itself an amino-acid-shaped residue. This is what
+    distinguishes an N-acyl CAP from a gamma/beta-linked DONOR residue
+    (glutamic acid's gamma-carboxyl acyl side still carries its own free
+    alpha-amino N, so it correctly fails this check and is Lever B's
+    territory instead).
+    """
+    n = mol.GetAtomWithIdx(amide_n)
+    amine_alpha = any(
+        nbr.GetSymbol() == 'C' and nbr.GetIdx() != carbonyl_c
+        and _bears_carboxyl_carbon(nbr, amide_n)
+        for nbr in n.GetNeighbors()
+    )
+    if not amine_alpha:
+        return False
+
+    visited = {carbonyl_c, amide_n}
+    stack = [carbonyl_c]
+    while stack:
+        cur = stack.pop()
+        for nbr in mol.GetAtomWithIdx(cur).GetNeighbors():
+            idx = nbr.GetIdx()
+            if idx in visited:
+                continue
+            if nbr.GetSymbol() == 'N':
+                return False  # acyl side reaches a nitrogen -- not a plain cap
+            visited.add(idx)
+            stack.append(idx)
+    return True
+
+
+def _split_one_bond(mol, carbonyl_c: int, amide_n: int):
+    """Cleave exactly the ``carbonyl_c``-``amide_n`` bond, returning
+    ``(acyl_side_frag, amine_side_frag)`` as two RDKit Mol fragments (each
+    still carrying one dummy atom at its cut point), or ``(None, None)`` on
+    any failure. Used by both Lever A and Lever B -- a single-bond special
+    case of the multi-bond walk in ``_extract_residues``."""
+    bond = mol.GetBondBetweenAtoms(carbonyl_c, amide_n)
+    if bond is None:
+        return None, None
+    try:
+        frag_mol = Chem.FragmentOnBonds(
+            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)])
+        mapping: List = []
+        frags = Chem.GetMolFrags(
+            frag_mol, asMols=True, sanitizeFrags=True, fragsMolAtomMapping=mapping)
+    except Exception:
+        return None, None
+    if len(frags) != 2:
+        return None, None
+    acyl_frag = amine_frag = None
+    for frag, idxs in zip(frags, mapping):
+        if carbonyl_c in idxs:
+            acyl_frag = frag
+        elif amide_n in idxs:
+            amine_frag = frag
+    return acyl_frag, amine_frag
+
+
+def _name_standard_chain(smi: str):
+    """Name ``smi`` (a free amino acid / peptide fragment, N reconstructed to
+    a free amine) via the ORDINARY, UNCHANGED flat acylamino machinery --
+    either as a >=2-residue chain (``_extract_residues`` + ``_identify_residues``)
+    or as a single free residue (``_identify_residues`` on the bare SMILES).
+    Fails closed (returns None) exactly as that machinery always has: any
+    internal non-alpha bond or non-standard residue declines. Shared by
+    Lever A's remainder and Lever B's 'flat' acceptor path."""
+    frag_mol = Chem.MolFromSmiles(smi)
+    if frag_mol is None:
+        return None
+    residues = _extract_residues(frag_mol)
+    if residues is not None and len(residues) >= 2:
+        named = _identify_residues(residues)
+        if named is None:
+            return None
+        return _assemble_peptide_name(named)
+    named1 = _identify_residues([smi])
+    if named1 is None:
+        return None
+    return _assemble_peptide_name(named1)
+
+
+def _try_n_acyl_cap(mol) -> Optional[str]:
+    """Lever A (SPY §3a): name an N-acyl-capped peptide.
+
+    Scoped to a cap in front of a genuine >=2-residue standard alpha chain
+    (NOT a single free N-acyl amino acid, e.g. N-acetylglycine -- that shape
+    already names correctly via the general/composer substitutive pipeline
+    today, VERIFIED 2026-08-15 ('acetamidoacetic acid'), so this lever must
+    not compete with it). Returns an UNVERIFIED candidate string; the caller
+    (``name_peptide``) gates it through ``_rt_verified``.
+    """
+    peptide_pat = Chem.MolFromSmarts(_PEPTIDE_BOND_SMARTS)
+    if peptide_pat is None:
+        return None
+    matches = mol.GetSubstructMatches(peptide_pat)
+    if not matches:
+        return None
+    cooh_pattern = Chem.MolFromSmarts(_TERMINAL_COOH_SMARTS)
+    if not cooh_pattern or not mol.GetSubstructMatches(cooh_pattern):
+        return None
+
+    seen = set()
+    cap_bond = None
+    for m in matches:
+        carbonyl_c, amide_n = m[0], m[2]
+        if (carbonyl_c, amide_n) in seen:
+            continue
+        seen.add((carbonyl_c, amide_n))
+        if _is_plain_acyl_cap(mol, carbonyl_c, amide_n):
+            if cap_bond is not None:
+                return None  # >1 plain-acyl bond -- ambiguous, decline
+            cap_bond = (carbonyl_c, amide_n)
+    if cap_bond is None:
+        return None
+    carbonyl_c, amide_n = cap_bond
+
+    cap_frag, remainder_frag = _split_one_bond(mol, carbonyl_c, amide_n)
+    if cap_frag is None or remainder_frag is None:
+        return None
+    cap_smi = _reconstruct_free_amino_acid(cap_frag)
+    remainder_smi = _reconstruct_free_amino_acid(remainder_frag)
+    if cap_smi is None or remainder_smi is None:
+        return None
+
+    # Require a genuine >=2-residue chain BEHIND the cap (see docstring) --
+    # a bare single free amino acid is already handled elsewhere, so this
+    # does NOT go through ``_name_standard_chain``'s single-residue fallback.
+    remainder_mol = Chem.MolFromSmiles(remainder_smi)
+    if remainder_mol is None:
+        return None
+    residues = _extract_residues(remainder_mol)
+    if residues is None or len(residues) < 2:
+        return None
+    named = _identify_residues(residues)
+    if named is None:
+        return None
+    remainder_name = _assemble_peptide_name(named)
+
+    from ..namer import Orthonym
+    from ..errors import is_failure_name
+    try:
+        cap_acid_name = Orthonym(
+            style="pin", _disable_opsin_validity_gate=True).name(cap_smi)
+    except Exception:
+        return None
+    if is_failure_name(cap_acid_name):
+        return None
+
+    from ..decomposition.fragment_assembly import _acid_to_acyl
+    cap_acyl = _acid_to_acyl(cap_acid_name)
+    if cap_acyl is None:
+        return None
+
+    if remainder_name.startswith('D-'):
+        return f"{cap_acyl}-{remainder_name}"
+    return f"{cap_acyl}{remainder_name}"
+
+
+# Standard amino acids with a second (side-chain) carboxyl -- the only two in
+# Table 10.4 -- mapped to the carbon-chain LENGTH from that side-chain
+# carboxyl (counted as C1) to the alpha carbon (inclusive of both ends).
+# Glutamic acid: C(=O)-CH2-CH2-CH(NH2)(COOH) -> 4 carbons ('butan-').
+# Aspartic acid: C(=O)-CH2-CH(NH2)(COOH)      -> 3 carbons ('propan-').
+_OMEGA_CARBOXYL_CHAIN_LENGTH = {"glutamic acid": 4, "aspartic acid": 3}
+
+# The 'amino' substituent prefix (optionally locant-prefixed) ANCHORED at the
+# start of the name, e.g. matches '1-amino' in
+# '1-aminocyclopropane-1-carboxylic acid'. Substituent prefixes FUSE directly
+# onto the parent hydride name with no space/hyphen ('aminocyclopropane', not
+# 'amino-cyclopropane'), so a token search for a word-bounded 'amino' never
+# matches at all -- anchoring at position 0 instead only fires when 'amino'
+# is the name's SOLE (or alphabetically-first) substituent, i.e. exactly the
+# free-NH2-only non-standard residue shape this lever targets (ACC and
+# similar). A residue with additional earlier-sorting substituents declines
+# here rather than risk swapping the wrong token.
+_AMINO_PREFIX_RE = re.compile(r'^(\d+-)?amino')
+
+
+def _swap_amino_for_amido(name: str, amido_group: str) -> Optional[str]:
+    """Replace the leading 'amino' substituent prefix in ``name`` with the
+    parenthesized ``amido_group`` at the same locant (P-16.3.3 complex-
+    substituent enclosure), e.g. '1-aminocyclopropane...' + '4-amino-4-
+    carboxybutanamido' -> '1-(4-amino-4-carboxybutanamido)cyclopropane...'.
+    Declines (returns None) when ``name`` does not start with 'amino' --
+    ambiguous, so never guessed."""
+    m = _AMINO_PREFIX_RE.match(name)
+    if m is None:
+        return None
+    locant = m.group(1) or ''
+    return f"{locant}({amido_group})" + name[m.end():]
+
+
+def _name_gamma_acceptor(remainder_smi: str) -> Optional[Tuple[str, str]]:
+    """Name the ACCEPTOR side of a Lever-B gamma/beta-link bond. Returns
+    ``(name, mode)`` where ``mode`` is:
+      - 'flat': ``name`` is a standard single residue or a standard >=2-
+        residue flat acylamino chain (via ``_name_standard_chain``) -- no
+        'amino' token to swap, the acyl group is simply prepended.
+      - 'swap': ``name`` is a NON-standard residue named via the general/
+        systematic namer (an already-existing capability, SPY-verified),
+        with a leading 'amino' substituent prefix to be replaced by the
+        donor's acyl-amido group (validated by ``_swap_amino_for_amido``,
+        called later by the caller once the acyl-amido text is built).
+    Returns None if the remainder cannot be named at all.
+    """
+    named = _name_standard_chain(remainder_smi)
+    if named is not None:
+        return named, 'flat'
+
+    from ..namer import Orthonym
+    from ..errors import is_failure_name
+    try:
+        general_name = Orthonym(
+            style="pin", _disable_opsin_validity_gate=True).name(remainder_smi)
+    except Exception:
+        return None
+    if is_failure_name(general_name):
+        return None
+    return general_name, 'swap'
+
+
+def _find_single_nonalpha_bond(mol) -> Optional[Tuple[int, int]]:
+    """Find every peptide-bond-shaped match in the WHOLE molecule and return
+    the (carbonyl_c, amide_n) of the ONE that fails ``_is_alpha_carboxyl_bond``,
+    PROVIDED every other match passes it. Returns None when there are zero or
+    more than one non-alpha match (a mid-chain non-standard residue, e.g.
+    chebi 371, produces >=2 non-alpha-adjacent matches or is excluded upstream
+    via the N-cap already being handled by Lever A) -- declines rather than
+    guess which one is the intended gamma/beta donor link."""
+    peptide_pat = Chem.MolFromSmarts(_PEPTIDE_BOND_SMARTS)
+    if peptide_pat is None:
+        return None
+    matches = mol.GetSubstructMatches(peptide_pat)
+    if not matches:
+        return None
+    seen = set()
+    nonalpha = []
+    for m in matches:
+        carbonyl_c, amide_n = m[0], m[2]
+        if (carbonyl_c, amide_n) in seen:
+            continue
+        seen.add((carbonyl_c, amide_n))
+        if not _is_alpha_carboxyl_bond(mol, carbonyl_c, amide_n):
+            nonalpha.append((carbonyl_c, amide_n))
+    if len(nonalpha) != 1:
+        return None
+    return nonalpha[0]
+
+
+def _try_gamma_donor_link(mol, carbonyl_c: int, amide_n: int) -> Optional[str]:
+    """Lever B core (SPY §3b): build the systematic acyl/amido construction
+    for a single gamma/beta side-chain-carboxyl amide bond. Returns an
+    UNVERIFIED candidate string; the caller gates it through ``_rt_verified``.
+    """
+    donor_frag, acceptor_frag = _split_one_bond(mol, carbonyl_c, amide_n)
+    if donor_frag is None or acceptor_frag is None:
+        return None
+    donor_smi = _reconstruct_free_amino_acid(donor_frag)
+    acceptor_smi = _reconstruct_free_amino_acid(acceptor_frag)
+    if donor_smi is None or acceptor_smi is None:
+        return None
+
+    donor_info = _identify_residues([donor_smi])
+    if donor_info is None:
+        return None  # not a standard amino acid -- Lever B does not apply
+    donor_name = donor_info[0]['name']
+    donor_stereo = donor_info[0]['stereo']  # "L-" / "D-" / ""
+
+    n = _OMEGA_CARBOXYL_CHAIN_LENGTH.get(donor_name)
+    if n is None:
+        return None  # only Glu (gamma) / Asp (beta) have a 2nd carboxyl
+
+    # Glu/Asp are not in the cysteine-family CIP-inversion set, so the raw
+    # CIP letter is simply what P-103.3.4's L/D mapping already computed.
+    cip_letter = {"L-": "S", "D-": "R", "": None}.get(donor_stereo)
+    stereo_prefix = f"({n}{cip_letter})-" if cip_letter else ""
+
+    from ..data.chain_names import get_chain_prefix
+    from ..assembly.substituent_naming import acyl_carbons_to_amido_prefix
+    stem = get_chain_prefix(n)
+    amido_stem = acyl_carbons_to_amido_prefix(n)
+    if not stem or amido_stem is None:
+        return None
+    oyl_group = f"{stereo_prefix}{n}-amino-{n}-carboxy{stem}anoyl"
+    amido_group = f"{stereo_prefix}{n}-amino-{n}-carboxy{amido_stem}"
+
+    acceptor = _name_gamma_acceptor(acceptor_smi)
+    if acceptor is None:
+        return None
+    acceptor_name, mode = acceptor
+
+    if mode == 'flat':
+        if acceptor_name.startswith('D-'):
+            return f"{oyl_group}-{acceptor_name}"
+        return f"{oyl_group}{acceptor_name}"
+
+    return _swap_amino_for_amido(acceptor_name, amido_group)
+
+
+def _try_gamma_link_whole(mol) -> Optional[str]:
+    """Lever B entry point: locate the sole non-alpha bond in ``mol`` (if
+    any) and attempt the systematic donor/acceptor construction. Returns an
+    UNVERIFIED candidate string; the caller gates it through ``_rt_verified``.
+    """
+    bond_pair = _find_single_nonalpha_bond(mol)
+    if bond_pair is None:
+        return None
+    carbonyl_c, amide_n = bond_pair
+    return _try_gamma_donor_link(mol, carbonyl_c, amide_n)
