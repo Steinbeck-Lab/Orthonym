@@ -1,0 +1,102 @@
+"""Producer-agnostic coverage verdict for the ``_finish`` choke (v33 Phase 0 L0/L1).
+
+Two carrier-specific proofs feed ONE verdict:
+  * ``GeneralEngineResult`` (has ``.bindings``) -> ``certify_general_result``
+    (E1 + binding spine, Java-free atom->token partition).
+  * bare ``str`` (PIN handlers) -> reuse the SELF-01 verdict ALREADY computed
+    by ``_final_opsin_validity_gate`` for this exact name (the CARRIED RULING
+    in ``task-L0-brief.md``: SELF-01 already OPSIN-parses every PIN name, so a
+    second OPSIN call per name would ~2x default-path cost). Only when no
+    SELF-01 result is available for this name (e.g. a tier/path that skipped
+    the gate) does this fall back to a fresh OPSIN re-anchor
+    (``validate_atom_coverage``, the (mol, name) InChIKey-skeleton compare).
+
+This is a coverage AUDIT; L0 runs it SHADOW (telemetry only, never changes the
+returned name), L1 (a later task) turns it into a veto.
+
+HONEST LIMIT: the bare-str path depends on OPSIN (not Java-free); it is the
+de-facto PIN coverage proof SELF-01 already applies. A Java-free PIN
+certificate is out of scope (phase4b Gap-1).
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CoverageVerdict:
+    """The producer-agnostic coverage verdict for one emitted name.
+
+    Attributes:
+        complete: True iff the winner's proof shows it accounts for every
+            heavy atom (and, on the GER path, bond/charge) of the input.
+        method: which proof produced this verdict -- one of
+            ``"e1_spine"`` (GeneralEngineResult, certify_general_result),
+            ``"self01"`` (bare str, reused SELF-01 verdict -- no extra OPSIN
+            call), ``"reanchor"`` (bare str, a fresh OPSIN re-anchor because
+            no SELF-01 verdict was available), ``"unavailable"`` (no proof
+            could be made -- OPSIN absent/erroring; fails OPEN in SHADOW).
+        detail: free-text diagnostic, empty on a clean pass.
+    """
+    complete: bool
+    method: str  # "e1_spine" | "self01" | "reanchor" | "unavailable"
+    detail: str = ""
+
+
+def audit_coverage(mol, name: str, result_obj,
+                    self01_complete: Optional[bool] = None) -> CoverageVerdict:
+    """Return the coverage verdict for the winning ``name`` of ``mol``.
+
+    Args:
+        mol: RDKit Mol for the input structure.
+        name: the name string about to ship (or that shipped).
+        result_obj: the ``GeneralEngineResult`` that produced ``name``, if the
+            winner came from the general engine (has a ``.bindings``
+            attribute); ``None`` for every bare-str (PIN/T4/etc.) winner.
+        self01_complete: the SELF-01 verdict ALREADY computed for this exact
+            ``name`` by ``_final_opsin_validity_gate`` (True = OPSIN re-parsed
+            it to the same constitution, False = a verified mismatch), or
+            ``None`` when no such verdict exists for this name (a path that
+            skipped the gate, or the gate's outcome belonged to a different
+            string -- see ``metrics.provenance.resolve_gate_outcome``).
+            IGNORED when ``result_obj`` is not None (the GER path never needs
+            it -- E1 is Java-free and strictly more informative: it covers
+            bonds/charge, not merely constitution).
+
+    Returns:
+        A :class:`CoverageVerdict`. Fail-closed (``complete=False``) on an
+        exception in the GER path; fail-OPEN (``complete=True,
+        method="unavailable"``) on an exception or OPSIN-unavailable in the
+        bare-str path -- SHADOW must never break a name.
+    """
+    if result_obj is not None and hasattr(result_obj, "bindings"):
+        try:
+            from orthonym.validation.coverage_gate import certify_general_result
+            ok = certify_general_result(mol, result_obj, allow_charged=True)
+        except Exception as exc:  # pragma: no cover - defensive, audit-only
+            logger.info("audit_coverage e1_spine raised: %s", exc)
+            return CoverageVerdict(False, "e1_spine", f"certify raised: {exc}")
+        return CoverageVerdict(bool(ok), "e1_spine", "" if ok else "certify failed")
+
+    # bare-str path -- CARRIED RULING: prefer the already-computed SELF-01
+    # verdict over a second OPSIN call.
+    if self01_complete is not None:
+        return CoverageVerdict(
+            bool(self01_complete), "self01",
+            "" if self01_complete else "self01 mismatch")
+
+    try:
+        from orthonym.validation.atom_coverage import validate_atom_coverage
+        cov = validate_atom_coverage(mol, name)
+    except Exception as exc:  # pragma: no cover - defensive, audit-only
+        logger.info("audit_coverage reanchor raised: %s", exc)
+        return CoverageVerdict(True, "unavailable", f"reanchor error: {exc}")
+    if getattr(cov, "method", None) == "unavailable":
+        return CoverageVerdict(True, "unavailable", "opsin unavailable")
+    return CoverageVerdict(
+        bool(cov.is_complete), "reanchor",
+        "" if cov.is_complete else "constitution mismatch")
