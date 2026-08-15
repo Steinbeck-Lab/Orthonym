@@ -1,0 +1,81 @@
+"""v33 Phase 0 Task L2.1: whole-molecule Offer + rank_offers/select_offer.
+
+A NEW, small, PURE module -- deliberately NOT built on `assembly.candidate_pool`
+or wired through `assembly.inner_dispatch`. The L2 SPY (task-L2-brief.md,
+invariant 17) proved those are the wrong vehicle: `candidate_pool.best()` ranks
+parent SKELETONS by the P-44 seniority criteria and `CandidateName` carries no
+`is_pin`/`tier`/coverage field at all, and restructuring `dispatch_inner` would
+hit `tier_a_ring.py:540-542`, which scrubs its own rejected candidates from the
+shared pool.
+
+This module instead ranks WHOLE finished NAMES (one per naming strategy that
+offered a result), consumed additively at `namer.py::_finish`. With exactly one
+offer (today, L2) selection is a pure identity; L3 adds a second (systematic
+floor) offer and L4 adds RT-gated retry offers -- neither of those layers
+changes this module, only what gets appended to the pool before `select_offer`
+runs.
+
+Pure by design: imports only `dataclasses`/`typing`. No OPSIN, no rdkit, no
+`namer` import -- keeping it import-cycle-free and trivially unit-testable.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, List, Optional
+
+
+#: Lower rank sorts first (preferred). Unknown/future tier strings fall back
+#: to 9 in `rank_offers` below -- deny-by-default, never crashes, never sorts
+#: an unrecognised tier ahead of a known one.
+_TIER_RANK = {"T1": 1, "T2": 2, "T3": 3, "T4": 4, "T5": 5}
+
+
+@dataclass(frozen=True)
+class Offer:
+    """One candidate finished name a naming strategy is offering as the
+    result for the whole molecule.
+
+    ``result_obj`` is the ``GeneralEngineResult`` backing ``name`` when one
+    exists (``None`` for a bare-str PIN-path winner) -- carried through so a
+    later gate (L4) can re-run OPSIN/E1 checks against the SAME bindings that
+    produced ``name``, rather than re-deriving them from the string.
+    """
+    name: str
+    result_obj: Any
+    is_pin: bool
+    tier: str
+    source: str
+    complete: bool
+
+
+def _rank_key(offer: Offer):
+    """The deterministic, TOTAL sort key `rank_offers` sorts ascending by.
+
+    ``(0 if complete else 1, 0 if is_pin else 1, tier_rank, source, name)`` --
+    a complete winner always beats an incomplete one; among complete offers a
+    PIN beats a non-PIN; then lower tier number wins; ``source`` and finally
+    ``name`` are pure tiebreaks that make the key TOTAL (no two distinct
+    offers with all four other fields equal can tie -- unless `name` itself
+    is equal too, which `sorted`'s stability then resolves by original list
+    order, matching the plan's `test_deterministic_and_empty` expectation).
+    """
+    return (
+        0 if offer.complete else 1,
+        0 if offer.is_pin else 1,
+        _TIER_RANK.get(offer.tier, 9),
+        offer.source,
+        offer.name,
+    )
+
+
+def rank_offers(offers: List[Offer]) -> List[Offer]:
+    """Sort ``offers`` ascending by `_rank_key` -- the most-preferred offer
+    (complete, PIN, lowest tier, then alphabetically-first source/name) is
+    first; an incomplete offer always sorts after every complete one."""
+    return sorted(offers, key=_rank_key)
+
+
+def select_offer(offers: List[Offer]) -> Optional[Offer]:
+    """The single most-preferred offer, or ``None`` for an empty pool."""
+    ranked = rank_offers(offers)
+    return ranked[0] if ranked else None
