@@ -1871,6 +1871,34 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                         break
 
     if quality_ok and not glycoside_bypass:
+        # v32 Phase 2 Step 2 (the assembly WEAVER,
+        # ): the length/token
+        # heuristic `_name_quality_is_acceptable` uses to decide "good
+        # enough, skip decomposition" can be FOOLED by a wrong whole-molecule
+        # PARENT choice that happens to be long enough to look complete --
+        # measured on the phosphatidylcholine-family SELF-01-suppressed
+        # cluster: `name_pipeline_only` picks the cut choline nitrogen as the
+        # whole molecule's own '...aminium' PARENT (ignoring the glycerol
+        # backbone and both fatty/phospho arms entirely), and
+        # "N,N,N-trimethylethanaminium" (28 chars) clears every length check
+        # despite covering ~7 of the molecule's 31 heavy atoms. Give the
+        # weaver's own atom-complete-or-abstain oracle (Part C,
+        # `weave.weave_is_verified` -- a full OPSIN round-trip, not a
+        # heuristic) one cheap chance to override the heuristic's accept,
+        # but ONLY when (a) >= 2 cleavable bonds exist (the composer's own
+        # star-topology precondition; a single-linkage molecule is
+        # untouched) and (b) `existing_name` does NOT itself independently
+        # round-trip (so an existing CORRECT short/retained name is never
+        # second-guessed -- zero regression risk on every molecule this
+        # heuristic already gets right).
+        if len(bonds) >= 2 and not _weave_result_is_verified(mol, existing_name):
+            try:
+                from .weave import try_weave, weave_is_verified
+                _weave_early = try_weave(mol, style)
+                if _weave_early and weave_is_verified(mol, _weave_early):
+                    return _weave_early
+            except Exception:
+                pass
         return None  # Existing name is good enough
 
     # Step 4: Choose ONE bond to cleave (the most significant one)
@@ -1977,6 +2005,39 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
                     return multi_result
 
+    # v32 Phase 2 Step 2 -- the assembly WEAVER
+    # (): a core-and-arms composer
+    # for star-topology multi-linkage molecules (glycerophospholipids and
+    # relatives) that none of the flat assemblers above could weave into ONE
+    # connected name (each fragment named fine on its own, but the suffix-
+    # string role converters have nothing to match on a T4-rescued/seniority-
+    # demoted fragment, so the molecule either space-joins -- SELF-01 sees
+    # disconnected OPSIN components -- or silently drops the fragment).
+    #
+    # Gating (PIN byte-identity + 0-wrong, invariant 1): reached only here,
+    # after every earlier attempt in this function has already had its
+    # chance to return. The decision to PREFER the weave candidate over
+    # whatever `single_result` already holds is never a heuristic quality
+    # check -- it is a full OPSIN round-trip on BOTH candidates. So:
+    #   - a `single_result` that is ALREADY correct (round-trips) is kept
+    #     UNCHANGED -- the weaver is not even consulted for a preference,
+    #     zero regression risk on any molecule this function already names
+    #     correctly.
+    #   - only when `single_result` does NOT round-trip (None, or the exact
+    #     "complete name for a smaller/different molecule" shape the spy
+    #     traced) does a weave candidate get a chance, and even then ONLY if
+    #     IT independently round-trips (`weave_is_verified`, Part C -- the
+    #     atom-complete-or-abstain guard). A weave candidate that fails to
+    #     verify is discarded; the function falls through unchanged.
+    if not (single_result and _weave_result_is_verified(mol, single_result)):
+        try:
+            from .weave import try_weave, weave_is_verified
+            weave_result = try_weave(mol, style)
+            if weave_result and weave_is_verified(mol, weave_result):
+                return weave_result
+        except Exception:
+            pass  # any failure here is a decline -- fall through unchanged
+
     # Compare decomposition result against existing pipeline name:
     # if decomposition produced a worse name (garbled, bracket-mismatched,
     # or containing malformed tokens), fall back to existing pipeline name.
@@ -1985,3 +2046,16 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
             return None  # Let existing pipeline name be used
 
     return single_result  # Best effort fallback
+
+
+def _weave_result_is_verified(mol, name: str) -> bool:
+    """True iff *name* (an EXISTING `single_result`/multi-bond candidate,
+    not a weave candidate) independently round-trips to *mol* -- reuses the
+    weaver's own Part-C oracle so the "is the existing result already good
+    enough" test and the "is the weave candidate good enough" test are the
+    SAME predicate, not two different notions of correctness."""
+    try:
+        from .weave import weave_is_verified
+        return weave_is_verified(mol, name)
+    except Exception:
+        return False
