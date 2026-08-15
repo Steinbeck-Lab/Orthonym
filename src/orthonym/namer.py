@@ -610,6 +610,51 @@ _SC_MODE = os.environ.get("ORTHONYM_SELF_CONSISTENCY_GATE", _SC_DEFAULT).strip()
 if _SC_MODE not in ("off", "warn", "on"):
     _SC_MODE = _SC_DEFAULT
 
+# v33 Phase 0 L0: producer-agnostic coverage AUDIT (telemetry only) at the
+# `_finish` choke. "off" disables it entirely; "shadow" (the default) records
+# a verdict but NEVER changes the returned name; "veto" is reserved for a
+# later task (L1) and behaves exactly like "shadow" here. Read fresh on every
+# call (not cached at import like `_SC_MODE`/`_DISABLE_VALIDITY_GATE` above) so
+# a measurement script can flip it per-process without import-order games, and
+# so `monkeypatch.setenv` works per-test without a module reload.
+_COVERAGE_AUDIT_MODES = ("off", "shadow", "veto")
+
+
+def _coverage_audit_mode() -> str:
+    mode = os.environ.get("ORTHONYM_COVERAGE_AUDIT", "shadow").strip().lower()
+    return mode if mode in _COVERAGE_AUDIT_MODES else "shadow"
+
+
+def _self01_complete_for(name: str) -> Optional[bool]:
+    """The SELF-01 verdict `_final_opsin_validity_gate` ALREADY computed for
+    THIS EXACT `name`, reused by the L0/L1 coverage audit instead of a second
+    OPSIN call (CARRIED RULING, `task-L0-brief.md`).
+
+    Deny-by-default via `resolve_gate_outcome`: an outcome recorded for a
+    DIFFERENT string (e.g. `_apply_trivial_fallback` swapped the name after
+    the gate ran, or no gate call happened on this path at all) yields no
+    verdict here (`None`), so the caller falls back to a fresh OPSIN
+    re-anchor. Only `self01_verified` / `self01_verified_constitution_only`
+    count as complete (constitution proven; the constitution-only carve-out
+    still proves constitution, which is all atom-coverage cares about) and
+    only `self01_warn_mismatch` (a PROVEN mismatch shipped anyway under
+    `_SC_MODE == "warn"`) counts as incomplete -- every other outcome
+    (not_run / bypassed / disabled / unavailable / descriptive_fallback /
+    suppressed / inconclusive / skipped / any carveout) is simply "no verdict
+    available", not a verdict either way.
+    """
+    from .metrics import provenance as _pv
+    prov = _pv.get_provenance()
+    resolved = _pv.resolve_gate_outcome(
+        prov["gate_outcome"], prov["gate_outcome_name"], name)
+    if resolved in (_pv.GATE_OUTCOME_SELF01,
+                    _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY):
+        return True
+    if resolved == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH:
+        return False
+    return None
+
+
 # Module-level singleton so the OPSIN parse cache is shared across all name()
 # calls in a process (lazy-init on first use).
 _VALIDITY_ORACLE = None
@@ -2567,6 +2612,19 @@ class Orthonym:
                 clear_ledger()
             except Exception:
                 pass
+            # v33 Phase 0 L0: same per-top-level-molecule invariant as the
+            # clears above. `_last_ger_result` is stashed by
+            # `_record_binding_proof` for the SHADOW coverage audit at
+            # `_finish`; without this reset a molecule with NO general-engine
+            # candidate at all would inherit the PREVIOUS molecule's result
+            # object (the `.name == name` staleness guard in `_finish` makes a
+            # false-positive match unlikely but not impossible on a name-string
+            # coincidence, and leaving stale state around is the wrong default
+            # regardless). `_last_coverage_verdict` is reset for the same
+            # reason -- a molecule the audit never reaches (mode "off", or an
+            # exception) must not report a PREVIOUS molecule's verdict.
+            self._last_ger_result = None
+            self._last_coverage_verdict = None
             # v25 G3: publish the engine flag so fragment/component recursion
             # (name_compound builds FRESH namers) inherits it. Top-level only;
             # reset in the finally below.
@@ -3579,6 +3637,52 @@ class Orthonym:
                 _cl.record_candidate("namer._finish", _cl.Stage.EMITTED, name)
         except Exception:  # pragma: no cover - telemetry must never break naming
             pass
+        # v33 Phase 0 L0: producer-agnostic coverage AUDIT, SHADOW mode
+        # (telemetry only -- NEVER changes `name`, only stores a verdict on
+        # `self._last_coverage_verdict` and logs one line). Gated to the
+        # top-level naming call, the same scope the SELF-01 gate itself uses
+        # (`name()`'s main exit calls `_final_opsin_validity_gate` only inside
+        # its own `is_top_level_naming()` block), so `_self01_complete_for`'s
+        # provenance read is never asked about a recursive fragment's state.
+        # Skipped for a failure-name winner (an abstention makes no coverage
+        # claim to audit, and its sentinel string would just waste an OPSIN
+        # re-anchor call on the bare-str fallback path for nothing).
+        try:
+            _audit_mode = _coverage_audit_mode()
+            if _audit_mode != "off":
+                from .assembly.fragment_naming import (
+                    is_top_level_naming as _cov_is_top_level)
+                if _cov_is_top_level() and not is_failure_name(name):
+                    _cov_mol = Chem.MolFromSmiles(smiles) if smiles else None
+                    if _cov_mol is not None:
+                        from .assembly.coverage_audit import audit_coverage
+                        _ger = getattr(self, "_last_ger_result", None)
+                        # Staleness guard mirroring
+                        # `provenance.resolve_gate_outcome`: only use the
+                        # stashed GeneralEngineResult if it is FOR this exact
+                        # name (a later rewrite -- e.g. the retained-name
+                        # preference swap -- must not attach someone else's
+                        # bindings to the string that actually ships).
+                        _result_obj = (
+                            _ger if _ger is not None
+                            and getattr(_ger, "name", None) == name
+                            else None)
+                        _self01 = (
+                            None if _result_obj is not None
+                            else _self01_complete_for(name))
+                        verdict = audit_coverage(
+                            _cov_mol, name, _result_obj,
+                            self01_complete=_self01)
+                        self._last_coverage_verdict = verdict
+                        logger.info(
+                            "coverage_audit mode=%s method=%s complete=%s "
+                            "heavy_atoms=%d name=%r",
+                            _audit_mode, verdict.method, verdict.complete,
+                            _cov_mol.GetNumHeavyAtoms(), name[:80])
+        except Exception as _cae:  # pragma: no cover - defensive
+            # SHADOW must never break a name regardless of what goes wrong
+            # inside the audit.
+            logger.info("coverage audit failed (shadow, ignored): %s", _cae)
         try:
             if self._binding_proof == "off":
                 return name
@@ -3604,6 +3708,15 @@ class Orthonym:
         call sites only tolerate that because nothing here is imported at
         module scope.
         """
+        # v33 Phase 0 L0: stash the raw GeneralEngineResult for the SHADOW
+        # coverage audit at `_finish`, INDEPENDENT of `self._binding_proof`
+        # below -- that flag gates a separate (older) ledger feature, and the
+        # audit needs `eng` itself (for `certify_general_result`), not the
+        # ledger's derived proof. `_finish` re-checks `eng.name == name`
+        # before using it, so a later rewrite of the string (e.g. the
+        # retained-name preference swap right after this call) is not
+        # mistaken for a certified GeneralEngineResult winner.
+        self._last_ger_result = eng
         if self._binding_proof == "off":
             return
         try:
