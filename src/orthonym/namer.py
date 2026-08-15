@@ -3728,9 +3728,31 @@ class Orthonym:
                             "heavy_atoms=%d name=%r",
                             _audit_mode, verdict.method, verdict.complete,
                             _cov_mol.GetNumHeavyAtoms(), name[:80])
+                        # v33 Phase 0 L1: turn the audit into a real VETO.
+                        # Reject ONLY an incomplete winner whose method is
+                        # NOT "unavailable" -- that method is the fail-OPEN
+                        # signal (OPSIN absent, or a skip-reanchor carve-out /
+                        # gate-disabled outcome per `_self01_lookup`), and
+                        # vetoing there would abstain names that are
+                        # otherwise fine (the CARRIED CONSTRAINT from L0).
+                        # `shadow`/`off` never reach here with a veto effect:
+                        # `off` short-circuited above (`_audit_mode != "off"`
+                        # guards this whole block) and `shadow` simply never
+                        # takes this branch.
+                        if (_audit_mode == "veto" and not verdict.complete
+                                and verdict.method != "unavailable"):
+                            logger.info(
+                                "coverage_audit VETO: method=%s detail=%r -- "
+                                "abstaining instead of shipping %r",
+                                verdict.method, verdict.detail, name[:80])
+                            name = _descriptive_fallback(smiles)
         except Exception as _cae:  # pragma: no cover - defensive
             # SHADOW must never break a name regardless of what goes wrong
-            # inside the audit.
+            # inside the audit; a VETO must fail OPEN on its own internal
+            # error too -- `name` is only ever reassigned above, inside this
+            # same try block, so an exception anywhere before that line
+            # (including inside `_descriptive_fallback` itself) leaves `name`
+            # at its original, un-vetoed value.
             logger.info("coverage audit failed (shadow, ignored): %s", _cae)
         try:
             if self._binding_proof == "off":
