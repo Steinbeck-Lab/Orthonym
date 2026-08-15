@@ -48,7 +48,9 @@ class CoverageVerdict:
 
 
 def audit_coverage(mol, name: str, result_obj,
-                    self01_complete: Optional[bool] = None) -> CoverageVerdict:
+                    self01_complete: Optional[bool] = None,
+                    skip_reanchor: bool = False,
+                    skip_detail: str = "") -> CoverageVerdict:
     """Return the coverage verdict for the winning ``name`` of ``mol``.
 
     Args:
@@ -66,12 +68,25 @@ def audit_coverage(mol, name: str, result_obj,
             IGNORED when ``result_obj`` is not None (the GER path never needs
             it -- E1 is Java-free and strictly more informative: it covers
             bonds/charge, not merely constitution).
+        skip_reanchor: v33 Phase 0 L0 review fix (C1/C2). When ``True`` (and
+            ``self01_complete`` is ``None``), skip the ``validate_atom_coverage``
+            re-anchor ENTIRELY -- no OPSIN subprocess is spawned -- and return
+            ``complete=True, method="unavailable"`` directly. Set by the caller
+            when a fresh re-anchor is GUARANTEED useless: a carve-out PIN name
+            is OPSIN-unparseable BY DESIGN (thioperoxol/inositol/np_stereoparent/
+            dianhydride/.../halogen_uide), and a gate outcome of
+            disabled/unavailable/not_run means no real gate decision exists to
+            reuse or repeat. Ignored when ``self01_complete`` is not ``None``
+            (a real verdict always wins) and ignored on the GER path.
+        skip_detail: the :class:`CoverageVerdict` ``detail`` to use when
+            ``skip_reanchor`` fires; defaults to a generic message.
 
     Returns:
         A :class:`CoverageVerdict`. Fail-closed (``complete=False``) on an
         exception in the GER path; fail-OPEN (``complete=True,
-        method="unavailable"``) on an exception or OPSIN-unavailable in the
-        bare-str path -- SHADOW must never break a name.
+        method="unavailable"``) on an exception, OPSIN-unavailable, or
+        ``skip_reanchor`` in the bare-str path -- SHADOW must never break a
+        name, and must never spawn a guaranteed-useless OPSIN subprocess.
     """
     if result_obj is not None and hasattr(result_obj, "bindings"):
         try:
@@ -88,6 +103,15 @@ def audit_coverage(mol, name: str, result_obj,
         return CoverageVerdict(
             bool(self01_complete), "self01",
             "" if self01_complete else "self01 mismatch")
+
+    # C1/C2 fix: some resolved gate outcomes make a fresh re-anchor guaranteed
+    # useless (carve-out PIN families are OPSIN-unparseable BY DESIGN; a
+    # disabled/unavailable/not-run gate means no real decision exists at all).
+    # Do NOT import or call `validate_atom_coverage` in that case -- no OPSIN
+    # subprocess spawn, ever, for these.
+    if skip_reanchor:
+        return CoverageVerdict(True, "unavailable",
+                               skip_detail or "reanchor skipped")
 
     try:
         from orthonym.validation.atom_coverage import validate_atom_coverage

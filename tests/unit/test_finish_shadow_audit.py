@@ -7,6 +7,7 @@ behaviour in every mode. Guarded by `ORTHONYM_COVERAGE_AUDIT`
 behaves like shadow here).
 """
 import os
+import time
 
 import pytest
 
@@ -70,3 +71,86 @@ class TestShadowAuditDoesNotChangeName:
         nm_off = Orthonym()
         names_off = [nm_off.name(s) for s in smiles_list]
         assert names_on == names_off
+
+
+class TestSelf01ReuseFiresEndToEnd:
+    """v33 Phase 0 L0 review fix (I2): a `_finish`-INTEGRATION-level proof that
+    the CARRIED-RULING reuse actually fires on the real path -- the gap that
+    let review finding C1 through (the unit tests on `audit_coverage` alone
+    could not see whether `namer._self01_lookup` was ever actually WIRED to a
+    real SELF-01 outcome end-to-end)."""
+
+    def test_bare_str_pin_winner_reuses_self01_with_gate_on(self, opsin_gate):
+        nm = Orthonym()
+        assert nm.name("CCO") == "ethanol"
+        verdict = nm._last_coverage_verdict
+        assert verdict is not None
+        assert verdict.method == "self01"
+        assert verdict.complete is True
+
+
+class TestSkipReanchorNeverSpawnsOpsin:
+    """v33 Phase 0 L0 review fix (C1/C2 + I2): a resolved gate outcome that
+    guarantees a reanchor is useless (a `carveout:*` PIN family, or a
+    disabled/unavailable/not-run gate) must skip `validate_atom_coverage`
+    ENTIRELY at `_finish` -- no OPSIN subprocess spawned, and FAST.
+
+    OPSIN 2.9.0 in this environment actually parses 'methane-SO-thioperoxol'
+    and 'myo-inositol' successfully (verified by direct probe), so those two
+    legacy carve-outs are not LIVE-reachable right now to demonstrate this --
+    a real, separate finding (the carve-outs' 'OPSIN-unparseable' premise may
+    be stale), out of scope for this fix. Instead this primes the exact
+    provenance state a genuine carve-out molecule produces
+    (`_final_opsin_validity_gate`'s `carveout_outcome(...)` call), which is
+    the real production mechanism `_self01_lookup` reads -- so this exercises
+    the ACTUAL `_finish` wiring, not a mock of it.
+    """
+
+    def _finish_after_carveout(self, nm, name, smiles, slug="thioperoxol"):
+        from orthonym.metrics import provenance as _pv
+        _pv.clear_provenance()
+        _pv.record_gate_outcome(_pv.carveout_outcome(slug), name)
+        return nm._finish(name, smiles)
+
+    def test_carveout_outcome_skips_reanchor_and_is_fast(self, monkeypatch):
+        def _boom(mol, name):
+            raise AssertionError(
+                "validate_atom_coverage must NOT be called for a carveout "
+                "outcome -- that is exactly the wasted OPSIN spawn review "
+                "finding C1 forbids")
+        monkeypatch.setattr(
+            "orthonym.validation.atom_coverage.validate_atom_coverage", _boom)
+        nm = Orthonym()
+        name = "methane-SO-thioperoxol"
+        t0 = time.perf_counter()
+        returned = self._finish_after_carveout(nm, name, "CSO")
+        elapsed = time.perf_counter() - t0
+        assert returned == name  # SHADOW never changes the name
+        verdict = nm._last_coverage_verdict
+        assert verdict is not None
+        assert verdict.method == "unavailable"
+        assert verdict.complete is True
+        assert "reanchor skipped" in verdict.detail
+        assert elapsed < 0.5, f"expected no OPSIN spawn, took {elapsed:.3f}s"
+
+    def test_gate_disabled_outcome_skips_reanchor(self, monkeypatch):
+        # C2: the suite's OWN autouse gate-off default resolves to
+        # `gate_disabled`, which must ALSO skip the reanchor -- this is what
+        # made every unit test that names a molecule pay a real OPSIN cost
+        # before this fix.
+        def _boom(mol, name):
+            raise AssertionError(
+                "validate_atom_coverage must NOT be called when the gate is "
+                "disabled -- C2")
+        monkeypatch.setattr(
+            "orthonym.validation.atom_coverage.validate_atom_coverage", _boom)
+        nm = Orthonym()
+        t0 = time.perf_counter()
+        name = nm.name("CCO")
+        elapsed = time.perf_counter() - t0
+        assert name == "ethanol"
+        verdict = nm._last_coverage_verdict
+        assert verdict is not None
+        assert verdict.method == "unavailable"
+        assert verdict.complete is True
+        assert elapsed < 0.5, f"expected no OPSIN spawn, took {elapsed:.3f}s"

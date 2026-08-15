@@ -73,3 +73,43 @@ class TestBareStrSelf01Reuse:
         v = audit_coverage(mol, "ethanol", None, self01_complete=False)
         assert v.complete is False
         assert v.method == "self01"
+
+
+class TestBareStrSkipReanchor:
+    """v33 Phase 0 L0 fix (review C1): some resolved gate outcomes make a
+    fresh OPSIN re-anchor GUARANTEED useless (a carve-out PIN is
+    OPSIN-unparseable BY DESIGN; gate disabled/unavailable/not-run all mean no
+    real gate decision exists to reuse). `skip_reanchor=True` must produce the
+    verdict WITHOUT ever importing/calling `validate_atom_coverage` -- no
+    OPSIN subprocess spawned."""
+
+    def test_skip_reanchor_never_calls_validate_atom_coverage(self, monkeypatch):
+        def _boom(mol, name):
+            raise AssertionError(
+                "validate_atom_coverage must NOT be called when "
+                "skip_reanchor=True -- that is the exact wasted OPSIN spawn "
+                "review finding C1 forbids")
+        monkeypatch.setattr(
+            "orthonym.validation.atom_coverage.validate_atom_coverage", _boom)
+        mol = Chem.MolFromSmiles("CSO")
+        v = audit_coverage(
+            mol, "methane-SO-thioperoxol", None, self01_complete=None,
+            skip_reanchor=True,
+            skip_detail="carveout:thioperoxol: no self01, reanchor skipped")
+        assert v == CoverageVerdict(
+            True, "unavailable",
+            "carveout:thioperoxol: no self01, reanchor skipped")
+
+    def test_skip_reanchor_default_detail(self):
+        mol = Chem.MolFromSmiles("CCO")
+        v = audit_coverage(mol, "ethanol", None, skip_reanchor=True)
+        assert v.complete is True
+        assert v.method == "unavailable"
+
+    def test_self01_complete_takes_priority_over_skip_reanchor(self):
+        # self01_complete is a REAL verdict; skip_reanchor is irrelevant once
+        # we already have one.
+        mol = Chem.MolFromSmiles("CCO")
+        v = audit_coverage(mol, "ethanol", None, self01_complete=True,
+                            skip_reanchor=True)
+        assert v == CoverageVerdict(True, "self01", "")

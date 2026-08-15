@@ -625,23 +625,60 @@ def _coverage_audit_mode() -> str:
     return mode if mode in _COVERAGE_AUDIT_MODES else "shadow"
 
 
-def _self01_complete_for(name: str) -> Optional[bool]:
+def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
     """The SELF-01 verdict `_final_opsin_validity_gate` ALREADY computed for
-    THIS EXACT `name`, reused by the L0/L1 coverage audit instead of a second
-    OPSIN call (CARRIED RULING, `task-L0-brief.md`).
+    THIS EXACT `name` -- reused by the L0/L1 coverage audit instead of a
+    second OPSIN call (CARRIED RULING, `task-L0-brief.md`) -- PLUS an explicit
+    "is a fresh re-anchor even worth trying" decision (v33 Phase 0 L0 review
+    fix, findings C1/C2: a deny-by-default `None` alone let the bare-str path
+    fall through to `validate_atom_coverage` -- a REAL `java -jar opsin`
+    subprocess -- for cases where that call is GUARANTEED to teach us
+    nothing, which is exactly the "second unconditional OPSIN call per name"
+    the carried ruling forbids. Measured: 0.9-2.7s per carve-out emission,
+    and every unit test that names a molecule without the `opsin_gate`
+    fixture, because the suite's autouse fixture disables the gate by
+    default -> `gate_disabled` -> old code's bare `None` -> reanchor).
 
-    Deny-by-default via `resolve_gate_outcome`: an outcome recorded for a
-    DIFFERENT string (e.g. `_apply_trivial_fallback` swapped the name after
-    the gate ran, or no gate call happened on this path at all) yields no
-    verdict here (`None`), so the caller falls back to a fresh OPSIN
-    re-anchor. Only `self01_verified` / `self01_verified_constitution_only`
-    count as complete (constitution proven; the constitution-only carve-out
-    still proves constitution, which is all atom-coverage cares about) and
-    only `self01_warn_mismatch` (a PROVEN mismatch shipped anyway under
-    `_SC_MODE == "warn"`) counts as incomplete -- every other outcome
-    (not_run / bypassed / disabled / unavailable / descriptive_fallback /
-    suppressed / inconclusive / skipped / any carveout) is simply "no verdict
-    available", not a verdict either way.
+    Returns:
+        ``(complete, skip_reanchor, detail)``:
+
+        * ``complete``: ``True``/``False`` when SELF-01 ALREADY answered for
+          this exact string -- a REAL reused verdict (deny-by-default via
+          `resolve_gate_outcome`: an outcome recorded for a DIFFERENT string
+          -- e.g. `_apply_trivial_fallback` swapped the name after the gate
+          ran -- never counts). `self01_verified` /
+          `self01_verified_constitution_only` -> ``True`` (constitution
+          proven -- the constitution-only carve-out still proves
+          constitution, all atom-coverage cares about). `self01_warn_mismatch`
+          -> ``False`` (a PROVEN mismatch shipped anyway under
+          `_SC_MODE == "warn"`). **``None`` in EVERY other case, including
+          when ``skip_reanchor`` is ``True``** -- deliberately, because
+          `audit_coverage` checks ``self01_complete is not None`` FIRST: a
+          skip decision must reach ITS OWN ``skip_reanchor`` branch there, not
+          be swallowed by the self01 branch as if it were a real verdict.
+        * ``skip_reanchor``: ``True`` when a fresh `validate_atom_coverage`
+          re-anchor must NOT be attempted at all -- a `carveout:*` outcome (a
+          BY-DESIGN OPSIN-unparseable PIN: thioperoxol / inositol /
+          np_stereoparent / dianhydride / chalcogen_dianhydride /
+          polyol_polyester / organometallic_additive / phane / halogen_uide
+          -- the parse is guaranteed to fail), or `gate_disabled` /
+          `unavailable` / `not_run` (no real gate decision exists at all to
+          reuse OR to usefully repeat: disabled/unavailable already mean "no
+          jar was consulted", so a reanchor would just make the SAME
+          jar-absence discovery via a second code path; not_run means this
+          bare-str winner never went through the gate machinery in the first
+          place). `audit_coverage` always answers ``complete=True`` for this
+          case (fail-OPEN, never blocks in SHADOW) -- but THAT answer comes
+          from `audit_coverage`'s own `skip_reanchor` branch, not from this
+          function's `complete` slot (see above).
+        * ``detail``: the message to use verbatim as the `CoverageVerdict`
+          detail when ``skip_reanchor`` is ``True``; ``""`` otherwise.
+
+        The remaining rare jar-present-but-non-terminal outcomes
+        (`suppressed`, `inconclusive`, `bypassed`, `self01_skipped`,
+        `descriptive_fallback`) return ``(None, False, "")`` -- "no verdict
+        available, but a reanchor might still learn something" -- exactly the
+        prior behaviour for those.
     """
     from .metrics import provenance as _pv
     prov = _pv.get_provenance()
@@ -649,10 +686,16 @@ def _self01_complete_for(name: str) -> Optional[bool]:
         prov["gate_outcome"], prov["gate_outcome_name"], name)
     if resolved in (_pv.GATE_OUTCOME_SELF01,
                     _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY):
-        return True
+        return True, False, ""
     if resolved == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH:
-        return False
-    return None
+        return False, False, ""
+    if (resolved.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX)
+            or resolved in (_pv.GATE_OUTCOME_DISABLED,
+                            _pv.GATE_OUTCOME_UNAVAILABLE,
+                            _pv.GATE_OUTCOME_NOT_RUN)):
+        # `complete=None` (NOT True) is deliberate -- see the docstring above.
+        return None, True, f"{resolved}: no self01, reanchor skipped"
+    return None, False, ""
 
 
 # Module-level singleton so the OPSIN parse cache is shared across all name()
@@ -3642,7 +3685,7 @@ class Orthonym:
         # `self._last_coverage_verdict` and logs one line). Gated to the
         # top-level naming call, the same scope the SELF-01 gate itself uses
         # (`name()`'s main exit calls `_final_opsin_validity_gate` only inside
-        # its own `is_top_level_naming()` block), so `_self01_complete_for`'s
+        # its own `is_top_level_naming()` block), so `_self01_lookup`'s
         # provenance read is never asked about a recursive fragment's state.
         # Skipped for a failure-name winner (an abstention makes no coverage
         # claim to audit, and its sentinel string would just waste an OPSIN
@@ -3667,12 +3710,18 @@ class Orthonym:
                             _ger if _ger is not None
                             and getattr(_ger, "name", None) == name
                             else None)
-                        _self01 = (
-                            None if _result_obj is not None
-                            else _self01_complete_for(name))
+                        if _result_obj is not None:
+                            # GER path never needs SELF-01 -- E1 is Java-free
+                            # and strictly more informative.
+                            _self01, _skip_reanchor, _skip_detail = None, False, ""
+                        else:
+                            _self01, _skip_reanchor, _skip_detail = (
+                                _self01_lookup(name))
                         verdict = audit_coverage(
                             _cov_mol, name, _result_obj,
-                            self01_complete=_self01)
+                            self01_complete=_self01,
+                            skip_reanchor=_skip_reanchor,
+                            skip_detail=_skip_detail)
                         self._last_coverage_verdict = verdict
                         logger.info(
                             "coverage_audit mode=%s method=%s complete=%s "
