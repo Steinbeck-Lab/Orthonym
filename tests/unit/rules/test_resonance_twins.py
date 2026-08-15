@@ -68,6 +68,47 @@ def test_diazonium_twin_names_and_round_trips():
         inchi.MolToInchiKey(Chem.MolFromSmiles("c1ccccc1[N+]#N"))
 
 
+def test_genuine_radical_cation_not_swept_by_diazonium_carveout():
+    """Defense-in-depth (fable review, 2026-08-15): ``c1ccccc1[N+]=N`` is a
+    GENUINE open-shell monoradical cation (1 radical electron on a degree-2
+    N), not the valence-shortfall artifact the carve-out in
+    ``rules.charged_router.route_charged`` targets (2 spurious radical
+    electrons on a degree-1 terminal N whose sole bond is a double bond).
+    ``classify_cation`` still labels it 'diazonium' (bond-order-only
+    classifier), so a carve-out keyed on "1 radical site == 1 cation site,
+    classified diazonium" alone is broader than intended and would build a
+    wrong ``benzenediazonium`` candidate for a real radical species. The
+    tightened carve-out must decline to clear ``radical_sites`` here, so
+    ``route_charged``'s ordinary "charged AND radical -> bail" guard fires
+    THE PRODUCER ITSELF, never relying on SELF-01 downstream to catch it."""
+    from orthonym.perception.ions import get_ion_sites
+    from orthonym.rules import charged_router as cr
+
+    mol = Chem.MolFromSmiles("c1ccccc1[N+]=N")
+    sites = get_ion_sites(mol)
+    assert sites['cations'][0]['atom_idx'] is not None  # sanity: a cation exists
+
+    calls = []
+    original = cr._name_diazonium
+
+    def _spy(m, cation_idx, style):
+        calls.append(cation_idx)
+        return original(m, cation_idx, style)
+
+    cr._name_diazonium = _spy
+    try:
+        result = cr.route_charged(mol, "pin")
+    finally:
+        cr._name_diazonium = original
+
+    assert result == '', result
+    assert calls == [], "route_charged must not reach _name_diazonium for a genuine radical cation"
+
+    # Whatever the overall pipeline ultimately reports, it must never be the
+    # diazonium-specific wrong candidate this carve-out used to build.
+    assert name_compound("c1ccccc1[N+]=N") != "benzenediazonium"
+
+
 def test_diazo_twin_names_and_round_trips():
     smi = "[CH2-][N+]#N"
     name = name_compound(smi)

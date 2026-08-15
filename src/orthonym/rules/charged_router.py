@@ -1024,10 +1024,30 @@ def route_charged(mol, style: str = 'pin') -> str:
     # so the ordinary single-cation path below (unchanged; still runs
     # _apply_guard3_reorder and every other guard) handles both drawings
     # exactly alike via the existing 'diazonium' -> _name_diazonium branch.
+    #
+    # Defense-in-depth (fable review, 2026-08-15): the condition MUST match the
+    # exact artifact signature, not just "1 radical site == 1 cation site,
+    # classified diazonium" -- that looser test also matches a GENUINE
+    # open-shell monoradical cation such as ``c1ccccc1[N+]=N`` (1 radical
+    # electron on a degree-2 N, classify_cation still says 'diazonium' since
+    # that classifier is bond-order-only). Requiring exactly 2 radical
+    # electrons on a DEGREE-1 atom whose SOLE bond is a DOUBLE bond pins this
+    # to the valence-shortfall artifact only -- mirrors the rigor of the R-S+/
+    # R-Se+ carve-out above (which gates on element/charge/H-count/substituent
+    # count, not just "1 radical + 1 cation, same atom"). A genuine radical
+    # cation now falls through to the ordinary "radical ion -> bail" guard
+    # below instead of building a candidate SELF-01 has to catch.
     if (len(radical_sites) == 1 and n_cations == 1 and not n_anions
             and radical_sites[0]['atom_idx'] == sites['cations'][0]['atom_idx']
+            and radical_sites[0]['n_electrons'] == 2
             and classify_cation(mol, sites['cations'][0]) == 'diazonium'):
-        radical_sites = []
+        _rad_atom = mol.GetAtomWithIdx(radical_sites[0]['atom_idx'])
+        _rad_nbrs = _rad_atom.GetNeighbors()
+        if (_rad_atom.GetDegree() == 1 and len(_rad_nbrs) == 1
+                and mol.GetBondBetweenAtoms(
+                    _rad_atom.GetIdx(), _rad_nbrs[0].GetIdx()
+                ).GetBondType() == Chem.BondType.DOUBLE):
+            radical_sites = []
 
     # A charged AND radical species (radical ion) is out of scope here -> bail.
     if radical_sites and (n_anions or n_cations):
