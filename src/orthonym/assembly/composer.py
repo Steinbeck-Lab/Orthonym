@@ -1538,23 +1538,48 @@ def _try_name_n_oxide(features: Any) -> Optional[str]:
         return None
 
     if aromatic_matches:
-        return _name_aromatic_n_oxide(mol, aromatic_matches)
+        return _name_aromatic_n_oxide(mol, aromatic_matches, features=features)
     elif aliphatic_matches:
         return _name_aliphatic_n_oxide(mol, aliphatic_matches)
     else:
         return _name_imine_n_oxide(mol, imine_matches)
 
 
-def _name_aromatic_n_oxide(mol, matches) -> Optional[str]:
+def _name_aromatic_n_oxide(mol, matches, features: Any = None) -> Optional[str]:
     """Name aromatic N-oxide: e.g., 'pyridine 1-oxide'.
 
     Strategy: remove O- atom, neutralize N+, name the base heterocycle,
     then append '{locant}-oxide'.
+
+    P-62.5 method (1): the suffix locant is the oxidised ring nitrogen's
+    REAL numbered position in the base heterocycle -- NOT always "1". For a
+    monoazine (pyridine) the ring's single N is always locant 1 (no other
+    ring heteroatom can compete), so hardcoding "1" happened to be harmless
+    there and for every SYMMETRIC unsubstituted diazine/triazine (every
+    oxidisable N is equivalent, so "1" is unambiguous by construction). It is
+    NOT harmless for a substituted, symmetry-broken diazine/triazine: the
+    reduced parent's OWN numbering (chosen by the independent recursive
+    ``name_fragment_recursively`` call below, which has no memory of which
+    atom was oxidised) does not always place the oxidised nitrogen at
+    position 1 -- see  section 2(b).
+
+    Void-if-ambiguous (0-wrong): a bis/multi-N-oxide (more than one
+    simultaneously-oxidised ring N) has no "di-oxide" construction here and
+    is declined outright (parent_rules.py:21470-21489 mirror -- decline
+    rather than silently pick matches[0]). For the single-oxide case, every
+    candidate locant is verified by an OPSIN round-trip against the ORIGINAL
+    (unreduced) molecule before being emitted; if none verifies, decline
+    (return None) rather than guess a digit.
     """
     from rdkit import Chem
     from rdkit.Chem import RWMol
 
-    # Use the first N-oxide match
+    # Void-if-ambiguous: more than one ring N simultaneously bears an oxide
+    # (a bis-N-oxide). There is no multiplied ("dioxide") suffix construction
+    # in this handler -- decline rather than silently name only matches[0].
+    if len(matches) != 1:
+        return None
+
     n_idx, o_idx = matches[0]  # [n+] index, [O-] index
 
     # Build modified molecule: remove O-, neutralize N+
@@ -1587,9 +1612,56 @@ def _name_aromatic_n_oxide(mol, matches) -> Optional[str]:
     if not base_name:
         return None
 
-    # For heterocycles, the N is typically at position 1
-    # IUPAC format: "pyridine 1-oxide"
-    return f"{base_name} 1-oxide"
+    # Resolve the REAL locant for the oxidised nitrogen instead of hardcoding
+    # "1". Try the already-threaded heterocycle locant map's own value first
+    # (usually right -- it privileges the O-bearing ring position when
+    # orienting the FULL, pre-reduction ring), then every other plausible
+    # ring locant, verifying each candidate by an OPSIN round-trip against
+    # the untouched input molecule; accept the first that matches.
+    from ..validation.opsin_roundtrip import opsin_roundtrip_check, _find_opsin_jar
+
+    if _find_opsin_jar() is None:
+        # OPSIN unavailable in this environment: cannot verify a computed
+        # locant. Fall back to the pre-fix behaviour (still correct for the
+        # monoazine/symmetric cases that make up the vast majority of
+        # N-oxides) rather than voiding every N-oxide outright.
+        return f"{base_name} 1-oxide"
+
+    het_locant_map = (
+        getattr(features, 'heterocycle_atom_to_locant', None) if features is not None
+        else None
+    ) or {}
+    mapped_locant = het_locant_map.get(n_idx)
+
+    ring_info = mol.GetRingInfo()
+    n_ring = next((r for r in ring_info.AtomRings() if n_idx in r), None)
+    max_locant = max(len(n_ring) if n_ring else 0, min(mol.GetNumHeavyAtoms(), 20))
+
+    candidate_locants = []
+    if isinstance(mapped_locant, int):
+        candidate_locants.append(mapped_locant)
+    for loc in range(1, max_locant + 1):
+        if loc not in candidate_locants:
+            candidate_locants.append(loc)
+
+    try:
+        mol_smiles = Chem.MolToSmiles(mol)
+    except Exception:
+        return None
+
+    for locant in candidate_locants:
+        candidate_name = f"{base_name} {locant}-oxide"
+        try:
+            verdict = opsin_roundtrip_check(mol_smiles, candidate_name)
+        except Exception:
+            continue
+        if verdict.get('passed'):
+            return candidate_name
+
+    # No locant could be verified against the input structure -- decline
+    # rather than emit an unverified digit (0-wrong: a table/locant miss
+    # degrades to abstention here, never to a guessed name).
+    return None
 
 
 def _name_aliphatic_n_oxide(mol, matches) -> Optional[str]:
