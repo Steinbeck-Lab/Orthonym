@@ -871,10 +871,22 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         # Fall-through cascade (route_charged declined, e.g. metal/fragment).
         if anion_type in ('sulfonate', 'sulfinate', 'phosphonate'):
             result = _name_oxoacid_anion(mol, style)
-        else:
-            result = _try_neutralize_and_name(mol)
+            return _validate_anion_name(mol, result)
 
-        return _validate_anion_name(mol, result)
+        # v32 Phase 3A-c (0-wrong): _try_neutralize_and_name NEVER re-applies
+        # an ionic suffix -- its own docstring is "Neutralize a multi-charged
+        # ion and name the organic skeleton". Accepting its bare neutral name
+        # as the FINAL name for a genuine single anion silently drops the
+        # charge and denotes a DIFFERENT (neutral) molecule. Measured:
+        # ``[O-]B(O)O`` (the dihydrogenborate anion) reached here (route_charged
+        # declines it -- no re-ionization primitive for this class; classify_anion
+        # has no dedicated boron-oxoacid-anion category and buckets it as
+        # 'alkoxide', which does not apply) and shipped ``boric acid``, which
+        # OPSIN round-trips to the NEUTRAL ``OB(O)O``, not the charged input
+        # (SELF-01 caught this only via the JVM backstop). Decline structurally
+        # here instead (invariant 16: that backstop fails OPEN without a JVM)
+        # -- never emit a name for a different molecule.
+        return ''
 
     # Multiple anions - try neutralize-then-name approach.
     # CR-02 (code review 2026-06-02): a fully-deprotonated S/P-oxoacid (e.g. the

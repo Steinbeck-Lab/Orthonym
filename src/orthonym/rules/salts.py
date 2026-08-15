@@ -280,6 +280,23 @@ def name_salt(mol, style: str = 'pin') -> str:
     if mol is None:
         return ''
 
+    # v32 Phase 3A-a (0-wrong): a salt is, by definition, charge-balanced
+    # overall (the cation charges sum to the anion charges sum -- it is a
+    # neutral compound). A disconnected-fragment set carrying a NET charge
+    # (e.g. ``CC(=O)[O-].[Pd+2]``, net +1: one acetate anion + a bare Pd2+
+    # cation) is NOT a neutral salt -- it is an unbalanced ionic assembly / a
+    # charged coordination complex (out of the contributor guide's declared scope,
+    # organometallics P-69). Naming it with the ordinary "cation anion" salt
+    # grammar silently implies balanced stoichiometry the input does not have:
+    # measured, this shipped ``palladium(II) acetate``, which OPSIN round-trips
+    # to the BALANCED diacetate Pd(OAc)2, not the 1:1 input (a different
+    # molecule). Decline structurally here rather than rely on the SELF-01
+    # OPSIN backstop to catch it after the fact (invariant 16: that backstop
+    # fails OPEN without a JVM). Mirrors the FIND-2 fail-closed guards below
+    # (honest '' -> abstain, never a generic literal).
+    if Chem.GetFormalCharge(mol) != 0:
+        return ''
+
     frags = parse_salt_fragments(mol)
 
     # --- Handle H+ fragments: merge with Cl-/Br- for hydroacid salt naming ---
@@ -814,6 +831,11 @@ def is_salt(mol) -> bool:
         True
     """
     if mol is None:
+        return False
+
+    # v32 Phase 3A-a: a genuine salt is charge-balanced overall; see the
+    # matching guard (and its rationale) in name_salt above.
+    if Chem.GetFormalCharge(mol) != 0:
         return False
 
     frags = parse_salt_fragments(mol)

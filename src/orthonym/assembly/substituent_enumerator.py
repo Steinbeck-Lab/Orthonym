@@ -4149,6 +4149,39 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
             else:
                 return name
 
+    # v32 Phase 3A-b (P-74.1.3, 0-wrong): a fragment with a REAL net formal
+    # charge (a genuine onium cation on the branch, e.g. a choline/
+    # trimethylammonium head), NOT an internal charge-separated pair that
+    # cancels within the same fragment (nitro/N-oxide/azide/diazo net to 0
+    # and are untouched by this guard). The recursive fallback below is
+    # CHARGE-BLIND: name_fragment_recursively names the isolated fragment as
+    # a whole molecule carrying the ionic '-ium' suffix, then parent_to_prefix
+    # does string-level suffix surgery that either produces the
+    # OPSIN-unparseable '-aminiumyl' ending or silently reinterprets the
+    # attachment bond as an extra substituent (mirrors the sibling fix in
+    # substituent_naming.py::name_substituent_fragment Step 2e). Route the
+    # DIRECT-ATTACHMENT shape (cation IS attach_idx, parent one bond away)
+    # through the existing structured cation_to_prefix primitive (P-74.1.3,
+    # rules/ions.py:4305 / charged_router.py:478); any other charged shape
+    # fails closed here (falls to the final decline below) rather than
+    # guessing. Neutral fragments (net charge 0) are unchanged -- no-op.
+    if sum(mol.GetAtomWithIdx(a).GetFormalCharge() for a in frag_atoms) != 0:
+        from .substituent_naming import cation_to_prefix
+        if attach_idx is not None:
+            _cat_atom = mol.GetAtomWithIdx(attach_idx)
+            if _cat_atom.GetFormalCharge() > 0:
+                _parent_nbrs = [n.GetIdx() for n in _cat_atom.GetNeighbors()
+                                if n.GetIdx() in parent_atoms]
+                if len(_parent_nbrs) == 1:
+                    _cp = cation_to_prefix(mol, attach_idx, _parent_nbrs[0])
+                    if _cp:
+                        return _cp
+        logger.debug(
+            "DROP-26 substituent_skip: reason=charged_fragment_not_direct_"
+            "cation_attach atom_count=%d", len(frag_atoms),
+        )
+        return None
+
     # Fallback: recursive naming for ring-containing compound fragments.
     # Use name_fragment_recursively() which has cycle detection via visited set.
     # This handles cases where the fragment is a ring system with heteroatoms

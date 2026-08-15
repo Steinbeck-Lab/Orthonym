@@ -5592,6 +5592,49 @@ def name_substituent_fragment(
     except Exception:
         pass
 
+    # Step 2e (v32 Phase 3A-b, P-74.1.3): a fragment with a REAL net formal
+    # charge (a genuine onium cation on the branch -- e.g. the choline/
+    # trimethylammonium head of a phosphatidylcholine-like lipid), NOT an
+    # internal charge-separated pair that cancels within the same fragment
+    # (nitro/N-oxide/azide/diazo net to 0 and are untouched by this guard).
+    # Steps 3-5 below are CHARGE-BLIND: name_fragment_recursively correctly
+    # builds a valid whole-molecule name for the ISOLATED fragment carrying
+    # the ionic '-ium' suffix (e.g. 'N,N,N-trimethylethan-1-aminium'), then
+    # parent_to_prefix does STRING-LEVEL suffix surgery to turn it into a
+    # prefix -- which either produces the OPSIN-unparseable '-aminiumyl'
+    # ending, or silently reinterprets the attachment bond as an extra
+    # substituent. Measured: a real choline-phosphate compound substituent
+    # came out '(2-phosphonooxy-N,N,N-trimethylethan-1-aminium)yl',
+    # SELF-01-suppressed (a 0-wrong defect this project's PIN tiers must not
+    # rely on the OPSIN backstop alone to catch, the contributor guide invariant 1).
+    #
+    # cation_to_prefix (P-74.1.3, the existing structured primitive, wired
+    # previously only at charged_router.py:478 / rules/ions.py:4305) builds
+    # the OPSIN-valid 'azaniumyl'-family prefix directly off the cation
+    # atom's own substituents. It is shaped for the DIRECT-ATTACHMENT case
+    # (the cation IS this fragment's own attach atom, with the parent one
+    # bond away) -- route exactly that shape through it. Any other charged
+    # shape (the charge sits deeper in the fragment, behind a chain this
+    # project has no nested-substituent composer for yet, or the net charge
+    # is an anion) fails closed rather than guessing -- never emit a name for
+    # a different molecule. Neutral fragments (net charge 0) are UNCHANGED --
+    # this block is a no-op for them (byte-identical).
+    if sum(mol.GetAtomWithIdx(a).GetFormalCharge() for a in sub_atoms) != 0:
+        _cat_atom = mol.GetAtomWithIdx(attach_idx)
+        if _cat_atom.GetFormalCharge() > 0:
+            _parent_nbrs = [n.GetIdx() for n in _cat_atom.GetNeighbors()
+                            if n.GetIdx() in parent_set]
+            if len(_parent_nbrs) == 1:
+                _cp = cation_to_prefix(mol, attach_idx, _parent_nbrs[0])
+                if _cp:
+                    return _add_substituent_stereo(
+                        mol, sub_atoms, _cp, attach_idx=attach_idx)
+        logger.debug(
+            "DROP-26 substituent_skip: reason=charged_fragment_not_direct_"
+            "cation_attach atom_count=%d", len(sub_atoms),
+        )
+        return None
+
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)
     if frag_smiles is None:
