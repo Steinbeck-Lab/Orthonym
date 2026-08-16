@@ -109,8 +109,15 @@ _STEREO_DESC_RE = re.compile(r"\((?:\d*[a-zA-Z]?'*[RSEZrsez](?:,\d*[a-zA-Z]?'*[R
 _IH_STEM_RE = re.compile(r"\d+[a-z]?'*H[,-]")
 # Italic heteroatom locants: N-, N,N'-, N2-, O-, S- (locant position only)
 _ITALIC_LOCANT_RE = re.compile(r"(?<![a-zA-Z])[NOSP]\d*'*(?=[,-])")
-# Numeral locant tokens in appearance order (incl. primes/superscript/lambda)
-_LOCANT_TOKEN_FINDER = re.compile(r"\d+'*[a-z]?'*(?:\^\d+)?(?:(?:λ|lambda)\d+)?")
+# Numeral locant tokens in appearance order (incl. primes/superscript/lambda).
+# The negative lookbehind stops a BARE lambda-convention marker with no
+# preceding locant ("λ5-phosphanyl", P-45.3.1 mononuclear substituent) from
+# having its bonding-number digit mis-read as an unrelated standalone locant
+# ("5"); a real locant+lambda token ("2λ5", P-21.2.4 skeletal replacement)
+# is unaffected since the lookbehind only guards the digit run's OWN start,
+# and there the "2" -- not "λ" -- immediately precedes it.
+_LOCANT_TOKEN_FINDER = re.compile(
+    r"(?<!λ)(?<!lambda)\d+'*[a-z]?'*(?:\^\d+)?(?:(?:λ|lambda)\d+)?")
 
 # naming_utils owns the nesting-relevant bracket grammar — reuse it.
 from .naming_utils import _FUSION_BRACKET_RE, _INDICATED_H_RE  # noqa: E402

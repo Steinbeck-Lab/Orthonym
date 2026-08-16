@@ -391,7 +391,7 @@ _ALPHA_NOISE_HEAD = (
     r"(?:"
     r"\((?:[0-9]+[a-z]?[rsez*]|[rsez]|rs|sr|[,\-+ ])+\)"   # (R) (2S) (1E,3E) (RS)
     r"|rel|rac|cis|trans|\(±\)"                        # relative / racemic / geometric
-    r"|alpha|beta|gamma|delta|[α-ω]"    # Greek, spelled or literal
+    r"|alpha|beta|gamma|delta|λ\d+|[α-ω]"    # Greek, spelled/literal; λ-convention (P-14.5)
     r"|\[\d+[a-z]{1,2}\]"                                   # isotopic: [2H], [13C]
     r")"
 )
