@@ -316,3 +316,75 @@ class TestCysteineStereoInversion:
             f"Expected an L-cysteine C-terminal (L omitted, P-103.3.4), got: {result}"
         assert "D-cysteine" not in result and "D-" not in result, \
             f"Should NOT mis-tag D, got: {result}"
+
+
+# ── Stereo honesty: never fabricate an implicit L on stereo-UNSPECIFIED
+# residues (v33 Phase 0 L3-2e) ───────────────────────────────────────────
+# P-103.1.3.1 "The stereodescriptors 'D' and 'L'" (BlueBookV2.md:54291): a
+# bare retained amino-acid name asserts a SPECIFIC configuration -- "The
+# stereodescriptor 'xi' (Greek letter xi) indicates unknown configuration."
+# P-103.3.4 "Indication of configuration in peptides" (:54715): omitting 'L'
+# in a peptide name is a DISPLAY convention for a residue KNOWN to be L --
+# its own text: "A residue of unknown configuration is indicated by the
+# prefix xi (Greek letter xi)." Orthonym does not emit xi-prefixed names,
+# so a residue whose alpha-carbon the input leaves stereo-UNSPECIFIED must
+# not be silently folded into that omission -- the retained acylamino name
+# must be declined, not emitted with a fabricated implicit L.
+
+@pytest.mark.unit
+class TestStereoHonestyUndefinedResidues:
+    """A stereo-UNSPECIFIED residue must never be named with the L-implying
+    retained acylamino name; a DEFINED-stereo peptide must be unaffected."""
+
+    def test_stereo_unspecified_dipeptide_declines_retained_name(self):
+        """Gly-Asn, NO stereo tags anywhere: 'glycylasparagine' would assert
+        an L-configured asparagine the input does not define -- must decline."""
+        result = name_compound("NCC(=O)NC(CC(N)=O)C(=O)O")
+        assert result != "glycylasparagine", (
+            f"Fabricated an implicit-L retained name for stereo-undefined "
+            f"input: {result!r}"
+        )
+
+    def test_stereo_unspecified_tetrapeptide_declines_retained_name(self):
+        """Ile-Glu-Thr-Asn, NO stereo tags anywhere: the retained
+        acylamino chain must not be emitted for an undefined residue."""
+        smi = "CCC(C)C(C(=O)NC(CCC(=O)O)C(=O)NC(C(C)O)C(=O)NC(CC(=O)N)C(=O)O)N"
+        result = name_compound(smi)
+        assert result != "isoleucylglutamylthreonylasparagine", (
+            f"Fabricated an implicit-L retained name for stereo-undefined "
+            f"input: {result!r}"
+        )
+
+    def test_stereo_unspecified_glycine_only_dipeptide_still_names(self):
+        """Gly-Gly has NO stereocentre at all (both residues achiral) -- the
+        stereo-honesty guard must not affect it; must still name normally."""
+        result = name_compound("NCC(=O)NCC(=O)O")
+        assert result == "glycylglycine"
+
+    def test_defined_stereo_dipeptide_unchanged(self):
+        """CRITICAL guard: a normal DEFINED-stereo peptide (L-Ala-Gly) must
+        be completely unaffected by the stereo-honesty check."""
+        result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
+        assert result == "alanylglycine"
+
+    def test_defined_stereo_tripeptide_unchanged(self):
+        """CRITICAL guard: Gly-L-Ala-L-Leu, all-defined, unaffected."""
+        result = name_compound("NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O")
+        assert result == "glycylalanylleucine"
+
+    def test_defined_stereo_arginine_tautomer_unchanged(self):
+        """CRITICAL guard: the InChIKey-skeleton-fallback residue path
+        (arginine's guanidine tautomer) is unaffected when stereo IS defined."""
+        result = name_compound("N=C(N)NCCC[C@H](N)C(=O)NCC(=O)O")
+        assert result == "arginylglycine"
+
+    def test_partially_specified_tripeptide_declines(self):
+        """One residue defined (Gly, achiral -- N/A), one residue (Ala)
+        stereo-UNSPECIFIED: the whole chain must decline, not partially
+        fabricate the unspecified residue's L."""
+        # Gly-Ala(unspecified)-Leu(L, defined)
+        smi = "NCC(=O)NC(C)C(=O)N[C@@H](CC(C)C)C(=O)O"
+        result = name_compound(smi)
+        assert result != "glycylalanylleucine", (
+            f"Fabricated L on the stereo-unspecified alanine residue: {result!r}"
+        )

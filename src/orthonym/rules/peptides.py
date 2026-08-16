@@ -36,6 +36,19 @@ name (0-wrong ABSOLUTE):
   the flat chain shorthand, because OPSIN's flat-chain grammar mis-parses a
   non-retained continuing acyl word (SPY-verified) and a bare 'glutamyl'
   shorthand imposes an L-configuration OPSIN does not know is undefined.
+
+v33 Phase 0 L3-2e (stereo honesty): P-103.1.3.1 "The stereodescriptors 'D'
+and 'L'" (BlueBookV2.md:54291) -- "The stereodescriptor 'xi' (Greek letter
+xi) indicates unknown configuration" -- and P-103.3.4 itself (:54715) --
+"A residue of unknown configuration is indicated by the prefix xi". A bare
+retained residue name is therefore NOT a safe default for an undefined
+alpha-carbon: the flat acylamino path (``_identify_residues`` with
+``strict_stereo=True``, via ``_alpha_stereo_undefined``) now DECLINES the
+whole chain rather than silently applying the L-omission convention
+(P-103.3.4) to a residue whose configuration the input never defined. Lever
+B's donor-residue recovery is deliberately exempt: it builds its own
+locant-based descriptor and already treats an unresolved centre as "omit the
+descriptor" with no implied configuration.
 """
 
 from typing import Optional, List, Dict, Tuple
@@ -154,8 +167,11 @@ def name_peptide(mol) -> Optional[str]:
         # fail-closed-to-None-unless-round-tripped guarantee as Lever A.
         return _rt_verified(mol, _try_gamma_link_whole(mol))
 
-    # Step 3: Identify residues and get stereo prefixes
-    named_residues = _identify_residues(residue_smiles_list)
+    # Step 3: Identify residues and get stereo prefixes. strict_stereo=True:
+    # this feeds the FLAT retained-name convention (Step 4), where an omitted
+    # descriptor is read as an implicit 'L' (P-103.3.4) -- see
+    # ``_identify_residues``'s docstring.
+    named_residues = _identify_residues(residue_smiles_list, strict_stereo=True)
     if named_residues is None:
         return None
 
@@ -457,6 +473,8 @@ def _remove_dummy_add_h(rw_mol: Chem.RWMol, dummy_idx: int, neighbor) -> None:
 
 def _identify_residues(
     residue_smiles_list: List[str],
+    *,
+    strict_stereo: bool = False,
 ) -> Optional[List[Dict[str, str]]]:
     """
     Identify each residue by trivial name and determine stereo prefix.
@@ -467,6 +485,19 @@ def _identify_residues(
         - 'stereo': "L-", "D-", or "" (empty for achiral)
 
     Returns None if any residue cannot be identified as a standard amino acid.
+
+    ``strict_stereo`` (default False -- byte-identical to before this
+    parameter existed): when True, ALSO decline (return None) if any
+    residue's alpha-carbon configuration is a genuine stereocentre left
+    UNDEFINED by the input (see ``_alpha_stereo_undefined``). Scoped to
+    callers that feed the result into ``_assemble_peptide_name`` -- the flat
+    acylamino/bare-retained-name convention where an omitted descriptor is
+    read as an IMPLICIT 'L' (P-103.3.4). Lever B's donor-residue recovery
+    (``_try_gamma_donor_link``) deliberately leaves this False: it builds its
+    OWN systematic, locant-based stereodescriptor and already treats an
+    empty ``stereo`` as "omit the descriptor" with no implied configuration
+    (unlike the retained-name convention), so no double-guard is needed
+    there.
     """
     result = []
     for smi in residue_smiles_list:
@@ -501,6 +532,23 @@ def _identify_residues(
             # Non-standard residue: cannot name with acylamino convention
             return None
 
+        # STEREO HONESTY (P-103.1.3.1 "The stereodescriptors 'D' and 'L'",
+        # BlueBookV2.md:54291, + P-103.3.4 "Indication of configuration in
+        # peptides", :54715): a bare retained residue name asserts a SPECIFIC
+        # configuration -- P-103.3.4's own text: "A residue of unknown
+        # configuration is indicated by the prefix xi (Greek letter xi)".
+        # Orthonym does not emit xi-prefixed names, so a residue whose
+        # alpha-carbon configuration the INPUT does not define must not be
+        # silently folded into the omitted-L convention (that is exactly the
+        # implicit-L fabrication this check exists to stop) -- decline the
+        # whole peptide instead, so the caller falls through to a systematic/
+        # stereo-free name (or an honest abstention). Glycine has no
+        # alpha-stereocentre, so it is exempt (never "undefined"). Gated on
+        # ``strict_stereo`` -- see the docstring for why Lever B's donor
+        # recovery must NOT set it.
+        if strict_stereo and _alpha_stereo_undefined(mol, aa_name):
+            return None
+
         # Get acyl form
         acyl = get_amino_acid_acyl_name(aa_name)
         if acyl is None:
@@ -516,6 +564,42 @@ def _identify_residues(
         })
 
     return result
+
+
+def _alpha_stereo_undefined(mol: Chem.Mol, aa_name: str) -> bool:
+    """True iff ``aa_name`` (a real, non-achiral standard amino acid) has an
+    alpha-carbon stereocentre in ``mol`` whose configuration the INPUT does
+    not define -- i.e. no wedge/parity (``CHI_UNSPECIFIED``) at that atom.
+
+    Every standard amino acid other than glycine has four distinct groups at
+    its alpha-carbon (H, NH2, COOH-carbon, a distinct side chain), so it is
+    ALWAYS a genuine stereocentre; glycine is the sole achiral exception and
+    is excluded by name up front. A ``True`` result means: naming this
+    residue with its bare retained name (which asserts L, or D if flagged --
+    P-103.1.3.1) would assert a configuration the structure does not have.
+
+    Root cause this guards: ``_get_stereo_prefix`` looks up ``_CIPCode`` and
+    falls back to ``""`` whenever it is absent, whether that is because the
+    residue is TRULY achiral (glycine) or because a genuine stereocentre's
+    configuration was simply never specified. P-103.3.4's L-omission display
+    rule then makes that "" indistinguishable from a defined-and-omitted L --
+    so a flat, stereo-free input silently acquired an implied L it does not
+    define. This check runs BEFORE that omission logic and answers only the
+    question the omission rule cannot: was a real stereocentre left
+    unspecified at all. If the SMARTS locator itself fails, that also means
+    "cannot confirm the configuration is defined" -> True (fail closed).
+    """
+    if aa_name == "glycine":
+        return False
+    alpha_pattern = Chem.MolFromSmarts("[NX3][CX4][CX3](=O)")
+    if alpha_pattern is None:
+        return True
+    matches = mol.GetSubstructMatches(alpha_pattern)
+    if not matches:
+        return True
+    alpha_c_idx = matches[0][1]
+    alpha_atom = mol.GetAtomWithIdx(alpha_c_idx)
+    return alpha_atom.GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED
 
 
 # Amino acids where L-configuration = R (CIP), not S.
@@ -738,12 +822,15 @@ def _name_standard_chain(smi: str):
     if frag_mol is None:
         return None
     residues = _extract_residues(frag_mol)
+    # strict_stereo=True: both branches below feed ``_assemble_peptide_name``,
+    # the flat retained-name convention where an omitted descriptor implies
+    # 'L' (P-103.3.4) -- see ``_identify_residues``'s docstring.
     if residues is not None and len(residues) >= 2:
-        named = _identify_residues(residues)
+        named = _identify_residues(residues, strict_stereo=True)
         if named is None:
             return None
         return _assemble_peptide_name(named)
-    named1 = _identify_residues([smi])
+    named1 = _identify_residues([smi], strict_stereo=True)
     if named1 is None:
         return None
     return _assemble_peptide_name(named1)
@@ -801,7 +888,8 @@ def _try_n_acyl_cap(mol) -> Optional[str]:
     residues = _extract_residues(remainder_mol)
     if residues is None or len(residues) < 2:
         return None
-    named = _identify_residues(residues)
+    # strict_stereo=True: feeds ``_assemble_peptide_name`` (see its docstring).
+    named = _identify_residues(residues, strict_stereo=True)
     if named is None:
         return None
     remainder_name = _assemble_peptide_name(named)
