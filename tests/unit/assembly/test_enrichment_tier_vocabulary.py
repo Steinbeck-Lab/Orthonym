@@ -11,7 +11,7 @@ substituents the best-effort vocabulary can name -- measured, on the same mol /
 fragment / attachment::
 
     NS(=O)=O                False -> 'substituent'   (a REFUSAL)
-                            True  -> '1-amino-1-oxo-2-oxa-1lambda6-thiaeth-1-en-1-yl'
+                            True  -> '1-amino-1-oxo-2-oxa-1λ6-thiaeth-1-en-1-yl'
     c1ccc2c(c1)OCO2         False -> 'substituent'
                             True  -> '7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-4-yl'
 

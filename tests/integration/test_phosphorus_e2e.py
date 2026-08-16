@@ -36,11 +36,11 @@ class TestPhosphineOxideE2E:
 
     def test_trimethylphosphane_oxide(self):
         """CP(C)(C)=O -> trimethylphosphane oxide (PHOSPH-03)"""
-        assert name_compound("CP(C)(C)=O") == "trimethyl-lambda5-phosphanone"
+        assert name_compound("CP(C)(C)=O") == "trimethyl-λ5-phosphanone"
 
     def test_triethylphosphane_oxide(self):
         """CCP(CC)(CC)=O -> triethylphosphane oxide"""
-        assert name_compound("CCP(CC)(CC)=O") == "triethyl-lambda5-phosphanone"
+        assert name_compound("CCP(CC)(CC)=O") == "triethyl-λ5-phosphanone"
 
 
 class TestPhosphonicAcidE2E:
@@ -114,7 +114,7 @@ class TestPhosphorusRetainedNames:
     def test_triphenylphosphane_oxide(self):
         """Triphenylphosphane oxide retained name."""
         result = name_compound("O=P(c1ccccc1)(c2ccccc2)c3ccccc3")
-        assert result == "triphenyl-lambda5-phosphanone"
+        assert result == "triphenyl-λ5-phosphanone"
 
 
 class TestPhosphorusEdgeCases:
@@ -154,7 +154,7 @@ class TestPhosphorusRequirements:
 
     def test_phosph_03_trimethylphosphane_oxide(self):
         """PHOSPH-03: name_compound('CP(C)(C)=O') returns 'trimethylphosphane oxide'"""
-        assert name_compound("CP(C)(C)=O") == "trimethyl-lambda5-phosphanone"
+        assert name_compound("CP(C)(C)=O") == "trimethyl-λ5-phosphanone"
 
     def test_phosph_04_methanephosphonic_acid(self):
         """PHOSPH-04: name_compound('CP(=O)(O)O') returns 'methanephosphonic acid'"""
@@ -220,7 +220,7 @@ class TestPhosphorusOnComplexSubstrate:
 
     def test_phosphine_oxide_not_disrupted(self):
         """Phosphine oxide naming not disrupted (PHOS-05 routing safety)."""
-        assert name_compound("CP(C)(C)=O") == "trimethyl-lambda5-phosphanone"
+        assert name_compound("CP(C)(C)=O") == "trimethyl-λ5-phosphanone"
 
 
 class TestCanaryRegression:

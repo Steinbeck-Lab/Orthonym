@@ -70,16 +70,16 @@ def _rt_inchikey(name: str):
 # Hantzsch-Widman name covers them, which is exactly the "table miss with
 # nowhere to fall" this tier is for.
 PARENT_HYDRIDE_POSITIVES = [
-    ("C1CC[Al]CC1", "1lambda2-aluminacyclohexane"),
-    ("C1CC[Ga]CC1", "1lambda2-gallacyclohexane"),
-    ("C1CC[In]CC1", "1lambda2-indacyclohexane"),
-    ("C1CC[Bi]CC1", "1lambda2-bismacyclohexane"),
-    ("C1CCC[Al]CCC1", "1lambda2-aluminacyclooctane"),
-    ("C1CC[Al]CC[Al]C1", "1lambda2,4lambda2-dialuminacyclooctane"),
-    ("C1CC[Ga]CC[Ga]C1", "1lambda2,4lambda2-digallacyclooctane"),
-    ("C1CC[Sb]CC[Sb]C1", "1lambda2,4lambda2-distibacyclooctane"),
-    ("C1CC2CCC1[Al]2", "7lambda2-aluminabicyclo[2.2.1]heptane"),
-    ("C1[Al]C2CC[Al]1CC2", "1,8lambda2-dialuminabicyclo[2.2.2]octane"),
+    ("C1CC[Al]CC1", "1λ2-aluminacyclohexane"),
+    ("C1CC[Ga]CC1", "1λ2-gallacyclohexane"),
+    ("C1CC[In]CC1", "1λ2-indacyclohexane"),
+    ("C1CC[Bi]CC1", "1λ2-bismacyclohexane"),
+    ("C1CCC[Al]CCC1", "1λ2-aluminacyclooctane"),
+    ("C1CC[Al]CC[Al]C1", "1λ2,4λ2-dialuminacyclooctane"),
+    ("C1CC[Ga]CC[Ga]C1", "1λ2,4λ2-digallacyclooctane"),
+    ("C1CC[Sb]CC[Sb]C1", "1λ2,4λ2-distibacyclooctane"),
+    ("C1CC2CCC1[Al]2", "7λ2-aluminabicyclo[2.2.1]heptane"),
+    ("C1[Al]C2CC[Al]1CC2", "1,8λ2-dialuminabicyclo[2.2.2]octane"),
 ]
 
 

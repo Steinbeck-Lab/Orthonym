@@ -1043,9 +1043,9 @@ def test_f5_other_guards_still_fail_closed(smiles, why):
     ("CC(C)SSSO",               "(propan-2-yl)trisulfanol"),
     # site 445 -- polysulfoxide / sulfone
     ("CC(C)S(=O)S(=O)C(C)C",
-     "1,2-di(propan-2-yl)-1lambda4,2lambda4-disulfane-1,2-dione"),
+     "1,2-di(propan-2-yl)-1λ4,2λ4-disulfane-1,2-dione"),
     ("CC(C)S(=O)S(=O)C",
-     "1-methyl-2-(propan-2-yl)-1lambda4,2lambda4-disulfane-1,2-dione"),
+     "1-methyl-2-(propan-2-yl)-1λ4,2λ4-disulfane-1,2-dione"),
 ])
 def test_f6_polychalcogen_previously_refused_organyl_is_now_named(
     ungated_namer, smiles, expected,
@@ -1062,7 +1062,7 @@ def test_f6_polychalcogen_previously_refused_organyl_is_now_named(
     ("CC(C)(C)SSSC",   "tert-butyl(methyl)trisulfane"),
     ("CC(C)(C)SSSCC",  "tert-butyl(ethyl)trisulfane"),
     ("CC(C)(C)S(=O)S(=O)C",
-     "1-tert-butyl-2-methyl-1lambda4,2lambda4-disulfane-1,2-dione"),
+     "1-tert-butyl-2-methyl-1λ4,2λ4-disulfane-1,2-dione"),
 ])
 def test_f6_citation_order_ignores_the_italicized_prefix(
     ungated_namer, smiles, expected,
@@ -1147,9 +1147,9 @@ def test_f6_polysulfane_parent_beats_skeletal_replacement(
     ("CSSSSSC",           "dimethylpentasulfane"),
     ("CSSO",              "methyldisulfanol"),
     ("CSSSO",             "methyltrisulfanol"),
-    ("CS(=O)S(=O)C",      "1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione"),
+    ("CS(=O)S(=O)C",      "1,2-dimethyl-1λ4,2λ4-disulfane-1,2-dione"),
     ("CS(=O)S(=O)S(=O)C",
-     "1,3-dimethyl-1lambda4,2lambda4,3lambda4-trisulfane-1,2,3-trione"),
+     "1,3-dimethyl-1λ4,2λ4,3λ4-trisulfane-1,2,3-trione"),
 ])
 def test_f6_polychalcogen_existing_names_are_byte_identical(
     ungated_namer, smiles, expected,
@@ -1411,12 +1411,12 @@ def test_f7_other_guards_still_fail_closed(smiles, why):
     # heteroimine + phosphanimine hub/N
     ("CC(C)P=N",          "1-(propan-2-yl)phosphanimine"),
     ("CC(C)P(C(C)C)(C(C)C)=N",
-     "P,P,P-tri(propan-2-yl)-lambda5-phosphanimine"),
+     "P,P,P-tri(propan-2-yl)-λ5-phosphanimine"),
     ("CC(C)P(C)(C)=NC(C)C",
-     "P,P-dimethyl-P-(propan-2-yl)-N-(propan-2-yl)-lambda5-phosphanimine"),
+     "P,P-dimethyl-P-(propan-2-yl)-N-(propan-2-yl)-λ5-phosphanimine"),
     # lambda-sulfane imine/oxide
-    ("CC(C)S(=N)(=O)C(C)C", "iminodi(propan-2-yl)-lambda6-sulfanone"),
-    ("CS(=N)(=O)C(C)C",     "imino(methyl)(propan-2-yl)-lambda6-sulfanone"),
+    ("CC(C)S(=N)(=O)C(C)C", "iminodi(propan-2-yl)-λ6-sulfanone"),
+    ("CS(=N)(=O)C(C)C",     "imino(methyl)(propan-2-yl)-λ6-sulfanone"),
     # phosphane with a silyl co-substituent
     ("CC(C)P([SiH3])C",   "methyl(propan-2-yl)(silyl)phosphane"),
     # mixed halo+organyl with the COMPOUND prefix in the FIRST (unmarked) slot:
@@ -1491,8 +1491,8 @@ def test_f8_multiplier_sits_outside_the_enclosing_marks(ungated_namer):
     parentheses".  `imino(dimethyl)-lambda6-sulfanone` put `di` inside them; the
     shape BB 16286 spells is `tert-butyldi(methyl)phosphane` (PIN)."""
     name = ungated_namer.name("CS(=N)(=O)C")
-    assert name == "iminodi(methyl)-lambda6-sulfanone"
-    assert name != "imino(dimethyl)-lambda6-sulfanone"
+    assert name == "iminodi(methyl)-λ6-sulfanone"
+    assert name != "imino(dimethyl)-λ6-sulfanone"
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -1511,8 +1511,8 @@ def test_f8_multiplier_sits_outside_the_enclosing_marks(ungated_namer):
     ("Cl[Si](Cl)(Cl)C",         "trichloro(methyl)silane"),
     ("C[Si](C)=O",              "dimethylsilanone"),
     ("CP=N",                    "1-methylphosphanimine"),
-    ("CP(C)(C)=N",              "P,P,P-trimethyl-lambda5-phosphanimine"),
-    ("CP(C)(C)=NC",             "P,P,P-trimethyl-N-methyl-lambda5-phosphanimine"),
+    ("CP(C)(C)=N",              "P,P,P-trimethyl-λ5-phosphanimine"),
+    ("CP(C)(C)=NC",             "P,P,P-trimethyl-N-methyl-λ5-phosphanimine"),
     ("C[PH2]",                  "methylphosphane"),
     ("C[P](C)C",                "trimethylphosphane"),
     ("[SiH3]P([SiH3])[SiH3]",   "trisilylphosphane"),

@@ -26,4 +26,4 @@ class TestPhosphanylSubstituent:
     def test_phosphoryl_unchanged(self):
         # regression: trimethylphosphine oxide P=O must NOT poach the phosphanyl tier
         assert orthonym.name_compound("CP(C)(C)=O", style="pin") == \
-            "trimethyl-lambda5-phosphanone"
+            "trimethyl-λ5-phosphanone"

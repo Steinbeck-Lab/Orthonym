@@ -42,7 +42,7 @@ online edition at https://iupac.qmul.ac.uk/BlueBook/):
     and '[(methylsulfanyl)oxy]ethane (PIN)' for CH3-CH2-O-S-CH3: the LAST-cited
     chalcogen is the atom bonded to the parent.
   * P-71.3 (BB 40737)  'tert-butyldisulfanyl (PIN)'.
-  * P-71.2.1.2  'tert-butoxytri(phenyl)-lambda5-phosphanyl (PIN)' -- tert-butoxy
+  * P-71.2.1.2  'tert-butoxytri(phenyl)-λ5-phosphanyl (PIN)' -- tert-butoxy
     concatenated BARE inside a compound prefix of a PIN, with the bracketed
     '[(2-methylpropan-2-yl)oxy]...' variant listed as NOT preferred. This is what
     establishes 'tert-butoxysulfanyl' rather than leaving it a guess.

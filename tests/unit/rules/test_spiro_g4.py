@@ -81,9 +81,9 @@ class TestSpiroLambda:
     @pytest.mark.parametrize(
         "smiles,expected",
         [
-            ("C1CCS12CCCCC2", "4lambda4-thiaspiro[3.5]nonane"),    # gold (S val 4)
-            ("C1CC[Se]12CCCCC2", "4lambda4-selenaspiro[3.5]nonane"),  # Se val 4
-            ("C1CCS12CCCCCC2", "4lambda4-thiaspiro[3.6]decane"),   # other ring sizes
+            ("C1CCS12CCCCC2", "4λ4-thiaspiro[3.5]nonane"),    # gold (S val 4)
+            ("C1CC[Se]12CCCCC2", "4λ4-selenaspiro[3.5]nonane"),  # Se val 4
+            ("C1CCS12CCCCCC2", "4λ4-thiaspiro[3.6]decane"),   # other ring sizes
         ],
     )
     def test_lambda_family(self, smiles, expected):

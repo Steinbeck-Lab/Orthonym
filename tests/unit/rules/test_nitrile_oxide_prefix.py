@@ -1,7 +1,7 @@
-"""P-66.5.4.2 lambda-branch: -C#[N+][O-] as (oxo-lambda5-azanylidyne)methyl
+"""P-66.5.4.2 lambda-branch: -C#[N+][O-] as (oxo-λ5-azanylidyne)methyl
 prefix in ANION context only; neutral (suffix-form) contexts fail closed.
 
-'sodium 4-[(oxo-lambda5-azanylidyne)methyl]benzoate' is the BB PIN verbatim
+'sodium 4-[(oxo-λ5-azanylidyne)methyl]benzoate' is the BB PIN verbatim
 (BlueBookV2.md:34897); OPSIN-2.9.0 parses it back to the input structure
 (verified 2026-07-09).
 """
@@ -20,7 +20,7 @@ def test_prefix_dict_in_anion_context():
              and any(b.GetBondType() == Chem.BondType.TRIPLE for b in a.GetBonds()))
     d = _nitrile_oxide_prefix(anion, c, ring)
     assert d is not None
-    assert d['name'] == "(oxo-lambda5-azanylidyne)methyl"
+    assert d['name'] == "(oxo-λ5-azanylidyne)methyl"
     assert len(d['atoms']) == 3
 
 
@@ -41,13 +41,13 @@ def test_sentinel_in_neutral_context():
     "-> the benzoate-nitrile-oxide salt still refuses ('sodium compound (not "
     "supported)'). FOLLOW-UP: route the salt anion through the fixed benzene "
     "substituent path, then this yields the BB PIN "
-    "'sodium 4-[(oxo-lambda5-azanylidyne)methyl]benzoate' (BB 34897).",
+    "'sodium 4-[(oxo-λ5-azanylidyne)methyl]benzoate' (BB 34897).",
     strict=False,
 )
 @pytest.mark.unit
 def test_sodium_salt_bluebook_pin():
     assert name_compound("[Na+].[O-]C(=O)c1ccc(C#[N+][O-])cc1") == \
-        "sodium 4-[(oxo-lambda5-azanylidyne)methyl]benzoate"
+        "sodium 4-[(oxo-λ5-azanylidyne)methyl]benzoate"
 
 
 @pytest.mark.xfail(

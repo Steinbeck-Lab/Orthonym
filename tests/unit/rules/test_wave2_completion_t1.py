@@ -32,9 +32,9 @@ BARE_HYDRIDES = [
     ("[SeH2]", "selane"),
     ("[TeH2]", "tellane"),
     ("[AsH3]", "arsane"),
-    ("[PH5]", "lambda5-phosphane"),
-    ("[SH4]", "lambda4-sulfane"),
-    ("[IH3]", "lambda3-iodane"),
+    ("[PH5]", "λ5-phosphane"),
+    ("[SH4]", "λ4-sulfane"),
+    ("[IH3]", "λ3-iodane"),
     ("I", "iodane"),
 ]
 
@@ -47,9 +47,9 @@ def test_bare_hydride_unit(smiles, expected):
 
 @pytest.mark.parametrize("smiles,expected", [
     ("[SiH4]", "silane"),
-    ("[PH5]", "lambda5-phosphane"),
-    ("[SH4]", "lambda4-sulfane"),
-    ("[IH3]", "lambda3-iodane"),
+    ("[PH5]", "λ5-phosphane"),
+    ("[SH4]", "λ4-sulfane"),
+    ("[IH3]", "λ3-iodane"),
     ("[SnH4]", "stannane"),
 ])
 def test_bare_hydride_e2e(smiles, expected):
@@ -59,7 +59,7 @@ def test_bare_hydride_e2e(smiles, expected):
 def test_halogen_regime_unchanged():
     # Protect: the pre-existing all-halogen regime is untouched.
     assert name_mononuclear_hydride(
-        Chem.MolFromSmiles("FS(F)(F)(F)(F)F")) == "hexafluoro-lambda6-sulfane"
+        Chem.MolFromSmiles("FS(F)(F)(F)(F)F")) == "hexafluoro-λ6-sulfane"
     assert name_mononuclear_hydride(
         Chem.MolFromSmiles("ClP(Cl)Cl")) == "trichlorophosphane"
 

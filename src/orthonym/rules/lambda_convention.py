@@ -28,6 +28,14 @@ value. Charged atoms and elements absent from the table are treated as standard
 from typing import Optional
 
 
+# Greek small letter lambda (IUPAC P-15.4.1.3). The Blue Book spells the
+# lambda-convention descriptor with the Greek letter (533 occurrences in the
+# 2013 Blue Book text), never the ASCII word "lambda" (0 occurrences inside a
+# name). This is the single source of truth for the on-the-wire spelling;
+# every emitter in this codebase must route through it rather than hardcoding
+# either spelling.
+LAMBDA = "λ"
+
 # IUPAC standard bonding numbers for skeletal-replacement ('a') atoms. The values
 # are the column headers of **Table 1.5** (P-15.4.1.1) [BBv2:6436-6443], which
 # prints each 'a' prefix under its standard bonding number; Table 2.4
@@ -85,9 +93,9 @@ def nonstandard_bonding_number(mol, atom_idx: int) -> Optional[int]:
 def format_lambda_token(locant, lam: Optional[int]) -> str:
     """Format a locant (+ optional lambda) into the citation token.
 
-    ``format_lambda_token(4, 4)`` -> ``"4lambda4"`` (P-31.1.4.2: the lambda
-    follows the locant with no separator); ``format_lambda_token(4, None)`` ->
-    ``"4"``. Shared by the spiro numberer and the acyclic skeletal-replacement
-    namer so the on-the-wire spelling is identical everywhere.
+    ``format_lambda_token(4, 4)`` -> ``"4λ4"`` (P-31.1.4.2: the lambda follows
+    the locant with no separator); ``format_lambda_token(4, None)`` -> ``"4"``.
+    Shared by the spiro numberer and the acyclic skeletal-replacement namer so
+    the on-the-wire spelling is identical everywhere.
     """
-    return f"{locant}lambda{lam}" if lam is not None else str(locant)
+    return f"{locant}{LAMBDA}{lam}" if lam is not None else str(locant)

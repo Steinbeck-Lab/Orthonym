@@ -56,7 +56,7 @@ def test_skeleton_only_suffixes_add_no_atoms():
 
 @pytest.mark.parametrize("token", [
     "quux",                       # not a morpheme at all
-    "lambda5-phosphanyl",         # lambda convention: out of scope
+    "λ5-phosphanyl",              # lambda convention: out of scope
     "bicyclo",                    # descriptor missing
     "spiro",                      # descriptor missing
 ])

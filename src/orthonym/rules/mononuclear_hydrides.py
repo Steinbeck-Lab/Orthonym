@@ -62,7 +62,7 @@ from typing import List, Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
-from .lambda_convention import nonstandard_bonding_number
+from .lambda_convention import nonstandard_bonding_number, LAMBDA
 from .phosphorus import _build_substituent_string
 from .substituent_purity import organyl_prefix_name
 from ..metrics.provenance import best_effort_ctx
@@ -358,8 +358,8 @@ def _assemble(prefix_block: str, lam: Optional[int], stem: str) -> str:
     if lam is None:
         return f"{prefix_block}{stem}"
     if not prefix_block:
-        return f"lambda{lam}-{stem}"
-    return f"{prefix_block}-lambda{lam}-{stem}"
+        return f"{LAMBDA}{lam}-{stem}"
+    return f"{prefix_block}-{LAMBDA}{lam}-{stem}"
 
 
 _PNICTOGEN_YL_STEM = {'As': 'arsanyl', 'Sb': 'stibanyl', 'Bi': 'bismuthanyl'}
@@ -1123,7 +1123,7 @@ def name_sulfine(mol) -> Optional[str]:
     if mol.GetNumHeavyAtoms() != 2 + sum(
             1 for a in mol.GetAtoms() if a.GetAtomicNum() == 6):
         return None
-    return f"{ylidene}-lambda4-sulfanone"
+    return f"{ylidene}-{LAMBDA}4-sulfanone"
 
 
 def name_dinuclear_hydride(mol) -> Optional[str]:

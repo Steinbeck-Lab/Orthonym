@@ -11,7 +11,7 @@ from orthonym.namer import name_compound
 def test_lambda4_benzothiophene_pin():
     # BB P-25.3.2.5.2 mechanism + P-25.3.2.5.3 indicated-H, on the
     # algorithmic 2-component fusion path (benzo + thiophene).
-    assert name_compound("[SH2]1C=CC2=C1C=CC=C2") == "1H-1lambda4-benzo[b]thiophene"
+    assert name_compound("[SH2]1C=CC2=C1C=CC=C2") == "1H-1λ4-benzo[b]thiophene"
 
 
 @pytest.mark.unit
@@ -37,4 +37,4 @@ def test_lambda_fused_never_emits_lambdaless_name():
     res = name_fused_heterocycle(Chem.MolFromSmiles("N1=CS=CC2=C1C=CC=N2"))
     assert res is None
     res2 = name_fused_heterocycle(Chem.MolFromSmiles("[SH2]1C=CC2=C1C=CC=C2"))
-    assert res2 is not None and "lambda4" in res2[0]
+    assert res2 is not None and "λ4" in res2[0]

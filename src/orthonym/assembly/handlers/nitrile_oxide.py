@@ -8,7 +8,7 @@ with zwitterions in the order of compound classes" (P-66.5.4.1), so they are sen
 to acids/esters — a co-present ester/acid demotes to a prefix.
 
 Fires ONLY for a NEUTRAL molecule (net formal charge 0). The deprotonated
-salt/anion uses the ``(oxo-lambda5-azanylidyne)methyl`` PREFIX path
+salt/anion uses the ``(oxo-λ5-azanylidyne)methyl`` PREFIX path
 (``benzene.py::_nitrile_oxide_prefix``, gated on ``GetFormalCharge < 0``) — the two
 never double-fire.
 

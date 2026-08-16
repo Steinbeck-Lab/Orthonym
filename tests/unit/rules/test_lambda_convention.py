@@ -78,8 +78,8 @@ class TestNonstandardBondingNumber:
 
 class TestFormatLambdaToken:
     def test_lambda_present(self):
-        assert format_lambda_token(4, 4) == "4lambda4"
-        assert format_lambda_token(6, 6) == "6lambda6"
+        assert format_lambda_token(4, 4) == "4λ4"
+        assert format_lambda_token(6, 6) == "6λ6"
 
     def test_lambda_absent(self):
         assert format_lambda_token(2, None) == "2"

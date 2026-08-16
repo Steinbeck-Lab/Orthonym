@@ -5098,6 +5098,7 @@ def _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx):
     non-alkyl N-substituents, or uncovered fragment atoms -> None."""
     from rdkit import Chem
     from .naming_utils import get_multiplier_prefix, get_alkyl_name
+    from ..rules.lambda_convention import LAMBDA
     hit = _find_amine_oxide_n(mol, sub_atoms)
     if hit is None:
         return None
@@ -5161,12 +5162,12 @@ def _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx):
         return None  # never drop an atom silently
     alkyl_names.sort()
     if not alkyl_names:
-        core = "(oxo-lambda5-azanyl)"
+        core = f"(oxo-{LAMBDA}5-azanyl)"
     elif len(alkyl_names) == 2 and alkyl_names[0] == alkyl_names[1]:
         mp = get_multiplier_prefix(2, alkyl_names[0])
-        core = f"[{mp}{alkyl_names[0]}(oxo)-lambda5-azanyl]"
+        core = f"[{mp}{alkyl_names[0]}(oxo)-{LAMBDA}5-azanyl]"
     elif len(alkyl_names) == 1:
-        core = f"[{alkyl_names[0]}(oxo)-lambda5-azanyl]"
+        core = f"[{alkyl_names[0]}(oxo)-{LAMBDA}5-azanyl]"
     else:
         return None
     chain_len = len(chain)

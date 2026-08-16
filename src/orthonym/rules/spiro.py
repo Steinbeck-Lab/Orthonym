@@ -64,6 +64,7 @@ from ..rules.locants import compare_locant_sets  # noqa: F401 — re-export lock
 from ..rules.lambda_convention import (  # noqa: F401 — re-export for test compat
     STANDARD_BONDING_NUMBER as _STANDARD_BONDING_NUMBER,
     nonstandard_bonding_number as _nonstandard_bonding_number,
+    LAMBDA as _LAMBDA,
 )
 
 # Chain length prefixes - delegated to centralized chain_names module
@@ -1298,7 +1299,7 @@ def _build_hetero_prefix(
         # "6-oxa" instead of "hexaoxa" (DD7 spiro multiplier bug).
         mult = get_multiplier_prefix(count, prefix_name)
         locant_tokens = [
-            (f"{loc}lambda{lam}" if lam is not None else str(loc))
+            (f"{loc}{_LAMBDA}{lam}" if lam is not None else str(loc))
             for loc, lam, _idx in entries
         ]
         locant_str = ','.join(locant_tokens)
@@ -2109,7 +2110,7 @@ def _build_lambda_ih_front_prefix(
             if loc is None:
                 continue
             key = (loc, prime_rank)
-            tok = f"{loc}{prime}lambda{lam}"
+            tok = f"{loc}{prime}{_LAMBDA}{lam}"
             if sa not in best_by_atom or key < best_by_atom[sa][0]:
                 best_by_atom[sa] = (key, tok)
     lambda_tokens = list(best_by_atom.values())
@@ -2861,7 +2862,7 @@ def _name_spirobi_core(mol):
     # P-24.8.2: a NONSTANDARD (λ) spiro atom carries its λ token on the UNPRIMED
     # locant (e.g. 2lambda4,2'-spirobi[[1,3,2]benzodioxathiole]).
     lam = _nonstandard_bonding_number(mol, spiro_center)
-    lo_tok = f"{lo}lambda{lam}" if lam is not None else str(lo)
+    lo_tok = f"{lo}{_LAMBDA}{lam}" if lam is not None else str(lo)
 
     # P-24.3.2: a component atom that COULD carry a ring double bond but does not
     # is saturation that has to be expressed OUTSIDE the bracket -- as a hydro
@@ -2983,7 +2984,7 @@ def _name_spiroter_core(mol):
     mid = named[1][2]
     hi = named[2][2]
     component_name = _strip_consumed_indicated_h(named[0][0], lo)
-    lo_tok = f"{lo}lambda{lam}" if lam is not None else str(lo)
+    lo_tok = f"{lo}{_LAMBDA}{lam}" if lam is not None else str(lo)
     name = f"{lo_tok},{mid}',{hi}''-spiroter[{component_name}]"
 
     combined: Dict[int, _Locant] = {}
@@ -3130,7 +3131,7 @@ def _name_spiro_named_components_core(mol):
     if lowest != (c0[2], 0):
         return None
     lo = c0[2]
-    lo_tok = f"{lo}lambda{lam}" if lam is not None else str(lo)
+    lo_tok = f"{lo}{_LAMBDA}{lam}" if lam is not None else str(lo)
 
     n0 = _strip_consumed_indicated_h(c0[0], c0[2])
     n1 = _strip_consumed_indicated_h(c1[0], c1[2])

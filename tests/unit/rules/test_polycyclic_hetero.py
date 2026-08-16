@@ -475,7 +475,7 @@ class TestVBIntegration:
 
 class TestVonBaeyerLambdaConvention:
     """A non-standard-valence ring heteroatom in a von-Baeyer system must carry
-    the lambda convention in its 'a'-prefix (e.g. tetravalent S -> 3lambda4-thia),
+    the lambda convention in its 'a'-prefix (e.g. tetravalent S -> 3λ4-thia),
     via the shared rules.lambda_convention infra. Standard-valence heteroatoms
     must be byte-identical (no spurious lambda)."""
 
@@ -491,24 +491,24 @@ class TestVonBaeyerLambdaConvention:
 
     @pytest.mark.unit
     def test_tetravalent_sulfur_emits_lambda4(self):
-        # S(IV) bridge in bicyclo[3.2.1]octane -> 3lambda4-thia (was 3-thia,
+        # S(IV) bridge in bicyclo[3.2.1]octane -> 3λ4-thia (was 3-thia,
         # which denotes S(II) -> a different molecule the gate suppressed).
         prefix = self._prefix("C12C[SH2]CC(CC1)C2")
-        assert "lambda4" in prefix and "thia" in prefix
+        assert "λ4" in prefix and "thia" in prefix
 
     @pytest.mark.unit
     def test_standard_valence_oxygen_no_lambda(self):
         # O(II) is standard -> no lambda (byte-identical to pre-Phase-13).
         prefix = self._prefix("C12COCC(CC1)C2")
-        assert "lambda" not in prefix and "oxa" in prefix
+        assert "λ" not in prefix and "oxa" in prefix
 
     @pytest.mark.unit
     def test_full_name_round_trippable_pin(self):
         from orthonym.namer import name_compound
         # S1 (v24): the replacement 'a'-prefix attaches DIRECTLY to the von-Baeyer
-        # descriptor (P-23.3.1) — no hyphen. PIN is `3lambda4-thiabicyclo[3.2.1]octane`.
+        # descriptor (P-23.3.1) — no hyphen. PIN is `3λ4-thiabicyclo[3.2.1]octane`.
         name = name_compound("C12C[SH2]CC(CC1)C2")
-        assert name == "3lambda4-thiabicyclo[3.2.1]octane"
+        assert name == "3λ4-thiabicyclo[3.2.1]octane"
 
 
 class TestVonBaeyerReplacementPrefixNoStrayHyphen:

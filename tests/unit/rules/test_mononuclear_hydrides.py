@@ -22,20 +22,20 @@ def _name(smiles):
 
 class TestLambdaWins:
     @pytest.mark.parametrize("smiles,expected", [
-        ("FS(F)(F)(F)(F)F", "hexafluoro-lambda6-sulfane"),    # SF6
-        ("FS(F)(F)F", "tetrafluoro-lambda4-sulfane"),          # SF4
-        ("FP(F)(F)(F)F", "pentafluoro-lambda5-phosphane"),     # PF5
-        ("ClP(Cl)(Cl)(Cl)Cl", "pentachloro-lambda5-phosphane"),  # PCl5
-        ("FI(F)(F)(F)F", "pentafluoro-lambda5-iodane"),        # IF5
-        ("FI(F)F", "trifluoro-lambda3-iodane"),                # IF3
-        ("F[Se](F)(F)(F)(F)F", "hexafluoro-lambda6-selane"),   # SeF6
+        ("FS(F)(F)(F)(F)F", "hexafluoro-λ6-sulfane"),    # SF6
+        ("FS(F)(F)F", "tetrafluoro-λ4-sulfane"),          # SF4
+        ("FP(F)(F)(F)F", "pentafluoro-λ5-phosphane"),     # PF5
+        ("ClP(Cl)(Cl)(Cl)Cl", "pentachloro-λ5-phosphane"),  # PCl5
+        ("FI(F)(F)(F)F", "pentafluoro-λ5-iodane"),        # IF5
+        ("FI(F)F", "trifluoro-λ3-iodane"),                # IF3
+        ("F[Se](F)(F)(F)(F)F", "hexafluoro-λ6-selane"),   # SeF6
     ])
     def test_known_lambda_hydrides(self, smiles, expected):
         assert _name(smiles) == expected
 
     def test_mixed_halogens_alphabetical(self):
         # SF5Cl: chloro (c) before fluoro (f); multiplier ignored for ordering.
-        assert _name("FS(F)(F)(F)(F)Cl") == "chloropentafluoro-lambda6-sulfane"
+        assert _name("FS(F)(F)(F)(F)Cl") == "chloropentafluoro-λ6-sulfane"
 
 
 class TestStandardValenceHalides:

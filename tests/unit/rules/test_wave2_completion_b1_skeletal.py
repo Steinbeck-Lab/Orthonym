@@ -35,19 +35,19 @@ class TestLambdaHeterochain:
     def test_tetrathiadodecane_parent_bb_verbatim(self):
         # P-21.2.4.1: the embedded SH2 (2 heavy neighbours) is a λ4 skeletal
         # atom, not a terminal thiol.
-        assert _skel("CSCC[SH2]CCSCCSC") == "2,5lambda4,8,11-tetrathiadodecane"
+        assert _skel("CSCC[SH2]CCSCCSC") == "2,5λ4,8,11-tetrathiadodecane"
 
     def test_lambda_numbering_low_locant(self):
         # λ4-S must take locant 5, not 8 (P-21.2.4.1 "lower locants to a
         # higher nonstandard bonding number"), independent of input order.
         rev = Chem.MolFromSmiles("CSCCSCC[SH2]CCSC")
         assert (try_skeletal_replacement_name(rev)
-                == "2,5lambda4,8,11-tetrathiadodecane")
+                == "2,5λ4,8,11-tetrathiadodecane")
 
     def test_substituted_lambda_chain(self):
         # P-15.4.3.2.2 substituent prefixes on the fixed numbering.
         assert (_skel("CSCCS(C)(C)CCSCCSC")
-                == "5,5-dimethyl-2,5lambda4,8,11-tetrathiadodecane")
+                == "5,5-dimethyl-2,5λ4,8,11-tetrathiadodecane")
 
     def test_genuine_terminal_thiol_still_blocked(self):
         # A real -SH terminus keeps the substitutive path (Gate 2 [SX2H]).
@@ -124,10 +124,10 @@ class TestHeteroatomTerminators:
 class TestLambdaPolysulfane:
     def test_hexasulfane_bb_verbatim(self):
         # P-21.2.4.2: λ6 takes the lower locant over λ4 on the positional tie.
-        assert name_compound("S[SH4]SS[SH2]S") == "2lambda6,5lambda4-hexasulfane"
+        assert name_compound("S[SH4]SS[SH2]S") == "2λ6,5λ4-hexasulfane"
 
     def test_lambda4_tetrasulfane_low_locant(self):
-        assert name_compound("SS[SH2]S") == "2lambda4-tetrasulfane"
+        assert name_compound("SS[SH2]S") == "2λ4-tetrasulfane"
 
     def test_plain_polysulfanes_unchanged(self):
         assert name_compound("SSS") == "trisulfane"

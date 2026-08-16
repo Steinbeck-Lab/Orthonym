@@ -100,7 +100,7 @@ class TestNewParentNamers:
         ("[PH2]C(=O)CCC", "1-phosphanylbutan-1-one"),
         ("C[Si](C)=O", "dimethylsilanone"),
         ("C[SiH]=O", "methylsilanone"),
-        ("CCC=S=O", "propylidene-lambda4-sulfanone"),
+        ("CCC=S=O", "propylidene-λ4-sulfanone"),
         ("CC=[N+]([O-])O", "ethylideneazinic acid"),
     ])
     def test_heals(self, smiles, expected):

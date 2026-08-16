@@ -122,7 +122,7 @@ ACCEPT_CASES = [
 # unchanged by P6.
 FAILCLOSED_CASES = [
     ("c1ccc2c(c1)O[SH2]O2", "[1,3,2]benzodioxathiole",
-     "7,9-dioxa-8lambda4-thiabicyclo[4.3.0]nona-1,3,5-triene"),
+     "7,9-dioxa-8λ4-thiabicyclo[4.3.0]nona-1,3,5-triene"),
 ]
 
 # Retained names the PIN path ALREADY emits (P6 must never touch these).

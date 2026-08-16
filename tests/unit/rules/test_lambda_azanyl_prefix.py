@@ -1,8 +1,8 @@
-"""P-62.5(2): oxo-lambda5-azanyl prefixes for an N-oxide on a substituent N.
+"""P-62.5(2): oxo-λ5-azanyl prefixes for an N-oxide on a substituent N.
 
 The full-molecule expected PIN is the Blue Book P-62.5 example verbatim;
-OPSIN-2.9.0 parses the ASCII-lambda spelling back to the input structure
-(verified 2026-07-09).
+OPSIN-2.9.0 parses the Greek-λ spelling back to the input structure
+(verified 2026-08-16; ASCII 'lambda' also parses, byte-identical structure).
 """
 import pytest
 from rdkit import Chem
@@ -21,17 +21,17 @@ def test_dimethyl_oxo_azanyl_methyl_fragment():
     patt = Chem.MolFromSmarts("[cH0]-[CH2]-[N+]([CH3])([CH3])[O-]")
     ring_c, ch2, n, me1, me2, o = mol.GetSubstructMatch(patt)
     assert _lambda5_azanyl_prefix(mol, [ch2, n, me1, me2, o], ch2) == \
-        "[dimethyl(oxo)-lambda5-azanyl]methyl"
+        "[dimethyl(oxo)-λ5-azanyl]methyl"
 
 
 @pytest.mark.unit
 def test_bare_oxo_azanyl_ethyl_fragment():
-    # BB P-62.5 substituent example: -CH2-CH2-NH2(O) -> 2-(oxo-lambda5-azanyl)ethyl
+    # BB P-62.5 substituent example: -CH2-CH2-NH2(O) -> 2-(oxo-λ5-azanyl)ethyl
     mol = Chem.MolFromSmiles("[O-][NH2+]CCOC(=O)c1ccccc1")
     patt = Chem.MolFromSmarts("[O-][NH2+][CH2][CH2]O")
     o, n, c2, c1, o_ester = mol.GetSubstructMatch(patt)
     assert _lambda5_azanyl_prefix(mol, [c1, c2, n, o], c1) == \
-        "2-(oxo-lambda5-azanyl)ethyl"
+        "2-(oxo-λ5-azanyl)ethyl"
 
 
 @pytest.mark.unit
@@ -51,14 +51,14 @@ def test_nitro_fragment_not_matched():
     "outside the guarded name_substituent_fragment chokepoint; (3) the validity "
     "gate not suppressing the grammar-invalid emitted name. FOLLOW-UP: build "
     "the amine-oxide parent tie-break, then this yields the BB PIN "
-    "'2-(3-{[dimethyl(oxo)-lambda5-azanyl]methyl}phenyl)-N,N-dimethylethan-1-amine "
+    "'2-(3-{[dimethyl(oxo)-λ5-azanyl]methyl}phenyl)-N,N-dimethylethan-1-amine "
     "N-oxide'. The lambda5-azanyl builder itself is correct (fragment tests).",
     strict=False,
 )
 @pytest.mark.unit
 def test_two_oxide_bluebook_pin():
     assert name_compound("C[N+]([O-])(C)Cc1cccc(CC[N+](C)(C)[O-])c1") == (
-        "2-(3-{[dimethyl(oxo)-lambda5-azanyl]methyl}phenyl)-"
+        "2-(3-{[dimethyl(oxo)-λ5-azanyl]methyl}phenyl)-"
         "N,N-dimethylethan-1-amine N-oxide"
     )
 

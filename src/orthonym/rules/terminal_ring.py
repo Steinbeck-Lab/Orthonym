@@ -77,6 +77,7 @@ logger = logging.getLogger(__name__)
 #: Shared with the von Baeyer sibling so the two halves of the terminal namer
 #: cannot drift into two different ceilings.
 from .vonbaeyer_universal import MAX_CAGE_ATOMS, MAX_CAGE_RINGS  # noqa: E402
+from .lambda_convention import LAMBDA  # noqa: E402
 
 __all__ = [
     "TerminalRingName",
@@ -348,7 +349,7 @@ _MONO_RE = re.compile(
 #: unambiguously parseable, which is what the audit needs.
 _MORPHEME_ALT = '|'.join(sorted(_morpheme_to_element(), key=len, reverse=True))
 _REPL_TERM_RE = re.compile(
-    r'(?P<locs>\d+(?:lambda\d+)?(?:,\d+(?:lambda\d+)?)*)-'
+    r'(?P<locs>\d+(?:' + LAMBDA + r'\d+)?(?:,\d+(?:' + LAMBDA + r'\d+)?)*)-'
     r'(?P<mult>di|tri|tetra|penta|hexa|hepta|octa|nona)?'
     r'(?P<morph>' + _MORPHEME_ALT + r')'
 )
@@ -398,7 +399,7 @@ def parse_monocycle_replacement_name(name: str):
                 return None
             locs = []
             for tok in tm.group('locs').split(','):
-                base = tok.split('lambda', 1)[0]
+                base = tok.split(LAMBDA, 1)[0]
                 if not base.isdigit():
                     return None
                 locs.append(int(base))

@@ -8,10 +8,10 @@ from orthonym.namer import name_compound
 
 LAMBDA_HW_CASES = [
     # (SMILES, expected PIN)  — BB P-22.2.7.1 examples verbatim
-    ("[SH2]1C=CC=C1", "1H-1lambda4-thiophene"),
-    ("[IH]1CCCCC1", "1lambda3-iodinane"),
-    ("O1C=[PH2]C=C1", "1,3lambda5-oxaphosphole"),
-    ("S1=CN=CC=C1", "1lambda4,3-thiazine"),
+    ("[SH2]1C=CC=C1", "1H-1λ4-thiophene"),
+    ("[IH]1CCCCC1", "1λ3-iodinane"),
+    ("O1C=[PH2]C=C1", "1,3λ5-oxaphosphole"),
+    ("S1=CN=CC=C1", "1λ4,3-thiazine"),
 ]
 
 
@@ -56,4 +56,4 @@ def test_partially_saturated_lambda_ring_is_named():
     the numbering rule can.  That is precisely the spelling blind spot, which
     is why the derivation is written out here.
     """
-    assert name_compound("[SH2]1CCC=C1") == "2,3-dihydro-1H-1lambda4-thiophene"
+    assert name_compound("[SH2]1CCC=C1") == "2,3-dihydro-1H-1λ4-thiophene"

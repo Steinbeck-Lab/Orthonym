@@ -16,7 +16,7 @@ from collections import deque, Counter
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
-from .lambda_convention import nonstandard_bonding_number
+from .lambda_convention import nonstandard_bonding_number, LAMBDA
 
 
 def _characterize_substituent(mol, start_idx: int, exclude: set) -> Optional[Tuple[str, str]]:
@@ -1066,7 +1066,7 @@ def name_phosphanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[st
     # 'lambda5-phosphanyl' (P-45.3.1 / P-14.1.3). Organyl λ5 / any P=O declines.
     from ..perception.lambda_hydride import is_lambda_hydride_phosphorus
     if is_lambda_hydride_phosphorus(mol, attach_idx):
-        return f"lambda{lam}-{base}"
+        return f"{LAMBDA}{lam}-{base}"
     return None
 
 

@@ -126,8 +126,8 @@ def test_saturated_ring_gets_the_saturated_stem(smiles, expected):
     ("C1CCNCC1", "piperidine"),
     # AA2's lambda class must be byte-identical: the lambda branch refuses
     # RDKit-aromatic rings before any of this is reachable.
-    ("C1=CC[SH]=C1", "2H-1lambda4-thiophene"),
-    ("C1CC[SH]=C1", "3,4-dihydro-2H-1lambda4-thiophene"),
+    ("C1=CC[SH]=C1", "2H-1λ4-thiophene"),
+    ("C1CC[SH]=C1", "3,4-dihydro-2H-1λ4-thiophene"),
 ])
 def test_correct_names_are_unchanged(smiles, expected):
     assert _name(smiles) == expected

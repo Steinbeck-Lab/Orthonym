@@ -1147,14 +1147,14 @@ def _identify_ring_heteroatom_fg(mol, start_idx: int,
 def _nitrile_oxide_prefix(mol, start_idx: int,
                           ring_atoms: Set[int]) -> Optional[Dict]:
     """P-66.5.4.2 lambda-branch: ring substituent -C#[N+]-[O-] (nitrile
-    oxide, ON#C-) -> preferred prefix '(oxo-lambda5-azanylidyne)methyl'
+    oxide, ON#C-) -> preferred prefix '(oxo-λ5-azanylidyne)methyl'
     (not isofulminato).
 
     Three-state return:
       * prefix dict  — pattern matched AND the fragment being named is an
         ANION (net formal charge < 0): P-41 class-2 anion parent outranks the
         zwitterionic nitrile oxide, so the prefix form is the PIN (BB
-        'sodium 4-[(oxo-lambda5-azanylidyne)methyl]benzoate', 34897).
+        'sodium 4-[(oxo-λ5-azanylidyne)methyl]benzoate', 34897).
       * {'name': None} — pattern matched in a NON-anion context: the nitrile
         oxide itself is senior (P-41 zwitterion) and the PIN is the
         functional-class '...nitrile oxide' SUFFIX form, unbuilt -> the
@@ -1187,8 +1187,9 @@ def _nitrile_oxide_prefix(mol, start_idx: int,
             or o_minus[0].GetDegree() != 1):
         return None
     if Chem.GetFormalCharge(mol) < 0:  # anion context (see investigation)
+        from .lambda_convention import LAMBDA
         return {
-            'name': '(oxo-lambda5-azanylidyne)methyl',
+            'name': f'(oxo-{LAMBDA}5-azanylidyne)methyl',
             'atoms': [start_idx, triple_n.GetIdx(), o_minus[0].GetIdx()],
             'is_complex': True,
         }

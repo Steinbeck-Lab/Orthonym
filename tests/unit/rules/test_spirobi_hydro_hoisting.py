@@ -135,9 +135,9 @@ class TestFullyMancudeComponentsUnchanged:
         # Divalent ring O atoms are sp3 but can never be doubly bonded: they must
         # attract neither a hydro prefix nor indicated hydrogen.
         ("O1S2(OC3=C1C=CC=C3)OC3=C(O2)C=CC=C3",
-         "2lambda4,2'-spirobi[[1,3,2]benzodioxathiole]"),
+         "2λ4,2'-spirobi[[1,3,2]benzodioxathiole]"),
         ("c1ccc2c(c1)OS1(O2)Oc2ccccc2O1",
-         "2lambda4,2'-spirobi[[1,3,2]benzodioxathiole]"),
+         "2λ4,2'-spirobi[[1,3,2]benzodioxathiole]"),
         # Owned by _name_spiro_vonbaeyer_core, not the spirobi core -- pinned so a
         # change of dispatch shows up here.
         ("c1ccc2c(c1)-c1ccccc1C21c2ccccc2-c2ccccc21", "9,9'-spirobi[fluorene]"),

@@ -89,7 +89,7 @@ def test_replacement_prefix_cites_every_heteroatom_with_a_locant_and_lambda():
     mol, ring = _ring('[SH2]1C=CC=C1')               # λ4-thiophene
     res = terminal_ring_name(mol, ring, None)
     assert res is not None
-    assert res.name == '1lambda4-thiacyclopenta-2,4-diene'
+    assert res.name == '1λ4-thiacyclopenta-2,4-diene'
 
     # two heteroatoms -> two locants, multiplied, in P-23.3.1 element order
     mol, ring = _ring('C1COCCS1')

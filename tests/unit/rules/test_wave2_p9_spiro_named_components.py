@@ -10,13 +10,13 @@ from orthonym.rules import spiro
 # (lambda6) S shared by three distinct named ring components in three rings.
 TARGET_SMILES = "C1=CC=CC=2S34(C5=C(C21)C=CC=C5)(OC5=C(S3)C=CC=C5)OC5=C(O4)C=CC=C5"
 TARGET_PIN = (
-    "2lambda6-spiro[[1,3,2]benzodioxathiole-2,2'-([1,2,3]benzoxadithiole)-"
+    "2λ6-spiro[[1,3,2]benzodioxathiole-2,2'-([1,2,3]benzoxadithiole)-"
     "2,5''-dibenzo[b,d]thiophene]"
 )
 
 # 3 identical benzodioxathiole (P-24.8.3 spiroter) — the new branch must decline.
 SPIROTER_SMILES = "O1S23(OC4=C1C=CC=C4)(OC4=C(O2)C=CC=C4)OC4=C(O3)C=CC=C4"
-SPIROTER_PIN = "2lambda6,2',2''-spiroter[[1,3,2]benzodioxathiole]"
+SPIROTER_PIN = "2λ6,2',2''-spiroter[[1,3,2]benzodioxathiole]"
 
 # 2 identical benzodioxathiole + 1 benzoxadithiole (P-24.8.4.3 'bis' form).
 # OPSIN 2.9 cannot parse the 'bis' name -> permanently fail-closed.

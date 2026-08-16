@@ -106,7 +106,7 @@ class TestP24LambdaMonocyclicTripleSpiro:
     # so the previously-deferred case now BUILDS via the spiroter path (the
     # dedicated name_lambda_multiring_spiro von-Baeyer form is unneeded here).
     _NEAREST = "C1CS23(C1)(CCC2)CCC3"  # lambda6 S in three 4-membered rings
-    _TARGET = "1lambda6,1',1''-spiroter[thietane]"
+    _TARGET = "1λ6,1',1''-spiroter[thietane]"
 
     def test_lambda_trispiro(self):
         assert name_compound(self._NEAREST) == self._TARGET
@@ -123,11 +123,11 @@ class TestP24LambdaMonocyclicTripleSpiro:
 class TestP24LambdaSpirobiSpiroter:
     def test_lambda4_spirobi_benzodioxathiole(self):
         assert name_compound("O1S2(OC3=C1C=CC=C3)OC3=C(O2)C=CC=C3") == \
-            "2lambda4,2'-spirobi[[1,3,2]benzodioxathiole]"
+            "2λ4,2'-spirobi[[1,3,2]benzodioxathiole]"
 
     def test_lambda6_spiroter_benzodioxathiole(self):
         assert name_compound("O1S23(OC4=C1C=CC=C4)(OC4=C(O2)C=CC=C4)OC4=C(O3)C=CC=C4") == \
-            "2lambda6,2',2''-spiroter[[1,3,2]benzodioxathiole]"
+            "2λ6,2',2''-spiroter[[1,3,2]benzodioxathiole]"
 
 
 @pytest.mark.unit
@@ -140,7 +140,7 @@ class TestP24LambdaSpiroDifferent:
     # component names, so the von-Baeyer '-ene' suffix machinery (which is scoped
     # to cage components only) does NOT fire. OPSIN-round-trippable.
     _SMILES = "N1=P2(N=CN=C1)OC1=C(N2)C=CC=C1"
-    _TARGET = ("3H-2lambda5-spiro[[1,3,2]benzoxazaphosphole-2,2'-"
+    _TARGET = ("3H-2λ5-spiro[[1,3,2]benzoxazaphosphole-2,2'-"
                "[1,3,5,2]triazaphosphinine]")
 
     def test_lambda5_spiro_benzoxazaphosphole_triazaphosphinine(self):
@@ -176,7 +176,7 @@ class TestP24LambdaUnbranchedPolyspiro:
     # _build_lambda_ih_front_prefix (indicated-H NOT at a spiro atom is
     # front-cited; the λ spiro atoms are cited once each). OPSIN-round-trippable.
     _SMILES = "S12(CCCC1)C=C1C(=C2)C=C2CS3(CC2=C1)CCCCC3"
-    _TARGET = ("1'H,3'H-1lambda4,1''lambda4-dispiro[thiane-1,2'-"
+    _TARGET = ("1'H,3'H-1λ4,1''λ4-dispiro[thiane-1,2'-"
                "benzo[1,2-c:4,5-c']dithiophene-6',1''-thiolane]")
 
     def test_lambda_dispiro_thiane_dithiophene_thiolane(self):

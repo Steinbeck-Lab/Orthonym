@@ -91,7 +91,7 @@ BASELINE = [
     ("[GeH2]1[GeH2][GeH]2[GeH2][GeH2][GeH]1[GeH2]2",
      "1,2,3,4,5,6,7-heptagerma"),
     ("[Te]1[Te][Te]2[Te][Te][Te]1[Te]2",
-     "1lambda3,2,3,4lambda3,5,6,7-heptatellura"),
+     "1λ3,2,3,4λ3,5,6,7-heptatellura"),
     # --- multi-element citation order (element seniority, NOT locant order) ---
     ("O1CC2CNC1C2", "3-oxa-5-aza"),
     ("O1CC2CSC1C2", "3-oxa-5-thia"),
@@ -104,12 +104,12 @@ BASELINE = [
     ("[SnH2]1CC2C[PbH2]C1C2", "3-stanna-5-plumba"),
     ("[SbH]1CC2C[BiH]C1C2", "3-stiba-5-bisma"),
     # --- lambda IS cited (valence exceeds the connectivity-forced value) ---
-    ("C1C[SH2]C2CCC1C2", "2lambda4-thia"),
-    ("C1C[SH4]C2CCC1C2", "2lambda6-thia"),
-    ("C1C[PH3]C2CCC1C2", "2lambda5-phospha"),
-    ("[TeH]1CC2CCC1C2", "3lambda3-tellura"),
-    ("[PH]12CCC(CC1)C2", "1lambda4-phospha"),
-    ("[SbH]12CCC(CC1)C2", "1lambda4-stiba"),
+    ("C1C[SH2]C2CCC1C2", "2λ4-thia"),
+    ("C1C[SH4]C2CCC1C2", "2λ6-thia"),
+    ("C1C[PH3]C2CCC1C2", "2λ5-phospha"),
+    ("[TeH]1CC2CCC1C2", "3λ3-tellura"),
+    ("[PH]12CCC(CC1)C2", "1λ4-phospha"),
+    ("[SbH]12CCC(CC1)C2", "1λ4-stiba"),
     # --- lambda is SUPPRESSED (bridgehead valence forced by skeletal degree, so
     #     an explicit lambda there is redundant and rejected) ---
     ("[TeH]12CCC(CC1)C2", "1-tellura"),
@@ -118,7 +118,7 @@ BASELINE = [
     ("[SnH]12CCC(CC1)C2", "1-stanna"),
     # --- suppressed on one atom, cited on others, in one prefix ---
     ("[TeH]1[Te][TeH]2[Te][Te][Te]1[Te]2",
-     "1,2,3lambda3,4lambda3,5,6,7-heptatellura"),
+     "1,2,3λ3,4λ3,5,6,7-heptatellura"),
     # --- no heteroatoms ---
     ("C1CC2CCC1C2", ""),
 ]

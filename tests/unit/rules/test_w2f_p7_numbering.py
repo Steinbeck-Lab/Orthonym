@@ -10,4 +10,4 @@ import orthonym
 
 def test_p1444h_lambda_lowest_locant():
     assert orthonym.name_compound("OC(C[PH4])CP", style="pin") == \
-        "1-(lambda5-phosphanyl)-3-phosphanylpropan-2-ol"
+        "1-(λ5-phosphanyl)-3-phosphanylpropan-2-ol"

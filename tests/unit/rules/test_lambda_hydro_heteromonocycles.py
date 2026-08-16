@@ -41,9 +41,9 @@ def _ring_name(smiles):
 BB_PIN_MANCUDE = [
     # 3H- puts the indicated hydrogen on a CARBON.  This is the case the old
     # guard refused, while emitting its 1H- companion perfectly well.
-    ("[SH]1=CCC=C1", "3H-1lambda4-thiophene"),    # :9171
-    ("[SH2]1C=CC=C1", "1H-1lambda4-thiophene"),   # :9167
-    ("[SH2]1C=CC=CC=C1", "1H-1lambda4-thiepine"),  # :9496
+    ("[SH]1=CCC=C1", "3H-1λ4-thiophene"),    # :9171
+    ("[SH2]1C=CC=C1", "1H-1λ4-thiophene"),   # :9167
+    ("[SH2]1C=CC=CC=C1", "1H-1λ4-thiepine"),  # :9496
 ]
 
 
@@ -63,7 +63,7 @@ def test_hydro_lambda_ring_matches_the_bluebook_parent_hydride():
     citation and heteroatom locants must be spelled exactly as the Blue Book
     spells them in the substituted name.
     """
-    assert _ring_name("[SH]1=NCCCC1") == "3,4,5,6-tetrahydro-1lambda4,2-thiazine"
+    assert _ring_name("[SH]1=NCCCC1") == "3,4,5,6-tetrahydro-1λ4,2-thiazine"
 
 
 # --------------------------------------------------------------------------
@@ -77,11 +77,11 @@ def test_hydro_lambda_ring_matches_the_bluebook_parent_hydride():
 # this: the two numberings describe the same molecule, and the whole class
 # round-tripped 707/707 while these were still wrong.
 P14_4B_MINIMAL_IH = [
-    ("C1=CC[SH]=C1", "2H-1lambda4-thiophene"),        # was 5H-
-    ("C1=CCC=C[SH]=C1", "4H-1lambda4-thiepine"),      # was 5H-
-    ("C1=CCC=[SH]C=C1", "3H-1lambda4-thiepine"),      # was 6H-
-    ("C1=CC=CC[SH]=CC=C1", "2H-1lambda4-thionine"),   # was 9H-
-    ("C1=CCC=CC=[SH]C=C1", "5H-1lambda4-thionine"),   # was 6H-
+    ("C1=CC[SH]=C1", "2H-1λ4-thiophene"),        # was 5H-
+    ("C1=CCC=C[SH]=C1", "4H-1λ4-thiepine"),      # was 5H-
+    ("C1=CCC=[SH]C=C1", "3H-1λ4-thiepine"),      # was 6H-
+    ("C1=CC=CC[SH]=CC=C1", "2H-1λ4-thionine"),   # was 9H-
+    ("C1=CCC=CC=[SH]C=C1", "5H-1λ4-thionine"),   # was 6H-
 ]
 
 
@@ -111,7 +111,7 @@ def test_retained_stem_is_whole_stem_not_suffix():
     assert _apply_retained_stem("1,3-dithiole") == "1,3-dithiole"
     assert _apply_retained_stem("1,3-oxazole") == "1,3-oxazole"
     assert _apply_retained_stem("1,4-dioxine") == "1,4-dioxine"
-    assert _apply_retained_stem("1lambda4,2-thiazine") == "1lambda4,2-thiazine"
+    assert _apply_retained_stem("1λ4,2-thiazine") == "1λ4,2-thiazine"
 
 
 @pytest.mark.unit
@@ -121,7 +121,7 @@ def test_retained_stem_applies_to_every_row_of_the_one_table():
     # selenopyran/telluropyran :8141, pyrrole :8163, pyridine :8157.
     assert _apply_retained_stem("azole") == "pyrrole"
     assert _apply_retained_stem("2H-azole") == "2H-pyrrole"
-    assert _apply_retained_stem("1lambda4-thiine") == "1lambda4-thiopyran"
+    assert _apply_retained_stem("1λ4-thiine") == "1λ4-thiopyran"
     for stem, retained in _MANCUDE_RETAINED_STEM.items():
         assert _apply_retained_stem(stem) == retained
         assert _apply_retained_stem("7-" + stem) == "7-" + retained
@@ -132,7 +132,7 @@ def test_mancude_five_and_six_ring_stems_are_retained_names():
     # Regression locks for the three names the shared table changed.
     assert _ring_name("C1=CCN=C1") == "2H-pyrrole"
     assert _ring_name("C1=CN=CC1") == "3H-pyrrole"
-    assert _ring_name("C1=CC=[SH]C=C1") == "1lambda4-thiopyran"
+    assert _ring_name("C1=CC=[SH]C=C1") == "1λ4-thiopyran"
 
 
 # --------------------------------------------------------------------------
@@ -222,4 +222,4 @@ def test_lambda_ring_never_loses_its_lambda():
     for smiles in ("[SH2]1CCC=C1", "[SH]1=NCCCC1", "C1=[SH]CC1",
                    "C1=CCC[SH]=C1", "C1=CC=CCC[SH]=CC=C1"):
         name = _ring_name(smiles)
-        assert name and "lambda4" in name, f"{smiles} -> {name}"
+        assert name and "λ4" in name, f"{smiles} -> {name}"

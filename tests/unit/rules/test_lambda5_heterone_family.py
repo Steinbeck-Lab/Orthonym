@@ -79,14 +79,14 @@ def namer():
 BUILT_HETERONES = [
     (
         "O=P(c1ccccc1)(c1ccccc1)c1ccccc1",
-        "triphenyl-lambda5-phosphanone",
+        "triphenyl-λ5-phosphanone",
         "P-74.2.1.4 :43054 (PIN); repeated :29410 and :39129, the latter "
-        "adding '(not oxotriphenyl-lambda5-phosphane)'.",
+        "adding '(not oxotriphenyl-λ5-phosphane)'.",
     ),
     (
         "CP(C)(C)=O",
-        "trimethyl-lambda5-phosphanone",
-        "BB :7023 index entry 'trimethylphosphane oxide / trimethyl-lambda5-"
+        "trimethyl-λ5-phosphanone",
+        "BB :7023 index entry 'trimethylphosphane oxide / trimethyl-λ5-"
         "phosphanone (PIN, P-68.3.2.3.1, P-74.2.1.4)'.",
     ),
     (
@@ -94,7 +94,7 @@ BUILT_HETERONES = [
         "phenylphosphanone",
         "P-64.1.2.2 :28291 (PIN) '(not phosphorosobenzene)'; repeated :39125. "
         "BOUNDARY: lambda-3 phosphorus, so NO lambda descriptor is emitted -- "
-        "the pair with triphenyl-lambda5-phosphanone proves the lambda is "
+        "the pair with triphenyl-λ5-phosphanone proves the lambda is "
         "computed from the hub's bonding number, not pasted on.",
     ),
     (
@@ -110,14 +110,14 @@ BUILT_HETERONES = [
     ),
     (
         "CCC[P](C)(=O)c1ccccc1",
-        "methyl(phenyl)(propyl)-lambda5-phosphanone",
-        "BB :46006 '(S)-methyl(phenyl)(propyl)-lambda5-phosphanone (PIN; see "
+        "methyl(phenyl)(propyl)-λ5-phosphanone",
+        "BB :46006 '(S)-methyl(phenyl)(propyl)-λ5-phosphanone (PIN; see "
         "P-74.2.1.4)'. BOUNDARY: three DIFFERENT substituents, so P-16.5.1.3 "
         "enclosing marks apply -- first cited unmarked, rest parenthesised.",
     ),
     (
         "C[As](C)(C)=O",
-        "trimethyl-lambda5-arsanone",
+        "trimethyl-λ5-arsanone",
         "P-74.2.1.4 :43057 'These methods are also applied to arsine and "
         "stibine oxides, sulfides, etc.'",
     ),
@@ -130,34 +130,34 @@ BUILT_HETERONES = [
     # --- the DIONE half, shipped by Task R2 ---
     (
         "O=P(=O)c1ccccc1",
-        "phenyl-lambda5-phosphanedione",
-        "P-61.6 :25983 VERBATIM (PIN): 'phenyl-lambda5-phosphanedione (PIN) "
-        "dioxo(phenyl)-lambda5-phosphane (not phosphobenzene)'.",
+        "phenyl-λ5-phosphanedione",
+        "P-61.6 :25983 VERBATIM (PIN): 'phenyl-λ5-phosphanedione (PIN) "
+        "dioxo(phenyl)-λ5-phosphane (not phosphobenzene)'.",
     ),
     (
         "CP(=O)=O",
-        "methyl-lambda5-phosphanedione",
-        "P-64.1.2.2 :28287 VERBATIM (PIN): 'CH3-PO2 methyl-lambda5-"
-        "phosphanedione (PIN) methyldi(oxo)-lambda5-phosphane (not "
+        "methyl-λ5-phosphanedione",
+        "P-64.1.2.2 :28287 VERBATIM (PIN): 'CH3-PO2 methyl-λ5-"
+        "phosphanedione (PIN) methyldi(oxo)-λ5-phosphane (not "
         "phosphomethane)'.",
     ),
     (
         "O=[As](=O)c1ccccc1",
-        "phenyl-lambda5-arsanedione",
+        "phenyl-λ5-arsanedione",
         "DERIVED, not printed verbatim -- 'arsanedione' has 0 hits in the Blue "
         "Book. P-61.6 :25977 declares -AsO2 a heterone in the same sentence as "
-        "-PO2 and prints its preselected prefix dioxo-lambda5-arsanyl (also the "
+        "-PO2 and prints its preselected prefix dioxo-λ5-arsanyl (also the "
         "prefix table :55895, structure O2As-, source P-61.6); P-64.1.2.2 "
         ":28281 gives the suffix ('named in the same way as ketones'); the "
-        "arsane stem, its lambda5 form and the mononuclear -one/-dione suffix "
-        "are each printed (arsanone PIN :25985, trimethyl-lambda5-arsanone "
+        "arsane stem, its λ5 form and the mononuclear -one/-dione suffix "
+        "are each printed (arsanone PIN :25985, trimethyl-λ5-arsanone "
         ":43057, phosphanedione PIN x2). Elision follows phosphane+dione. OPSIN "
         "2.9.0 parses it to the exact input structure (validity, not PIN "
         "authority).",
     ),
     (
         "C[As](=O)=O",
-        "methyl-lambda5-arsanedione",
+        "methyl-λ5-arsanedione",
         "Same derivation as the phenyl arsanedione above; the methyl member is "
         "the exact -AsO2 analogue of the printed CH3-PO2 PIN at :28287.",
     ),
@@ -195,7 +195,7 @@ FAIL_CLOSED = [
         "OP(=O)=O",
         "Metaphosphoric acid HO-PO2: two terminal oxo groups AND a P-OH, so it "
         "passes the oxo census and is refused only by the organyl purity loop. "
-        "Inorganic (P-67 acid), never a 'hydroxy-lambda5-phosphanedione'.",
+        "Inorganic (P-67 acid), never a 'hydroxy-λ5-phosphanedione'.",
     ),
     (
         "COP(=O)=O",
@@ -212,16 +212,17 @@ FAIL_CLOSED = [
         "A carboxylic acid on the organyl. The COOH is senior, so the heterone "
         "must NOT capture the molecule as a dione parent; P-61.6 :25977 says "
         "that in the presence of a more senior characteristic group the group "
-        "is cited by the prefix dioxo-lambda5-phosphanyl instead.",
+        "is cited by the prefix dioxo-λ5-phosphanyl instead.",
     ),
 ]
 
 
 def _norm(name):
-    """The CLI renders the lambda as 'lambda5'; normalise any unicode form."""
+    """The CLI renders the lambda as 'λ5'; normalise any alternate rendering
+    (superscript unicode or the retired ASCII 'lambda5' spelling) to it."""
     return (
-        name.replace("λ⁵", "lambda5")
-        .replace("λ5", "lambda5")
+        name.replace("λ⁵", "λ5")
+        .replace("lambda5", "λ5")
         .replace("<sup>5</sup>", "5")
     )
 
@@ -244,10 +245,10 @@ def test_lambda_descriptor_tracks_the_hub_bonding_number(namer):
 
     The two phosphanones differ ONLY in the hub's bonding number, so this pins
     the λ-convention itself rather than a spelling. A regression that hard-coded
-    'lambda5' onto every phosphanone would pass every row above except this one.
+    'λ5' onto every phosphanone would pass every row above except this one.
     """
-    assert "lambda5" not in _norm(namer.name("O=Pc1ccccc1"))
-    assert "lambda5" in _norm(namer.name("O=P(c1ccccc1)(c1ccccc1)c1ccccc1"))
+    assert "λ5" not in _norm(namer.name("O=Pc1ccccc1"))
+    assert "λ5" in _norm(namer.name("O=P(c1ccccc1)(c1ccccc1)c1ccccc1"))
 
 
 @pytest.mark.parametrize(
@@ -271,8 +272,8 @@ def test_lambda_is_computed_for_the_dione_too(namer):
     Paired with ``phenylphosphanone`` (λ³, no descriptor) this shows the same
     computation drives both oxo counts.
     """
-    assert _norm(namer.name("CP(=O)=O")) == "methyl-lambda5-phosphanedione"
-    assert "lambda" not in _norm(namer.name("O=Pc1ccccc1"))
+    assert _norm(namer.name("CP(=O)=O")) == "methyl-λ5-phosphanedione"
+    assert "λ" not in _norm(namer.name("O=Pc1ccccc1"))
 
 
 def test_the_dione_element_gate_is_the_bluebook_class_not_the_hub_list():
@@ -317,4 +318,4 @@ def test_p74_2_1_5_heterimine_also_emits(namer):
     italicised locants.
     """
     got = _norm(namer.name("CCN=P(c1ccccc1)(c1ccccc1)c1ccccc1"))
-    assert got == "N-ethyl-P,P,P-triphenyl-lambda5-phosphanimine"
+    assert got == "N-ethyl-P,P,P-triphenyl-λ5-phosphanimine"

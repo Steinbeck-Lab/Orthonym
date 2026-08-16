@@ -31,7 +31,7 @@ GUARD = {
     "C[B-](C)(C)C": "tetramethylboranuide",                           # P-72.3
     "C[P-](C)(C)C": "tetramethylphosphanuide",                        # P-72.3
     "NC(=[OH+])N": "uronium",                                         # P-73.1.2.2
-    "CCC=[S+][O-]": "propylidene-lambda4-sulfanone",                  # P-74.2.2.1.8
+    "CCC=[S+][O-]": "propylidene-λ4-sulfanone",                       # P-74.2.2.1.8
     "CC(C)[O-]": "propan-2-olate",                                    # P-72.2.2.2.2
 }
 

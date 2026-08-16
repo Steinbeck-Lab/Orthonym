@@ -246,13 +246,13 @@ def test_the_open_exception_set_still_cites(namer, smiles, expected, bb):
      "the P-68.4.2.2 parent+suffix layer, already locant-free by its own route"),
     ("CSSSO", "methyltrisulfanol", "ditto"),
     ("CC(C)SSO", "(propan-2-yl)disulfanol", "ditto, compound prefix"),
-    ("CS(=O)S(=O)C", "1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione",
+    ("CS(=O)S(=O)C", "1,2-dimethyl-1λ4,2λ4-disulfane-1,2-dione",
      "★ the P-68.4.3.2 sulfoxide/sulfone layer CITES, and must: the lambda and "
      "-one suffix locants are essential, so P-14.3.3 restores every locant. "
      "BB 29415 `1-methyl-2-phenyl-1lambda6,2lambda6-disulfane-1,1,2,2-tetrone` "
      "(PIN) is the verbatim witness"),
     ("CC(C)S(=O)S(=O)C",
-     "1-methyl-2-(propan-2-yl)-1lambda4,2lambda4-disulfane-1,2-dione", "ditto"),
+     "1-methyl-2-(propan-2-yl)-1λ4,2λ4-disulfane-1,2-dione", "ditto"),
 ])
 def test_neighbouring_layers_unchanged(namer, smiles, expected, why):
     assert namer.name(smiles) == expected, why

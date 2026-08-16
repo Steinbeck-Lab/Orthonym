@@ -644,7 +644,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     # P-22.2.7.1). Fail-closed: a lambda atom without a determinate NUMERIC
     # fused locant (or on skeletal carbon) invalidates the whole name — the
     # lambda-less name would denote a DIFFERENT molecule.
-    from .lambda_convention import nonstandard_bonding_number
+    from .lambda_convention import nonstandard_bonding_number, LAMBDA
     lam_entries = []
     for idx in sorted(ring_atom_set):
         lam = nonstandard_bonding_number(mol, idx)
@@ -660,7 +660,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if lam_entries:
         lam_entries.sort()
         lam_prefix = ','.join(
-            f"{loc}lambda{lam}" for loc, lam in lam_entries
+            f"{loc}{LAMBDA}{lam}" for loc, lam in lam_entries
         ) + '-'
 
     if indicated_h:
@@ -1259,10 +1259,10 @@ def name_fused_heterocycle(mol):
     # mandatory lambda tokens). Catalog and core-substructure matches are
     # standard-valence structures — matching one here would name a different
     # molecule. Fail closed if the algorithmic path declines.
-    from .lambda_convention import nonstandard_bonding_number as _nsbn
+    from .lambda_convention import nonstandard_bonding_number as _nsbn, LAMBDA as _LAMBDA
     if any(_nsbn(mol, i) is not None for i in ring_atoms):
         _lam_name = _try_algorithmic_fusion_name(mol)
-        if _lam_name and 'lambda' in _lam_name:
+        if _lam_name and _LAMBDA in _lam_name:
             return (_lam_name, ring_atoms, {}, True)
         return None
 
