@@ -4011,9 +4011,23 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
         # Alcohol: add hydroxy prefix
         return _prefix_stem_yl("hydroxy", stem)
 
-    # ---- Locanted ketone: -an-N-one ----
+    # ---- Locanted ketone: -N-one ----
     # e.g., "butan-2-one" -> "2-oxobutyl"
-    m_one = re.search(r'an?-(\d+)-one$', name)
+    # Task L3-0 (v33 Phase 0): was anchored to a literal 'a'(+optional 'n')
+    # immediately before the locant digit (`an?-(\d+)-one$`), which requires
+    # the locant to sit right after a saturated '-an-' infix. An unsaturated
+    # chain hides the locant behind '-en-'/'-yn-' instead (e.g.
+    # "hept-2-en-4-one" -- the char before "-4-one" is the 'n' of 'en', not
+    # of 'an'), so the narrow anchor missed it and execution fell through to
+    # the "Unlocanted ketone" branch below, which silently spliced 'oxo' onto
+    # the stem with NO locant at all -- dropping a real, load-bearing locant
+    # rather than declining ('oxo-2-methylhept-2-en-4-yl'; OPSIN then places
+    # the uncited oxo at the lowest available position, a different molecule).
+    # Widened to match ANY locant immediately before '-one$', mirroring the
+    # already-correct sibling "Locanted alcohol" pattern two blocks up
+    # (`r'-(\d+)-ol$'`, documented there to match saturated/unsaturated/bare
+    # forms alike).
+    m_one = re.search(r'-(\d+)-one$', name)
     if m_one:
         return _decline_unjustifiable(
             "oxo", "locant borrowed from the capped molecule's numbering")
@@ -4029,9 +4043,12 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
             stem = base
         return _prefix_stem_yl("oxo", stem)
 
-    # ---- Locanted amine: -an-N-amine ----
+    # ---- Locanted amine: -N-amine ----
     # e.g., "propan-1-amine" -> "1-aminopropyl"
-    m_amine = re.search(r'an?-(\d+)-amine$', name)
+    # Task L3-0 (v33 Phase 0): same narrow-anchor blind spot as `m_one` above
+    # (`an?-(\d+)-amine$` misses an unsaturated "-en-N-amine"/"-yn-N-amine"
+    # chain, e.g. "hept-2-en-4-amine"), widened the same way.
+    m_amine = re.search(r'-(\d+)-amine$', name)
     if m_amine:
         # The R8.2 witness: '2,12-dimethyltetradecan-3-amine' ->
         # '3-amino-2,12-dimethyltetradecyl'. Numbered from the free valence the
