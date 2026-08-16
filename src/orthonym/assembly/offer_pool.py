@@ -79,3 +79,28 @@ def select_offer(offers: List[Offer]) -> Optional[Offer]:
     """The single most-preferred offer, or ``None`` for an empty pool."""
     ranked = rank_offers(offers)
     return ranked[0] if ranked else None
+
+
+def select_rt_passing(offers: List[Offer], rt_ok) -> Optional[Offer]:
+    """v33 Phase 0 L4-core: the RT/PIN-gate-over-offers SELECTION PRIMITIVE.
+
+    Walks ``rank_offers(offers)`` in order and returns the FIRST offer that is
+    both ``.complete`` and passes the caller-injected ``rt_ok(offer) -> bool``
+    predicate; ``None`` if no offer qualifies (including an empty pool).
+
+    This is the SAFETY NET every later offer (a systematic floor, a capability
+    producer) relies on: an added offer can never win purely on rank -- it
+    must also pass whichever OPSIN round-trip / self-consistency check
+    ``rt_ok`` encodes. With today's single-offer pool this is a proven
+    IDENTITY whenever that offer's own ``rt_ok`` is True (the common case,
+    since the primary winner was already gated upstream); the caller's
+    contract (not this function's) is to fall back to the name already
+    shipping when this returns ``None``, rather than newly abstaining.
+
+    ``rt_ok`` is injected (never imported) so this module stays pure -- no
+    OPSIN, no rdkit, no `namer` import, matching the rest of the module.
+    """
+    for offer in rank_offers(offers):
+        if offer.complete and rt_ok(offer):
+            return offer
+    return None

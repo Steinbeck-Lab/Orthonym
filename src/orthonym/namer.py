@@ -1443,6 +1443,54 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     return _suppressed_to
 
 
+def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
+    """v33 Phase 0 L4-core: the RT/PIN-gate PASS/FAIL predicate for ONE
+    candidate ``name`` offered as a whole-molecule winner (the ``rt_ok``
+    ``offer_pool.select_rt_passing`` is injected with, built at `_finish`).
+
+    NO double-OPSIN: for the (today, ALWAYS) common case where the validity
+    gate already ran on this EXACT string, this reuses that recorded SELF-01
+    verdict via `_self01_lookup` -- ZERO fresh OPSIN calls. Only a string with
+    NO recorded verdict for it (e.g. a name `_apply_trivial_fallback` swapped
+    in AFTER the gate ran, or a future alternative offer the gate never saw
+    at all) triggers ONE fresh, LOW-LEVEL check -- `_validity_gate_name_to_smiles`
+    + `_self_consistency_verdict` -- never `_final_opsin_validity_gate` itself,
+    which would re-run the whitelist carve-outs and record suppression
+    telemetry a SECOND time for a name the gate machinery may already hold a
+    (different-string) opinion about.
+
+    Fail-OPEN throughout, mirroring L1's `method == "unavailable"` handling:
+    jar-absent, a transient 'unavailable' OPSIN outcome, and an inconclusive
+    self-consistency compare all return True. This predicate must never be
+    the reason `select_rt_passing` empties the whole offer pool.
+    """
+    self01_complete, skip_reanchor, _detail = _self01_lookup(name)
+    if self01_complete is True:
+        return True
+    if self01_complete is False:
+        # self01_warn_mismatch -- a PROVEN constitutional mismatch shipped
+        # anyway under _SC_MODE=="warn". A real fail for RT-gating purposes.
+        return False
+    if skip_reanchor:
+        # carveout:* / gate_disabled / unavailable / not_run -- no jar was
+        # (or would be) consulted; fail-OPEN rather than treat "no verdict"
+        # as a rejection.
+        return True
+    # No recorded verdict at all (suppressed / inconclusive / bypassed /
+    # self01_skipped / descriptive_fallback outcome, OR a string the gate
+    # never saw -- e.g. a post-gate trivial-fallback swap, or a future
+    # alternative offer). ONE fresh, low-level check.
+    if not _validity_gate_jar_present():
+        return True  # fail-OPEN: no jar to consult
+    opsin_smiles = _validity_gate_name_to_smiles(name)
+    if opsin_smiles is None:
+        # A transient 'unavailable' fails OPEN; a definitive 'rejected' does not.
+        return _validity_gate_status(name) == "unavailable"
+    if not input_smiles:
+        return True  # nothing to compare against -- inconclusive, fail-OPEN
+    return _self_consistency_verdict(input_smiles, opsin_smiles) != "mismatch"
+
+
 # ---------------------------------------------------------------------------
 # Compound class pre-routing (Phase 141, CLASS-06)
 # ---------------------------------------------------------------------------
@@ -3755,20 +3803,28 @@ class Orthonym:
                                 "abstaining instead of shipping %r",
                                 verdict.method, verdict.detail, name[:80])
                             name = _descriptive_fallback(smiles)
-                        # v33 Phase 0 L2: wrap the current winner (post-veto,
-                        # so its `.name` is exactly whatever `name` holds at
-                        # this point -- the fallback string if L1 just fired,
-                        # the original winner otherwise) as ONE `Offer` and
-                        # run it through `select_offer`. With a single offer
-                        # this is a provable IDENTITY: `select_offer` returns
-                        # `rank_offers([offer])[0]`, which is `offer` itself,
-                        # so `name = selected.name` reassigns `name` to the
-                        # exact value it already held -- byte-identical by
-                        # construction, not by coincidence of the ranking key.
-                        # This is the enabling structure for L3 (a second,
-                        # systematic-floor offer) and L4 (RT-gated retry
-                        # offers over the ranked pool); neither exists yet, so
-                        # today's pool size is always 0 or 1.
+                        # v33 Phase 0 L2/L4-core: wrap the current winner
+                        # (post-veto, so its `.name` is exactly whatever
+                        # `name` holds at this point -- the fallback string
+                        # if L1 just fired, the original winner otherwise) as
+                        # ONE `Offer` and run it through
+                        # `select_rt_passing` -- the RT-GATE-OVER-OFFERS
+                        # selection primitive (L4-core): the first offer, in
+                        # rank order, that is both `.complete` AND passes the
+                        # `_offer_rt_ok` predicate below. With a single offer
+                        # this is a provable IDENTITY WHENEVER that offer's
+                        # own `rt_ok` is True (the common case -- the primary
+                        # winner was already gated upstream, so `_offer_rt_ok`
+                        # reuses that recorded SELF-01 verdict via
+                        # `_self01_lookup`, zero fresh OPSIN calls); if
+                        # `select_rt_passing` returns `None` (no offer both
+                        # complete and rt_ok), `_select_rt_passing_offer_name`
+                        # below falls back to the CURRENT `name` unchanged --
+                        # L4-core must never newly-abstain a name that ships
+                        # today, only add the selection MECHANISM. This is
+                        # the safety net L3-1's floor offer (and later
+                        # capability offers) rely on: an added offer can
+                        # never win un-RT-gated.
                         #
                         # `result_obj`/`is_pin`/`tier`/`source` are read from
                         # the SAME provenance `name_tiered` derives its labels
@@ -3808,14 +3864,12 @@ class Orthonym:
                                 else "T4")
                         else:
                             _offer_is_pin, _offer_tier = True, "T1"
-                        from .assembly.offer_pool import Offer, select_offer
+                        from .assembly.offer_pool import Offer
                         self._offers = [Offer(
                             name=name, result_obj=_offer_result_obj,
                             is_pin=_offer_is_pin, tier=_offer_tier,
                             source=_offer_source, complete=verdict.complete)]
-                        _offer_selected = select_offer(self._offers)
-                        if _offer_selected is not None:
-                            name = _offer_selected.name
+                        name = self._select_rt_passing_offer_name(name, smiles)
         except Exception as _cae:  # pragma: no cover - defensive
             # SHADOW must never break a name regardless of what goes wrong
             # inside the audit; a VETO must fail OPEN on its own internal
@@ -3839,6 +3893,31 @@ class Orthonym:
         except Exception as _fe:      # pragma: no cover - defensive
             logger.info("binding-proof finish failed (ignored): %s", _fe)
             return name
+
+    def _select_rt_passing_offer_name(self, current_name: str,
+                                       smiles: str) -> str:
+        """v33 Phase 0 L4-core: run `select_rt_passing` over `self._offers`
+        (already built by the caller) with an `_offer_rt_ok`-backed predicate,
+        and return the winner's name -- or `current_name` UNCHANGED if no
+        offer is both `.complete` and `rt_ok` (never newly-abstain a name
+        that ships today; that is L4-core's whole contract, not this
+        function's choice to make).
+
+        Factored out of `_finish` as its own method (rather than inlined)
+        so it is independently testable with a hand-built `self._offers`
+        pool and a monkeypatched `_offer_rt_ok`, without needing a second
+        real offer to exist yet (L3-1 is what will add one).
+        """
+        from .assembly.offer_pool import select_rt_passing
+
+        def _rt_ok(offer):
+            return _offer_rt_ok(offer.name, smiles)
+
+        selected = select_rt_passing(self._offers, _rt_ok)
+        logger.info(
+            "select_rt_passing considered %d offer(s); winner=%r",
+            len(self._offers), selected.name if selected is not None else None)
+        return selected.name if selected is not None else current_name
 
     def _record_binding_proof(self, mol, eng, stage: str) -> None:
         """v29 P1: record a certified general-engine spine on the ledger.
