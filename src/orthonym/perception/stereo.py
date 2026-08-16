@@ -7,7 +7,7 @@ Chem.AssignStereochemistry() which fails on complex molecules.
 
 import logging
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict, Iterable, Optional
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
@@ -276,7 +276,7 @@ def get_undefined_stereocenters(mol) -> List[int]:
     return undefined
 
 
-def input_stereo_undefined(mol, atom_indices=None) -> bool:
+def input_stereo_undefined(mol, atom_indices: Optional[Iterable[int]] = None) -> bool:
     """True iff ``mol`` leaves a REAL stereo feature UNDEFINED: a tetrahedral
     stereocentre flagged possible but carrying no CIP configuration, or a
     stereogenic double bond left undirected. When ``atom_indices`` is given, the

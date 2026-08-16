@@ -304,12 +304,25 @@ def name_natural_product(mol) -> Optional[str]:
     # androst-/pregn-/...), which canonically asserts the WHOLE natural configuration
     # (P-103.1.3.1) -> that is the fabrication this guard declines.
     #
-    # A PARTIALLY-defined steroid is NOT a fabrication: steroid names carry PER-LOCANT
-    # alpha/beta descriptors, so the assembler emits an honest name citing only the
-    # defined centres and legally OMITS any undefined one (e.g. WSC-02 --
-    # `5alpha-pregnane-3beta,20-diol` -- cites C-5/C-3 and omits the undefined C-20;
-    # OPSIN round-trips that name to the SAME molecule, confirming it is not
-    # fabrication). Round 1 declined whenever ANY matched stereocentre was undefined
+    # A PARTIALLY-defined steroid is NOT decided by this guard alone -- it depends
+    # WHICH centre is the one that is defined. When at least one defined centre is a
+    # ring alpha/beta position, steroid names carry PER-LOCANT descriptors, so the
+    # assembler emits an honest name citing only the defined centres and legally
+    # OMITS any undefined one (e.g. WSC-02 -- `5alpha-pregnane-3beta,20-diol` -- cites
+    # C-5/C-3 and omits the undefined C-20; OPSIN round-trips that name to the SAME
+    # molecule). But when the ONLY defined matched centre is a SIDE-CHAIN position
+    # (e.g. C-20) and every ring centre is undefined, `_honesty_defined` below is
+    # still non-empty, so THIS guard does NOT decline -- and the assembler still
+    # emits the bare retained parent (`cholest-5-en-3-ol`), which asserts the whole
+    # natural ring configuration exactly as the fully-flat case does. That sub-case's
+    # real 0-wrong backstop is C3 (`namer.py::_self_consistency_verdict`, the
+    # `nb > na` branch), which rejects the emission once OPSIN re-parses the name and
+    # reports more specified stereocentres than the flat input defined. C2a is a
+    # belt, not the full guarantee: it declines the fully-flat scaffold outright (no
+    # matched centre defined at all); C3 catches the ring-flat/side-chain-defined
+    # rest. (A follow-up ticket may tighten this guard to key on RING centres
+    # specifically rather than any matched centre -- out of scope here.) Round 1
+    # declined whenever ANY matched stereocentre was undefined
     # (with a Blue-Book-cited C-5 exception, P-101.2.6/BlueBookV2.md:51045, for the one
     # ring position steroid names leave free); that broke WSC-02-shaped partially-defined
     # steroids. Measured (coordinator SPY): all 25 fabrication witnesses have ZERO

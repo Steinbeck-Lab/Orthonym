@@ -219,12 +219,20 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
         canonical_smiles, mol=mol, with_descriptor=is_top_level_naming(),
     )
     if trivial:
-        # v33 Phase 1 (C2b) STEREO HONESTY: a retained AA name implies a specific
-        # configuration (L, unless D-cited). At TOP-LEVEL naming, if the input leaves a
-        # real stereocentre undefined, that name fabricates stereo the input never
-        # defined (P-103.1.3.1) -> decline to the stereo-free systematic name below.
-        # Scoped to top-level: fragment decomposition keeps the bare name (peptides.py
-        # owns that path's guard). Achiral AAs (glycine) have no undefined centre.
+        # v33 Phase 1 (C2b) STEREO HONESTY: the blanket policy is TOP-LEVEL naming +
+        # an undefined real stereocentre -> decline the retained AA name and fall
+        # through to the stereo-free systematic name below. Config-fabrication is the
+        # PRIMARY reason (a retained AA name implies a specific configuration -- L,
+        # unless D-cited -- and asserting one for an input that leaves it undefined
+        # fabricates stereo the input never defined, P-92/P-93), but it is not the
+        # SOLE one: this same guard also demotes retained names that do not imply a
+        # configuration at all, e.g. butyrine (achiral at its would-be alpha centre in
+        # some substitution patterns), whenever the top-level input still leaves a
+        # real stereocentre elsewhere undefined -- the condition below is a blanket
+        # top-level+undefined-stereocentre check, not a per-name config-fabrication
+        # test. Scoped to top-level: fragment decomposition keeps the bare name
+        # (peptides.py owns that path's guard). Achiral AAs (glycine) have no
+        # undefined centre.
         from ..perception.stereo import input_stereo_undefined
         if not (is_top_level_naming() and input_stereo_undefined(mol)):
             return trivial

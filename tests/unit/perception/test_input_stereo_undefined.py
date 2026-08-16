@@ -36,3 +36,9 @@ def test_atom_indices_scopes_tetrahedral_check():
 
 def test_fail_closed_on_none():
     assert input_stereo_undefined(None) is True
+
+def test_fail_closed_on_non_mol_object():
+    # a non-None, non-Mol object blows up inside get_undefined_stereocenters ->
+    # the except-Exception branch must fail CLOSED (True), never silently treat an
+    # uncomputable case as "no undefined stereo".
+    assert input_stereo_undefined("not a mol") is True
