@@ -219,3 +219,64 @@ class TestCandidateLocantsMixedTuple:
         # must not raise TypeError
         res = nm.name("OCc1ccc2cc(-c3ccc4ccccc4c3)ccc2c1")
         assert isinstance(res, str)
+
+
+class TestCandidateLocantsMixedStrInt:
+    """v33 Phase 0 cleanup T3: `_candidate_locants` must not TypeError on
+    MIXED str/int locants either -- a distinct crash from the mixed
+    int/tuple one above (`TestCandidateLocantsMixedTuple`, v30 #40).
+
+    Root cause: the fast path at `_candidate_locants` reads
+    ``ring_info['iupac_locants']`` DIRECTLY (``pos = iupac``), bypassing
+    `_build_ring_pos`'s legacy-string filter (`parent_selection.py:172`,
+    ``isinstance(locant, (int, tuple))``) that would otherwise drop a bare
+    string locant like ``'3a'`` before it ever reaches `sorted()`. Because
+    the pre-existing homogenisation guard only tests
+    ``any(isinstance(v, tuple) for v in locs)``, a str-and-int mix with NO
+    tuple present at all skips that guard entirely and reaches plain
+    ``sorted([2, '3a', 5])`` -- `'<' not supported between instances of
+    'str' and 'int'` (measured, L3-2/L3-3 SPY).
+    """
+
+    def test_mixed_str_int_locants_no_typeerror(self):
+        from orthonym.rules.p44_scorer import _candidate_locants, ParentCandidate
+        mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene (10 atoms)
+        atoms = tuple(range(10))
+        cand = ParentCandidate(kind="ring", atoms=atoms, pg_count=0)
+        # A legacy-string fusion locant ('4a') left uncoerced alongside
+        # plain ints -- no tuple anywhere, so the existing
+        # any(isinstance(v, tuple)) homogenisation guard never fires.
+        iupac = {0: 1, 1: 2, 2: 3, 3: 4, 4: '4a',
+                  5: 5, 6: 6, 7: 7, 8: 8, 9: '8a'}
+        ring_info = {"iupac_locants": iupac}
+        out = _candidate_locants(mol, cand, [3, 4, 5, 9], ring_info=ring_info)
+        # Must not raise, and must be a DETERMINISTIC total order: every
+        # int-typed locant sorts before every (uncoerced) string locant,
+        # each bucket internally sorted the same way plain sorted() always
+        # gave it (ints numerically, strings lexicographically).
+        assert out == [4, 5, '4a', '8a']
+
+    def test_direct_sort_key_orders_all_three_shapes(self):
+        """Unit-level: the key alone, over int + (int, str) tuple + bare
+        str in ONE list -- proves the total order is crash-proof even for
+        a shape combination `_candidate_locants` itself never actually
+        assembles (belt-and-braces on the key, not just the call site)."""
+        from orthonym.rules.p44_scorer import _locant_sort_key
+        locs = [5, '3a', (2, 'b'), 1, '10b']
+        out = sorted(locs, key=_locant_sort_key)
+        assert out == [1, (2, 'b'), 5, '10b', '3a']
+
+    def test_homogeneous_int_list_byte_identical(self):
+        """Guard: a plain-int list (the common case) sorts EXACTLY as
+        bare `sorted()` always did -- the fix must not perturb it."""
+        from orthonym.rules.p44_scorer import _locant_sort_key
+        locs = [5, 1, 3, 2, 4]
+        assert sorted(locs, key=_locant_sort_key) == sorted(locs) == [1, 2, 3, 4, 5]
+
+    def test_homogeneous_tuple_list_byte_identical(self):
+        """Guard: a plain (int, str)-tuple list also sorts EXACTLY as
+        bare `sorted()` always did."""
+        from orthonym.rules.p44_scorer import _locant_sort_key
+        locs = [(4, 'a'), (4, ''), (8, 'a'), (5, '')]
+        assert (sorted(locs, key=_locant_sort_key) == sorted(locs)
+                == [(4, ''), (4, 'a'), (5, ''), (8, 'a')])

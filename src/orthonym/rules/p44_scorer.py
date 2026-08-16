@@ -188,6 +188,52 @@ def _n_multiple_bonds(mol, atom_set) -> Tuple[int, int]:
     return n_mult, n_dbl
 
 
+def _locant_sort_key(v):
+    """v33 Phase 0 cleanup T3: TOTAL, crash-proof sort key for the locant
+    values `_candidate_locants` collects (below).
+
+    The `_Locant` type contract (`locants.py`) only ever admits ``int`` or
+    ``(int, str)`` fusion/prime tuples -- but `_candidate_locants`'s FAST
+    PATH reads ``ring_info['iupac_locants']`` DIRECTLY (bypassing
+    `_build_ring_pos`'s legacy-string filter, which drops any locant that
+    is not ``int``/``tuple`` before the sorted-fallback proxy). When a
+    producer leaves a bare legacy-string locant (e.g. ``'3a'``, never
+    coerced to ``(3, 'a')``) in that dict and every one of ``cand.atoms``
+    still happens to be a key, the fast path takes it uncoerced -- and
+    plain ``sorted(locs)`` then compares that string against an ``int``/
+    ``tuple`` neighbour and raises ``TypeError`` (measured, L3-2/L3-3 SPY:
+    crashes ``_classify`` -> the molecule abstains; 0-wrong-safe but a
+    robustness defect).
+
+    This key bucket-separates by type -- ``(0, (base, suffix))`` for every
+    ``int``/``tuple`` locant (ints padded to ``(n, '')`` so two bucket-0
+    keys always compare tuple-to-tuple, never int-to-tuple) and
+    ``(1, str_val)`` for a bare string -- so bucket 0 always sorts before
+    bucket 1 and Python never has to compare across the two shapes.
+
+    This is deliberately NOT a claim that a bare string locant sorts into
+    the numerically "correct" position relative to the int/tuple ones --
+    doing that correctly means root-causing the producer that leaks the
+    unconverted string in the first place, out of scope for this fix (the
+    task brief sanctions the minimal safe fix here). It only guarantees
+    `sorted()` cannot raise, matching the project's fail-closed contract.
+
+    Byte-identical for every list this project has ever fed `sorted()`
+    here: a homogeneous-int or homogeneous-(int, str)-tuple list (the
+    only two shapes the type contract already allowed) reduces to the
+    SAME relative order `sorted(locs)` always gave it, since every
+    element still lands in bucket 0 and the inner ``(base, suffix)``
+    comparison reproduces plain int/tuple ordering exactly. A
+    homogeneous-string list also reduces to its previous (lexicographic)
+    order, since every element lands in bucket 1 alone.
+    """
+    if isinstance(v, str):
+        return (1, v)
+    if isinstance(v, tuple):
+        return (0, v)
+    return (0, (v, ''))
+
+
 def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
                        ring_info=None):
     """Lowest-locant set for `target_atoms` on this candidate.
@@ -225,7 +271,7 @@ def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
     locs = [pos[a] for a in targets if a in pos]
     if any(isinstance(v, tuple) for v in locs):
         locs = [(v, '') if isinstance(v, int) else v for v in locs]
-    return sorted(locs)
+    return sorted(locs, key=_locant_sort_key)
 
 
 def _substituent_positions(mol, cand: ParentCandidate):
