@@ -977,10 +977,23 @@ def _name_amino_acid_ester(
     if ate_stem is None:
         return None  # out of scope (diacid / 2-stereocentre / non-standard AA)
 
+    # v33 Phase 0 T5 (stereo honesty, mirrors L3-2e + the amino_acids.py
+    # standalone-AA fix): `_get_stereo_prefix` falls back to "" both for TRUE
+    # achirality (glycine) and for a genuine alpha-carbon stereocentre the
+    # INPUT never defines (no wedge/parity). Emitting the bare '-ate' stem in
+    # that case (e.g. 'methyl alaninate') is NOT the achiral-glycine case this
+    # docstring's "" carve-out describes -- it silently asserts the implicit-L
+    # convention on a structure that does not define it (`## **P-103.1.3.1**
+    # The stereodescriptors 'D' and 'L'`, BlueBookV2.md:54291: "The
+    # stereodescriptor 'xi' ... indicates unknown configuration"). DECLINE
+    # (return None) so the caller falls through to the ordinary systematic
+    # ester path -- no regression, see `name_ester`'s docstring at :1024-1026.
+    from .peptides import _get_stereo_prefix, _alpha_stereo_undefined
+    if _alpha_stereo_undefined(acid_mol, aa_name):
+        return None
     # Explicit alpha-carbon descriptor. Reuses the peptide stereo-prefix logic
     # (already returns "L-"/"D-"/"" -- "" only for achiral glycine) -- no new
     # CIP code.
-    from .peptides import _get_stereo_prefix
     descriptor = _get_stereo_prefix(acid_mol, aa_name)
 
     r_prime = get_alkyl_fragment_name(mol, alkyl_atoms)

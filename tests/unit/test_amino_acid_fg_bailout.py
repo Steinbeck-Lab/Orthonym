@@ -55,11 +55,19 @@ class TestAminoAcidFGBailout:
         assert result == "glycine", f"Expected 'glycine' but got: {result}"
 
     def test_alanine_trivial_name_preserved(self):
-        """Alanine trivial name lookup unaffected by bailout logic."""
+        """Alanine naming, non-stereo input, unaffected by bailout logic.
+
+        v33 Phase 0 T5 (change-asserted-value, was `== "alanine"`): the input
+        is stereo-UNDEFINED at the alpha-carbon, so the retained (implicit-L)
+        name is no longer emitted -- see `test_amino_acids.py`'s module
+        docstring for the full evidence (BB P-103.1.3.1, InChIKey proof,
+        head_ab.sh mutation test). This test's own purpose (bailout logic does
+        not swallow alanine) is preserved -- the result is still a name, not None.
+        """
         smiles = "CC(N)C(=O)O"
         result = name_compound(smiles)
         assert result is not None, "Should produce a name"
-        assert result == "alanine", f"Expected 'alanine' but got: {result}"
+        assert result == "2-aminopropanoic acid", f"Expected the systematic name but got: {result}"
 
     def test_amino_acid_with_halogen_includes_halogen(self):
         """2-amino-3-chloropentanoic acid must include 'chloro' prefix."""

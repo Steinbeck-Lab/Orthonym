@@ -2,6 +2,30 @@
 
 Tests both trivial names for standard amino acids and systematic names
 for non-standard amino acids.
+
+v33 Phase 0 T5 (change-asserted-value, stereo honesty): most SMILES below carry
+NO wedge/parity at the alpha-carbon (CHI_UNSPECIFIED) -- a genuinely
+stereo-undefined structure. The bare retained name (e.g. 'alanine') is Table
+10.4's name for the DEFINED (L) configuration only: `## **P-103.1.3.1** The
+stereodescriptors 'D' and 'L'` (BlueBookV2.md:54291) -- "The stereodescriptor
+'xi' (Greek letter xi) indicates unknown configuration" -- and OPSIN's grammar
+always resolves a bare amino-acid retained name to that ONE defined
+stereocentre, so asserting it against an undefined-stereo input is impossible
+to round-trip BY CONSTRUCTION: the input's full InChIKey has no stereo layer
+while OPSIN's parse of the bare name always has one (verified for asparagine:
+input `DCXYFEDJOCDNAF-UHFFFAOYSA-N` vs OPSIN('asparagine')
+`DCXYFEDJOCDNAF-REOHCLBHSA-N` -- same skeleton, stereo layer present only on
+the wrong side). Each new expected value below is the Blue Book's OWN
+systematic name for that amino acid (Table 10.4, BlueBookV2.md:54186-54245)
+and OPSIN-round-trips exactly to the stereo-free input (verified independently
+of this fix's code via ). Mutation-tested via
+ against the pre-fix (35d5e921) versions of
+`data/amino_acids.py` + `data/retained_names.py` + `rules/esters.py`: every
+updated assertion FAILS on the old code and PASSES on the fix. Stereo-DEFINED
+inputs (explicit `@`/`@@`) are untouched by this fix and are covered
+separately in `test_amino_acid_stereo.py` / `test_amino_acid_diacid.py`
+(a handful of THOSE were already red before this fix, for an unrelated,
+pre-existing reason -- see those files' own notes).
 """
 import pytest
 from orthonym import name_compound
@@ -15,30 +39,30 @@ class TestStandardAminoAcids:
         assert name_compound("NCC(=O)O") == "glycine"
 
     def test_alanine(self):
-        """Alanine: 2-aminopropanoic acid."""
-        assert name_compound("CC(N)C(=O)O") == "alanine"
+        """Alanine, stereo-UNDEFINED input: the systematic name (see module note)."""
+        assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"
 
     def test_valine(self):
-        """Valine: 2-amino-3-methylbutanoic acid."""
-        assert name_compound("CC(C)C(N)C(=O)O") == "valine"
+        """Valine, stereo-UNDEFINED input: the systematic name (see module note)."""
+        assert name_compound("CC(C)C(N)C(=O)O") == "2-amino-3-methylbutanoic acid"
 
     def test_leucine(self):
-        """Leucine: 2-amino-4-methylpentanoic acid."""
-        assert name_compound("CC(C)CC(N)C(=O)O") == "leucine"
+        """Leucine, stereo-UNDEFINED input: the systematic name (see module note)."""
+        assert name_compound("CC(C)CC(N)C(=O)O") == "2-amino-4-methylpentanoic acid"
 
     def test_isoleucine(self):
-        """Isoleucine: 2-amino-3-methylpentanoic acid."""
-        assert name_compound("CCC(C)C(N)C(=O)O") == "isoleucine"
+        """Isoleucine, stereo-UNDEFINED input: the systematic name (see module note)."""
+        assert name_compound("CCC(C)C(N)C(=O)O") == "2-amino-3-methylpentanoic acid"
 
     def test_serine(self):
-        """Serine: 2-amino-3-hydroxypropanoic acid."""
+        """Serine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(CO)C(=O)O")
-        assert result == "serine"
+        assert result == "2-amino-3-hydroxypropanoic acid"
 
     def test_cysteine(self):
-        """Cysteine: 2-amino-3-mercaptopropanoic acid."""
+        """Cysteine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(CS)C(=O)O")
-        assert result == "cysteine"
+        assert result == "2-amino-3-sulfanylpropanoic acid"
 
     def test_methionine(self):
         """Methionine: 2-amino-4-(methylthio)butanoic acid.
@@ -55,77 +79,86 @@ class TestStandardAminoAcids:
         So Orthonym was RIGHT to answer 'S-methylcysteine' and this expectation
         was impossible. Fixed by correcting the input, not the expected name,
         because the test's purpose is to cover methionine.
+
+        v33 Phase 0 T5: this input is also stereo-UNDEFINED, so the retained
+        name expectation moved to the systematic name too (see module note).
         """
         result = name_compound("CSCCC(N)C(=O)O")
-        assert result == "methionine"
+        assert result == "2-amino-4-(methylsulfanyl)butanoic acid"
 
     def test_phenylalanine(self):
-        """Phenylalanine: 2-amino-3-phenylpropanoic acid."""
+        """Phenylalanine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(Cc1ccccc1)C(=O)O")
-        assert result == "phenylalanine"
+        assert result == "2-amino-3-phenylpropanoic acid"
 
     def test_proline(self):
-        """Proline: imino acid, cyclic amino acid."""
+        """Proline, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("OC(=O)C1CCCN1")
-        assert result == "proline"
+        assert result == "pyrrolidine-2-carboxylic acid"
 
     def test_threonine(self):
-        """Threonine: 2-amino-3-hydroxybutanoic acid."""
+        """Threonine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("CC(O)C(N)C(=O)O")
-        assert result == "threonine"
+        assert result == "2-amino-3-hydroxybutanoic acid"
 
     def test_tyrosine(self):
-        """Tyrosine: 2-amino-3-(4-hydroxyphenyl)propanoic acid."""
+        """Tyrosine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(Cc1ccc(O)cc1)C(=O)O")
-        assert result == "tyrosine"
+        assert result == "2-amino-3-(4-hydroxyphenyl)propanoic acid"
 
     def test_tryptophan(self):
-        """Tryptophan: contains indole ring."""
+        """Tryptophan, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(Cc1c[nH]c2ccccc12)C(=O)O")
-        assert result == "tryptophan"
+        assert result == "2-amino-3-(1H-indol-3-yl)propanoic acid"
 
 
 class TestAcidicAminoAcids:
     """Test acidic amino acids and their amides."""
 
     def test_aspartic_acid(self):
-        """Aspartic acid: 2-aminobutanedioic acid."""
+        """Aspartic acid, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(CC(=O)O)C(=O)O")
-        assert result == "aspartic acid"
+        assert result == "aminobutanedioic acid"
 
     def test_glutamic_acid(self):
-        """Glutamic acid: 2-aminopentanedioic acid."""
+        """Glutamic acid, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(CCC(=O)O)C(=O)O")
-        assert result == "glutamic acid"
+        assert result == "2-aminopentanedioic acid"
 
     def test_asparagine(self):
-        """Asparagine: 2-amino-3-carbamoylpropanoic acid."""
+        """Asparagine, stereo-UNDEFINED input: the systematic name (see module note).
+
+        v33 Phase 0 T5: same defect + fix as `test_peptides.py::
+        test_asparagine_not_misrouted`, whose docstring carries the full
+        3-artifact change-asserted-value evidence (BB citation, InChIKey
+        necessary-condition proof, head_ab.sh mutation test).
+        """
         result = name_compound("NC(CC(N)=O)C(=O)O")
-        assert result == "asparagine"
+        assert result == "2,4-diamino-4-oxobutanoic acid"
 
     def test_glutamine(self):
-        """Glutamine: 2-amino-4-carbamoylbutanoic acid."""
+        """Glutamine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(CCC(N)=O)C(=O)O")
-        assert result == "glutamine"
+        assert result == "2,5-diamino-5-oxopentanoic acid"
 
 
 class TestBasicAminoAcids:
     """Test basic amino acids."""
 
     def test_lysine(self):
-        """Lysine: 2,6-diaminohexanoic acid."""
+        """Lysine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NCCCCC(N)C(=O)O")
-        assert result == "lysine"
+        assert result == "2,6-diaminohexanoic acid"
 
     def test_arginine(self):
-        """Arginine: contains guanidino group."""
+        """Arginine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(CCCNC(N)=N)C(=O)O")
-        assert result == "arginine"
+        assert result == "2-amino-5-guanidinopentanoic acid"
 
     def test_histidine(self):
-        """Histidine: contains imidazole ring."""
+        """Histidine, stereo-UNDEFINED input: the systematic name (see module note)."""
         result = name_compound("NC(Cc1cnc[nH]1)C(=O)O")
-        assert result == "histidine"
+        assert result == "2-amino-3-(1H-imidazol-5-yl)propanoic acid"
 
 
 class TestNonStandardAminoAcids:
@@ -305,10 +338,14 @@ class TestIntegrationWithNameCompound:
         assert name_compound("NCC(=O)O") == "glycine"
 
     def test_amino_acid_through_full_pipeline(self):
-        """Multiple amino acids work through the full pipeline."""
+        """Multiple amino acids work through the full pipeline.
+
+        v33 Phase 0 T5: glycine is achiral (unaffected); the other two are
+        stereo-UNDEFINED, so they now emit the systematic name (see module note).
+        """
         assert name_compound("NCC(=O)O") == "glycine"
-        assert name_compound("CC(N)C(=O)O") == "alanine"
-        assert name_compound("NC(Cc1ccccc1)C(=O)O") == "phenylalanine"
+        assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"
+        assert name_compound("NC(Cc1ccccc1)C(=O)O") == "2-amino-3-phenylpropanoic acid"
 
     def test_non_amino_acid_not_affected(self):
         """Regular compounds still work correctly."""
@@ -537,29 +574,34 @@ class TestExpandedAminoAcidPipeline:
         assert get_amino_acid_acyl_name("proline") == "prolyl"
 
     def test_all_proteinogenic_via_name_compound(self):
-        """All 20 proteinogenic amino acids work through full pipeline."""
+        """All 20 proteinogenic amino acids work through full pipeline.
+
+        v33 Phase 0 T5: every SMILES here is stereo-UNDEFINED (glycine
+        excepted, achiral), so each now emits the systematic name (see module
+        note) instead of the bare, implicit-L retained name.
+        """
         proteinogenic = [
             ("NCC(=O)O", "glycine"),
-            ("CC(N)C(=O)O", "alanine"),
-            ("CC(C)C(N)C(=O)O", "valine"),
-            ("CC(C)CC(N)C(=O)O", "leucine"),
-            ("CCC(C)C(N)C(=O)O", "isoleucine"),
-            ("NC(CO)C(=O)O", "serine"),
-            ("CC(O)C(N)C(=O)O", "threonine"),
-            ("NC(CS)C(=O)O", "cysteine"),
+            ("CC(N)C(=O)O", "2-aminopropanoic acid"),
+            ("CC(C)C(N)C(=O)O", "2-amino-3-methylbutanoic acid"),
+            ("CC(C)CC(N)C(=O)O", "2-amino-4-methylpentanoic acid"),
+            ("CCC(C)C(N)C(=O)O", "2-amino-3-methylpentanoic acid"),
+            ("NC(CO)C(=O)O", "2-amino-3-hydroxypropanoic acid"),
+            ("CC(O)C(N)C(=O)O", "2-amino-3-hydroxybutanoic acid"),
+            ("NC(CS)C(=O)O", "2-amino-3-sulfanylpropanoic acid"),
             # was CSCC(N)C(=O)O = S-methylcysteine; see test_methionine.
-            ("CSCCC(N)C(=O)O", "methionine"),
-            ("NC(CC(=O)O)C(=O)O", "aspartic acid"),
-            ("NC(CCC(=O)O)C(=O)O", "glutamic acid"),
-            ("NC(CC(N)=O)C(=O)O", "asparagine"),
-            ("NC(CCC(N)=O)C(=O)O", "glutamine"),
-            ("NCCCCC(N)C(=O)O", "lysine"),
-            ("NC(CCCNC(N)=N)C(=O)O", "arginine"),
-            ("NC(Cc1cnc[nH]1)C(=O)O", "histidine"),
-            ("NC(Cc1ccccc1)C(=O)O", "phenylalanine"),
-            ("NC(Cc1ccc(O)cc1)C(=O)O", "tyrosine"),
-            ("NC(Cc1c[nH]c2ccccc12)C(=O)O", "tryptophan"),
-            ("OC(=O)C1CCCN1", "proline"),
+            ("CSCCC(N)C(=O)O", "2-amino-4-(methylsulfanyl)butanoic acid"),
+            ("NC(CC(=O)O)C(=O)O", "aminobutanedioic acid"),
+            ("NC(CCC(=O)O)C(=O)O", "2-aminopentanedioic acid"),
+            ("NC(CC(N)=O)C(=O)O", "2,4-diamino-4-oxobutanoic acid"),
+            ("NC(CCC(N)=O)C(=O)O", "2,5-diamino-5-oxopentanoic acid"),
+            ("NCCCCC(N)C(=O)O", "2,6-diaminohexanoic acid"),
+            ("NC(CCCNC(N)=N)C(=O)O", "2-amino-5-guanidinopentanoic acid"),
+            ("NC(Cc1cnc[nH]1)C(=O)O", "2-amino-3-(1H-imidazol-5-yl)propanoic acid"),
+            ("NC(Cc1ccccc1)C(=O)O", "2-amino-3-phenylpropanoic acid"),
+            ("NC(Cc1ccc(O)cc1)C(=O)O", "2-amino-3-(4-hydroxyphenyl)propanoic acid"),
+            ("NC(Cc1c[nH]c2ccccc12)C(=O)O", "2-amino-3-(1H-indol-3-yl)propanoic acid"),
+            ("OC(=O)C1CCCN1", "pyrrolidine-2-carboxylic acid"),
         ]
         for smiles, expected_name in proteinogenic:
             result = name_compound(smiles)

@@ -420,7 +420,18 @@ def _aa_config_descriptor(mol, name: str) -> Optional[str]:
     # already returns exactly "L-"/"D-"/"" and handles the cysteine CIP inversion
     # (L = R for the S/Se side chains). Its verdict is now USED, not filtered.
     # (lazy import avoids the data<->rules circular import at module load).
-    from ..rules.peptides import _get_stereo_prefix
+    from ..rules.peptides import _get_stereo_prefix, _alpha_stereo_undefined
+    # v33 Phase 0 T5 (stereo honesty, mirrors L3-2e's peptide fix): `_get_stereo_
+    # prefix` falls back to "" both for TRUE achirality (glycine -- excluded
+    # above the allo/dimeric branches) and for a genuine alpha-carbon
+    # stereocentre the INPUT never defines (no wedge/parity, CHI_UNSPECIFIED).
+    # `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'` (BlueBookV2.md:54291)
+    # -- "The stereodescriptor 'xi' (Greek letter xi) indicates unknown
+    # configuration" -- so an unresolved centre must DEFER (None) to the
+    # systematic namer, never silently emit the bare retained name (which both
+    # OPSIN and the P-103.3.4 L-omission convention read as an implicit L).
+    if _alpha_stereo_undefined(mol, name):
+        return None
     return _get_stereo_prefix(mol, name)
 
 

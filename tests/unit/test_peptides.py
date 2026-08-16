@@ -181,9 +181,33 @@ class TestPeptideEdgeCases:
     """Test that non-peptide amides are NOT misrouted to peptide naming."""
 
     def test_asparagine_not_misrouted(self):
-        """Asparagine has a primary amide side chain but is a single amino acid."""
+        """Asparagine has a primary amide side chain but is a single amino acid.
+
+        v33 Phase 0 T5 (change-asserted-value, was `== "asparagine"`): the input
+        SMILES has NO wedge/parity at the alpha-carbon (CHI_UNSPECIFIED) -- a
+        genuinely stereo-undefined structure. The bare retained name `asparagine`
+        is Table 10.4's name for the DEFINED (L) configuration (`## **P-103.1.3.1**
+        The stereodescriptors 'D' and 'L'`, BlueBookV2.md:54291: "The
+        stereodescriptor 'xi' ... indicates unknown configuration"), and OPSIN's
+        grammar always resolves a bare amino-acid retained name to that ONE
+        defined stereocentre -- so asserting it against this input is provably
+        impossible to round-trip: input full InChIKey
+        `DCXYFEDJOCDNAF-UHFFFAOYSA-N` (no stereo layer) vs OPSIN's parse of
+        'asparagine' `DCXYFEDJOCDNAF-REOHCLBHSA-N` (defined stereo layer) --
+        same skeleton, different (missing-vs-present) stereo layer, so a
+        byte-identical full round-trip is impossible by construction, not by
+        chance. `2,4-diamino-4-oxobutanoic acid` is the Blue Book's OWN
+        systematic name for asparagine (Table 10.4, BlueBookV2.md:54196) and
+        full-InChIKey RT-exacts to this exact input (`DCXYFEDJOCDNAF-
+        UHFFFAOYSA-N` both sides, OPSIN-verified independently of this fix's
+        code). Mutation-tested:  with the pre-fix
+        (HEAD-committed-at-35d5e921) versions of `data/amino_acids.py` +
+        `data/retained_names.py` + `rules/esters.py` swapped in makes this
+        assertion FAIL (old code still emits bare 'asparagine'); the working
+        tree's fix makes it PASS.
+        """
         result = name_compound("NC(CC(N)=O)C(=O)O")
-        assert result == "asparagine"
+        assert result == "2,4-diamino-4-oxobutanoic acid"
 
     def test_n_acetylglycine_not_misrouted(self):
         """N-acetylglycine has an amide bond but NO terminal NH2 on acyl side."""

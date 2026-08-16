@@ -233,12 +233,29 @@ class TestDataExpansion:
         assert len(naphtho_entries) >= 3, "Expected at least 3 naphtho-fused entries"
 
     def test_new_amino_acid_entries(self):
-        """Test that amino acid entries exist."""
+        """Test that amino acid entries exist and are nameable.
+
+        v33 Phase 0 T5 (root-cause architecture change, not a value error):
+        `RETAINED_NAMES` used to carry a SECOND, stereo-blind copy of every
+        common amino acid's flat SMILES, and it was checked BEFORE the
+        stereo-aware `data.amino_acids` path in the naming dispatch order --
+        so a genuinely stereo-undefined input matched this dumb copy first and
+        silently asserted an implicit L configuration it does not define
+        (P-103.1.3.1, BlueBookV2.md:54291). T5 deleted the 19 duplicate,
+        alpha-stereocentre-bearing entries here (glycine, the sole achiral one,
+        stays); every deleted name is still nameable via
+        `data.amino_acids.STANDARD_AMINO_ACIDS`, which this test now also
+        checks so its original intent (these names are RECOGNISED) still holds.
+        """
+        from orthonym.data.amino_acids import STANDARD_AMINO_ACIDS
         amino_acids = ["glycine", "alanine", "valine", "tryptophan", "tyrosine"]
         for aa in amino_acids:
             found = any(
                 RETAINED_NAMES[s].lower() == aa.lower()
                 for s in RETAINED_NAMES
+            ) or any(
+                STANDARD_AMINO_ACIDS[s].lower() == aa.lower()
+                for s in STANDARD_AMINO_ACIDS
             )
             assert found, f"Amino acid {aa} not found in retained names"
 

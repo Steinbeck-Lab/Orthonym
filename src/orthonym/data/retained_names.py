@@ -463,26 +463,33 @@ RETAINED_NAMES = {
     "C1CNSC1": "isothiazolidine",
 
     # === AMINO ACIDS (common) ===
+    # Glycine is the sole ACHIRAL standard amino acid (no alpha-carbon
+    # stereocentre), so a bare, context-free SMILES match never asserts a
+    # configuration the input lacks -- safe to keep in this dumb, stereo-blind
+    # dict.
     "NCC(=O)O": "glycine",
-    "CC(N)C(=O)O": "alanine",
-    "CC(C)C(N)C(=O)O": "valine",
-    "CC(C)CC(N)C(=O)O": "leucine",
-    "CCC(C)C(N)C(=O)O": "isoleucine",
-    "OC(=O)C(N)Cc1ccccc1": "phenylalanine",
-    "NC(Cc1c[nH]c2ccccc12)C(=O)O": "tryptophan",
-    "NC(Cc1ccc(O)cc1)C(=O)O": "tyrosine",
-    "CSCCC(N)C(=O)O": "methionine",
-    "NC(CS)C(=O)O": "cysteine",
-    "NC(CC(=O)O)C(=O)O": "aspartic acid",
-    "NC(CCC(=O)O)C(=O)O": "glutamic acid",
-    "NC(=O)CC(N)C(=O)O": "asparagine",
-    "NC(=O)CCC(N)C(=O)O": "glutamine",
-    "NCCCCC(N)C(=O)O": "lysine",
-    "N=C(N)NCCCC(N)C(=O)O": "arginine",
-    "NC(Cc1c[nH]cn1)C(=O)O": "histidine",
-    "O=C(O)C1CCCN1": "proline",
-    "NC(CO)C(=O)O": "serine",
-    "CC(O)C(N)C(=O)O": "threonine",
+    # v33 Phase 0 T5 (stereo honesty, LIVE 0-wrong): the other 19 common amino
+    # acids used to have a flat/stereo-free entry HERE too. This dict is keyed
+    # by EXACT canonical SMILES with no stereo awareness at all, and
+    # `_handle_retained_name` (routing/dispatch_table.py, StoutClass.RETAINED_
+    # NAME, priority 1300) runs BEFORE `_handle_amino_acid` (StoutClass.AMINO_
+    # ACID, priority 1400) -- so for any INPUT with an undefined alpha-carbon
+    # (no wedge/parity), this flat entry matched FIRST and silently emitted the
+    # bare retained name (e.g. `NC(CC(N)=O)C(=O)O` -> "asparagine"), which
+    # OPSIN parses back to the L stereoisomer -- a stereo the input never
+    # defined (full RT-fail). `## **P-103.1.3.1** The stereodescriptors 'D' and 'L'`
+    # (BlueBookV2.md:54291): "The stereodescriptor 'xi' (Greek letter xi)
+    # indicates unknown configuration" -- so an unresolved centre must never
+    # be spelled with the plain (implicit-L) name. `data.amino_acids.
+    # STANDARD_AMINO_ACIDS` already carries every one of these 19 keys (same
+    # structures, RT-equivalent), reached via the AMINO_ACID dispatch entry
+    # (`get_amino_acid_name(..., with_descriptor=True)`), which now correctly
+    # DEFERS (returns None -> falls through to the systematic namer) for a
+    # genuinely stereo-undefined alpha-carbon and still emits the bare name
+    # for the achiral case / correct L-/D- for a defined one. Deleting the
+    # duplicates here (rather than gating dispatch order) removes the second,
+    # stereo-blind copy at its root and costs no coverage -- every deleted key
+    # has a live equivalent in `STANDARD_AMINO_ACIDS`.
 
     # === ADDITIONAL SATURATED HETEROCYCLES (Phase 8 expansion) ===
     "C1COCCO1": "1,4-dioxane",

@@ -52,7 +52,19 @@ class TestAminoAcidTrivialStereo:
     """Trivial amino acid names also get stereo prefix if stereo is defined."""
 
     def test_trivial_name_with_stereo_gets_prefix(self):
-        """If a trivial name is returned and mol has stereo, stereo is prepended."""
+        """A genuinely stereo-UNDEFINED alpha-carbon must NOT get the bare
+        (implicit-L) trivial name -- it defers to the systematic name.
+
+        v33 Phase 0 T5 (change-asserted-value, was
+        ``result == "alanine" or "alanine" in result``): this test's own name
+        and original intent ("no stereo in input means no stereo in output")
+        already correctly predicted a stereo-free OUTPUT for this stereo-free
+        INPUT -- the old assertion just implemented that as the bare retained
+        name, which silently asserts the implicit-L configuration this input
+        does not define (see `test_amino_acids.py`'s module docstring for the
+        full P-103.1.3.1 / InChIKey / mutation-test evidence). The systematic
+        name is the true "no stereo in, no stereo out" answer.
+        """
         from orthonym.rules.amino_acids import name_amino_acid, _build_amino_acid_locant_map
         from rdkit import Chem
 
@@ -60,8 +72,7 @@ class TestAminoAcidTrivialStereo:
         mol = Chem.MolFromSmiles("CC(N)C(=O)O")
         can = Chem.MolToSmiles(mol)
         result = name_amino_acid(mol, can)
-        # No stereo in input means no stereo in output
-        assert result == "alanine" or (result and "alanine" in result)
+        assert result == "2-aminopropanoic acid"
 
     def test_locant_map_finds_acid_carbon(self):
         """_build_amino_acid_locant_map assigns locant 1 to acid carbon."""

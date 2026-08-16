@@ -13,14 +13,22 @@ class TestDicarboxylicAminoAcidBailout:
     """AMAC-01: Dicarboxylic amino acids should produce 'dioic' names."""
 
     def test_aspartic_acid_nonstereo(self):
-        """Non-stereo aspartic acid should still use retained name."""
+        """Non-stereo (alpha-carbon CHI_UNSPECIFIED) aspartic acid now DEFERS to
+        the systematic name rather than the retained name, which asserts a
+        defined (L) configuration this input lacks.
+
+        v33 Phase 0 T5 (change-asserted-value, was `== "aspartic acid"`): see
+        `test_amino_acids.py`'s module docstring for the full P-103.1.3.1 /
+        InChIKey / mutation-test evidence -- identical argument, same input.
+        """
         result = name_compound("NC(CC(=O)O)C(=O)O")
-        assert result == "aspartic acid"
+        assert result == "aminobutanedioic acid"
 
     def test_glutamic_acid_nonstereo(self):
-        """Non-stereo glutamic acid should still use retained name."""
+        """Non-stereo glutamic acid now DEFERS to the systematic name (T5, see
+        `test_aspartic_acid_nonstereo`'s docstring)."""
         result = name_compound("NC(CCC(=O)O)C(=O)O")
-        assert result == "glutamic acid"
+        assert result == "2-aminopentanedioic acid"
 
     def test_aspartic_acid_stereo(self):
         """WSD-07 (Phase 175): a stereo-tagged free aspartic acid resolves to the
@@ -47,9 +55,11 @@ class TestDicarboxylicAminoAcidBailout:
         )
 
     def test_alanine_unchanged(self):
-        """Alanine (1 COOH) should still produce 'alanine' -- regression guard."""
+        """Alanine (1 COOH), non-stereo -- T5: now DEFERS to the systematic name
+        (see `test_aspartic_acid_nonstereo`'s docstring); the mono-COOH bailout
+        guard itself is unaffected (still not misrouted to the dicarboxylic path)."""
         result = name_compound("NC(C)C(=O)O")
-        assert result == "alanine"
+        assert result == "2-aminopropanoic acid"
 
 
 @pytest.mark.unit

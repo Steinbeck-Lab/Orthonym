@@ -36,9 +36,12 @@ class TestThioetherDrop:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("CSCC[C@@H](N)C(=O)O", "D-methionine"),  # catalog C5 methionine (P5) — unaffected
-        ("CSCC(N)C(=O)O", "S-methylcysteine"),    # catalog S-methylcysteine (P5) — unaffected
-        ("NC(CS)C(=O)O", "cysteine"),             # catalog cysteine — unaffected
+        ("CSCC[C@@H](N)C(=O)O", "D-methionine"),  # catalog C5 methionine (P5) — unaffected (defined stereo)
+        ("CSCC(N)C(=O)O", "S-methylcysteine"),    # catalog S-methylcysteine (P5) — unaffected: non-standard AA, out of the with_descriptor scope entirely
+        # v33 Phase 0 T5 (change-asserted-value, was "cysteine"): stereo-UNDEFINED
+        # at the alpha-carbon now DEFERS to the systematic name -- see
+        # test_amino_acids.py's module docstring for the full evidence.
+        ("NC(CS)C(=O)O", "2-amino-3-sulfanylpropanoic acid"),
     ])
     def test_catalog_amino_acids_unaffected(self, smiles, expected):
         assert name_compound(smiles) == expected

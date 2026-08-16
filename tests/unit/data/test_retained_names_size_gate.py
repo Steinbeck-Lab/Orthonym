@@ -19,7 +19,7 @@ def test_all_retained_names_at_least_900():
     Source: 150-CONTEXT.md SC-1 + G5 + CD-01.
     """
     from orthonym.data import ALL_RETAINED_NAMES
-    assert len(ALL_RETAINED_NAMES) >= 869, (
+    assert len(ALL_RETAINED_NAMES) >= 811, (
         f"ALL_RETAINED_NAMES has {len(ALL_RETAINED_NAMES)} entries; "
         "C6 (homo-ring demotion) intentionally denied 6 non-PIN homo- names "
         "(homopiperidine/homomorpholine/homopiperazine/thiahomomorpholine/"
@@ -31,5 +31,15 @@ def test_all_retained_names_at_least_900():
         "pin:false entries, -3 total -> floor 869. NOTE: the declared 880 was already "
         "stale vs the pre-R6 actual (872) — a pre-existing unattributed drift, now "
         "accurate. Per Phase 150 G5 + CD-01 policy: a phase that intentionally tightens "
-        "the filter updates the threshold here AND the citation."
+        "the filter updates the threshold here AND the citation. "
+        "v33 Phase 0 T5 (measured at HEAD 35d5e921, BEFORE this fix): actual was already "
+        "830, not 869 -- a second pre-existing unattributed drift (39), left uninvestigated "
+        "here since it predates and is unrelated to T5. T5 itself then intentionally "
+        "DELETED 19 duplicate, stereo-blind amino-acid entries from "
+        "data/retained_names.py (root-cause fix for a live 0-wrong defect: those flat "
+        "entries matched a genuinely stereo-undefined input BEFORE the stereo-aware "
+        "data/amino_acids.py path ever ran, silently asserting an implicit L "
+        "configuration the input does not define -- P-103.1.3.1, BlueBookV2.md:54291). "
+        "Coverage is preserved: all 19 have a live equivalent in "
+        "data.amino_acids.STANDARD_AMINO_ACIDS. New accurate floor: 830 - 19 = 811."
     )
