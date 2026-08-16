@@ -219,7 +219,15 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
         canonical_smiles, mol=mol, with_descriptor=is_top_level_naming(),
     )
     if trivial:
-        return trivial
+        # v33 Phase 1 (C2b) STEREO HONESTY: a retained AA name implies a specific
+        # configuration (L, unless D-cited). At TOP-LEVEL naming, if the input leaves a
+        # real stereocentre undefined, that name fabricates stereo the input never
+        # defined (P-103.1.3.1) -> decline to the stereo-free systematic name below.
+        # Scoped to top-level: fragment decomposition keeps the bare name (peptides.py
+        # owns that path's guard). Achiral AAs (glycine) have no undefined centre.
+        from ..perception.stereo import input_stereo_undefined
+        if not (is_top_level_naming() and input_stereo_undefined(mol)):
+            return trivial
 
     # Check if it matches the alpha-amino acid pattern for systematic naming
     if not detect_amino_acid(mol):

@@ -208,9 +208,17 @@ class TestNonStandardAminoAcids:
         assert result == "(methylamino)acetic acid"
 
     def test_ornithine(self):
-        """Ornithine: 2,5-diaminopentanoic acid."""
+        """Ornithine: 2,5-diaminopentanoic acid.
+
+        v33 Phase 1 (C2b): the flat SMILES leaves the alpha-carbon stereocentre
+        undefined. Bare 'ornithine' is config-implying (OPSIN parses it to the
+        DEFINED L configuration, same as 'L-ornithine' -- probed 2026-08-16), so
+        emitting it here would fabricate stereo the input never defined
+        (P-103.1.3.1). Same defect class as SL-MET; re-keyed to the systematic
+        name the guard now (correctly) defers to.
+        """
         result = name_compound("NCCCC(N)C(=O)O")
-        assert result == "ornithine"
+        assert result == "2,5-diaminopentanoic acid"
 
     def test_gaba(self):
         """GABA: 4-aminobutanoic acid (not alpha-amino acid)."""
@@ -555,10 +563,21 @@ class TestExpandedAminoAcidPipeline:
         )
 
     def test_default_mode_returns_trivial(self):
-        """Default (pin) mode returns trivial names for new amino acid entries."""
+        """Default (pin) mode declines a config-implying trivial name on
+        undefined stereo, same as it now does for a STANDARD AA (see
+        test_amino_acid_through_full_pipeline's alanine case).
+
+        v33 Phase 1 (C2b): this flat SMILES leaves the alpha-carbon
+        stereocentre undefined, so the NON_STANDARD-AA guard now uniformly
+        applies WSD-07's existing STANDARD-AA policy here too and defers to
+        the systematic name (not a coverage loss -- still names the identical
+        molecule; 'butyrine' is also not a Table 10.4/10.5 PIN, so this is a
+        preference win, not just a stereo-honesty one). Formerly asserted the
+        pre-fix fabricating behavior ('butyrine'); re-keyed.
+        """
         result = name_compound("CCC(N)C(=O)O")
-        assert result == "butyrine", (
-            f"Expected trivial name 'butyrine', got: {result}"
+        assert result == "2-aminobutanoic acid", (
+            f"Expected systematic name '2-aminobutanoic acid', got: {result}"
         )
 
     def test_peptide_acyl_name_expansion(self):
