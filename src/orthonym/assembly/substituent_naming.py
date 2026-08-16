@@ -5000,6 +5000,32 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
     # independent numbering (e.g. BFS-from-attachment) is explicitly rejected as
     # "a DIFFERENT wrong heuristic — a band-aid the fix-methodology forbids."
     #
+    # v33 Phase 0 L3-2a: for the ACYCLIC-ALKYL shape specifically, that
+    # recursion-contract change already exists. `_acyclic_alkyl_located_stereo_name`
+    # -- the SAME deriver the single-centre branch above trusts (it returns
+    # `pin_form` and ships it in place of the caller's `name`) -- exposes the
+    # substituent's own chain-position map (`pos`, P-29.2/P-46.1.8/.12 numbering)
+    # via `with_pos=True`. That map IS "the same numbering the substituent name
+    # used" for this shape: `_located_acyclic_alkyl_name` is the deriver of
+    # `name` itself here (a plain or hydroxy/halogen/amino-decorated acyclic
+    # alkyl chain, e.g. '1,2,3-trihydroxypropyl' or the branched
+    # '5-(propan-2-yl)heptan-2-yl'), so its `pos` is self-consistently the
+    # numbering the emitted text already carries -- not a re-derived guess.
+    # It declines (`None`) for every other shape (ring atoms, ethers, charged
+    # atoms, non-single bonds), so the D-09 "missing beats wrong" fallback
+    # below is unchanged for those; and a stereocentre this deriver's OWN
+    # numbering does not cover (e.g. one buried inside a recursively-named
+    # branch) is guarded by the ``all(... in pos ...)`` check, never fabricated.
+    located = _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
+    if located is not None:
+        pin_form, _k, pos = located
+        if all(idx in pos for idx, _cip in stereo_atoms):
+            from ..rules.stereochemistry import format_stereodescriptor_string
+            descr = sorted((pos[idx], cip) for idx, cip in stereo_atoms)
+            block = format_stereodescriptor_string(descr)
+            if block:
+                return f"{block}{pin_form}"
+
     # Per D-09 (missing beats wrong): when the substituent's own numbering
     # cannot be threaded, emit NO multi-centre stereo block — return the name
     # unchanged. A multi-centre stereo descriptor placed with fabricated locants

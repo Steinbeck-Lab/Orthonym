@@ -126,18 +126,36 @@ def test_mixed_rs_and_ez_share_one_locant_ordered_block(smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# (b) what cannot be located FAILS CLOSED
+# (b) a locatable multi-centre fragment is EXPRESSED (v33 Phase 0 L3-2a)
 # --------------------------------------------------------------------------
-
-@pytest.mark.parametrize("smiles", [
-    # Two stereocentres in one acyclic fragment: `_add_substituent_stereo`'s
-    # multi-centre branch returns the name UNCHANGED (D-09 forbids fabricating
-    # the locants), so both diastereomers used to emit `3-methylpentan-2-yl`.
-    "CC[C@@H](C)[C@@H](C)[As](C)C",
-    "CC[C@@H](C)[C@H](C)[As](C)C",
+#
+# UPDATED (v33 Phase 0 L3-2a): this pair was NOT a case of "cannot be
+# located" -- it was a case of nobody having wired the existing locator in.
+# `_add_substituent_stereo`'s multi-centre branch now calls
+# `_acyclic_alkyl_located_stereo_name` (the SAME P-46.1.8/.12 chain-position
+# deriver the single-centre branch above already trusted, since it ships
+# `pin_form` in place of the caller's `name`) whenever the fragment is a
+# plain/decorated acyclic alkyl chain. For THIS shape the numbering threads
+# cleanly, so both diastereomers now get distinct, located descriptors
+# instead of an identical stereo-free name -- which is what P-91.2.1.2.1
+# (BlueBookV2.md:44624, "stereodescriptors ... must be cited") and P-92.1.1
+# (:44718, "all stereogenic units must be specified, unless an omission is
+# allowed according to P-91.2.2") require once the locant is determinable;
+# P-91.2.2 (:44635) licenses omission only for specific ring classes, never
+# for an acyclic side chain. Verified independently of this codebase: OPSIN
+# parses BOTH `[(2R,3R)-3-methylpentan-2-yl]dimethylarsane` and
+# `[(2S,3R)-3-methylpentan-2-yl]dimethylarsane` back to the exact InChIKey of
+# their respective input SMILES, and the two names are textually distinct
+# (previously both diastereomers collided on the identical, stereo-free
+# `3-methylpentan-2-yl`). The truly-unthreadable case (D-09's "missing beats
+# wrong" fallback) is still covered separately --
+# `tests/unit/assembly/test_substituent_stereo.py::TestMultiCentre`.
+@pytest.mark.parametrize("smiles,expected", [
+    ("CC[C@@H](C)[C@@H](C)[As](C)C", "(2R,3R)-3-methylpentan-2-yl"),
+    ("CC[C@@H](C)[C@H](C)[As](C)C", "(2S,3R)-3-methylpentan-2-yl"),
 ])
-def test_unexpressible_multicentre_stereo_fails_closed(smiles):
-    assert _organyl(smiles) is None
+def test_locatable_multicentre_stereo_is_expressed(smiles, expected):
+    assert _organyl(smiles) == expected
 
 
 def test_the_multicentre_diastereomers_no_longer_collide():

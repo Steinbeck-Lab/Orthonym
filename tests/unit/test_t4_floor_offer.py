@@ -89,6 +89,48 @@ class TestFloorWinsOverAbstainedPrimary:
             "the winning name should be exactly the stashed floor candidate")
 
 
+class TestStereoOnlyFloorCompletenessL3_2a:
+    """v33 Phase 0 L3-2a: the STEREO_ONLY 7-row bucket from the L3-2/L3-3 SPY
+    (`FLOOR_COVERS_RT_FAIL` -- both the primary AND the floor omitted real
+    defined stereo on a decorated acyclic side-chain substituent, e.g.
+    '1,2,3-trihydroxypropyl'/'5-(propan-2-yl)heptan-2-yl' with NO leading
+    descriptor block, even though the constitution was already right).
+
+    Root cause: `substituent_naming._add_substituent_stereo`'s multi-centre
+    branch unconditionally declined (D-09 'missing beats wrong') because it
+    had no way to thread the substituent's OWN chain numbering -- fixed by
+    reusing `_acyclic_alkyl_located_stereo_name` (the same deriver the
+    single-centre branch already trusts). Measured: 5 of the 7 bucket rows
+    converted to full-InChIKey RT-exact (the other 2 are different root
+    causes -- a spiro/fused-ring CIP-numbering mismatch and an oxime E/Z
+    omission -- explicitly OUT of this task's scope, see the L3-2a report).
+    """
+
+    @pytest.mark.parametrize("smiles", [
+        # row 4 of the bucket: triacetate pyranose with a
+        # '(2,3,4-trihydroxybutoxy)' alkoxy side chain (2 stereocentres).
+        "CCCCCCCCCCCCCCCC(=O)O[C@@H]1[C@H](OC(C)=O)[C@H](OC[C@@H](O)[C@@H](O)CO)"
+        "O[C@H](COC(C)=O)[C@H]1OC(C)=O",
+        # row 7 of the bucket: tetracyclic diterpene with a
+        # '5-(propan-2-yl)heptan-2-yl' branched side chain (2 stereocentres,
+        # free valence NOT at locant 1).
+        "C=C1[C@@H](O)CC[C@]2(C)C3=C(CC[C@@H]12)[C@]1(O)[C@@H](O)C[C@H]"
+        "([C@H](C)CC[C@H](CC)C(C)C)[C@@]1(C)C[C@H]3O",
+    ])
+    def test_stereo_only_bucket_row_now_rt_exact(self, smiles):
+        nm = _best_effort_namer()
+        name = nm.name(smiles)
+        assert name and not name.startswith("unknown"), (
+            f"expected a real emitted name, got {name!r}")
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        opsin_smi = opsin_parse(name)
+        if opsin_smi is None:
+            pytest.skip("OPSIN jar unavailable in this environment")
+        assert _full_inchikey(smiles) == _full_inchikey(opsin_smi), (
+            f"emitted name {name!r} does not full-RT-match the input "
+            "(stereo still omitted/mis-assigned)")
+
+
 class TestByteIdentityUnderPin:
     """v33 Phase 0 L3-1 guard: best-effort ONLY -- structurally impossible to
     reach `name_t4_complete` from `_finish` under `--emit-tier pin` (the

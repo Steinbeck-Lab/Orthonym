@@ -76,3 +76,73 @@ class TestMultiCentre:
         # block keyed off enumerate(sorted(sub_atoms)). The fix must emit NO
         # fabricated block when the substituent's own numbering is unthreadable.
         assert out == "frag", out
+
+
+class TestMultiCentreThreadedViaAcyclicAlkyl:
+    """v33 Phase 0 L3-2a: when ``attach_idx`` IS known and the fragment is a
+    plain (optionally hydroxy/halogen/amino-decorated) ACYCLIC alkyl chain,
+    ``_acyclic_alkyl_located_stereo_name`` (the SAME deriver the single-centre
+    branch already trusts) exposes the substituent's own P-46.1.8/.12
+    chain-position map, so the multi-centre branch can now thread it instead
+    of unconditionally falling back to D-09's 'missing beats wrong'.
+
+    Root cause + measured 7-row bucket: this is the class that made the T4
+    floor omit real defined stereo on a decorated glycoside/lipid/steroid
+    side-chain substituent ('1,2,3-trihydroxypropyl', '2,3,4-trihydroxybutyl',
+    '5-(propan-2-yl)heptan-2-yl' ...), which fails full-InChIKey RT and is
+    voided by the L3-1 offer gate.
+    """
+
+    def test_unbranched_two_centre_chain_gets_located_block(self):
+        # C7=attach(S), O8, C9(R), O10, C11(terminal CH2OH) -- exactly the
+        # 'sugar side-chain' shape (row 0 / row 4 of the L3-2a bucket).
+        mol = _mol("OC1CCCCC1[C@H](O)[C@H](O)CO")
+        sub_atoms = [7, 8, 9, 10, 11, 12]
+        attach_idx = 7
+        out = _add_substituent_stereo(
+            mol, sub_atoms, "1,2,3-trihydroxypropyl", attach_idx=attach_idx)
+        assert out == "(1S,2R)-1,2,3-trihydroxypropyl", out
+
+    def test_branched_chain_free_valence_not_locant_one(self):
+        # Free valence at C2 of a branched heptyl chain, with BOTH
+        # stereocentres off the attachment atom -- the steroid side-chain
+        # shape (row 7/10/16 of the L3-2a bucket: free valence at locant 2,
+        # not 1). Locants must come from the chain's OWN P-46.1.8 numbering,
+        # never a raw atom-index guess (attach_idx=1 -> locant 2; the other
+        # stereocentre at raw atom-index 4 -> locant 5, NOT enumerate
+        # position 5 of sorted(sub_atoms), which this fragment's shape makes
+        # coincide -- the assembly-site regression test below uses a
+        # genuinely non-coincident shape).
+        mol = _mol("C[C@H](CC[C@H](C(C)C)CC)C1CCCCC1")
+        stereo_idx = [a.GetIdx() for a in mol.GetAtoms()
+                      if a.HasProp("_CIPCode")]
+        assert len(stereo_idx) == 2
+        attach_idx = 1
+        sub_atoms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        from orthonym.assembly.substituent_naming import (
+            _acyclic_alkyl_located_stereo_name)
+        located = _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
+        assert located is not None
+        pin_form, k, pos = located
+        assert k == 2, "free valence must NOT be locant 1 for this shape"
+        out = _add_substituent_stereo(
+            mol, sub_atoms, pin_form, attach_idx=attach_idx)
+        expected_locants = sorted(
+            (pos[i], mol.GetAtomWithIdx(i).GetProp("_CIPCode"))
+            for i in stereo_idx)
+        expected_block = "(" + ",".join(
+            f"{loc}{cip}" for loc, cip in expected_locants) + ")-"
+        assert out == f"{expected_block}{pin_form}", out
+
+    def test_unthreadable_shape_still_falls_back_unchanged(self):
+        # A RING stereocentre (not an acyclic alkyl chain) -- the deriver
+        # declines (None) and D-09's fallback must still hold: no fabricated
+        # block, even though attach_idx is now provided.
+        mol = _mol("C[C@H]1CC[C@@H](C)CC1")
+        stereo_idx = [a.GetIdx() for a in mol.GetAtoms()
+                      if a.HasProp("_CIPCode")]
+        assert len(stereo_idx) == 2
+        sub_atoms = [a.GetIdx() for a in mol.GetAtoms()]
+        out = _add_substituent_stereo(
+            mol, sub_atoms, "4-methylcyclohexyl", attach_idx=stereo_idx[0])
+        assert out == "4-methylcyclohexyl", out
