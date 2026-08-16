@@ -188,3 +188,95 @@ class TestW6bLinearOligosaccharide:
         mol = Chem.MolFromSmiles(smi)
         names = {name_compound(Chem.MolToSmiles(mol, doRandom=True)) for _ in range(8)}
         assert len(names) == 1, names
+
+
+class TestExtractUnitCappedNoIsotopeLeak:
+    """v33 P0 L3-2b: ``_extract_unit_capped`` (the multi-bond generalization of
+    the proven ``conjugate_controller._extract_capped_sugar`` primitive) calls
+    ``Chem.FragmentOnBonds(..., addDummies=True)`` WITHOUT ``dummyLabels``, so
+    RDKit isotope-labels each new capping dummy atom with the bonded partner's
+    ORIGINAL atom index. ``at.SetAtomicNum(8)`` (restoring the -OH) never clears
+    that isotope, so every capped unit's canonical SMILES carries stray isotope
+    tags (e.g. ``[C@H]1O[C@H]([5OH])...`` instead of plain ``O``).
+
+    ``_extract_capped_sugar`` (the single-bond sibling this generalizes) already
+    guards against exactly this via ``dummyLabels=[(0, 0)]`` — the multi-bond
+    generalization dropped that detail.
+
+    This is USUALLY masked: ``recognize_sugar_skeleton``'s connectivity/CIP
+    fingerprint tolerates the stray isotopes for plain hexopyranoses (glucose,
+    galactose, ...). But the only recognizer that knows a MODIFIED sugar (e.g.
+    2-acetamido-2-deoxy-glucopyranose / GlcNAc) is ``lookup_sugar``'s EXACT
+    canonical-SMILES dictionary match, which an isotope-tagged SMILES can never
+    hit — so every GlcNAc/GalNAc (etc.) unit in an oligosaccharide chain fails
+    recognition and the whole chain abstains (measured: v33 Phase 0 L3-2b SPY,
+    5 real oligosaccharide/glycoconjugate rows, ALL declining here)."""
+
+    def test_middle_unit_capped_smiles_has_no_isotopes(self):
+        """Maltotriose's MIDDLE unit (2 bridging bonds) -> capped SMILES must
+        carry plain ``O`` at both former-bridge positions, never an isotope
+        tag. Reproduces the leak on an all-glucose chain (isotope-agnostic
+        symptom), independent of any amino-sugar content."""
+        from orthonym.rules import oligosaccharides as oligo
+
+        smi = ("OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@@H](O[C@H]3[C@H](O)"
+               "[C@@H](O)C(O)O[C@@H]3CO)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O")
+        mol = Chem.MolFromSmiles(smi)
+        topo = oligo._oligo_topology(mol)
+        assert topo is not None
+        units, links = topo["units"], topo["links"]
+        unit_bridge_bonds = {ui: [] for ui in range(len(units))}
+        for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
+            unit_bridge_bonds[donor_ui].append((anom_c, o_idx))
+            unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
+        middle_ui = next(ui for ui, bonds in unit_bridge_bonds.items() if len(bonds) == 2)
+        canon = oligo._extract_unit_capped(
+            mol, units[middle_ui]["ringset"], unit_bridge_bonds[middle_ui]
+        )
+        assert canon is not None
+        capped = Chem.MolFromSmiles(canon)
+        assert capped is not None
+        assert all(a.GetIsotope() == 0 for a in capped.GetAtoms()), canon
+
+    def test_amino_sugar_middle_unit_recognized_after_uncapping(self):
+        """Once the isotope leak is fixed, an amino-sugar (GlcNAc) unit's
+        capped SMILES must exact-match ``lookup_sugar``'s catalog — the
+        recognizer ``name_linear_oligosaccharide`` actually calls."""
+        from orthonym.data.sugar_names import lookup_sugar
+
+        # A GlcNAc unit capped at both bridging positions (C1 exocyclic O and
+        # the C4-O acceptor), as _extract_unit_capped would isolate it from a
+        # real chain (v33 P0 L3-2b SPY row idx5 unit).
+        capped_glcnac = "CC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O"
+        mol = Chem.MolFromSmiles(capped_glcnac)
+        canon = Chem.MolToSmiles(mol)
+        assert lookup_sugar(canon) == ("beta", "D", "2-acetamido-2-deoxy-glucopyranose")
+
+
+class TestAminoSugarOligosaccharideChain:
+    """v33 P0 L3-2b: a real hexasaccharide (3x beta-D-galactopyranose alternating
+    with 3x N-acetyl-beta-D-glucosamine, terminal D-glucopyranose reducing end)
+    that abstained pre-fix because every GlcNAc unit failed recognition (the
+    isotope-leak above). Root cause fixed at the unit-extraction primitive, not
+    a per-molecule special case."""
+
+    HEXASACCHARIDE_SMILES = (
+        "CC(=O)N[C@H]1[C@H](O[C@H]2[C@@H](O)[C@@H](CO)O[C@@H](O[C@H]3[C@H](O)"
+        "[C@@H](NC(C)=O)[C@H](O[C@H]4[C@@H](O)[C@@H](CO)O[C@@H](O[C@H]5[C@H](O)"
+        "[C@@H](NC(C)=O)[C@H](O[C@H]6[C@@H](O)[C@@H](CO)O[C@@H](O[C@H]7[C@H](O)"
+        "[C@@H](O)C(O)O[C@@H]7CO)[C@@H]6O)O[C@@H]5CO)[C@@H]4O)O[C@@H]3CO)[C@@H]2O)"
+        "O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O)[C@H]2O)[C@@H]1O"
+    )
+
+    def test_amino_sugar_chain_names_and_round_trips(self):
+        """The chain assembler now recognizes every unit (incl. the 3 GlcNAc
+        rings) and emits an OPSIN-RT-verified name; previously abstained
+        (``None``) because ``lookup_sugar`` never matched the isotope-tagged
+        capped SMILES."""
+        from orthonym.rules.oligosaccharides import name_disaccharide
+
+        mol = Chem.MolFromSmiles(self.HEXASACCHARIDE_SMILES)
+        assert mol is not None
+        name = name_disaccharide(mol)
+        assert name is not None
+        assert "2-acetamido" in name or "acetamido" in name

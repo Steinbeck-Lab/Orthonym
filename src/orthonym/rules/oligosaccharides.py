@@ -591,7 +591,20 @@ def _extract_unit_capped(mol, ringset: Set[int],
             return None
         bond_ids.append(b.GetIdx())
     try:
-        frag = Chem.FragmentOnBonds(mol, bond_ids, addDummies=True)
+        # v33 P0 L3-2b: explicit dummyLabels=(0, 0) per bond, mirroring
+        # _extract_capped_sugar's dummyLabels=[(0, 0)] — WITHOUT it RDKit
+        # isotope-labels each dummy with the cleaved bond partner's atom index,
+        # and at.SetAtomicNum(8) below never clears that isotope. The stray
+        # isotope survives into the returned canonical SMILES, which defeats
+        # lookup_sugar's EXACT-match catalog for every unit whose ONLY
+        # recognizer is that catalog (e.g. GlcNAc/GalNAc; recognize_sugar_
+        # skeleton's isotope-agnostic fingerprint masked this for plain
+        # hexopyranoses). Zero-isotope dummies -> a real -OH, indistinguishable
+        # from the uncapped sugar's own canonical SMILES.
+        frag = Chem.FragmentOnBonds(
+            mol, bond_ids, addDummies=True,
+            dummyLabels=[(0, 0)] * len(bond_ids),
+        )
         mapping: List = []
         frags = Chem.GetMolFrags(
             frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
@@ -786,9 +799,22 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
             anom_defined = (mol.GetAtomWithIdx(units[ui]["anomeric_idx"]).GetChiralTag()
                             != Chem.ChiralType.CHI_UNSPECIFIED)
             if anom_defined and pa and pc:
-                parent_str = f"{pa}-{pc}-{pb}"
+                # v33 P0 L3-2b: see _split_decorated_sugar_base — a decorated
+                # base (e.g. GlcNAc's "2-acetamido-2-deoxy-glucopyranose") needs
+                # the anomer-config descriptor inserted AFTER its own prefixes,
+                # not prepended ahead of them (OPSIN rejects the naive order).
+                _prefix_block, _stem = _split_decorated_sugar_base(pb)
+                _descriptor = f"{pa}-{pc}-{_stem}"
+                parent_str = f"{_prefix_block}-{_descriptor}" if _prefix_block else _descriptor
             else:
-                parent_str = f"{pc}-{pb}" if pc else pb
+                if pc:
+                    _prefix_block2, _stem2 = _split_decorated_sugar_base(pb)
+                    _descriptor2 = f"{pc}-{_stem2}"
+                    parent_str = (
+                        f"{_prefix_block2}-{_descriptor2}" if _prefix_block2 else _descriptor2
+                    )
+                else:
+                    parent_str = pb
                 relax.add(units[ui]["anomeric_idx"])
             parts.append(parent_str)
         else:
@@ -821,21 +847,47 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
     return name
 
 
+def _split_decorated_sugar_base(base: str) -> Tuple[str, str]:
+    """Split a catalog sugar base name into ``(prefix_block, stem)`` at the LAST
+    hyphen, e.g. ``"2-acetamido-2-deoxy-glucopyranose"`` ->
+    ``("2-acetamido-2-deoxy", "glucopyranose")``; an undecorated base (no
+    hyphen) returns ``("", base)``.
+
+    v33 P0 L3-2b: mirrors ``sugar_names.name_free_sugar``'s F-CATALOG-JOIN fix
+    (v23 Phase 5, ``sugar_names.py:2105-2110``) — "a prefix-bearing catalog base
+    needs the configurational descriptor inserted BEFORE the stem, AFTER the
+    prefixes". ``_glycosyl_term``/the parent-string builder below used the
+    naive ``anomer-config-base`` order unconditionally, which OPSIN accepts for
+    an undecorated base (no prefixes to misplace the descriptor ahead of) but
+    REJECTS for a decorated one: OPSIN parses ``2-acetamido-2-deoxy-beta-D-
+    glucopyranose`` but not ``beta-D-2-acetamido-2-deoxy-glucopyranose``
+    (verified via ``opsin_roundtrip_check``). Every existing disaccharide test
+    uses an undecorated base (glucopyranose/fructofuranose), so this never had
+    a failing case until an amino-sugar (GlcNAc/GalNAc) unit exercised it.
+    """
+    if "-" in base:
+        prefix_block, stem = base.rsplit("-", 1)
+        return prefix_block, stem
+    return "", base
+
+
 def _glycosyl_term(anomer: str, config: str, base: str) -> Optional[str]:
-    """Build a glycosyl substituent term ``{anomer}-{config}-{base}yl`` (-ose -> -osyl).
+    """Build a glycosyl substituent term ``{anomer}-{config}-{base}yl`` (-ose -> -osyl),
+    with the configurational descriptor correctly placed AFTER any base-name
+    prefixes and immediately before the ``-osyl`` stem for a decorated base
+    (see :func:`_split_decorated_sugar_base`).
 
     Uses the structural ``-ose`` -> ``-osyl`` slice; never string-surgery on a derived
     base beyond the canonical suffix transform.
     """
     if not base:
         return None
-    if base.endswith("ose"):
-        stem = base[:-1] + "yl"  # -ose -> -osyl
-    else:
-        stem = base + "yl"
+    prefix_block, raw_stem = _split_decorated_sugar_base(base)
+    stem = raw_stem[:-1] + "yl" if raw_stem.endswith("ose") else raw_stem + "yl"
     if anomer and config:
-        return f"{anomer}-{config}-{stem}"
-    return stem
+        descriptor = f"{anomer}-{config}-{stem}"
+        return f"{prefix_block}-{descriptor}" if prefix_block else descriptor
+    return f"{prefix_block}-{stem}" if prefix_block else stem
 
 
 def _glycoside_head(anomer: str, config: str, base: str) -> Optional[str]:
