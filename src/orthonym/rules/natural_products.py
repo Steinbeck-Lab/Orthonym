@@ -296,6 +296,33 @@ def name_natural_product(mol) -> Optional[str]:
     if scaffold_info is None:
         return None
 
+    # v33 Phase 1 (C2a) STEREO HONESTY: the scaffold match is stereo-RELAXED
+    # (perception/natural_products.py:40-67), so a stereo-UNDEFINED steroid/terpenoid
+    # matches a config-defined scaffold. The retained parent name (cholest-/androst-/
+    # pregn-/...) canonically asserts the natural configuration (P-103.1.3.1) at every
+    # ring stereocentre EXCEPT C-5, which the Blue Book documents as the one centre the
+    # bare parent name does NOT fix -- P-101.2.6 "Stereochemical configuration of parent
+    # structures" (BlueBookV2.md:51045): "The name of a fundamental parent structure
+    # usually implies the absolute configuration of all chirality centers ... All
+    # chirality must be defined so that for example with a steroid the stereochemistry
+    # at 'C-5', when relevant, is indicated by alpha, beta or xi ... here, the
+    # configuration of the hydrogen atom at position 5 is not known and thus the
+    # orientation is 'xi' (xi)." So an undefined C-5 alone is the Blue-Book-sanctioned
+    # unspecified case, not a fabrication -- exclude only that locant's atom(s) from the
+    # check, and only for the steroid scaffold class this citation covers. If the input
+    # leaves any OTHER matched-scaffold stereocentre undefined, the name would FABRICATE
+    # stereo the input never defined -> decline, so the caller falls through to a
+    # stereo-free systematic name (von Baeyer, best-effort) or an honest abstain. The
+    # exact-derivative lookup above is isomeric-SMILES-keyed and already safe.
+    from ..perception.stereo import input_stereo_undefined
+    _honesty_matched = scaffold_info.get("matched_atoms") or []
+    if scaffold_info.get("scaffold_class") == "steroid":
+        _honesty_numbering = _build_target_to_iupac(scaffold_info) or {}
+        _c5_atoms = {idx for idx, locant in _honesty_numbering.items() if locant == 5}
+        _honesty_matched = [i for i in _honesty_matched if i not in _c5_atoms]
+    if input_stereo_undefined(mol, atom_indices=_honesty_matched):
+        return None
+
     # Step 3b: Detect NP modifications (nor-, homo-, seco-)
     # Build numbering early so it can be reused in Steps 4-6
     numbering = _build_target_to_iupac(scaffold_info)
