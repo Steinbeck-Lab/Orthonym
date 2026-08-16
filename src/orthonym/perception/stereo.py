@@ -276,6 +276,40 @@ def get_undefined_stereocenters(mol) -> List[int]:
     return undefined
 
 
+def input_stereo_undefined(mol, atom_indices=None) -> bool:
+    """True iff ``mol`` leaves a REAL stereo feature UNDEFINED: a tetrahedral
+    stereocentre flagged possible but carrying no CIP configuration, or a
+    stereogenic double bond left undirected. When ``atom_indices`` is given, the
+    tetrahedral check is restricted to those atoms (bond check is unrestricted).
+
+    The shared stereo-honesty predicate for v33 Phase 1: a config-implying
+    retained name (steroid ``cholest-``/``androst-``, amino acid
+    ``S-methylcysteine``) asserts a specific configuration, so it must not be
+    emitted when this returns True -- that would fabricate stereo the input
+    never defined (P-103.1.3.1 / P-92). Fail-CLOSED: any failure returns True,
+    so an uncomputable case never lets a fabrication through.
+    """
+    if mol is None:
+        return True
+    try:
+        undef = get_undefined_stereocenters(mol)   # tetrahedral, existing helper
+        if atom_indices is not None:
+            allowed = set(atom_indices)
+            undef = [i for i in undef if i in allowed]
+        if undef:
+            return True
+        # Stereogenic-but-undirected double bonds (belt-level; scoped producers
+        # rarely hit this, but the contract covers it).
+        probe = Chem.Mol(mol)
+        Chem.FindPotentialStereoBonds(probe)
+        for bond in probe.GetBonds():
+            if bond.GetStereo() == Chem.BondStereo.STEREOANY:
+                return True
+        return False
+    except Exception:
+        return True
+
+
 # =============================================================================
 # Axial Chirality Detection (IUPAC P-93.5)
 # =============================================================================
