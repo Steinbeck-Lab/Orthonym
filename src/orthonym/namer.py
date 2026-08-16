@@ -2772,6 +2772,14 @@ class Orthonym:
             # `_last_ger_result`) of the systematic-floor name the LAST
             # `_maybe_append_t4_floor_offer` call computed, if any.
             self._t4_floor_candidate = None
+            # v33 Phase 0 cleanup T1: same per-top-level-molecule invariant --
+            # `_last_selected_offer` stashes the WINNING `Offer`
+            # `_select_rt_passing_offer_name` picked (or `None` if it fell
+            # back to `current_name` unchanged), so `name_tiered` can derive
+            # tier/is_pin/source from the offer that actually won rather than
+            # the process-wide provenance contextvar, which still describes
+            # whichever producer ran LAST (the losing primary on a floor win).
+            self._last_selected_offer = None
             # v25 G3: publish the engine flag so fragment/component recursion
             # (name_compound builds FRESH namers) inherits it. Top-level only;
             # reset in the finally below.
@@ -3178,6 +3186,28 @@ class Orthonym:
         else:
             tier, is_pin = "T1", True
             opsin = gate_opsin_label
+        # v33 Phase 0 cleanup T1: the branches above derive tier/is_pin/
+        # source from the provenance CONTEXTVAR, which reflects whichever
+        # producer ran LAST -- correct when `self._offers` holds a single
+        # primary offer (the contextvar and that offer are built from the
+        # identical snapshot, so nothing changes below), but WRONG when
+        # `_select_rt_passing_offer_name` picked a DIFFERENT, later-appended
+        # offer over that primary (e.g. the T4 systematic floor beating a
+        # stereo-wrong primary): the contextvar still describes the LOSING
+        # primary. Re-derive from the WINNING `Offer` itself whenever one won
+        # and its `.name` is exactly what shipped (`_last_selected_offer` is
+        # `None` when `select_rt_passing` found no complete+RT-passing offer,
+        # in which case `current_name` ships unchanged and there is nothing
+        # to override). Guarded off the T5/abstain branch too, though that is
+        # belt-and-braces: a winning offer can never be a failure-name
+        # sentinel (both offer-construction sites in `_finish` already
+        # refuse to append one).
+        _offer_winner = getattr(self, "_last_selected_offer", None)
+        if (_offer_winner is not None and _offer_winner.name == name
+                and tier != "T5"):
+            source = _offer_winner.source
+            is_pin = _offer_winner.is_pin
+            tier = _offer_winner.tier
         gates = []
         if source == "general_engine":
             gates.append("E1")
@@ -4001,6 +4031,11 @@ class Orthonym:
         logger.info(
             "select_rt_passing considered %d offer(s); winner=%r",
             len(self._offers), selected.name if selected is not None else None)
+        # v33 Phase 0 cleanup T1: stash the winning Offer (or None when no
+        # offer both completed and RT-passed, in which case `current_name`
+        # ships unchanged and there is no "winner" to report) so `name_tiered`
+        # can read its tier/is_pin/source instead of the stale contextvar.
+        self._last_selected_offer = selected
         return selected.name if selected is not None else current_name
 
     def _maybe_append_t4_floor_offer(self, mol, smiles: str,
