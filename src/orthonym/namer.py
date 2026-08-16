@@ -1069,8 +1069,13 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
         return "ok"
     na = _specified_stereo_count(mi)
     nb = _specified_stereo_count(mo)
-    # na == 0 (stereo-UNSPECIFIED input named by a stereo-implying retained name)
-    # is a SEPARATE Blue Book question tracked in  — tolerated here.
+    # v33 Phase 1 (C3): a name that OVER-specifies stereo (nb > na) FABRICATES
+    # configuration the input does not define (P-103.1.3.1) -> reject. na == 0 alone
+    # is no longer a blanket pass: only the truly achiral case (na == 0 AND nb == 0)
+    # stays ok. Producer guards (C2) prevent most fabrication reaching here; this is
+    # the OPSIN-parseable backstop.
+    if nb > na:
+        return "mismatch"
     if na == 0:
         return "ok"
     # v27 Phase 0: a name that specifies FEWER stereo features than the input OMITS
@@ -1079,7 +1084,7 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     # stereo). Structural count, never a name-string scan.
     if _name_omits_input_stereo(input_smiles, opsin_smiles):
         return "mismatch"
-    if na != nb:            # name OVER-specifies (nb > na) -> tolerated (separate case)
+    if nb < na:              # benign under-count _name_omits_input_stereo let through
         return "ok"
     # Equal specified-stereo count. When the two are the EXACT same constitution
     # (isomeric-stripped canonical equal — NOT merely mobile-H/tautomer-equivalent),

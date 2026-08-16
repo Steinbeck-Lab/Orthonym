@@ -3,9 +3,11 @@ conjugated/aromatic double bond, where the RegistrationHash TAUTOMER_HASH layer 
 (fumarate vs maleate hash equal). The fix decides an equal-count, same-EXACT-constitution case
 by a sound per-element atom-mapped compare, while preserving:
   - tautomer/mobile-H tolerance (the gate is deliberately tautomer-insensitive),
-  - stereo OMISSION tolerance (a less-specific name is valid),
-  - the na==0 case (stereo-unspecified input vs a stereo-implying name) — a SEPARATE Blue Book
-    question, intentionally left tolerated here.
+  - stereo OMISSION tolerance (a less-specific name is valid).
+
+v33 Phase 1 (C3): the na==0 case (stereo-unspecified input vs a stereo-implying name) is NO
+LONGER tolerated — it FABRICATES configuration the input does not define (P-103.1.3.1) and is
+now a "mismatch". See tests/unit/test_gate_stereo_fabrication.py.
 `_self_consistency_verdict` is the SELF-01 stereo decision on the DEFAULT (PIN) path.
 """
 from orthonym import namer as NM
@@ -51,9 +53,10 @@ def test_tetrahedral_omission_is_ok():
     assert V("C[C@H](N)C(=O)O", "CC(N)C(=O)O") == "ok"
 
 
-def test_unspecified_input_vs_stereo_name_stays_ok():
-    # na==0 (flat input) vs a stereo-asserting name — DEFERRED (Blue Book question), tolerated here.
-    assert V("CC(C)CC([NH3+])C(=O)O", "[NH3+][C@@H](CC(C)C)C(=O)O") == "ok"
+def test_unspecified_input_fabricated_stereo_is_mismatch():
+    # v33 Phase 1 (C3): na==0 (flat input) vs a stereo-asserting name FABRICATES
+    # configuration -> mismatch (was tolerated pre-C3).
+    assert V("CC(C)CC([NH3+])C(=O)O", "[NH3+][C@@H](CC(C)C)C(=O)O") == "mismatch"
 
 
 def test_constitution_difference_is_mismatch():
