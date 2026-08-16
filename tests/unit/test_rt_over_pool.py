@@ -119,16 +119,60 @@ class TestOfferRtOkPredicate:
     """Unit tests of `_offer_rt_ok` itself, monkeypatching its dependencies
     directly -- proves the NO-double-OPSIN reuse and the fail-open paths."""
 
-    def test_recorded_self01_pass_is_reused_zero_opsin_calls(self, monkeypatch):
+    def test_recorded_self01_pass_still_checks_full_inchikey_matching_passes(
+            self, monkeypatch):
+        """v33 Phase 0 L3-1 CHANGE: a recorded SELF-01 pass no longer
+        short-circuits `_offer_rt_ok` -- it proves constitution only (the
+        L3 CHARACTERIZATION's whole finding), so the full-InChIKey compare
+        still runs. In PRODUCTION `_validity_gate_name_to_smiles` is a cache
+        HIT here (the SELF-01 gate already called it for this exact string,
+        so no NEW JVM invocation happens) -- this unit test proves the
+        DECISION (matching molecule -> True), not the cache mechanics
+        (which live inside `OpsinOracle` and are exercised by the
+        integration-level test below)."""
         monkeypatch.setattr(
             namer_mod, "_self01_lookup", lambda name: (True, False, ""))
-
-        def _boom(*a, **k):
-            raise AssertionError("must not call OPSIN when self01 already passed")
-
-        monkeypatch.setattr(namer_mod, "_validity_gate_jar_present", _boom)
-        monkeypatch.setattr(namer_mod, "_validity_gate_name_to_smiles", _boom)
+        monkeypatch.setattr(
+            namer_mod, "_validity_gate_jar_present", lambda: True)
+        monkeypatch.setattr(
+            namer_mod, "_validity_gate_name_to_smiles", lambda name: "CCO")
         assert namer_mod._offer_rt_ok("ethanol", "CCO") is True
+
+    def test_recorded_self01_pass_but_full_inchikey_stereo_mismatch_fails(
+            self, monkeypatch):
+        """THE L3-1 fix: a name that SELF-01 already marked constitution-
+        verified (`self01_complete=True`) but whose OPSIN re-perception
+        encodes a DIFFERENT stereoisomer (or a stereo-UNSPECIFIED input named
+        by a stereo-fabricating retained name -- the dominant discard-gap
+        mechanism, `_self_consistency_verdict`'s own `na == 0` tolerance)
+        must now FAIL `_offer_rt_ok`, where the pre-L3-1 constitution-only
+        check would have wrongly accepted it."""
+        monkeypatch.setattr(
+            namer_mod, "_self01_lookup", lambda name: (True, False, ""))
+        monkeypatch.setattr(
+            namer_mod, "_validity_gate_jar_present", lambda: True)
+        # input is the ACHIRAL form; the name's OPSIN re-perception asserts a
+        # specific (S) stereocentre -- same constitution, different full key.
+        monkeypatch.setattr(
+            namer_mod, "_validity_gate_name_to_smiles",
+            lambda name: "C[C@H](N)C(=O)O")
+        assert namer_mod._offer_rt_ok(
+            "(2S)-2-aminopropanoic acid", "CC(N)C(=O)O") is False
+
+    def test_no_recorded_verdict_full_inchikey_stereo_mismatch_fails(
+            self, monkeypatch):
+        """Same full-InChIKey stereo check, but on the fresh-check branch
+        (no recorded SELF-01 verdict at all) -- both branches must apply the
+        same stricter bar."""
+        monkeypatch.setattr(
+            namer_mod, "_self01_lookup", lambda name: (None, False, ""))
+        monkeypatch.setattr(
+            namer_mod, "_validity_gate_jar_present", lambda: True)
+        monkeypatch.setattr(
+            namer_mod, "_validity_gate_name_to_smiles",
+            lambda name: "C[C@H](N)C(=O)O")
+        assert namer_mod._offer_rt_ok(
+            "(2S)-2-aminopropanoic acid", "CC(N)C(=O)O") is False
 
     def test_recorded_self01_warn_mismatch_fails(self, monkeypatch):
         monkeypatch.setattr(

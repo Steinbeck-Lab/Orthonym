@@ -193,7 +193,21 @@ def test_a_suppressed_emission_is_not_proved_against_the_abstention_sentinel():
     with mock.patch.object(type(namer), "_name_impl",
                            staticmethod(lambda _s: "unknown organic compound")), \
          mock.patch.object(type(namer), "_try_general_engine_recovery",
-                           staticmethod(_recover)):
+                           staticmethod(_recover)), \
+         mock.patch("orthonym.assembly.t4_coverage.name_t4_complete",
+                    return_value=None):
+        # v33 Phase 0 L3-1: `_try_general_engine_recovery` is no longer the
+        # ONLY rescue path for a suppressed emission -- `_finish` now ALSO
+        # tries the systematic floor directly (`name_t4_complete`) whenever
+        # the primary is a failure-name sentinel, independent of this test's
+        # `_try_general_engine_recovery` mock. "CCO" is trivially
+        # T4-nameable, so without also patching the floor producer this test
+        # would (correctly, by L3-1's design) get a REAL rescued name here
+        # instead of the abstention its scenario is built to force -- that is
+        # the intended new capability, not a bug, but it defeats this test's
+        # specific job of isolating the PROOF-LEDGER's suppressed-emission
+        # guard. Patched to None so the abstention this test needs as a
+        # precondition still holds.
         out = namer.name("CCO")
 
     assert is_failure_name(out)

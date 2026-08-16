@@ -1443,52 +1443,94 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     return _suppressed_to
 
 
+def _full_inchikey_offer_match(input_smiles: str, opsin_smiles: str) -> bool:
+    """v33 Phase 0 L3-1: True iff ``input_smiles`` and ``opsin_smiles`` share
+    the SAME FULL (all-layer) InChIKey -- constitution AND stereo AND
+    protonation/mobile-H-tautomer state all identical.
+
+    Strictly stronger than `_self_consistency_skeleton`'s stereo-/charge-
+    insensitive FIRST block (which is what the ordinary SELF-01 gate proves):
+    the L3 CHARACTERIZATION found the discard-gap primaries are constitution-
+    CORRECT (they pass that tolerant compare -- including its deliberate
+    ``na == 0`` licence, "a stereo-UNSPECIFIED input named by a stereo-
+    implying retained name ... tolerated here") but full-InChIKey-FAIL (33/34
+    differ in the SECOND block: a fabricated/omitted/conflicting stereo
+    assignment the constitutional gate lets through by design). An offer
+    competing against a systematic floor needs the STRICTER bar, not the
+    PIN-emission gate's tolerant one.
+
+    Fail-OPEN (``True``) on any parse/hash failure -- an inconclusive compare
+    must never reject an offer.
+    """
+    try:
+        mi = Chem.MolFromSmiles(input_smiles)
+        mo = Chem.MolFromSmiles(opsin_smiles)
+        if mi is None or mo is None:
+            return True
+        from rdkit.Chem import inchi
+        ik_in = inchi.MolToInchiKey(mi)
+        ik_out = inchi.MolToInchiKey(mo)
+        if not ik_in or not ik_out:
+            return True
+        return ik_in == ik_out
+    except Exception:
+        return True
+
+
 def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
-    """v33 Phase 0 L4-core: the RT/PIN-gate PASS/FAIL predicate for ONE
+    """v33 Phase 0 L4-core/L3-1: the RT/PIN-gate PASS/FAIL predicate for ONE
     candidate ``name`` offered as a whole-molecule winner (the ``rt_ok``
     ``offer_pool.select_rt_passing`` is injected with, built at `_finish`).
 
-    NO double-OPSIN: for the (today, ALWAYS) common case where the validity
-    gate already ran on this EXACT string, this reuses that recorded SELF-01
-    verdict via `_self01_lookup` -- ZERO fresh OPSIN calls. Only a string with
-    NO recorded verdict for it (e.g. a name `_apply_trivial_fallback` swapped
-    in AFTER the gate ran, or a future alternative offer the gate never saw
-    at all) triggers ONE fresh, LOW-LEVEL check -- `_validity_gate_name_to_smiles`
-    + `_self_consistency_verdict` -- never `_final_opsin_validity_gate` itself,
-    which would re-run the whitelist carve-outs and record suppression
-    telemetry a SECOND time for a name the gate machinery may already hold a
-    (different-string) opinion about.
+    v33 Phase 0 L3-1 CHANGE: this now requires a FULL-InChIKey match
+    (`_full_inchikey_offer_match`), not merely the constitution-only SELF-01
+    verdict the L4-core version reused outright. The L3 CHARACTERIZATION
+    measured that the constitution-only bar lets a stereo-wrong (or stereo-
+    fabricated) primary through, which is exactly the gap the systematic
+    floor exists to close -- so a primary that only proves constitution must
+    NOT out-rank a floor offer that proves the full molecule.
+
+    NO double-OPSIN in the common case: `_validity_gate_name_to_smiles` is
+    MEMOIZED (`OpsinOracle._name_cache`), and the ordinary SELF-01 gate
+    (`_final_opsin_validity_gate`) already called it on this EXACT string
+    before recording whatever verdict `_self01_lookup` reads back -- so the
+    call below is a cache HIT, not a new JVM invocation, for every name the
+    gate already processed. Only a string with NO recorded verdict at all
+    (e.g. a name `_apply_trivial_fallback` swapped in AFTER the gate ran, or
+    a fresh floor/alternative offer the gate never saw) triggers a genuinely
+    NEW OPSIN call here.
 
     Fail-OPEN throughout, mirroring L1's `method == "unavailable"` handling:
     jar-absent, a transient 'unavailable' OPSIN outcome, and an inconclusive
-    self-consistency compare all return True. This predicate must never be
-    the reason `select_rt_passing` empties the whole offer pool.
+    compare all return True. This predicate must never be the reason
+    `select_rt_passing` empties the whole offer pool.
     """
     self01_complete, skip_reanchor, _detail = _self01_lookup(name)
-    if self01_complete is True:
-        return True
     if self01_complete is False:
         # self01_warn_mismatch -- a PROVEN constitutional mismatch shipped
-        # anyway under _SC_MODE=="warn". A real fail for RT-gating purposes.
+        # anyway under _SC_MODE=="warn". A real fail for RT-gating purposes;
+        # the full-InChIKey bar can only be at least as strict, never rescue it.
         return False
     if skip_reanchor:
         # carveout:* / gate_disabled / unavailable / not_run -- no jar was
         # (or would be) consulted; fail-OPEN rather than treat "no verdict"
-        # as a rejection.
+        # as a rejection. These names are OPSIN-unparseable BY DESIGN (or no
+        # gate decision exists at all), so no full-InChIKey compare is even
+        # possible -- fail-open is the only sound answer.
         return True
-    # No recorded verdict at all (suppressed / inconclusive / bypassed /
-    # self01_skipped / descriptive_fallback outcome, OR a string the gate
-    # never saw -- e.g. a post-gate trivial-fallback swap, or a future
-    # alternative offer). ONE fresh, low-level check.
     if not _validity_gate_jar_present():
         return True  # fail-OPEN: no jar to consult
+    # NOTE: deliberately NOT short-circuited on `self01_complete is True`
+    # (L3-1's whole point) -- proceed to the full-InChIKey compare below,
+    # reusing the memoized name_to_smiles lookup regardless of what the
+    # constitution-only SELF-01 verdict said.
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is None:
         # A transient 'unavailable' fails OPEN; a definitive 'rejected' does not.
         return _validity_gate_status(name) == "unavailable"
     if not input_smiles:
         return True  # nothing to compare against -- inconclusive, fail-OPEN
-    return _self_consistency_verdict(input_smiles, opsin_smiles) != "mismatch"
+    return _full_inchikey_offer_match(input_smiles, opsin_smiles)
 
 
 # ---------------------------------------------------------------------------
@@ -2725,6 +2767,11 @@ class Orthonym:
             # exception, or a non-top-level recursive call) would report the
             # PREVIOUS molecule's offer pool instead of an empty one.
             self._offers = []
+            # v33 Phase 0 L3-1: same per-top-level-molecule invariant --
+            # `_t4_floor_candidate` is a telemetry stash (mirroring
+            # `_last_ger_result`) of the systematic-floor name the LAST
+            # `_maybe_append_t4_floor_offer` call computed, if any.
+            self._t4_floor_candidate = None
             # v25 G3: publish the engine flag so fragment/component recursion
             # (name_compound builds FRESH namers) inherits it. Top-level only;
             # reset in the finally below.
@@ -3869,7 +3916,44 @@ class Orthonym:
                             name=name, result_obj=_offer_result_obj,
                             is_pin=_offer_is_pin, tier=_offer_tier,
                             source=_offer_source, complete=verdict.complete)]
+                        # v33 Phase 0 L3-1: the systematic FLOOR as a 2nd,
+                        # RT-gated offer -- best-effort ONLY (structurally
+                        # impossible under --emit-tier pin/complete: this
+                        # whole call is gated behind
+                        # `_general_fallback_unverified`, the SAME flag
+                        # `name_t4_complete`'s pre-existing caller requires).
+                        # See `_maybe_append_t4_floor_offer`'s docstring for
+                        # the cost guard (skips the floor entirely when the
+                        # primary already full-RT-passes) and the PIN-first
+                        # byte-identity argument (a pin-strict run never
+                        # reaches this line at all).
+                        if self._general_fallback_unverified:
+                            self._maybe_append_t4_floor_offer(
+                                _cov_mol, smiles, name,
+                                primary_is_failure=False)
                         name = self._select_rt_passing_offer_name(name, smiles)
+                elif (_cov_is_top_level() and is_failure_name(name)
+                        and self._general_fallback_unverified):
+                    # v33 Phase 0 L3-1: the CRITICAL wiring wrinkle the task
+                    # brief flags -- the block above never runs for a
+                    # failure-name sentinel (its own guard,
+                    # `not is_failure_name(name)`, is false here: auditing a
+                    # sentinel's "coverage" or vetoing it would be
+                    # meaningless). This narrower sibling path seeds
+                    # `self._offers` with ONLY the floor candidate (a
+                    # sentinel is not itself an offer) and lets
+                    # `_select_rt_passing_offer_name` ship the floor when it
+                    # full-RT-passes, or fall back to the UNCHANGED sentinel
+                    # otherwise -- WITHOUT the meaningless `audit_coverage`
+                    # call on the sentinel string.
+                    _cov_mol = Chem.MolFromSmiles(smiles) if smiles else None
+                    if _cov_mol is not None:
+                        self._offers = []
+                        self._maybe_append_t4_floor_offer(
+                            _cov_mol, smiles, name, primary_is_failure=True)
+                        if self._offers:
+                            name = self._select_rt_passing_offer_name(
+                                name, smiles)
         except Exception as _cae:  # pragma: no cover - defensive
             # SHADOW must never break a name regardless of what goes wrong
             # inside the audit; a VETO must fail OPEN on its own internal
@@ -3918,6 +4002,134 @@ class Orthonym:
             "select_rt_passing considered %d offer(s); winner=%r",
             len(self._offers), selected.name if selected is not None else None)
         return selected.name if selected is not None else current_name
+
+    def _maybe_append_t4_floor_offer(self, mol, smiles: str,
+                                      primary_name: str,
+                                      primary_is_failure: bool) -> None:
+        """v33 Phase 0 L3-1: append the systematic floor
+        (`assembly.t4_coverage.name_t4_complete`) to `self._offers` as a 2ND
+        `Offer`, IF the primary winner does not already full-RT-pass.
+
+        THE breadth lever this task exists for: the L3 SIZING measured that
+        the floor already builds a correct, full-round-tripping name for
+        36/86 single-fragment-noncharged gap rows the pipeline otherwise
+        emits WRONG (34) or abstains on (2) -- reaching emission for only 1.
+        Appending it here (ranked and RT-gated by `_select_rt_passing_offer_name`
+        right after this call returns) is what lets it WIN instead of just
+        existing unreachably.
+
+        Best-effort ONLY BY CONSTRUCTION: both call sites in `_finish` only
+        invoke this method inside an `if self._general_fallback_unverified`
+        guard -- the SAME flag `name_t4_complete`'s pre-existing caller
+        (`_try_general_engine_recovery`, ~:3414) requires, so a PIN/complete/
+        valid-tier run can never reach `name_t4_complete` from here either.
+
+        Cost guard: `name_t4_complete` recurses the full naming machinery
+        (perception + classification + the T4 producer cascade), so it is
+        only computed when it might actually be NEEDED --
+
+        * ``primary_is_failure=False`` (the ordinary "primary emitted a real
+          name" call site): `_offer_rt_ok(primary_name, smiles)` is checked
+          FIRST -- a cheap, MEMOIZED lookup (reuses the SELF-01 gate's own
+          OPSIN call for `primary_name`, no new JVM invocation) -- and the
+          floor is skipped entirely when the primary already full-RT-passes.
+          This is the common case, and exactly what keeps a PIN winner that
+          already round-trips exact untouched (the "PIN-first preserved"
+          guard).
+        * ``primary_is_failure=True`` (the primary is already a failure-name
+          sentinel, e.g. 'unknown organic compound'): skips straight to
+          computing the floor without probing `_offer_rt_ok` on the sentinel
+          first -- a sentinel can never itself round-trip, and probing it
+          would be a WASTED fresh OPSIN call the sentinel was never gated
+          against in the first place (`_final_opsin_validity_gate` returns
+          early on a known descriptive-fallback string, `namer.py`
+          ~:1194-1198, without ever calling `_validity_gate_name_to_smiles`
+          on it -- so there is no cached verdict to reuse here either).
+
+        `name_t4_complete` is run inside `isolated_naming_session()` (mirrors
+        `_try_general_engine_recovery`'s existing T4 call site, ~:3442-3443):
+        called mid-`name()` at `session_depth >= 1` it would hit
+        `MAX_NAMING_DEPTH` prematurely and degrade to an abstention
+        (documented root cause, `t4_coverage.py` ~:292-299 / RE-CONFIRMED at
+        `_try_general_engine_recovery` above) -- the isolated session gives
+        it the full recursion budget a standalone call gets.
+
+        `complete` is derived via `audit_coverage` exactly like the primary
+        offer above (bare-str path, `result_obj=None`) -- NOT assumed True
+        from `name_t4_complete`'s own internal E1 certification, so a floor
+        candidate is held to the SAME audited bar as everything else in the
+        pool. The REAL 0-wrong safety net is `_offer_rt_ok` (full-InChIKey)
+        at selection time, not this flag: a floor that is `complete` but
+        fails `rt_ok` still cannot win (`select_rt_passing` requires both).
+
+        Never raises -- a producer bug here must leave `self._offers` exactly
+        as it already was (fail-closed), matching this whole `_finish` block's
+        contract that a coverage-audit failure must never change or crash the
+        name.
+        """
+        if mol is None:
+            return
+        # Require an ACTUAL, LIVE way to verify a brand-new candidate against
+        # the primary before ever computing one. Two distinct guards, both
+        # measured necessary (a caught regression each):
+        #
+        # * `self._disable_opsin_validity_gate` (instance flag, "test/internal
+        #   mode"): when set, `_final_opsin_validity_gate` is never called for
+        #   the PRIMARY on its own naming path either (namer.py ~:4296's own
+        #   `if not self._disable_opsin_validity_gate:` guard), so no gate
+        #   outcome is recorded for it and `_self01_lookup` cannot distinguish
+        #   "never checked because gate is off" from "checked and belongs to
+        #   a stale, unrelated string" (`resolve_gate_outcome`'s ``bypassed``
+        #   case, deny-by-default but NOT in `_self01_lookup`'s skip_reanchor
+        #   bucket) -- so `_offer_rt_ok(primary_name, ...)` could go either
+        #   way depending on provenance left over from a PRIOR, unrelated
+        #   `.name()` call in the same process (measured:
+        #   `tests/unit/validation/test_binding_proof_wiring.py::
+        #   test_a_retained_name_swap_after_the_certificate_is_reported`,
+        #   order-dependent without this guard). Skipping the floor mechanism
+        #   entirely when the gate is explicitly off keeps that mode's
+        #   pre-L3-1 behaviour unchanged -- exactly what "test/internal mode"
+        #   should mean for a NEW OPSIN-gated capability.
+        # * A missing jar: mirrors the EXISTING T4 producer's own requirement
+        #   (`_try_general_engine_recovery` ~:3431-3433, `_try_t4_rescue`
+        #   ~:3646 -- "Keep the abstention without a jar") -- a T4 name must
+        #   never ship UNVERIFIED. Without this, `_offer_rt_ok` fails OPEN
+        #   (True) for a candidate NO ONE has ever checked, which would let a
+        #   von-Baeyer name that must NEVER ship win purely because there was
+        #   nothing to disprove it with (measured:
+        #   `tests/unit/test_general_fallback_wiring.py::
+        #   test_mancude_refused_regardless_of_optin_no_jar`).
+        if self._disable_opsin_validity_gate or not _validity_gate_jar_present():
+            return
+        if not primary_is_failure and _offer_rt_ok(primary_name, smiles):
+            return  # primary already full-RT-passes -- the floor is not needed
+        try:
+            from .assembly.t4_coverage import name_t4_complete
+            from .assembly.fragment_naming import isolated_naming_session
+            canonical = Chem.MolToSmiles(mol, canonical=True)
+            with isolated_naming_session():
+                feats = self._perceive(mol, smiles, canonical)
+                self._classify(feats)
+                floor_name = name_t4_complete(mol, feats)
+            if not floor_name or is_failure_name(floor_name):
+                return
+            from .assembly.coverage_audit import audit_coverage
+            _self01, _skip_reanchor, _skip_detail = _self01_lookup(floor_name)
+            verdict = audit_coverage(
+                mol, floor_name, None, self01_complete=_self01,
+                skip_reanchor=_skip_reanchor, skip_detail=_skip_detail)
+            from .assembly.offer_pool import Offer
+            self._offers.append(Offer(
+                name=floor_name, result_obj=None, is_pin=False, tier="T4",
+                source="t4_floor", complete=verdict.complete))
+            self._t4_floor_candidate = floor_name
+            logger.info(
+                "t4 floor offer: name=%r complete=%s (method=%s)",
+                floor_name[:80], verdict.complete, verdict.method)
+        except Exception as _fe:  # pragma: no cover - defensive
+            logger.info(
+                "t4 floor offer computation failed (kept existing offers): %s",
+                _fe)
 
     def _record_binding_proof(self, mol, eng, stage: str) -> None:
         """v29 P1: record a certified general-engine spine on the ledger.
