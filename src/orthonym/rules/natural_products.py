@@ -296,41 +296,53 @@ def name_natural_product(mol) -> Optional[str]:
     if scaffold_info is None:
         return None
 
-    # v33 Phase 1 (C2a) STEREO HONESTY -- STEROID-SCOPED (coordinator ruling, 2026-08-16,
-    # fix round 1). The scaffold match is stereo-RELAXED (perception/natural_products.py:
-    # 40-67), so a stereo-UNDEFINED steroid matches a config-defined scaffold. The
-    # retained STEROID parent name (cholest-/androst-/pregn-/...) canonically asserts the
-    # natural configuration (P-103.1.3.1) at every ring stereocentre EXCEPT C-5, which the
-    # Blue Book documents as the one centre the bare parent name does NOT fix -- P-101.2.6
-    # "Stereochemical configuration of parent structures" (BlueBookV2.md:51045): "The name
-    # of a fundamental parent structure usually implies the absolute configuration of all
-    # chirality centers ... All chirality must be defined so that for example with a
-    # steroid the stereochemistry at 'C-5', when relevant, is indicated by alpha, beta or
-    # xi ... here, the configuration of the hydrogen atom at position 5 is not known and
-    # thus the orientation is 'xi' (xi)." So an undefined C-5 alone is the
-    # Blue-Book-sanctioned unspecified case, not a fabrication -- exclude only that
-    # locant's atom(s) from the check.
+    # v33 Phase 1 (C2a) STEREO HONESTY -- STEROID-SCOPED, FULLY-FLAT-ONLY (coordinator
+    # ruling, 2026-08-16, fix round 2). The scaffold match is stereo-RELAXED
+    # (perception/natural_products.py:40-67), so a stereo-UNDEFINED steroid matches a
+    # config-defined scaffold. A FULLY stereo-undefined steroid (no matched-scaffold
+    # stereocentre defined at all) then gets the bare retained parent name (cholest-/
+    # androst-/pregn-/...), which canonically asserts the WHOLE natural configuration
+    # (P-103.1.3.1) -> that is the fabrication this guard declines.
     #
-    # Scoped to scaffold_class == "steroid" ONLY (measured, not guessed): a coordinator
+    # A PARTIALLY-defined steroid is NOT a fabrication: steroid names carry PER-LOCANT
+    # alpha/beta descriptors, so the assembler emits an honest name citing only the
+    # defined centres and legally OMITS any undefined one (e.g. WSC-02 --
+    # `5alpha-pregnane-3beta,20-diol` -- cites C-5/C-3 and omits the undefined C-20;
+    # OPSIN round-trips that name to the SAME molecule, confirming it is not
+    # fabrication). Round 1 declined whenever ANY matched stereocentre was undefined
+    # (with a Blue-Book-cited C-5 exception, P-101.2.6/BlueBookV2.md:51045, for the one
+    # ring position steroid names leave free); that broke WSC-02-shaped partially-defined
+    # steroids. Measured (coordinator SPY): all 25 fabrication witnesses have ZERO
+    # matched-scaffold stereocentres defined -- so the correct, measured criterion is
+    # "zero defined AND at least one undefined", not "any undefined". This criterion
+    # SUBSUMES the round-1 C-5 exception: a bare androstane/gonane/estrane test SMILES
+    # leaves only C-5 undefined but has C-8/9/10/13/14 defined, so `scaffold_defined` is
+    # non-empty and the guard already keeps the name without special-casing C-5 (verified
+    # empirically against the full required test list before removing that special case
+    # -- no dead code kept).
+    #
+    # Scoped to scaffold_class == "steroid" ONLY (fix round 1, unchanged): a coordinator
     # SPY found ALL 25 fabrication witnesses in this codebase are steroid-class and ZERO
     # are alkaloid-class. Alkaloid retained names (tropane, berberine, ajmaline, ...) are
     # constitutional parents that do not assert the flagged ring configuration (e.g.
     # tropane's bridgehead centres are ring-closure-constrained, not a free config the
     # name implies), so applying this guard to them was an over-broad breadth regression,
-    # not a fabrication fix. If the input leaves any OTHER matched-scaffold STEROID
-    # stereocentre undefined, the name would FABRICATE stereo the input never defined ->
-    # decline, so the caller falls through to a stereo-free systematic name (von Baeyer,
-    # best-effort) or an honest abstain. Any genuine non-steroid fabrication is still
-    # caught downstream by the C3 gate backstop + the offer RT-gate (0-wrong holds by
+    # not a fabrication fix. Any genuine non-steroid fabrication is still caught
+    # downstream by the C3 gate backstop + the offer RT-gate (0-wrong holds by
     # construction, not by this guard). The exact-derivative lookup above is
     # isomeric-SMILES-keyed and already safe.
     if scaffold_info.get("scaffold_class") == "steroid":
-        from ..perception.stereo import input_stereo_undefined
-        _honesty_matched = scaffold_info.get("matched_atoms") or []
-        _honesty_numbering = _build_target_to_iupac(scaffold_info) or {}
-        _c5_atoms = {idx for idx, locant in _honesty_numbering.items() if locant == 5}
-        _honesty_matched = [i for i in _honesty_matched if i not in _c5_atoms]
-        if input_stereo_undefined(mol, atom_indices=_honesty_matched):
+        _honesty_matched = set(scaffold_info.get("matched_atoms") or [])
+        _honesty_centres = Chem.FindMolChiralCenters(
+            mol, includeUnassigned=True, useLegacyImplementation=False
+        )
+        _honesty_defined = [
+            idx for idx, lbl in _honesty_centres if lbl != "?" and idx in _honesty_matched
+        ]
+        _honesty_undef = [
+            idx for idx, lbl in _honesty_centres if lbl == "?" and idx in _honesty_matched
+        ]
+        if _honesty_undef and not _honesty_defined:
             return None
 
     # Step 3b: Detect NP modifications (nor-, homo-, seco-)
