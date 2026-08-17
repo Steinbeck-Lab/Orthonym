@@ -149,11 +149,28 @@ class TestCationSubstituentPrefix:
         prefix = cation_to_prefix(mol, n_idx, ethyl_c)
         assert prefix == "trimethylazaniumyl", prefix
 
-    def test_name_substituent_fragment_fails_closed_on_remote_charge(self):
-        """When the charge sits deeper in the fragment than the attach atom
-        (no nested-substituent composer exists for that shape yet), the
-        namer must decline (None), never fall through to the charge-blind
-        parent_to_prefix guess."""
+    def test_name_substituent_fragment_names_pendant_onium_branch(self):
+        """v33 Phase 3 enabler (P-74.1.3): the "no nested-substituent
+        composer exists for that shape yet" premise this test used to assert
+        is no longer true -- `_name_polyfunctional_acyclic_substituent`
+        (assembly/substituent_naming.py, Pass 1d) now composes a pendant
+        onium branch as a locanted detachable prefix, reusing the existing
+        structured `cation_to_prefix` primitive rather than falling through
+        to the charge-blind `parent_to_prefix` guess this class of test was
+        written to forbid. The guess this test guarded against denoted a
+        DIFFERENT molecule (an OPSIN-unparseable '...aminiumyl' suffix
+        surgery, or a silently-mis-anchored attachment); the value asserted
+        below is RT-verified as the SAME molecule instead:
+
+            OPSIN.parse("2-(trimethylazaniumyl)ethoxybenzene")
+                -> C[N+](CCOC1=CC=CC=C1)(C)C
+                -> canonical C[N+](C)(C)CCOc1ccccc1
+
+        i.e. benzene + this exact -O-CH2-CH2-N+(CH3)3 fragment, confirmed via
+        OPSIN (an independent implementation, not the code under test).
+        `test_out_of_scope_remote_charge_still_fails_closed` below keeps this
+        test's original guard alive for a charge shape the new pass does NOT
+        cover (a carbocation branch, not an onium element)."""
         from orthonym.assembly.substituent_naming import name_substituent_fragment
         # -O-CH2-CH2-N+(CH3)3 fragment attached to a parent via the ether O;
         # the charge is 2 atoms away from attach_idx (the O).
@@ -179,6 +196,23 @@ class TestCationSubstituentPrefix:
                 if nb.GetIdx() not in visited:
                     stack.append(nb.GetIdx())
         result = name_substituent_fragment(mol, frag, o_idx, parent_c)
+        assert result == "2-(trimethylazaniumyl)ethoxy", result
+
+    def test_out_of_scope_remote_charge_still_fails_closed(self):
+        """A charge shape the new Pass 1d does NOT cover -- a carbocation
+        branch (carbon is not in `_ONIUM_PREFIX_STEM`, so `cation_to_prefix`
+        declines it) -- must still fail closed (None), preserving this test
+        class's original guard: never fall through to the charge-blind
+        `parent_to_prefix` guess."""
+        from orthonym.assembly.substituent_naming import (
+            _name_polyfunctional_acyclic_substituent,
+        )
+        # -CH2-CH(OH)-CH2-[CH2+]: the hydroxy forces entry into the
+        # polyfunctional path; the terminal carbocation is out of scope.
+        mol = Chem.MolFromSmiles("C(O)CC[CH2+]")
+        attach = 0
+        frag = list(a.GetIdx() for a in mol.GetAtoms())
+        result = _name_polyfunctional_acyclic_substituent(mol, frag, attach, set())
         assert result is None, result
 
     def test_regression_neutral_compound_substituent_unchanged(self):

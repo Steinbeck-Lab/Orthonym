@@ -1824,6 +1824,88 @@ def _name_polyfunctional_acyclic_substituent(
         if any(cnt >= 2 for cnt in _acyloxy_tokens.values()):
             return None
 
+    # ---- Pass 1d (v33 Phase 3 enabler, P-74.1.3 / P-73): a pendant ONIUM --
+    # cation branch off a backbone carbon (choline's -CH2-CH2-N+(CH3)3) is a
+    # locanted detachable '(...)azaniumyl'-family prefix, consumed here just
+    # like the substituted-amino (Pass 1b) / acyloxy (Pass 1c) branches above.
+    #
+    # This is NOT the DIRECT-ATTACHMENT shape (the cation itself IS
+    # ``attach_idx``) -- that is a separate, already-shipped mechanism
+    # (`rules/charged_router.py`/`rules/ions.py` calling `cation_to_prefix`
+    # directly) and stays untouched: the component search below BLOCKS on the
+    # cation atom, so when the cation IS ``attach_idx`` no neighbour's
+    # component can ever contain it, ``host`` stays None, and this pass is a
+    # clean no-op (falls through to Pass-2's existing charge decline exactly
+    # as before this pass existed).
+    #
+    # ``cation_to_prefix`` (P-74.1.3, the existing structured primitive
+    # defined later in this same module) already builds the whole
+    # '{N-substituents}azaniumyl'-family token from the cation's OWN
+    # neighbours; this pass only has to (a) find the ONE neighbour branch
+    # that leads back to ``attach_idx`` (the "host" backbone carbon the
+    # prefix locants onto) and (b) consume the cation + every OTHER branch
+    # (the cation's own substituents, which ``cation_to_prefix`` names and
+    # owns internally) so Pass 2 below never sees the charge.
+    #
+    # Fail-closed (skip this cation -- Pass 2's pre-existing
+    # ``GetFormalCharge() != 0`` guard then declines the whole fragment,
+    # exactly as it did before this pass existed) for: a ring-borne onium
+    # (pyridinium etc. -- the ring engine's job), a cation bridging TWO
+    # backbone-side paths (in-chain, not a pendant branch), a host that is
+    # not carbon, or any shape ``cation_to_prefix`` itself declines (ylide /
+    # non-onium / P-74.2 1,n-dipolar). A NEUTRAL fragment never enters this
+    # loop at all (no atom has formal charge > 0) -- a byte-identical no-op
+    # for every existing hydroxy/amino/halogen/etc class.
+    _ring_info_cat = mol.GetRingInfo()
+    for idx in list(sub_set):
+        if idx in consumed:
+            continue
+        a = mol.GetAtomWithIdx(idx)
+        if a.GetFormalCharge() <= 0:
+            continue
+        if _ring_info_cat.NumAtomRings(idx) > 0:
+            continue  # ring-borne onium -> not this pass
+
+        def _cation_component(seed, _block=idx):
+            comp: Set[int] = set()
+            st = [seed]
+            while st:
+                x = st.pop()
+                if x in comp or x == _block or x not in sub_set:
+                    continue
+                comp.add(x)
+                for n in mol.GetAtomWithIdx(x).GetNeighbors():
+                    nj = n.GetIdx()
+                    if nj != _block and nj not in comp:
+                        st.append(nj)
+            return comp
+
+        in_frag = [n.GetIdx() for n in a.GetNeighbors()
+                   if n.GetIdx() in sub_set and n.GetIdx() not in consumed]
+        host = None
+        host_multi = False
+        branch_atoms_cat: Set[int] = set()
+        for nb in in_frag:
+            comp = _cation_component(nb)
+            if attach_idx in comp:
+                if host is not None:
+                    host_multi = True
+                host = nb
+            else:
+                branch_atoms_cat |= comp
+        if host is None or host_multi:
+            continue  # not a pendant branch (bridging / walled off) -> decline
+        if mol.GetAtomWithIdx(host).GetSymbol() != 'C' or host in consumed:
+            continue
+        if mol.GetBondBetweenAtoms(idx, host).GetBondType() != Chem.BondType.SINGLE:
+            continue
+        _cp = cation_to_prefix(mol, idx, host)
+        if not _cp:
+            continue  # cation_to_prefix declined -> fail closed, fragment falls through
+        consumed.add(idx)
+        consumed.update(branch_atoms_cat)
+        _add_prefix(host, f"({_cp})")
+
     # Backbone = every carbon not consumed by a carboxy group.
     backbone = [
         i for i in sub_set
