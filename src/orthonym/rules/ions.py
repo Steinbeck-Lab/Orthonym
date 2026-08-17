@@ -4150,6 +4150,40 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         from ..namer import Orthonym
         from ..assembly.composer import _assemble_amine_name
 
+        # v33 Phase 3 (P-44.1.1 PG-count tie, WS-Q.2): PG_ATTACHMENT_INDICES['tertiary_amine']
+        # == [1, 2, 3] assumes the canonical 3-carbon tertiary-amine SMARTS shape (N + 3 C).
+        # Our injected match below is a QUATERNARY N with 4 carbon branches (N + 4 C, a
+        # 5-tuple), so `_pg_attachment_atoms` (rules/parent_selection.py) silently drops
+        # whichever branch lands at tuple position 4 -- RDKit's neighbour-iteration order,
+        # not IUPAC seniority. When the dropped branch is the ONE that actually reaches a
+        # competing ring (e.g. a phenol several atoms down the chain), both
+        # `_count_pg_on_chain`/`_count_pg_on_ring` read 0 (the 3 surviving branches are bare
+        # terminal methyls touching neither ring nor chain), the P-44.1.1 tie falls through
+        # to the ring-senior-to-chain default (P-44.1.2.2), and the ring wins parent
+        # selection -- emptying `features.principal_chain` and losing the amine parent
+        # entirely (a phenol ring elsewhere in the molecule "beats" the forced amine
+        # override). Fix: order the injected carbon branches so any branch reaching MORE
+        # than the bare N-C bond (i.e. anything but a lone terminal methyl) is listed FIRST
+        # -- deterministically, by descending reachable-atom count, ties by atom index --
+        # so it always lands within PG_ATTACHMENT_INDICES' first-3 window and the P-44
+        # tie-break sees the amine's true competing branch instead of only its methyls.
+        def _branch_size(start_idx: int) -> int:
+            seen = {n_idx}
+            stack = [start_idx]
+            size = 0
+            while stack:
+                i = stack.pop()
+                if i in seen:
+                    continue
+                seen.add(i)
+                size += 1
+                for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+                    if nb.GetIdx() not in seen:
+                        stack.append(nb.GetIdx())
+            return size
+
+        carbon_neighbors = sorted(carbon_neighbors, key=lambda c: (-_branch_size(c), c))
+
         # Build features on the ORIGINAL (charged) mol so the N-substituent
         # enumeration sees all branches; inject a tertiary_amine FG so the amine N
         # becomes the principal group and find_principal_chain orients the parent
@@ -4185,6 +4219,18 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         if len(_n_positions) == 1 and _n_positions[0] == len(_pc) - 1 and len(_pc) >= 2:
             _pc.reverse()
             features.principal_chain = _pc
+            # v33 Phase 3 (WS-Q.1): `features.atom_to_locant` was built by
+            # `namer._classify()` from the PRE-reversal chain order and is not
+            # recomputed here, so every downstream locant lookup (the aminium
+            # suffix locant in particular) kept numbering from the OLD orientation
+            # while `principal_chain` now numbers from the new one -- e.g. for
+            # '3-carboxy-...propan-{N}-aminium' the suffix locant came out '3'
+            # (the pre-reversal C1) instead of '1' (RT-mismatch -> SELF-01
+            # abstain). Recompute from the reversed chain so every consumer of
+            # `atom_to_locant` (suffix, prefixes, bond locants) agrees with the
+            # chain it is now walking.
+            from .locants import build_atom_to_locant
+            features.atom_to_locant = build_atom_to_locant(_pc)
         # Re-point the principal-group N-substituent set to EXCLUDE the carbon that
         # find_principal_chain chose as the parent chain anchor, so the N-prefix
         # multiplier counts exactly the off-chain branches (P-73.1.2.1 N-locants).
