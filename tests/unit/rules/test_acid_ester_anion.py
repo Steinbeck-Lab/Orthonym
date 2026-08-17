@@ -99,3 +99,51 @@ def test_dispatcher_routes_sulfate():
 
 def test_dispatcher_declines_nonester():
     assert name_acid_ester_anion(Chem.MolFromSmiles("CC(=O)[O-]")) is None  # acetate
+
+
+import pytest
+from orthonym import Orthonym
+
+
+@pytest.fixture(scope="module")
+def namer():
+    return Orthonym()
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("CCCCCCCCCCCCOP(=O)([O-])[O-]", "dodecyl phosphate"),
+    ("CCCCCCCCCCCCOP(=O)([O-])O", "dodecyl hydrogen phosphate"),
+    ("CCOP(=O)([O-])OCC", "diethyl phosphate"),
+    ("COP(=O)([O-])[O-]", "methyl phosphate"),
+    ("CCCCCCCCCCCCOS(=O)(=O)[O-]", "dodecyl sulfate"),
+])
+def test_integration_ester_anion_names(namer, smi, expected):
+    # opsin_gate: without the RT-validity gate ON, an earlier neutral-form
+    # candidate (e.g. 'dodecyl dihydrogen phosphate') wins before the gate
+    # can reject it as a different molecule and fall back to our anion name.
+    assert namer.name(smi) == expected
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    # neutral esters unchanged (name_phosphate_ester)
+    ("CCCCCCCCCCCCOP(=O)(O)O", "dodecyl dihydrogen phosphate"),
+    ("COP(=O)(OC)OC", "trimethyl phosphate"),
+    # sulfonate unchanged (must NOT be intercepted by the sulfate-ester branch)
+    ("CS(=O)(=O)[O-]", "methanesulfonate"),
+])
+def test_integration_regressions_unchanged(namer, smi, expected):
+    assert namer.name(smi) == expected
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", [
+    "CCCCCCCCCCCCOP(=S)([O-])[O-]",   # thiophosphate ester anion -> not a wrong name
+    "OP(=O)([O-])OP(=O)([O-])[O-]",   # diphosphate (multi-centre) -> fail closed
+])
+def test_integration_failclosed_never_wrong(namer, smi):
+    # honest fail: abstain rather than a wrong molecule. Assert it does NOT emit
+    # a phosphate ester-anion name; abstention text is acceptable.
+    out = namer.name(smi)
+    assert "phosphate" not in out or out == "unknown organic compound"

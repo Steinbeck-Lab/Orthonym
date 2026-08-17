@@ -842,6 +842,16 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             if azanide:
                 return _validate_anion_name(mol, azanide)
 
+        # P-72.2.2.2.1.2: acid-ester anion (phosphate/sulfate ester [O-]). Derive
+        # the anion word in place (surviving -OH count); route_charged below
+        # DECLINES this shape (charged_router.py:471/:475) and the neutralize
+        # paths would emit the NEUTRAL word (a different molecule). Placed before
+        # route_charged so a monoester monoanion / sulfate ester anion is named.
+        from .acid_ester_anion import name_acid_ester_anion
+        ester_anion = name_acid_ester_anion(mol)
+        if ester_anion:
+            return _validate_anion_name(mol, ester_anion)
+
         # 169.6-03 (CHOKE-01): for every OTHER single-anion class delegate to the
         # SINGLE route_charged chokepoint. It generalizes _name_oxoacid_anion
         # (neutralize -> re-enter the full pipeline -> re-apply the class-correct
@@ -902,6 +912,15 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         oxo_name = _name_oxoacid_anion(mol, style)
         if oxo_name:
             return _validate_anion_name(mol, oxo_name)
+
+    # P-72.2.2.2.1.2: a multi-[O-] acid-ester anion (a phosphate monoester
+    # DIANION reaches here with len(anions) == 2). Derive the anion word in
+    # place; _try_neutralize_and_name below would emit the NEUTRAL word which
+    # OPSIN round-trips to a different (neutral) molecule -> gate rejects.
+    from .acid_ester_anion import name_acid_ester_anion
+    ester_anion = name_acid_ester_anion(mol)
+    if ester_anion:
+        return _validate_anion_name(mol, ester_anion)
 
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
