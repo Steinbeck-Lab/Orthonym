@@ -1,5 +1,9 @@
 from rdkit import Chem
 from orthonym.rules.phosphorus import name_phosphate_ester_anion
+from orthonym.rules.acid_ester_anion import (
+    name_sulfate_ester_anion,
+    name_acid_ester_anion,
+)
 
 
 def _p(smi):
@@ -55,3 +59,43 @@ def test_zwitterion_extra_charged_centre_failclosed():
     # O-phosphoserine-shaped dianion + zwitterion: a charged centre outside
     # the terminal [O-] must reject via the per-atom scan, not slip through.
     assert _p("[NH3+]C(COP(=O)([O-])[O-])C(=O)[O-]") is None
+
+
+def _s_idx(smi):
+    m = Chem.MolFromSmiles(smi)
+    return next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'S')
+
+
+def test_sulfate_ester_anion():
+    smi = "CCCCCCCCCCCCOS(=O)(=O)[O-]"
+    assert name_sulfate_ester_anion(Chem.MolFromSmiles(smi), _s_idx(smi)) == "dodecyl sulfate"
+
+
+def test_sulfonate_not_intercepted():
+    # S-C (methanesulfonate), not S-O-C -> not our class
+    smi = "CS(=O)(=O)[O-]"
+    assert name_sulfate_ester_anion(Chem.MolFromSmiles(smi), _s_idx(smi)) is None
+
+
+def test_thiosulfate_ester_failclosed():
+    smi = "CCCCCCCCCCCCOS(=S)(=O)[O-]"
+    assert name_sulfate_ester_anion(Chem.MolFromSmiles(smi), _s_idx(smi)) is None
+
+
+def test_sulfate_extra_charged_centre_failclosed():
+    # net charge (-1) equals -anion_count, but a remote [NH3+]/carboxylate pair
+    # is extra -> the per-atom charge scan must reject (a net-sum check would not)
+    smi = "[NH3+]C(CC(=O)[O-])OS(=O)(=O)[O-]"
+    assert name_sulfate_ester_anion(Chem.MolFromSmiles(smi), _s_idx(smi)) is None
+
+
+def test_dispatcher_routes_phosphate():
+    assert name_acid_ester_anion(Chem.MolFromSmiles("CCCCCCCCCCCCOP(=O)([O-])[O-]")) == "dodecyl phosphate"
+
+
+def test_dispatcher_routes_sulfate():
+    assert name_acid_ester_anion(Chem.MolFromSmiles("CCCCCCCCCCCCOS(=O)(=O)[O-]")) == "dodecyl sulfate"
+
+
+def test_dispatcher_declines_nonester():
+    assert name_acid_ester_anion(Chem.MolFromSmiles("CC(=O)[O-]")) is None  # acetate
