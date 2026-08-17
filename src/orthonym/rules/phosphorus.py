@@ -11,7 +11,7 @@ Handles:
 """
 
 import re
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Set
 from collections import deque, Counter
 from rdkit import Chem
 
@@ -988,7 +988,7 @@ def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
     anion_count = 0
     c_ligands: List[int] = []
     dbl_oxo = 0
-    anion_oxygens: set = set()
+    anion_oxygens: Set[int] = set()
     for b in p.GetBonds():
         nb = b.GetOtherAtom(p)
         bt = b.GetBondType()

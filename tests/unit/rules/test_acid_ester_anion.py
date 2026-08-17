@@ -1,4 +1,6 @@
+import pytest
 from rdkit import Chem
+from orthonym import Orthonym
 from orthonym.rules.phosphorus import name_phosphate_ester_anion
 from orthonym.rules.acid_ester_anion import (
     name_sulfate_ester_anion,
@@ -101,10 +103,6 @@ def test_dispatcher_declines_nonester():
     assert name_acid_ester_anion(Chem.MolFromSmiles("CC(=O)[O-]")) is None  # acetate
 
 
-import pytest
-from orthonym import Orthonym
-
-
 @pytest.fixture(scope="module")
 def namer():
     return Orthonym()
@@ -126,6 +124,13 @@ def test_integration_ester_anion_names(namer, smi, expected):
 
 
 @pytest.mark.opsin_gate
+def test_integration_phosphonate_ester_anion(namer):
+    # end-to-end RT for the phosphonate ester anion (a P-C ligand shifts the
+    # stem to 'phosphonate'; not covered by test_integration_ester_anion_names).
+    assert namer.name("CP(=O)([O-])OCC") == "ethyl methylphosphonate"
+
+
+@pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
     # neutral esters unchanged (name_phosphate_ester)
     ("CCCCCCCCCCCCOP(=O)(O)O", "dodecyl dihydrogen phosphate"),
@@ -143,7 +148,7 @@ def test_integration_regressions_unchanged(namer, smi, expected):
     "OP(=O)([O-])OP(=O)([O-])[O-]",   # diphosphate (multi-centre) -> fail closed
 ])
 def test_integration_failclosed_never_wrong(namer, smi):
-    # honest fail: abstain rather than a wrong molecule. Assert it does NOT emit
-    # a phosphate ester-anion name; abstention text is acceptable.
+    # honest fail: abstain rather than a wrong molecule. Both inputs verified
+    # to abstain to exactly this sentinel (never a phosphate-flavoured guess).
     out = namer.name(smi)
-    assert "phosphate" not in out or out == "unknown organic compound"
+    assert out == "unknown organic compound"

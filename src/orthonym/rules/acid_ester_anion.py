@@ -6,13 +6,20 @@ plain organyl: ``dodecyl phosphate``, ``dodecyl hydrogen phosphate``,
 PLACE from the surviving free ``-OH`` count; the ``[O-]`` carry the charge and
 are not counted as hydrogens (D-04 — never neutralize-then-rename). Fail-closed
 (``None``) off the clean single-centre ester-anion shape so a wrong molecule is
-never emitted; the caller RT-gates any returned name.
+never emitted; the immediate caller (``_validate_anion_name``) only checks
+suffix sanity (an ``'oic acid'`` / ``'methylidene'`` guard) — the actual
+round-trip / 0-wrong backstop is the top-level SELF-01/OPSIN validity gate
+(``namer._final_opsin_validity_gate``).
 """
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from rdkit import Chem
 
 # The number of PROTONATED terminal acidic oxygens -> the sulfate word (D-04).
+# [1] ("hydrogen sulfate", the NEUTRAL form) is currently UNREACHABLE:
+# name_sulfate_ester_anion requires anion_count >= 1, so a returned name
+# always has oh_count == 0. Kept for a Slice-A follow-up (a neutral-path
+# sulfate-ester producer), not dead in intent.
 _SULFATE_WORD = {1: "hydrogen sulfate", 0: "sulfate"}
 
 
@@ -33,7 +40,7 @@ def name_sulfate_ester_anion(mol, sulfur_idx: int) -> Optional[str]:
         return None
 
     accounted = {sulfur_idx}
-    anion_oxygens: set = set()
+    anion_oxygens: Set[int] = set()
     ester_oxygens: List[int] = []
     oh_count = 0
     anion_count = 0
