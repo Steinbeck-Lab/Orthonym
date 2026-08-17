@@ -1050,7 +1050,30 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             for idx in match:
                 if idx not in ring_set:
                     consumed_atoms.add(idx)
+    # v33 Phase 3 residual fix: secondary_amide/tertiary_amide have NO prefix
+    # form (get_prefix() is None, seniority.py:916-917 -- "Named via acylamino
+    # pathway in universal pipeline"), so Step 5 above never emits a prefix for
+    # them. The blanket loop below used to mark their off-ring match atoms
+    # (the amide N + carbonyl C=O; a 2-atom-short-of-the-whole-branch SMARTS,
+    # `functional_groups.py`'s `"[CX3](=O)[NX3H1][#6]"`) as "consumed" anyway,
+    # which orphaned the acyl R-group carbon -- its only path back to the ring
+    # runs THROUGH the now-"parent" N/C=O -- so the universal substituent
+    # walker below could never discover the whole -NH-C(=O)-R branch.
+    # `_verify_completeness`'s hard assert on that orphaned atom was then
+    # silently swallowed by `_integrate_universal_prefixes`'s bare
+    # `except Exception: return ""`, dropping the WHOLE acylamino group from
+    # the assembled name (an atom-drop SELF-01 correctly vetoed downstream,
+    # so the molecule abstained rather than emitting wrong -- but a table
+    # miss must degrade to an uglier name, not to silence). Leaving these two
+    # FG names OUT of consumed_atoms lets the universal pipeline discover and
+    # name the branch itself (`_name_amino_branch` -> `linear_acyl_amido_prefix`
+    # -> 'acetamido' / 'N-methylacetamido'), mirroring the CHAIN-parent path's
+    # existing `_POLY_GUARD_FG_TYPES` allowlist (only consume atoms of an FG
+    # actually spelled as a whole-branch prefix).
+    _ACYLAMINO_PATHWAY_FGS = ('secondary_amide', 'tertiary_amide')
     for fg_name, matches in non_principal.items():
+        if fg_name in _ACYLAMINO_PATHWAY_FGS:
+            continue
         for match in matches:
             for idx in match:
                 if idx not in ring_set:
