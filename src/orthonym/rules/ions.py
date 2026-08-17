@@ -1223,12 +1223,45 @@ def _name_np_conjugate_anion(mol) -> str:
         return ''
 
 
+def _is_bare_methylidene_leak(result: str) -> bool:
+    """True if 'methylidene' is the BARE, suffix-less TERMINAL token of an ion
+    name -- the actual radical-leak shape a name-validation guard must reject
+    -- as opposed to a legitimate one-carbon ylidene-OWNER substituent
+    embedded in a larger construction (e.g. '...methylideneamino ...',
+    '...methylidenehydrazin...-ium-...-ide'), which always has more text
+    after 'methylidene' because it names a substituent attached to something
+    else, never the standalone charged species itself.
+
+    SPY (2026-08-17, v33 Phase 3 review follow-up): Plan 17-06 (2026-02-05)
+    added a blind ``'methylidene' in result`` substring guard against a
+    "radical name leaking into ion naming" but recorded no reproducing
+    molecule -- none of its own 5 canary SMILES ever produced the substring
+    (verified: none of ``[CH2+]``/``C=[NH2+]``/``[CH2-]``/``C[NH3+]``/
+    ``CC(=O)[O-]`` reaches 'methylidene' in its raw pre-guard result). The
+    real, reproducible leak is ``_try_neutralize_and_name`` (the generic
+    single-atom fallback ``name_anion``/``name_cation`` call when no
+    dedicated class matches and the systematic ``route_charged``/retained
+    lookups decline): neutralizing a genuine one-carbon ion (e.g.
+    ``[CH3+]`` or ``[CH-]``) collapses the WHOLE molecule down to a bare
+    divalent-radical fragment, which the general engine names
+    'methylidene' -- with NO ion suffix anywhere in the string. That bare
+    terminal token is the leak; 'methylidene' followed by more text never is.
+    """
+    if 'methylidene' not in result:
+        return False
+    trimmed = result.rstrip(')] ')
+    return trimmed.endswith('methylidene')
+
+
 def _validate_anion_name(mol, result: str) -> str:
     """Validate an anion name and guard against misapplied suffixes.
 
     Guards against:
     - 'oic acid' suffix on a molecule without a carboxylic acid group
-    - 'methylidene' appearing in an ion name (radical name leaking)
+    - a bare, suffix-less 'methylidene' radical name leaking into ion naming
+      (see ``_is_bare_methylidene_leak``) -- NOT every occurrence of the
+      substring, which also appears in legitimate one-carbon ylidene-owner
+      names (e.g. 'sulfanylmethylideneamino sulfate').
 
     Args:
         mol: RDKit Mol object
@@ -1248,16 +1281,16 @@ def _validate_anion_name(mol, result: str) -> str:
             # Molecule doesn't actually have a carboxylic acid - suffix is wrong
             return ''
 
-    # Guard: methylidene false positive (radical name leaking into ion naming)
-    if 'methylidene' in result:
+    # Guard: bare methylidene radical leak (see _is_bare_methylidene_leak).
+    if _is_bare_methylidene_leak(result):
         return ''
 
     # D-10 (Table 3.4 / P-72.2.2.1): a carbanion '-ide' name is a valid anion
     # ending. Explicitly accept it (it passes today via no rejecting guard, but a
     # future guard must not silently suppress it). The single existing risk is the
-    # 'methylidene' radical-leak guard above — '-ide' (preceded by 'an-N-') is a
+    # bare-methylidene radical-leak guard above — '-ide' (preceded by 'an-N-') is a
     # distinct, valid suffix and must reach this return.
-    if result.endswith('ide') and 'methylidene' not in result:
+    if result.endswith('ide') and not _is_bare_methylidene_leak(result):
         return result
 
     return result
@@ -1268,7 +1301,10 @@ def _validate_cation_name(mol, result: str) -> str:
 
     Guards against:
     - 'aminium' suffix on a molecule without an amine group
-    - 'methylidene' appearing in a cation name (radical name leaking)
+    - a bare, suffix-less 'methylidene' radical name leaking into cation
+      naming (see ``_is_bare_methylidene_leak``) -- NOT every occurrence of
+      the substring, which also appears in legitimate one-carbon
+      ylidene-owner names.
 
     Args:
         mol: RDKit Mol object
@@ -1298,8 +1334,8 @@ def _validate_cation_name(mol, result: str) -> str:
             # Molecule doesn't actually have an amine group - suffix is wrong
             return ''
 
-    # Guard: methylidene false positive (radical name leaking into cation naming)
-    if 'methylidene' in result:
+    # Guard: bare methylidene radical leak (see _is_bare_methylidene_leak).
+    if _is_bare_methylidene_leak(result):
         return ''
 
     return result
