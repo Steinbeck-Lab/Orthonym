@@ -142,12 +142,33 @@ class TestDispatchTableIntegrity:
           Tier-2 slot would be unreachable for phospholipids (180 RESOLVED A1).
           Its hard-gate detector fires only on clean lipid backbones, so the
           half-step does not affect insertability of the dense region.
+        - v33 Phase 3 B1 ESTER_ANION_ZWITTERION @ 301 (Tier-1): a deliberate
+          half-step interceptor inserted directly AFTER ZWITTERION@300 (no
+          hundreds slot is free between 300 and ANION_RETAINED@400). It MUST
+          follow ZWITTERION@300 (a NET-CHARGED acid-ester-anion zwitterion is
+          classified 'ion', not 'zwitterion', by `detect_species_type`, so the
+          two predicates are mutually exclusive by net-charge sign — ordering
+          relative to ZWITTERION is immaterial for correctness, but sits here
+          for the same P-74 family grouping). Its predicate is the SAME
+          fully-validated, atom-coverage-checked namer as the handler
+          (predicate-is-handler pattern), so the half-step cannot fire on any
+          shape it does not also correctly name — it does not affect
+          insertability of the dense region.
         """
         LIPID_HALF_STEP = 250  # Phase 180 Tier-1 interceptor (documented exception)
+        ESTER_ANION_ZWITTERION_HALF_STEP = 301  # v33 Phase 3 B1 (documented exception)
+        # Phase 184 CATION_QUATERNARY @ 480 (Tier-1): a deliberate half-step
+        # interceptor between ANION_RETAINED@400 and CATION_RETAINED@500 (no
+        # hundreds slot free there). Same documented-half-step pattern as
+        # LIPID@250 / ESTER_ANION_ZWITTERION@301; a pre-existing entry that was
+        # never added to this exclusion list (surfaced by the B1 test touch).
+        CATION_QUATERNARY_HALF_STEP = 480
         outer = sorted(
             e.priority
             for e in DISPATCH_TABLE.values()
-            if 100 <= e.priority < 10000 and e.priority != LIPID_HALF_STEP  # dense region
+            if 100 <= e.priority < 10000
+            and e.priority not in (LIPID_HALF_STEP, ESTER_ANION_ZWITTERION_HALF_STEP,
+                                   CATION_QUATERNARY_HALF_STEP)  # dense region
         )
         for prev, curr in zip(outer, outer[1:]):
             assert curr - prev >= 100, (

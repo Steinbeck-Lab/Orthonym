@@ -99,6 +99,7 @@ class StoutClass(_StrEnumBase):
     ANION_RETAINED = "anion_retained"         # row 4; namer.py:861-871; P-72
     CATION_RETAINED = "cation_retained"       # row 5; namer.py:872-875; P-73
     CATION_QUATERNARY = "cation_quaternary"   # Phase 184 WS-E.1 (P-73.1.2.1 quaternary aminium; priority 480, tier 1 — below ZWITTERION@300/LIPID@250, above CATION_RETAINED@500)
+    ESTER_ANION_ZWITTERION = "ester_anion_zwitterion"  # v33 Phase 3 B1 (P-72.2.2.2.1.2 choline-family acid-ester-anion zwitterion; priority 301, tier 1 — right after ZWITTERION@300). A mono-ester P-oxoacid DIANION whose owner arm carries a quaternary cation (e.g. R-O-PO3^2-) has NET CHARGE != 0, so `detect_species_type` returns 'ion' (not 'zwitterion') and ZWITTERION@300's predicate never sees it, even though `charged_router`'s OWN internal zwitterion test (site presence, not net charge) already names it correctly once reached. This entry is the missing dispatch-level door for that net-charged variant; predicate-IS-handler pattern (mirrors ANION_RETAINED@400).
     ANION_SMALL = "anion_small"               # row 6; namer.py:877-914; P-72.2.1
     POLY_ANION = "poly_anion"                 # row 7; namer.py:916-956; P-72.2.1
     MULTI_COMPONENT_NEUTRAL = "multi_component_neutral"  # row 8; namer.py:967-998
@@ -277,6 +278,33 @@ def _is_zwitterion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
     """
     from orthonym.perception.ions import detect_species_type
     return detect_species_type(mol) == 'zwitterion'
+
+
+def _is_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v33 Phase 3 B1 (P-72.2.2.2.1.2): the missing dispatch door for a NET-
+    CHARGED choline-family acid-ester-anion zwitterion (a mono-ester P/S
+    oxoacid whose owner arm bears a quaternary cation -- e.g. a phosphate
+    mono-ester DIANION, ``C[N+](C)(C)CCOP(=O)([O-])[O-]``). ``get_ion_sites``
+    is per-ATOM, so that dianion carries 2 anion "sites" on one P even though
+    ZWITTERION@300 requires ``detect_species_type(mol) == 'zwitterion'``,
+    which is net-charge-0-gated (this shape's net charge is -1 -> 'ion').
+
+    Predicate-IS-handler pattern (mirrors ANION_RETAINED@400 /
+    CATION_RETAINED@500): calls the SAME naming function the handler below
+    re-runs, so this predicate can only ever return True for a shape the
+    handler will also successfully name -- a False here means the (fully
+    fail-closed, atom-coverage-checked) namer already declined, so nothing
+    is stolen from GENERAL for any other net-charged mixed-sign shape.
+    """
+    from orthonym.perception.ions import detect_species_type, get_ion_sites
+    if detect_species_type(mol) != 'ion':
+        return False
+    sites = get_ion_sites(mol)
+    if len(sites['cations']) != 1 or not sites['anions']:
+        return False
+    from orthonym.rules.charged_router import _name_ester_anion_zwitterion
+    return bool(_name_ester_anion_zwitterion(
+        mol, sites['cations'][0]['atom_idx'], sites['anions'][0]['atom_idx']))
 
 
 def _is_anion_retained(mol, smiles, canonical_smiles, features=None, *, _style: str = "pin", **kwargs) -> bool:
@@ -712,6 +740,18 @@ def _handle_zwitterion(mol, smiles, canonical_smiles, features=None, *,
     """Mirrors namer.py:859-860."""
     from orthonym.rules.salts import name_zwitterion
     return name_zwitterion(mol, style=style)
+
+
+def _handle_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None, *,
+                                   style: str = "pin", **kwargs) -> Optional[str]:
+    """v33 Phase 3 B1 thin shim: re-runs the SAME naming function
+    ``_is_ester_anion_zwitterion`` already validated (predicate-is-handler
+    pattern), so this is never called on a shape that would fail."""
+    from orthonym.perception.ions import get_ion_sites
+    from orthonym.rules.charged_router import _name_ester_anion_zwitterion
+    sites = get_ion_sites(mol)
+    return _name_ester_anion_zwitterion(
+        mol, sites['cations'][0]['atom_idx'], sites['anions'][0]['atom_idx']) or None
 
 
 def _handle_anion_retained(mol, smiles, canonical_smiles, features=None, *,
@@ -2076,6 +2116,13 @@ _register_dispatch(
     predicate=_is_zwitterion, handler=_handle_zwitterion,
     iupac_section="impl routing — formal-charge>0 zwitterion detection per Blue Book P-74",
     description="Formal-charge zwitterion; routes to rules.salts.name_zwitterion",
+    side_effect_inventory=(),
+)
+_register_dispatch(
+    class_id=StoutClass.ESTER_ANION_ZWITTERION, priority=301, tier=1,
+    predicate=_is_ester_anion_zwitterion, handler=_handle_ester_anion_zwitterion,
+    iupac_section="Blue Book P-72.2.2.2.1.2 acid-ester anion + P-74.0 zwitterion anion-is-parent override",
+    description="NET-CHARGED choline-family acid-ester-anion zwitterion (e.g. a phosphate mono-ester dianion with a quaternary-cation owner arm); routes to rules.charged_router._name_ester_anion_zwitterion",
     side_effect_inventory=(),
 )
 _register_dispatch(

@@ -379,6 +379,117 @@ def _parent_has_chain_locants(parent_anion_name: str) -> bool:
     return parent_anion_name.endswith(('anoate', 'enoate', 'ynoate', 'dioate'))
 
 
+def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
+    """Name a choline-family acid-ester-anion ZWITTERION (v33 Phase 3 B1).
+
+    P-74.0 forces the anion (a P/S oxoacid mono-ester anion, P-72.2.2.2.1.2)
+    as the parent -- but here, unlike the betaine path in `_route_zwitterion`
+    below (P-74.1.3, cation on a DIFFERENT parent, severed and re-attached as
+    a `(...azaniumyl)` prefix), the cation sits INSIDE the ester-owner arm R
+    itself (``R-O-SO3[-]``, ``R`` = ``2-(trimethylazaniumyl)ethyl``). So the
+    owner substituent is named WITH the cation in place (the shipped
+    cation-bearing-substituent capability, `e4936b8e`) via the same recursive
+    ``_p_ester_owner_group`` helper the neutral/pure-anion acid-ester
+    producers use (`phosphorus.py`, `acid_ester_anion.py`), and the acid word
+    (``sulfate`` / ``hydrogen phosphate`` / ...) is derived IN PLACE from the
+    surviving free ``-OH`` count via ``conjugate_controller`` (D-04 — never
+    neutralize-then-rename): ``'{owner} {word}'``
+    (``2-(trimethylazaniumyl)ethyl sulfate``).
+
+    ``anion_idx`` is ANY one terminal acidic O of the acid centre -- the
+    central P/S and every one of its OTHER terminal oxygens are discovered by
+    walking ``central``'s own bonds, so a mono-ester DIANION (two independent
+    ``[O-]`` "sites" on the same P, `get_ion_sites` being per-atom) is handled
+    correctly regardless of which one the caller passes.
+
+    Fail-closed (``''``) off anything but a clean single-centre, non-ring,
+    neutral-P/S, single-ester-owner, single-acid-group shape: any non-O
+    double bond (thio), any P-N/S-C substituent, a second ester owner
+    (diester), a P-O-P bridge, a cation NOT on the owner arm, or an owner
+    fragment `name_substituent` cannot spell all decline. The final
+    atom-coverage check (owner_frag union {central, dbl-bonded O's, ester-O,
+    terminal O's} must equal EVERY heavy atom in the molecule) is the 0-wrong
+    guard -- it never lets a dropped atom through. The outer SELF-01/OPSIN
+    gate RT-verifies the returned name as the ultimate backstop.
+    """
+    from .conjugate_controller import (PHOSPHATE_WORD, SULFATE_WORD,
+                                       _terminal_acid_oxygens)
+    from .phosphorus import _p_ester_owner_group
+
+    anion_atom = mol.GetAtomWithIdx(anion_idx)
+    if anion_atom.GetSymbol() != 'O' or anion_atom.GetFormalCharge() >= 0:
+        return ''
+    central_candidates = list(anion_atom.GetNeighbors())
+    if len(central_candidates) != 1:
+        return ''
+    central = central_candidates[0]
+    if central.GetSymbol() not in ('P', 'S') or central.GetFormalCharge() != 0 \
+            or central.IsInRing():
+        return ''
+    central_idx = central.GetIdx()
+
+    accounted = {central_idx}
+    ester_oxygens = []
+    dbl_oxo = 0
+    for b in central.GetBonds():
+        nb = b.GetOtherAtom(central)
+        bt = b.GetBondType()
+        sym = nb.GetSymbol()
+        if bt == Chem.BondType.DOUBLE:
+            if sym != 'O':
+                return ''                          # P=S / P=C / S=C -> thio, defer
+            dbl_oxo += 1
+            accounted.add(nb.GetIdx())
+            continue
+        if bt != Chem.BondType.SINGLE:
+            return ''
+        if sym != 'O':
+            return ''                              # P-N / P-C / S-C -> defer
+        others = [x for x in nb.GetNeighbors() if x.GetIdx() != central_idx]
+        if not others:
+            # A terminal O: the counted [O-], a second [O-] (dianion), or a
+            # free -OH. A bare terminal O with neither charge nor H is
+            # ambiguous -> defer.
+            if nb.GetFormalCharge() == 0 and nb.GetTotalNumHs() == 0:
+                return ''
+            accounted.add(nb.GetIdx())
+        elif len(others) == 1 and others[0].GetSymbol() == 'C' \
+                and nb.GetFormalCharge() == 0:
+            ester_oxygens.append(nb.GetIdx())      # -O-C ester owner
+            accounted.add(nb.GetIdx())
+        else:
+            return ''                              # P-O-P bridge / charged owner O -> defer
+
+    if len(ester_oxygens) != 1:
+        return ''                                  # need exactly one ester owner (no diester)
+    ester_o_idx = ester_oxygens[0]
+
+    required_dbl_oxo = 2 if central.GetSymbol() == 'S' else 1
+    if dbl_oxo != required_dbl_oxo:
+        return ''
+
+    prot, _anion_n = _terminal_acid_oxygens(mol, central_idx, ester_o_idx)
+    word_table = SULFATE_WORD if central.GetSymbol() == 'S' else PHOSPHATE_WORD
+    word = word_table.get(prot)
+    if not word:
+        return ''
+
+    got = _p_ester_owner_group(mol, ester_o_idx, central_idx)
+    if not got:
+        return ''
+    owner, owner_frag = got
+    if not owner or owner == 'substituent' or not isinstance(owner, str):
+        return ''
+    if cation_idx not in owner_frag:
+        return ''                                  # cation not on the owner arm -> defer
+
+    accounted |= owner_frag
+    if accounted != set(range(mol.GetNumAtoms())):
+        return ''                                  # atom-coverage guard -- never drop an atom
+
+    return f'{owner} {word}'
+
+
 def _route_zwitterion(mol, sites, style: str) -> str:
     """GUARD 4: zwitterion anion-is-parent override (P-74.0).
 
@@ -404,6 +515,29 @@ def _route_zwitterion(mol, sites, style: str) -> str:
 
     cations = sites['cations']
     anions = sites['anions']
+
+    # v33 Phase 3 B1 (choline-family acid-ester-anion zwitterion, P-72.2.2.2.1.2):
+    # a cation sitting INSIDE the ester-owner arm R of a P/S oxoacid mono-ester
+    # anion (e.g. R-O-SO3[-], R = 2-(trimethylazaniumyl)ethyl -> choline
+    # sulfate). Tried FIRST, before the single-cation/single-anion scope check
+    # below, because `get_ion_sites` is per-ATOM: a mono-ester phosphate
+    # DIANION (R-O-PO3^2-) surfaces as TWO independent anion "sites" (each
+    # [O-] its own atom) even though it is ONE acid-ester anion functional
+    # group -- GUARD 2's ionic-center-count-first philosophy already documented
+    # above (a multi-center anion on one FG is one named entity, not per-atom).
+    # `_name_ester_anion_zwitterion`'s own shape + atom-coverage validation
+    # declines ('') anything that is not a clean single-cation, single-P/S-
+    # centre mono-ester, so this is a pure ADD: every existing zwitterion class
+    # (carboxylate betaine, amino-acid, ring carboxylate, ...) has an anion
+    # whose sole neighbour is a carbon, so `central.GetSymbol() not in ('P',
+    # 'S')` declines INSTANTLY and falls through unchanged to the scope check
+    # and legacy paths below -- 0 behaviour change for anything but the new
+    # shape.
+    if len(cations) == 1 and len(anions) >= 1:
+        est_name = _name_ester_anion_zwitterion(
+            mol, cations[0]['atom_idx'], anions[0]['atom_idx'])
+        if est_name:
+            return est_name
 
     # Scope (D-06): exactly one cationic and one anionic center (the amino-acid /
     # betaine majority). Multi-center dipolar zwitterions are deferred.
