@@ -577,8 +577,25 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
 
 def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     """Pre-WS-6 topology-only numbering (bridgeheads[0] = C1; longest -> second ->
-    shortest bridge, all in bh1->bh2 path order). Preserved verbatim as the
-    tie-break default so unsubstituted / symmetric bicyclics stay byte-identical."""
+    shortest bridge). Preserved verbatim as the tie-break default so
+    unsubstituted / symmetric bicyclics stay byte-identical.
+
+    P-23.2.5 direction fix (cephem von Baeyer defect, v33 Phase 3): the
+    SECONDARY (second-longest) bridge must be numbered continuing FROM the
+    second bridgehead BACK toward the first -- see this module's own
+    ``get_bicyclo_numbering`` docstring example for norbornane, "Second
+    longest (2 atoms): 4 -> 5 -> 6 -> 1" (bridgehead 4, THEN back to 1) -- not
+    forward from bridgehead 1 in the same direction as the longest bridge.
+    ``paths_sorted[1]`` is always returned in near-bh1-first order (path order
+    from ``find_bridge_paths(mol, bh1, bh2)``), so the fix is to consume it in
+    REVERSE, matching the (already-correct) convention used by
+    ``_enumerate_bicyclo_numberings`` for the same segment. For an
+    unsubstituted / symmetric secondary bridge this changes no emitted name
+    (both atoms are structurally equivalent); it matters only when a
+    distinguishing substituent (e.g. a ring-fusion oxo) sits asymmetrically in
+    that bridge, where the old forward order silently swapped it onto the
+    wrong ring atom -- a WRONG MOLECULE, not merely a mis-numbered one.
+    """
     bridgeheads = list(find_true_bridgeheads(mol))
     if len(bridgeheads) != 2:
         return None
@@ -596,7 +613,7 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
         current_locant += 1
     atom_to_locant[bh2] = current_locant
     current_locant += 1
-    for atom_idx in paths_sorted[1][1:-1]:
+    for atom_idx in reversed(paths_sorted[1][1:-1]):
         if atom_idx not in atom_to_locant:
             atom_to_locant[atom_idx] = current_locant
             current_locant += 1
