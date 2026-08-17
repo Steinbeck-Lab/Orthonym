@@ -27,6 +27,40 @@ def test_raffinose_via_public_entry():
     assert O.name_disaccharide(mol) == EXPECTED
 
 
+# --- slice 2: BRANCHED reducing oligosaccharides (P-102.7.3) ---
+# a unit accepting >1 glycosyl; both expected names are OPSIN-RT-verified to the input.
+BRANCHED_GLUCOTRIOSE = "OC[C@H]1O[C@H](OC[C@H]2OC(O)[C@H](O)[C@@H](O)[C@@H]2O[C@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@@H](O)[C@@H]1O"
+BRANCHED_GLUCOTRIOSE_NAME = "alpha-D-glucopyranosyl-(1->6)-[alpha-D-glucopyranosyl-(1->4)]-D-glucopyranose"
+
+
+def test_branched_glucotriose():
+    mol = Chem.MolFromSmiles(BRANCHED_GLUCOTRIOSE)
+    assert mol is not None
+    assert O.name_branched_oligosaccharide(mol) == BRANCHED_GLUCOTRIOSE_NAME
+
+
+def test_branched_via_public_entry():
+    mol = Chem.MolFromSmiles(BRANCHED_GLUCOTRIOSE)
+    assert O.name_disaccharide(mol) == BRANCHED_GLUCOTRIOSE_NAME
+
+
+def test_branched_lewis_type():
+    # beta-D-Gal-(1->3)-[alpha-L-Fuc-(1->4)]-D-Glc (a Lewis-a core) round-trips.
+    smi = "C[C@@H]1O[C@@H](O[C@H]2[C@H](O[C@@H]3O[C@H](CO)[C@H](O)[C@H](O)[C@H]3O)[C@@H](O)C(O)O[C@@H]2CO)[C@@H](O)[C@H](O)[C@@H]1O"
+    mol = Chem.MolFromSmiles(smi)
+    name = O.name_branched_oligosaccharide(mol)
+    assert name == "alpha-L-fucopyranosyl-(1->4)-[beta-D-galactopyranosyl-(1->3)]-D-glucopyranose", name
+
+
+def test_branched_declines_linear():
+    # a LINEAR reducing chain (no branch point) must fall through to the linear
+    # namer, not the branched one.
+    maltose = "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)C(O)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O"
+    m = Chem.MolFromSmiles(maltose)
+    assert m is not None
+    assert O.name_branched_oligosaccharide(m) is None
+
+
 def test_nonreducing_declines_under_three_units():
     # the new 3+ namer must fail closed on <3 sugar units (a monosaccharide /
     # disaccharide is the single-sugar / binary assembler's job — no double-handling).

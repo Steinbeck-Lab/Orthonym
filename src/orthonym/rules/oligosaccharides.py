@@ -575,7 +575,10 @@ def name_disaccharide(mol) -> Optional[str]:
     result = name_linear_oligosaccharide(mol)
     if result is not None:
         return result
-    return name_nonreducing_oligosaccharide(mol)
+    result = name_nonreducing_oligosaccharide(mol)
+    if result is not None:
+        return result
+    return name_branched_oligosaccharide(mol)
 
 
 def _extract_unit_capped(mol, ringset: Set[int],
@@ -839,6 +842,159 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
     name = "-".join(parts)
 
     # 7. Completeness invariant (D-12) + RT gate (D-13).
+    all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    consumed: Set[int] = set(bridging_os)
+    for u in units:
+        consumed |= _unit_atoms(mol, u["ring"], bridging_os)
+    if consumed != all_heavy:
+        return None
+    if not _sugar_name_rt_ok(mol, name, relax_atoms=relax or None):
+        return None
+    return name
+
+
+def name_branched_oligosaccharide(mol) -> Optional[str]:
+    """Name a BRANCHED reducing oligosaccharide (>=3 units, P-102.7.3) where a
+    single unit accepts MORE THAN ONE glycosyl, e.g.
+    ``alpha-D-glucopyranosyl-(1->4)-[alpha-D-glucopyranosyl-(1->6)]-D-glucopyranose``.
+
+    Builds the glycosyl TREE rooted at the unique free-hemiacetal reducing unit and
+    renders it recursively: at each branch point the highest-locant child continues
+    the main chain inline, every other child is a bracketed side chain cited before
+    it.  Fail-closed (``None``) on: no reducing parent (non-reducing -> the
+    glycoside namer), a cycle, an unrecognized unit, a dropped atom, or an RT-fail.
+    0-wrong via the OPSIN-RT gate (D-13); it only fires where the linear namer already
+    declined (a branch), so it cannot regress a passing name."""
+    detected = _detect_sugar_units_links(mol)
+    if detected is None:
+        return None
+    units, links, _c2u = detected
+    if len(units) < 3:
+        return None
+    # only DIRECTED glycosidic links (drop any reciprocal anomeric<->anomeric pair;
+    # a non-reducing centre is the glycoside namer's job, not this one).
+    from collections import Counter
+    o_count = Counter(l[3] for l in links)
+    chain_links = [l for l in links if o_count[l[3]] == 1]
+    if not chain_links:
+        return None
+
+    # Reducing parent = the unique unit that donates nothing and whose anomeric O
+    # is a free -OH.
+    donors = {l[0] for l in chain_links}
+    non_donors = [ui for ui in range(len(units)) if ui not in donors]
+    reducing = [ui for ui in non_donors
+                if mol.GetAtomWithIdx(units[ui]["anomeric_exo_o"]).GetTotalNumHs() > 0]
+    if len(reducing) != 1:
+        return None
+    parent_ui = reducing[0]
+
+    # This namer is ONLY for the BRANCHED case (a unit accepting >1 glycosyl);
+    # the linear reducing chain is name_linear_oligosaccharide's job.
+    if not any(v > 1 for v in Counter(l[1] for l in chain_links).values()):
+        return None
+
+    # children[acc_ui] = list of (donor_ui, anom_c, acc_c) glycosyl branches on it.
+    children: Dict[int, List[Tuple[int, int, int]]] = {}
+    for donor_ui, acc_ui, anom_c, o_idx, acc_c in chain_links:
+        children.setdefault(acc_ui, []).append((donor_ui, anom_c, acc_c))
+
+    # Recognize every unit (capped at all its glycosidic bonds).
+    bridging_os = {l[3] for l in links}
+    unit_bridge_bonds: Dict[int, List[Tuple[int, int]]] = {ui: [] for ui in range(len(units))}
+    for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
+        unit_bridge_bonds[donor_ui].append((anom_c, o_idx))
+        unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
+    from orthonym.data.sugar_names import (
+        lookup_sugar, recognize_sugar_skeleton, name_monosaccharide_systematic,
+    )
+    tuples: Dict[int, Tuple[str, str, str]] = {}
+    for ui, u in enumerate(units):
+        bonds = list({(c, o) for (c, o) in unit_bridge_bonds[ui]})
+        canon = _extract_unit_capped(mol, u["ringset"], bonds)
+        if canon is None:
+            return None
+        sm = Chem.MolFromSmiles(canon)
+        if sm is None:
+            return None
+        tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
+        if tup is None:
+            systematic = name_monosaccharide_systematic(sm)
+            tup = ("", "", systematic) if systematic else None
+        if tup is None:
+            return None
+        tuples[ui] = tup
+
+    relax: Set[int] = set()
+
+    def _acc_locant(acc_ui: int, acc_c: int) -> Optional[int]:
+        u = units[acc_ui]
+        return _ring_carbon_locants(mol, u["ring"], u["ring_oxygen"], u["anomeric_idx"]).get(acc_c)
+
+    def _render(ui: int, seen: Set[int]) -> Optional[str]:
+        """Render the subtree rooted at glycosyl unit ``ui`` (NOT the parent):
+        its own glycosyl term plus any child branches prefixed to it."""
+        if ui in seen:
+            return None
+        seen = seen | {ui}
+        ga, gc, gb = tuples[ui]
+        term = _glycosyl_term(ga, gc, gb)
+        if term is None:
+            return None
+        return _prefix_children(ui, term, seen)
+
+    def _prefix_children(ui: int, tail: str, seen: Set[int]) -> Optional[str]:
+        kids = children.get(ui, [])
+        if not kids:
+            return tail
+        # order by acceptor locant on THIS unit; highest continues the main chain.
+        annotated = []
+        for donor_ui, anom_c, acc_c in kids:
+            loc = _acc_locant(ui, acc_c)
+            if loc is None:
+                return None
+            annotated.append((loc, donor_ui, anom_c))
+        annotated.sort()  # ascending locant
+        main_loc, main_donor, main_anom = annotated[-1]
+        side = annotated[:-1]
+        parts = []
+        for loc, d_ui, anom_c in side:
+            sub = _render(d_ui, seen)
+            if sub is None:
+                return None
+            c = _anomeric_locant(mol, units[d_ui]["ring"], units[d_ui]["ring_oxygen"], anom_c)
+            parts.append(f"[{sub}-({c}{_ARROW}{loc})]")
+        main_sub = _render(main_donor, seen)
+        if main_sub is None:
+            return None
+        c_main = _anomeric_locant(mol, units[main_donor]["ring"], units[main_donor]["ring_oxygen"], main_anom)
+        main_piece = f"{main_sub}-({c_main}{_ARROW}{main_loc})"
+        # main chain, then each bracketed side chain, then the acceptor -- all
+        # hyphen-joined: "glycosyl-(1->4)-[glycosyl-(1->6)]-D-glucopyranose".
+        return "-".join([main_piece] + parts + [tail])
+
+    # Parent (reducing) string.
+    pa, pc, pb = tuples[parent_ui]
+    anom_defined = (mol.GetAtomWithIdx(units[parent_ui]["anomeric_idx"]).GetChiralTag()
+                    != Chem.ChiralType.CHI_UNSPECIFIED)
+    if anom_defined and pa and pc:
+        _pb, _st = _split_decorated_sugar_base(pb)
+        _desc = f"{pa}-{pc}-{_st}"
+        parent_str = f"{_pb}-{_desc}" if _pb else _desc
+    else:
+        if pc:
+            _pb2, _st2 = _split_decorated_sugar_base(pb)
+            _desc2 = f"{pc}-{_st2}"
+            parent_str = f"{_pb2}-{_desc2}" if _pb2 else _desc2
+        else:
+            parent_str = pb
+        relax.add(units[parent_ui]["anomeric_idx"])
+
+    name = _prefix_children(parent_ui, parent_str, {parent_ui})
+    if name is None:
+        return None
+
+    # Completeness invariant + RT gate.
     all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     consumed: Set[int] = set(bridging_os)
     for u in units:
