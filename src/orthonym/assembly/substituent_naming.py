@@ -1864,7 +1864,7 @@ def _name_polyfunctional_acyclic_substituent(
         if a.GetFormalCharge() <= 0:
             continue
         if _ring_info_cat.NumAtomRings(idx) > 0:
-            continue  # ring-borne onium -> not this pass
+            continue  # defensive no-op: upstream (line 1563) already excludes ring-bearing fragments
 
         def _cation_component(seed, _block=idx):
             comp: Set[int] = set()

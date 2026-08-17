@@ -18,6 +18,7 @@ from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.assembly.substituent_enumerator import name_substituent
+from orthonym.assembly.substituent_naming import name_substituent_fragment
 
 
 def _terminal_attach(m):
@@ -48,6 +49,17 @@ def test_cationic_branch_substituent_three_carbon_chain():
     attach = _terminal_attach(m)
     frag = frozenset(a.GetIdx() for a in m.GetAtoms())
     assert name_substituent(m, frag, attach) == "3-(trimethylazaniumyl)propyl"
+
+
+def test_cationic_branch_one_carbon_locant_elided():
+    """Boundary case: 1-carbon backbone with cation directly attached.
+    Locant is elided for a 1-carbon substituent (CH2 becomes methyl, not
+    1-methyl). This tests the direct-attach boundary where host == attach_idx
+    within Pass 1d's component search."""
+    m = Chem.MolFromSmiles("C[N+](C)(C)C")
+    attach = 0  # the first carbon (the methyl that is the sole backbone)
+    frag = frozenset(a.GetIdx() for a in m.GetAtoms())
+    assert name_substituent_fragment(m, frag, attach, set()) == "(trimethylazaniumyl)methyl"
 
 
 def test_direct_attach_shape_unaffected_by_generic_namer():
