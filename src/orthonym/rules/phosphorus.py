@@ -962,6 +962,125 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
     return " ".join(pieces)
 
 
+def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
+    """Functional-class name for the ANION of a P-oxoacid acid-ester (P-72.2.2.2.1.2).
+
+    Sibling of :func:`name_phosphate_ester` for the deprotonated form. The
+    protonation word is derived IN PLACE from the surviving free ``-OH`` count
+    (``_HYDROGEN_MULT``): the ``[O-]`` carry the charge and are NOT counted as
+    hydrogens, so a monoester dianion (0 OH) -> ``dodecyl phosphate``, a monoanion
+    (1 OH) -> ``dodecyl hydrogen phosphate``, a diester monoanion (0 OH, 2 owners)
+    -> ``diethyl phosphate``. Never neutralize-then-rename (D-04). Requires at
+    least one terminal ``[O-]`` (else -> ``None``, the NEUTRAL producer owns that
+    shape) and that the molecule's only charges are those ``[O-]``. Fail-closed
+    (``None``) off the clean single-P ester-anion shape (thio P=S/P-S, ring P,
+    P-N, P-O-P bridge, no ester owner, unspellable owner, incomplete coverage).
+    """
+    if mol is None:
+        return None
+    p = mol.GetAtomWithIdx(phosphorus_idx)
+    if p.GetSymbol() != 'P' or p.GetFormalCharge() != 0 or p.IsInRing():
+        return None
+
+    accounted = {phosphorus_idx}
+    ester_oxygens: List[int] = []
+    oh_count = 0
+    anion_count = 0
+    c_ligands: List[int] = []
+    dbl_oxo = 0
+    for b in p.GetBonds():
+        nb = b.GetOtherAtom(p)
+        bt = b.GetBondType()
+        sym = nb.GetSymbol()
+        if bt == Chem.BondType.DOUBLE and sym == 'O':
+            dbl_oxo += 1
+            accounted.add(nb.GetIdx())
+            continue
+        if bt != Chem.BondType.SINGLE:
+            return None                         # P=C / P#N / P=S -> defer
+        if sym == 'C':
+            c_ligands.append(nb.GetIdx())
+            continue
+        if sym != 'O':
+            return None                         # P-S / P-N -> defer
+        others = [x for x in nb.GetNeighbors() if x.GetIdx() != phosphorus_idx]
+        if not others and nb.GetFormalCharge() < 0:
+            anion_count += 1                    # terminal [O-]
+            accounted.add(nb.GetIdx())
+        elif not others and nb.GetTotalNumHs() >= 1 and nb.GetFormalCharge() == 0:
+            oh_count += 1                       # terminal -OH
+            accounted.add(nb.GetIdx())
+        elif len(others) == 1 and others[0].GetSymbol() in ('C', 'S') \
+                and nb.GetFormalCharge() == 0:
+            ester_oxygens.append(nb.GetIdx())   # -O-C / -O-S ester owner
+            accounted.add(nb.GetIdx())
+        else:
+            return None                         # P-O-P bridge / charged owner O -> defer
+
+    if anion_count < 1:
+        return None                             # neutral -> name_phosphate_ester owns it
+    if not ester_oxygens:
+        return None                             # bare inorganic anion, not an ester
+    if dbl_oxo > 1:
+        return None
+    # The only charges in the molecule must be our terminal [O-].
+    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != -anion_count:
+        return None
+
+    stem = _P_ACID_STEM.get((dbl_oxo == 1, len(c_ligands)))
+    if stem is None or (len(c_ligands) > 0 and stem == "phosphite"):
+        return None
+
+    owner_tokens: List[str] = []
+    for o_idx in ester_oxygens:
+        got = _p_ester_owner_group(mol, o_idx, phosphorus_idx)
+        if got is None:
+            return None
+        token, frag = got
+        owner_tokens.append(token)
+        accounted |= frag
+    owner_text = _assemble_p_owner_text(owner_tokens)
+
+    stem_prefix = ""
+    if c_ligands:
+        from ..assembly.substituent_enumerator import name_substituent
+        c_tokens: List[str] = []
+        for c_idx in c_ligands:
+            frag = set()
+            stack = [c_idx]
+            while stack:
+                a = stack.pop()
+                if a in frag:
+                    continue
+                frag.add(a)
+                for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                    j = nb.GetIdx()
+                    if j == phosphorus_idx:
+                        continue
+                    if j not in frag:
+                        stack.append(j)
+            try:
+                tok = name_substituent(mol, frozenset(frag), c_idx, allow_mancude=True)
+            except Exception:  # noqa: BLE001
+                return None
+            if not tok or not isinstance(tok, str) or tok == 'substituent':
+                return None
+            c_tokens.append(tok)
+            accounted |= frag
+        stem_prefix = _assemble_p_owner_text(c_tokens)
+
+    if accounted != set(range(mol.GetNumAtoms())):
+        return None
+    hyd = _HYDROGEN_MULT.get(oh_count)
+    if hyd is None:
+        return None                             # >2 free OH is not an ester shape
+    pieces = [owner_text]
+    if hyd:
+        pieces.append(hyd)
+    pieces.append(f"{stem_prefix}{stem}")
+    return " ".join(pieces)
+
+
 def get_phosphanyl_prefix(mol, phosphorus_idx: int, exclude_atoms: set = None) -> Optional[str]:
     """
     Generate IUPAC P-68 phosphanyl prefix string.
