@@ -792,7 +792,32 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
     chokepoint (reached via name_anion's single-anion delegation below); this
     handler stays a thin shim over name_anion + the v18 neutralize-recurse
     fallback.
+
+    v33 Phase 3 (glucosinolate/thiohydroximate O-sulfate anion): P-72.2.2.2.1.2
+    acid-ester anion (phosphate/sulfate ester ``[O-]``, including the oxime-N-owner
+    sibling ``name_oxime_o_sulfate_anion``) is tried FIRST here, mirroring the
+    ordering ``name_anion`` already applies INTERNALLY to its own single-anion
+    cascade (``ions.py`` -- "Placed before route_charged so a monoester monoanion
+    / sulfate ester anion is named"). Without this pre-check, this handler's
+    direct ``route_charged`` call (below) reaches it BEFORE that internal
+    ordering ever applies, and for ``CC(=NOS(=O)(=O)[O-])S`` route_charged's
+    alkoxide/neutralize-reenter-suffix seam does not own this class and
+    mis-names it (wrong ``'ethane-1-thiolate'``, caught only by the top-level
+    SELF-01 gate -> silent abstention). ``name_acid_ester_anion`` is narrow and
+    atom-coverage-audited (fail-closed ``None`` off anything but the exact
+    P/S-ester-anion shape), so it cannot fire for, and cannot change, any other
+    anion class -- verified byte-identical for the four Slice-A regressions
+    (route_charged already returns '' for all four; this pre-check computes the
+    same string name_anion's internal fallback would have produced anyway).
     """
+    from orthonym.rules.acid_ester_anion import name_acid_ester_anion
+    from orthonym.rules.ions import _validate_anion_name
+    ester_anion = name_acid_ester_anion(mol)
+    if ester_anion:
+        validated = _validate_anion_name(mol, ester_anion)
+        if validated:
+            return validated
+
     from orthonym.rules.charged_router import route_charged
     routed = route_charged(mol, style)
     if routed:

@@ -1295,6 +1295,13 @@ _POLYFUNC_OXO_PREFIX = "oxo"
 _POLYFUNC_HYDROXY_PREFIX = "hydroxy"
 _POLYFUNC_AMINO_PREFIX = "amino"
 _POLYFUNC_CARBOXY_PREFIX = "carboxy"
+# v33 Phase 3 (glucosinolate/thiohydroximate O-sulfate anion): the S-analogue of
+# hydroxy (P-63.1.5) for a terminal -SH branch on a backbone carbon
+# ('2-sulfanylethyl', the direct parallel to '2-hydroxyethyl'). Documented as
+# declined at the point below until this fix ("other tiers own them" was
+# unverified -- SPY showed no tier names a chain+thiol branch at all, not even
+# the 2-atom case).
+_POLYFUNC_SULFANYL_PREFIX = "sulfanyl"
 
 
 def _name_carbamoylamino_chain_substituent(
@@ -2013,6 +2020,26 @@ def _name_polyfunctional_acyclic_substituent(
                 return None
             _add_prefix(c_host[0], _HALOGEN_PREFIX[sym])
             fg_count += 1
+        elif (sym == 'S' and len(in_frag_nbrs) == 1 and len(c_host) == 1
+                and mol.GetBondBetweenAtoms(idx, c_host[0]).GetBondType()
+                    == Chem.BondType.SINGLE
+                and a.GetTotalNumHs() >= 1):
+            # v33 Phase 3 (glucosinolate/thiohydroximate O-sulfate anion,
+            # P-63.1.5): a terminal -SH (thiol) on a backbone carbon is the
+            # 'sulfanyl' detachable prefix -- the direct S-analogue of the
+            # 'hydroxy' branch above ('2-sulfanylethyl' parallels
+            # '2-hydroxyethyl'). MEASURED: no other tier names this shape
+            # (the comment on the chalcogenylidene branch below claiming
+            # "other tiers own them" was unverified for the single-bond
+            # case -- SPY found the fragment cache/recursive/descriptive
+            # tiers all decline a chain+thiol branch, even the 2-atom
+            # '2-sulfanylethyl'). A charged / isotope-labelled / bridging S
+            # never reaches this branch (guarded above); anything else
+            # (0 H -- a thioether bridge or -S- ester owner) falls through
+            # unchanged to the chalcogenylidene branch next, preserving its
+            # existing decline.
+            _add_prefix(c_host[0], _POLYFUNC_SULFANYL_PREFIX)
+            fg_count += 1
         elif sym in ('S', 'Se', 'Te'):
             # Wave-2 completion C (P-64.6.1): a TERMINAL =S/=Se/=Te on a
             # backbone C is the chalcogenylidene prefix (2-sulfanylidenebutyl,
@@ -2066,6 +2093,12 @@ def _name_polyfunctional_acyclic_substituent(
         if any(y in _prefixes for y in _YLIDENES) and (
                 _POLYFUNC_HYDROXY_PREFIX in _prefixes
                 or _POLYFUNC_OXO_PREFIX in _prefixes):
+            return None
+        # v33 Phase 3: oxo + sulfanyl on ONE carbon is the same thioic-S-acid
+        # shape (-C(=O)-SH, P-65.1.1.4) as the hydroxy/oxo carboxyl-carbon
+        # case above -- never emit '1-oxo-1-sulfanyl...'; defer to the
+        # dedicated S-acid prefix ('sulfanylcarbonyl', PREFIX_FORMS) tier.
+        if _POLYFUNC_OXO_PREFIX in _prefixes and _POLYFUNC_SULFANYL_PREFIX in _prefixes:
             return None
 
     if fg_count < 1:
