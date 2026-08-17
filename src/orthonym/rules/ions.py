@@ -3230,6 +3230,29 @@ def _is_naphthalene_system(mol, aromatic_idx: int, atom_rings) -> bool:
     return False
 
 
+def _branch_all_carbon(mol, start_idx: int, blocked: set) -> bool:
+    """True iff the substituent subtree reached from ``start_idx`` (not crossing
+    into ``blocked``) is a pure hydrocarbon (only carbon heavy atoms) -- i.e. a
+    plain alkyl the simple ring-substituent alkyl namer can count without dropping
+    a heteroatom."""
+    from collections import deque
+    seen = set()
+    dq = deque([start_idx])
+    while dq:
+        i = dq.popleft()
+        if i in seen or i in blocked:
+            continue
+        seen.add(i)
+        a = mol.GetAtomWithIdx(i)
+        if a.GetAtomicNum() > 1 and a.GetSymbol() != 'C':
+            return False
+        for n in a.GetNeighbors():
+            ni = n.GetIdx()
+            if ni not in seen and ni not in blocked:
+                dq.append(ni)
+    return True
+
+
 def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, base_name: str) -> str:
     """
     Name an aromatic carboxylate with any substituents on the ring.
@@ -3275,6 +3298,42 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
     # Find substituents on the ring (excluding the carboxyl attachment point)
     ring_set = set(benzene_ring)
     carboxyl_attachment_idx = aromatic_ring_atom.GetIdx()
+
+    # v33 (0-wrong): this handler names ring substituents by ATOM TYPE alone
+    # (O -> 'hydroxy', N -> 'amino', C -> alkyl). That silently DROPS anything more
+    # than a terminal group -- an ether/ester O (e.g. a glycosyloxy), a substituted
+    # N, a hetero-bearing or aromatic C-branch -- producing a wrong, atom-incomplete
+    # name (4-(glycosyloxy)benzoate -> '4-hydroxybenzoate'). FAIL CLOSED on any such
+    # substituent so ``_name_carboxylate_systematic`` falls through to the
+    # substituent-complete neutralize->name->-oate path (which, in best-effort mode,
+    # names the complex arm correctly). Simple hydroxy/amino/nitro/halo/alkyl are
+    # unaffected -> every existing carboxylate test stays byte-identical.
+    for _ridx in ring_set:
+        if _ridx == carboxyl_attachment_idx:
+            continue
+        for _nbr in mol.GetAtomWithIdx(_ridx).GetNeighbors():
+            _ni = _nbr.GetIdx()
+            if _ni in ring_set or _ni == carboxyl_carbon_idx:
+                continue
+            _sym = _nbr.GetSymbol()
+            if _sym in ('F', 'Cl', 'Br', 'I'):
+                continue
+            _heavy = [n for n in _nbr.GetNeighbors()
+                      if n.GetIdx() not in ring_set and n.GetAtomicNum() > 1]
+            if _sym == 'O':
+                if _heavy:
+                    return ''  # ether/ester O, not a terminal -OH
+            elif _sym == 'N':
+                _is_nitro = (_nbr.GetFormalCharge() == 1
+                             and sum(1 for n in _nbr.GetNeighbors()
+                                     if n.GetSymbol() == 'O') >= 2)
+                if _heavy and not _is_nitro:
+                    return ''  # substituted / acyl N
+            elif _sym == 'C' and not _nbr.GetIsAromatic():
+                if not _branch_all_carbon(mol, _ni, ring_set | {carboxyl_carbon_idx}):
+                    return ''  # hetero-bearing C-branch -> alkyl namer would drop atoms
+            else:
+                return ''  # aromatic-C (biaryl) / S / P / ... -> out of scope here
 
     # Map substituent type to name
     SUBSTITUENT_NAMES = {
@@ -3559,7 +3618,14 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     if carboxyl_carbon is not None:
         aromatic_name = _detect_aromatic_carboxylate(mol, carboxyl_carbon)
         if aromatic_name:
-            return _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon, aromatic_name)
+            arom = _name_aromatic_carboxylate_with_substituents(
+                mol, carboxyl_carbon, aromatic_name)
+            if arom:
+                return arom
+            # v33: the aromatic handler FAILED CLOSED on a complex ring substituent
+            # (ether/ester/hetero-alkyl it would otherwise drop). Fall through to the
+            # substituent-complete neutralize->name->-oate path below rather than
+            # returning its empty decline.
 
     # Try neutralize-then-name approach for full substituent detection
     acid_name = _neutralize_carboxylate_to_acid(mol, anion_site)
@@ -3636,6 +3702,21 @@ def _neutralize_carboxylate_to_acid(mol, anion_site: Dict) -> str:
         acid_name = name_fragment_recursively(neutral_smiles)
         if acid_name and ('oic acid' in acid_name or 'ic acid' in acid_name):
             return acid_name
+        # v33 breadth: in best-effort mode, name the neutral acid via the FULL
+        # best-effort pipeline -- it names complex substituents (a glycosyloxy /
+        # ether / ring arm) that name_fragment_recursively declines PIN-only. The
+        # caller converts to -oate and the outer SELF-01/E1 gate RT-checks the whole
+        # anion, so 0-wrong holds. PIN/default tier (ctx False) is untouched.
+        from ..metrics.provenance import best_effort_ctx
+        if best_effort_ctx.get():
+            from ..namer import Orthonym
+            be = Orthonym(
+                style='pin', _disable_opsin_validity_gate=True,
+                general_fallback=True, general_fallback_unverified=True,
+                allow_aromatic_general=True,
+            ).name(neutral_smiles)
+            if be and ('oic acid' in be or 'ic acid' in be):
+                return be
     except (RecursionError, ValueError, RuntimeError):
         pass
     return ''

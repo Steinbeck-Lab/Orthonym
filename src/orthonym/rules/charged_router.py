@@ -745,7 +745,27 @@ def _reenter(neutral_smi: str, style: str) -> str:
     atom — IMPLEMENTATION-MAP §1).
     """
     from ..namer import Orthonym
-    return Orthonym(style=style, _disable_opsin_validity_gate=True).name(neutral_smi)
+    return Orthonym(style=style, _disable_opsin_validity_gate=True,
+                     **_best_effort_reenter_kwargs()).name(neutral_smi)
+
+
+def _best_effort_reenter_kwargs() -> dict:
+    """v33 breadth: when the OUTER call is best-effort, name the neutral parent
+    best-effort too, so a charged molecule whose neutral parent is nameable ONLY
+    under the general/best-effort tier (a complex carboxylate/ammonium/phosphate,
+    ~40% of the abstention census) converts instead of abstaining -- the charge is
+    incidental, not the blocker.  Reads ``best_effort_ctx`` so the PIN/default tier
+    (ctx False) re-enters PIN-only exactly as before (gate byte-identical); the
+    best-effort name still faces the caller's E1/SELF-01 certification, so 0-wrong
+    holds by construction."""
+    try:
+        from ..metrics.provenance import best_effort_ctx
+        if best_effort_ctx.get():
+            return dict(general_fallback=True, general_fallback_unverified=True,
+                        allow_aromatic_general=True)
+    except Exception:
+        pass
+    return {}
 
 
 def _reenter_forced(neutral_smi: str, style: str, principal_fg: str) -> str:
@@ -755,7 +775,8 @@ def _reenter_forced(neutral_smi: str, style: str, principal_fg: str) -> str:
     so the S/P-oxoacid suffix never appeared and the ionize step found no match."""
     from ..namer import Orthonym
     return Orthonym(style=style, _disable_opsin_validity_gate=True,
-                     _principal_group_override=principal_fg).name(neutral_smi)
+                     _principal_group_override=principal_fg,
+                     **_best_effort_reenter_kwargs()).name(neutral_smi)
 
 
 def _classify_single_anion(mol, sites):
