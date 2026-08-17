@@ -110,3 +110,25 @@ def test_integration_failclosed_never_wrong(namer, smi):
     out = namer.name(smi)
     assert out == "unknown organic compound"
     assert "diylbis(" not in out
+
+
+@pytest.mark.opsin_gate
+def test_mixed_protonation_dication_fails_closed(namer):
+    """One NH3+ (protonated amine) + one N+(C)(C) quaternary -> mixed protonation.
+
+    Scope requires IDENTICAL onium units (both must be quaternary N+);
+    mixing a protonated amine with a quaternary N+ fails closed.
+    """
+    out = namer.name("[NH3+]CCCCCC[N+](C)(C)C")
+    assert out == "unknown organic compound"
+
+
+@pytest.mark.opsin_gate
+def test_mixed_onium_dication_fails_closed(namer):
+    """N+ (pyridinium-like) + S+ (sulfonium-like) -> mixed onium types.
+
+    Scope requires both cations to be identical quaternary N+;
+    mixing N+ with S+ is out of scope, fails closed.
+    """
+    out = namer.name("C[N+](C)(C)CCCCCC[S+](C)C")
+    assert out == "unknown organic compound"
