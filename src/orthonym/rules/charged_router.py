@@ -372,10 +372,11 @@ def _attachment_locant_on_anion_parent(mol, anion_idx: int,
 
 def _parent_has_chain_locants(parent_anion_name: str) -> bool:
     """True if the anion-parent name is a systematic chain name that admits a
-    substituent locant (``…anoate``). A retained 2-carbon ``acetate`` (and other
-    locant-free retained anion names) carries no chain numbering, so the
-    OPSIN-default position is used (no spurious locant)."""
-    return parent_anion_name.endswith('anoate')
+    substituent locant (``…anoate``, ``…enoate``, ``…ynoate``, ``…dioate``).
+    A retained 2-carbon ``acetate`` (and other locant-free retained anion names)
+    carries no chain numbering, so the OPSIN-default position is used (no spurious
+    locant)."""
+    return parent_anion_name.endswith(('anoate', 'enoate', 'ynoate', 'dioate'))
 
 
 def _route_zwitterion(mol, sites, style: str) -> str:
@@ -539,9 +540,12 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     # the parent name carries its own leading locant but we computed no
     # cation-locant prefix, the join is ambiguous -> decline (honest-fail, the
     # neutral-form path names it). A clean name has the parent starting with a
-    # letter right after the ')'.
-    after_paren = parent_anion_name[:1]
-    if not locant_prefix and after_paren.isdigit():
+    # letter right after the ')'. Strip leading stereodescriptors (e.g. '(2E)')
+    # before checking for a digit, so a future un-handled stereo parent with no
+    # computed locant also fails closed.
+    from ..assembly.naming_utils import _STEREO_PAREN_RE
+    _after = _STEREO_PAREN_RE.sub('', parent_anion_name, count=1).lstrip('-')
+    if not locant_prefix and _after[:1].isdigit():
         return ''
     return composed
 
