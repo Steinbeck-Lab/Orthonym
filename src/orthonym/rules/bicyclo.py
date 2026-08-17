@@ -580,7 +580,7 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     shortest bridge). Preserved verbatim as the tie-break default so
     unsubstituted / symmetric bicyclics stay byte-identical.
 
-    P-23.2.5 direction fix (cephem von Baeyer defect, v33 Phase 3): the
+    P-23.2.3 direction fix (cephem von Baeyer defect, v33 Phase 3): the
     SECONDARY (second-longest) bridge must be numbered continuing FROM the
     second bridgehead BACK toward the first -- see this module's own
     ``get_bicyclo_numbering`` docstring example for norbornane, "Second
