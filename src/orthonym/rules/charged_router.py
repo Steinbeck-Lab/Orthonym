@@ -521,6 +521,50 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
     return f'{owner} {word}'
 
 
+def _atom_coverage_ok_for_polyacid_zwitterion(mol, cation_idx: int,
+                                              parent_attach_idx: int,
+                                              anion_idxs: list) -> bool:
+    """Finding A (v33 Phase 3 review) -- atom-coverage guard for
+    ``_name_polyacid_zwitterion``.
+
+    That function severs the cation and names the poly-acid parent, but its
+    ``parent_attach_idx`` is computed from the shortest path to ``anions[0]``
+    ONLY. Its own docstring scopes the cation to "a protonated amine OR
+    quaternary onium" -- a quaternary onium can carry MULTIPLE branches, so if
+    a second (or third) carboxylate sat on a DIFFERENT branch than
+    ``anions[0]``, that atom would be discarded with the cation fragment by
+    ``_sever_cation_build_anion_parent`` -- a silent atom/charge drop never
+    asserted internally (only the outer SELF-01/OPSIN gate would eventually
+    catch the resulting wrong molecule).
+
+    Mirror ``_name_ester_anion_zwitterion``'s ``accounted`` discipline
+    (:518-519 above): split the molecule at the SAME bond
+    ``_sever_cation_build_anion_parent`` is about to cut and require every
+    anion atom to land in the fragment that does NOT contain the cation --
+    the severed-parent fragment atoms union the cation-side fragment atoms is
+    ALWAYS every atom of the molecule (``RemoveBond`` drops no atom, only
+    splits connectivity), so "every anion is on the parent side" is the whole
+    coverage guarantee. Returns False (fail closed) if any anion is stranded
+    on the cation side, or if the cut does not even disconnect the graph
+    (e.g. a ring bridges the two atoms some other way) so no cation-free
+    fragment exists at all.
+    """
+    rw = Chem.RWMol(mol)
+    bond = rw.GetBondBetweenAtoms(cation_idx, parent_attach_idx)
+    if bond is None:
+        return False
+    rw.RemoveBond(cation_idx, parent_attach_idx)
+    frag_idx_tuples = Chem.GetMolFrags(rw.GetMol(), asMols=False, sanitizeFrags=False)
+    cation_side = None
+    for fr_idxs in frag_idx_tuples:
+        if cation_idx in fr_idxs:
+            cation_side = set(fr_idxs)
+            break
+    if cation_side is None:
+        return False  # unreachable in practice (cation_idx is always in SOME fragment); fail closed
+    return not any(idx in cation_side for idx in anion_idxs)
+
+
 def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> str:
     """P-74.1.3 generalized to a MULTI-carboxylate anion parent (v33 Phase 3).
 
@@ -576,6 +620,12 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
         return ''
     parent_attach_idx = path[1]  # the cation neighbour leading into the parent
 
+    anion_atom_idxs = [a['atom_idx'] for a in anions]
+    if not _atom_coverage_ok_for_polyacid_zwitterion(
+            mol, cation_idx, parent_attach_idx, anion_atom_idxs):
+        return ''  # Finding A: an anion is stranded on the cation side of the
+                   # severed bond -> would be silently dropped -- fail closed
+
     from ..assembly.substituent_naming import cation_to_prefix
     cat_prefix = cation_to_prefix(mol, cation_idx, parent_attach_idx)
     if not cat_prefix:
@@ -601,10 +651,21 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
     # break the tie -- P-14.4 lowest locants picks the smaller end).
     locant_prefix = ''
     attach_locant = _attachment_locant_on_polyacid_parent(
-        mol, [a['atom_idx'] for a in anions], parent_attach_idx)
-    if attach_locant is not None and attach_locant >= 2 \
-            and _parent_has_chain_locants(parent_anion_name):
-        locant_prefix = f'{attach_locant}-'
+        mol, anion_atom_idxs, parent_attach_idx)
+    if attach_locant is not None and attach_locant >= 2:
+        if _parent_has_chain_locants(parent_anion_name):
+            locant_prefix = f'{attach_locant}-'
+        else:
+            # Finding B (v33 Phase 3 review): the parent-anion name is not a
+            # form `_parent_has_chain_locants` recognizes (e.g. a 3+-carboxylate
+            # `...tricarboxylate` from `name_carboxylate_anion` -- P-65.1.1 --
+            # which matches none of anoate/enoate/ynoate/dioate). A required
+            # locant (>= 2, so omitting it is NOT one of the P-14.3.4
+            # licences) would then silently stay uncited, letting OPSIN default
+            # the azaniumyl onto the wrong ring/chain position (P-14.3.3 is
+            # deny-by-default). Fail closed rather than ship an unlocanted
+            # prefix on a parent form this producer cannot locant correctly.
+            return ''
 
     # P-16.3.3: a SIMPLE (unsubstituted) prefix like a bare protonated-amine
     # 'azaniumyl' is cited WITHOUT enclosing marks (BB '2-aminopentanedioic

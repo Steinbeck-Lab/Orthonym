@@ -133,3 +133,75 @@ def test_ring_cation_declines_the_new_branch_directly():
     result = _name_polyacid_zwitterion(
         mol, sites['cations'], sites['anions'], 'pin')
     assert result == ''
+
+
+# --- v33 Phase 3 review follow-up (Findings A/B/C) -----------------------
+@pytest.mark.opsin_gate
+def test_tricarboxylate_parent_failclosed(namer):
+    # Finding B: a 3-carboxylate parent (`propane-1,2,3-tricarboxylic acid`
+    # -- P-65.1.1) is named `...tricarboxylate` by `name_carboxylate_anion`,
+    # which `_parent_has_chain_locants` does NOT recognize (only
+    # anoate/enoate/ynoate/dioate). The cation sits on C2 (locant 2, NOT the
+    # licensed-omission position), so shipping the prefix unlocanted would
+    # silently cite the wrong ring/chain position. RT-verified 2026-08-17
+    # (`.venv/bin/python -m orthonym`): before the Finding-B tightening this
+    # emitted the unlocanted 'azaniumylpropane-1,2,3-tricarboxylate', which
+    # OPSIN parses as a DIFFERENT molecule (NH3+ defaults onto C1) and the
+    # outer SELF-01 gate suppressed -> abstain. `_name_polyacid_zwitterion`
+    # now declines this shape itself (proactive fail-closed, not just an
+    # accidental gate catch).
+    from orthonym.errors import is_failure_name
+    out = namer.name("[NH3+]C(CC(=O)[O-])(CC(=O)[O-])C(=O)[O-]")
+    assert out is not None
+    assert is_failure_name(out), f"expected an honest abstain, got: {out!r}"
+
+
+def test_tricarboxylate_parent_declines_the_new_branch_directly():
+    # Unit-level companion to the RT-gated test above: confirm the DECLINE
+    # happens inside `_name_polyacid_zwitterion` itself (Finding B), not
+    # merely downstream in the outer gate.
+    from rdkit import Chem
+    from orthonym.perception.ions import get_ion_sites
+    from orthonym.rules.charged_router import _name_polyacid_zwitterion
+
+    smi = "[NH3+]C(CC(=O)[O-])(CC(=O)[O-])C(=O)[O-]"
+    mol = Chem.MolFromSmiles(smi)
+    assert mol is not None
+    sites = get_ion_sites(mol)
+    result = _name_polyacid_zwitterion(
+        mol, sites['cations'], sites['anions'], 'pin')
+    assert result == ''
+
+
+@pytest.mark.opsin_gate
+def test_compound_cation_prefix_polyacid_branch(namer):
+    # Finding C: a COMPOUND (substituted) cation prefix -- a quaternary
+    # trimethylazaniumyl, not the bare 'azaniumyl' of the goal molecules --
+    # on the poly-acid branch, pinning `enclose_if_compound`'s parens arm
+    # here (RT-verified 2026-08-17).
+    assert namer.name("C[N+](C)(C)C(CC(=O)[O-])C(=O)[O-]") == \
+        "2-(trimethylazaniumyl)butanedioate"
+
+
+def test_multi_branch_onium_atom_drop_declines_directly():
+    # Finding A: a quaternary onium with the two carboxylate anions on
+    # DIFFERENT branches (methyl, methyl, -CH2COO- [anions[0]], -CH2COO-
+    # [anions[1]]). Before the atom-coverage guard, `parent_attach_idx` was
+    # computed from `anions[0]` alone, so severing at that bond stranded
+    # anions[1]'s whole branch on the CATION side -- `cation_to_prefix`
+    # would happily absorb it as a neutral 'carboxymethyl' N-substituent
+    # (measured: `cation_to_prefix(mol, 1, 3)` == 'carboxymethyldimethyl-
+    # azaniumyl'), silently dropping that anion's charge. The new
+    # `_atom_coverage_ok_for_polyacid_zwitterion` guard must decline this
+    # shape before `cation_to_prefix` is even called.
+    from rdkit import Chem
+    from orthonym.perception.ions import get_ion_sites
+    from orthonym.rules.charged_router import _name_polyacid_zwitterion
+
+    smi = "C[N+](C)(CC(=O)[O-])CC(=O)[O-]"
+    mol = Chem.MolFromSmiles(smi)
+    assert mol is not None
+    sites = get_ion_sites(mol)
+    result = _name_polyacid_zwitterion(
+        mol, sites['cations'], sites['anions'], 'pin')
+    assert result == ''
