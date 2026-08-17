@@ -754,6 +754,38 @@ def _has_oligo_chain(mol) -> bool:
     return _oligo_topology(mol) is not None
 
 
+def _has_extended_oligo(mol) -> bool:
+    """Cheap NO-OPSIN dispatch precondition for the NON-REDUCING /
+    :func:`name_nonreducing_oligosaccharide` and BRANCHED /
+    :func:`name_branched_oligosaccharide` namers (v33 glyco slices 1-2).
+
+    Mirrors their topology detection (>=3 units + an anomeric<->anomeric central
+    bond, or a unit accepting >1 glycosyl) WITHOUT the RT gate, so the dispatch
+    routes these to the carbohydrate handler instead of the general oxane engine.
+    Without this the namers are correct but never reached (choke-point-off-path)."""
+    detected = _detect_sugar_units_links(mol)
+    if detected is None:
+        return False
+    units, links, _c2u = detected
+    if len(units) < 3:
+        return False
+    from collections import Counter
+    by_o: Dict[int, List] = {}
+    for l in links:
+        by_o.setdefault(l[3], []).append(l)
+    # non-reducing: a bridge O whose BOTH carbons are anomeric (glycosyl-glycoside)
+    for o_idx, ls in by_o.items():
+        if len(ls) == 2:
+            uA, uB = ls[0][0], ls[0][1]
+            if {ls[0][2], ls[0][4]} <= {units[uA]["anomeric_idx"], units[uB]["anomeric_idx"]}:
+                return True
+    # branched: a unit accepts >1 glycosyl (via a directed, non-central link)
+    chain_links = [l for l in links if len(by_o[l[3]]) == 1]
+    if any(v > 1 for v in Counter(l[1] for l in chain_links).values()):
+        return True
+    return False
+
+
 def name_linear_oligosaccharide(mol) -> Optional[str]:
     """Name a LINEAR reducing oligosaccharide (>=2 units) by P-102.7.2.2:
     ``glycosyl-(1->c')-[glycosyl-(1->c')-]n-glycose`` (maltotriose ->

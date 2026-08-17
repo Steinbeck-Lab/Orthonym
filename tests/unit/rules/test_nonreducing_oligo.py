@@ -61,6 +61,17 @@ def test_branched_declines_linear():
     assert O.name_branched_oligosaccharide(m) is None
 
 
+def test_dispatch_precondition_routes_extended_oligo():
+    # DISPATCH INTEGRATION (closes the choke-point-off-path blind spot): the cheap
+    # no-OPSIN precondition must fire for non-reducing AND branched oligosaccharides,
+    # else name_tiered routes them to the general oxane engine and the composer,
+    # though correct when called directly, is never reached.
+    assert O._has_extended_oligo(Chem.MolFromSmiles(RAFFINOSE)) is True
+    assert O._has_extended_oligo(Chem.MolFromSmiles(BRANCHED_GLUCOTRIOSE)) is True
+    # a single monosaccharide / disaccharide must NOT trip it.
+    assert O._has_extended_oligo(Chem.MolFromSmiles("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O")) is False
+
+
 def test_nonreducing_declines_under_three_units():
     # the new 3+ namer must fail closed on <3 sugar units (a monosaccharide /
     # disaccharide is the single-sugar / binary assembler's job — no double-handling).

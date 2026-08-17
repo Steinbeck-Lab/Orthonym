@@ -478,8 +478,12 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     # W6B-T11 linear reducing oligosaccharide (3+ units / 1->6 links the binary
     # disaccharide SMARTS misses) -> the handler's name_disaccharide falls back to
     # name_linear_oligosaccharide (RT-gated).
-    from orthonym.rules.oligosaccharides import _has_oligo_chain
+    from orthonym.rules.oligosaccharides import _has_oligo_chain, _has_extended_oligo
     if _has_oligo_chain(mol):
+        return True
+    # v33 glyco slices 1-2: NON-REDUCING (raffinose) and BRANCHED oligosaccharides
+    # -> the handler's name_disaccharide routes to name_nonreducing/branched (RT-gated).
+    if _has_extended_oligo(mol):
         return True
     # W6B-T12 glycosyloxy on a senior aglycone (sugar O-linked to a non-sugar
     # aglycone bearing a group senior to hydroxy).
