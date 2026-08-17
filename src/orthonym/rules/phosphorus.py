@@ -988,6 +988,7 @@ def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
     anion_count = 0
     c_ligands: List[int] = []
     dbl_oxo = 0
+    anion_oxygens: set = set()
     for b in p.GetBonds():
         nb = b.GetOtherAtom(p)
         bt = b.GetBondType()
@@ -1006,6 +1007,7 @@ def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
         others = [x for x in nb.GetNeighbors() if x.GetIdx() != phosphorus_idx]
         if not others and nb.GetFormalCharge() < 0:
             anion_count += 1                    # terminal [O-]
+            anion_oxygens.add(nb.GetIdx())
             accounted.add(nb.GetIdx())
         elif not others and nb.GetTotalNumHs() >= 1 and nb.GetFormalCharge() == 0:
             oh_count += 1                       # terminal -OH
@@ -1023,9 +1025,13 @@ def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
         return None                             # bare inorganic anion, not an ester
     if dbl_oxo > 1:
         return None
-    # The only charges in the molecule must be our terminal [O-].
-    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != -anion_count:
-        return None
+    # 0-wrong: ONLY the counted terminal [O-] may carry charge. A net-sum
+    # check would pass a charge-separated zwitterion (e.g. an O-phospho
+    # amino-acid) whose remote +/- cancel; scan per-atom so any other charged
+    # centre fails closed before a fragment reaches the substituent namer.
+    for a in mol.GetAtoms():
+        if a.GetFormalCharge() != 0 and a.GetIdx() not in anion_oxygens:
+            return None
 
     stem = _P_ACID_STEM.get((dbl_oxo == 1, len(c_ligands)))
     if stem is None or (len(c_ligands) > 0 and stem == "phosphite"):

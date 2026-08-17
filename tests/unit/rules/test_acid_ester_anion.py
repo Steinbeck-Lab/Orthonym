@@ -44,3 +44,14 @@ def test_bare_inorganic_phosphate_no_owner_failclosed():
 def test_extra_cation_centre_failclosed():
     # a second (cationic) centre -> not a clean single acid-ester anion
     assert _p("C[N+](C)(C)CCOP(=O)([O-])[O-]") is None
+
+
+def test_phosphonate_ester_anion():
+    # methylphosphonate mono-ethyl-ester anion: one P-C ligand -> phosphonate stem
+    assert _p("CP(=O)([O-])OCC") == "ethyl methylphosphonate"
+
+
+def test_zwitterion_extra_charged_centre_failclosed():
+    # O-phosphoserine-shaped dianion + zwitterion: a charged centre outside
+    # the terminal [O-] must reject via the per-atom scan, not slip through.
+    assert _p("[NH3+]C(COP(=O)([O-])[O-])C(=O)[O-]") is None
