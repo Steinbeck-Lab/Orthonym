@@ -572,7 +572,10 @@ def name_disaccharide(mol) -> Optional[str]:
     result = _name_disaccharide_binary(mol)
     if result is not None:
         return result
-    return name_linear_oligosaccharide(mol)
+    result = name_linear_oligosaccharide(mol)
+    if result is not None:
+        return result
+    return name_nonreducing_oligosaccharide(mol)
 
 
 def _extract_unit_capped(mol, ringset: Set[int],
@@ -843,6 +846,219 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
     if consumed != all_heavy:
         return None
     if not _sugar_name_rt_ok(mol, name, relax_atoms=relax or None):
+        return None
+    return name
+
+
+def _detect_sugar_units_links(mol):
+    """Perceive sugar units + glycosidic links WITHOUT the reducing-chain
+    constraint (`_oligo_topology` steps 1-2, replicated so the non-reducing namer
+    can reuse them without disturbing the proven reducing path). Returns
+    ``(units, links, carbon_to_unit)`` or ``None``. Each ``link`` is
+    ``(donor_ui, acc_ui, anom_c, bridge_o, acc_c)``; the same anomeric<->anomeric
+    bridge O yields TWO reciprocal links (that pair IS the glycosyl-glycoside bond)."""
+    if mol is None:
+        return None
+    ri = mol.GetRingInfo()
+    units: List[Dict] = []
+    for ring in ri.AtomRings():
+        if len(ring) not in (5, 6):
+            continue
+        if sum(1 for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O") != 1:
+            continue
+        if any(mol.GetAtomWithIdx(i).GetSymbol() not in ("C", "O") for i in ring):
+            continue
+        ro = _ring_oxygen(mol, ring)
+        if ro is None:
+            return None
+        ringset = set(ring)
+        anomeric_idx = anomeric_exo_o = None
+        for idx in ring:
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetSymbol() != "C" or not any(n.GetIdx() == ro for n in a.GetNeighbors()):
+                continue
+            exo_os = [n.GetIdx() for n in a.GetNeighbors()
+                      if n.GetIdx() not in ringset and n.GetSymbol() == "O"]
+            if len(exo_os) == 1:
+                anomeric_idx, anomeric_exo_o = idx, exo_os[0]
+                break
+        if anomeric_idx is None:
+            return None
+        units.append({"ring": ring, "ringset": ringset, "ring_oxygen": ro,
+                      "anomeric_idx": anomeric_idx, "anomeric_exo_o": anomeric_exo_o})
+    if len(units) < 2:
+        return None
+    carbon_to_unit: Dict[int, int] = {}
+    for ui, u in enumerate(units):
+        for idx in u["ring"]:
+            if mol.GetAtomWithIdx(idx).GetSymbol() == "C":
+                carbon_to_unit[idx] = ui
+            for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+                if nbr.GetIdx() not in u["ringset"] and nbr.GetAtomicNum() == 6:
+                    carbon_to_unit.setdefault(nbr.GetIdx(), ui)
+    links: List[Tuple[int, int, int, int, int]] = []
+    for ui, u in enumerate(units):
+        o_idx = u["anomeric_exo_o"]
+        o_atom = mol.GetAtomWithIdx(o_idx)
+        if o_atom.GetTotalNumHs() > 0:
+            continue
+        c_nbrs = [n.GetIdx() for n in o_atom.GetNeighbors() if n.GetAtomicNum() == 6]
+        if len(c_nbrs) != 2:
+            continue
+        acceptor_c = next((c for c in c_nbrs if c != u["anomeric_idx"]), None)
+        if acceptor_c is None:
+            continue
+        acc_ui = carbon_to_unit.get(acceptor_c)
+        if acc_ui is None or acc_ui == ui:
+            continue
+        links.append((ui, acc_ui, u["anomeric_idx"], o_idx, acceptor_c))
+    return units, links, carbon_to_unit
+
+
+def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
+    """Name a LINEAR NON-REDUCING oligosaccharide of >=3 units (P-102.7.2.1),
+    e.g. raffinose ->
+    ``alpha-D-galactopyranosyl-(1->6)-alpha-D-glucopyranosyl beta-D-fructofuranoside``.
+
+    Scope (v33 slice 1, fail-closed outside it): exactly ONE glycosyl-glycoside
+    central bond (an anomeric<->anomeric bridge), of whose two units exactly one is
+    a LEAF (no other glycosidic link) -> the glycoside PARENT; the other roots a
+    single LINEAR glycosyl chain covering every remaining unit. Both the completeness
+    invariant (every heavy atom consumed) and the OPSIN-RT gate (0-wrong) must pass.
+    Branched chains, >1 central bond, or both-central-units-branched decline here."""
+    detected = _detect_sugar_units_links(mol)
+    if detected is None:
+        return None
+    units, links, _carbon_to_unit = detected
+    if len(units) < 3:
+        return None  # 2-unit non-reducing (sucrose) is the binary assembler's job
+
+    # 1. Central glycosyl-glycoside bond: a bridge O whose BOTH carbons are anomeric
+    #    (of different units) -> two reciprocal links sharing that O.
+    by_o: Dict[int, List] = {}
+    for l in links:
+        by_o.setdefault(l[3], []).append(l)
+    central_units = None
+    for o_idx, ls in by_o.items():
+        if len(ls) != 2:
+            continue
+        uA, uB = ls[0][0], ls[0][1]
+        anomerics = {units[uA]["anomeric_idx"], units[uB]["anomeric_idx"]}
+        if {ls[0][2], ls[0][4]} <= anomerics:  # both bond carbons anomeric
+            if central_units is not None:
+                return None  # >1 central bond -> out of slice-1 scope
+            central_units = (uA, uB)
+    if central_units is None:
+        return None
+
+    # 2. The two DIRECTED glycosidic links (exclude the reciprocal central pair).
+    central_o = next(o for o, ls in by_o.items()
+                     if len(ls) == 2 and {ls[0][0], ls[0][1]} == set(central_units))
+    chain_links = [l for l in links if l[3] != central_o]
+
+    # 3. Parent = the central unit that is a LEAF (roots nothing in chain_links);
+    #    the other central unit roots the glycosyl chain.
+    donors = {l[0] for l in chain_links}
+    acceptors = {l[1] for l in chain_links}
+    uA, uB = central_units
+    def _is_leaf(ui):  # touches no non-central glycosidic bond
+        return ui not in donors and ui not in acceptors
+    if _is_leaf(uA) and not _is_leaf(uB):
+        parent_ui, root_ui = uA, uB
+    elif _is_leaf(uB) and not _is_leaf(uA):
+        parent_ui, root_ui = uB, uA
+    else:
+        return None  # both leaf (=binary) or both branched -> out of scope
+
+    # 4. Order the glycosyl chain from the root outward; must be linear + cover all.
+    from collections import Counter
+    if any(v > 1 for v in Counter(l[1] for l in chain_links).values()):
+        return None  # a unit accepts >1 glycosyl -> branched
+    donor_of: Dict[int, Tuple] = {}
+    for l in chain_links:
+        if l[1] in donor_of:
+            return None
+        donor_of[l[1]] = l
+    order = [root_ui]
+    seen = {root_ui, parent_ui}
+    cur = root_ui
+    while cur in donor_of:
+        d = donor_of[cur][0]
+        if d in seen:
+            return None
+        order.append(d)
+        seen.add(d)
+        cur = d
+    if len(seen) != len(units) or len(order) != len(units) - 1:
+        return None  # disconnected / not a single linear glycosyl chain
+
+    # 5. Recognize every unit (capped at ALL its glycosidic bonds, D-09).
+    bridging_os = {l[3] for l in links}
+    unit_bridge_bonds: Dict[int, List[Tuple[int, int]]] = {ui: [] for ui in range(len(units))}
+    for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
+        unit_bridge_bonds[donor_ui].append((anom_c, o_idx))
+        unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
+    # central bond: both sides are the anomeric carbon
+    for l in links:
+        if l[3] == central_o:
+            unit_bridge_bonds[l[0]].append((l[2], l[3]))
+    from orthonym.data.sugar_names import (
+        lookup_sugar, recognize_sugar_skeleton, name_monosaccharide_systematic,
+    )
+    tuples: Dict[int, Tuple[str, str, str]] = {}
+    for ui, u in enumerate(units):
+        # dedupe bridge bonds (central O appended twice above for the pair)
+        bonds = list({(c, o) for (c, o) in unit_bridge_bonds[ui]})
+        canon = _extract_unit_capped(mol, u["ringset"], bonds)
+        if canon is None:
+            return None
+        sm = Chem.MolFromSmiles(canon)
+        if sm is None:
+            return None
+        tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
+        if tup is None:
+            systematic = name_monosaccharide_systematic(sm)
+            tup = ("", "", systematic) if systematic else None
+        if tup is None:
+            return None
+        tuples[ui] = tup
+
+    # 6. Assemble: glycosyl chain (terminal -> root) + " " + parent glycoside head.
+    parts: List[str] = []
+    for ui in reversed(order):  # terminal donor first ... root glycosyl last
+        ga, gc, gb = tuples[ui]
+        gterm = _glycosyl_term(ga, gc, gb)
+        if gterm is None:
+            return None
+        if ui == root_ui:
+            parts.append(gterm)  # root glycosyl attaches to parent via a space
+        else:
+            link = next(x for x in chain_links if x[0] == ui)
+            _d, acc_ui, anom_c, _o, acc_c = link
+            acc_u = units[acc_ui]
+            acc_locs = _ring_carbon_locants(
+                mol, acc_u["ring"], acc_u["ring_oxygen"], acc_u["anomeric_idx"])
+            c_prime = acc_locs.get(acc_c)
+            if c_prime is None:
+                return None
+            c = _anomeric_locant(mol, units[ui]["ring"], units[ui]["ring_oxygen"], anom_c)
+            parts.append(f"{gterm}-({c}{_ARROW}{c_prime})")
+    chain_str = "-".join(parts)
+
+    pa, pc, pb = tuples[parent_ui]
+    parent_head = _glycoside_head(pa, pc, pb)
+    if parent_head is None:
+        return None
+    name = f"{chain_str} {parent_head}"
+
+    # 7. Completeness invariant + RT gate (0-wrong).
+    all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    consumed: Set[int] = set(bridging_os)
+    for u in units:
+        consumed |= _unit_atoms(mol, u["ring"], bridging_os)
+    if consumed != all_heavy:
+        return None
+    if not _sugar_name_rt_ok(mol, name):
         return None
     return name
 
