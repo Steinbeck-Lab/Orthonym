@@ -194,8 +194,13 @@ def is_bicyclo_system(mol) -> bool:
     # cyclopropanes) have no fused parent name and keep the bicyclo format.
     lengths = get_bridge_lengths(mol, bh1, bh2)
     if lengths and min(lengths) == 0:
-        # Check ring sizes -- only route to fused if rings are >= 5
-        ri_rings = ri.AtomRings()
+        # Check ring sizes -- only route to fused if rings are >= 5.
+        # Scope to the connected-component ring atoms already computed
+        # above (ring_atoms_set), NOT the whole-molecule SSSR: a pendant
+        # substituent ring elsewhere in the molecule (e.g. a phenyl on an
+        # acylamino side chain) must not inflate this guard and block
+        # bicyclo detection of the actual fused bicyclic core.
+        ri_rings = [r for r in ri.AtomRings() if set(r) <= ring_atoms_set]
         ring_sizes = sorted([len(r) for r in ri_rings])
         if len(ring_sizes) >= 2 and ring_sizes[-2] >= 5:
             return False
