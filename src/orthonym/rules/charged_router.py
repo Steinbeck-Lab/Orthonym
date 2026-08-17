@@ -1299,6 +1299,19 @@ def route_charged(mol, style: str = 'pin') -> str:
                 bis = _poly_to_bis_cation_suffix(_nn) if _nn else ''
                 if bis:
                     return bis
+            # v33 Phase 3 (P-73.5.1.1/.2): a SYMMETRIC bis-quaternary-ammonium
+            # dication joined by a straight, saturated, unbranched all-carbon
+            # bridge -> the multiplicative '{bridge-diyl}bis({onium unit})'
+            # assembly, e.g. hexamethonium
+            # C[N+](C)(C)CCCCCC[N+](C)(C)C -> hexane-1,6-diylbis(trimethyl-
+            # azanium). emit_bis_quaternary_ammonium fails closed ('') on
+            # anything asymmetric / ring-borne / branched-bridge, falling
+            # through unchanged to the legacy path below.
+            if ccls == 'quaternary' and len(sites['cations']) == 2:
+                from .ions import emit_bis_quaternary_ammonium
+                biq = emit_bis_quaternary_ammonium(mol, sites['cations'])
+                if biq:
+                    return biq
             return ''
         # W4-I3 (P-73.2.2.3): a diazonium cation R-N2+ is named by appending
         # 'diazonium' to the parent hydride obtained by SEVERING the whole -N#N+

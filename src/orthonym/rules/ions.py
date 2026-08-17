@@ -706,6 +706,131 @@ def _poly_to_bis_cation_suffix(neutral_name: str) -> str:
     return ''
 
 
+def _walk_linear_carbon_bridge(mol, n1_idx: int, n2_idx: int) -> Optional[List[int]]:
+    """Return the ordered list of carbon atom indices forming a SINGLE,
+    unbranched, saturated, acyclic, all-carbon bridge whose first atom is
+    bonded directly to ``n1_idx`` and whose last atom is bonded directly to
+    ``n2_idx`` -- or ``None`` (fail closed) if no such simple path exists.
+
+    Used by ``emit_bis_quaternary_ammonium`` (P-73.5.1.1) to isolate the
+    polymethylene linker of a symmetric bis-onium dication
+    (``C[N+](C)(C)CCCCCC[N+](C)(C)C`` -> the 6-carbon bridge). Fails closed
+    on:
+      - more than one branch of n1 reaching n2 (a fused/macrocyclic shape),
+      - any bridge atom that is not carbon, charged, radical, in a ring, has
+        != 2 heavy neighbours (branching), or is joined by anything but a
+        single bond (unsaturation) -- all out of this narrow builder's scope.
+    """
+    n1 = mol.GetAtomWithIdx(n1_idx)
+
+    def _reaches(start_idx: int) -> bool:
+        seen = {n1_idx}
+        stack = [start_idx]
+        while stack:
+            cur = stack.pop()
+            if cur == n2_idx:
+                return True
+            if cur in seen:
+                continue
+            seen.add(cur)
+            for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                if nb.GetIdx() not in seen:
+                    stack.append(nb.GetIdx())
+        return False
+
+    candidates = [nb.GetIdx() for nb in n1.GetNeighbors() if _reaches(nb.GetIdx())]
+    if len(candidates) != 1:
+        return None  # not a single simple n1<->n2 path -> out of scope
+
+    path: List[int] = []
+    prev_idx = n1_idx
+    cur_idx = candidates[0]
+    for _ in range(1000):  # hard cap: defends against any graph anomaly
+        atom = mol.GetAtomWithIdx(cur_idx)
+        if (atom.GetSymbol() != 'C' or atom.GetFormalCharge() != 0
+                or atom.GetNumRadicalElectrons() != 0 or atom.IsInRing()):
+            return None
+        heavy_nbrs = [nb.GetIdx() for nb in atom.GetNeighbors()]
+        if len(heavy_nbrs) != 2:
+            return None  # branching (a substituent hanging off the bridge)
+        for nb_idx in heavy_nbrs:
+            bond = mol.GetBondBetweenAtoms(cur_idx, nb_idx)
+            if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+                return None  # unsaturation -> out of scope
+        path.append(cur_idx)
+        nxt_idx = heavy_nbrs[0] if heavy_nbrs[1] == prev_idx else heavy_nbrs[1]
+        if nxt_idx == n2_idx:
+            return path
+        prev_idx, cur_idx = cur_idx, nxt_idx
+    return None  # runaway walk -> fail closed
+
+
+def emit_bis_quaternary_ammonium(mol, cation_sites: List[Dict[str, Any]]) -> str:
+    """P-73.5.1.1 / P-73.5.1.2 (v33 Phase 3): a SYMMETRIC dication with
+    exactly two IDENTICAL quaternary-ammonium centres joined by a straight,
+    saturated, unbranched, unsubstituted all-carbon bridge is named as a
+    multiplicative assembly of parent cations::
+
+        {bridge parent-diyl}bis({onium unit})
+
+        C[N+](C)(C)CCCCCC[N+](C)(C)C
+            -> hexane-1,6-diylbis(trimethylazanium)
+
+    (BB P-73.5.1.1, cf. the PIN example '(1,4-phenylene)bis(phosphanium)' and
+    '4,4′-(ethane-1,2-diyl)bis(1-methylpyridin-1-ium)'.)
+
+    SCOPE (fail closed, i.e. return '', on anything else — asymmetric onium
+    substituents, >2 cations, a ring-borne cationic centre, or a
+    branched/heteroatom-bearing/unsaturated bridge; the caller's existing
+    fallback then owns the molecule unchanged):
+
+      - exactly 2 cation sites, each N, formal charge +1, 0 attached H,
+        degree 4 (quaternary, P-73.1.2.1), NOT in a ring.
+      - the two nitrogens are joined by a SINGLE simple, unbranched,
+        saturated, acyclic, all-carbon bridge (``_walk_linear_carbon_bridge``)
+        of length >= 2 -- this both bounds scope and guarantees the bridge is
+        trivially symmetric (its two numbering directions are equivalent by
+        construction, so locants 1 and n are forced with no orientation
+        choice to make).
+      - the two onium substituent sets (``cation_to_prefix(..., as_free_ion=
+        True)`` on each N, reusing the existing zwitterion-onium-prefix
+        machinery) must be BYTE-IDENTICAL strings -- the "two units
+        identical" requirement.
+    """
+    if mol is None or len(cation_sites) != 2:
+        return ''
+    idxs = [c['atom_idx'] for c in cation_sites]
+    if len(set(idxs)) != 2:
+        return ''
+    for i in idxs:
+        a = mol.GetAtomWithIdx(i)
+        if (a.GetSymbol() != 'N' or a.GetFormalCharge() != 1
+                or a.GetTotalNumHs() != 0 or a.GetDegree() != 4
+                or a.IsInRing()):
+            return ''
+
+    n1_idx, n2_idx = idxs
+    path = _walk_linear_carbon_bridge(mol, n1_idx, n2_idx)
+    if not path or len(path) < 2:
+        return ''  # no bridge, or too short to be an unambiguous n>=2 diyl
+
+    attach1, attach2 = path[0], path[-1]
+    from ..assembly.substituent_naming import cation_to_prefix
+    unit1 = cation_to_prefix(mol, n1_idx, attach1, as_free_ion=True)
+    unit2 = cation_to_prefix(mol, n2_idx, attach2, as_free_ion=True)
+    if not unit1 or not unit2 or unit1 != unit2:
+        return ''  # not identical onium units -> fail closed (asymmetric)
+
+    from ..data.chain_names import get_chain_prefix
+    n = len(path)
+    try:
+        stem = get_chain_prefix(n)
+    except ValueError:
+        return ''
+    linker = f"{stem}ane-1,{n}-diyl"
+    return f"{linker}bis({unit1})"
+
+
 def _name_acyl_azanide(mol, anion_idx: int) -> str:
     """P-72.2.2.2.4 (BB 41069/41079): an amide-type anion R-CO-NH- is named on the
     preselected 'azanide' parent with the acyl group cited as a prefix

@@ -5875,7 +5875,8 @@ _ONIUM_PREFIX_STEM = {
 }
 
 
-def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int) -> str:
+def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int,
+                      as_free_ion: bool = False) -> str:
     """Build the cation-as-substituent prefix for a zwitterion (P-74.1.3).
 
     The cationic atom (``cation_idx``, e.g. a quaternary ammonium N) is the
@@ -5896,11 +5897,22 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int) -> str:
         mol: RDKit Mol of the whole zwitterion.
         cation_idx: Atom index of the (non-internal) cationic centre.
         parent_attach_idx: Neighbour atom index on the path to the anion.
+        as_free_ion: when True, build the standalone onium-cation UNIT name
+            (stem + ``ium``, e.g. ``trimethylazanium``) instead of the
+            ``-iumyl`` substituent-PREFIX form. Used by the P-73.5.1.1/.2
+            multiplicative bis(...)/tris(...) polycation assembly (v33 Phase
+            3, e.g. ``hexane-1,6-diylbis(trimethylazanium)``), where the
+            repeated cationic UNIT is cited as a complete parent-cation name,
+            not a ``-yl`` substituent (cf. BB PIN example
+            ``(1,4-phenylene)bis(phosphanium)``). The N-substituent
+            composition (alphabetized/multiplied) is identical either way;
+            only the trailing suffix differs.
 
     Returns:
-        The cation prefix WITHOUT enclosing marks (e.g. ``trimethylazaniumyl``),
-        or '' for an out-of-scope cation (ylide / non-N onium / amine-oxide /
-        1,n-dipolar — P-74.2 deferred, D-06 honest-fail).
+        The cation prefix WITHOUT enclosing marks (e.g. ``trimethylazaniumyl``,
+        or ``trimethylazanium`` when ``as_free_ion``), or '' for an
+        out-of-scope cation (ylide / non-N onium / amine-oxide / 1,n-dipolar —
+        P-74.2 deferred, D-06 honest-fail).
     """
     cat = mol.GetAtomWithIdx(cation_idx)
 
@@ -5914,7 +5926,7 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int) -> str:
     stem = _ONIUM_PREFIX_STEM.get(cat.GetSymbol())
     if stem is None or cat.GetFormalCharge() <= 0:
         return ''
-    _onium_suffix = stem + 'iumyl'
+    _onium_suffix = (stem + 'ium') if as_free_ion else (stem + 'iumyl')
 
     # Collect each N-substituent branch (every neighbour except the one leading
     # to the anionic parent). Each branch is named as a substituent prefix.
