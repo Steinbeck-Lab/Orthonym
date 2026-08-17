@@ -10640,6 +10640,32 @@ def assemble_ion_name(features: Any, mol, style: str = 'pin') -> str:
                 return name_cation(mol, style)
             elif ion_sites.get('anions') and not ion_sites.get('cations'):
                 return name_anion(mol, style)
+            elif ion_sites.get('cations') and ion_sites.get('anions'):
+                # v33 Phase 3 (aminium/betaine + poly-carboxylate zwitterion,
+                # e.g. the glutamate/aspartate zwitterion anion
+                # [NH3+]C(CCC(=O)[O-])C(=O)[O-], net charge -1): a molecule
+                # carrying BOTH a cationic and an anionic centre is
+                # STRUCTURALLY a zwitterion (route_charged's own
+                # `_is_zwitterion` check is charge-agnostic -- it looks at
+                # `get_ion_sites`, not `Chem.GetFormalCharge`), but
+                # `detect_species_type` only classifies it `'zwitterion'` when
+                # the NET charge is exactly zero (docstring: "net zero charge
+                # but has both + and - atoms"). A genuine mixed-sign fragment
+                # with a NON-zero net charge (2+ anions on 1 cation, or vice
+                # versa) was classified `'ion'` here and fell through BOTH
+                # branches above (neither "cations only" nor "anions only"
+                # matches), landing on the empty-string fallback below --
+                # never even reaching `name_zwitterion` / `route_charged`.
+                # Route it through the SAME `name_zwitterion` entry point the
+                # net-zero 'zwitterion' branch already uses above: it is a
+                # pure ADD (this shape previously always returned '' here) and
+                # `name_zwitterion` fails closed ('') on anything it cannot
+                # name, with the top-level SELF-01/OPSIN gate (which also
+                # checks net-charge preservation) as the 0-wrong backstop.
+                result = name_zwitterion(mol, style)
+                if result and result != 'zwitterion':
+                    return result
+                return ''
     except RecursionError:
         # Safety net: if recursion still occurs, return empty string
         return ''

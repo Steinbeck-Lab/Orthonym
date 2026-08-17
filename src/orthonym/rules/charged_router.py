@@ -379,6 +379,37 @@ def _parent_has_chain_locants(parent_anion_name: str) -> bool:
     return parent_anion_name.endswith(('anoate', 'enoate', 'ynoate', 'dioate'))
 
 
+def _attachment_locant_on_polyacid_parent(mol, anion_idxs, parent_attach_idx):
+    """Cation-substituent attachment locant on a MULTI-carboxylate anion parent
+    (v33 Phase 3, the ``_attachment_locant_on_anion_parent`` sibling for >= 2
+    carboxylates).
+
+    The cation was SEVERED before the parent was re-entered/renamed
+    (``_sever_cation_build_anion_parent``), so the bare polyacid (e.g.
+    pentanedioic acid) carries no other substituent and its two ends are
+    numbering-equivalent — P-14.4/P-31.1.4.3 lowest-locants then picks
+    whichever end gives the SMALLER locant for the one substituent that will
+    be cited (the azaniumyl prefix). Compute the candidate distance+1 from
+    EVERY carboxyl-carbon anchor (every anion site) to ``parent_attach_idx``
+    and return the minimum -- e.g. glutamate's alpha carbon is 4 bonds from
+    one carboxyl and 2 from the other; the correct PIN locant is 2, matching
+    the lower candidate. Returns None if no path exists to any anchor.
+    """
+    from rdkit.Chem import rdmolops
+    best = None
+    for anion_idx in anion_idxs:
+        an = mol.GetAtomWithIdx(anion_idx)
+        anchors = [n.GetIdx() for n in an.GetNeighbors() if n.GetSymbol() != 'H']
+        for c1 in anchors:
+            path = rdmolops.GetShortestPath(mol, c1, parent_attach_idx)
+            if not path:
+                continue
+            d = len(path)  # distance(c1, attach) + 1 = the 1-indexed locant
+            if best is None or d < best:
+                best = d
+    return best
+
+
 def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
     """Name a choline-family acid-ester-anion ZWITTERION (v33 Phase 3 B1).
 
@@ -490,6 +521,111 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
     return f'{owner} {word}'
 
 
+def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> str:
+    """P-74.1.3 generalized to a MULTI-carboxylate anion parent (v33 Phase 3).
+
+    A single cation (protonated amine or quaternary onium) riding on a
+    POLY-carboxylate parent -- >= 2 ``-C(=O)[O-]`` groups on one acyclic
+    skeleton, e.g. the glutamate zwitterion anion
+    ``[NH3+]C(CCC(=O)[O-])C(=O)[O-]`` -> ``2-azaniumylpentanedioate`` (RT-
+    verified 2026-08-17) -- mirrors the established single-anion P-74.1.3
+    branch below (sever the cation -> neutralize EVERY anion in place ->
+    re-enter the full pipeline -> convert the resulting polyacid name via the
+    SAME ``name_carboxylate_anion`` transform that already turns
+    ``'pentanedioic acid'`` into ``'pentanedioate'``), generalized from
+    exactly-one to >= 2 carboxylate anions.
+
+    Deliberately WITHOUT the single-anion branch's protonated-amine defer
+    (D-06, ``_route_zwitterion`` below): that defer exists because a
+    MONO-carboxylate protonated-amine zwitterion has an established
+    retained/neutral-form name (glycine, GABA, ...) reachable via the legacy
+    amino-acid-zwitterion path. A >= 2-carboxylate one does not --
+    ``_name_amino_acid_zwitterion``'s neutral-form dispensation is licensed
+    only for the monoamino MONOcarboxylic Table-10.4 amino acids (P-103.2.4.4),
+    so for a diacid amino acid the systematic azaniumyl-prefixed acid-anion
+    form built here IS the name (and the neutral 'glutamic acid'/'aspartic
+    acid' fallback the legacy path might otherwise reach is a DIFFERENT,
+    lower-charge molecule the outer SELF-01/net-charge check would reject
+    anyway).
+
+    SCOPE (fail-closed on anything else, per invariant "0-wrong ABSOLUTE"):
+    exactly 1 cation, >= 2 anions, EVERY anion classified 'carboxylate' (a
+    mixed carboxylate + sulfonate/alkoxide/etc. zwitterion declines), the
+    cation NOT a ring atom (a ring-skeletal cation is P-74.1.2, out of scope
+    here), and a real severable cation-attach bond. Returns '' on any decline
+    -- the caller falls through to the existing exactly-one-anion scope check
+    and the legacy amino-acid-zwitterion path, unchanged. 0 behaviour change
+    for anything but this new multi-carboxylate shape; the top-level
+    SELF-01/OPSIN gate is the final backstop as elsewhere in this module.
+    """
+    from rdkit.Chem import rdmolops
+
+    if len(cations) != 1 or len(anions) < 2:
+        return ''
+    if any(classify_anion(mol, a) != 'carboxylate' for a in anions):
+        return ''  # mixed anion types -> out of scope, decline
+
+    cation_idx = cations[0]['atom_idx']
+    cation_atom = mol.GetAtomWithIdx(cation_idx)
+    if cation_atom.IsInRing():
+        return ''  # P-74.1.2 skeletal cation -> out of scope here (defer)
+
+    anion_idx0 = anions[0]['atom_idx']
+    path = rdmolops.GetShortestPath(mol, cation_idx, anion_idx0)
+    if len(path) < 2:
+        return ''
+    parent_attach_idx = path[1]  # the cation neighbour leading into the parent
+
+    from ..assembly.substituent_naming import cation_to_prefix
+    cat_prefix = cation_to_prefix(mol, cation_idx, parent_attach_idx)
+    if not cat_prefix:
+        return ''  # ylide / non-N onium / unnameable -> honest-fail
+
+    parent_smi = _sever_cation_build_anion_parent(mol, cation_idx, parent_attach_idx)
+    if not parent_smi:
+        return ''
+    try:
+        neutral_name = _reenter(parent_smi, style)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not neutral_name or _is_malformed_parent(neutral_name):
+        return ''
+
+    from .ions import name_carboxylate_anion
+    parent_anion_name = name_carboxylate_anion(neutral_name)
+    if not parent_anion_name:
+        return ''
+
+    # Attachment locant: the MINIMUM candidate over every carboxyl anchor (the
+    # severed-cation parent is numbering-symmetric with no other substituent to
+    # break the tie -- P-14.4 lowest locants picks the smaller end).
+    locant_prefix = ''
+    attach_locant = _attachment_locant_on_polyacid_parent(
+        mol, [a['atom_idx'] for a in anions], parent_attach_idx)
+    if attach_locant is not None and attach_locant >= 2 \
+            and _parent_has_chain_locants(parent_anion_name):
+        locant_prefix = f'{attach_locant}-'
+
+    # P-16.3.3: a SIMPLE (unsubstituted) prefix like a bare protonated-amine
+    # 'azaniumyl' is cited WITHOUT enclosing marks (BB '2-aminopentanedioic
+    # acid (PIN)' pattern -- no parens around 'amino'); a COMPOUND/substituted
+    # one (a quaternary 'trimethylazaniumyl') still takes them, matching the
+    # established single-anion branch's ``({cat_prefix})`` convention below.
+    # Reuse the general compound/complex test rather than a new ad hoc rule.
+    from ..assembly.naming_utils import enclose_if_compound
+    enclosed_cat_prefix = enclose_if_compound(cat_prefix)
+    composed = f'{locant_prefix}{enclosed_cat_prefix}{parent_anion_name}'
+
+    # Defensive: never ship a malformed composition where the prefix glues
+    # directly onto a parent locant with no separator (mirrors the
+    # single-anion branch's identical guard below).
+    from ..assembly.naming_utils import _STEREO_PAREN_RE
+    _after = _STEREO_PAREN_RE.sub('', parent_anion_name, count=1).lstrip('-')
+    if not locant_prefix and _after[:1].isdigit():
+        return ''
+    return composed
+
+
 def _route_zwitterion(mol, sites, style: str) -> str:
     """GUARD 4: zwitterion anion-is-parent override (P-74.0).
 
@@ -538,6 +674,21 @@ def _route_zwitterion(mol, sites, style: str) -> str:
             mol, cations[0]['atom_idx'], anions[0]['atom_idx'])
         if est_name:
             return est_name
+
+    # v33 Phase 3 (P-74.1.3 generalized to a MULTI-carboxylate anion parent):
+    # a single non-ring cation (protonated amine or quaternary onium) riding
+    # on a POLY-carboxylate anion parent -- e.g. the glutamate/aspartate
+    # zwitterion anion [NH3+]C(CCC(=O)[O-])C(=O)[O-] -> 2-azaniumylpentane-
+    # dioate. Tried BEFORE the exactly-one-anion scope check below (which
+    # would otherwise decline this shape outright): `_name_polyacid_zwitterion`
+    # self-validates the shape (single non-ring cation, EVERY anion a
+    # carboxylate) and returns '' on anything else, so this is a pure ADD --
+    # 0 behaviour change for the established single-anion amino-acid / betaine
+    # majority.
+    if len(cations) == 1 and len(anions) >= 2:
+        poly_name = _name_polyacid_zwitterion(mol, cations, anions, style)
+        if poly_name:
+            return poly_name
 
     # Scope (D-06): exactly one cationic and one anionic center (the amino-acid /
     # betaine majority). Multi-center dipolar zwitterions are deferred.
