@@ -2680,9 +2680,13 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
         `[CH-]1CCCCC1`->cyclohexan-1-ide, `c1cc[nH+]cc1`->pyridin-1-ium,
         `O1CC[NH2+]CC1`->morpholin-4-ium, `c1c[nH]c[nH+]1`->imidazol-3-ium.
       * DEMOTE (a 0-H ring cation, e.g. an N-substituted aromatic `C[n+]1ccccc1`):
-        the centre cannot be neutralized in place (over-valent), so the exocyclic
-        substituent(s) are severed, named as ring substituent prefix(es) at the
-        centre locant, and the neutral ring takes the -ium. -> 1-methylpyridin-1-ium.
+        the centre cannot be neutralized in place (over-valent). Reuses the
+        P-74.1.2 charged-ring locant/prefix/stem trio (`_charged_ring_locants` +
+        `_p74_ring_substituent_prefix` + `_p74_bare_ring_stem`, ions.py:3058) to
+        cite the centre's own exocyclic substituent(s) AND any other ring
+        substituent as ordinary prefixes in ONE numbering, with the neutral bare
+        ring taking the -ium. -> 1-methylpyridin-1-ium,
+        1-methyl-4-phenylpyridin-1-ium, 7-bromo-1-methylquinolin-1-ium.
 
     RADICAL centres (-yl/-ylidene/-ylidyne) reuse the SAME in-place machinery
     (P-71.2.1.2 / P-71.2.2.2 general method: elide the parent-hydride's final 'e'
@@ -2785,93 +2789,67 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
            if n.GetIdx() not in ring_system]
     if not exo:
         return ''
-    from ..perception.chains import classify_substituent
-    sub_names = []
-    for e in exo:
-        sub_atoms = _collect_substituent_atoms(mol, center_idx, e, ring_system)
-        if sub_atoms is None:
-            return ''
-        info = classify_substituent(mol, sorted(sub_atoms), set(ring_system))
-        sub_name = info.get('name')
-        if not sub_name:
-            return ''
-        sub_names.append(sub_name)
-    # Scope: >=1 exocyclic substituent on the charged ring centre, no OTHER ring
-    # substituents (enforced after severing by _ring_frag_has_substituent). A
-    # single N-substituted aromatic (C[n+]1ccccc1 -> 1-methylpyridin-1-ium) AND a
+    # Scope: >=1 exocyclic substituent on the charged ring centre. A single
+    # N-substituted aromatic (C[n+]1ccccc1 -> 1-methylpyridin-1-ium), a
     # QUATERNARY ring N+ carrying >=2 substituents (C[N+]1(C)CCCCC1 ->
     # 1,1-dimethylpiperidin-1-ium, P-73.1.1.2/P-73.4; C[N+]1(C)CCOCC1 ->
-    # 4,4-dimethylmorpholin-4-ium) are both in scope — all substituents share the
-    # centre locant and are grouped/multiplied/alphabetized below.
-    if not sub_names:
-        return ''
-    work = Chem.RWMol(mol)
-    try:
-        for e in exo:
-            work.RemoveBond(center_idx, e)
-        a = work.GetAtomWithIdx(center_idx)
-        a.SetFormalCharge(0)
-        a.SetNoImplicit(False)
-        severed = work.GetMol()
-        frag_mols = Chem.GetMolFrags(severed, asMols=True, sanitizeFrags=True)
-        frag_idxs = Chem.GetMolFrags(severed, asMols=False, sanitizeFrags=True)
-    except (RuntimeError, ValueError):
-        return ''
-    ring_k = [k for k, ix in enumerate(frag_idxs) if center_idx in ix]
-    if not ring_k:
-        return ''
-    ring_frag = frag_mols[ring_k[0]]
-    ring_orig = frag_idxs[ring_k[0]]
-    center_frag_idx = list(ring_orig).index(center_idx)
-    # The neutral ring (after severing) must be unsubstituted for this scope.
-    if _ring_frag_has_substituent(ring_frag):
-        return ''
-    try:
-        from ..namer import Orthonym
-        parent = Orthonym(
-            style='pin', _disable_opsin_validity_gate=True
-        ).name(Chem.MolToSmiles(ring_frag))
-    except (RecursionError, ValueError, RuntimeError):
-        return ''
-    if not parent or 'unknown' in parent.lower():
-        return ''
-    # Number the bare neutral ring frag with the charged centre as a low-locant
-    # criterion (cation-lowest, like the in-place branch). The frag is a bare
-    # single ring (guarded above), so derive its ring-atom set for the enumerator.
-    frag_rings = ring_frag.GetRingInfo().AtomRings()
-    locants = None
-    if len(frag_rings) == 1:
-        locants, _ = _charged_ring_locants(
-            ring_frag, set(frag_rings[0]), center_frag_idx)
+    # 4,4-dimethylmorpholin-4-ium), AND now (v33 Phase 3) a ring that ALSO
+    # carries an unrelated substituent elsewhere (C[n+]1ccc(-c2ccccc2)cc1 ->
+    # 1-methyl-4-phenylpyridin-1-ium) are all in scope: reuse the SAME P-74.1.2
+    # charged-ring locant/prefix/stem trio `emit_zwitterion_ring_carboxylate`
+    # (ions.py:3058) already ships -- `_charged_ring_locants` +
+    # `_p74_ring_substituent_prefix` + `_p74_bare_ring_stem` -- rather than the
+    # old severed-fragment naming, which failed closed the instant ANY ring
+    # position besides the centre's own carried a substituent
+    # (`_ring_frag_has_substituent`). ONE numbering now covers every ring
+    # substituent (the centre's own AND any other), each cited as an ordinary
+    # ring-substituent prefix at its own locant.
+    #
+    # `_charged_ring_locants` already tolerates a charged, still-substituted
+    # `mol` -- proven by `emit_zwitterion_ring_carboxylate` calling it exactly
+    # this way on the identical 0-H aromatic-N+ shape -- so try it FIRST,
+    # unsevered, on the original mol. A fused/bridged ring system (quinolinium,
+    # phenazinium: a fusion atom has 3 ring-neighbours, so its single-cycle walk
+    # declines) needs a neutral, sanitizable mol before the general
+    # `_ring_iupac_locants` supplier can number it, so ONLY that fallback
+    # severs the centre's exocyclic bond(s) first (index-preserving via the
+    # fragment's original-atom-index list) -- matching what the prior DEMOTE
+    # code already proved for a BARE fused ring cation (1-methylquinolin-1-ium).
+    locants, _indicated_h = _charged_ring_locants(mol, ring_system, center_idx)
     if locants is None:
-        locants = _ring_iupac_locants(ring_frag)
-    if not locants or center_frag_idx not in locants:
+        work = Chem.RWMol(mol)
+        try:
+            for e in exo:
+                work.RemoveBond(center_idx, e)
+            a = work.GetAtomWithIdx(center_idx)
+            a.SetFormalCharge(0)
+            a.SetNoImplicit(False)
+            severed = work.GetMol()
+            frag_mols = Chem.GetMolFrags(severed, asMols=True, sanitizeFrags=True)
+            frag_idxs = Chem.GetMolFrags(severed, asMols=False, sanitizeFrags=True)
+        except (RuntimeError, ValueError):
+            return ''
+        ring_k = [k for k, ix in enumerate(frag_idxs) if center_idx in ix]
+        if not ring_k:
+            return ''
+        ring_frag = frag_mols[ring_k[0]]
+        ring_orig = frag_idxs[ring_k[0]]
+        frag_locants = _ring_iupac_locants(ring_frag)
+        if not frag_locants:
+            return ''
+        # Remap the fragment-space numbering back onto the ORIGINAL mol's atom
+        # indices, so the trio below can be driven off the untouched mol/ring_system.
+        locants = {ring_orig[k]: v for k, v in frag_locants.items()}
+    if not locants or center_idx not in locants:
         return ''
-    center_locant = locants[center_frag_idx]
-    # All exocyclic substituents share the centre locant (P-73.1.1.2 / P-73.4);
-    # group by name, multiply (di/tri…), alphabetize (P-14.5.2). For one methyl:
-    # '1-methyl' + 'pyridin-1-ium' -> '1-methylpyridin-1-ium'. For two methyls on
-    # a quaternary N: '1,1-dimethyl' + 'piperidin-1-ium' -> '1,1-dimethylpiperidin-1-ium'.
-    from ..assembly.naming_utils import (
-        get_multiplier_prefix, alpha_sort_key, is_complex_substituent)
-    name_to_count: Dict[str, int] = {}
-    for sn in sub_names:
-        name_to_count[sn] = name_to_count.get(sn, 0) + 1
-    prefix_parts = []
-    for sn, count in name_to_count.items():
-        mult = get_multiplier_prefix(count, sn)
-        loc_str = ','.join([str(center_locant)] * count)
-        if is_complex_substituent(sn) and count > 1:
-            body = f"{mult}({sn})"
-        else:
-            body = f"{mult}{sn}"
-        prefix_parts.append((alpha_sort_key(sn), f"{loc_str}-{body}"))
-    prefix_parts.sort(key=lambda t: t[0])
-    # P-14.5.2: consecutive locant-bearing prefix blocks are separated by a hyphen
-    # ('1-ethyl' + '1-methyl' -> '1-ethyl-1-methyl'); the whole block then abuts the
-    # parent stem directly ('1,1-dimethyl' + 'piperidin' -> '1,1-dimethylpiperidin').
-    prefix_str = '-'.join(p[1] for p in prefix_parts)
-    return f"{prefix_str}{_elide_terminal_e(parent)}-{center_locant}-{suffix}"
+    center_locant = locants[center_idx]
+    prefix = _p74_ring_substituent_prefix(mol, ring_system, locants, set())
+    if prefix is None:
+        return ''
+    stem = _p74_bare_ring_stem(mol, ring_system, center_idx)
+    if not stem:
+        return ''
+    return f"{prefix}{_elide_terminal_e(stem)}-{center_locant}-{suffix}"
 
 
 def _collect_substituent_atoms(mol, center_idx, start_idx, ring_system):
@@ -2925,20 +2903,6 @@ def _ring_bears_principal_group(ring_mol):
         return pg_name is not None
     except (RuntimeError, ValueError, KeyError, IndexError, TypeError):
         return False
-
-
-def _ring_frag_has_substituent(ring_frag):
-    """True if the severed ring fragment carries any off-ring heavy substituent
-    (so the demote scope — an otherwise-unsubstituted neutral ring — does not
-    apply and we fail-closed)."""
-    ring_atoms = set()
-    for ring in ring_frag.GetRingInfo().AtomRings():
-        ring_atoms.update(ring)
-    for idx in ring_atoms:
-        for nb in ring_frag.GetAtomWithIdx(idx).GetNeighbors():
-            if nb.GetIdx() not in ring_atoms and nb.GetSymbol() != 'H':
-                return True
-    return False
 
 
 def _carboxyl_ring_anchor(mol, anion_idx, ring_system):
