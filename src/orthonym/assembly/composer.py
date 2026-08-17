@@ -4599,7 +4599,45 @@ def _build_bicyclo_substituent_prefix(
                         sub_groups['amino'].append(locant)
                 continue  # Still skip alkyl naming path
 
-            # Get alkyl name
+            # v33 Phase 3 (beta-lactam layer 2, SPY layer a-2): `carbon_count`
+            # is a raw count of C atoms in the fragment -- it cannot tell a
+            # plain alkyl chain from a heteroatom-bearing substituent that
+            # happens to contain the same number of carbons (acylamino,
+            # acyloxyalkyl, ...). The naive `get_alkyl_name(carbon_count)`
+            # below silently drops every non-carbon atom and re-emits a
+            # same-carbon-count alkyl name -- e.g. penicillin G's
+            # 6-phenylacetamido (8 carbons) became '6-octyl'. Route any
+            # substituent that is NOT a pure hydrocarbon through the SAME
+            # recursive substituent-naming primitives the polyfunctional
+            # chain composer already uses for this exact problem
+            # (rules/polyfunctional.py:3272-3276): `_check_for_acylamino`
+            # first (it alone covers a branched/ring-containing acyl, e.g.
+            # phenylacetamido -> '(2-phenylacetamido)', which the general
+            # cascade below cannot), then `name_substituent` (the general
+            # recursive namer -- covers acyloxyalkyl, haloalkyl, hydroxyalkyl,
+            # retained substituents, etc.). Fail closed (whole bicyclo parent
+            # declines) if neither can spell it, rather than emit the wrong
+            # alkyl -- never a silent atom drop.
+            sub_frag_atoms = sub_info.get('atoms') or []
+            is_pure_hydrocarbon = all(
+                mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in sub_frag_atoms
+            )
+            if not is_pure_hydrocarbon:
+                first_atom = sub_info.get('first_atom')
+                het_name = _check_for_acylamino(
+                    mol, sub_frag_atoms, list(atom_to_locant.keys())
+                )
+                if het_name is None and first_atom is not None:
+                    from .substituent_enumerator import name_substituent
+                    _cand = name_substituent(mol, sub_frag_atoms, first_atom)
+                    if _cand and _cand != 'substituent':
+                        het_name = _cand
+                if het_name is None:
+                    return None
+                sub_groups[het_name].append(locant)
+                continue
+
+            # Get alkyl name (pure hydrocarbon substituent -- unchanged)
             alkyl_name = get_alkyl_name(carbon_count)
             sub_groups[alkyl_name].append(locant)
 
