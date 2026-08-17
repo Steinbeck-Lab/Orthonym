@@ -64,6 +64,10 @@ def namer():
     # atom has 3 ring-neighbours, so the single-cycle `_charged_ring_locants`
     # walk declines and the fallback numbering must ALSO see the substituent).
     ("C[n+]1cccc2ccc(Br)cc21", "7-bromo-1-methylquinolin-1-ium"),
+    # A second fused-ring cation with an orientation-sensitive substituent
+    # (methyl at position 6 in the isoquinolinium system) -- raises confidence
+    # in the fused-ring fallback path where numbering direction matters.
+    ("C[n+]1ccc2cc(C)ccc2c1", "2,6-dimethylisoquinolin-2-ium"),
 ])
 def test_substituted_aromatic_ring_cation_rt_verified(namer, smiles, expected):
     assert namer.name(smiles) == expected
