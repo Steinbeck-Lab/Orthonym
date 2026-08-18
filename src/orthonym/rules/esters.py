@@ -1198,8 +1198,35 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
             if ester_o is not None:
                 exclude.add(ester_o)
 
+            # v33 Phase 6 Wave 2 (#6): a SECOND, non-principal ester whose
+            # alcohol-side atom sits directly ON this ring (Ar-O-C(=O)R,
+            # e.g. an aryl acetate substituent on the same ring that also
+            # carries THIS ester's acid) is invisible to the exclude set
+            # above -- its atoms belong to a wholly separate ester bond,
+            # not to this ester's own acid/alkyl fragments. Left in, the
+            # generic substituent walker below mis-reads the whole
+            # '-O-C(=O)-CH3' branch (measured: 'hydroxyethyl' for an
+            # acetoxy branch -- a WRONG MOLECULE, not just an ugly name).
+            # Name any such exocyclic ester with the SAME helper
+            # `detect_exocyclic_esters` uses elsewhere, and exclude its
+            # atoms from the generic walk so it is not named twice.
+            extra_ester_groups: dict = {}
+            for exo in detect_exocyclic_esters(mol):
+                exo_match = exo['ester_match']
+                if exo_match[0] == carbonyl_c:
+                    continue  # this ester itself
+                exo_ring_atom = exo['ring_attach_atom_idx']
+                if exo_ring_atom not in ring_atoms_in_acid or exo_ring_atom not in oriented_ring:
+                    continue  # different ring, or numbering unavailable -- leave to the generic walker
+                exo_locant = oriented_ring.index(exo_ring_atom) + 1
+                extra_ester_groups.setdefault(exo['acyloxy_prefix'], []).append(exo_locant)
+                exo_acid_atoms, _ = parse_ester_fragments(mol, exo_match)
+                exclude.update(exo_acid_atoms)
+                if len(exo_match) > 2:
+                    exclude.add(exo_match[2])
+
             try:
-                from ..assembly.composer import _integrate_universal_prefixes
+                from ..assembly.composer import _integrate_universal_prefixes, _format_prefix_groups
                 acid_prefix_str = _integrate_universal_prefixes(
                     mol, set(ring_atoms_in_acid),
                     parent_type="ring",
@@ -1209,6 +1236,18 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
             except Exception as exc:
                 logger.debug("Ester ring-acid prefix discovery failed: %s", exc)
                 acid_prefix_str = ""
+
+            if extra_ester_groups:
+                extra_str = _format_prefix_groups(dict(extra_ester_groups))
+                if acid_prefix_str:
+                    from ..assembly.naming_utils import alpha_sort_key as _alpha_sort_key
+                    parts = sorted(
+                        [p for p in (extra_str, acid_prefix_str) if p],
+                        key=_alpha_sort_key,
+                    )
+                    acid_prefix_str = "-".join(parts)
+                else:
+                    acid_prefix_str = extra_str
 
     acylate_name = get_acylate_name(acid_name)
 
@@ -1994,6 +2033,189 @@ def classify_multi_ester(mol, ester_matches: list) -> str:
     return "independent"
 
 
+def _ring_walk_locants(mol, ring_set: set, start: int, second: int) -> Optional[list]:
+    """Walk a simple monocyclic ring atom-by-atom from ``start`` through
+    ``second``, returning the full bond-adjacency atom order.
+
+    Returns None if the walk cannot complete (defensive; should not happen
+    for a genuine SSSR ring atom set).
+    """
+    order = [start, second]
+    prev, current = start, second
+    while len(order) < len(ring_set):
+        atom = mol.GetAtomWithIdx(current)
+        nxt = None
+        for nbr in atom.GetNeighbors():
+            nid = nbr.GetIdx()
+            if nid in ring_set and nid != prev:
+                nxt = nid
+                break
+        if nxt is None:
+            return None
+        order.append(nxt)
+        prev, current = current, nxt
+    return order
+
+
+def _insert_ring_ester_locant(acylate_name: str, locant: int = 1) -> str:
+    """Insert an explicit ring-attachment locant before a SYSTEMATIC
+    ring-acid ESTER suffix -- 'cyclohexanecarboxylate' ->
+    'cyclohexane-1-carboxylate'.
+
+    P-14.3.3 "Citation of locants" is deny-by-default: once ANY locant in
+    a name's scope is essential (a substituent prefix on the same ring
+    takes one), every locant in that scope must be cited, including the
+    parent's own suffix attachment. Retained trivial acyl stems
+    ('benzoate', 'acetate', ...) do not match this systematic
+    '-carboxylate' suffix and are returned unchanged -- a retained
+    parent's single attachment point needs no numeral (P-14.3.4 licence).
+    """
+    suffix = "carboxylate"
+    if acylate_name.endswith(suffix):
+        stem = acylate_name[: -len(suffix)]
+        if stem.endswith('-') or (stem and stem[-1].isdigit()):
+            return acylate_name  # already locanted
+        return f"{stem}-{locant}-{suffix}"
+    return acylate_name
+
+
+def _name_ring_principal_independent_esters(
+    mol, principal: dict, non_principal: list,
+    acylate_name: str, alkyl_name: str,
+) -> Optional[str]:
+    """Rebuild an independent-ester name when the PRINCIPAL ester's acid is
+    a ring acid (e.g. cyclohexanecarboxylic, benzoic) and one or more
+    NON-PRINCIPAL esters sit on that same ring -- either directly
+    (Ar-O-C(=O)R) or through a single pendant atom (Ar-CH2-O-C(=O)R).
+
+    v33 Phase 6 Wave 2 (#6): the OLD code named the non-principal acid
+    ALONE (dropping the alcohol-side linking atom entirely -- the
+    methylene of a '-CH2-O-C(=O)R' arm) and space-joined it in front of
+    the whole name with no locant -- a wrong-molecule / OPSIN-unparseable
+    candidate. This rebuilds each non-principal ester as a COMPLETE,
+    LOCANTED substituent prefix (methylene included) sited on the ring,
+    reusing the same ``name_substituent_fragment`` compound-substituent
+    namer the ring-as-parent composer already uses for this exact shape
+    (``rules/polyfunctional.py``'s ring-as-parent path, which names the
+    same '-CH2-O-C(=O)CH3' arm as ``'(acetyloxy)methyl'`` when it reaches
+    it directly).
+
+    Fails closed (returns None) on any topology this narrow
+    reconstruction cannot positively confirm -- a fused/complex ring
+    acid, a non-principal ester whose alcohol-side atom is not either ON
+    the ring or a single plain atom bonded to it, or a substituent
+    fragment ``name_substituent_fragment`` cannot express. NEVER falls
+    back to the old space-joined form for a ring principal -- that form
+    is proven wrong (dropped atom, no locant), never an acceptable
+    "uglier but honest" degrade.
+    """
+    ring_info = mol.GetRingInfo()
+    acid_set = set(principal['acid_atoms'])
+    rings_in_acid = [r for r in ring_info.AtomRings() if set(r).issubset(acid_set)]
+    if len(rings_in_acid) != 1:
+        return None  # fused/complex/absent ring -- out of this reconstruction's scope
+    ring_atoms = set(rings_in_acid[0])
+
+    principal_carbonyl_c = principal['match'][0]
+    start_atom = None
+    for idx in ring_atoms:
+        if mol.GetBondBetweenAtoms(idx, principal_carbonyl_c) is not None:
+            start_atom = idx
+            break
+    if start_atom is None:
+        return None
+
+    ring_neighbors = [
+        nbr.GetIdx() for nbr in mol.GetAtomWithIdx(start_atom).GetNeighbors()
+        if nbr.GetIdx() in ring_atoms
+    ]
+    if len(ring_neighbors) != 2:
+        return None  # not a simple monocyclic ring atom -- decline
+
+    from ..assembly.substituent_naming import name_substituent_fragment
+
+    # Classify each non-principal ester's shape relative to the ring.
+    entries = []  # [{'ring_atom': int, 'prefix_name': str}, ...]
+    for ester in non_principal:
+        match = ester['match']
+        ester_o = match[2]
+        attach = match[3]
+
+        if attach in ring_atoms:
+            # Direct acyloxy substituent on the ring (Ar-O-C(=O)R).
+            non_principal_acid_name = get_acid_fragment_name(mol, ester['acid_atoms'])
+            if not non_principal_acid_name:
+                return None
+            prefix_name = get_acyloxy_prefix(non_principal_acid_name)
+            if not prefix_name:
+                return None
+            entries.append({'ring_atom': attach, 'prefix_name': prefix_name})
+            continue
+
+        # Pendant single-atom arm (Ar-CH2-O-C(=O)R). The arm's attach atom
+        # must have EXACTLY two heavy neighbors -- the ring atom and the
+        # ester oxygen -- so name_substituent_fragment's parent framing
+        # (ring = parent_chain) is unambiguous. Anything else (further
+        # branching, a second ring, a longer topological path back to the
+        # ring) is declined rather than guessed at.
+        attach_atom_obj = mol.GetAtomWithIdx(attach)
+        heavy_neighbors = [n.GetIdx() for n in attach_atom_obj.GetNeighbors()]
+        ring_side = [n for n in heavy_neighbors if n in ring_atoms]
+        if (len(heavy_neighbors) != 2 or len(ring_side) != 1
+                or ester_o not in heavy_neighbors):
+            return None
+        parent_ring_atom = ring_side[0]
+
+        sub_atoms = set(ester['acid_atoms']) | {attach, ester_o}
+        prefix_name = name_substituent_fragment(
+            mol, sorted(sub_atoms), attach, sorted(ring_atoms),
+        )
+        if not prefix_name:
+            return None  # cannot safely express this arm -- decline, never flatten
+        entries.append({'ring_atom': parent_ring_atom, 'prefix_name': prefix_name})
+
+    if not entries:
+        return None
+
+    # Orient the ring in the direction giving the lowest locant SET to the
+    # non-principal substituents (P-14.4 lowest locants).
+    best_order = None
+    best_locants = None
+    for second in ring_neighbors:
+        order = _ring_walk_locants(mol, ring_atoms, start_atom, second)
+        if order is None:
+            continue
+        atom_to_locant = {a: i + 1 for i, a in enumerate(order)}
+        locants = sorted(atom_to_locant[e['ring_atom']] for e in entries)
+        if best_locants is None or locants < best_locants:
+            best_locants = locants
+            best_order = atom_to_locant
+
+    if best_order is None:
+        return None
+
+    # Group identical prefixes for multiplier handling and format with locants.
+    from collections import defaultdict
+    from ..assembly.composer import _format_prefix_groups
+    prefix_groups: dict = defaultdict(list)
+    for e in entries:
+        prefix_groups[e['prefix_name']].append(best_order[e['ring_atom']])
+
+    prefix_str = _format_prefix_groups(dict(prefix_groups))
+    if not prefix_str:
+        return None
+
+    ring_locant = best_order[start_atom]  # always 1 by construction
+    final_acylate = _insert_ring_ester_locant(acylate_name, ring_locant)
+
+    if prefix_str[-1].isalpha() and final_acylate[:1].isdigit():
+        ring_part = f"{prefix_str}-{final_acylate}"
+    else:
+        ring_part = f"{prefix_str}{final_acylate}"
+
+    return f"{alkyl_name} {ring_part}"
+
+
 def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
     """
     Name a molecule with independent ester groups (IUPAC P-65.1).
@@ -2054,6 +2276,18 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
     alkyl_name = get_alkyl_fragment_name(mol, principal['alkyl_atoms'])
     if not alkyl_name:
         return None
+
+    # v33 Phase 6 Wave 2 (#6): when the PRINCIPAL ester's acid is a RING
+    # acid, the OLD space-joined/unlocanted acyloxy-prefix path below is
+    # PROVEN WRONG (it drops the alcohol-side linking atom of any
+    # non-principal ester whose alkyl carbon is a pendant substituent on
+    # that ring, and never cites a locant at all). Rebuild it as a
+    # complete, locanted substituent prefix instead; fail closed (None)
+    # rather than fall through to the broken join for this shape.
+    if acid_is_ring_acid(mol, principal['acid_atoms']):
+        return _name_ring_principal_independent_esters(
+            mol, principal, ester_data[1:], acylate_name, alkyl_name,
+        )
 
     # Non-principal esters: convert to acyloxy prefixes
     acyloxy_prefixes = []
