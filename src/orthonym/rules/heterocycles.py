@@ -4153,7 +4153,8 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
     names get the same P-16.5.1.1 enclosure as C-substituents.
     """
     from ..assembly.naming_utils import (
-        enclose_if_compound, is_complex_substituent, needs_brackets,
+        apply_enclosing_marks, enclose_if_compound, is_complex_substituent,
+        needs_brackets,
     )
     if locants:
         from ..assembly.naming_utils import _has_stereo_prefix
@@ -4164,12 +4165,21 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
             # check skipped enclosure and emitted '1-(S)-sec-butyl...').
             display = f'[{name}]'
         elif not _fully_enclosed(name) and (
-                is_complex_substituent(name) or needs_brackets(name)):
+                is_complex_substituent(name) or needs_brackets(name)
+                or any(mark in name for mark in '([{')):
             # P-16.5.1.1: a name that is NOT fully enclosed by one outer pair of
             # parentheses — e.g. '(pyrimidin-5-yl)methyl' where the paren closes
-            # before 'methyl' — still needs enclosure. Use [] when the name
-            # already contains '(' (nesting rule), else use ().
-            display = f'[{name}]' if '(' in name else f'({name})'
+            # before 'methyl' — still needs enclosure. The third disjunct (any
+            # inner enclosing mark present) catches a name that already carries
+            # a mark but neither is_complex_substituent nor needs_brackets flags
+            # it (mirrors enclose_if_compound's third arm) — e.g.
+            # '[(butan-2-yl)oxy]methyl'. Route through apply_enclosing_marks so
+            # the mark ESCALATES per P-16.5.4 ( -> [ -> { ) instead of the old
+            # raw '(' in name picker, which capped at '[' and produced a double
+            # '[[...]]' when name already contained a '['. Fusion/spiro/von-
+            # Baeyer brackets (e.g. '[2,3-b]') are excluded from the escalation
+            # count by apply_enclosing_marks itself (P-16.5.4.1.2).
+            display = apply_enclosing_marks(name, -1)
         locant_str = ",".join(str(loc) for loc in sorted(locants))
         if count == 1:
             return f"{locant_str}-{display}"
@@ -4214,7 +4224,8 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
     # Wrap compound names in enclosing marks to prevent locant ambiguity
     display_name = name
     from ..assembly.naming_utils import (
-        is_complex_substituent, needs_brackets, _has_stereo_prefix,
+        apply_enclosing_marks, is_complex_substituent, needs_brackets,
+        _has_stereo_prefix,
     )
 
     # _fully_enclosed is defined at module level (shared with _format_n_substituent)
@@ -4224,18 +4235,30 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
         # use square brackets per IUPAC P-16.5.1.1
         display_name = f'[{name}]'
     elif not _fully_enclosed(name) and (
-            is_complex_substituent(name) or needs_brackets(name)):
+            is_complex_substituent(name) or needs_brackets(name)
+            or any(mark in name for mark in '([{')):
         # is_complex_substituent governs the di-/bis- multiplier choice;
         # needs_brackets is the broader P-16.5.1.1 enclosing test that also
         # flags compound FG-on-alkyl prefixes (hydroxymethyl, aminomethyl)
         # which take a SIMPLE multiplier but STILL require parentheses
         # (the benzene path's '1,3,5-tri(hydroxymethyl)benzene' convention).
-        if '(' in name:
-            # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): a name already containing parentheses is
-            # enclosed in the next mark up ([(naphthalen-2-yl)methyl]).
-            display_name = f'[{name}]'
-        else:
-            display_name = f'({name})'
+        # The third disjunct (any inner enclosing mark present) catches a
+        # name that already carries '(', '[' or '{' but is not itself fully
+        # enclosed -- e.g. '[(butan-2-yl)oxy]methyl' -- which needs_brackets
+        # and is_complex_substituent both miss when there is no top-level
+        # digit/hyphen (mirrors enclose_if_compound's third arm, the shared
+        # inner-mark test the benzene/chain path already relies on).
+        #
+        # Route through apply_enclosing_marks (P-16.5.4 nesting ORDER, BB
+        # 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks
+        # requirement (BB 7232) so the mark ESCALATES ( -> [ -> { ) instead
+        # of the old raw '(' in name picker, which capped at '[' and
+        # produced a double '[[...]]' when name already contained a '['.
+        # Fusion/spiro/von-Baeyer brackets (e.g. '[2,3-b]') are excluded
+        # from the escalation count by apply_enclosing_marks itself
+        # (P-16.5.4.1.2), so a fusion-descriptor substituent still gets
+        # plain parentheses.
+        display_name = apply_enclosing_marks(name, -1)
     if count == 1:
         return display_name if omit_locants else f"{locant_str}-{display_name}"
     # P-16.3.5(a) (BB:7104): 'bis'/'tris'/'tetrakis' indicate a multiplicity of
