@@ -38,10 +38,14 @@ def test_nitrophenoxymethyl_oxirane_names(namer):
     # prints verbatim: `[(3-chlorophenyl)methyl]benzene`,
     # `2-[(4-bromophenyl)methyl]pyridine`, `4-[(4-hydroxyphenyl)methyl]phenol`.
     # The retained contraction changes the SPELLING of the atomic unit
-    # ("phenoxy" vs "(phenyl)oxy"), not whether a decorated version of it needs
-    # its own marks as a sub-component. The outer citation on oxirane then
-    # escalates ( -> [ over the inner marks, per `enclose_if_compound`
-    # (P-16.5.1.1, the shared enclosure primitive used ~30 other call sites).
+    # ("phenoxy" vs "(phenyl)oxy"), not whether a decorated, LOCANTED version
+    # of it needs its own marks as a sub-component. The outer citation on
+    # oxirane then escalates ( -> [ over the inner marks. The decision is
+    # keyed on `starts_with_locant` (does the oxy prefix CITE a locant), not
+    # on `is_complex_substituent`/`enclose_if_compound` -- those flag
+    # 'benzyloxy'/'cyclohexyloxy' as compound two-morpheme prefixes even
+    # though they carry no locant, which over-nests and regresses the gold
+    # row covered by test_benzyloxy_and_cyclohexyloxy_stay_bare below.
     smi = "O=[N+]([O-])c1ccc(OCC2CO2)cc1"
     name = namer.name(smi)
     assert name == "[(4-nitrophenoxy)methyl]oxirane", name
@@ -65,3 +69,21 @@ def test_plain_aryloxymethyl_unchanged(namer, smi, expected):
     name = namer.name(smi_)
     assert name == expected, name
     assert _full_rt(smi_, name), name
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    # PROTECT-ROW REGRESSION LOCK. A first fix used `enclose_if_compound`, which
+    # flags 'benzyloxy'/'cyclohexyloxy' as compound two-morpheme prefixes and
+    # over-nested these — regressing the gold PIN `4-(benzyloxymethyl)phenol`
+    # (, category characteristic_groups) to a wrong
+    # `4-[(benzyloxy)methyl]phenol`. A retained oxy prefix that cites NO locant
+    # of its own stays BARE (single parens, no inner nest) — the enclosure
+    # decision is keyed on `starts_with_locant`, not on compound-ness.
+    ("Oc1ccc(COCc2ccccc2)cc1", "4-(benzyloxymethyl)phenol"),
+    ("Clc1ccc(COC2CCCCC2)cc1", "1-chloro-4-(cyclohexyloxymethyl)benzene"),
+])
+def test_benzyloxy_and_cyclohexyloxy_stay_bare(namer, smi, expected):
+    name = namer.name(smi)
+    assert name == expected, name
+    assert _full_rt(smi, name), name

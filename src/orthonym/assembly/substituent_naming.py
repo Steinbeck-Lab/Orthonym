@@ -2745,7 +2745,7 @@ def _name_ether_substituted_chain(
     from .substituent_prefix_forms import get_alkoxy_prefix, get_sulfanyl_prefix
     from .naming_utils import (
         is_complex_substituent, apply_enclosing_marks, _is_fully_enclosed,
-        enclose_if_compound,
+        starts_with_locant,
     )
     groups: dict = defaultdict(list)
     for bb_c, o_idx, r_side in ether_links:
@@ -2753,7 +2753,7 @@ def _name_ether_substituted_chain(
             oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
             if not oxy or oxy == "alkoxy":
                 return None  # un-nameable R -> fall through (fail-closed)
-            # P-16.3.3/P-16.5: a LOCANT-BEARING oxy prefix -- whether it already
+            # P-16.3.3/P-16.5: a CITED-LOCANT oxy prefix -- whether it already
             # carries marks from a nested recursion ('(4-methoxyphenyl)methoxy')
             # OR is a bare-but-substituted retained contraction ('4-nitrophenoxy',
             # '4-methylphenoxy' -- P-63.2.2.2 keeps the CONTRACTED spelling even
@@ -2764,16 +2764,28 @@ def _name_ether_substituted_chain(
             # case ('[(3-chlorophenyl)methyl]benzene', '2-[(4-bromophenyl)methyl]
             # pyridine', '4-[(4-hydroxyphenyl)methyl]phenol' -- the retained
             # contraction changes the SPELLING of the atomic unit, not whether a
-            # decorated version of it needs its own marks as a sub-component). A
-            # SIMPLE, unsubstituted oxy ('phenoxy', 'methoxy', 'benzyloxy') stays
-            # bare. `enclose_if_compound` is the shared P-16.5.1.1 primitive (used
-            # ~30 other call sites) that decides exactly this, including the
-            # escalating idempotent case ('(4-methoxyphenyl)methoxy' ->
-            # '[(4-methoxyphenyl)methoxy]', never re-enclosing an
-            # already-fully-enclosed token like '(methoxymethoxy)'). Replaces a
-            # narrower hand-rolled bracket-presence check that missed the
-            # bare-but-locant-bearing case (v33 Phase 6 aryloxymethyl review fix).
-            oxy = enclose_if_compound(oxy)
+            # decorated, LOCANTED version of it needs its own marks as a
+            # sub-component).
+            #
+            # A RETAINED oxy prefix that carries NO locant of its own must stay
+            # bare, even though it is structurally a fused two-part compound:
+            # 'phenoxy', 'methoxy', 'benzyloxy', 'cyclohexyloxy' (P-63.2.2.2 /
+            # P-29.6.1, BB '2-benzylpyridine (PIN)' -- the retained-ROOT-word
+            # test, not a general compound-substituent test). ``is_complex_
+            # substituent``/``enclose_if_compound`` are the wrong primitive
+            # here -- a FIRST ATTEMPT used ``enclose_if_compound`` and it
+            # regressed a gold row: 'benzyloxy' and 'cyclohexyloxy' trip
+            # ``is_complex_substituent`` as a two-morpheme compound (like
+            # 'cyclohexylmethyl') even though they carry no substituent locant,
+            # over-nesting 'Oc1ccc(COCc2ccccc2)cc1' from the gold
+            # '4-(benzyloxymethyl)phenol' to a wrong '4-[(benzyloxy)methyl]
+            # phenol'. The decision this call site needs is narrower than
+            # "is this compound" -- it is "does this oxy prefix CITE A LOCANT" --
+            # so use ``starts_with_locant`` (the shared primitive for exactly
+            # that test, e.g. distinguishing 'chloro' from '4-chloro') instead.
+            if (not _is_fully_enclosed(oxy)
+                    and (('(' in oxy or '[' in oxy) or starts_with_locant(oxy))):
+                oxy = apply_enclosing_marks(oxy, -1)
         else:  # S -> (R)sulfanyl (P-29.5.2 concatenation)
             # Name the R side with the proper substituent namer so a RING-bearing
             # R (benzyl -> 'benzyl') is not flattened to a carbon count
