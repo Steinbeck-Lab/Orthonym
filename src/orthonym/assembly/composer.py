@@ -4587,16 +4587,41 @@ def _build_bicyclo_substituent_prefix(
             if carbon_count == 0:
                 # Name non-carbon substituents directly (halogens, hydroxy, amino)
                 first_atom = sub_info.get('first_atom')
+                matched = False
                 if first_atom is not None:
                     atom = mol.GetAtomWithIdx(first_atom)
                     symbol = atom.GetSymbol()
                     halogen_names = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
                     if symbol in halogen_names:
                         sub_groups[halogen_names[symbol]].append(locant)
+                        matched = True
                     elif symbol == 'O' and atom.GetTotalNumHs() >= 1:
                         sub_groups['hydroxy'].append(locant)
+                        matched = True
                     elif symbol == 'N' and atom.GetTotalNumHs() >= 2:
                         sub_groups['amino'].append(locant)
+                        matched = True
+                if not matched:
+                    # v33 Phase 6 (lead d-real): a zero-carbon substituent that is
+                    # NOT a halogen/hydroxy/amino (e.g. nitro) used to fall through
+                    # here with no sub_groups entry at all -- its atoms were
+                    # silently dropped from the emitted name, relying entirely on
+                    # the downstream E1/SELF-01 gate to notice the resulting
+                    # atom-incomplete candidate and abstain. Route it through the
+                    # same recursive substituent namer used elsewhere in this
+                    # function instead; if THAT also declines, `return None` (an
+                    # explicit decline of the whole bicyclo parent) rather than
+                    # silently continuing past the unaccounted atoms.
+                    het_name = None
+                    sub_frag_atoms0 = sub_info.get('atoms') or []
+                    if first_atom is not None:
+                        from .substituent_enumerator import name_substituent
+                        _cand = name_substituent(mol, sub_frag_atoms0, first_atom)
+                        if _cand and _cand != 'substituent':
+                            het_name = _cand
+                    if het_name is None:
+                        return None
+                    sub_groups[het_name].append(locant)
                 continue  # Still skip alkyl naming path
 
             # v33 Phase 3 (beta-lactam layer 2, SPY layer a-2): `carbon_count`
@@ -4653,8 +4678,25 @@ def _build_bicyclo_substituent_prefix(
                 sub_groups[het_name].append(locant)
                 continue
 
-            # Get alkyl name (pure hydrocarbon, non-ring substituent -- unchanged)
-            alkyl_name = get_alkyl_name(carbon_count)
+            # v33 Phase 6 (lead c-real): a pure-hydrocarbon, non-ring substituent
+            # may still be BRANCHED (isopropyl, tert-butyl, ...); get_alkyl_name
+            # always builds the STRAIGHT-CHAIN name for that carbon count, so
+            # isopropyl (3 carbons) came out as 'propyl' (the n-propyl token,
+            # rendered with a ring locant as e.g. '2-propyl') -- a different
+            # molecule, caught only by the top-level SELF-01 gate. Route every
+            # pure-hydrocarbon substituent through the same recursive namer used
+            # above for heteroatom-bearing/ring substituents, which distinguishes
+            # branching correctly; fail closed (whole bicyclo parent declines)
+            # rather than fall back to a carbon-count guess.
+            first_atom = sub_info.get('first_atom')
+            alkyl_name = None
+            if first_atom is not None:
+                from .substituent_enumerator import name_substituent
+                _cand = name_substituent(mol, sub_frag_atoms, first_atom)
+                if _cand and _cand != 'substituent':
+                    alkyl_name = _cand
+            if alkyl_name is None:
+                return None
             sub_groups[alkyl_name].append(locant)
 
     # WSD-01: fold in non-principal ring-FG prefixes (hydroxy/oxo/amino/...) so a
