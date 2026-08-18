@@ -5845,9 +5845,17 @@ def name_substituent_fragment(
                                 if n.GetIdx() not in set(sub_atoms)]
                 if len(_parent_nbrs) == 1:
                     from ..rules.phosphorus import (
+                        name_phosphoxane_oxy_substituent,
                         name_phosphoanhydride_oxy_substituent)
-                    _ph = name_phosphoanhydride_oxy_substituent(
+                    # PIN first (P-67.2.6 method 2, the diphosphoxane skeletal
+                    # parent); fall back to the valid method-1 recursive-phosphoryl
+                    # form if the chain is not a clean phosphoxane (e.g. a single P
+                    # -> phosphonooxy via method-1).
+                    _ph = name_phosphoxane_oxy_substituent(
                         mol, attach_idx, _parent_nbrs[0])
+                    if _ph is None:
+                        _ph = name_phosphoanhydride_oxy_substituent(
+                            mol, attach_idx, _parent_nbrs[0])
                     if _ph is not None:
                         return _ph
                 return None

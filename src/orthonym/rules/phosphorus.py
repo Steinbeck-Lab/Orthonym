@@ -1309,6 +1309,163 @@ def name_phosphoanhydride_oxy_substituent(
     return f'[{body}]oxy'
 
 
+_PHOSPHOXANE_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
+                     7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
+
+
+def _walk_phosphoanhydride_chain(mol, o_idx: int, from_idx: int):
+    """From the bridging oxygen ``o_idx`` (bonded to parent ``from_idx``) walk the
+    LINEAR P-O-P… phosphoanhydride chain. Return the ordered list of P atom indices
+    ``[P1, P2, …]`` (P1 bonded to ``o_idx``), or None if it is not a single
+    unbranched neutral chain of phosphorus atoms bridged by shared oxygens."""
+    o = mol.GetAtomWithIdx(o_idx)
+    ps = [n for n in o.GetNeighbors()
+          if n.GetIdx() != from_idx and n.GetSymbol() == 'P']
+    if len(ps) != 1:
+        return None
+    p_list = []
+    prev_o = o_idx
+    cur_p = ps[0].GetIdx()
+    seen = set()
+    while True:
+        if cur_p in seen:
+            return None                                  # cycle guard
+        seen.add(cur_p)
+        p = mol.GetAtomWithIdx(cur_p)
+        if (p.GetSymbol() != 'P' or p.GetFormalCharge() != 0
+                or p.GetNumRadicalElectrons() != 0):
+            return None
+        p_list.append(cur_p)
+        next_p = next_o = None
+        for nb in p.GetNeighbors():
+            if nb.GetIdx() == prev_o or nb.GetSymbol() != 'O':
+                continue
+            b = mol.GetBondBetweenAtoms(cur_p, nb.GetIdx())
+            if b.GetBondType() != Chem.BondType.SINGLE or nb.GetFormalCharge() != 0:
+                continue
+            nb_heavy = [x for x in nb.GetNeighbors() if x.GetAtomicNum() > 1]
+            other_p = [x for x in nb_heavy
+                       if x.GetIdx() != cur_p and x.GetSymbol() == 'P']
+            if len(nb_heavy) == 2 and len(other_p) == 1:
+                if next_p is not None:
+                    return None                          # branched P-O-P: not linear
+                next_p, next_o = other_p[0].GetIdx(), nb.GetIdx()
+        if next_p is None:
+            break
+        prev_o, cur_p = next_o, next_p
+    return p_list
+
+
+def name_phosphoxane_oxy_substituent(
+        mol, o_idx: int, from_idx: int) -> Optional[str]:
+    """P-67.2.6 method (2) — the PIN: name an ``-O-P(=O)(…)…`` phosphoanhydride
+    bridge as the skeletal-replacement ``…phosphoxan-1-yl`` parent, returning
+    ``'(<subs>[n]phosphoxan-1-yl)oxy'``.
+
+    ``diphosphoxane``/``triphosphoxane``/… are preselected parent hydrides (P-12.2,
+    `BlueBookV2/BlueBookV2.md:8050,2971`): a chain of n phosphorus atoms bridged by
+    (n-1) oxygens, numbered P at the odd locants 1,3,5,…,(2n-1). Each P carries its
+    ``=O`` (``oxo``), its ``-OH`` (``hydroxy``), any ``-O-R`` ester (``{R}oxy``),
+    and a ``λ⁵`` designator (all P are pentavalent). The attachment is at P-1.
+
+    This is the PREFERRED form (method 2, the PIN) over the recursive-phosphoryl
+    method-1 (:func:`name_phosphoanhydride_oxy_substituent`). Returns None
+    (fail-closed) for any P outside the neutral mono-oxo phosphoryl anhydride class
+    (P-C phosphonate, no-oxo phosphite, charged/oxido P, branched P-O-P), so the
+    caller can fall back to method-1. RT-verified through OPSIN 2.9.0 for di/tri/
+    tetraphosphoxane. Record: .
+    """
+    p_list = _walk_phosphoanhydride_chain(mol, o_idx, from_idx)
+    if not p_list or len(p_list) < 2:
+        return None                                      # single P -> phosphonooxy/method-1
+    backbone_o = set()
+    # backbone O = o_idx (attach) + every O bridging two chain P's
+    backbone_o.add(o_idx)
+    p_set = set(p_list)
+    for i in range(len(p_list) - 1):
+        pa, pb = p_list[i], p_list[i + 1]
+        for nb in mol.GetAtomWithIdx(pa).GetNeighbors():
+            if (nb.GetSymbol() == 'O'
+                    and mol.GetBondBetweenAtoms(pb, nb.GetIdx()) is not None):
+                backbone_o.add(nb.GetIdx())
+
+    hydroxy_loc, oxo_loc, lam_loc = [], [], []
+    ester_subs = []                                      # (locant, "{R}oxy")
+    for k, p_idx in enumerate(p_list):
+        locant = 2 * k + 1                               # P at 1,3,5,…
+        lam_loc.append(locant)
+        p = mol.GetAtomWithIdx(p_idx)
+        oxo_here = 0
+        for nb in p.GetNeighbors():
+            if nb.GetIdx() in backbone_o:
+                continue
+            b = mol.GetBondBetweenAtoms(p_idx, nb.GetIdx())
+            if nb.GetSymbol() == 'O' and b.GetBondType() == Chem.BondType.DOUBLE:
+                oxo_here += 1
+                oxo_loc.append(locant)
+                continue
+            if (nb.GetSymbol() == 'O' and b.GetBondType() == Chem.BondType.SINGLE
+                    and nb.GetFormalCharge() == 0):
+                heavy = [x for x in nb.GetNeighbors()
+                         if x.GetIdx() != p_idx and x.GetAtomicNum() > 1]
+                if not heavy and nb.GetTotalNumHs() >= 1:
+                    hydroxy_loc.append(locant)
+                elif len(heavy) == 1 and heavy[0].GetSymbol() == 'C':
+                    from ..assembly.substituent_naming import name_substituent_fragment
+                    from ..assembly.substituent_enumerator import (
+                        alkoxy_prefix_from_substituent)
+                    frag = _reachable_carbon_fragment(mol, heavy[0].GetIdx(),
+                                                      nb.GetIdx())
+                    yl = name_substituent_fragment(mol, frag, heavy[0].GetIdx(), [])
+                    if not yl:
+                        return None
+                    alk = alkoxy_prefix_from_substituent(yl)
+                    if not alk:
+                        return None
+                    ester_subs.append((locant, alk))
+                else:
+                    return None                          # -O-P off-chain / -O-N / oxido
+            else:
+                return None                              # P-C phosphonate, etc.
+        if oxo_here != 1:
+            return None                                  # need exactly one P=O per P
+
+    n = len(p_list)
+    parent = f"{_PHOSPHOXANE_MULT.get(n, '')}phosphoxane"
+    if not _PHOSPHOXANE_MULT.get(n):
+        return None
+    from ..assembly.naming_utils import get_multiplier_prefix
+
+    def _locant_prefix(locants, word):
+        if not locants:
+            return None
+        locs = ','.join(str(x) for x in sorted(locants))
+        mult = get_multiplier_prefix(len(locants), word)
+        return f"{locs}-{mult}{word}"
+
+    # detachable prefixes in alphanumerical order (P-14.5): esters ({R}oxy) and
+    # hydroxy interleave by name; oxo comes after hydroxy ('h' < 'o').
+    detach = []
+    for loc, tok in ester_subs:
+        detach.append((tok, f"{loc}-{tok}"))            # single ester at this P
+    hp = _locant_prefix(hydroxy_loc, 'hydroxy')
+    if hp:
+        detach.append(('hydroxy', hp))
+    op = _locant_prefix(oxo_loc, 'oxo')
+    from ..assembly.naming_utils import alpha_sort_key
+    detach_sorted = [s for _, s in sorted(detach, key=lambda t: alpha_sort_key(t[0]))]
+    pieces = detach_sorted[:]
+    if op:
+        pieces.append(op)                                # oxo last (after hydroxy)
+    lam = ','.join(f"{x}{LAMBDA}5" for x in sorted(lam_loc))
+    # Elide the terminal 'e' of the parent before the '-1-yl' ending
+    # (diphosphoxane -> diphosphoxan-1-yl), per P-29.2 / standard '-yl' elision.
+    stem = parent[:-1] if parent.endswith('e') else parent
+    body = '-'.join(pieces) if pieces else ''
+    core = f"{body}-{lam}-{stem}-1-yl" if body else f"{lam}-{stem}-1-yl"
+    return f"({core})oxy"
+
+
 def get_phosphorus_prefix(fg_name: str) -> Optional[str]:
     """
     Get prefix form for phosphorus functional groups.
