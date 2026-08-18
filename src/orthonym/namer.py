@@ -2207,6 +2207,36 @@ def validate_binding_proof(value: str) -> str:
     return value
 
 
+import functools as _functools
+
+
+def _budget_scope(fn):
+    """v33 giant-molecule hang fix: bracket a top-level ``name()`` with the
+    per-top-level fragment work budget.
+
+    ``enter_name_scope``/``exit_name_scope`` maintain a raw ``name()`` call-stack
+    counter on the fragment thread-local; the TRUE outermost call arms the budget
+    and every nested re-entry (the recursion through ``name_compound`` and the
+    isolated T4 producer) shares it. Crucially, ``isolated_naming_session`` resets
+    the session state but NOT this counter, so the budget survives the nested
+    recovery entries a giant molecule triggers -- guaranteeing termination.
+
+    A decorator (not inline enter/exit) so the budget is released on EVERY exit
+    path -- ``name()`` has several early ``return`` sites that each call
+    ``end_naming_session`` -- with no leak that could contaminate the next
+    molecule.
+    """
+    @_functools.wraps(fn)
+    def _wrapper(self, *args, **kwargs):
+        from .assembly.fragment_naming import enter_name_scope, exit_name_scope
+        enter_name_scope()
+        try:
+            return fn(self, *args, **kwargs)
+        finally:
+            exit_name_scope()
+    return _wrapper
+
+
 class Orthonym:
     """
     IUPAC nomenclature generator.
@@ -2663,6 +2693,7 @@ class Orthonym:
                 return cand
         return gated
 
+    @_budget_scope
     def name(self, smiles: str, *, raise_on_limit: bool = False) -> str:
         """
         Generate IUPAC name from SMILES.

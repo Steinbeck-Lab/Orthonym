@@ -15,23 +15,33 @@ pytestmark = pytest.mark.unit
 
 
 def test_isolated_session_zeroes_depth_inside_and_restores_after():
+    # v33 giant-molecule hang fix updated this contract: isolation still zeroes and
+    # restores the DEPTH budget (session_depth + visited), but the fragment memo
+    # CACHE now PERSISTS across the boundary (it is a context-free pure function and
+    # is owned by the whole-molecule name scope). Resetting/restoring the cache was
+    # the bug that made a giant re-explore the same fragment thousands of times.
+    fn._fragment_guard.name_call_depth = 0
     fn._fragment_guard.session_depth = 3
     fn._fragment_guard.cache = {"parent": "value"}
     fn._fragment_guard.visited = {"SMILES"}
     try:
         with fn.isolated_naming_session():
             assert fn._session_depth() == 0
-            # a fresh nested session may build its own state...
+            # the live cache is still visible inside (not zeroed)...
+            assert fn._fragment_guard.cache == {"parent": "value"}
+            # ...and a name discovered inside is added to that same live cache.
             fn._fragment_guard.session_depth = 2
-            fn._fragment_guard.cache = {"nested": "x"}
-        # ...but the enclosing session is restored exactly on exit.
+            fn._fragment_guard.cache["nested"] = "x"
+        # depth budget restored exactly...
         assert fn._fragment_guard.session_depth == 3
-        assert fn._fragment_guard.cache == {"parent": "value"}
         assert fn._fragment_guard.visited == {"SMILES"}
+        # ...but the cache PERSISTS with both entries (memo survives the molecule).
+        assert fn._fragment_guard.cache == {"parent": "value", "nested": "x"}
     finally:
         fn._fragment_guard.session_depth = 0
         fn._fragment_guard.cache = None
         fn._fragment_guard.visited = set()
+        fn._fragment_guard.name_call_depth = 0
 
 
 def test_isolated_session_restores_even_on_exception():

@@ -134,7 +134,40 @@ def find_opsin_jar() -> Optional[str]:
     return None
 
 
+# v33 giant-molecule hang fix: memoize OPSIN parse results. Parsing a name to a
+# structure is a PURE, DETERMINISTIC function of (name, jar), so a process-global
+# cache is always correct AND improves determinism (a name that times out once is
+# thereafter a fast, consistent miss instead of a load-dependent flake). This is
+# the lever that collapses the giant-molecule cost: the decomposition can generate
+# the SAME candidate name dozens of times, but OPSIN now runs on each distinct
+# name at most once instead of paying a fresh (up to 30 s) subprocess every time.
+_OPSIN_PARSE_CACHE = {}
+_OPSIN_PARSE_CACHE_MAX = 16384
+
+
 def _parse_name_with_opsin(name: str, opsin_jar: str) -> Optional[str]:
+    """Memoizing wrapper over :func:`_parse_name_with_opsin_uncached`.
+
+    See the note above ``_OPSIN_PARSE_CACHE`` for why a process-global memo is
+    sound. Bounded to ``_OPSIN_PARSE_CACHE_MAX`` distinct names; once full it stops
+    inserting (never evicts) so a pathological batch cannot grow it without bound.
+    """
+    if not name or not opsin_jar:
+        return None
+    key = (name, opsin_jar)
+    cached = _OPSIN_PARSE_CACHE.get(key, _CACHE_MISS)
+    if cached is not _CACHE_MISS:
+        return cached
+    result = _parse_name_with_opsin_uncached(name, opsin_jar)
+    if len(_OPSIN_PARSE_CACHE) < _OPSIN_PARSE_CACHE_MAX:
+        _OPSIN_PARSE_CACHE[key] = result
+    return result
+
+
+_CACHE_MISS = object()
+
+
+def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
     """Parse a single IUPAC name to SMILES using OPSIN JAR.
 
     Mirrors the batch approach from ``
