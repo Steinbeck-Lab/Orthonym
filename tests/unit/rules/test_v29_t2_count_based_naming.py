@@ -246,11 +246,24 @@ def test_s2_taurine_amide_names_correctly_end_to_end(ungated_namer):
     """The fix does not merely remove a wrong name — it UNBLOCKS the right one.
 
     Pre-fix this emitted '1-(ethylamino)-1-oxooctadecanesulfonate' with the gate
-    off and 'unknown organic compound' with the gate on. The name below
-    round-trips through OPSIN 2.9.0 to the input structure.
+    off and 'unknown organic compound' with the gate on.
+
+    UPDATE (2026-08-18, v33 Phase 6 lead a): the general engine's principal-
+    chain selection (perception/chains.py::find_principal_chain) previously
+    picked the longer all-carbon octadecanoyl chain over the sulfonic-
+    acid-bearing chain even after this S2 fix, so the emitted name here was
+    briefly frozen as 'N-octadecanoyl-2-aminoethane-1-sulfonate' -- an
+    N-acyl-substituent form built on top of that wrong-chain selection. v33
+    Phase 6 lead a fixed principal-chain selection for heteroatom-only-suffix
+    acids (sulfonic/sulfinic/phosphonic/phosphinic now register their
+    S/P-bearing carbon so criterion 1, P-44.1, picks the correct chain), so
+    this molecule now names via the same acylamido form as its siblings in
+    test_acyl_taurine.py (2-acetamidoethane-1-sulfonate,
+    2-formamidoethane-1-sulfonate, 2-propanamidoethane-1-sulfonate).
+    RT-verified: InChIKey LMIJIHJZVURGQK-UHFFFAOYSA-M on both sides.
     """
     out = ungated_namer.name("CCCCCCCCCCCCCCCCCC(=O)NCCS(=O)(=O)[O-]")
-    assert out == "N-octadecanoyl-2-aminoethane-1-sulfonate", out
+    assert out == "2-octadecanamidoethane-1-sulfonate", out
 
 
 def test_s2_does_not_fabricate_a_c43_chain(ungated_namer):

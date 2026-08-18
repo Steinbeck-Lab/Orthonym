@@ -15,17 +15,31 @@ linear_acyl_amido_prefix``), then converts the ``-ic acid`` suffix to
 suffix conversion). These tests LOCK that behaviour down as a regression
 guard and add end-to-end coverage that did not exist before.
 
-Also verified (not fixed, out of scope): a LONGER unbranched acyl chain
-(propanoyl, 3 carbons) on the SAME taurine skeleton abstains, because the
-general engine's principal-chain selection picks the longer all-carbon
-acyl chain as the parent instead of the shorter chain carrying the
-sulfonic acid (principal characteristic group) -- a real but SEPARATE,
-broad general-engine defect (chain selection ignoring principal-group
-location), well outside "simple acyl-amino-sulfonate anion naming" scope.
-It fails CLOSED (abstains to the sentinel), never emits a wrong name, so
-0-wrong holds; not fixed here. The carbamoyl-direction shape (carboxylate
-senior parent, taurine as a (2-sulfoethyl)carbamoyl prefix) similarly
-still abstains and was left untouched per task scope.
+Also verified at the time this file was written (2026-08-17, not fixed here,
+out of scope for this slice): a LONGER unbranched acyl chain (propanoyl, 3
+carbons) on the SAME taurine skeleton abstained, because the general
+engine's principal-chain selection picked the longer all-carbon acyl chain
+as the parent instead of the shorter chain carrying the sulfonic acid
+(principal characteristic group) -- a real but SEPARATE, broad
+general-engine defect (chain selection ignoring principal-group location),
+well outside "simple acyl-amino-sulfonate anion naming" scope. It failed
+CLOSED (abstained to the sentinel) rather than emitting a wrong name, so
+0-wrong held; not fixed in this Phase-3 slice.
+
+UPDATE (2026-08-18, v33 Phase 6 lead a): that general-engine principal-chain
+defect is now FIXED (`perception/chains.py::find_principal_chain` -- the
+heteroatom-only-suffix acid classes, sulfonic/sulfinic/phosphonic/phosphinic
++ imidic/peroxoic/thioic S variants, now register their S/P-bearing carbon
+into `fg_atoms` so criterion 1 -- "chain contains the PCG" -- picks the
+correct, acid-bearing chain instead of tying at 0 and falling through to
+"longest chain"). The propanoyl-taurine anion below now names correctly as
+``2-propanamidoethane-1-sulfonate`` (RT-verified,
+InChIKey CIPJBOMLFKUUEH-UHFFFAOYSA-M on both sides) --
+`test_integration_longer_acyl_chain_failclosed_not_wrong` below was updated
+to assert the new correct name in place of the stale abstain assertion. The
+carbamoyl-direction shape (carboxylate senior parent, taurine as a
+(2-sulfoethyl)carbamoyl prefix) is a different molecule/scope and was not
+re-checked here; it may still abstain.
 """
 import pytest
 from orthonym import Orthonym
@@ -79,10 +93,12 @@ def test_integration_bile_acid_taurine_conjugate_failclosed(namer):
 
 
 @pytest.mark.opsin_gate
-def test_integration_longer_acyl_chain_failclosed_not_wrong(namer):
-    # A longer unbranched acyl (propanoyl) on the same taurine skeleton
-    # abstains (a separate, out-of-scope general-engine principal-chain
-    # selection defect -- see module docstring). Confirms 0-wrong: it
-    # abstains rather than emitting a wrong molecule.
+def test_integration_longer_acyl_chain_now_named(namer):
+    # A longer unbranched acyl (propanoyl) on the same taurine skeleton used
+    # to abstain (a separate, out-of-scope general-engine principal-chain
+    # selection defect -- see module docstring). v33 Phase 6 lead a fixed
+    # that defect (perception/chains.py::find_principal_chain now registers
+    # the sulfonic acid's bearing carbon), so this now names correctly.
+    # RT-verified: InChIKey CIPJBOMLFKUUEH-UHFFFAOYSA-M on both sides.
     smi = "CCC(=O)NCCS(=O)(=O)[O-]"
-    assert namer.name(smi) == "unknown organic compound"
+    assert namer.name(smi) == "2-propanamidoethane-1-sulfonate"
