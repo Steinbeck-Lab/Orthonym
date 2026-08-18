@@ -5106,7 +5106,8 @@ def _check_retained_substituent(
 # ============================================================================
 
 
-def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False):
+def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
+                                allow_functional=False):
     """Name an acyclic, all-carbon, saturated substituent by its OWN principal
     chain, numbered from the free valence (P-29.2 / P-46.1.8 / P-46.1.12).
 
@@ -5157,6 +5158,36 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False):
     # check, charged atoms) declines fail-closed to the recursive path.
     ring_info = mol.GetRingInfo()
     carbon_set = set()
+    if allow_functional:
+        # v33 re-rooted FG-capable substituent (P-46.1.12): the CHAIN is the
+        # acyclic, single-bonded carbon skeleton through the free valence; EVERY
+        # other atom -- ring atoms, chain-carbon =O (oxo), -O-R ethers/esters,
+        # -N< amines/amides, -S-R thioethers, phospho subgraphs -- is permitted
+        # and cited as a structurally-numbered detachable PREFIX (or recursed
+        # branch) below, never a suffix. This reuses the SAME free-valence
+        # numbering and branch machinery as the strict alkyl path, so a fragment
+        # rooted at an arbitrary attachment atom is named as a proper substituent
+        # (not string-surgered from a molecule name). 0-wrong is preserved by the
+        # top-level SELF-01/OPSIN gate. Defer (return None) on a charged atom or a
+        # C=C/C#C in the carbon skeleton (chain unsaturation not handled here yet).
+        for idx in sub_set:
+            atom = mol.GetAtomWithIdx(idx)
+            if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+                return None
+            if atom.GetSymbol() != 'C' or ring_info.NumAtomRings(idx) > 0:
+                continue
+            cc_unsat = any(
+                b.GetBondTypeAsDouble() > 1.0
+                and b.GetOtherAtom(atom).GetSymbol() == 'C'
+                and b.GetOtherAtom(atom).GetIdx() in sub_set
+                for b in atom.GetBonds())
+            if cc_unsat:
+                return None
+            carbon_set.add(idx)
+        if attach_idx not in carbon_set:
+            return None
+        return _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set,
+                                    ring_info, with_pos)
     for idx in sub_set:
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetFormalCharge() != 0:
@@ -5412,6 +5443,203 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False):
             base = f"{stem}yl"
         return _ret(f"{prefix}{base}", 1)
     return _ret(f"{prefix}{stem}an-{k}-yl", k)
+
+
+def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with_pos):
+    """v33 FG-capable located substituent assembly (see ``_located_acyclic_alkyl_name``
+    ``allow_functional``). The parent is the longest ACYCLIC carbon chain through the
+    free valence (P-29.2, numbered from the free valence P-46.1.8); every off-chain
+    atom -- a chain-carbon ``=O`` (oxo), ``-OH`` (hydroxy), ``-NH2`` (amino), and any
+    ``-O-R`` / ``-N<`` / ``-S-R`` / ring / phospho branch -- is cited as a
+    structurally-numbered detachable PREFIX via the shared substituent namer
+    (P-46.1.12), recursed. Returns ``(name, k[, chain_pos])`` or None (missing-beats-
+    wrong: any unnameable branch declines the whole form). Stereo descriptors are
+    added by the caller from ``chain_pos``.
+    """
+    sub_set = set(sub_atoms)
+
+    def _longest_arm(start, came_from):
+        best_child = {}
+        stack = [(start, came_from, False)]
+        while stack:
+            node, parent, processed = stack.pop()
+            if processed:
+                best = [node]
+                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
+                    nidx = nbr.GetIdx()
+                    if nidx in carbon_set and nidx != parent:
+                        cand = [node] + best_child.get(nidx, [nidx])
+                        if len(cand) > len(best):
+                            best = cand
+                best_child[node] = best
+            else:
+                stack.append((node, parent, True))
+                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
+                    nidx = nbr.GetIdx()
+                    if nidx in carbon_set and nidx != parent:
+                        stack.append((nidx, node, False))
+        return best_child[start]
+
+    arms = []
+    for nbr in mol.GetAtomWithIdx(attach_idx).GetNeighbors():
+        if nbr.GetIdx() in carbon_set:
+            arms.append(_longest_arm(nbr.GetIdx(), attach_idx))
+    arms.sort(key=len, reverse=True)
+    if len(arms) >= 2:
+        chain = list(reversed(arms[0])) + [attach_idx] + arms[1]
+    elif len(arms) == 1:
+        chain = [attach_idx] + arms[0]
+    else:
+        chain = [attach_idx]
+    # free valence gets the lowest locant (P-46.1.8)
+    if (len(chain) - chain.index(attach_idx)) < (chain.index(attach_idx) + 1):
+        chain = list(reversed(chain))
+    chain_len = len(chain)
+    if chain_len < 1:
+        return None
+    k = chain.index(attach_idx) + 1
+    chain_set_c = set(chain)
+    chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+
+    from collections import defaultdict
+    branch_groups: dict = defaultdict(list)
+    for c in chain:
+        for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in chain_set_c or nidx not in sub_set:
+                continue
+            bond = mol.GetBondBetweenAtoms(c, nidx)
+            sym = nbr.GetSymbol()
+            # chain-carbon =O -> oxo (P-64.2.1 as a prefix); =N -> imino
+            if bond.GetBondTypeAsDouble() == 2.0 and nbr.GetDegree() == 1:
+                if sym == 'O':
+                    branch_groups['oxo'].append(chain_pos[c]); continue
+                if sym == 'N':
+                    branch_groups['imino'].append(chain_pos[c]); continue
+            # collect the whole off-chain branch
+            frag = []
+            seen = set(chain_set_c)
+            stk = [nidx]
+            while stk:
+                cur = stk.pop()
+                if cur in seen:
+                    continue
+                seen.add(cur)
+                frag.append(cur)
+                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
+                        stk.append(nn.GetIdx())
+            if len(frag) == 1 and sym in ('F', 'Cl', 'Br', 'I'):
+                branch_groups[{'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo',
+                               'I': 'iodo'}[sym]].append(chain_pos[c]); continue
+            if len(frag) == 1 and sym == 'O' and nbr.GetTotalNumHs() >= 1:
+                branch_groups['hydroxy'].append(chain_pos[c]); continue
+            if len(frag) == 1 and sym == 'N' and nbr.GetTotalNumHs() == 2:
+                branch_groups['amino'].append(chain_pos[c]); continue
+            try:
+                # recurse through the central substituent entry so the branch
+                # reaches the same tiers (rings, phospho Step 0, and Tier FG for a
+                # nested FG chain), rooted at the branch's own attachment atom.
+                bname = name_substituent_fragment(mol, sorted(frag), nidx, list(chain))
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("located-fg branch naming failed: %s", exc)
+                return None
+            if not bname or bname == 'substituent':
+                return None
+            branch_groups[bname].append(chain_pos[c])
+
+    from .composer import _format_prefix_groups
+    prefix = _format_prefix_groups(branch_groups) if branch_groups else ""
+    try:
+        if k == 1:
+            base = get_alkyl_name(chain_len)
+            name = f"{prefix}{base}"
+        else:
+            from ..data.chain_names import get_chain_prefix
+            stem = get_chain_prefix(chain_len)
+            name = f"{prefix}{stem}an-{k}-yl"
+    except (ValueError, KeyError):
+        return None
+    return (name, k, chain_pos) if with_pos else (name, k)
+
+
+def _fg_enclose(tok: str) -> str:
+    """Enclose a composed substituent token when it carries a locant or its own
+    marks (P-16.3.3); a simple one-word token stays bare."""
+    if not tok:
+        return tok
+    if tok[0] == '(' or tok[0] == '[':
+        return tok
+    if any(ch.isdigit() for ch in tok) or '-' in tok or ' ' in tok:
+        return f"({tok})"
+    return tok
+
+
+def _fg_branch_atoms(mol, start, block, sub_set):
+    br = []
+    seen = {block}
+    stk = [start]
+    while stk:
+        cur = stk.pop()
+        if cur in seen or cur not in sub_set:
+            continue
+        seen.add(cur)
+        br.append(cur)
+        for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+            if nn.GetIdx() != block and nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
+                stk.append(nn.GetIdx())
+    return br
+
+
+def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
+    """v33: FG-capable substituent rooted at a HETERO atom -- ``-O-R`` -> R-oxy,
+    ``-S-R`` -> (R)sulfanyl, ``-N(<)`` -> (R)amino -- with R recursed through the
+    central substituent entry (so a nested FG chain reaches Tier FG). Returns the
+    prefix string or None (fail-closed)."""
+    sub_set = set(sub_atoms)
+    a = mol.GetAtomWithIdx(attach_idx)
+    if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
+        return None
+    sym = a.GetSymbol()
+    heavy = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() in sub_set]
+
+    def _name_r(r_root):
+        return name_substituent_fragment(
+            mol, sorted(_fg_branch_atoms(mol, r_root, attach_idx, sub_set)),
+            r_root, [attach_idx])
+
+    if sym == 'O':
+        if not heavy:
+            return 'hydroxy'
+        if len(heavy) != 1:
+            return None
+        r = _name_r(heavy[0])
+        if not r:
+            return None
+        from .substituent_enumerator import alkoxy_prefix_from_substituent
+        return alkoxy_prefix_from_substituent(r) or (f"{_fg_enclose(r)}oxy")
+    if sym == 'S':
+        if not heavy:
+            return 'sulfanyl'
+        if len(heavy) != 1:
+            return None
+        r = _name_r(heavy[0])
+        if not r:
+            return None
+        return f"{_fg_enclose(r)}sulfanyl"
+    if sym == 'N':
+        subs = []
+        for h in heavy:
+            r = _name_r(h)
+            if not r:
+                return None
+            subs.append(r)
+        if not subs:
+            return 'amino'
+        from .naming_utils import alpha_sort_key
+        inner = ''.join(_fg_enclose(s) for s in sorted(subs, key=alpha_sort_key))
+        return f"{inner}amino"
+    return None
 
 
 def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
@@ -6416,6 +6644,37 @@ def name_substituent_fragment(
             "cation_attach atom_count=%d", len(sub_atoms),
         )
         return None
+
+    # Tier FG (v33): the PROPER re-rooted FG-capable located substituent namer,
+    # LAST resort before the free-molecule band-aid (Step 3/4). Names an
+    # acyclic-carbon-backbone fragment rooted at the attachment atom, citing every
+    # FG / ring / hetero group as a structurally-numbered detachable prefix
+    # (P-46.1.12) -- the form parent_to_prefix (string surgery on a molecule name)
+    # cannot produce. Placed here, after every strict tier declined, so it never
+    # changes an existing strict-tier name; the top-level SELF-01/OPSIN gate voids
+    # any non-RT candidate, keeping 0-wrong.
+    _fg_best_effort = False
+    try:
+        from ..metrics.provenance import best_effort_ctx
+        _fg_best_effort = bool(best_effort_ctx.get())
+    except Exception:
+        _fg_best_effort = False
+    if _fg_best_effort and attach_idx is not None and attach_idx in set(sub_atoms):
+        _fg_name = None
+        try:
+            _asym = mol.GetAtomWithIdx(attach_idx).GetSymbol()
+            if _asym in ('O', 'S', 'N'):
+                _fg_name = _located_fg_hetero_root(mol, list(sub_atoms), attach_idx)
+            else:
+                _r = _located_acyclic_alkyl_name(
+                    mol, list(sub_atoms), attach_idx, allow_functional=True)
+                _fg_name = _r[0] if _r is not None else None
+        except Exception as _exc:  # noqa: BLE001
+            logger.debug("Tier FG located namer failed: %s", _exc)
+            _fg_name = None
+        if _fg_name is not None:
+            return _add_substituent_stereo(
+                mol, sub_atoms, _fg_name, attach_idx=attach_idx)
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)
