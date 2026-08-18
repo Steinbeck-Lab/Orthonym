@@ -1534,9 +1534,31 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # Fail closed on any DEFINED stereocentre/stereobond: the
                 # delegated path emits no parent-level descriptors (the T3d
                 # oxime-decline precedent).
+                #
+                # v33 Phase 6 (E3 Task 5 follow-on): `Chem.FindMolChiralCenters`
+                # has an undocumented DESTRUCTIVE side effect — its internal
+                # legacy re-perception pass clears every bond's `_CIPCode`
+                # property (the E/Z label `rdCIPLabeler.AssignCIPLabels` /
+                # the `centres` bridge already set during perception),
+                # while leaving `Bond.GetStereo()` itself untouched. Verified
+                # in isolation: a bond reporting `(1,2,HasProp=1,'E')`
+                # BEFORE the call reports `(1,2,HasProp=0,None)` straight
+                # after, though STEREOE survives. Called on the SHARED
+                # `mol` (not a copy), this permanently erases the E/Z
+                # descriptors for every LATER consumer in this SAME naming
+                # attempt — including this function's own final
+                # `collect_stereodescriptors` call far below, which is why a
+                # stereo-bearing on-chain amide (e.g. anandamide's
+                # 5,8,11-trienoyl homologue) always emitted a name with
+                # "0 R/S + N E/Z but name lacks descriptors" once this branch
+                # ran, WITH OR WITHOUT the N-substituent fix. Call it on a
+                # disposable COPY so the probe cannot clobber the shared
+                # mol's already-assigned CIP labels; `_has_stereo` itself is
+                # unaffected (chirality centres are copy-invariant).
                 from rdkit import Chem as _Chem
                 _has_stereo = bool(
-                    _Chem.FindMolChiralCenters(mol, includeUnassigned=False)
+                    _Chem.FindMolChiralCenters(
+                        _Chem.Mol(mol), includeUnassigned=False)
                 ) or any(
                     b.GetStereo() != _Chem.BondStereo.STEREONONE
                     for b in mol.GetBonds()
@@ -2763,6 +2785,100 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         f"N,N-{_rmult}{_wrap_n_substituent(_rn)}"
                     )
 
+    # --- v33 Phase 6 (E3 Task 5): N-substituent prefix for a PRINCIPAL AMIDE
+    # whose acyl carbon carries stereo the earlier delegation cannot render ---
+    # The dedicated amide delegate a few hundred lines above this
+    # (`rules.amides.name_amide` / `composer._assemble_amide_name`) already
+    # returns the correct name for a stereo-free on-chain-acyl secondary/
+    # tertiary amide; it fails CLOSED (declines, not wrong) whenever the
+    # molecule carries a defined stereocentre or stereo double bond, because
+    # it cannot render the parent chain's own descriptors (the T3d
+    # oxime-decline precedent cited there). When that guard declines and
+    # control reaches this generic chain-building section, the amide's own
+    # N-branch has ALREADY been excluded from the substituent walk
+    # (`_generate_alkyl_prefixes_for_polyfunctional`'s mirror of the amine
+    # exclusion above) — so it must be rendered HERE or the atoms are lost.
+    # Before this block the exclusion did not exist and the amide N (bonded
+    # directly to the chain's acyl carbon, chain position 1) was walked as an
+    # ordinary heteroatom substituent and mis-named a plain "(R)amino" PREFIX
+    # ON C1: 'CCCCCCCC/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCCO' (anandamide's
+    # 5,8,11-trienoyl homologue) shipped '1-[(2-hydroxyethyl)amino]icosa-
+    # 5,8,11-trienamide' — a name that double-expresses the amide carbon
+    # (chain C1 as BOTH the amide carbonyl AND an amino-bearing substituent
+    # carbon) and is OPSIN-unparseable. Mirrors the principal-amine N,N-
+    # prefix block above, same `_name_r_group`/`_wrap_n_substituent`
+    # primitives; fails closed (returns None, never emits) on an un-nameable
+    # R or a shape with more than one amide match, so a previously-abstaining
+    # molecule can only become a NAMED, atom-complete, RT-correct name — never
+    # a new atom drop. The earlier successful delegation always `return`s
+    # before this point, so this block never double-fires for the cases it
+    # already names correctly (verified: 'CCCCC(=O)NCCO' stays
+    # 'N-(2-hydroxyethyl)pentanamide', unaffected).
+    _AMIDE_PRINCIPAL_FGS = {'secondary_amide', 'tertiary_amide'}
+    if principal_group in _AMIDE_PRINCIPAL_FGS:
+        _amide_matches_ns = features.functional_groups.get(
+            principal_group, []) or []
+        if len(_amide_matches_ns) == 1:
+            _amide_match_ns = _amide_matches_ns[0]
+            _amide_n_atom_ns = next(
+                (a for a in _amide_match_ns
+                 if mol.GetAtomWithIdx(a).GetSymbol() == 'N'), None)
+            _amide_acyl_c_ns = next(
+                (a for a in _amide_match_ns
+                 if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
+                 and any(
+                     nb.GetSymbol() == 'O'
+                     and mol.GetBondBetweenAtoms(a, nb.GetIdx())
+                            .GetBondTypeAsDouble() == 2.0
+                     for nb in mol.GetAtomWithIdx(a).GetNeighbors())),
+                None,
+            )
+            if (_amide_n_atom_ns is not None
+                    and _amide_acyl_c_ns is not None
+                    and _amide_acyl_c_ns in set(principal_chain)):
+                from ..assembly.composer import _name_r_group, _wrap_n_substituent
+                from ..assembly.naming_utils import enclose_if_compound
+                from collections import Counter as _NCounterAmide
+
+                _an_sub_names: List[str] = []
+                for _anb in mol.GetAtomWithIdx(_amide_n_atom_ns).GetNeighbors():
+                    _ani = _anb.GetIdx()
+                    # Skip the acyl carbon itself and hydrogens; the remaining
+                    # heavy neighbours are the amide's N-substituent(s).
+                    if _ani == _amide_acyl_c_ns or _anb.GetAtomicNum() <= 1:
+                        continue
+                    _arn = _name_r_group(
+                        mol, _ani, exclude_atoms={_amide_n_atom_ns})
+                    if not _arn:
+                        # Fail closed -- see docstring above: this is now the
+                        # ONLY producer of this amide's N-substituent prefix
+                        # (the branch was excluded from the walk), so skipping
+                        # an un-nameable one would DELETE atoms, not degrade.
+                        return None
+                    # P-16.5.1.1: a COMPOUND R group (e.g. "2-hydroxyethyl")
+                    # takes its own enclosing marks before the "N-" locant is
+                    # prefixed -- `_name_r_group` returns the BARE compound
+                    # token (verified: "2-hydroxyethyl", no parens), and
+                    # `_wrap_n_substituent` deliberately only ESCALATES an
+                    # enclosure that is already there (its own docstring: "do
+                    # not need brackets" for a name with none). Without this,
+                    # the emitted prefix read "N-2-hydroxyethyl..." instead of
+                    # "N-(2-hydroxyethyl)...".
+                    _arn = enclose_if_compound(_arn)
+                    _an_sub_names.append(_arn)
+                if _an_sub_names:
+                    _an_counts = _NCounterAmide(_an_sub_names)
+                    for _arn in sorted(_an_counts.keys()):
+                        _arc = _an_counts[_arn]
+                        if _arc == 1:
+                            all_prefixes.append(
+                                f"N-{_wrap_n_substituent(_arn)}")
+                        else:
+                            _armult = get_multiplier_prefix(_arc, _arn)
+                            all_prefixes.append(
+                                f"N,N-{_armult}{_wrap_n_substituent(_arn)}"
+                            )
+
     # --- Merge duplicate bare prefix names ---
     # When two FG detection paths (e.g., primary_alcohol and secondary_alcohol)
     # both produce the same bare prefix form ("hydroxy"), merge into one entry
@@ -3164,12 +3280,42 @@ def _generate_alkyl_prefixes_for_polyfunctional(
     # in name_polyfunctional). Di-/polyamines fall back to the prior path.
     _exclude_principal_amine = len(_principal_amine_n) == 1
 
+    # v33 Phase 6 (E3 Task 5): mirror of the amine exclusion above for a
+    # PRINCIPAL AMIDE (secondary_amide / tertiary_amide) whose acyl carbon sits
+    # ON the principal chain but whose N-substituent(s) are named via the
+    # "N-substituent prefix for a PRINCIPAL AMIDE" block later in
+    # name_polyfunctional (reached only when the earlier stereo-free amide
+    # delegation -- rules.amides.name_amide / composer._assemble_amide_name --
+    # already declined, e.g. a stereo-bearing acyl it cannot render parent-
+    # level descriptors for). Before this guard the amide N (bonded directly
+    # to the chain's acyl carbon) was walked here like any other heteroatom
+    # substituent and mis-named a plain "(R)amino" PREFIX ON C1 --
+    # '...icosa-5,8,11-trien-1-yl [(2-hydroxyethyl)amino]...' shaped names that
+    # double-express the amide carbon and fail OPSIN. Scoped to a SINGLE amide
+    # match (di-amide chains fall back to the prior, unaffected, path).
+    _AMIDE_PRINCIPALS = {'secondary_amide', 'tertiary_amide'}
+    _principal_amide_n: set = set()
+    if getattr(features, 'principal_group', None) in _AMIDE_PRINCIPALS:
+        _amide_matches_excl = features.functional_groups.get(
+            features.principal_group, []) or []
+        if len(_amide_matches_excl) == 1:
+            _n_idx_excl = next(
+                (a for a in _amide_matches_excl[0]
+                 if mol.GetAtomWithIdx(a).GetSymbol() == 'N'), None)
+            if _n_idx_excl is not None:
+                _principal_amide_n.add(_n_idx_excl)
+    _exclude_principal_amide = len(_principal_amide_n) == 1
+
     _excl_branch = exclude_branch_atoms or set()
     for position, sub_list in features.substituents.items():
         for sub_atoms in sub_list:
             # HYG-04 site#2: don't name the principal amine's own branch as a
             # substituent — its N-substituents are emitted as N,N- prefixes.
             if _exclude_principal_amine and (_principal_amine_n & set(sub_atoms)):
+                continue
+            # v33 Phase 6 (E3 Task 5): same exclusion for a principal amide's
+            # own N-branch — see comment above.
+            if _exclude_principal_amide and (_principal_amide_n & set(sub_atoms)):
                 continue
             # AM-4: skip branches owned by the amidine amino/imino FG-prefix path.
             if _excl_branch & set(sub_atoms):

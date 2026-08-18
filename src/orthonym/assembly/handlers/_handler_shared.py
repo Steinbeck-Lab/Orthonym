@@ -1099,6 +1099,56 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             matches = [m for m in matches
                        if not any(all(a in s for a in m) for s in _ring_sub_sets)]
 
+        # v33 Phase 6 (E3 Task 6): an ALDEHYDE fully contained in a chain
+        # substituent branch, cited a second time as an unlocated "oxo" on the
+        # PARENT even though the branch's own compound name already speaks
+        # for it. NOT a BRANCH_HANDLED_FGS addition -- that blanket-trust set
+        # deliberately EXCLUDES 'aldehyde' (tests/unit/rules/test_bugb_guard.py
+        # ::test_no_dangerous_entries): a `-CH2-CHO` branch on
+        # 'OC(=O)C(CC=O)CCC' is mis-named "(2-hydroxyethyl)" by the compound-
+        # substituent namer (a DIFFERENT molecule -- the aldehyde read as a
+        # hydroxyl), so trusting ANY branch containing an aldehyde would
+        # unmask that separate bug instead of merely duplicating it (SELF-01
+        # still catches the duplicate; it would also still catch the
+        # mis-naming, so nothing here is 0-wrong-unsafe, but this file's own
+        # policy is not to rely on that). This match is narrower and adds a
+        # concrete verification step the blanket set lacks: it fires only
+        # when the branch containing the match was rendered as ONE existing
+        # prefix whose TEXT literally already mentions "oxo" -- checkable
+        # evidence the branch spoke for the carbonyl, not a guess from branch
+        # size. Verified case: 'C/C=C(\\C=O)C(CC(=O)O)CC(=O)O' -- the
+        # substituent walk already renders locant 3 as
+        # "3-(1-oxobut-2-en-2-yl)" (its own "1-oxo" token is the ALDEHYDE
+        # itself), so the parent-level aldehyde match here is redundant and
+        # the input never had a second carbonyl at chain-C1; before this
+        # guard the duplicate was emitted as bare, unlocated "oxo-" (the
+        # aldehyde's atoms are off-chain, so `_get_fg_locants` cannot place
+        # it), grafting a phantom 2-oxo onto the parent
+        # ('oxo-3-(1-oxobut-2-en-2-yl)pentanedioic acid' parsed to a 2-
+        # oxopentanedioic acid -- SELF-01 correctly suppressed it, but never
+        # got the chance to emit the correct name either).
+        if fg_name == 'aldehyde' and features.substituents:
+            _ald_filtered = []
+            for _am in matches:
+                _am_set = set(_am)
+                _ald_owned = False
+                for _apos, _asub_list in features.substituents.items():
+                    if len(_asub_list) != 1:
+                        continue
+                    _asub_set = set(_asub_list[0])
+                    if not _am_set.issubset(_asub_set):
+                        continue
+                    if any(_apos in (getattr(_afrag, 'locants', None) or ())
+                           and 'oxo' in (getattr(_afrag, 'text', '') or '')
+                           for _afrag in prefixes):
+                        _ald_owned = True
+                    break
+                if not _ald_owned:
+                    _ald_filtered.append(_am)
+            matches = _ald_filtered
+            if not matches:
+                continue
+
         # BUG-B: Skip simple FG matches on small substituent branches (<=3 carbons)
         # that get named as compound substituents (hydroxymethyl, aminomethyl, etc.)
         # Uses shared BRANCH_HANDLED_FGS from naming_utils (unified in Phase 113).
@@ -1132,6 +1182,39 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                                 c_count = sum(1 for a in sub_atoms
                                               if features.mol.GetAtomWithIdx(a).GetSymbol() == 'C')
                                 if 1 <= c_count <= 3:
+                                    on_small_branch = True
+                                    break
+                                # v33 Phase 6 (E3 Task 4): the <=3-carbon cap above
+                                # is a PROXY for "the branch's own compound name
+                                # already speaks for this FG" — verified only up
+                                # to 3 carbons (naming_utils.py BRANCH_HANDLED_FGS
+                                # docstring). It breaks now that a compound
+                                # substituent CAN embed a buried FG on a LARGER
+                                # branch too (e.g. saccharopine's N-(5-amino-5-
+                                # carboxypentyl) arm — 6 carbons — whose alpha
+                                # amino is fully consumed by the branch's own
+                                # "...5-amino..." token). Rather than raise the
+                                # magic number (which would also affect halogen/
+                                # nitro branches never verified past 3C), check
+                                # the PROXY'S PROXY directly: `prefixes` (built a
+                                # few lines above by `_generate_alkyl_prefixes`)
+                                # already holds ONE compound-name fragment per
+                                # successfully-named branch, keyed by this same
+                                # locant. If this is the ONLY branch at `_pos`
+                                # (no ambiguity about which branch's name we are
+                                # trusting) and that locant already produced a
+                                # prefix fragment, the branch was named as a
+                                # single whole (this tree's namers are fail-
+                                # closed — they must cover every frag_atom or
+                                # decline, per substituent_enumerator.py's
+                                # `classify_and_name_fragment` contract), so the
+                                # FG match nested inside it is already spoken
+                                # for. Scoped to len(sub_list) == 1 so a position
+                                # carrying two independent branches (one named,
+                                # one dropped) cannot be mistaken for the other.
+                                if len(sub_list) == 1 and any(
+                                        _pos in (getattr(_frag, 'locants', None) or ())
+                                        for _frag in prefixes):
                                     on_small_branch = True
                                     break
                         if on_small_branch:

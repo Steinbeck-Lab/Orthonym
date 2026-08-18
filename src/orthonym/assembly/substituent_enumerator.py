@@ -4741,7 +4741,7 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             for n in atom.GetNeighbors():
                 if n.GetIdx() not in visited and n.GetIdx() != attach_idx:
                     stack_c.append(n.GetIdx())
-        if carbon_count > 0 and not has_hetero and not has_ring:
+        if carbon_count > 0 and not has_ring:
             # P-29.2: the branch's bond to the nitrogen may be DOUBLE
             # (-N=CH-CH3), where the prefix is 'ethylideneamino'. The carbon
             # walk above crosses that bond without noticing it, so 'CC=NCC(=O)O'
@@ -4761,6 +4761,20 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             # other two and this one was missed. Route through the SAME
             # constitution-perceiving primitive the acid path uses, then through
             # the ONE assembler, so the amide and the acid cannot disagree.
+            #
+            # v33 Phase 6 (E3 Task 4): `has_hetero` used to gate this call OFF
+            # entirely, so a branch carrying its own heteroatom decoration
+            # (amino, carboxy, hydroxy, ...) beyond the attachment N -- e.g.
+            # saccharopine's N-(5-amino-5-carboxypentyl) arm -- fell straight
+            # through to `return None` and the whole molecule was dropped
+            # (SELF-01 suppressed the atom-incomplete parent-only candidate).
+            # `composed_prefix_organyl_name` already routes through
+            # `name_substituent`, the SAME cascade that names '2-carboxyethyl'
+            # and '5-amino-5-carboxypentyl' as compound alkyl prefixes
+            # elsewhere in this tree, and it fails closed (None) on anything
+            # it cannot prove -- so dropping the heteroatom restriction only
+            # ADDS coverage; a pure-alkyl branch is unaffected (byte-identical
+            # path, unconditional on has_hetero).
             _organyl = composed_prefix_organyl_name(mol, visited, branches[0])
             if _organyl is None:
                 return None

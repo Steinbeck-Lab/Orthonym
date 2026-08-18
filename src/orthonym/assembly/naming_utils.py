@@ -119,6 +119,22 @@ BRANCH_HANDLED_FGS: frozenset = frozenset({
     'fluoro', 'chloro', 'bromo', 'iodo',  # -> "fluoromethyl" etc.
     'nitro',              # W2F-P3 -> "nitromethyl", "1,2-dinitropropyl"
 })
+# v33 Phase 6 (E3 Task 6) tried adding 'aldehyde' here and REVERTED it: it
+# broke `tests/unit/rules/test_bugb_guard.py::test_no_dangerous_entries`
+# (aldehyde/ketone/nitrile/... are deliberately excluded because this whole
+# set means "trust the branch namer blindly"), and doing so UNMASKED a
+# separate, pre-existing, genuinely dangerous bug: a `-CH2-CHO` branch on
+# `OC(=O)C(CC=O)CCC` is mis-named "(2-hydroxyethyl)" (a different molecule,
+# the aldehyde read as a hydroxyl) by the compound-substituent namer, and with
+# 'aldehyde' in this set that wrong branch name would have been TRUSTED
+# (skipping the parent-level "oxo" that used to at least keep the atom count
+# honest, even if duplicated). SELF-01 still caught the resulting name in
+# both directions (RT mismatch), so 0-wrong held either way, but "safe
+# either way" is not "safe to ship" per this set's own documented contract.
+# The real Task 6 fix (`C/C=C(\\C=O)C(CC(=O)O)CC(=O)O`'s duplicate unlocated
+# "oxo") is instead scoped narrowly in `_handler_shared.py`'s FG-prefix loop
+# to the UNLOCATABLE case specifically (see the comment there), leaving this
+# frozenset and its dangerous-FG contract untouched.
 
 # ---------------------------------------------------------------------------
 # P-16.3.3(b)/P-16.2.4.1(d) / P-29.6.1: the italicized STRUCTURAL prefixes that are written with a
