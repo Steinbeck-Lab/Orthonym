@@ -1838,7 +1838,7 @@ def _name_polyfunctional_acyclic_substituent(
         if any(cnt >= 2 for cnt in _acyloxy_tokens.values()):
             return None
 
-    # ---- Pass 1c2 (v33 Phase 6 Wave 2, #5b, P-66.5.1 / P-29.3.2): a pendant
+    # ---- Pass 1c2 (v33 Phase 6 Wave 2, #5b, P-61.5.1 / P-29.3.2): a pendant
     # NITRO group on a backbone carbon (-CH2-N+(=O)[O-], the charge-separated
     # graph form of -NO2) is the detachable 'nitro' prefix, consumed HERE --
     # before Pass 1d's generic cation loop just below, which ALSO matches on

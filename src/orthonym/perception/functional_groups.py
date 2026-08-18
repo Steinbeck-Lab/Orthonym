@@ -556,7 +556,7 @@ FUNCTIONAL_GROUP_SMARTS = {
     "diazenyl": "[NX2H1]=[NX2][#6]",
 
     # === OTHER ===
-    # BBR-PERC/DEF-4 (169.7): C-attached nitro only (P-65.3.1) via recursive-env so the
+    # BBR-PERC/DEF-4 (169.7): C-attached nitro only (P-61.5.1) via recursive-env so the
     # match-tuple arity is unchanged; stops nitrate ESTERS (R-O-NO2, CCO[N+](=O)[O-]) from
     # false-matching as nitro. Aliphatic + aromatic C both satisfy [#6].
     "nitro": "[NX3+;$([NX3+][#6])](=O)[O-]",
