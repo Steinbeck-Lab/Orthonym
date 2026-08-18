@@ -83,14 +83,46 @@ def test_no_regression_vinyl_and_alkyl(smi, expected):
     "O=[N+]([O-])/C=C/c1ccc(O)cc1",   # nitrovinyl
     "CS/C=C/c1ccc(O)cc1",             # vinyl thioether
 ])
-def test_blocker1_stereo_completeness_abstains(smi):
+def test_blocker1_stereo_completeness_never_drops_ez(smi):
     """fable-b2 BLOCKER 1 / invariant 9: a substituent with a DEFINED-stereo C=C
-    whose name would drop the E/Z descriptor (legacy `Xethenyl` tier) must NOT ship
-    (the gate's stereo carve-out would pass a wrong-molecule name). The stereo-
-    completeness guard declines -> abstain (0-wrong), never a `...ethenylphenol`."""
+    must NEVER ship a name that DROPS the E/Z descriptor (the legacy `Xethenyl`
+    tier — a wrong-molecule name). The invariant is 0-wrong, and it is now met two
+    ways: an abstention (`unknown organic compound`) OR a stereo-COMPLETE name that
+    round-trips with full stereo. v33 Phase 6 (E3): the FindMolChiralCenters
+    shared-mol `_CIPCode`-wipe fix lets the nitrovinyl now name CORRECTLY WITH its
+    (1E) descriptor (`4-[(1E)-2-nitroeth-1-en-1-yl]phenol`, RT-full) instead of
+    abstaining; the enol-ether / vinyl-thioether still abstain (their substituent
+    prefix isn't built). Either outcome is 0-wrong; a descriptor-less `ethenylphenol`
+    or a bare `…enyl…phenol` with no E/Z is the forbidden case."""
+    from rdkit import Chem
+    from rdkit.Chem import inchi
+    from orthonym.validation.opsin_roundtrip import opsin_parse
     n = _pin().name(smi) or ""
-    assert "ethenylphenol" not in n and n != "", None  # abstains, not the wrong name
-    assert n == "unknown organic compound", n
+    # the forbidden stereo-dropped forms
+    assert "ethenylphenol" not in n
+    named = n and "unknown" not in n
+    if named:
+        # if it ships a name for a defined-stereo C=C, it MUST carry the descriptor
+        # AND round-trip with full stereo (0-wrong)
+        assert any(d in n for d in ("(E)", "(Z)", "1E", "1Z", "2E", "2Z")), n
+        o = opsin_parse(n)
+        assert o and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == \
+            inchi.MolToInchiKey(Chem.MolFromSmiles(o)), n
+
+
+@pytest.mark.opsin_gate
+def test_blocker1_nitrovinyl_now_names_with_stereo():
+    """The nitrovinyl witness specifically now names to the exact stereo-complete
+    PIN (v33 Phase 6 E3 stereo-wipe fix)."""
+    from rdkit import Chem
+    from rdkit.Chem import inchi
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    smi = "O=[N+]([O-])/C=C/c1ccc(O)cc1"
+    n = _pin().name(smi)
+    assert n == "4-[(1E)-2-nitroeth-1-en-1-yl]phenol", n
+    o = opsin_parse(n)
+    assert o and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == \
+        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
 
 
 def test_blocker2_benzonitrile_brackets_complex_substituent():
