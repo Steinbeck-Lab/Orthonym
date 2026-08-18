@@ -1695,6 +1695,25 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             )
             if _ester_pin:
                 return _ester_pin
+        elif len(_ester_matches_all) == 2:
+            # v33 Phase 6 (diacylglycerol-shape fix, PHASE6-DIESTER-OL-
+            # SENIORITY): P-65.6.3.3.4.2 + P-44.3 -- a partially-esterified
+            # polyol carrying TWO different noncyclic esters plus a free
+            # hydroxyl. The senior acid (longer principal chain) stays the
+            # functional-class parent; the other ester becomes an acyloxy
+            # prefix and the free -OH a hydroxy prefix, both on the 'yl'
+            # word -- NOT the EL-02 demotion below, which wrongly promotes
+            # the junior hydroxy class to principal (inverting P-41: ester
+            # class 9 outranks hydroxy class 17). Fail-closed: declines
+            # (None) for anything outside its narrow scope (a tied acid
+            # length, a ring acid, an off-chain decoration, ...), falling
+            # through to EL-02 unchanged.
+            from ..rules.esters import name_polyfunctional_diester_free_hydroxy
+            _diester_pin = name_polyfunctional_diester_free_hydroxy(
+                mol, _ester_matches_all, principal_chain,
+            )
+            if _diester_pin:
+                return _diester_pin
 
     # --- EL-02 (fallback): Ester demotion in polyfunctional context ---
     # Legacy path, reached only when the acid-analog naming above declined

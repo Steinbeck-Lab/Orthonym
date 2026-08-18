@@ -1088,6 +1088,58 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)
 
+    # v33 Phase 6: the acid-side word (chain-vs-ring selection, acid-side
+    # substituent discovery, and R/S stereo citation) is built by the shared
+    # primitive so `name_polyfunctional_diester_free_hydroxy` (the
+    # diacylglycerol-shape multi-ester path) builds it identically for
+    # whichever ester it selects as the principal/senior acid.
+    acylate_name = _build_ester_acid_word(mol, ester_match, acid_atoms, alkyl_atoms)
+    if acylate_name is None:
+        return None
+
+    # Get alkyl name
+    alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
+
+    if not alkyl_name:
+        return None
+
+    # STER-12: Collect alkyl-side (alcohol fragment) stereo descriptors.
+    # Skip if the alkyl name already contains a stereo prefix.
+    import re as _re
+    from .stereochemistry import format_stereodescriptor_string as _fmt_stereo
+    if not _re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name):
+        alkyl_stereo = _collect_alkyl_fragment_stereo(mol, alkyl_atoms, ester_match)
+        alkyl_stereo = [(loc, cip) for loc, cip in alkyl_stereo if cip in ('R', 'S')]
+        if alkyl_stereo:
+            alkyl_stereo_prefix = _fmt_stereo(alkyl_stereo)
+            alkyl_name = f"{alkyl_stereo_prefix}{alkyl_name}"
+
+    # Combine: "alkyl acylate"
+    return f"{alkyl_name} {acylate_name}"
+
+
+def _build_ester_acid_word(
+    mol, ester_match: tuple, acid_atoms: List[int], alkyl_atoms: List[int],
+) -> Optional[str]:
+    """Build the acid-side word ('<stereo><prefixes><acid>oate') for ONE
+    ester match (P-65.6.3.2: the ester's suffix half).
+
+    v33 Phase 6: extracted verbatim from ``name_ester`` (which used to build
+    this inline) so it is a SINGLE source of truth, shared by ``name_ester``
+    itself and by ``name_polyfunctional_diester_free_hydroxy`` (the
+    diacylglycerol-shape path, which builds the acid word for whichever of
+    its two esters is selected as the senior/principal acid, then names the
+    OTHER ester as an acyloxy prefix on the alkyl side instead of calling
+    this function a second time).
+
+    Returns None (fail-closed) when the acid side cannot be named — a
+    complex ring acid whose ring-naming fails, or an acid-side substituent
+    the universal prefix pipeline cannot discover.
+    """
+    # Ensure CIP labels are assigned (idempotent guard)
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(mol)
+
     # --- Phase 86-02: Acid-side substituent discovery via universal pipeline ---
     # Find the principal chain in the acid fragment to correctly identify
     # chain length (excluding branch carbons) and discover substituents.
@@ -1150,8 +1202,13 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
             acid_name = get_acid_fragment_name(mol, acid_atoms)
     else:
         # --- ESTR-01/ESTR-02: Ring acid path (NEW) ---
-        # ring_acid_name already computed at line 776 and verified non-None
-        # (otherwise we would have returned None at line 779).
+        # `name_ester`'s own early guard already verified
+        # get_ring_acid_name(mol, acid_atoms) is non-None before calling this
+        # helper (it returns None outright otherwise); recomputed here so
+        # this function is self-contained for any other caller.
+        ring_acid_name = get_ring_acid_name(mol, acid_atoms)
+        if ring_acid_name is None:
+            return None
         acid_name = ring_acid_name
 
         # Discover substituents on the ring atoms using universal pipeline
@@ -1257,23 +1314,6 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if acid_prefix_str:
         acylate_name = f"{acid_prefix_str}{acylate_name}"
 
-    # Get alkyl name
-    alkyl_name = get_alkyl_fragment_name(mol, alkyl_atoms)
-
-    if not alkyl_name:
-        return None
-
-    # STER-12: Collect alkyl-side (alcohol fragment) stereo descriptors.
-    # Skip if the alkyl name already contains a stereo prefix.
-    import re as _re
-    from .stereochemistry import format_stereodescriptor_string as _fmt_stereo
-    if not _re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name):
-        alkyl_stereo = _collect_alkyl_fragment_stereo(mol, alkyl_atoms, ester_match)
-        alkyl_stereo = [(loc, cip) for loc, cip in alkyl_stereo if cip in ('R', 'S')]
-        if alkyl_stereo:
-            alkyl_stereo_prefix = _fmt_stereo(alkyl_stereo)
-            alkyl_name = f"{alkyl_stereo_prefix}{alkyl_name}"
-
     # Collect R/S stereodescriptors for atoms in the acid fragment.
     # Skip if the acid name already contains stereo (e.g., from the unsaturation
     # path which produces names like "(4E)-octa-4,7-dienoic").
@@ -1287,15 +1327,12 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
         # Only keep R/S descriptors (E/Z is handled by the unsaturation path)
         acid_stereo = [(loc, cip) for loc, cip in acid_stereo if cip in ('R', 'S')]
 
-    # Combine: "alkyl acylate"
-    name = f"{alkyl_name} {acylate_name}"
-
-    # Prepend R/S stereo prefix to the acylate portion
+    # Prepend R/S stereo prefix to the acylate word
     if acid_stereo:
         stereo_prefix = format_stereodescriptor_string(acid_stereo)
-        name = f"{alkyl_name} {stereo_prefix}{acylate_name}"
+        acylate_name = f"{stereo_prefix}{acylate_name}"
 
-    return name
+    return acylate_name
 
 
 def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
@@ -2740,6 +2777,208 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     if len(ate) < 4 or ate.startswith("ano"):
         return None
     return f"{alkyl_name} {ate}"
+
+
+def name_polyfunctional_diester_free_hydroxy(
+    mol, ester_matches: list, principal_chain: list,
+) -> Optional[str]:
+    """P-65.6.3.3.4.2 (BB verbatim worked example at P-65.6.3.3.4: '2-(acetyl-
+    oxy)-3-(hexadecanoyloxy)propyl (9Z)-octadec-9-enoate') + P-44.3 (greater
+    number of skeletal atoms): a partially-esterified acyclic polyol bearing
+    exactly TWO different noncyclic ester groups plus >=1 free hydroxyl, all
+    on the SAME short saturated carbon backbone (the diacylglycerol shape).
+
+    The senior acid (the ester whose acid-side principal chain has MORE
+    carbons -- P-44.3 seniority of chains) stays the functional-class parent
+    ('<yl> <acid>oate'); the OTHER ester is demoted to an 'acyloxy' prefix
+    and the free hydroxyl(s) to 'hydroxy' prefixes, both cited on the 'yl'
+    word, exactly as P-65.6.3.3.4.2's worked examples do it.
+
+    v33 Phase 6: this closes the gap where ``name_polyfunctional_ester_via_
+    acid`` (the single-ester acid-analog strategy) declines outright for
+    >1 ester match, and the legacy EL-02 fallback in
+    ``rules/polyfunctional.py::name_polyfunctional`` then demoted BOTH
+    esters and promoted the junior hydroxy class to principal -- inverting
+    P-41 (ester class 9 outranks hydroxy class 17).
+
+    Fail-closed scope (returns None -- caller falls through to the legacy
+    EL-02 acyloxy-all/'-ol' demotion, which is uglier but not wrong -- for
+    anything broader):
+      - exactly 2 ester matches;
+      - `principal_chain` is a plain acyclic, saturated, all-carbon chain;
+      - BOTH esters' alkyl (alcohol-side) attachment atoms sit ON that
+        chain, and neither acid is a ring acid;
+      - every atom of `principal_chain` not consumed by an ester attachment
+        is either UNDECORATED or bears exactly one free hydroxyl (any other
+        decoration -- halogen, amine, a third ester, ... -- declines);
+      - the two acids' principal-chain lengths are NOT tied (a tie is
+        outside this narrow scope).
+    """
+    if len(ester_matches) != 2:
+        return None
+    if not principal_chain or len(principal_chain) < 2:
+        return None
+    chain_set = set(principal_chain)
+
+    # The backbone this path decorates must be a plain acyclic saturated
+    # carbon chain -- it never renders a ring or an unsaturated backbone.
+    for a in principal_chain:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
+            return None
+    for i in range(len(principal_chain) - 1):
+        bond = mol.GetBondBetweenAtoms(principal_chain[i], principal_chain[i + 1])
+        if bond is None or bond.GetBondTypeAsDouble() != 1.0:
+            return None
+
+    infos = []
+    for m in ester_matches:
+        if len(m) < 4:
+            return None
+        alkyl_c = m[3]
+        if alkyl_c not in chain_set:
+            return None
+        acid_atoms, alkyl_atoms = parse_ester_fragments(mol, m)
+        if not acid_atoms or not alkyl_atoms:
+            return None
+        if acid_is_ring_acid(mol, acid_atoms):
+            return None  # bounded to acyclic acids
+        acid_chain = _find_acid_principal_chain(mol, acid_atoms)
+        if not acid_chain:
+            return None
+        infos.append({
+            'match': m, 'attach': alkyl_c,
+            'acid_atoms': acid_atoms, 'alkyl_atoms': alkyl_atoms,
+            'acid_len': len(acid_chain),
+        })
+
+    if infos[0]['acid_len'] == infos[1]['acid_len']:
+        return None  # tied acid length -- outside this narrow scope
+
+    infos.sort(key=lambda x: -x['acid_len'])
+    principal, demoted = infos[0], infos[1]
+
+    # The demoted ester's acyloxy prefix -- reuses the SAME single-ester
+    # prefix builder the ring-acid path already relies on, so the spelling
+    # ('(9Z)-pentadec-9-enoyloxy') is identical to what OST already emits
+    # elsewhere for this exact acyl group.
+    acyloxy_word = name_ester_as_prefix(mol, demoted['match'])
+    if not acyloxy_word:
+        return None
+
+    # Any OTHER backbone position must carry a free chain hydroxyl (the
+    # only junior decoration this path knows how to place). Anything else
+    # (halogen, amine, a third ester, ...) declines fail-closed.
+    consumed = {principal['attach'], demoted['attach']}
+    hydroxy_atoms = []
+    for a in principal_chain:
+        if a in consumed:
+            continue
+        atom = mol.GetAtomWithIdx(a)
+        oh_nbrs = [nb for nb in atom.GetNeighbors()
+                   if nb.GetSymbol() == 'O' and nb.GetIdx() not in chain_set
+                   and nb.GetTotalNumHs() >= 1]
+        if len(oh_nbrs) == 1:
+            hydroxy_atoms.append(a)
+        elif oh_nbrs:
+            return None  # more than one O-substituent here -- unmodelled
+
+    # The ester oxygen that bridges each attachment atom to its own acid
+    # side belongs to NEITHER acid_atoms nor alkyl_atoms (parse_ester_
+    # fragments splits AT that atom), so it must be matched by identity,
+    # not fragment membership.
+    ester_o_for = {
+        principal['attach']: principal['match'][2],
+        demoted['attach']: demoted['match'][2],
+    }
+    accounted = consumed | set(hydroxy_atoms)
+    for a in principal_chain:
+        atom = mol.GetAtomWithIdx(a)
+        for nb in atom.GetNeighbors():
+            nidx = nb.GetIdx()
+            if nidx in chain_set:
+                continue
+            if nb.GetAtomicNum() <= 1:
+                continue  # implicit/explicit H
+            if a in ester_o_for and nidx == ester_o_for[a]:
+                continue  # this position's own ester oxygen
+            if a in accounted and nb.GetSymbol() == 'O' and nb.GetTotalNumHs() >= 1:
+                continue  # this position's own free hydroxyl
+            return None  # unaccounted decoration -- decline
+
+    # ---- Numbering (P-29.2 / P-46.1.8): the principal ester's attachment
+    # atom gets the LOWEST possible locant on the 'yl' word; on an
+    # exact-centre tie, P-14.5.2 gives the lowest locant to whichever
+    # decoration is cited first in alphanumerical order. ----
+    chain = list(principal_chain)
+    attach = principal['attach']
+    fwd_k = chain.index(attach) + 1
+    rev_k = len(chain) - chain.index(attach)
+
+    decorations = {demoted['attach']: acyloxy_word}
+    for a in hydroxy_atoms:
+        decorations[a] = 'hydroxy'
+
+    if rev_k < fwd_k:
+        chain = list(reversed(chain))
+    elif rev_k == fwd_k:
+        from ..assembly.naming_utils import alpha_sort_key as _alpha_sort_key
+        chain_len0 = len(chain)
+        fwd_pos = {a: chain.index(a) + 1 for a in decorations}
+        rev_pos = {a: chain_len0 + 1 - p for a, p in fwd_pos.items()}
+        if fwd_pos != rev_pos:
+            names_alpha = sorted(decorations, key=lambda a: _alpha_sort_key(decorations[a]))
+            cur_seq = tuple(fwd_pos[a] for a in names_alpha)
+            flip_seq = tuple(rev_pos[a] for a in names_alpha)
+            if flip_seq < cur_seq:
+                chain = list(reversed(chain))
+
+    k = chain.index(attach) + 1
+    chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+
+    # ---- Build the decorated 'yl' word (P-14.5 prefix ordering + P-16.5.4
+    # enclosing-mark escalation, both via the shared formatter). ----
+    from collections import defaultdict as _dd
+    from ..assembly.composer import _format_prefix_groups
+    branch_groups: dict = _dd(list)
+    if hydroxy_atoms:
+        branch_groups['hydroxy'] = sorted(chain_pos[a] for a in hydroxy_atoms)
+    branch_groups[acyloxy_word].append(chain_pos[demoted['attach']])
+    prefix_str = _format_prefix_groups(dict(branch_groups))
+
+    chain_len = len(chain)
+    if k == 1:
+        try:
+            base = get_alkyl_name(chain_len)
+        except (ValueError, KeyError):
+            return None
+        yl_word = f"{prefix_str}{base}"
+    else:
+        try:
+            stem = get_chain_prefix(chain_len)
+        except (ValueError, KeyError):
+            return None
+        yl_word = f"{prefix_str}{stem}an-{k}-yl"
+
+    # Stereo on the yl fragment (P-92 / mirrors name_ester's STER-12
+    # collector, renumbered to THIS chain's own locants -- the attachment
+    # atom is frequently the stereocentre, e.g. '(2S)-...propan-2-yl').
+    from .stereochemistry import (
+        collect_stereodescriptors as _collect_stereo,
+        format_stereodescriptor_string as _fmt_stereo,
+    )
+    yl_stereo = [(loc, cip) for loc, cip in _collect_stereo(mol, chain_pos)
+                 if cip in ('R', 'S')]
+    if yl_stereo:
+        yl_word = f"{_fmt_stereo(yl_stereo)}{yl_word}"
+
+    acylate_word = _build_ester_acid_word(
+        mol, principal['match'], principal['acid_atoms'], principal['alkyl_atoms'],
+    )
+    if not acylate_word:
+        return None
+
+    return f"{yl_word} {acylate_word}"
 
 
 def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
