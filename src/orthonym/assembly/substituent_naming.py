@@ -1302,6 +1302,13 @@ _POLYFUNC_CARBOXY_PREFIX = "carboxy"
 # unverified -- SPY showed no tier names a chain+thiol branch at all, not even
 # the 2-atom case).
 _POLYFUNC_SULFANYL_PREFIX = "sulfanyl"
+# v33 Phase 6 Wave 2 (#5b, P-66.5.1): the nitro group, charge-separated in the
+# graph (-N+(=O)[O-]) but net-neutral as a substituent -- consumed by the
+# dedicated Pass 1c2 below BEFORE Pass 1d's generic cation loop and Pass 2's
+# blanket charge decline can see it, so it is numbered from the free valence
+# exactly like hydroxy/amino/halogen ('2-nitroethyl', not the bare 'nitroethyl'
+# or the wrong-end '1-nitropropyl').
+_POLYFUNC_NITRO_PREFIX = "nitro"
 
 
 def _name_carbamoylamino_chain_substituent(
@@ -1830,6 +1837,78 @@ def _name_polyfunctional_acyclic_substituent(
         # shape; a multiplicative acyloxy is a follow-on.)
         if any(cnt >= 2 for cnt in _acyloxy_tokens.values()):
             return None
+
+    # ---- Pass 1c2 (v33 Phase 6 Wave 2, #5b, P-66.5.1 / P-29.3.2): a pendant
+    # NITRO group on a backbone carbon (-CH2-N+(=O)[O-], the charge-separated
+    # graph form of -NO2) is the detachable 'nitro' prefix, consumed HERE --
+    # before Pass 1d's generic cation loop just below, which ALSO matches on
+    # this N (its formal charge is +1, so it satisfies Pass 1d's
+    # ``GetFormalCharge() <= 0: continue`` filter). Pass 1d hands any such atom
+    # to ``cation_to_prefix``, an onium-family builder (ammonium/oxonium/
+    # phosphonium, P-74.1.3) that structurally declines a nitro N (no host
+    # carries the onium's expected all-single-bond substituent pattern) and
+    # returns None -- a SILENT decline: Pass 1d does not consume the N or its
+    # two oxygens on a miss, so nothing here or in Pass 1d places it, and the
+    # fragment reaches Pass 2's blanket ``GetFormalCharge() != 0: return None``
+    # check, which declines the WHOLE fragment (nitro's charge-separated N+/O-
+    # never nets to zero ATOM BY ATOM, only in sum over the pair). That decline
+    # is why nitro -- alone among hydroxy/amino/carboxy/halogen -- never reached
+    # the free-valence-numbered builder below and fell back to the OLDER
+    # recursive whole-molecule namer instead, whose numbering anchors the
+    # SUBSTITUENT at ITS OWN lowest locant rather than the chain's free valence:
+    # '-CH2-CH2-CH2-NO2' capped to the free molecule 'nitropropane' numbers the
+    # nitro at C1 (both chain ends are termini once the attachment is capped
+    # with H), then the alkyl/alkoxy conversion re-roots the free valence at
+    # locant 1 WITHOUT renumbering the nitro -- '1-nitropropyl' instead of
+    # '3-nitropropyl', the SAME wrong-end bug the hydroxy/carboxy passes above
+    # exist to fix (P-29.3.2: the free valence takes locant 1).
+    #
+    # Structural match only, so this is a no-op for every other N+ shape
+    # (ammonium/oxonium cations fall through unchanged to Pass 1d): the N must
+    # carry formal charge +1, exactly 3 neighbours all inside the fragment --
+    # ONE single-bonded backbone carbon (the host, not yet consumed), ONE
+    # neutral terminal =O, and ONE terminal -O- of formal charge -1 -- and
+    # nothing else. Any deviation (extra substituent, ring N, wrong bond order/
+    # charge on either oxygen) is left alone for Pass 1d / Pass 2 to decline
+    # exactly as before this pass existed.
+    for _nidx in list(sub_set):
+        if _nidx in consumed:
+            continue
+        _na = mol.GetAtomWithIdx(_nidx)
+        if _na.GetSymbol() != 'N' or _na.GetFormalCharge() != 1:
+            continue
+        _nbrs = list(_na.GetNeighbors())
+        if len(_nbrs) != 3:
+            continue
+        _host_c = _dbl_o = _neg_o = None
+        _ok = True
+        for _nb in _nbrs:
+            _ni = _nb.GetIdx()
+            if _ni not in sub_set:
+                _ok = False
+                break
+            _bond = mol.GetBondBetweenAtoms(_nidx, _ni)
+            if (_nb.GetSymbol() == 'C' and _bond.GetBondType() == Chem.BondType.SINGLE
+                    and _host_c is None):
+                _host_c = _ni
+            elif (_nb.GetSymbol() == 'O' and _bond.GetBondType() == Chem.BondType.DOUBLE
+                    and _nb.GetFormalCharge() == 0 and _nb.GetDegree() == 1
+                    and _dbl_o is None):
+                _dbl_o = _ni
+            elif (_nb.GetSymbol() == 'O' and _bond.GetBondType() == Chem.BondType.SINGLE
+                    and _nb.GetFormalCharge() == -1 and _nb.GetDegree() == 1
+                    and _neg_o is None):
+                _neg_o = _ni
+            else:
+                _ok = False
+                break
+        if not (_ok and _host_c is not None and _dbl_o is not None
+                and _neg_o is not None) or _host_c in consumed:
+            continue
+        consumed.add(_nidx)
+        consumed.add(_dbl_o)
+        consumed.add(_neg_o)
+        _add_prefix(_host_c, _POLYFUNC_NITRO_PREFIX)
 
     # ---- Pass 1d (v33 Phase 3 enabler, P-74.1.3 / P-73): a pendant ONIUM --
     # cation branch off a backbone carbon (choline's -CH2-CH2-N+(CH3)3) is a
