@@ -1078,7 +1078,13 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     # naming fails defers to complex naming. WS-A task 9: an acid that
     # merely CONTAINS a ring down-chain is a chain acid with a ring
     # substituent — it takes the chain path below.
-    if acid_is_ring_acid(mol, acid_atoms):
+    #
+    # v33 Phase 6 (C): anchored on the KNOWN carbonyl carbon
+    # (``ester_match[0]``) via ``_carbonyl_is_ring_bonded``, never on a
+    # BFS-scanned ``acid_atoms`` set -- see that helper's docstring for why
+    # ``acid_is_ring_acid`` can wander into a second ester's atoms and
+    # return an order-dependent answer for the SAME molecule.
+    if _carbonyl_is_ring_bonded(mol, ester_match[0]):
         ring_acid_name = get_ring_acid_name(mol, acid_atoms)
         if ring_acid_name is None:
             # Complex ring acid (fused heterocycle etc.) - defer to complex naming
@@ -1145,10 +1151,13 @@ def _build_ester_acid_word(
     # chain length (excluding branch carbons) and discover substituents.
     acid_set = set(acid_atoms)
     # WS-A task 9: chain-vs-ring acid naming is decided by the CARBONYL
-    # bond, not mere ring presence (see acid_is_ring_acid).
-    acid_has_ring = acid_is_ring_acid(mol, acid_atoms)
+    # bond, not mere ring presence (see acid_is_ring_acid). v33 Phase 6 (C):
+    # anchored on the KNOWN carbonyl carbon (``ester_match[0]``), never a
+    # BFS-scanned ``acid_atoms`` set -- see ``_carbonyl_is_ring_bonded``.
+    acid_has_ring = _carbonyl_is_ring_bonded(mol, ester_match[0])
     acid_principal_chain = None
     acid_prefix_str = ""
+    ring_locant_for_suffix = None
 
     if not acid_has_ring:
         # --- Chain acid path (existing logic, unchanged) ---
@@ -1233,8 +1242,29 @@ def _build_ester_acid_word(
                     break
 
             if start_atom is not None:
-                pos = ring_atoms_in_acid.index(start_atom)
-                oriented_ring = ring_atoms_in_acid[pos:] + ring_atoms_in_acid[:pos]
+                # v33 Phase 6 (C): try BOTH ring-walk directions and pick
+                # the one giving lowest locants to the ring's OTHER
+                # substituents (P-31.1.4.2.4 (f)/(g)), reusing the SAME
+                # pg-aware orientation primitive the free-acid path already
+                # gets right (`orient_cycloalkane` /
+                # `_orient_cycloalkane_with_pg` in `cycloalkanes.py`). That
+                # primitive is order-invariant -- it exhaustively tries all
+                # 2n rotations, never just the ONE direction
+                # `RingInfo.AtomRings()` happened to return. The OLD code
+                # here only rotated `ring_atoms_in_acid` to start at
+                # `start_atom` in whatever direction AtomRings() gave it --
+                # never tried the reverse -- which was both a lowest-locant
+                # violation ('methyl 5-methylcyclopentanecarboxylate'
+                # instead of '2-methyl...') AND a determinism defect: the
+                # SAME molecule, spelled with a different SMILES atom
+                # order, can flip which direction AtomRings() returns.
+                from .cycloalkanes import get_ring_substituents, orient_cycloalkane
+                _sub_positions = get_ring_substituents(mol, tuple(ring_atoms_in_acid))
+                oriented_ring = orient_cycloalkane(
+                    mol, tuple(ring_atoms_in_acid), _sub_positions,
+                    principal_group_atoms={start_atom},
+                )
+                ring_locant_for_suffix = oriented_ring.index(start_atom) + 1
             else:
                 oriented_ring = ring_atoms_in_acid
 
@@ -1307,6 +1337,17 @@ def _build_ester_acid_word(
                     acid_prefix_str = extra_str
 
     acylate_name = get_acylate_name(acid_name)
+
+    # v33 Phase 6 (C), nit-1: P-14.3.3 "Citation of locants" is
+    # deny-by-default -- once the ring bears a substituent prefix (an
+    # essential locant), the ring's OWN suffix-attachment locant must also
+    # be cited ('methyl 2-methylcyclohexane-1-carboxylate', never
+    # '...cyclohexanecarboxylate'). An unsubstituted ring acid keeps the
+    # P-14.3.4 licensed omission -- 'methyl cyclohexanecarboxylate' is
+    # unaffected. Mirrors the Wave-2 independent-ester path
+    # (`_name_ring_principal_independent_esters`), which already does this.
+    if acid_has_ring and acid_prefix_str and ring_locant_for_suffix is not None:
+        acylate_name = _insert_ring_ester_locant(acylate_name, ring_locant_for_suffix)
 
     # Prepend acid-side substituent prefixes to the acylate name.
     # The prefix string from _format_prefix_groups ends without a trailing
@@ -1382,7 +1423,11 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
     # ('ethyl (5R,5S,6S)-2-[(3S,4S,5R)-...cyclohexylidene]acetate'). Exclude ring
     # atoms so the acid parent cites only its chain stereo. A RING acid (the ring IS
     # the parent) still cites its ring stereo.
-    _chain_acid = not acid_is_ring_acid(mol, acid_atoms)
+    #
+    # v33 Phase 6 (C): anchored on the KNOWN carbonyl carbon
+    # (``ester_match[0]``), never a BFS-scanned ``acid_atoms`` set -- see
+    # ``_carbonyl_is_ring_bonded``.
+    _chain_acid = not _carbonyl_is_ring_bonded(mol, ester_match[0])
 
     # BFS from carbonyl C through the acid fragment to build chain ordering
     # (carbonyl C = locant 1, next C = locant 2, etc.)
