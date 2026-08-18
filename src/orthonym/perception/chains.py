@@ -47,6 +47,22 @@ _HETEROACID_CHARACTERISTIC_Z: Dict[str, int] = {
     "sulfonoperoxoic_acid": 16, "sulfonothioic_S_acid": 16,
     "sulfonimidic_acid": 16, "sulfinimidic_acid": 16,
     "phosphonic_acid": 15, "phosphinic_acid": 15,
+    # v33 Phase 6 Wave 2 (#4): same bearing-carbon defect for the remaining
+    # Group-15/16 oxoacid FG classes (functional_groups.py ~94-114). arsonic_acid
+    # and stibonic_acid use the same recursive carbon guard as sulfonic_acid
+    # ("[AsX4;$([AsX4][#6])](=O)([OX2H1])[OX2H1]") -- carbon absent from the
+    # match tuple -- so As/Sb were already MASKED (they name via a substituent-
+    # prefix fallback) rather than defect-free; added here for parity/robustness.
+    # selenonic_acid/seleninic_acid/telluronic_acid/tellurinic_acid are the SAME
+    # recursive-guard shape and were live abstentions (longer competing carbon
+    # chain wins the parent) until this entry. arsinic_acid/stibinic_acid carry
+    # both carbons as LITERAL match atoms (like phosphinic_acid) so have no live
+    # bug, but are included for consistency -- harmless, see phosphinic_acid note
+    # above.
+    "arsonic_acid": 33, "arsinic_acid": 33,
+    "stibonic_acid": 51, "stibinic_acid": 51,
+    "selenonic_acid": 34, "seleninic_acid": 34,
+    "telluronic_acid": 52, "tellurinic_acid": 52,
 }
 
 
