@@ -168,8 +168,14 @@ def is_bicyclo_system(mol) -> bool:
     if get_spiro_atoms(mol):
         return False
 
-    # Must have exactly 2 true bridgeheads
-    bridgeheads = find_true_bridgeheads(mol)
+    # Must have exactly 2 true bridgeheads.
+    # Scoped to the connected-component ring atoms computed above
+    # (ring_atoms_set), NOT find_true_bridgeheads(mol)'s whole-molecule
+    # default: a pendant ring single-bonded to the core (e.g. a phenyl
+    # substituent on norbornane) makes that junction atom look like a
+    # 3rd bridgehead under the whole-molecule count, wrongly rejecting a
+    # genuinely bicyclic core. See perception.rings.find_ring_bridgeheads.
+    bridgeheads = find_ring_bridgeheads(mol, ring_atoms_set)
     if len(bridgeheads) != 2:
         return False
 
@@ -337,7 +343,18 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
     if not is_bicyclo_system(mol):
         return None
 
-    bridgeheads = list(find_true_bridgeheads(mol))
+    # Scope the bridgehead count to the connected ring component (same fix
+    # as is_bicyclo_system, v33 Phase 6 lead b): a pendant ring single-bonded
+    # to the core must not inflate the whole-molecule bridgehead count and
+    # falsely disqualify a genuinely bicyclic core.
+    ri = mol.GetRingInfo()
+    ring_atoms = set()
+    for ring in ri.AtomRings():
+        ring_atoms.update(ring)
+    from .polycyclic import _get_largest_connected_ring_component
+    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
+
+    bridgeheads = list(find_ring_bridgeheads(mol, ring_atoms))
     if len(bridgeheads) != 2:
         return None
 
@@ -348,12 +365,6 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
 
     # Verify bridge sum + 2 = total ring atoms (IUPAC invariant).
     # This catches invalid bridge calculations before generating bad names.
-    ri = mol.GetRingInfo()
-    ring_atoms = set()
-    for ring in ri.AtomRings():
-        ring_atoms.update(ring)
-    from .polycyclic import _get_largest_connected_ring_component
-    ring_atoms = _get_largest_connected_ring_component(mol, ring_atoms)
     bridge_sum = sum(lengths)
     if bridge_sum + 2 != len(ring_atoms):
         return None
@@ -523,11 +534,14 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     if not is_bicyclo_system(mol):
         return None
 
-    bridgeheads = list(find_true_bridgeheads(mol))
+    # Scope to the connected ring component (v33 Phase 6 lead b) before
+    # counting bridgeheads, so a pendant ring's junction atom is never
+    # mistaken for a 3rd bridgehead.
+    ring_atoms = get_bicyclo_ring_atoms(mol) or set()
+    bridgeheads = list(find_ring_bridgeheads(mol, ring_atoms))
     if len(bridgeheads) != 2:
         return None
 
-    ring_atoms = get_bicyclo_ring_atoms(mol) or set()
     suffix_set = {i for i in (suffix_ring_atoms or set()) if i in ring_atoms}
 
     # WS-6 / BBR-RCON (DEF-7): enumerate the ADMISSIBLE von Baeyer numberings
@@ -601,7 +615,12 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     that bridge, where the old forward order silently swapped it onto the
     wrong ring atom -- a WRONG MOLECULE, not merely a mis-numbered one.
     """
-    bridgeheads = list(find_true_bridgeheads(mol))
+    # Scope to the connected ring component (v33 Phase 6 lead b): a pendant
+    # ring's junction atom must not be mistaken for a 3rd bridgehead.
+    ring_atoms = get_bicyclo_ring_atoms(mol)
+    if not ring_atoms:
+        return None
+    bridgeheads = list(find_ring_bridgeheads(mol, ring_atoms))
     if len(bridgeheads) != 2:
         return None
     bh1, bh2 = bridgeheads[0], bridgeheads[1]
@@ -894,8 +913,10 @@ def get_complete_bicyclo_data(mol, suffix_ring_atoms: Optional[Set[int]] = None)
     # Get unsaturation
     unsaturation = detect_bicyclo_unsaturation(mol, ring_atoms)
 
-    # Get bridgeheads
-    bridgeheads = find_true_bridgeheads(mol)
+    # Get bridgeheads. Scoped to the connected ring component (v33 Phase 6
+    # lead b), same as is_bicyclo_system: a pendant ring's junction atom
+    # must not be mistaken for a 3rd bridgehead.
+    bridgeheads = find_ring_bridgeheads(mol, ring_atoms)
 
     # Count ALL ring atoms for parent name (IUPAC: heteroatoms count toward
     # ring size in replacement nomenclature). carbon_count is kept for

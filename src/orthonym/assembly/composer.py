@@ -4622,11 +4622,27 @@ def _build_bicyclo_substituent_prefix(
             is_pure_hydrocarbon = all(
                 mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in sub_frag_atoms
             )
-            if not is_pure_hydrocarbon:
+            # v33 Phase 6 (lead b follow-on): "pure hydrocarbon" does not mean
+            # "acyclic chain" -- a pendant RING substituent (phenyl, cyclohexyl,
+            # ...) is also all-carbon. get_alkyl_name(carbon_count) below assumes
+            # an open chain and silently re-spells a same-carbon-count ring as an
+            # alkyl -- e.g. 2-phenylnorbornane (6-carbon phenyl) became
+            # '2-hexylbicyclo[2.2.1]heptane', a different molecule (caught by the
+            # top-level SELF-01 gate, which abstained rather than emit it, but the
+            # bicyclo composer must not build the wrong candidate in the first
+            # place). Route any substituent fragment containing a ring atom
+            # through the same recursive namer used for heteroatom-bearing
+            # substituents below, instead of the acyclic alkyl path.
+            is_ring_hydrocarbon = is_pure_hydrocarbon and any(
+                mol.GetAtomWithIdx(a).IsInRing() for a in sub_frag_atoms
+            )
+            if not is_pure_hydrocarbon or is_ring_hydrocarbon:
                 first_atom = sub_info.get('first_atom')
-                het_name = _check_for_acylamino(
-                    mol, sub_frag_atoms, list(atom_to_locant.keys())
-                )
+                het_name = None
+                if not is_ring_hydrocarbon:
+                    het_name = _check_for_acylamino(
+                        mol, sub_frag_atoms, list(atom_to_locant.keys())
+                    )
                 if het_name is None and first_atom is not None:
                     from .substituent_enumerator import name_substituent
                     _cand = name_substituent(mol, sub_frag_atoms, first_atom)
@@ -4637,7 +4653,7 @@ def _build_bicyclo_substituent_prefix(
                 sub_groups[het_name].append(locant)
                 continue
 
-            # Get alkyl name (pure hydrocarbon substituent -- unchanged)
+            # Get alkyl name (pure hydrocarbon, non-ring substituent -- unchanged)
             alkyl_name = get_alkyl_name(carbon_count)
             sub_groups[alkyl_name].append(locant)
 
