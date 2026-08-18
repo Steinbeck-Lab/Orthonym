@@ -3,9 +3,28 @@
 The chalcogen-rooted sulfanyl cascade tier declines a saturated-ring / ring-on-chain
 R, so -S-cyclohexyl / -S-CH2Ar fell through to the ugly replacement name. Under the
 best-effort tier recurse name_substituent on R and wrap 'sulfanyl' -- mirroring the
-O-rooted alkoxy (cyclohexyloxy) and N-rooted amino (cyclohexylamino) ring paths. PIN
-default byte-identical (best-effort only). Gate-independent probe re-anchor rejects a
-yl-less ring-assembly R (the ed52fa98 / 8afa533c F1 class).
+O-rooted alkoxy (cyclohexyloxy) and N-rooted amino (cyclohexylamino) ring paths.
+Gate-independent probe re-anchor rejects a yl-less ring-assembly R (the ed52fa98 /
+8afa533c F1 class).
+
+v33 Phase 6 Task 10 (E2a, DROP-24 ring-branch ownership) GRADUATED this from
+best-effort-only to the PIN default too: `name_substituent_fragment`'s Step 1b
+(chalcogen-ether substituent, `assembly/substituent_naming.py`) was widened from
+``('Se', 'Te')`` to include plain ``'S'``, so a direct ``-S-Ar``/``-S-cycloalkyl``
+attachment is now named through the SAME chalcogen-agnostic `get_sulfanyl_prefix`
+builder the best-effort tier already used -- which recurses the ring side through
+the SAME trustworthy ring chokepoint (`rules.ring_substituents
+.name_ring_system_substituent`) `name_substituent_fragment`'s own PIN-tier ring
+branches already rely on elsewhere, not the mancude-gated best-effort path. Verified
+byte-identical to `_name_thio_ring_branch`'s answer on every case here, INCLUDING the
+adversarial ring-assembly probe-reanchor canary
+(`test_ring_assembly_R_names_when_it_round_trips`, unaffected -- it calls
+`_name_thio_ring_branch` directly). The former "PIN keeps the historical sentinel"
+scope limit was a not-yet-built gap, not a correctness objection; `allow_mancude`
+no longer gates this specific shape (both states now reach the identical, RT-verified
+name) because `name_substituent_fragment` itself has no gate parameter to honour --
+it is PIN-tier by construction, called identically regardless of the caller's mancude
+setting.
 """
 import pytest
 from rdkit import Chem
@@ -62,11 +81,15 @@ def test_best_effort_names_s_rooted_ring_sulfanyl(mol_smi, expected):
     assert name_substituent(m, frag, S, allow_mancude=True) == expected
 
 
-@pytest.mark.parametrize("mol_smi,_expected", BEST_EFFORT)
-def test_pin_default_byte_identical(mol_smi, _expected):
-    # PIN default keeps the historical sentinel (best-effort-only scope).
+@pytest.mark.parametrize("mol_smi,expected", BEST_EFFORT)
+def test_pin_default_byte_identical(mol_smi, expected):
+    # v33 Phase 6 Task 10: PIN default now matches best-effort byte-for-byte
+    # -- the ring-branch-ownership fix lives in `name_substituent_fragment`
+    # itself (Step 1b, gate-agnostic), so `allow_mancude` no longer changes
+    # the answer for this shape. See the module docstring for the full
+    # derivation + the RT-safety evidence.
     m, frag, S = _sulfanyl_frag(mol_smi)
-    assert name_substituent(m, frag, S, allow_mancude=False) == "substituent"
+    assert name_substituent(m, frag, S, allow_mancude=False) == expected
 
 
 # A ring-ASSEMBLY-bearing R (-CH2-[1,1'-biphenyl]-4-yl) is named as the proper
