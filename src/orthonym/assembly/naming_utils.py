@@ -2574,10 +2574,14 @@ def _wrap_n_substituent(name: str) -> str:
             if depth == 0 and i == len(name) - 1:
                 # The opening paren matches the closing paren at the end
                 return name
-    # Contains parentheses (stereo prefix, compound sub-substituent, etc.)
-    # -> escalate to square brackets per P-16.5.4.1.5 (BB 7509)
-    if '(' in name:
-        return f"[{name}]"
+    # Contains an inner enclosing mark (stereo prefix, compound sub-substituent,
+    # an already-bracketed sub-fragment, etc.) -> escalate ( -> [ -> { per
+    # P-16.5.4.1 via the shared primitive, which auto-detects the nesting depth
+    # from the name's existing marks. The old `'(' in name -> f"[{name}]"` capped
+    # at one level and produced a double `[[...]...]` when the name already held a
+    # square bracket (e.g. an N-[(biphenylyl)methyl] arm) -- v33 Phase 6 (B).
+    if any(mark in name for mark in '(['):
+        return apply_enclosing_marks(name, -1)
     return name
 
 

@@ -1763,6 +1763,11 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     if ester_acyloxy_prefixes:
         # Group identical acyloxy prefixes for multipliers
         from collections import Counter as _Ctr
+        # v33 Phase 6 (B): enclose the acyloxy prefix via the shared escalation
+        # primitive ( -> [ -> { instead of a raw f"({acyloxy_name})", which
+        # produced a double `((...)...)` when the name already held an inner
+        # mark (e.g. an '(9Z)-octadec-9-enoyloxy' glycerolipid arm).
+        from ..assembly.naming_utils import apply_enclosing_marks as _enc
         acyloxy_groups: Dict[str, List] = defaultdict(list)
         for acyloxy_name, locant in ester_acyloxy_prefixes:
             acyloxy_groups[acyloxy_name].append(locant)
@@ -1770,18 +1775,19 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         for acyloxy_name, locants in sorted(acyloxy_groups.items()):
             valid_locants = sorted(loc for loc in locants if loc is not None)
             count = len(locants)
+            enc = _enc(acyloxy_name, -1)
             if count > 1 and valid_locants:
                 locant_str = ",".join(str(loc) for loc in valid_locants)
                 multiplier = get_multiplier_prefix(count, acyloxy_name)
-                all_prefixes.append(f"{locant_str}-{multiplier}({acyloxy_name})")
+                all_prefixes.append(f"{locant_str}-{multiplier}{enc}")
             elif valid_locants:
-                all_prefixes.append(f"{valid_locants[0]}-({acyloxy_name})")
+                all_prefixes.append(f"{valid_locants[0]}-{enc}")
             else:
                 if count > 1:
                     multiplier = get_multiplier_prefix(count, acyloxy_name)
-                    all_prefixes.append(f"{multiplier}({acyloxy_name})")
+                    all_prefixes.append(f"{multiplier}{enc}")
                 else:
-                    all_prefixes.append(f"({acyloxy_name})")
+                    all_prefixes.append(enc)
 
     # --- Generate FG prefixes from non-principal groups ---
     chain_set = set(principal_chain)

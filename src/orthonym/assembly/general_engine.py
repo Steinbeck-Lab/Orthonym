@@ -695,13 +695,18 @@ def _is_complex_prefix(name: str) -> bool:
 
 def _mult_prefix(n: int, name: str) -> Optional[str]:
     """'2,2-' + this -> 'dimethyl' / 'bis(2-chloroethyl)'. None if n too big."""
+    # v33 Phase 6 (B): enclose a complex prefix via the shared escalation
+    # primitive ( -> [ -> { instead of a raw f"({name})", which produced a
+    # double `((...)...)` when the name already held an inner mark (e.g. a
+    # stereo-led substituent '(7S)-7-hydroxyoctyl').
+    from .naming_utils import apply_enclosing_marks
     if n == 1:
-        return f"({name})" if _is_complex_prefix(name) else name
+        return apply_enclosing_marks(name, -1) if _is_complex_prefix(name) else name
     table = _MULT_COMPLEX if _is_complex_prefix(name) else _MULT_SIMPLE
     if n not in table:
         return None
     if table is _MULT_COMPLEX:
-        return f"{table[n]}({name})"
+        return f"{table[n]}{apply_enclosing_marks(name, -1)}"
     # P-16.3.3(b)/P-16.2.4.1(d) second leg: 'di-tert-butyl', never 'ditert-butyl'.
     from .naming_utils import multiplier_needs_hyphen
     return f"{table[n]}{'-' if multiplier_needs_hyphen(name) else ''}{name}"

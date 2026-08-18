@@ -1,0 +1,57 @@
+"""v33 Phase 6 (B): enclosing-mark escalation ( -> [ -> { at 3 render sites.
+All are LIVE, RT-OK-today spelling defects (P-16.5.4.1) — the fix must keep RT and
+never wrap a simple prefix or mangle a fusion descriptor."""
+import pytest
+from rdkit import Chem
+from rdkit.Chem import inchi
+from orthonym import Orthonym
+from orthonym.validation.opsin_roundtrip import opsin_parse
+
+
+@pytest.fixture(scope="module")
+def namer():
+    return Orthonym()
+
+
+@pytest.fixture(scope="module")
+def be():
+    return Orthonym(general_fallback=True, general_fallback_unverified=True,
+                     allow_aromatic_general=True)
+
+
+def _rt(smi, name):
+    if not name or "unknown" in name:
+        return False
+    o = opsin_parse(name)
+    return bool(o) and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == \
+        inchi.MolToInchiKey(Chem.MolFromSmiles(o))
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("CC(=O)NCc1ccc(-c2ccc(Cl)cc2)cc1", "N-{[4-(4-chlorophenyl)phenyl]methyl}acetamide"),
+    ("CC(=O)N(Cc1ccc(-c2ccc(Cl)cc2)cc1)C", "N-{[4-(4-chlorophenyl)phenyl]methyl}-N-methylacetamide"),
+])
+def test_n_substituent_brace_escalation(namer, smi, expected):
+    n = namer.name(smi)
+    assert "[[" not in (n or "") and "]]" not in (n or "") and "((" not in (n or ""), n
+    assert n == expected, n
+    assert _rt(smi, n), n
+
+
+@pytest.mark.opsin_gate
+def test_simple_n_substituent_stays_bare(namer):
+    # a bare simple N-substituent must NOT be wrapped
+    assert namer.name("CC(=O)NC") == "N-methylacetamide"
+    assert namer.name("CC(=O)NCC") == "N-ethylacetamide"
+
+
+@pytest.mark.opsin_gate
+def test_polyfunctional_acyloxy_no_double_paren(be):
+    # a diacylglycerol whose acyloxy arms carry an inner (9Z) stereo mark:
+    # old raw f"({acyloxy})" gave `((9Z)-...enoyloxy)`; the fix escalates to `[...]`.
+    smi = "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC"
+    n = be.name(smi)
+    assert n and "unknown" not in n, n
+    assert "((" not in n and "[[" not in n, n
+    assert _rt(smi, n), n
