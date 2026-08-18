@@ -2771,6 +2771,13 @@ def _is_monocyclic_lactam(mol):
     return is_monocyclic_lactam(mol)
 
 
+def _is_monocyclic_lactone(mol):
+    """Late-bound wrapper for lactones.is_monocyclic_lactone (avoids a
+    module-load circular import between heterocycles and lactones)."""
+    from .lactones import is_monocyclic_lactone
+    return is_monocyclic_lactone(mol)
+
+
 def _ring_has_extra_heteroatom(mol, ring_set, carbonyl_idx) -> bool:
     """True if the ring containing `carbonyl_idx` carries a ring heteroatom
     besides the single amide N — i.e. it is a multi-heteroatom saturated
@@ -3175,10 +3182,31 @@ def get_heterocycle_substituents(
                 and _ring_has_extra_heteroatom(mol, ring_set, ring_atom_idx)
             )
 
+            # v33 Phase 6 (A fix, review finding): a ring carbonyl whose
+            # principal group is an ESTER that the lactone handler DECLINED
+            # (is_monocyclic_lactone returns None -- a dione, or an
+            # in-ring-C=C at HW ring size, v33 Phase 6 Task 1) is named as
+            # the ketone '-one'/'-dione' SUFFIX on the heterocycle parent,
+            # NOT an 'oxo'/'dioxo' detachable PREFIX. P-66.6.3: the ring
+            # carbonyl is the senior (only) characteristic group here, so
+            # P-65.7.1 requires the suffix form (oxolane-2,4-dione, not
+            # 2,4-dioxooxolane). Mirrors the secondary_amide/lactam branch
+            # above; unlike that branch there is no "extra heteroatom" gate
+            # needed -- is_monocyclic_lactone's own all-carbon-besides-O
+            # scope already means any DECLINED lactone reaching here is a
+            # single-ring-O heterocycle by construction.
+            ring_lactone_suffix = (
+                not is_principal_suffix
+                and not ring_ketone_suffix
+                and principal_group == 'ester'
+                and hetero_sub_name == 'oxo'
+                and _is_monocyclic_lactone(mol) is None
+            )
+
             if is_principal_suffix:
                 sub_info['is_suffix'] = True
                 sub_info['suffix_name'] = pg_ring_suffix
-            elif ring_ketone_suffix:
+            elif ring_ketone_suffix or ring_lactone_suffix:
                 sub_info['is_suffix'] = True
                 sub_info['suffix_name'] = 'one'
             else:

@@ -27,3 +27,18 @@ def test_saturated_lactone_unchanged(namer):
     # decline must be scoped to unsaturated/dione — saturated lactone still names
     assert namer.name("O=C1CCCCCCCCCCCO1") and "unknown" not in namer.name("O=C1CCCCCCCCCCCO1")
     assert _rt("O=C1CCCCCCCCCCCO1", namer.name("O=C1CCCCCCCCCCCO1"))
+
+# Review fix: the dione decline must route to the -one/-dione SUFFIX form
+# (P-66.6.3 suffix seniority), not a lateral oxo/dioxo PREFIX form.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("O=C1CC(=O)CO1", "oxolane-2,4-dione"),
+    ("O=C1CCC(=O)CO1", "oxane-2,5-dione"),
+    # Large-ring dione RESCUE: previously abstained entirely (no prior
+    # correct emission), now names with the -dione suffix.
+    ("O=C1CCCCC(=O)CO1", "oxocane-2,7-dione"),
+])
+def test_dione_lactone_suffix_form(namer, smi, expected):
+    n = namer.name(smi)
+    assert n == expected, n
+    assert _rt(smi, n), n
