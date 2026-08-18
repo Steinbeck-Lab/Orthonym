@@ -2598,22 +2598,67 @@ def _name_ether_substituted_chain(
     if attach_atom.GetSymbol() != 'C' or ring_info.NumAtomRings(attach_idx) > 0:
         return None  # attach via heteroatom / ring -> not this handler
 
+    # Backbone = carbons reachable from the attachment WITHOUT crossing ANY
+    # heteroatom. Must be all-carbon, acyclic, saturated. A heteroatom
+    # neighbour simply stops the walk here -- it is classified below as a
+    # potential backbone-attached ether/thioether LINK. (v33 Phase 6 DROP-24
+    # aryloxymethyl fix: this walk used to depend on a whole-fragment
+    # heteroatom front filter that rejected on ANY non-O/S atom anywhere in
+    # the fragment, including one buried inside an R group -- e.g. the nitro N
+    # of `4-nitrophenoxy` -- which aborted the whole handler before it ever
+    # reached the R-group namer. The walk no longer needs that precomputed
+    # set: a non-carbon neighbour is simply not part of the backbone.)
+    backbone: List[int] = []
+    seen = {attach_idx}
+    stack = [attach_idx]
+    while stack:
+        cur = stack.pop()
+        cur_atom = mol.GetAtomWithIdx(cur)
+        if cur_atom.GetSymbol() != 'C' or ring_info.NumAtomRings(cur) > 0:
+            return None
+        backbone.append(cur)
+        for nbr in cur_atom.GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni not in sub_set or ni in seen:
+                continue
+            if nbr.GetSymbol() != 'C':
+                continue  # heteroatom neighbour -> a link candidate, not backbone
+            bond = mol.GetBondBetweenAtoms(cur, ni)
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                return None  # unsaturated backbone -> fall through
+            seen.add(ni)
+            stack.append(ni)
+    backbone_set = set(backbone)
+
     # Identify ether-type links: neutral, divalent, acyclic, both neighbours in
     # the fragment, both bonds single. P-63.2.5/P-29.5.2: O -> (R)oxy prefix, S
     # -> (R)sulfanyl prefix (W2E-P1FC Task 8, the -CH2-S-R concatenation). Any
-    # other decoration (charged, =O, -OH, ring, peroxide -O-O-/-S-S-) disqualifies
-    # the whole fragment (fail-closed).
-    # Every heteroatom in the fragment must be a neutral, divalent, acyclic,
-    # single-bonded ether O / thioether S (no charge, no =O/-OH, no ring, no
-    # peroxide/disulfide catenation) — otherwise a richer producer owns it.
-    all_hetero: List[int] = []
-    for idx in sub_atoms:
+    # other decoration (charged, =O, -OH, ring, peroxide -O-O-/-S-S-) directly
+    # ON THE BACKBONE disqualifies the whole fragment (fail-closed) -- a richer
+    # producer owns it.
+    #
+    # Only heteroatoms DIRECTLY bonded to a backbone carbon are held to this
+    # strict test. A heteroatom with NO backbone neighbour is INTERIOR to an R
+    # group (e.g. that same nitro N, or a ring heteroatom) and is unrestricted
+    # here: it is accounted for by the recursive R-group namer
+    # (`get_alkoxy_prefix` / `name_substituent_fragment`) below, never by this
+    # front filter, and by the atom-coverage check that follows (no atom may
+    # go unaccounted -> no silent drop).
+    link_candidates: Set[int] = set()
+    for idx in backbone:
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni in sub_set and ni not in backbone_set:
+                link_candidates.add(ni)
+
+    # P-46/P-57.1.6.2: an O/S with BOTH neighbours on the backbone is an
+    # in-backbone (replacement) heteroatom -> not this handler (fail closed).
+    ether_os: List[int] = []
+    for idx in link_candidates:
         atom = mol.GetAtomWithIdx(idx)
         sym = atom.GetSymbol()
-        if sym == 'C':
-            continue
         if sym not in ('O', 'S'):
-            return None  # any non-C, non-O/S heteroatom -> richer case
+            return None  # non-ether functional group directly on the backbone
         if (atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0
                 or atom.GetDegree() != 2 or ring_info.NumAtomRings(idx) > 0):
             return None
@@ -2627,50 +2672,10 @@ def _name_ether_substituted_chain(
         # (R)peroxy/(R)disulfanyl, owned by a different producer.
         if any(mol.GetAtomWithIdx(n).GetSymbol() in ('O', 'S') for n in nbrs):
             return None
-        all_hetero.append(idx)
-    if not all_hetero:
-        return None  # plain alkyl is the fast path; need >=1 ether here
-    all_hetero_set = set(all_hetero)
-
-    # Backbone = carbons reachable from the attachment WITHOUT crossing ANY
-    # ether/thioether heteroatom. Must be all-carbon, acyclic, saturated.
-    backbone: List[int] = []
-    seen = {attach_idx}
-    stack = [attach_idx]
-    while stack:
-        cur = stack.pop()
-        cur_atom = mol.GetAtomWithIdx(cur)
-        if cur_atom.GetSymbol() != 'C' or ring_info.NumAtomRings(cur) > 0:
-            return None
-        backbone.append(cur)
-        for nbr in cur_atom.GetNeighbors():
-            ni = nbr.GetIdx()
-            if ni in all_hetero_set or ni not in sub_set or ni in seen:
-                continue
-            if nbr.GetSymbol() != 'C':
-                return None  # non-C, non-ether neighbour on the backbone
-            bond = mol.GetBondBetweenAtoms(cur, ni)
-            if bond.GetBondType() != Chem.BondType.SINGLE:
-                return None  # unsaturated backbone -> fall through
-            seen.add(ni)
-            stack.append(ni)
-    backbone_set = set(backbone)
-
-    # P-46/P-57.1.6.2: classify each heteroatom. A BACKBONE ether-link bridges
-    # the backbone (exactly one neighbour on the backbone) to an R group;
-    # heteroatoms with NO backbone neighbour are INTERIOR to an R group and are
-    # named by the recursive R namer, not treated as backbone links here. An
-    # O/S with BOTH neighbours on the backbone is an in-backbone (replacement)
-    # heteroatom -> not this handler (fail closed).
-    ether_os: List[int] = []
-    for idx in all_hetero:
-        bb_n = sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors()
-                   if n.GetIdx() in backbone_set)
-        if bb_n == 1:
-            ether_os.append(idx)
-        elif bb_n == 2:
+        bb_n = sum(1 for n in nbrs if n in backbone_set)
+        if bb_n == 2:
             return None  # in-backbone ether -> replacement parent, not a link
-        # bb_n == 0: interior to an R group; absorbed by the R walk below.
+        ether_os.append(idx)
     if not ether_os:
         return None  # no backbone-bridging ether -> fall through
     ether_set = set(ether_os)
