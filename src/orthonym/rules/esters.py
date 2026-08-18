@@ -2079,9 +2079,34 @@ def _insert_ring_ester_locant(acylate_name: str, locant: int = 1) -> str:
     return acylate_name
 
 
+def _carbonyl_is_ring_bonded(mol, carbonyl_c: int) -> bool:
+    """True iff the KNOWN carbonyl carbon ``carbonyl_c`` (identified
+    directly from its ester SMARTS match, never inferred from a scanned
+    atom set) is itself in a ring (lactone-like) or directly bonded to a
+    ring atom (benzoic-/cyclohexanecarboxylic-shape).
+
+    v33 Phase 6 Wave 2 (#6, review fix): ``acid_is_ring_acid(mol,
+    acid_atoms)`` decides this by scanning a whole ``acid_atoms`` set for
+    the FIRST carbon that looks like a carbonyl and returning based on
+    THAT one. For a multi-ester molecule, ``parse_ester_fragments``'s BFS
+    excludes only THIS ester's own ``ester_o``, so a ring principal's
+    ``acid_atoms`` can be contaminated with a SECOND ester's atoms
+    (including its carbonyl carbon) reachable around the ring. Which
+    carbon the scan hits first then depends on set/atom-index order --
+    the SAME molecule, spelled with a different SMILES atom order, could
+    take a different branch. Anchoring directly on the specific,
+    already-known ``carbonyl_c`` is invariant to all of that.
+    """
+    ring_info = mol.GetRingInfo()
+    if ring_info.NumAtomRings(carbonyl_c) > 0:
+        return True  # lactone-like / carbonyl itself in a ring
+    atom = mol.GetAtomWithIdx(carbonyl_c)
+    return any(nbr.IsInRing() for nbr in atom.GetNeighbors())
+
+
 def _name_ring_principal_independent_esters(
     mol, principal: dict, non_principal: list,
-    acylate_name: str, alkyl_name: str,
+    alkyl_name: str,
 ) -> Optional[str]:
     """Rebuild an independent-ester name when the PRINCIPAL ester's acid is
     a ring acid (e.g. cyclohexanecarboxylic, benzoic) and one or more
@@ -2108,21 +2133,44 @@ def _name_ring_principal_independent_esters(
     back to the old space-joined form for a ring principal -- that form
     is proven wrong (dropped atom, no locant), never an acceptable
     "uglier but honest" degrade.
-    """
-    ring_info = mol.GetRingInfo()
-    acid_set = set(principal['acid_atoms'])
-    rings_in_acid = [r for r in ring_info.AtomRings() if set(r).issubset(acid_set)]
-    if len(rings_in_acid) != 1:
-        return None  # fused/complex/absent ring -- out of this reconstruction's scope
-    ring_atoms = set(rings_in_acid[0])
 
+    v33 Phase 6 Wave 2 (#6, review fix): every structural decision here
+    is anchored on the PRINCIPAL ester's own known match atoms
+    (``principal['match']``), NEVER on ``principal['acid_atoms']`` --
+    that set can be contaminated with a second ester's atoms (see
+    ``_carbonyl_is_ring_bonded``'s docstring), and scanning it for "the"
+    ring or "the" acid name is exactly the order-dependent bug that let
+    the SAME molecule, spelled with a different SMILES atom order, fall
+    through to the old broken path and fabricate a wrong acid stem
+    (measured: 'decanoate' for a cyclohexanecarboxylate principal).
+    """
     principal_carbonyl_c = principal['match'][0]
+    ring_info = mol.GetRingInfo()
+
+    # Find the ring atom directly bonded to the KNOWN carbonyl carbon --
+    # never inferred from principal['acid_atoms'].
     start_atom = None
-    for idx in ring_atoms:
-        if mol.GetBondBetweenAtoms(idx, principal_carbonyl_c) is not None:
-            start_atom = idx
+    for nbr in mol.GetAtomWithIdx(principal_carbonyl_c).GetNeighbors():
+        if nbr.IsInRing():
+            start_atom = nbr.GetIdx()
             break
     if start_atom is None:
+        return None
+
+    # The ring at start_atom must be a single, simple SSSR ring (not
+    # shared atom-for-atom with a second ring) for this reconstruction.
+    candidate_rings = [r for r in ring_info.AtomRings() if start_atom in r]
+    if len(candidate_rings) != 1:
+        return None  # fused/spiro/bridged at this atom -- out of scope
+    ring_atoms = set(candidate_rings[0])
+
+    # Derive the acid name from the CLEAN ring atom set alone (no
+    # dependency on principal['acid_atoms'] at all) -- order-invariant.
+    acid_name = get_ring_acid_name(mol, sorted(ring_atoms))
+    if not acid_name:
+        return None
+    acylate_name = get_acylate_name(acid_name)
+    if not acylate_name:
         return None
 
     ring_neighbors = [
@@ -2264,6 +2312,31 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
 
     # Principal ester: name as "alkyl [acid]oate"
     principal = ester_data[0]
+
+    # v33 Phase 6 Wave 2 (#6): when the PRINCIPAL ester's acid is a RING
+    # acid, the OLD space-joined/unlocanted acyloxy-prefix path below is
+    # PROVEN WRONG (it drops the alcohol-side linking atom of any
+    # non-principal ester whose alkyl carbon is a pendant substituent on
+    # that ring, and never cites a locant at all). Rebuild it as a
+    # complete, locanted substituent prefix instead; fail closed (None)
+    # rather than fall through to the broken join for this shape.
+    #
+    # (Review fix) This check -- and the WHOLE ring-principal branch it
+    # guards -- must be decided from principal['match'][0] (the KNOWN
+    # carbonyl carbon), never from principal['acid_atoms']: that set can
+    # be contaminated with the OTHER ester's atoms (see
+    # `_carbonyl_is_ring_bonded`'s docstring), which previously made
+    # `acid_is_ring_acid(mol, principal['acid_atoms'])` -- and the
+    # subsequent `get_acid_fragment_name` call -- return DIFFERENT
+    # answers for the SAME molecule depending on SMILES atom order.
+    if _carbonyl_is_ring_bonded(mol, principal['match'][0]):
+        alkyl_name = get_alkyl_fragment_name(mol, principal['alkyl_atoms'])
+        if not alkyl_name:
+            return None
+        return _name_ring_principal_independent_esters(
+            mol, principal, ester_data[1:], alkyl_name,
+        )
+
     acid_name = get_acid_fragment_name(mol, principal['acid_atoms'])
     if not acid_name:
         return None
@@ -2276,18 +2349,6 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
     alkyl_name = get_alkyl_fragment_name(mol, principal['alkyl_atoms'])
     if not alkyl_name:
         return None
-
-    # v33 Phase 6 Wave 2 (#6): when the PRINCIPAL ester's acid is a RING
-    # acid, the OLD space-joined/unlocanted acyloxy-prefix path below is
-    # PROVEN WRONG (it drops the alcohol-side linking atom of any
-    # non-principal ester whose alkyl carbon is a pendant substituent on
-    # that ring, and never cites a locant at all). Rebuild it as a
-    # complete, locanted substituent prefix instead; fail closed (None)
-    # rather than fall through to the broken join for this shape.
-    if acid_is_ring_acid(mol, principal['acid_atoms']):
-        return _name_ring_principal_independent_esters(
-            mol, principal, ester_data[1:], acylate_name, alkyl_name,
-        )
 
     # Non-principal esters: convert to acyloxy prefixes
     acyloxy_prefixes = []
