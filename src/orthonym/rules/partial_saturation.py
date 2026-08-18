@@ -1572,6 +1572,23 @@ def _resolve_oxo_parent(mol, ring_atoms):
     if len(rings) == 1:
         if all(mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in ring_set):
             return []  # carbocyclic monocycle -> cycloalkanone path
+        # v33 Phase 6 (A): "mancude parent + added indicated hydrogen"
+        # (P-31.1.4.2) is a Hantzsch-Widman-range concept (rings of size
+        # 3-10 -- the same bound name_heterocycle's own `ring_size > 10`
+        # branch and _name_lambda_heteromonocycle already enforce). Past
+        # that, RDKit can still force-sanitize a monocyclic ring as fully
+        # aromatic (_mancude_ring_parent succeeds), but citing it as a
+        # mancude parent is WRONG nomenclature for a macrocycle -- the PIN
+        # method there is direct ene/dione locant citation on the
+        # replacement-nomenclature stem. Measured: an unsaturated
+        # 13-membered oxa-lactone ring (ONE real ring C=C) built a bogus
+        # 6-double-bond "mancude" parent and named a different molecule
+        # (a hyper-unsaturated hexaene + decahydro form), silently
+        # preempting the correct ring_heterocycle path via the KIH
+        # short-circuit in tier_a_ring. Decline here so the caller falls
+        # through to it.
+        if n > 10:
+            return []
         parent, old_to_new = _mancude_ring_parent(mol, ring_set)
         if parent is None:
             # non-aromatizing mancude monocycle (pyran-type intrinsic-IH parent)

@@ -1947,6 +1947,21 @@ def name_partially_saturated_monocyclic_heterocycle(
     n = len(ring_set)
     if n < 4:
         return None
+    # v33 Phase 6 (A): scope to the Hantzsch-Widman ring-size range this
+    # function's "mancude parent" premise applies to (build_hw_name / the
+    # sibling _name_lambda_heteromonocycle both cap at 10 -- BlueBookV2.md
+    # P-22.2.2.1.1's HW stems are defined for rings of size 3-10 only).
+    # Without this bound, a >10-membered partially-saturated heterocycle
+    # (e.g. an unsaturated macrolactone ring) fell through to the mancude
+    # "max non-cumulated double bonds + hydro" scheme below and emitted a
+    # WRONG hyper-unsaturated name (measured: a 13-membered ring with ONE
+    # real ring C=C came back as a 6-double-bond "...hexaene" + decahydro
+    # prefix). name_heterocycle's own `ring_size > 10` branch (replacement
+    # nomenclature via _orient_macrocycle_for_replacement) already numbers
+    # the ACTUAL ring double bond(s) correctly and is reached once this
+    # declines.
+    if n > 10:
+        return None
 
     # Ring atoms still unsaturated in the MOLECULE (ring double bond or aromatic)
     # — these are NOT hydro positions.

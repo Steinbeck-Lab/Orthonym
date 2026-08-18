@@ -124,6 +124,56 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                     if mol.GetAtomWithIdx(i).GetAtomicNum() != 6:
                         return None
 
+                # v33 Phase 6 (A): unsaturated / dione monocyclic lactones.
+                # name_lactone_ring/name_monocyclic_lactone only builds a
+                # SATURATED single-oxo stem (oxacyclo...an-2-one) -- an
+                # in-ring C=C or a second in-ring carbonyl would otherwise
+                # be silently dropped, naming a different (more saturated)
+                # molecule than the input.
+                #
+                # HW-range rings (<=10): the PIN for an unsaturated ring
+                # ketone here uses a DIFFERENT scheme entirely -- indicated
+                # hydrogen + hydro prefixes on the mancude aromatic parent
+                # (furan-2(3H)-one, 3,4-dihydro-2H-pyran-2-one) -- which
+                # this module does not build. DECLINE so dispatch routes to
+                # the general heterocyclic-ketone engine
+                # (rules.heterocycles.name_heterocycle + the substituted-
+                # heterocycle assembler), which already has that machinery.
+                #
+                # Ring sizes >10 have no HW mancude parent at all; P-31.1.4's
+                # replacement-nomenclature PIN there is direct ene-locant
+                # citation on the SAME fixed O=1/C=2 numbering this module
+                # already uses for the saturated case
+                # (oxacyclotridec-10-en-2-one) -- built directly below via
+                # ``ring_double_bonds`` instead of declining. (Measured: the
+                # general engine's >10 replacement-nomenclature path has no
+                # suffix-locant-aware numbering and names a constitutionally
+                # different molecule for this size range.)
+                ring_double_bonds = []
+                for b in mol.GetBonds():
+                    a1, a2 = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+                    if (a1 in ring_set and a2 in ring_set
+                            and b.GetBondTypeAsDouble() == 2.0):
+                        ring_double_bonds.append((a1, a2))
+                if ring_double_bonds and len(ring) <= 10:
+                    return None  # HW range -> general engine's indicated-H scheme
+
+                for i in ring_set:
+                    if i == carbonyl_c:
+                        continue
+                    at = mol.GetAtomWithIdx(i)
+                    if at.GetSymbol() != "C":
+                        continue
+                    for nbr in at.GetNeighbors():
+                        j = nbr.GetIdx()
+                        if j in ring_set:
+                            continue
+                        if nbr.GetSymbol() not in ("O", "S", "Se", "Te"):
+                            continue
+                        bond2 = mol.GetBondBetweenAtoms(i, j)
+                        if bond2 is not None and bond2.GetBondType() == Chem.BondType.DOUBLE:
+                            return None  # 2nd in-ring carbonyl -> dione class
+
                 return {
                     "ring_atoms": ring,
                     "carbonyl_idx": carbonyl_c,
@@ -135,6 +185,11 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
                     # lactone) or 'S'/'Se'/'Te' (thiono/seleno/telluro lactone,
                     # P-65.6.3.5.1 -> -thione/-selone/-tellone suffix).
                     "chalcogen": mol.GetAtomWithIdx(carbonyl_o).GetSymbol(),
+                    # v33 Phase 6 (A): in-ring C=C atom-idx pairs (empty for
+                    # the saturated case). Only ever non-empty here for
+                    # ring_size > 10 (the HW range declines above), so the
+                    # macrocyclic ene-locant path is the sole consumer.
+                    "ring_double_bonds": ring_double_bonds,
                 }
 
     return None
@@ -170,7 +225,8 @@ def _join_lactone_suffix(parent_name: str, locant: int, suffix: str) -> str:
 
 
 def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
-                      chalcogen: str = "O") -> Optional[str]:
+                      chalcogen: str = "O",
+                      ene_locants: Optional[List[int]] = None) -> Optional[str]:
     """
     Get the IUPAC name for a monocyclic lactone of a given ring size.
 
@@ -184,6 +240,13 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
             3 (the only geometry this namer describes), builds the
             1,3-dioxa Hantzsch-Widman parent (1,3-dioxan-2-one). Any other
             value returns None (fail closed).
+        ene_locants: v33 Phase 6 (A). Sorted list of the lower-numbered
+            locant of each in-ring C=C, on the SAME fixed O=1/C=2 numbering
+            this function already uses. Ring sizes 11+ ONLY (the HW range
+            has no replacement-nomenclature ring stem to attach an ene
+            locant to -- ``is_monocyclic_lactone`` never supplies this for
+            ring_size<=10). ``None``/empty -> the existing saturated
+            ``...an`` stem (byte-identical to the pre-Phase-6 behaviour).
 
     Returns:
         IUPAC name string (e.g., 'oxolan-2-one'), or None if ring size
@@ -258,10 +321,25 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
     except ValueError:
         return None
 
-    # Build: oxacyclo + {prefix} + an-2-{suffix}
-    # The chain prefix already provides the stem (e.g., "undec" for 11);
-    # 'oxacyclo...an' ends in a consonant so no elision applies.
-    return f"oxacyclo{chain_prefix}an-2-{suffix}"
+    if not ene_locants:
+        # Build: oxacyclo + {prefix} + an-2-{suffix}
+        # The chain prefix already provides the stem (e.g., "undec" for 11);
+        # 'oxacyclo...an' ends in a consonant so no elision applies.
+        return f"oxacyclo{chain_prefix}an-2-{suffix}"
+
+    # v33 Phase 6 (A): unsaturated macrocyclic lactone. Replace the
+    # saturated '...an' stem with the standard cycloalkENE construction
+    # ('...an' dropped, '-{locants}-{mult}ene' takes its place -- e.g.
+    # cyclotridecane -> cyclotridec-10-ene), then join the -one suffix
+    # through the SAME elision rule as every other branch here ('ene' + a
+    # vowel-initial suffix elides its terminal 'e': tridec-10-en-2-one).
+    locs = sorted(ene_locants)
+    loc_str = ",".join(str(l) for l in locs)
+    mult = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}.get(len(locs))
+    if mult is None:
+        return None  # more double bonds than this namer enumerates -> fail closed
+    ene_stem = f"oxacyclo{chain_prefix}-{loc_str}-{mult}ene"
+    return _join_lactone_suffix(ene_stem, 2, suffix)
 
 
 # ---------------------------------------------------------------------------
@@ -296,16 +374,6 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     if info is None:
         return None
 
-    # P-64.1.2.1(a) cyclic carbonate: the second ring O bonded to the
-    # carbonyl C sits at locant 3 by the O=1, carbonyl C=2 numbering.
-    extra_o_locant = 3 if info.get("extra_ring_O_idx") is not None else None
-    parent_name = name_lactone_ring(
-        info["ring_size"], extra_o_locant=extra_o_locant,
-        chalcogen=info.get("chalcogen", "O"),
-    )
-    if parent_name is None:
-        return None
-
     # Detect substituents on the lactone ring
     ring_atoms = info["ring_atoms"]
     ester_o_idx = info["ester_O_idx"]
@@ -321,18 +389,54 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
     try:
         o_pos = ring_list.index(ester_o_idx)
     except ValueError:
+        o_pos = None
+
+    if o_pos is None:
+        ordered = None
+        atom_to_locant = {}
+    else:
+        # Reorder ring starting from O, going toward carbonyl C
+        ordered = ring_list[o_pos:] + ring_list[:o_pos]
+
+        # Check direction: next atom should be carbonyl C
+        if len(ordered) > 1 and ordered[1] != carbonyl_idx:
+            # Reverse direction (keep O first)
+            ordered = [ordered[0]] + ordered[1:][::-1]
+
+        # Build atom-to-locant mapping (1-indexed)
+        atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(ordered)}
+
+    # v33 Phase 6 (A): in-ring C=C locants (macrocyclic only -- see
+    # name_lactone_ring's ene_locants docstring) on this SAME fixed
+    # numbering. Each bond's cited locant is the LOWER of its two atoms'
+    # locants; safe without a wraparound check because the only ring
+    # heteroatom (O, locant 1) never carries a ring double bond in this
+    # namer's scope (fail-closed all-carbon-besides-O check above), so a
+    # double bond can never span the ring-closing (n, 1) pair.
+    ene_locants = None
+    _dbl = info.get("ring_double_bonds")
+    if _dbl and atom_to_locant:
+        ene_locants = sorted(
+            min(atom_to_locant[a1], atom_to_locant[a2])
+            for a1, a2 in _dbl
+            if a1 in atom_to_locant and a2 in atom_to_locant
+        )
+        if len(ene_locants) != len(_dbl):
+            return None  # a double-bond atom fell outside the numbering -> fail closed
+
+    # P-64.1.2.1(a) cyclic carbonate: the second ring O bonded to the
+    # carbonyl C sits at locant 3 by the O=1, carbonyl C=2 numbering.
+    extra_o_locant = 3 if info.get("extra_ring_O_idx") is not None else None
+    parent_name = name_lactone_ring(
+        info["ring_size"], extra_o_locant=extra_o_locant,
+        chalcogen=info.get("chalcogen", "O"),
+        ene_locants=ene_locants,
+    )
+    if parent_name is None:
+        return None
+
+    if ordered is None:
         return parent_name
-
-    # Reorder ring starting from O, going toward carbonyl C
-    ordered = ring_list[o_pos:] + ring_list[:o_pos]
-
-    # Check direction: next atom should be carbonyl C
-    if len(ordered) > 1 and ordered[1] != carbonyl_idx:
-        # Reverse direction (keep O first)
-        ordered = [ordered[0]] + ordered[1:][::-1]
-
-    # Build atom-to-locant mapping (1-indexed)
-    atom_to_locant = {atom_idx: i + 1 for i, atom_idx in enumerate(ordered)}
 
     # Collect stereodescriptors using lactone ring locant mapping
     from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
