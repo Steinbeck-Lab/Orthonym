@@ -11,6 +11,44 @@ from rdkit import Chem
 
 from ..rules.lambda_convention import nonstandard_bonding_number
 
+# v33 Phase 6 (heteroatom-only-suffix acids): characteristic-heteroatom
+# (atomic number) for FG classes whose SMARTS matches S/P + O with NO carbon
+# atom in the match tuple. sulfonic_acid, sulfinic_acid, phosphonic_acid and
+# the sulfonic-family imidic/peroxoic/thioic S variants all use a RECURSIVE
+# carbon guard (e.g. sulfonic_acid "[SX4;$([SX4][#6])](=O)(=O)[OX2H1]") -- the
+# bonded carbon is only a validity filter, never a literal pattern atom, so it
+# is ABSENT from the match tuple (verified: GetSubstructMatches on
+# CCCCS(=O)(=O)O returns only the S,O,O,O indices, no carbon).
+#
+# Without a characteristic-heteroatom entry for these FG names, the `_het_z`
+# lookup in find_principal_chain (below) stayed None for them, so its "het not
+# found" legacy fallback registered only the S/P/O atoms into fg_atoms and
+# NEVER the bearing carbon (the carbon directly bonded to S/P). Criterion 1
+# ("chain contains the principal characteristic group", P-44.1) was then False
+# for every candidate carbon chain -- tying at 0 -- so criterion 3 (max chain
+# length) handed the parent to a longer chain that does not carry the acid at
+# all (e.g. the acyl chain of a taurine amide: CCC(=O)NCCS(=O)(=O)O wrongly
+# parented as "propanesulfonic acid" instead of the ethanesulfonic-acid-bearing
+# chain). This mapping feeds the SAME `_het_z` bearing-carbon branch already
+# used for alcohol/amine (seniority._CLASS_CHARACTERISTIC_Z), so their bearing
+# carbons are now computed identically -- registering the acid-bearing carbon
+# into fg_atoms lets criterion 1 pick the correct chain before length is ever
+# consulted.
+#
+# phosphinic_acid's SMARTS ("[PX4](=O)([OX2H1])([#6])[#6]") already carries
+# both carbons as LITERAL match atoms (not recursive), so it has no live bug
+# here, but is included for consistency with its sulfonic/phosphonic-family
+# siblings -- verified harmless: the het-found branch recomputes the same
+# carbons as bearing carbons, and P/O atoms (present in fg_atoms either way)
+# can never appear in a carbon-chain's atom set, so fg_count/fg_atoms are
+# unaffected by the branch switch.
+_HETEROACID_CHARACTERISTIC_Z: Dict[str, int] = {
+    "sulfonic_acid": 16, "sulfinic_acid": 16,
+    "sulfonoperoxoic_acid": 16, "sulfonothioic_S_acid": 16,
+    "sulfonimidic_acid": 16, "sulfinimidic_acid": 16,
+    "phosphonic_acid": 15, "phosphinic_acid": 15,
+}
+
 
 def find_all_carbon_chains(
     mol,
@@ -442,6 +480,16 @@ def find_principal_chain(
         _parent_class = _SENIORITY_PARENT.get(principal_group)
         _members = _SENIORITY_CLASS_MEMBERS.get(_parent_class)
         _het_z = _CLASS_CHARACTERISTIC_Z.get(_parent_class)
+        if _het_z is None:
+            # v33 Phase 6: heteroatom-only-suffix acid classes (sulfonic/
+            # sulfinic/phosphonic/phosphinic + the sulfonic-family imidic/
+            # peroxoic/thioic S variants) are singleton classes -- never a
+            # _SENIORITY_PARENT value -- so _parent_class is always None for
+            # them and the lookup above always misses. Fall back to a direct
+            # principal_group lookup in _HETEROACID_CHARACTERISTIC_Z (module
+            # level, above). Harmless for every other FG name: that dict only
+            # has keys for the classes named there.
+            _het_z = _HETEROACID_CHARACTERISTIC_Z.get(principal_group)
         if _members is None or _parent_class not in _RC4_UNION_CLASSES:
             fg_matches = functional_groups[principal_group]
         else:
