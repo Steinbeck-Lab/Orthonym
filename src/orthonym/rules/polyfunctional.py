@@ -1088,16 +1088,21 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             # then returns '' and the arm silently vanishes -> atom-incomplete
             # -> abstain (the composer already names it correctly via
             # `name_substituent_fragment` -> '(acetyloxy)methyl' when reached
-            # directly). Defer ONLY when: (a) this is the whole-branch acyloxy
-            # shape (last SMARTS atom is a carbon OUTSIDE the ring, i.e. a
-            # true linker, not the ring atom itself), and (b) it is not the
-            # ring's own principal ester (guarded by `principal_group ==
-            # 'ester'` above, a disjoint code path) -- so deferring here can
-            # only ever apply to a genuine non-principal branch.
-            if fg_name == 'ester' and len(match) >= 4:
-                _anchor = match[-1]
-                if _anchor not in ring_set and mol.GetAtomWithIdx(_anchor).GetSymbol() == 'C':
-                    continue
+            # directly). Defer ONLY when: (a) the match's alkyl-side anchor
+            # (the ester SMARTS's last atom, always present and always a
+            # carbon -- `[CX3](=O)[OX2][#6]` yields exactly 4 atoms) sits
+            # OUTSIDE the ring (i.e. it is a true off-ring linker, not the
+            # ring atom itself), and (b) it is not the ring's own principal
+            # ester (guarded by `principal_group == 'ester'` above, a
+            # disjoint code path) -- so deferring here can only ever apply to
+            # a genuine non-principal branch. This is direction-agnostic: it
+            # also defers the mirror shape Ring-C(=O)-O-R (a mono-alkyl ester
+            # of a ring diacid, e.g. 'methyl ... carboxylic acid' ->
+            # '2-(methoxycarbonyl)cyclohexane-1-carboxylic acid'), which is
+            # correct extra breadth, not a leak -- see
+            # test_mirror_shape_methoxycarbonyl_ring_diacid_monoester.
+            if fg_name == 'ester' and match[-1] not in ring_set:
+                continue
             for idx in match:
                 if idx not in ring_set:
                     consumed_atoms.add(idx)
