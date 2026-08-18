@@ -2745,6 +2745,7 @@ def _name_ether_substituted_chain(
     from .substituent_prefix_forms import get_alkoxy_prefix, get_sulfanyl_prefix
     from .naming_utils import (
         is_complex_substituent, apply_enclosing_marks, _is_fully_enclosed,
+        enclose_if_compound,
     )
     groups: dict = defaultdict(list)
     for bb_c, o_idx, r_side in ether_links:
@@ -2752,17 +2753,27 @@ def _name_ether_substituted_chain(
             oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
             if not oxy or oxy == "alkoxy":
                 return None  # un-nameable R -> fall through (fail-closed)
-            if ('(' in oxy or '[' in oxy) and not _is_fully_enclosed(oxy):
-                # w2f p1 (P-16.5): a mark-bearing compound oxy prefix whose
-                # STEM lies OUTSIDE the marks ('(4-methoxyphenyl)methoxy') must
-                # be enclosed AS A UNIT before concatenating the backbone stem
-                # -> '[(4-methoxyphenyl)methoxy]methyl' (mirrors the S-branch
-                # convention below). A FULLY-enclosed oxy ('(methoxymethoxy)')
-                # keeps its single marks — the downstream citation layer owns
-                # the outer bracket ('[(methoxymethoxy)methyl]benzene'), never
-                # a double '[(methoxymethoxy)]methyl'. Markless
-                # 'benzyloxy'/'methoxy'/'phenoxy' stay byte-identical.
-                oxy = apply_enclosing_marks(oxy, -1)
+            # P-16.3.3/P-16.5: a LOCANT-BEARING oxy prefix -- whether it already
+            # carries marks from a nested recursion ('(4-methoxyphenyl)methoxy')
+            # OR is a bare-but-substituted retained contraction ('4-nitrophenoxy',
+            # '4-methylphenoxy' -- P-63.2.2.2 keeps the CONTRACTED spelling even
+            # substituted, e.g. BB verbatim '(4-chlorophenoxy)benzene',
+            # '(2-nitrophenoxy)borane') -- must be enclosed AS A UNIT before
+            # concatenating the backbone stem: '(4-nitrophenoxy)methyl', mirroring
+            # the BB-verbatim sub-component pattern for the analogous (X-phenyl)
+            # case ('[(3-chlorophenyl)methyl]benzene', '2-[(4-bromophenyl)methyl]
+            # pyridine', '4-[(4-hydroxyphenyl)methyl]phenol' -- the retained
+            # contraction changes the SPELLING of the atomic unit, not whether a
+            # decorated version of it needs its own marks as a sub-component). A
+            # SIMPLE, unsubstituted oxy ('phenoxy', 'methoxy', 'benzyloxy') stays
+            # bare. `enclose_if_compound` is the shared P-16.5.1.1 primitive (used
+            # ~30 other call sites) that decides exactly this, including the
+            # escalating idempotent case ('(4-methoxyphenyl)methoxy' ->
+            # '[(4-methoxyphenyl)methoxy]', never re-enclosing an
+            # already-fully-enclosed token like '(methoxymethoxy)'). Replaces a
+            # narrower hand-rolled bracket-presence check that missed the
+            # bare-but-locant-bearing case (v33 Phase 6 aryloxymethyl review fix).
+            oxy = enclose_if_compound(oxy)
         else:  # S -> (R)sulfanyl (P-29.5.2 concatenation)
             # Name the R side with the proper substituent namer so a RING-bearing
             # R (benzyl -> 'benzyl') is not flattened to a carbon count

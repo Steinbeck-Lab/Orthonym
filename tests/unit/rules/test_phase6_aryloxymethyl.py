@@ -20,28 +20,48 @@ def _full_rt(smiles: str, name: str) -> bool:
 
 @pytest.mark.opsin_gate
 def test_nitrophenoxymethyl_oxirane_names(namer):
-    # NOTE: the task brief predicted "2-[(4-nitrophenoxy)methyl]oxirane". That
-    # string contradicts this codebase's OWN Blue-Book-cited precedent (see
-    # tests/unit/rules/test_p14_3_4_task3b_baked_locants.py, BB P-13.1 table
-    # row 7, verbatim PIN `phenyloxirane`, plus `chlorooxirane`/`methyloxirane`):
-    # a MONOsubstituted oxirane omits its ring locant because the two ring CH2
-    # positions are one orbit (`l3_one_kind_of_substitutable_h`), independent of
-    # what decorates the substituent. `get_alkoxy_prefix` (called directly,
-    # bypassing the front-filter bug) already returns bare "4-nitrophenoxy" --
-    # structurally identical in shape to "4-methylphenoxy"/"4-chlorophenoxy" --
-    # so nitro must take the SAME omission as the sibling controls below, not a
-    # one-off bracket/locant escalation with no Blue Book basis distinguishing
-    # it from methyl/chloro.
+    # PIN = "[(4-nitrophenoxy)methyl]oxirane" (RT-verified below).
+    #
+    # Ring locant: OMITTED. BB P-13.1 table row 7 (verbatim, see
+    # test_p14_3_4_task3b_baked_locants.py) gives `phenyloxirane (PIN)` for a
+    # monosubstituted oxirane -- the two ring CH2 positions are one orbit
+    # (`l3_one_kind_of_substitutable_h`), independent of what decorates the
+    # substituent, so no "2-" is cited here either.
+    #
+    # Brackets: NESTED, not collapsed. `4-nitrophenoxy` (P-63.2.2.2 keeps the
+    # retained CONTRACTED "phenoxy" spelling even when the ring is substituted
+    # -- BB verbatim `(4-chlorophenoxy)benzene`, `(2-nitrophenoxy)borane`) is
+    # itself a LOCANT-BEARING (compound) sub-component of the larger
+    # substituent prefix `{oxy}methyl`, so per P-16.3.3/P-16.5 it takes its own
+    # enclosing marks BEFORE concatenating "methyl", exactly parallel to the
+    # analogous (X-phenyl)+methyl/methoxy sub-component pattern the Blue Book
+    # prints verbatim: `[(3-chlorophenyl)methyl]benzene`,
+    # `2-[(4-bromophenyl)methyl]pyridine`, `4-[(4-hydroxyphenyl)methyl]phenol`.
+    # The retained contraction changes the SPELLING of the atomic unit
+    # ("phenoxy" vs "(phenyl)oxy"), not whether a decorated version of it needs
+    # its own marks as a sub-component. The outer citation on oxirane then
+    # escalates ( -> [ over the inner marks, per `enclose_if_compound`
+    # (P-16.5.1.1, the shared enclosure primitive used ~30 other call sites).
     smi = "O=[N+]([O-])c1ccc(OCC2CO2)cc1"
     name = namer.name(smi)
-    assert name == "(4-nitrophenoxymethyl)oxirane", name
+    assert name == "[(4-nitrophenoxy)methyl]oxirane", name
     assert _full_rt(smi, name), name
 
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
+    # Unsubstituted phenoxy carries no locant of its own -> stays bare, single
+    # parens (no inner sub-component to nest).
     ("c1ccc(OCC2CO2)cc1", "(phenoxymethyl)oxirane"),
-    ("Cc1ccc(OCC2CO2)cc1", "(4-methylphenoxymethyl)oxirane"),
+    # PRE-EXISTING non-PIN collapse, corrected here (change-asserted-value):
+    # "4-methylphenoxy" is exactly as locant-bearing/compound as
+    # "4-nitrophenoxy" above and takes the identical nested-bracket treatment
+    # -- RT-verified below. The old collapsed "(4-methylphenoxymethyl)oxirane"
+    # was never a valid PIN spelling; it just happened to round-trip.
+    ("Cc1ccc(OCC2CO2)cc1", "[(4-methylphenoxy)methyl]oxirane"),
 ])
 def test_plain_aryloxymethyl_unchanged(namer, smi, expected):
-    assert namer.name(smi) == expected
+    smi_ = smi
+    name = namer.name(smi_)
+    assert name == expected, name
+    assert _full_rt(smi_, name), name
