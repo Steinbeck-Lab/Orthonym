@@ -62,6 +62,27 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
         'num_rings': 6,
     },
+    'heptacene': {
+        # Linear 7-fused-ring acene (P-25.1.2, next member of the acene series
+        # after hexacene). AUTHORITATIVE numbering derived 2026-08-18 from
+        # OPSIN 2.9.0 `heptacene -o extendedsmi` ($_AV: locants) —
+        # C1=CC=CC2=CC3=CC4=CC5=CC6=CC7=CC=CC=C7C=C6C=C5C=C4C=C3C=C12
+        # |$_AV:1;2;3;4;4a;5;5a;6;6a;7;7a;8;8a;9;9a;10;11;12;13;13a;14;14a;15;
+        # 15a;16;16a;17;17a;18;18a$| — mapped onto this RDKit-canonical
+        # SMILES via GetSubstructMatch (same molecule confirmed by identical
+        # InChI). Per-position round-trip VERIFIED: all 18 peripheral integer
+        # locants (1-18) reconstructed as mono-methylheptacene, named via
+        # Orthonym, and confirmed both to carry the expected locant in the
+        # emitted name AND to round-trip through OPSIN to the identical
+        # InChIKey as the substituted input (see
+        # tests/unit/rules/test_heptacene.py).
+        'canonical_smiles': 'c1ccc2cc3cc4cc5cc6cc7ccccc7cc6cc5cc4cc3cc2c1',
+        'smarts': 'c1ccc2cc3cc4cc5cc6cc7ccccc7cc6cc5cc4cc3cc2c1',
+        'num_atoms': 30,
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '18a', 4: 18, 5: '17a', 6: 17, 7: '16a', 8: 16, 9: '15a', 10: 15, 11: '14a', 12: 14, 13: '13a', 14: 13, 15: 12, 16: 11, 17: 10, 18: '9a', 19: 9, 20: '8a', 21: 8, 22: '7a', 23: 7, 24: '6a', 25: 6, 26: '5a', 27: 5, 28: '4a', 29: 4},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        'num_rings': 7,
+    },
     # (pentahelicene DEFERRED — [5]helicene's PIN is the fusion name
     # dibenzo[c,g]phenanthrene, NOT 'pentahelicene': BB P-25.1.2.6 starts the
     # helicene series at SIX rings. The fusion name needs the polycomponent
