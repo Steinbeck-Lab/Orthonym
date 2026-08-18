@@ -5832,6 +5832,25 @@ def name_substituent_fragment(
                 and _a.GetTotalNumHs() == 0 and not _a.IsInRing()):
             _inner_nbrs = [n.GetIdx() for n in _a.GetNeighbors()
                            if n.GetIdx() in set(sub_atoms)]
+            # v33 (P-67.2.6): an -O-P(=O)(…)… phosphoanhydride subgraph as a
+            # substituent. OST already names a terminal -O-P(=O)(OH)2 as
+            # 'phosphonooxy' via FG perception, but a P-O-P bridge/chain (di/tri…
+            # phosphate ester, as in acyl-CoA) matched no FG and fell through to a
+            # generic mis-expression -> 'unknown'. Route it to the recursive
+            # phosphoryl-oxy namer (best-effort systematic form; the top-level
+            # SELF-01/OPSIN gate keeps 0-wrong).
+            if len(_inner_nbrs) == 1 and mol.GetAtomWithIdx(
+                    _inner_nbrs[0]).GetSymbol() == 'P':
+                _parent_nbrs = [n.GetIdx() for n in _a.GetNeighbors()
+                                if n.GetIdx() not in set(sub_atoms)]
+                if len(_parent_nbrs) == 1:
+                    from ..rules.phosphorus import (
+                        name_phosphoanhydride_oxy_substituent)
+                    _ph = name_phosphoanhydride_oxy_substituent(
+                        mol, attach_idx, _parent_nbrs[0])
+                    if _ph is not None:
+                        return _ph
+                return None
             if len(_inner_nbrs) == 1 and mol.GetAtomWithIdx(
                     _inner_nbrs[0]).GetSymbol() == 'C':
                 _rest = [i for i in sub_atoms if i != attach_idx]

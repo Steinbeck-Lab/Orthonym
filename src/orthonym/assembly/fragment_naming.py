@@ -39,6 +39,10 @@ MAX_NAMING_DEPTH = 7
 # is different. Generous limit (20 vs old limit of 7) to allow deep
 # but finite naming chains.
 _MAX_VISITED_SIZE = 50  # Phase 127: raised from 30 for deeper decomposition; fallback at limit
+# NOTE (v33): raising this to 200 was measured INERT for the acyl-CoA giant (its
+# pantetheine-thioester substituent fails for a different reason, not this net) and is a
+# global change with gate/perf risk, so it is NOT raised. Revisit as a measured breadth lever
+# once the per-top-level work budget is proven a sufficient anti-runaway guard corpus-wide.
 
 # v33 giant-molecule hang fix: negative-cache sentinel. Stored in the runtime
 # fragment cache to mark a fragment that is CONTEXT-INDEPENDENTLY unnameable (the

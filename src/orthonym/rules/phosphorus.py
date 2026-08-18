@@ -1195,6 +1195,120 @@ def name_phosphanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[st
     return None
 
 
+def _reachable_carbon_fragment(mol, start_c: int, block_o: int) -> List[int]:
+    """Atoms reachable from ``start_c`` without crossing ``block_o`` (the bridging
+    ester oxygen). The carbon-side subgraph of an ``-O-C…`` phosphoester branch."""
+    frag: Set[int] = set()
+    stack = [start_c]
+    while stack:
+        a = stack.pop()
+        if a in frag or a == block_o:
+            continue
+        frag.add(a)
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            j = nb.GetIdx()
+            if j != block_o and j not in frag:
+                stack.append(j)
+    return sorted(frag)
+
+
+def name_phosphoanhydride_oxy_substituent(
+        mol, o_idx: int, from_idx: int, _depth: int = 0) -> Optional[str]:
+    """P-67.2.6 method (1): name an ``-O-P(=O)(…)…`` phosphoanhydride subgraph as a
+    recursive phosphoryl-oxy substituent prefix.
+
+    ``o_idx`` is the ester/bridging oxygen bonded to the parent atom ``from_idx``;
+    the oxygen's other neighbour must be a phosphorus. Returns a substituent string
+    ENDING in ``oxy`` — ``'phosphonooxy'`` for a terminal ``-O-P(=O)(OH)2``, or the
+    nested ``'[<branches>phosphoryl]oxy'`` for a P-O-P(-O-P…) anhydride bridge —
+    or None (fail-closed) for any P outside the neutral mono-oxo phosphoryl class
+    (a P-C phosphonate, a no-oxo phosphite, a charged/oxido/radical P, etc.), which
+    carry their own nomenclature.
+
+    This is the valid SYSTEMATIC form the Blue Book lists as alternative (1) under
+    P-67.2.6 (`BlueBookV2/BlueBookV2.md:36937`); the PIN (method 2) uses the
+    ``…diphosphoxan-1-yl`` skeletal-replacement parent and is a future PIN-tier
+    build. Emitted only on the best-effort path, where a valid systematic name is
+    preferred over silence. 0-wrong is preserved by the top-level SELF-01/OPSIN
+    round-trip gate. Full record: .
+    """
+    if _depth > 12:
+        return None
+    o = mol.GetAtomWithIdx(o_idx)
+    ps = [n for n in o.GetNeighbors()
+          if n.GetIdx() != from_idx and n.GetSymbol() == 'P']
+    if len(ps) != 1:
+        return None
+    p = ps[0]
+    p_idx = p.GetIdx()
+    if p.GetFormalCharge() != 0 or p.GetNumRadicalElectrons() != 0:
+        return None
+    oxo = 0
+    branches: List[str] = []
+    for nb in p.GetNeighbors():
+        if nb.GetIdx() == o_idx:
+            continue
+        bond = mol.GetBondBetweenAtoms(p_idx, nb.GetIdx())
+        if nb.GetSymbol() == 'O' and bond.GetBondType() == Chem.BondType.DOUBLE:
+            oxo += 1
+            continue
+        if (nb.GetSymbol() == 'O'
+                and bond.GetBondType() == Chem.BondType.SINGLE
+                and nb.GetFormalCharge() == 0):
+            o2 = nb
+            heavy = [x for x in o2.GetNeighbors()
+                     if x.GetIdx() != p_idx and x.GetAtomicNum() > 1]
+            if not heavy:
+                if o2.GetTotalNumHs() >= 1:
+                    branches.append('hydroxy')          # -OH
+                else:
+                    return None                          # bare -O- / oxido: decline
+            elif len(heavy) == 1 and heavy[0].GetSymbol() == 'P':
+                sub = name_phosphoanhydride_oxy_substituent(
+                    mol, o2.GetIdx(), p_idx, _depth + 1)   # recurse P-O-P
+                if sub is None:
+                    return None
+                branches.append(sub)
+            elif len(heavy) == 1 and heavy[0].GetSymbol() == 'C':
+                from ..assembly.substituent_naming import name_substituent_fragment
+                from ..assembly.substituent_enumerator import (
+                    alkoxy_prefix_from_substituent)
+                c = heavy[0]
+                frag = _reachable_carbon_fragment(mol, c.GetIdx(), o2.GetIdx())
+                yl = name_substituent_fragment(mol, frag, c.GetIdx(), [])
+                if not yl:
+                    return None
+                alk = alkoxy_prefix_from_substituent(yl)
+                if not alk:
+                    return None
+                branches.append(alk)
+            else:
+                return None                              # -O-N etc.: decline
+        else:
+            return None                                  # P-C / P-N / no-O ligand
+    if oxo != 1:
+        return None                                      # need exactly one P=O
+    # Terminal -O-P(=O)(OH)2 -> contracted 'phosphonooxy' (P-67.1.4.1).
+    if sorted(branches) == ['hydroxy', 'hydroxy']:
+        return 'phosphonooxy'
+    # General phosphoryl bridge: cite branches in alphanumerical order (P-14.5),
+    # then 'phosphoryl', wrapped and attached via the linking O -> '...oxy'
+    # (P-67.2.6 method 1). Enclose each branch that is complex (carries a locant or
+    # its own enclosure); a bare 'hydroxy' stays unenclosed.
+    from ..assembly.naming_utils import alpha_sort_key
+    ordered = sorted(branches, key=alpha_sort_key)
+
+    def _enc(tok: str) -> str:
+        if tok == 'hydroxy':
+            return tok
+        if tok.startswith('[') or tok.startswith('('):
+            return tok
+        return f'({tok})'
+
+    body = ''.join(_enc(t) for t in ordered) + 'phosphoryl'
+    return f'[{body}]oxy'
+
+
 def get_phosphorus_prefix(fg_name: str) -> Optional[str]:
     """
     Get prefix form for phosphorus functional groups.
