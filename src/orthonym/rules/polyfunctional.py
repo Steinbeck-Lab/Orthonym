@@ -1075,6 +1075,29 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         if fg_name in _ACYLAMINO_PATHWAY_FGS:
             continue
         for match in matches:
+            # v33 Phase 6 lead e: a non-principal 'ester' expressed as a
+            # whole-branch acyloxy arm (-CH2-O-C(=O)R attached to the ring
+            # through a carbon linker) has the SAME shape of bug as the
+            # acylamino case above: get_prefix('ester') is None (no Step-5
+            # prefix), yet the blanket loop below used to still mark the
+            # match's off-ring atoms (acyl C, both O's, and the FIRST alkyl
+            # carbon captured by the ester SMARTS) as "consumed". When that
+            # first alkyl carbon IS the branch's only anchor back to the ring
+            # (e.g. the CH2 of -CH2-O-C(=O)CH3), consuming it orphans the
+            # whole arm from `_integrate_universal_prefixes`'s walk, which
+            # then returns '' and the arm silently vanishes -> atom-incomplete
+            # -> abstain (the composer already names it correctly via
+            # `name_substituent_fragment` -> '(acetyloxy)methyl' when reached
+            # directly). Defer ONLY when: (a) this is the whole-branch acyloxy
+            # shape (last SMARTS atom is a carbon OUTSIDE the ring, i.e. a
+            # true linker, not the ring atom itself), and (b) it is not the
+            # ring's own principal ester (guarded by `principal_group ==
+            # 'ester'` above, a disjoint code path) -- so deferring here can
+            # only ever apply to a genuine non-principal branch.
+            if fg_name == 'ester' and len(match) >= 4:
+                _anchor = match[-1]
+                if _anchor not in ring_set and mol.GetAtomWithIdx(_anchor).GetSymbol() == 'C':
+                    continue
             for idx in match:
                 if idx not in ring_set:
                     consumed_atoms.add(idx)
