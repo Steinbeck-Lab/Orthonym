@@ -70,9 +70,18 @@ def test_caffeine_declines():
     assert name_oxo_purine(mol) is None
 
 
+def test_2_chloro_9_methylhypoxanthine():
+    # halogen-substituted mono-6-oxo purine (RT-verified via OPSIN 2.9.0:
+    # name -> SMILES -> InChIKey, identical to the input's)
+    mol = _mol("Cn1cnc2c1[nH]c(Cl)nc2=O")
+    assert Chem.MolToInchiKey(mol) == "GFDFINQSCGJTCD-UHFFFAOYSA-N"
+    assert name_oxo_purine(mol) == "2-chloro-9-methyl-1,9-dihydro-6H-purin-6-one"
+
+
 def test_uric_acid_like_trione_declines():
     # extra C8=O (uric acid / trione family) -> not this engine's scope
     mol = _mol("Cn1c(=O)c2[nH]c(=O)[nH]c2n(C)c1=O")
+    assert Chem.MolToInchiKey(mol) == "OTSBKHHWSQYEHK-UHFFFAOYSA-N"
     assert name_oxo_purine(mol) is None
 
 

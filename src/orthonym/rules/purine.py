@@ -106,10 +106,15 @@ def name_substituted_purine(mol) -> Optional[str]:
         # only exocyclic group is the retained-defining C6 amino/oxo (adenine /
         # hypoxanthine) keeps its retained name -> decline here. "Substituted"
         # means at least one ring-position substituent beyond that: a C/N-alkyl
-        # or aryl prefix, a halogen, a suffix group, or an N-substituent.
+        # or aryl prefix, a halogen, a suffix group, an N-substituent, or an
+        # amino pattern beyond the bare-adenine defining C6-amino (di-/poly-amino,
+        # or a lone amino NOT at C6 -- e.g. 2,6-diaminopurine).
+        amino = subs.get('amino_substituents') or []
         substituted = bool(
             subs.get('c_substituents') or subs.get('n_substituents')
             or subs.get('other') or subs.get('suffix_groups')
+            or len(amino) > 1            # di-/poly-amino (e.g. 2,6-diaminopurine)
+            or (amino and amino != [6])  # a lone amino NOT at C6
         )
         if not substituted:
             continue
@@ -236,10 +241,11 @@ def name_purine_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
         base = _assemble_fused_heterocycle_name(mol, parent, subs, atom_mapping)
         # The three guards above (oxo/suffix declined, amino demoted to a
         # prefix) guarantee the assembler never applies a suffix here, so
-        # `base` always ends in the bare parent hydride "...purine". This
-        # assert stops a future guard edit from silently reintroducing a
-        # truncation bug at the "-yl" conversion below.
-        assert base.endswith("purine"), base
+        # `base` always ends in the bare parent hydride "...purine". If a
+        # future guard edit ever lets a suffix leak through anyway, fail
+        # closed here rather than string-surger a truncated name.
+        if not base.endswith("purine"):
+            return None  # a suffix leaked (guard drift) -> fail closed, never string-surger
         # base is e.g. "6-amino-9H-purine"; convert to "6-amino-9H-purin-9-yl".
         stem = base[:-1] if base.endswith('e') else base
         return f"{stem}-{attach_loc}-yl"
@@ -363,6 +369,10 @@ def name_oxo_purine(mol) -> Optional[str]:
         alongside the caller's ordering (purine_oxo / xanthine run first);
       - any substituent the shared identifier can't type as plain
         alkyl/halogen/bare-amino (fail-closed).
+
+    This engine owns the MONO-6-oxo case (hypoxanthine/guanine family) only.
+    The purine-2,6-DIONE case (xanthine/caffeine family) lives in
+    ``rules/purine_oxo.py::name_purine_26_dione``.
     """
     if mol is None or _OXO_CORE is None:
         return None

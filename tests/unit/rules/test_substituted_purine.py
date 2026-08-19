@@ -1,5 +1,8 @@
+import pytest
 from rdkit import Chem
 from orthonym.rules.purine import name_substituted_purine
+
+pytestmark = pytest.mark.opsin_gate
 
 
 def _mol(smi):
@@ -20,6 +23,24 @@ def test_bare_adenine_declines():
     # bare adenine keeps its retained name via another path -> this producer declines
     assert name_substituted_purine(_mol("Nc1ncnc2[nH]cnc12")) is None
     assert name_substituted_purine(_mol("Nc1ncnc2nc[nH]c12")) is None
+
+
+def test_26_diaminopurine():
+    # di-amino purine (amino at C2 AND C6): widens the "substituted" predicate
+    # to catch len(amino) > 1, since neither amino alone would trip the old
+    # c/n_substituents/other/suffix_groups check -> it used to fall through to
+    # the wrong retained-core path. Indicated H is derived per structure (this
+    # engine never hardcodes 9H): the two SMILES below are the 7H and 9H
+    # tautomers of the SAME molecule (RDKit InChIKey MSSXOMSJDRHRMC-UHFFFAOYSA-N
+    # for both -- confirmed by RDKit InChI's mobile-H layer, exactly like
+    # adenine's own 7H/9H pair below), and OPSIN round-trips EACH engine output
+    # back to that identical InChIKey (verified via in-process opsin_stdout).
+    mol_7h = _mol("Nc1nc(N)c2[nH]cnc2n1")
+    mol_9h = _mol("Nc1nc(N)c2nc[nH]c2n1")
+    assert Chem.MolToInchiKey(mol_7h) == "MSSXOMSJDRHRMC-UHFFFAOYSA-N"
+    assert Chem.MolToInchiKey(mol_9h) == "MSSXOMSJDRHRMC-UHFFFAOYSA-N"
+    assert name_substituted_purine(mol_7h) == "7H-purine-2,6-diamine"
+    assert name_substituted_purine(mol_9h) == "9H-purine-2,6-diamine"
 
 
 def test_non_purine_declines():
@@ -62,3 +83,9 @@ def test_bare_adenine_unchanged_end_to_end():
     from orthonym import Orthonym
     # bare adenine still gets its retained name (standard tautomer)
     assert Orthonym().name("Nc1ncnc2nc[nH]c12") == "adenine"
+
+
+def test_26_diaminopurine_end_to_end():
+    from orthonym import Orthonym
+    assert Orthonym().name("Nc1nc(N)c2[nH]cnc2n1") == "7H-purine-2,6-diamine"
+    assert Orthonym().name("Nc1nc(N)c2nc[nH]c2n1") == "9H-purine-2,6-diamine"

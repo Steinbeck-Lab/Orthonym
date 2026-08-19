@@ -22,6 +22,9 @@ halogen on a bare purine-2,6-dione ring system whose imidazole has exactly one
 saturated N. Functional/heteroatom substituents, a C8=O (purine-2,6,8-trione,
 i.e. the uric-acid family), extra fused rings, and the unsubstituted parent all
 decline here (the unsubstituted parent keeps its retained name via another path).
+
+This module owns the purine-2,6-DIONE (xanthine/caffeine family) only. The
+MONO-6-oxo case (hypoxanthine/guanine) lives in ``rules/purine.py::name_oxo_purine``.
 """
 from collections import defaultdict
 from typing import Optional
