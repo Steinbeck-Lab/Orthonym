@@ -43,3 +43,13 @@ def test_fusion_carbon_attach_declines():
     assert len(fusion_carbons) == 2
     for attach in fusion_carbons:
         assert name_purine_substituent(mol, ring_set, attach) is None
+
+
+def test_purine_substituent_via_dispatch():
+    from orthonym.rules.ring_substituents import name_ring_system_substituent
+    mol = Chem.MolFromSmiles("OC(=O)Cn1cnc2c(N)ncnc21")
+    ring = mol.GetSubstructMatch(Chem.MolFromSmarts(
+        "[#7]1~[#6]~[#7]~[#6]2~[#7]~[#6]~[#7]~[#6]2~[#6]1"))
+    ch2 = [a.GetIdx() for a in mol.GetAtoms()
+           if a.GetSymbol() == "C" and a.GetTotalNumHs() == 2][0]
+    assert name_ring_system_substituent(mol, set(ring), ch2) == "6-amino-9H-purin-9-yl"

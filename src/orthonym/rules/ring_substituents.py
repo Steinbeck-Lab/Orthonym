@@ -2112,6 +2112,17 @@ def name_ring_system_substituent(
     if _phth is not None:
         return _phth
 
+    # Purine ring system (adenine/hypoxanthine/purine skeleton), free valence on
+    # a ring atom: fixed-numbering PIN substituent (6-amino-9H-purin-9-yl). The
+    # generic decorated-fused path declines it (its retained-stem lookup keys on
+    # the bare-ring SMILES `c1ncc2ncnc2n1`, no [nH], which misses the catalog).
+    # This producer derives purine's fixed numbering + graph indicated-H directly
+    # and fails closed, so it is safe on any tier (SELF-01 backstops).
+    from .purine import name_purine_substituent
+    _pur = name_purine_substituent(mol, frag_set, attach_idx)
+    if _pur is not None:
+        return _pur
+
     frag_ring_atoms = {a for a in frag_atoms if ring_info.NumAtomRings(a) > 0}
     if frag_ring_atoms == frag_set and ring_info.NumAtomRings(attach_idx) > 0:
         try:
