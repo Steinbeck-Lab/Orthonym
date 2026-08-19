@@ -45,3 +45,57 @@ def name_salt_abstains(smi: str) -> bool:
     from orthonym.rules.salts import name_salt
     mol = Chem.MolFromSmiles(smi)
     return name_salt(mol, "pin") == ""
+
+
+def _rt_ok_or_abstain(smi: str) -> bool:
+    """True iff name_compound either abstains (unknown / '(not supported)')
+    or emits a name whose OPSIN round-trip InChIKey MATCHES the input --
+    i.e. it never ships a WRONG species."""
+    name = name_compound(smi, style="pin")
+    if not name or "unknown" in name or "not supported" in name:
+        return True
+    got = _rt(name)
+    want = inchi.MolToInchiKey(Chem.MolFromSmiles(smi))
+    return got == want
+
+
+def test_aqueous_hydrohalide_fails_closed():
+    # Fable-found 0-wrong BLOCKER: a hydroacid written ionically ([H+].[X-])
+    # plus water of crystallization used to leave the [H+] orphaned -- the
+    # hydroacid-merge branch only fires when an ORGANIC neutral (>1 heavy
+    # atom) is present, so a water-only neutral set never reaches it. The
+    # FIND-2 cation guard then passed VACUOUSLY (0 == 0, since h_plus_frags
+    # is excluded from cation_list), and the A2 water-fold appended
+    # 'monohydrate' to an anion-only name -- shipping a WRONG species (net
+    # charge -1 instead of neutral): 'O.[H+].[Cl-]' -> 'chloride monohydrate'.
+    for smi in ("O.[H+].[Cl-]", "O.[H+].[Br-]", "O.O.[H+].[Cl-]"):
+        assert _rt_ok_or_abstain(smi), (
+            f"{smi} shipped a wrong-species name: "
+            f"{name_compound(smi, style='pin')!r}"
+        )
+
+
+def test_ionic_hydroacid_fails_closed():
+    # PRE-EXISTING sibling (not introduced by Lever A2, same root cause,
+    # same fix): a bare [H+].[X-] pair with NO neutral fragment at all also
+    # falls through the hydroacid-merge branch (`neutrals` is empty) and
+    # used to emit an anion-only name ('chloride', 'acetate') that does not
+    # round-trip to the input (which carries a net -1 charge under this
+    # reading, or is really "hydrogen chloride"/"acetic acid" and not a salt
+    # at all) -- either way, an anion word alone is a wrong species.
+    for smi in ("[H+].[Cl-]", "[H+].CC(=O)[O-]"):
+        assert _rt_ok_or_abstain(smi), (
+            f"{smi} shipped a wrong-species name: "
+            f"{name_compound(smi, style='pin')!r}"
+        )
+
+
+def test_drug_hydrochloride_still_names():
+    # Regression: the LEGITIMATE Drug.[H+].[Cl-] -> 'drug hydrochloride'
+    # path RETURNS inside the hydroacid-merge branch (organic neutral +
+    # h_plus_frags + halide anion) and must never reach the new orphaned-H+
+    # guard.
+    smi = "Clc1ccccc1CCN.[H+].[Cl-]"
+    name = name_compound(smi, style="pin")
+    assert name and "hydrochloride" in name
+    assert _rt(name) == inchi.MolToInchiKey(Chem.MolFromSmiles(smi))

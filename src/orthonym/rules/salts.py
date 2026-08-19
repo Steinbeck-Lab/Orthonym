@@ -334,6 +334,16 @@ def name_salt(mol, style: str = 'pin') -> str:
                 except (RecursionError, ValueError, RuntimeError):
                     pass
 
+    # 0-wrong (Fable-found): a hydroacid written ionically ([H+].[X-], optionally
+    # with water) leaves the proton orphaned unless the hydroacid-merge branch above
+    # consumed it (which needs an ORGANIC neutral and RETURNS on success). If any
+    # [H+] survives here it would be silently dropped and name_salt would emit an
+    # anion-only name (e.g. 'chloride'/'chloride monohydrate') -- a WRONG species
+    # (net charge -1). Fail closed. Also closes the pre-existing [H+].[Cl-]->'chloride'
+    # default-path 0-wrong bug.
+    if h_plus_frags:
+        return ''
+
     cation_names = []
     anion_names = []
 
