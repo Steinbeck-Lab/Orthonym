@@ -117,3 +117,121 @@ def name_substituted_purine(mol) -> Optional[str]:
         return _assemble_fused_heterocycle_name(mol, parent, subs, atom_mapping)
 
     return None
+
+
+def _external_subtree(mol, attach_idx, core_atoms) -> set:
+    """All atoms reachable from `attach_idx` without re-entering
+    `core_atoms`, excluding `attach_idx` itself -- the parent-side structure
+    this substituent attaches to. Empty if `attach_idx` has no exocyclic
+    neighbour (an unattached/free ring, not expected from a real fragment)."""
+    from collections import deque
+    start = [n.GetIdx() for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+             if n.GetIdx() not in core_atoms]
+    visited = set(start)
+    queue = deque(start)
+    while queue:
+        idx = queue.popleft()
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in core_atoms or nidx in visited:
+                continue
+            visited.add(nidx)
+            queue.append(nidx)
+    return visited
+
+
+def name_purine_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
+    """Name a purine ring-system fragment as a `-yl` substituent rooted at
+    `attach_idx` (a ring atom). Returns `<prefixes>-<indH>H-purin-<loc>-yl` or
+    None. C6-amino renders as the `6-amino` PREFIX (purine is a substituent,
+    not the parent). Indicated H derived from the graph (tautomer-safe).
+
+    Accuracy-first, fail-closed: declines an oxo-bearing fragment (Tier 1
+    substituent scope is non-oxo, the same boundary as
+    ``name_substituted_purine``) and any detachable-suffix decoration
+    (carboxylic acid etc.) elsewhere on the ring, which this simple `-yl`
+    builder cannot combine correctly.
+    """
+    if mol is None or _PURINE_CORE is None:
+        return None
+    frag_set = set(frag_atoms)
+    matches = mol.GetSubstructMatches(_PURINE_CORE, uniquify=False)
+    if not matches:
+        return None
+
+    from .fused_rings import (
+        get_fused_heterocycle_substituents,
+        _assemble_fused_heterocycle_name,
+        _exocyclic_atoms_accounted,
+    )
+    from ..perception.rings import get_ring_systems
+
+    for match in matches:
+        if set(match) != frag_set:
+            continue  # the fragment must be exactly the purine ring system
+        atom_mapping = _purine_atom_mapping(match)
+        core_atoms = set(match)
+        if attach_idx not in atom_mapping:
+            continue
+
+        if not _core_is_own_ring_system(mol, core_atoms, get_ring_systems):
+            continue  # something else is fused on -> a different, larger parent
+
+        attach_loc = atom_mapping[attach_idx]
+        loc_to_idx = {loc: midx for midx, loc in atom_mapping.items()}
+        sat = _purine_indicated_h(mol, loc_to_idx, core_atoms)
+        if sat is None:
+            continue
+
+        # Mask off everything past `attach_idx` -- that is the PARENT this
+        # substituent attaches to, not a ring decoration. Left visible, the
+        # shared collector walks straight past it and misidentifies it as
+        # one (e.g. an acetic-acid tail read as a `9-(carboxymethyl)` ring
+        # substituent). Rather than mutate `mol` (a bond cut there breaks
+        # re-Kekulization of the whole fused ring -- measured), fold the
+        # entire externally-reachable subtree into an EXTENDED core-atoms
+        # set passed only to the collector: every atom in it is already
+        # "core" from the collector's point of view, so its neighbours
+        # inside the subtree are never visited and the walk never reaches
+        # past the attachment point. The real (narrow) `atom_mapping` --
+        # ring atoms only -- still goes to the assembler, so no placeholder
+        # locant ever leaks into the assembled name.
+        external_subtree = _external_subtree(mol, attach_idx, core_atoms)
+        extended_mapping = dict(atom_mapping)
+        for idx in external_subtree:
+            extended_mapping[idx] = idx  # placeholder; never emitted (no
+                                          # exocyclic neighbour of these
+                                          # atoms lies outside extended_mapping)
+
+        subs = get_fused_heterocycle_substituents(mol, extended_mapping)
+
+        # Same source-level completeness guard as the parent path: fail
+        # closed on any exocyclic branch the shared collector can't identify.
+        if not _exocyclic_atoms_accounted(mol, set(extended_mapping)):
+            continue
+
+        if subs.get('oxo_substituents'):
+            continue  # Tier 1 substituent scope is non-oxo (same boundary
+                       # as name_substituted_purine)
+        if subs.get('suffix_groups'):
+            continue  # a detachable-suffix decoration elsewhere on the ring
+                       # can't be combined with -yl output by this builder
+
+        # C6-amino must be a PREFIX here (substituent context): demote the
+        # amine SUFFIX to an `amino` PREFIX at its locant.
+        amino_locants = subs.get('amino_substituents') or []
+        subs = dict(subs)
+        subs['amino_substituents'] = []
+        other = list(subs.get('other') or [])
+        for loc in amino_locants:
+            other.append({'name': 'amino', 'locant': loc})
+        subs['other'] = other
+
+        # Assemble prefixes on the bare parent hydride, then attach `-<loc>-yl`.
+        parent = f"{sat}H-purine"
+        base = _assemble_fused_heterocycle_name(mol, parent, subs, atom_mapping)
+        # base is e.g. "6-amino-9H-purine"; convert to "6-amino-9H-purin-9-yl".
+        stem = base[:-1] if base.endswith('e') else base
+        return f"{stem}-{attach_loc}-yl"
+
+    return None
