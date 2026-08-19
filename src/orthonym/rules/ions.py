@@ -1338,6 +1338,23 @@ def _validate_cation_name(mol, result: str) -> str:
     if _is_bare_methylidene_leak(result):
         return ''
 
+    # 0-wrong (v33 Phase 4 Lever B): a cation name MUST preserve the input's
+    # net positive charge. The multi-cation neutralize-and-name fallback
+    # (name_cation ~:1170) can return a bare NEUTRAL skeleton name, which
+    # name_salt then pairs with a halide into a WRONG molecule (CHEBI:53452
+    # [NH3+]CC[NH2+]naphthalene -> 'N-2-aminoethylnaphthalen-1-amine'). Verify
+    # the produced name parses back to the same formal charge; else fail closed.
+    # Fail-OPEN when OPSIN is unavailable (parsed is None), matching the house
+    # validity-gate convention (a missing JVM never hard-fails a name).
+    mol_charge = Chem.GetFormalCharge(mol)
+    if mol_charge > 0:
+        from orthonym.namer import _validity_gate_name_to_smiles
+        parsed = _validity_gate_name_to_smiles(result)
+        if parsed is not None:
+            pm = Chem.MolFromSmiles(parsed)
+            if pm is not None and Chem.GetFormalCharge(pm) != mol_charge:
+                return ''
+
     return result
 
 
