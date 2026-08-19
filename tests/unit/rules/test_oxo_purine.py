@@ -1,0 +1,125 @@
+"""Unit tests for the substituted mono-6-oxo purine (hypoxanthine/guanine
+family) naming engine.
+
+Both RT-exact targets below were confirmed via OPSIN 2.9.0 round-trip
+(name -> SMILES -> InChIKey, identical to the input SMILES's InChIKey) before
+this engine was written:
+
+    9-methylguanine       Cn1cnc2c1nc(N)[nH]c2=O
+        -> 2-amino-9-methyl-1,9-dihydro-6H-purin-6-one
+    9-methylhypoxanthine  Cn1cnc2c1[nH]cnc2=O  (also O=c1[nH]cnc2n(C)cnc12)
+        -> 9-methyl-1,9-dihydro-6H-purin-6-one
+
+The C2-amino (guanine family) is placed as an ordinary `2-amino` PREFIX --
+never as the shared fused-ring assembler's amino SUFFIX, which would silently
+drop the C6 oxo (a wrong-molecule defect; see module docstring in
+rules/purine.py::name_oxo_purine). The engine declines the bare parent
+(hypoxanthine or guanine with no OTHER substituent), a 2,6-dione (caffeine
+family; purine_oxo.py owns that), any extra ring oxo (8-oxo/trione), and any
+substituent outside plain alkyl/halogen/bare-amino (fail-closed).
+"""
+import pytest
+from rdkit import Chem
+
+from orthonym.rules.purine import name_oxo_purine
+
+pytestmark = pytest.mark.unit
+
+
+def _mol(smi):
+    return Chem.MolFromSmiles(smi)
+
+
+def test_9_methylguanine():
+    mol = _mol("Cn1cnc2c1nc(N)[nH]c2=O")
+    assert Chem.MolToInchiKey(mol) == "UUWJNBOCAPUTBK-UHFFFAOYSA-N"  # 9-methylguanine
+    assert name_oxo_purine(mol) == "2-amino-9-methyl-1,9-dihydro-6H-purin-6-one"
+
+
+@pytest.mark.parametrize("smiles", [
+    "Cn1cnc2c1[nH]cnc2=O",
+    "O=c1[nH]cnc2n(C)cnc12",
+])
+def test_9_methylhypoxanthine(smiles):
+    mol = _mol(smiles)
+    assert Chem.MolToInchiKey(mol) == "PESGUQRDJASXOR-UHFFFAOYSA-N"  # 9-methylhypoxanthine
+    assert name_oxo_purine(mol) == "9-methyl-1,9-dihydro-6H-purin-6-one"
+
+
+def test_bare_hypoxanthine_declines():
+    # bare hypoxanthine keeps its retained name via another path -> decline here
+    mol = _mol("O=c1[nH]cnc2[nH]cnc12")
+    assert Chem.MolToInchiKey(mol) == "FDGQSTZJBFJUBT-UHFFFAOYSA-N"
+    assert name_oxo_purine(mol) is None
+
+
+def test_bare_guanine_declines():
+    # bare guanine (C2-amino is the DEFINING substituent, not a real one) ->
+    # decline here so the retained name wins downstream
+    mol = _mol("Nc1nc2[nH]cnc2c(=O)[nH]1")
+    assert Chem.MolToInchiKey(mol) == "UYTPUPDQBNUYGX-UHFFFAOYSA-N"
+    assert name_oxo_purine(mol) is None
+
+
+def test_caffeine_declines():
+    # a 2,6-dione is a DIFFERENT parent (purine_oxo.py owns it); this engine's
+    # core pins exactly one ring C=O (C6), so a second ring =O at C2 is typed
+    # 'oxo' by the shared identifier -- not an accepted type -> decline
+    mol = _mol("Cn1c(=O)c2c(ncn2C)n(C)c1=O")
+    assert Chem.MolToInchiKey(mol) == "RYYVLZVUVIJVGH-UHFFFAOYSA-N"  # caffeine
+    assert name_oxo_purine(mol) is None
+
+
+def test_uric_acid_like_trione_declines():
+    # extra C8=O (uric acid / trione family) -> not this engine's scope
+    mol = _mol("Cn1c(=O)c2[nH]c(=O)[nH]c2n(C)c1=O")
+    assert name_oxo_purine(mol) is None
+
+
+def test_non_purine_declines():
+    assert name_oxo_purine(_mol("c1ccccc1")) is None
+    assert name_oxo_purine(_mol("CCO")) is None
+
+
+def test_none_input():
+    assert name_oxo_purine(None) is None
+
+
+def test_unclassifiable_substituent_fails_closed():
+    # a boronic-acid ring substituent is NOT typed by _identify_fused_substituent
+    # -> fail closed rather than silently omit it and name a different molecule
+    mol = _mol("O=c1[nH]cnc2n(B(O)O)cnc12")
+    assert name_oxo_purine(mol) is None
+
+
+@pytest.mark.opsin_gate
+def test_9_methylguanine_end_to_end():
+    from orthonym import Orthonym
+    smi = "Cn1cnc2c1nc(N)[nH]c2=O"
+    assert Orthonym().name(smi) == "2-amino-9-methyl-1,9-dihydro-6H-purin-6-one"
+
+
+@pytest.mark.opsin_gate
+def test_9_methylhypoxanthine_end_to_end():
+    from orthonym import Orthonym
+    smi = "Cn1cnc2c1[nH]cnc2=O"
+    assert Orthonym().name(smi) == "9-methyl-1,9-dihydro-6H-purin-6-one"
+
+
+@pytest.mark.opsin_gate
+def test_bare_guanine_unchanged_end_to_end():
+    from orthonym import Orthonym
+    assert Orthonym().name("Nc1nc2[nH]cnc2c(=O)[nH]1") == "guanine"
+
+
+@pytest.mark.opsin_gate
+def test_bare_hypoxanthine_unchanged_end_to_end():
+    from orthonym import Orthonym
+    assert Orthonym().name("O=c1[nH]cnc2[nH]cnc12") == "hypoxanthine"
+
+
+@pytest.mark.opsin_gate
+def test_caffeine_unchanged_end_to_end():
+    from orthonym import Orthonym
+    assert Orthonym().name("Cn1c(=O)c2c(ncn2C)n(C)c1=O") == \
+        "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"

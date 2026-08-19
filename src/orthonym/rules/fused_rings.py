@@ -1295,6 +1295,18 @@ def name_fused_heterocycle(mol):
     if subst_purine_name:
         return (subst_purine_name, ring_atoms, {}, True)
 
+    # Substituted mono-6-oxo purine (hypoxanthine/guanine family): systematic
+    # PIN on the fixed purine parent with a constructive `-6-one` template and
+    # graph-derived added-indicated-H. Runs AFTER the 2,6-dione and xanthine
+    # handlers above (which keep first refusal on any 2,6-dione/trione) and
+    # near `name_substituted_purine` (non-oxo purines), since the two engines
+    # handle disjoint (oxo vs non-oxo) cases. Declines the bare base, which
+    # keeps its retained name below.
+    from .purine import name_oxo_purine
+    oxo_purine_name = name_oxo_purine(mol)
+    if oxo_purine_name:
+        return (oxo_purine_name, ring_atoms, {}, True)
+
     # First try exact match for unsubstituted fused heterocycle
     result = get_fused_heterocycle_name(mol)
     if result:
