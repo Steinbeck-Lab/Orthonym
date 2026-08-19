@@ -407,23 +407,41 @@ def name_salt(mol, style: str = 'pin') -> str:
     if len(anion_names) != len(frags['anions']):
         return ''
 
-    # FIND-2 fail-closed (0-wrong): a genuine NEUTRAL fragment reaching this
-    # point is unaccounted for. The only two places a neutral fragment is
-    # legitimately consumed are the H+-merge hydroacid-salt branch above
-    # (:294-318, which RETURNS directly on success) and -- not applicable
-    # here -- a zwitterion, which `parse_salt_fragments` (ions.py:551) buckets
-    # by WHOLE-FRAGMENT net formal charge, so a net-neutral zwitterion is a
-    # SINGLE fragment with no separate cation/anion entries and never reaches
-    # `name_salt` at all (`is_salt` requires both `cations` and `anions`
-    # non-empty). So any survivor in `neutrals` here is a real extraneous
-    # organic/inorganic co-fragment (e.g. a solvate ``CCO.[Na+].[Cl-]``, or
-    # water of crystallization the H+-merge branch didn't consume) that this
-    # function has no mechanism to fold into the name -- joining only the
-    # ionic subset would silently drop it. Abstain instead, mirroring the
-    # cation/anion guards above and abort-whole
-    # (fragment_rules.py:60-61).
+    # v33 Phase 4 Lever A2 (0-wrong preserved): a genuine NEUTRAL fragment
+    # reaching this point is unaccounted for. The only two places a neutral
+    # fragment is legitimately consumed are the H+-merge hydroacid-salt
+    # branch above (:294-318, which RETURNS directly on success) and -- not
+    # applicable here -- a zwitterion, which `parse_salt_fragments`
+    # (ions.py:551) buckets by WHOLE-FRAGMENT net formal charge, so a
+    # net-neutral zwitterion is a SINGLE fragment with no separate
+    # cation/anion entries and never reaches `name_salt` at all (`is_salt`
+    # requires both `cations` and `anions` non-empty). So any survivor in
+    # `neutrals` here is a real extraneous organic/inorganic co-fragment.
+    #
+    # Previously this ALWAYS aborted (mirroring the cation/anion guards
+    # above and abort-whole, fragment_rules.py:60-61) -- but that
+    # made a recognized water of crystallization (e.g. cetylpyridinium
+    # chloride monohydrate, CHEBI:3566) abstain even though the ionic part
+    # names cleanly. P-14.8.2 general nomenclature explicitly allows a
+    # water solvate to be folded as a "<name> <mult>hydrate" suffix (BB
+    # line 4657/4685: "...monohydrate"), so fold a WATER-ONLY neutral set
+    # into that suffix and keep the fail-closed abstain for any OTHER
+    # (unrecognized) neutral co-former -- never silently drop it or force
+    # a wrong/partial name.
+    from .adducts import _HYDRATE_MULTIPLIERS
+    solvate_suffix = ''
     if neutrals:
-        return ''
+        water = [n for n in neutrals
+                 if Chem.MolToSmiles(n['mol'], canonical=True) == 'O']
+        other = [n for n in neutrals
+                 if Chem.MolToSmiles(n['mol'], canonical=True) != 'O']
+        if other:
+            return ''  # unrecognized neutral co-former -> fail closed (0-wrong)
+        w = len(water)
+        hydrate_prefix = _HYDRATE_MULTIPLIERS.get(w)
+        if hydrate_prefix is None:
+            return ''  # water count outside the mono..deca table -> fail closed
+        solvate_suffix = ' ' + hydrate_prefix + 'hydrate'
 
     # --- Hydrogen prefix for partial salts (IUPAC P-72.2.1) ---
     # When an anion fragment still has protonated carboxylic acid groups
@@ -470,7 +488,8 @@ def name_salt(mol, style: str = 'pin') -> str:
     else:
         result_parts = formatted_cations + formatted_anions
 
-    return ' '.join(result_parts)
+    result = ' '.join(result_parts)
+    return result + solvate_suffix
 
 
 def _apply_stoichiometric_prefix(name: str, count: int) -> str:
