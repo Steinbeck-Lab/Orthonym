@@ -67,6 +67,7 @@ def name_substituted_purine(mol) -> Optional[str]:
     from .fused_rings import (
         get_fused_heterocycle_substituents,
         _assemble_fused_heterocycle_name,
+        _exocyclic_atoms_accounted,
     )
     from ..perception.rings import get_ring_systems
 
@@ -86,8 +87,19 @@ def name_substituted_purine(mol) -> Optional[str]:
             continue
 
         subs = get_fused_heterocycle_substituents(mol, atom_mapping)
-        if not subs:
-            continue
+
+        # ``get_fused_heterocycle_substituents`` silently ``continue``s past any
+        # exocyclic branch it cannot identify, so its output can be MISSING a
+        # substituent -- i.e. denote a DIFFERENT molecule. Fail closed at the
+        # source rather than trust an incomplete collection.
+        if not _exocyclic_atoms_accounted(mol, core_atoms):
+            continue  # a substituent the shared collector would silently omit
+                      # -> decline rather than name a different molecule
+
+        if subs.get('oxo_substituents'):
+            continue  # Tier 1 is non-oxo; oxo purines (hypoxanthine/guanine/
+                      # xanthine family) defer to purine_oxo.py. Prevents the
+                      # amino+oxo silent-oxo-drop wrong-molecule name.
 
         # Fire ONLY for a genuinely substituted purine. A bare purine base whose
         # only exocyclic group is the retained-defining C6 amino/oxo (adenine /
