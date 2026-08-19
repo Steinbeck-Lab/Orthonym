@@ -101,6 +101,33 @@ def test_boronic_acid_now_names_under_best_effort(_best_effort):
     assert rt["passed"], rt
 
 
+def test_sentinel_leak_guard_direct():
+    # errors.py's documented 310/10000-row leak class: a bare equality/space
+    # check on the cascade placeholder MISSES its DECORATED forms (a locant or
+    # italic-element prefix already welded on, e.g. 'N-substituentformamide').
+    # `is_refusal_sentinel` is a substring test, so it catches both the bare
+    # and the decorated shape; lock that contract directly.
+    from orthonym.errors import is_refusal_sentinel
+    assert is_refusal_sentinel('substituent')
+    assert is_refusal_sentinel('N-substituentformamide')
+    assert is_refusal_sentinel('N-substituenthydroxyphosphonooxytricosanamide')
+    assert not is_refusal_sentinel('9H-purin-6-amine')
+
+
+def test_decorated_sentinel_leak_fails_closed(_best_effort, monkeypatch):
+    # If the general recursive namer ever returns a DECORATED sentinel for an
+    # unaccounted branch -- no literal space, not equal to the bare
+    # 'substituent' placeholder, so a naive equality/space check would have
+    # let it through -- the augmentation must still fail closed rather than
+    # weld it into the assembled purine name (never a wrong/garbage name).
+    import orthonym.rules.ring_substituents as ring_substituents_mod
+    monkeypatch.setattr(
+        ring_substituents_mod, "name_ring_system_substituent",
+        lambda *a, **k: "N-substituentformamide",
+    )
+    assert name_substituted_purine(_mol(_ACETYL_COA)) is None
+
+
 def test_pin_default_engine_output_unchanged_end_to_end():
     # Byte-identity spot check on the default (PIN) engine tier: normal
     # molecules unaffected by this fix, incl. the purine family itself.

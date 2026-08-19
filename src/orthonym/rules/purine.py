@@ -196,6 +196,7 @@ def _best_effort_augment_purine_subs(mol, atom_mapping, core_atoms, subs):
         return None  # PIN/default: fail closed, exactly as before this fix
 
     from .ring_substituents import name_ring_system_substituent
+    from ..errors import is_refusal_sentinel
 
     exocyclic = {
         a.GetIdx() for a in mol.GetAtoms()
@@ -240,8 +241,14 @@ def _best_effort_augment_purine_subs(mol, atom_mapping, core_atoms, subs):
             # retry the WHOLE branch as one ring-or-chain substituent.
             name = name_ring_system_substituent(
                 mol, sorted(branch), nbr_idx, allow_mancude=True)
-            if not name or name == 'substituent' or ' ' in name:
-                return None  # still unnameable -> fail closed
+            # `is_refusal_sentinel` catches the bare 'substituent' placeholder
+            # AND its DECORATED forms (e.g. 'N-substituentformamide',
+            # 'N-substituenthydroxyphosphonooxy...') -- a bare equality/space
+            # check misses those (errors.py's documented 310/10000-row leak
+            # class), so a leaked sentinel could otherwise be welded into the
+            # assembled purine name.
+            if not name or is_refusal_sentinel(name):
+                return None  # still unnameable / sentinel leak -> fail closed
 
             locants_here = subs['c_substituents'].setdefault(name, [])
             if locant not in locants_here:
