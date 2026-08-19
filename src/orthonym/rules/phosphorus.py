@@ -1445,9 +1445,15 @@ def name_phosphoxane_oxy_substituent(
 
     # detachable prefixes in alphanumerical order (P-14.5): esters ({R}oxy) and
     # hydroxy interleave by name; oxo comes after hydroxy ('h' < 'o').
+    from ..assembly.naming_utils import enclose_if_compound
     detach = []
     for loc, tok in ester_subs:
-        detach.append((tok, f"{loc}-{tok}"))            # single ester at this P
+        # P-16.3.3: a COMPOUND ester branch (its own locant/brackets, e.g. an
+        # amino-acyl-decorated alkoxy) must be enclosed before the diphosphoxane
+        # locant is prepended -- otherwise the leading digit of the branch
+        # collides with the prepended locant ('3-4-[...]butoxy', OPSIN-unparseable).
+        # A SIMPLE ester ('methoxy') stays bare.
+        detach.append((tok, f"{loc}-{enclose_if_compound(tok)}"))
     hp = _locant_prefix(hydroxy_loc, 'hydroxy')
     if hp:
         detach.append(('hydroxy', hp))

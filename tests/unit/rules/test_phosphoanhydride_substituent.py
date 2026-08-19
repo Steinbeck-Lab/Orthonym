@@ -75,6 +75,51 @@ def test_phosphoxane_declines_single_p():
     assert name_px(m, o, c) is None
 
 
+def test_phosphoxane_compound_ester_branch_is_enclosed():
+    # P-16.3.3: a COMPOUND ester branch (its own leading locant, e.g. the
+    # contracted '2-methylpropoxy') must be enclosed before the diphosphoxane
+    # locant is prepended, or the two locants collide into an unparseable
+    # '3-2-methylpropoxy'. Defect A, v33.
+    from orthonym.rules.phosphorus import name_phosphoxane_oxy_substituent as name_px
+    m, o, c = _o_and_parent('OCCOP(=O)(O)OP(=O)(O)OCC(C)C')
+    out = name_px(m, o, c)
+    assert out == (
+        '(1,3-dihydroxy-3-(2-methylpropoxy)-1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)oxy')
+    assert '3-2-methylpropoxy' not in out
+
+
+def test_phosphoxane_compound_bracketed_ester_branch_is_enclosed():
+    # A larger, bracket-carrying compound ester branch (an amino-acyl-decorated
+    # alkoxy, as in the acyl-CoA pantetheine arm) must ALSO be enclosed; before
+    # the fix this produced the OPSIN-unparseable '3-4-[...]butoxy' collision.
+    from orthonym.rules.phosphorus import name_phosphoxane_oxy_substituent as name_px
+    m, o, c = _o_and_parent(
+        'OCCOP(=O)(O)OP(=O)(O)OCC(C)(C)C(O)C(=O)NCCC(=O)NCCSC(=O)C')
+    out = name_px(m, o, c)
+    assert '3-4-[' not in out
+    assert out.startswith(
+        '(3-(4-[(3-{[2-(acetylsulfanyl)ethyl]amino}-3-oxopropyl)amino]'
+        '-3-hydroxy-2,2-dimethyl-4-oxobutoxy)-1,3-dihydroxy')
+
+
+@pytest.mark.slow
+def test_phosphoxane_compound_ester_branch_roundtrips():
+    # GREEN end-to-end: the enclosed name is OPSIN-parseable and round-trips
+    # to the exact input structure (was opsin_parse_failed before the fix).
+    from orthonym.jvm_budget import jvm_slots
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+    from orthonym.rules.phosphorus import name_phosphoxane_oxy_substituent as name_px
+
+    smi = 'OCCOP(=O)(O)OP(=O)(O)OCC(C)(C)C(O)C(=O)NCCC(=O)NCCSC(=O)C'
+    m, o, c = _o_and_parent(smi)
+    token = name_px(m, o, c)
+    name = f"2-[{token}]ethan-1-ol"
+    with jvm_slots(1, purpose="test_phosphoxane_compound_ester_branch_roundtrips"):
+        result = opsin_roundtrip_check(smi, name)
+    assert result['passed'] is True
+    assert result['inchi_match'] is True
+
+
 def test_declines_no_oxo_phosphite():
     # Trivalent P (no P=O) is a phosphite, not a phosphoryl -> None.
     m = Chem.MolFromSmiles('OCCOP(O)O')
