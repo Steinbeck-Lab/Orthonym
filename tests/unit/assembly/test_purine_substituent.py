@@ -53,3 +53,25 @@ def test_purine_substituent_via_dispatch():
     ch2 = [a.GetIdx() for a in mol.GetAtoms()
            if a.GetSymbol() == "C" and a.GetTotalNumHs() == 2][0]
     assert name_ring_system_substituent(mol, set(ring), ch2) == "6-amino-9H-purin-9-yl"
+
+
+def test_purine_substituent_end_to_end_pipeline():
+    # Bug C, real caller: the dispatcher's frag_atoms is the WHOLE substituent
+    # side (ring + its own exocyclic decorations, e.g. the C6-amino nitrogen),
+    # NOT just the 9 bare ring atoms -- unlike the hand-built frag_set in
+    # test_purine_substituent_via_dispatch above, which excludes the amino atom
+    # and so cannot catch a frag_set/frag_ring_atoms mismatch. This test goes
+    # through the full Orthonym().name() pipeline (real dispatch call shape)
+    # and round-trips the emitted name through OPSIN, so it is what actually
+    # proves the purine tier fires on real input.
+    from orthonym import Orthonym
+    from orthonym.validation import opsin_roundtrip_check
+
+    smiles = "OC(=O)Cn1cnc2c(N)ncnc21"
+    name = Orthonym().name(smiles)
+
+    assert name != "unknown organic compound"
+    assert "purin" in name
+
+    rt = opsin_roundtrip_check(smiles, name)
+    assert rt["passed"], rt
