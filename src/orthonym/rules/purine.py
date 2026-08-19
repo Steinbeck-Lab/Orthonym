@@ -197,6 +197,9 @@ def name_purine_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
         # ring atoms only -- still goes to the assembler, so no placeholder
         # locant ever leaks into the assembled name.
         external_subtree = _external_subtree(mol, attach_idx, core_atoms)
+        if not external_subtree:
+            return None  # attach atom has no exocyclic free valence (e.g. a
+                         # fusion carbon C4/C5) -> not a real -yl attachment
         extended_mapping = dict(atom_mapping)
         for idx in external_subtree:
             extended_mapping[idx] = idx  # placeholder; never emitted (no
@@ -230,6 +233,12 @@ def name_purine_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
         # Assemble prefixes on the bare parent hydride, then attach `-<loc>-yl`.
         parent = f"{sat}H-purine"
         base = _assemble_fused_heterocycle_name(mol, parent, subs, atom_mapping)
+        # The three guards above (oxo/suffix declined, amino demoted to a
+        # prefix) guarantee the assembler never applies a suffix here, so
+        # `base` always ends in the bare parent hydride "...purine". This
+        # assert stops a future guard edit from silently reintroducing a
+        # truncation bug at the "-yl" conversion below.
+        assert base.endswith("purine"), base
         # base is e.g. "6-amino-9H-purine"; convert to "6-amino-9H-purin-9-yl".
         stem = base[:-1] if base.endswith('e') else base
         return f"{stem}-{attach_loc}-yl"
