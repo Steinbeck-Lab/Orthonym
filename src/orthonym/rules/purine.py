@@ -92,10 +92,22 @@ def name_substituted_purine(mol) -> Optional[str]:
         # ``get_fused_heterocycle_substituents`` silently ``continue``s past any
         # exocyclic branch it cannot identify, so its output can be MISSING a
         # substituent -- i.e. denote a DIFFERENT molecule. Fail closed at the
-        # source rather than trust an incomplete collection.
-        if not _exocyclic_atoms_accounted(mol, core_atoms):
-            continue  # a substituent the shared collector would silently omit
-                      # -> decline rather than name a different molecule
+        # source rather than trust an incomplete collection -- UNLESS best-effort
+        # is on, in which case retry any unidentified/incomplete branch with the
+        # general recursive substituent namer (v33 Defect B): this is what lets a
+        # giant arm -- e.g. a nucleotide's ribose-diphosphate-pantetheine chain on
+        # a purine N9, as in acetyl-CoA -- be named as an ordinary ring substituent
+        # instead of silently dropping the whole molecule to a malformed von
+        # Baeyer fallback. PIN/default byte-identical: `_best_effort_augment_purine_subs`
+        # is a no-op whenever the standard collection already succeeded, and it
+        # fails closed (returns None, same as the old bare check) whenever
+        # best-effort is off or a branch is still unnameable even by the general
+        # recursion.
+        subs = _best_effort_augment_purine_subs(mol, atom_mapping, core_atoms, subs)
+        if subs is None:
+            continue  # a substituent the shared collector -- and, in best-effort
+                      # mode, the general recursive namer -- would still silently
+                      # omit -> decline rather than name a different molecule
 
         if subs.get('oxo_substituents'):
             continue  # Tier 1 is non-oxo; oxo purines (hypoxanthine/guanine/
@@ -123,6 +135,126 @@ def name_substituted_purine(mol) -> Optional[str]:
         return _assemble_fused_heterocycle_name(mol, parent, subs, atom_mapping)
 
     return None
+
+
+def _branch_subtree(mol, root_idx: int, core_atoms) -> set:
+    """All atoms reachable from `root_idx` (INCLUSIVE) without re-entering
+    `core_atoms` -- the full extent of the one exocyclic branch rooted at
+    `root_idx`. Used to name a whole branch as a unit even when the shared
+    identifier only recognised (or partially recognised) part of it."""
+    from collections import deque
+    visited = {root_idx}
+    queue = deque([root_idx])
+    while queue:
+        idx = queue.popleft()
+        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx in core_atoms or nidx in visited:
+                continue
+            visited.add(nidx)
+            queue.append(nidx)
+    return visited
+
+
+def _best_effort_augment_purine_subs(mol, atom_mapping, core_atoms, subs):
+    """Best-effort completeness rescue for the purine substituent collection.
+
+    `get_fused_heterocycle_substituents` silently drops any exocyclic branch
+    `_identify_fused_substituent` cannot fully identify, so callers guard with
+    `_exocyclic_atoms_accounted` and fail closed. That is correct for the PIN/
+    default tier -- an unidentifiable branch must never be silently omitted --
+    but it also means a purine bearing one GIANT arm (e.g. a nucleotide's
+    ribose-diphosphate-pantetheine chain on N9, as in acetyl-CoA) can never be
+    named at all: the narrow identifier's ring/alkyl/functional-group producers
+    were never built to recognise a whole nucleotide tail.
+
+    Under `best_effort_ctx`, retry every branch the standard collector left
+    unaccounted (absent OR only partially covered) with the general recursive
+    substituent namer (`name_ring_system_substituent`, which itself falls back
+    to the plain-chain cascade for a ring-free branch), and inject a
+    successfully-named branch into `subs['c_substituents']` at its ring locant
+    -- the same bucket a ring-atom substituent with a numeric locant already
+    uses (see `get_fused_heterocycle_substituents`'s ring-N-locant comment).
+
+    Returns:
+      - `subs` UNCHANGED when the standard collection already accounted for
+        every exocyclic atom (byte-identical no-op -- this is the ONLY case
+        reached when `best_effort_ctx` is off, since the caller's own
+        `_exocyclic_atoms_accounted` check already gated it identically).
+      - an AUGMENTED copy of `subs` when best-effort naming closed every gap.
+      - `None` (fail closed) when `best_effort_ctx` is off and the standard
+        collection was incomplete, or when a branch remains unnameable even
+        by the general recursion.
+    """
+    from .fused_rings import _exocyclic_atoms_accounted, _identify_fused_substituent
+
+    if _exocyclic_atoms_accounted(mol, core_atoms):
+        return subs
+
+    from ..metrics.provenance import best_effort_ctx
+    if not best_effort_ctx.get():
+        return None  # PIN/default: fail closed, exactly as before this fix
+
+    from .ring_substituents import name_ring_system_substituent
+
+    exocyclic = {
+        a.GetIdx() for a in mol.GetAtoms()
+        if a.GetIdx() not in core_atoms and a.GetAtomicNum() > 1
+    }
+    subs = dict(subs)
+    subs['c_substituents'] = {
+        name: list(locants)
+        for name, locants in (subs.get('c_substituents') or {}).items()
+    }
+    accounted: set = set()
+
+    for core_atom_idx, locant in atom_mapping.items():
+        core_atom = mol.GetAtomWithIdx(core_atom_idx)
+        for neighbor in core_atom.GetNeighbors():
+            nbr_idx = neighbor.GetIdx()
+            if nbr_idx in core_atoms:
+                continue
+
+            branch = _branch_subtree(mol, nbr_idx, core_atoms)
+            heavy_branch = {
+                a for a in branch if mol.GetAtomWithIdx(a).GetAtomicNum() > 1
+            }
+            if not heavy_branch:
+                continue  # nothing heavy on this branch (shouldn't happen)
+
+            sub_info = _identify_fused_substituent(mol, nbr_idx, core_atoms)
+            info_atoms = set()
+            if sub_info is not None:
+                info_atoms = {
+                    a for a in sub_info.get('atoms', [])
+                    if mol.GetAtomWithIdx(a).GetAtomicNum() > 1
+                }
+            if sub_info is not None and info_atoms == heavy_branch:
+                # Already fully named by the standard identifier -- leave the
+                # bucket `get_fused_heterocycle_substituents` already filled.
+                accounted |= info_atoms
+                continue
+
+            # Unidentified, or only PARTIALLY identified (would otherwise be
+            # a silent atom drop naming a different molecule) -- best-effort
+            # retry the WHOLE branch as one ring-or-chain substituent.
+            name = name_ring_system_substituent(
+                mol, sorted(branch), nbr_idx, allow_mancude=True)
+            if not name or name == 'substituent' or ' ' in name:
+                return None  # still unnameable -> fail closed
+
+            locants_here = subs['c_substituents'].setdefault(name, [])
+            if locant not in locants_here:
+                locants_here.append(locant)
+            accounted |= heavy_branch
+
+    if accounted != exocyclic:
+        return None  # a branch remains unaccounted even after best-effort
+
+    for name in subs['c_substituents']:
+        subs['c_substituents'][name].sort()
+
+    return subs
 
 
 def _external_subtree(mol, attach_idx, core_atoms) -> set:
@@ -214,9 +346,17 @@ def name_purine_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
 
         subs = get_fused_heterocycle_substituents(mol, extended_mapping)
 
-        # Same source-level completeness guard as the parent path: fail
-        # closed on any exocyclic branch the shared collector can't identify.
-        if not _exocyclic_atoms_accounted(mol, set(extended_mapping)):
+        # Same source-level completeness guard as the parent path (best-effort
+        # augmented, see `name_substituted_purine` / `_best_effort_augment_purine_subs`):
+        # fail closed on any exocyclic branch the shared collector -- and, in
+        # best-effort mode, the general recursive namer -- still can't identify.
+        # `atom_mapping` (the real, narrow ring-locant mapping) says WHICH ring
+        # positions to inspect; `set(extended_mapping)` (which also covers the
+        # masked parent-side subtree) is the exclusion boundary, exactly as the
+        # bare `_exocyclic_atoms_accounted` call above used to receive.
+        subs = _best_effort_augment_purine_subs(
+            mol, atom_mapping, set(extended_mapping), subs)
+        if subs is None:
             continue
 
         if subs.get('oxo_substituents'):
