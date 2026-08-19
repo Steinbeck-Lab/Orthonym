@@ -6529,9 +6529,31 @@ def name_substituent_fragment(
             _ri = mol.GetRingInfo()
             if any(_ri.NumAtomRings(a) > 0 for a in sub_atoms):
                 from ..rules.ring_substituents import name_ring_system_substituent
+                # v33 (giants engine, acyl-CoA): a chain-rooted ring-bearing
+                # fragment (P-29.1.2, ``-CH2-[ring]``) where the ring ALSO
+                # carries its own further ring-system substituent (e.g. the
+                # ribose ring's purine base, non-fused, joined by a single
+                # bond) only resolves through this chokepoint's
+                # ``_compound_ring_on_chain_substituent`` / decorated-fused
+                # branches when ``allow_mancude=True`` -- measured directly
+                # (isolated adenosine-3'-phosphate fragment: None without,
+                # '[(2R,3S,4R,5R)-5-(6-amino-9H-purin-9-yl)-4-hydroxy-3-
+                # (phosphonooxy)oxolan-2-yl]methyl' with). That capability is
+                # new and unproven against the PIN gold set (same reasoning
+                # as the existing ``allow_mancude`` best-effort gate a few
+                # lines below in this same function), so gate it on
+                # ``best_effort_ctx`` -- a non-best-effort call is
+                # byte-identical to before this existed.
+                _ring_mancude = False
+                try:
+                    from ..metrics.provenance import best_effort_ctx as _rbe_ctx
+                    _ring_mancude = bool(_rbe_ctx.get())
+                except Exception:
+                    _ring_mancude = False
                 _ring_nm = name_ring_system_substituent(
                     mol, sorted(sub_atoms), attach_idx,
                     allow_enumerator_fallback=False,
+                    allow_mancude=_ring_mancude,
                 )
                 if _ring_nm:
                     return _ring_nm
@@ -6630,6 +6652,72 @@ def name_substituent_fragment(
         located_name, _k = located
         return _add_substituent_stereo(mol, sub_atoms, located_name, attach_idx=attach_idx)
 
+    # Tier FG (v33): the PROPER re-rooted FG-capable located substituent namer.
+    # Placed here -- BEFORE the Wave2 T3a ring-atom guard just below -- because
+    # that guard's "any ring atom anywhere in sub_atoms -> decline" check also
+    # catches a shape T3a never intended to block: a fragment whose attach_idx
+    # is an ORDINARY ACYCLIC atom and the ring is reached only several bonds
+    # downstream (e.g. a giant acyl-CoA's C(=O)-S-CH2CH2-NH-...-O-CH2-[ribose
+    # ring]-[purine] "S-alkyl" ester group). T3a's own worked example
+    # (-CH2-O-CH2-Ar(OH)) is a fragment with NO acyclic backbone at all beyond
+    # the ring -- Tier FG's carbon-only backbone walk (`_located_fg_assemble`)
+    # simply never engages for it (attach_idx would not land in `carbon_set`),
+    # so moving this block earlier cannot resurrect that defect. For the
+    # genuine chain-reaches-a-ring shape, `_located_fg_assemble` builds the
+    # acyclic backbone through the free valence and, on reaching the ring,
+    # recurses through `name_substituent_fragment` on JUST the ring branch
+    # (a small, PROPERLY re-anchored sub-fragment where the ring chokepoint
+    # -- Step 1c above -- gets a fair, correctly-scoped shot) instead of
+    # collapsing ring+backbone into one opaque blob and string-surgering a
+    # free-molecule name (parent_to_prefix's fail-closed contract, untouched).
+    # Names an acyclic-carbon-backbone fragment rooted at the attachment atom,
+    # citing every FG / ring / hetero group as a structurally-numbered
+    # detachable prefix (P-46.1.12). Gated on best_effort_ctx, so a non-best-
+    # effort (PIN) call is byte-identical to before this block existed; the
+    # top-level SELF-01/OPSIN gate voids any non-RT candidate, keeping
+    # 0-wrong.
+    _fg_best_effort = False
+    try:
+        from ..metrics.provenance import best_effort_ctx
+        _fg_best_effort = bool(best_effort_ctx.get())
+    except Exception:
+        _fg_best_effort = False
+    if _fg_best_effort and attach_idx is not None and attach_idx in set(sub_atoms):
+        _fg_name = None
+        _fg_located = None
+        try:
+            _asym = mol.GetAtomWithIdx(attach_idx).GetSymbol()
+            if _asym in ('O', 'S', 'N'):
+                _fg_name = _located_fg_hetero_root(mol, list(sub_atoms), attach_idx)
+            else:
+                # v33 bugfix: request `with_pos=True` in the SAME call that
+                # builds `_fg_name`, and hand the resulting (name, k, pos)
+                # triple to `_add_substituent_stereo` as `located`. This chain
+                # is the ONLY deriver that can locate a stereocentre sitting on
+                # an FG-shaped chain (the strict, non-FG deriver
+                # `_add_substituent_stereo` falls back to declines it, which
+                # is how a chain stereocentre here -- e.g. the acyl-CoA
+                # pantetheine 3-hydroxy centre -- used to be silently dropped
+                # instead of just missing a locant). Passing the SAME triple
+                # already used for `_fg_name` (rather than letting the callee
+                # re-derive one from `attach_idx` alone) guarantees the name
+                # `_add_substituent_stereo` decorates is byte-identical to
+                # this one -- no risk of a second, differently-tie-broken
+                # recomputation silently replacing a correct name.
+                _r = _located_acyclic_alkyl_name(
+                    mol, list(sub_atoms), attach_idx, allow_functional=True,
+                    with_pos=True)
+                _fg_name = _r[0] if _r is not None else None
+                _fg_located = _r if _r is not None else None
+        except Exception as _exc:  # noqa: BLE001
+            logger.debug("Tier FG located namer failed: %s", _exc)
+            _fg_name = None
+            _fg_located = None
+        if _fg_name is not None:
+            return _add_substituent_stereo(
+                mol, sub_atoms, _fg_name, attach_idx=attach_idx,
+                located=_fg_located)
+
     # Wave2 T3a constitution-conservation guard: a ring-bearing fragment
     # reaching this point means the trustworthy ring chokepoint (Step 1c)
     # DECLINED it. Steps 3-5 would cap the fragment, name it as a free
@@ -6691,56 +6779,6 @@ def name_substituent_fragment(
             "cation_attach atom_count=%d", len(sub_atoms),
         )
         return None
-
-    # Tier FG (v33): the PROPER re-rooted FG-capable located substituent namer,
-    # LAST resort before the free-molecule band-aid (Step 3/4). Names an
-    # acyclic-carbon-backbone fragment rooted at the attachment atom, citing every
-    # FG / ring / hetero group as a structurally-numbered detachable prefix
-    # (P-46.1.12) -- the form parent_to_prefix (string surgery on a molecule name)
-    # cannot produce. Placed here, after every strict tier declined, so it never
-    # changes an existing strict-tier name; the top-level SELF-01/OPSIN gate voids
-    # any non-RT candidate, keeping 0-wrong.
-    _fg_best_effort = False
-    try:
-        from ..metrics.provenance import best_effort_ctx
-        _fg_best_effort = bool(best_effort_ctx.get())
-    except Exception:
-        _fg_best_effort = False
-    if _fg_best_effort and attach_idx is not None and attach_idx in set(sub_atoms):
-        _fg_name = None
-        _fg_located = None
-        try:
-            _asym = mol.GetAtomWithIdx(attach_idx).GetSymbol()
-            if _asym in ('O', 'S', 'N'):
-                _fg_name = _located_fg_hetero_root(mol, list(sub_atoms), attach_idx)
-            else:
-                # v33 bugfix: request `with_pos=True` in the SAME call that
-                # builds `_fg_name`, and hand the resulting (name, k, pos)
-                # triple to `_add_substituent_stereo` as `located`. This chain
-                # is the ONLY deriver that can locate a stereocentre sitting on
-                # an FG-shaped chain (the strict, non-FG deriver
-                # `_add_substituent_stereo` falls back to declines it, which
-                # is how a chain stereocentre here -- e.g. the acyl-CoA
-                # pantetheine 3-hydroxy centre -- used to be silently dropped
-                # instead of just missing a locant). Passing the SAME triple
-                # already used for `_fg_name` (rather than letting the callee
-                # re-derive one from `attach_idx` alone) guarantees the name
-                # `_add_substituent_stereo` decorates is byte-identical to
-                # this one -- no risk of a second, differently-tie-broken
-                # recomputation silently replacing a correct name.
-                _r = _located_acyclic_alkyl_name(
-                    mol, list(sub_atoms), attach_idx, allow_functional=True,
-                    with_pos=True)
-                _fg_name = _r[0] if _r is not None else None
-                _fg_located = _r if _r is not None else None
-        except Exception as _exc:  # noqa: BLE001
-            logger.debug("Tier FG located namer failed: %s", _exc)
-            _fg_name = None
-            _fg_located = None
-        if _fg_name is not None:
-            return _add_substituent_stereo(
-                mol, sub_atoms, _fg_name, attach_idx=attach_idx,
-                located=_fg_located)
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)
