@@ -29,7 +29,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 from ..perception.stereo import assign_stereochemistry
-from .naming_utils import get_alkyl_name, SIMPLE_MULTIPLIERS, alpha_sort_key
+from .naming_utils import get_alkyl_name, SIMPLE_MULTIPLIERS, alpha_sort_key, simple_multiplier_word
 from .fragment_naming import name_fragment_recursively
 
 logger = logging.getLogger(__name__)
@@ -542,8 +542,6 @@ def _build_alkenyl_name(
     double_locants = sorted(double_locants)
     triple_locants = sorted(triple_locants)
 
-    MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta"}
-
     # For 2-carbon chains: no locants needed for unsaturation
     if carbon_count == 2:
         if double_locants:
@@ -563,12 +561,12 @@ def _build_alkenyl_name(
     segments = []
     if double_locants:
         loc_str = ",".join(str(l) for l in double_locants)
-        mult = MULT.get(num_double, str(num_double)) if num_double > 1 else ""
+        mult = simple_multiplier_word(num_double) or ""
         segments.append((loc_str, mult, "en"))
 
     if triple_locants:
         loc_str = ",".join(str(l) for l in triple_locants)
-        mult = MULT.get(num_triple, str(num_triple)) if num_triple > 1 else ""
+        mult = simple_multiplier_word(num_triple) or ""
         segments.append((loc_str, mult, "yn"))
 
     # Assemble infix: "a" (if needed) then "-locants-[mult]bond" per segment
