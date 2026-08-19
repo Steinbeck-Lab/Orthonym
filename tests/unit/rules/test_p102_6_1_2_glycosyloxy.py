@@ -201,22 +201,19 @@ class TestGlycosylSubstituentPrefix:
             "O=Cc1ccc(OC2OC(CO)C(O)C(O)C2O)cc1")
         assert glycosyl_substituent_prefix(mol, frag, o) is None
 
-    def test_builds_the_bracketed_form_for_a_decorated_glycosyl(self):
-        """v33 Phase 7 Lever 2b: the former decorated-base REFUSAL is now a
-        BUILDER (BB P-102.6.1.2's third example, ``:53935``).
+    def test_refuses_a_decorated_glycosyl(self):
+        """Isolating witness for the decorated-base guard.
 
         N-acetylglucosamine looks up as
         ``('beta', 'D', '2-acetamido-2-deoxy-glucopyranose')`` -- non-uronic, with
-        both descriptors. The naive concatenation
-        'beta-D-2-acetamido-2-deoxy-glucopyranosyloxy' is OPSIN-unparseable
-        (the anomer-config descriptor sits BEFORE the decoration prefix); the
-        correct form re-anchors the descriptor after the decoration block and
-        encloses the decorated glycosyl in its own marks before 'oxy'.
+        both descriptors -- so only the decorated-base guard can refuse it.
+        Concatenating would give 'beta-D-2-acetamido-2-deoxy-glucopyranosyloxy',
+        whereas P-102.6.1.2 (:53935) requires the decorated glycosyl inside its
+        own enclosing marks before 'oxy'.
         """
         mol, frag, o = _glyco_fragment(
             "O=Cc1ccc(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2NC(C)=O)cc1")
-        assert glycosyl_substituent_prefix(mol, frag, o) == \
-            "[2-acetamido-2-deoxy-beta-D-glucopyranosyl]oxy"
+        assert glycosyl_substituent_prefix(mol, frag, o) is None
 
     def test_refuses_a_thioglycoside(self):
         """An S-linked glycoside is not an *O*-glycosyl compound and must never be

@@ -1061,12 +1061,8 @@ def glycosyl_substituent_prefix(mol, frag_atoms, attach_idx) -> Optional[str]:
     * a **substituted** glycosyl -- P-102.6.1.2's third example (``:53935``)
       spells it ``5-{[4,6-dideoxy-4-(dimethylamino)-alpha-D-glucopyranosyl]oxy}``,
       i.e. the decorated glycosyl goes inside its own enclosing marks before
-      'oxy'. ``sugar_to_glycosyloxy_prefix`` cannot build that (it puts the
-      anomer-config descriptor BEFORE any decoration prefix, which OPSIN
-      rejects), so a decorated base is instead built via
-      ``oligosaccharides._glycosyl_term`` (which re-anchors the descriptor
-      after the decoration block, before the ``-osyl`` stem) and wrapped as
-      ``[<decorated-glycosyl>]oxy``.
+      'oxy'. ``sugar_to_glycosyloxy_prefix`` cannot build that, so a base name
+      carrying any locant or decoration is refused rather than mis-spelled.
     * a **uronic** glycosyl -- P-102.6.1.2's second example (``:53929``) cites
       it as ``beta-D-glucopyranosyluronic acid``, not as a '...osyloxy' token.
       The naive contraction 'glucuronopyranosyloxy' is a fabricated morpheme
@@ -1084,9 +1080,8 @@ def glycosyl_substituent_prefix(mol, frag_atoms, attach_idx) -> Optional[str]:
             parent, i.e. the glycosidic oxygen.
 
     Returns:
-        The ``<glycosyl>oxy`` compound prefix (e.g. ``beta-D-glucopyranosyloxy``,
-        or ``[2-acetamido-2-deoxy-beta-D-glucopyranosyl]oxy`` for a decorated
-        base), or ``None`` to fall through to the remaining tiers.
+        The ``<glycosyl>oxy`` compound prefix (e.g. ``beta-D-glucopyranosyloxy``),
+        or ``None`` to fall through to the remaining tiers.
     """
     from rdkit import Chem as _C
 
@@ -1153,18 +1148,9 @@ def glycosyl_substituent_prefix(mol, frag_atoms, attach_idx) -> Optional[str]:
         return None
     if "urono" in base or "uronic" in base:
         return None
-    # A decorated base name needs the P-102.6.1.2 '[...]oxy' enclosing-mark form
-    # (BB :53935 -- decorations then anomer-config then stem, ALL inside the
-    # glycosyl's own brackets, with 'oxy' appended outside): reuse the
-    # oligosaccharide namer's descriptor-placement primitive rather than
-    # re-deriving the reordering here. Deferred import: oligosaccharides.py
-    # already imports from this module, so a top-level import would be circular.
+    # A decorated base name needs the P-102.6.1.2 '[...]oxy' enclosing-mark form.
     if any(ch.isdigit() for ch in base) or "-" in base:
-        from ..rules.oligosaccharides import _glycosyl_term
-        glycosyl = _glycosyl_term(anomer, config, base)
-        if not glycosyl:
-            return None
-        return f"[{glycosyl}]oxy"
+        return None
 
     prefix = sugar_to_glycosyloxy_prefix(anomer, config, base)
     return prefix or None
@@ -3260,13 +3246,6 @@ def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:
     fail-closed for the glycoside path), then swap the single ``methoxy`` token for
     ``(<glycosyloxy>)`` and escalate its enclosing marks (P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232)).  Fail-closed on
     >1 sugar ring, a free/undefined anomeric, a non-senior aglycone, or an RT-fail.
-
-    A DECORATED base (deoxy/amino/N-acetyl...) swaps ``methoxy`` for
-    ``[<decorated-glycosyl>]oxy`` instead (BB P-102.6.1.2's third example,
-    ``:53935``: ``...-4-(dimethylamino)-alpha-D-glucopyranosyl]oxy``) -- the
-    decorated glycosyl carries its OWN enclosing marks, with ``oxy`` appended
-    outside them, rather than the plain undecorated ``(<glycosyl>oxy)`` fused
-    form.
     """
     if mol is None:
         return None
@@ -3315,21 +3294,7 @@ def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:
     tup = lookup_sugar(Chem.MolToSmiles(sugar_mol)) or recognize_sugar_skeleton(sugar_mol)
     if tup is None:
         return None
-    anomer, config, base = tup
-    # A decorated base (deoxy/amino/N-acetyl...) needs the P-102.6.1.2 '[...]oxy'
-    # enclosing-mark form (BB :53935) -- ``sugar_to_glycosyloxy_prefix`` places the
-    # anomer-config descriptor BEFORE the decoration prefix, which OPSIN rejects
-    # for a decorated base (mirrors ``glycosyl_substituent_prefix``'s fix above,
-    # ``:1152``). Build it via the oligosaccharide namer's descriptor-placement
-    # primitive instead; deferred import avoids the circular top-level import.
-    if any(ch.isdigit() for ch in base) or "-" in base:
-        from orthonym.rules.oligosaccharides import _glycosyl_term
-        glycosyl = _glycosyl_term(anomer, config, base)
-        if not glycosyl:
-            return None
-        glycosyloxy_replacement = f"[{glycosyl}]oxy"
-    else:
-        glycosyloxy_replacement = f"({sugar_to_glycosyloxy_prefix(anomer, config, base)})"
+    glycosyloxy = sugar_to_glycosyloxy_prefix(*tup)
 
     # Build the aglycone methyl ether: cleave anomeric-C — glycosidic-O, keep the
     # aglycone side, and cap the glycosidic O with a methyl.
@@ -3372,7 +3337,7 @@ def name_glycosyloxy_aglycone(mol, canonical_smiles: str) -> Optional[str]:
         return None
     if "methoxy" not in ether_name:
         return None
-    candidate = _escalate_enclosing_marks(ether_name, "methoxy", glycosyloxy_replacement)
+    candidate = _escalate_enclosing_marks(ether_name, "methoxy", f"({glycosyloxy})")
     if candidate is None:
         return None
     if not _mono_name_rt_ok(mol, candidate):
