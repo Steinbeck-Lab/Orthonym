@@ -715,14 +715,31 @@ def _oligo_topology(mol) -> Optional[Dict]:
     if not links:
         return None
 
-    # 3. Reducing parent = the unique non-donor unit whose anomeric is a free -OH.
+    # 3. Reducing parent = the unique non-donor unit; its anomeric is EITHER a
+    #    free -OH (a true reducing end) OR capped with a simple ALKYL/ARYL
+    #    group (v33 Engine-2 fix (b), e.g. a methyl glycoside used as a
+    #    synthetic capping group in a GAG fragment) -- both are valid chain
+    #    termini for this namer. A cap belonging to ANOTHER recognized sugar
+    #    ring is a genuine non-reducing glycoside (deferred elsewhere).
     donors = {l[0] for l in links}
     non_donors = [ui for ui in range(len(units)) if ui not in donors]
     if len(non_donors) != 1:
         return None
     parent_ui = non_donors[0]
-    if mol.GetAtomWithIdx(units[parent_ui]["anomeric_exo_o"]).GetTotalNumHs() == 0:
-        return None  # parent anomeric linked -> non-reducing glycoside (deferred)
+    parent_anom_o = units[parent_ui]["anomeric_exo_o"]
+    parent_cap_c: Optional[int] = None
+    if mol.GetAtomWithIdx(parent_anom_o).GetTotalNumHs() == 0:
+        o_atom = mol.GetAtomWithIdx(parent_anom_o)
+        c_nbrs = [n.GetIdx() for n in o_atom.GetNeighbors() if n.GetAtomicNum() == 6]
+        if len(c_nbrs) != 2:
+            return None
+        parent_cap_c = next(
+            (c for c in c_nbrs if c != units[parent_ui]["anomeric_idx"]), None
+        )
+        if parent_cap_c is None or carbon_to_unit.get(parent_cap_c) is not None:
+            return None  # cap is another sugar unit -> non-reducing glycoside (deferred)
+        if mol.GetAtomWithIdx(parent_cap_c).IsInRing():
+            return None  # a ring cap is out of scope for this simple-alkyl relaxation
     if any(v > 1 for v in Counter(l[1] for l in links).values()):
         return None  # a unit accepts >1 glycosyl -> BRANCHED
 
@@ -746,7 +763,8 @@ def _oligo_topology(mol) -> Optional[Dict]:
         return None  # disconnected / not a single linear chain
 
     return {"units": units, "links": links, "order": order,
-            "parent_ui": parent_ui, "bridging_os": bridging_os}
+            "parent_ui": parent_ui, "bridging_os": bridging_os,
+            "parent_cap_c": parent_cap_c}
 
 
 def _has_oligo_chain(mol) -> bool:
@@ -786,6 +804,87 @@ def _has_extended_oligo(mol) -> bool:
     return False
 
 
+def _glycoside_cap_name(mol, o_idx: int, cap_c_idx: int) -> Optional[str]:
+    """Name a SIMPLE alkyl/aryl glycoside-capping group (the leading
+    substituent word of P-102.5.6.2.2, e.g. ``methyl`` in ``methyl
+    alpha-D-glucopyranoside``) as a substituent prefix.
+
+    Isolates the cap fragment (cuts the O-cap bond, the cut valence relaxes
+    to an implicit H -- naming the free R-H molecule), names it as a
+    standalone compound, then converts to prefix form via
+    :func:`~orthonym.assembly.substituent_naming.parent_to_prefix` (P-29.2).
+    Returns ``None`` for anything this simple converter cannot express (a
+    branched/substituted cap, an unrecognized fragment) -- the caller then
+    declines the whole capped-terminus relaxation (fail-closed, never a wrong
+    cap name); the OPSIN RT gate is the final arbiter regardless of what this
+    returns."""
+    bond = mol.GetBondBetweenAtoms(o_idx, cap_c_idx)
+    if bond is None:
+        return None
+    try:
+        frag = Chem.FragmentOnBonds(
+            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
+        )
+        mapping: List = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    cap_frag = None
+    for fm, mp in zip(frags, mapping):
+        if cap_c_idx in mp:
+            cap_frag = fm
+            break
+    if cap_frag is None:
+        return None
+    rw = Chem.RWMol(cap_frag)
+    dummy_idxs = [a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0]
+    if len(dummy_idxs) != 1:
+        return None
+    rw.RemoveAtom(dummy_idxs[0])
+    try:
+        Chem.SanitizeMol(rw)
+        cap_mol = Chem.RemoveHs(rw)
+        cap_canon = Chem.CanonSmiles(Chem.MolToSmiles(cap_mol))
+    except Exception:
+        return None
+    n_carbons = sum(1 for a in cap_mol.GetAtoms() if a.GetAtomicNum() == 6)
+    if n_carbons == 0:
+        return None
+    from orthonym import name_compound
+    parent_name = name_compound(cap_canon)
+    if not parent_name or "unknown" in parent_name:
+        return None
+    from orthonym.assembly.substituent_naming import parent_to_prefix
+    return parent_to_prefix(parent_name, n_carbons, attach_locant=1)
+
+
+def _capped_parent_glycoside_str(anomer: str, config: str, base: str) -> Optional[str]:
+    """Build the P-102.5.6.2.2 glycoside head for a (possibly decorated,
+    non-uronic) base, with the anomer-config descriptor correctly placed
+    AFTER any base-name prefixes and immediately before the ``-oside`` stem
+    (mirrors :func:`_glycosyl_term`'s ``-osyl`` sibling -- OPSIN rejects the
+    naive anomer-config-PREFIX order for a decorated base, see
+    :func:`_split_decorated_sugar_base`). A uronic base is deferred (returns
+    ``None``): this relaxation's confirmed target is a plain amino/deoxy/
+    O-sulfo capped terminus, not a uronic one."""
+    if not base or "urono" in base:
+        return None
+    prefix_block, raw_stem = _split_decorated_sugar_base(base)
+    from orthonym.data.sugar_names import sugar_to_glycoside_class_name
+    stem_head = sugar_to_glycoside_class_name("", "", raw_stem)
+    if not stem_head:
+        return None
+    if anomer and config:
+        descriptor = f"{anomer}-{config}-{stem_head}"
+    elif config:
+        descriptor = f"{config}-{stem_head}"
+    else:
+        descriptor = stem_head
+    return f"{prefix_block}-{descriptor}" if prefix_block else descriptor
+
+
 def name_linear_oligosaccharide(mol) -> Optional[str]:
     """Name a LINEAR reducing oligosaccharide (>=2 units) by P-102.7.2.2:
     ``glycosyl-(1->c')-[glycosyl-(1->c')-]n-glycose`` (maltotriose ->
@@ -803,12 +902,25 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
     order = topo["order"]
     parent_ui = topo["parent_ui"]
     bridging_os = topo["bridging_os"]
+    parent_cap_c = topo.get("parent_cap_c")
 
     # 5. Isolate + recognize each unit (D-09), collecting its bridging bonds.
     unit_bridge_bonds: Dict[int, List[Tuple[int, int]]] = {ui: [] for ui in range(len(units))}
     for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
         unit_bridge_bonds[donor_ui].append((anom_c, o_idx))
         unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
+    cap_name: Optional[str] = None
+    if parent_cap_c is not None:
+        # v33 Engine-2 fix (b): an alkyl/aryl-capped terminus (e.g. a methyl
+        # glycoside).  Cleave the cap bond too so the ISOLATED parent fragment
+        # (used for classification/recognition only) gets a free anomeric -OH;
+        # the cap itself is named separately and prefixed as "{cap} ..." in a
+        # P-102.5.6.2.2 glycoside head below, never as a free sugar.
+        parent_anom_o = units[parent_ui]["anomeric_exo_o"]
+        unit_bridge_bonds[parent_ui].append((units[parent_ui]["anomeric_idx"], parent_anom_o))
+        cap_name = _glycoside_cap_name(mol, parent_anom_o, parent_cap_c)
+        if cap_name is None:
+            return None  # cannot express the cap -> decline this relaxation (fail-closed)
     from orthonym.data.sugar_names import (
         lookup_sugar, recognize_sugar_skeleton, name_monosaccharide_systematic,
     )
@@ -829,11 +941,45 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
         tuples[ui] = tup
 
     # 6. Assemble in name order (terminal donor ... -> reducing parent).
+    #
+    # v33 Engine-2 fix (b): a capped parent is NOT cited with the P-102.7.2.2
+    # "(1->c')" suffix chain -- OPSIN rejects "glycosyl-(1->c')-methyl
+    # alpha-D-glucopyranoside" (VERIFIED, this session). The P-102.5.6.2.2
+    # glycoside instead takes its substituent as a PREFIX: "methyl c'-O-
+    # (nested-glycosyl-chain)-alpha-D-glucopyranoside" (VERIFIED against both
+    # a 1- and a 2-donor synthetic methyl glycoside). The immediate donor onto
+    # the parent (``order[1]``) therefore contributes its BARE glycosyl term
+    # (no trailing "-(c->c')") when capped; its attachment locant becomes the
+    # OUTER "c'-O-" marker instead, and the whole non-parent chain is
+    # bracketed as the O-substituent.
     relax: Set[int] = set()
     parts: List[str] = []
+    outer_locant: Optional[int] = None
+    immediate_donor_ui = order[1] if parent_cap_c is not None and len(order) > 1 else None
+    name: Optional[str] = None
     for ui in reversed(order):
         if ui == parent_ui:
             pa, pc, pb = tuples[ui]
+            if parent_cap_c is not None:
+                # A glycoside asserts a defined anomer -- but pa/pc are
+                # legitimately EMPTY for a "systematic" tuple (e.g. a
+                # decorated GlcNS6S from name_monosaccharide_systematic),
+                # which bakes anomer/config INTO pb instead (mirrors the
+                # free-sugar branch below, which handles both shapes via
+                # _split_decorated_sugar_base). Require only that the
+                # anomeric centre is actually DEFINED on the input structure.
+                anom_defined = (mol.GetAtomWithIdx(units[ui]["anomeric_idx"]).GetChiralTag()
+                                != Chem.ChiralType.CHI_UNSPECIFIED)
+                if not anom_defined or outer_locant is None:
+                    return None
+                glyco_head = _capped_parent_glycoside_str(pa, pc, pb)
+                if glyco_head is None:
+                    return None
+                bracket = "-".join(parts)
+                if len(parts) > 1:
+                    bracket = f"[{bracket}]"
+                name = f"{cap_name} {outer_locant}-O-{bracket}-{glyco_head}"
+                continue
             anom_defined = (mol.GetAtomWithIdx(units[ui]["anomeric_idx"]).GetChiralTag()
                             != Chem.ChiralType.CHI_UNSPECIFIED)
             if anom_defined and pa and pc:
@@ -870,8 +1016,13 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
             if c_prime is None:
                 return None
             c = _anomeric_locant(mol, units[ui]["ring"], units[ui]["ring_oxygen"], anom_c)
-            parts.append(f"{gterm}-({c}{_ARROW}{c_prime})")
-    name = "-".join(parts)
+            if ui == immediate_donor_ui:
+                outer_locant = c_prime
+                parts.append(gterm)
+            else:
+                parts.append(f"{gterm}-({c}{_ARROW}{c_prime})")
+    if name is None:
+        name = "-".join(parts)
 
     # 7. Completeness invariant (D-12) + RT gate (D-13).
     all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
@@ -1275,6 +1426,29 @@ def _split_decorated_sugar_base(base: str) -> Tuple[str, str]:
     return "", base
 
 
+# v33 Engine-2: the CATALOG uronic-acid base (``lookup_sugar``'s
+# ``URONIC_ACID_NAMES``/``recognize_sugar_skeleton``'s fingerprint recovery,
+# e.g. ``"glucuronopyranose"``) ends in ``"ose"`` like an ordinary sugar, so
+# ``_glycosyl_term``'s naive ``-ose``->``-osyl`` slice would emit
+# ``"glucuronopyranosyl"`` -- a token OPSIN 2.9.0 does NOT parse in ANY
+# context (VERIFIED: even the bare free name ``"alpha-L-iduronopyranose"``
+# fails). The BB glycosyl-donor citation of a uronic acid instead keeps the
+# "-osyl" ending on the UN-contracted pyranose stem, with "uronic acid"
+# appended (``"glucopyranosyluronic acid"``, VERIFIED round-trips as a
+# mid-chain "-(1->c')-" donor). Explicit map (the contributor guide Warning 2), mirroring
+# ``sugar_names._URONIC_STEM_MAP``'s own keys.
+_URONIC_CATALOG_TO_GLYCOSYL_TAIL = {
+    "alluronopyranose": "allopyranosyluronic acid",
+    "altruronopyranose": "altropyranosyluronic acid",
+    "glucuronopyranose": "glucopyranosyluronic acid",
+    "mannuronopyranose": "mannopyranosyluronic acid",
+    "guluronopyranose": "gulopyranosyluronic acid",
+    "iduronopyranose": "idopyranosyluronic acid",
+    "galacturonopyranose": "galactopyranosyluronic acid",
+    "taluronopyranose": "talopyranosyluronic acid",
+}
+
+
 def _glycosyl_term(anomer: str, config: str, base: str) -> Optional[str]:
     """Build a glycosyl substituent term ``{anomer}-{config}-{base}yl`` (-ose -> -osyl),
     with the configurational descriptor correctly placed AFTER any base-name
@@ -1283,11 +1457,31 @@ def _glycosyl_term(anomer: str, config: str, base: str) -> Optional[str]:
 
     Uses the structural ``-ose`` -> ``-osyl`` slice; never string-surgery on a derived
     base beyond the canonical suffix transform.
+
+    A base ending in ``"uronic acid"`` (v33 Engine-2: a decorated uronic unit
+    from ``name_monosaccharide_systematic``'s free-acid form, e.g. ``"2-O-
+    sulfo-alpha-L-idopyranuronic acid"``) inserts ``"osyl"`` immediately
+    before ``"uronic acid"`` -- ``"...idopyranosyluronic acid"`` -- a fixed,
+    unambiguous suffix insertion (never a guessed reversal of the free-acid
+    elision). VERIFIED (OPSIN 2.9.0, this session): ``"alpha-L-
+    idopyranosyluronic acid-(1->4)-D-glucopyranose"`` and the O-sulfo-
+    decorated ``"2-O-sulfo-alpha-L-idopyranosyluronic acid-(1->4)-D-
+    glucopyranose"`` both round-trip; the CATALOG "-urono-...-pyranosyl"
+    spelling (``"iduronopyranosyl"``/``"glucuronopyranosyl"``) does **NOT** —
+    OPSIN 2.9.0 does not parse that token in ANY context, prefix or free name
+    (``"alpha-L-iduronopyranose"`` alone fails to parse).
     """
     if not base:
         return None
     prefix_block, raw_stem = _split_decorated_sugar_base(base)
-    stem = raw_stem[:-1] + "yl" if raw_stem.endswith("ose") else raw_stem + "yl"
+    if raw_stem in _URONIC_CATALOG_TO_GLYCOSYL_TAIL:
+        stem = _URONIC_CATALOG_TO_GLYCOSYL_TAIL[raw_stem]
+    elif raw_stem.endswith("uronic acid"):
+        stem = raw_stem[: -len("uronic acid")] + "osyluronic acid"
+    elif raw_stem.endswith("ose"):
+        stem = raw_stem[:-1] + "yl"
+    else:
+        stem = raw_stem + "yl"
     if anomer and config:
         descriptor = f"{anomer}-{config}-{stem}"
         return f"{prefix_block}-{descriptor}" if prefix_block else descriptor

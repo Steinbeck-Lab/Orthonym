@@ -1635,6 +1635,180 @@ _URONIC_STEM_MAP = {
 }
 
 
+def _o_acid_ester_prefix(mol, o_idx: int):
+    """Classify an exocyclic oxygen as a sulfate/phosphate-MONOester linker
+    (v33 Engine-2, BB P-102.5.6.1.2 @53197 / P-102.5.6.1.3 @53225).
+
+    Returns ``(prefix_word, central_idx)`` where ``prefix_word`` is the
+    carbohydrate-specific *O*-substitution prefix (``"sulfo"`` / ``"sulfonato"``
+    for a sulfate ester; ``"phosphono"`` / ``"phosphonato"`` for a phosphate
+    MONOester) and ``central_idx`` is the S/P acid-centre atom whose branch
+    :func:`_idealize_to_parent` strips back to the bare hydroxyl -- or
+    ``None`` when ``o_idx`` is not this exact shape (a plain hydroxyl, an
+    ether, a glycosidic bridge, a di/tri-phosphate, or a mixed-protonation
+    "hydrogen phosphate" monoester, all out of scope for now).
+
+    ⚠ VERIFIED (OPSIN 2.9.0, this session): ``6-O-sulfo-alpha-D-glucopyranose``
+    and ``6-O-phosphono-alpha-D-glucopyranose`` round-trip to the exact
+    mono-ester structure. The GENERAL substitutive prefixes
+    ``6-(sulfooxy)-``/``6-(phosphonooxy)-`` do **NOT** — OPSIN parses them as
+    an EXTRA substituent ON TOP of the position's own retained hydroxyl
+    (``OC(O)...`` — two oxygens at C6) rather than a substitution of its H, so
+    they emit a WRONG (extra-oxygen) molecule here. The carbohydrate ``O-``
+    prefix table (P-102.5.6.1.2/.1.3) governs a sugar ring position, never the
+    general P-65/P-67 prefix table cited elsewhere in this tree for a
+    non-carbohydrate parent (``composer.py``/``seniority.py``/``phosphorus.py``).
+    """
+    o_atom = mol.GetAtomWithIdx(o_idx)
+    if o_atom.GetTotalNumHs() != 0:
+        return None  # a free -OH, not an ester linker
+    nbrs = list(o_atom.GetNeighbors())
+    if len(nbrs) != 2:
+        return None
+    central = next((n for n in nbrs if n.GetAtomicNum() in (15, 16)), None)
+    if central is None:
+        return None
+    central_idx = central.GetIdx()
+    from orthonym.rules.conjugate_controller import (
+        _count_double_bonded_oxygens,
+        _terminal_acid_oxygens,
+    )
+    if central.GetAtomicNum() == 16:  # sulfate: S with exactly two =O
+        if _count_double_bonded_oxygens(mol, central_idx) != 2:
+            return None
+        prot, anion = _terminal_acid_oxygens(mol, central_idx, o_idx)
+        if prot == 1 and anion == 0:
+            return ("sulfo", central_idx)
+        if prot == 0 and anion == 1:
+            return ("sulfonato", central_idx)
+        return None  # not a simple mono-sulfate ester
+    if central.GetAtomicNum() == 15:  # phosphate MONOester: P with one =O, no P-O-P
+        if _count_double_bonded_oxygens(mol, central_idx) != 1:
+            return None
+        for n in central.GetNeighbors():
+            if n.GetAtomicNum() == 8 and n.GetIdx() != o_idx:
+                if any(nn.GetAtomicNum() == 15 and nn.GetIdx() != central_idx
+                       for nn in n.GetNeighbors()):
+                    return None  # P-O-P / di-tri-phosphate -> out of scope
+        prot, anion = _terminal_acid_oxygens(mol, central_idx, o_idx)
+        if prot == 2 and anion == 0:
+            return ("phosphono", central_idx)
+        if prot == 0 and anion == 2:
+            return ("phosphonato", central_idx)
+        return None  # mixed protonation (hydrogen phosphate) -> out of scope for now
+    return None
+
+
+def _n_sulfamate_prefix(mol, n_idx: int) -> Optional[int]:
+    """Classify a ring-amino nitrogen further substituted with a sulfo group
+    (``-NH-SO3H``, the N-sulfonate/sulfamate of heparin's N-sulfoglucosamine).
+
+    Returns the sulfamate S atom index (for :func:`_idealize_to_parent` to
+    strip, leaving a bare amino N idealized to -OH like plain ``amino``), or
+    ``None`` when the nitrogen is not this exact neutral shape (bare amino,
+    N-acyl, N-alkyl, charged, or an anionic sulfamate — all a different
+    caller's business or out of scope for now).
+
+    ⚠ VERIFIED (OPSIN 2.9.0): ``2-(sulfoamino)-2-deoxy-alpha-D-glucopyranose``
+    round-trips to N-sulfo-alpha-D-glucosamine.
+    """
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetFormalCharge() != 0:
+        return None
+    heavy = [x for x in n_atom.GetNeighbors() if x.GetAtomicNum() > 1]
+    if len(heavy) != 2:
+        return None
+    central = next((x for x in heavy if x.GetAtomicNum() == 16), None)
+    if central is None:
+        return None
+    central_idx = central.GetIdx()
+    from orthonym.rules.conjugate_controller import (
+        _count_double_bonded_oxygens,
+        _terminal_acid_oxygens,
+    )
+    if _count_double_bonded_oxygens(mol, central_idx) != 2:
+        return None
+    prot, anion = _terminal_acid_oxygens(mol, central_idx, n_idx)
+    if prot != 1 or anion != 0:
+        return None  # only the neutral -NH-SO3H shape is in scope for now
+    return central_idx
+
+
+def _bfs_branch(mol, start_idx: int, exclude_idx: int):
+    """Every atom reachable from ``start_idx`` without crossing ``exclude_idx``
+    (the atom the branch attaches to, kept out of the returned set). Used by
+    :func:`_idealize_to_parent` to strip an O-sulfo/O-phospho/N-sulfamate acid
+    branch back to the bare linker atom (-OH / -NH2)."""
+    seen: set = set()
+    stack = [start_idx]
+    while stack:
+        i = stack.pop()
+        if i in seen or i == exclude_idx:
+            continue
+        seen.add(i)
+        for nbr in mol.GetAtomWithIdx(i).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni not in seen and ni != exclude_idx:
+                stack.append(ni)
+    return seen
+
+
+def _strip_o_esters_for_catalog_check(mol):
+    """Remove every O-sulfo/O-phospho ester branch, restoring a bare
+    hydroxyl at each linker -- WITHOUT touching any other modification
+    (deoxy/amino/uronic/halo/N-sulfamate stay exactly as they are).
+
+    Used ONLY to test whether the ester-stripped residual is an EXACT-
+    CATALOG sugar (v33 Engine-2's ``name_sugar_ester``-deference guard);
+    returns the stripped (NEW) mol, ``mol`` unchanged if there is nothing to
+    strip, or ``None`` on sanitize failure. The input mol is never mutated."""
+    rw = Chem.RWMol(mol)
+    acid_branch_atoms: set = set()
+    for a in rw.GetAtoms():
+        if a.GetSymbol() != "O":
+            continue
+        acid = _o_acid_ester_prefix(rw, a.GetIdx())
+        if acid is not None:
+            _word, central_idx = acid
+            acid_branch_atoms |= _bfs_branch(rw, central_idx, a.GetIdx())
+    if not acid_branch_atoms:
+        return mol
+    try:
+        for idx in sorted(acid_branch_atoms, reverse=True):
+            rw.RemoveAtom(idx)
+        m2 = rw.GetMol()
+        Chem.SanitizeMol(m2)
+        return m2
+    except Exception:
+        return None
+
+
+def _build_o_acid_prefix_terms(o_sulfo, o_phospho):
+    """Group O-sulfo/O-phospho ``(locant, word)`` pairs by protonation word
+    into alphabetized detachable prefix terms (BB P-102.5.6.1.2/.1.3's
+    ``O-`` locant-marker form, e.g. ``"2,3-di-O-sulfo"``).
+
+    Returns a list of ``(alpha_key, rendered_term)`` tuples (the alpha key
+    ignores the italic ``O-`` locant marker, mirroring how the halo grouping
+    ignores its own multiplying prefix), or ``None`` on overflow (>4 of one
+    word — out of scope, fail-closed, never a wrong multiplier)."""
+    mult = {1: "", 2: "di", 3: "tri", 4: "tetra"}
+    by_word: Dict[str, list] = {}
+    for loc, word in o_sulfo:
+        by_word.setdefault(word, []).append(loc)
+    for loc, word in o_phospho:
+        by_word.setdefault(word, []).append(loc)
+    terms = []
+    for word, locs in by_word.items():
+        m = mult.get(len(locs))
+        if m is None:
+            return None
+        locs = sorted(locs)
+        marker = f"{m}-O-" if m else "O-"  # BB @53221 "1,6-di-O-phosphonato-"
+        terms.append((word, f"{','.join(str(x) for x in locs)}-{marker}{word}"))
+    return terms
+
+
 def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
     """Classify a single sugar ring's modified positions structurally (D-04).
 
@@ -1686,7 +1860,10 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
     locant_of = {c: k + 1 for k, c in enumerate(ring_carbons)}
     last_ring_locant = len(ring_carbons)  # C5 on a pyranose, C4 on a furanose
 
-    found = {"deoxy": [], "amino": [], "uronic": [], "halo": []}
+    found = {
+        "deoxy": [], "amino": [], "uronic": [], "halo": [],
+        "o_sulfo": [], "o_phospho": [], "n_sulfo": [],
+    }
     for ring_c in ring_carbons:
         loc = locant_of[ring_c]
         atom = mol.GetAtomWithIdx(ring_c)
@@ -1695,7 +1872,19 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 continue
             sym = nbr.GetSymbol()
             if sym == "O":
-                continue  # hydroxyl / anomeric-O / glycosidic-O (clean)
+                # v33 Engine-2: an O-sulfate/O-phosphate-MONOester ring
+                # substituent (BB P-102.5.6.1.2/.1.3) — everything else
+                # (a plain hydroxyl, the anomeric -OR, a glycosidic bridge —
+                # already relaxed to -OH by the unit isolator) is clean.
+                acid = _o_acid_ester_prefix(mol, nbr.GetIdx())
+                if acid is None:
+                    continue  # hydroxyl / anomeric-O / glycosidic-O (clean)
+                word, _central = acid
+                if word in ("sulfo", "sulfonato"):
+                    found["o_sulfo"].append((loc, word))
+                else:
+                    found["o_phospho"].append((loc, word))
+                continue
             if sym in ("F", "Cl", "Br", "I"):
                 # ring C-OH replaced by C-halogen: a deoxy-halo sugar (e.g.
                 # 2-deoxy-2-fluoro-D-galactopyranose, P-102.5.3 + halogeno prefix).
@@ -1710,8 +1899,10 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 continue
             if sym == "N":
                 # ring C-OH replaced by C-N: amino at this ring carbon's locant.
-                # Only a BARE primary amine (-NH2) is the P-102.5.4 subtractive
-                # `amino` class.  An N-acyl / N-alkyl / charged nitrogen is a
+                # A BARE primary amine (-NH2) is the P-102.5.4 subtractive
+                # `amino` class; a bare amine FURTHER substituted with a sulfo
+                # group (-NH-SO3H) is the `n_sulfo` class (v33 Engine-2, heparin's
+                # N-sulfoglucosamine). An N-acyl / N-alkyl / charged nitrogen is a
                 # distinct (out-of-scope) regime: its decoration is invisible to
                 # the ring-CIP fingerprint, so classifying it as plain `amino`
                 # would silently DROP the substituent and ship a wrong name
@@ -1722,15 +1913,16 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 heavy_nbrs = sum(
                     1 for x in nbr.GetNeighbors() if x.GetAtomicNum() > 1
                 )
-                if (
-                    heavy_nbrs != 1
-                    or nbr.GetFormalCharge() != 0
-                    or nbr.GetTotalNumHs() < 2
-                ):
-                    return None  # N-acyl / N-alkyl / charged N -> out of scope
-                found["amino"].append(loc)
+                if heavy_nbrs == 1 and nbr.GetFormalCharge() == 0 and nbr.GetTotalNumHs() >= 2:
+                    found["amino"].append(loc)
+                    continue
+                if _n_sulfamate_prefix(mol, nbr.GetIdx()) is not None:
+                    found["n_sulfo"].append(loc)
+                    continue
+                return None  # N-acyl / N-alkyl / charged N -> out of scope
             elif sym == "C":
-                # exocyclic carbon: CH2OH (clean) / CH3 (deoxy) / COOH (uronic).
+                # exocyclic carbon: CH2OH (clean) / CH3 (deoxy) / COOH (uronic) /
+                # CH2-O-sulfo / CH2-O-phospho (v33 Engine-2, the C6 tail).
                 o_neighbors = [
                     x for x in nbr.GetNeighbors() if x.GetSymbol() == "O"
                 ]
@@ -1743,7 +1935,15 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 elif not o_neighbors and nbr.GetDegree() == 1:
                     found["deoxy"].append(exo_locant)  # bare terminal CH3
                 elif len(o_neighbors) == 1 and not has_double_o:
-                    pass  # clean CH2OH exocyclic carbon (C6) — no modification
+                    acid = _o_acid_ester_prefix(mol, o_neighbors[0].GetIdx())
+                    if acid is None:
+                        pass  # clean CH2OH exocyclic carbon (C6) — no modification
+                    else:
+                        word, _central = acid
+                        if word in ("sulfo", "sulfonato"):
+                            found["o_sulfo"].append((exo_locant, word))
+                        else:
+                            found["o_phospho"].append((exo_locant, word))
                 else:
                     return None  # unrecognized exocyclic carbon (fail-closed)
             else:
@@ -1828,9 +2028,28 @@ def _idealize_to_parent(mol):
         for a in rw.GetAtoms()
         if a.GetSymbol() == "C" and a.GetDegree() == 1
     ]
+    # v33 Engine-2: O-SULFO / O-PHOSPHONO ester branches (BB P-102.5.6.1.2/.1.3)
+    # — the linker O/N keeps its OWN index (it idealizes to a bare hydroxyl /
+    # amino below); the acid centre (S/P) + its own oxygens are collected here
+    # for removal.  N-SULFO (heparin's N-sulfoglucosamine): the sulfamate S
+    # branch on an amino nitrogen is stripped the same way; the nitrogen
+    # itself is still flipped N -> O by the AMINO edit (it is also in
+    # ``nitrogen_idxs`` above).
+    acid_branch_atoms: set = set()
+    for a in rw.GetAtoms():
+        if a.GetSymbol() != "O":
+            continue
+        acid = _o_acid_ester_prefix(rw, a.GetIdx())
+        if acid is not None:
+            _word, central_idx = acid
+            acid_branch_atoms |= _bfs_branch(rw, central_idx, a.GetIdx())
+    for idx in nitrogen_idxs:
+        sulfamate_central = _n_sulfamate_prefix(rw, idx)
+        if sulfamate_central is not None:
+            acid_branch_atoms |= _bfs_branch(rw, sulfamate_central, idx)
 
     try:
-        # AMINO: every (bare) nitrogen -> O.  No index shift.
+        # AMINO / N-SULFO: every (bare or sulfamated) nitrogen -> O.  No index shift.
         for idx in nitrogen_idxs:
             rw.GetAtomWithIdx(idx).SetAtomicNum(8)
         # HALO: every ring-carbon halogen -> O (-> -OH).  No index shift.
@@ -1842,9 +2061,10 @@ def _idealize_to_parent(mol):
         for methyl in deoxy_methyl_idxs:
             o = rw.AddAtom(Chem.Atom(8))
             rw.AddBond(methyl, o, Chem.BondType.SINGLE)
-        # URONIC: remove each carbonyl =O.  RemoveAtom re-indexes higher atoms,
-        # so delete in descending order to keep the remaining indices valid.
-        for o_idx in sorted(set(carbonyl_o_idxs), reverse=True):
+        # URONIC + O-SULFO/O-PHOSPHONO/N-SULFAMATE branch removal: RemoveAtom
+        # re-indexes higher atoms, so delete every collected index in ONE
+        # descending pass.
+        for o_idx in sorted(set(carbonyl_o_idxs) | acid_branch_atoms, reverse=True):
             rw.RemoveAtom(o_idx)
     except (StopIteration, RuntimeError, ValueError):
         return None  # an expected modification atom was not found -> fail-closed
@@ -1972,9 +2192,37 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
     amino_locants = sorted(modifications["amino"])
     uronic_locants = sorted(modifications["uronic"])
     halo_locants = sorted(modifications.get("halo", []))  # [(locant, halogen)]
-    if not (deoxy_locants or amino_locants or uronic_locants or halo_locants):
+    o_sulfo_mods = modifications.get("o_sulfo", [])        # [(locant, word)]
+    o_phospho_mods = modifications.get("o_phospho", [])    # [(locant, word)]
+    n_sulfo_locants = sorted(modifications.get("n_sulfo", []))
+    if not (
+        deoxy_locants or amino_locants or uronic_locants or halo_locants
+        or o_sulfo_mods or o_phospho_mods or n_sulfo_locants
+    ):
         # A clean ring is recognize_sugar_skeleton's / lookup_sugar's job.
         return None
+    if o_sulfo_mods or o_phospho_mods:
+        # v33 Engine-2: defer to ``name_sugar_ester`` (BB P-102.5.6.1.2/.1.3's
+        # FUNCTIONAL-CLASS suffix form) whenever the ester-STRIPPED residual
+        # is an EXACT-CATALOG sugar (``lookup_sugar``, a retained trivial
+        # name like L-fucose) -- that is the established PIN: "alpha-L-
+        # fucopyranose 1-(dihydrogen phosphate)", never the systematic
+        # "6-deoxy-1-O-phosphono-alpha-L-galactopyranose" (regression found +
+        # fixed this session, gold_pins W6-P1).
+        #
+        # Deliberately NARROWER than "would name_sugar_ester succeed at all":
+        # name_sugar_ester's OWN residual call falls through to THIS SAME
+        # systematic engine for a non-cataloged residual (e.g. GlcNS6S's
+        # residual, after stripping just the O-sulfate, is the N-sulfonate
+        # amino sugar THIS engine names) -- deferring on that self-recursive
+        # success would produce the two-word functional-class suffix form
+        # ("...glucopyranose 6-(hydrogen sulfate)"), which cannot be cited as
+        # a glycosyl-chain donor prefix at all, silently breaking Engine 2's
+        # GAG-chain target. Only an EXACT-CATALOG residual is a genuinely
+        # DIFFERENT, retained-name PIN worth yielding to.
+        residual = _strip_o_esters_for_catalog_check(mol)
+        if residual is not None and lookup_sugar(Chem.MolToSmiles(residual)) is not None:
+            return None
 
     # (3) Physically idealize the ring to its parent skeleton and recover
     # (anomer, config, base) from the proven fingerprint index (D-01).
@@ -2013,13 +2261,24 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
     # (WR-01) at the function tail so no wrong name ships.
     if uronic_locants:
         # A uronic sugar is named purely by the -uronic acid suffix; it must not
-        # co-occur with deoxy/amino/halo in this engine's scope (fail-closed).
+        # co-occur with deoxy/amino/halo in this engine's scope (fail-closed;
+        # DEFERRED: KDO/ulosonic uronic+deoxy + Delta4,5-ene-uronate, v33
+        # Engine-2). O-SULFO/O-PHOSPHONO DO co-occur (heparin's IdoA-2-sulfate /
+        # GlcA-2-sulfate units, BB P-102.5.6.1.2/.1.3 + P-102.5.6.6.4).
         if deoxy_locants or amino_locants or halo_locants:
             return None
         uronic_base = _URONIC_STEM_MAP.get(base)
         if uronic_base is None:
             return None  # out-of-map skeleton has no verified uronic name (D-11)
         candidate = uronic_free_acid_name(anomer, config, uronic_base)
+        if candidate is None:
+            return None
+        acid_prefix_terms = _build_o_acid_prefix_terms(o_sulfo_mods, o_phospho_mods)
+        if acid_prefix_terms is None:
+            return None  # >4 of one acid ester -> out of scope, fail-closed
+        if acid_prefix_terms:
+            acid_prefix_terms.sort(key=lambda t: t[0])
+            candidate = f"{'-'.join(t for _, t in acid_prefix_terms)}-{candidate}"
     else:
         # DEOXY / AMINO / HALO: build alphabetized detachable prefixes WITH
         # structural locants (never string surgery on the derived base).
@@ -2029,11 +2288,21 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
         # halo locant is also a deoxy locant.
         prefix_terms = []  # (alpha-sort-key, rendered-term)
         all_deoxy = sorted(
-            set(deoxy_locants) | set(amino_locants) | {loc for loc, _ in halo_locants}
+            set(deoxy_locants) | set(amino_locants) | set(n_sulfo_locants)
+            | {loc for loc, _ in halo_locants}
         )
         if amino_locants:
             prefix_terms.append(
                 ("amino", f"{','.join(str(x) for x in amino_locants)}-amino")
+            )
+        # N-SULFO (v33 Engine-2, heparin's N-sulfoglucosamine): the N-H
+        # replaced by -SO3H is ALSO a deoxy position (the same "N replaces a
+        # C-OH" logic as plain amino), cited as the compound substituent
+        # prefix ``(sulfoamino)`` (VERIFIED, OPSIN 2.9.0).
+        if n_sulfo_locants:
+            prefix_terms.append(
+                ("sulfoamino",
+                 f"{','.join(str(x) for x in n_sulfo_locants)}-(sulfoamino)")
             )
         # HALO: group by halogen, cite locants + multiplier, alpha-key = halogen
         # name (fluoro/chloro/bromo/iodo — ordered ignoring the di/tri multiplier).
@@ -2055,6 +2324,13 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
             prefix_terms.append(
                 ("deoxy", f"{','.join(str(x) for x in all_deoxy)}-deoxy")
             )
+        # O-SULFO / O-PHOSPHONO (v33 Engine-2, BB P-102.5.6.1.2/.1.3): NOT a
+        # deoxy position (an O-substitution replaces the hydroxyl's H, not the
+        # whole OH), so these are added as their own prefix term(s) only.
+        acid_prefix_terms = _build_o_acid_prefix_terms(o_sulfo_mods, o_phospho_mods)
+        if acid_prefix_terms is None:
+            return None  # >4 of one acid ester -> out of scope, fail-closed
+        prefix_terms.extend(acid_prefix_terms)
         # Alphabetize the detachable prefixes (amino < bromo < chloro < deoxy < ...).
         prefix_terms.sort(key=lambda t: t[0])
         prefix_str = "-".join(term for _, term in prefix_terms)

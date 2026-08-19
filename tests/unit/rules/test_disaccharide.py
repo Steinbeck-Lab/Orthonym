@@ -280,3 +280,121 @@ class TestAminoSugarOligosaccharideChain:
         name = name_disaccharide(mol)
         assert name is not None
         assert "2-acetamido" in name or "acetamido" in name
+
+
+class TestV33Engine2DecoratedUnitVocabulary:
+    """v33 giants-engine Engine 2 (
+    engine.md): extends ``name_monosaccharide_systematic``'s modification
+    vocabulary to O-sulfate / O-phosphate-MONOester / N-sulfonate esters (BB
+    P-102.5.6.1.2 @53197 / P-102.5.6.1.3 @53225), so a decorated GAG-style unit
+    (heparin/heparan/chondroitin/dermatan sulfate) no longer voids an
+    otherwise-nameable oligosaccharide chain.
+
+    ⚠ VERIFIED (OPSIN 2.9.0, this session): the carbohydrate-specific ``O-``
+    prefix (``6-O-sulfo-``/``6-O-phosphono-``) round-trips to the exact
+    mono-ester structure; the GENERAL substitutive prefix (``(sulfooxy)``/
+    ``(phosphonooxy)``) does NOT -- it makes OPSIN insert an EXTRA oxygen at
+    the cited position (an additional substituent atop the position's own
+    retained hydroxyl, rather than a substitution of its H), so it silently
+    asserts a WRONG molecule if ever reused for a carbohydrate ring position.
+    """
+
+    def test_pure_o_ester_defers_to_name_sugar_ester(self):
+        """A PURE O-sulfate/O-phosphate ester (no co-occurring deoxy/amino/
+        uronic/halo/N-sulfonate) must DECLINE here -- it is the EXISTING,
+        already-PIN-tested ``name_sugar_ester``'s job (the BB P-102.5.6.1.2/
+        .1.3 FUNCTIONAL-CLASS suffix form, ``"D-glucopyranose 6-(dihydrogen
+        phosphate)"``/``"alpha-D-glucopyranose 2-(hydrogen sulfate)"``,
+        dispatched ahead of this engine). This engine's O- PREFIX form fires
+        ONLY when a co-occurring modification makes the suffix form
+        inexpressible (test_o_sulfate_plus_uronic_acid_co_occurrence,
+        test_n_sulfonate_glucosamine below) -- regression-tested directly:
+        see ``TestSugarPhosphateSulfateEster`` in test_systematic_carbohydrate.py."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        sulfate = Chem.MolFromSmiles("O[C@H]1O[C@H](COS(=O)(=O)O)[C@@H](O)[C@H](O)[C@H]1O")
+        assert name_monosaccharide_systematic(sulfate) is None
+        phospho = Chem.MolFromSmiles("O[C@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H](O)[C@H]1O")
+        assert name_monosaccharide_systematic(phospho) is None
+
+    def test_n_sulfonate_glucosamine(self):
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        # N-sulfo-alpha-D-glucosamine (heparin's characteristic GlcNS unit).
+        mol = Chem.MolFromSmiles(
+            "O[C@H]1O[C@H](COS(=O)(=O)O)[C@@H](O)[C@H](O)[C@H]1NS(=O)(=O)O"
+        )
+        assert name_monosaccharide_systematic(mol) == (
+            "2-deoxy-6-O-sulfo-2-(sulfoamino)-alpha-D-glucopyranose"
+        )
+
+    def test_uronic_acid_with_o_sulfate_co_occurs(self):
+        """O-sulfo MUST co-occur with a uronic acid (heparin's IdoA-2-sulfate /
+        GlcA-2-sulfate units) -- only the deoxy/amino/halo+uronic combination
+        stays vetoed (DEFERRED: KDO/ulosonic uronic+deoxy)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        mol = Chem.MolFromSmiles(
+            "O[C@@H]1O[C@@H](C(=O)O)[C@@H](O)[C@H](OS(=O)(=O)O)[C@H]1O"
+        )
+        name = name_monosaccharide_systematic(mol)
+        assert name is not None
+        assert "O-sulfo" in name and "uronic acid" in name
+
+    def test_n_acetyl_plus_sulfate_stays_out_of_scope(self):
+        """N-acyl is explicitly out of scope for this classifier (a DIFFERENT,
+        pre-existing regime, P-102.5.6.4) -- must not silently drop the acyl
+        group. No regression: still declines (never a wrong/partial name)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        mol = Chem.MolFromSmiles(
+            "CC(=O)N[C@@H]1[C@@H](O)[C@@H](O)[C@@H](COS(=O)(=O)O)O[C@H]1O"
+        )
+        assert name_monosaccharide_systematic(mol) is None
+
+
+class TestV33Engine2CappedTerminusChain:
+    """v33 giants-engine Engine 2 fix (b): the oligosaccharide chain's reducing
+    end may be capped with a simple alkyl/aryl glycoside (e.g. a methyl
+    glycoside used as a synthetic capping group in a GAG fragment), not only a
+    free hemiacetal. ``_oligo_topology`` accepts this terminus and
+    ``name_linear_oligosaccharide`` renders it via the P-102.5.6.2.2 glycoside
+    form (``"{cap} n-O-[...]-{glycoside}"``), never the free-sugar ``-ose``
+    form. VERIFIED (OPSIN 2.9.0): the ``(1->c')`` suffix chain does NOT combine
+    with a glycoside head (``"glycosyl-(1->c')-methyl alpha-D-
+    glucopyranoside"`` fails to parse); the ``n-O-[...]`` prefix form does.
+    """
+
+    def test_methyl_glycoside_disaccharide(self):
+        from orthonym import name_compound
+
+        # methyl 3-O-beta-D-glucopyranosyl-alpha-D-glucopyranoside (single
+        # donor -> no enclosing marks needed, P-16.3.3: a bare glycosyl prefix
+        # carries no internal locant/parenthetical of its own).
+        smi = (
+            "CO[C@H]1O[C@H](CO)[C@@H](O)[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)"
+            "[C@H](O)[C@H]2O)[C@H]1O"
+        )
+        name = name_compound(smi)
+        assert name == "methyl 3-O-beta-D-glucopyranosyl-alpha-D-glucopyranoside"
+
+    def test_heparin_pentasaccharide_methyl_glycoside(self):
+        """A real heparin-fragment pentasaccharide (methyl-capped GlcNS6S --
+        IdoA2S -- GlcNS3,6S -- GlcA -- GlcNS6S, all-N-sulfonate/O-sulfate, no
+        N-acyl) -- the exact SPY positive that motivated this engine. Full
+        InChIKey round-trip verified this session (KANJSNBRCNMZMV-ABRZTLGGSA-N)."""
+        from orthonym import name_compound
+        from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+        smi = (
+            "CO[C@H]1O[C@H](COS(=O)(=O)O)[C@@H](O[C@@H]2O[C@@H](C(=O)O)"
+            "[C@@H](O[C@H]3O[C@H](COS(=O)(=O)O)[C@@H](O[C@@H]4O[C@H](C(=O)O)"
+            "[C@@H](O[C@H]5O[C@H](COS(=O)(=O)O)[C@@H](O)[C@H](O)"
+            "[C@H]5NS(=O)(=O)O)[C@H](O)[C@H]4O)[C@H](OS(=O)(=O)O)"
+            "[C@H]3NS(=O)(=O)O)[C@H](O)[C@H]2OS(=O)(=O)O)[C@H](O)"
+            "[C@H]1NS(=O)(=O)O"
+        )
+        name = name_compound(smi)
+        assert name is not None and "unknown" not in name
+        result = opsin_roundtrip_check(smi, name)
+        assert result["passed"] is True, (name, result)
