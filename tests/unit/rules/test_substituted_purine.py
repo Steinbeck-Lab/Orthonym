@@ -49,3 +49,16 @@ def test_unclassifiable_substituent_fails_closed():
     # (returns None) -> _exocyclic_atoms_accounted must catch it and decline,
     # rather than silently omit it and name a different (des-boronic) molecule
     assert name_substituted_purine(_mol("OB(O)c1ncnc2[nH]cnc12")) is None
+
+
+def test_9_methyladenine_end_to_end():
+    from orthonym import Orthonym
+    smi = "Cn1cnc2c(N)ncnc21"
+    name = Orthonym().name(smi)
+    assert name == "9-methyl-9H-purin-6-amine", name
+
+
+def test_bare_adenine_unchanged_end_to_end():
+    from orthonym import Orthonym
+    # bare adenine still gets its retained name (standard tautomer)
+    assert Orthonym().name("Nc1ncnc2nc[nH]c12") == "adenine"

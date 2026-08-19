@@ -1284,6 +1284,17 @@ def name_fused_heterocycle(mol):
     if xanthine_name:
         return (xanthine_name, ring_atoms, {}, True)
 
+    # Substituted purine (adenine/hypoxanthine/purine skeleton carrying a ring
+    # substituent): systematic PIN on the fixed purine parent with graph-derived
+    # indicated H. Runs BEFORE the retained/core-match path so a substituted
+    # adenine is NOT captured by the 10-atom retained `adenine` core (which
+    # absorbs the C6 amino and mis-places the ring-N substituent). Declines the
+    # bare base, which keeps its retained name below.
+    from .purine import name_substituted_purine
+    subst_purine_name = name_substituted_purine(mol)
+    if subst_purine_name:
+        return (subst_purine_name, ring_atoms, {}, True)
+
     # First try exact match for unsubstituted fused heterocycle
     result = get_fused_heterocycle_name(mol)
     if result:
