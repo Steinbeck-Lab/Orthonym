@@ -14,6 +14,8 @@ from orthonym.rules.phosphorus import (
     _count_alkyl_carbons,
     _characterize_substituent,
 )
+from orthonym import Orthonym
+from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
 
 class TestPhosphineNaming:
@@ -642,3 +644,31 @@ class TestPhosphanylPrefix:
                 break
         result = get_phosphanyl_prefix(mol, p_idx)
         assert result == "methyldi(phenyl)phosphanyl"
+
+
+class TestPhosphateEsterProtonationRegression:
+    """v33 fix: a hardcoded ``retained_names.py`` table used to shadow
+    ``name_phosphate_ester`` at dispatch priority 1300 for these 4 neutral
+    mono-/di-esters, shipping "methyl phosphate" / "dimethyl phosphate" /
+    "ethyl phosphate" / "diethyl phosphate" -- names that OPSIN parses back
+    to the deprotonated DIANION, not the neutral input SMILES. Correct PIN
+    cites the free -OH as "(di)hydrogen" (P-67/P-68). Gate ON (production
+    path) + RT-verified against the real OPSIN jar, so this cannot regress
+    silently back to the anion name.
+    """
+
+    @pytest.mark.opsin_gate
+    @pytest.mark.parametrize("smiles,expected", [
+        ("COP(=O)(O)O", "methyl dihydrogen phosphate"),
+        ("COP(=O)(O)OC", "dimethyl hydrogen phosphate"),
+        ("CCOP(=O)(O)O", "ethyl dihydrogen phosphate"),
+        ("CCOP(=O)(O)OCC", "diethyl hydrogen phosphate"),
+    ])
+    def test_neutral_mono_di_ester_is_not_the_anion_name(self, smiles, expected):
+        result = Orthonym(style="pin").name(smiles)
+        assert result == expected
+
+        rt = opsin_roundtrip_check(smiles, result)
+        assert rt["passed"], (
+            f"{smiles!r} -> {result!r} failed OPSIN round-trip: {rt['error']}"
+        )

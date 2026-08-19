@@ -79,24 +79,28 @@ class TestPhosphateEsterE2E:
     """E2E tests for phosphate ester naming (PHOSPH-06)."""
 
     def test_methyl_phosphate(self):
-        """COP(=O)(O)O -> methyl phosphate (PHOSPH-06)"""
-        assert name_compound("COP(=O)(O)O") == "methyl phosphate"
+        """COP(=O)(O)O -> methyl dihydrogen phosphate (PHOSPH-06).
+
+        Bare 'methyl phosphate' is the ANION name (OPSIN parses it to the
+        dianion COP(=O)([O-])[O-], a different species) -- v33 fix.
+        """
+        assert name_compound("COP(=O)(O)O") == "methyl dihydrogen phosphate"
 
     def test_dimethyl_phosphate(self):
-        """COP(=O)(OC)O -> dimethyl phosphate"""
-        assert name_compound("COP(=O)(OC)O") == "dimethyl phosphate"
+        """COP(=O)(OC)O -> dimethyl hydrogen phosphate (1 free -OH cited, v33 fix)."""
+        assert name_compound("COP(=O)(OC)O") == "dimethyl hydrogen phosphate"
 
     def test_trimethyl_phosphate(self):
         """COP(=O)(OC)OC -> trimethyl phosphate"""
         assert name_compound("COP(=O)(OC)OC") == "trimethyl phosphate"
 
     def test_ethyl_phosphate(self):
-        """CCOP(=O)(O)O -> ethyl phosphate"""
-        assert name_compound("CCOP(=O)(O)O") == "ethyl phosphate"
+        """CCOP(=O)(O)O -> ethyl dihydrogen phosphate (v33 fix, see test_methyl_phosphate)."""
+        assert name_compound("CCOP(=O)(O)O") == "ethyl dihydrogen phosphate"
 
     def test_diethyl_phosphate(self):
-        """CCOP(=O)(OCC)O -> diethyl phosphate"""
-        assert name_compound("CCOP(=O)(OCC)O") == "diethyl phosphate"
+        """CCOP(=O)(OCC)O -> diethyl hydrogen phosphate (1 free -OH cited, v33 fix)."""
+        assert name_compound("CCOP(=O)(OCC)O") == "diethyl hydrogen phosphate"
 
     def test_triethyl_phosphate(self):
         """CCOP(=O)(OCC)OCC -> triethyl phosphate"""
@@ -165,8 +169,8 @@ class TestPhosphorusRequirements:
         assert name_compound("CP(C)(=O)O") == "dimethylphosphinic acid"
 
     def test_phosph_06_methyl_phosphate(self):
-        """PHOSPH-06: name_compound('COP(=O)(O)O') returns 'methyl phosphate'"""
-        assert name_compound("COP(=O)(O)O") == "methyl phosphate"
+        """PHOSPH-06: name_compound('COP(=O)(O)O') returns 'methyl dihydrogen phosphate' (v33 fix)."""
+        assert name_compound("COP(=O)(O)O") == "methyl dihydrogen phosphate"
 
 
 class TestPhosphanylPrefix:
@@ -215,8 +219,8 @@ class TestPhosphorusOnComplexSubstrate:
         assert name_compound("O=P(O)(c1ccccc1)c2ccccc2") == "diphenylphosphinic acid"
 
     def test_phosphate_ester_not_disrupted(self):
-        """Phosphate ester naming not disrupted (PHOS-05 routing safety)."""
-        assert name_compound("COP(=O)(O)O") == "methyl phosphate"
+        """Phosphate ester naming not disrupted (PHOS-05 routing safety, v33 fix)."""
+        assert name_compound("COP(=O)(O)O") == "methyl dihydrogen phosphate"
 
     def test_phosphine_oxide_not_disrupted(self):
         """Phosphine oxide naming not disrupted (PHOS-05 routing safety)."""

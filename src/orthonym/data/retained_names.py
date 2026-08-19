@@ -406,12 +406,17 @@ RETAINED_NAMES = {
     # Phosphinic acids
     "CP(C)(=O)O": "dimethylphosphinic acid",
     "CCP(=O)(O)CC": "diethylphosphinic acid",
-    # Phosphate esters (functional class naming)
-    "COP(=O)(O)O": "methyl phosphate",
-    "COP(=O)(O)OC": "dimethyl phosphate",
+    # Phosphate esters (functional class naming).
+    # Mono-/di-ester rows for methyl/ethyl were REMOVED here (v33): "methyl
+    # phosphate"/"dimethyl phosphate"/"ethyl phosphate"/"diethyl phosphate"
+    # denote the ANION (OPSIN parses them back to the deprotonated dianion),
+    # not the neutral acid-ester SMILES these rows were keyed on. The neutral
+    # forms need the free -OH cited ("methyl dihydrogen phosphate", "dimethyl
+    # hydrogen phosphate", ...) which `rules/phosphorus.py::name_phosphate_ester`
+    # already produces correctly (per-OH protonation word derived from the
+    # structure) once dispatch is no longer shadowed by this table. The
+    # tri-ester rows below are correct as-is (0 free -OH -> no protonation word).
     "COP(=O)(OC)OC": "trimethyl phosphate",
-    "CCOP(=O)(O)O": "ethyl phosphate",
-    "CCOP(=O)(O)OCC": "diethyl phosphate",
     "CCOP(=O)(OCC)OCC": "triethyl phosphate",
     
     # === RETAINED NITROGEN COMPOUNDS ===
