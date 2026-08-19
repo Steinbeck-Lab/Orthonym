@@ -5560,6 +5560,23 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
             name = f"{prefix}{stem}an-{k}-yl"
     except (ValueError, KeyError):
         return None
+    # v33: cite this chain's OWN stereodescriptors from the SAME free-valence
+    # numbering the name was built with (`chain_pos`), exactly as the sibling
+    # located derivers do (`_located_acyclic_alkyl_name` at the alkenyl path,
+    # BlueBookV2 P-91.2.1.2.1 / P-46.3). The docstring formerly said "stereo is
+    # added by the caller", but the Tier-FG caller's `_add_substituent_stereo`
+    # does not fire when this chain is reached as a deep `-O-<chain>` (butoxy)
+    # substituent -- so an on-chain stereocentre (e.g. the acyl-CoA pantetheine
+    # 3-hydroxy centre) was silently dropped -> the whole molecule abstained on
+    # a stereo mismatch. `_located_stereo_block` cites ONLY atoms in `chain_pos`
+    # and ONLY DEFINED (`_CIPCode`) centres, so off-chain-branch stereocentres
+    # (expressed by their own nested prefix) are never double-counted, and an
+    # undefined centre is never fabricated. The caller's later
+    # `_add_substituent_stereo` is idempotent here (its
+    # `count_expressed_stereo_descriptors` guard suppresses a second block).
+    stereo = _located_stereo_block(mol, chain_pos)
+    if stereo:
+        name = f"{stereo}{name}"
     return (name, k, chain_pos) if with_pos else (name, k)
 
 
@@ -5663,7 +5680,7 @@ def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
         mol, sub_atoms, attach_idx, with_pos=True)
 
 
-def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
+def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None):
     """Add CIP stereodescriptors to a substituent name if stereocenters exist.
 
     When a substituent contains one or more stereocenters with defined CIP
@@ -5673,7 +5690,9 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
 
     For a single stereocenter the format is "(R)-name" or "({k}R)-name".
     For multiple stereocenters the format uses locants threaded from the
-    substituent's own numbering (or emits none — D-09).
+    substituent's own numbering (any stereocentre this numbering does not
+    reach is presumed already expressed by a nested recursively-named
+    branch — see the ``located`` bugfix note below — and is left alone).
 
     This is a systemic fix: any substituent on any parent (chain, ring,
     heterocycle) that has a stereocenter gets the descriptor.
@@ -5687,9 +5706,22 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
             acyclic-alkyl substituent from STRUCTURE. None when the caller has no
             attachment context (then the located form is not derivable and the
             bare "(R)-"/"(S)-" form is used per the unique-position rule).
-
-    Returns:
-        Name with stereo prefix if stereocenters found, otherwise unchanged.
+        located: An optional pre-computed ``(pin_form, k, pos)`` triple — the
+            same contract ``_acyclic_alkyl_located_stereo_name`` returns — to
+            use IN PLACE OF re-deriving one from ``attach_idx``. v33 bugfix:
+            the Tier-FG caller (``allow_functional=True``) already builds
+            exactly this triple to produce ``name`` itself; passing it here
+            guarantees ``pin_form`` stays byte-identical to ``name`` (no risk
+            of a second, differently-tie-broken recomputation silently
+            replacing a correct name) while still exposing the FG chain's own
+            ``pos`` map, which the plain ``attach_idx``-only path below cannot
+            reach (it calls the STRICT, non-FG deriver only — the FG shape
+            declines fail-closed to plain ``None``, which is exactly how a
+            chain stereocentre in an FG-shaped fragment, e.g. the pantetheine
+            3-hydroxy centre of an acyl-CoA thioester substituent, used to be
+            silently dropped instead of just missing-a-locant). Every other
+            caller passes nothing and keeps the prior strict-only behaviour
+            unchanged.
     """
     if not sub_atoms or not name:
         return name
@@ -5740,8 +5772,9 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
         # `butan-2-yl` is the preferred prefix; `sec-butyl` is NOT a PIN):
         #   CC(=O)N[C@@H](C)CC  -> N-[(2S)-butan-2-yl]acetamide
         #   CC(=O)N[C@@H](C)CCC -> N-[(2S)-pentan-2-yl]acetamide
-        located = _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
-        if located is not None:
+        _loc = located if located is not None \
+            else _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
+        if _loc is not None:
             # `_located_acyclic_alkyl_name` gives the substituent's OWN principal-
             # chain numbering (attach=1..n). Cite the descriptor at the
             # stereocentre's TRUE locant in that numbering -- P-91.3
@@ -5753,7 +5786,7 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
             # the off-attachment case the old `s_idx == attach_idx` gate dropped
             # (`3-hydroxybutyl` -> `(3S)-3-hydroxybutyl`). The locant comes from
             # the SANCTIONED structure-derived chain, never a re-derived BFS.
-            pin_form, _k, pos = located
+            pin_form, _k, pos = _loc
             loc = pos.get(s_idx)
             if loc is not None:
                 return f"({loc}{cip})-{pin_form}"
@@ -5788,23 +5821,39 @@ def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None):
     # numbering the emitted text already carries -- not a re-derived guess.
     # It declines (`None`) for every other shape (ring atoms, ethers, charged
     # atoms, non-single bonds), so the D-09 "missing beats wrong" fallback
-    # below is unchanged for those; and a stereocentre this deriver's OWN
-    # numbering does not cover (e.g. one buried inside a recursively-named
-    # branch) is guarded by the ``all(... in pos ...)`` check, never fabricated.
-    located = _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
-    if located is not None:
-        pin_form, _k, pos = located
-        if all(idx in pos for idx, _cip in stereo_atoms):
+    # below is unchanged for those.
+    #
+    # v33 bugfix (acyl-CoA pantetheine 3-hydroxy centre): a stereocentre this
+    # deriver's OWN numbering does not cover is NOT necessarily unfindable —
+    # it is typically one already expressed inside a nested recursively-named
+    # branch prefix (a branch atom is never itself a member of `pos`, which
+    # maps ONLY this level's own chain; branches are named+stereo-decorated by
+    # their OWN independent `_add_substituent_stereo` call before this outer
+    # one runs). Requiring ALL stereocentres in the whole fragment subtree to
+    # be in `pos` before emitting ANY of them was therefore wrong: it silently
+    # DROPPED an own-chain descriptor whenever the fragment ALSO contained an
+    # already-resolved nested one (e.g. a Tier-FG '...-4-oxobutyl' chain whose
+    # C3 stereocentre is on-chain, alongside a nested acyl-sulfanyl branch
+    # whose OWN stereocentre was already baked into `name`). Emit locants for
+    # whichever stereocentres `pos` DOES cover; the rest are presumed already
+    # expressed and are left untouched -- never fabricated, never double-counted.
+    _loc = located if located is not None \
+        else _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx)
+    if _loc is not None:
+        pin_form, _k, pos = _loc
+        own_stereo = [(idx, cip) for idx, cip in stereo_atoms if idx in pos]
+        if own_stereo:
             from ..rules.stereochemistry import format_stereodescriptor_string
-            descr = sorted((pos[idx], cip) for idx, cip in stereo_atoms)
+            descr = sorted((pos[idx], cip) for idx, cip in own_stereo)
             block = format_stereodescriptor_string(descr)
             if block:
                 return f"{block}{pin_form}"
 
     # Per D-09 (missing beats wrong): when the substituent's own numbering
-    # cannot be threaded, emit NO multi-centre stereo block — return the name
-    # unchanged. A multi-centre stereo descriptor placed with fabricated locants
-    # is worse than none (it would round-trip to the WRONG diastereomer). The
+    # cannot be threaded (or covers none of this fragment's stereocentres),
+    # emit NO multi-centre stereo block here — return the name unchanged. A
+    # multi-centre stereo descriptor placed with fabricated locants is worse
+    # than none (it would round-trip to the WRONG diastereomer). The
     # single-centre branch above still emits the correct unlocanted "(R)-"/"(S)-".
     return name
 
@@ -6661,20 +6710,39 @@ def name_substituent_fragment(
         _fg_best_effort = False
     if _fg_best_effort and attach_idx is not None and attach_idx in set(sub_atoms):
         _fg_name = None
+        _fg_located = None
         try:
             _asym = mol.GetAtomWithIdx(attach_idx).GetSymbol()
             if _asym in ('O', 'S', 'N'):
                 _fg_name = _located_fg_hetero_root(mol, list(sub_atoms), attach_idx)
             else:
+                # v33 bugfix: request `with_pos=True` in the SAME call that
+                # builds `_fg_name`, and hand the resulting (name, k, pos)
+                # triple to `_add_substituent_stereo` as `located`. This chain
+                # is the ONLY deriver that can locate a stereocentre sitting on
+                # an FG-shaped chain (the strict, non-FG deriver
+                # `_add_substituent_stereo` falls back to declines it, which
+                # is how a chain stereocentre here -- e.g. the acyl-CoA
+                # pantetheine 3-hydroxy centre -- used to be silently dropped
+                # instead of just missing a locant). Passing the SAME triple
+                # already used for `_fg_name` (rather than letting the callee
+                # re-derive one from `attach_idx` alone) guarantees the name
+                # `_add_substituent_stereo` decorates is byte-identical to
+                # this one -- no risk of a second, differently-tie-broken
+                # recomputation silently replacing a correct name.
                 _r = _located_acyclic_alkyl_name(
-                    mol, list(sub_atoms), attach_idx, allow_functional=True)
+                    mol, list(sub_atoms), attach_idx, allow_functional=True,
+                    with_pos=True)
                 _fg_name = _r[0] if _r is not None else None
+                _fg_located = _r if _r is not None else None
         except Exception as _exc:  # noqa: BLE001
             logger.debug("Tier FG located namer failed: %s", _exc)
             _fg_name = None
+            _fg_located = None
         if _fg_name is not None:
             return _add_substituent_stereo(
-                mol, sub_atoms, _fg_name, attach_idx=attach_idx)
+                mol, sub_atoms, _fg_name, attach_idx=attach_idx,
+                located=_fg_located)
 
     # Step 3: Extract fragment SMILES and name recursively
     frag_smiles = _extract_fragment_smiles(mol, sub_atoms, attach_idx, parent_set)
