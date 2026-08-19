@@ -3816,7 +3816,8 @@ class Orthonym:
             from .rules.adducts import name_adduct
             return name_adduct(
                 mol, canonical_smiles, style=self.style,
-                general_fallback=True, allow_aromatic_general=True)
+                general_fallback=True, allow_aromatic_general=True,
+                general_fallback_unverified=self._general_fallback_unverified)
         except Exception as e:
             logger.info("P4 multi-fragment recovery error (kept abstention): %s", e)
             return None

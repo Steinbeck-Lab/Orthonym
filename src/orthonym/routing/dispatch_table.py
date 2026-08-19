@@ -982,7 +982,11 @@ def _handle_multi_component_neutral(mol, smiles, canonical_smiles, features=None
     structure-dropping hazard) is removed — partial sets refuse.
     """
     from orthonym.rules.adducts import name_adduct
-    adduct_name = name_adduct(mol, canonical_smiles, style=style)
+    adduct_name = name_adduct(
+        mol, canonical_smiles, style=style,
+        general_fallback=kwargs.get("general_fallback", False),
+        allow_aromatic_general=kwargs.get("allow_aromatic_general", False),
+        general_fallback_unverified=kwargs.get("general_fallback_unverified", False))
     if adduct_name is not None:
         return adduct_name
     # Frozen legacy path: ALL fragments constitutionally identical.

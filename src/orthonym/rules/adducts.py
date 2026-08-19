@@ -68,7 +68,8 @@ def split_components(mol) -> Optional[List[Tuple[str, int]]]:
 
 def _name_component(frag_smi: str, style: str, *,
                     general_fallback: bool = False,
-                    allow_aromatic_general: bool = False) -> Optional[str]:
+                    allow_aromatic_general: bool = False,
+                    general_fallback_unverified: bool = False) -> Optional[str]:
     """Name ONE component fragment, or None (fail-closed).
 
     Single-heavy-atom fragments come ONLY from the P-14.8.2 table above.
@@ -96,7 +97,8 @@ def _name_component(frag_smi: str, style: str, *,
     try:
         name = Orthonym(
             style=style, general_fallback=general_fallback,
-            allow_aromatic_general=allow_aromatic_general).name(frag_smi)
+            allow_aromatic_general=allow_aromatic_general,
+            general_fallback_unverified=general_fallback_unverified).name(frag_smi)
     except Exception:
         return None
     if not name or not isinstance(name, str) or name.startswith("unknown"):
@@ -212,7 +214,8 @@ def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
 def name_adduct(mol, canonical_smiles: Optional[str] = None,
                 style: str = "pin", *,
                 general_fallback: bool = False,
-                allow_aromatic_general: bool = False) -> Optional[str]:
+                allow_aromatic_general: bool = False,
+                general_fallback_unverified: bool = False) -> Optional[str]:
     """Name an all-neutral multi-component input per P-14.8, or None.
 
     Fail-closed refusals (return None; the dispatch cascade then falls
@@ -252,7 +255,8 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     for smi, count in ordered:
         component_name = _name_component(
             smi, style, general_fallback=general_fallback,
-            allow_aromatic_general=allow_aromatic_general)
+            allow_aromatic_general=allow_aromatic_general,
+            general_fallback_unverified=general_fallback_unverified)
         if component_name is None:
             return None  # fail-closed: never drop or placeholder a component
         named.append((component_name, count))
