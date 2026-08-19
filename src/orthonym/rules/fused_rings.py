@@ -2745,10 +2745,22 @@ def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
     # Wrap compound names (those containing digits or hyphens) in parentheses
     # to prevent locant ambiguity (e.g., 8-(2-methylpropyl) not 8-2-methylpropyl)
     display_name = name
-    if not name.startswith('('):
-        from ..assembly.naming_utils import is_complex_substituent
-        if is_complex_substituent(name):
-            display_name = f'({name})'
+    from ..assembly.naming_utils import (
+        is_complex_substituent, _is_fully_enclosed, enclose_if_compound,
+    )
+    if name.startswith('('):
+        # A name that opens with '(' was formerly left bare unconditionally --
+        # correct for a single fully-bracketed token ('(2-methylpropyl)'), WRONG
+        # for a compound whose leading '(' is a stereo / indicated-H block, not a
+        # whole-substituent enclosure: '(2R,3R,4S,5R)-5-...oxolan-2-yl' is NOT
+        # fully enclosed (its first ')' closes mid-string) and needs an OUTER
+        # mark -> '[(2R,3R,4S,5R)-5-...oxolan-2-yl]' (P-16.3.3). Only such
+        # not-fully-enclosed names change; a fully-bracketed token stays bare, so
+        # every currently-parseable name is byte-identical.
+        if not _is_fully_enclosed(name):
+            display_name = enclose_if_compound(name)
+    elif is_complex_substituent(name):
+        display_name = f'({name})'
     if count == 1:
         return f"{locant_str}-{display_name}-"
     else:

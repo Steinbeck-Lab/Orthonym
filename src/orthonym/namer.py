@@ -3456,6 +3456,21 @@ class Orthonym:
         from .assembly.fragment_naming import is_top_level_naming
         if not is_top_level_naming():
             return None
+        # v33: before the von-Baeyer engine, prefer a retained fused-heterocycle
+        # whole-molecule name (the `...9H-purin-6-amine` parent of an acyl-CoA)
+        # when it round-trips. A giant purine-containing molecule is not itself a
+        # bare fused ring, so the normal dispatch never routes it to
+        # `name_fused_heterocycle`; without this it is named on a von-Baeyer
+        # `...tetraazabicyclo[4.3.0]...` polyene here. RT-gated (adopted only when
+        # verified), so a molecule whose fused form is not yet RT-exact still
+        # falls through to the valid von-Baeyer name below -- no regression,
+        # 0-wrong. Best-effort only, so PIN/default output is unchanged.
+        if self._general_fallback_unverified:
+            _mol_up = Chem.MolFromSmiles(smiles)
+            if _mol_up is not None:
+                _fused_up = self._try_retained_fused_upgrade(_mol_up, smiles)
+                if _fused_up is not None:
+                    return _fused_up
         try:
             mol = Chem.MolFromSmiles(smiles)
             if mol is None:
@@ -4452,6 +4467,43 @@ class Orthonym:
             end_naming_session()
             clear_confidence()
 
+    def _try_retained_fused_upgrade(self, mol, smiles: str) -> Optional[str]:
+        """v33: a retained fused-heterocycle whole-molecule name (currently the
+        purine ring system) when it round-trips, else None.
+
+        A giant purine-containing molecule (an acyl-CoA) is not itself a bare
+        fused ring, so the normal dispatch never routes it to
+        ``name_fused_heterocycle``; it falls to the von-Baeyer general-engine
+        fallback and is named on a ``...tetraazabicyclo[4.3.0]...`` polyene parent
+        instead of its PIN-quality ``...9H-purin-6-amine``. This offers the fused
+        name as a preferred candidate, adopted by the caller ONLY when its OPSIN
+        round-trip verifies -- so a molecule whose fused form is not yet RT-exact
+        still falls through to the (valid) von-Baeyer name (no regression; 0-wrong
+        via the RT probe + the downstream SELF-01 gate). ``best_effort_ctx`` is
+        already set for this session (the caller gates on
+        ``_general_fallback_unverified``), so ``name_substituted_purine`` recurses
+        the giant arm under best-effort."""
+        try:
+            from .rules.purine import _PURINE_CORE
+        except Exception:
+            return None
+        if _PURINE_CORE is None or not mol.HasSubstructMatch(_PURINE_CORE):
+            return None
+        try:
+            from .rules.fused_rings import name_fused_heterocycle
+            res = name_fused_heterocycle(mol)
+        except Exception:
+            return None
+        if not res or not res[0]:
+            return None
+        cand = res[0]
+        try:
+            from .validation import opsin_roundtrip_check
+            rt = opsin_roundtrip_check(smiles, cand)
+        except Exception:
+            return None
+        return cand if rt and rt.get("passed") else None
+
     def _name_impl(self, smiles: str, _skip_decomposition: bool = False) -> str:
         """Internal naming implementation (wrapped by session management).
 
@@ -4685,6 +4737,24 @@ class Orthonym:
             # the >15-HA coverage gate, the P10 source-vetoes, and the
             # SELF-01 OPSIN-RT gate.
             # ============================================================
+            # v33: prefer a retained fused-heterocycle whole-molecule name (e.g.
+            # the `...9H-purin-6-amine` parent of an acyl-CoA) over the general
+            # engine's von-Baeyer polyene, WHEN it round-trips. A giant
+            # purine-containing molecule is not itself a bare fused ring, so the
+            # normal dispatch never routes it to `name_fused_heterocycle` -- it
+            # falls straight to the von-Baeyer fallback below and loses the
+            # PIN-quality retained parent (`...tetraazabicyclo[4.3.0]...`). Try the
+            # fused name first; adopt it ONLY when its OPSIN round-trip verifies,
+            # so a molecule whose fused form is not yet RT-exact still falls
+            # through to the (valid) von-Baeyer name -- never a regression, 0-wrong
+            # via the RT probe + the downstream SELF-01 gate. Best-effort only
+            # (`_general_fallback_unverified`), so PIN/default output is unchanged.
+            if (self._general_fallback_unverified
+                    and (not name or is_failure_name(name))):
+                _fused_up = self._try_retained_fused_upgrade(mol, smiles)
+                if _fused_up is not None:
+                    name = _fused_up
+
             if self._general_fallback and (not name or is_failure_name(name)):
                 from .assembly.general_engine import name_general
                 from .validation.coverage_gate import certify_general_result
