@@ -199,3 +199,64 @@ def test_builder_declines_extra_nitrogen_directly():
     sites = get_ion_sites(mol)
     assert _name_primary_amine_azaniumyl_zwitterion(
         mol, sites['cations'], sites['anions'], 'pin') == ''
+
+
+# =============================================================================
+# Task C1 (v33 charged completion): thiolate `sulfido` prefix + cysteinate
+# multi-anion fallback.
+#
+# `classify_anion` (ions.py:112) already returns 'thiolate' for a terminal
+# C-bonded [S-]; `_apply_anionic_substituent_prefixes` (ions.py:~3986) did NOT
+# know how to cite a JUNIOR thiolate centre -- the neutral-acid path built
+# 'sulfanyl...' (the neutral -SH substituent prefix), which round-trips to a
+# DIFFERENT (neutral-thiol) molecule and SELF-01 correctly rejected it.
+# FIX 3a mirrors the existing sulfinato/sulfonato/phosphonato swap blocks with
+# a 'sulfanyl'->'sulfido' single-occurrence swap.
+#
+# Cysteinate ('N[C@@H](C[S-])C(=O)[O-]') additionally stacks a SECOND defect:
+# the multi-anion branch's neutralize-then-name step (`_try_neutralize_and_name`)
+# resolves the fully-neutral skeleton to the RETAINED amino-acid word
+# ('L-cysteine'), which has no '-oic acid'/'-ic acid' suffix to convert and no
+# morpheme for the extra (thiolate) anionic centre. FIX 3b adds
+# `_try_neutralize_and_name_systematic` (ions.py), a sibling that requests the
+# SYSTEMATIC name of the same fully-neutral skeleton
+# ('...-3-sulfanylpropanoic acid'), which DOES convert and DOES carry the
+# 'sulfanyl' token FIX 3a can re-ionize -- RT-gated with a strict full-InChIKey
+# check before shipping (mirrors the ester-anion RT pattern elsewhere in
+# ions.py's multi-anion branch).
+#
+# The multi-anion dispatch entry for THIS shape is actually
+# `routing.dispatch_table._handle_poly_anion` (predicate `_is_poly_anion`:
+# >=2 anions, no cations), a near-duplicate of ions.py's own multi-anion
+# branch that only neutralizes OXYGEN anions (leaving a thiolate charged) and
+# had no fallback when its own '-oic acid' conversion failed -- it shipped the
+# unconverted/wrong intermediate name outright (silently dropping the
+# thiolate's charge). Extended (same commit) to defer to the now-fixed
+# `ions.py::name_anion` when its own conversion cannot express every anionic
+# centre, rather than ship the incomplete name.
+# =============================================================================
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("[S-]CC(=O)[O-]", "sulfidoacetate"),
+    ("N[C@@H](C[S-])C(=O)[O-]", "(2R)-2-amino-3-sulfidopropanoate"),
+])
+def test_thiolate_sulfido(smi, expected):
+    n = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                  allow_aromatic_general=True).name(smi)
+    assert n == expected
+    _full_ik_rt(smi, n)
+
+
+# --- regression: shapes _apply_anionic_substituent_prefixes / the poly-anion
+# dispatch already handled correctly must stay byte-identical.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("[O-]C(=O)CC(=O)[O-]", "propanedioate"),
+    ("CP(=O)([O-])[O-]", "methylphosphonate"),
+    ("OC(=O)CCCCC(=O)[O-]", "5-carboxypentanoate"),
+])
+def test_c1_no_regression_existing_partial_and_dianion_shapes(smi, expected):
+    n = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                  allow_aromatic_general=True).name(smi)
+    assert n == expected

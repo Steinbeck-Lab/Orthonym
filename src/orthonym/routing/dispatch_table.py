@@ -1053,6 +1053,22 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
                             mol, sites['anions'], anion_name
                         )
                         return anion_name
+                    # v33 charged C1 stack (cysteinate class): the O-ONLY
+                    # neutralization above leaves any NON-OXYGEN anion
+                    # (thiolate/aminide/...) still charged, so `neutral_name`
+                    # names an INTERMEDIATE species, not the target skeleton --
+                    # its recursive namer call can silently mis-name that
+                    # intermediate (the still-charged substituent has no
+                    # expressible form there), and even a clean intermediate
+                    # name may carry no convertible '-oic acid' suffix.
+                    # ions.py's own multi-anion branch (`name_anion`)
+                    # neutralizes EVERY charge and RT-gates a systematic-name
+                    # fallback (FIX 3b) for exactly this shape -- defer to it
+                    # rather than shipping the unconverted/wrong intermediate.
+                    from orthonym.rules.ions import name_anion as _full_name_anion
+                    full = _full_name_anion(mol, style)
+                    if full:
+                        return full
                 return neutral_name
     except (ValueError, RuntimeError, KeyError, IndexError, RecursionError) as exc:
         # Expected operational fall-through, matching ions.py's explicit lists.

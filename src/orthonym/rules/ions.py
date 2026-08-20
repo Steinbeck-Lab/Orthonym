@@ -1098,6 +1098,39 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
                 # anionic prefix (carboxylato/oxido) instead of the neutral carboxy/hydroxy.
                 anion_name = _apply_anionic_substituent_prefixes(mol, anions, anion_name)
                 return _validate_anion_name(mol, anion_name)
+            # FIX 3b (v33 charged C1, cysteinate multi-anion stack): the
+            # retained neutral name (e.g. an amino-acid word like
+            # 'L-cysteine') has no convertible '-oic acid'/'-ic acid'
+            # suffix, so a second anionic centre (a thiolate riding
+            # alongside the carboxylate) cannot be re-ionized on it. Fall
+            # back to the SYSTEMATIC neutral name of the SAME
+            # fully-neutralized skeleton, which does carry a convertible
+            # acid suffix -- e.g. cysteine -> the retained word fails,
+            # '(2R)-2-amino-3-sulfanylpropanoic acid' converts to
+            # '...propanoate' and then to '...sulfidopropanoate'.
+            sys_neutral_name = _try_neutralize_and_name_systematic(mol)
+            if sys_neutral_name:
+                sys_anion_name = _acid_name_to_carboxylate(
+                    sys_neutral_name, carboxylate_count)
+                if sys_anion_name:
+                    sys_anion_name = _apply_anionic_substituent_prefixes(
+                        mol, anions, sys_anion_name)
+                    validated = _validate_anion_name(mol, sys_anion_name)
+                    if validated:
+                        # 0-wrong: this candidate is derived from a
+                        # constructed systematic name the top-level SELF-01
+                        # gate has not yet seen -- strictly RT-gate it here
+                        # (full InChIKey: charges + stereo) before shipping,
+                        # matching the ester-anion RT pattern elsewhere in
+                        # this function. Fall through (never ship
+                        # unverified) if it cannot be confirmed.
+                        from orthonym.validation.opsin_roundtrip import opsin_parse
+                        back = opsin_parse(validated)
+                        if back:
+                            bm = Chem.MolFromSmiles(back)
+                            if (bm is not None and
+                                    Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol)):
+                                return validated
         return _validate_anion_name(mol, neutral_name)
 
     # Fallback: name first anion site only
@@ -1476,6 +1509,65 @@ def _try_neutralize_and_name(mol) -> str:
         # Use unified fragment naming (cycle-detected, session-cached)
         from ..assembly.fragment_naming import name_fragment_recursively
         neutral_name = name_fragment_recursively(neutral_smiles)
+        if neutral_name:
+            return neutral_name
+    except (RecursionError, ValueError, RuntimeError):
+        pass
+
+    return ''
+
+
+def _try_neutralize_and_name_systematic(mol) -> str:
+    """Sibling of ``_try_neutralize_and_name`` that requests the SYSTEMATIC
+    (non-retained) name for the fully-neutralized skeleton.
+
+    FIX 3b (v33 charged C1, cysteinate multi-anion stack): the multi-anion
+    branch neutralizes ALL charges and names the skeleton via the default
+    (retained-name-preferring) pipeline, e.g. cysteinate's fully-neutral form
+    ([O-] AND [S-] both re-protonated) resolves to the retained amino-acid
+    word ``'L-cysteine'``. That word has NO morpheme for a SECOND anionic
+    centre (the thiolate) -- re-ionizing only its carboxyl ('L-cysteinate')
+    round-trips to the WRONG molecule (thiol intact, only the carboxylate
+    charged; SELF-01 correctly rejects it). The SYSTEMATIC acid name
+    (``'(2R)-2-amino-3-sulfanylpropanoic acid'``) DOES carry a convertible
+    '-oic acid' suffix and a substituent prefix (``sulfanyl``) that
+    ``_apply_anionic_substituent_prefixes`` can re-ionize to ``sulfido``.
+    Mirrors the identical retained->systematic fallback already shipped for
+    the amido-prefix converter (``composer.py``'s
+    ``name_fragment_recursively(_fs, style='systematic')`` call, used when
+    a retained amino-acid acid name has no amido form)."""
+    if mol is None:
+        return ''
+
+    # Bail on inorganic/metallic species (out of scope), same guard as the
+    # retained-name sibling.
+    if _has_metal(mol):
+        return ''
+
+    try:
+        rw = Chem.RWMol(mol)
+        for atom in rw.GetAtoms():
+            charge = atom.GetFormalCharge()
+            if charge != 0:
+                atom.SetFormalCharge(0)
+                if charge > 0:
+                    cur_h = atom.GetNumExplicitHs()
+                    atom.SetNumExplicitHs(max(0, cur_h - charge))
+                elif charge < 0:
+                    cur_h = atom.GetNumExplicitHs()
+                    atom.SetNumExplicitHs(cur_h + abs(charge))
+
+        try:
+            Chem.SanitizeMol(rw)
+        except Exception:
+            return ''
+
+        neutral_smiles = Chem.MolToSmiles(rw, canonical=True)
+        if not neutral_smiles:
+            return ''
+
+        from ..assembly.fragment_naming import name_fragment_recursively
+        neutral_name = name_fragment_recursively(neutral_smiles, style='systematic')
         if neutral_name:
             return neutral_name
     except (RecursionError, ValueError, RuntimeError):
@@ -4017,6 +4109,7 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     n_sulfonate = sum(1 for c in classes if c == 'sulfonate')
     n_sulfinate = sum(1 for c in classes if c == 'sulfinate')
     n_phosphonate = sum(1 for c in classes if c == 'phosphonate')
+    n_thiolate = sum(1 for c in classes if c == 'thiolate')
     # Parent = the senior anionic class present (P-72.7e: carboxylate senior to
     # olate/sulfonate/sulfinate/phosphonate). The caller only reaches this
     # function when n_carb >= 1 (carboxylate_count > 0 guard at the call site),
@@ -4028,12 +4121,20 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     else:
         return name
     # Every S/P-oxoacid anionic centre present is junior to the chosen parent
-    # (carboxylate/olate) in every reachable case today.
-    junior_sulfonate, junior_sulfinate, junior_phosphonate = (
-        n_sulfonate, n_sulfinate, n_phosphonate
+    # (carboxylate/olate) in every reachable case today. A terminal C-bonded
+    # thiolate ([S-]) is likewise junior (P-72.7e: carboxylate senior to
+    # thiolate) -- FIX 3a (v33 charged C1): mirror the sulfinato/sulfonato
+    # blocks below with a 'sulfido' swap so a junior thiolate site is cited
+    # by its ANIONIC prefix (P-72.6.2 pattern) rather than the neutral
+    # 'sulfanyl' (-SH), which silently drops the charge and denotes a
+    # different (neutral-thiol) molecule -- SELF-01 caught this live
+    # (measured: 'sulfanylacetate' for [S-]CC(=O)[O-] parses back to neutral
+    # -SH and is suppressed as a different molecule).
+    junior_sulfonate, junior_sulfinate, junior_phosphonate, junior_thiolate = (
+        n_sulfonate, n_sulfinate, n_phosphonate, n_thiolate
     )
     total_junior = (junior_carb + junior_ox + junior_sulfonate
-                    + junior_sulfinate + junior_phosphonate)
+                    + junior_sulfinate + junior_phosphonate + junior_thiolate)
     if total_junior != 1:
         return name  # single-junior scope (avoids prefix re-ordering)
 
@@ -4060,6 +4161,14 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
         # 'phosphono' is a distinct token (does not overlap 'phosphonate').
         if out.count('phosphono') == 1:
             out = out.replace('phosphono', 'phosphonato', 1)
+    if junior_thiolate == 1:
+        # 'sulfanyl' is the neutral -SH substituent prefix; swap the SINGLE
+        # occurrence to the anionic 'sulfido' (mirrors the sulfinato/
+        # sulfonato/phosphonato blocks above). Guarded to exactly one
+        # occurrence so a genuine neutral -SH elsewhere in the name is never
+        # mis-converted.
+        if out.count('sulfanyl') == 1:
+            out = out.replace('sulfanyl', 'sulfido', 1)
     return out
 
 
