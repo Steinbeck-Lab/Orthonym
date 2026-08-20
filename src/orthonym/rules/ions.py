@@ -972,10 +972,27 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
         # DECLINES this shape (charged_router.py:471/:475) and the neutralize
         # paths would emit the NEUTRAL word (a different molecule). Placed before
         # route_charged so a monoester monoanion / sulfate ester anion is named.
+        #
+        # v33 charged Slice A fix-round 2 (class closure): this is the ester-anion
+        # producer's 0-wrong gate. name_acid_ester_anion is NOT fail-closed at the
+        # producer -- a cyclitol/inositol owner whose stereo OPSIN 2.9.0 cannot
+        # CIP-verify (e.g. the phosphate/sulfate MONOanion of a hexahydroxycyclohexane)
+        # must ABSTAIN, never ship stereo-unverified via the final-gate carve-out.
+        # Require the SAME strict full-InChIKey round-trip (constitution + stereo +
+        # charge) already applied to the poly-anion siblings
+        # (dispatch_table.py::_handle_poly_anion, this file's own multi-anion branch).
         from .acid_ester_anion import name_acid_ester_anion
         ester_anion = name_acid_ester_anion(mol)
         if ester_anion:
-            return _validate_anion_name(mol, ester_anion)
+            from orthonym.validation.opsin_roundtrip import opsin_parse
+            back = opsin_parse(ester_anion)
+            if back:
+                bm = Chem.MolFromSmiles(back)
+                if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+                    validated = _validate_anion_name(mol, ester_anion)
+                    if validated:
+                        return validated
+            # strict RT could not confirm the name -> fall through (abstain / other paths)
 
         # 169.6-03 (CHOKE-01): for every OTHER single-anion class delegate to the
         # SINGLE route_charged chokepoint. It generalizes _name_oxoacid_anion

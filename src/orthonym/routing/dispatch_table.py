@@ -810,13 +810,28 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
     (route_charged already returns '' for all four; this pre-check computes the
     same string name_anion's internal fallback would have produced anyway).
     """
+    # v33 charged Slice A fix-round 2 (class closure): this is the ester-anion
+    # producer's 0-wrong gate. name_acid_ester_anion is NOT fail-closed at the
+    # producer -- a cyclitol/inositol owner whose stereo OPSIN 2.9.0 cannot
+    # CIP-verify (e.g. the phosphate/sulfate MONOanion of a hexahydroxycyclohexane)
+    # must ABSTAIN, never ship stereo-unverified via the final-gate carve-out.
+    # Require the SAME strict full-InChIKey round-trip (constitution + stereo +
+    # charge) already applied to the poly-anion siblings
+    # (dispatch_table.py::_handle_poly_anion, ions.py's single- and multi-anion
+    # branches).
     from orthonym.rules.acid_ester_anion import name_acid_ester_anion
     from orthonym.rules.ions import _validate_anion_name
     ester_anion = name_acid_ester_anion(mol)
     if ester_anion:
-        validated = _validate_anion_name(mol, ester_anion)
-        if validated:
-            return validated
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        back = opsin_parse(ester_anion)
+        if back:
+            bm = Chem.MolFromSmiles(back)
+            if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+                validated = _validate_anion_name(mol, ester_anion)
+                if validated:
+                    return validated
+        # strict RT could not confirm the name -> fall through (abstain / other paths)
 
     from orthonym.rules.charged_router import route_charged
     routed = route_charged(mol, style)

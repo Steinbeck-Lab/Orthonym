@@ -63,3 +63,33 @@ def test_ester_anion_sweep_roundtrips_or_declines(smi):
 def test_cyclitol_phosphate_abstains_stereo_unverified():
     smi = "O=P([O-])([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O"
     assert _be().name(smi) == "unknown organic compound"
+
+# --- fix round 2 (class closure): the SAME defect class on the single-anion sibling
+# sites (ions.py:975-978, dispatch_table.py::_handle_anion_small). The strict gate
+# must NEVER abstain a name that is correct + OPSIN-parseable -- verify plain ester
+# monoanions still ship and full-InChIKey round-trip (RT computed, not hardcoded).
+@pytest.mark.parametrize("smi", [
+    "CCOP(=O)(O)[O-]",   # ethyl hydrogen phosphate (P monoester monoanion)
+    "CCOS(=O)(=O)[O-]",  # sulfate ester monoanion
+])
+def test_plain_ester_monoanion_still_ships_and_roundtrips(smi):
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    name = _be().name(smi)
+    assert name and name != "unknown organic compound", \
+        f"{smi} unexpectedly abstained: {name!r}"
+    got = opsin_parse(name)
+    assert got is not None, f"{name} did not OPSIN-parse"
+    assert Chem.MolToInchiKey(Chem.MolFromSmiles(got)) == \
+           Chem.MolToInchiKey(Chem.MolFromSmiles(smi)), \
+           f"{smi} -> {name} did NOT round-trip (0-wrong violation)"
+
+# --- fix round 2: cyclitol/inositol phosphate/sulfate MONOanion -> the ester-anion
+# producer's owner-namer emits a stereo OPSIN 2.9.0 cannot CIP-parse; this must
+# ABSTAIN via the single-anion sibling sites, not ship stereo-unverified.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", [
+    "O=P(O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O",   # cyclitol phosphate monoanion
+    "O=S(=O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O",  # cyclitol sulfate monoanion
+])
+def test_cyclitol_monoanion_abstains_stereo_unverified(smi):
+    assert _be().name(smi) == "unknown organic compound"
