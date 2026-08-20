@@ -5657,6 +5657,52 @@ def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
     return None
 
 
+def located_map_completes_substituent_stereo(mol, sub_atoms, name, pos) -> bool:
+    """Would citing descriptors for exactly the centres ``pos`` covers make
+    ``name`` express EVERY defined stereo element of ``sub_atoms``?
+
+    The admission test for a producer-supplied ``located`` map (see
+    ``_add_substituent_stereo``'s ``located`` argument). A producer that owns a
+    CHAIN numbering can only cite its own chain's centres; a ring-yl or
+    heteroatom-branch centre it cannot reach must ALREADY be spelled inside
+    ``name``. When that is not the case, citing the reachable subset would ship a
+    PARTIALLY stereo-specified prefix -- a name that claims one configuration and
+    leaves the rest silent. Under D-09 ("missing beats wrong") and the same
+    all-or-nothing principle as ``general_engine_stereo_complete``, that must
+    fail CLOSED: the pre-existing descriptor-less name is emitted instead, and no
+    partial configuration is ever asserted.
+
+    PRECONDITION (caller's responsibility -- the count identity cannot see a
+    violation): the centres reachable through ``pos`` must be DISJOINT from the
+    centres already expressed inside ``name``. Every current caller
+    (``_compound_ring_on_chain_substituent`` via Tier 1.95) satisfies this by
+    construction -- ``pos`` holds only carrier-CHAIN carbons while ``name``
+    expresses only the nested RING-yl centres, two disjoint sets. A future caller
+    passing an OVERLAPPING map would get a false ADMIT (one centre double-cited,
+    another left silent), so it must re-establish the disjointness first.
+
+    Counts DEFINED elements only: ``_CIPCode`` on an atom, or on a bond with both
+    ends inside the fragment. NOTE this atoms-AND-bonds population is WIDER than
+    the atoms-only ``stereo_atoms`` that ``_add_substituent_stereo`` cites over; a
+    defined stereo BOND therefore pushes the sum away from equality and DECLINES
+    (safe direction -- carriers are all-single by the producer's own guard, so no
+    such bond reaches here today). Carbohydrate ``alpha-D-`` notation is NOT
+    counted as expressed by ``count_expressed_stereo_descriptors``, so a
+    glycosyl-bearing fragment under-counts and therefore declines -- safe again.
+    """
+    from ..rules.stereochemistry import count_expressed_stereo_descriptors
+    sub_set = set(sub_atoms)
+    defined = sum(1 for i in sub_set
+                  if mol.GetAtomWithIdx(i).HasProp('_CIPCode'))
+    for b in mol.GetBonds():
+        if (b.GetBeginAtomIdx() in sub_set and b.GetEndAtomIdx() in sub_set
+                and b.HasProp('_CIPCode')):
+            defined += 1
+    reachable = sum(1 for i in sub_set
+                    if i in pos and mol.GetAtomWithIdx(i).HasProp('_CIPCode'))
+    return count_expressed_stereo_descriptors(name) + reachable == defined
+
+
 def _acyclic_alkyl_located_stereo_name(mol, sub_atoms, attach_idx):
     """Stereo-path adapter for the located acyclic-alkyl deriver.
 

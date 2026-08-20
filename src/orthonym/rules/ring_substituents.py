@@ -2067,6 +2067,7 @@ def name_ring_system_substituent(
     attach_idx: int,
     allow_enumerator_fallback: bool = True,
     allow_mancude: bool = False,
+    pos_out: Optional[Dict[int, int]] = None,
 ) -> Optional[str]:
     """Name a RING-CONTAINING substituent fragment (WS-A task 9 chokepoint).
 
@@ -2083,6 +2084,13 @@ def name_ring_system_substituent(
     Returns None when no trustworthy name can be produced — callers must
     treat None as "do not emit", never fabricate a carbon-count alkyl name
     for a ring fragment (the historical phenyl->'hexyl' corruption).
+
+    ``pos_out``: optional caller-owned dict, filled with the CARRIER chain
+    numbering when (and only when) the ring-on-chain producer emitted a name
+    that cites carrier locants — see ``_compound_ring_on_chain_substituent``
+    for why the stereo emitter needs it. Every other producer here numbers a
+    RING, not a chain, and leaves the map empty; an empty map is exactly the
+    pre-existing behaviour, so no caller is affected by passing one.
     """
     ring_info = mol.GetRingInfo()
     frag_atoms = list(frag_atoms)
@@ -2179,6 +2187,7 @@ def name_ring_system_substituent(
         name = _compound_ring_on_chain_substituent(
             mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info,
             allow_mancude=allow_mancude,
+            pos_out=pos_out,
         )
     if not name and allow_enumerator_fallback:
         # Recursion guard: the public ``name_substituent`` cascade routes
@@ -2266,10 +2275,29 @@ def _fold_nonring_decorations(mol, frag_set, frag_ring_atoms, attach_idx):
 def _compound_ring_on_chain_substituent(
     mol, frag_atoms, frag_set, frag_ring_atoms, attach_idx, ring_info,
     allow_mancude: bool = False,
+    pos_out: Optional[Dict[int, int]] = None,
 ) -> Optional[str]:
     """Build '(ring-yl)alkyl' for an unbranched carrier rooted at the
     attachment with exactly ONE ring system hanging off it. Returns None
     (caller falls back) whenever any guard fails — never guesses.
+
+    ``pos_out``: an optional caller-owned dict this producer FILLS with the
+    carrier chain numbering it actually used to place the ring-yl locant
+    (``{atom index: locant}``, free valence = 1 per P-29.2). It is the same
+    ``pos`` contract ``_located_acyclic_alkyl_name(..., with_pos=True)``
+    returns, and it exists for one reason: a carrier atom can itself be a
+    stereocentre (e.g. ``-CH(CH3)-`` bridging a ring to the parent), and
+    ``_add_substituent_stereo`` can only cite a descriptor at a locant it can
+    prove came from the numbering THE NAME USED — re-deriving one is the
+    rejected BFS-from-attachment heuristic (see that function's WR-06 note).
+    Without this channel the acyclic-only deriver declines on a ring-bearing
+    fragment and every own-carrier descriptor was silently DROPPED, shipping a
+    stereo-incomplete (wrong-diastereomer) substituent prefix.
+    Filled ONLY on the branches whose emitted name actually cites a carrier
+    locant; left EMPTY for the mononuclear-carrier branches (benzyl,
+    '{ring-yl}methyl', the α-halogen-decorated carrier), whose descriptor is
+    unlocanted by P-91 because the position is unique. An empty/absent map
+    reproduces the previous behaviour exactly.
 
     v28 Composer1 Task 3: when ``allow_mancude`` is True (complete/
     best-effort engine tier only) the carrier may ALSO admit exactly ONE
@@ -2517,7 +2545,11 @@ def _compound_ring_on_chain_substituent(
         if not group or ' ' in group:
             return None
         if len(carbon_path) == 1:
+            # Mononuclear carrier: no locant is cited, so no map is published
+            # (a unique-position descriptor stays unlocanted per P-91).
             return f'{group}methyl'
+        if pos_out is not None:
+            pos_out.update({_a: _i for _i, _a in enumerate(carbon_path, start=1)})
         return f'{len(carbon_path)}-{group}{hetero_alkyl}'
     try:
         from ..assembly.naming_utils import get_alkyl_name
@@ -2597,6 +2629,9 @@ def _compound_ring_on_chain_substituent(
         if ring_name == 'phenyl':
             return 'benzyl'
         return f'{inner}methyl'
+    if pos_out is not None:
+        # The SAME `enumerate(path, start=1)` numbering `loc` above came from.
+        pos_out.update({_a: _i for _i, _a in enumerate(path, start=1)})
     return f'{loc}-{inner}{alkyl}'
 
 

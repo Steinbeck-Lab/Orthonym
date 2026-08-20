@@ -326,7 +326,25 @@ def test_decorated_ring_on_a_retained_urea_parent(namer, smiles, expected):
     # (the first attempt at Gap B) truncated the fragment hanging off the ring
     # and turned this correct name into
     # `1-[(1S)-ethyl]((S)-1-cyclohexylethyl)cyanamide`.
-    ("C[C@@H](C1CCCCC1)NC#N", "((S)-1-cyclohexylethyl)cyanamide"),
+    #
+    # v33 Engine 4 change-asserted-value: `(S)-` -> `(1S)-`. The carrier chain
+    # numbering the prefix cites was not reaching the stereo emitter, so the
+    # descriptor shipped unlocanted. Rule (VERIFIED, `BlueBookV2.md:44643`,
+    # heading `## **P-91.3** NAMING OF STEREOISOMERS`): a substituent-group
+    # stereodescriptor is "preceded by a numerical or letter locant to describe
+    # the position of the stereogenic unit *when such locants are present*" --
+    # worked `(PIN)` example `[(1R)-1-chloropropyl]benzene`; the unlocanted form
+    # is for a name with NO locant (`(R)-bromo(chloro)fluoromethane` (PIN)).
+    # `1-cyclohexylethyl` carries locant 1, so `(1S)` is the PIN spelling.
+    # OPSIN 2.9.0 parses BOTH spellings to the input's full InChIKey, so this is
+    # a pure conformance change (0-wrong-neutral).
+    # NOTE the outer `(` is a PRE-EXISTING enclosing-mark defect, unrelated and
+    # unchanged: P-16.5.4.1.3 (`BlueBookV2.md:7478`) counts stereo parentheses
+    # toward nesting, so P-16.5.4.1.4 requires `[...]` here. `_STEREO_PAREN_RE`
+    # STRIPS them (and matches only the unlocanted `(S)`/`(R)`), which is why the
+    # `(S)-` spelling never tripped the grammar check and `(1S)-` now does. The
+    # name is still emitted per D-11/D-15 and round-trips exactly.
+    ("C[C@@H](C1CCCCC1)NC#N", "((1S)-1-cyclohexylethyl)cyanamide"),
     # A ring bonded DIRECTLY to the cyanamide N: enrichment corrupted both of
     # these into abstentions, so they also pin that the handler skips it.
     # (Both round-trip through OPSIN 2.9.0 to the input constitution.)
@@ -416,8 +434,15 @@ def test_retained_urea_parent_rejects_a_numeric_front_of_name_stereo_block():
 
 @pytest.mark.parametrize("smiles,expected", [
     # stereo lives in the N-substituent and is cited THERE -- unchanged
+    # v33 Engine 4 change-asserted-value: `(S)-` -> `(1S)-`, same P-91.3
+    # citation as the cyanamide row above (`BlueBookV2.md:44643`; `(PIN)`
+    # example `[(1R)-1-chloropropyl]benzene`). The property this row exists to
+    # pin -- the descriptor stays INSIDE the N-substituent bracket and no locant
+    # is hung on the retained parent -- is unchanged, and the `not
+    # got.startswith("(")` assertion below still holds. Both spellings
+    # round-trip through OPSIN 2.9.0 to the input's full InChIKey.
     ("C[C@@H](C1CCCCC1)NC(=S)NCC=C",
-     "N-[(S)-1-cyclohexylethyl]-N'-(prop-2-en-1-yl)thiourea"),
+     "N-[(1S)-1-cyclohexylethyl]-N'-(prop-2-en-1-yl)thiourea"),
     # a substituent whose stereo the prefix namer cannot carry: the constitution
     # is still right and no locant that denotes nothing is cited
     ("C[C@@H]([C@H]1C[C@@H]2CC[C@H]1C2)NC(=S)NCC=C",

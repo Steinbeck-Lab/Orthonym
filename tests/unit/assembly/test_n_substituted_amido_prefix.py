@@ -107,9 +107,19 @@ def test_helper_2chlorophenyl_R_bracketed():
 def test_helper_stereo_R_bracket_escalated():
     # BLOCKER (b): a stereocentre R' -> the descriptor must be embedded and the mark
     # escalated to [] (P-16.5.4), never spliced raw after `N-`.
+    # v33 Engine 4 change-asserted-value: `(S)-` -> `(1S)-`. The carrier chain
+    # numbering `1-phenylethyl` cites was not reaching the substituent stereo
+    # emitter, so the descriptor shipped unlocanted. VERIFIED rule,
+    # `BlueBookV2.md:44643`, heading `## **P-91.3** NAMING OF STEREOISOMERS`:
+    # a substituent-group stereodescriptor is "preceded by a numerical or letter
+    # locant to describe the position of the stereogenic unit *when such locants
+    # are present*" -- worked `(PIN)` example `[(1R)-1-chloropropyl]benzene`.
+    # The property under test (embedded descriptor + `[]` escalation) is
+    # unchanged; only the descriptor gained its locant. Both spellings round-trip
+    # through OPSIN 2.9.0 to the input's full InChIKey.
     m = _frag("OC(=O)CCN([C@@H](C)c1ccccc1)C(C)=O")
     assert n_substituted_acyl_amido_prefix(m, 5, set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4},
-                                           {0, 1, 2, 3, 4}) == "N-[(S)-1-phenylethyl]acetamido"
+                                           {0, 1, 2, 3, 4}) == "N-[(1S)-1-phenylethyl]acetamido"
 
 
 def test_helper_thioacyl_R_fails_closed():

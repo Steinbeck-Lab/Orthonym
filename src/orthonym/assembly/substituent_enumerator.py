@@ -1814,18 +1814,27 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                 return True
         return False
 
-    def _stereo_route(prefix: str) -> str:
+    def _stereo_route(prefix: str, located=None) -> str:
         # Route a stereo-dropping tier's return through the substituent stereo
         # emitter, unless the prefix already carries a leading "(...)" descriptor
         # (double-apply guard) or the fragment has no CIP stereo. `attach_idx` is
         # threaded so the emitter can derive the located descriptor (PIN name +
         # attachment locant) for an acyclic-alkyl substituent from STRUCTURE.
+        #
+        # `located` is the OPTIONAL `(pin_form, k, pos)` triple documented on
+        # `_add_substituent_stereo`: a tier that ALREADY knows the numbering its
+        # own name used passes it here instead of letting the emitter re-derive
+        # one. Only Tier 1.95 does so today (its ring-on-chain producer owns a
+        # CARRIER chain numbering the acyclic-only deriver cannot reach, so
+        # without it every carrier-borne descriptor was dropped). `pin_form` is
+        # the tier's own `prefix`, so the emitted text stays byte-identical.
         if not prefix or _STEREO_BLOCK_RE.match(prefix):
             return prefix
         if not _frag_has_cip_stereo():
             return prefix
         return _add_substituent_stereo(
-            mol, list(frag_atoms_set), prefix, attach_idx=attach_idx
+            mol, list(frag_atoms_set), prefix, attach_idx=attach_idx,
+            located=located,
         )
 
     # ---- Tier 0.5 (Phase 160.1 D-04): IUPAC P-65 / P-66 prefix-form check ----
@@ -2109,13 +2118,45 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             _ri = mol.GetRingInfo()
             if any(_ri.NumAtomRings(a) > 0 for a in frag_atoms_set):
                 from ..rules.ring_substituents import name_ring_system_substituent
+                # `_carrier_pos` is filled by the ring-on-chain producer with the
+                # CARRIER chain numbering its own name cites (free valence = 1,
+                # P-29.2). A carrier atom can itself be a stereocentre -- e.g. the
+                # `-CH(CH3)-` bridging a lactone ring to a pentacyclic parent in
+                # CHEBI:2364 -- and the acyclic-only deriver inside
+                # `_add_substituent_stereo` DECLINES on any ring-bearing fragment,
+                # so that descriptor used to be silently dropped (a stereo-
+                # incomplete, i.e. WRONG-diastereomer, prefix). Handing the
+                # producer's own map over as `located` cites it at the locant the
+                # name really used, never a re-derived one. Empty map (every other
+                # producer, and the mononuclear-carrier branches whose descriptor
+                # is unlocanted) => byte-identical to before.
+                _carrier_pos: dict = {}
                 _ring_nm = name_ring_system_substituent(
                     mol, sorted(frag_atoms_set), attach_idx,
                     allow_enumerator_fallback=False,
                     allow_mancude=allow_mancude,
+                    pos_out=_carrier_pos,
                 )
                 if _ring_nm:
-                    return _stereo_route(_ring_nm)
+                    # Fail closed on a PARTIAL expression: the carrier map can
+                    # only reach the carrier's own centres, so hand it over only
+                    # when doing so spells EVERY defined stereo element of the
+                    # fragment (the rest already inside the nested ring-yl
+                    # prefix). Otherwise the pre-existing descriptor-less name
+                    # stands -- e.g. '1-(bicyclo[2.2.1]heptan-2-yl)ethyl', whose
+                    # 3 ring centres no producer here can cite: claiming only
+                    # the carrier's would assert one configuration and leave
+                    # three silent (D-09, missing beats wrong).
+                    from .substituent_naming import (
+                        located_map_completes_substituent_stereo)
+                    _use_pos = bool(_carrier_pos) and \
+                        located_map_completes_substituent_stereo(
+                            mol, frag_atoms_set, _ring_nm, _carrier_pos)
+                    return _stereo_route(
+                        _ring_nm,
+                        located=((_ring_nm, 1, _carrier_pos)
+                                 if _use_pos else None),
+                    )
         except Exception:
             pass
 
