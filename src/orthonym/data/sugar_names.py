@@ -1734,6 +1734,199 @@ def _n_sulfamate_prefix(mol, n_idx: int) -> Optional[int]:
     return central_idx
 
 
+def _o_plain_acyl_prefix(mol, o_idx: int) -> Optional[int]:
+    """Classify an exocyclic oxygen as a PLAIN carboxylic-ester linker
+    (BB P-102.5.6.2, e.g. an O-acetyl/O-benzoyl on a sugar ring position or
+    its C6 tail) -- distinct from :func:`_o_acid_ester_prefix`'s S/P-centred
+    sulfate/phosphate case, which is tried first by every caller.
+
+    Returns the acyl (carbonyl) carbon's atom index, or ``None`` when
+    ``o_idx`` is not this exact shape (a plain hydroxyl, an ether, a
+    glycosidic bridge, or an S/P-centred ester -- a different caller's
+    business or out of scope).
+
+    v33 Task 1.2 (glycan decoration lever): a plain-acyl ring oxygen used to
+    be silently treated as a bare hydroxyl by every caller (neither
+    idealized nor recorded), so a decorated ring never matched the clean-
+    parent fingerprint and the whole molecule fell through to ``None`` —
+    this predicate is the structural half of making that decoration visible.
+    """
+    o_atom = mol.GetAtomWithIdx(o_idx)
+    if o_atom.GetTotalNumHs() != 0:
+        return None  # a free -OH, not an ester linker
+    nbrs = list(o_atom.GetNeighbors())
+    if len(nbrs) != 2:
+        return None
+    for n in nbrs:
+        if n.GetAtomicNum() != 6:
+            continue
+        dbl_o = [
+            b for b in n.GetBonds()
+            if b.GetBondTypeAsDouble() == 2.0
+            and b.GetOtherAtom(n).GetAtomicNum() == 8
+        ]
+        if len(dbl_o) == 1:
+            return n.GetIdx()
+    return None
+
+
+def _n_plain_acyl_prefix(mol, n_idx: int) -> Optional[int]:
+    """Classify a ring nitrogen substituted with a PLAIN acyl group
+    (``-NH-C(=O)-R``, e.g. GlcNAc's N-acetyl, or an N-acyl OTHER than
+    acetyl not covered by the free-name catalog).
+
+    Returns the acyl (carbonyl) carbon's atom index, or ``None`` for
+    anything else (bare amino, N-sulfamate, N-alkyl, charged -- a different
+    caller's business).
+    """
+    n_atom = mol.GetAtomWithIdx(n_idx)
+    if n_atom.GetFormalCharge() != 0:
+        return None
+    heavy = [x for x in n_atom.GetNeighbors() if x.GetAtomicNum() > 1]
+    if len(heavy) != 2:
+        return None
+    for x in heavy:
+        if x.GetAtomicNum() != 6:
+            continue
+        dbl_o = [
+            b for b in x.GetBonds()
+            if b.GetBondTypeAsDouble() == 2.0
+            and b.GetOtherAtom(x).GetAtomicNum() == 8
+        ]
+        if len(dbl_o) == 1:
+            return x.GetIdx()
+    return None
+
+
+def _o_acyl_word(mol, sugar_c: int, ester_o: int, acyl_c: int) -> Optional[str]:
+    """The O-acyl PREFIX word (``acetyl`` / ``benzoyl`` / ...) for a plain
+    ester at a sugar position (BB P-102.5.6.2, e.g. ``6-O-acetyl-``).
+
+    Mirrors :func:`_acyl_to_ate_word`'s fragment-isolation recipe (cleave
+    ``sugar_c—ester_o``, keep the acyl side -- the freed ester-O
+    resanitizes to a bare -OH, reconstructing the free acid R-COOH) but
+    converts the recovered acid name to its ACYL form (via
+    :func:`~orthonym.decomposition.fragment_assembly._acid_to_acyl`)
+    instead of the acylate (``-ate``) word. ``None`` if the fragment does
+    not name as a carboxylic acid (fail-closed). The input mol is never
+    mutated.
+    """
+    bond = mol.GetBondBetweenAtoms(sugar_c, ester_o)
+    if bond is None:
+        return None
+    try:
+        frag = Chem.FragmentOnBonds(
+            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
+        )
+        mapping: List = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    acid_frag = None
+    for fm, mp in zip(frags, mapping):
+        if acyl_c in mp:
+            acid_frag = fm
+            break
+    if acid_frag is None:
+        return None
+    rw = Chem.RWMol(acid_frag)
+    dummy_idxs = [a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0]
+    if len(dummy_idxs) != 1:
+        return None
+    rw.RemoveAtom(dummy_idxs[0])  # the ester-O relaxes to the acid -OH after sanitize
+    try:
+        Chem.SanitizeMol(rw)
+        acid = Chem.RemoveHs(rw)
+        acid_canon = Chem.CanonSmiles(Chem.MolToSmiles(acid))
+    except Exception:
+        return None
+    from orthonym import name_compound  # lazy: data -> namer is acyclic at runtime
+    acid_name = name_compound(acid_canon)
+    if not acid_name or "unknown" in acid_name:
+        return None
+    from orthonym.decomposition.fragment_assembly import _acid_to_acyl
+    return _acid_to_acyl(acid_name)
+
+
+def _n_acyl_amido_word(mol, ring_n: int, acyl_c: int) -> Optional[str]:
+    """The N-acyl AMIDO prefix word (``acetamido`` / ``benzamido`` / ...)
+    for a ring nitrogen bearing a plain acyl group (BB P-102.5.4 +
+    P-66.1.1.4.3 method (1); GlcNAc's own catalogued trivial name already
+    spells this exact group ``2-acetamido``, so this generalizes the SAME
+    convention to an N-acyl the catalog does not carry).
+
+    Cleaves ``ring_n—acyl_c`` and keeps the acyl side; unlike the ester
+    case, simply removing the dummy would leave the carbonyl carbon
+    valence-deficient in the WRONG place (an aldehyde, R-CHO) because the
+    amide nitrogen -- not the ester oxygen -- was the leaving group, so a
+    NEW oxygen is explicitly added on the dummy to reconstruct the free
+    acid R-COOH. ``None`` if the fragment does not name as a carboxylic
+    acid or has no safe amido transform (fail-closed). The input mol is
+    never mutated.
+    """
+    bond = mol.GetBondBetweenAtoms(ring_n, acyl_c)
+    if bond is None:
+        return None
+    try:
+        frag = Chem.FragmentOnBonds(
+            mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
+        )
+        mapping: List = []
+        frags = Chem.GetMolFrags(
+            frag, asMols=True, sanitizeFrags=False, fragsMolAtomMapping=mapping
+        )
+    except Exception:
+        return None
+    acid_frag = None
+    for fm, mp in zip(frags, mapping):
+        if acyl_c in mp:
+            acid_frag = fm
+            break
+    if acid_frag is None:
+        return None
+    rw = Chem.RWMol(acid_frag)
+    dummy_idxs = [a.GetIdx() for a in rw.GetAtoms() if a.GetAtomicNum() == 0]
+    if len(dummy_idxs) != 1:
+        return None
+    rw.GetAtomWithIdx(dummy_idxs[0]).SetAtomicNum(8)  # amide N leaves -> new -OH on C
+    try:
+        Chem.SanitizeMol(rw)
+        acid = Chem.RemoveHs(rw)
+        acid_canon = Chem.CanonSmiles(Chem.MolToSmiles(acid))
+    except Exception:
+        return None
+    from orthonym import name_compound  # lazy: data -> namer is acyclic at runtime
+    acid_name = name_compound(acid_canon)
+    if not acid_name or "unknown" in acid_name:
+        return None
+    from orthonym.assembly.substituent_naming import acid_name_to_amido_prefix
+    return acid_name_to_amido_prefix(acid_name)
+
+
+def _build_o_acyl_prefix_terms(o_acyl_mods):
+    """Group O-acyl ``(locant, acyl_word)`` pairs sharing the SAME acyl word
+    into an alphabetized detachable prefix term (``6-O-acetyl`` /
+    ``3,6-di-O-acetyl``), mirroring :func:`_build_o_acid_prefix_terms`'s
+    locant-marker convention. A MIXED-acyl ring (different acyl words at
+    different locants) is out of scope for this grouping -> ``None``
+    (fail-closed, mirrors :func:`_name_sugar_acyl_ester`'s own "mixed acyl
+    -> fail-closed" rule); an empty input -> ``[]`` (no-op)."""
+    if not o_acyl_mods:
+        return []
+    words = {w for _loc, w in o_acyl_mods}
+    if len(words) != 1:
+        return None  # mixed acyl -> out of scope, fail closed
+    word = next(iter(words))
+    mult = {1: "", 2: "di", 3: "tri", 4: "tetra"}.get(len(o_acyl_mods))
+    if mult is None:
+        return None  # >4 of one acyl -> out of scope, fail closed
+    locs = sorted(loc for loc, _w in o_acyl_mods)
+    marker = f"{mult}-O-" if mult else "O-"
+    return [(word, f"{','.join(str(x) for x in locs)}-{marker}{word}")]
+
+
 def _bfs_branch(mol, start_idx: int, exclude_idx: int):
     """Every atom reachable from ``start_idx`` without crossing ``exclude_idx``
     (the atom the branch attaches to, kept out of the returned set). Used by
@@ -1863,6 +2056,7 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
     found = {
         "deoxy": [], "amino": [], "uronic": [], "halo": [],
         "o_sulfo": [], "o_phospho": [], "n_sulfo": [],
+        "o_acyl": [], "n_acyl": [],
     }
     for ring_c in ring_carbons:
         loc = locant_of[ring_c]
@@ -1875,16 +2069,26 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 # v33 Engine-2: an O-sulfate/O-phosphate-MONOester ring
                 # substituent (BB P-102.5.6.1.2/.1.3) — everything else
                 # (a plain hydroxyl, the anomeric -OR, a glycosidic bridge —
-                # already relaxed to -OH by the unit isolator) is clean.
+                # already relaxed to -OH by the unit isolator) is clean —
+                # UNLESS it is a plain carboxylic ester (v33 Task 1.2, BB
+                # P-102.5.6.2): an O-acyl ring substituent, tried second so
+                # the S/P-centred check above keeps first claim.
                 acid = _o_acid_ester_prefix(mol, nbr.GetIdx())
-                if acid is None:
-                    continue  # hydroxyl / anomeric-O / glycosidic-O (clean)
-                word, _central = acid
-                if word in ("sulfo", "sulfonato"):
-                    found["o_sulfo"].append((loc, word))
-                else:
-                    found["o_phospho"].append((loc, word))
-                continue
+                if acid is not None:
+                    word, _central = acid
+                    if word in ("sulfo", "sulfonato"):
+                        found["o_sulfo"].append((loc, word))
+                    else:
+                        found["o_phospho"].append((loc, word))
+                    continue
+                plain_acyl_c = _o_plain_acyl_prefix(mol, nbr.GetIdx())
+                if plain_acyl_c is not None:
+                    acyl_word = _o_acyl_word(mol, ring_c, nbr.GetIdx(), plain_acyl_c)
+                    if acyl_word is None:
+                        return None  # cannot express this acyl -> out of scope
+                    found["o_acyl"].append((loc, acyl_word))
+                    continue
+                continue  # hydroxyl / anomeric-O / glycosidic-O (clean)
             if sym in ("F", "Cl", "Br", "I"):
                 # ring C-OH replaced by C-halogen: a deoxy-halo sugar (e.g.
                 # 2-deoxy-2-fluoro-D-galactopyranose, P-102.5.3 + halogeno prefix).
@@ -1919,7 +2123,18 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                 if _n_sulfamate_prefix(mol, nbr.GetIdx()) is not None:
                     found["n_sulfo"].append(loc)
                     continue
-                return None  # N-acyl / N-alkyl / charged N -> out of scope
+                # v33 Task 1.2 (BB P-102.5.4 + P-66.1.1.4.3 method (1)): an
+                # N-acyl amino sugar (GlcNAc's own N-acetyl is already
+                # spelled this exact way in the catalog, "2-acetamido"; this
+                # generalizes to any acyl the catalog does not carry).
+                plain_acyl_c = _n_plain_acyl_prefix(mol, nbr.GetIdx())
+                if plain_acyl_c is not None:
+                    amido_word = _n_acyl_amido_word(mol, nbr.GetIdx(), plain_acyl_c)
+                    if amido_word is None:
+                        return None  # cannot express this acyl -> out of scope
+                    found["n_acyl"].append((loc, amido_word))
+                    continue
+                return None  # N-alkyl / charged N -> still out of scope
             elif sym == "C":
                 # exocyclic carbon: CH2OH (clean) / CH3 (deoxy) / COOH (uronic) /
                 # CH2-O-sulfo / CH2-O-phospho (v33 Engine-2, the C6 tail).
@@ -1936,14 +2151,24 @@ def _classify_sugar_positions(mol, ring, ring_oxygen, anomeric_idx):
                     found["deoxy"].append(exo_locant)  # bare terminal CH3
                 elif len(o_neighbors) == 1 and not has_double_o:
                     acid = _o_acid_ester_prefix(mol, o_neighbors[0].GetIdx())
-                    if acid is None:
-                        pass  # clean CH2OH exocyclic carbon (C6) — no modification
-                    else:
+                    if acid is not None:
                         word, _central = acid
                         if word in ("sulfo", "sulfonato"):
                             found["o_sulfo"].append((exo_locant, word))
                         else:
                             found["o_phospho"].append((exo_locant, word))
+                    else:
+                        # v33 Task 1.2: an O-acyl ester on the C6 tail
+                        # (e.g. 6-O-acetyl-D-glucopyranose).
+                        plain_acyl_c = _o_plain_acyl_prefix(mol, o_neighbors[0].GetIdx())
+                        if plain_acyl_c is not None:
+                            acyl_word = _o_acyl_word(
+                                mol, nbr.GetIdx(), o_neighbors[0].GetIdx(), plain_acyl_c
+                            )
+                            if acyl_word is None:
+                                return None  # cannot express this acyl -> out of scope
+                            found["o_acyl"].append((exo_locant, acyl_word))
+                        # else: clean CH2OH exocyclic carbon (C6) — no modification
                 else:
                     return None  # unrecognized exocyclic carbon (fail-closed)
             else:
@@ -2043,10 +2268,25 @@ def _idealize_to_parent(mol):
         if acid is not None:
             _word, central_idx = acid
             acid_branch_atoms |= _bfs_branch(rw, central_idx, a.GetIdx())
+            continue
+        # v33 Task 1.2: a plain O-acyl ester -- the linker O keeps its own
+        # index (idealizes to a bare hydroxyl once the acyl branch is gone,
+        # exactly like the O-sulfo/O-phospho linker above); the acyl
+        # carbon + its own carbonyl O + R chain are collected for removal.
+        plain_acyl_c = _o_plain_acyl_prefix(rw, a.GetIdx())
+        if plain_acyl_c is not None:
+            acid_branch_atoms |= _bfs_branch(rw, plain_acyl_c, a.GetIdx())
     for idx in nitrogen_idxs:
         sulfamate_central = _n_sulfamate_prefix(rw, idx)
         if sulfamate_central is not None:
             acid_branch_atoms |= _bfs_branch(rw, sulfamate_central, idx)
+            continue
+        # v33 Task 1.2: a plain N-acyl (GlcNAc's N-acetyl generalized) -- the
+        # nitrogen itself is already in ``nitrogen_idxs`` (flipped N -> O
+        # below like plain amino); only its acyl branch needs removing.
+        n_acyl_c = _n_plain_acyl_prefix(rw, idx)
+        if n_acyl_c is not None:
+            acid_branch_atoms |= _bfs_branch(rw, n_acyl_c, idx)
 
     try:
         # AMINO / N-SULFO: every (bare or sulfamated) nitrogen -> O.  No index shift.
@@ -2117,7 +2357,7 @@ def _mono_name_rt_ok(mol, name: str) -> bool:
         return True
 
 
-def name_monosaccharide_systematic(mol) -> Optional[str]:
+def name_monosaccharide_systematic(mol, for_glycosidic_unit: bool = False) -> Optional[str]:
     """Systematic P-102.5 name for a non-cataloged deoxy/amino/uronic sugar ring.
 
     A sibling GENERALIZATION of :func:`recognize_sugar_skeleton` (D-01): for a
@@ -2155,6 +2395,26 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
 
     Args:
         mol: RDKit Mol of a free monosaccharide (anomeric -OH present).
+        for_glycosidic_unit: v33 Task 1.2 -- when ``True`` (only the
+            oligosaccharide unit-recognizer,
+            ``rules.oligosaccharides._recognize_unit``, passes this), (a) an
+            O-acyl / N-acyl ring decoration (``o_acyl`` / ``n_acyl`` in
+            :func:`_classify_sugar_positions`'s output) is THREADED into the
+            name as a substituent prefix instead of forcing an early
+            ``None`` -- that decoration is a genuine chain-donor/-acceptor
+            shape (e.g. a heparin-style O-acetylated or non-catalog-N-acyl
+            residue mid-chain), not a standalone free sugar, so there is no
+            "defer to the retained functional-class ester name" option to
+            fall back on; (b) the O-sulfo/O-phospho "defer to
+            ``name_sugar_ester``'s catalog-residual functional-class form"
+            check below is skipped for the same reason -- the PREFIX form
+            (``6-O-sulfo-...``) is the only one composable as a glycosyl
+            unit. Default ``False`` keeps EVERY existing caller (the free-
+            sugar path, ``name_sugar_ester``'s own residual recursion, etc.)
+            byte-identical: an O-acyl/N-acyl-decorated ring still returns
+            ``None`` exactly as it did before this parameter existed
+            (single-residue free-sugar O-acyl/N-acyl support is a separate,
+            later lever).
 
     Returns:
         The systematic P-102.5 name, or ``None`` when out of scope.
@@ -2195,13 +2455,22 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
     o_sulfo_mods = modifications.get("o_sulfo", [])        # [(locant, word)]
     o_phospho_mods = modifications.get("o_phospho", [])    # [(locant, word)]
     n_sulfo_locants = sorted(modifications.get("n_sulfo", []))
+    o_acyl_mods = modifications.get("o_acyl", [])           # [(locant, acyl_word)]
+    n_acyl_mods = modifications.get("n_acyl", [])           # [(locant, amido_word)]
+    if not for_glycosidic_unit and (o_acyl_mods or n_acyl_mods):
+        # v33 Task 1.2 scope fence: O-acyl/N-acyl support is only wired for
+        # the disaccharide/oligosaccharide unit path so far (Task 1.4 will
+        # extend it to the standalone free-sugar path) -- byte-identical to
+        # every existing caller's pre-Task-1.2 behaviour (still ``None``).
+        return None
     if not (
         deoxy_locants or amino_locants or uronic_locants or halo_locants
         or o_sulfo_mods or o_phospho_mods or n_sulfo_locants
+        or o_acyl_mods or n_acyl_mods
     ):
         # A clean ring is recognize_sugar_skeleton's / lookup_sugar's job.
         return None
-    if o_sulfo_mods or o_phospho_mods:
+    if (o_sulfo_mods or o_phospho_mods) and not for_glycosidic_unit:
         # v33 Engine-2: defer to ``name_sugar_ester`` (BB P-102.5.6.1.2/.1.3's
         # FUNCTIONAL-CLASS suffix form) whenever the ester-STRIPPED residual
         # is an EXACT-CATALOG sugar (``lookup_sugar``, a retained trivial
@@ -2220,6 +2489,12 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
         # a glycosyl-chain donor prefix at all, silently breaking Engine 2's
         # GAG-chain target. Only an EXACT-CATALOG residual is a genuinely
         # DIFFERENT, retained-name PIN worth yielding to.
+        #
+        # v33 Task 1.2: this whole defer is skipped when ``for_glycosidic_unit``
+        # is set -- the oligosaccharide unit-recognizer needs the composable
+        # PREFIX form ("6-O-sulfo-alpha-D-galactopyranose") unconditionally,
+        # never the two-word functional-class form, because it is about to
+        # embed this base inside a larger glycosidic name, not ship it alone.
         residual = _strip_o_esters_for_catalog_check(mol)
         if residual is not None and lookup_sugar(Chem.MolToSmiles(residual)) is not None:
             return None
@@ -2265,7 +2540,7 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
         # DEFERRED: KDO/ulosonic uronic+deoxy + Delta4,5-ene-uronate, v33
         # Engine-2). O-SULFO/O-PHOSPHONO DO co-occur (heparin's IdoA-2-sulfate /
         # GlcA-2-sulfate units, BB P-102.5.6.1.2/.1.3 + P-102.5.6.6.4).
-        if deoxy_locants or amino_locants or halo_locants:
+        if deoxy_locants or amino_locants or halo_locants or n_acyl_mods:
             return None
         uronic_base = _URONIC_STEM_MAP.get(base)
         if uronic_base is None:
@@ -2276,6 +2551,13 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
         acid_prefix_terms = _build_o_acid_prefix_terms(o_sulfo_mods, o_phospho_mods)
         if acid_prefix_terms is None:
             return None  # >4 of one acid ester -> out of scope, fail-closed
+        # v33 Task 1.2: O-acyl DOES co-occur with a uronic base (an
+        # O-acetylated glucuronic-acid-type residue), the same "not a deoxy
+        # position" logic as O-sulfo/O-phospho above.
+        o_acyl_prefix_terms = _build_o_acyl_prefix_terms(o_acyl_mods)
+        if o_acyl_prefix_terms is None:
+            return None  # mixed / >4 acyl -> out of scope, fail-closed
+        acid_prefix_terms = acid_prefix_terms + o_acyl_prefix_terms
         if acid_prefix_terms:
             acid_prefix_terms.sort(key=lambda t: t[0])
             candidate = f"{'-'.join(t for _, t in acid_prefix_terms)}-{candidate}"
@@ -2289,7 +2571,7 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
         prefix_terms = []  # (alpha-sort-key, rendered-term)
         all_deoxy = sorted(
             set(deoxy_locants) | set(amino_locants) | set(n_sulfo_locants)
-            | {loc for loc, _ in halo_locants}
+            | {loc for loc, _ in halo_locants} | {loc for loc, _ in n_acyl_mods}
         )
         if amino_locants:
             prefix_terms.append(
@@ -2304,6 +2586,15 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
                 ("sulfoamino",
                  f"{','.join(str(x) for x in n_sulfo_locants)}-(sulfoamino)")
             )
+        # N-ACYL (v33 Task 1.2, BB P-102.5.4 + P-66.1.1.4.3 method (1)): the
+        # N-H replaced by an acyl group is ALSO a deoxy position (same logic
+        # as plain amino/N-sulfo), cited as its own amido term per locant
+        # (e.g. ``2-acetamido``, GlcNAc's own catalogued spelling) -- each
+        # locant keeps its OWN term rather than being grouped/multiplied,
+        # since a mixed-acyl ring (two different acyl groups) is legitimate
+        # here and a single shared multiplier would misdescribe it.
+        for loc, amido_word in n_acyl_mods:
+            prefix_terms.append((amido_word, f"{loc}-{amido_word}"))
         # HALO: group by halogen, cite locants + multiplier, alpha-key = halogen
         # name (fluoro/chloro/bromo/iodo — ordered ignoring the di/tri multiplier).
         _HALO_NAME = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
@@ -2331,6 +2622,12 @@ def name_monosaccharide_systematic(mol) -> Optional[str]:
         if acid_prefix_terms is None:
             return None  # >4 of one acid ester -> out of scope, fail-closed
         prefix_terms.extend(acid_prefix_terms)
+        # O-ACYL (v33 Task 1.2, BB P-102.5.6.2): likewise NOT a deoxy
+        # position -- its own prefix term(s) only.
+        o_acyl_prefix_terms = _build_o_acyl_prefix_terms(o_acyl_mods)
+        if o_acyl_prefix_terms is None:
+            return None  # mixed / >4 acyl -> out of scope, fail-closed
+        prefix_terms.extend(o_acyl_prefix_terms)
         # Alphabetize the detachable prefixes (amino < bromo < chloro < deoxy < ...).
         prefix_terms.sort(key=lambda t: t[0])
         prefix_str = "-".join(term for _, term in prefix_terms)

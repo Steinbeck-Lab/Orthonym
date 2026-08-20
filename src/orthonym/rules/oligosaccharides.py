@@ -103,10 +103,18 @@ def _recognize_unit(mol, detach_carbon: int, bridging_o_idx: int) -> Optional[Tu
     tup = recognize_sugar_skeleton(sugar_mol)
     if tup is not None:
         return tup
-    # Decorated (deoxy/amino/uronic) unit via the Plan-01 systematic engine: it
-    # returns a full name string; carry it as a base-only tuple (no separate
-    # anomer/config -- the systematic name already embeds them).
-    systematic = name_monosaccharide_systematic(sugar_mol)
+    # Decorated (deoxy/amino/uronic/o_sulfo/o_phospho/o_acyl/n_acyl) unit via
+    # the systematic engine: it returns a full name string; carry it as a
+    # base-only tuple (no separate anomer/config -- the systematic name
+    # already embeds them). ``for_glycosidic_unit=True`` (v33 Task 1.2) is
+    # what makes a decorated ring (sulfo/O-acyl/N-acyl) recognizable AT ALL
+    # here -- it both threads the O-acyl/N-acyl decoration into the name
+    # (default-off elsewhere, Task 1.4's job) and skips the "defer to the
+    # standalone functional-class ester name" check that would otherwise
+    # fire for a catalog-residual sulfate/phosphate, since this unit is
+    # about to be embedded inside a larger glycosidic name, not shipped
+    # alone.
+    systematic = name_monosaccharide_systematic(sugar_mol, for_glycosidic_unit=True)
     if systematic:
         return ("", "", systematic)
     return None
@@ -559,6 +567,18 @@ def _name_disaccharide_binary(mol) -> Optional[str]:
         )
         if anomeric_defined and par_anomer and par_config:
             parent_str = f"{par_anomer}-{par_config}-{par_base}"
+        elif anomeric_defined:
+            # v33 Task 1.2 fix: a SYSTEMATIC base (from
+            # ``name_monosaccharide_systematic``, e.g. a sulfo/O-acyl/N-acyl-
+            # decorated reducing end) already folds its anomer+config INTO
+            # ``par_base`` when the fingerprint-recovered anomer is known --
+            # ``par_anomer``/``par_config`` being empty here means "embedded",
+            # NOT "unspecified".  The OLD code treated any empty par_anomer/
+            # par_config as "unspecified" and relaxed a centre the name
+            # actually asserts, which then RT-fails (OPSIN parses the
+            # asserted anomer, but the relaxed comparison target has that
+            # centre stripped) -- never relax a structurally DEFINED centre.
+            parent_str = f"{par_config}-{par_base}" if par_config else par_base
         else:
             parent_str = f"{par_config}-{par_base}" if par_config else par_base
             relax.add(parent_anomeric)
@@ -949,7 +969,10 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
             return None
         tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
         if tup is None:
-            systematic = name_monosaccharide_systematic(sm)
+            # v33 Task 1.2: for_glycosidic_unit=True threads O-acyl/N-acyl/
+            # O-sulfo/O-phospho ring decoration into this chain unit's name
+            # (see the identical comment on _recognize_unit's call).
+            systematic = name_monosaccharide_systematic(sm, for_glycosidic_unit=True)
             tup = ("", "", systematic) if systematic else None
         if tup is None:
             return None
@@ -1117,7 +1140,10 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
             return None
         tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
         if tup is None:
-            systematic = name_monosaccharide_systematic(sm)
+            # v33 Task 1.2: for_glycosidic_unit=True threads O-acyl/N-acyl/
+            # O-sulfo/O-phospho ring decoration into this chain unit's name
+            # (see the identical comment on _recognize_unit's call).
+            systematic = name_monosaccharide_systematic(sm, for_glycosidic_unit=True)
             tup = ("", "", systematic) if systematic else None
         if tup is None:
             return None
@@ -1371,7 +1397,10 @@ def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
             return None
         tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
         if tup is None:
-            systematic = name_monosaccharide_systematic(sm)
+            # v33 Task 1.2: for_glycosidic_unit=True threads O-acyl/N-acyl/
+            # O-sulfo/O-phospho ring decoration into this chain unit's name
+            # (see the identical comment on _recognize_unit's call).
+            systematic = name_monosaccharide_systematic(sm, for_glycosidic_unit=True)
             tup = ("", "", systematic) if systematic else None
         if tup is None:
             return None

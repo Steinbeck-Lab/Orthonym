@@ -398,3 +398,163 @@ class TestV33Engine2CappedTerminusChain:
         assert name is not None and "unknown" not in name
         result = opsin_roundtrip_check(smi, name)
         assert result["passed"] is True, (name, result)
+
+
+class TestV33Task1p2DecoratedUnitClassification:
+    """v33 Task 1.2 (breadth-lever program, Phase 1): ``_classify_units`` (and
+    the shared per-unit cascade every namer in this module goes through --
+    ``_recognize_unit`` plus the 3 identical inline copies in
+    ``name_linear_oligosaccharide`` / ``name_branched_oligosaccharide`` /
+    ``name_nonreducing_oligosaccharide``) used to fail to segment a DECORATED
+    ring: a sulfo/O-acyl/N-acyl substituent on a unit made ``lookup_sugar`` /
+    ``recognize_sugar_skeleton`` / the (undecorated-only) call to
+    ``name_monosaccharide_systematic`` all miss, so the whole unit -- and
+    therefore the whole chain -- returned ``None``.
+
+    Root cause (SPY, verified on the ``sulfo-27``/``sulfo-32`` backlog
+    witnesses below before this fix): ``_classify_sugar_positions``
+    (``data/sugar_names.py``) silently treated a plain-acyl ring oxygen as a
+    bare hydroxyl (never idealized, so the clean-parent fingerprint never
+    matched) and explicitly failed closed on ANY N-acyl nitrogen (documented
+    "N-acyl / N-alkyl / charged N -> out of scope"); separately, even the
+    ALREADY-classified O-sulfo/O-phospho case deferred to
+    ``name_sugar_ester``'s two-word FUNCTIONAL-CLASS form
+    ("beta-D-galactopyranose 6-(hydrogen sulfate)") whenever the ester-
+    stripped residual was an exact-catalog sugar -- a form that cannot be
+    embedded as a glycosyl unit inside a larger disaccharide/oligosaccharide
+    name at all.
+
+    Fix: ``_classify_sugar_positions``/``_idealize_to_parent`` now also
+    recognize + physically idealize a plain O-acyl ester and a plain N-acyl
+    amide (new ``o_acyl``/``n_acyl`` modification categories, alongside the
+    existing o_sulfo/o_phospho/n_sulfo/deoxy/amino/uronic/halo ones), and
+    ``name_monosaccharide_systematic`` gained an opt-in
+    ``for_glycosidic_unit=True`` parameter (passed ONLY by the 4 oligo-
+    saccharide per-unit call sites in this module) that (a) threads O-acyl/
+    N-acyl into the assembled name as a PREFIX (``6-O-acetyl-``/
+    ``2-acetamido-``-style) instead of forcing an early ``None``, and (b)
+    skips the catalog-residual "defer to name_sugar_ester" check so a
+    sulfo/phospho decoration ALSO composes as a prefix rather than the
+    standalone functional-class form. Every other existing caller (the
+    default ``for_glycosidic_unit=False``) is BYTE-IDENTICAL: an O-acyl/
+    N-acyl-decorated free-standing sugar still returns ``None`` (Task 1.4's
+    scope), proven by ``TestV33Engine2DecoratedUnitVocabulary`` above and
+    ``test_systematic_carbohydrate.py`` staying fully green.
+
+    A SECOND, independent bug surfaced by the SULFO witnesses (not itself an
+    O-acyl/N-acyl issue): ``_name_disaccharide_binary``'s glycosylglycose
+    assembly relaxed (stripped the chirality of) the reducing-end anomeric
+    centre whenever the unit tuple's own ``anomer``/``config`` fields were
+    empty -- true for EVERY ``name_monosaccharide_systematic`` result, since
+    that engine folds a KNOWN anomer/config into the base string itself
+    rather than returning them as separate fields. Relaxing a centre the
+    name explicitly asserts (e.g. "...-6-O-sulfo-beta-D-glucopyranose")
+    makes the OPSIN round-trip fail (the parsed structure has that centre
+    DEFINED; the relaxed comparison target does not) -- fixed by relaxing
+    only when the anomeric centre is genuinely UNDEFINED on the input
+    structure, never merely because the tuple fields are empty.
+
+    Provenance: ``sulfo-27``/``sulfo-32`` are REAL rows from the v33
+    breadth-lever glycan backlog (``glycan_413.json``, HA 27 / HA 32) --
+    genuine two-real-sugar-ring disaccharides, hand-verified (not the
+    heuristic ``sugar_glycan`` family tag, which independently confirmed
+    false-positives on coumarins/furanones/lactone-bearing terpenoids in
+    this same backlog). A corpus-wide search of all 413 rows for a CLEAN
+    (non-aglycone-entangled) two-real-sugar-ring O-acyl or N-acyl disaccharide
+    found none -- every O-acyl/N-acyl "sugar_glycan"-tagged multi-ring row is
+    either a single decorated sugar attached to a macrolide/steroid aglycone
+    (not a second monosaccharide ring) or a giant peptide-glycoside hybrid,
+    neither of which this module's 2-real-sugar-ring cascade targets. The
+    ``o_acyl``/``n_acyl`` recognizer tests below therefore use two small,
+    chemically ordinary CONSTRUCTED disaccharides (a 6-O-acetylated maltose
+    analog; a maltose analog whose reducing end is a non-catalog N-acyl
+    amino sugar, N-propanoyl rather than GlcNAc's own catalogued N-acetyl,
+    so the test actually exercises the new code path instead of the
+    catalog short-circuit) to isolate and prove each decoration axis --
+    every SMILES here is independently OPSIN-full-InChIKey verified via
+    ``verify_or_none``, never asserted by construction.
+    """
+
+    # Real backlog witness (HA 27): D-galactopyranosyl-(1->4)-6-O-sulfo-D-
+    # glucopyranose -- a genuine sulfated disaccharide.
+    SULFO_27_SMILES = (
+        "O=S(=O)(O)OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+        "[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O"
+    )
+    # Real backlog witness (HA 32): a methyl glycoside disaccharide with BOTH
+    # units 6-O-sulfated.
+    SULFO_32_SMILES = (
+        "CO[C@@H]1O[C@H](COS(=O)(=O)O)[C@@H](O[C@H]2O[C@H](COS(=O)(=O)O)"
+        "[C@@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@H]1O"
+    )
+    # Constructed: maltose analog with a 6-O-acetyl on the reducing-end ring.
+    O_ACYL_DISACCHARIDE_SMILES = (
+        "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](O)[C@H](O)O[C@H]2COC(C)=O)"
+        "[C@H](O)[C@@H](O)[C@@H]1O"
+    )
+    # Constructed: maltose analog whose reducing-end ring is a non-catalog
+    # N-acyl (N-propanoyl) amino sugar.
+    N_ACYL_DISACCHARIDE_SMILES = (
+        "OC[C@H]1O[C@H](O[C@H]2[C@H](O)[C@@H](NC(=O)CC)[C@H](O)O[C@H]2CO)"
+        "[C@H](O)[C@@H](O)[C@@H]1O"
+    )
+
+    def test_sulfo_27_backlog_witness_round_trips(self):
+        """Before this fix: ``classify_units_ok=False`` (per the Phase-0
+        census), ``name_disaccharide`` returned ``None``."""
+        from orthonym.rules.oligosaccharides import name_disaccharide
+        from orthonym.validation.reconstruct import verify_or_none
+
+        mol = Chem.MolFromSmiles(self.SULFO_27_SMILES)
+        assert mol is not None
+        name = name_disaccharide(mol)
+        assert name is not None, "decorated-ring unit must now be recognized"
+        assert "O-sulfo" in name
+        assert verify_or_none(name, self.SULFO_27_SMILES) == name
+
+    def test_sulfo_32_backlog_witness_round_trips(self):
+        from orthonym.rules.oligosaccharides import name_disaccharide
+        from orthonym.validation.reconstruct import verify_or_none
+
+        mol = Chem.MolFromSmiles(self.SULFO_32_SMILES)
+        assert mol is not None
+        name = name_disaccharide(mol)
+        assert name is not None
+        assert name.count("O-sulfo") == 2  # both units decorated
+        assert verify_or_none(name, self.SULFO_32_SMILES) == name
+
+    def test_o_acyl_disaccharide_round_trips(self):
+        from orthonym.rules.oligosaccharides import name_disaccharide
+        from orthonym.validation.reconstruct import verify_or_none
+
+        mol = Chem.MolFromSmiles(self.O_ACYL_DISACCHARIDE_SMILES)
+        assert mol is not None
+        name = name_disaccharide(mol)
+        assert name is not None
+        assert "O-acetyl" in name
+        assert verify_or_none(name, self.O_ACYL_DISACCHARIDE_SMILES) == name
+
+    def test_n_acyl_disaccharide_round_trips(self):
+        from orthonym.rules.oligosaccharides import name_disaccharide
+        from orthonym.validation.reconstruct import verify_or_none
+
+        mol = Chem.MolFromSmiles(self.N_ACYL_DISACCHARIDE_SMILES)
+        assert mol is not None
+        name = name_disaccharide(mol)
+        assert name is not None
+        assert "propanamido" in name
+        assert verify_or_none(name, self.N_ACYL_DISACCHARIDE_SMILES) == name
+
+    def test_for_glycosidic_unit_default_is_byte_identical(self):
+        """The new ``for_glycosidic_unit`` parameter defaults to ``False`` and
+        every EXISTING caller (the free-sugar path) must be unaffected: an
+        O-acyl/N-acyl-decorated standalone ring still abstains (Task 1.4's
+        scope, not this one)."""
+        from orthonym.data.sugar_names import name_monosaccharide_systematic
+
+        o_acyl_mono = Chem.MolFromSmiles("OC[C@H]1O[C@H](O)[C@H](O)[C@H](O)[C@H]1OC(C)=O")
+        assert name_monosaccharide_systematic(o_acyl_mono) is None
+        n_acyl_mono = Chem.MolFromSmiles(
+            "OC[C@H]1O[C@H](O)[C@H](NC(=O)CC)[C@H](O)[C@H]1O"
+        )
+        assert name_monosaccharide_systematic(n_acyl_mono) is None
