@@ -584,29 +584,34 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     if routed:
         return routed
 
-    # Check for amino acid zwitterion pattern (the neutral-form path: GABA ->
-    # 4-aminobutanoic acid, which is RT-correct at connectivity since InChI-L1
-    # ignores charge — the deferred D-03 precision path).
+    # v33 charged Slice B (P-74.2.1.2, correcting the 4782742f over-reach): the
+    # NEUTRAL-form name of a zwitterion is NOT its PIN. P-74.2.1.2 (BlueBookV2.md
+    # :1779 item (e)) makes the IONIC form the PIN — the anion is the parent and
+    # each protonated-amine cation is an ``azaniumyl`` prefix — and that form is
+    # built by ``route_charged`` GUARD 4 (called just above:
+    # ``_name_primary_amine_azaniumyl_zwitterion``). The neutral-form namers below
+    # are therefore a BEST-EFFORT-ONLY fallback (a non-PIN but full-InChIKey
+    # RT-correct systematic name, reachable only when the azaniumyl PIN could not
+    # be constructed). On the DEFAULT / PIN tier the contract is azaniumyl-or-
+    # ABSTAIN: returning the neutral name there would ship a non-PIN name on the
+    # PIN path (the 4782742f defect: S-methylcysteine zwitterion ->
+    # ``(2R)-2-amino-3-(methylsulfanyl)propanoic acid``). Tier read from
+    # ``best_effort_ctx`` (the same signal ``charged_router._reenter`` reads;
+    # published by the namer, default False -> PIN tier).
+    from ..metrics.provenance import best_effort_ctx
+    if not best_effort_ctx.get():
+        return ''  # DEFAULT / PIN tier: azaniumyl PIN (above) or abstain
+
+    # --- BEST-EFFORT tier only: non-PIN neutral-form fallback ----------------
+    # A net-zero amino-acid-shaped zwitterion neutralizes IN PLACE to the SAME
+    # full InChIKey (InChI's mobile-H tautomer perception), so the neutral name
+    # still round-trips; it still faces the caller's E1/SELF-01 gate. This
+    # degrades a table/PIN miss to an uglier systematic name rather than to
+    # silence (T4: an abstention is a defect), but only above the PIN tier.
     if _is_amino_acid_zwitterion(mol):
         aa_name = _name_amino_acid_zwitterion(mol, style)
         if aa_name:
             return aa_name
-        # v33 charged B2: `_name_amino_acid_zwitterion` returns '' (fail-
-        # closed) whenever the neutral skeleton is NOT a Table-10.4 standard
-        # amino acid (e.g. selenohomocysteine) — it declines rather than
-        # emit a retained name P-103.2.4.4 does not license. That does not
-        # mean no honest name exists: a net-zero amino-acid-shaped zwitterion
-        # neutralizes IN PLACE to the SAME (mobile-H tautomer) InChIKey
-        # (verified for selenohomocysteine and the standard AAs alike), so
-        # falling through to the general/systematic neutral namer still
-        # yields a full-InChIKey round-trip. Do NOT return '' here — that
-        # would abstain when a systematic name is available (T4: an
-        # abstention is a defect, not a safe default). The name still goes
-        # through the caller's RT/SELF-01 gate, so this is a pure widening,
-        # never a new wrong-ship path.
-
-    # General zwitterion naming (falls through here for both the non-amino-
-    # acid case above and the just-declined amino-acid case).
     return _name_general_zwitterion(mol, style)
 
 

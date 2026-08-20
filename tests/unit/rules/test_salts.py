@@ -80,21 +80,26 @@ class TestNameZwitterion:
     def test_glycine_zwitterion_systematic(self):
         """Test glycine zwitterion with systematic naming.
 
-        169.6-04: with style='systematic' the retained-name lookup is skipped and
-        route_charged GUARD 4 produces the structured P-74.1.3 anion-is-parent
-        form ``2-(azaniumyl)ethanoate`` (the anion is the parent; the protonated
-        amine is the (azaniumyl) prefix). This round-trips in OPSIN to
-        [NH3+]CC(=O)[O-] (RT-verified). The older neutral-form ``2-aminoacetic
-        acid`` and the retained ``glycine`` also remain acceptable.
+        v33 charged Slice B (P-74.2.1.2): with style='systematic' the retained-name
+        lookup is skipped and route_charged GUARD 4 ->
+        ``_name_primary_amine_azaniumyl_zwitterion`` produces the ionic anion-is-
+        parent form -- the anion (``acetate``) is the parent, the protonated amine
+        an ``azaniumyl`` prefix -> ``azaniumylacetate`` (the C2 locant is elided on
+        the 2-carbon acetate; RT-verified full-InChIKey to [NH3+]CC(=O)[O-] by the
+        builder's own gate). The older neutral-form ``aminoacetic acid`` (now
+        BEST-EFFORT-tier only) and the retained ``glycine`` remain acceptable
+        forms of a valid answer.
         """
         mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
         name = name_zwitterion(mol, style='systematic')
         low = name.lower()
         is_systematic = 'amino' in low and ('acid' in low or 'anoic' in low)
         is_retained = low == 'glycine'
-        is_p74_ionic = 'azaniumyl' in low and ('oate' in low or 'anoate' in low)
+        # P-74 ionic: an azaniumyl prefix on a carboxylate anion parent
+        # (systematic -oate/-anoate OR the retained -acetate).
+        is_p74_ionic = 'azaniumyl' in low and low.endswith('ate')
         assert is_systematic or is_retained or is_p74_ionic, \
-            f"Expected systematic / retained / P-74.1.3 ionic name, got: {name}"
+            f"Expected systematic / retained / P-74 ionic name, got: {name}"
 
     def test_glycine_zwitterion_trivial(self):
         """Test glycine zwitterion may use trivial name."""

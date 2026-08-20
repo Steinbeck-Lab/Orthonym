@@ -687,6 +687,172 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
     return composed
 
 
+# =============================================================================
+# v33 charged Slice B (P-74.2.1.2) — primary protonated-amine azaniumyl PIN.
+#
+# P-74.2.1.2 (BlueBookV2.md:1779 item (e)): a zwitterion whose ionic centres sit
+# in ONE parent is NOT named as a neutral suffix-bearing compound; its PIN is the
+# IONIC form -- the ANION is the parent (keeps its -oate/... suffix) and each
+# protonated-amine CATION becomes an ``azaniumyl`` substituent prefix (two or
+# more of the same kind -> ``bis(azaniumyl)`` / ``tris(azaniumyl)``, P-16.3.4).
+#
+# The betaine SEVER path below (P-74.1.3) cannot serve a PRIMARY amino-acid
+# zwitterion: severing the -NH3+ and capping its carbon with H DESTROYS the alpha
+# stereocentre, so it can never spell the ``(2R)``/``(2S)`` descriptor the ionic
+# PIN needs (measured: S-methylcysteine's C2 is a stereocentre only WHILE the N
+# is attached). This builder instead NEUTRALIZES the whole zwitterion in place
+# (-NH3+ -> -NH2, -COO- -> -COOH), names the neutral amino acid through the full
+# pipeline (which keeps every stereocentre + numbering + substituent order),
+# converts the acid to its carboxylate anion via the proven
+# ``name_carboxylate_anion`` transform, and re-expresses the grouped ``amino``
+# prefix as the ionic ``azaniumyl`` prefix. Replacing -NH2 by -NH3+ does not
+# change the alpha carbon's CIP priorities, so the descriptor is invariant
+# between the two forms (verified: the neutral and ionic InChIKeys share the same
+# stereo layer). Every emission is full-InChIKey RT-gated (charges + stereo), so
+# a wrong transform / wrong descriptor / dropped charge fails CLOSED (0-wrong).
+# =============================================================================
+
+# Simple multiplying prefix (di/tri/...) that the neutral namer uses to group
+# identical detachable ``amino`` prefixes, and the multiplicative prefix
+# (bis/tris/...) that the azaniumyl ionic prefix takes instead (P-16.3.4:
+# ``bis``/``tris`` are used before a substituted/parenthesised substituent group
+# name; ``2,5-bis(azaniumyl)pentanoate`` is OPSIN-RT verified).
+_SIMPLE_MULTIPLIER = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_MULTIPLICATIVE_PREFIX = {2: 'bis', 3: 'tris', 4: 'tetrakis',
+                          5: 'pentakis', 6: 'hexakis'}
+
+
+def _full_inchikey_rt_ok(mol, name: str) -> bool:
+    """0-wrong gate for the azaniumyl builder: OPSIN-parse ``name`` and require
+    its FULL standard InChIKey (constitution + charge + stereo) to equal the
+    input's. Fail CLOSED on a missing jar / parse failure / any mismatch. This is
+    the producer's OWN backstop, independent of the namer's SELF-01 gate (which is
+    constitution-only on the default path and would miss a wrong descriptor or a
+    neutralised net charge) -- mirrors ``added_carbon_parent._whole_name_stereo_ok``.
+    """
+    from ..namer import _validity_gate_name_to_smiles
+    smi = _validity_gate_name_to_smiles(name)
+    if not smi:
+        return False
+    parsed = Chem.MolFromSmiles(smi)
+    if parsed is None:
+        return False
+    try:
+        return Chem.MolToInchiKey(parsed) == Chem.MolToInchiKey(mol)
+    except Exception:
+        return False
+
+
+def _amino_prefix_to_azaniumyl(anion_name: str, n: int) -> str:
+    """Re-express the grouped neutral ``amino`` prefix of a carboxylate-anion name
+    as the ionic ``azaniumyl`` prefix (P-74.2.1.2). ``n`` = the number of primary
+    protonated amines.
+
+    Re-anchored, not blind string surgery: the builder's scope guarantees the
+    molecule carries EXACTLY ``n`` nitrogen atoms, all primary -NH3+, so the
+    neutral name contains exactly one detachable amino cluster -- ``amino``
+    (n=1) or ``{di|tri|...}amino`` (n>=2) -- and no other occurrence of the
+    substring. Swap that single locanted token for ``azaniumyl`` (n=1) or
+    ``{bis|tris|...}(azaniumyl)`` (n>=2), preserving its locant set. Returns ''
+    (fail-closed) if the expected token is absent or ambiguous; the caller then
+    abstains. The whole result is full-InChIKey RT-gated by the caller.
+    """
+    simple = _SIMPLE_MULTIPLIER.get(n)
+    if simple is None:
+        return ''
+    token = simple + 'amino'
+    if n == 1:
+        repl = 'azaniumyl'
+    else:
+        mult = _MULTIPLICATIVE_PREFIX.get(n)
+        if not mult:
+            return ''
+        repl = mult + '(azaniumyl)'
+    # The token must appear exactly once and be a STANDALONE detachable prefix,
+    # not a substring inside a larger token (e.g. a compound '...ylamino'): reject
+    # only when the char immediately before it is a LETTER. Both start-of-name
+    # (idx == 0, an UNLOCANTED amino such as glycine's ``aminoacetate``) and a
+    # preceding locant separator ('-', e.g. ``2,3-diamino...``) are valid prefix
+    # boundaries. The whole result is full-InChIKey RT-gated by the caller.
+    if anion_name.count(token) != 1:
+        return ''
+    idx = anion_name.find(token)
+    if idx > 0 and anion_name[idx - 1].isalpha():
+        return ''
+    return anion_name[:idx] + repl + anion_name[idx + len(token):]
+
+
+def _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style) -> str:
+    """P-74.2.1.2 azaniumyl PIN for a PRIMARY protonated-amine zwitterion
+    (net-zero amino-acid-shaped OR net-charged mixed-sign, e.g. a protonated
+    diamino-acid). The anion is the parent, each -NH3+ an ``azaniumyl`` prefix.
+
+    SCOPE (fail-closed '' on anything else -> caller falls through unchanged):
+      * every cation is a PRIMARY protonated ammonium -NH3+ (N, +1, 3 H, bonded
+        to exactly one heavy atom) -- quaternary betaines keep the SEVER path;
+      * EVERY nitrogen in the molecule is one of those cations (so the neutral
+        name has exactly one grouped ``amino`` prefix and no stray N token);
+      * every anion is a carboxylate (the ``name_carboxylate_anion`` transform);
+      * the cation/anion counts avoid the ``_name_polyacid_zwitterion`` region it
+        already owns: EITHER exactly 1 cation + exactly 1 anion, OR >= 2 cations.
+
+    All four RT-verified targets are carboxylate; a sulfinate/sulfonate amino
+    acid is out of scope here (declines -> abstain) and is left for a later
+    widening. Every emission is full-InChIKey RT-gated.
+    """
+    if not cations or not anions:
+        return ''
+    # Partition: the 1-cation/>=2-anion region is _name_polyacid_zwitterion's.
+    if not ((len(cations) == 1 and len(anions) == 1) or len(cations) >= 2):
+        return ''
+    # Every cation a primary protonated ammonium -NH3+.
+    for c in cations:
+        a = mol.GetAtomWithIdx(c['atom_idx'])
+        if (a.GetSymbol() != 'N' or a.GetFormalCharge() != 1
+                or a.GetTotalNumHs() != 3):
+            return ''
+        heavy = [nb for nb in a.GetNeighbors() if nb.GetSymbol() != 'H']
+        if len(heavy) != 1:
+            return ''
+    # No OTHER nitrogen -> the neutral name's only detachable N prefix is the
+    # grouped ``amino`` cluster (guards the re-expression against a stray amino).
+    n_nitrogen = sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'N')
+    if n_nitrogen != len(cations):
+        return ''
+    # Every anion a carboxylate.
+    if any(classify_anion(mol, a) != 'carboxylate' for a in anions):
+        return ''
+
+    n = len(cations)
+    from .salts import _neutralize_zwitterion
+    neutral = _neutralize_zwitterion(mol)
+    if neutral is None:
+        return ''
+    neutral_smi = Chem.MolToSmiles(neutral, canonical=True)
+    if not neutral_smi:
+        return ''
+    try:
+        neutral_name = _reenter(neutral_smi, style)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not neutral_name or _is_malformed_parent(neutral_name):
+        return ''
+
+    from .ions import name_carboxylate_anion
+    anion_name = name_carboxylate_anion(neutral_name)
+    if not anion_name:
+        return ''
+
+    composed = _amino_prefix_to_azaniumyl(anion_name, n)
+    if not composed:
+        return ''
+
+    # 0-wrong: full-InChIKey RT gate (charges + stereo). Never ship on a mismatch.
+    if not _full_inchikey_rt_ok(mol, composed):
+        return ''
+    return composed
+
+
 def _route_zwitterion(mol, sites, style: str) -> str:
     """GUARD 4: zwitterion anion-is-parent override (P-74.0).
 
@@ -751,6 +917,20 @@ def _route_zwitterion(mol, sites, style: str) -> str:
         if poly_name:
             return poly_name
 
+    # v33 charged Slice B (P-74.2.1.2): PRIMARY protonated-amine azaniumyl PIN.
+    # Handles the two shapes the sever paths above cannot: (a) a single-cation
+    # single-anion amino acid whose alpha stereocentre must survive into the
+    # ``(2R)-2-azaniumyl...oate`` descriptor (severing destroys it), and (b) a
+    # MULTI-cation / net-charged protonated diamino-acid -> ``bis(azaniumyl)``.
+    # Self-validates its scope (primary -NH3+ only, no other N, carboxylate
+    # anions, counts disjoint from the polyacid region above) and full-InChIKey
+    # RT-gates every emission, so this is a pure ADD: a quaternary betaine
+    # (0 H on N) declines instantly and falls through to the sever paths below,
+    # 0 behaviour change for the established betaine/choline majority.
+    azm = _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style)
+    if azm:
+        return azm
+
     # Scope (D-06): exactly one cationic and one anionic center (the amino-acid /
     # betaine majority). Multi-center dipolar zwitterions are deferred.
     if len(cations) != 1 or len(anions) != 1:
@@ -780,15 +960,18 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     if zwit:
         return zwit
 
-    # SCOPE (D-06): GUARD 4's (azaniumyl) prefix is for a cation on a DIFFERENT
-    # parent (P-74.1.3) — i.e. a QUATERNARY ammonium (0 H) that has NO neutral
-    # free-amine form, the betaine class. A PROTONATED amine (NH3+/NH2+/NH+, >0
-    # H) neutralizes to a free amino SUBSTITUENT on the parent, so an amino-acid
-    # zwitterion / zwitterionic peptide is named by its established neutral /
-    # retained / peptide form (P-74 neutral-form recommendation) — NOT the
-    # azaniumyl prefix. Defer those to the legacy path (which sequences amino-acid
-    # zwitterions + peptides correctly). Only the quaternary betaine class is
-    # owned here. (Betaine N+ totalH=0; glycine/dipeptide N+ totalH=3.)
+    # SCOPE (D-06): this single-cation SEVER path (below) builds GUARD 4's
+    # (azaniumyl) prefix for a QUATERNARY ammonium (0 H) betaine, whose severed
+    # cation carbon is not a stereocentre. A PROTONATED amine (NH3+/NH2+/NH+, >0
+    # H) whose azaniumyl PIN was buildable has ALREADY been named by
+    # `_name_primary_amine_azaniumyl_zwitterion` above (v33 charged Slice B,
+    # P-74.2.1.2 — the stereo-preserving neutralize-in-place builder, tried
+    # before the scope check). Reaching HERE with a protonated amine therefore
+    # means that builder DECLINED (out of scope for it: a non-carboxylate anion,
+    # a stray extra nitrogen, or a failed RT gate). The sever path cannot help
+    # such a case (it would drop the alpha stereocentre), so defer to the legacy
+    # path — which, on the DEFAULT tier, now abstains per P-74.2.1.2 (the neutral
+    # form is not the PIN; salts.name_zwitterion best-effort-gates that fallback).
     if cation_atom.GetSymbol() == 'N' and cation_atom.GetTotalNumHs() > 0:
         return ''
 

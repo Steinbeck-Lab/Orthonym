@@ -23,30 +23,25 @@ Built classes:
         positional ester locants) and 2-stereocentre AAs (threonine/isoleucine --
         allo entanglement) are OUT of scope and fall through to the pre-existing
         systematic ester name (no regression).
-  * 3.7 non-standard-AA zwitterion (P-103.2.4.4, BB 54554-54569): the
-        P-103.2.4.1 "convenient neutral form" dispensation is licensed ONLY for
-        the monoamino monocarboxylic acids retained in Table 10.4 (the 20 canonical
-        STANDARD_AMINO_ACIDS) -- BB's own P-103.2.4.4 example (S-methyl-L-cysteine
-        zwitterion) shows the PIN for a NON-standard (Table 10.5 / substituted)
-        amino-acid zwitterion is the Method-1 ionic form
-        `(2S)-2-azaniumyl-3-(methylsulfanyl)propanoate`, which Orthonym cannot yet
-        build (no charged Method-1 engine).
-        UPDATED (v33 charged B2, `salts.py` `name_zwitterion`): a non-standard AA
-        zwitterion no longer fails closed to `unknown organic compound` -- it falls
-        through to the systematic neutral name instead
-        (`(2R)-2-amino-3-(methylsulfanyl)propanoic acid` for this molecule).
-        VERIFIED (not merely reasoned) that this is 0-wrong: standard InChI's
-        mobile-H tautomer perception treats the zwitterion and the neutral acid as
-        the SAME species -- `Chem.MolToInchiKey` on the zwitterion input and on
-        `opsin_parse()` of the emitted name both give
-        `IDIDJDIHTAOVLG-VKHMYHEASA-N` (full key, stereo included) -- so the old
-        "describes a different (neutral) species" premise in this docstring's prior
-        wording does not hold for the round-trip question, only for the PIN-class
-        question (Method-1 ionic vs neutral form). Per the contributor guide invariant 1's T4
-        carve-out ("an abstention is a DEFECT, not a safe default... a table miss
-        must degrade to an uglier name, never to a refusal"), the systematic name
-        (non-PIN, but honest and RT-verified) is preferred over silence. Standard-AA
-        zwitterions (glycine/L-alanine/...) are UNCHANGED (still the retained name).
+  * 3.7 non-standard-AA zwitterion (P-103.2.4.4 / P-74.2.1.2, BB 54554-54569):
+        the P-103.2.4.1 "convenient neutral form" dispensation is licensed ONLY
+        for the monoamino monocarboxylic acids retained in Table 10.4 (the 20
+        canonical STANDARD_AMINO_ACIDS). BB's own P-103.2.4.4 example
+        (S-methyl-L-cysteine zwitterion) shows the PIN for a NON-standard amino-acid
+        zwitterion is the P-74.2.1.2 Method-1 IONIC form -- the anion is the parent,
+        the protonated amine an `azaniumyl` prefix.
+        UPDATED (v33 charged Slice B, `charged_router` GUARD 4 ->
+        `_name_primary_amine_azaniumyl_zwitterion`): Orthonym now BUILDS that
+        ionic PIN on the DEFAULT path -- `(2R)-2-azaniumyl-3-(methylsulfanyl)-
+        propanoate` -- correcting the intermediate 4782742f over-reach that shipped
+        the NON-PIN neutral `(2R)-2-amino-3-(methylsulfanyl)propanoic acid` on the
+        PIN path (P-74.2.1.2: a zwitterion's neutral form is not its PIN). The
+        alpha stereocentre survives because the builder neutralizes IN PLACE and
+        re-expresses the amino prefix (it does not sever/cap the stereocentre), and
+        every emission is full-InChIKey RT-gated (charges + stereo). The neutral
+        systematic name remains reachable on the BEST-EFFORT tier only. Standard-AA
+        zwitterions (glycine/L-alanine/...) are UNCHANGED (still the retained name,
+        fired before route_charged).
 
 Deferred (documented, accuracy-first — do NOT emit a retained form where the PIN
 is uncertain, to avoid regressing a correct systematic name):
@@ -135,25 +130,30 @@ def test_amino_acid_esters_out_of_scope_falls_through(smiles):
     assert "unknown" not in name
 
 
-# --- 3.7 non-standard-AA zwitterion: systematic fallback (P-103.2.4.4 /
-# v33 charged B2) --------------------------------------------------------
-def test_non_standard_zwitterion_falls_through_to_systematic():
+# --- 3.7 non-standard-AA zwitterion: azaniumyl ionic PIN (P-103.2.4.4 /
+# P-74.2.1.2, v33 charged Slice B) ---------------------------------------
+@pytest.mark.opsin_gate
+def test_non_standard_zwitterion_builds_azaniumyl_pin():
     # S-methylcysteine-family zwitterion: BB's OWN example (S-methyl-L-cysteine
-    # zwitterion) shows the PIN is the Method-1 ionic form, which Orthonym
-    # cannot yet build -- but v33 charged B2 makes `name_zwitterion` fall
-    # through to the systematic neutral name instead of aborting, since it is
-    # 0-wrong: OPSIN-parsing the emitted name reproduces the EXACT same full
-    # InChIKey as the zwitterion input (mobile-H tautomer perception treats
-    # them as the same species) -- verified independently of this test via
-    # `opsin_parse('(2R)-2-amino-3-(methylsulfanyl)propanoic acid')` ->
-    # InChIKey IDIDJDIHTAOVLG-VKHMYHEASA-N, matching the input SMILES's own
-    # InChIKey exactly. A non-PIN systematic name beats an abstention here
-    # (the contributor guide invariant 1's T4 carve-out).
+    # zwitterion, P-103.2.4.4) shows the PIN for a NON-standard amino-acid
+    # zwitterion is the P-74.2.1.2 Method-1 IONIC form -- anion is the parent,
+    # the protonated amine is an `azaniumyl` prefix. v33 charged Slice B now
+    # BUILDS it on the DEFAULT path (route_charged GUARD 4 ->
+    # `_name_primary_amine_azaniumyl_zwitterion`), correcting the 4782742f
+    # over-reach that shipped the NON-PIN neutral `...propanoic acid` here.
+    # The alpha stereocentre survives (neutralize-in-place, not sever), so the
+    # descriptor is spelled: the builder full-InChIKey RT-gates its own
+    # emission, so this is 0-wrong (the input's InChIKey
+    # IDIDJDIHTAOVLG-VKHMYHEASA-N -- (2R), NOT (2S) as an early note guessed --
+    # is reproduced by OPSIN-parsing the name). RAW (gate off) proves the
+    # producer's OWN RT gate, not the namer's SELF-01.
     from rdkit import Chem
     from orthonym.validation.opsin_roundtrip import opsin_parse
     smi = "CSC[C@H]([NH3+])C(=O)[O-]"
     name = RAW.name(smi)
-    assert name == "(2R)-2-amino-3-(methylsulfanyl)propanoic acid"
+    assert name == "(2R)-2-azaniumyl-3-(methylsulfanyl)propanoate"
+    # must NOT be the non-PIN neutral acid on the default path (P-74.2.1.2)
+    assert "propanoic acid" not in name
     g = opsin_parse(name)
     assert g and Chem.MolToInchiKey(Chem.MolFromSmiles(g)) == \
         Chem.MolToInchiKey(Chem.MolFromSmiles(smi))

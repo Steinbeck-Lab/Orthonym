@@ -100,6 +100,7 @@ class StoutClass(_StrEnumBase):
     CATION_RETAINED = "cation_retained"       # row 5; namer.py:872-875; P-73
     CATION_QUATERNARY = "cation_quaternary"   # Phase 184 WS-E.1 (P-73.1.2.1 quaternary aminium; priority 480, tier 1 — below ZWITTERION@300/LIPID@250, above CATION_RETAINED@500)
     ESTER_ANION_ZWITTERION = "ester_anion_zwitterion"  # v33 Phase 3 B1 (P-72.2.2.2.1.2 choline-family acid-ester-anion zwitterion; priority 301, tier 1 — right after ZWITTERION@300). A mono-ester P-oxoacid DIANION whose owner arm carries a quaternary cation (e.g. R-O-PO3^2-) has NET CHARGE != 0, so `detect_species_type` returns 'ion' (not 'zwitterion') and ZWITTERION@300's predicate never sees it, even though `charged_router`'s OWN internal zwitterion test (site presence, not net charge) already names it correctly once reached. This entry is the missing dispatch-level door for that net-charged variant; predicate-IS-handler pattern (mirrors ANION_RETAINED@400).
+    MIXED_SIGN_ZWITTERION = "mixed_sign_zwitterion"  # v33 charged Slice B (P-74.2.1.2 azaniumyl PIN; priority 302, tier 1 — right after ESTER_ANION_ZWITTERION@301). The GENERAL net-charged door for a single-fragment, metal-free MIXED-SIGN organic (>=1 cation site AND >=1 anion site) that `detect_species_type` buckets as 'ion' (net charge != 0), e.g. a protonated diamino-acid `[NH3+]CCCC([NH3+])C(=O)[O-]` (net +1) -> `2,5-bis(azaniumyl)pentanoate`. `charged_router.route_charged` routes such a fragment to `_route_zwitterion` (its zwitterion test is site-presence, not net charge), which builds the RT-gated azaniumyl PIN; predicate-IS-handler (mirrors ESTER_ANION_ZWITTERION@301). Net-zero mixed-sign is already ZWITTERION@300's; this is strictly the net-charged variant.
     ANION_SMALL = "anion_small"               # row 6; namer.py:877-914; P-72.2.1
     POLY_ANION = "poly_anion"                 # row 7; namer.py:916-956; P-72.2.1
     MULTI_COMPONENT_NEUTRAL = "multi_component_neutral"  # row 8; namer.py:967-998
@@ -305,6 +306,45 @@ def _is_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None, **k
     from orthonym.rules.charged_router import _name_ester_anion_zwitterion
     return bool(_name_ester_anion_zwitterion(
         mol, sites['cations'][0]['atom_idx'], sites['anions'][0]['atom_idx']))
+
+
+def _is_mixed_sign_zwitterion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """v33 charged Slice B (P-74.2.1.2): the GENERAL dispatch door for a NET-
+    CHARGED, single-fragment, metal-free MIXED-SIGN organic (a protonated
+    diamino-acid, etc.). ``detect_species_type`` buckets any net charge != 0 as
+    ``'ion'`` (never ``'zwitterion'``, which is net-0-gated), so ZWITTERION@300's
+    predicate never sees it even though ``charged_router``'s OWN zwitterion test
+    (site presence, not net charge) names it once reached.
+
+    Predicate-IS-handler (mirrors ESTER_ANION_ZWITTERION@301 / ANION_RETAINED@400):
+    calls the SAME ``route_charged`` the handler re-runs, so this returns True only
+    for a shape ``route_charged`` (-> the fail-closed, full-InChIKey RT-gated
+    azaniumyl builder) will also name -- nothing is stolen from ANION_SMALL /
+    POLY_ANION / GENERAL for a net-charged shape route_charged declines. Pure
+    read-only (AP-21). Requires BOTH a cation and an anion site, so a pure anion
+    (ANION_SMALL) or pure cation (CATION_*) never matches here.
+    """
+    from orthonym.perception.ions import detect_species_type, get_ion_sites
+    from orthonym.rules.ions import _has_metal
+    if detect_species_type(mol) != 'ion':
+        return False
+    if _has_metal(mol):
+        return False
+    from rdkit import Chem
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return False
+    sites = get_ion_sites(mol)
+    if not (sites['cations'] and sites['anions']):
+        return False
+    from orthonym.rules.charged_router import route_charged, _full_inchikey_rt_ok
+    name = route_charged(mol, "pin")
+    # 0-wrong for a NET-CHARGED species: route_charged's azaniumyl builder
+    # RT-gates itself, but its betaine/polyacid/ester sub-paths rely on the outer
+    # SELF-01 gate, which is constitution-only (InChIKey skeleton block) and would
+    # NOT catch a dropped net charge. Gate the whole door on a full-InChIKey RT
+    # (charges + stereo) so this net-charged variant can never ship a neutralised
+    # or otherwise wrong molecule -- decline (fall through to GENERAL) instead.
+    return bool(name) and _full_inchikey_rt_ok(mol, name)
 
 
 def _is_anion_retained(mol, smiles, canonical_smiles, features=None, *, _style: str = "pin", **kwargs) -> bool:
@@ -752,6 +792,22 @@ def _handle_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None,
     sites = get_ion_sites(mol)
     return _name_ester_anion_zwitterion(
         mol, sites['cations'][0]['atom_idx'], sites['anions'][0]['atom_idx']) or None
+
+
+def _handle_mixed_sign_zwitterion(mol, smiles, canonical_smiles, features=None, *,
+                                  style: str = "pin", **kwargs) -> Optional[str]:
+    """v33 charged Slice B thin shim: the P-74.2.1.2 azaniumyl PIN parent decision
+    is owned by ``route_charged`` -> ``_route_zwitterion`` (which full-InChIKey
+    RT-gates every emission). Re-runs the SAME call ``_is_mixed_sign_zwitterion``
+    validated (predicate-is-handler), returning None on no-match so the dispatcher
+    falls through to ANION_SMALL@600 / POLY_ANION@700 / GENERAL. Re-applies the
+    same full-InChIKey RT gate the predicate used (0-wrong for the net-charged
+    species; never ship a neutralised molecule)."""
+    from orthonym.rules.charged_router import route_charged, _full_inchikey_rt_ok
+    name = route_charged(mol, style)
+    if name and _full_inchikey_rt_ok(mol, name):
+        return name
+    return None
 
 
 def _handle_anion_retained(mol, smiles, canonical_smiles, features=None, *,
@@ -2199,6 +2255,13 @@ _register_dispatch(
     predicate=_is_ester_anion_zwitterion, handler=_handle_ester_anion_zwitterion,
     iupac_section="Blue Book P-72.2.2.2.1.2 acid-ester anion + P-74.0 zwitterion anion-is-parent override",
     description="NET-CHARGED choline-family acid-ester-anion zwitterion (e.g. a phosphate mono-ester dianion with a quaternary-cation owner arm); routes to rules.charged_router._name_ester_anion_zwitterion",
+    side_effect_inventory=(),
+)
+_register_dispatch(
+    class_id=StoutClass.MIXED_SIGN_ZWITTERION, priority=302, tier=1,
+    predicate=_is_mixed_sign_zwitterion, handler=_handle_mixed_sign_zwitterion,
+    iupac_section="Blue Book P-74.2.1.2 zwitterion ionic-form PIN (anion parent + azaniumyl cation prefix)",
+    description="NET-CHARGED single-fragment mixed-sign organic (protonated diamino-acid etc.; net charge != 0 -> 'ion', so ZWITTERION@300 misses it); routes to rules.charged_router.route_charged -> RT-gated azaniumyl builder",
     side_effect_inventory=(),
 )
 _register_dispatch(

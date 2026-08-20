@@ -110,23 +110,22 @@ def test_mixed_carboxylate_sulfonate_zwitterion_failclosed(namer):
 
 
 @pytest.mark.opsin_gate
-def test_two_cations_falls_through_to_systematic(namer):
-    # >1 cation is out of scope for the P-74.1.3 GUARD-4 ionic-prefix path
-    # (`_route_zwitterion`/`_name_polyacid_zwitterion` both require exactly
-    # one cation) AND for `_name_amino_acid_zwitterion` (not a Table-10.4
-    # standard AA) -- both decline ('') -- but v33 charged B2's fall-through
-    # in `name_zwitterion` then names the fully-neutralized skeleton
-    # systematically, and it is 0-wrong: this net-zero diamino-diacid
-    # zwitterion neutralizes to the SAME full InChIKey (mobile-H tautomer
-    # perception), verified independently via OPSIN below. A fabricated or
-    # wrong-constitution name is still refused (this is not a relaxation of
-    # that guarantee) -- only the "must abstain" expectation changes, since
-    # a correct systematic name is available.
+def test_two_cations_build_bis_azaniumyl(namer):
+    # >1 cation is out of scope for the single-cation P-74.1.3 GUARD-4 path
+    # and for `_name_polyacid_zwitterion` (both require exactly one cation),
+    # but v33 charged Slice B's `_name_primary_amine_azaniumyl_zwitterion`
+    # (tried BEFORE the single-cation scope check) handles the multi-cation
+    # shape: the anion is the parent and each primary -NH3+ is an `azaniumyl`
+    # prefix, two of the same kind -> `bis(azaniumyl)` (P-16.3.4). This is the
+    # P-74.2.1.2 ionic PIN, replacing the 4782742f neutral over-reach
+    # (`2,3-diaminopentanedioic acid`). The builder full-InChIKey RT-gates its
+    # own emission (0-wrong); verified independently via OPSIN below.
     from rdkit import Chem
     from orthonym.validation.opsin_roundtrip import opsin_parse
     smi = "[NH3+]C(CC(=O)[O-])C([NH3+])C(=O)[O-]"
     out = namer.name(smi)
-    assert out == "2,3-diaminopentanedioic acid"
+    assert out == "2,3-bis(azaniumyl)pentanedioate"
+    assert "dioic acid" not in out  # not the non-PIN neutral form (P-74.2.1.2)
     g = opsin_parse(out)
     assert g and Chem.MolToInchiKey(Chem.MolFromSmiles(g)) == \
         Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
