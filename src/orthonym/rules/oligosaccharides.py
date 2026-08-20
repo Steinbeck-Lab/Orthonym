@@ -844,18 +844,48 @@ def _glycoside_cap_name(mol, o_idx: int, cap_c_idx: int) -> Optional[str]:
     substituent word of P-102.5.6.2.2, e.g. ``methyl`` in ``methyl
     alpha-D-glucopyranoside``) as a substituent prefix.
 
-    Isolates the cap fragment (cuts the O-cap bond, the cut valence relaxes
-    to an implicit H -- naming the free R-H molecule), names it as a
-    standalone compound, then converts to prefix form via
-    :func:`~orthonym.assembly.substituent_naming.parent_to_prefix` (P-29.2).
-    Returns ``None`` for anything this simple converter cannot express (a
-    branched/substituted cap, an unrecognized fragment) -- the caller then
-    declines the whole capped-terminus relaxation (fail-closed, never a wrong
-    cap name); the OPSIN RT gate is the final arbiter regardless of what this
-    returns."""
+    First tries :func:`~orthonym.assembly.substituent_naming.
+    _located_acyclic_alkyl_name` DIRECTLY on the original ``mol`` (v33 Task
+    1.3): given the cap's own atom set + its attachment atom, that primitive
+    derives the free-valence locant FROM THE STRUCTURE (P-46.1.8) and covers a
+    functionalized acyclic cap (a halogen/hydroxyl/primary-amine branch), e.g.
+    the common synthetic ``5-aminopentyl``/``2-aminoethyl`` glycoconjugate
+    linker. That is the root-cause fix for a real defect this session's SPY
+    found: the fallback path below always guessed ``attach_locant=1``, which
+    is only correct when the free valence happens to sit at the cap's OWN
+    lowest-locant end -- wrong whenever a senior characteristic group (e.g.
+    the amine) claims locant 1 instead, silently declining a nameable cap
+    (VERIFIED: ``pentan-1-amine``/``attach_locant=1`` -> ``None``, while the
+    structural deriver correctly returns ``5-aminopentyl``).
+
+    Falls back to isolating the cap fragment (cuts the O-cap bond, the cut
+    valence relaxes to an implicit H -- naming the free R-H molecule), naming
+    it as a standalone compound, then converting to prefix form via
+    :func:`~orthonym.assembly.substituent_naming.parent_to_prefix` (P-29.2)
+    for anything the structural deriver declines (an aromatic/ring cap, a
+    C=C/C#C-unsaturated chain, etc.) -- unchanged from before, so every
+    already-passing plain-alkyl/aryl cap (methyl, the heparin methyl
+    glycoside) is byte-identical. Returns ``None`` for anything neither path
+    can express -- the caller then declines the whole capped-terminus
+    relaxation (fail-closed, never a wrong cap name); the OPSIN RT gate is the
+    final arbiter regardless of what this returns."""
     bond = mol.GetBondBetweenAtoms(o_idx, cap_c_idx)
     if bond is None:
         return None
+    sub_atoms = {cap_c_idx}
+    stack = [cap_c_idx]
+    while stack:
+        cur = stack.pop()
+        for nbr in mol.GetAtomWithIdx(cur).GetNeighbors():
+            ni = nbr.GetIdx()
+            if ni == o_idx or ni in sub_atoms:
+                continue
+            sub_atoms.add(ni)
+            stack.append(ni)
+    from orthonym.assembly.substituent_naming import _located_acyclic_alkyl_name
+    located = _located_acyclic_alkyl_name(mol, sub_atoms, cap_c_idx, allow_functional=True)
+    if located is not None:
+        return located[0]
     try:
         frag = Chem.FragmentOnBonds(
             mol, [bond.GetIdx()], addDummies=True, dummyLabels=[(0, 0)]
@@ -1089,7 +1119,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
     detected = _detect_sugar_units_links(mol)
     if detected is None:
         return None
-    units, links, _c2u = detected
+    units, links, carbon_to_unit = detected
     if len(units) < 3:
         return None
     # only DIRECTED glycosidic links (drop any reciprocal anomeric<->anomeric pair;
@@ -1100,15 +1130,34 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
     if not chain_links:
         return None
 
-    # Reducing parent = the unique unit that donates nothing and whose anomeric O
-    # is a free -OH.
+    # Reducing parent = the unique unit that donates nothing. Its anomeric O is
+    # EITHER a free -OH (a true reducing end) OR capped with a simple ALKYL/ARYL
+    # group (v33 Task 1.3: generalizes _oligo_topology's Engine-2 fix (b),
+    # e.g. an aminopentyl/aminoethyl synthetic linker on a BRANCHED glycan tree
+    # -- that relaxation previously existed only in the LINEAR namer, so any
+    # branched tree with a capped root was structurally unreachable regardless
+    # of size). A cap belonging to ANOTHER recognized sugar ring is a genuine
+    # non-reducing glycoside (deferred elsewhere); a RING cap is out of scope
+    # for this simple-alkyl/aryl relaxation (mirrors _oligo_topology exactly).
     donors = {l[0] for l in chain_links}
     non_donors = [ui for ui in range(len(units)) if ui not in donors]
-    reducing = [ui for ui in non_donors
-                if mol.GetAtomWithIdx(units[ui]["anomeric_exo_o"]).GetTotalNumHs() > 0]
-    if len(reducing) != 1:
+    if len(non_donors) != 1:
         return None
-    parent_ui = reducing[0]
+    parent_ui = non_donors[0]
+    parent_anom_o = units[parent_ui]["anomeric_exo_o"]
+    parent_cap_c: Optional[int] = None
+    if mol.GetAtomWithIdx(parent_anom_o).GetTotalNumHs() == 0:
+        o_atom = mol.GetAtomWithIdx(parent_anom_o)
+        c_nbrs = [n.GetIdx() for n in o_atom.GetNeighbors() if n.GetAtomicNum() == 6]
+        if len(c_nbrs) != 2:
+            return None
+        parent_cap_c = next(
+            (c for c in c_nbrs if c != units[parent_ui]["anomeric_idx"]), None
+        )
+        if parent_cap_c is None or carbon_to_unit.get(parent_cap_c) is not None:
+            return None  # cap is another sugar unit -> non-reducing glycoside (deferred)
+        if mol.GetAtomWithIdx(parent_cap_c).IsInRing():
+            return None  # a ring cap is out of scope for this simple-alkyl relaxation
 
     # This namer is ONLY for the BRANCHED case (a unit accepting >1 glycosyl);
     # the linear reducing chain is name_linear_oligosaccharide's job.
@@ -1126,6 +1175,16 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
     for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
         unit_bridge_bonds[donor_ui].append((anom_c, o_idx))
         unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
+    cap_name: Optional[str] = None
+    if parent_cap_c is not None:
+        # v33 Task 1.3: also cut the aglycone bond so the ISOLATED parent
+        # fragment (used for recognition) gets a free anomeric -OH rather than
+        # carrying the whole capping chain as an unrecognized substituent
+        # (mirrors name_linear_oligosaccharide's identical step).
+        unit_bridge_bonds[parent_ui].append((units[parent_ui]["anomeric_idx"], parent_anom_o))
+        cap_name = _glycoside_cap_name(mol, parent_anom_o, parent_cap_c)
+        if cap_name is None:
+            return None  # cannot express the cap -> decline this relaxation (fail-closed)
     from orthonym.data.sugar_names import (
         lookup_sugar, recognize_sugar_skeleton, name_monosaccharide_systematic,
     )
@@ -1197,37 +1256,81 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
         # hyphen-joined: "glycosyl-(1->4)-[glycosyl-(1->6)]-D-glucopyranose".
         return "-".join([main_piece] + parts + [tail])
 
-    # Parent (reducing) string.
+    # Parent string.
     pa, pc, pb = tuples[parent_ui]
     anom_defined = (mol.GetAtomWithIdx(units[parent_ui]["anomeric_idx"]).GetChiralTag()
                     != Chem.ChiralType.CHI_UNSPECIFIED)
-    if anom_defined and pa and pc:
-        _pb, _st = _split_decorated_sugar_base(pb)
-        _desc = f"{pa}-{pc}-{_st}"
-        parent_str = f"{_pb}-{_desc}" if _pb else _desc
+
+    if parent_cap_c is not None:
+        # v33 Task 1.3: a CAPPED root (P-102.5.6.2.2 glycoside) -- mirrors
+        # name_linear_oligosaccharide's identical relaxation, generalized so a
+        # BRANCHED tree can also sit behind an alkyl/aryl-capped reducing
+        # terminus (e.g. a synthetic aminopentyl/aminoethyl linker on a
+        # branched glycoconjugate). A glycoside asserts a DEFINED anomer (the
+        # bond is now fixed, never mutarotating) -- decline if the input
+        # structure leaves it unspecified, never invent alpha/beta.
+        if not anom_defined:
+            return None
+        glyco_head = _capped_parent_glycoside_str(pa, pc, pb)
+        if glyco_head is None:
+            return None
+        # Scope (v33 Task 1.3): exactly ONE direct substituent on the capped
+        # root ring -- any deeper branching in that substituent's OWN subtree
+        # is handled generically by _render's existing recursion. A root that
+        # itself carries >1 direct O-substituent (P-102.5.6.2.2's multi-O-
+        # substituted glycoside form) is a distinct, unverified shape; decline
+        # (fail-closed) rather than guess at its citation order.
+        kids = children.get(parent_ui, [])
+        if len(kids) != 1:
+            return None
+        donor_ui, _anom_c, acc_c = kids[0]
+        outer_locant = _acc_locant(parent_ui, acc_c)
+        if outer_locant is None:
+            return None
+        subtree = _render(donor_ui, {parent_ui})
+        if subtree is None:
+            return None
+        # Two structurally-honest candidate renderings (bare vs enclosed
+        # O-substituent, mirroring name_linear_oligosaccharide's own
+        # single-part/multi-part bracket rule) -- the OPSIN RT gate below is
+        # the arbiter, never a guess shipped unverified.
+        candidates = [
+            f"{cap_name} {outer_locant}-O-{subtree}-{glyco_head}",
+            f"{cap_name} {outer_locant}-O-[{subtree}]-{glyco_head}",
+        ]
     else:
-        if pc:
-            _pb2, _st2 = _split_decorated_sugar_base(pb)
-            _desc2 = f"{pc}-{_st2}"
-            parent_str = f"{_pb2}-{_desc2}" if _pb2 else _desc2
+        if anom_defined and pa and pc:
+            _pb, _st = _split_decorated_sugar_base(pb)
+            _desc = f"{pa}-{pc}-{_st}"
+            parent_str = f"{_pb}-{_desc}" if _pb else _desc
         else:
-            parent_str = pb
-        relax.add(units[parent_ui]["anomeric_idx"])
+            if pc:
+                _pb2, _st2 = _split_decorated_sugar_base(pb)
+                _desc2 = f"{pc}-{_st2}"
+                parent_str = f"{_pb2}-{_desc2}" if _pb2 else _desc2
+            else:
+                parent_str = pb
+            relax.add(units[parent_ui]["anomeric_idx"])
+        candidate = _prefix_children(parent_ui, parent_str, {parent_ui})
+        if candidate is None:
+            return None
+        candidates = [candidate]
 
-    name = _prefix_children(parent_ui, parent_str, {parent_ui})
-    if name is None:
-        return None
-
-    # Completeness invariant + RT gate.
+    # Completeness invariant (D-12) -- structural, independent of which name
+    # candidate is tried below.
     all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     consumed: Set[int] = set(bridging_os)
     for u in units:
         consumed |= _unit_atoms(mol, u["ring"], bridging_os)
     if consumed != all_heavy:
         return None
-    if not _sugar_name_rt_ok(mol, name, relax_atoms=relax or None):
-        return None
-    return name
+
+    # RT gate (D-13): the first candidate that round-trips wins; 0-wrong via
+    # fail-closed (None) if none does.
+    for candidate in candidates:
+        if _sugar_name_rt_ok(mol, candidate, relax_atoms=relax or None):
+            return candidate
+    return None
 
 
 def _detect_sugar_units_links(mol):
