@@ -1,6 +1,6 @@
 from rdkit import Chem
 from orthonym.validation.reconstruct import (
-    Verdict, NameFacts, reconstruct_and_verify)
+    Verdict, NameFacts, reconstruct_and_verify, verify_or_none)
 
 def _mol(smi):
     return Chem.MolFromSmiles(smi)
@@ -93,3 +93,29 @@ def test_sanitize_failure_is_error_not_raise():
                       principal_group=("ol", (1, 1, 1, 1, 1)))
     result = reconstruct_and_verify(facts, _mol("CO"))
     assert result.verdict == Verdict.ERROR
+
+
+def test_verify_or_none_opsin_parseable_correct():
+    assert verify_or_none("ethanol", "CCO") == "ethanol"
+
+def test_verify_or_none_opsin_parseable_wrong_constitution():
+    assert verify_or_none("ethane", "CCO") is None
+
+def test_verify_or_none_rejects_charge_wrong_name():
+    # BLOCKER 1: skeleton block matches but full key differs -> must be None.
+    assert verify_or_none("propanoic acid", "CCC(=O)[O-]") is None
+
+def test_verify_or_none_rejects_wrong_enantiomer():
+    # (R)-name vs (S)-input: skeleton matches, full key differs -> None.
+    assert verify_or_none("(2R)-butan-2-ol", "C[C@H](O)CC") is None
+
+def test_verify_or_none_unparseable_reconstructor_confirms():
+    facts = NameFacts(parent_kind="chain", parent_length=3, principal_group=("ol", (1,)))
+    assert verify_or_none("nonopsin-propan-1-ol", "CCCO", name_facts=facts) \
+        == "nonopsin-propan-1-ol"
+
+def test_verify_or_none_unparseable_no_facts_is_none():
+    assert verify_or_none("some-nonopsin-name", "CCCO") is None
+
+def test_verify_or_none_wildcard_input_is_none():
+    assert verify_or_none("ethane", "CC*") is None

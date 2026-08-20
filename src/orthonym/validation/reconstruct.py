@@ -211,6 +211,39 @@ _SUBSTITUENT_TABLE = {
 }
 
 
+def verify_or_none(name, input_smiles, name_facts: Optional["NameFacts"] = None) -> Optional[str]:
+    """Dual 0-wrong oracle: return ``name`` iff it is verified, else ``None``.
+
+    (1) OPSIN-RT, STRICT: if OPSIN parses ``name`` and its parse-back has the SAME
+        FULL InChIKey as the input (all layers -- constitution AND stereo AND
+        charge/tautomer), the name is verified. Full-key, NOT the skeleton block:
+        a skeleton match confirms a neutralised or wrong-enantiomer name (measured),
+        which would be a 0-wrong hole. Strict => a name that omits stereo the input
+        asserts returns None (a safe false-negative, never a false CONFIRM).
+    (2) OPSIN cannot parse ``name`` AND ``name_facts`` supplied: run the
+        reconstructor; CONFIRMED -> verified.
+    (3) Otherwise -> None (fail closed). A wildcard input is never verifiable.
+    """
+    mol = Chem.MolFromSmiles(input_smiles)
+    if mol is None or has_unverifiable_atoms(mol):
+        return None
+    try:
+        from .atom_coverage import validate_atom_coverage
+        cov = validate_atom_coverage(mol, name)
+        if cov.method == "parse_back":
+            # OPSIN parsed the name. Verify on the FULL InChIKey (both non-empty).
+            if cov.input_inchikey and cov.parsed_inchikey \
+                    and cov.input_inchikey == cov.parsed_inchikey:
+                return name
+            return None   # parsed to a DIFFERENT (or stereo/charge-different) molecule
+    except Exception:
+        pass   # OPSIN unavailable / errored -> try the reconstructor
+    if name_facts is not None:
+        if reconstruct_and_verify(name_facts, mol).verdict == Verdict.CONFIRMED:
+            return name
+    return None
+
+
 def _graft_substituent(rw, base_idx, frag_smiles):
     """Merge a plain fragment (no dummy) onto base_idx via a single bond from
     base to the fragment's atom 0 (the attachment atom by convention)."""
