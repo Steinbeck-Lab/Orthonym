@@ -221,7 +221,10 @@ def verify_or_none(name, input_smiles, name_facts: Optional["NameFacts"] = None)
         which would be a 0-wrong hole. Strict => a name that omits stereo the input
         asserts returns None (a safe false-negative, never a false CONFIRM).
     (2) OPSIN cannot parse ``name`` AND ``name_facts`` supplied: run the
-        reconstructor; CONFIRMED -> verified.
+        reconstructor; CONFIRMED -> verified. This branch is CONSTITUTION-ONLY
+        (Wave-0 ``NameFacts`` has no stereo fields and ``_normalize`` strips
+        stereo both sides) -- it abstains whenever the input asserts defined
+        stereochemistry, since it cannot check what the name claims about it.
     (3) Otherwise -> None (fail closed). A wildcard input is never verifiable.
     """
     mol = Chem.MolFromSmiles(input_smiles)
@@ -239,6 +242,15 @@ def verify_or_none(name, input_smiles, name_facts: Optional["NameFacts"] = None)
     except Exception:
         pass   # OPSIN unavailable / errored -> try the reconstructor
     if name_facts is not None:
+        # The reconstructor is constitution-only (Wave-0 NameFacts has no stereo
+        # fields and _normalize strips stereo). If the input asserts stereo, the
+        # reconstructor cannot verify it -- abstain rather than CONFIRM a name whose
+        # stereo we did not check (0-wrong: never confirm what we cannot verify).
+        _m2 = Chem.Mol(mol)
+        Chem.RemoveStereochemistry(_m2)
+        _input_has_stereo = Chem.MolToSmiles(_m2) != Chem.MolToSmiles(mol)
+        if _input_has_stereo:
+            return None
         if reconstruct_and_verify(name_facts, mol).verdict == Verdict.CONFIRMED:
             return name
     return None

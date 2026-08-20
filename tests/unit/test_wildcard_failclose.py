@@ -28,6 +28,22 @@ def test_raise_on_limit_still_raises():
         Orthonym().name("CC*", raise_on_limit=True)
     assert exc.value.code == "WILDCARD_ATOMS"
 
+def test_hash0_notation_wildcard_abstains():
+    # [#0] is RDKit's bracket spelling of a zero-atomic-number (dummy) atom --
+    # the SAME species as bare `*`. CC[#0] canonicalizes to *CC (identical to
+    # CC*), so it must abstain identically, never ship a wrong molecule.
+    assert _name("CC[#0]") == WILDCARD_MSG
+    assert _name("CC[#0]") != "ethane"
+    assert _name("[#0]CC") == WILDCARD_MSG
+    assert _name("[#0]CC") != "ethane"
+    assert _name("C[#0]") == WILDCARD_MSG
+    assert _name("C[#0]") != "methane"
+
+def test_hash0_raise_on_limit_raises():
+    with pytest.raises(OrthonymLimitError) as exc:
+        Orthonym().name("CC[#0]", raise_on_limit=True)
+    assert exc.value.code == "WILDCARD_ATOMS"
+
 @pytest.mark.parametrize("smiles,expected_contains", [
     ("CC[CH2+]", "propylium"),                     # charged, RT-valid — unchanged
     ("[O-]C(=O)CC[N+](C)(C)C", "azaniumyl"),       # zwitterion — unchanged

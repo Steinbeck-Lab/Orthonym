@@ -2898,11 +2898,12 @@ class Orthonym:
             # on the wildcard mol and re-open the hole, so this must NOT route
             # through the OrthonymLimitError handler's recovery path below.
             # Perf: zero-false-negative pre-filter -- an RDKit dummy/wildcard
-            # atom (atomic number 0) is ALWAYS written as `*` in SMILES (bare
-            # `*`, `[*]`, `[1*]`, ...) and `*` denotes nothing else, so
-            # '*' not in smiles guarantees no wildcard and skips the extra
-            # RDKit parse on the common (non-wildcard) path.
-            if '*' in smiles:
+            # atom (atomic number 0) is spelled ONLY as `*`/`[*]` (bare `*`,
+            # `[*]`, `[1*]`, ...) or as `[#0]`/decorated (`[13#0]`, `[#0-]`,
+            # ...) -- both spellings are checked, so the filter has no false
+            # negative, and skips the extra RDKit parse on the common
+            # (non-wildcard) path.
+            if '*' in smiles or '#0' in smiles:
                 _probe = Chem.MolFromSmiles(smiles)
                 if _probe is not None:
                     _scope = classify_scope_limit(_probe)
@@ -4412,11 +4413,12 @@ class Orthonym:
             # returns a metadata dict, so mirror the limit handler's fallback dict
             # (lines ~4405–4419) rather than name()'s string return.
             # Perf: zero-false-negative pre-filter -- an RDKit dummy/wildcard
-            # atom (atomic number 0) is ALWAYS written as `*` in SMILES (bare
-            # `*`, `[*]`, `[1*]`, ...) and `*` denotes nothing else, so
-            # '*' not in smiles guarantees no wildcard and skips the extra
-            # RDKit parse on the common (non-wildcard) path.
-            if '*' in smiles:
+            # atom (atomic number 0) is spelled ONLY as `*`/`[*]` (bare `*`,
+            # `[*]`, `[1*]`, ...) or as `[#0]`/decorated (`[13#0]`, `[#0-]`,
+            # ...) -- both spellings are checked, so the filter has no false
+            # negative, and skips the extra RDKit parse on the common
+            # (non-wildcard) path.
+            if '*' in smiles or '#0' in smiles:
                 _probe = Chem.MolFromSmiles(smiles)
                 if _probe is not None:
                     _scope = classify_scope_limit(_probe)

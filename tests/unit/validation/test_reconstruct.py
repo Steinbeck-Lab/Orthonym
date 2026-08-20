@@ -119,3 +119,20 @@ def test_verify_or_none_unparseable_no_facts_is_none():
 
 def test_verify_or_none_wildcard_input_is_none():
     assert verify_or_none("ethane", "CC*") is None
+
+def test_verify_or_none_reconstructor_abstains_on_stereo_input():
+    # Wave-0 NameFacts is constitution-only (no stereo fields, and
+    # reconstruct_and_verify's _normalize strips stereo both sides), so the
+    # raw reconstructor CONFIRMS a chain-4/ol-at-2 rebuild against EITHER the
+    # achiral or the chiral butan-2-ol SMILES -- it cannot tell them apart.
+    # verify_or_none must not let that ship: an OPSIN-unparseable name paired
+    # with a stereo-bearing input must ABSTAIN (None), never CONFIRM a name
+    # whose stereo claim was never checked. The achiral witness (same facts,
+    # no defined stereocentre) must still CONFIRM -- the guard is scoped to
+    # inputs that actually assert stereo, not a blanket abstain.
+    facts = NameFacts(parent_kind="chain", parent_length=4,
+                       principal_group=("ol", (2,)))
+    assert reconstruct_and_verify(facts, _mol("C[C@H](O)CC")).verdict == Verdict.CONFIRMED
+    assert verify_or_none("nonopsin-butan-2-ol", "CC(O)CC", name_facts=facts) \
+        == "nonopsin-butan-2-ol"
+    assert verify_or_none("nonopsin-butan-2-ol", "C[C@H](O)CC", name_facts=facts) is None
