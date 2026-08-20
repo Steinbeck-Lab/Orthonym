@@ -1245,6 +1245,21 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     # W6B-T13 fail-closed veto (n-O-yl, P-102.6.2 remainder): a sugar-O-ether the
     # namers cannot handle would otherwise drop the sugar (a wrong name) via the
     # general chain namer -> refuse ('' -> unknown), never ship a sugar-dropping name.
+    #
+    # v33 Task 1.1: KEPT as '' (does NOT cascade to T4), unlike the ulosonic veto
+    # below. `name_glycosyloxy_yl_parent` (above) recognises the identical n-O-yl
+    # shape and structurally dominates this predicate for every constructed
+    # witness tried (plain alkyl/acid aglycones all resolved upstream) -- but that
+    # producer's locant pick is a HARD OPSIN round-trip (`opsin_parse` fails
+    # CLOSED without Java), so with no jar / a transient OPSIN failure it ALWAYS
+    # declines while this cheap RDKit-only predicate still fires True. Flipping to
+    # `None` in exactly that gap would let the cascade fall through to the general
+    # chain namer, which drops the whole sugar (the wrong name this veto exists to
+    # prevent) -- invariant 9 (a fail-closed removal can unmask a worse
+    # generator). No real witness that reaches this site with all upstream
+    # producers declined was found in the 413-row glycan backlog (structural
+    # signal is 0/413) or constructed by hand, so the flip's safety here is
+    # UNVERIFIED; kept fail-closed per the task's own escape clause.
     from orthonym.data.sugar_names import _is_sugar_o_ether_leak
     if _is_sugar_o_ether_leak(mol):
         return ''
@@ -1257,10 +1272,39 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
 
     # W6B-T7 fail-closed veto: an uncataloged 2-ulosonic acid must NOT fall through
     # to the general ring-carboxylic namer (which drops side-chain stereo -> a
-    # wrong, RT-failing name).  Refuse ('' terminates the cascade -> 'unknown').
+    # wrong, RT-failing name).
+    #
+    # v33 Task 1.1: '' -> None on the BEST-EFFORT tier ONLY (cascades to T4/general
+    # instead of terminating); PIN/default stays '' -- BYTE-IDENTICAL, proven by
+    # `tests/unit/rules/test_systematic_carbohydrate.py::TestW6bUlosonicAcid::
+    # test_uncataloged_ulosonic_fails_closed`, which calls the PIN-tier
+    # `name_compound` default and asserts abstention. An earlier untiered attempt
+    # at this flip (both tiers -> None) broke exactly that test: PIN-tier then
+    # cascaded to the general engine and shipped a stereo-dropped name instead of
+    # abstaining -- a real regression against the "PIN/default byte-identical"
+    # invariant, caught by the existing suite before this shipped.
+    #
+    # On best-effort, measured on the 9 real structural positives in the 413-row
+    # glycan backlog (`_is_uncataloged_ulosonic_acid` True): under '' this site
+    # was NOT actually protecting anything on THAT tier either -- 8/9 already
+    # abstained cleanly and the 9th (an O-acetylated N-acetylneuraminic-acid-like
+    # ring) shipped a WRONG best-effort name via the UNRELATED general-engine
+    # stereo-omission recovery ladder (`_try_general_engine_recovery`, namer.py
+    # ~3680-3745) regardless of '' vs None -- that ladder fires whenever the
+    # top-level result is a failure sentinel (namer.py:3070
+    # `is_failure_name(result)`), independent of which dispatch class produced
+    # the sentinel. So '' bought that witness nothing on best-effort. Flipping to
+    # None there instead lets LOWER-priority dispatch entries (natural products /
+    # peptide / retained-name / GENERAL) get a turn first: 2 of the 9 witnesses
+    # that used to abstain now emit a full-InChIKey-verified correct name (`rt`),
+    # the 6 others are unchanged (still abstain), and the 1 wrong witness is
+    # unchanged (still wrong, from the unrelated general-engine hole above -- NOT
+    # something this veto's return value controls either way). 0 new wrong
+    # introduced on best-effort. See task-1.1-report.md for the full witness table.
     from orthonym.data.sugar_names import _is_uncataloged_ulosonic_acid
     if _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
-        return ''
+        from orthonym.metrics.provenance import best_effort_ctx
+        return None if best_effort_ctx.get() else ''
     return None
 
 

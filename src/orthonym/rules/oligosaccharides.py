@@ -25,8 +25,10 @@ cascade (D-05/D-09 — never inherit an anomer across units), derives the direct
 ``(c->c')`` ASCII linkage locants by ring-walking from each unit's anomeric carbon
 (D-07), enforces the no-silent-drop completeness invariant over the ORIGINAL mol's
 heavy atoms reconciling the single shared bridging O (D-12, Pitfall 7), and gates the
-assembled name on an OPSIN round-trip fallback (D-13, fail-OPEN when Java/OPSIN
-absent) before shipping.
+assembled name on an OPSIN round-trip fallback (D-13) before shipping -- fail-OPEN
+when Java/OPSIN is absent on the PIN/default tier (unchanged), fail-CLOSED on the
+best-effort tier (v33 Task 1.1: that tier has no downstream SELF-01 backstop, so
+this gate is the only thing standing between an unverified name and T4 output).
 
 Root-cause-only (the contributor guide): no postprocessor, no regex / string surgery on any
 derived base, no per-molecule hardcode. Every gate failure returns ``None`` so the
@@ -398,12 +400,23 @@ def _classify_units(mol) -> Optional[Dict]:
 # RT-fallback gate (D-13, mirror natural_products._alpha_beta_rt_ok)
 # --------------------------------------------------------------------------- #
 def _sugar_name_rt_ok(mol, name: str, relax_atoms: Optional[Set[int]] = None) -> bool:
-    """Return True iff ``name`` OPSIN-round-trips to ``mol`` (fail-OPEN, D-13).
+    """Return True iff ``name`` OPSIN-round-trips to ``mol``.
 
-    Fail-OPEN: when OPSIN/Java is unavailable the round-trip cannot be checked, so we
-    ship the name (the SUB-03 validity-gate posture). When OPSIN IS available, a name
-    that does not round-trip is rejected so the caller falls back to ``None`` ->
-    existing pipeline (zero RT regression).
+    Tier-split (v33 Task 1.1): on the PIN/default tier this is fail-OPEN, BYTE-
+    IDENTICAL to its pre-v33 behaviour -- when OPSIN/Java is unavailable or the
+    round-trip check itself raises, we ship the name (the SUB-03 validity-gate
+    posture), because that tier's own downstream ``_final_opsin_validity_gate`` /
+    SELF-01 gate is the real backstop and already measures 0 wrong here
+    (PHASE0-GLYCAN-DECLINE-CENSUS.md: 412 abstain + 1 opsin_unparseable, 0 wrong).
+
+    On the BEST-EFFORT tier (``best_effort_ctx.get()``) that downstream gate does
+    NOT run for a T4 emission by design, so this was the ONLY check standing
+    between an unverified glycan name and best-effort output -- fail-open here is
+    fail-open for the whole molecule. So on this tier the gate flips to
+    fail-CLOSED: an unavailable jar, a round-trip EXCEPTION, or an actual mismatch
+    all abstain (``False``) rather than ship. A CLEAN mismatch (OPSIN parses the
+    name to a different InChI) already returned False in both tiers before this
+    change -- only the "cannot check" branches (missing jar / exception) flip.
 
     ``relax_atoms`` (the reducing-end anomeric carbon, when its descriptor is omitted
     per D-09) have their chirality cleared on a copy of ``mol`` before the InChI
@@ -411,12 +424,14 @@ def _sugar_name_rt_ok(mol, name: str, relax_atoms: Optional[Set[int]] = None) ->
     of the structure (the name asserts "anomer unspecified", which must compare against
     the structure with that one centre relaxed -- never invent an alpha/beta).
     """
+    from ..metrics.provenance import best_effort_ctx
+    fail_open = not best_effort_ctx.get()
     try:
         from ..validation.opsin_roundtrip import (
             opsin_roundtrip_check, _find_opsin_jar, _java_available,
         )
         if _find_opsin_jar() is None or not _java_available():
-            return True  # fail-OPEN
+            return fail_open
         target = mol
         if relax_atoms:
             rw = Chem.RWMol(mol)
@@ -427,7 +442,7 @@ def _sugar_name_rt_ok(mol, name: str, relax_atoms: Optional[Set[int]] = None) ->
         smi = Chem.MolToSmiles(target)
         return bool(opsin_roundtrip_check(smi, name).get("passed"))
     except Exception:
-        return True
+        return fail_open
 
 
 def _count_sugar_rings(mol) -> int:
