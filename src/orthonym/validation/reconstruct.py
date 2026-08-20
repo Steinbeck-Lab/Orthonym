@@ -121,8 +121,9 @@ def reconstruct_and_verify(name_facts: "NameFacts", input_mol) -> ReconResult:
 
 
 def _build_from_facts(f: "NameFacts"):
-    """Rebuild parent skeleton + principal group. Raises _Abstain on anything
-    unmodeled. Task 3 extends with replacements/unsaturations/substituents."""
+    """Rebuild parent skeleton, skeletal replacements, unsaturation, principal
+    group and table-resolved substituents. Raises _Abstain on anything
+    unmodeled."""
     if f.parent_kind == "chain":
         if f.parent_length < 1:
             raise _Abstain("nonpositive chain length")
@@ -147,10 +148,34 @@ def _build_from_facts(f: "NameFacts"):
     else:
         raise _Abstain(f"unmodeled parent_kind {f.parent_kind!r}")
 
-    if f.replacements or f.unsaturations or f.substituents:
-        raise _Abstain("replacements/unsaturations/substituents unmodeled in Task 2")
+    _ALLOWED_REPL = {"O", "N", "S", "P"}
+    for locant, sym in f.replacements:
+        if sym not in _ALLOWED_REPL:
+            raise _Abstain(f"unmodeled replacement element {sym!r}")
+        if locant not in idx_by_locant:
+            raise _Abstain("replacement locant out of range")
+        rw.GetAtomWithIdx(idx_by_locant[locant]).SetAtomicNum(
+            Chem.GetPeriodicTable().GetAtomicNumber(sym))
+
+    for locant, order in f.unsaturations:
+        if order not in (2, 3):
+            raise _Abstain("unmodeled bond order")
+        if locant not in idx_by_locant or (locant + 1) not in idx_by_locant:
+            raise _Abstain("unsaturation locant out of range")
+        b = rw.GetBondBetweenAtoms(idx_by_locant[locant], idx_by_locant[locant + 1])
+        if b is None:
+            raise _Abstain("no backbone bond at unsaturation locant")
+        b.SetBondType(Chem.BondType.DOUBLE if order == 2 else Chem.BondType.TRIPLE)
 
     _apply_principal_group(rw, idx_by_locant, f.principal_group)
+
+    for name, locant in f.substituents:
+        if locant not in idx_by_locant:
+            raise _Abstain("substituent locant out of range")
+        frag = _SUBSTITUENT_TABLE.get(name)
+        if frag is None:
+            raise _Abstain(f"unmodeled substituent name {name!r}")
+        _graft_substituent(rw, idx_by_locant[locant], frag)
 
     m = rw.GetMol()
     Chem.SanitizeMol(m)
@@ -174,3 +199,28 @@ def _apply_principal_group(rw, idx_by_locant, pg):
         # length — modeling their carbon-counting is a later wave. Abstain to stay
         # sound-over-complete (never a false CONFIRM).
         raise _Abstain(f"unmodeled principal group {key!r}")
+
+
+# Wave-0 substituent vocabulary: NAME -> fragment SMILES, attachment atom = atom 0.
+# Fixed table (never derived from the input graph) so the substituent compare is a
+# genuine independent rebuild. Later waves extend it; an unknown name ABSTAINs.
+_SUBSTITUENT_TABLE = {
+    "methyl": "C", "ethyl": "CC", "propyl": "CCC", "butyl": "CCCC",
+    "fluoro": "F", "chloro": "Cl", "bromo": "Br", "iodo": "I",
+    "hydroxy": "O", "amino": "N", "nitro": "[N+](=O)[O-]", "cyano": "C#N",
+}
+
+
+def _graft_substituent(rw, base_idx, frag_smiles):
+    """Merge a plain fragment (no dummy) onto base_idx via a single bond from
+    base to the fragment's atom 0 (the attachment atom by convention)."""
+    frag = Chem.MolFromSmiles(frag_smiles)
+    if frag is None:
+        raise _Abstain(f"substituent SMILES unparseable: {frag_smiles!r}")
+    amap = {a.GetIdx(): rw.AddAtom(Chem.Atom(a.GetAtomicNum())) for a in frag.GetAtoms()}
+    # carry the fragment's formal charges (e.g. nitro) so sanitize succeeds.
+    for a in frag.GetAtoms():
+        rw.GetAtomWithIdx(amap[a.GetIdx()]).SetFormalCharge(a.GetFormalCharge())
+    for b in frag.GetBonds():
+        rw.AddBond(amap[b.GetBeginAtomIdx()], amap[b.GetEndAtomIdx()], b.GetBondType())
+    rw.AddBond(base_idx, amap[0], Chem.BondType.SINGLE)
