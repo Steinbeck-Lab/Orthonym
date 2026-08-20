@@ -49,3 +49,17 @@ def test_ester_anion_sweep_roundtrips_or_declines(smi):
         assert Chem.MolToInchiKey(Chem.MolFromSmiles(got)) == \
                Chem.MolToInchiKey(Chem.MolFromSmiles(smi)), \
                f"{smi} -> {name} did NOT round-trip (0-wrong violation)"
+
+# --- fix round 1: cyclitol/inositol phosphate dianion -> the ester-anion producer emits a
+# name whose stereo OPSIN 2.9.0 cannot CIP-parse (constitution-only match is not enough).
+# Never-wrong beats never-silent: this must ABSTAIN, not ship a stereo-unverified name.
+# `opsin_gate` (tests/conftest.py): the suite disables the OPSIN validity gate by
+# default (most tests assert raw generator output); this test is ABOUT gate/abstain
+# behaviour, so per conftest's own documented convention it must re-enable the gate
+# to exercise the same path production (`.venv/bin/python -m orthonym`) runs — a
+# canary confirmed the assertion is gate-invariant here (it holds with the gate on;
+# without the marker pytest sees the pre-gate raw candidate instead).
+@pytest.mark.opsin_gate
+def test_cyclitol_phosphate_abstains_stereo_unverified():
+    smi = "O=P([O-])([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O"
+    assert _be().name(smi) == "unknown organic compound"

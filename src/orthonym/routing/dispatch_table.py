@@ -890,14 +890,31 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
     # route_charged below can only swap a SUFFIX and mis-lands the -2 as `bis(olate)`
     # on the owner polyol (a DIFFERENT molecule -> SELF-01 rejects -> abstain). The
     # single-anion path already orders this before route_charged (ions.py:975-978);
-    # mirror it here. name_acid_ester_anion fail-closes off the clean single-centre
-    # ester-anion shape, so a non-ester dianion (propanedioate, methylphosphonate
-    # dianion) falls through to route_charged/_name_oxoacid_anion byte-identically.
+    # mirror it here. Non-ester dianions (propanedioate, methylphosphonate dianion)
+    # are untouched: name_acid_ester_anion returns None off the ester shape, so this
+    # whole block is skipped and route_charged/_name_oxoacid_anion own them.
     from orthonym.rules.acid_ester_anion import name_acid_ester_anion
-    from orthonym.rules.ions import _validate_anion_name
     ester_anion = name_acid_ester_anion(mol)
     if ester_anion:
-        return _validate_anion_name(mol, ester_anion)
+        # 0-wrong (standing rule: never-wrong beats never-silent). The producer's
+        # owner-namer is NOT fail-closed: it can mis-number an identical-diacyl owner
+        # (a wrong constitution SELF-01 then rejects) or emit a cyclitol/inositol name
+        # OPSIN 2.9.0 cannot CIP-parse (stereo unverifiable). Require a STRICT full-
+        # InChIKey round-trip (constitution + stereo + charge) HERE, so a name the
+        # final-gate stereo carve-out would otherwise ship stereo-unverified instead
+        # ABSTAINS. Non-ester dianions (propanedioate, methylphosphonate dianion) are
+        # untouched: name_acid_ester_anion returns None off the ester shape, so this
+        # whole block is skipped and route_charged/_name_oxoacid_anion own them.
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        back = opsin_parse(ester_anion)
+        if back:
+            bm = Chem.MolFromSmiles(back)
+            if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+                from orthonym.rules.ions import _validate_anion_name
+                validated = _validate_anion_name(mol, ester_anion)
+                if validated:            # FINDING 3: _validate_anion_name may return
+                    return validated     # '' -> do NOT terminate the cascade on ''
+        # strict RT could not confirm the name -> fall through (abstain / other paths)
 
     from orthonym.rules.charged_router import route_charged
     routed = route_charged(mol, style)

@@ -1042,10 +1042,30 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
     # DIANION reaches here with len(anions) == 2). Derive the anion word in
     # place; _try_neutralize_and_name below would emit the NEUTRAL word which
     # OPSIN round-trips to a different (neutral) molecule -> gate rejects.
+    #
+    # v33 charged Slice A fix-round: sibling of dispatch_table.py::_handle_poly_anion's
+    # ester-anion branch, and the producer here is subject to the SAME failure modes
+    # (mis-numbered identical-diacyl owner -> wrong constitution; cyclitol/inositol
+    # stereo OPSIN 2.9.0 cannot CIP-parse). Verified via head_ab against 00180b23
+    # (pre-Slice-A): a cyclitol-phosphate dianion already reached exactly THIS call
+    # site and shipped a stereo-unverified name before any Slice A code existed --
+    # dispatch_table.py's own neutralize-then-name fallback bare-returns the neutral
+    # (charge-dropping) name for a non-carboxylate anion, SELF-01 correctly suppresses
+    # THAT wrong-molecule candidate, and the cascade falls through to here, which had
+    # no gate. Require the SAME strict full-InChIKey round-trip (constitution + stereo
+    # + charge) so an unverifiable name ABSTAINS instead of shipping.
     from .acid_ester_anion import name_acid_ester_anion
     ester_anion = name_acid_ester_anion(mol)
     if ester_anion:
-        return _validate_anion_name(mol, ester_anion)
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        back = opsin_parse(ester_anion)
+        if back:
+            bm = Chem.MolFromSmiles(back)
+            if bm is not None and Chem.MolToInchiKey(bm) == Chem.MolToInchiKey(mol):
+                validated = _validate_anion_name(mol, ester_anion)
+                if validated:
+                    return validated
+        # strict RT could not confirm the name -> fall through (abstain / other paths)
 
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
