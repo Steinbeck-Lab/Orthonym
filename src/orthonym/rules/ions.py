@@ -3801,6 +3801,67 @@ def _amino_acid_carboxylate(mol, anion_site: Dict) -> str:
     return ''
 
 
+def _build_partial_acid_salt_chain_name(
+        prefix: str, parent_len: int,
+        unsaturations: List[Tuple[int, int]],
+        substituents: List[Tuple[int, str]]) -> str:
+    """FIX C2 (v33 charged completion) builder: assemble the widened
+    partial-acid-salt CHAIN anion name -- ``<stereo>-<subs><stem>oate`` -- from
+    a 'carboxy' substituent riding on the last parent locant (the
+    still-protonated carboxyl carbon), any hydroxy/amino BACKBONE substituents
+    (locant, kind) pairs, and backbone unsaturation (locant, 2|3 bond-order)
+    pairs. Callers prepend any stereodescriptor block themselves.
+
+    Parent+infix construction generalizes the previous bare ``f"{prefix}anoate"``
+    (0 unsaturations still yields that exact string) to admit a ``-en-``/``-yn-``
+    infix -- an additive ``-oate`` suffix elides the infix's final 'e'
+    (``prop-2-ene`` + ``-oate`` -> ``prop-2-enoate``; ``prop-2-yne`` + ``-oate``
+    -> ``prop-2-ynoate``), mirroring ``assembly/general_engine.py::_stem_block``'s
+    ene/yne construction generalized to end in 'oate' rather than a bare
+    hydride name.
+    """
+    from ..assembly.naming_utils import simple_multiplier_word
+
+    ene = sorted(loc for loc, order in unsaturations if order == 2)
+    yne = sorted(loc for loc, order in unsaturations if order == 3)
+    if not ene and not yne:
+        stem = f"{prefix}anoate"
+    else:
+        block = prefix
+        if ene:
+            if len(ene) > 1:
+                block += 'a'
+            mult = simple_multiplier_word(len(ene)) if len(ene) > 1 else ''
+            block += '-' + ','.join(str(loc) for loc in ene) + '-' + (mult or '') + 'en'
+        if yne:
+            if len(yne) > 1:
+                block += 'a' if not ene else ''
+            mult = simple_multiplier_word(len(yne)) if len(yne) > 1 else ''
+            block += '-' + ','.join(str(loc) for loc in yne) + '-' + (mult or '') + 'yn'
+        stem = block + 'oate'
+
+    # Substituent prefixes: 'carboxy' (always, at parent_len) plus any
+    # hydroxy/amino backbone substituents -- grouped by name, multiplied,
+    # and cited in alphanumerical order (P-14.5.2: ignore multiplying
+    # prefixes, so 'carboxy' < 'hydroxy' regardless of a later 'di-').
+    from collections import defaultdict
+    groups: Dict[str, List[int]] = defaultdict(list)
+    groups['carboxy'].append(parent_len)
+    for loc, kind in substituents:
+        groups[kind].append(loc)
+    for name in groups:
+        groups[name].sort()
+
+    plain_mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+    parts = []
+    for name in sorted(groups.keys()):
+        locs = groups[name]
+        mult = plain_mult.get(len(locs), f'{len(locs)}-')
+        loc_str = ','.join(str(loc) for loc in locs)
+        parts.append(f"{loc_str}-{mult}{name}")
+    return '-'.join(parts) + stem
+
+
 def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
     """Method (1) P-65.6.2.3.1 — PIN for acid salts of polybasic ORGANIC acids.
 
@@ -3811,12 +3872,23 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
     ``3-carboxypropanoate`` (BB 31606). This differs from method (2)
     (``hydrogen heptanedioate``), which is retained for general nomenclature only.
 
-    Scope (fail-closed -> caller keeps method (2)): built for the clean, acyclic,
-    all-carbon linear diacid mono-anion where the whole molecule is
-    ``HO2C-[CH2]k-CO2(-)`` — the diacid family the target belongs to. Any other
-    shape (ring, branch, hetero-substituent, unsaturation, >1 protonated -COOH,
-    the inorganic 1-carbon carbonic anion) returns '' so the existing path/method
-    (2) still applies. NEVER emits a wrong name.
+    Scope (fail-closed -> caller keeps method (2)): acyclic (ring parent is a
+    SEPARATE, out-of-scope constructor -- follow-up), where the whole
+    molecule is ``HO2C-[chain]-CO2(-)`` and ``[chain]`` is carbon-only apart
+    from a plain terminal ``-OH``/``-NH2`` riding on a PARENT-chain carbon
+    (FIX C2, v33 charged completion: widened from all-carbon-only) and any
+    backbone unsaturation strictly BETWEEN parent-chain carbons (FIX C2:
+    widened from fully-saturated-only; the bond INTO the still-protonated
+    carboxyl carbon must stay single -- that shape needs a different,
+    un-numbered construction and stays out of scope). Any other shape
+    (>1 protonated -COOH, a substituent on the still-protonated carboxyl
+    carbon, an ether/ester/amide/secondary-or-tertiary-amine/other
+    heteroatom, an alkyl branch, the inorganic 1-carbon carbonic anion)
+    returns '' so the existing path/method (2) still applies. The builder
+    (``_build_partial_acid_salt_chain_name``) is extended in the SAME change
+    as every guard widening, so no atom can be silently dropped -- if it
+    cannot express a substituent it returns '' and this function fails
+    closed too. NEVER emits a wrong name.
     """
     from rdkit.Chem import MolFromSmarts
     from rdkit.Chem import rdmolops
@@ -3830,7 +3902,8 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
         return ''
     cp = prot_matches[0][0]            # protonated carboxyl carbon
 
-    # Acyclic only (a ring parent is out of this linear construction).
+    # Acyclic only (a ring parent is out of this linear construction) --
+    # UNCHANGED per FIX C2 scope (the ring case is a separate follow-up).
     if mol.GetRingInfo().NumRings() > 0:
         return ''
 
@@ -3844,47 +3917,124 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
     if ci is None or ci == cp:
         return ''
 
-    # Skeleton must be all-carbon apart from carboxyl oxygens; the ONLY oxygenated
-    # carbons are the two carboxyl carbons (no third carboxyl / carbonyl / hetero).
-    carboxyl_cs = {ci, cp}
-    for atom in mol.GetAtoms():
-        sym = atom.GetSymbol()
-        if sym == 'O':
-            if not any(n.GetIdx() in carboxyl_cs for n in atom.GetNeighbors()):
-                return ''
-        elif sym != 'C':
-            return ''
-    oxy_cs = {a.GetIdx() for a in mol.GetAtoms()
-              if a.GetSymbol() == 'C'
-              and any(n.GetSymbol() == 'O' for n in a.GetNeighbors())}
-    if oxy_cs != carboxyl_cs:
-        return ''
-
-    # The backbone from C1 to the protonated carboxyl must be the WHOLE carbon
-    # chain (no branches) and fully saturated (single C-C bonds only).
+    # The backbone: the WHOLE carbon chain from C1 (ci) to the protonated
+    # carboxyl carbon (cp) -- no branching carbons (an alkyl branch keeps
+    # this constructor out of scope; UNCHANGED guard, still enforced below
+    # by the per-atom scan).
     path = rdmolops.GetShortestPath(mol, ci, cp)
     if not path:
         return ''
     n_carbons = sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'C')
     if len(path) != n_carbons:
         return ''
-    for bond in mol.GetBonds():
-        if (bond.GetBeginAtom().GetSymbol() == 'C'
-                and bond.GetEndAtom().GetSymbol() == 'C'
-                and bond.GetBondType() != Chem.BondType.SINGLE):
-            return ''
-
-    # Parent = the chain rooted at the ionized carboxyl (C1) EXCLUDING the
-    # protonated carboxyl carbon; that carbon becomes a 'carboxy' prefix on the
-    # last parent carbon (locant = parent length).
     parent_len = len(path) - 1
     if parent_len < 1:
         return ''
+    parent_carbon_set = set(path[:parent_len])   # the numbered parent chain; excludes cp
+
+    # Carboxyl oxygens: both O's of the ionized (ci) and protonated (cp) groups
+    # -- exempt from the substituent scan below.
+    carboxyl_cs = {ci, cp}
+    carboxyl_os = set()
+    for c_idx in carboxyl_cs:
+        for nb in mol.GetAtomWithIdx(c_idx).GetNeighbors():
+            if nb.GetSymbol() == 'O':
+                carboxyl_os.add(nb.GetIdx())
+
+    # FIX C2 (v33 charged completion): widen the all-carbon skeleton guard to
+    # admit a plain terminal HYDROXY (-OH) or primary AMINO (-NH2) substituent
+    # on a PARENT-chain carbon (never on cp itself -- an extra substituent on
+    # the still-protonated carboxyl carbon is a shape this linear, numbered
+    # construction cannot express -- fail closed to method (2)). Any other
+    # heteroatom, or a heteroatom that is not a simple single-bonded terminal
+    # -OH/-NH2 (an ether/ester/amide/secondary-or-tertiary-amine bridge, or
+    # one bonded to more than one heavy neighbour), fails closed -- the
+    # builder has no way to express it, so NEVER silently drop it.
+    substituents: List[Tuple[int, str]] = []   # (locant, 'hydroxy'|'amino')
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        sym = atom.GetSymbol()
+        if sym == 'C':
+            if idx not in parent_carbon_set and idx != cp:
+                return ''   # a carbon off the backbone -> alkyl branch, out of scope
+            continue
+        if sym == 'O':
+            if idx in carboxyl_os:
+                continue
+            heavy_nbrs = [n for n in atom.GetNeighbors() if n.GetSymbol() != 'H']
+            if (len(heavy_nbrs) != 1
+                    or atom.GetFormalCharge() != 0
+                    or atom.GetTotalNumHs() != 1):
+                return ''
+            owner = heavy_nbrs[0]
+            bond = mol.GetBondBetweenAtoms(idx, owner.GetIdx())
+            if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+                return ''
+            if owner.GetIdx() not in parent_carbon_set:
+                return ''   # substituent on cp (or off-backbone) -- can't express
+            substituents.append((path.index(owner.GetIdx()) + 1, 'hydroxy'))
+            continue
+        if sym == 'N':
+            heavy_nbrs = [n for n in atom.GetNeighbors() if n.GetSymbol() != 'H']
+            if (len(heavy_nbrs) != 1
+                    or atom.GetFormalCharge() != 0
+                    or atom.GetTotalNumHs() != 2):
+                return ''
+            owner = heavy_nbrs[0]
+            bond = mol.GetBondBetweenAtoms(idx, owner.GetIdx())
+            if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+                return ''
+            if owner.GetIdx() not in parent_carbon_set:
+                return ''
+            substituents.append((path.index(owner.GetIdx()) + 1, 'amino'))
+            continue
+        # any other element (S, halogen, P, ...) -> out of scope, fail closed
+        return ''
+
+    # FIX C2: widen the fully-saturated-only guard to admit backbone
+    # unsaturation strictly BETWEEN parent-chain carbons (the numbered
+    # positions); the bond from the last parent carbon INTO cp must stay
+    # single -- unsaturation there needs a different, un-numbered
+    # construction and is out of this constructor's scope.
+    unsaturations: List[Tuple[int, int]] = []   # (lower locant, 2|3)
+    for i in range(parent_len - 1):
+        bond = mol.GetBondBetweenAtoms(path[i], path[i + 1])
+        if bond is None:
+            return ''
+        bt = bond.GetBondType()
+        if bt == Chem.BondType.SINGLE:
+            continue
+        elif bt == Chem.BondType.DOUBLE:
+            unsaturations.append((i + 1, 2))
+        elif bt == Chem.BondType.TRIPLE:
+            unsaturations.append((i + 1, 3))
+        else:
+            return ''   # aromatic/dative backbone bond -- out of scope
+    last_bond = mol.GetBondBetweenAtoms(path[parent_len - 1], cp)
+    if last_bond is None or last_bond.GetBondType() != Chem.BondType.SINGLE:
+        return ''
+
     from ..data.chain_names import get_chain_prefix
     prefix = get_chain_prefix(parent_len)
     if not prefix:
         return ''
-    return f"{parent_len}-carboxy{prefix}anoate"
+
+    name = _build_partial_acid_salt_chain_name(
+        prefix, parent_len, unsaturations, substituents)
+    if not name:
+        return ''
+
+    # Stereodescriptor block over the numbered PARENT-chain atoms only (cp is
+    # not numbered -- P-91.3 cites a descriptor at the locant of the parent
+    # atom it belongs to).
+    if any(mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+           for a in path[:parent_len]):
+        from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
+        atom_to_locant = {path[i]: i + 1 for i in range(parent_len)}
+        stereo_prefix = format_stereodescriptor_string(
+            collect_stereodescriptors(mol, atom_to_locant))
+        name = stereo_prefix + name
+    return name
 
 
 def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:

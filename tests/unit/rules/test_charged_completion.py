@@ -260,3 +260,73 @@ def test_c1_no_regression_existing_partial_and_dianion_shapes(smi, expected):
     n = Orthonym(general_fallback=True, general_fallback_unverified=True,
                   allow_aromatic_general=True).name(smi)
     assert n == expected
+
+
+# =============================================================================
+# Task C2 (v33 charged completion): partial-acid-salt CHAIN widening
+# (guard AND builder together).
+#
+# `_name_partial_acid_salt_anion` (ions.py) had 3 guards protecting its
+# atom-drop-unsafe builder (`f"{parent_len}-carboxy{prefix}anoate"`, which
+# cannot express a substituent, unsaturation, or a ring): ring-exclusion
+# (kept UNCHANGED -- the ring case is a separate follow-up), an
+# all-carbon-except-carboxyl-oxygens guard, and a fully-saturated-backbone
+# guard. This widens the latter two -- admitting a plain terminal
+# hydroxy/amino substituent on a PARENT-chain carbon, and backbone
+# unsaturation strictly BETWEEN parent-chain carbons -- AND extends the
+# builder (`_build_partial_acid_salt_chain_name`, new) in the SAME change to
+# (a) enumerate the substituents with locants and (b) emit a `-en-`/`-yn-`
+# infix with locant, so no atom the widened guards now admit can be silently
+# dropped. Any shape the builder still cannot express (an alkyl branch, an
+# ether/amide/secondary-amine, a substituent riding on the still-protonated
+# carboxyl carbon itself, unsaturation into that carbon) fails closed to ''
+# at the GUARD, never reaching the builder.
+# =============================================================================
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("O=C([O-])[C@H](O)[C@@H](O)C(=O)O", "(2R,3R)-3-carboxy-2,3-dihydroxypropanoate"),
+    ("O=C([O-])C#CC(=O)O", "3-carboxyprop-2-ynoate"),
+])
+def test_partial_acid_salt_chain_widening(smi, expected):
+    n = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                  allow_aromatic_general=True).name(smi)
+    assert n == expected
+    _full_ik_rt(smi, n)
+
+
+# --- regression: the non-partial-acid-salt shapes AND the existing
+# all-carbon partial-acid-salt case must stay byte-identical.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("[O-]C(=O)CC(=O)[O-]", "propanedioate"),
+    ("CP(=O)([O-])[O-]", "methylphosphonate"),
+    ("OC(=O)CCCCC(=O)[O-]", "5-carboxypentanoate"),
+])
+def test_c2_no_regression_existing_shapes(smi, expected):
+    n = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                  allow_aromatic_general=True).name(smi)
+    assert n == expected
+
+
+def test_partial_acid_salt_chain_alkyl_branch_fails_closed():
+    # An alkyl branch (methylmalonate mono-anion) is a shape the builder
+    # cannot express (it isn't a plain hydroxy/amino/unsaturation widening) --
+    # the guard must fail closed ('') rather than drop the branch.
+    from orthonym.perception.ions import get_ion_sites
+    from orthonym.rules.ions import _name_partial_acid_salt_anion, classify_anion
+    mol = Chem.MolFromSmiles("OC(=O)C(C)C(=O)[O-]")
+    sites = get_ion_sites(mol)
+    carboxylates = [a for a in sites['anions'] if classify_anion(mol, a) == 'carboxylate']
+    assert _name_partial_acid_salt_anion(mol, carboxylates[0]) == ''
+
+
+def test_partial_acid_salt_chain_ether_substituent_fails_closed():
+    # An ether-bridging oxygen (not a plain terminal -OH) is not expressible
+    # by the hydroxy/amino widening -- must fail closed.
+    from orthonym.perception.ions import get_ion_sites
+    from orthonym.rules.ions import _name_partial_acid_salt_anion, classify_anion
+    mol = Chem.MolFromSmiles("OC(=O)C(OC)C(=O)[O-]")
+    sites = get_ion_sites(mol)
+    carboxylates = [a for a in sites['anions'] if classify_anion(mol, a) == 'carboxylate']
+    assert _name_partial_acid_salt_anion(mol, carboxylates[0]) == ''
