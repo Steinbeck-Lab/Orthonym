@@ -238,15 +238,21 @@ class TestAminoAcidZwitterionNaming:
         result = name_compound('C[C@H]([NH3+])C([O-])=O')
         assert result == 'L-alanine', f"Expected L-alanine, got: {result}"
 
-    def test_l_valine_zwitterion(self):
-        """L-valine zwitterion."""
+    def test_d_valine_zwitterion(self):
+        """v33 charged B1: this SMILES is the R (D) enantiomer, not L -- the
+        table used to mislabel it 'L-valine'. VERIFIED via OPSIN: the input's
+        InChIKey (KZSNJWFQEVHDMF-SCSAIBSYSA-N) matches opsin_parse('D-valine'),
+        not opsin_parse('L-valine') (KZSNJWFQEVHDMF-BYPYZUCNSA-N)."""
         result = name_compound('CC(C)[C@@H]([NH3+])C([O-])=O')
-        assert result == 'L-valine', f"Expected L-valine, got: {result}"
+        assert result == 'D-valine', f"Expected D-valine, got: {result}"
 
-    def test_l_leucine_zwitterion(self):
-        """L-leucine zwitterion."""
+    def test_d_leucine_zwitterion(self):
+        """v33 charged B1: this SMILES is the R (D) enantiomer, not L -- the
+        table used to mislabel it 'L-leucine' (the original SPY finding).
+        VERIFIED via OPSIN: the input's InChIKey
+        (ROHFNLRQFUQHCH-RXMQYKEDSA-N) matches opsin_parse('D-leucine')."""
         result = name_compound('CC(C)C[C@@H]([NH3+])C([O-])=O')
-        assert result == 'L-leucine', f"Expected L-leucine, got: {result}"
+        assert result == 'D-leucine', f"Expected D-leucine, got: {result}"
 
     def test_l_proline_zwitterion(self):
         """L-proline zwitterion."""

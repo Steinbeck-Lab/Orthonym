@@ -97,22 +97,34 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     # Alanine zwitterion
     'C[C@H]([NH3+])C(=O)[O-]': 'L-alanine',
     'C[C@@H]([NH3+])C(=O)[O-]': 'D-alanine',
-    'CC([NH3+])C(=O)[O-]': 'alanine',
+    # NOTE (v33 charged B1): the achiral (stereo-UNDEFINED) 'CC([NH3+])C(=O)[O-]'
+    # entry mapping to bare 'alanine' was DELETED. Per BlueBookV2.md:54291
+    # (P-103.1.3.1 "The stereodescriptors 'D' and 'L'"), a bare retained
+    # amino-acid name denotes ONLY the defined (L) configuration -- OPSIN's
+    # grammar always resolves 'alanine' to the L stereocentre (verified:
+    # opsin_parse('alanine') -> InChIKey QNAYBMKLOCPYGJ-REOHCLBHSA-N), which
+    # provably differs from the stereo-undefined input's InChIKey
+    # (QNAYBMKLOCPYGJ-UHFFFAOYSA-N) -- a different, more specific claim than
+    # the input supports. Same defect class already fixed for the NEUTRAL
+    # form (see tests/unit/test_amino_acids.py module docstring); the deleted
+    # entry now falls through to `_name_amino_acid_zwitterion`'s existing
+    # is_bare_standard_aa systematic-name path (0-wrong: a name that does not
+    # over-claim stereochemistry).
     # Valine zwitterion
-    'CC(C)[C@@H]([NH3+])C(=O)[O-]': 'L-valine',
+    'CC(C)[C@@H]([NH3+])C(=O)[O-]': 'D-valine',
     'CC(C)[C@H]([NH3+])C(=O)[O-]': 'L-valine',
     # Leucine zwitterion
-    'CC(C)C[C@@H]([NH3+])C(=O)[O-]': 'L-leucine',
+    'CC(C)C[C@@H]([NH3+])C(=O)[O-]': 'D-leucine',
     'CC(C)C[C@H]([NH3+])C(=O)[O-]': 'L-leucine',
     # Isoleucine zwitterion
-    'CC[C@H](C)[C@@H]([NH3+])C(=O)[O-]': 'L-isoleucine',
+    'CC[C@H](C)[C@@H]([NH3+])C(=O)[O-]': 'D-alloisoleucine',
     'CC[C@H](C)[C@H]([NH3+])C(=O)[O-]': 'L-isoleucine',
     # Serine zwitterion
     '[NH3+][C@@H](CO)C(=O)[O-]': 'L-serine',
-    '[NH3+][C@H](CO)C(=O)[O-]': 'L-serine',
+    '[NH3+][C@H](CO)C(=O)[O-]': 'D-serine',
     # Threonine zwitterion
-    'C[C@@H](O)[C@@H]([NH3+])C(=O)[O-]': 'L-threonine',
-    'C[C@H](O)[C@@H]([NH3+])C(=O)[O-]': 'L-threonine',
+    'C[C@@H](O)[C@@H]([NH3+])C(=O)[O-]': 'D-allothreonine',
+    'C[C@H](O)[C@@H]([NH3+])C(=O)[O-]': 'D-threonine',
     # Proline zwitterion
     'O=C([O-])[C@@H]1CCC[NH2+]1': 'L-proline',
     # Phenylalanine zwitterion
@@ -122,7 +134,7 @@ RETAINED_AMINO_ACID_ZWITTERIONS = {
     # Tryptophan zwitterion
     '[NH3+][C@@H](Cc1c[nH]c2ccccc12)C(=O)[O-]': 'L-tryptophan',
     # Methionine zwitterion
-    'CSCC[C@@H]([NH3+])C(=O)[O-]': 'L-methionine',
+    'CSCC[C@@H]([NH3+])C(=O)[O-]': 'D-methionine',
     # Histidine zwitterion
     '[NH3+][C@@H](Cc1c[nH]cn1)C(=O)[O-]': 'L-histidine',
     # Glutamic acid zwitterion (one COOH protonated)
