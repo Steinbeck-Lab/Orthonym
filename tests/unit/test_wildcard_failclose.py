@@ -21,9 +21,7 @@ def test_wildcard_ester_does_not_ship_ethyl_formate():
 def test_isotope_over_wildcard_abstains():
     # [2H]CC* : the isotope decorator runs first (2847) and its recursive skeleton
     # name is now the wildcard sentinel -> decorator fails closed -> abstain.
-    out = _name("[2H]CC*")
-    assert "wildcard" in out.lower() or "unknown" in out.lower()
-    assert out not in ("ethane", "deuterioethane")
+    assert _name("[2H]CC*") == WILDCARD_MSG
 
 def test_raise_on_limit_still_raises():
     with pytest.raises(OrthonymLimitError) as exc:

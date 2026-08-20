@@ -2897,23 +2897,29 @@ class Orthonym:
             # the general-engine recovery runs — recovery would re-run producers
             # on the wildcard mol and re-open the hole, so this must NOT route
             # through the OrthonymLimitError handler's recovery path below.
-            _probe = Chem.MolFromSmiles(smiles)
-            if _probe is not None:
-                _scope = classify_scope_limit(_probe)
-                if _scope is not None:
-                    _scope.smiles = smiles
-                    if raise_on_limit:
-                        raise _scope
-                    # Default path: honest descriptive fallback, byte-identical to
-                    # the current output for a wildcard whose producer already
-                    # fails (idx3), via the SAME _apply_trivial_fallback the limit
-                    # handler uses — but WITHOUT recovery.
-                    from .metrics.abstention import (
-                        AbstentionCode, record_abstention)
-                    record_abstention(AbstentionCode.OTHER, detail=_scope.code)
-                    return self._finish(
-                        self._apply_trivial_fallback(_scope.message, smiles),
-                        smiles)
+            # Perf: zero-false-negative pre-filter -- an RDKit dummy/wildcard
+            # atom (atomic number 0) is ALWAYS written as `*` in SMILES (bare
+            # `*`, `[*]`, `[1*]`, ...) and `*` denotes nothing else, so
+            # '*' not in smiles guarantees no wildcard and skips the extra
+            # RDKit parse on the common (non-wildcard) path.
+            if '*' in smiles:
+                _probe = Chem.MolFromSmiles(smiles)
+                if _probe is not None:
+                    _scope = classify_scope_limit(_probe)
+                    if _scope is not None:
+                        _scope.smiles = smiles
+                        if raise_on_limit:
+                            raise _scope
+                        # Default path: honest descriptive fallback, byte-identical
+                        # to the current output for a wildcard whose producer
+                        # already fails (idx3), via the SAME _apply_trivial_fallback
+                        # the limit handler uses — but WITHOUT recovery.
+                        from .metrics.abstention import (
+                            AbstentionCode, record_abstention)
+                        record_abstention(AbstentionCode.OTHER, detail=_scope.code)
+                        return self._finish(
+                            self._apply_trivial_fallback(_scope.message, smiles),
+                            smiles)
             try:
                 result = self._name_impl(smiles)
             except OrthonymLimitError as _limit:
@@ -4405,20 +4411,26 @@ class Orthonym:
             # Wave-0 D1: same wildcard pre-check as name(). name_with_confidence
             # returns a metadata dict, so mirror the limit handler's fallback dict
             # (lines ~4405–4419) rather than name()'s string return.
-            _probe = Chem.MolFromSmiles(smiles)
-            if _probe is not None:
-                _scope = classify_scope_limit(_probe)
-                if _scope is not None:
-                    _scope.smiles = smiles
-                    record_abstention(AbstentionCode.OTHER, detail=_scope.code)
-                    _fallback_name = self._apply_trivial_fallback(
-                        _scope.message, smiles)
-                    _abst = abstention_code_for(_fallback_name)
-                    _md = unmeasured_confidence(
-                        name=_fallback_name, handler='fallback')
-                    _md['limit'] = _scope.as_dict()
-                    _md['abstention'] = _abst.value if _abst else None
-                    return _md
+            # Perf: zero-false-negative pre-filter -- an RDKit dummy/wildcard
+            # atom (atomic number 0) is ALWAYS written as `*` in SMILES (bare
+            # `*`, `[*]`, `[1*]`, ...) and `*` denotes nothing else, so
+            # '*' not in smiles guarantees no wildcard and skips the extra
+            # RDKit parse on the common (non-wildcard) path.
+            if '*' in smiles:
+                _probe = Chem.MolFromSmiles(smiles)
+                if _probe is not None:
+                    _scope = classify_scope_limit(_probe)
+                    if _scope is not None:
+                        _scope.smiles = smiles
+                        record_abstention(AbstentionCode.OTHER, detail=_scope.code)
+                        _fallback_name = self._apply_trivial_fallback(
+                            _scope.message, smiles)
+                        _abst = abstention_code_for(_fallback_name)
+                        _md = unmeasured_confidence(
+                            name=_fallback_name, handler='fallback')
+                        _md['limit'] = _scope.as_dict()
+                        _md['abstention'] = _abst.value if _abst else None
+                        return _md
             try:
                 name = self._name_impl(smiles)
             except OrthonymLimitError as _limit:
