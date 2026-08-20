@@ -150,6 +150,25 @@ def clear_provenance() -> None:
     _SUFFIX_FREE_PREFIX_NAME.set(False)
 
 
+def restore_provenance(snapshot: dict) -> None:
+    """Re-set every provenance ContextVar from a ``get_provenance()`` dict.
+
+    The inverse of :func:`get_provenance`. A caller that speculatively runs a
+    producer which records provenance (``record_source`` et al.) and then
+    REJECTS its candidate must restore the pre-attempt provenance, otherwise the
+    kept emission carries the rejected producer's label. Used by the v33
+    Engine-3 NP→von-Baeyer downgrade, whose ``_try_general_engine_recovery``
+    probe stamps ``source="general_engine"`` before the RT gate can decline it.
+    """
+    _SOURCE.set(snapshot.get("source"))
+    _OPSIN.set(snapshot.get("opsin"))
+    _STEREO_UNEXPRESSED.set(bool(snapshot.get("stereo_unexpressed")))
+    _GATE_OUTCOME.set(snapshot.get("gate_outcome", GATE_OUTCOME_NOT_RUN))
+    _GATE_OUTCOME_NAME.set(snapshot.get("gate_outcome_name"))
+    _GENERAL_RING_PREFIX.set(bool(snapshot.get("general_ring_prefix")))
+    _SUFFIX_FREE_PREFIX_NAME.set(bool(snapshot.get("suffix_free_prefix_name")))
+
+
 def record_source(source: str, opsin: Optional[str] = None) -> None:
     _SOURCE.set(source)
     if opsin is not None:

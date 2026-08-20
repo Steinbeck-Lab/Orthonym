@@ -3090,6 +3090,28 @@ class Orthonym:
                             _dname, smiles, self._grammar_stats)
                         if not is_failure_name(_dgated):
                             result = _dgated
+            # v33 giants Engine 3: a retained natural-product PARENT HYDRIDE
+            # (`ursane`, `hopane`, `cevane`, ... -- the P-101.2.7 Table 10.1
+            # stereoparents) IS the PIN, and `_final_opsin_validity_gate`
+            # whitelists it (`np_stereoparent` carve-out) precisely because
+            # OPSIN 2.9.0 cannot parse it. That is right for the PIN tiers, but
+            # on the BEST-EFFORT path the whitelist costs a round-trip the
+            # general engine can win. Offer its von-Baeyer systematic name and
+            # adopt it ONLY when the full-InChI round-trip verifies. Measured
+            # over all 53 such skeletons: 51 convert, 2 keep the retained name
+            # (`germacrane`, whose systematic form is a NON-RT
+            # `...-1,7-dimethyl-4-(propan-2-yl)cyclodecane`, and `corynoxan`,
+            # for which the engine produces nothing) -- so an unconditional
+            # downgrade would REGRESS those two, which is why the RT gate is
+            # load-bearing rather than belt-and-braces. Best-effort only
+            # (`_general_fallback_unverified`), so PIN/default output is
+            # byte-identical.
+            if (is_top_level_naming() and self._general_fallback_unverified
+                    and not self._disable_opsin_validity_gate
+                    and not is_failure_name(result)):
+                _np_sys = self._try_np_systematic_downgrade(smiles, result)
+                if _np_sys is not None:
+                    result = _np_sys
             # HYG-02: post-failure limit (opt-in). If naming produced no real
             # name, map the failure to a named code. Keyed off an actual failure
             # so it can never fire on a successfully-named compound.
@@ -4504,6 +4526,62 @@ class Orthonym:
         except Exception:
             return None
         return cand if rt and rt.get("passed") else None
+
+    def _try_np_systematic_downgrade(
+            self, smiles: str, retained_name: str) -> Optional[str]:
+        """v33 giants Engine 3: an OPSIN-round-trippable name for a retained
+        natural-product parent hydride, when the general-engine recovery can
+        produce one -- else None (keep the retained name).
+
+        The mirror of :meth:`_try_retained_fused_upgrade`: that one trades a
+        von-Baeyer name for a retained one, this one trades a retained name for
+        a recovered one. Both are best-effort-only, RT-gated, whole-molecule
+        swaps that leave the PIN default byte-identical.
+
+        `ursane`, `hopane`, `cevane`, ... are valid PINs (P-101.2.7 Table 10.1)
+        that OPSIN 2.9.0 cannot parse, so they are whitelisted past the SELF-01
+        gate and ship unverified. On the best-effort path a round-trippable name
+        is worth more than the retained spelling, so offer it here -- but adopt
+        it ONLY on a verified full-InChI round-trip. Most rows recover a
+        von-Baeyer systematic parent; the recovery's own retained-name
+        preference can also return a trivial name (e.g. `(4E)-sphing-4-enine` ->
+        `sphingosine`, RT-verified), which is acceptable on the breadth tier
+        (the PIN default keeps the sphingoid parent). The gate is load-bearing,
+        not defensive: 2 of the 53 skeletons (`germacrane`, `corynoxan`) recover
+        NO round-tripping name, and an unconditional downgrade regresses them
+        (to a non-RT cyclodecane-parent name and to the abstention sentinel
+        respectively).
+
+        Never raises: any failure keeps the retained name.
+        """
+        if not self._general_fallback_unverified:
+            return None
+        try:
+            from .data.natural_products import NAME_EXACT_NP_PARENTS
+        except Exception:
+            return None
+        if retained_name not in NAME_EXACT_NP_PARENTS:
+            return None
+        # `_try_general_engine_recovery` stamps `source="general_engine"` (and an
+        # `opsin` status) via `record_source` BEFORE we can decline its
+        # candidate. Snapshot the pre-probe provenance so a KEPT retained name
+        # (RT-reject) is labelled by its own producer rather than the discarded
+        # general-engine attempt -- otherwise the cohort/census attribution the
+        # project ranks levers by is skewed on every kept row.
+        from .metrics.provenance import get_provenance, restore_provenance
+        _snap = get_provenance()
+        try:
+            cand = self._try_general_engine_recovery(smiles)
+            if cand and not is_failure_name(cand) and cand != retained_name:
+                from .validation import opsin_roundtrip_check
+                rt = opsin_roundtrip_check(smiles, cand)
+                if rt and rt.get("passed"):
+                    return cand  # adopt: general_engine provenance is correct
+        except Exception:  # noqa: BLE001 - any failure keeps the retained PIN
+            pass
+        # RT-reject / no candidate / crash: restore provenance, keep retained.
+        restore_provenance(_snap)
+        return None
 
     def _name_impl(self, smiles: str, _skip_decomposition: bool = False) -> str:
         """Internal naming implementation (wrapped by session management).
