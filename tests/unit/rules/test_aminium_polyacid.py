@@ -110,12 +110,26 @@ def test_mixed_carboxylate_sulfonate_zwitterion_failclosed(namer):
 
 
 @pytest.mark.opsin_gate
-def test_two_cations_failclosed(namer):
-    # >1 cation is out of scope -- must decline rather than fabricate.
-    from orthonym.errors import is_failure_name
-    out = namer.name("[NH3+]C(CC(=O)[O-])C([NH3+])C(=O)[O-]")
-    assert out is not None
-    assert is_failure_name(out), f"expected an honest abstain, got: {out!r}"
+def test_two_cations_falls_through_to_systematic(namer):
+    # >1 cation is out of scope for the P-74.1.3 GUARD-4 ionic-prefix path
+    # (`_route_zwitterion`/`_name_polyacid_zwitterion` both require exactly
+    # one cation) AND for `_name_amino_acid_zwitterion` (not a Table-10.4
+    # standard AA) -- both decline ('') -- but v33 charged B2's fall-through
+    # in `name_zwitterion` then names the fully-neutralized skeleton
+    # systematically, and it is 0-wrong: this net-zero diamino-diacid
+    # zwitterion neutralizes to the SAME full InChIKey (mobile-H tautomer
+    # perception), verified independently via OPSIN below. A fabricated or
+    # wrong-constitution name is still refused (this is not a relaxation of
+    # that guarantee) -- only the "must abstain" expectation changes, since
+    # a correct systematic name is available.
+    from rdkit import Chem
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    smi = "[NH3+]C(CC(=O)[O-])C([NH3+])C(=O)[O-]"
+    out = namer.name(smi)
+    assert out == "2,3-diaminopentanedioic acid"
+    g = opsin_parse(out)
+    assert g and Chem.MolToInchiKey(Chem.MolFromSmiles(g)) == \
+        Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
 
 
 def test_ring_cation_declines_the_new_branch_directly():

@@ -588,9 +588,25 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     # 4-aminobutanoic acid, which is RT-correct at connectivity since InChI-L1
     # ignores charge — the deferred D-03 precision path).
     if _is_amino_acid_zwitterion(mol):
-        return _name_amino_acid_zwitterion(mol, style)
+        aa_name = _name_amino_acid_zwitterion(mol, style)
+        if aa_name:
+            return aa_name
+        # v33 charged B2: `_name_amino_acid_zwitterion` returns '' (fail-
+        # closed) whenever the neutral skeleton is NOT a Table-10.4 standard
+        # amino acid (e.g. selenohomocysteine) — it declines rather than
+        # emit a retained name P-103.2.4.4 does not license. That does not
+        # mean no honest name exists: a net-zero amino-acid-shaped zwitterion
+        # neutralizes IN PLACE to the SAME (mobile-H tautomer) InChIKey
+        # (verified for selenohomocysteine and the standard AAs alike), so
+        # falling through to the general/systematic neutral namer still
+        # yields a full-InChIKey round-trip. Do NOT return '' here — that
+        # would abstain when a systematic name is available (T4: an
+        # abstention is a defect, not a safe default). The name still goes
+        # through the caller's RT/SELF-01 gate, so this is a pure widening,
+        # never a new wrong-ship path.
 
-    # General zwitterion naming
+    # General zwitterion naming (falls through here for both the non-amino-
+    # acid case above and the just-declined amino-acid case).
     return _name_general_zwitterion(mol, style)
 
 
