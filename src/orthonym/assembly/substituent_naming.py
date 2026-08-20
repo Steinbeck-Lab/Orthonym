@@ -1522,7 +1522,71 @@ def _name_branched_polyfunctional_substituent(
     return f"{''.join(_joined_prefix_parts(parts))}{stem}yl"
 
 
+# ----------------------------------------------------------------------------
+# Per-molecule memoization for _name_polyfunctional_acyclic_substituent.
+#
+# ROOT-CAUSE PERFORMANCE FIX (2026-08-20): naming a long peptide/depsipeptide
+# chain calls this function ~20,000+ times for as few as ~30 DISTINCT
+# (frozenset(sub_atoms), attach_idx) keys -- the recursive substituent namer
+# re-derives the same overlapping sub-fragment's name over and over (a single
+# key was recomputed 11,552 times on one 209-heavy-atom peptide), the classic
+# exponential-recursion-over-overlapping-subproblems shape. The function has
+# no side effects and its result depends ONLY on (mol, sub_atoms, attach_idx)
+# -- `parent_set` is accepted but never read in the body below, confirmed by
+# inspection -- so memoizing is a pure speedup with byte-identical output.
+#
+# Scope: PER MOLECULE OBJECT, not global. `sub_atoms`/`attach_idx` are atom
+# INDICES that only mean anything relative to one `mol`; a cache keyed on
+# indices alone would return a name computed for a different molecule's atoms
+# once a second molecule is named in the same process. `mol` is threaded
+# UNCHANGED as the single full-molecule object through the whole recursive
+# substituent-naming tree (verified: every call site -- the Step 2c-poly
+# dispatch in name_substituent_fragment and the Tier-1.96 call in
+# substituent_enumerator.py -- passes the same top-level `mol` with a SUBSET
+# of its atom indices, never a fragment-extracted new Mol), so identity
+# (`is`) on `mol` is the correct scope key. The held module-level reference to
+# the current mol additionally prevents a same-`id()` false match after the
+# previous mol is garbage-collected and a new object happens to reuse the
+# freed address.
+#
+# `None` is a legitimate (and, per the profiler, extremely common) result and
+# is cached like any other value via a sentinel, so a failing subproblem does
+# not keep re-failing at full cost either.
+# ----------------------------------------------------------------------------
+_POLYFUNC_MEMO_MOL = None
+_POLYFUNC_MEMO_CACHE: dict = {}
+_POLYFUNC_MEMO_MISS = object()
+
+
 def _name_polyfunctional_acyclic_substituent(
+    mol,
+    sub_atoms: List[int],
+    attach_idx: int,
+    parent_set: Set[int],
+) -> Optional[str]:
+    """Memoizing wrapper around :func:`_name_polyfunctional_acyclic_substituent_impl`.
+
+    See the module comment above the cache globals for the scoping and
+    correctness argument. Delegates all naming logic unchanged to the `_impl`
+    function; this wrapper only adds a per-mol memo keyed on
+    ``(frozenset(sub_atoms), attach_idx)``.
+    """
+    global _POLYFUNC_MEMO_MOL, _POLYFUNC_MEMO_CACHE
+    if _POLYFUNC_MEMO_MOL is not mol:
+        _POLYFUNC_MEMO_CACHE = {}
+        _POLYFUNC_MEMO_MOL = mol
+    key = (frozenset(sub_atoms), attach_idx)
+    cached = _POLYFUNC_MEMO_CACHE.get(key, _POLYFUNC_MEMO_MISS)
+    if cached is not _POLYFUNC_MEMO_MISS:
+        return cached
+    result = _name_polyfunctional_acyclic_substituent_impl(
+        mol, sub_atoms, attach_idx, parent_set
+    )
+    _POLYFUNC_MEMO_CACHE[key] = result
+    return result
+
+
+def _name_polyfunctional_acyclic_substituent_impl(
     mol,
     sub_atoms: List[int],
     attach_idx: int,
