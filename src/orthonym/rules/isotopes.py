@@ -394,7 +394,8 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         # Re-name in systematic regardless (the descriptor needs locants).
         from ..namer import Orthonym
         skeleton = Orthonym(style="systematic").name(stripped_smiles)
-    if not skeleton or "unknown" in skeleton.lower():
+    from ..errors import is_failure_name
+    if not skeleton or "unknown" in skeleton.lower() or is_failure_name(skeleton):
         return None
 
     # Group labels by (mass, element) -> count; element read from the ORIGINAL

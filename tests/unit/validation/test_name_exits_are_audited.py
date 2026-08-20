@@ -1,11 +1,14 @@
 """v29 P1 (fix wave 1): EVERY exit of ``Orthonym.name()`` is audited.
 
-``name()`` has seven ``return`` statements (five originally + two added in v30
+``name()`` has eight ``return`` statements (five originally + two added in v30
 Phase 1 for producer-exception resilience: the generic ``except Exception``
 routes to recovery success / descriptive fallback so a raising producer degrades
-instead of crashing out of ``name()``). Before this wave only two were hooked to
-the binding-proof step, and two of the three then-unhooked ones ship a real
-(non-failure) name:
+instead of crashing out of ``name()``; + one added in Wave 0 Task 1 (D1) for the
+unconditional wildcard fail-close -- a dummy atom made the input InChIKey
+uncomputable, so the SELF-01 oracle failed open and ``CC*`` shipped ``"ethane"``;
+the new exit routes through ``self._finish`` like every other). Before v30
+Phase 1 only two were hooked to the binding-proof step, and two of the three
+then-unhooked ones ship a real (non-failure) name:
 
 * the isotope-decorator exit -- the entire isotope-labeled compound class
   returned with ``ledger_stage=None`` in every mode, because that exit sits
@@ -130,13 +133,16 @@ def test_the_guard_sees_all_known_exits():
     """Pins the guard's own reach: if a refactor collapsed ``name()`` so the
     walker found (say) one return, the guard above would pass vacuously.
 
-    Count is 7 as of v30 Phase 1: the original 5 plus the two producer-exception
-    resilience exits (recovery success + descriptive fallback) added to the
-    generic ``except Exception`` handler so a producer that raises degrades to
-    recovery/abstain instead of crashing out of ``name()``. Both route through
-    ``self._finish`` (checked by the guard above)."""
+    Count is 8 as of Wave 0 Task 1 (D1): the original 5, plus the two
+    producer-exception resilience exits (recovery success + descriptive
+    fallback) added in v30 Phase 1 to the generic ``except Exception`` handler
+    so a producer that raises degrades to recovery/abstain instead of crashing
+    out of ``name()``, plus the wildcard fail-close exit added in Wave 0 Task 1
+    (the unconditional ``classify_scope_limit`` pre-check's default-path
+    return). All route through ``self._finish`` (checked by the guard
+    above)."""
     _src, returns = _returns_in_name()
-    assert len(returns) == 7, [(ln, ast.unparse(v)) for ln, v in returns]
+    assert len(returns) == 8, [(ln, ast.unparse(v)) for ln, v in returns]
 
 
 # ---------------------------------------------------------------------------

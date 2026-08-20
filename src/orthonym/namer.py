@@ -2890,15 +2890,30 @@ class Orthonym:
             if _bal is not None:
                 smiles = _bal
         try:
-            # HYG-02: structural scope pre-check (opt-in). Only the wildcard
-            # class is refused here — the one class with zero in-scope risk.
-            if raise_on_limit:
-                _probe = Chem.MolFromSmiles(smiles)
-                if _probe is not None:
-                    _scope = classify_scope_limit(_probe)
-                    if _scope is not None:
-                        _scope.smiles = smiles
+            # HYG-02 + Wave-0 D1: structural scope pre-check, now UNCONDITIONAL.
+            # A wildcard atom makes the input InChIKey uncomputable, so the
+            # SELF-01 round-trip oracle fails OPEN and a wildcard input ships a
+            # WRONG molecule (CC* -> "ethane"). Refuse it before any producer OR
+            # the general-engine recovery runs — recovery would re-run producers
+            # on the wildcard mol and re-open the hole, so this must NOT route
+            # through the OrthonymLimitError handler's recovery path below.
+            _probe = Chem.MolFromSmiles(smiles)
+            if _probe is not None:
+                _scope = classify_scope_limit(_probe)
+                if _scope is not None:
+                    _scope.smiles = smiles
+                    if raise_on_limit:
                         raise _scope
+                    # Default path: honest descriptive fallback, byte-identical to
+                    # the current output for a wildcard whose producer already
+                    # fails (idx3), via the SAME _apply_trivial_fallback the limit
+                    # handler uses — but WITHOUT recovery.
+                    from .metrics.abstention import (
+                        AbstentionCode, record_abstention)
+                    record_abstention(AbstentionCode.OTHER, detail=_scope.code)
+                    return self._finish(
+                        self._apply_trivial_fallback(_scope.message, smiles),
+                        smiles)
             try:
                 result = self._name_impl(smiles)
             except OrthonymLimitError as _limit:
@@ -4387,6 +4402,23 @@ class Orthonym:
         if is_top_level_naming():
             clear_abstention()
         try:
+            # Wave-0 D1: same wildcard pre-check as name(). name_with_confidence
+            # returns a metadata dict, so mirror the limit handler's fallback dict
+            # (lines ~4405–4419) rather than name()'s string return.
+            _probe = Chem.MolFromSmiles(smiles)
+            if _probe is not None:
+                _scope = classify_scope_limit(_probe)
+                if _scope is not None:
+                    _scope.smiles = smiles
+                    record_abstention(AbstentionCode.OTHER, detail=_scope.code)
+                    _fallback_name = self._apply_trivial_fallback(
+                        _scope.message, smiles)
+                    _abst = abstention_code_for(_fallback_name)
+                    _md = unmeasured_confidence(
+                        name=_fallback_name, handler='fallback')
+                    _md['limit'] = _scope.as_dict()
+                    _md['abstention'] = _abst.value if _abst else None
+                    return _md
             try:
                 name = self._name_impl(smiles)
             except OrthonymLimitError as _limit:

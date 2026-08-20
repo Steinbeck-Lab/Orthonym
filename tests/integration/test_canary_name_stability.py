@@ -49,7 +49,11 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*C(=O)N[C@@H](CO[C@@H]1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O[C@@H]3O[C@H](CO)[C@@H](O)[C@H](O[C@@H]4O[C@H](CO)[C@H](O)[C@H](O[C@H]5O[C@H](CO)[C@H](O)[C@H](O)[C@H]5NC(C)=O)[C@H]4O[C@@H]4O[C@@H](C)[C@@H](O)[C@@H](O)[C@@H]4O)[C@H]3NC(C)=O)[C@H]2O)[C@H](O)[C@H]1O)[C@H](O)/C=C/CCCCCCCCCCCCC",
-        "(ethanediamide)(2S,3R,4E)-1,3-dihydroxy-2-(methanoylamino)octadec-4-enamide",  # ASML-12: locant-aware prefix merge
+        # Wave-0 D1: this SMILES carries a wildcard atom (atomic number 0), the
+        # same defect class as CC*->"ethane" -- the old pinned name below silently
+        # dropped the wildcard position instead of refusing. Correct behaviour
+        # (measured post-fix) is the unconditional wildcard sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "(ethanediamide)(2S,3R,4E)-1,3-dihydroxy-2-(methanoylamino)octadec-4-enamide"  # ASML-12: locant-aware prefix merge
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
@@ -884,7 +888,9 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*N=C=N[1*]",
-        "2,4-diazapentane",
+        # Wave-0 D1: wildcard atom (atomic number 0) -- same defect class as
+        # CC*->"ethane". Correct behaviour is the unconditional sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "2,4-diazapentane"
     ),
     (
         "C/N=C(\\N)NCCCCN",
@@ -1037,7 +1043,9 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*c1c(*)c(*)c(-c2oc3c(*)c(*)c(*)c(*)c3c(=O)c2O[C@@H]2O[C@H](COC(=O)CC(=O)[O-])[C@@H](O)[C@H](O)[C@H]2O)c(*)c1*",  # aromatic,heterocycle,fused-ring,charged,large,carbohydrate
-        "(propanedioyloxy)-3-oxanyl-4-oxo-2-phenyl-2H-pyran",
+        # Wave-0 D1: wildcard atoms (atomic number 0, x9) -- same defect class as
+        # CC*->"ethane". Correct behaviour is the unconditional sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "(propanedioyloxy)-3-oxanyl-4-oxo-2-phenyl-2H-pyran"
     ),
     pytest.param(
         "COc1cc(OC)c(C(C)=O)c(O)c1CCOCCc1c(O)cc(OC)c(C(C)=O)c1O",  # aromatic,large
@@ -2098,7 +2106,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*c1c[nH]cc1*",  # aromatic,heterocycle,small
-        "pyrrole",
+        # Wave-0 D1: wildcard atoms (atomic number 0, x2) -- same defect class as
+        # CC*->"ethane" ("pyrrole" silently dropped both attachment points).
+        # Correct behaviour is the unconditional sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "pyrrole"
     ),
     (
         "CC(C)=CCCc1ccsc1",  # aromatic,heterocycle,small
@@ -2133,7 +2144,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*C(=O)OC/C=C/c1ccc(O)c(OC)c1",  # aromatic,small
-        "(4E)-4-ethenyl-2-methoxyphenol",
+        # Wave-0 D1: wildcard atom (atomic number 0) -- same defect class as
+        # CC*->"ethane" (the ester's acyl carbon and its wildcard substituent
+        # were silently dropped). Correct behaviour is the unconditional sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "(4E)-4-ethenyl-2-methoxyphenol"
     ),
     (
         "CO[C@H]1O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@H]1NC(C)=O",  # heterocycle,medium,carbohydrate
@@ -2186,7 +2200,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "[1*]C(=O)OC[C@H](COP(=O)(O)OCC[N+](C)(C)C)OC([2*])=O",  # acyclic,charged,medium
-        "(2R)-nonyl formate",
+        # Wave-0 D1: wildcard atoms (atomic number 0, x2) -- same defect class as
+        # CC*->"ethane" (the phosphocholine backbone and both acyl wildcards were
+        # silently dropped). Correct behaviour is the unconditional sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "(2R)-nonyl formate"
     ),
     (
         "CCCCCCCCCCCCCC(=O)CC(C)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2503,7 +2520,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*C(=O)[C@@H](N)Cc1c[nH]cn1",  # aromatic,heterocycle,small
-        "3-imidazolylpropan-2-amine",
+        # Wave-0 D1: wildcard atom (atomic number 0) -- same defect class as
+        # CC*->"ethane" (the acyl carbonyl and its wildcard substituent were
+        # silently dropped). Correct behaviour is the unconditional sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "3-imidazolylpropan-2-amine"
     ),
     (
         "[AtH]",  # acyclic,small
@@ -2511,7 +2531,10 @@ NAME_STABILITY_CANARY = [
     ),
     (
         "*C(=O)OC[C@H](COP(=O)(O)OCC(COP(=O)(O)OC[C@@H](COC(*)=O)OC(*)=O)OC(C)=O)OC(*)=O",  # acyclic,large
-        "(formyloxy)(2R)-1,2-tris(formyloxy)(acetyloxy)propanol",
+        # Wave-0 D1: wildcard atoms (atomic number 0, x4) -- same defect class as
+        # CC*->"ethane" (a phosphoglyceride whose four acyl wildcards were
+        # silently dropped). Correct behaviour is the unconditional sentinel.
+        "compound with wildcard atoms (not supported)",  # was: "(formyloxy)(2R)-1,2-tris(formyloxy)(acetyloxy)propanol"
     ),
     (
         "O=C(O)C[C@H](O)CCCCCCCCCCCO",  # acyclic,medium
