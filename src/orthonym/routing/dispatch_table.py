@@ -884,6 +884,21 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
     suffix, GUARD 2); fall through to the v18 oxoacid + carboxylate
     neutralize-recurse body on ''.
     """
+    # P-72.2.2.2.1.2 (v33 charged Slice A): a phosphate/sulfate ester-ANION dianion
+    # (e.g. glycerol phosphate O=P([O-])([O-])OC(CO)CO) is named as the functional-
+    # class ester-anion WORD ("1,3-dihydroxypropan-2-yl phosphate"), charges intact.
+    # route_charged below can only swap a SUFFIX and mis-lands the -2 as `bis(olate)`
+    # on the owner polyol (a DIFFERENT molecule -> SELF-01 rejects -> abstain). The
+    # single-anion path already orders this before route_charged (ions.py:975-978);
+    # mirror it here. name_acid_ester_anion fail-closes off the clean single-centre
+    # ester-anion shape, so a non-ester dianion (propanedioate, methylphosphonate
+    # dianion) falls through to route_charged/_name_oxoacid_anion byte-identically.
+    from orthonym.rules.acid_ester_anion import name_acid_ester_anion
+    from orthonym.rules.ions import _validate_anion_name
+    ester_anion = name_acid_ester_anion(mol)
+    if ester_anion:
+        return _validate_anion_name(mol, ester_anion)
+
     from orthonym.rules.charged_router import route_charged
     routed = route_charged(mol, style)
     if routed:
