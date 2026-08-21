@@ -13,7 +13,9 @@ witnesses shipped this way, e.g.
     -> (1S,6R)-8-chloro-2,5,7-trioxospiro[...pentaene]  (OPSIN cannot parse it)
 
 The fix routes this exact branch through ``verify_or_none`` before shipping:
-non-None -> ship (opsin_status="verified_reconstructor"); None -> abstain.
+non-None -> ship (opsin_status="verified" -- fix-round-1 Finding 3 corrected
+this from the originally-shipped "verified_reconstructor", since name_facts=None
+means the only reachable success is a genuine OPSIN match); None -> abstain.
 ``name_facts`` is None at this call site (no name->NameFacts extractor exists
 yet for an arbitrary general-engine name string -- see task-A-report.md A.3),
 so with the real ``verify_or_none`` this branch always abstains today; most
@@ -74,7 +76,9 @@ def test_opsin_unparseable_engine_name_now_abstains(monkeypatch):
 def test_opsin_unparseable_engine_name_ships_when_verify_or_none_confirms(
         monkeypatch):
     """Wiring contract: a non-None verify_or_none return DOES ship, tagged
-    opsin='verified_reconstructor' (never the bare 'unverified' claim)."""
+    opsin='verified' (fix-round-1 Finding 3: with name_facts=None the only
+    reachable success is a genuine OPSIN verification, never the bare
+    'unverified' claim, and never mislabeled 'verified_reconstructor')."""
     import orthonym.namer as namer_mod
     from orthonym.validation import reconstruct as recon_mod
     _force_opsin_rejects(monkeypatch)
@@ -87,7 +91,7 @@ def test_opsin_unparseable_engine_name_ships_when_verify_or_none_confirms(
     nm = Orthonym(general_fallback=True, general_fallback_unverified=True)
     out = nm._try_general_engine_recovery("CC(Cl)CC")
     assert out is not None, "verify_or_none confirmed but the name did not ship"
-    assert get_provenance()["opsin"] == "verified_reconstructor"
+    assert get_provenance()["opsin"] == "verified"
 
 
 def test_verify_or_none_called_with_the_candidate_and_input_smiles(monkeypatch):

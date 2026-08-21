@@ -1511,6 +1511,26 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     jar-absent, a transient 'unavailable' OPSIN outcome, and an inconclusive
     compare all return True. This predicate must never be the reason
     `select_rt_passing` empties the whole offer pool.
+
+    v33 no-abstain Phase A fix-round-1 (Findings 1+2, FABLE adversarial
+    review): `skip_reanchor` bundles FOUR distinct outcomes as though they all
+    meant "no check is possible or worth attempting" -- but `unavailable` /
+    `not_run` mean only "no gate call was recorded for THIS EXACT STRING
+    (yet)", which is a LIVE, checkable question right now whenever a jar is
+    present -- unlike a genuine `carveout:*` (a by-design OPSIN-unparseable
+    PIN class -- thioperoxol/inositol/...) or `gate_disabled` (the whole
+    verification layer is deliberately off). Fail-opening all four alike let a
+    stubbed T4 producer ship a WRONG-MOLECULE name via a `t4_floor` offer with
+    ZERO gates firing end-to-end:  stubbed
+    `t4_coverage.name_t4_complete` to return `"ethanol"` for an unrelated
+    abstainer (`CC(=O)C1=C(C)S[C@@H](C)CC1=O`) and the genuine
+    `_finish`/`_maybe_append_t4_floor_offer`/`_offer_rt_ok`/`select_rt_passing`
+    chain shipped it, `source=t4_floor`, `gate_outcome=not_run`. Deny-by-
+    default: a never-gated string (`unavailable`/`not_run`) must EARN a fresh
+    positive `verify_or_none` verdict before it may win, whenever a jar is
+    present; only a genuine carveout / gate-disabled / no-jar case keeps the
+    advisory fail-open (that reasoning is legitimately unaffected -- none of
+    those three ever had a check available at all).
     """
     self01_complete, skip_reanchor, _detail = _self01_lookup(name)
     if self01_complete is False:
@@ -1519,12 +1539,31 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
         # the full-InChIKey bar can only be at least as strict, never rescue it.
         return False
     if skip_reanchor:
-        # carveout:* / gate_disabled / unavailable / not_run -- no jar was
-        # (or would be) consulted; fail-OPEN rather than treat "no verdict"
-        # as a rejection. These names are OPSIN-unparseable BY DESIGN (or no
-        # gate decision exists at all), so no full-InChIKey compare is even
-        # possible -- fail-open is the only sound answer.
-        return True
+        # Findings 1+2 fix: split the FOUR bundled outcomes by reading the
+        # `_detail` string `_self01_lookup` already returns (it is always
+        # formatted `f"{resolved}: ..."`) rather than re-deriving the outcome
+        # from provenance directly -- so a test (or caller) that mocks
+        # `_self01_lookup` as a black box still drives this branch correctly,
+        # and no second, redundant contextvar read is needed.
+        from .metrics import provenance as _pv
+        if (_detail.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX)
+                or _detail.startswith(_pv.GATE_OUTCOME_DISABLED + ":")):
+            # by-design OPSIN-unparseable PIN, or the whole gate deliberately
+            # off -- no check was ever possible or intended. Advisory
+            # fail-open stands, UNCHANGED from before this fix.
+            return True
+        # `unavailable` or `not_run`: this string has NEVER been checked.
+        if not _validity_gate_jar_present():
+            return True  # genuinely no way to verify right now -- fail-OPEN
+        if not input_smiles:
+            return True  # nothing to compare against -- inconclusive, fail-OPEN
+        # A fresh, real verdict is possible -- require it. verify_or_none's
+        # OPSIN branch fails closed (returns None) on a transient
+        # 'unavailable' outcome too (it only succeeds on a genuine
+        # `method == "parse_back"` match), so this single call also closes
+        # Finding 2's transient-unavailable fail-open for this branch.
+        from .validation.reconstruct import verify_or_none
+        return verify_or_none(name, input_smiles) is not None
     if not _validity_gate_jar_present():
         return True  # fail-OPEN: no jar to consult
     # NOTE: deliberately NOT short-circuited on `self01_complete is True`
@@ -3772,10 +3811,19 @@ class Orthonym:
                     # This TIGHTENS the tier (measured before/after in
                     # task-A-report.md); it does not add a stereo-omission
                     # degrade path.
+                    # fix-round-1 Finding 3: with `name_facts=None`, the ONLY
+                    # reachable success inside `verify_or_none` is its OPSIN
+                    # full-InChIKey branch (the reconstructor branch requires
+                    # `name_facts is not None`, unreachable here) -- so a
+                    # non-None return here is a genuine OPSIN verification,
+                    # not a reconstructor one. Label it "verified" (accurate),
+                    # never "verified_reconstructor" (a future task that
+                    # supplies real `name_facts` and reaches the reconstructor
+                    # branch may introduce its own distinct label then).
                     from .validation.reconstruct import verify_or_none
                     if verify_or_none(cand, smiles, name_facts=None) is None:
                         return None
-                    opsin_status = "verified_reconstructor"
+                    opsin_status = "verified"
             if cand and not is_failure_name(cand):
                 from .metrics.provenance import (
                     record_source, record_stereo_unexpressed)
@@ -4972,14 +5020,47 @@ class Orthonym:
                         # v27 P6 T6.2: shared stereo-emit policy (same helper as
                         # the late-recovery site). complete/valid abstain on
                         # dropped stereo; best-effort ships a constitution-only
-                        # name flagged stereo_unexpressed. The downstream
-                        # _final_opsin_validity_gate is already CONSTITUTIONAL
-                        # (InChIKey skeleton + charge, stereo-insensitive), so a
-                        # flagged emission verifies at the granularity it asserts
-                        # there; jar-absent best-effort rides the existing T4
-                        # unverified contract (fail-OPEN gate).
+                        # name flagged stereo_unexpressed.
+                        #
+                        # v33 no-abstain Phase A fix-round-1, Finding 4 (HIGH,
+                        # FABLE adversarial review): the OLD comment here claimed
+                        # the downstream `_final_opsin_validity_gate` "verifies at
+                        # the granularity [a flagged emission] asserts" -- WRONG.
+                        # That gate is CONSTITUTIONAL ONLY (InChIKey skeleton +
+                        # charge; it never inspects the stereo layer at all), so
+                        # a flagged emission that OMITS one stereo descriptor
+                        # while asserting a WRONG value for another (partial
+                        # omission + partial CONFLICT -- e.g. a 2-centre input
+                        # where the name cites only 1 centre and gets it
+                        # negated) has the SAME skeleton and would ship as a
+                        # WRONG STEREOISOMER unverified. Reproduced directly
+                        # ():
+                        # `C[C@@H](O)[C@@H](N)C` + candidate
+                        # `(3R)-3-aminobutan-2-ol` -- skeleton matches, full
+                        # InChIKey differs, and this lane shipped it with no
+                        # check at all. Route a FLAGGED emission through the
+                        # SAME `_rt_match` superset gate the late-recovery site
+                        # (`_try_general_engine_recovery`) already uses for this
+                        # exact purpose -- proven (FABLE's Q1,
+                        # , 13/14 probed
+                        # cases) to ACCEPT a genuine omission while REJECTING a
+                        # conflict/fabrication/wrong-enantiomer. An unflagged
+                        # emission (`_stereo_flagged=False`, already fully
+                        # stereo-complete) is UNCHANGED -- this only tightens the
+                        # flagged (best-effort-only) case. jar-absent still
+                        # fail-opens (rides the existing T4 unverified
+                        # contract), matching every other best-effort site.
                         _permitted, _stereo_flagged = self._stereo_emit_decision(
                             mol, _eng.name)
+                        if (_permitted and _stereo_flagged
+                                and not self._disable_opsin_validity_gate
+                                and _validity_gate_jar_present()):
+                            _g1_opsin_smi = _validity_gate_name_to_smiles(
+                                _eng.name)
+                            if (_g1_opsin_smi is None
+                                    or not self._rt_match(
+                                        smiles, _g1_opsin_smi, True)):
+                                _permitted = False
                         if not _no_jar_abstain and _permitted:
                             name = _eng.name
                             # v25 G3: observation-only provenance (the emission
