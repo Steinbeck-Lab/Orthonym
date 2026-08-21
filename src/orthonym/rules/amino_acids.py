@@ -23,14 +23,38 @@ from ..data.amino_acids import get_amino_acid_name, is_standard_amino_acid
 # [NX3;H2,H1] - primary or secondary amine nitrogen
 # [CX4] - sp3 carbon (alpha carbon)
 # [CX3](=O)[OX2H1] - carboxylic acid
-ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1][CX4][CX3](=O)[OX2H1]"
+#
+# v33 Phase 2 Task 2.0: N broadened to also admit H0 -- mirrors
+# rules/peptides.py's own `_PEPTIDE_BOND_SMARTS` broadening (v30). A
+# peptide's C-TERMINAL residue's own N-Calpha-COOH triad is what this
+# pattern is meant to catch (N here can be the free N-terminus of a
+# mono-residue "peptide", OR the amide N carried over from the PRECEDING
+# residue's peptide bond, hence the pre-existing H1 branch). When that
+# C-terminal residue is a cyclic imino acid (proline/hydroxyproline), its
+# ring nitrogen has TWO ring substituents already, so acylation by the
+# preceding residue leaves it with NO free hydrogen (a tertiary amide, H0)
+# -- the H1/H2-only pattern silently missed every X-...-Pro peptide, which
+# is why `is_peptide()` (below) returned False even though
+# `rules.peptides.name_peptide()` already named these correctly once
+# reached directly ( sec.4).
+# Was previously kept in sync with `peptides.py`'s pattern only by name, not
+# by value -- this restores that sync.
+ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2H1]"
 
 # SMARTS for peptide bond (secondary amide linkage between amino acids)
-# [NX3;H1] - secondary amide nitrogen (NH, not NH2)
+# [NX3;H0,H1] - secondary OR tertiary amide nitrogen (NH, or ring N with no H
+#   left once acylated -- a C-terminal cyclic imino acid such as proline)
 # [CX3](=O) - carbonyl carbon
 # [CX4] - alpha carbon on the acid side
-# This detects -C(=O)-NH-CH- linkages typical of peptide bonds
-PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H1][CX4]"
+# This detects -C(=O)-NH-CH- (and -C(=O)-N(ring)-CH- for Pro/Hyp) linkages
+# typical of peptide bonds.
+#
+# v33 Phase 2 Task 2.0: broadened to H0,H1 to match
+# rules/peptides.py's `_PEPTIDE_BOND_SMARTS` exactly (same rationale as
+# ALPHA_AMINO_ACID_SMARTS above) -- a dipeptide whose ONLY bond is an X-Pro
+# bond (Pro as the sole C-terminal residue) has no OTHER bond to fall back
+# on, so this constant must admit H0 too, not just the amino-acid pattern.
+PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 
 # SMARTS patterns for additional functional groups (PEP-02 bailout)
 # These detect FGs beyond amino + acid that _name_amino_acid_systematic

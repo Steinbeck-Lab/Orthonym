@@ -175,8 +175,23 @@ def name_peptide(mol) -> Optional[str]:
     if named_residues is None:
         return None
 
-    # Step 4: Assemble the peptide name
-    return _assemble_peptide_name(named_residues)
+    # Step 4: Assemble the peptide name. RT-gated (v33 Phase 2 Task 2.0): this
+    # was the one candidate-emission site in this file NOT verified against
+    # the input mol -- every v32 breadth lever (A/B, below) already routes
+    # through `_rt_verified`, but the ORIGINAL flat/acylamino-convention path
+    # never did, because before Task 2.0 the dispatch predicate
+    # (`amino_acids.is_peptide`) silently protected it from ever reaching a
+    # C-terminal cyclic-imino-acid (proline) chain at all. Unblocking that
+    # dispatch (Task 2.0's SMARTS fix) now routes 9 more molecules here, and
+    # the Phase-0 SPY measured 1/9 of them assembles a WRONG name (an
+    # 11-residue chain with an internal Gln + Asp -- likely a stereo/CIP
+    # mis-mapping), caught only incidentally by a downstream gate today.
+    # `_rt_verified` fails CLOSED on any mismatch/parse-error/no-OPSIN, so a
+    # wrong flat candidate now ABSTAINS instead of shipping; every ordinary
+    # peptide this path already named correctly continues to round-trip and
+    # is therefore unaffected in substance (0-wrong ABSOLUTE).
+    candidate = _assemble_peptide_name(named_residues)
+    return _rt_verified(mol, candidate)
 
 
 def _is_valid_peptide(mol) -> bool:
