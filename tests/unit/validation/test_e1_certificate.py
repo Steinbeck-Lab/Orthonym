@@ -105,3 +105,89 @@ def test_heteroatom_suffix_token_on_heteroatom_not_rejected():
 ])
 def test_confidently_all_carbon_classifier(token, expected):
     assert _token_is_confidently_all_carbon(token) is expected
+
+
+# ---------------------------------------------------------------------------
+# Phase E (no-abstain universal namer): the shared shape-agnostic core
+# ``_verify_partition`` -- ``verify_certificate`` is now a thin wrapper over it,
+# and the universal recursive namer certifies its output through the SAME core
+# (invariant 12: extend, don't duplicate). These tests exercise the core on
+# plain ``(token, atom_ids)`` tuples (the ``UniversalResult.bindings`` shape),
+# the branch-restricted ``atoms=`` reference set, and ``allow_charged``.
+# ---------------------------------------------------------------------------
+from orthonym.validation.e1_certificate import _verify_partition
+
+
+def test_verify_partition_complete_ok():
+    v = _verify_partition(ETHANOL, "ethan-1-ol",
+                          [("ethan", frozenset({0, 1})), ("ol", frozenset({2}))])
+    assert v.ok
+
+
+def test_verify_partition_accepts_a_oneshot_generator():
+    # the wrapper feeds a generator; the core must materialise it (iterated 3x)
+    gen = (p for p in [("ethan", frozenset({0, 1})), ("ol", frozenset({2}))])
+    v = _verify_partition(ETHANOL, "ethan-1-ol", gen)
+    assert v.ok
+
+
+def test_verify_partition_atom_drop_fails():
+    v = _verify_partition(ETHANOL, "ethan-1-ol", [("ethan", frozenset({0, 1}))])
+    assert not v.ok and "unbound" in v.reason
+
+
+def test_verify_partition_double_count_fails():
+    v = _verify_partition(ETHANOL, "x",
+                          [("a", frozenset({0, 1})), ("b", frozenset({1, 2}))])
+    assert not v.ok and "twice" in v.reason
+
+
+def test_verify_partition_phantom_atom_fails():
+    v = _verify_partition(ETHANOL, "x",
+                          [("a", frozenset({0, 1})), ("b", frozenset({2, 99}))])
+    assert not v.ok and ("non-heavy" in v.reason or "missing" in v.reason)
+
+
+def test_verify_partition_token_in_name_fails():
+    v = _verify_partition(ETHANOL, "ethan-1-ol",
+                          [("propan", frozenset({0, 1})), ("ol", frozenset({2}))])
+    assert not v.ok and "not in name" in v.reason
+
+
+def test_verify_partition_f_e1_all_carbon_on_hetero_fails():
+    v = _verify_partition(ETHANOL, "ethyl", [("ethyl", frozenset({0, 1, 2}))])
+    assert not v.ok and "all-carbon token" in v.reason
+
+
+def test_verify_partition_allow_charged_lifts_g1():
+    mol = Chem.MolFromSmiles("CC[O-]")  # net -1
+    pairs = [("ethan", frozenset({0, 1})), ("olate", frozenset({2}))]
+    assert not _verify_partition(mol, "ethan-1-olate", pairs).ok            # G1 fires
+    assert _verify_partition(mol, "ethan-1-olate", pairs, allow_charged=True).ok
+
+
+def test_verify_partition_branch_scope_covers_frag():
+    # atoms=frag restricts the partition to a branch subgraph; the two C's
+    # are the whole 'branch', O (idx 2) is outside it and must NOT be bound.
+    v = _verify_partition(ETHANOL, "ethyl", [("ethyl", frozenset({0, 1}))],
+                          atoms=frozenset({0, 1}))
+    assert v.ok
+
+
+def test_verify_partition_branch_scope_rejects_out_of_frag_atom():
+    # a branch binding that references an atom outside frag is a phantom
+    v = _verify_partition(ETHANOL, "ethyl", [("ethyl", frozenset({0, 1, 2}))],
+                          atoms=frozenset({0, 1}))
+    assert not v.ok and ("non-heavy" in v.reason or "missing" in v.reason)
+
+
+def test_wrapper_delegates_identically_to_core():
+    # verify_certificate(mol, result) must equal _verify_partition over the
+    # unpacked (token, atom_ids) tuples -- byte-identical logic for the 2
+    # existing GeneralEngineResult callers.
+    bindings = [TokenBinding((0, 1), "eth", "parent"), TokenBinding((2,), "ol", "suffix")]
+    res = _res(bindings)
+    a = verify_certificate(ETHANOL, res)
+    b = _verify_partition(ETHANOL, res.name,
+                          ((tb.token, tb.atom_ids) for tb in bindings))
+    assert (a.ok, a.reason) == (b.ok, b.reason)

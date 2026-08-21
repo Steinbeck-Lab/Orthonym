@@ -759,3 +759,77 @@ def test_single_heavy_atom_top_level_input_no_raise():
                 a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1
             )
             assert result.covers == heavy
+
+
+# ===========================================================================
+# Phase E (no-abstain universal namer): the universal namer certifies its
+# output through the SHARED E1 core ``_verify_partition`` (invariant 12:
+# extend, don't duplicate), REPLACING its hand-rolled coverage self-check.
+# These prove (a) the shared core is actually on the execution path -- a dead
+# choke point shows no movement (feedback_choke_point_off_path); (b) the two
+# checks the old self-check lacked (token-in-name, F-E1) now void a universal
+# name; (c) the charge-suffix-elision false-positive the token-in-name check
+# would otherwise raise is fixed (the elision-robust spine token).
+# ===========================================================================
+import orthonym.validation.e1_certificate as e1
+
+
+def test_phase_e_whole_molecule_routes_through_verify_partition(monkeypatch):
+    """The whole-molecule entry certifies through ``_verify_partition``: force
+    the shared core to reject and confirm the public entry point VOIDS; the
+    positive control (real core) ships. A dead site would ship regardless."""
+    mol = Chem.MolFromSmiles("CCCCCC")  # hexane -- trivially covered + verified
+    assert name_universal_substitutive(mol) is not None  # positive control
+
+    monkeypatch.setattr(e1, "_verify_partition",
+                        lambda *a, **k: e1.E1Verdict(False, "rigged reject"))
+    assert name_universal_substitutive(Chem.MolFromSmiles("CCCCCC")) is None
+
+
+def test_phase_e_branch_prefix_routes_through_verify_partition(monkeypatch):
+    """The branch entry (B3 ``-yl`` prefix) certifies through the SAME shared
+    core, scoped to the fragment. Force reject -> None; real core -> ships."""
+    mol = Chem.MolFromSmiles("CCCCC")
+    frag = frozenset(a.GetIdx() for a in mol.GetAtoms())
+    assert us.name_universal_substituent_prefix(mol, frag, 0, 1) == "pentan-1-yl"
+
+    monkeypatch.setattr(e1, "_verify_partition",
+                        lambda *a, **k: e1.E1Verdict(False, "rigged reject"))
+    mol2 = Chem.MolFromSmiles("CCCCC")
+    frag2 = frozenset(a.GetIdx() for a in mol2.GetAtoms())
+    assert us.name_universal_substituent_prefix(mol2, frag2, 0, 1) is None
+
+
+def test_phase_e_token_in_name_violation_voids(monkeypatch):
+    """The token-in-name check the old self-check LACKED is now live on the
+    universal path: rig a top-level binding token that is NOT a substring of
+    the assembled name and confirm the public entry point voids (rather than
+    shipping a name whose token census does not match its own spelling)."""
+    orig = us._name_component
+
+    def rigged(ctx, component, attach_hint, is_top):
+        result = orig(ctx, component, attach_hint, is_top)
+        if is_top and result is not None and result.bindings:
+            bindings = list(result.bindings)
+            tok, ids = bindings[0]
+            bindings[0] = ("zznotinname", ids)  # atoms unchanged; token bogus
+            result = dataclasses.replace(result, bindings=bindings)
+        return result
+
+    monkeypatch.setattr(us, "_name_component", rigged)
+    assert name_universal_substitutive(Chem.MolFromSmiles("CCCCCC")) is None
+
+
+@pytest.mark.parametrize("smi", ["C[N+](C)(C)C", "C[N+](C)(C)[CH2-]"])
+def test_phase_e_charged_species_still_names_no_elision_false_positive(smi):
+    """Regression: the charge/ionic suffix elides the parent core's trailing
+    'e' (``2-azapropane`` -> ``...2-azapropan-2-ium``; P-16.7.1(a)/P-74.1.1),
+    which a literal-substring token-in-name check would spuriously reject. The
+    spine binding token is recorded in the elision-robust stem form (mirroring
+    general_engine.py:1911), so a validly-spelled cation/zwitterion still
+    NAMES rather than being over-voided."""
+    result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+    assert result is not None and result.name
+    # and the shared core certifies its own output (self-consistent)
+    assert e1._verify_partition(Chem.MolFromSmiles(smi), result.name,
+                                result.bindings, allow_charged=True).ok

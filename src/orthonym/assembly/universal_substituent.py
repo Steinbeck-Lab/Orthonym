@@ -430,17 +430,31 @@ def _name_universal_substitutive_unsafe(
         if a.GetFormalCharge() != 0 and a.GetIdx() not in charge_ok:
             return None  # unspellable internal charge -> void, never mis-name
 
-    covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
-    total_bound = sum(len(ids) for _tok, ids in comp.bindings)
-    if covers != heavy or total_bound != len(heavy):
-        # ``covers != heavy`` catches a GAP; ``total_bound != len(heavy)``
-        # additionally catches a DOUBLE-COUNT (two bindings sharing an atom)
-        # that a union-only check cannot see (fix round 1, finding 5) -- this
-        # converts the pairwise-disjointness ARGUMENT (branches are built
-        # from a monotonically growing exclude set, so they cannot overlap)
-        # into an ASSERTION, rather than trusting the argument to always hold.
-        return None  # void: coverage incomplete -- never ship a partial name
+    # Phase E: certify the atom->token partition through the SAME shared E1
+    # core that certifies coverage elsewhere (invariant 12: extend, don't
+    # duplicate), REPLACING the hand-rolled two-sided ``covers != heavy or
+    # total_bound != len(heavy)`` self-check that lived here. That self-check
+    # re-derived E1's P1 atom-partition -- GAP via ``covers != heavy``,
+    # DOUBLE-COUNT via ``total_bound`` (fix round 1, finding 5) -- but LACKED
+    # E1's token-in-name and F-E1 chemistry-soundness checks, which this now
+    # gains for free. ``UniversalResult.bindings`` is already E1's
+    # ``(token, atom_ids)`` pairs shape, so no adapter is needed.
+    # ``allow_charged=True`` because this producer owns the charge axis by a
+    # STRONGER, earlier guard: the per-atom raw-formal-charge void guard above
+    # (task B2b) already voided any charge it could not spell -- E1's G1 is a
+    # blanket net==0 check that would over-void a validly-spelled cation/anion
+    # this producer legitimately emits (function-level import: keep the module
+    # graph acyclic, mirroring how t4_coverage/substituent_enumerator import
+    # this module).
+    from ..validation.e1_certificate import _verify_partition
+    verdict = _verify_partition(ctx.mol, comp.name, comp.bindings,
+                                allow_charged=True)
+    if not verdict.ok:
+        return None  # void: E1 rejected the partition (gap / double-count /
+        #              phantom / token-not-in-name / all-carbon-token-on-hetero)
+        #              -- never ship an atom-incomplete or mis-tokenised name
 
+    covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
     return UniversalResult(name=comp.name, bindings=tuple(comp.bindings), covers=covers)
 
 
@@ -581,13 +595,22 @@ def _name_universal_substituent_prefix_unsafe(
     if comp is None:
         return None
 
-    # Branch-restricted coverage assertion (the analogue of the whole-molecule
-    # one in ``_name_universal_substitutive_unsafe``, scoped to ``frag``):
-    # every branch atom bound exactly once, no gap, no double-count.
-    covers = frozenset(a for _t, ids in comp.bindings for a in ids)
-    total_bound = sum(len(ids) for _t, ids in comp.bindings)
-    if covers != frag or total_bound != len(frag):
-        return None  # void: never a partial / re-fragmenting branch name
+    # Phase E: certify the branch's atom->token partition through the SAME
+    # shared E1 core (invariant 12), scoped to ``frag`` (the branch's own
+    # heavy-atom set) via ``atoms=frag`` -- the analogue of the whole-molecule
+    # certification in ``_name_universal_substitutive_unsafe``, REPLACING the
+    # hand-rolled two-sided ``covers != frag or total_bound != len(frag)``
+    # self-check. Checked against ``comp.name`` (the branch's assembled name
+    # BEFORE the ``-yl`` rewrite ``_render_as_substituent`` applies below),
+    # which is exactly what the branch's internal tokens compose. Gains
+    # token-in-name + F-E1 over the old union/count self-check.
+    # ``allow_charged=True`` for the same reason as the whole-molecule call --
+    # the branch-restricted raw-charge guard just below owns the charge axis.
+    from ..validation.e1_certificate import _verify_partition
+    branch_verdict = _verify_partition(ctx.mol, comp.name, comp.bindings,
+                                       allow_charged=True, atoms=frag)
+    if not branch_verdict.ok:
+        return None  # void: never a partial / re-fragmenting / mis-tokenised branch
 
     # Branch-restricted charge assertions (the analogues of the two whole-
     # molecule ones): every GENUINE ionic centre inside the branch must have
@@ -667,8 +690,20 @@ def _name_component(
 
     # ---- branches: every off-spine atom, named by RE-ENTERING this SAME
     # function on its own (strictly smaller) subgraph. NO depth cap. -------
+    # Phase E: record the parent-spine binding token in the ELISION-ROBUST stem
+    # form (drop a trailing 'e'), mirroring general_engine's own ring
+    # parent-token convention (general_engine.py:1911). E1's token-in-name check
+    # (via ``_verify_partition``) requires each token to be a literal substring
+    # of the assembled name, but the parent core's trailing 'e' is legitimately
+    # elided when a charge/ionic suffix is appended below
+    # (``_elide_before_ionic_suffix``; P-16.7.1(a)/P-74.1.1) -- so the raw
+    # ``spine_core`` (e.g. ``2-azapropane``) would spuriously fail token-in-name
+    # on a validly-spelled cation/anion/zwitterion (``...2-azapropan-2-ium``).
+    # The stem (``2-azapropan``) is a substring whether or not the name elides;
+    # ``spine_core`` itself is still used for the NAME assembly below, unchanged.
+    spine_token = spine_core[:-1] if spine_core.endswith("e") else spine_core
     bindings: List[Tuple[str, FrozenSet[int]]] = [
-        (spine_core, frozenset(spine_atoms)),
+        (spine_token, frozenset(spine_atoms)),
     ]
     charged_accum: set = set(charge_ids)
     nitro_accum: set = set()  # Task B2b fix round 1: rendered-nitro atoms
