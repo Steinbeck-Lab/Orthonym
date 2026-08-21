@@ -30,13 +30,18 @@ _ESTER_ROUTED_SMILES = "CC(=O)O[C@H]1C(=C)C=C(C=C1OC)OC"  # cid 639588
 _ESTER_ROUTED_EXPECTED = (
     "(6S)-6-(acetyloxy)-1,3-dimethoxy-5-methylidenecyclohexa-1,3-diene")
 
-# A molecule NO cascade rung can complete: the ``-OC(=O)NP(=O)(Cl)Cl``
-# substituent (a dichlorophosphoryl carbamate) cannot be named -- the engine's
-# recursive substituent namer hits its depth cap (DROP-12
-# ``recursion_depth_fallback``) on the organophosphorus fragment, so every rung
-# fails E1 and the producer HONESTLY abstains (None), never a partial. This is
-# the genuine clean-abstain fixture now that the ester class routes around.
-_UNROUTABLE_SMILES = "C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl"
+# A molecule NO cascade rung -- INCLUDING the Phase-B4 universal-namer floor --
+# can complete: a bare carboxylate (an FG anion) is out of scope for BOTH the
+# general engine's charge suffixes AND ``name_universal_substitutive`` (whose
+# B2b charge support explicitly DEFERS FG anions -- see its module docstring),
+# so every rung voids and the producer HONESTLY abstains (None), never a
+# partial. (The v33 charged-lever names ``acetate`` via its own specialized
+# producer earlier in the pipeline, so this abstention is confined to the T4
+# best-effort layer and never surfaces to a user.) The former organophosphorus
+# fixture ``C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl`` is NO LONGER unroutable -- the B4
+# universal floor now names it (test below), which is the whole point of the
+# phase.
+_UNROUTABLE_SMILES = "CC(=O)[O-]"
 
 
 def _mol():
@@ -65,24 +70,46 @@ def _classified(smi):
 
 @pytest.mark.unit
 def test_declining_molecule_returns_none():
-    """A molecule NO cascade rung can complete yields a clean abstain (None)
-    from the producer -- never a raise, never a partial. Task 5's route-around
-    cascade TRIES every applicable strategy (PG-suppression, ring-first then
-    chain-parent) and, when the remaining substituent is genuinely unnameable
-    (the organophosphorus carbamate below), falls through to an honest abstain.
-    If it were ever to emit for this input, E1 must still bind every heavy atom.
+    """A molecule NO cascade rung can complete -- INCLUDING the Phase-B4
+    universal-namer floor -- yields a clean abstain (None), never a raise, never
+    a partial. The bare carboxylate below is an FG anion, out of scope for both
+    the general engine's charge suffixes and ``name_universal_substitutive``
+    (which defers FG anions), so every rung voids. An E1-backed rung that DID
+    emit would still have to bind every heavy atom.
     """
     mol, feats = _classified(_UNROUTABLE_SMILES)
     name = t4_coverage.name_t4_complete(mol, feats)
     if name is not None:
-        # Not expected -- but a non-None here must be atom-complete, never a
-        # partial (0-partial invariant). Prove it via the producer's E1 object.
+        # Not expected here -- but a non-None must be atom-complete, never a
+        # partial (0-partial invariant). An E1-backed rung (rungs 0-2) carries a
+        # ``result_obj``; the polyol/universal FLOOR rungs carry ``result_obj is
+        # None`` and are coverage-complete BY CONSTRUCTION (verified downstream
+        # by SELF-01), so accept either but reject a partial E1 object.
         cand = t4_coverage._best_effort_candidate(mol, feats)
-        assert cand is not None and cand.result_obj is not None
-        verdict = verify_certificate(mol, cand.result_obj)
-        assert verdict.ok, f"emitted a PARTIAL name: {name!r} ({verdict.reason})"
+        assert cand is not None
+        if cand.result_obj is not None:
+            verdict = verify_certificate(mol, cand.result_obj)
+            assert verdict.ok, f"emitted a PARTIAL name: {name!r} ({verdict.reason})"
     else:
         assert name is None
+
+
+@pytest.mark.unit
+def test_universal_floor_names_former_unroutable_carbamate():
+    """Phase B4: the organophosphorus carbamate that USED to be the clean-abstain
+    fixture (``C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl`` -- its recursive substituent namer
+    hit the DROP-12 depth cap) is now named by the unconditional universal
+    floor rung, coverage-complete and carrying no ``result_obj`` (verified
+    downstream by SELF-01). This is the abstention-rate lever the phase exists
+    for: a hard branch degrades to an ugly-but-valid systematic name instead of
+    failing the whole molecule.
+    """
+    mol, feats = _classified("C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl")
+    name = t4_coverage.name_t4_complete(mol, feats)
+    assert name is not None and name, "universal floor must name it, not abstain"
+    cand = t4_coverage._best_effort_candidate(mol, feats)
+    assert cand is not None and cand.result_obj is None, (
+        "the universal floor rung carries no result_obj (like polyol-polyester)")
 
 
 @pytest.mark.unit
@@ -371,9 +398,20 @@ def test_t4_polyfunctional_honest_abstain_no_partial(smi):
 # in -- and it must round-trip OPSIN-exact (SELF-01), since the wiring routes
 # the T4 name through the same final round-trip ladder the engine's own name
 # gets. Kept in this file (not the isolation file) because it needs a live OPSIN
-# JVM; the isolation file stays JVM-cheap. The exact string is Task 3's verified
-# emission for cid 1542461.
-_T4_TARGET_EXPECTED = "(1R,2R)-2-((dimethylamino)methyl)cyclohexan-1-ol"
+# JVM; the isolation file stays JVM-cheap. The exact string is the producer's
+# verified emission for cid 1542461.
+#
+# Enclosing marks per P-16.5.2.4 ("Brackets enclose substituent prefixes in
+# which parentheses have already been used", BlueBookV2.md:7416, verbatim PIN
+# example ``4-[(hydroxyselanyl)methyl]benzoic acid``): the compound prefix
+# ``(dimethylamino)methyl`` already uses parentheses, so its enclosure is SQUARE
+# BRACKETS, not a doubled parenthesis. The former ``((dimethylamino)methyl)``
+# expectation was a stale non-PIN spelling recorded before the enclosing-mark
+# convention was corrected; the producer emits the correct bracket form (proven
+# to be identical with and without the Phase-B4 universal-floor rung -- it comes
+# from an earlier T4 rung this task's diff did not touch), and OPSIN round-trips
+# both spellings to the same structure (the bracket form is the PIN).
+_T4_TARGET_EXPECTED = "(1R,2R)-2-[(dimethylamino)methyl]cyclohexan-1-ol"
 
 
 @pytest.mark.unit

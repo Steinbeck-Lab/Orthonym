@@ -347,4 +347,35 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
         if candidate is not None:
             return candidate
 
+    # Final rung (Phase B4): the UNCONDITIONAL recursive substitutive namer.
+    # Every feature-override rung above declined -- the remaining abstentions
+    # are the ENGINE-CAPABILITY class the Task-6 note enumerated (a hard branch
+    # the recursive substituent namer cannot spell, a ring parent no
+    # producer hosts, a charge name_general has no suffix for). This rung is
+    # the coverage floor that closes them: `name_universal_substitutive`
+    # re-derives the WHOLE molecule from scratch as senior parent + every
+    # off-parent atom rendered as a recursive `-yl` (skeletal heteroatoms as
+    # aza/oxa replacement), bottoming out at an ugly-but-valid systematic
+    # token rather than declining. It is coverage-complete BY CONSTRUCTION
+    # (its own atom-coverage assertion) and, like the polyol-polyester rung
+    # above, carries NO result_obj -- so `name_t4_complete` ships it straight
+    # to the caller's SELF-01 round-trip ladder (namer.py), which is the
+    # 0-wrong net: an unverifiable universal name (or a stereo CONFLICT) is
+    # suppressed there, a constitution-correct one (or a safe stereo-OMISSION
+    # via the `_rt_match` superset gate) ships. It renders no stereo
+    # descriptors (constitution-complete only), which is exactly what that
+    # superset gate is built to accept as a valid less-specific degrade.
+    # Fail-closed: `None` (a genuine residual -- out-of-scope charge, an
+    # isotope/radical/wildcard, or the work-budget/size ceiling) keeps the
+    # honest abstention below. Reachable ONLY on the best-effort path (this
+    # whole module is `_general_fallback`-gated in namer.py), so PIN is
+    # untouched.
+    try:
+        from .universal_substituent import name_universal_substitutive
+        _uni = name_universal_substitutive(mol)
+        if _uni is not None and _uni.name:
+            return _Candidate(name=_uni.name, result_obj=None)
+    except Exception as exc:  # fail-closed: a producer bug keeps the abstention
+        logger.info("t4 universal-substitutive rung raised: %s", exc)
+
     return None  # every applicable strategy tried -> honest abstain
