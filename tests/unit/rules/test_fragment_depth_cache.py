@@ -8,6 +8,8 @@ Tests the infrastructure in fragment_naming.py:
 """
 
 import pytest
+from rdkit import Chem
+from rdkit.Chem import inchi
 from orthonym.assembly.fragment_naming import (
     MAX_NAMING_DEPTH,
     _fragment_guard,
@@ -15,6 +17,22 @@ from orthonym.assembly.fragment_naming import (
     name_fragment_recursively,
 )
 from orthonym import name_compound
+
+
+def _inchikey(smiles: str) -> str:
+    """Full (3-block) InChIKey oracle, local to this file. STRICTER than the
+    shared ``canonical`` SMILES fixture: RDKit canonical SMILES is
+    tautomer-sensitive (it does not normalize mobile-H tautomers), which
+    mis-flags e.g. a guanidino ``N=C(N)N`` vs ``NC(N)=N`` redraw as a wrong
+    molecule even though the standard-InChI mobile-H layer makes them one
+    species. A full InChIKey compares skeleton + stereo + protonation, so it is
+    strictly stronger than production's own skeleton-only SELF-01 check and
+    stays a genuine 0-wrong guard. Used only by
+    ``test_production_never_emits_a_wrong_name`` -- see RB-6 in
+    ."""
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None, f"Invalid SMILES: {smiles}"
+    return inchi.MolToInchiKey(mol)
 
 
 @pytest.fixture(autouse=True)
@@ -406,7 +424,7 @@ class TestDepthLimitCompounds:
 
     @pytest.mark.roundtrip
     @pytest.mark.opsin_gate
-    def test_production_never_emits_a_wrong_name(self, opsin_to_smiles, canonical):
+    def test_production_never_emits_a_wrong_name(self, opsin_to_smiles):
         """The invariant that actually holds for all 25: production either
         names the compound CORRECTLY or abstains — it never ships a name that
         denotes a different structure.
@@ -415,6 +433,11 @@ class TestDepthLimitCompounds:
         i.e. production's real configuration, unlike every other test in this
         file. Skips rather than passes when the jar is absent, because the gate
         fails OPEN without it (see tests/conftest.py).
+
+        RB-6: the oracle is the full-InChIKey ``_inchikey`` helper, not the
+        shared (tautomer-sensitive) ``canonical`` SMILES fixture, so a mobile-H
+        redraw of the same species (e.g. row 017's guanidino group) is not
+        mis-flagged as a wrong molecule. See RB3-RB6-DERIVATION.md.
         """
         emitted, abstained, wrong = [], [], []
         for param in DEPTH_LIMIT_COMPOUNDS:
@@ -425,7 +448,7 @@ class TestDepthLimitCompounds:
                 abstained.append(param.id)
                 continue
             parsed = opsin_to_smiles(name)
-            if parsed is not None and canonical(parsed) == canonical(smiles):
+            if parsed is not None and _inchikey(parsed) == _inchikey(smiles):
                 emitted.append(param.id)
             else:
                 wrong.append((param.id, name, parsed))

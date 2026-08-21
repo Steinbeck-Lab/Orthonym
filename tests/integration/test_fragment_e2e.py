@@ -4,7 +4,7 @@ End-to-end integration tests for Phase 22: Fragment-Aware Naming.
 Validates all Phase 22 features working together through the full naming
 pipeline (SMILES -> name_compound() -> IUPAC name):
 
-1. Peptide naming (glycylglycine, L-alanyl-L-alanine, tripeptides)
+1. Peptide naming (glycylglycine, alanylalanine, tripeptides)
 2. NP ester decoration (testosterone acetate functional class naming)
 3. Multiplicative nomenclature (methylenedianiline)
 4. Recursion guard (deeply nested molecules don't crash)
@@ -33,29 +33,35 @@ class TestPeptideE2E:
 
     @pytest.mark.integration
     def test_l_alanyl_l_alanine(self):
-        """L-Ala-L-Ala dipeptide -> 'L-alanyl-L-alanine'."""
+        """L-Ala-L-Ala dipeptide -> 'alanylalanine'.
+
+        P-103.3.4 (BlueBookV2.md:54717): the stereodescriptor 'L' is NOT
+        indicated in peptide names for Table-10.4 residues, so both L-alanine
+        components drop their descriptor. (Only 'D' is cited.)"""
         result = name_compound("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O")
-        assert result == "L-alanyl-L-alanine"
+        assert result == "alanylalanine"
 
     @pytest.mark.integration
     def test_glycyl_l_alanine(self):
-        """Gly-L-Ala dipeptide -> 'glycyl-L-alanine'."""
+        """Gly-L-Ala dipeptide -> 'glycylalanine' (P-103.3.4: L omitted)."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)O")
-        assert result == "glycyl-L-alanine"
+        assert result == "glycylalanine"
 
     @pytest.mark.integration
     def test_l_alanylglycine(self):
-        """L-Ala-Gly dipeptide -> 'L-alanylglycine'."""
+        """L-Ala-Gly dipeptide -> 'alanylglycine' (P-103.3.4: L omitted)."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "L-alanylglycine"
+        assert result == "alanylglycine"
 
     @pytest.mark.integration
     def test_tripeptide_gly_ala_leu(self):
-        """Gly-L-Ala-L-Leu tripeptide naming."""
+        """Gly-L-Ala-L-Leu tripeptide -> 'glycylalanylleucine'.
+
+        P-103.3.4 (BlueBookV2.md:54717): both L-descriptors omitted."""
         result = name_compound(
             "NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O"
         )
-        assert result == "glycyl-L-alanyl-L-leucine"
+        assert result == "glycylalanylleucine"
 
     @pytest.mark.integration
     def test_asparagine_not_misrouted(self):

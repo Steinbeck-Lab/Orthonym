@@ -14,8 +14,11 @@ The charge suffix's locant is the ACTUAL charged atom's parent locant, so the
 descriptor is structurally faithful on its own; SELF-01 (OPSIN round-trip) is
 the backstop but fails OPEN without Java, hence the structural fail-closed rules.
 
-Reproduce-first (confirmed 2026-07-21, production OPSIN gate on):
-  - ACCEPTANCE cases below: pin (default) ABSTAINS; ``complete`` emits an
+Reproduce-first (confirmed 2026-07-21, production OPSIN gate on; RB-2 pin-emit
+split 2026-08-21):
+  - PIN_EMIT_CASES: the three silyl/germyl heteroarene-ammonium rows ARE PINs
+    (P-73.1.1.2 + P-68.2.2) and EMIT at the default pin tier.
+  - PIN_ABSTAIN_CASES: pin (default) ABSTAINS; ``complete`` emits an
     OPSIN-round-tripping charged name.
   - FAIL-CLOSED cases: ``complete`` abstains (never a wrong / charge-dropped
     name) -- charge on a substituent, a radical-cation, an unexpressible charge.
@@ -42,10 +45,54 @@ from orthonym.validation.e1_certificate import verify_certificate
 pytestmark = pytest.mark.unit
 
 
-# ACCEPTANCE: pin ABSTAINS; complete emits this exact RT-OK charged name.
-# (SMILES, complete-tier name). Categories: heteroarene-ammonium (monocycle),
-# von-Baeyer cage cation, chain carbanion (carboxylate-free simple organic ion).
-ACCEPT_CASES = [
+# Two expectation tables, split (RB-2) because the FULL NAMER and the
+# ENGINE-DIRECT (``name_general``) call paths legitimately produce different --
+# each individually correct -- strings for the fused-ring cation. See
+#  (§1 PIN status, §2 engine gap):
+#   * FULL_NAMER_CASES -- what ``Orthonym.name()`` actually ships. The three
+#     heteroarene-ammonium rows are PINs (P-73.1.1.2, whose own worked example is
+#     ``1-methylpyridin-1-ium (PIN)``; silyl/germyl are PIN-eligible preselected
+#     prefixes, P-68.2.2), so they EMIT at the default pin tier -- they do NOT
+#     abstain. For the fused-ring cation the production ``ions.py`` P-74 onium
+#     router supplies the retained ``isoquinolin-2-ium`` form (P-25.5 /
+#     P-52.2.4.4: a fusion name is preferred over a skeletal-replacement 'a'
+#     name) and wins at every tier.
+#   * ENGINE_DIRECT_CASES -- what ``name_general`` emits when called in
+#     isolation, bypassing the onium router. ``name_general_ring`` has no
+#     retained-fused-ring preference, so it emits the von-Baeyer /
+#     skeletal-replacement form for the fused-ring cation. That string is NEVER
+#     shipped by the full namer (the onium router intercepts first), so it is
+#     engine-isolation-only and 0-wrong-safe. Every other row is identical
+#     between the two tables.
+
+# Full-namer PIN-tier emissions: these ARE PINs and emit at the DEFAULT pin tier.
+PIN_EMIT_CASES = [
+    ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
+    ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),
+    # Fused-ring cation: the full namer ships the retained fusion name
+    # ``2-silylisoquinolin-2-ium`` (P-25.5 / P-52.2.4.4, worked example :42203),
+    # via the ions.py P-74 onium router recursing on the neutral bare ring.
+    ("[SiH3][n+]1ccc2ccccc2c1", "2-silylisoquinolin-2-ium"),
+]
+
+# Full-namer cases that abstain at pin and emit only at the ``complete`` tier.
+PIN_ABSTAIN_CASES = [
+    ("[SiH3]C[CH-]C", "1-silylpropan-2-ide"),
+    ("FC(F)(F)[CH-]C", "1,1,1-trifluoropropan-2-ide"),
+    # Multi-charge dication: the multiplied suffix ("-1,4-diium") begins with
+    # the consonant 'd' (di-), NOT a vowel -- P-16.7.1(a) requires the parent's
+    # terminal 'e' be RETAINED ("...diazine-1,4-diium", not "diazin-1,4-diium").
+    # Regression case for the elision-conditional fix in _append_charge_suffix.
+    ("C[n+]1cc[n+](C)cc1", "1,4-dimethyl-1,4-diazine-1,4-diium"),
+]
+
+# What the full namer ships across both tiers (pin-emit + complete-only).
+FULL_NAMER_CASES = PIN_EMIT_CASES + PIN_ABSTAIN_CASES
+
+# Engine-direct (``name_general``) emissions: identical to FULL_NAMER_CASES
+# except the fused-ring cation, which is the von-Baeyer / skeletal-replacement
+# form (engine-isolation-only, never shipped in production -- see the header).
+ENGINE_DIRECT_CASES = [
     ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
     ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),
     # v31 change-asserted-value: the aza-cage heteroatom takes the LOWEST locant
@@ -59,10 +106,6 @@ ACCEPT_CASES = [
      "3-silyl-3-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaen-3-ium"),
     ("[SiH3]C[CH-]C", "1-silylpropan-2-ide"),
     ("FC(F)(F)[CH-]C", "1,1,1-trifluoropropan-2-ide"),
-    # Multi-charge dication: the multiplied suffix ("-1,4-diium") begins with
-    # the consonant 'd' (di-), NOT a vowel -- P-16.7.1(a) requires the parent's
-    # terminal 'e' be RETAINED ("...diazine-1,4-diium", not "diazin-1,4-diium").
-    # Regression case for the elision-conditional fix in _append_charge_suffix.
     ("C[n+]1cc[n+](C)cc1", "1,4-dimethyl-1,4-diazine-1,4-diium"),
 ]
 
@@ -73,7 +116,8 @@ FAILCLOSED_CASES = [
     "[SiH3][CH-]c1ccccc1",   # charge not expressible as a parent suffix
 ]
 
-_RT_NAMES = dict(ACCEPT_CASES)
+# Round-trip the names the full namer actually ships.
+_RT_NAMES = dict(FULL_NAMER_CASES)
 
 
 # --------------------------------------------------------------------------
@@ -143,19 +187,19 @@ def _engine_name(smiles, *, allow_aromatic_general):
 # every P5 case, so the PIN/default path is byte-identical. Deterministic, no
 # Java. verify_certificate also still rejects charge by default.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,_name", ACCEPT_CASES)
+@pytest.mark.parametrize("smiles,_name", ENGINE_DIRECT_CASES)
 def test_pin_engine_inert_without_flag(smiles, _name):
     assert _engine_name(smiles, allow_aromatic_general=False) is None
 
 
-@pytest.mark.parametrize("smiles,expected", ACCEPT_CASES)
+@pytest.mark.parametrize("smiles,expected", ENGINE_DIRECT_CASES)
 def test_charge_claims_are_declared_in_the_binding_spine(smiles, expected):
     """Phase 0c Task 2: the charge-suffix producer now threads
     ``charge_atom_ids`` through a role='charge' binding, so P3's
     charge-totality proof stops being a permanent ``CHARGE_UNVERIFIED`` warn
     for every net-charged emission. The emitted NAME is unchanged (asserted
-    against the SAME pinned ``ACCEPT_CASES`` string every other test in this
-    file uses) -- only the binding ledger gained a new, E1-invisible entry.
+    against the SAME pinned ``ENGINE_DIRECT_CASES`` string the engine-direct
+    tests use) -- only the binding ledger gained a new, E1-invisible entry.
     """
     got = _engine_name(smiles, allow_aromatic_general=True)
     assert got == expected, f"{smiles}: {got!r} != {expected!r}"
@@ -181,7 +225,7 @@ def test_charge_claims_are_declared_in_the_binding_spine(smiles, expected):
 # --------------------------------------------------------------------------
 # Phase 0c Task 4 Part C: the T4 wiring now promotes P8's stereo axis and
 # P3's CHARGE_UNVERIFIED to error severity (``escalate=STRICT_STEREO_CHARGE_AXES``,
-# ``mode`` stays "audit"). These two ACCEPT_CASES are the task's named charge
+# ``mode`` stays "audit"). These two charge cases are the task's named charge
 # witnesses -- confirm the promotion does not touch them: their
 # ``charge_atom_ids`` are already threaded (Task 2a), so CHARGE_UNVERIFIED
 # never fires for them regardless of severity, the proof stays ``ok``, and
@@ -234,7 +278,7 @@ def test_e1_certificate_rejects_charge_by_default():
 # --------------------------------------------------------------------------
 # ENGINE-DIRECT EMISSION under complete (deterministic, no Java): exact strings.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,expected", ACCEPT_CASES)
+@pytest.mark.parametrize("smiles,expected", ENGINE_DIRECT_CASES)
 def test_engine_emits_charged_name(smiles, expected):
     got = _engine_name(smiles, allow_aromatic_general=True)
     assert got == expected, f"{smiles}: {got!r} != {expected!r}"
@@ -249,10 +293,25 @@ def test_engine_fails_closed(smiles):
 
 
 # --------------------------------------------------------------------------
-# FULL-NAMER complete tier: pin ABSTAINS, complete emits the expected name.
+# FULL-NAMER pin tier: PIN_EMIT_CASES emit their PIN, PIN_ABSTAIN_CASES abstain.
+# FULL-NAMER complete tier: every full-namer case emits its expected name.
 # Needs the production gate (else the suite ships unverified names).
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,expected", ACCEPT_CASES)
+@pytest.mark.parametrize("smiles,expected", PIN_EMIT_CASES)
+def test_pin_emits(smiles, expected, production_gate):
+    """RB-2: these three are PINs, so the DEFAULT pin tier emits them rather
+    than abstaining. `1-silylpyridin-1-ium`/`1-germylpyridin-1-ium` by direct
+    analogy to `1-methylpyridin-1-ium (PIN)` (P-73.1.1.2); silyl/germyl are
+    PIN-eligible preselected prefixes (P-68.2.2). The fused-ring cation ships
+    the retained `2-silylisoquinolin-2-ium` (P-25.5 / P-52.2.4.4, worked example
+    :42203) via the production ions.py P-74 onium router, NOT the P5 complete-tier
+    lever. See ."""
+    pin = Orthonym(style="pin")
+    out = pin.name(Chem.CanonSmiles(smiles))
+    assert out == expected, f"{smiles}: pin gave {out!r} != {expected!r}"
+
+
+@pytest.mark.parametrize("smiles,expected", PIN_ABSTAIN_CASES)
 def test_pin_abstains(smiles, expected, production_gate):
     pin = Orthonym(style="pin")
     out = pin.name(Chem.CanonSmiles(smiles))
@@ -260,7 +319,7 @@ def test_pin_abstains(smiles, expected, production_gate):
         f"expected pin abstention for {smiles!r}, got {out!r}")
 
 
-@pytest.mark.parametrize("smiles,expected", ACCEPT_CASES)
+@pytest.mark.parametrize("smiles,expected", FULL_NAMER_CASES)
 def test_complete_emits(smiles, expected, production_gate):
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)

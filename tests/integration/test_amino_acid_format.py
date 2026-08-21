@@ -75,13 +75,23 @@ class TestMultiAmineFormat:
 
     @pytest.mark.integration
     def test_geminal_diamine_ethanoic(self):
-        """NC(N)C(=O)O: geminal diamine -> 2,2-diaminoethanoic acid."""
+        """NC(N)C(=O)O: geminal diamine -> 'diaminoacetic acid' (NO locant).
+
+        Both NH2 sit on acetic acid's sole substitutable carbon (C2), so all
+        locants are omitted -- P-14.3.4.6 ("All locants are omitted ... when all
+        substitutable hydrogen atoms have the same locant"), exactly the shape
+        the Blue Book itself locks with `difluoroacetic acid (PIN) (not
+        2,2-difluoroacetic acid)` (BlueBookV2.md:3037). Contrast the diacid
+        below, where butanedioic acid's C3 is also substitutable so the locant
+        returns."""
         result = name_compound("NC(N)C(=O)O")
-        assert result == "2,2-diaminoethanoic acid"
+        assert result == "diaminoacetic acid"
 
     @pytest.mark.integration
     def test_geminal_diamine_diacid(self):
-        """NC(CC(=O)O)(C(=O)O)N: geminal diamine diacid -> 2,2-diaminobutanedioic acid."""
+        """NC(CC(=O)O)(C(=O)O)N: geminal diamine diacid -> 2,2-diaminobutanedioic
+        acid. Butanedioic acid has a second substitutable carbon (C3), so
+        P-14.3.4.6 does NOT apply and the '2,2' locants are required."""
         result = name_compound("NC(CC(=O)O)(C(=O)O)N")
         assert result == "2,2-diaminobutanedioic acid"
 

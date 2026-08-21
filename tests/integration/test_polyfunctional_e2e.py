@@ -127,10 +127,13 @@ class TestPOLY06_HydroxyAcids:
     """POLY-06: Name hydroxy acids."""
 
     def test_2_hydroxyacetic_acid(self):
-        """Glycolic acid - systematic name (ethanoic is also valid IUPAC)."""
+        """HO-CH2-COOH -> 'hydroxyacetic acid' (PIN, NO locant).
+
+        BlueBookV2.md:29854 verbatim: `HO-CH2-COOH hydroxyacetic acid (PIN)
+        (not glycolic acid)`. Acetic acid has a single substitutable carbon
+        (C2), so its locant is omitted (P-16.5.1.3.2 / P-14.3.4.6)."""
         result = name_compound("OCC(=O)O")
-        # Both "2-hydroxyacetic acid" and "2-hydroxyethanoic acid" are valid IUPAC
-        assert result in ["2-hydroxyacetic acid", "2-hydroxyethanoic acid"]
+        assert result == "hydroxyacetic acid"
 
     def test_3_hydroxypropanoic_acid(self):
         """Hydroxyl at position 3."""
@@ -185,10 +188,11 @@ class TestPhase4SuccessCriteria:
     """Verify Phase 4 success criteria from roadmap."""
 
     def test_criterion_1_hydroxy_acid(self):
-        """User can input 'OCC(=O)O' and receive a hydroxy acid name."""
+        """User can input 'OCC(=O)O' and receive a hydroxy acid name.
+
+        PIN is `hydroxyacetic acid` (BlueBookV2.md:29854, no locant)."""
         result = name_compound("OCC(=O)O")
-        # Both "2-hydroxyacetic acid" and "2-hydroxyethanoic acid" are valid
-        assert result in ["2-hydroxyacetic acid", "2-hydroxyethanoic acid"]
+        assert result == "hydroxyacetic acid"
 
     def test_criterion_2_ester(self):
         """User can input 'CC(=O)OC' and receive 'methyl acetate'."""
