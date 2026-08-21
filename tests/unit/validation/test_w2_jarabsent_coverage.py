@@ -120,6 +120,37 @@ def test_witness_no_longer_ships_atom_drop_jar_absent(monkeypatch, smiles):
         f"{smiles} still ships the atom-dropped wrong name {name!r}")
 
 
+def test_captopril_surviving_name_is_atom_complete_jar_absent(monkeypatch):
+    """Item-1 strengthening: the SURVIVING captopril name must be ATOM-COMPLETE,
+    not merely ``!=`` the one historical atom-dropped string. A future regression
+    that swapped one atom-drop for another (e.g. bare ``proline``, or re-dropping
+    the acyl chain) would pass the ``!=`` check above but must fail this one.
+
+    Captopril's SOLE sulfur sits in the ``2-methyl-3-sulfanylpropanoyl`` acyl
+    group -- exactly the fragment the W2 bug dropped -- so any atom-complete name
+    MUST express that whole acyl chain (its ``sulfanyl`` marker), while any
+    ring-only atom-drop necessarily lacks it.
+
+    NB (documented F1 residual -- see JAR-ABSENT-DEFAULT-TIER-FINDING.md): the
+    surviving name here is ``N-2-methyl-3-sulfanylpropanoylproline``, which is
+    atom-COMPLETE but OPSIN-UNPARSEABLE as written (its acyl substituent lacks
+    enclosing marks; the parenthesised ``N-(2-methyl-3-sulfanylpropanoyl)proline``
+    parses to the full captopril skeleton). Jar-PRESENT the OPSIN gate rejects the
+    malformed spelling and captopril abstains -- so an OPSIN round-trip cannot
+    serve as the atom-completeness oracle here; the drop-witness sulfur can.
+    """
+    _force_jar_absent(monkeypatch)
+    from orthonym import Orthonym
+    from orthonym.namer import is_failure_name
+    name = Orthonym(style="pin").name(CAPTOPRIL)
+    if is_failure_name(name):
+        return  # an abstention drops no atoms -- atom-safe
+    assert "sulfanyl" in name, (
+        f"captopril jar-absent name is atom-INCOMPLETE -- it dropped the "
+        f"S-bearing acyl chain: {name!r}")
+    assert name != _WITNESS_WRONG[CAPTOPRIL]
+
+
 def test_methyl_sulfate_abstains_jar_absent(monkeypatch):
     _force_jar_absent(monkeypatch)
     from orthonym import Orthonym
