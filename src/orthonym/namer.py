@@ -1176,7 +1176,8 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
 
 
 def _final_opsin_validity_gate(name: str, smiles: Optional[str],
-                               stats: Optional[Dict[str, int]] = None) -> str:
+                               stats: Optional[Dict[str, int]] = None,
+                               *, besteffort_unverified: bool = False) -> str:
     """SUB-03 real-OPSIN validity gate (D-11/D-12/D-13).
 
     Suppress an OPSIN-unparseable production name to the EXISTING
@@ -1184,6 +1185,21 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     Runs AFTER stereo + grammar repair, as the last transform before the value
     leaves name()/name_with_confidence(); inside the is_top_level_naming guard
     so it never fires on decomposition fragments.
+
+    ``besteffort_unverified`` (task-JAR-ABSENT, FABLE 0-wrong hole): the four
+    name()/name_with_confidence() call sites pass ``self._general_fallback_unverified``.
+    When True AND the OPSIN jar is GENUINELY absent (a no-Java deployment), the
+    D-13 jar-absent fail-OPEN below is replaced by a fail-CLOSED suppression:
+    at best-effort tier we cannot constitutionally verify ANY name without OPSIN
+    (the Wave-0 reconstructor has no NameFacts extractor for an arbitrary emitted
+    name yet -- ``verify_or_none(name, smiles, name_facts=None)`` is provably None
+    on every jar-absent call), and FABLE proved this branch ships WRONG-molecule
+    names at best-effort in a no-Java env (``COS(=O)(=O)O`` -> ``methane``). 0-wrong
+    is ABSOLUTE, so an unverifiable best-effort emission must abstain, not ship.
+    Default False keeps the historical jar-absent fail-OPEN for the PIN/default
+    tier and for every direct unit-test caller (2-/3-positional-arg callers are
+    unaffected). See task-jar-absent-report.md for why the default/PIN tier is a
+    separate, larger no-Java-PIN policy decision left as a scoped follow-up.
     """
     from .metrics import provenance as _pv
     if not name:
@@ -1207,6 +1223,29 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         pass
     # D-13 fail-OPEN: probe the JAR FIRST.
     if not _validity_gate_jar_present():
+        # task-JAR-ABSENT (FABLE 0-wrong hole): a GENUINELY absent jar means no
+        # constitutional verification is possible for this name -- no OPSIN, and
+        # the Wave-0 reconstructor needs a NameFacts extractor that does not yet
+        # exist for an arbitrary emitted name (verify_or_none(name_facts=None) is
+        # provably None on every jar-absent call). At BEST-EFFORT tier
+        # (general_fallback_unverified) that unverified branch is exactly the
+        # class FABLE showed ships WRONG-molecule names in a no-Java deployment
+        # (COS(=O)(=O)O -> methane; ClP(Cl)(=O)OC1=CC=CC=C1 ->
+        # (phosphonooxy)benzene, Cl2 silently swapped for (OH)2). 0-wrong is
+        # ABSOLUTE, so fail CLOSED to the honest fallback rather than ship it.
+        # The default/PIN tier (besteffort_unverified=False) keeps the historical
+        # D-13 fail-OPEN so this cannot touch the 1652 gate's correct-by-
+        # construction OPSIN-unparseable carve-out classes (inositol,
+        # np_stereoparent, thioperoxol, dianhydride, phane, ...) -- a separate
+        # no-Java-PIN policy question left as a scoped follow-up (see report).
+        if besteffort_unverified:
+            from .metrics.abstention import AbstentionCode, record_suppression
+            record_suppression(
+                AbstentionCode.GATE_SUPPRESSED,
+                detail='jar_absent_besteffort_unverified', candidate=name)
+            _suppressed_to = _descriptive_fallback(smiles)
+            _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+            return _suppressed_to
         _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name
     # CR-01 (code review 2026-06-02): suppress ONLY on a DEFINITIVE OPSIN
@@ -2727,8 +2766,9 @@ class Orthonym:
                 self._grammar, self._grammar_stats,
             )
             if _final_opsin_validity_gate(
-                    cand, smiles, self._grammar_stats) not in \
-                    _DESCRIPTIVE_FALLBACK_NAMES:
+                    cand, smiles, self._grammar_stats,
+                    besteffort_unverified=self._general_fallback_unverified) \
+                    not in _DESCRIPTIVE_FALLBACK_NAMES:
                 return cand
         return gated
 
@@ -3059,6 +3099,7 @@ class Orthonym:
                         _pre_gate = result
                         result = _final_opsin_validity_gate(
                             result, smiles, self._grammar_stats,
+                            besteffort_unverified=self._general_fallback_unverified,
                         )
                         # v29 Phase 4: the gate is now a FILTER over the
                         # cascade, not a terminal abort. Only fires when a real
@@ -3148,7 +3189,8 @@ class Orthonym:
                     _dname = try_decompose(_dprobe, style=self.style)
                     if _dname and not is_failure_name(_dname):
                         _dgated = _final_opsin_validity_gate(
-                            _dname, smiles, self._grammar_stats)
+                            _dname, smiles, self._grammar_stats,
+                            besteffort_unverified=self._general_fallback_unverified)
                         if not is_failure_name(_dgated):
                             result = _dgated
             # v33 giants Engine 3: a retained natural-product PARENT HYDRIDE
@@ -3740,9 +3782,13 @@ class Orthonym:
                     return None
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
-            # but-MISMATCHED name is NEVER shipped, at any tier. No-jar
-            # transience ships ONLY behind the T4 opt-in (`opsin_status` stays
-            # "unverified" -- a genuine environment gap, not a proof gap).
+            # but-MISMATCHED name is NEVER shipped, at any tier. task-JAR-ABSENT
+            # (FABLE 0-wrong hole): the no-jar best-effort branch below no
+            # longer ships unverified -- the old claim that "no-jar transience
+            # ships ONLY behind the T4 opt-in ... a genuine environment gap,
+            # not a proof gap" mischaracterized the hole (FABLE's witnesses were
+            # demonstrably WRONG-molecule, not merely-unprovable-but-correct),
+            # so the branch now routes through `verify_or_none` and abstains.
             # v33 no-abstain Phase A: when the jar IS present but OPSIN
             # rejects `cand` outright, the WIRED oracle below decides --
             # see the `else` branch after the `_opsin_smi is not None` check.
@@ -3752,6 +3798,33 @@ class Orthonym:
             elif not _validity_gate_jar_present():
                 if not self._general_fallback_unverified:
                     return None
+                # v33 no-abstain / task-JAR-ABSENT (FABLE 0-wrong hole): a
+                # jar-absent best-effort emission must NOT ship `cand`
+                # unverified. Before this fix control fell straight through
+                # this whole if/elif/else to the emit at the bottom with
+                # opsin_status="unverified" and ZERO verification of any kind
+                # -- FABLE measured 7/7 WRONG-molecule ships in a no-Java
+                # deployment (`COS(=O)(=O)O`->`methane`;
+                # `ClP(Cl)(=O)OC1=CC=CC=C1`->`(phosphonooxy)benzene` with Cl2
+                # silently swapped for (OH)2, a wrong constitution). Route
+                # through the Wave-0 OPSIN-free reconstructor oracle instead,
+                # exactly as the jar-PRESENT rejected branch does at the `else`
+                # below (shared seam). `name_facts=None` here (there is no
+                # name->NameFacts extractor for an arbitrary general-engine
+                # name yet -- see the `else` branch note), so with NO jar
+                # `verify_or_none`'s OPSIN branch is "unavailable" and its
+                # reconstructor branch (which requires name_facts) is skipped:
+                # it is PROVABLY None on this path today -- i.e. a clean
+                # fail-closed ABSTAIN, while remaining future-proof (a later
+                # NameFacts extractor lights up real jar-absent verification
+                # here for free, with zero further change to this call site).
+                # NEVER ship unverified. Label matches the `else` branch:
+                # with name_facts=None the ONLY reachable non-None is a
+                # genuine OPSIN full-InChIKey confirm, so "verified" is honest.
+                from .validation.reconstruct import verify_or_none
+                if verify_or_none(cand, smiles, name_facts=None) is None:
+                    return None
+                opsin_status = "verified"
             else:
                 _opsin_smi = _validity_gate_name_to_smiles(cand)
                 if _opsin_smi is not None:
@@ -4572,6 +4645,7 @@ class Orthonym:
                     if not self._disable_opsin_validity_gate:
                         name = _final_opsin_validity_gate(
                             name, smiles, self._grammar_stats,
+                            besteffort_unverified=self._general_fallback_unverified,
                         )
             metadata = retrieve_confidence()
             # v29 C4: no candidate was scored (early-return path). This used to
@@ -5047,9 +5121,11 @@ class Orthonym:
                         # conflict/fabrication/wrong-enantiomer. An unflagged
                         # emission (`_stereo_flagged=False`, already fully
                         # stereo-complete) is UNCHANGED -- this only tightens the
-                        # flagged (best-effort-only) case. jar-absent still
-                        # fail-opens (rides the existing T4 unverified
-                        # contract), matching every other best-effort site.
+                        # flagged (best-effort-only) case. (This gate is
+                        # jar-PRESENT-only; the jar-ABSENT best-effort case no
+                        # longer fail-opens -- see the task-JAR-ABSENT
+                        # verify_or_none gate just before the emit below, which
+                        # closed the FABLE 0-wrong hole here.)
                         _permitted, _stereo_flagged = self._stereo_emit_decision(
                             mol, _eng.name)
                         if (_permitted and _stereo_flagged
@@ -5060,6 +5136,34 @@ class Orthonym:
                             if (_g1_opsin_smi is None
                                     or not self._rt_match(
                                         smiles, _g1_opsin_smi, True)):
+                                _permitted = False
+                        # task-JAR-ABSENT (FABLE 0-wrong hole, inline-G1
+                        # sibling of the late-recovery ladder site above):
+                        # `_no_jar_abstain` only fires for the COMPLETE tier
+                        # (`allow_aromatic_general and not
+                        # general_fallback_unverified`), so a jar-absent
+                        # BEST-EFFORT emission fell through and shipped
+                        # `_eng.name` with NO verification of any kind -- the
+                        # downstream `_final_opsin_validity_gate` fails OPEN
+                        # with no jar, so nothing caught a wrong molecule. Same
+                        # defect class as the primary hole. Mirror the primary
+                        # fix: route a jar-absent best-effort emission through
+                        # the OPSIN-free reconstructor oracle before shipping.
+                        # `name_facts=None` => provably None with no jar today
+                        # (a clean fail-closed ABSTAIN; future-proof for a
+                        # later NameFacts extractor). Untouched when the jar is
+                        # PRESENT (the stereo gate above already covers that)
+                        # and in disable-gate test mode (G2 ship-unverified
+                        # contract, matching the primary site's `if
+                        # self._disable_opsin_validity_gate: pass`).
+                        if (_permitted
+                                and self._general_fallback_unverified
+                                and not self._disable_opsin_validity_gate
+                                and not _validity_gate_jar_present()):
+                            from .validation.reconstruct import verify_or_none
+                            if verify_or_none(
+                                    _eng.name, smiles,
+                                    name_facts=None) is None:
                                 _permitted = False
                         if not _no_jar_abstain and _permitted:
                             name = _eng.name
