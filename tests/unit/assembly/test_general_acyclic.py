@@ -166,5 +166,8 @@ def test_general_acyclic_loc_target():
     """general_acyclic.py target ~150-200 LOC verbatim lift."""
     src = open("src/orthonym/assembly/handlers/general_acyclic.py").read()
     loc = src.count("\n")
-    # The plan target is ~150 LOC; verbatim lift makes it ~190 LOC with imports + docstring
-    assert 100 <= loc <= 300, f"general_acyclic.py LOC = {loc}, expected 100-300"
+    # The plan target is ~150 LOC; verbatim lift makes it ~190 LOC with imports + docstring.
+    # Ceiling raised 300->320 (task-W2 Witness B): the handler gained the OPSIN-free
+    # atom-coverage close (a one-line _w2_atom_coverage_declines call + its import; the
+    # check body itself lives in _handler_shared to keep this handler thin).
+    assert 100 <= loc <= 320, f"general_acyclic.py LOC = {loc}, expected 100-320"

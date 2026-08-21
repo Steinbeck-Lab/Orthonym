@@ -730,6 +730,19 @@ class NameFragment:
     #: wrong on the complement (``2-methylpentanedioic acid`` legitimately keeps
     #: its locant).  ``None`` means "``text`` cites no locants of its own".
     text_without_locants: Optional[str] = None
+    #: task-W2 (Witness B): the heavy-atom indices this fragment ACCOUNTS FOR in
+    #: the molecule (the parent's skeletal atoms, a substituent's frag_atoms, the
+    #: suffix's characteristic-group atoms). ``None`` = "this producer did not
+    #: report its atoms" — the handler's atom-coverage close then SKIPS the check
+    #: for the whole name (breadth-safe: an un-instrumented producer is never
+    #: false-voided). A ``stereo`` fragment carries no atoms and is exempt. When
+    #: EVERY parent/suffix/prefix fragment reports atoms, their union is the
+    #: name-side accounting the general-acyclic handler verifies against the whole
+    #: molecule, so a silently-dropped substituent (e.g. the carbon-free sulfate
+    #: ester of `COS(=O)(=O)O`, dropped at DROP-01 → `methane`) is caught at
+    #: construction instead of shipping a wrong molecule when the OPSIN jar is
+    #: absent.
+    atoms: Optional[frozenset] = None
 
 
 def _get_parent_atom_count(features) -> int:
@@ -4853,7 +4866,7 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
         # Generate substituted name with N-locants and C-locants.
         # WS-4 / BBR-RSFX: pass the principal group so a senior FG on the ring is
         # emitted as a suffix (-one/-ol/-amine), not a detachable prefix.
-        return name_substituted_heterocycle(
+        result = name_substituted_heterocycle(
             features.mol,
             features.principal_ring,
             parent_name,
@@ -4861,9 +4874,53 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
             atom_to_locant,
             principal_group=getattr(features, 'principal_group', None)
         )
+    else:
+        # No substituents - return parent name directly
+        result = parent_name
 
-    # No substituents - return parent name directly
-    return parent_name
+    if result is None:
+        return None
+
+    # ── task-W2 Witness-A: jar-independent atom-coverage close ──────────────
+    # get_heterocycle_substituents (rules/heterocycles.py) can SILENTLY OMIT an
+    # exocyclic group it declines to name here — notably an ACYL group on a ring
+    # NITROGEN (an amide), which it skips outright betting a competing amide
+    # producer wins the pool. When no competing full-coverage candidate exists,
+    # that dropped-atom name is the sole survivor: captopril
+    # (CC(CS)C(=O)N1CCCC1C(=O)O) shipped as `pyrrolidine-2-carboxylic acid`,
+    # a different molecule (the 2-methyl-3-sulfanylpropanoyl chain vanished).
+    # SELF-01 caught it ONLY with the OPSIN jar present; jar-absent it shipped.
+    # Verify the emitted name accounts for EVERY heavy atom via the shared E1
+    # partition primitive (features.mol is the whole molecule on this top-level
+    # heterocycle path — the parent is the BARE ring name and every suffix/oxo
+    # group is carried as a substituent entry with its own `atoms`, so ring ∪
+    # substituent-atoms is the complete name-side accounting). Decline
+    # (fail-closed) if any atom is unbound — measured 2026-08-21 over 2,500 ChEBI
+    # + PubChem rows, 134 declines, EVERY one a genuine drop, 0 complete names
+    # voided. Gated UNCONDITIONALLY (pure Python/RDKit; redundant-but-harmless
+    # with SELF-01 jar-present, load-bearing jar-absent).
+    from ..validation.e1_certificate import verify_atom_coverage
+    if not features.principal_ring:
+        # Defensive: the ring atom set is the anchor of the accounting; without
+        # it the check cannot be trusted, so skip rather than risk a false void.
+        # (Unreachable in practice — parent_name is None without a ring, handled
+        # above — but never void on missing data.)
+        return result
+    _cov_groups = [features.principal_ring]
+    if substituents:
+        for _slist in substituents.values():
+            for _sinfo in _slist:
+                _sa = _sinfo.get('atoms')
+                if _sa:
+                    _cov_groups.append(_sa)
+    _verdict = verify_atom_coverage(features.mol, result, _cov_groups)
+    if not _verdict.ok:
+        logger.debug(
+            "W2 heterocycle atom-coverage decline: name=%s reason=%s smiles=%s",
+            result, _verdict.reason, getattr(features, 'canonical_smiles', '?'),
+        )
+        return None
+    return result
 
 
 def _amide_acyl_parent_locants(mol, amide_atoms) -> Optional[Dict[int, int]]:
@@ -8356,6 +8413,12 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
 
     # Group substituents by name: {name: [locants]}
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
+    # task-W2 (Witness B): the heavy atoms each NAMED substituent group consumes,
+    # accumulated alongside `substituent_groups` so the prefix fragment can carry
+    # its own atoms. A substituent that is SKIPPED (DROP-01/… `continue`) never
+    # reaches an append site, so its atoms are absent here — which is exactly how
+    # the handler's coverage close detects a silent drop.
+    substituent_group_atoms: Dict[str, set] = defaultdict(set)
     chain_set = set(features.principal_chain) if features.principal_chain else set()
 
     for sub_info in sub_infos:
@@ -8473,6 +8536,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     mol, list(sub_info.frag_atoms), _g14_attach)
                 if _g14:
                     substituent_groups[_g14].append(sub_info.locant)
+                    substituent_group_atoms[_g14].update(sub_info.frag_atoms)
                     continue
         # W2F-P7 (P-68.3 / P-45.3.1): a CARBON-FREE phosphanyl chain substituent
         # would likewise be lost by Guard 3 (has_carbon False). This is the path a
@@ -8498,6 +8562,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     mol, list(sub_info.frag_atoms), _p_attach)
                 if _ph:
                     substituent_groups[_ph].append(sub_info.locant)
+                    substituent_group_atoms[_ph].update(sub_info.frag_atoms)
                     continue
         if not has_carbon:
             logger.debug(
@@ -8600,6 +8665,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             name = _convert_yl_to_ylidene(name)
 
         substituent_groups[name].append(sub_info.locant)
+        substituent_group_atoms[name].update(sub_info.frag_atoms)
 
     # INST-01: Atom coverage audit
     if logger.isEnabledFor(logging.DEBUG):
@@ -8684,6 +8750,9 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             locants=emit_locants,
             fragment_type="prefix",
             text_without_locants=unlocanted,
+            # task-W2 (Witness B): the heavy atoms this prefix accounts for, so the
+            # general-acyclic handler can verify the whole name covers every atom.
+            atoms=frozenset(substituent_group_atoms.get(name, ())),
         ))
 
     # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)

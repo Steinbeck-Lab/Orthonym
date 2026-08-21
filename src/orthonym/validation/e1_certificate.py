@@ -171,6 +171,55 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
     return E1Verdict(True, "ok")
 
 
+def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
+    """Producer-side atom-COVERAGE close (the task-W2 reusable template).
+
+    A thin wrapper over :func:`_verify_partition` for the recurring producer
+    situation the W2 jar-absent-proper fix addresses: *"here are the atom groups
+    my emitted ``name`` accounts for — confirm together they cover EVERY heavy
+    atom of ``mol``, else I must decline (fail-closed) rather than ship a name
+    that silently dropped atoms."*
+
+    This is the OPSIN-free, jar-independent guard that catches an atom-drop at
+    CONSTRUCTION (defense-in-depth: jar-present SELF-01 would also catch it, but
+    only after a JVM round-trip; jar-absent nothing else does). It reuses the E1
+    partition primitive rather than duplicating a coverage check (invariant 12:
+    extend, don't duplicate) and is deliberately scoped to the COVERAGE axis:
+
+    * Groups are DEDUPLICATED before binding, so a benign double-listing of an
+      atom never trips the partition's ``bound twice`` refusal (a false void that
+      would cost breadth — the fix must void ONLY genuine drops).
+    * Each group is bound under the EMPTY token, so the token-in-name and F-E1
+      chemistry checks are SKIPPED here. Those two checks presuppose a
+      ``GeneralEngineResult``-style ``(token, atom_ids)`` stream whose token
+      strings are reconstructable; a legacy composer producer building the
+      partition from atom-index data alone cannot supply faithful token strings
+      (locants/elision/enclosing-marks are added around morphemes at assembly
+      time), and a mismatched token would false-void a CORRECT name. Coverage is
+      the only axis this template owns.
+    * ``allow_charged`` defaults True: this template checks atom coverage, not
+      the G1 charge scope, so a legitimately-charged parent is never voided for a
+      reason unrelated to an atom drop.
+
+    Args:
+      * ``atom_id_groups`` -- iterable of iterables of heavy-atom indices, one per
+        name-piece the producer emitted (ring atoms, each named substituent's
+        atoms, suffix atoms, ...). Their UNION is the accounted set.
+
+    Returns an :class:`E1Verdict`; ``.ok`` is False (with an ``unbound heavy
+    atoms`` reason) when any heavy atom is left unaccounted. Callers decline
+    (return ``None`` / abstain) on a non-ok verdict.
+    """
+    seen: set = set()
+    pairs = []
+    for grp in atom_id_groups:
+        g = frozenset(grp) - seen
+        if g:
+            pairs.append(("", g))
+            seen |= g
+    return _verify_partition(mol, name, pairs, allow_charged=allow_charged)
+
+
 def verify_certificate(mol, result, allow_charged: bool = False) -> E1Verdict:
     """Atom-partition certificate for a GeneralEngineResult.
 

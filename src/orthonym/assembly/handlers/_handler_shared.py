@@ -283,7 +283,10 @@ def _generate_chain_parent(features: Any) -> "NameFragment":
     return NameFragment(
         text=stem,
         locants=(tuple(double_locants), tuple(triple_locants)),
-        fragment_type="parent"
+        fragment_type="parent",
+        # task-W2 (Witness B): the parent's skeletal atoms, for the general-acyclic
+        # atom-coverage close (harmless/unused for handlers that do not run it).
+        atoms=frozenset(features.principal_chain or ()),
     )
 
 
@@ -2147,6 +2150,46 @@ def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
             return False
 
     return l5_uniform_complete(parent, decoration_of=decoration_of, counts=counts)
+
+
+def _w2_atom_coverage_declines(features, fragments, assembled: str) -> bool:
+    """task-W2 (Witness B): does this general-acyclic name silently DROP atoms?
+
+    A perceived substituent that FAILS to name — e.g. the carbon-free sulfate
+    ester ``-O-SO2-OH`` of ``COS(=O)(=O)O``, skipped at DROP-01 in
+    ``_generate_alkyl_prefixes`` expecting an FG-prefix that never comes — is
+    dropped silently, so the parent-only name ``methane`` ships a DIFFERENT
+    molecule when the OPSIN jar is absent (SELF-01 catches it only jar-present).
+
+    Every parent/prefix fragment now carries the heavy atoms it accounts for
+    (``NameFragment.atoms``); a dropped substituent reaches no append site, so its
+    atoms are simply absent from the union. When EVERY covered fragment reports
+    its atoms, that union is the name-side accounting and any unbound heavy atom
+    is a drop → return True (the handler declines, fail-closed → cascade/abstain,
+    never a wrong molecule). Reuses the shared E1 partition primitive
+    (``verify_atom_coverage``) rather than duplicating a coverage check.
+
+    BREADTH-SAFE: if ANY covered fragment did not report its atoms — an
+    un-instrumented producer, or a suffix (suffix atoms are the documented
+    incremental boundary of this fix) — the whole check is SKIPPED (return False),
+    never a false void. Called UNCONDITIONALLY (pure Python/RDKit;
+    redundant-but-harmless with SELF-01 jar-present, load-bearing jar-absent).
+    """
+    cov_frags = [
+        f for f in fragments
+        if f.fragment_type in ("parent", "suffix", "prefix")
+    ]
+    if not cov_frags or any(f.atoms is None for f in cov_frags):
+        return False
+    from ...validation.e1_certificate import verify_atom_coverage
+    verdict = verify_atom_coverage(
+        features.mol, assembled, [f.atoms for f in cov_frags])
+    if not verdict.ok:
+        logger.debug(
+            "W2 general_acyclic atom-coverage decline: name=%s reason=%s smiles=%s",
+            assembled, verdict.reason, getattr(features, 'canonical_smiles', '?'))
+        return True
+    return False
 
 
 def _assemble_fragments(

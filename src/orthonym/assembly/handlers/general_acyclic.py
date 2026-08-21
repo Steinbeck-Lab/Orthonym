@@ -104,6 +104,7 @@ def name_general_acyclic(
         _generate_ring_parent,
         _generate_stereodescriptors,
         _generate_suffix,
+        _w2_atom_coverage_declines,
     )
 
     # === Body: verbatim lift of composer.py:951-1055 (chain-fallback section) ===
@@ -254,6 +255,9 @@ def name_general_acyclic(
                 "ASSEMBLY_AUDIT: missing_fg=%s in name=%s smiles=%s",
                 missing_fgs, assembled, getattr(features, 'canonical_smiles', '?'),
             )
+
+    if _w2_atom_coverage_declines(features, fragments, assembled):
+        return None  # task-W2 Witness-B: name silently DROPPED atoms → decline
 
     # Phase 145.1: route chain-naming through pool.
     # In first_applicable mode, pool.best() returns the FIRST added
