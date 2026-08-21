@@ -51,8 +51,11 @@ Task B2b (this round) LIFTS the blanket per-atom-charge void and replaces it
 with real charge PERCEPTION, reusing ``assembly.general_engine``'s existing
 charge-suffix primitives (``_charge_suffix_text`` / ``_zwitterion_suffix_plan``
 / ``_elide_before_ionic_suffix``) so charge is spelled the SAME way as the
-rest of the codebase, never reinvented. Scope, precisely (fail-closed on
-everything else -- a table miss VOIDS the whole call, never mis-names):
+rest of the codebase, never reinvented. This is backstopped by a general
+RAW-formal-charge void guard (fix round 1 below) so that a charge the reused
+primitives cannot spell always VOIDS the whole call rather than being spelled
+wrong. Scope, precisely (fail-closed on everything else -- an unspellable
+charge VOIDS the whole call, never mis-names):
 
 * A GENUINE ionic centre (``perception.ions.get_ion_sites``, which already
   excludes P-59 INTERNAL charges -- nitro, N-oxide, azide, diazo -- these are
@@ -98,6 +101,33 @@ everything else -- a table miss VOIDS the whole call, never mis-names):
   top-level assertion (mirroring the atom-coverage assertion) checks that
   EVERY genuine ionic-centre atom index was actually resolved by some level's
   suffix, not merely trusted to be, before returning a name.
+
+Fix round 1 (task-review + FABLE adversarial, both on ``dc96929f`` -- see
+``.superpowers/sdd/2026-08-21-no-abstain-universal-namer/
+task-B2b-fixround1-findings.md``): the four bullets above governed only the
+GENUINE ionic centres ``get_ion_sites`` reports. But ``get_ion_sites``
+STRIPS P-59 INTERNAL and P-74.2.1 semipolar charges (N-oxide, azide, diazo,
+nitrone, nitrile oxide, nitronate, aci-nitro, nitrate ester, thionitro, and
+the charge-drawn S/P-oxides), so those charged atoms were invisible to BOTH
+``_resolve_spine_charge`` and the charge-coverage assertion -- while the
+spine builders thread atoms by ELEMENT SYMBOL ONLY, with no formal-charge
+check, and happily absorbed such an atom into the skeleton AS IF NEUTRAL,
+yielding a coverage-complete name of a DIFFERENT molecule (all measured
+mis-naming on ``dc96929f``; nitro was the sole exception, kept out of the
+chain via ``_is_nitro_root``, but its O atoms could still be shredded as a
+BFS seed / branch root, so polynitro mis-named too). The fix is ONE general
+RAW-formal-charge void guard at the top-level entry point: VOID the whole
+result whenever any atom carries a nonzero raw formal charge that was NOT
+consumed by (a) the genuine-ion suffix machinery
+(``cation_sites | anion_sites``, asserted resolved) or (b) a nitro group
+actually rendered by ``_nitro_shortcut`` (tracked as
+``_ComponentResult.nitro_atoms``). ``get_ion_sites`` lists every
+nonzero-charge atom then removes the internal set, so
+``cation_sites | anion_sites`` is EXACTLY the non-internal raw-charged atoms
+-- the guard therefore fires precisely on the internal charges, closing the
+whole class (N-oxide/azide/diazo/nitrone/... and polynitro shredding) in one
+set-membership check WITHOUT building any of their nomenclature (they
+correctly VOID = abstain; the floor degrades, never mis-names).
 
 This module is a PURE PRODUCER: it never calls ``verify_or_none`` and never
 ships a name; the caller (a later wiring task) is responsible for gating.
@@ -244,6 +274,32 @@ class _ComponentResult:
     #                                              symmetric to the atom-
     #                                              coverage assertion, but
     #                                              for CHARGE correctness.
+    nitro_atoms: FrozenSet[int] = frozenset()     # Task B2b fix round 1:
+    #                                              atom indices (N + both its
+    #                                              O) that were RENDERED as a
+    #                                              nitro group via
+    #                                              ``_nitro_shortcut``
+    #                                              SOMEWHERE within this
+    #                                              component (this level's own
+    #                                              leaf, unioned with every
+    #                                              child branch's own
+    #                                              `nitro_atoms`). Threaded --
+    #                                              not re-derived by string-
+    #                                              matching the "nitro" token
+    #                                              at the top level -- because
+    #                                              a nitro nested inside a
+    #                                              rendered ``-yl`` substituent
+    #                                              is folded into that
+    #                                              substituent's token and
+    #                                              would be invisible to such a
+    #                                              scan. Consumed by the
+    #                                              top-level RAW-formal-charge
+    #                                              void guard: nitro's P-59
+    #                                              INTERNAL charges are the one
+    #                                              internal-charge shape this
+    #                                              module can actually spell,
+    #                                              so they are the sole
+    #                                              exception (b) to that guard.
 
 
 # ===========================================================================
@@ -255,7 +311,7 @@ def name_universal_substitutive(
 ) -> Optional[UniversalResult]:
     """Name *mol* unconditionally, or return ``None`` (void -- never partial).
 
-    ``None`` happens for exactly five reasons, all fail-closed:
+    ``None`` happens for exactly six reasons, all fail-closed:
       1. a scope guard (isotopes / radicals / wildcard atoms / multi-fragment
          input) -- explicitly out of scope for this task, never silently
          mis-named;
@@ -271,7 +327,18 @@ def name_universal_substitutive(
          ship a name that omits the charge (the top-level charge-coverage
          assertion, symmetric to the atom-coverage one, catches this even if
          a lower-level construction bug would otherwise have missed it);
-      5. ANY other unexpected exception (fix round 1, finding 2). This is a
+      5. a P-59 INTERNAL / P-74.2.1 semipolar charge (N-oxide, azide, diazo,
+         nitrone, nitrile oxide, nitronate, aci-nitro, nitrate ester,
+         thionitro, charge-drawn S/P-oxide, or a shredded polynitro) --
+         ``get_ion_sites`` strips these, so they never reach reason 4's
+         machinery; the top-level RAW-formal-charge void guard (fix round 1;
+         see module docstring's fix-round-1 paragraph) voids any atom whose
+         nonzero raw formal charge was NOT consumed by the genuine-ion suffix
+         machinery or a rendered ``_nitro_shortcut``, so an internal charge
+         this module cannot spell VOIDS rather than being absorbed into the
+         skeleton as if neutral (a coverage-complete name of a DIFFERENT
+         molecule -- the whole defect this fix round closes);
+      6. ANY other unexpected exception (fix round 1, finding 2). This is a
          pure ``Optional``-contracted producer: it must never raise. Measured
          holes this closes: a spine longer than 9,999 atoms reaches
          ``data/chain_names.py``'s "chain length outside supported range
@@ -398,6 +465,33 @@ def _name_universal_substitutive_unsafe(
     if comp.charged != all_charge_ids:
         return None  # void: a genuine ionic centre was not expressed
 
+    # Task B2b fix round 1: the RAW-formal-charge void guard -- the one
+    # general check that closes the whole internal-charge mis-naming class.
+    # ``get_ion_sites`` (which ``cation_sites``/``anion_sites`` derive from)
+    # STRIPS P-59 INTERNAL charges (N-oxide, azide, diazo, nitrone, nitrile
+    # oxide, nitronate, aci-nitro, nitrate ester, thionitro, and the P-74.2.1
+    # semipolar / charge-drawn S/P-oxides), so those charged atoms are
+    # invisible to BOTH ``_resolve_spine_charge`` AND the charge-coverage
+    # assertion just above -- while the spine builders thread atoms by ELEMENT
+    # SYMBOL ONLY, with no formal-charge check, and would happily absorb such
+    # an atom into the skeleton AS IF NEUTRAL, yielding a coverage-complete
+    # name of a DIFFERENT molecule. ``all_charge_ids`` is EXACTLY the set of
+    # raw-charged atoms that are NOT internal (get_ion_sites lists every
+    # nonzero-charge atom, then removes the internal set), so the internal
+    # atoms are precisely ``{raw-charged} - all_charge_ids``. VOID whenever
+    # any atom carries a nonzero raw formal charge that was NOT consumed by
+    # (a) the genuine-ion suffix machinery (``all_charge_ids``, asserted
+    # resolved above) or (b) a nitro group actually rendered by
+    # ``_nitro_shortcut`` (``comp.nitro_atoms`` -- the one internal-charge
+    # shape this module can spell). This also closes polynitro shredding: a
+    # torn-apart nitro is never rendered as a nitro leaf, so its O(-) raw
+    # charge is unconsumed and trips the guard, voiding the whole molecule
+    # (correct -- degrade to abstain, never mis-name).
+    charge_ok = all_charge_ids | comp.nitro_atoms
+    for a in work.GetAtoms():
+        if a.GetFormalCharge() != 0 and a.GetIdx() not in charge_ok:
+            return None  # unspellable internal charge -> void, never mis-name
+
     covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
     total_bound = sum(len(ids) for _tok, ids in comp.bindings)
     if covers != heavy or total_bound != len(heavy):
@@ -440,9 +534,16 @@ def _name_component(
         shortcut = _leaf_shortcut(mol, component, attach_hint)
         if shortcut is not None:
             token, atoms = shortcut
+            # Task B2b fix round 1: record a rendered nitro group's atoms so
+            # the top-level raw-charge guard knows its P-59 internal charges
+            # ARE accounted for (exception (b)). ``_nitro_shortcut`` is the
+            # sole producer of the "nitro" token, so this single-site check
+            # is exact -- no other leaf carries a formal charge.
+            nitro_atoms = atoms if token == "nitro" else frozenset()
             return _ComponentResult(
                 name=token, bindings=[(token, atoms)], covers=atoms,
                 attach_locant=None, is_prefix_ready=True,
+                nitro_atoms=nitro_atoms,
             )
 
     # ---- parent (spine) selection -----------------------------------------
@@ -470,6 +571,7 @@ def _name_component(
         (spine_core, frozenset(spine_atoms)),
     ]
     charged_accum: set = set(charge_ids)
+    nitro_accum: set = set()  # Task B2b fix round 1: rendered-nitro atoms
     prefix_entries: Dict[str, List[int]] = {}
     for s_atom, root, order, branch_atoms in _discover_branches(
         mol, spine_atoms, component,
@@ -482,6 +584,7 @@ def _name_component(
         prefix_entries.setdefault(rendered, []).append(loc)
         bindings.append((rendered, sub.covers))
         charged_accum |= sub.charged
+        nitro_accum |= sub.nitro_atoms
 
     prefix_parts = []
     for name, locs in prefix_entries.items():
@@ -511,6 +614,7 @@ def _name_component(
     return _ComponentResult(
         name=full_name, bindings=bindings, covers=covers,
         attach_locant=attach_locant, charged=frozenset(charged_accum),
+        nitro_atoms=frozenset(nitro_accum),
     )
 
 

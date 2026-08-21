@@ -304,6 +304,95 @@ def test_charged_substituent_on_neutral_parent_carries_on_branch_name():
     assert "cyclohexane" in result.name
 
 
+# ===========================================================================
+# Task B2b fix round 1: the RAW-formal-charge void guard -- the whole
+# internal-charge class VOIDS (never mis-names). See
+# ``.superpowers/sdd/2026-08-21-no-abstain-universal-namer/
+# task-B2b-fixround1-findings.md``.
+# ===========================================================================
+
+# Every one of these carries a nonzero RAW formal charge that ``get_ion_sites``
+# STRIPS as a P-59 INTERNAL / P-74.2.1 semipolar bonding feature -- invisible
+# to both ``_resolve_spine_charge`` and the charge-coverage assertion. Before
+# the fix, the element-symbol-only spine builders absorbed each into the
+# skeleton AS IF NEUTRAL and emitted a coverage-complete name of a DIFFERENT
+# molecule (all 21 measured emitting wrong on dc96929f). The raw-charge guard
+# voids every one: none is spellable by this producer, so the floor degrades
+# to abstain, never mis-names.
+_INTERNAL_CHARGE_VOID_WITNESSES = [
+    ("N-oxide (aliphatic, TMAO)",        "C[N+](C)([O-])C"),
+    ("N-oxide (aromatic, pyridine)",     "[O-][n+]1ccccc1"),
+    ("N-oxide (NMMO)",                   "C[N+]1([O-])CCOCC1"),
+    ("N-oxide (2-methylpyridine)",       "Cc1cccc[n+]1[O-]"),
+    ("azide (ethyl)",                    "CCN=[N+]=[N-]"),
+    ("azide (resonance twin)",           "CC[N-][N+]#N"),
+    ("azide (cyclohexyl)",               "[N-]=[N+]=NC1CCCCC1"),
+    ("diazo (methane)",                  "C=[N+]=[N-]"),
+    ("diazo (ethane)",                   "CC=[N+]=[N-]"),
+    ("nitrone",                          "CC=[N+](C)[O-]"),
+    ("nitrile oxide",                    "CC#[N+][O-]"),
+    ("nitronate",                        "CC=[N+]([O-])[O-]"),
+    ("aci-nitro",                        "CC=[N+]([O-])O"),
+    ("nitrate ester",                    "CCO[N+](=O)[O-]"),
+    ("thionitro",                        "CC[N+](=S)[O-]"),
+    ("S-oxide (charge-drawn, DMSO)",     "C[S+](C)[O-]"),
+    ("P-oxide (charge-drawn)",           "C[P+](C)(C)[O-]"),
+    ("S-oxide (ethyl-methyl)",           "C[S+]([O-])CC"),
+    ("polynitro (dinitromethane)",       "C([N+](=O)[O-])[N+](=O)[O-]"),
+    ("polynitro (1,2-dinitroethane)",    "[O-][N+](=O)CC[N+](=O)[O-]"),
+    ("polynitro (trinitromethane)",      "[O-][N+](=O)C([N+](=O)[O-])[N+](=O)[O-]"),
+]
+
+
+@pytest.mark.parametrize(
+    "label,smiles", _INTERNAL_CHARGE_VOID_WITNESSES,
+    ids=[w[0] for w in _INTERNAL_CHARGE_VOID_WITNESSES],
+)
+def test_internal_charge_classes_void_never_misname(label, smiles):
+    """Fix round 1: an internal-charge class the module cannot spell must VOID
+    (return None), never emit a coverage-complete name of a different molecule.
+    This is the fail-closed regression suite for the whole class.
+
+    Polynitro is included deliberately: its nitro groups get shredded (a nitro
+    O can seed a spine, or be a raw-``GetNeighbors`` branch root), so they are
+    NEVER rendered as a ``_nitro_shortcut`` leaf -- their O(-) raw charge is
+    unconsumed and trips the guard. (A future task may NAME polynitro; for now,
+    voiding is correct and sufficient -- degrade to abstain, never mis-name.)"""
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None
+    assert name_universal_substitutive(mol) is None, (
+        f"{label} ({smiles!r}) must VOID -- an internal charge this producer "
+        f"cannot spell must never be absorbed into the skeleton as if neutral"
+    )
+
+
+def test_np_ylide_zwitterion_names_and_verifies():
+    """Fix round 1 keep-green: a P-74.1.1 skeletal zwitterion (both ionic
+    centres genuine and on the same spine) is IN scope and must still emit +
+    verify -- the raw-charge guard allows it because both charged atoms are
+    genuine ion sites (``cation_sites | anion_sites``) the suffix machinery
+    consumed, NOT stripped internal charges. Covers both the N-ylide and the
+    P-ylide (trimethylammonium/phosphonium methylide)."""
+    for smi in ("C[N+](C)(C)[CH2-]", "C[P+](C)(C)[CH2-]"):
+        result, verified = _name_and_verify(smi)
+        assert verified == result.name
+        assert "ium" in result.name and "ide" in result.name
+
+
+@pytest.mark.parametrize(
+    "smiles", ["CCON=O", "CC=NO", "CCN=O", "CCCC(CCC)N(O)O"],
+    ids=["nitrite-ester", "oxime", "nitroso", "N,N-dihydroxyheptanamine"],
+)
+def test_internal_charge_neutral_analogues_stay_correct(smiles):
+    """Fix round 1 keep-green: the NEUTRAL analogues of the voided classes
+    (drawn without formal charges) carry no raw charge, so the guard never
+    fires on them -- they must still name completely and verify, exactly as
+    before the fix. Guards against an over-broad guard that keys on the wrong
+    signal (element/shape rather than raw formal charge)."""
+    result, verified = _name_and_verify(smiles)
+    assert verified == result.name
+
+
 def test_charged_species_determinism_across_permutations():
     """The SAME charged molecule from differently-numbered (but structurally
     identical) SMILES must produce the IDENTICAL name -- the charge-suffix
