@@ -3701,8 +3701,12 @@ class Orthonym:
                     return None
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
-            # but-MISMATCHED name is NEVER shipped, at any tier. Unverifiable
-            # (no jar / rejected / transient) ships ONLY behind the T4 opt-in.
+            # but-MISMATCHED name is NEVER shipped, at any tier. No-jar
+            # transience ships ONLY behind the T4 opt-in (`opsin_status` stays
+            # "unverified" -- a genuine environment gap, not a proof gap).
+            # v33 no-abstain Phase A: when the jar IS present but OPSIN
+            # rejects `cand` outright, the WIRED oracle below decides --
+            # see the `else` branch after the `_opsin_smi is not None` check.
             opsin_status = "unverified"
             if self._disable_opsin_validity_gate:
                 pass  # test/internal mode: ship unverified (G2 contract)
@@ -3737,6 +3741,41 @@ class Orthonym:
                     # the pre-existing `not general_fallback_unverified` guard --
                     # byte-identical for the engine-own and multi-fragment paths.
                     return None
+                else:
+                    # v33 no-abstain Phase A (the `verify_or_none` keystone):
+                    # OPSIN could not parse `cand` at ALL (jar present;
+                    # rejected or a transient in-process failure -- the two
+                    # are indistinguishable from a single None here, exactly
+                    # as the pre-existing branches above already treat them).
+                    # Before this SHIPPED completely unverified -- `opsin_status`
+                    # stayed "unverified" with literally no proof, the exact gap
+                    # measured live on dev500 (3 witnesses: a spiro-fused
+                    # dioxatricyclic ketone, a dioxa-aza-cyclododecanone, and a
+                    # spiro-decahydronaphthalene isoindolinone -- task-A-report.md
+                    # A.1). Route it through the Wave-0 OPSIN-free reconstructor
+                    # oracle instead of shipping bare: `verify_or_none` ships
+                    # `cand` only if OPSIN parses it after all (re-checked
+                    # inside the oracle) OR the reconstructor CONFIRMS it from
+                    # `name_facts`.
+                    #
+                    # `name_facts=None` here: `cand` at this rung is an
+                    # assembled name STRING from the general engine's own
+                    # `name_general` result (`eng`, not a `_Candidate` with a
+                    # T4 `result_obj`), and there is no name->NameFacts
+                    # extractor for an arbitrary general-engine name yet (a
+                    # separate, larger task -- see task-A-report.md A.3). With
+                    # `name_facts=None` only the OPSIN branch could confirm,
+                    # and it already failed to parse one line above, so this
+                    # call ALWAYS abstains today -- that is the CORRECT, sound
+                    # answer (never a false CONFIRM): a name neither OPSIN nor
+                    # the reconstructor can check must not ship unverified.
+                    # This TIGHTENS the tier (measured before/after in
+                    # task-A-report.md); it does not add a stereo-omission
+                    # degrade path.
+                    from .validation.reconstruct import verify_or_none
+                    if verify_or_none(cand, smiles, name_facts=None) is None:
+                        return None
+                    opsin_status = "verified_reconstructor"
             if cand and not is_failure_name(cand):
                 from .metrics.provenance import (
                     record_source, record_stereo_unexpressed)
