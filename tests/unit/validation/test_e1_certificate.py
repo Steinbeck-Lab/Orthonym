@@ -154,6 +154,20 @@ def test_verify_partition_token_in_name_fails():
     assert not v.ok and "not in name" in v.reason
 
 
+def test_verify_partition_token_in_name_tolerates_terminal_e_elision():
+    # P-16.7.1(a)/P-74.1.1: a parent-hydride token's terminal 'e' is elided
+    # before a vowel-initial ionic suffix, so the FULL token ('ethane') is
+    # absent but its stem ('ethan') is present -> accepted on token-in-name.
+    v = _verify_partition(ETHANOL, "ethan-1-ol",
+                          [("ethane", frozenset({0, 1})), ("ol", frozenset({2}))])
+    assert v.ok
+    # but the elision tolerance strips ONLY a single trailing 'e' -- a genuinely
+    # absent token (no shared stem) still fails.
+    v2 = _verify_partition(ETHANOL, "ethan-1-ol",
+                           [("propane", frozenset({0, 1})), ("ol", frozenset({2}))])
+    assert not v2.ok and "not in name" in v2.reason
+
+
 def test_verify_partition_f_e1_all_carbon_on_hetero_fails():
     v = _verify_partition(ETHANOL, "ethyl", [("ethyl", frozenset({0, 1, 2}))])
     assert not v.ok and "all-carbon token" in v.reason

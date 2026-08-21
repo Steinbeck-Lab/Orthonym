@@ -825,11 +825,49 @@ def test_phase_e_charged_species_still_names_no_elision_false_positive(smi):
     """Regression: the charge/ionic suffix elides the parent core's trailing
     'e' (``2-azapropane`` -> ``...2-azapropan-2-ium``; P-16.7.1(a)/P-74.1.1),
     which a literal-substring token-in-name check would spuriously reject. The
-    spine binding token is recorded in the elision-robust stem form (mirroring
-    general_engine.py:1911), so a validly-spelled cation/zwitterion still
-    NAMES rather than being over-voided."""
+    FULL ``spine_core`` token is stored (so F-E1/P1 see the real token); the
+    elision is tolerated on the token-in-name axis ALONE inside
+    ``_verify_partition`` (accepts the stem), so a validly-spelled
+    cation/zwitterion still NAMES rather than being over-voided."""
     result = name_universal_substitutive(Chem.MolFromSmiles(smi))
     assert result is not None and result.name
+    # the FULL parent token is stored (fix round 1: not pre-stemmed)
+    assert result.bindings[0][0].endswith("e"), result.bindings[0][0]
     # and the shared core certifies its own output (self-consistent)
     assert e1._verify_partition(Chem.MolFromSmiles(smi), result.name,
                                 result.bindings, allow_charged=True).ok
+
+
+def test_phase_e_f_e1_is_live_for_all_carbon_spine_through_real_path(monkeypatch):
+    """Fix round 1: the FULL spine token is stored, so E1's F-E1 all-carbon
+    classifier is LIVE for the alkane/cycloalkane/retained-ring class it
+    guards (a pre-stemmed ``cyclohexan`` would be unclassifiable -> F-E1
+    inert). Two parts, both through the REAL producer (not a hand-built
+    token that never gets stemmed):
+
+      (a) cyclohexanol's real spine binding token is the FULL ``cyclohexane``
+          and F-E1 classifies it all-carbon;
+      (b) rigging that all-carbon spine token to also cover the hydroxy O
+          (an all-carbon token bound to a heteroatom) is REJECTED by F-E1 ->
+          the public entry voids. A pre-stemmed token would have shipped."""
+    smi = "OC1CCCCC1"  # cyclohexanol: ring spine is naturally all-carbon
+    real = name_universal_substitutive(Chem.MolFromSmiles(smi))
+    assert real is not None
+    spine_tok = real.bindings[0][0]
+    assert spine_tok == "cyclohexane"
+    assert e1._token_is_confidently_all_carbon(spine_tok)  # part (a): F-E1 LIVE
+
+    orig = us._name_component
+
+    def rigged(ctx, component, attach_hint, is_top):
+        res = orig(ctx, component, attach_hint, is_top)
+        if is_top and res is not None and len(res.bindings) >= 2:
+            tok0, ids0 = res.bindings[0]  # ("cyclohexane", ring carbons)
+            merged = set(ids0)
+            for _t, ids in res.bindings[1:]:
+                merged |= set(ids)  # fold the hydroxy O into the all-carbon token
+            res = dataclasses.replace(res, bindings=[(tok0, frozenset(merged))])
+        return res
+
+    monkeypatch.setattr(us, "_name_component", rigged)
+    assert name_universal_substitutive(Chem.MolFromSmiles(smi)) is None  # part (b)

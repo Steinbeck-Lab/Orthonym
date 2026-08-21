@@ -109,9 +109,10 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
 
     Checks, in order: P1 atom partition (every reference-set heavy atom bound by
     exactly one token, no double-count, no phantom/non-reference atom),
-    token-in-name (each non-empty token is a literal substring of ``name``), F-E1
-    chemistry-soundness (a confidently all-carbon token may not bind a
-    heteroatom), G1 charge scope.
+    token-in-name (each non-empty token is a substring of ``name``, tolerating
+    the P-16.7.1(a)/P-74.1.1 terminal-'e' elision before a vowel-initial ionic
+    suffix), F-E1 chemistry-soundness (a confidently all-carbon token may not
+    bind a heteroatom), G1 charge scope.
     """
     pairs = list(pairs)
     if atoms is None:
@@ -132,9 +133,25 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
     if phantom:
         return E1Verdict(False, f"bindings reference non-heavy/missing "
                                 f"atoms: {sorted(phantom)}")
+    # Token-in-name: every non-empty token is a literal substring of ``name``.
+    # ELISION-ROBUST on THIS axis only (P-16.7.1(a) / P-74.1.1): a parent-hydride
+    # token's terminal 'e' is elided before a vowel-initial ionic/cumulative
+    # suffix (``2-azapropane`` -> ``...2-azapropan-2-ium``), so the FULL token
+    # is legitimately absent while its stem (token without the trailing 'e') is
+    # present. Accept the stem too. This tolerance is confined to token-in-name;
+    # the stored token stays the FULL form, so P1 and F-E1 both see the real,
+    # classifiable token. Existing GeneralEngineResult callers are unaffected
+    # (their parent tokens are already elision-robust stems, e.g. 'but'/'benzen',
+    # so the extra clause never changes their verdict); the relaxation only ever
+    # ACCEPTS the one legitimate elision, never admits an unrelated token.
     for token, _atom_ids in pairs:
-        if token and token not in name:
-            return E1Verdict(False, f"token {token!r} not in name")
+        if not token:
+            continue
+        if token in name:
+            continue
+        if token.endswith("e") and token[:-1] in name:
+            continue
+        return E1Verdict(False, f"token {token!r} not in name")
     # F-E1: a CONFIDENTLY all-carbon token may not be bound to a heteroatom.
     # Sound-by-refusal -- only fires on the alkane/alkyl/carbocyclic class; every
     # other token is skipped, so no legitimate certificate is voided.

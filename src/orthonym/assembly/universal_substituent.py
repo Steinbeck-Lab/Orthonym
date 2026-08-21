@@ -690,20 +690,20 @@ def _name_component(
 
     # ---- branches: every off-spine atom, named by RE-ENTERING this SAME
     # function on its own (strictly smaller) subgraph. NO depth cap. -------
-    # Phase E: record the parent-spine binding token in the ELISION-ROBUST stem
-    # form (drop a trailing 'e'), mirroring general_engine's own ring
-    # parent-token convention (general_engine.py:1911). E1's token-in-name check
-    # (via ``_verify_partition``) requires each token to be a literal substring
-    # of the assembled name, but the parent core's trailing 'e' is legitimately
-    # elided when a charge/ionic suffix is appended below
-    # (``_elide_before_ionic_suffix``; P-16.7.1(a)/P-74.1.1) -- so the raw
-    # ``spine_core`` (e.g. ``2-azapropane``) would spuriously fail token-in-name
-    # on a validly-spelled cation/anion/zwitterion (``...2-azapropan-2-ium``).
-    # The stem (``2-azapropan``) is a substring whether or not the name elides;
-    # ``spine_core`` itself is still used for the NAME assembly below, unchanged.
-    spine_token = spine_core[:-1] if spine_core.endswith("e") else spine_core
+    # Phase E (fix round 1): store the FULL, unstemmed ``spine_core`` token
+    # (``hexane``/``cyclohexane``/``2-azapropane``...). E1's F-E1 all-carbon
+    # classifier and P1 partition both need the true token -- F-E1's grammar
+    # only recognises the FULL suffix form (``hexane``->all-carbon,
+    # ``hexan``->unclassified), so a pre-stemmed token would silently disable
+    # F-E1 for exactly the alkane/cycloalkane class it exists to guard. The
+    # parent core's trailing 'e' IS legitimately elided when a charge/ionic
+    # suffix is appended below (``_elide_before_ionic_suffix``;
+    # P-16.7.1(a)/P-74.1.1), so ``2-azapropane`` is not a literal substring of
+    # ``...2-azapropan-2-ium`` -- but that elision is tolerated on the
+    # TOKEN-IN-NAME axis ALONE, inside ``_verify_partition`` (accepts the stem
+    # ``token[:-1]``), NOT by pre-stemming the stored token here.
     bindings: List[Tuple[str, FrozenSet[int]]] = [
-        (spine_token, frozenset(spine_atoms)),
+        (spine_core, frozenset(spine_atoms)),
     ]
     charged_accum: set = set(charge_ids)
     nitro_accum: set = set()  # Task B2b fix round 1: rendered-nitro atoms
