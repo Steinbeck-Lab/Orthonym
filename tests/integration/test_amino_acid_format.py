@@ -17,9 +17,14 @@ class TestSimpleAminoAcidRegression:
 
     @pytest.mark.integration
     def test_alanine_systematic(self):
-        """Alanine: 2-aminopropanoic acid (single amino group)."""
+        """Alanine (UNDEFINED stereo): 2-aminopropanoic acid.
+
+        v33 Phase-1 stereo honesty (748bf56d): the retained name 'alanine'
+        implies the L enantiomer (P-101.2.6 + P-103.1.3.1), so an
+        undefined-stereo input honestly declines it and emits the systematic
+        name. OPSIN round-trip verified."""
         result = name_compound("NC(C)C(=O)O")
-        assert result == "alanine"
+        assert result == "2-aminopropanoic acid"
 
     @pytest.mark.integration
     def test_glycine(self):
@@ -28,15 +33,23 @@ class TestSimpleAminoAcidRegression:
 
     @pytest.mark.integration
     def test_ornithine(self):
-        """Ornithine: 2,5-diaminopentanoic acid (has trivial name)."""
+        """Ornithine (UNDEFINED stereo): 2,5-diaminopentanoic acid.
+
+        Same stereo-honesty rule as test_alanine_systematic: bare 'ornithine'
+        implies L, so undefined stereo declines to the systematic name.
+        OPSIN round-trip verified."""
         result = name_compound("NCCCC(N)C(=O)O")
-        assert result == "ornithine"
+        assert result == "2,5-diaminopentanoic acid"
 
     @pytest.mark.integration
     def test_lysine(self):
-        """Lysine: 2,6-diaminohexanoic acid (trivial lookup)."""
+        """Lysine (UNDEFINED stereo): 2,6-diaminohexanoic acid.
+
+        Same stereo-honesty rule as test_alanine_systematic: bare 'lysine'
+        implies L, so undefined stereo declines to the systematic name.
+        OPSIN round-trip verified."""
         result = name_compound("NCCCCC(N)C(=O)O")
-        assert result == "lysine"
+        assert result == "2,6-diaminohexanoic acid"
 
 
 class TestMultiAmineFormat:

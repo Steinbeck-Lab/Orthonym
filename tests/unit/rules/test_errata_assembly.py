@@ -135,14 +135,18 @@ class TestBuildSubstituentStringErrata10:
         assert result == "trimethyl"
 
     def test_two_different_groups_ethyl_dimethyl(self):
-        """ethyl < methyl alphabetically: ethyl first (no marks), dimethyl in parens."""
+        """ethyl first (no marks); the multiplicative prefix 'di' stays OUTSIDE
+        the parentheses -> 'ethyldi(methyl)' (P-16.5.1.3.1, BB:7272: multiplying
+        prefixes are not enclosed; verbatim PIN 'tert-butyldi(methyl)phosphane',
+        BB 16286). Source corrected in 47a8624a; this expectation was stale."""
         result = _build_substituent_string(["ethyl", "methyl", "methyl"])
-        assert result == "ethyl(dimethyl)"
+        assert result == "ethyldi(methyl)"
 
     def test_two_different_groups_ethyl_diphenyl(self):
-        """ethyl < phenyl alphabetically: ethyl first (no marks), diphenyl in parens."""
+        """As above (P-16.5.1.3.1): 'di' stays outside the marks ->
+        'ethyldi(phenyl)'."""
         result = _build_substituent_string(["ethyl", "phenyl", "phenyl"])
-        assert result == "ethyl(diphenyl)"
+        assert result == "ethyldi(phenyl)"
 
     def test_trimethylphosphane_unchanged(self):
         """Trimethylphosphane should be unchanged (single unique substituent)."""
@@ -151,7 +155,8 @@ class TestBuildSubstituentStringErrata10:
         assert result == "trimethylphosphane"
 
     def test_two_unique_substituents_diphenyl_methyl(self):
-        """diphenyl + methyl: diphenyl > methyl alpha -- methyl first, diphenyl second."""
-        # methyl < phenyl alphabetically -> methyl first (no marks), diphenyl in parens
+        """methyl first (no marks); 'di' stays OUTSIDE the parentheses ->
+        'methyldi(phenyl)' (P-16.5.1.3.1, BB:7272). Stale expectation from the
+        pre-errata assembler; source corrected in 47a8624a."""
         result = _build_substituent_string(["methyl", "phenyl", "phenyl"])
-        assert result == "methyl(diphenyl)"
+        assert result == "methyldi(phenyl)"

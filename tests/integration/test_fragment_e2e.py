@@ -59,15 +59,21 @@ class TestPeptideE2E:
 
     @pytest.mark.integration
     def test_asparagine_not_misrouted(self):
-        """Asparagine (amide side chain) should NOT be routed to peptide naming."""
+        """Asparagine (amide side chain), UNDEFINED stereo, must NOT route to
+        peptide naming -- it is one molecule. Bare 'asparagine' implies L
+        (v33 Phase-1 stereo honesty), so undefined stereo names systematically;
+        the single-molecule systematic name confirms no peptide misrouting.
+        OPSIN round-trip verified."""
         result = name_compound("NC(CC(N)=O)C(=O)O")
-        assert result == "asparagine"
+        assert result == "2,4-diamino-4-oxobutanoic acid"
 
     @pytest.mark.integration
     def test_glutamine_not_misrouted(self):
-        """Glutamine (amide side chain) should NOT be routed to peptide naming."""
+        """Glutamine (amide side chain), UNDEFINED stereo, must NOT route to
+        peptide naming. Same stereo-honesty rule as asparagine above.
+        OPSIN round-trip verified."""
         result = name_compound("NC(CCC(N)=O)C(=O)O")
-        assert result == "glutamine"
+        assert result == "2,5-diamino-5-oxopentanoic acid"
 
     @pytest.mark.integration
     def test_simple_glycine_unchanged(self):
@@ -77,9 +83,12 @@ class TestPeptideE2E:
 
     @pytest.mark.integration
     def test_simple_alanine_unchanged(self):
-        """Single amino acid alanine should still produce 'alanine'."""
+        """Single amino acid alanine, UNDEFINED stereo -> systematic name.
+
+        v33 Phase-1 stereo honesty: bare 'alanine' implies L
+        (P-101.2.6/P-103.1.3.1), so an undefined-stereo input declines it."""
         result = name_compound("CC(N)C(=O)O")
-        assert result == "alanine"
+        assert result == "2-aminopropanoic acid"
 
 
 # ============================================================================

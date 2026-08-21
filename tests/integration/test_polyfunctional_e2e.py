@@ -151,16 +151,20 @@ class TestPOLY07_AminoAcids:
         assert name_compound("NCC(=O)O") == "glycine"
 
     def test_alanine(self):
-        """3-carbon amino acid."""
-        assert name_compound("CC(N)C(=O)O") == "alanine"
+        """3-carbon amino acid, UNDEFINED stereo -> systematic.
+
+        v33 Phase-1 stereo honesty: bare 'alanine' implies L, so an
+        undefined-stereo input declines it (P-101.2.6/P-103.1.3.1)."""
+        assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"
 
     def test_phenylalanine(self):
-        """Aromatic amino acid."""
-        assert name_compound("NC(Cc1ccccc1)C(=O)O") == "phenylalanine"
+        """Aromatic amino acid, UNDEFINED stereo -> systematic (same rule)."""
+        assert (name_compound("NC(Cc1ccccc1)C(=O)O")
+                == "2-amino-3-phenylpropanoic acid")
 
     def test_valine(self):
-        """Branched aliphatic amino acid."""
-        assert name_compound("CC(C)C(N)C(=O)O") == "valine"
+        """Branched aliphatic amino acid, UNDEFINED stereo -> systematic."""
+        assert name_compound("CC(C)C(N)C(=O)O") == "2-amino-3-methylbutanoic acid"
 
 
 class TestPOLY08_KetoAcids:
@@ -308,8 +312,12 @@ class TestRetainedNamesPriority:
         assert name_compound("NCC(=O)O") == "glycine"
 
     def test_alanine_over_aminopropanoic(self):
-        """Alanine is preferred over 2-aminopropanoic acid."""
-        assert name_compound("CC(N)C(=O)O") == "alanine"
+        """UNDEFINED-stereo alanine names systematically.
+
+        The pre-v33 assertion (retained 'alanine' preferred) is inverted by the
+        Phase-1 stereo-honesty change: bare 'alanine' implies L, so an
+        undefined-stereo input must decline it and use the systematic name."""
+        assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"
 
     def test_acetamide_over_ethanamide(self):
         """Acetamide is a retained name."""

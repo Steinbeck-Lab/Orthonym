@@ -169,9 +169,11 @@ CORE_NAMING = [
     ("CC(=O)OC", "methyl acetate"),
     ("CC(=O)OCC", "ethyl acetate"),
 
-    # Amino acids (retained)
+    # Amino acids. Glycine is achiral so its retained name stands; undefined-
+    # stereo alanine declines the L-implying retained name for the systematic
+    # form (v33 Phase-1 stereo honesty, P-101.2.6/P-103.1.3.1).
     ("NCC(=O)O", "glycine"),
-    ("CC(N)C(=O)O", "alanine"),
+    ("CC(N)C(=O)O", "2-aminopropanoic acid"),
 
     # Cycloalkenes
     ("C1=CCCCC1", "cyclohexene"),

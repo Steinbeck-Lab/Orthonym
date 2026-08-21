@@ -192,8 +192,12 @@ _ROOT_CAUSE_REFUSALS = [
     ("diazenyl", BindingKind.PREFIX, "qualifies no skeleton"),
     ("phosphate", BindingKind.SUFFIX, "qualifies no skeleton"),
     ("azide", BindingKind.PREFIX, "qualifies no skeleton"),
-    # A characteristic-group suffix closes the name (P-14.2).
-    ("alanylalanine", BindingKind.SUFFIX, "is not final"),
+    # 'alanine' left ALL_RETAINED_NAMES with the v33 Phase-1 amino-acid
+    # stereo-honesty change, so _parse_all now fails BEFORE _well_formed's
+    # "is not final" check: the trailing 'ine' is an unparsed residue. The token
+    # is still soundly (non-confidently) refused -- only the diagnostic reason
+    # moved earlier in the pipeline.
+    ("alanylalanine", BindingKind.SUFFIX, "unparsed residue"),
     # ... and attaches to a parent hydride, not to a molecule that already
     # carries the group ('phosphoramid' already holds the acid oxygens) nor to a
     # substituent prefix (where the accounting is functional REPLACEMENT).

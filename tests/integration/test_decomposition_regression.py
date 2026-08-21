@@ -149,9 +149,11 @@ AMIDE_CANARIES = [
     ("CC(=O)NCC", "N-ethylacetamide"),  # Note: existing pipeline name
     ("CCCC(=O)NCC", "N-ethylbutanamide"),
     ("CC(=O)NCCC", "N-propylacetamide"),
-    # Amino acids (contain amide-like bonds)
+    # Amino acids (contain amide-like bonds). Glycine is achiral so its
+    # retained name stands; undefined-stereo alanine declines the L-implying
+    # retained name and uses the systematic form (v33 Phase-1 stereo honesty).
     ("NCC(=O)O", "glycine"),
-    ("CC(N)C(=O)O", "alanine"),
+    ("CC(N)C(=O)O", "2-aminopropanoic acid"),
     # Peptides (contain amide bonds, handled by peptide route)
     ("NCC(=O)NCC(=O)O", "glycylglycine"),
 ]

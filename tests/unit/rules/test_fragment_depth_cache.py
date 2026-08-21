@@ -322,7 +322,9 @@ _RT_BREADTH_GAPS = {
     "003_terpene_dioxolane",
     "005_steroid_polyol",
     "007_galactitol_glucoside",
-    "008_allylamine_benzophenone",
+    # "008_allylamine_benzophenone" -- REMOVED 2026-08-21: now round-trips
+    # (verify_or_none True): '(4-bromophenyl)({2-fluoro-4-[6-(methyl(prop-2-en-
+    # 1-yl)amino)hexyloxy]phenyl})methanone'. Same treatment as 013/020.
     "011_macrolide_lactone",
     "012_biaryl_ether",
     # "013_dipeptide_proline" -- REMOVED 2026-08-21 (v33 Phase 2 Task 2.2
@@ -331,14 +333,17 @@ _RT_BREADTH_GAPS = {
     # i.e. Task 2.0/2.1 (the peptide dispatch SMARTS fix + Lever C) closed
     # this gap and nobody removed the stale xfail entry. Now
     # 'prolylprolylglutamine', OPSIN round-trip verified exact.
-    "016_phenol_ether_ketone",
+    # "016_phenol_ether_ketone" -- REMOVED 2026-08-21: now round-trips
+    # (verify_or_none True): '1-({4-[3-(hydroxymethyl)-5-methoxyphenoxy]-2-
+    # methoxy-6-methylphenyl})-3-methylbut-3-en-2-one'.
     "017_tripeptide_arginine",
     "018_steroid_furanone",
     # "020_tetrapeptide" -- REMOVED 2026-08-21, same cause/verification as
     # 013 above. Now 'aspartylvalylglycylproline', OPSIN round-trip
     # verified exact.
     "021_udp_sugar",
-    "023_serine_succinate",
+    # "023_serine_succinate" -- REMOVED 2026-08-21: now round-trips
+    # (verify_or_none True): '4-[(S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid'.
     "025_pyrrolizinone_amide",
 }
 
@@ -365,7 +370,7 @@ _RT_PARAMS = [
     for p in DEPTH_LIMIT_COMPOUNDS
 ]
 
-assert len(_RT_BREADTH_GAPS) == 14, "the measured gap list changed size"
+assert len(_RT_BREADTH_GAPS) == 11, "the measured gap list changed size"
 assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
     "a _RT_BREADTH_GAPS id does not match any DEPTH_LIMIT_COMPOUNDS param"
 )

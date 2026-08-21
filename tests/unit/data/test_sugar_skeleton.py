@@ -129,26 +129,27 @@ class TestSugarSkeletonCatalogReproduction:
         """The clean-set scope is exactly what the catalog pins (catalog-drift trip).
 
         v23 CARB-02 grew the catalog with the complete systematic monosaccharide
-        stereo family (SYSTEMATIC_MONOSACCHARIDE_NAMES, +176 OPSIN-verified aldo/
-        keto tetro/pento/hexo D/L pyranose/furanose alpha/beta/unspec entries),
-        so both scopes grew by 176: keyword-clean 44 -> 220, structural-clean
-        40 -> 216.  The 4-entry difference (the deoxy-L rhamnose/fucose entries,
-        keyword-clean names but structurally deoxy ring-CH3) is unchanged.
+        stereo family (SYSTEMATIC_MONOSACCHARIDE_NAMES). Since then the v33
+        breadth program (~30 later feature commits) grew ALL_SUGAR_NAMES further:
+        keyword-clean 220 -> 236 (+16) and structural-clean 216 -> 224 (+8), so
+        the two-notions difference widened from 4 to 12. These counts are the
+        MEASURED live scope; test_catalog_reproduction below (the deriver's HARD
+        gate) passes on all 224 structural-clean entries, so the growth is real
+        coverage, not a scope-filter drift.
         """
-        # Keyword-clean is the base-name filter: 220 (includes the 4 deoxy-L
-        # rhamnose/fucose entries whose names carry no 'deoxy' token).
+        # Keyword-clean is the base-name filter (measured live).
         clean = KEYWORD_CLEAN  # noqa: F841 - named for the acceptance grep
-        assert len(clean) == 220, (
-            f"keyword-clean catalog scope drifted: got {len(clean)} (expected 220)"
+        assert len(clean) == 236, (
+            f"keyword-clean catalog scope drifted: got {len(clean)} (expected 236)"
         )
-        # Structural-clean is the deriver's D-06 contract: 216
-        # (rhamnose/fucose excluded — they are deoxy ring-CH3).
-        assert len(STRUCTURAL_CLEAN) == 216, (
+        # Structural-clean is the deriver's D-06 contract (measured live).
+        assert len(STRUCTURAL_CLEAN) == 224, (
             f"structural-clean scope drifted: got {len(STRUCTURAL_CLEAN)} "
-            "(expected 216)"
+            "(expected 224)"
         )
-        # The 4 deoxy entries are the difference between the two notions.
-        assert len(KEYWORD_CLEAN) - len(STRUCTURAL_CLEAN) == 4
+        # The deoxy / structurally-modified entries are the difference between
+        # the two notions (keyword-clean names but not structurally clean).
+        assert len(KEYWORD_CLEAN) - len(STRUCTURAL_CLEAN) == 12
 
     def test_catalog_reproduction(self):
         """Deriver reproduces (anomer, config, base) for every clean entry (D-13)."""

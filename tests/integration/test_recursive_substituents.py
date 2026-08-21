@@ -230,15 +230,20 @@ class TestCompoundSubstituentFormatting:
 
     @pytest.mark.integration
     def test_sec_butyl_parens(self):
-        """sec-butyl (has hyphen) gets parentheses for clarity."""
+        """sec-butyl is a SIMPLE substituent -> NO enclosing marks (P-16.3.3(b);
+        cf. the contributor guide '3-tert-butyl-...'). The old parens-for-any-hyphen rule
+        was stale."""
         result = format_substituent_prefix("sec-butyl", [3], 1)
-        assert result == "3-(sec-butyl)"
+        assert result == "3-sec-butyl"
 
     @pytest.mark.integration
     def test_already_wrapped_no_double(self):
-        """Already-wrapped names don't get double parentheses."""
+        """A name carrying an UN-closed enclosing mark (parens around oxan-2-yl,
+        bare trailing 'oxy') is a compound substituent; per the enclosing-mark
+        nesting order (P-16.5.4.1) it escalates to the next bracket level ->
+        '1-[(oxan-2-yl)oxy]', not a bare/double paren. Stale expectation."""
         result = format_substituent_prefix("(oxan-2-yl)oxy", [1], 1)
-        assert result == "1-(oxan-2-yl)oxy"
+        assert result == "1-[(oxan-2-yl)oxy]"
 
 
 # ============================================================================
@@ -270,11 +275,14 @@ class TestIsComplexSubstituent:
 
     @pytest.mark.integration
     def test_complex_sec_butyl(self):
-        assert is_complex_substituent("sec-butyl") is True
+        # P-16.3.3(b): sec-butyl is a SIMPLE substituent (the italic 'sec-' is
+        # not a locant/complexity marker), so it is NOT complex.
+        assert is_complex_substituent("sec-butyl") is False
 
     @pytest.mark.integration
     def test_complex_tert_butyl(self):
-        assert is_complex_substituent("tert-butyl") is True
+        # P-16.3.3(b): tert-butyl is SIMPLE (cf. the contributor guide '3-tert-butyl-...').
+        assert is_complex_substituent("tert-butyl") is False
 
 
 # ============================================================================
