@@ -525,6 +525,11 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
         return True
     if _find_sugar_acyl_esters(mol) is not None:
         return True
+    # v33 Task 1.4: N-acyl (amide) ring decoration has no O/S/P-ester
+    # equivalent, so none of the ester detectors above ever see it.
+    from orthonym.data.sugar_names import _has_sugar_n_acyl_amide
+    if _has_sugar_n_acyl_amide(mol):
+        return True
     # W8-P7b.4 C-substituted sugar (n-C-R / n-deoxy-n-R): a ring carbon bears an
     # extra C/halogen substituent, so the clean-sugar SMARTS pre-gate misses it.
     from orthonym.data.sugar_names import _is_c_substituted_sugar_shape
@@ -1185,6 +1190,16 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     ester = name_sugar_ester(mol, canonical_smiles)
     if ester is not None:
         return ester
+
+    # v33 Task 1.4: free sugar bearing N-acyl (no functional-class analog for
+    # an amide) or O-acyl+N-acyl combined decoration that ``name_sugar_ester``'s
+    # functional-class ester route cannot express (see the function's own
+    # docstring for why). Tried ONLY after the two functional-class routes
+    # above have declined, so it never preempts their preferred spelling.
+    from orthonym.data.sugar_names import name_free_sugar_decorated_prefix
+    decorated = name_free_sugar_decorated_prefix(mol)
+    if decorated is not None:
+        return decorated
 
     # W6-P2: glycosylamine (anomeric -NH2, P-102.6.1.3) and glycosyl halide
     # (anomeric halogen, P-102.6.1.5). Each fail-closed on any non-exact shape.

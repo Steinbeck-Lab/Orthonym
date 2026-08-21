@@ -2900,6 +2900,56 @@ def _find_sugar_acyl_esters(mol):
     return esters
 
 
+def _has_sugar_n_acyl_amide(mol) -> bool:
+    """Cheap STRUCTURAL detector (v33 Task 1.4): True iff a single 5/6-membered
+    sugar-shaped ring (one ring-O, an anomeric carbon) carries a ring nitrogen
+    substituted with a PLAIN acyl group (an N-acyl / amido decoration -- the
+    non-catalog analog of GlcNAc's own N-acetyl, e.g. a free N-propanoyl
+    2-amino sugar).
+
+    This is the ONE ring decoration class with NO O/S/P-ester equivalent, so
+    none of :func:`_find_sugar_oxoacid_ester` / :func:`_find_sugar_acyl_esters`
+    (both O/S/P-ester detectors) ever see it, and the carbohydrate dispatch
+    predicate (:func:`~orthonym.routing.dispatch_table._is_carbohydrate_lookup`)
+    would otherwise never fire for it -- letting the molecule fall through to
+    the general oxane/oxolane substitutive namer, which drops the sugar
+    identity (e.g. names it as an N-substituted oxan-3-yl amide instead of a
+    deoxy-amido-pyranose).
+
+    Pure RDKit (reuses :func:`_n_plain_acyl_prefix`'s cheap shape check and
+    :func:`_locate_anomeric_carbon`'s hemiacetal gate); NO OPSIN, so it is
+    safe to call from the dispatch predicate -- the handler's own RT gate
+    (:func:`_mono_name_rt_ok`, inside :func:`name_monosaccharide_systematic`)
+    is what actually verifies the emitted name.
+    """
+    if mol is None:
+        return False
+    ri = mol.GetRingInfo()
+    sugar_rings = [
+        r for r in ri.AtomRings()
+        if len(r) in (5, 6)
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "O") == 1
+        and sum(1 for i in r if mol.GetAtomWithIdx(i).GetSymbol() == "C") == len(r) - 1
+    ]
+    if len(sugar_rings) != 1:
+        return False
+    ring = sugar_rings[0]
+    ring_oxygen = next(i for i in ring if mol.GetAtomWithIdx(i).GetSymbol() == "O")
+    if _locate_anomeric_carbon(mol, ring, ring_oxygen) is None:
+        return False
+    ringset = set(ring)
+    for i in ring:
+        atom = mol.GetAtomWithIdx(i)
+        if atom.GetSymbol() != "C":
+            continue
+        for nbr in atom.GetNeighbors():
+            if nbr.GetIdx() in ringset or nbr.GetSymbol() != "N":
+                continue
+            if _n_plain_acyl_prefix(mol, nbr.GetIdx()) is not None:
+                return True
+    return False
+
+
 def _is_uncataloged_ulosonic_acid(mol, canonical_smiles):
     """VETO (W6B-T7, accuracy-first): True for a 2-ulosonic-acid-shaped ring — a
     ketal ring carbon bearing ring-O + -OH + -COOH, plus an exocyclic polyol side
@@ -3196,6 +3246,44 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
     if not _mono_name_rt_ok(mol, candidate):
         return None
     return candidate
+
+
+def name_free_sugar_decorated_prefix(mol) -> Optional[str]:
+    """v33 Task 1.4: standalone free sugar bearing N-acyl (amide) decoration,
+    or O-acyl COMBINED with N-acyl on the same ring -- the two shapes
+    :func:`name_free_sugar` (default ``for_glycosidic_unit=False``) and
+    :func:`name_sugar_ester`'s functional-class ester route cannot express:
+
+    * there is no BB functional-class analog for an amide (an N-acyl amino
+      sugar is cited by its ``acetamido``-style PREFIX even standalone, e.g.
+      the catalog's own ``2-acetamido-2-deoxy-glucopyranose``), so a
+      NON-catalog N-acyl (e.g. N-propanoyl) has nowhere else to go;
+    * :func:`name_sugar_ester`'s O-acyl strip-and-recurse
+      (:func:`_name_sugar_acyl_ester`) names its residual via
+      :func:`name_free_sugar`, which hits the SAME
+      ``for_glycosidic_unit=False`` fence on any N-acyl left in that residual
+      -- so an O-acyl+N-acyl ring declines even though the O-acyl alone would
+      have named fine.
+
+    Reuses the IDENTICAL prefix-embedding engine v33 Task 1.2 proved correct
+    for the oligosaccharide glycosidic-unit path
+    (``name_monosaccharide_systematic(mol, for_glycosidic_unit=True)``, BB
+    P-102.5.4 / P-102.5.6.2) -- for a STANDALONE ring that assembled string
+    IS already the complete systematic name; no glycosidic wrapping needed.
+
+    Tried ONLY after :func:`name_free_sugar` and :func:`name_sugar_ester`
+    have both declined (dispatch order in
+    ``routing.dispatch_table._handle_carbohydrate_lookup``), so it never
+    preempts the preferred functional-class spelling (``beta-D-glucopyranose
+    6-acetate``) for the uniform-single-word, N-acyl-free O-acyl case that
+    route already names correctly.
+
+    Fail-closed / RT-gated: :func:`name_monosaccharide_systematic`'s own
+    OPSIN round-trip backstop (:func:`_mono_name_rt_ok`) already guards this
+    path, so a candidate that does not verify never ships (returns ``None``
+    -> the existing pipeline cascade-continues).
+    """
+    return name_monosaccharide_systematic(mol, for_glycosidic_unit=True)
 
 
 def name_aldonate_ester(mol, canonical_smiles: str) -> Optional[str]:

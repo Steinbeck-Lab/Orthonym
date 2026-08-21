@@ -662,3 +662,91 @@ class TestW6bSugarAcylEster:
         from rdkit import Chem
         smi = "CC(=O)O[C@H]1[C@H](O)O[C@@H](CO)[C@H](O)[C@@H]1OC(=O)c1ccccc1"
         assert _name_sugar_acyl_ester(Chem.MolFromSmiles(smi)) is None
+
+
+@pytest.mark.unit
+class TestV33Task1p4FreeSugarNAcylDecoration:
+    """v33 Task 1.4 (BB P-102.5.4 / P-102.5.6.2): a STANDALONE free sugar
+    bearing N-acyl (amide) decoration, or O-acyl COMBINED with N-acyl on the
+    same ring -- the two shapes neither ``name_free_sugar`` (no functional-
+    class analog for an amide) nor ``name_sugar_ester``'s O-acyl
+    strip-and-recurse (hits the same fence on any N-acyl left in its
+    residual) can express. Witnesses are CONSTRUCTED (non-catalog acyl words,
+    mirroring Task 1.2's own precedent) because the real ``sugar_glycan``
+    backlog family tag is heavily false-positive at this granularity (Task
+    1.2/1.3's own finding) -- every real single-ring backlog row found by a
+    structural census either already round-trips once isolated, or is
+    blocked by an unrelated GIANT aglycone the general engine cannot name
+    regardless of sugar recognition (a different lever, not this task's
+    scope)."""
+
+    # Free 2-deoxy-2-propanamido-D-glucopyranose analog: N-propanoyl (NOT the
+    # catalogued N-acetyl/GlcNAc) at the ring nitrogen, no O-acyl. Built from
+    # the catalog's own beta-D-GlcNAc SMILES with acetyl -> propanoyl.
+    N_ACYL_ONLY = "CCC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@@H]1O"
+
+    # Same ring, PLUS a 6-O-acetyl ester (O-acyl + N-acyl combined).
+    O_ACYL_PLUS_N_ACYL = "CCC(=O)N[C@@H]1[C@@H](O)[C@H](O)[C@@H](COC(C)=O)O[C@@H]1O"
+
+    # Furanose ring form diversity: 2-deoxy-2-propanamido-D-ribofuranose
+    # analog (no O-acyl).
+    N_ACYL_FURANOSE = "OC[C@H]1O[C@@H](O)[C@H](NC(=O)CC)[C@@H]1O"
+
+    def _rt_exact(self, smi, name):
+        from rdkit import Chem
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        want = Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
+        opsin_smiles = opsin_parse(name)
+        assert opsin_smiles is not None, f"OPSIN could not parse {name!r}"
+        got = Chem.MolToInchiKey(Chem.MolFromSmiles(opsin_smiles))
+        assert got == want, f"{name!r} round-trips to a DIFFERENT molecule"
+
+    def test_n_acyl_only_pyranose_names_and_round_trips(self):
+        from orthonym import name_compound
+        name = name_compound(self.N_ACYL_ONLY)
+        assert name and "unknown" not in name
+        assert "propanamido" in name and "deoxy" in name
+        self._rt_exact(self.N_ACYL_ONLY, name)
+
+    def test_o_acyl_plus_n_acyl_combined_names_and_round_trips(self):
+        from orthonym import name_compound
+        name = name_compound(self.O_ACYL_PLUS_N_ACYL)
+        assert name and "unknown" not in name
+        assert "propanamido" in name and "acetyl" in name
+        self._rt_exact(self.O_ACYL_PLUS_N_ACYL, name)
+
+    def test_n_acyl_furanose_names_and_round_trips(self):
+        from orthonym import name_compound
+        name = name_compound(self.N_ACYL_FURANOSE)
+        assert name and "unknown" not in name
+        assert "propanamido" in name and "furanose" in name
+        self._rt_exact(self.N_ACYL_FURANOSE, name)
+
+    def test_predicate_detects_n_acyl_only_ring(self):
+        from orthonym.data.sugar_names import _has_sugar_n_acyl_amide
+        from rdkit import Chem
+        assert _has_sugar_n_acyl_amide(Chem.MolFromSmiles(self.N_ACYL_ONLY)) is True
+
+    def test_predicate_false_on_clean_catalog_sugar(self):
+        from orthonym.data.sugar_names import _has_sugar_n_acyl_amide
+        from rdkit import Chem
+        glucose = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+        assert _has_sugar_n_acyl_amide(Chem.MolFromSmiles(glucose)) is False
+
+    def test_predicate_false_on_nacetyl_glcnac_catalog_amide(self):
+        # A CATALOG N-acetyl amide (GlcNAc) should NOT need this detector --
+        # lookup_sugar already claims it; the detector being True too is
+        # harmless (name_free_sugar wins first), but confirm it does not
+        # mis-fire on a non-sugar / no-ring input.
+        from orthonym.data.sugar_names import _has_sugar_n_acyl_amide
+        from rdkit import Chem
+        assert _has_sugar_n_acyl_amide(Chem.MolFromSmiles("CCO")) is False
+        assert _has_sugar_n_acyl_amide(None) is False
+
+    def test_functional_class_ester_route_unaffected(self):
+        # Regression: the existing pure-O-acyl functional-class route
+        # (name_sugar_ester -> _name_sugar_acyl_ester) must stay
+        # byte-identical -- this new fallback is tried strictly AFTER it.
+        from orthonym import name_compound
+        assert name_compound("C(C)(=O)OC[C@@H]1[C@H]([C@@H]([C@H]([C@H](O)O1)O)O)O") == \
+            "beta-D-glucopyranose 6-acetate"
