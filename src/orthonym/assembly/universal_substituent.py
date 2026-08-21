@@ -381,6 +381,86 @@ def _name_universal_substitutive_unsafe(
     # ``atom_work_budget`` alone, so a caller cannot re-enable the crash by
     # passing a larger budget (that budget still legitimately raises the
     # RECURSIVE-work ceiling; it cannot raise the raw-size safety ceiling).
+    built = _build_ctx(mol, atom_work_budget)
+    if built is None:
+        return None
+    ctx, heavy = built
+
+    comp = _name_component(ctx, heavy, attach_hint=None, is_top=True)
+    if comp is None:
+        return None
+
+    # Charge-coverage assertion (Task B2b), symmetric to the atom-coverage
+    # one below: every GENUINE ionic-centre atom must have been resolved by
+    # a charge suffix SOMEWHERE in the recursion. By construction this
+    # always holds (every genuine ion atom ends up on some level's own
+    # spine -- see the module docstring's inductive argument -- and that
+    # level's own resolution either succeeds or voids the whole call
+    # already), but it is ASSERTED rather than trusted, exactly like the
+    # atom-coverage check a few lines down.
+    all_charge_ids = frozenset(s['atom_idx'] for s in ctx.cation_sites) | \
+        frozenset(s['atom_idx'] for s in ctx.anion_sites)
+    if comp.charged != all_charge_ids:
+        return None  # void: a genuine ionic centre was not expressed
+
+    # Task B2b fix round 1: the RAW-formal-charge void guard -- the one
+    # general check that closes the whole internal-charge mis-naming class.
+    # ``get_ion_sites`` (which ``cation_sites``/``anion_sites`` derive from)
+    # STRIPS P-59 INTERNAL charges (N-oxide, azide, diazo, nitrone, nitrile
+    # oxide, nitronate, aci-nitro, nitrate ester, thionitro, and the P-74.2.1
+    # semipolar / charge-drawn S/P-oxides), so those charged atoms are
+    # invisible to BOTH ``_resolve_spine_charge`` AND the charge-coverage
+    # assertion just above -- while the spine builders thread atoms by ELEMENT
+    # SYMBOL ONLY, with no formal-charge check, and would happily absorb such
+    # an atom into the skeleton AS IF NEUTRAL, yielding a coverage-complete
+    # name of a DIFFERENT molecule. ``all_charge_ids`` is EXACTLY the set of
+    # raw-charged atoms that are NOT internal (get_ion_sites lists every
+    # nonzero-charge atom, then removes the internal set), so the internal
+    # atoms are precisely ``{raw-charged} - all_charge_ids``. VOID whenever
+    # any atom carries a nonzero raw formal charge that was NOT consumed by
+    # (a) the genuine-ion suffix machinery (``all_charge_ids``, asserted
+    # resolved above) or (b) a nitro group actually rendered by
+    # ``_nitro_shortcut`` (``comp.nitro_atoms`` -- the one internal-charge
+    # shape this module can spell). This also closes polynitro shredding: a
+    # torn-apart nitro is never rendered as a nitro leaf, so its O(-) raw
+    # charge is unconsumed and trips the guard, voiding the whole molecule
+    # (correct -- degrade to abstain, never mis-name).
+    charge_ok = all_charge_ids | comp.nitro_atoms
+    for a in ctx.mol.GetAtoms():
+        if a.GetFormalCharge() != 0 and a.GetIdx() not in charge_ok:
+            return None  # unspellable internal charge -> void, never mis-name
+
+    covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
+    total_bound = sum(len(ids) for _tok, ids in comp.bindings)
+    if covers != heavy or total_bound != len(heavy):
+        # ``covers != heavy`` catches a GAP; ``total_bound != len(heavy)``
+        # additionally catches a DOUBLE-COUNT (two bindings sharing an atom)
+        # that a union-only check cannot see (fix round 1, finding 5) -- this
+        # converts the pairwise-disjointness ARGUMENT (branches are built
+        # from a monotonically growing exclude set, so they cannot overlap)
+        # into an ASSERTION, rather than trusting the argument to always hold.
+        return None  # void: coverage incomplete -- never ship a partial name
+
+    return UniversalResult(name=comp.name, bindings=tuple(comp.bindings), covers=covers)
+
+
+def _build_ctx(
+    mol, atom_work_budget: int,
+) -> Optional[Tuple["_Ctx", FrozenSet[int]]]:
+    """Shared whole-molecule perception + ``_Ctx`` setup for BOTH public
+    entry points (``name_universal_substitutive`` on the whole graph and
+    ``name_universal_substituent_prefix`` on a rooted branch subgraph).
+
+    Returns ``(ctx, heavy)`` or ``None`` -- the SAME fail-closed scope guards
+    the whole-molecule entry point has always applied (size ceiling,
+    multi-fragment, isotope/radical/wildcard, kekulize) run here unchanged, so
+    the branch entry point inherits them identically. Extracted verbatim from
+    ``_name_universal_substitutive_unsafe`` (behaviour-preserving refactor);
+    the top-level charge/atom-coverage ASSERTIONS stay in that function because
+    they are meaningful only for a whole-molecule call (they assert over the
+    FULL heavy set / FULL ion-site set), while the branch entry point applies
+    the branch-restricted analogues itself.
+    """
     size_cap = min(atom_work_budget, _MAX_ATOMS_FOR_PERCEPTION)
     if mol.GetNumHeavyAtoms() > size_cap:
         return None
@@ -447,63 +527,83 @@ def _name_universal_substitutive_unsafe(
     ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
                budget=_Budget(atom_work_budget), canon_rank=canon_rank,
                cation_sites=cation_sites, anion_sites=anion_sites)
+    return ctx, heavy
 
-    comp = _name_component(ctx, heavy, attach_hint=None, is_top=True)
+
+def name_universal_substituent_prefix(
+    mol, frag_atoms, attach_idx: int, bond_order: int = 1,
+    atom_work_budget: int = DEFAULT_ATOM_WORK_BUDGET,
+) -> Optional[str]:
+    """Name a BRANCH subgraph as a ``-yl``/``-ylidene``/``-ylidyne`` substituent
+    prefix over the WHOLE-molecule perception context, or ``None`` (void).
+
+    Task B3 (the branch-fallback wiring): where the existing recursive
+    substituent namer (``substituent_enumerator.name_substituent``) declines a
+    hard branch, this re-enters the SAME unconditional recursive machinery on
+    just that branch and renders a covering ``-yl`` prefix, cited at the
+    branch's own attachment locant. ``attach_idx`` is the atom WITHIN
+    ``frag_atoms`` that bonds to the parent; ``bond_order`` is that attachment
+    bond's order (1/2/3 -> yl/ylidene/ylidyne).
+
+    Fail-closed, exactly like ``name_universal_substitutive``: returns ``None``
+    (never a partial or a mis-cover) whenever the whole-molecule scope guards
+    trip, the branch is not a subset of the heavy-atom set, the attach atom is
+    not in the branch, the recursive namer voids, or the branch-restricted
+    coverage / charge assertions (the analogues of the whole-molecule ones,
+    scoped to ``frag_atoms``) fail. The caller gates the returned string
+    through the existing E1 + SELF-01 round-trip net (0-wrong preserved); this
+    is a PURE producer and never ships.
+    """
+    if mol is None:
+        return None
+    try:
+        return _name_universal_substituent_prefix_unsafe(
+            mol, frag_atoms, attach_idx, bond_order, atom_work_budget)
+    except Exception:
+        return None
+
+
+def _name_universal_substituent_prefix_unsafe(
+    mol, frag_atoms, attach_idx: int, bond_order: int, atom_work_budget: int,
+) -> Optional[str]:
+    built = _build_ctx(mol, atom_work_budget)
+    if built is None:
+        return None
+    ctx, heavy = built
+
+    frag = frozenset(int(a) for a in frag_atoms)
+    if not frag or not frag.issubset(heavy):
+        return None  # a branch atom is a hydrogen / out of range -> void
+    if attach_idx not in frag:
+        return None  # contract: attach_idx is the branch-side attachment atom
+
+    comp = _name_component(ctx, frag, attach_hint=attach_idx, is_top=False)
     if comp is None:
         return None
 
-    # Charge-coverage assertion (Task B2b), symmetric to the atom-coverage
-    # one below: every GENUINE ionic-centre atom must have been resolved by
-    # a charge suffix SOMEWHERE in the recursion. By construction this
-    # always holds (every genuine ion atom ends up on some level's own
-    # spine -- see the module docstring's inductive argument -- and that
-    # level's own resolution either succeeds or voids the whole call
-    # already), but it is ASSERTED rather than trusted, exactly like the
-    # atom-coverage check a few lines down.
-    all_charge_ids = frozenset(s['atom_idx'] for s in cation_sites) | \
-        frozenset(s['atom_idx'] for s in anion_sites)
-    if comp.charged != all_charge_ids:
-        return None  # void: a genuine ionic centre was not expressed
+    # Branch-restricted coverage assertion (the analogue of the whole-molecule
+    # one in ``_name_universal_substitutive_unsafe``, scoped to ``frag``):
+    # every branch atom bound exactly once, no gap, no double-count.
+    covers = frozenset(a for _t, ids in comp.bindings for a in ids)
+    total_bound = sum(len(ids) for _t, ids in comp.bindings)
+    if covers != frag or total_bound != len(frag):
+        return None  # void: never a partial / re-fragmenting branch name
 
-    # Task B2b fix round 1: the RAW-formal-charge void guard -- the one
-    # general check that closes the whole internal-charge mis-naming class.
-    # ``get_ion_sites`` (which ``cation_sites``/``anion_sites`` derive from)
-    # STRIPS P-59 INTERNAL charges (N-oxide, azide, diazo, nitrone, nitrile
-    # oxide, nitronate, aci-nitro, nitrate ester, thionitro, and the P-74.2.1
-    # semipolar / charge-drawn S/P-oxides), so those charged atoms are
-    # invisible to BOTH ``_resolve_spine_charge`` AND the charge-coverage
-    # assertion just above -- while the spine builders thread atoms by ELEMENT
-    # SYMBOL ONLY, with no formal-charge check, and would happily absorb such
-    # an atom into the skeleton AS IF NEUTRAL, yielding a coverage-complete
-    # name of a DIFFERENT molecule. ``all_charge_ids`` is EXACTLY the set of
-    # raw-charged atoms that are NOT internal (get_ion_sites lists every
-    # nonzero-charge atom, then removes the internal set), so the internal
-    # atoms are precisely ``{raw-charged} - all_charge_ids``. VOID whenever
-    # any atom carries a nonzero raw formal charge that was NOT consumed by
-    # (a) the genuine-ion suffix machinery (``all_charge_ids``, asserted
-    # resolved above) or (b) a nitro group actually rendered by
-    # ``_nitro_shortcut`` (``comp.nitro_atoms`` -- the one internal-charge
-    # shape this module can spell). This also closes polynitro shredding: a
-    # torn-apart nitro is never rendered as a nitro leaf, so its O(-) raw
-    # charge is unconsumed and trips the guard, voiding the whole molecule
-    # (correct -- degrade to abstain, never mis-name).
-    charge_ok = all_charge_ids | comp.nitro_atoms
-    for a in work.GetAtoms():
-        if a.GetFormalCharge() != 0 and a.GetIdx() not in charge_ok:
-            return None  # unspellable internal charge -> void, never mis-name
+    # Branch-restricted charge assertions (the analogues of the two whole-
+    # molecule ones): every GENUINE ionic centre inside the branch must have
+    # been expressed by a suffix, and no raw internal charge inside the branch
+    # may be left unspelled (absorbed into the skeleton as if neutral).
+    frag_charge_ids = frozenset(
+        s['atom_idx'] for s in (ctx.cation_sites + ctx.anion_sites)
+        if s['atom_idx'] in frag)
+    if comp.charged != frag_charge_ids:
+        return None
+    charge_ok = comp.charged | comp.nitro_atoms
+    for idx in frag:
+        if ctx.mol.GetAtomWithIdx(idx).GetFormalCharge() != 0 and idx not in charge_ok:
+            return None
 
-    covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
-    total_bound = sum(len(ids) for _tok, ids in comp.bindings)
-    if covers != heavy or total_bound != len(heavy):
-        # ``covers != heavy`` catches a GAP; ``total_bound != len(heavy)``
-        # additionally catches a DOUBLE-COUNT (two bindings sharing an atom)
-        # that a union-only check cannot see (fix round 1, finding 5) -- this
-        # converts the pairwise-disjointness ARGUMENT (branches are built
-        # from a monotonically growing exclude set, so they cannot overlap)
-        # into an ASSERTION, rather than trusting the argument to always hold.
-        return None  # void: coverage incomplete -- never ship a partial name
-
-    return UniversalResult(name=comp.name, bindings=tuple(comp.bindings), covers=covers)
+    return _render_as_substituent(comp, bond_order)
 
 
 # ===========================================================================

@@ -1189,6 +1189,44 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                          token)
             return None if allow_mancude else "substituent"
 
+    # Phase B3 -- branch-fallback via the unconditional universal recursive
+    # namer. The five-tier cascade above declined this branch (``token`` is the
+    # ``'substituent'`` sentinel, or ``None`` under ``allow_mancude``), which
+    # ``general_engine`` translates into ``_refuse("branch unnameable ...")`` --
+    # failing the WHOLE enclosing candidate. RE-SPY (task-B34) confirmed this
+    # ``name_substituent`` decline is THE branch site that cascades to
+    # whole-molecule abstention (309 declines over the 44 dev500 best-effort
+    # abstainers; ``composer.classify_and_name_fragment`` recorded 0). Rather
+    # than decline, re-enter the universal namer on JUST this branch subgraph
+    # and render an ugly-but-valid ``-yl``/``-ylidene``/``-ylidyne`` prefix
+    # (cited at the branch's own attachment locant, correct P-29.2 morphology
+    # from ``free_valence``). The general engine binds the WHOLE ``frag`` atom
+    # set to this returned string (``TokenBinding(frag, prefix)``), so E1 atom
+    # coverage holds regardless of the token content; SELF-01 (the caller's
+    # OPSIN round-trip / ``_rt_match`` superset ladder) is the 0-wrong net --
+    # a branch name that does not round-trip (or a stereo CONFLICT) is
+    # suppressed to abstain, a constitution-correct one (incl. a safe
+    # stereo-OMISSION) ships. Fail-closed: a universal ``None`` (genuine
+    # residual) or a malformed/multi-word result keeps the existing decline.
+    #
+    # BEST-EFFORT ONLY: gated on ``best_effort_ctx`` (True iff
+    # ``general_fallback_unverified``), so the PIN / valid / complete tiers --
+    # which also call ``name_substituent`` -- are byte-identical. An ugly
+    # universal ``-yl`` is a best-effort degrade, never a PIN component; a
+    # PIN-tier branch decline must still abstain, exactly as before.
+    from ..errors import is_refusal_sentinel
+    from ..metrics.provenance import best_effort_ctx
+    if (best_effort_ctx.get()
+            and (token is None or is_refusal_sentinel(token))):
+        try:
+            from .universal_substituent import name_universal_substituent_prefix
+            _uni = name_universal_substituent_prefix(
+                mol, frag_atoms_set, attach_idx, bond_order=free_valence)
+        except Exception:  # a producer bug must never crash branch naming
+            _uni = None
+        if _uni and not is_refusal_sentinel(_uni) and ' ' not in _uni:
+            return _uni
+
     return token
 
 
