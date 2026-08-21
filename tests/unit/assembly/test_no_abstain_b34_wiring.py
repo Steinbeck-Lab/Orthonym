@@ -128,3 +128,61 @@ def test_universal_floor_is_deterministic_across_permuted_smiles():
     smi_c = Chem.MolToSmiles(m, rootedAtAtom=m.GetNumAtoms() - 1)
     names = {Orthonym(style="pin", **_BE).name(s) for s in (smi_a, smi_b, smi_c)}
     assert len(names) == 1, f"non-deterministic across permutations: {names}"
+
+
+@pytest.mark.unit
+def test_b3_fallback_guards_undecidable_bond_order():
+    """Fix-round Finding 1: the B3 branch fallback must NOT invoke
+    ``name_universal_substituent_prefix`` when the attachment free valence is
+    ``None`` (UNDECIDABLE -- a bridge/spiro, P-25, or an aromatic/dative
+    linkage). ``_free_valence_at_attachment`` documents "None means UNDECIDABLE
+    and must never be read as 1", yet ``_render_as_substituent`` silently
+    defaults ``None`` -> ``"yl"``, which would name a DIFFERENT free-valence
+    morphology. The guard ``free_valence in (1, 2, 3)`` keeps the prior decline
+    on ``None``.
+
+    Pure unit test -- gate-independent (the guard blocks before any naming). The
+    NONE case is non-vacuous: ``name_substituent`` returns the ``'substituent'``
+    decline sentinel, proving the B3 block WAS reached (``best_effort_ctx`` True,
+    ``token`` a sentinel) and that the ONLY thing suppressing the call is the
+    bond-order guard. The FV=1 positive control proves the spy actually fires
+    when the guard permits, so the empty NONE-case list is not a broken-spy
+    artifact (``feedback_harness_that_reports_success``).
+    """
+    import orthonym.assembly.universal_substituent as US
+    from orthonym.assembly import substituent_enumerator as SE
+    from orthonym.metrics.provenance import best_effort_ctx
+
+    def _run(smi, frag, attach):
+        mol = Chem.MolFromSmiles(smi)
+        fv = SE._free_valence_at_attachment(mol, frag, attach)
+        calls = []
+        real = US.name_universal_substituent_prefix
+        US.name_universal_substituent_prefix = (
+            lambda *a, **k: (calls.append(k.get("bond_order")), real(*a, **k))[1])
+        tok = best_effort_ctx.set(True)
+        try:
+            ret = SE.name_substituent(mol, frag, attach)
+        finally:
+            best_effort_ctx.reset(tok)
+            US.name_universal_substituent_prefix = real
+        return fv, calls, ret
+
+    # NONE case: spiro[4.5]decane fragment {5,6,7,8,9} attaches by two bonds
+    # (a bridge), so _free_valence_at_attachment is None -> guard must block.
+    fv, calls, ret = _run("C1CCC2(CC1)CCCC2", {5, 6, 7, 8, 9}, 5)
+    assert fv is None, f"fixture no longer has an undecidable free valence: {fv}"
+    assert ret == "substituent", (
+        f"B3 block not reached (no decline sentinel): {ret!r}")
+    assert calls == [], (
+        f"universal prefix invoked with UNDECIDABLE bond_order: {calls}")
+
+    # POSITIVE CONTROL: the carbamate's O-C(=O)-N-P(=O)Cl2 branch has a single
+    # single-bonded attachment (free_valence == 1), so the SAME B3 block DOES
+    # call the universal prefix -- proving the empty list above is the guard,
+    # not a dead spy.
+    fv, calls, ret = _run(
+        "C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl", {6, 7, 8, 9, 10, 11, 12, 13}, 6)
+    assert fv == 1, f"positive-control fixture free valence changed: {fv}"
+    assert calls == [1], (
+        f"universal prefix NOT called for a decidable free valence: {calls}")

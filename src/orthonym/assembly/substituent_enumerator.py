@@ -1214,10 +1214,23 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # which also call ``name_substituent`` -- are byte-identical. An ugly
     # universal ``-yl`` is a best-effort degrade, never a PIN component; a
     # PIN-tier branch decline must still abstain, exactly as before.
+    #
+    # BOND-ORDER GUARD: ``free_valence`` (= ``_free_valence_at_attachment`` via
+    # ``verdict.free_valence``) is ``None`` for a bridge/spiro (P-25, 2+ linkage
+    # bonds), an aromatic or dative linkage, or no linkage at all -- its
+    # docstring (:380) states "None means UNDECIDABLE and must never be read as
+    # 1", yet ``_render_as_substituent`` would silently default ``None`` ->
+    # ``"yl"`` (``universal_substituent.py`` ``{1:"yl",2:"ylidene",3:"ylidyne"}
+    # .get(bond_order, "yl")``), naming a DIFFERENT free-valence morphology. So
+    # only offer the universal fallback when the free valence is a decidable
+    # single-attachment 1/2/3; on ``None`` (or any other value) keep the
+    # existing decline (fall through to ``return token``) rather than emit a
+    # wrong-morphology candidate that only the round-trip net would catch.
     from ..errors import is_refusal_sentinel
     from ..metrics.provenance import best_effort_ctx
     if (best_effort_ctx.get()
-            and (token is None or is_refusal_sentinel(token))):
+            and (token is None or is_refusal_sentinel(token))
+            and free_valence in (1, 2, 3)):
         try:
             from .universal_substituent import name_universal_substituent_prefix
             _uni = name_universal_substituent_prefix(
