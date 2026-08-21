@@ -250,6 +250,7 @@ def get_polycyclic_substituents(mol, pah_name: str,
     # nitrile) is tracked separately so it can claim the lowest locant FIRST
     # (P-14.4(c)) — the WR-01 PCG-anchor.
     _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
+    _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
     attach_atoms = set()
     suffix_atoms = set()
     for idx in core_atoms:
@@ -267,6 +268,16 @@ def get_polycyclic_substituents(mol, pah_name: str,
             # though it is not tagged is_suffix (kept a prefix candidate so the
             # senior-group cases stay byte-identical).
             elif _amine_pcg and sub and sub.get('name') == 'amino':
+                is_pcg = True
+            # RB-1: a ring -OH that IS the molecular principal group (phenol,
+            # P-41 class 17 -- senior to amine class 19, BB:18190/18192) is the
+            # PCG, so its ring carbon must claim the lowest locant (P-14.4(c),
+            # BB:3256; naphthalene example :3262) BEFORE a junior prefix (amino)
+            # is considered. `hydroxy` is not tagged is_suffix here (the `-ol`
+            # suffix-word promotion runs later, ~:1266), so anchor it explicitly
+            # -- mirrors the Fix 2 amine carve-out. Whole-class: any senior ring
+            # `-ol` on a fused polycyclic bearing a junior prefix.
+            elif _ol_pcg and sub and sub.get('name') == 'hydroxy':
                 is_pcg = True
         if is_attach:
             attach_atoms.add(idx)
@@ -1166,6 +1177,7 @@ def name_substituted_polycyclic(
             # subset) so the stereodescriptor numbering cannot desync from the
             # substituent numbering (WR-03).
             _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
+            _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
             attach_atoms = set()
             suffix_atoms = set()
             for idx in core_set:
@@ -1180,6 +1192,8 @@ def name_substituted_polycyclic(
                         is_pcg = True
                     elif _amine_pcg and sub and sub.get('name') == 'amino':
                         is_pcg = True  # Fix 2: amine-as-principal PCG anchor (WR-03 mirror)
+                    elif _ol_pcg and sub and sub.get('name') == 'hydroxy':
+                        is_pcg = True  # RB-1: phenol-as-principal PCG anchor (WR-03 mirror)
                 if is_attach:
                     attach_atoms.add(idx)
                 if is_pcg:

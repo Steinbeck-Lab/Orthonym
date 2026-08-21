@@ -211,12 +211,16 @@ class TestPolycyclicAutomorphismMin:
         # 'amino' PREFIX; the acid keeps the '-carboxylic acid' suffix (P-41).
         assert _name(namer, "Nc1ccc2cc(C(=O)O)ccc2c1") == "6-aminonaphthalene-2-carboxylic acid"
 
-    def test_pah_amine_not_promoted_over_hydroxy(self, namer):
-        # -OH is senior to -NH2 (P-41). polycyclics.py does not yet promote -OH
-        # to the '-ol' suffix, so the amine must NOT be promoted either (else it
-        # would wrongly outrank the alcohol) -- fail closed to the prior
-        # (non-PIN, but not wrong-structure) double-prefix form.
-        assert _name(namer, "Nc1ccc2cc(O)ccc2c1") == "2-amino-6-hydroxynaphthalene"
+    def test_pah_amine_stays_prefix_under_senior_hydroxy(self, namer):
+        # -OH is senior to -NH2 (P-41 Table 4.1: hydroxy class 17 > amine class 19,
+        # BB:18190/:18192), so the ring -OH is the principal characteristic group and
+        # renders as the '-ol' SUFFIX while the amine stays the 'amino' PREFIX.
+        # RB-1: the '-ol' PCG must also claim the LOWER symmetry-equivalent locant
+        # BEFORE the amino prefix (P-14.4(c), BB:3256; naphthalene example :3262).
+        # (The prior assertion `2-amino-6-hydroxynaphthalene` was doubly stale: the
+        # '-ol' promotion had already landed AND the PCG did not yet claim the low
+        # locant -- this test was already red at BASE before the RB-1 fix.)
+        assert _name(namer, "Nc1ccc2cc(O)ccc2c1") == "6-aminonaphthalen-2-ol"
 
     def test_populated_pahs_never_use_naphthalene_heuristic(self, monkeypatch):
         # DD4 regression guard: cataloged PAHs with populated iupac_numbering must

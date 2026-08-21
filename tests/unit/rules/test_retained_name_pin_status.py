@@ -97,9 +97,17 @@ class TestTheSuffixPromotionHalf:
 
     def test_amino_plus_ol_now_renders(self, namer):
         """Before the promotion this failed closed to a double prefix. `-ol` is senior
-        to `-amine` (P-41), which is why the ol promotion is ordered FIRST — the amine
-        promotion is guarded by `not suffix_groups`."""
-        assert namer.name("Nc1ccc(O)c2ccccc12") == "1-aminonaphthalen-4-ol"
+        to `-amine` (P-41 Table 4.1: hydroxy class 17 > amine class 19, BB:18190/:18192),
+        which is why the ol promotion is ordered FIRST — the amine promotion is guarded
+        by `not suffix_groups`.
+
+        RB-1: the `-ol` is the principal characteristic group, so it must also claim the
+        LOWER of the two symmetry-equivalent locants BEFORE the amino prefix is considered
+        (P-14.4(c) "principal characteristic groups ... (suffixes)", BB:3256; naphthalene
+        example `6-carboxynaphthalen-2-yl` :3262). Was `1-aminonaphthalen-4-ol` (ol on the
+        higher locant 4) — the PCG-anchor fix in `get_polycyclic_substituents` gives the
+        `-ol` locant 1. Both forms round-trip identically via OPSIN; this is a RULE call."""
+        assert namer.name("Nc1ccc(O)c2ccccc12") == "4-aminonaphthalen-1-ol"
 
     def test_senior_suffix_keeps_hydroxy_as_a_prefix(self, namer):
         """Deny-by-default: with a senior suffix present the hydroxy must NOT be
