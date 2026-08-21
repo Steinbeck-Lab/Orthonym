@@ -157,7 +157,16 @@ def name_peptide(mol) -> Optional[str]:
         # (unchanged behaviour) unless the cap is a genuine plain acyl group
         # AND the residues behind it are a fully standard >=2-residue chain
         # AND the assembled candidate OPSIN-round-trips to this exact mol.
-        return _rt_verified(mol, _try_n_acyl_cap(mol))
+        result = _rt_verified(mol, _try_n_acyl_cap(mol))
+        if result is not None:
+            return result
+        # v33 Task 2.1 Lever C: a capped-terminus shape `_is_valid_peptide`
+        # rejects for a DIFFERENT reason than Lever A covers -- most often a
+        # C-terminal PRIMARY AMIDE (no free -COOH anywhere in the molecule,
+        # so `_is_valid_peptide`'s COOH check fails and Lever A's own COOH
+        # requirement, `:871`, also fails). Self-contained (re-walks the
+        # chain itself via `_extract_residues`), so safe to try here too.
+        return _rt_verified(mol, _try_capped_termini(mol))
 
     # Step 2: Extract residue SMILES by walking the peptide chain
     residue_smiles_list = _extract_residues(mol)
@@ -173,7 +182,15 @@ def name_peptide(mol) -> Optional[str]:
     # ``_identify_residues``'s docstring.
     named_residues = _identify_residues(residue_smiles_list, strict_stereo=True)
     if named_residues is None:
-        return None
+        # v33 Task 2.1 Lever C: the whole-molecule gate passed (free termini
+        # SMARTS matched -- a mono-N-methylated N-terminus is still `[NX3;H1]`,
+        # so it slips through `_is_valid_peptide`'s free-NH2 check), but a
+        # per-residue trivial-name lookup then failed -- typically the
+        # N-terminal residue's OWN backbone amino N carrying a free (non-
+        # acylated) methyl substituent, a table miss for the modified
+        # residue. Self-contained; also independently catches a
+        # C-terminal-amide shape reaching this branch some other way.
+        return _rt_verified(mol, _try_capped_termini(mol))
 
     # Step 4: Assemble the peptide name. RT-gated (v33 Phase 2 Task 2.0): this
     # was the one candidate-emission site in this file NOT verified against
@@ -1080,3 +1097,201 @@ def _try_gamma_link_whole(mol) -> Optional[str]:
         return None
     carbonyl_c, amide_n = bond_pair
     return _try_gamma_donor_link(mol, carbonyl_c, amide_n)
+
+
+# ============================================================================
+# v33 Phase 2 Task 2.1: Lever C -- capped termini. Extends the flat acylamino
+# convention to accept two shapes the ordinary path declines on (SPY:
+#  sec.3 -- 71% of the true-
+# peptide backlog is exactly one or both of these, the single dominant
+# blocker):
+#   - a C-TERMINAL PRIMARY AMIDE (``-C(=O)NH2``) instead of the free
+#     ``-COOH`` the acylamino convention assumes -- rendered as the standard
+#     amino-acid-amide suffix ("...amide", e.g. ``glycinamide``).
+#   - a mono-N-METHYLATED (free, non-acylated) N-terminus -- rendered as an
+#     "N-methyl" substituent prefix on the whole assembled name (the same
+#     convention as the well-known ``N-methyl-D-aspartic acid``).
+# Both caps are stripped from an ISOLATED COPY of just the one residue
+# fragment they live on (never the whole molecule) -- ``_extract_residues``
+# already walks the backbone and hands back each residue's OWN reconstructed
+# free-amino-acid SMILES untouched at the true termini, so no whole-molecule
+# surgery is needed. The stripped fragment is looked up via the EXACT SAME
+# trivial-name table as every other residue; the cap is then re-applied
+# TEXTUALLY at exactly the token position it structurally came from --
+# mutating the RESIDUE DATA that feeds ``_assemble_peptide_name`` (the
+# C-terminal residue's ``name`` field) or prepending to the assembled
+# string's own start (the N-terminal token, position 0) -- never splicing an
+# already-assembled name blindly. ``_rt_verified`` (full-InChI OPSIN
+# round-trip) gates every candidate this lever returns, so a mis-rendering
+# degrades to abstention, never a wrong name (0-wrong ABSOLUTE).
+# ============================================================================
+
+
+# A lone, free (non-acylated) methyl directly on a secondary amino nitrogen
+# that is itself bonded to an sp3 alpha-carbon -- the shape of a MONO-N-
+# methylated amino-acid N-terminus (e.g. sarcosine's own N, or N-
+# methylalanine's). Applied only to an already-ISOLATED single-residue
+# fragment (see module docstring above), so no additional "is this really
+# the N-terminus" disambiguation is needed -- `_extract_residues` has
+# already done that work.
+_MONO_N_METHYL_SMARTS = "[CH3;D1][NX3;H1;!$([NX3][CX3]=O)][CX4]"
+
+# A genuine, unsubstituted primary carboxamide -- ``-C(=O)NH2``. Applied
+# only to an already-isolated single-residue fragment; a standard residue
+# with its OWN side-chain primary amide (asparagine, glutamine) matches this
+# TWICE (once for a genuine C-terminal amide cap, once for the side chain),
+# so the "exactly one match" requirement in `_strip_terminal_amide` below
+# naturally declines those rather than guessing which one is the cap.
+_PRIMARY_CARBOXAMIDE_SMARTS = "[CX3](=O)[NX3H2]"
+
+# Standard amino acids whose SIDE CHAIN is itself a second acid/amide-class
+# characteristic group -- P-41 seniority (carboxylic acid > carboxamide)
+# means the free side-chain acid, not the amidated alpha-carboxyl, would be
+# the true parent suffix, and the flat acylamino convention has no way to
+# express that (it would need a `carbamoyl`-prefix construction instead of
+# a suffix swap). Explicitly excluded rather than relying solely on the
+# RT-gate to catch the resulting wrong-shaped name (the the contributor guide-flagged
+# "side-chain-acid trap"). Asparagine/glutamine are listed defensively too
+# (their OWN side-chain amide already makes `_strip_terminal_amide` decline
+# via the two-match ambiguity above; this is belt-and-suspenders).
+_COMPETING_SIDE_CHAIN_AMINO_ACIDS = {
+    "aspartic acid", "glutamic acid", "asparagine", "glutamine",
+}
+
+
+def _strip_mono_n_methyl(smi: str) -> Tuple[str, bool]:
+    """If ``smi`` (a single free-amino-acid residue fragment) has EXACTLY one
+    free, non-acylated mono-N-methyl on its backbone amino nitrogen, return
+    ``(new_smiles_with_methyl_removed, True)``. Otherwise return
+    ``(smi, False)`` UNCHANGED -- ambiguous (0 or >=2 matches) or a
+    sanitize failure both decline rather than guess."""
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return smi, False
+    pattern = Chem.MolFromSmarts(_MONO_N_METHYL_SMARTS)
+    if pattern is None:
+        return smi, False
+    matches = mol.GetSubstructMatches(pattern)
+    if len(matches) != 1:
+        return smi, False
+    methyl_idx = matches[0][0]
+    rw = Chem.RWMol(mol)
+    try:
+        rw.RemoveAtom(methyl_idx)
+        Chem.SanitizeMol(rw)
+    except Exception:
+        return smi, False
+    return Chem.MolToSmiles(rw, canonical=True), True
+
+
+def _strip_terminal_amide(smi: str) -> Tuple[str, bool]:
+    """If ``smi`` (a single free-amino-acid residue fragment) has EXACTLY one
+    genuine primary carboxamide, convert it back to the free acid (the same
+    dummy->OH technique ``_reconstruct_free_amino_acid`` already uses) and
+    return ``(new_smiles, True)``. Otherwise return ``(smi, False)``
+    UNCHANGED -- 0 matches (nothing to strip) or >=2 matches (ambiguous,
+    e.g. asparagine/glutamine's own side-chain amide) both decline."""
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return smi, False
+    pattern = Chem.MolFromSmarts(_PRIMARY_CARBOXAMIDE_SMARTS)
+    if pattern is None:
+        return smi, False
+    matches = mol.GetSubstructMatches(pattern)
+    if len(matches) != 1:
+        return smi, False
+    amide_n_idx = matches[0][2]  # [0]=carbonyl C, [1]==O, [2]=amide N
+    rw = Chem.RWMol(mol)
+    try:
+        atom = rw.GetAtomWithIdx(amide_n_idx)
+        atom.SetAtomicNum(8)
+        atom.SetNumExplicitHs(1)
+        atom.SetNoImplicit(True)
+        Chem.SanitizeMol(rw)
+    except Exception:
+        return smi, False
+    return Chem.MolToSmiles(rw, canonical=True), True
+
+
+def _identify_one_residue(smi: str) -> Optional[Dict[str, str]]:
+    """Ordinary (unmodified) trivial-name lookup for a SINGLE residue
+    fragment, via the exact same table `_identify_residues` uses. Returns
+    the residue dict, or None if this fragment is not (as-is) a standard
+    amino acid."""
+    result = _identify_residues([smi], strict_stereo=True)
+    return result[0] if result else None
+
+
+def _acid_name_to_amide(name: str) -> str:
+    """Standard-amino-acid-amide spelling: drop a trailing 'e' and append
+    'amide', else append 'amide' directly -- verified against all 16 non-
+    excluded Table-10.4 names' known amide forms (glycinamide, alaninamide,
+    valinamide, leucinamide, isoleucinamide, prolinamide,
+    phenylalaninamide, tryptophanamide, methioninamide, serinamide,
+    threoninamide, cysteinamide, tyrosinamide, lysinamide, argininamide,
+    histidinamide)."""
+    return (name[:-1] + "amide") if name.endswith("e") else (name + "amide")
+
+
+def _try_capped_termini(mol) -> Optional[str]:
+    """Lever C (v33 Task 2.1): re-attempt the flat acylamino chain allowing
+    the FIRST residue's own backbone amino N to carry a lone free N-methyl,
+    and/or the LAST residue's own alpha-carboxyl to be a primary carboxamide
+    instead of the free acid the ordinary convention assumes. Returns an
+    UNVERIFIED candidate string; the caller gates it through
+    ``_rt_verified``.
+    """
+    residues = _extract_residues(mol)
+    if residues is None or len(residues) < 2:
+        return None
+
+    working = list(residues)
+    methyl_applied = False
+    amide_applied = False
+
+    # Only attempt a strip on a residue whose UNMODIFIED form already fails
+    # the ordinary lookup -- an already-standard residue (e.g. a genuine,
+    # uncapped asparagine sitting at the C-terminus) is left untouched, so
+    # this lever can never mistake a residue's own natural side chain for a
+    # cap that was never there.
+    if _identify_one_residue(working[0]) is None:
+        stripped, changed = _strip_mono_n_methyl(working[0])
+        if changed:
+            working[0] = stripped
+            methyl_applied = True
+
+    if _identify_one_residue(working[-1]) is None:
+        stripped, changed = _strip_terminal_amide(working[-1])
+        if changed:
+            working[-1] = stripped
+            amide_applied = True
+
+    if not methyl_applied and not amide_applied:
+        return None  # nothing this lever can help with -- some other decline
+
+    named = _identify_residues(working, strict_stereo=True)
+    if named is None:
+        return None
+
+    if amide_applied:
+        cterm_name = named[-1]['name']
+        if cterm_name in _COMPETING_SIDE_CHAIN_AMINO_ACIDS:
+            # Side-chain-acid trap (the contributor guide): the free side-chain acid/
+            # amide would outrank a suffix-amide swap under P-41 seniority.
+            # Abstain rather than misplace.
+            return None
+        named = list(named)
+        named[-1] = dict(named[-1])
+        named[-1]['name'] = _acid_name_to_amide(cterm_name)
+
+    candidate = _assemble_peptide_name(named)
+
+    if methyl_applied:
+        # The N-terminal token always starts at position 0 of the assembled
+        # string in this flat convention; a cited 'D-' descriptor sits
+        # before it (P-103.3.4), so 'N-methyl' needs its own hyphen only
+        # then (matching the established 'N-methyl-D-aspartic acid' style).
+        prefix = "N-methyl-" if candidate.startswith("D-") else "N-methyl"
+        candidate = prefix + candidate
+
+    return candidate

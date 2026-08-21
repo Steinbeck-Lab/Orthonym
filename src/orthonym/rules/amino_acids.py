@@ -56,6 +56,23 @@ ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2H1]"
 # on, so this constant must admit H0 too, not just the amino-acid pattern.
 PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 
+# v33 Phase 2 Task 2.1 (capped termini): a peptide whose C-TERMINAL residue's
+# alpha-carboxyl is a PRIMARY CARBOXAMIDE (-C(=O)NH2, e.g. a bioactive
+# peptide's amidated C-terminus) has NO free -COOH anywhere in the whole
+# molecule, so ALPHA_AMINO_ACID_SMARTS (which hard-requires `[OX2H1]`) never
+# matches and `is_peptide()` returned False -- the dispatcher never called
+# `rules.peptides.name_peptide` at all, even once that module's own
+# `_is_valid_peptide`/producer were extended to accept this cap
+# ( sec.3: 71% of the true-
+# peptide backlog is exactly this "both termini capped" shape). Deliberately
+# a SEPARATE constant rather than broadening `ALPHA_AMINO_ACID_SMARTS`
+# itself: that constant also gates `detect_amino_acid`/`name_amino_acid`,
+# the STANDALONE free-amino-acid systematic namer, which assumes a genuine
+# `[OX2H1]` and would mis-name a standalone amino-acid AMIDE (not a peptide
+# at all) if broadened -- this new pattern is consulted ONLY by
+# `is_peptide()` below, so that unrelated path is untouched.
+_TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[NX3H2]"
+
 # SMARTS patterns for additional functional groups (PEP-02 bailout)
 # These detect FGs beyond amino + acid that _name_amino_acid_systematic
 # cannot handle. When found, we bail out to the general polyfunctional pipeline.
@@ -120,8 +137,13 @@ def is_peptide(mol) -> bool:
     Returns:
         True if molecule is a peptide (has amino acid pattern AND peptide bonds)
     """
-    # Must have amino acid pattern AND peptide bonds
-    if not detect_amino_acid(mol):
+    # Must have amino acid pattern AND peptide bonds. v33 Task 2.1: OR in the
+    # terminal-primary-amide alternative (see the constant's docstring) so a
+    # capped-C-terminus peptide still dispatches to `rules.peptides` instead
+    # of silently falling through to "unknown organic compound".
+    amide_pattern = Chem.MolFromSmarts(_TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS)
+    has_amide_alpha = amide_pattern is not None and mol.HasSubstructMatch(amide_pattern)
+    if not (detect_amino_acid(mol) or has_amide_alpha):
         return False
     return count_peptide_bonds(mol) >= 1
 
