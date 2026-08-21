@@ -23,8 +23,17 @@ Coverage:
     fast, never hangs
   * the atom-coverage assertion actually VOIDS a rigged incomplete binding
     (proves the gate fires, not just that good input passes it)
-  * a per-atom formal-charge scope guard (internally charge-separated atoms
-    such as nitro are refused rather than mis-constructed)
+  * Task B2b: charge / indicated-H as suffixes (design step 4) -- a genuine
+    net-charged cation/anion, a skeletal (P-74.1.1) zwitterion, a charged
+    substituent on a neutral parent, and the nitroethane-class internally
+    charge-separated species (now NAMED, not voided, when spellable+
+    verified) reusing ``general_engine``'s own charge-suffix primitives; an
+    FG-anchored anion (carboxylate) correctly VOIDS as out of scope for
+    those reused primitives, never mis-named
+  * a live regression test that actually exercises the public entry point's
+    broad ``except Exception`` guard (monkeypatch-injected error), since the
+    original fix-round-1 giant-chain witness is now short-circuited by the
+    ``_MAX_ATOMS_FOR_PERCEPTION`` cap before that code path is reached
 
 Targeted-file run only (per project convention -- avoid the OPSIN-pipe
 deadlock of a full ``pytest tests/`` run):
@@ -212,17 +221,135 @@ def test_stereo_bearing_perindopril_is_constitution_complete():
 
 
 # ===========================================================================
-# Per-atom formal charge: refuse rather than mis-construct.
+# Charge: named when spellable+verified via the reused general_engine
+# primitives, voided (never mis-constructed) when out of their scope.
 # ===========================================================================
 
-def test_internally_charged_species_refused_not_misconstructed():
-    """nitroethane (CC[N+](=O)[O-]) has NET charge 0 but an internal +1/-1
-    pair this module does not model (charge suffixes are a later-phase
-    item). MEASURED: before the per-atom guard was added, this produced a
-    name that did NOT round-trip (a wrong construction, not merely an ugly
-    one) -- the guard must refuse it outright rather than ship a candidate
-    ``verify_or_none`` would have to catch."""
-    mol = Chem.MolFromSmiles("CC[N+](=O)[O-]")
+def test_internally_charged_species_now_named_not_voided():
+    """Task B2b: nitroethane (``CC[N+](=O)[O-]``, NET charge 0, an internal
+    +1/-1 nitro pair) used to be refused OUTRIGHT by a blanket per-atom-
+    charge guard (before B2b: any nonzero per-atom formal charge -> void,
+    added because the ORIGINAL unguarded ``nitro`` leaf shortcut, keyed only
+    on "N bonded to two terminal O's" with no bond-order/charge check, fired
+    on the wrong shape and mis-named a different molecule). B2b replaces the
+    blanket guard with a charge-and-bond-order-VALIDATED ``_nitro_shortcut``
+    (nitro's charges are P-59 INTERNAL, excluded from
+    ``perception.ions.get_ion_sites``'s genuine-ion-site perception, so this
+    is spelled directly as a leaf, never via the charge-suffix machinery).
+    This is the the contributor guide-mandated regression check: an internally
+    charge-separated net-0 species must now be NAMED when it can be spelled
+    correctly and verified, never silently left void."""
+    result, verified = _name_and_verify("CC[N+](=O)[O-]")
+    assert verified == result.name
+    assert "nitro" in result.name
+
+
+# ===========================================================================
+# Task B2b: charge / indicated-H as suffixes (step 4 of the design).
+# ===========================================================================
+
+def test_quaternary_ammonium_cation_gets_ium_suffix():
+    """A net-charged, single-sign species: tetramethylammonium
+    (``C[N+](C)(C)C``) -- the nitrogen is a skeletal 'quaternary' cation
+    (``general_engine.classify_cation``), reused via
+    ``general_engine._charge_suffix_text`` to append a locanted ``-ium``
+    suffix on whichever spine the N ends up on."""
+    result, verified = _name_and_verify("C[N+](C)(C)C")
+    assert verified == result.name
+    assert "ium" in result.name
+
+
+def test_carboxylate_anion_voids_out_of_scope_fg_anion():
+    """A net-charged anion: acetate (``CC(=O)[O-]``) classifies as
+    'carboxylate' (an FG-anchored anion), which is OUT OF SCOPE for the
+    reused ``general_engine._charge_suffix_text`` (that function's own
+    scope only covers skeletal 'carbanion'/'heteroatom_hydride_anion'/
+    'uide_anion' bases -- an FG anion is explicitly declined there, "PIN
+    path owns it"). This module has no functional-group-suffix layer of its
+    own to build the 'ate' form, so it VOIDS rather than mis-name it --
+    never a wrong or partial name for what it cannot yet spell."""
+    mol = Chem.MolFromSmiles("CC(=O)[O-]")
+    assert name_universal_substitutive(mol) is None
+
+
+def test_zwitterion_amino_acid_voids_carboxylate_anchored_case():
+    """A second, distinct zwitterion (net-0, internally charge-separated):
+    the glycine zwitterion ``C(C(=O)[O-])[NH3+]``. Its cation (aminium) IS
+    in ``general_engine._zwitterion_suffix_plan``'s skeletal cation-base
+    table, but its anion classifies 'carboxylate' -- in neither the P-74.1.1
+    skeletal anion table NOR the P-74.1.2 '-olate' table (which is disabled
+    here anyway via ``allow_fg_anion=False``, since this producer has no
+    FG-suffix layer to hold the anchor atom out of substituent discovery).
+    Asserts the REQUIRED invariant: NEVER a wrong constitution -- void is
+    the correct, honest degrade here (a specialized carboxylate-zwitterion
+    mechanism, out of scope for this general recursive namer, would be
+    needed to name it)."""
+    mol = Chem.MolFromSmiles("C(C(=O)[O-])[NH3+]")
+    assert name_universal_substitutive(mol) is None
+
+
+def test_charged_substituent_on_neutral_parent_carries_on_branch_name():
+    """A charged SUBSTITUENT on an otherwise-neutral parent: cyclohexane
+    forces the RING to be the top-level spine (ring always beats chain when
+    any ring atom is present), so the pendant ``-N+(CH3)3`` group is
+    discovered as an off-spine BRANCH and named by RE-ENTERING this same
+    recursive namer on the branch subgraph -- its own local spine carries
+    the genuine cation, gets its own ``-ium`` suffix (SAME
+    ``_resolve_spine_charge`` machinery as the top-level case), and is then
+    mechanically rewritten as a ``-yl`` substituent prefix on the neutral
+    cyclohexane parent. Coverage-complete and OPSIN round-trip verified."""
+    result, verified = _name_and_verify("C1CCCCC1[N+](C)(C)C")
+    assert verified == result.name
+    assert "ium" in result.name
+    assert "cyclohexane" in result.name
+
+
+def test_charged_species_determinism_across_permutations():
+    """The SAME charged molecule from differently-numbered (but structurally
+    identical) SMILES must produce the IDENTICAL name -- the charge-suffix
+    locant derives from the SAME canonical-rank-based spine numbering the B2
+    determinism fix established, so it inherits determinism for free rather
+    than needing its own separate tie-break."""
+    import random
+
+    random.seed(2026_08_21)
+    witnesses = [
+        "C[N+](C)(C)C",
+        "CC[N+](=O)[O-]",
+        "C1CCCCC1[N+](C)(C)C",
+    ]
+    for smi in witnesses:
+        mol = Chem.MolFromSmiles(smi)
+        n_atoms = mol.GetNumAtoms()
+        names = set()
+        for _ in range(8):
+            perm = list(range(n_atoms))
+            random.shuffle(perm)
+            renumbered = Chem.RenumberAtoms(mol, perm)
+            smi2 = Chem.MolToSmiles(renumbered, canonical=False)
+            mol2 = Chem.MolFromSmiles(smi2)
+            assert mol2 is not None
+            result = name_universal_substitutive(mol2)
+            names.add(result.name if result is not None else None)
+        assert len(names) == 1, f"{smi} produced {names} across permutations"
+
+
+def test_broad_except_guard_actually_fires_on_an_injected_error(monkeypatch):
+    """The public entry point's broad ``except Exception: return None`` (its
+    own docstring reason 5) needs a regression test that actually exercises
+    it -- the fix round 1 witness (a 10,000-atom chain) is now
+    short-circuited by the ``_MAX_ATOMS_FOR_PERCEPTION`` size cap BEFORE the
+    code path the broad except was added for is ever reached, making that
+    test vacuous for THIS guard specifically (it still correctly tests the
+    size cap). This test injects a ``ValueError`` directly into the inner
+    unsafe function via monkeypatch and confirms the PUBLIC wrapper still
+    returns ``None`` rather than letting the exception propagate -- proving
+    the broad except is live, not merely present."""
+    def _boom(mol, atom_work_budget):
+        raise ValueError("injected failure -- proves the broad except fires")
+
+    monkeypatch.setattr(us, "_name_universal_substitutive_unsafe", _boom)
+    mol = Chem.MolFromSmiles("CCO")
     assert name_universal_substitutive(mol) is None
 
 

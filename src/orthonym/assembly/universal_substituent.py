@@ -40,10 +40,66 @@ polycyclic ring systems (reusing ``rules.vonbaeyer_universal.
 analyze_cage_universal`` + ``rules.polycyclic._build_parent_with_unsaturation``
 for the parent TEXT only -- NOT ``general_engine``'s substituent-recursion
 tail, which is exactly the declining machinery this module replaces).
-Net charge, isotopes, multi-fragment inputs and indicated hydrogen are
-OUT OF SCOPE for this task and void the whole call (``None``) -- they are a
-later-phase lift (design doc step 4), not a silent wrong emission.  This
-module is a PURE PRODUCER: it never calls ``verify_or_none`` and never
+Isotopes, radicals, wildcard atoms and multi-fragment inputs are OUT OF
+SCOPE and void the whole call (``None``).  Indicated hydrogen is also OUT OF
+SCOPE for this task (deferred -- no witness in the B2b brief requires it) and
+voids nothing on its own: this module simply does not special-case it, which
+is a pre-existing gap (unrelated to charge), not something this task
+introduces or worsens.
+
+Task B2b (this round) LIFTS the blanket per-atom-charge void and replaces it
+with real charge PERCEPTION, reusing ``assembly.general_engine``'s existing
+charge-suffix primitives (``_charge_suffix_text`` / ``_zwitterion_suffix_plan``
+/ ``_elide_before_ionic_suffix``) so charge is spelled the SAME way as the
+rest of the codebase, never reinvented. Scope, precisely (fail-closed on
+everything else -- a table miss VOIDS the whole call, never mis-names):
+
+* A GENUINE ionic centre (``perception.ions.get_ion_sites``, which already
+  excludes P-59 INTERNAL charges -- nitro, N-oxide, azide, diazo -- these are
+  not "ionic centers" needing a suffix) is only ever resolved when it sits on
+  the SPINE atoms of *some* level of the recursion (top-level parent or a
+  substituent branch's own local parent) -- never as a bare prefix. Every
+  leaf-shortcut (``_leaf_shortcut``) BAILS on any component containing a
+  genuinely-charged atom (other than the dedicated nitro shape below), so a
+  charged atom always falls through to the generic spine machinery, which
+  forces it onto SOME level's spine (the branch-discovery/forced-root
+  argument: a component shrinks every recursive call, and a size-1 component
+  always makes its own sole atom the spine).
+* Net-charged, single-sign species (a plain cation or anion, e.g. a
+  quaternary ammonium or a skeletal carbanion): ``general_engine.
+  _charge_suffix_text`` on whichever spine holds the site(s) -- SAME scope as
+  general_engine's own P5 layer, so e.g. an FG anion (carboxylate, alkoxide,
+  phenolate, sulfonate, ...) or an FG cation (diazonium, acylium) is OUT OF
+  SCOPE and VOIDS (general_engine's own charged-species PIN path owns those,
+  not this general/best-effort producer).
+* Net-0 zwitterions with BOTH ionic centres SKELETAL to the SAME spine
+  (P-74.1.1, ``general_engine._zwitterion_suffix_plan(..., allow_fg_anion=
+  False)``): resolved the same way. The FG-anchored "-olate" branch
+  (P-74.1.2, an anion hanging off a characteristic group not itself on the
+  spine) is explicitly DISABLED (``allow_fg_anion=False``) -- this producer
+  has no functional-group-suffix layer to hold an atom out of substituent
+  discovery for it, so it is deferred, not built. A carboxylate-anchored
+  zwitterion (amino-acid style, e.g. glycine) therefore VOIDS -- carboxylate
+  is out of scope for BOTH the skeletal and the -olate branch of the reused
+  primitive (it is owned by the v33 charged-lever's dedicated ester-anion-word
+  mechanism, a different, specialized producer this module does not invoke).
+* Nitro (``C-N(+)(=O)[O-]``, P-59 internal charge) is spelled directly as a
+  dedicated, charge-and-bond-order-VALIDATED leaf shortcut (``_nitro_shortcut``)
+  exactly like ``carboxy``/``cyano`` -- never via the genuine-ion machinery
+  above. Its nitrogen is also excluded from ordinary chain-spine CONTINUATION
+  (``_is_nitro_root`` in ``_tree_neighbors``) so it can never be mis-threaded
+  into a replacement-nomenclature chain as if it were an ordinary
+  (uncharged, standard-valence) heteroatom -- that would silently drop the
+  charge information a plain "aza" locant carries no trace of.
+* Any OTHER shape a genuine ionic centre can take (multiply-charged, mixed
+  cation+anion under a nonzero net charge, more than one cation/anion pair,
+  an ionic centre split across two different spine levels, ...) is out of
+  scope for the reused primitives and VOIDS the whole call -- a final
+  top-level assertion (mirroring the atom-coverage assertion) checks that
+  EVERY genuine ionic-centre atom index was actually resolved by some level's
+  suffix, not merely trusted to be, before returning a name.
+
+This module is a PURE PRODUCER: it never calls ``verify_or_none`` and never
 ships a name; the caller (a later wiring task) is responsible for gating.
 """
 from __future__ import annotations
@@ -55,6 +111,7 @@ from rdkit import Chem
 
 from ..perception.stereo import assign_stereochemistry
 from ..perception.rings import get_ring_systems
+from ..perception.ions import get_ion_sites
 from .naming_utils import (
     SIMPLE_MULTIPLIERS,
     alpha_sort_key,
@@ -63,6 +120,14 @@ from .naming_utils import (
 from ..rules.skeletal_replacement import REPLACEMENT_TERMS, _A_CITATION_ORDER
 from ..rules.vonbaeyer_universal import analyze_cage_universal
 from ..rules.polycyclic import _build_parent_with_unsaturation
+# Task B2b: reuse general_engine's own charge-suffix primitives so this
+# module spells charge the SAME way as the rest of the codebase (never
+# reinvented) -- see the module docstring's charge-scope paragraph.
+from .general_engine import (
+    _charge_suffix_text,
+    _zwitterion_suffix_plan,
+    _elide_before_ionic_suffix,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +192,12 @@ class _Ctx:
     ring_system_of: Dict[int, int]
     budget: _Budget
     canon_rank: Tuple[int, ...]  # atom idx -> canonical rank (numbering-invariant)
+    # Task B2b: GENUINE ionic centres only (get_ion_sites already excludes
+    # P-59 internal charges -- nitro, N-oxide, azide, diazo). Computed ONCE
+    # per top-level call and consulted by every recursive ``_name_component``
+    # call to decide whether ITS OWN spine needs a charge suffix.
+    cation_sites: List[Dict[str, object]]
+    anion_sites: List[Dict[str, object]]
 
 
 @dataclass(frozen=True)
@@ -156,6 +227,23 @@ class _ComponentResult:
     #                                              _render_as_substituent
     #                                              must NOT mechanically
     #                                              append -yl/-ylidene to it.
+    charged: FrozenSet[int] = frozenset()         # Task B2b: genuine
+    #                                              ionic-centre atom indices
+    #                                              (see _Ctx.cation_sites /
+    #                                              .anion_sites) that were
+    #                                              successfully expressed by
+    #                                              a charge suffix SOMEWHERE
+    #                                              within this component
+    #                                              (this level's own spine,
+    #                                              unioned with every child
+    #                                              branch's own `charged`).
+    #                                              The top-level entry point
+    #                                              asserts this equals the
+    #                                              FULL genuine-ion-site set
+    #                                              before shipping a name --
+    #                                              symmetric to the atom-
+    #                                              coverage assertion, but
+    #                                              for CHARGE correctness.
 
 
 # ===========================================================================
@@ -167,14 +255,23 @@ def name_universal_substitutive(
 ) -> Optional[UniversalResult]:
     """Name *mol* unconditionally, or return ``None`` (void -- never partial).
 
-    ``None`` happens for exactly four reasons, all fail-closed:
-      1. a scope guard (charged species / isotopes / radicals / wildcard
-         atoms / multi-fragment input) -- explicitly out of scope for this
-         task, never silently mis-named;
+    ``None`` happens for exactly five reasons, all fail-closed:
+      1. a scope guard (isotopes / radicals / wildcard atoms / multi-fragment
+         input) -- explicitly out of scope for this task, never silently
+         mis-named;
       2. the work budget trips on a pathological input;
       3. the atom-coverage assertion finds a gap (should not happen given
          the construction, but is asserted rather than trusted);
-      4. ANY other unexpected exception (fix round 1, finding 2). This is a
+      4. a genuine ionic centre (see module docstring's charge-scope
+         paragraph, Task B2b) that cannot be faithfully expressed by the
+         reused ``general_engine`` charge-suffix primitives on any level's
+         spine -- an FG anion/cation, a mixed-sign net-charged species, a
+         multiply-charged centre, or an ionic centre split across two
+         different spine levels are all out of scope and void rather than
+         ship a name that omits the charge (the top-level charge-coverage
+         assertion, symmetric to the atom-coverage one, catches this even if
+         a lower-level construction bug would otherwise have missed it);
+      5. ANY other unexpected exception (fix round 1, finding 2). This is a
          pure ``Optional``-contracted producer: it must never raise. Measured
          holes this closes: a spine longer than 9,999 atoms reaches
          ``data/chain_names.py``'s "chain length outside supported range
@@ -228,16 +325,16 @@ def _name_universal_substitutive_unsafe(
 
     if len(Chem.GetMolFrags(work)) != 1:
         return None  # multi-fragment: out of scope for this producer
-    if any(a.GetFormalCharge() != 0 for a in work.GetAtoms()):
-        # PER-ATOM, not just net, formal charge. Measured: nitroethane
-        # (CC[N+](=O)[O-]) has NET charge 0 (a +1/-1 internal pair) but this
-        # module does not model formal charge at all -- it fills implicit H
-        # from plain valence, so an internally charge-separated atom (nitro,
-        # azide, N-oxide, ...) that slipped past a net-charge-only guard was
-        # constructed WRONG (measured: the emitted name did not round-trip).
-        # Charge handling (P-73/P-74 suffixes) is an explicit later-phase
-        # scope item (design doc step 4) -- refuse rather than mis-construct.
-        return None
+    # Task B2b: the blanket "ANY nonzero per-atom formal charge -> void"
+    # guard that used to live here is GONE -- charge is now perceived and
+    # spelled properly (see the module docstring's charge-scope paragraph
+    # and ``_resolve_spine_charge`` below), reusing ``general_engine``'s own
+    # charge-suffix primitives so a genuine ionic centre gets a real
+    # ``-ium``/``-ylium``/``-ide``/``-uide`` suffix (or the P-74.1.1
+    # cumulative zwitterion form) instead of being refused outright. What
+    # remains refused is exactly what falls outside that reused primitive's
+    # OWN scope (FG anions/cations, mixed-sign net charge, ...) -- see reason
+    # 4 in this function's docstring -- never a silent, charge-blind name.
     if any(a.GetIsotope() for a in work.GetAtoms()):
         return None
     if any(a.GetNumRadicalElectrons() for a in work.GetAtoms()):
@@ -271,12 +368,35 @@ def _name_universal_substitutive_unsafe(
     # ``1-chlorocyclohexane`` from another. Computed ONCE per top-level call.
     canon_rank = tuple(Chem.CanonicalRankAtoms(work, breakTies=True))
 
+    # Task B2b: GENUINE ionic centres only -- ``get_ion_sites`` already
+    # excludes P-59 INTERNAL charges (nitro, N-oxide, azide, diazo), which
+    # are spelled directly via ``_nitro_shortcut`` instead (see module
+    # docstring). Computed ONCE here; every recursive ``_name_component``
+    # call consults it to decide whether ITS OWN spine needs a suffix.
+    ion_sites = get_ion_sites(work)
+    cation_sites = list(ion_sites.get('cations') or [])
+    anion_sites = list(ion_sites.get('anions') or [])
+
     ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
-               budget=_Budget(atom_work_budget), canon_rank=canon_rank)
+               budget=_Budget(atom_work_budget), canon_rank=canon_rank,
+               cation_sites=cation_sites, anion_sites=anion_sites)
 
     comp = _name_component(ctx, heavy, attach_hint=None, is_top=True)
     if comp is None:
         return None
+
+    # Charge-coverage assertion (Task B2b), symmetric to the atom-coverage
+    # one below: every GENUINE ionic-centre atom must have been resolved by
+    # a charge suffix SOMEWHERE in the recursion. By construction this
+    # always holds (every genuine ion atom ends up on some level's own
+    # spine -- see the module docstring's inductive argument -- and that
+    # level's own resolution either succeeds or voids the whole call
+    # already), but it is ASSERTED rather than trusted, exactly like the
+    # atom-coverage check a few lines down.
+    all_charge_ids = frozenset(s['atom_idx'] for s in cation_sites) | \
+        frozenset(s['atom_idx'] for s in anion_sites)
+    if comp.charged != all_charge_ids:
+        return None  # void: a genuine ionic centre was not expressed
 
     covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
     total_bound = sum(len(ids) for _tok, ids in comp.bindings)
@@ -335,11 +455,21 @@ def _name_component(
         return None
     spine_atoms, spine_core, spine_atom_to_locant, attach_locant = spine_result
 
+    # ---- charge (Task B2b): does THIS level's own spine carry a genuine
+    # ionic centre? Checked BEFORE branch discovery so an unresolvable
+    # charge voids immediately without wasted recursive work -- see the
+    # module docstring's charge-scope paragraph and ``_resolve_spine_charge``.
+    needs_charge, charge_suffix_text, charge_ids = _resolve_spine_charge(
+        ctx, spine_atom_to_locant)
+    if needs_charge and charge_suffix_text is None:
+        return None  # genuine ionic centre on this spine, not expressible
+
     # ---- branches: every off-spine atom, named by RE-ENTERING this SAME
     # function on its own (strictly smaller) subgraph. NO depth cap. -------
     bindings: List[Tuple[str, FrozenSet[int]]] = [
         (spine_core, frozenset(spine_atoms)),
     ]
+    charged_accum: set = set(charge_ids)
     prefix_entries: Dict[str, List[int]] = {}
     for s_atom, root, order, branch_atoms in _discover_branches(
         mol, spine_atoms, component,
@@ -351,6 +481,7 @@ def _name_component(
         loc = spine_atom_to_locant[s_atom]
         prefix_entries.setdefault(rendered, []).append(loc)
         bindings.append((rendered, sub.covers))
+        charged_accum |= sub.charged
 
     prefix_parts = []
     for name, locs in prefix_entries.items():
@@ -368,11 +499,81 @@ def _name_component(
     else:
         full_name = spine_core
 
+    if needs_charge:
+        # Appended to the FULLY assembled name (prefixes + parent core), not
+        # just ``spine_core`` -- mirrors general_engine's own ordering
+        # (``_append_charge_suffix`` is called on the substituent-decorated
+        # name), so P-16.7.1(a)/P-74.1.1 elision targets the parent
+        # hydride's own trailing 'e', never truncates a substituent prefix.
+        full_name = _elide_before_ionic_suffix(full_name, charge_suffix_text)
+
     covers = frozenset(a for _t, ids in bindings for a in ids)
     return _ComponentResult(
         name=full_name, bindings=bindings, covers=covers,
-        attach_locant=attach_locant,
+        attach_locant=attach_locant, charged=frozenset(charged_accum),
     )
+
+
+def _resolve_spine_charge(
+    ctx: _Ctx, spine_atom_to_locant: Dict[int, int],
+) -> Tuple[bool, Optional[str], FrozenSet[int]]:
+    """Does THIS level's own spine carry a genuine ionic centre, and if so,
+    what suffix text expresses it (reusing ``general_engine``'s primitives)?
+
+    Returns ``(needs_charge, suffix_text, charged_atom_ids)``:
+      * ``(False, None, frozenset())`` -- no genuine ionic centre touches
+        this spine; nothing to do (the overwhelmingly common, uncharged case).
+      * ``(True, None, frozenset())`` -- a genuine ionic centre touches this
+        spine but is NOT expressible by the reused primitives (an FG anion
+        like carboxylate/alkoxide, an FG cation like diazonium/acylium, a
+        mixed-sign net-charged species, ...) -- the caller MUST void.
+      * ``(True, "<suffix>", ids)`` -- resolved; the caller appends
+        ``<suffix>`` (via ``_elide_before_ionic_suffix``) and records ``ids``
+        as consumed (the top-level charge-coverage assertion).
+
+    Two mutually-exclusive reused shapes, tried in turn (a molecule can only
+    ever match ONE, since they gate on opposite global site shapes):
+      * ``general_engine._charge_suffix_text`` -- a net-charged, SINGLE-SIGN
+        species (a plain cation or anion; internally ``bool(anions) ==
+        bool(cations)`` must be False, i.e. exactly one sign present at all,
+        globally). Scope is general_engine's OWN P5 scope -- 'ylium'/
+        'aminium'/'onium'/'quaternary' cations, 'carbanion'/
+        'heteroatom_hydride_anion'/'uide_anion' anions; anything else (FG
+        anions/cations) returns None from that function, which this treats
+        as "not expressible", never as "no charge here".
+      * ``general_engine._zwitterion_suffix_plan(..., allow_fg_anion=False)``
+        -- a net-0 zwitterion with BOTH ionic centres skeletal to THIS SAME
+        spine (P-74.1.1). ``allow_fg_anion=False`` disables the P-74.1.2
+        "-olate" FG-anchored branch: this producer has no functional-group-
+        suffix layer to hold an atom out of substituent discovery for it, so
+        that branch is deferred, not built (a carboxylate-anchored
+        zwitterion, e.g. an amino acid, is therefore NOT expressible here and
+        voids -- see module docstring).
+    """
+    spine_atoms = set(spine_atom_to_locant)
+    touches = (
+        any(s['atom_idx'] in spine_atoms for s in ctx.cation_sites)
+        or any(s['atom_idx'] in spine_atoms for s in ctx.anion_sites)
+    )
+    if not touches:
+        return False, None, frozenset()
+
+    single_sign = _charge_suffix_text(ctx.mol, spine_atom_to_locant)
+    if single_sign is not None:
+        text, charged_atom_ids = single_sign
+        return True, text, frozenset(charged_atom_ids)
+
+    zwit = _zwitterion_suffix_plan(ctx.mol, spine_atom_to_locant, allow_fg_anion=False)
+    if zwit is not None:
+        held, text = zwit
+        if not held:  # allow_fg_anion=False -> always empty when it succeeds
+            resolved = frozenset(
+                s['atom_idx'] for s in (ctx.cation_sites + ctx.anion_sites)
+                if s['atom_idx'] in spine_atoms
+            )
+            return True, text, resolved
+
+    return True, None, frozenset()  # touches, but not expressible -> void
 
 
 def _render_as_substituent(sub: _ComponentResult, bond_order: int) -> str:
@@ -455,14 +656,23 @@ def _bfs_component(mol, start: int, exclude: FrozenSet[int]) -> FrozenSet[int]:
 
 def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int]:
     """Neighbors of *atom* usable for CHAIN-spine walking: heavy, in
-    *component*, and NOT a ring atom (rings are branch ports, not chain
-    continuations -- see module docstring on chain/ring composition)."""
+    *component*, NOT a ring atom (rings are branch ports, not chain
+    continuations -- see module docstring on chain/ring composition), and
+    NOT the nitrogen of a nitro group (Task B2b, ``_is_nitro_root``): nitro
+    is always resolved as a branch via the dedicated ``_nitro_shortcut``
+    leaf, never mechanically threaded into a replacement-nomenclature chain
+    as if its nitrogen were an ordinary standard-valence heteroatom -- doing
+    so would silently drop the +1/-1 charge information a plain locanted
+    "aza" carries no trace of (see module docstring's charge-scope
+    paragraph)."""
     out = []
     for nb in ctx.mol.GetAtomWithIdx(atom).GetNeighbors():
         j = nb.GetIdx()
         if nb.GetAtomicNum() <= 1 or j not in component:
             continue
         if ctx.ring_system_of.get(j) is not None:
+            continue
+        if _is_nitro_root(ctx.mol, j):
             continue
         out.append(j)
     return out
@@ -811,6 +1021,26 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     """A handful of common small groups named directly rather than via the
     generic chain/replacement machinery. Returns ``(token, atom_ids)`` or
     ``None`` (fall through to generic construction)."""
+    # Task B2b: nitro is checked FIRST, before the generic charge guard just
+    # below -- its charges are P-59 INTERNAL (excluded from
+    # ``perception.ions.get_ion_sites``'s genuine-ion-site perception), so
+    # this is the standard neutral-molecule nitro group's own Lewis
+    # structure, not a "genuine ionic centre" the charge-suffix machinery
+    # needs to see.
+    nitro = _nitro_shortcut(mol, component, attach_hint)
+    if nitro is not None:
+        return nitro
+
+    # Task B2b: a GENUINELY charged atom anywhere in this branch (nitro,
+    # just checked, is the only exception) must NEVER take one of the
+    # NEUTRAL shortcuts below -- none of them checks formal charge, so a
+    # lone O- would otherwise be mis-named "hydroxy" (a different, neutral
+    # constitution; wrong molecular formula and net charge). Bail to generic
+    # spine construction instead, where a charged atom is always forced onto
+    # SOME level's own spine and handled by ``_resolve_spine_charge``.
+    if any(mol.GetAtomWithIdx(a).GetFormalCharge() != 0 for a in component):
+        return None
+
     atom = mol.GetAtomWithIdx(attach_hint)
     others = [n.GetIdx() for n in atom.GetNeighbors()
               if n.GetIdx() in component and n.GetAtomicNum() > 1]
@@ -863,16 +1093,80 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
             if ok and sorted(kinds) == sorted([(2, 0), (1, 1)]):
                 return "carboxy", frozenset(component)
 
-    # NOTE (fix round 1, finding 1): a `nitro` shortcut used to live here,
-    # keyed only on "N bonded to exactly two terminal O's" with NO bond-order
-    # check. Real neutral nitro is `[N+](=O)[O-]` -- refused upstream by the
-    # per-atom formal-charge guard -- and a neutral pentavalent N=O/N=O never
-    # sanitizes, so the ONLY shape that could ever reach this branch was
-    # N(OH)2 (two SINGLE-bonded terminal oxygens), which the shortcut still
-    # named "nitro" -- a DIFFERENT, wrong-constitution molecule (measured:
-    # CCCC(CCC)N(O)O -> "4-nitroheptane", which denotes C7H15NO2, not the
-    # actual C7H17NO2). Deleted rather than fixed-in-place: real nitro naming
-    # needs the charged form, which is out of scope for this module (task
-    # B2b). A genuine N(OH)2 branch now falls through to the generic
-    # skeletal-replacement chain construction instead (ugly, but correct).
+    # A genuine N(OH)2 branch (real neutral atoms, no nitro shape -- see
+    # ``_nitro_shortcut`` above) falls through to the generic
+    # skeletal-replacement chain construction (ugly, but correct).
     return None
+
+
+def _nitro_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """``-N(+)(=O)[O-]`` attached via N, exactly 3 atoms -- the standard
+    neutral-molecule nitro group.
+
+    Task B2b (this replaces the shortcut fix round 1 DELETED rather than
+    fixed-in-place, per that round's own note -- see the comment this
+    function's call site now precedes): fix round 1's nitro shortcut checked
+    NO bond order or charge at all (keyed only on "N bonded to two terminal
+    O's"), so it fired on N(OH)2 too and named it "nitro" -- a DIFFERENT,
+    wrong-constitution molecule (measured: ``CCCC(CCC)N(O)O`` ->
+    "4-nitroheptane", C7H15NO2, not the actual C7H17NO2). This version checks
+    EVERY bond order and EVERY formal charge explicitly: the nitrogen must
+    carry formal charge +1 and exactly two O neighbours, one DOUBLE-bonded
+    and neutral, the other SINGLE-bonded and -1 -- the real nitro Lewis
+    structure, and nothing else can match it.
+
+    Nitro's charges are P-59 INTERNAL (excluded from
+    ``perception.ions.get_ion_sites``), so this leaf is spelled directly,
+    never via the genuine-ion charge-suffix machinery in
+    ``_resolve_spine_charge`` -- and ``_is_nitro_root``/``_tree_neighbors``
+    keeps this nitrogen out of ordinary chain-spine continuation so it is
+    always discovered as a branch (where THIS function can see it), never
+    mis-threaded into a replacement-nomenclature chain."""
+    if len(component) != 3:
+        return None
+    atom = mol.GetAtomWithIdx(attach_hint)
+    if atom.GetSymbol() != "N" or atom.GetFormalCharge() != 1:
+        return None
+    in_component = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in component]
+    if len(in_component) != 2:
+        return None
+    outside = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() not in component]
+    if len(outside) != 1:
+        return None  # nitro's N must have exactly one non-oxygen substituent
+    kinds = []
+    for o_idx in in_component:
+        o_atom = mol.GetAtomWithIdx(o_idx)
+        if o_atom.GetSymbol() != "O":
+            return None
+        o_nbrs = [n.GetIdx() for n in o_atom.GetNeighbors()]
+        if o_nbrs != [attach_hint]:
+            return None  # each O must bond ONLY to this N (terminal)
+        bond = mol.GetBondBetweenAtoms(attach_hint, o_idx)
+        bt = round(bond.GetBondTypeAsDouble())
+        kinds.append((bt, o_atom.GetFormalCharge(), o_atom.GetTotalNumHs()))
+    if sorted(kinds) == sorted([(2, 0, 0), (1, -1, 0)]):
+        return "nitro", frozenset(component)
+    return None
+
+
+def _is_nitro_root(mol, j: int) -> bool:
+    """True if atom *j* is a nitro group's nitrogen (see ``_nitro_shortcut``
+    for the exact shape) -- used by ``_tree_neighbors`` to keep nitro OUT of
+    ordinary chain-spine continuation, so it is always resolved as a branch
+    via the charge-validated leaf shortcut, never mis-threaded into a
+    replacement-nomenclature chain as if it were an uncharged, standard-
+    valence heteroatom (which would silently drop its charge)."""
+    atom = mol.GetAtomWithIdx(j)
+    if atom.GetSymbol() != "N" or atom.GetFormalCharge() != 1 or atom.GetDegree() != 3:
+        return False
+    o_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() == "O"]
+    if len(o_neighbors) != 2:
+        return False
+    kinds = []
+    for o_atom in o_neighbors:
+        if o_atom.GetDegree() != 1:
+            return False
+        bond = mol.GetBondBetweenAtoms(j, o_atom.GetIdx())
+        bt = round(bond.GetBondTypeAsDouble())
+        kinds.append((bt, o_atom.GetFormalCharge(), o_atom.GetTotalNumHs()))
+    return sorted(kinds) == sorted([(2, 0, 0), (1, -1, 0)])
