@@ -278,10 +278,16 @@ def test_giant_outright_exceeds_budget_fails_closed_fast():
 
 def test_giant_deep_branching_trips_budget_despite_modest_atom_count():
     """A moderately-sized (420-atom) 'comb' structure with a DELIBERATELY
-    small custom budget: proves the budget is charged per RECURSIVE CALL
-    (cumulative work), not just checked once against the raw atom count --
-    the comb's total atom count is far below the custom budget's sibling
-    threshold once every branch call is summed."""
+    small custom budget is refused, fast.
+
+    NOTE (fix round 1, finding 6): this specific case (420 atoms > the
+    budget of 300) is actually caught by the top-level SIZE guard, not the
+    per-call recursive charge -- see
+    ``test_cumulative_recursive_charge_trips_when_size_guard_would_not``
+    below for a case that isolates the recursive-charging mechanism
+    specifically (total atoms UNDER the budget, cumulative charge over it).
+    Kept as a regression: either mechanism refusing this input, fast, is
+    correct behaviour."""
     comb = _build_comb(main_len=20, tooth_len=20)
     assert comb.GetNumHeavyAtoms() == 420
     t0 = time.time()
@@ -338,3 +344,202 @@ def test_atom_coverage_assertion_voids_a_rigged_gap(monkeypatch):
     mol = Chem.MolFromSmiles("CC(C)CC")  # has a branch -> >1 binding entries
     result = name_universal_substitutive(mol)
     assert result is None
+
+
+def test_atom_coverage_assertion_voids_a_rigged_double_count(monkeypatch):
+    """Fix round 1, finding 5: the disjointness assertion
+    (``sum(len(ids)) == len(heavy)``) catches a DOUBLE-COUNT (two bindings
+    sharing an atom) that a union-only check cannot see, because the union
+    of an overlapping set is still the full atom set. Rig one atom into TWO
+    bindings and confirm the public entry point still voids the candidate."""
+    orig = us._name_component
+
+    def rigged(ctx, component, attach_hint, is_top):
+        result = orig(ctx, component, attach_hint, is_top)
+        if is_top and result is not None and len(result.bindings) >= 2:
+            bindings = list(result.bindings)
+            tok0, ids0 = bindings[0]
+            tok1, ids1 = bindings[1]
+            if ids0 and ids1:
+                # Duplicate one atom from binding 0 into binding 1 as well --
+                # the union is UNCHANGED (still the full heavy-atom set), but
+                # the total bound count now exceeds it.
+                dup_atom = next(iter(ids0))
+                bindings[1] = (tok1, frozenset(ids1) | {dup_atom})
+                result = dataclasses.replace(result, bindings=bindings)
+        return result
+
+    monkeypatch.setattr(us, "_name_component", rigged)
+    mol = Chem.MolFromSmiles("CC(C)CC")
+    result = name_universal_substitutive(mol)
+    assert result is None
+
+
+# ===========================================================================
+# Fix round 1 (task-review + FABLE adversarial review of commit cad511fd)
+# ===========================================================================
+
+def test_nitro_shortcut_removed_no_wrong_constitution():
+    """Fix round 1, finding 1 (CRITICAL): the deleted ``nitro`` leaf
+    shortcut checked NO bond orders, so it fired on N(OH)2 (real neutral
+    nitro is refused upstream by the per-atom charge guard, and a
+    pentavalent-N-with-two-double-bonds shape never sanitizes) and named it
+    "nitro" -- a DIFFERENT, wrong-constitution molecule. MEASURED before the
+    fix: ``CCCC(CCC)N(O)O`` (N,N-dihydroxyheptan-4-amine) emitted
+    "4-nitroheptane" (denotes a different molecule, C7H15NO2 vs the actual
+    C7H17NO2). The shortcut is gone; the branch now falls through to the
+    generic (uglier, but not wrong) skeletal-replacement construction."""
+    mol = Chem.MolFromSmiles("CCCC(CCC)N(O)O")
+    result = name_universal_substitutive(mol)
+    if result is not None:
+        assert "nitro" not in result.name
+        assert result.covers == frozenset(
+            a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1
+        )
+
+
+def test_never_raises_on_unexpected_exception():
+    """Fix round 1, finding 2: a pure ``Optional``-contracted producer must
+    NEVER raise. MEASURED before the fix: a 10,000-carbon chain reached
+    ``data/chain_names.py``'s "chain length outside supported range
+    (1-9999)" ``ValueError`` uncaught (the entry point only caught
+    ``_BudgetExceeded``). This is a plain SMILES string, not RDKit
+    construction, so it also exercises the real public entry point
+    end-to-end exactly as a caller would use it."""
+    mol = Chem.MolFromSmiles("C" * 10_000)
+    assert mol is not None
+    result = name_universal_substitutive(mol)  # must not raise
+    assert result is None
+
+
+def test_never_segfaults_on_repeated_large_molecule_calls():
+    """Fix round 1 follow-up (found verifying finding 2): a raw linear chain
+    crashes the PROCESS (segfault, not a Python exception -- no try/except
+    can catch it) inside CIP assignment past a few thousand atoms, and
+    MEASURED worse: calling this module TWICE in one process on moderately
+    large chains (2,500+ atoms) crashes on the SECOND call even though the
+    first succeeds -- consistent with state accumulating in the CIP bridge
+    across calls, exactly the shape a batch/eval harness uses (name many
+    molecules in one process). ``_MAX_ATOMS_FOR_PERCEPTION`` is a hard,
+    non-overridable ceiling BELOW the region where this was ever observed
+    (stress-tested at 40 repeats). This test is the regression guard: if it
+    segfaults, pytest itself dies (exit 139) rather than reporting a
+    failure -- that IS the signal.
+    """
+    for _ in range(5):
+        mol = Chem.MolFromSmiles("C" * 2_500)
+        result = name_universal_substitutive(mol)
+        assert result is None  # refused by the hard ceiling, not attempted
+
+
+def test_large_atom_work_budget_cannot_reenable_the_crash():
+    """Fix round 1: a caller passing a large ``atom_work_budget`` legitimately
+    raises the cumulative RECURSIVE-work ceiling (for generous branch
+    allowance) but must NOT be able to re-enable the raw-size safety
+    ceiling that guards against the measured CIP segfault -- the effective
+    cap is ``min(atom_work_budget, _MAX_ATOMS_FOR_PERCEPTION)``, never
+    ``atom_work_budget`` alone."""
+    mol = Chem.MolFromSmiles("C" * 2_500)
+    result = name_universal_substitutive(mol, atom_work_budget=1_000_000)
+    assert result is None
+
+
+def test_monocycle_scan_is_budget_charged_not_blind():
+    """Fix round 1, finding 3: monocycle numbering search scores O(n)
+    candidates for O(n) rotations -- O(n^2) work that used to run AFTER the
+    one up-front atom-count charge, so it was budget-blind (measured: 87.5s
+    at 4,001 atoms, ~550s projected at 9,999). It must now be charged BEFORE
+    the scan runs, so a tight custom budget trips during the scan rather
+    than after it completes. Uses a monocycle small enough to pass the
+    initial size guard but whose O(len(candidates) * n) scan cost exceeds a
+    deliberately tight budget."""
+    smi = "C1" + "C" * 498 + "CC1"  # 501-atom monocycle
+    mol = Chem.MolFromSmiles(smi)
+    assert mol.GetNumHeavyAtoms() == 501
+    t0 = time.time()
+    result = name_universal_substitutive(mol, atom_work_budget=520)
+    elapsed = time.time() - t0
+    assert result is None
+    assert elapsed < 5.0  # generous: covers a cold CIP-bridge warm-up
+
+
+def test_monocycle_still_names_within_the_hard_size_ceiling():
+    """Sanity companion to the above: an ordinary, small monocycle is
+    unaffected by the budget-charging fix."""
+    mol = Chem.MolFromSmiles("C1CCCCC1")
+    result = name_universal_substitutive(mol)
+    assert result is not None
+    assert result.name == "cyclohexane"
+
+
+def test_cumulative_recursive_charge_trips_when_size_guard_would_not():
+    """Fix round 1, finding 6 (test gap): the EXISTING giant/comb test
+    (``test_giant_deep_branching_trips_budget_despite_modest_atom_count``)
+    trips the top-level SIZE guard (420 atoms > budget 300), never
+    exercising the per-call RECURSIVE charging mechanism at all. This test
+    isolates that mechanism: total heavy-atom count is UNDER the custom
+    budget (240 <= 300, so the size guard passes), but the CUMULATIVE charge
+    across the top-level spine plus its 15 branch calls (15 + 2*15*15 = 465)
+    exceeds the same budget -- the trip must come from recursion, not size."""
+    comb = _build_comb(main_len=15, tooth_len=15)
+    assert comb.GetNumHeavyAtoms() == 240
+    result = name_universal_substitutive(comb, atom_work_budget=300)
+    assert result is None
+
+
+def test_determinism_across_equivalent_smiles_permutations():
+    """Fix round 1, finding 4: the SAME molecule from differently-numbered
+    (but structurally identical) SMILES must produce the IDENTICAL name --
+    every tie-break in this module must key on ``Chem.CanonicalRankAtoms``
+    (numbering-invariant), never a raw RDKit atom index. MEASURED before the
+    fix: ``ClC1CCCCC1`` emitted "5-chlorocyclohexane" from one atom-numbering
+    and "1-chlorocyclohexane" from another -- both individually RT-valid,
+    so a downstream OPSIN-RT gate could not have caught the
+    nondeterminism. Also confirms LOWEST-locant numbering as a side effect
+    (chlorocyclohexane must always emit "1-chlorocyclohexane", never
+    "5-...")."""
+    import random
+
+    random.seed(1234567)
+    witnesses = [
+        "ClC1CCCCC1",
+        "ClC1CCC(Br)CC1",
+        "O=C(O)C1CCCC1CC(C)C",
+        "C1CCC(C1)C1CCOC1",
+    ]
+    for smi in witnesses:
+        mol = Chem.MolFromSmiles(smi)
+        n_atoms = mol.GetNumAtoms()
+        names = set()
+        for _ in range(8):
+            perm = list(range(n_atoms))
+            random.shuffle(perm)
+            renumbered = Chem.RenumberAtoms(mol, perm)
+            smi2 = Chem.MolToSmiles(renumbered, canonical=False)
+            mol2 = Chem.MolFromSmiles(smi2)
+            assert mol2 is not None
+            result = name_universal_substitutive(mol2)
+            names.add(result.name if result is not None else None)
+        assert len(names) == 1, f"{smi} produced {names} across permutations"
+
+    # The specific lowest-locant regression named in the finding:
+    mol = Chem.MolFromSmiles("ClC1CCCCC1")
+    result = name_universal_substitutive(mol)
+    assert result.name == "1-chlorocyclohexane"
+
+
+def test_single_heavy_atom_top_level_input_no_raise():
+    """Fix round 1, finding 7: a bare single-heavy-atom molecule at the top
+    level (water / ammonia / hydrogen sulfide) skips the leaf-shortcut table
+    (branches only) and falls into the generic chain-spine path as a
+    length-1 chain. Assert it either produces a coverage-complete result or
+    voids (None) -- never raises."""
+    for smi in ("O", "N", "S"):
+        mol = Chem.MolFromSmiles(smi)
+        assert mol is not None
+        result = name_universal_substitutive(mol)  # must not raise
+        if result is not None:
+            heavy = frozenset(
+                a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1
+            )
+            assert result.covers == heavy

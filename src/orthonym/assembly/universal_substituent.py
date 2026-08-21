@@ -73,8 +73,36 @@ from ..rules.polycyclic import _build_parent_with_unsaturation
 #: few hundred heavy atoms with modest branch nesting); a pathological giant
 #: with deep alternating branch nesting re-charges the same atoms once per
 #: ancestor call, so this trips in bounded, FAST (no I/O, no subprocess)
-#: Python work long before it would hang.
+#: Python work long before it would hang. This is the CALLER-TUNABLE
+#: cumulative recursive-work budget -- it is NOT, by itself, a safety
+#: ceiling on raw atom count; see ``_MAX_ATOMS_FOR_PERCEPTION`` below.
 DEFAULT_ATOM_WORK_BUDGET = 20_000
+
+#: Fix round 1 follow-up (found while VERIFYING finding 2's fix -- the broad
+#: except alone was not enough): a raw linear chain segfaults inside
+#: ``assign_stereochemistry`` (CIP; the vendored ``centres`` bridge, gated
+#: by ``ORTHONYM_USE_CENTRES_CIP``, default on) somewhere between 18,000 and
+#: 19,999 heavy atoms on a SINGLE call. A process crash is NOT a Python
+#: exception -- it cannot be caught by ANY try/except, including the broad
+#: one this fix round added. Worse, measured: this is NOT purely a function
+#: of single-call size -- calling this module TWICE in one process on
+#: moderately large chains (3,000, then another 3,000; separately, 2,500
+#: then another 2,500) segfaults on the SECOND call even though the FIRST
+#: succeeds cleanly, consistent with state accumulating in the CIP bridge
+#: across calls (a realistic deployment shape: one process names many
+#: molecules in a batch/eval loop). Stress-tested instead of merely spot-
+#: checked: 40 repeated calls at 2,000 atoms each all survived; repeated
+#: calls at 2,500 crashed on the second. A caller may legitimately want a
+#: large ``atom_work_budget`` (for generous cumulative RECURSIVE-work
+#: allowance across many small branches -- entirely orthogonal to raw input
+#: size), so this ceiling is a SEPARATE, non-overridable hard cap on the raw
+#: heavy-atom count this module will even attempt to run RDKit perception
+#: (kekulize/CIP/ring-systems/canonical-ranking) on, enforced regardless of
+#: whatever ``atom_work_budget`` value is passed in. Deliberately
+#: conservative, not tuned to the exact boundary, which is expected to
+#: depend on process memory/stack state and so should not be treated as a
+#: fixed constant.
+_MAX_ATOMS_FOR_PERCEPTION = 2_000
 
 
 class _BudgetExceeded(Exception):
@@ -98,6 +126,7 @@ class _Ctx:
     ring_systems: List[FrozenSet[int]]
     ring_system_of: Dict[int, int]
     budget: _Budget
+    canon_rank: Tuple[int, ...]  # atom idx -> canonical rank (numbering-invariant)
 
 
 @dataclass(frozen=True)
@@ -138,27 +167,58 @@ def name_universal_substitutive(
 ) -> Optional[UniversalResult]:
     """Name *mol* unconditionally, or return ``None`` (void -- never partial).
 
-    ``None`` happens for exactly three reasons, all fail-closed:
+    ``None`` happens for exactly four reasons, all fail-closed:
       1. a scope guard (charged species / isotopes / radicals / wildcard
          atoms / multi-fragment input) -- explicitly out of scope for this
          task, never silently mis-named;
       2. the work budget trips on a pathological input;
       3. the atom-coverage assertion finds a gap (should not happen given
-         the construction, but is asserted rather than trusted).
+         the construction, but is asserted rather than trusted);
+      4. ANY other unexpected exception (fix round 1, finding 2). This is a
+         pure ``Optional``-contracted producer: it must never raise. Measured
+         holes this closes: a spine longer than 9,999 atoms reaches
+         ``data/chain_names.py``'s "chain length outside supported range
+         (1-9999)" ``ValueError`` via ``_build_parent_with_unsaturation``
+         (now moot in practice below ``_MAX_ATOMS_FOR_PERCEPTION``, but kept
+         as defense in depth rather than relying on that cap alone), and a
+         caller who passes a huge ``atom_work_budget`` re-enables an
+         unbounded Python call-stack depth (``RecursionError``) that the
+         normal (default-budget) recursion depth (~200, arithmetically safe
+         against Python's ~1000 default limit) would never reach. Caught
+         here rather than narrowly patched at each raise site, because a
+         pure producer's contract is "never raise", not "never raise for the
+         causes I've already found". NOTE: this broad catch cannot help
+         against a process-level crash (segfault) -- see
+         ``_MAX_ATOMS_FOR_PERCEPTION`` for that measured, separate hole.
     """
     if mol is None:
         return None
+    try:
+        return _name_universal_substitutive_unsafe(mol, atom_work_budget)
+    except Exception:
+        return None
+
+
+def _name_universal_substitutive_unsafe(
+    mol, atom_work_budget: int,
+) -> Optional[UniversalResult]:
+    """The real body -- may raise; ``name_universal_substitutive`` is the
+    only caller and converts every exception to ``None``."""
     # Cheap size guard BEFORE any perception work. This is not redundant with
     # the per-call recursive charging below: kekulization, CIP assignment and
     # ring-system perception all run UNCONDITIONALLY on the whole molecule,
     # before the first recursive call/charge ever happens, and are NOT
     # guaranteed safe at arbitrary size -- measured: a 25,000-atom linear
-    # chain segfaults inside that pipeline (a C-level stack/recursion limit,
-    # not a Python exception the budget's try/except could catch) well
-    # before ``_name_component`` charges a single atom. An input already
-    # bigger than the whole budget can never finish within it, so refuse it
-    # before touching RDKit's heavier graph algorithms at all.
-    if mol.GetNumHeavyAtoms() > atom_work_budget:
+    # chain segfaults inside that pipeline, and (fix round 1 follow-up) so
+    # does a ~20,000-atom one, specifically inside CIP assignment. A process
+    # crash is NOT a Python exception, so no try/except (including the broad
+    # one added this round) can catch it -- the cap below is therefore
+    # ``min(atom_work_budget, _MAX_ATOMS_FOR_PERCEPTION)``, never just
+    # ``atom_work_budget`` alone, so a caller cannot re-enable the crash by
+    # passing a larger budget (that budget still legitimately raises the
+    # RECURSIVE-work ceiling; it cannot raise the raw-size safety ceiling).
+    size_cap = min(atom_work_budget, _MAX_ATOMS_FOR_PERCEPTION)
+    if mol.GetNumHeavyAtoms() > size_cap:
         return None
     work = Chem.Mol(mol)
     try:
@@ -202,18 +262,31 @@ def name_universal_substitutive(
         for a in atoms:
             ring_system_of[a] = i
 
-    ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
-               budget=_Budget(atom_work_budget))
+    # Fix round 1, finding 4: EVERY tie-break in this module keys on
+    # ``canon_rank`` (``Chem.CanonicalRankAtoms``, invariant to input atom
+    # numbering), never a raw RDKit atom index -- a raw-index tie-break made
+    # the SAME molecule from differently-numbered SMILES emit DIFFERENT (both
+    # individually RT-valid) names, e.g. chlorocyclohexane as
+    # ``5-chlorocyclohexane`` from one input numbering and
+    # ``1-chlorocyclohexane`` from another. Computed ONCE per top-level call.
+    canon_rank = tuple(Chem.CanonicalRankAtoms(work, breakTies=True))
 
-    try:
-        comp = _name_component(ctx, heavy, attach_hint=None, is_top=True)
-    except _BudgetExceeded:
-        return None
+    ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
+               budget=_Budget(atom_work_budget), canon_rank=canon_rank)
+
+    comp = _name_component(ctx, heavy, attach_hint=None, is_top=True)
     if comp is None:
         return None
 
     covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
-    if covers != heavy:
+    total_bound = sum(len(ids) for _tok, ids in comp.bindings)
+    if covers != heavy or total_bound != len(heavy):
+        # ``covers != heavy`` catches a GAP; ``total_bound != len(heavy)``
+        # additionally catches a DOUBLE-COUNT (two bindings sharing an atom)
+        # that a union-only check cannot see (fix round 1, finding 5) -- this
+        # converts the pairwise-disjointness ARGUMENT (branches are built
+        # from a monotonically growing exclude set, so they cannot overlap)
+        # into an ASSERTION, rather than trusting the argument to always hold.
         return None  # void: coverage incomplete -- never ship a partial name
 
     return UniversalResult(name=comp.name, bindings=tuple(comp.bindings), covers=covers)
@@ -424,7 +497,7 @@ def _ring_system_for_component(
                     candidates.append(sys_atoms)
         if not candidates:
             return None
-        candidates.sort(key=lambda s: (-len(s), min(s)))
+        candidates.sort(key=lambda s: (-len(s), min(ctx.canon_rank[a] for a in s)))
         return candidates[0]
     else:
         if attach_hint is None:
@@ -488,6 +561,17 @@ def _name_ring_spine(
     if not cands:
         return None
 
+    # Fix round 1, finding 3: scoring every candidate is O(len(cands) * n) --
+    # for the free-numbering (``attach_hint is None``) case ``len(cands) ==
+    # 2n``, so this is O(n^2) work that happened AFTER the one up-front
+    # ``ctx.budget.charge(len(component))`` at call entry, i.e. budget-blind.
+    # Measured: 1.4s @ n=501 -> 87.5s @ n=4001 (clean quadratic), ~550s
+    # projected at n=9999 -- a LEGAL input that would otherwise return a name
+    # but stall for minutes first. Charge the actual O(len(cands)*n) work
+    # before doing it, so a large monocycle trips the SAME budget a large
+    # chain or a deep branch structure would, instead of being exempt from it.
+    ctx.budget.charge(len(cands) * n)
+
     def score(order):
         hetero = sorted(i + 1 for i, a in enumerate(order)
                         if mol.GetAtomWithIdx(a).GetAtomicNum() != 6)
@@ -500,7 +584,28 @@ def _name_ring_spine(
             bt = round(bond.GetBondTypeAsDouble())
             if bt >= 2:
                 unsat.append(i + 1)
-        return (hetero, unsat)
+        # Fix round 1, finding 4: a substituent-locant tier (mirroring
+        # ``_chain_score``) -- without it, a plain (or symmetrically
+        # decorated) carbocycle ties on (hetero, unsat) for EVERY rotation,
+        # and ``min()`` silently falls back to iteration order, which tracks
+        # the RDKit ring-tuple order, which tracks INPUT ATOM NUMBERING (e.g.
+        # chlorocyclohexane emitted "5-chlorocyclohexane" from one input
+        # numbering and "1-chlorocyclohexane" from another -- both RT-valid,
+        # neither deterministic, and not even lowest-locant).
+        branch_locants = []
+        for i, a in enumerate(order):
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                j = nb.GetIdx()
+                if (nb.GetAtomicNum() > 1 and j in component
+                        and j not in ring_atoms):
+                    branch_locants.append(i + 1)
+        branch_locants.sort()
+        # Final tie-break: canonical rank of the candidate's OWN atom
+        # sequence, invariant to input atom numbering -- resolves any
+        # remaining tie (a genuinely symmetric ring) the SAME way regardless
+        # of how the input SMILES happened to number its atoms.
+        canon_tie = tuple(ctx.canon_rank[a] for a in order)
+        return (hetero, unsat, branch_locants, canon_tie)
 
     best = min(cands, key=score)
     atom_to_locant = {a: i + 1 for i, a in enumerate(best)}
@@ -540,16 +645,23 @@ def _name_chain_spine(
     else:
         # Two-BFS tree-diameter technique: BFS from an arbitrary atom finds
         # one end (u) of a longest path; BFS from u finds the other end and,
-        # via parent pointers, the path itself.
-        u = _farthest_from(ctx, next(iter(sorted(component))), component)
+        # via parent pointers, the path itself. The seed atom is chosen by
+        # CANONICAL rank (fix round 1, finding 4), not raw atom index, so the
+        # SAME molecule from a differently-numbered SMILES starts from the
+        # same graph-invariant seed.
+        seed = min(component, key=lambda a: ctx.canon_rank[a])
+        u = _farthest_from(ctx, seed, component)
         path = _farthest_path_from(ctx, u, component)
         # Free choice of numbering direction: lowest locants to heteroatoms,
         # then unsaturation, then (P-31 simplified) substituent attachment
-        # points -- an all-carbon saturated chain ties on the first two, so
-        # without this third tier a branch could be numbered from the wrong
-        # end (e.g. 2-methylbutane emitted as "3-methylbutane").
+        # points, then a canonical-rank tie-break -- an all-carbon saturated
+        # chain ties on the first two, so without the third tier a branch
+        # could be numbered from the wrong end (e.g. 2-methylbutane emitted
+        # as "3-methylbutane"), and without the final tie-break a fully
+        # symmetric tie could still resolve by raw atom index (numbering-
+        # dependent, non-deterministic across equivalent SMILES).
         rev = list(reversed(path))
-        if _chain_score(mol, rev, component) < _chain_score(mol, path, component):
+        if _chain_score(ctx, rev, component) < _chain_score(ctx, path, component):
             path = rev
 
     if not path:
@@ -577,7 +689,8 @@ def _name_chain_spine(
     return frozenset(path), core, atom_to_locant, attach_locant
 
 
-def _chain_score(mol, order: List[int], component: Optional[FrozenSet[int]] = None):
+def _chain_score(ctx: _Ctx, order: List[int], component: Optional[FrozenSet[int]] = None):
+    mol = ctx.mol
     hetero = [i + 1 for i, a in enumerate(order)
               if mol.GetAtomWithIdx(a).GetAtomicNum() != 6]
     unsat = []
@@ -594,12 +707,17 @@ def _chain_score(mol, order: List[int], component: Optional[FrozenSet[int]] = No
                 if nb.GetAtomicNum() > 1 and j in component and j not in spine_set:
                     branch_locants.append(i + 1)
         branch_locants.sort()
-    return (hetero, unsat, branch_locants)
+    # Fix round 1, finding 4: final canonical-rank tie-break -- resolves a
+    # fully symmetric remaining tie the SAME way regardless of input atom
+    # numbering (never falls back to raw atom index / iteration order).
+    canon_tie = tuple(ctx.canon_rank[a] for a in order)
+    return (hetero, unsat, branch_locants, canon_tie)
 
 
 def _farthest_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> int:
     """BFS from *start* over chain-tree neighbors; returns the farthest atom
-    reached (ties broken by lowest atom index, for determinism)."""
+    reached (ties broken by CANONICAL rank -- fix round 1, finding 4 -- never
+    raw atom index, so the result is invariant to input atom numbering)."""
     dist = {start: 0}
     order_seen = [start]
     stack = [start]
@@ -611,7 +729,7 @@ def _farthest_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> int:
                 order_seen.append(nb)
                 stack.append(nb)
     maxd = max(dist.values())
-    best = min(a for a in order_seen if dist[a] == maxd)
+    best = min((a for a in order_seen if dist[a] == maxd), key=lambda a: ctx.canon_rank[a])
     return best
 
 
@@ -631,7 +749,7 @@ def _farthest_path_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> Lis
                 order_seen.append(nb)
                 stack.append(nb)
     maxd = max(dist.values())
-    far = min(a for a in order_seen if dist[a] == maxd)
+    far = min((a for a in order_seen if dist[a] == maxd), key=lambda a: ctx.canon_rank[a])
     path = []
     cur = far
     while cur is not None:
@@ -745,16 +863,16 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
             if ok and sorted(kinds) == sorted([(2, 0), (1, 1)]):
                 return "carboxy", frozenset(component)
 
-    # nitro: N bonded to exactly two terminal O's, nothing else.
-    if len(component) == 3 and atom.GetSymbol() == "N" and len(others) == 2:
-        if all(mol.GetAtomWithIdx(o).GetSymbol() == "O" for o in others):
-            ok = True
-            for o in others:
-                o_nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(o).GetNeighbors()
-                         if n.GetIdx() in component]
-                if o_nbrs != [attach_hint]:
-                    ok = False
-            if ok:
-                return "nitro", frozenset(component)
-
+    # NOTE (fix round 1, finding 1): a `nitro` shortcut used to live here,
+    # keyed only on "N bonded to exactly two terminal O's" with NO bond-order
+    # check. Real neutral nitro is `[N+](=O)[O-]` -- refused upstream by the
+    # per-atom formal-charge guard -- and a neutral pentavalent N=O/N=O never
+    # sanitizes, so the ONLY shape that could ever reach this branch was
+    # N(OH)2 (two SINGLE-bonded terminal oxygens), which the shortcut still
+    # named "nitro" -- a DIFFERENT, wrong-constitution molecule (measured:
+    # CCCC(CCC)N(O)O -> "4-nitroheptane", which denotes C7H15NO2, not the
+    # actual C7H17NO2). Deleted rather than fixed-in-place: real nitro naming
+    # needs the charged form, which is out of scope for this module (task
+    # B2b). A genuine N(OH)2 branch now falls through to the generic
+    # skeletal-replacement chain construction instead (ugly, but correct).
     return None
