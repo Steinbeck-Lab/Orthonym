@@ -325,11 +325,18 @@ _RT_BREADTH_GAPS = {
     "008_allylamine_benzophenone",
     "011_macrolide_lactone",
     "012_biaryl_ether",
-    "013_dipeptide_proline",
+    # "013_dipeptide_proline" -- REMOVED 2026-08-21 (v33 Phase 2 Task 2.2
+    # cleanup): verified via  that this already
+    # round-trips correctly at HEAD 799d3491 (before Task 2.2's own code),
+    # i.e. Task 2.0/2.1 (the peptide dispatch SMARTS fix + Lever C) closed
+    # this gap and nobody removed the stale xfail entry. Now
+    # 'prolylprolylglutamine', OPSIN round-trip verified exact.
     "016_phenol_ether_ketone",
     "017_tripeptide_arginine",
     "018_steroid_furanone",
-    "020_tetrapeptide",
+    # "020_tetrapeptide" -- REMOVED 2026-08-21, same cause/verification as
+    # 013 above. Now 'aspartylvalylglycylproline', OPSIN round-trip
+    # verified exact.
     "021_udp_sugar",
     "023_serine_succinate",
     "025_pyrrolizinone_amide",
@@ -341,9 +348,10 @@ _RT_GAP_REASON = (
     "emits a name that either OPSIN cannot parse (e.g. "
     "'N-(4-oxo-3-propan-3-ylsubstituent)heptanamide') or that denotes a "
     "different structure (e.g. serine succinate -> 'butanedioic acid', a "
-    "silent atom drop). With the gate ON — which is production's default — all "
-    "16 of these compounds emit 'unknown organic compound' instead, so no "
-    "wrong name ships. strict=True: fix the generator and this goes red."
+    "silent atom drop). With the gate ON — which is production's default — "
+    "these compounds emit 'unknown organic compound' instead, so no "
+    "wrong name ships (originally 16; 2 peptide entries closed 2026-08-21, "
+    "see _RT_BREADTH_GAPS). strict=True: fix the generator and this goes red."
 )
 
 _RT_PARAMS = [
@@ -357,7 +365,7 @@ _RT_PARAMS = [
     for p in DEPTH_LIMIT_COMPOUNDS
 ]
 
-assert len(_RT_BREADTH_GAPS) == 16, "the measured gap list changed size"
+assert len(_RT_BREADTH_GAPS) == 14, "the measured gap list changed size"
 assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
     "a _RT_BREADTH_GAPS id does not match any DEPTH_LIMIT_COMPOUNDS param"
 )

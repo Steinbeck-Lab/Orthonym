@@ -49,6 +49,19 @@ whole chain rather than silently applying the L-omission convention
 B's donor-residue recovery is deliberately exempt: it builds its own
 locant-based descriptor and already treats an unresolved centre as "omit the
 descriptor" with no implied configuration.
+
+v33 Phase 2: Task 2.0 (dispatch SMARTS fix) + Task 2.1 (Lever C, capped
+termini -- ``_try_capped_termini``) closed the two largest decline buckets.
+Task 2.2 adds ``_try_backbone_substitutive``, the general BACKBONE-
+SUBSTITUTIVE producer for the residual (giant / non-standard-residue
+chains): the C-terminal residue's own free acid is the parent, and every
+other residue is folded in one at a time (PREPEND for a standard/closed
+acyl word, SPLICE via ``_swap_amino_for_amido`` when a non-standard
+residue's own systematic acid name leaves a leading 'amino' locant open).
+Tried LAST, after every path above declines; gated by ``_rt_verified`` like
+every other lever here, so an out-of-scope shape (a capped/dual-acid
+C-terminus, or a genuine side-chain acid on a non-parent residue -- the
+"side-chain-acid trap") ABSTAINS rather than misplace an amidation.
 """
 
 from typing import Optional, List, Dict, Tuple
@@ -166,7 +179,12 @@ def name_peptide(mol) -> Optional[str]:
         # so `_is_valid_peptide`'s COOH check fails and Lever A's own COOH
         # requirement, `:871`, also fails). Self-contained (re-walks the
         # chain itself via `_extract_residues`), so safe to try here too.
-        return _rt_verified(mol, _try_capped_termini(mol))
+        result = _rt_verified(mol, _try_capped_termini(mol))
+        if result is not None:
+            return result
+        # v33 Task 2.2: the general backbone-substitutive producer -- also
+        # self-contained (re-walks via `_extract_residues`), tried last.
+        return _rt_verified(mol, _try_backbone_substitutive(mol))
 
     # Step 2: Extract residue SMILES by walking the peptide chain
     residue_smiles_list = _extract_residues(mol)
@@ -190,7 +208,13 @@ def name_peptide(mol) -> Optional[str]:
         # acylated) methyl substituent, a table miss for the modified
         # residue. Self-contained; also independently catches a
         # C-terminal-amide shape reaching this branch some other way.
-        return _rt_verified(mol, _try_capped_termini(mol))
+        result = _rt_verified(mol, _try_capped_termini(mol))
+        if result is not None:
+            return result
+        # v33 Task 2.2: the general backbone-substitutive producer -- also
+        # self-contained, tried last (e.g. a non-standard/undefined-stereo
+        # residue that made `_identify_residues` decline here).
+        return _rt_verified(mol, _try_backbone_substitutive(mol))
 
     # Step 4: Assemble the peptide name. RT-gated (v33 Phase 2 Task 2.0): this
     # was the one candidate-emission site in this file NOT verified against
@@ -208,7 +232,13 @@ def name_peptide(mol) -> Optional[str]:
     # peptide this path already named correctly continues to round-trip and
     # is therefore unaffected in substance (0-wrong ABSOLUTE).
     candidate = _assemble_peptide_name(named_residues)
-    return _rt_verified(mol, candidate)
+    result = _rt_verified(mol, candidate)
+    if result is not None:
+        return result
+    # v33 Task 2.2: last resort when the flat candidate itself failed
+    # round-trip (a rare pre-existing bug elsewhere in this file, e.g. a
+    # mis-mapped stereo prefix) -- self-contained, re-walks independently.
+    return _rt_verified(mol, _try_backbone_substitutive(mol))
 
 
 def _is_valid_peptide(mol) -> bool:
@@ -1295,3 +1325,247 @@ def _try_capped_termini(mol) -> Optional[str]:
         candidate = prefix + candidate
 
     return candidate
+
+
+# ============================================================================
+# v33 Phase 2 Task 2.2: the general BACKBONE-SUBSTITUTIVE producer -- the
+# real breadth lever for the ~214-row residual (giant / non-standard-residue
+# peptides Levers A/B/C cannot name). Tried LAST, only when every path above
+# has declined. See  and the
+# plan's Phase 2 Task 2.2 for the derivation.
+#
+# Mechanism (P-66.6.6 generalised to a non-standard/mixed chain): the
+# C-TERMINAL residue's own free acid is the parent (P-41 senior principal
+# group); every OTHER residue, walking N-terminal-ward one at a time, is
+# folded onto whatever has been built so far EXACTLY the way the ordinary
+# flat convention already works -- a standard residue's tabulated acyl form
+# is simply PREPENDED (this is valid for ANY compound acyl word, standard or
+# not, exactly as Lever A's single N-acyl cap already demonstrates); a
+# NON-STANDARD residue is named as a free acid via the general/systematic
+# namer (on its OWN isolated small fragment only -- never the whole
+# remainder, which the general engine does NOT reliably parent-select for a
+# multi-amide chain, measured directly this task) and converted to an acyl
+# word the same way.
+#
+# The one extra wrinkle a non-standard residue introduces: its OWN acid name
+# carries a VISIBLE, addressable leading 'amino' substituent (P-14
+# alphanumeric order almost always puts it first). Once such a word is
+# itself prepended onto the chain, that visible 'amino' token is the new
+# attachment point for whatever comes next -- so the NEXT residue must be
+# SPLICED into it (`_swap_amino_for_amido`, exactly Lever B's mechanism),
+# not prepended as a separate word. This file tracks that as `is_open`:
+# False after adding a STANDARD (retained/closed) residue, and True after
+# adding a NON-STANDARD one whose acid name's leading substituent matched
+# `_AMINO_PREFIX_RE` (a defined-stereo systematic name gets a leading CIP
+# locant like '(2R)-' that this shared, already-fail-closed regex does not
+# match -- so an 'open' non-standard residue immediately followed by
+# another residue conservatively ABSTAINS rather than guess; this is the
+# SAME conservative behaviour Lever B already has, reused unchanged).
+#
+# Side-chain-acid trap (the contributor guide; 57/226 backlog carry >=2 free -COOH): the
+# parent must carry EXACTLY one free -COOH, and every OTHER residue's own
+# isolated fragment must ALSO show exactly one (the one `_extract_residues`
+# artificially frees at its own alpha-carboxyl cut point) -- an ADDITIONAL
+# free acid anywhere is a genuine competing principal group (Glu/Asp side
+# chain) this producer must never misplace; it ABSTAINS instead.
+#
+# Every candidate this returns is UNVERIFIED; `name_peptide` gates it
+# through `_rt_verified` (full-InChI OPSIN round-trip) exactly like every
+# other lever in this file, so a wrong guess degrades to abstention, never
+# a wrong molecule (0-wrong ABSOLUTE).
+# ============================================================================
+
+# Work budget (giants): bound the per-residue general-namer fan-out
+# rather than a wall-clock alarm -- Phase-0 measured that a per-molecule
+# SIGALRM does NOT fire once the JVM is live (HotSpot signal chaining), so
+# only an in-algorithm bound is reliable. No real backlog witness has more
+# than 35 residues; a chain longer than this has no precedent and simply
+# ABSTAINS rather than risk N separate general-namer calls compounding.
+_BACKBONE_SUBSTITUTIVE_MAX_RESIDUES = 40
+
+# A STANDARD residue costs one cheap table lookup; only a NON-standard one
+# costs a full general-namer call (measured up to ~2s on a defined-stereo
+# fragment). This is the real work-budget knob -- a chain where every
+# residue is standard (the common shape) is bounded near-instantly by the
+# residue cap above regardless of length; a chain needing many separate
+# general-namer calls is the one that could compound toward the 40s-class
+# verification bound, so cap that count directly.
+_BACKBONE_SUBSTITUTIVE_MAX_NONSTANDARD_CALLS = 15
+
+
+def _resolve_free_residue_acid_name(smi: str) -> Optional[str]:
+    """Name ``smi`` (a SINGLE isolated free-amino-acid fragment -- never a
+    multi-residue remainder; the general/composer engine's own parent
+    selection does not reliably handle a multi-amide chain, measured
+    directly building this producer) as an acid via the general/PIN namer.
+    Retained trivial or systematic, whichever the namer itself prefers.
+    Fails closed (None) on any error or failure-sentinel output.
+
+    ``_extract_residues`` stamps an ISOTOPE label on the cut-point oxygen
+    of every fragment (its own internal bond-order bookkeeping --
+    ``_identify_residues`` already strips it before its table lookups via
+    an isomeric-SMILES-off fallback). The general namer has no such
+    fallback and would otherwise try to name a real isotopologue, so clear
+    isotopes here FIRST while preserving the genuine stereo descriptors
+    (``@``/``@@``) this producer needs kept.
+    """
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return None
+    for atom in mol.GetAtoms():
+        if atom.GetIsotope():
+            atom.SetIsotope(0)
+    clean_smi = Chem.MolToSmiles(mol, canonical=True)
+
+    from ..namer import Orthonym
+    from ..errors import is_failure_name
+    try:
+        name = Orthonym(
+            style="pin", _disable_opsin_validity_gate=True).name(clean_smi)
+    except Exception:
+        return None
+    if is_failure_name(name):
+        return None
+    return name
+
+
+def _standard_amido_prefix(aa_name: str, stereo_disp: str) -> Optional[str]:
+    """AMIDO-prefix form of a STANDARD amino acid's own alpha-carboxyl, for
+    use as a SPLICED substituent (P-66.1.1.4.3) when this residue's own
+    backbone amino group has already been filled by a non-standard donor's
+    contribution further toward the N-terminus. Derived from the SAME
+    table-verified amide-name transform ``_acid_name_to_amide`` already
+    uses (drop trailing 'e', add 'amide'; final 'e'->'o' for the -amido
+    form): 'glycine'->'glycinamido', 'alanine'->'alaninamido'.
+
+    Excludes ``_COMPETING_SIDE_CHAIN_AMINO_ACIDS`` (Asp/Glu/Asn/Gln): their
+    own name already encodes a side-chain acid/amide, so the blind
+    amide-name transform is ambiguous about WHICH carbonyl it modifies --
+    decline rather than guess (the same trap Lever C's docstring already
+    flags). Any wrong guess this function makes is still caught by
+    ``_rt_verified``'s full-InChI OPSIN round-trip before it can ship, so a
+    bad spelling degrades to an abstention, never a wrong molecule.
+    """
+    if aa_name in _COMPETING_SIDE_CHAIN_AMINO_ACIDS:
+        return None
+    amide_name = _acid_name_to_amide(aa_name)
+    if not amide_name.endswith('e'):
+        return None
+    amido = amide_name[:-1] + 'o'
+    return (stereo_disp + amido) if stereo_disp else amido
+
+
+def _residue_open_forms(
+    smi: str,
+) -> Optional[Tuple[Optional[str], Optional[str], bool]]:
+    """``(acyl_word, amido_word, is_open)`` for residue ``smi`` viewed in
+    ISOLATION (its own free NH2/COOH form, ignoring what precedes it in the
+    real molecule). ``acyl_word`` is safe to PREPEND onto a currently-CLOSED
+    accumulated name; ``amido_word`` is safe to SPLICE
+    (``_swap_amino_for_amido``) into a currently-OPEN one. ``is_open`` says
+    whether THIS residue's own contribution, once attached, leaves a
+    further-addressable leading 'amino' locant for the NEXT (further
+    N-terminal-ward) residue. Returns None when neither form is buildable.
+    """
+    info = _identify_one_residue(smi)
+    if info is not None:
+        stereo_disp = "" if info['stereo'] == "L-" else info['stereo']
+        acyl = (stereo_disp + info['acyl']) if stereo_disp else info['acyl']
+        amido = _standard_amido_prefix(info['name'], stereo_disp)
+        return acyl, amido, False  # a retained trivial word is always closed
+
+    acid_name = _resolve_free_residue_acid_name(smi)
+    if acid_name is None:
+        return None
+    from ..decomposition.fragment_assembly import _acid_to_acyl
+    from ..assembly.substituent_naming import acid_name_to_amido_prefix
+    acyl = _acid_to_acyl(acid_name)
+    amido = acid_name_to_amido_prefix(acid_name)
+    if acyl is None and amido is None:
+        return None
+    is_open = bool(_AMINO_PREFIX_RE.match(acid_name))
+    return acyl, amido, is_open
+
+
+def _try_backbone_substitutive(mol) -> Optional[str]:
+    """v33 Phase 2 Task 2.2: name ANY linear alpha-peptide (standard,
+    non-standard, or a mix) as one systematic name, tried only when every
+    other path in this file has declined. See the module-section comment
+    above for the full derivation. Returns an UNVERIFIED candidate string;
+    the caller (``name_peptide``) gates it through ``_rt_verified``.
+    """
+    residues = _extract_residues(mol)
+    if residues is None or len(residues) < 2:
+        return None
+    if len(residues) > _BACKBONE_SUBSTITUTIVE_MAX_RESIDUES:
+        return None
+
+    cooh_pattern = Chem.MolFromSmarts(_TERMINAL_COOH_SMARTS)
+
+    # Parent scope: the C-terminal residue must carry EXACTLY one free
+    # carboxylic acid -- a capped (amide/ester/aldehyde) or dual-acid
+    # C-terminus is out of THIS producer's scope (never guess a different
+    # principal group / parent skeleton).
+    parent_frag = Chem.MolFromSmiles(residues[-1])
+    if parent_frag is None:
+        return None
+    if len(parent_frag.GetSubstructMatches(cooh_pattern)) != 1:
+        return None
+
+    # Side-chain-acid trap: every OTHER residue's own isolated fragment
+    # must show EXACTLY the one free acid its own reconstruction
+    # artificially frees (its own alpha-carboxyl cut point) -- an
+    # additional free acid anywhere is a genuine competing principal group.
+    # Also pre-count how many are NON-standard (a cheap table lookup each)
+    # -- ONLY a non-standard residue costs a general-namer call (measured
+    # up to ~2s each on a defined-stereo residue), so this is the real work
+    # budget: cap it well under the 40s-class verification bound rather
+    # than the residue count alone.
+    n_nonstandard = 0
+    for frag_smi in residues[:-1]:
+        frag = Chem.MolFromSmiles(frag_smi)
+        if frag is None:
+            return None
+        if len(frag.GetSubstructMatches(cooh_pattern)) != 1:
+            return None
+        if _identify_one_residue(frag_smi) is None:
+            n_nonstandard += 1
+    if n_nonstandard > _BACKBONE_SUBSTITUTIVE_MAX_NONSTANDARD_CALLS:
+        return None
+
+    acceptor = _name_gamma_acceptor(residues[-1])
+    if acceptor is None:
+        return None
+    name, mode = acceptor
+    is_open = False
+    if mode == 'swap':
+        is_open = bool(_AMINO_PREFIX_RE.match(name))
+        if not is_open:
+            # A systematic parent whose leading substituent is not
+            # addressable (e.g. a defined-stereo CIP locant, or a
+            # multiplied 'x,y-diamino...' prefix) -- nothing can be safely
+            # attached to it; every peptide reaching this producer has
+            # >=1 residue still to add, so decline outright.
+            return None
+
+    for smi in reversed(residues[:-1]):
+        forms = _residue_open_forms(smi)
+        if forms is None:
+            return None
+        acyl, amido, next_is_open = forms
+        if is_open:
+            if amido is None:
+                return None
+            name = _swap_amino_for_amido(name, amido)
+            if name is None:
+                return None
+        else:
+            if acyl is None:
+                return None
+            if name.startswith('D-'):
+                name = f"{acyl}-{name}"
+            else:
+                name = f"{acyl}{name}"
+        is_open = next_is_open
+
+    return name
