@@ -4225,6 +4225,32 @@ def _acid_name_to_carboxylate(acid_name: str, carboxylate_count: int) -> str:
     return ''
 
 
+_ACID_SUFFIX_MULTIPLIER_WORDS = {
+    'di': 2, 'tri': 3, 'tetra': 4, 'penta': 5, 'hexa': 6,
+}
+
+
+def _parent_acid_suffix_multiplicity(anion_name: str) -> int:
+    """How many carboxylate SITES the PARENT suffix of ``anion_name`` already
+    accounts for: 1 for a mono-acid '-oate'/'-carboxylate' tail (P-65.6.1),
+    2 for a '-dioate'/'-dicarboxylate' tail, 3 for '-trioate'/'-tricarboxylate',
+    etc. Reads the multiplying prefix already embedded in the SUFFIX's own
+    ending (produced by ``_acid_to_oate``/``_acid_name_to_carboxylate``), never
+    a fresh count -- a textual sibling of those two suffix-conversion
+    functions, same root-cause-transform pattern as
+    ``_apply_anionic_substituent_prefixes`` itself.
+
+    v34 (WS1/WS6): this is the piece that was MISSING before -- the caller
+    used to assume the parent always consumed exactly one carboxylate site
+    (''junior = n_carb - 1''), which undercounts a genuine polyacid parent
+    ('-dioate'/'-trioate') and misclassifies its remaining junior sites as an
+    unhandled multi-junior shape."""
+    m = re.search(r'(di|tri|tetra|penta|hexa)?(oate|carboxylate)$', anion_name)
+    if not m or not m.group(1):
+        return 1
+    return _ACID_SUFFIX_MULTIPLIER_WORDS.get(m.group(1), 1)
+
+
 def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     """P-72.6 (BB :41195, "ANIONIC CENTERS IN BOTH PARENT COMPOUNDS AND
     SUBSTITUENT GROUPS"): an anionic characteristic group that is NOT in the
@@ -4234,7 +4260,7 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     sulfonato (preselected prefix)" / "–P(O)(O– )2 phosphonato (preselected
     prefix)") — NEVER the neutral prefix (carboxy/hydroxy/sulfo/phosphono),
     which silently drops the charge and denotes a DIFFERENT (less-anionic)
-    molecule. The parent anion consumed the senior anionic centre (carboxylate
+    molecule. The parent anion consumed the senior anionic centre(s) (carboxylate
     senior to sulfonate/olate — P-72.7e: general seniority order of classes,
     P-41, generalizing the BB's own "3-oxidonaphthalene-2-carboxylate (PIN)
     (carboxylate senior to olate)" example, :41288-41290); every OTHER anionic
@@ -4243,11 +4269,17 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     Root-cause transform on the multi-anion name (the parent-suffix conversion
     _acid_name_to_carboxylate already runs the same kind of neutral->anion textual
     step). Count-matched to the ACTUAL anionic sites so a genuine NEUTRAL -OH/-COOH/
-    -SO3H/-PO3H2 substituent is never converted, AND applied only when the total
-    junior count is exactly 1 (single-junior scope — avoids alphanumerical prefix
-    re-ordering, and structurally fails closed on any shape with >=2 junior centres,
-    e.g. a full phosphonate DIANION riding alongside a carboxylate, rather than
-    guessing at a re-ordered multi-prefix name).
+    -SO3H/-PO3H2 substituent is never converted.
+
+    v34 (WS1/WS6): widened from "exactly 1 junior site" to "any number of
+    junior sites, PROVIDED they are all the SAME class" (``_parent_acid_suffix_
+    multiplicity`` correctly attributes a polyacid parent's OWN sites first, so
+    e.g. a tricarboxylate anion with a '-dioate' parent now correctly resolves
+    to exactly 1 junior 'carboxy' site instead of an uncomputed 2). A MIXED set
+    of junior classes (e.g. a junior carboxylate riding alongside a junior
+    phosphonate) still fails closed — converting two different substituent
+    words risks re-ordering the alphabetized prefix list, which this producer
+    does not attempt.
     Examples (all verbatim BB PINs/preselected prefixes): 2-(carboxylatomethyl)benzoate
     (BB :41293), 3-oxidonaphthalene-2-carboxylate (BB :41295),
     4-sulfonatobenzoate (P-72.6.1 + P-72.7e, RT-verified 2026-08-17)."""
@@ -4264,8 +4296,24 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     # olate/sulfonate/sulfinate/phosphonate). The caller only reaches this
     # function when n_carb >= 1 (carboxylate_count > 0 guard at the call site),
     # so the elif branch below is a defensive fallback, not a live path today.
+    #
+    # v34 (WS1/WS6): the OLD ``n_carb - 1`` assumed the PARENT suffix always
+    # consumes exactly ONE carboxylate site. That is wrong for a polyacid
+    # parent (a '-dioate'/'-dicarboxylate' name already accounts for TWO
+    # sites, a '-trioate'/'-tricarboxylate' for THREE, ...), so a genuine
+    # tricarboxylate anion (one parent '-dioate' + one JUNIOR 'carboxy' arm)
+    # was undercounted as TWO junior sites and fell into the (uncomputable,
+    # fail-closed) multi-junior branch below, silently leaving the junior
+    # '-COO-' as the neutral 'carboxy' prefix -- a charge-dropping name a
+    # different molecule -- SELF-01 correctly suppressed it, but as an
+    # avoidable abstention. ``_parent_acid_suffix_multiplicity`` reads the
+    # multiplying prefix already embedded in the converted suffix
+    # ('-dioate' -> 2, '-tricarboxylate' -> 3, plain '-oate'/'-carboxylate'
+    # -> 1) so the JUNIOR count reflects only the sites the parent suffix did
+    # NOT already claim.
     if n_carb >= 1:
-        junior_carb, junior_ox = n_carb - 1, n_ox
+        junior_carb = max(n_carb - _parent_acid_suffix_multiplicity(name), 0)
+        junior_ox = n_ox
     elif n_ox >= 1:
         junior_carb, junior_ox = 0, n_ox - 1
     else:
@@ -4283,42 +4331,54 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     junior_sulfonate, junior_sulfinate, junior_phosphonate, junior_thiolate = (
         n_sulfonate, n_sulfinate, n_phosphonate, n_thiolate
     )
-    total_junior = (junior_carb + junior_ox + junior_sulfonate
-                    + junior_sulfinate + junior_phosphonate + junior_thiolate)
-    if total_junior != 1:
-        return name  # single-junior scope (avoids prefix re-ordering)
+    junior_by_class = {
+        'carb': junior_carb, 'ox': junior_ox, 'sulfonate': junior_sulfonate,
+        'sulfinate': junior_sulfinate, 'phosphonate': junior_phosphonate,
+        'thiolate': junior_thiolate,
+    }
+    total_junior = sum(junior_by_class.values())
+    if total_junior == 0:
+        return name
+    # v34 (WS1/WS6): widen single-junior (total_junior == 1) to HOMOGENEOUS
+    # multi-junior (>= 2 junior sites, but ALL of the SAME class, e.g. a
+    # tetracarboxylate anion with a '-dioate' parent leaving TWO junior
+    # 'carboxy' arms). A MIXED set of junior classes (e.g. one junior
+    # 'carboxy' AND one junior 'hydroxy' together) still fails closed --
+    # converting two DIFFERENT substituent words risks re-ordering the
+    # alphabetized prefix list, which this producer does not attempt.
+    if sum(1 for v in junior_by_class.values() if v > 0) > 1:
+        return name  # mixed junior classes -> fail closed (prefix-reordering risk)
 
     out = name
-    if junior_carb == 1:
+    if junior_carb >= 1:
         # 'carboxy' NOT part of 'carboxyl…' (the parent 'carboxylate'/'carboxylato').
-        if len(re.findall(r'carboxy(?!l)', out)) == 1:
-            out = re.sub(r'carboxy(?!l)', 'carboxylato', out, count=1)
-    if junior_ox == 1:
-        # Convert only when EVERY 'hydroxy' prefix is the single anionic O- (so a
+        if len(re.findall(r'carboxy(?!l)', out)) == junior_carb:
+            out = re.sub(r'carboxy(?!l)', 'carboxylato', out, count=junior_carb)
+    if junior_ox >= 1:
+        # Convert only when EVERY 'hydroxy' prefix is an anionic O- (so a
         # genuine neutral -OH is never turned into 'oxido').
-        if out.count('hydroxy') == 1:
-            out = out.replace('hydroxy', 'oxido', 1)
-    if junior_sulfonate == 1:
+        if out.count('hydroxy') == junior_ox:
+            out = out.replace('hydroxy', 'oxido', junior_ox)
+    if junior_sulfonate >= 1:
         # 'sulfo' NOT part of 'sulfon…' (the neutral 'sulfonic'/'sulfonyl' or an
         # already-anionic 'sulfonato'/'sulfonate' stem elsewhere in the name).
-        if len(re.findall(r'sulfo(?!n)', out)) == 1:
-            out = re.sub(r'sulfo(?!n)', 'sulfonato', out, count=1)
-    if junior_sulfinate == 1:
+        if len(re.findall(r'sulfo(?!n)', out)) == junior_sulfonate:
+            out = re.sub(r'sulfo(?!n)', 'sulfonato', out, count=junior_sulfonate)
+    if junior_sulfinate >= 1:
         # 'sulfino' is a distinct token (does not overlap 'sulfinato').
-        if out.count('sulfino') == 1:
-            out = out.replace('sulfino', 'sulfinato', 1)
-    if junior_phosphonate == 1:
+        if out.count('sulfino') == junior_sulfinate:
+            out = out.replace('sulfino', 'sulfinato', junior_sulfinate)
+    if junior_phosphonate >= 1:
         # 'phosphono' is a distinct token (does not overlap 'phosphonate').
-        if out.count('phosphono') == 1:
-            out = out.replace('phosphono', 'phosphonato', 1)
-    if junior_thiolate == 1:
-        # 'sulfanyl' is the neutral -SH substituent prefix; swap the SINGLE
-        # occurrence to the anionic 'sulfido' (mirrors the sulfinato/
-        # sulfonato/phosphonato blocks above). Guarded to exactly one
-        # occurrence so a genuine neutral -SH elsewhere in the name is never
-        # mis-converted.
-        if out.count('sulfanyl') == 1:
-            out = out.replace('sulfanyl', 'sulfido', 1)
+        if out.count('phosphono') == junior_phosphonate:
+            out = out.replace('phosphono', 'phosphonato', junior_phosphonate)
+    if junior_thiolate >= 1:
+        # 'sulfanyl' is the neutral -SH substituent prefix; swap the anionic
+        # occurrences to 'sulfido' (mirrors the sulfinato/sulfonato/
+        # phosphonato blocks above). Guarded to an EXACT count match so a
+        # genuine neutral -SH elsewhere in the name is never mis-converted.
+        if out.count('sulfanyl') == junior_thiolate:
+            out = out.replace('sulfanyl', 'sulfido', junior_thiolate)
     return out
 
 
