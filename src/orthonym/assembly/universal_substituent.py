@@ -157,6 +157,7 @@ from .general_engine import (
     _charge_suffix_text,
     _zwitterion_suffix_plan,
     _elide_before_ionic_suffix,
+    _stereo_prefix,
 )
 
 
@@ -300,6 +301,22 @@ class _ComponentResult:
     #                                              module can actually spell,
     #                                              so they are the sole
     #                                              exception (b) to that guard.
+    spine_atom_to_locant: Optional[Dict[int, int]] = None  # WS-STEREO: the
+    #                                              atom->locant map of THIS
+    #                                              level's OWN spine (chain,
+    #                                              monocycle or polycycle),
+    #                                              exactly the shape
+    #                                              ``general_engine._stereo_prefix``
+    #                                              consumes -- ``None`` for a
+    #                                              leaf-shortcut result (no
+    #                                              spine of its own). Only the
+    #                                              TOP-level caller reads this
+    #                                              (mirroring general_engine's
+    #                                              own four call sites, which
+    #                                              are each a single PARENT-
+    #                                              scope stereo block, never a
+    #                                              merge across independently-
+    #                                              numbered branch spines).
 
 
 # ===========================================================================
@@ -455,7 +472,44 @@ def _name_universal_substitutive_unsafe(
         #              -- never ship an atom-incomplete or mis-tokenised name
 
     covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
-    return UniversalResult(name=comp.name, bindings=tuple(comp.bindings), covers=covers)
+
+    # WS-STEREO: the floor above is constitution-complete but STEREO-BLIND --
+    # ``assign_stereochemistry(work)`` in ``_build_ctx`` computes CIP but
+    # nothing downstream of it ever consulted the shared descriptor
+    # primitives (root cause; see the WS-STEREO task brief). Mirror
+    # ``general_engine``'s own four parent engines (each prepends
+    # ``_stereo_prefix(mol, atom_to_locant)`` to ITS OWN parent-scope name --
+    # general_engine.py:893/1473/1930/2037): prepend the TOP-LEVEL spine's own
+    # stereo-descriptor block the SAME way. Substituent-BRANCH-internal stereo
+    # is intentionally OUT OF SCOPE (general_engine's own comment at :890-892
+    # notes that case is a SEPARATE mechanism -- ``name_substituent``'s own
+    # stereo route -- not reused by this producer); a branch stereocentre this
+    # leaves uncaptured simply fails the verify gate below and safely falls
+    # back to the unchanged plain name, never a wrong one.
+    #
+    # 0-WRONG-SAFE GATE (task brief, CRITICAL): a WRONG stereo descriptor is
+    # WORSE than an omitted one (it ships a wrong stereoisomer name). So the
+    # with-stereo candidate ships ONLY if it FULL-RT-verifies (OPSIN full
+    # InChIKey -- constitution AND stereo AND charge -- via
+    # ``validation.reconstruct.verify_or_none``) against the ORIGINAL input
+    # ``mol`` passed to this function. Any failure to verify (unassignable/
+    # uncertain CIP, a wrong-enantiomer construction, OPSIN/JVM unavailable,
+    # ...) falls back to ``comp.name`` UNCHANGED -- today's block1 behaviour.
+    # This can only ever IMPROVE a name (block1 -> full), never make one wrong.
+    name = comp.name
+    if comp.spine_atom_to_locant:
+        stereo_block = _stereo_prefix(ctx.mol, comp.spine_atom_to_locant)
+        if stereo_block:
+            candidate_name = stereo_block + comp.name
+            try:
+                from ..validation.reconstruct import verify_or_none
+                verified = verify_or_none(candidate_name, Chem.MolToSmiles(mol))
+            except Exception:
+                verified = None  # fail-closed: never ship an unverified guess
+            if verified is not None:
+                name = verified
+
+    return UniversalResult(name=name, bindings=tuple(comp.bindings), covers=covers)
 
 
 def _build_ctx(
@@ -769,6 +823,7 @@ def _name_component(
         name=full_name, bindings=bindings, covers=covers,
         attach_locant=attach_locant, charged=frozenset(charged_accum),
         nitro_atoms=frozenset(nitro_accum),
+        spine_atom_to_locant=dict(spine_atom_to_locant),
     )
 
 
