@@ -3177,7 +3177,31 @@ def _p74_bare_ring_stem(mol, ring_system, cation_idx):
     Stripping ALL substituents is the point: the predecessor named a ring that
     still carried them, so the stem came back as '2,4-diphenylpyridine' — a name
     whose locants belong to the neutral ring's own numbering and therefore
-    disagree with the P-74.1.2 numbering the suffixes are cited in."""
+    disagree with the P-74.1.2 numbering the suffixes are cited in.
+
+    WS-NOABSTAIN class 5 (name QUALITY, not an abstain -- WS7's floor already
+    masked this with a valid block1 name): ``RWMol.RemoveAtom`` does NOT
+    recompute a REMAINING ring atom's implicit-H bookkeeping when one of its
+    heavy neighbours is deleted -- a bracket atom like the P-74.1.2
+    carboxylate-bearing ring carbon's own ``[C@H]`` keeps its ORIGINAL
+    ``noImplicit=True`` / explicit-H=1 from when it had 4 connections (2 ring
+    bonds + the now-deleted carboxyl branch + 1 H). After deletion it has only
+    3 connections total (2 ring bonds + 1 explicit H) -- one short of
+    carbon's valence 4 -- and with ``noImplicit`` still ``True``,
+    ``SanitizeMol`` cannot silently top it up with an implicit H, so it
+    becomes an open-valence/radical-shaped atom (``[CH]1CCCN1``, NOT
+    ``C1CCCN1``). The namer then reads that open valence as a FREE VALENCE --
+    "this is a substituent fragment, not a whole molecule" -- and returns the
+    ``-yl`` substituent form (``pyrrolidin-2-yl``) instead of the parent
+    hydride (``pyrrolidine``), which is exactly the malformed
+    ``1-methylpyrrolidin-2-yl-1-ium-2-carboxylate`` this closes. The existing
+    reset already fixes the CATION atom the same way for the SAME reason
+    (its own exocyclic substituent -- the onium's charge-bearing bond -- was
+    never actually removed here, but its H-count/charge needed resetting
+    regardless); generalising it to EVERY ring atom fixes every OTHER ring
+    position whose own exocyclic substituent(s) were just deleted, with no
+    behaviour change for a ring atom that had none (an already-implicit-H
+    atom is unaffected by clearing a flag that was already False)."""
     ring = sorted(set(ring_system))
     work = Chem.RWMol(mol)
     for idx in sorted((a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in ring),
@@ -3188,6 +3212,10 @@ def _p74_bare_ring_stem(mol, ring_system, cation_idx):
         ca.SetFormalCharge(0)
         ca.SetNumExplicitHs(0)
         ca.SetNoImplicit(False)
+        # WS-NOABSTAIN class 5: see the docstring above -- every ring atom,
+        # not just the cation, may have lost an exocyclic neighbour above.
+        for a in work.GetAtoms():
+            a.SetNoImplicit(False)
         bare = work.GetMol()
         Chem.SanitizeMol(bare)
         from ..namer import Orthonym
