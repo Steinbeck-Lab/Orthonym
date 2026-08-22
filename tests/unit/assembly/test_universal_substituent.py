@@ -16,9 +16,12 @@ Coverage:
     two SEPARATE ring systems linked by a chain
   * hard-branch witnesses that abstain TODAY on ``main`` (confirmed by the
     B.1 spy) -- complete coverage + ``verify_or_none`` CONFIRMS
-  * the stereo-omission degrade is documented as expected (constitution
-    matches; the STRICT full-InChIKey ``verify_or_none`` withholds CONFIRM,
-    which is correct: this module does not yet render stereo descriptors)
+  * WS-STEREO (v34): the top-level spine's own stereo descriptor block is now
+    prepended (mirroring ``general_engine``'s four parent engines) and
+    0-wrong-gated through ``verify_or_none`` -- a witness whose stereocentres
+    are all on the spine now FULL-InChIKey CONFIRMS; a witness with a
+    branch-buried (off-spine) stereocentre still safely degrades to the
+    stereo-omitted constitution-only name (never a wrong/partial descriptor)
   * the mandatory work-budget backstop: a pathological giant fails closed,
     fast, never hangs
   * the atom-coverage assertion actually VOIDS a rigged incomplete binding
@@ -191,35 +194,43 @@ def test_hard_branch_witness_perindopril_fragment():
 # Stereo-omission is a documented, ACCEPTABLE degrade -- NOT wrong-molecule.
 # ===========================================================================
 
-def test_stereo_bearing_witness_is_constitution_complete():
+def test_stereo_bearing_witness_now_full_ws_stereo_win():
     """The stereo-bearing ORIGINAL of the sulfooxy/carboxylic-acid witness.
-    This module calls ``assign_stereochemistry`` (determinism / canonical
-    CIP path) but does not yet RENDER stereo descriptors into the name
-    string -- a documented, in-scope-for-later-work degrade (design doc:
-    "a stereo-incomplete name is a valid less-specific degrade, not wrong").
-    Coverage is total and the CONSTITUTION (InChIKey skeleton block) matches
-    exactly; only the stereo layer differs, so the STRICT full-InChIKey
-    ``verify_or_none`` correctly withholds CONFIRM rather than falsely
-    confirming a name that omits stereo the input asserts."""
+    WS-STEREO (v34) now prepends the top-level spine's own stereo descriptor
+    block (mirroring ``general_engine``'s parent engines) and 0-wrong-gates it
+    through ``verify_or_none``: BOTH defined descriptors here (the C=C bond
+    E/Z is on the chain spine itself) are spine-scoped, so the with-stereo
+    candidate FULL-InChIKey CONFIRMS -- constitution-complete AND stereo-
+    complete, not merely a safe degrade. Mutation-checked: forcing
+    ``general_engine._stereo_prefix`` to ``''`` (as bound in this module)
+    reproduces the exact former value (name without the leading ``(5Z)-``
+    block, ``verify_or_none`` -> ``None``) -- see task-WS-STEREO-report.md.
+    Do NOT revert this value without re-deriving it the same way."""
     smi = r"C/C=C(/COS(=O)(=O)O)C(=O)O"
     mol = Chem.MolFromSmiles(smi)
     result = name_universal_substitutive(mol)
     assert result is not None
     assert result.covers == _heavy_atoms(smi)
+    assert result.name == "(5Z)-5-carboxy-2-hydroxy-2-oxo-1,3-dioxa-2-thiahepta-1,5-diene"
     cov = validate_atom_coverage(mol, result.name)
     assert cov.constitution_match is True
-    assert verify_or_none(result.name, smi) is None  # strict: stereo omitted
+    assert verify_or_none(result.name, smi) == result.name  # full: stereo now expressed
 
 
-def test_stereo_bearing_perindopril_is_constitution_complete():
+def test_stereo_bearing_perindopril_now_full_ws_stereo_win():
+    """WS-STEREO (v34): both defined stereocentres are chain-SPINE atoms, so
+    the with-stereo candidate FULL-InChIKey CONFIRMS. Mutation-checked (see
+    the sibling test above and task-WS-STEREO-report.md)."""
     smi = r"CCC[C@H](N[C@H](C)C=O)C(=O)OCC"
     mol = Chem.MolFromSmiles(smi)
     result = name_universal_substitutive(mol)
     assert result is not None
     assert result.covers == _heavy_atoms(smi)
+    assert result.name == ("(3R,5S)-3-(methan-1-yl)-6-oxo-5-(propan-1-yl)-"
+                            "1,7-dioxa-4-azanon-1-ene")
     cov = validate_atom_coverage(mol, result.name)
     assert cov.constitution_match is True
-    assert verify_or_none(result.name, smi) is None  # strict: stereo omitted
+    assert verify_or_none(result.name, smi) == result.name  # full: stereo now expressed
 
 
 # ===========================================================================
