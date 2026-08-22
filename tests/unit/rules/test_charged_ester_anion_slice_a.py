@@ -50,19 +50,45 @@ def test_ester_anion_sweep_roundtrips_or_declines(smi):
                Chem.MolToInchiKey(Chem.MolFromSmiles(smi)), \
                f"{smi} -> {name} did NOT round-trip (0-wrong violation)"
 
-# --- fix round 1: cyclitol/inositol phosphate dianion -> the ester-anion producer emits a
-# name whose stereo OPSIN 2.9.0 cannot CIP-parse (constitution-only match is not enough).
-# Never-wrong beats never-silent: this must ABSTAIN, not ship a stereo-unverified name.
-# `opsin_gate` (tests/conftest.py): the suite disables the OPSIN validity gate by
-# default (most tests assert raw generator output); this test is ABOUT gate/abstain
-# behaviour, so per conftest's own documented convention it must re-enable the gate
-# to exercise the same path production (`.venv/bin/python -m orthonym`) runs — a
-# canary confirmed the assertion is gate-invariant here (it holds with the gate on;
-# without the marker pytest sees the pre-gate raw candidate instead).
-@pytest.mark.opsin_gate
-def test_cyclitol_phosphate_abstains_stereo_unverified():
+# --- cyclitol/inositol phosphate/sulfate ester anions: the ester-anion PRODUCER
+# still emits a name whose stereo OPSIN 2.9.0 cannot CIP-parse, and SELF-01 still
+# correctly suppresses THAT stereo-bearing name (never-wrong preserved). What
+# CHANGED at WS7 (v34 composed-charge): the universal coverage FLOOR now BACKSTOPS
+# these with a CONSTITUTION-ONLY name (stereo omitted) instead of a silent
+# abstain -- a safe stereo-OMISSION superset (feedback:
+# stereo-omission is not a wrong molecule; best-effort ships the superset, never
+# abstains for 0 precision gain). CONTRACT CHANGE (was
+# ``== "unknown organic compound"``): these are now NAMED, not voided. The floor
+# is asserted DIRECTLY (deterministic) with a 0-wrong constitution+charge check;
+# the end-to-end best-effort tier ships exactly this backstop.
+def _floor_constitution_charge_only(smi):
+    """Assert the coverage floor names ``smi`` with a name whose OPSIN parse-back
+    matches on CONSTITUTION + net CHARGE (stereo removed both sides) but NOT on
+    the full InChIKey (stereo genuinely omitted -> a safe superset, not a wrong
+    stereoisomer). Floor-direct: independent of the in-process OPSIN-validity
+    gate's warm-up state (a documented pytest OPSIN/JVM harness hazard)."""
+    from orthonym.assembly.universal_substituent import (
+        name_universal_substitutive)
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    r = name_universal_substitutive(Chem.MolFromSmiles(smi))
+    assert r is not None and r.name, f"floor voided on {smi!r}"
+    got = opsin_parse(r.name)
+    assert got is not None, f"floor name did not OPSIN-parse: {r.name!r}"
+
+    def _flat(s):
+        m = Chem.MolFromSmiles(s)
+        Chem.RemoveStereochemistry(m)   # keep formal charge, drop stereo
+        return Chem.MolToSmiles(m)
+    assert _flat(got) == _flat(smi), \
+        f"0-wrong: {smi} -> {r.name} differs in constitution/charge"
+    assert Chem.MolToInchiKey(Chem.MolFromSmiles(got)) != \
+        Chem.MolToInchiKey(Chem.MolFromSmiles(smi)), \
+        f"expected a stereo-OMISSION (block1), got a full match for {r.name!r}"
+
+
+def test_cyclitol_phosphate_dianion_floor_backstops_constitution_only():
     smi = "O=P([O-])([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O"
-    assert _be().name(smi) == "unknown organic compound"
+    _floor_constitution_charge_only(smi)
 
 # --- fix round 2 (class closure): the SAME defect class on the single-anion sibling
 # sites (ions.py:975-978, dispatch_table.py::_handle_anion_small). The strict gate
@@ -83,13 +109,13 @@ def test_plain_ester_monoanion_still_ships_and_roundtrips(smi):
            Chem.MolToInchiKey(Chem.MolFromSmiles(smi)), \
            f"{smi} -> {name} did NOT round-trip (0-wrong violation)"
 
-# --- fix round 2: cyclitol/inositol phosphate/sulfate MONOanion -> the ester-anion
-# producer's owner-namer emits a stereo OPSIN 2.9.0 cannot CIP-parse; this must
-# ABSTAIN via the single-anion sibling sites, not ship stereo-unverified.
-@pytest.mark.opsin_gate
+# --- cyclitol/inositol phosphate/sulfate MONOanion: same WS7 change as the
+# dianion above -- the producer's stereo name is still SELF-01-suppressed, and
+# the coverage floor now backstops with a constitution-only stereo-omission
+# (0-wrong), instead of a silent abstain.
 @pytest.mark.parametrize("smi", [
     "O=P(O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O",   # cyclitol phosphate monoanion
     "O=S(=O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O",  # cyclitol sulfate monoanion
 ])
-def test_cyclitol_monoanion_abstains_stereo_unverified(smi):
-    assert _be().name(smi) == "unknown organic compound"
+def test_cyclitol_monoanion_floor_backstops_constitution_only(smi):
+    _floor_constitution_charge_only(smi)

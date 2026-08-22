@@ -237,11 +237,27 @@ def _common_refusal(mol, allow_charged: bool = False) -> Optional[str]:
     return None
 
 
-def _charge_suffix_text(mol, atom_to_locant) -> Optional[Tuple[str, Tuple[int, ...]]]:
+def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
+                        ) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """v26 P5 (BB P-73 cations / P-74 anions): the charge-suffix string for
     skeletal charge(s) on the ALREADY-NUMBERED general parent --
     ``-1-ium`` / ``-2-ylium`` / ``-1-ide`` / ``-1-uide`` (or the multiplied
     ``-1,4-diium`` / ``-1,2-diylium`` / ``-1,4-diide`` forms).
+
+    WS7 (v34) ``parent_only``: the DEFAULT (False) keeps the v26 GLOBAL scope --
+    the whole molecule must be single-sign (a plain cation OR anion), which is
+    right for ``general_engine``'s whole-molecule suffix. The universal
+    coverage-floor calls it with ``parent_only=True`` because it resolves charge
+    PER SPINE LEVEL and expresses off-spine charges of the OTHER sign elsewhere
+    (a terminal ``[O-]``/``[NH3+]`` via ``_charged_leaf_shortcut``): in that mode
+    the both-signs / single-sign test is applied only to the charges that lie ON
+    THIS parent (``atom_to_locant``), so a skeletal ``-ium`` cation still gets its
+    suffix even though the molecule ALSO carries a leaf-expressed anion elsewhere
+    (a zwitterion). A parent that itself carries BOTH signs still declines here
+    (the ``_zwitterion_suffix_plan`` cumulative path owns that), and the floor's
+    top-level charge-coverage assertion still proves EVERY genuine ion atom was
+    expressed somewhere, so nothing is dropped. ``general_engine``'s own call
+    sites never pass it -> byte-identical.
 
     The locant is the ACTUAL charged atom's parent locant, so the emitted
     descriptor is structurally faithful on its own (SELF-01 is only the
@@ -271,12 +287,18 @@ def _charge_suffix_text(mol, atom_to_locant) -> Optional[Tuple[str, Tuple[int, .
     sites = get_ion_sites(mol)  # excludes internal P-59 charges
     anions = list(sites.get('anions') or [])
     cations = list(sites.get('cations') or [])
+    parent_atoms = set(atom_to_locant)
+    if parent_only:
+        # WS7: judge single-vs-both sign over ONLY the charges on THIS parent;
+        # off-parent charges of the other sign are expressed elsewhere by the
+        # coverage-floor (a terminal charged leaf / another spine level).
+        anions = [s for s in anions if s['atom_idx'] in parent_atoms]
+        cations = [s for s in cations if s['atom_idx'] in parent_atoms]
     if bool(anions) == bool(cations):
         # neither (internal-only net charge) or BOTH (mixed-sign) -> out of scope
         return None
     charged = anions or cations
     negative = bool(anions)
-    parent_atoms = set(atom_to_locant)
 
     per_locant_base: List[Tuple[int, str]] = []
     for site in charged:

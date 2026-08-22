@@ -669,6 +669,25 @@ def _name_component(
                 nitro_atoms=nitro_atoms,
             )
 
+        # WS7 (v34 composed-charge): a lone charged TERMINAL atom -- the bare
+        # ``[O-]``/``[S-]`` an FG anion (carboxylate/sulfonate/phosphonate/
+        # alkoxide/thiolate) decomposes to once its ``=O`` is threaded into the
+        # skeleton, or a terminal ``-NH3(+)`` -- is rendered with its CHARGED
+        # substituent prefix (``oxido``/``sulfido``/``azaniumyl``) and its atom
+        # recorded in ``charged`` so the top-level charge-coverage assertion
+        # sees it accounted for (symmetric to the ``nitro_atoms`` thread above).
+        # This is the coverage-floor's own FG-anion/terminal-cation handler; a
+        # SKELETAL (non-terminal) charge is still resolved by
+        # ``_resolve_spine_charge`` below.
+        charged_leaf = _charged_leaf_shortcut(mol, component, attach_hint)
+        if charged_leaf is not None:
+            token, atoms, charged_atoms = charged_leaf
+            return _ComponentResult(
+                name=token, bindings=[(token, atoms)], covers=atoms,
+                attach_locant=None, is_prefix_ready=True,
+                charged=charged_atoms,
+            )
+
     # ---- parent (spine) selection -----------------------------------------
     ring_here = _ring_system_for_component(ctx, component, attach_hint, is_top)
     if ring_here is not None:
@@ -797,7 +816,15 @@ def _resolve_spine_charge(
     if not touches:
         return False, None, frozenset()
 
-    single_sign = _charge_suffix_text(ctx.mol, spine_atom_to_locant)
+    # WS7 (v34): ``parent_only=True`` -- this producer resolves charge PER SPINE
+    # and expresses off-spine charges of the OTHER sign elsewhere (a terminal
+    # ``[O-]``/``[NH3+]`` via ``_charged_leaf_shortcut``), so a SKELETAL cation
+    # (or anion) on this spine gets its ``-ium``/``-ide`` suffix even in a
+    # zwitterion whose opposite centre is a leaf on another branch. The top-level
+    # charge-coverage assertion still proves every genuine ion atom was expressed
+    # somewhere, so no charge is dropped.
+    single_sign = _charge_suffix_text(ctx.mol, spine_atom_to_locant,
+                                      parent_only=True)
     if single_sign is not None:
         text, charged_atom_ids = single_sign
         return True, text, frozenset(charged_atom_ids)
@@ -903,7 +930,17 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
     as if its nitrogen were an ordinary standard-valence heteroatom -- doing
     so would silently drop the +1/-1 charge information a plain locanted
     "aza" carries no trace of (see module docstring's charge-scope
-    paragraph)."""
+    paragraph).
+
+    WS7 (v34 composed-charge): likewise NOT a singly-charged TERMINAL atom (a
+    degree-1 ``[O-]``/``[S-]``/``[NH3+]`` etc.). Such an atom is always resolved
+    as a branch via ``_charged_leaf_shortcut`` (``oxido``/``sulfido``/
+    ``azaniumyl``), which carries its charge -- threading it into the chain
+    skeleton as a plain ``oxa``/``aza`` atom would silently drop that charge,
+    exactly like the nitro case. A degree-1 atom is always a chain ENDPOINT, so
+    excluding it only shortens the spine by that terminus; it never severs the
+    backbone (an internal, non-terminal charge stays threadable and is handled
+    by ``_resolve_spine_charge``)."""
     out = []
     for nb in ctx.mol.GetAtomWithIdx(atom).GetNeighbors():
         j = nb.GetIdx()
@@ -913,6 +950,10 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             continue
         if _is_nitro_root(ctx.mol, j):
             continue
+        if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom) is not None:
+            continue  # terminal charged atom a charged-leaf owns -> branch, not
+            #            spine (a carbanion / heteroatom-hydride anion this leaf
+            #            does NOT own stays threadable -> skeletal -ide/-uide)
         out.append(j)
     return out
 
@@ -1335,6 +1376,71 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     # A genuine N(OH)2 branch (real neutral atoms, no nitro shape -- see
     # ``_nitro_shortcut`` above) falls through to the generic
     # skeletal-replacement chain construction (ugly, but correct).
+    return None
+
+
+# WS7 (v34 composed-charge): charged terminal-atom substituent prefixes
+# (P-72 anionic / P-73 cationic substituent prefixes). In THIS module's
+# skeletal-replacement construction the carbonyl/sulfonyl/phosphoryl ``=O`` of a
+# carboxylate/sulfonate/phosphonate is THREADED INTO the parent skeleton (as an
+# ``oxa``/etc. atom + ``-ene``), which leaves the anionic ``[O-]`` as a bare,
+# single-bonded TERMINAL branch -- structurally identical to an alkoxide/
+# phenolate O(-). So every FG anion this module meets decomposes to a lone
+# charged terminal atom, and the ONE root-cause fix for the whole class is to
+# render that atom with its CHARGED substituent prefix (``oxido`` for ``-O(-)``,
+# ``sulfido`` for ``-S(-)``, ``azaniumyl`` for a terminal ``-NH3(+)``) rather
+# than bailing to the neutral ``hydroxy``/``amino`` leaf (which drops the charge
+# -> a different, neutral molecule -- the exact hazard the ``_leaf_shortcut``
+# charge-guard exists to prevent) or voiding. Each prefix was verified to
+# OPSIN-round-trip WITH its charge (e.g. ``2-oxido-1-oxabut-1-ene`` -> the
+# propanoate anion, ``sulfidoethane`` -> the ethanethiolate anion,
+# ``2-azaniumyl-1-oxidoethane`` -> the 2-aminoethanolate zwitterion); the
+# emission is still gated by the caller's SELF-01 round-trip net, so an
+# unverifiable candidate abstains rather than shipping wrong.
+_ANION_LEAF_SINGLE = {"O": "oxido", "S": "sulfido", "Se": "selanido"}
+
+
+def _charged_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """A lone, singly-charged TERMINAL atom named directly as its charged
+    substituent prefix. Returns ``(token, atom_ids, charged_atom_ids)`` or
+    ``None`` (fall through to generic construction).
+
+    Scope (tight, all validated by the caller's round-trip net):
+      * exactly one atom, formal charge +/-1, a SINGLE bond to its one outside
+        (parent) neighbour;
+      * ANION (-1): a chalcogen ``O``/``S``/``Se`` with no attached H
+        -> ``oxido``/``sulfido``/``selanido``;
+      * CATION (+1): a protonated nitrogen carrying H (a terminal ``-NH3(+)``)
+        -> ``azaniumyl``.
+
+    Anything else (a doubly-charged atom, a =/# multiple-bond attachment, a
+    carbanion, a bare halide, a substituted onium that is not a bare terminal
+    atom) returns ``None`` and is handled by the generic spine/charge machinery
+    or voids there -- never mis-spelled here."""
+    if len(component) != 1:
+        return None
+    idx = next(iter(component))
+    atom = mol.GetAtomWithIdx(idx)
+    charge = atom.GetFormalCharge()
+    if abs(charge) != 1:
+        return None
+    outside = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() not in component]
+    if len(outside) != 1:
+        return None  # not a terminal atom (0 or >=2 heavy neighbours)
+    bond = mol.GetBondBetweenAtoms(idx, outside[0])
+    if bond is None or round(bond.GetBondTypeAsDouble()) != 1:
+        return None  # only a single-bond attachment carries these prefixes
+    sym = atom.GetSymbol()
+    if charge == -1:
+        if atom.GetTotalNumHs() != 0:
+            return None
+        token = _ANION_LEAF_SINGLE.get(sym)
+        if token is None:
+            return None
+        return token, frozenset(component), frozenset(component)
+    # charge == +1: a terminal protonated ammonium -> azaniumyl (-NH3+).
+    if sym == "N" and atom.GetTotalNumHs() > 0:
+        return "azaniumyl", frozenset(component), frozenset(component)
     return None
 
 

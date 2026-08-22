@@ -27,9 +27,11 @@ Coverage:
     net-charged cation/anion, a skeletal (P-74.1.1) zwitterion, a charged
     substituent on a neutral parent, and the nitroethane-class internally
     charge-separated species (now NAMED, not voided, when spellable+
-    verified) reusing ``general_engine``'s own charge-suffix primitives; an
-    FG-anchored anion (carboxylate) correctly VOIDS as out of scope for
-    those reused primitives, never mis-named
+    verified) reusing ``general_engine``'s own charge-suffix primitives;
+    WS7 (v34) adds the FG-anion/terminal-cation charged-leaf
+    (``oxido``/``sulfido``/``azaniumyl``), so a carboxylate/sulfonate/
+    alkoxide anion and an amino-acid-style zwitterion are now NAMED and
+    full-InChIKey verified, never voided or mis-named
   * a live regression test that actually exercises the public entry point's
     broad ``except Exception`` guard (monkeypatch-injected error), since the
     original fix-round-1 giant-chain witness is now short-circuited by the
@@ -259,33 +261,41 @@ def test_quaternary_ammonium_cation_gets_ium_suffix():
     assert "ium" in result.name
 
 
-def test_carboxylate_anion_voids_out_of_scope_fg_anion():
-    """A net-charged anion: acetate (``CC(=O)[O-]``) classifies as
-    'carboxylate' (an FG-anchored anion), which is OUT OF SCOPE for the
-    reused ``general_engine._charge_suffix_text`` (that function's own
-    scope only covers skeletal 'carbanion'/'heteroatom_hydride_anion'/
-    'uide_anion' bases -- an FG anion is explicitly declined there, "PIN
-    path owns it"). This module has no functional-group-suffix layer of its
-    own to build the 'ate' form, so it VOIDS rather than mis-name it --
-    never a wrong or partial name for what it cannot yet spell."""
-    mol = Chem.MolFromSmiles("CC(=O)[O-]")
-    assert name_universal_substitutive(mol) is None
+def test_carboxylate_anion_names_via_charged_leaf():
+    """WS7 (v34 composed-charge): a net-charged FG anion is now NAMED, not
+    voided. Acetate (``CC(=O)[O-]``) classifies 'carboxylate', but in THIS
+    module's skeletal-replacement construction the carbonyl ``=O`` is threaded
+    INTO the parent (``1-oxaprop-1-ene``), leaving the anionic ``[O-]`` as a
+    bare terminal branch that ``_charged_leaf_shortcut`` renders as the charged
+    substituent prefix ``oxido`` -- carrying the charge (never the neutral
+    ``hydroxy``). Coverage-complete and STRICT full-InChIKey ``verify_or_none``
+    CONFIRMs it (there is no stereo to omit).
+
+    CONTRACT CHANGE (was ``... is None``): pre-WS7 this producer had no way to
+    express an FG anion and voided; WS7's charged-leaf handler is exactly the
+    mechanism that closes that gap. The expected string is re-derived, not
+    hand-edited (verified to OPSIN-round-trip WITH its -1 charge)."""
+    result, verified = _name_and_verify("CC(=O)[O-]")
+    assert result.name == "2-oxido-1-oxaprop-1-ene"
+    assert verified == result.name  # full-InChIKey RT (constitution + charge)
 
 
-def test_zwitterion_amino_acid_voids_carboxylate_anchored_case():
-    """A second, distinct zwitterion (net-0, internally charge-separated):
-    the glycine zwitterion ``C(C(=O)[O-])[NH3+]``. Its cation (aminium) IS
-    in ``general_engine._zwitterion_suffix_plan``'s skeletal cation-base
-    table, but its anion classifies 'carboxylate' -- in neither the P-74.1.1
-    skeletal anion table NOR the P-74.1.2 '-olate' table (which is disabled
-    here anyway via ``allow_fg_anion=False``, since this producer has no
-    FG-suffix layer to hold the anchor atom out of substituent discovery).
-    Asserts the REQUIRED invariant: NEVER a wrong constitution -- void is
-    the correct, honest degrade here (a specialized carboxylate-zwitterion
-    mechanism, out of scope for this general recursive namer, would be
-    needed to name it)."""
-    mol = Chem.MolFromSmiles("C(C(=O)[O-])[NH3+]")
-    assert name_universal_substitutive(mol) is None
+def test_zwitterion_amino_acid_names_via_charged_leaves():
+    """WS7 (v34): the glycine zwitterion ``C(C(=O)[O-])[NH3+]`` (net-0,
+    internally charge-separated) is now NAMED, not voided. Both charged termini
+    are rendered as charged substituent prefixes -- the aminium as ``azaniumyl``
+    and the carboxylate ``[O-]`` (its ``=O`` threaded into the ``1-oxaprop-1-ene``
+    skeleton) as ``oxido`` -- so the whole zwitterion is covered and the -/+
+    charges are both carried. STRICT full-InChIKey ``verify_or_none`` CONFIRMs.
+
+    CONTRACT CHANGE (was ``... is None``): the pre-WS7 producer could express the
+    skeletal aminium cation but had no FG-anion layer, so it voided; WS7's
+    charged-leaf handler names both centres. Expected string re-derived and
+    OPSIN-round-trip-verified, not hand-edited. (The FULL namer still prefers the
+    retained name ``glycine`` for this input; this is the isolated floor test.)"""
+    result, verified = _name_and_verify("C(C(=O)[O-])[NH3+]")
+    assert result.name == "3-azaniumyl-2-oxido-1-oxaprop-1-ene"
+    assert verified == result.name
 
 
 def test_charged_substituent_on_neutral_parent_carries_on_branch_name():
