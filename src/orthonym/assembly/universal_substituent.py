@@ -742,6 +742,21 @@ def _name_component(
                 charged=charged_atoms,
             )
 
+        # WS-NOABSTAIN class 3: a phosphinate P(=O)([O-])(H) unit (P-V, one
+        # explicit P-H) -- see ``_phosphinate_oxide_leaf_shortcut``'s
+        # docstring for why this MUST be a dedicated leaf rather than the
+        # generic chain/hetero-prefix machinery: OPSIN does not validate the
+        # equivalent raw replacement-chain spelling even with a correct
+        # lambda-convention citation.
+        phosphinate_leaf = _phosphinate_oxide_leaf_shortcut(mol, component, attach_hint)
+        if phosphinate_leaf is not None:
+            token, atoms, charged_atoms = phosphinate_leaf
+            return _ComponentResult(
+                name=token, bindings=[(token, atoms)], covers=atoms,
+                attach_locant=None, is_prefix_ready=True,
+                charged=charged_atoms,
+            )
+
     # ---- parent (spine) selection -----------------------------------------
     ring_here = _ring_system_for_component(ctx, component, attach_hint, is_top)
     if ring_here is not None:
@@ -995,7 +1010,14 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
     exactly like the nitro case. A degree-1 atom is always a chain ENDPOINT, so
     excluding it only shortens the spine by that terminus; it never severs the
     backbone (an internal, non-terminal charge stays threadable and is handled
-    by ``_resolve_spine_charge``)."""
+    by ``_resolve_spine_charge``).
+
+    WS-NOABSTAIN class 3: likewise NOT a phosphinate P (``-PH(=O)[O-]``,
+    ``_is_phosphinate_oxide_root``) -- see ``_phosphinate_oxide_leaf_shortcut``
+    for why this group must be resolved as a branch (the ``phosphanyl``
+    substituent form) rather than woven into the replacement-nomenclature
+    chain as a skeletal ``phospha`` atom (measured: even WITH the correct
+    P-15.4.1 lambda citation, OPSIN does not validate that shape)."""
     out = []
     for nb in ctx.mol.GetAtomWithIdx(atom).GetNeighbors():
         j = nb.GetIdx()
@@ -1004,6 +1026,8 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
         if ctx.ring_system_of.get(j) is not None:
             continue
         if _is_nitro_root(ctx.mol, j):
+            continue
+        if _is_phosphinate_oxide_root(ctx.mol, j):
             continue
         if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom) is not None:
             continue  # terminal charged atom a charged-leaf owns -> branch, not
@@ -1322,6 +1346,21 @@ def _farthest_path_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> Lis
 # ===========================================================================
 
 def _build_hetero_prefix(mol, spine_order: List[int], atom_to_locant: Dict[int, int]) -> str:
+    # NOTE (WS-NOABSTAIN class 3): a lambda-convention citation was tried
+    # here first (a skeletal P/S atom whose actual bonding number exceeds
+    # its standard one, e.g. a phosphinate's P or a sulfonic-acid-in-chain
+    # S). REVERTED: measured regressions on multiple ALREADY-CORRECT,
+    # OPSIN-verified existing names that carry such an atom WITHOUT a lambda
+    # citation (e.g. "...2-oxo-1,3-dioxa-2-thiahepta-1,5-diene" for a
+    # sulfonic-acid chain, "...3-phosphaoctan-7-ium-1-yl..." for an
+    # ammonium-ester phosphate chain) -- OPSIN already round-trips those
+    # correctly WITHOUT lambda via its own valence-filling on the SUFFIX/
+    # charge-suffix-adjacent atom, so adding one only changed working
+    # spelling for no gain. The actual class-3 fix is
+    # ``_phosphinate_oxide_leaf_shortcut`` + ``_is_phosphinate_oxide_root``,
+    # which divert the ONE shape that genuinely needed different handling
+    # (a phosphinate P) OUT of this chain-threading path entirely before it
+    # ever reaches here -- so this function stays exactly as it always was.
     by_element: Dict[str, List[int]] = {}
     for a in spine_order:
         sym = mol.GetAtomWithIdx(a).GetSymbol()
@@ -1578,6 +1617,96 @@ def _is_nitro_root(mol, j: int) -> bool:
     valence heteroatom (which would silently drop its charge)."""
     atom = mol.GetAtomWithIdx(j)
     if atom.GetSymbol() != "N" or atom.GetFormalCharge() != 1 or atom.GetDegree() != 3:
+        return False
+    o_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() == "O"]
+    if len(o_neighbors) != 2:
+        return False
+    kinds = []
+    for o_atom in o_neighbors:
+        if o_atom.GetDegree() != 1:
+            return False
+        bond = mol.GetBondBetweenAtoms(j, o_atom.GetIdx())
+        bt = round(bond.GetBondTypeAsDouble())
+        kinds.append((bt, o_atom.GetFormalCharge(), o_atom.GetTotalNumHs()))
+    return sorted(kinds) == sorted([(2, 0, 0), (1, -1, 0)])
+
+
+def _phosphinate_oxide_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """``-P(=O)([O-])(H)`` (a phosphinate: P-V, one explicit P-H), attached
+    via P to exactly one outside atom by a single bond -- 3 atoms, mirroring
+    ``_nitro_shortcut``'s shape. Named directly as the SUBSTITUTIVE
+    ``(oxido(oxo)phosphanyl)`` prefix (P-68 mononuclear-hydride substituent
+    group ``phosphanyl`` = ``-PH2``, with ``oxo``/``oxido`` replacing two of
+    its three H's, one remaining) rather than through the generic chain /
+    ``_build_hetero_prefix`` replacement-nomenclature machinery.
+
+    WS-NOABSTAIN class 3 root cause (measured, NOT the brief's original
+    "N-simultaneous-leaves composition" hypothesis): OPSIN does not validate
+    the equivalent raw skeletal-replacement spelling for this shape even WITH
+    a correct P-15.4.1 lambda citation -- ``2-oxido-1-oxa-2λ5-phosphaprop-
+    1-ene`` (the chain builder's own output for ``C[PH](=O)[O-]`` once
+    lambda is wired in) still round-trips to the neutral, P-H-less
+    ``O=P(=O)C``. The substitutive ``phosphanyl`` spelling, by contrast, IS
+    OPSIN-verified: ``(oxido(oxo)phosphanyl)ethane`` -> ``[O-]P(=O)CC``,
+    which RDKit fills to the SAME 1-implicit-H, valence-5 phosphorus as the
+    input (the identical "explicit bond order already 4 of an allowed-
+    valence-5 element -> 1 implicit H" inference ``methylphosphinate`` /
+    ``CP([O-])=O`` already relies on). Returns
+    ``(token, atom_ids, charged_atom_ids)`` or ``None``.
+
+    Scope (tight, all validated by the caller's round-trip net): P formal
+    charge 0, degree 3 (2 O's in ``component`` + 1 outside), the outside bond
+    a SINGLE bond (substituent ``-yl`` attachment), one O double-bonded /
+    neutral / 0-H (the ``oxo``) and one O single-bonded / -1 / 0-H (the
+    ``oxido``, each terminal -- bonded ONLY to this P), and P itself carrying
+    EXACTLY 1 H (the phosphinate's defining P-H -- a phosphonate-style P with
+    a SECOND non-H substituent instead is a different species this shortcut
+    must not mis-spell, and is not reachable here anyway since that shape has
+    2 outside neighbours, not 1)."""
+    if len(component) != 3:
+        return None
+    atom = mol.GetAtomWithIdx(attach_hint)
+    if atom.GetSymbol() != "P" or atom.GetFormalCharge() != 0:
+        return None
+    if atom.GetTotalNumHs() != 1:
+        return None
+    in_component = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() in component]
+    if len(in_component) != 2:
+        return None
+    outside = [n.GetIdx() for n in atom.GetNeighbors() if n.GetIdx() not in component]
+    if len(outside) != 1:
+        return None  # substituent attachment: exactly one outside neighbour
+    bond_out = mol.GetBondBetweenAtoms(attach_hint, outside[0])
+    if bond_out is None or round(bond_out.GetBondTypeAsDouble()) != 1:
+        return None  # a "-yl" substituent attaches by a single bond
+    oxido_idx = None
+    for o_idx in in_component:
+        o_atom = mol.GetAtomWithIdx(o_idx)
+        if o_atom.GetSymbol() != "O":
+            return None
+        if [n.GetIdx() for n in o_atom.GetNeighbors()] != [attach_hint]:
+            return None  # each O must bond ONLY to this P (terminal)
+        bond = mol.GetBondBetweenAtoms(attach_hint, o_idx)
+        bt = round(bond.GetBondTypeAsDouble())
+        if bt == 2 and o_atom.GetFormalCharge() == 0 and o_atom.GetTotalNumHs() == 0:
+            continue  # the neutral "oxo" oxygen
+        if bt == 1 and o_atom.GetFormalCharge() == -1 and o_atom.GetTotalNumHs() == 0:
+            oxido_idx = o_idx
+            continue  # the anionic "oxido" oxygen
+        return None
+    if oxido_idx is None:
+        return None
+    return ("oxido(oxo)phosphanyl", frozenset(component), frozenset({oxido_idx}))
+
+
+def _is_phosphinate_oxide_root(mol, j: int) -> bool:
+    """True if atom *j* is a phosphinate P (see
+    ``_phosphinate_oxide_leaf_shortcut`` for the exact shape) -- used by
+    ``_tree_neighbors`` to keep it OUT of ordinary chain-spine continuation,
+    mirroring ``_is_nitro_root``."""
+    atom = mol.GetAtomWithIdx(j)
+    if (atom.GetSymbol() != "P" or atom.GetFormalCharge() != 0
+            or atom.GetDegree() != 3 or atom.GetTotalNumHs() != 1):
         return False
     o_neighbors = [n for n in atom.GetNeighbors() if n.GetSymbol() == "O"]
     if len(o_neighbors) != 2:
