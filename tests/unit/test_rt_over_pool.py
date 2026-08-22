@@ -224,8 +224,21 @@ class TestOfferRtOkPredicate:
             lambda name: "c1ccccc1")
         assert namer_mod._offer_rt_ok("wrong-name-for-ethanol", "CCO") is False
 
-    def test_no_recorded_verdict_opsin_rejects_outright_but_unavailable_open(
+    def test_no_recorded_verdict_transient_unavailable_fails_closed(
             self, monkeypatch):
+        """WS7 fix round 1 (0-wrong, coordinator CRITICAL): a `(None, False, "")`
+        lookup means NO positive SELF-01 verdict for THIS exact string
+        (`bypassed`/`suppressed`/`inconclusive` -- e.g. a fresh floor offer). When
+        OPSIN cannot re-perceive it (`name_to_smiles`->None) under a transient
+        `unavailable`, the offers lane MUST fail CLOSED -- an ungated offer may
+        never ship on a transient blip (symmetric with the recovery-lane T4).
+
+        CONTRACT CHANGE (was ``is True``): the old fail-OPEN here WAS the
+        production-reachable 0-wrong hole -- `F[B-](F)(F)F` shipped the unverified
+        floor `2,2-difluoro-2-borapropan-2-uide`; `[Se-]CC` shipped the
+        OPSIN-unparseable `1-selanidoethane`. Fail-OPEN on a transient blip is now
+        reserved for a string that ALREADY earned a real positive verdict
+        (`self01_complete is True`), never a no-verdict offer."""
         monkeypatch.setattr(
             namer_mod, "_self01_lookup", lambda name: (None, False, ""))
         monkeypatch.setattr(
@@ -234,7 +247,7 @@ class TestOfferRtOkPredicate:
             namer_mod, "_validity_gate_name_to_smiles", lambda name: None)
         monkeypatch.setattr(
             namer_mod, "_validity_gate_status", lambda name: "unavailable")
-        assert namer_mod._offer_rt_ok("some-name", "CCO") is True
+        assert namer_mod._offer_rt_ok("some-name", "CCO") is False
 
     def test_no_recorded_verdict_opsin_rejects_outright_definitively_fails(
             self, monkeypatch):

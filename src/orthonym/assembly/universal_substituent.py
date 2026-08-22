@@ -1392,12 +1392,14 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 # than bailing to the neutral ``hydroxy``/``amino`` leaf (which drops the charge
 # -> a different, neutral molecule -- the exact hazard the ``_leaf_shortcut``
 # charge-guard exists to prevent) or voiding. Each prefix was verified to
-# OPSIN-round-trip WITH its charge (e.g. ``2-oxido-1-oxabut-1-ene`` -> the
-# propanoate anion, ``sulfidoethane`` -> the ethanethiolate anion,
+# OPSIN-round-trip WITH its charge (all confirmed against OPSIN 2.9.0:
+# ``2-oxido-1-oxabut-1-ene`` -> propanoate anion, ``1-sulfidoethane`` ->
+# ethanethiolate anion, ``1-selenidoethane`` -> ethaneselenolate anion,
 # ``2-azaniumyl-1-oxidoethane`` -> the 2-aminoethanolate zwitterion); the
 # emission is still gated by the caller's SELF-01 round-trip net, so an
-# unverifiable candidate abstains rather than shipping wrong.
-_ANION_LEAF_SINGLE = {"O": "oxido", "S": "sulfido", "Se": "selanido"}
+# unverifiable candidate abstains rather than shipping wrong. (NB the Se prefix
+# is ``selenido``, NOT ``selanido`` -- OPSIN rejects the latter.)
+_ANION_LEAF_SINGLE = {"O": "oxido", "S": "sulfido", "Se": "selenido"}
 
 
 def _charged_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
@@ -1409,9 +1411,12 @@ def _charged_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
       * exactly one atom, formal charge +/-1, a SINGLE bond to its one outside
         (parent) neighbour;
       * ANION (-1): a chalcogen ``O``/``S``/``Se`` with no attached H
-        -> ``oxido``/``sulfido``/``selanido``;
-      * CATION (+1): a protonated nitrogen carrying H (a terminal ``-NH3(+)``)
-        -> ``azaniumyl``.
+        -> ``oxido``/``sulfido``/``selenido`` (all OPSIN-RT-verified);
+      * CATION (+1): a protonated primary ammonium -- a terminal ``-NH3(+)``,
+        i.e. a degree-1 N(+) carrying EXACTLY 3 H -> ``azaniumyl``. The strict
+        3-H count is deliberate: it excludes a 2-H terminal N(+) (an
+        aminylium/nitrenium ``R-NH2(+)``, a DIFFERENT species ``azaniumyl``
+        would mis-spell); such a centre falls through and voids/gate-rejects.
 
     Anything else (a doubly-charged atom, a =/# multiple-bond attachment, a
     carbanion, a bare halide, a substituted onium that is not a bare terminal
@@ -1438,8 +1443,10 @@ def _charged_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
         if token is None:
             return None
         return token, frozenset(component), frozenset(component)
-    # charge == +1: a terminal protonated ammonium -> azaniumyl (-NH3+).
-    if sym == "N" and atom.GetTotalNumHs() > 0:
+    # charge == +1: a terminal protonated PRIMARY ammonium (-NH3+, exactly 3 H)
+    # -> azaniumyl. A 2-H terminal N+ (aminylium/nitrenium) is a different
+    # species and must NOT take this token; it falls through and voids.
+    if sym == "N" and atom.GetTotalNumHs() == 3:
         return "azaniumyl", frozenset(component), frozenset(component)
     return None
 

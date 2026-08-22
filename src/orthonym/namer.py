@@ -1611,8 +1611,26 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     # constitution-only SELF-01 verdict said.
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is None:
-        # A transient 'unavailable' fails OPEN; a definitive 'rejected' does not.
-        return _validity_gate_status(name) == "unavailable"
+        # OPSIN could not re-perceive this string. Fail OPEN on a transient
+        # 'unavailable' ONLY when this EXACT string ALREADY earned a real
+        # positive SELF-01 verdict (`self01_complete is True`) -- re-looking up a
+        # previously-VERIFIED name and hitting a transient blip must not lose it.
+        #
+        # WS7 fix round 1 (coordinator CRITICAL, 0-wrong): for a string with NO
+        # positive verdict (`self01_complete is None` -- `bypassed` / `suppressed`
+        # / `inconclusive`, e.g. a FRESH floor/alternative offer whose exact
+        # string the gate NEVER verified), a None here means the offer is
+        # UNVERIFIED, so it must fail CLOSED. `bypassed` reaches THIS branch
+        # (not the deny-by-default `verify_or_none` branch above, which
+        # `_self01_lookup` only routes `unavailable`/`not_run` into), so without
+        # this a transient OPSIN failure shipped an ungated floor offer
+        # (`F[B-](F)(F)F` -> the unverified floor `2,2-difluoro-2-borapropan-2-uide`;
+        # `[Se-]CC` -> the OPSIN-unparseable `1-selanidoethane`). This makes the
+        # offers lane symmetric with the recovery-lane T4 (`_cand_from_t4`), which
+        # already fails CLOSED on the same blip. A definitive 'rejected' fails
+        # closed for every string regardless.
+        return (self01_complete is True
+                and _validity_gate_status(name) == "unavailable")
     if not input_smiles:
         return True  # nothing to compare against -- inconclusive, fail-OPEN
     return _full_inchikey_offer_match(input_smiles, opsin_smiles)
