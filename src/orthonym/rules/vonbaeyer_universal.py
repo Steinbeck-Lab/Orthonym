@@ -382,14 +382,68 @@ def analyze_cage_universal(
     if mol is None:
         return None
 
-    canon_smiles = Chem.MolToSmiles(mol, canonical=True)
+    # The self-consistency check below round-trips `mol` through a canonical
+    # SMILES and re-parses it, purely to obtain a canonical atom-order
+    # mapping (`orig_to_canon`). Try it UNCHANGED first -- this is the
+    # original algorithm, byte-identical for every existing caller (all of
+    # which pass a mol whose own aromaticity/Kekulization state already
+    # round-trips cleanly through this).
+    mol_for_match = mol
+    canon_smiles = Chem.MolToSmiles(mol_for_match, canonical=True)
     canon = Chem.MolFromSmiles(canon_smiles)
-    if canon is None:
-        return None
-    match = mol.GetSubstructMatch(canon)
-    if len(match) != mol.GetNumAtoms():
-        logger.info("vonbaeyer_universal: no whole-mol canon match; refuse")
-        return None
+    match = mol_for_match.GetSubstructMatch(canon) if canon is not None else ()
+
+    if canon is None or len(match) != mol.GetNumAtoms():
+        # WS-NOABSTAIN fallback (only reached when the original check above
+        # already failed, so this can only ADD coverage, never change an
+        # already-working case). If the caller passed an already-Kekulized
+        # mol (aromatic flags cleared -- e.g. `universal_substituent.py`'s
+        # `_build_ctx`, which Kekulizes its whole working context up front
+        # for its own bond-order bookkeeping), the freshly reparsed `canon`
+        # above comes back RE-AROMATIZED while `mol` still has explicit
+        # Kekule bonds for the exact same graph -- `GetSubstructMatch` is
+        # bond-type-strict by default, so it reports NO match at all for a
+        # perfectly legal cage (naphthalene, any mancude ring). Retry by
+        # re-aromatizing a COPY of `mol` so the match compares aromatic-to-
+        # aromatic representations. `Chem.SetAromaticity` on an
+        # already-aromatic mol is a no-op, so this retry is only ever
+        # useful for the Kekulized-caller case the first attempt above
+        # cannot handle.
+        mol_for_match = Chem.Mol(mol)
+        try:
+            Chem.SetAromaticity(mol_for_match)
+            # A prior ``Chem.Kekulize(..., clearAromaticFlags=True)`` demotes
+            # a bracket-explicit H -- e.g. the pyrrole-type ``[nH]`` in an
+            # indole/purine/imidazole-fused system -- from EXPLICIT to
+            # IMPLICIT bookkeeping (``GetTotalNumHs()`` stays correct
+            # throughout, but ``GetNumExplicitHs()`` drops to 0).
+            # ``SetAromaticity`` above restores the aromatic FLAG but not
+            # that explicit-H bookkeeping, and ``MolToSmiles`` decides
+            # whether to write ``[nH]`` vs. bare ``n`` from the
+            # explicit/no-implicit state, not from ``GetTotalNumHs()`` alone
+            # -- so the canonical SMILES below would silently lose the ring
+            # N-H, and re-parsing it would then fail to kekulize entirely
+            # (measured on plain pyrrole and on this task's protonated-
+            # purine witness). Re-pin every atom's already-correct total H
+            # count as EXPLICIT before serializing, so this retry is
+            # lossless regardless of what the caller's mol's Kekulize state
+            # did to the explicit/implicit split.
+            for a in mol_for_match.GetAtoms():
+                total_h = a.GetTotalNumHs()
+                a.SetNoImplicit(True)
+                a.SetNumExplicitHs(total_h)
+        except Exception:
+            return None
+
+        canon_smiles = Chem.MolToSmiles(mol_for_match, canonical=True)
+        canon = Chem.MolFromSmiles(canon_smiles)
+        if canon is None:
+            return None
+        match = mol_for_match.GetSubstructMatch(canon)
+        if len(match) != mol.GetNumAtoms():
+            logger.info("vonbaeyer_universal: no whole-mol canon match; refuse")
+            return None
+
     orig_to_canon = {orig: c for c, orig in enumerate(match)}
 
     kek = Chem.RWMol(canon)
@@ -499,7 +553,16 @@ def analyze_cage_universal(
     # (norbornadiene) and saturated hetero cages (quinuclidine) are NOT aromatic
     # -> named on both paths. The oxo/ene valence guard in the engine
     # (general_engine.name_general_ring, suffix_core=='one') still fires.
-    is_mancude = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in cage_orig)
+    # WS-NOABSTAIN: read aromaticity off `mol_for_match` (the re-aromatized
+    # copy above), never the original `mol` -- an already-Kekulized caller's
+    # `mol` has every `GetIsAromatic()` flag cleared, which used to make this
+    # ALWAYS read False (never mancude) regardless of true aromaticity. That
+    # was latent/inert only because the match check above voided the whole
+    # call first for every genuinely aromatic cage; now that the match is
+    # fixed, this must be fixed in the same commit or a real mancude cage
+    # would silently fall through the default (`allow_mancude=False`) PIN
+    # path as if it were saturated.
+    is_mancude = any(mol_for_match.GetAtomWithIdx(i).GetIsAromatic() for i in cage_orig)
     if is_mancude and not allow_mancude:
         logger.info("vonbaeyer_universal: mancude/aromatic cage -> refuse (default path)")
         return None

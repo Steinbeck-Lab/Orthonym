@@ -1068,7 +1068,20 @@ def _name_ring_spine(
     ri = mol.GetRingInfo()
     sssr_here = [set(r) for r in ri.AtomRings() if set(r) <= ring_atoms]
     if len(sssr_here) >= 2:
-        cage = analyze_cage_universal(mol, cage_atoms=set(ring_atoms))
+        # WS-NOABSTAIN: this module is the unconditional best-effort FLOOR
+        # (reachable only on the `general_fallback` path -- t4_coverage.py's
+        # comment at its call site: "PIN is untouched"), so a fused/mancude
+        # aromatic ring system (a charged flavonoid/isoflavone phenolate, a
+        # protonated purine, or any plain aromatic bicycle no other producer
+        # hosted) must degrade to the kekulized von-Baeyer polyene form
+        # (`allow_mancude=True`, the SAME opt-in `_universal_cage_substituent_
+        # name` already uses in `ring_substituents.py`) rather than refuse --
+        # refusing here means the whole enclosing candidate silently abstains
+        # instead of shipping an uglier, non-PIN, but round-trip-verified
+        # name. Never reached at PIN tier, so PIN's own (correct) refusal for
+        # a mancude cage is untouched.
+        cage = analyze_cage_universal(mol, cage_atoms=set(ring_atoms),
+                                      allow_mancude=True)
         if cage is None:
             return None
         parent_block = _build_parent_with_unsaturation(
