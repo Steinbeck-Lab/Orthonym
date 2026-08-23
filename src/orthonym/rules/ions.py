@@ -1084,6 +1084,27 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
                     return validated
         # strict RT could not confirm the name -> fall through (abstain / other paths)
 
+    # v36 A1 Task 5 (defect C): sibling of the single-anion branch's identical
+    # call above (:1019) -- a natural-product scaffold carrying an unclaimed
+    # sulfate/phosphate/glycosyl conjugate that is FULLY deprotonated (a
+    # mono-phosphate-ester DIANION, e.g. disodium dexamethasone-21-phosphate)
+    # reaches this multi-anion branch (len(anions) == 2) and used to fall
+    # straight through to `_try_neutralize_and_name`, which re-protonates both
+    # acid oxygens and names the resulting NEUTRAL diester -- a 'dihydrogen
+    # phosphate' word for a molecule that has no free acid -OH at all (D-04
+    # violation: the neutral word denotes a DIFFERENT, uncharged molecule).
+    # `_name_np_conjugate_anion` already derives the anion word IN PLACE from
+    # the CHARGED mol (conjugate_controller.PHOSPHATE_WORD keyed on the
+    # PROTONATED oxygen count, which is 0 here -> 'phosphate', no
+    # hydrogen/dihydrogen token) and internally RT-gates its own result
+    # (D-10), so wiring it in here needs no additional verification -- it is
+    # the same producer the single-anion branch already trusts, reached one
+    # branch later. '' (no NP scaffold / no conjugate / NP path declined) ->
+    # fall through unchanged.
+    np_conj = _name_np_conjugate_anion(mol)
+    if np_conj:
+        return _validate_anion_name(mol, np_conj)
+
     neutral_name = _try_neutralize_and_name(mol)
     if neutral_name:
         # Convert acid suffixes to carboxylate suffixes for deprotonated
