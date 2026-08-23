@@ -77,7 +77,7 @@ STOICHIOMETRIC_PREFIXES = {
 # P-72.2.2.2.2 (:41013) / P-73.1.2.1 (:41431): a COMPOSITE ion is multiplied
 # with the enclosing multipliers bis/tris/tetrakis (name wrapped in parens),
 # NOT the simple di/tri/tetra (which are glued directly onto the name).
-COMPLEX_STOICHIOMETRIC_PREFIXES = {
+COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
     2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis', 6: 'hexakis',
     7: 'heptakis', 8: 'octakis', 9: 'nonakis', 10: 'decakis',
 }
@@ -571,9 +571,15 @@ def _apply_stoichiometric_prefix(name: str, count: int) -> str:
         'diacetate'
         >>> _apply_stoichiometric_prefix('sodium', 1)
         'sodium'
+        >>> _apply_stoichiometric_prefix('D-gluconate', 2)
+        'bis(D-gluconate)'
     """
     if count == 1:
         return name
+
+    if _anion_needs_enclosing_multiplier(name):
+        word = COMPLEX_STOICHIOMETRIC_PREFIXES.get(count, f"{count}kis")
+        return f"{word}({name})"
 
     prefix = STOICHIOMETRIC_PREFIXES.get(count, str(count))
     return f"{prefix}{name}"
