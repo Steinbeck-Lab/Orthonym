@@ -188,6 +188,54 @@ def _clone_features_with(features, **overrides):
         return None
 
 
+def _prefer_stereo_floor_if_better(mol, candidate: "_Candidate") -> "_Candidate":
+    """v35 Track A #2 -- verify-before-commit for the stereo-blind cascade rungs.
+
+    Every early rung here (``_run_general_e1`` rung 0, the polyol rung, the
+    feature-override cascade) is E1-complete -- it proves atom COVERAGE, not
+    stereo. For a molecule with defined stereocentres such a rung can return a
+    stereo-OMITTED name that E1-passes and so short-circuits the cascade at
+    ``return candidate``, before the final ``name_universal_substitutive`` rung
+    whose v35 branch-stereo produces a FULL-InChIKey-round-tripping name.
+    Committing to the stereo-blind rung there ships a name that fails full-RT
+    and SHADOWS the correct floor (invariant 18 offer-not-return; council Track
+    A #2), which the whole pipeline then falls back to.
+
+    So: for a molecule WITH defined stereo, if the rung's own name does NOT
+    full-InChIKey verify but the universal floor's DOES, prefer the floor.
+    ACHIRAL molecules (the common case) return the rung untouched with NO OPSIN
+    call -- this only ever costs, and only ever helps, a stereo-bearing input.
+    Both branches are full-InChIKey gated, so it can never ship a wrong
+    molecule, and it never abstains (keeps the original rung when neither
+    verifies -- e.g. OPSIN absent, both fail closed).
+    """
+    from rdkit import Chem
+
+    has_stereo = any(
+        a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms()
+    ) or any(
+        b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()
+    )
+    if not has_stereo:
+        return candidate  # achiral: rung stands, no OPSIN, no behaviour change
+
+    from ..validation.reconstruct import verify_or_none
+    smi = Chem.MolToSmiles(mol)
+    try:
+        if verify_or_none(candidate.name, smi) is not None:
+            return candidate  # rung already stereo-complete: keep its nomenclature
+    except Exception:
+        pass  # treat an unverifiable rung as a candidate for the floor upgrade
+    try:
+        from .universal_substituent import name_universal_substitutive
+        uni = name_universal_substitutive(mol)
+        if uni is not None and uni.name and verify_or_none(uni.name, smi) is not None:
+            return _Candidate(name=uni.name, result_obj=None)
+    except Exception as exc:  # fail-closed: keep the rung, never abstain
+        logger.info("t4 stereo-floor preference raised: %s", exc)
+    return candidate
+
+
 def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     """Senior parent + every other atom as a COMPLETE recursive substituent,
     with a bounded route-around-declines cascade (Task 5).
@@ -301,7 +349,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # Rung 0: the full engine with the perceived principal group (Task 3).
     candidate = _run_general_e1(mol, features)
     if candidate is not None:
-        return candidate
+        return _prefer_stereo_floor_if_better(mol, candidate)  # v35: verify-before-commit
 
     # Rung 0.5 (v30 tail #21): the acyclic polyol / polyether / POLYESTER class.
     # name_general is a ring/von-Baeyer engine and returns None for an acyclic
@@ -317,7 +365,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
         from ..rules.polyol_polyester import name_acyclic_polyol_polyester
         _pp = name_acyclic_polyol_polyester(mol)
         if _pp:
-            return _Candidate(name=_pp, result_obj=None)
+            return _prefer_stereo_floor_if_better(mol, _Candidate(name=_pp, result_obj=None))
     except Exception as exc:  # fail-closed: a producer bug keeps the abstention
         logger.info("t4 polyol-polyester producer raised: %s", exc)
 
@@ -345,7 +393,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
             continue
         candidate = _run_general_e1(mol, alt_features)
         if candidate is not None:
-            return candidate
+            return _prefer_stereo_floor_if_better(mol, candidate)  # v35: verify-before-commit
 
     # Final rung (Phase B4): the UNCONDITIONAL recursive substitutive namer.
     # Every feature-override rung above declined -- the remaining abstentions
