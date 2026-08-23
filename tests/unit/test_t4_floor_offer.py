@@ -60,12 +60,15 @@ class TestFloorWinsOverStereoWrongPrimary:
             pytest.skip("OPSIN jar unavailable in this environment")
         assert _full_inchikey(smiles) == _full_inchikey(opsin_smi), (
             f"emitted name {name!r} does not full-RT-match the input")
-        # The winning offer must be the T4 floor, not the stereo-fabricating
-        # primary (proves the RANKING actually picked the floor, not a
-        # coincidental match).
-        winners = [o for o in nm._offers if o.name == name]
-        assert winners and winners[0].source == "t4_floor", (
-            f"expected the t4_floor offer to win; offers={nm._offers}")
+        # v35 re-baseline: the invariant these rows prove is that a
+        # full-InChIKey-correct name SHIPS for a formerly stereo-wrong primary
+        # -- via whichever offer wins. When these tests were written that was
+        # the t4_floor offer; the primary producers have since improved to emit
+        # a constitution- and stereo-correct name DIRECTLY for these molecules
+        # (source pin_path/general_engine), so the floor is correctly not
+        # needed. The floor-preference mechanism itself is exercised by
+        # test_t4_stereo_verify_before_commit_v35.py. What must hold here is the
+        # 0-wrong outcome asserted above: the shipped name is the right molecule.
 
 
 class TestFloorWinsOverAbstainedPrimary:
@@ -85,8 +88,10 @@ class TestFloorWinsOverAbstainedPrimary:
             pytest.skip("OPSIN jar unavailable in this environment")
         assert _full_inchikey(smiles) == _full_inchikey(opsin_smi), (
             f"emitted name {name!r} does not full-RT-match the input")
-        assert nm._t4_floor_candidate == name, (
-            "the winning name should be exactly the stashed floor candidate")
+        # v35 re-baseline: see TestFloorWinsOverStereoWrongPrimary -- the
+        # formerly-abstaining primary now emits a full-RT-correct name directly,
+        # so `_t4_floor_candidate` is None (the floor was not needed). The
+        # 0-wrong outcome asserted above is the invariant that must hold.
 
 
 class TestStereoOnlyFloorCompletenessL3_2a:
@@ -147,17 +152,29 @@ class TestByteIdentityUnderPin:
             "2-[4-(2-methylpropyl)phenyl]propanoic acid")
         assert len(nm._offers) == 1
 
-    def test_discard_gap_molecule_unchanged_under_pin_default(self):
-        """The SAME molecule that flips under best-effort must NOT flip
-        under PIN-default -- only 1 offer ever exists there, so
-        `_select_rt_passing_offer_name` falls back to the current (wrong)
-        name rather than newly abstain -- L4-core's byte-identity guarantee."""
+    def test_discard_gap_molecule_uses_single_offer_under_pin_default(self):
+        """Under PIN-default only ONE offer ever exists (the floor is never
+        appended -- that is `_general_fallback_unverified`-gated), so
+        best-effort can never alter the PIN-default output.
+
+        v35 re-baseline: this row's input is stereo-UNDEFINED
+        (`CC(O)C(N)...`, no `@`), so the old expected `threonylcysteine` was
+        itself a 0-wrong DEFECT -- that retained name implies L-stereo the input
+        does not carry, and full-InChIKey RT-mismatches. The primary now emits
+        the constitution-correct, stereo-honest systematic name, which full-RT
+        MATCHES. Assert the single-offer structural invariant plus that the one
+        PIN-default name is the right molecule (not a specific string)."""
+        from orthonym.validation.opsin_roundtrip import opsin_parse
         nm_pin = Orthonym()
         smiles = "CC(O)C(N)C(=O)NC(CS)C(=O)O"
         name = nm_pin.name(smiles)
-        assert name == "threonylcysteine"
-        assert len(nm_pin._offers) == 1
-        assert nm_pin._offers[0].name == "threonylcysteine"
+        assert name and not name.startswith("unknown"), f"no PIN name: {name!r}"
+        assert len(nm_pin._offers) == 1  # floor never appended under PIN-default
+        opsin_smi = opsin_parse(name)
+        if opsin_smi is None:
+            pytest.skip("OPSIN jar unavailable in this environment")
+        assert _full_inchikey(smiles) == _full_inchikey(opsin_smi), (
+            f"PIN-default name {name!r} does not full-RT-match the input")
 
     def test_ibuprofen_unchanged_under_best_effort_too(self):
         """A PIN primary that DOES full-RT-pass always wins regardless of
