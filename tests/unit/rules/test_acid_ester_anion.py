@@ -143,12 +143,28 @@ def test_integration_regressions_unchanged(namer, smi, expected):
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smi", [
-    "CCCCCCCCCCCCOP(=S)([O-])[O-]",   # thiophosphate ester anion -> not a wrong name
-    "OP(=O)([O-])OP(=O)([O-])[O-]",   # diphosphate (multi-centre) -> fail closed
-])
-def test_integration_failclosed_never_wrong(namer, smi):
-    # honest fail: abstain rather than a wrong molecule. Both inputs verified
-    # to abstain to exactly this sentinel (never a phosphate-flavoured guess).
-    out = namer.name(smi)
+def test_integration_failclosed_never_wrong_organic(namer):
+    # thiophosphate ester anion -> not a wrong name. Carries a carbon skeleton
+    # (the dodecyl chain), so the v36 B3 carbon-free honesty floor
+    # (errors.py::classify_failure_limit) does not apply here -- this stays
+    # the pre-existing organic-unnameable sentinel.
+    out = namer.name("CCCCCCCCCCCCOP(=S)([O-])[O-]")
     assert out == "unknown organic compound"
+
+
+@pytest.mark.opsin_gate
+def test_integration_failclosed_never_wrong_inorganic(namer):
+    # diphosphate (multi-centre) -> fail closed, never a wrong molecule.
+    # v36 B3: this input is carbon-free (O/P/H only), so it now correctly
+    # abstains via errors.py's structural honesty floor to the HONEST
+    # "inorganic compound (not supported)" message instead of the
+    # the contributor guide-flagged-dishonest "unknown organic compound" sentinel --
+    # this assertion was updated deliberately, not because the old string
+    # "looked wrong": the input has zero carbon atoms (verified: no 'C' in
+    # "OP(=O)([O-])OP(=O)([O-])[O-]"), and the project's own stated policy
+    # (the contributor guide invariant 16 / V36-SPY-B3 §4a) is that a carbon-free
+    # fragment must never surface the organic sentinel. 0-wrong is
+    # unaffected either way (both strings are abstentions, never a shipped
+    # name); only the honesty of the abstention message changed.
+    out = namer.name("OP(=O)([O-])OP(=O)([O-])[O-]")
+    assert out == "inorganic compound (not supported)"

@@ -308,7 +308,19 @@ def classify_failure_limit(mol: Chem.Mol,
     # byte-identical — the sole metal is trivially lowest.
     non_organic = {atom.GetSymbol() for atom in mol.GetAtoms()
                    if atom.GetSymbol() not in _ORGANIC_ELEMENTS}
-    if non_organic:
+    # v36 B3 honesty floor: the ORIGINAL non_organic test above is
+    # ELEMENT-SET-based, so a bare carbon-free ion built entirely from
+    # `_ORGANIC_ELEMENTS` (nitrate O=[N+]([O-])[O-], sulfite, [S-2], [H+]) has
+    # an EMPTY non_organic set and used to fall through to the "unknown
+    # organic compound" sentinel below -- factually dishonest for a molecule
+    # containing no carbon at all. Make the test STRUCTURAL as well: no atom
+    # with atomic number 6 anywhere in the fragment means this is not an
+    # organic compound, full stop, regardless of which specific elements it
+    # is built from. A molecule that DOES contain carbon is completely
+    # unaffected (falls through to the organic-unnameable branch exactly as
+    # before -- never over-broadened).
+    has_carbon = any(atom.GetAtomicNum() == 6 for atom in mol.GetAtoms())
+    if non_organic or not has_carbon:
         pt = Chem.GetPeriodicTable()
         metals = sorted((s for s in non_organic if s in _METAL_NAMES),
                         key=lambda s: pt.GetAtomicNumber(s))
