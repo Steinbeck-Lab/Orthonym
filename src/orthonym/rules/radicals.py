@@ -568,10 +568,13 @@ def _name_peroxyl_radical(mol, radical_idx: int, bridge_o_idx: int) -> str:
     ``_compose_oxyl_name`` (method (1) 'R + peroxyl', PIN, tried first;
     method (2) '(R)dioxidanyl' as a verified fallback) -- VERIFIED -r
     round-trip witnesses: 'methylperoxyl' for ``[O]OC``, 'tert-butylperoxyl'
-    for ``[O]OC(C)(C)C``. Scope is a single carbon R group on an otherwise
-    unbranched -O-O. bridge; anything else (a second substituent on the
-    bridge oxygen, a non-carbon R) fails closed to '' so the caller's plain
-    'oxyl' fallback -- never a wrong name -- takes over."""
+    for ``[O]OC(C)(C)C``. The constraint is on the BRIDGE, not on R: the
+    bridge oxygen must have exactly one non-radical neighbour and that
+    neighbour must be carbon (a single carbon ATTACHMENT point) -- the R
+    group hanging off it is unconstrained and, per the chokepoint above, can
+    be branched/substituted/aromatic. Anything else (a second substituent on
+    the bridge oxygen, or a non-carbon attachment) fails closed to '' so the
+    caller's plain 'oxyl' fallback -- never a wrong name -- takes over."""
     bridge_atom = mol.GetAtomWithIdx(bridge_o_idx)
     r_neighbors = [n for n in bridge_atom.GetNeighbors() if n.GetIdx() != radical_idx]
     if len(r_neighbors) != 1 or r_neighbors[0].GetSymbol() != 'C':

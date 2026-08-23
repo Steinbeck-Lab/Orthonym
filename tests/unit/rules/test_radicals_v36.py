@@ -56,11 +56,11 @@ def test_unsubstituted_methoxyl_pin_unchanged():
 # further substituent) shape, but Task 1's own coverage only exercised aryl.
 # These three are VERIFIED -r-round-trip witnesses for the alkyl branch
 # (name_oxyl_radical's aliphatic non-plain-hydrocarbon path -> the
-# `_compose_oxidanyl` systematic '(R)oxidanyl' composition).
+# systematic '(R)oxyl' composition).
 SUBSTITUTED_ALKOXYL = [
-    "[O]CCCl",          # (2-chloroethyl)oxidanyl
-    "[O]CC(=O)O",       # (carboxymethyl)oxidanyl
-    "[O]CC1CCCCC1",     # (cyclohexylmethyl)oxidanyl
+    "[O]CCCl",          # (2-chloroethyl)oxyl
+    "[O]CC(=O)O",       # (carboxymethyl)oxyl
+    "[O]CC1CCCCC1",     # (cyclohexylmethyl)oxyl
 ]
 
 
