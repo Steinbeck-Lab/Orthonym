@@ -4611,6 +4611,43 @@ class Orthonym:
                         _md['limit'] = _scope.as_dict()
                         _md['abstention'] = _abst.value if _abst else None
                         return _md
+            # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
+            # Twin of name()'s hook (:2938). name_with_confidence bypassed it and
+            # called _name_impl directly, so an isotope-labeled mol named as the
+            # UNLABELED skeleton (label silently dropped = wrong molecule; the OPSIN
+            # validity gate cannot catch it — it parses to the unlabeled structure,
+            # and SELF-01's skeleton compare ignores isotopes). Route to the
+            # fail-closed decorator BEFORE _name_impl strips the label. has_isotopes
+            # gate => zero cost + byte-identical on the entire unlabeled corpus.
+            # Nothing scored coverage on this early-return path, so both exits use
+            # the honest unmeasured record (v29 C4). We are already INSIDE the try
+            # whose finally ends the session, so just return — no second
+            # end_naming_session (unlike name(), whose hook sat outside its try).
+            if is_top_level_naming():
+                _iso_probe = Chem.MolFromSmiles(smiles)
+                if _iso_probe is not None:
+                    from .rules.isotopes import has_isotopes, decorate_isotopic_name
+                    if has_isotopes(_iso_probe):
+                        _iso_name = decorate_isotopic_name(smiles, self.style, self)
+                        if _iso_name is not None:
+                            _md = unmeasured_confidence(
+                                name=_iso_name, handler='isotope')
+                            _md['limit'] = None
+                            _md['abstention'] = None
+                            return _md
+                        # Decorator failed closed on an isotope-labeled molecule:
+                        # REFUSE. Falling through to _name_impl would emit the
+                        # UNLABELED skeleton name (label silently dropped). Abstain
+                        # to the descriptive fallback, exactly as name() does (:2967).
+                        record_abstention(AbstentionCode.OTHER,
+                                          detail='isotope_decorator_failed')
+                        _fallback_name = _descriptive_fallback(smiles)
+                        _abst = abstention_code_for(_fallback_name)
+                        _md = unmeasured_confidence(
+                            name=_fallback_name, handler='fallback')
+                        _md['limit'] = None
+                        _md['abstention'] = _abst.value if _abst else None
+                        return _md
             try:
                 name = self._name_impl(smiles)
             except OrthonymLimitError as _limit:
