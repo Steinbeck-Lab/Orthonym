@@ -74,6 +74,47 @@ STOICHIOMETRIC_PREFIXES = {
 }
 
 
+# P-72.2.2.2.2 (:41013) / P-73.1.2.1 (:41431): a COMPOSITE ion is multiplied
+# with the enclosing multipliers bis/tris/tetrakis (name wrapped in parens),
+# NOT the simple di/tri/tetra (which are glued directly onto the name).
+COMPLEX_STOICHIOMETRIC_PREFIXES = {
+    2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis', 6: 'hexakis',
+    7: 'heptakis', 8: 'octakis', 9: 'nonakis', 10: 'decakis',
+}
+
+
+def _anion_needs_enclosing_multiplier(name: str) -> bool:
+    """True if an ion name must take bis(...)/tris(...) rather than di.../tri...
+
+    Orthonym's 0-wrong gate IS OPSIN round-trip, so the trigger set matches
+    OPSIN 2.9.0's grammar (probe_salt_spelling.py, 2026-08-23) — STRICTER than
+    `_needs_complex_fragment_multiplier`, which never validates against
+    OPSIN and would emit simple `di` for `2-hydroxypropanoate` (OPSIN rejects
+    `di2-hydroxypropanoate`). This is a dedicated salt predicate on purpose;
+    do NOT reuse the substituent-tuned is_complex_substituent/get_multiplier_prefix
+    (see the ⛔ warning in get_multiplier_prefix's docstring, commit b3f6ce7c).
+
+    Composite when the name:
+      - contains '(' , ')' or a space (already enclosed / multi-word), or
+      - contains any digit (a locant; `di<name>` fuses ambiguously), or
+      - contains '-' (catches no-digit stereo prefixes: D-/L-), or
+      - starts with a multiplier word, or ends with a stem-collision suffix
+        where a bare `di-` would fuse into a different word (carried from
+        fragment_rules.py:2820-2822).
+    """
+    if '(' in name or ')' in name or ' ' in name:
+        return True
+    if any(ch.isdigit() for ch in name):
+        return True
+    if '-' in name:
+        return True
+    if name.startswith(('bis', 'tris', 'tetrakis', 'tetra', 'penta', 'hexa')):
+        return True
+    if name.endswith(('azanide', 'phosphinate', 'phosphonate')):
+        return True
+    return False
+
+
 # === AMINO ACID ZWITTERION PATTERNS ===
 
 # SMARTS for alpha-amino acid zwitterion pattern
