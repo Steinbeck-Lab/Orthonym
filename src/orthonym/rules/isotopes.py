@@ -208,6 +208,200 @@ def _p4542_p4543_key(groups) -> tuple:
     return tuple(key)
 
 
+def _find_best_placement(
+    skel: str, keys, original: Chem.Mol, n_pos: int
+) -> Tuple[Optional[str], Optional[int], Optional[str], Optional[int]]:
+    """Best ``(candidate, offset, descriptor, loc_rank)`` for ONE skeleton
+    spelling and ONE ``(mass, element) -> count`` key list, OPSIN-RT gated
+    against ``original``; ``(None, None, None, None)`` if nothing round-trips.
+
+    Extracted (v36 A3) from what was a same-shaped closure named ``_enumerate``
+    inside ``_decorate_isotopic_name_inner`` so BOTH the single-attachment
+    path there (unchanged behaviour -- it now calls this with its own
+    ``keys``/``original``) and the multi-attachment placement below
+    (:func:`_decorate_multi_position`, called once per attachment GROUP with a
+    masked ``original``) share ONE oracle-driven search, instead of two
+    independently-maintained copies that could drift apart.
+
+    ``loc_rank`` is -1 when the winning descriptor needs NO locant (P-45.4.1
+    lowest-locant-first: the locant-free form is tried before any integer),
+    else the locant that turned out to be required.
+    """
+    offs_raw = [0] + _insertion_offsets(skel)
+    seen: set = set()
+    offs: List[int] = []
+    for x in offs_raw:
+        if x not in seen:
+            seen.add(x)
+            offs.append(x)
+    won = []
+    for locant in [None] + list(range(1, n_pos + 1)):
+        groups_desc = [(locant, mass, el, count) for (mass, el), count in keys]
+        desc = format_isotope_descriptor(groups_desc)
+        for off in offs:
+            candidate = skel[:off] + desc + skel[off:]
+            if _isotope_round_trips(candidate, original):
+                loc_rank = -1 if locant is None else locant
+                won.append((_p4542_p4543_key(groups_desc), loc_rank, off, desc, candidate))
+        if won:
+            # P-45.4.1: the first locant-form that yields ANY round-tripper is
+            # the lowest-locant form; do not consider higher-locant forms.
+            break
+    if not won:
+        return None, None, None, None
+    won.sort(key=lambda w: (w[0], w[1], w[2]))
+    _, loc_rank, off, desc, candidate = won[0]
+    return candidate, off, desc, loc_rank
+
+
+def _mask_isotopes(mol: Chem.Mol, keep_indices) -> Chem.Mol:
+    """A COPY of ``mol`` with every isotope label cleared except at
+    ``keep_indices``. Used to test ONE attachment-group's placement in
+    isolation -- see :func:`_decorate_multi_position`.
+
+    A cleared D/T is an EXPLICIT plain-1H atom (same reasoning as
+    ``strip_isotopes``): left alone, its canonical SMILES prints a literal
+    ``[H]`` that can never match an OPSIN-parsed candidate (which has an
+    ordinary IMPLICIT hydrogen there), so every group but the last would
+    spuriously fail its round-trip. ``RemoveHs`` collapses exactly the
+    now-plain explicit H atoms into implicit H count while leaving any
+    STILL-labelled (isotope != 0) explicit H untouched -- RDKit treats an
+    isotopically-labelled H as "special" and keeps it explicit.
+    """
+    copy = Chem.Mol(mol)
+    keep = set(keep_indices)
+    for atom in copy.GetAtoms():
+        if atom.GetIdx() not in keep and atom.GetIsotope() != 0:
+            atom.SetIsotope(0)
+    try:
+        copy = Chem.RemoveHs(copy)
+    except Exception:
+        pass
+    return copy
+
+
+def _partition_by_attachment(
+    original: Chem.Mol, label_map: Dict[int, int]
+) -> List[Dict[int, int]]:
+    """Partition ``label_map`` into groups that share ONE skeleton attachment
+    point, so each group's descriptor can be placed at its OWN insertion
+    offset independently (P-82.2.1: the descriptor is inserted "before the
+    part of the compound that is isotopically substituted" -- different
+    PARTS of the compound take different insertion points).
+
+    An explicit-H label (D/T, ``strip_isotopes`` never removes them from
+    ``label_map`` even though ``RemoveHs`` collapses the STRIPPED copy) is
+    attached to exactly one heavy neighbour; every D/T sharing that neighbour
+    (the two D's of an NH2, the two of a CH2, ...) is one group. A labelled
+    HEAVY atom (13C, 18F, 11C, ...) is its own attachment point.
+
+    A single-group molecule (everything shares one neighbour, or there is
+    only one labelled atom) returns a length-1 list, so the existing
+    single-descriptor path is exercised exactly as before for every
+    previously-working case -- this function only SPLITS when the labelled
+    atoms sit at structurally distinct positions, and the OPSIN round-trip
+    oracle still has the final say on every candidate it enables.
+    """
+    groups: Dict[int, Dict[int, int]] = {}
+    for idx, mass in label_map.items():
+        atom = original.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == "H":
+            nbrs = atom.GetNeighbors()
+            key = nbrs[0].GetIdx() if nbrs else idx
+        else:
+            key = idx
+        groups.setdefault(key, {})[idx] = mass
+    return list(groups.values())
+
+
+def _decorate_multi_position(
+    skeleton: str, groups: List[Dict[int, int]], original: Chem.Mol, n_pos: int
+) -> Optional[str]:
+    """Place ONE descriptor per attachment GROUP, each at its own insertion
+    offset (P-82.2.1 + P-82.6.3.1/.2/.3 -- different labelled parts of a
+    compound each get their own descriptor scoped to that part, e.g. BB's own
+    ``benzene(13C)carbonitrile`` / ``3-[ethyl(2-34S)trisulfanyl]propanoic
+    acid`` pattern of several independently-scoped parenthetical descriptors
+    in one name).
+
+    A single combined descriptor (the existing enumeration, one shared
+    locant for every labelled atom of a nuclide) cannot express labelled
+    atoms sitting at MORE than one structurally distinct position -- e.g.
+    per-deuterated glycine has D on the amino N, the alpha C, and the
+    carboxyl O, three unrelated "parts". Each group's own winning
+    ``(offset, descriptor)`` is found INDEPENDENTLY by :func:`_find_best_placement`
+    against an isotope-MASKED copy of ``original`` carrying ONLY that group's
+    labels -- valid because OPSIN scopes each parenthesized descriptor to the
+    substring it precedes, independent of any other descriptor elsewhere in
+    the name (verified 2026-08-23: the three-way glycine split round-trips
+    when the three independently-found descriptors are combined). The
+    combined candidate is still OPSIN-RT gated against the TRUE original
+    before being returned, so any compositionality failure (e.g. two groups
+    wanting the identical offset) simply fails closed -- never a wrong name.
+    """
+    if len(groups) < 2:
+        return None
+    placements: List[Tuple[int, str]] = []
+    for group in groups:
+        by_key: Dict[Tuple[int, str], int] = {}
+        for idx, mass in group.items():
+            el = original.GetAtomWithIdx(idx).GetSymbol()
+            by_key[(mass, el)] = by_key.get((mass, el), 0) + 1
+        group_keys = sorted(by_key.items(), key=lambda kv: (kv[0][1], kv[0][0]))
+        masked = _mask_isotopes(original, group.keys())
+        _cand, off, desc, _loc_rank = _find_best_placement(skeleton, group_keys, masked, n_pos)
+        if off is None:
+            return None
+        placements.append((off, desc))
+    # Colliding offsets have no principled merge order here -> fail closed
+    # rather than guess (this has not been observed on any verified witness).
+    offsets_seen = [p[0] for p in placements]
+    if len(set(offsets_seen)) != len(offsets_seen):
+        return None
+    # Splice from the HIGHEST offset down so an earlier offset is never
+    # shifted by a later insertion.
+    placements.sort(key=lambda p: -p[0])
+    out = skeleton
+    for off, desc in placements:
+        out = out[:off] + desc + out[off:]
+    if _isotope_round_trips(out, original):
+        return out
+    return None
+
+
+# ---------------------------------------------------------------------------
+# P-82.6.3.2 (BlueBookV2.md:44251) -- systematic-parent fallback
+# ---------------------------------------------------------------------------
+# "When the nuclide is located at a position in a retained name that is not
+# numbered[,] a systematic name that identifies separately the relevant atom
+# is used for the IUPAC preferred name." style='systematic' does not always
+# deliver that: measured 2026-08-23, on a substituted 2-carbon carboxylic
+# acid it still keeps the RETAINED "acetic acid" stem ("aminoacetic acid",
+# not "aminoethanoic acid") -- P-14.3.4 omits the substituent's own locant and
+# the retained "acid" suffix has no "-oic acid" slot to insert a descriptor
+# before, unlike the fully systematic form. The amino-acid class already
+# carries its own fully systematic namer for exactly this shape
+# (`_name_amino_acid_systematic`); this fallback is scoped to it. When it
+# does not apply, this returns None and the caller's fallback is a no-op --
+# never a forced or guessed alternate parent.
+def _systematic_parent_fallback(stripped: Chem.Mol) -> Optional[str]:
+    """An alternate, more fully systematic parent name for ``stripped``.
+
+    Currently covers the amino-acid class only (the verified per-D-glycine
+    gap); returns None when inapplicable.
+    """
+    try:
+        from .amino_acids import detect_amino_acid, _name_amino_acid_systematic
+    except Exception:
+        return None
+    try:
+        if not detect_amino_acid(stripped):
+            return None
+        return _name_amino_acid_systematic(stripped)
+    except Exception:
+        return None
+
+
 def _decorate_demultiplied(skeleton, keys, original, stripped) -> Optional[str]:
     """Generalized P-82.2.2.1 de-multiplication (single OR mixed nuclides).
 
@@ -421,10 +615,6 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     if demux is not None:
         return demux
 
-    def _descriptor(locant):
-        groups = [(locant, mass, el, count) for (mass, el), count in keys]
-        return format_isotope_descriptor(groups)
-
     # P-82.2.1: the descriptor "is inserted before the part of the compound that
     # is isotopically substituted". For a whole-parent label that is the front of
     # the name; for a labeled part after substituent prefixes (the labeled C of
@@ -433,54 +623,53 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # lets the OPSIN round-trip oracle pick the unique correct one (probe: only
     # ONE offset round-trips per (structure, descriptor)). Front (0) is tried
     # first so the front placement is preferred when it is valid.
-    insert_offsets = [0] + _insertion_offsets(skeleton)
-    # dedupe preserving order (front-first)
-    seen_off = set()
-    offsets = []
-    for o in insert_offsets:
-        if o not in seen_off:
-            seen_off.add(o)
-            offsets.append(o)
-
+    #
     # Locant-form order (P-45.4.1 / P-14.3.4): the no-locant form (None) is
     # tried first — locants are omitted when the position is unambiguous; then
     # integer locants ascending (lowest-locant-first). Among round-trippers,
     # P-45.4.2/.4.3 (higher Z then higher mass at the lower locant) breaks ties.
+    # (v36 A3: the search itself now lives in the module-level
+    # ``_find_best_placement`` so the multi-attachment path below can reuse it
+    # unchanged; this closure is a thin adapter preserving the existing
+    # ``(candidate, loc_rank)`` contract used by the rest of this function.)
     def _enumerate(skel):
         """Best (candidate, loc_rank) for one skeleton spelling, or (None, None).
 
         ``loc_rank`` is -1 when the winning descriptor needs NO locant, else the
         locant. That value is the P-82.6.1.1 trigger: see below.
         """
-        _offs = [0] + _insertion_offsets(skel)
-        _seen, _o = set(), []
-        for x in _offs:
-            if x not in _seen:
-                _seen.add(x)
-                _o.append(x)
-        won = []
-        for locant in [None] + list(range(1, n_pos + 1)):
-            desc = _descriptor(locant)
-            for off in _o:
-                candidate = skel[:off] + desc + skel[off:]
-                if _isotope_round_trips(candidate, original):
-                    groups = [(locant, mass, el, count) for (mass, el), count in keys]
-                    # locant None ranks as lowest for P-45.4.1 (unambiguous omit).
-                    loc_rank = -1 if locant is None else locant
-                    won.append((_p4542_p4543_key(groups), loc_rank, off, candidate))
-            if won:
-                # P-45.4.1: the first locant-form that yields ANY round-tripper is
-                # the lowest-locant form (None precedes integers, integers ascend);
-                # do not consider higher-locant forms once a lower one succeeds.
-                break
-        if not won:
-            return None, None
-        # Among equally-low-locant round-trippers, P-45.4.2/.4.3 then front-first.
-        won.sort(key=lambda w: (w[0], w[1], w[2]))
-        return won[0][3], won[0][1]
+        candidate, _off, _desc, loc_rank = _find_best_placement(skel, keys, original, n_pos)
+        return candidate, loc_rank
 
     best, loc_rank = _enumerate(skeleton)
     if best is None:
+        # v36 A3 Task 1 (P-82.6.3.2 + multi-position placement): the single
+        # combined descriptor above shares ONE locant across every labelled
+        # atom of a nuclide, which cannot express labels sitting at more than
+        # one structurally distinct position (per-D-glycine: D on the amino
+        # N, the alpha C, AND the carboxyl O). Try, in order:
+        #   (a) one descriptor per attachment group, on THIS skeleton;
+        #   (b) if the skeleton itself has no slot at all for some part of
+        #       the label (a retained parent with an unnumbered position,
+        #       P-82.6.3.2), retry every placement strategy against a MORE
+        #       fully systematic alternate parent.
+        groups = _partition_by_attachment(original, label_map)
+        if len(groups) > 1:
+            multi = _decorate_multi_position(skeleton, groups, original, n_pos)
+            if multi is not None:
+                return multi
+        alt_skeleton = _systematic_parent_fallback(stripped)
+        if alt_skeleton and alt_skeleton != skeleton:
+            alt_demux = _decorate_demultiplied(alt_skeleton, keys, original, stripped)
+            if alt_demux is not None:
+                return alt_demux
+            alt_best, _alt_loc_rank = _enumerate(alt_skeleton)
+            if alt_best is not None:
+                return alt_best
+            if len(groups) > 1:
+                alt_multi = _decorate_multi_position(alt_skeleton, groups, original, n_pos)
+                if alt_multi is not None:
+                    return alt_multi
         # De-multiplication (single AND mixed nuclides) was already attempted
         # ahead of this enumeration by _decorate_demultiplied; nothing else to
         # try -> fail closed (never a wrong labeled name).
