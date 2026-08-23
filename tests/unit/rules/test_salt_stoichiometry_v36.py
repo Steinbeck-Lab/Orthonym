@@ -47,3 +47,27 @@ def test_needs_enclosing_multiplier_startswith_endswith_branches(name, expected)
 ])
 def test_apply_stoichiometric_prefix(name, count, expected):
     assert _apply_stoichiometric_prefix(name, count) == expected
+
+
+from orthonym.namer import name_compound
+from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+# salt witnesses 11 & 12 (calcium bis-aldonate) + 1 verified synthetic case.
+A1_SALT_WITNESSES = [
+    # w11: calcium D-gluconate
+    "O=C([O-])[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO."
+    "O=C([O-])[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO.[Ca+2]",
+    # w12: calcium aldonate (C2 stereo unspecified variant)
+    "O=C([O-])C(O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO."
+    "O=C([O-])C(O)[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO.[Ca+2]",
+    # verified synthetic: calcium bis(2-hydroxypropanoate) (lactate)
+    "CC(O)C(=O)[O-].CC(O)C(=O)[O-].[Ca+2]",
+]
+
+
+@pytest.mark.parametrize("smiles", A1_SALT_WITNESSES)
+def test_a1_salt_witness_round_trips(smiles):
+    name = name_compound(smiles, style="pin")
+    assert name, f"abstained on {smiles}"
+    result = opsin_roundtrip_check(smiles, name)
+    assert result["passed"], f"{name!r} did not round-trip: {result}"
