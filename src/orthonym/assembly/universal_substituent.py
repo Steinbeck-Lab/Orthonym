@@ -473,43 +473,102 @@ def _name_universal_substitutive_unsafe(
 
     covers = frozenset(a for _tok, ids in comp.bindings for a in ids)
 
-    # WS-STEREO: the floor above is constitution-complete but STEREO-BLIND --
-    # ``assign_stereochemistry(work)`` in ``_build_ctx`` computes CIP but
-    # nothing downstream of it ever consulted the shared descriptor
-    # primitives (root cause; see the WS-STEREO task brief). Mirror
-    # ``general_engine``'s own four parent engines (each prepends
-    # ``_stereo_prefix(mol, atom_to_locant)`` to ITS OWN parent-scope name --
-    # general_engine.py:893/1473/1930/2037): prepend the TOP-LEVEL spine's own
-    # stereo-descriptor block the SAME way. Substituent-BRANCH-internal stereo
-    # is intentionally OUT OF SCOPE (general_engine's own comment at :890-892
-    # notes that case is a SEPARATE mechanism -- ``name_substituent``'s own
-    # stereo route -- not reused by this producer); a branch stereocentre this
-    # leaves uncaptured simply fails the verify gate below and safely falls
-    # back to the unchanged plain name, never a wrong one.
-    #
-    # 0-WRONG-SAFE GATE (task brief, CRITICAL): a WRONG stereo descriptor is
-    # WORSE than an omitted one (it ships a wrong stereoisomer name). So the
-    # with-stereo candidate ships ONLY if it FULL-RT-verifies (OPSIN full
-    # InChIKey -- constitution AND stereo AND charge -- via
-    # ``validation.reconstruct.verify_or_none``) against the ORIGINAL input
-    # ``mol`` passed to this function. Any failure to verify (unassignable/
-    # uncertain CIP, a wrong-enantiomer construction, OPSIN/JVM unavailable,
-    # ...) falls back to ``comp.name`` UNCHANGED -- today's block1 behaviour.
-    # This can only ever IMPROVE a name (block1 -> full), never make one wrong.
-    name = comp.name
-    if comp.spine_atom_to_locant:
-        stereo_block = _stereo_prefix(ctx.mol, comp.spine_atom_to_locant)
-        if stereo_block:
-            candidate_name = stereo_block + comp.name
-            try:
-                from ..validation.reconstruct import verify_or_none
-                verified = verify_or_none(candidate_name, Chem.MolToSmiles(mol))
-            except Exception:
-                verified = None  # fail-closed: never ship an unverified guess
-            if verified is not None:
-                name = verified
-
+    # v35 Track A -- STEREO: ``comp`` above is constitution-complete but its
+    # ``name`` is stereo-blind (it was built with ``emit_branch_stereo`` off so
+    # the E1/charge partition asserts run on the canonical constitution, never
+    # a stereo-decorated token). ``_resolve_floor_stereo`` now runs the
+    # cascade full -> top-only -> plain, shipping the first candidate that
+    # FULL-InChIKey verifies. ``comp.bindings``/``covers`` are the plain
+    # partition regardless of which name wins (stereo is a pure name-string
+    # decoration, so the atom->token partition is identical).
+    name = _resolve_floor_stereo(ctx, mol, heavy, comp, atom_work_budget)
     return UniversalResult(name=name, bindings=tuple(comp.bindings), covers=covers)
+
+
+def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
+                          comp: "_ComponentResult", atom_work_budget: int) -> str:
+    """v35 Track A: pick the most stereo-complete floor name that FULL-InChIKey
+    verifies, degrading gracefully. Returns the name string to ship.
+
+    Cascade (WS-STEREO extended from top-spine-only to branch-recursive):
+
+    1. **full** -- rebuild the component tree with ``emit_branch_stereo=True``
+       so every recursion level writes its own branch's stereodescriptors
+       (``(2R)-``/``(1E)-``) with that branch's OWN local locants (the model
+       use), then prepend the top spine's own stereo
+       block. Captures a stereocentre no matter how deep in a branch it sits.
+    2. **top-only** -- prepend just the top spine's stereo block to the plain
+       ``comp.name`` (the previous WS-STEREO behaviour): recovers the parent
+       stereo when a branch centre is CIP-ambiguous and voids the full
+       candidate.
+    3. **plain** -- ``comp.name`` unchanged (today's block-1 fallback).
+
+    0-WRONG-SAFE by construction: a candidate ships ONLY if it round-trips to
+    the ORIGINAL input's FULL InChIKey (constitution AND stereo AND charge) via
+    ``validation.reconstruct.verify_or_none``. A wrong/uncertain descriptor
+    fails that gate and the cascade falls through -- it can only ever IMPROVE a
+    name (block-1 -> full), never make one wrong. Up to two OPSIN verifies (the
+    user-chosen cascade cost); ``plain`` needs none.
+    """
+    from ..validation.reconstruct import verify_or_none
+
+    plain = comp.name
+    # Achiral fast path: no defined stereocentre or stereo bond means every
+    # cascade rung would equal ``plain``, so skip the second tree build AND the
+    # OPSIN verifies entirely -- keeping the achiral cost identical to pre-v35
+    # (``assign_stereochemistry`` already ran in ``_build_ctx``, so the tags are
+    # set). This is the common case and must not pay the branch-stereo cost.
+    m = ctx.mol
+    has_stereo = any(
+        a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in m.GetAtoms()
+    ) or any(
+        b.GetStereo() != Chem.BondStereo.STEREONONE for b in m.GetBonds()
+    )
+    if not has_stereo:
+        return plain
+
+    top_block = ""
+    if comp.spine_atom_to_locant:
+        top_block = _stereo_prefix(ctx.mol, comp.spine_atom_to_locant)
+
+    # rung 1: full branch-recursive stereo (rebuild the tree, stereo on).
+    # The plain build above already DEPLETED ``ctx.budget``; give the rebuild a
+    # FRESH budget of the SAME allowance so a large-but-nameable molecule still
+    # gets its stereo captured, and GUARD the whole build so a genuinely
+    # budget-exhausting giant (``_BudgetExceeded``) -- or any other rebuild
+    # failure -- falls through to rung2/plain instead of escaping to the
+    # top-level ``except: return None`` and abstaining the molecule outright.
+    # A stereo rebuild must never turn a valid plain name into silence (the
+    # module's never-abstain, always-degrade contract).
+    candidates: List[str] = []
+    saved_budget = ctx.budget
+    try:
+        ctx.budget = _Budget(atom_work_budget)
+        comp_full = _name_component(ctx, heavy, attach_hint=None, is_top=True,
+                                   emit_branch_stereo=True)
+    except Exception:
+        comp_full = None
+    finally:
+        ctx.budget = saved_budget
+    if comp_full is not None:
+        full_name = (top_block + comp_full.name) if top_block else comp_full.name
+        if full_name != plain:
+            candidates.append(full_name)
+    # rung 2: top-spine-only stereo (the previous WS-STEREO candidate)
+    if top_block:
+        top_name = top_block + plain
+        if top_name != plain and top_name not in candidates:
+            candidates.append(top_name)
+
+    can = Chem.MolToSmiles(mol)
+    for candidate in candidates:
+        try:
+            verified = verify_or_none(candidate, can)
+        except Exception:
+            verified = None  # fail-closed: never ship an unverified guess
+        if verified is not None:
+            return verified
+    return plain
 
 
 def _build_ctx(
@@ -689,12 +748,24 @@ def _name_universal_substituent_prefix_unsafe(
 
 def _name_component(
     ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[int], is_top: bool,
+    emit_branch_stereo: bool = False,
 ) -> Optional[_ComponentResult]:
     """Name one component -- the whole molecule (``is_top``) or one branch.
 
     Termination: ``component`` shrinks strictly on every recursive call (see
     module docstring); the work budget is charged here, once per call, by
     component size, and fails closed on exhaustion.
+
+    v35 Track A -- ``emit_branch_stereo``: when True, EVERY recursion level
+    prepends its OWN spine's stereodescriptor block (``(2R)-``/``(1E)-`` ...)
+    to each branch it renders as a substituent, so a stereocentre buried in a
+    branch is expressed with the branch's own internal locants (the SAME
+    numbering ``_render_as_substituent`` cites). Default False preserves the
+    stereo-blind constitution name used for the E1/charge partition
+    assertions; the caller rebuilds with True only to form a with-stereo
+    candidate that is then FULL-InChIKey verified (see
+    ``_resolve_floor_stereo``). The flag is threaded unchanged into the
+    recursive call so it reaches every depth.
     """
     ctx.budget.charge(len(component))
     if not component:
@@ -799,10 +870,22 @@ def _name_component(
     for s_atom, root, order, branch_atoms in _discover_branches(
         mol, spine_atoms, component,
     ):
-        sub = _name_component(ctx, branch_atoms, attach_hint=root, is_top=False)
+        sub = _name_component(ctx, branch_atoms, attach_hint=root, is_top=False,
+                              emit_branch_stereo=emit_branch_stereo)
         if sub is None:
             return None  # never ship a partial name: whole call voids
         rendered = _render_as_substituent(sub, order)
+        # v35 Track A: prepend THIS branch's own spine stereo. ``sub.spine_
+        # atom_to_locant`` numbers the branch's own atoms (None for a leaf
+        # shortcut -> no block); deeper sub-branch stereo is already baked into
+        # ``sub.name`` by the recursion above. ``alpha_sort_key`` strips the
+        # descriptor (resolved P-14.5 noise-strip), so ordering is unaffected,
+        # and ``format_substituent_prefix`` supplies the enclosing marks the
+        # now-complex prefix needs (``4-[(3R)-3-hydroxy...yl]``).
+        if emit_branch_stereo and sub.spine_atom_to_locant:
+            branch_stereo = _stereo_prefix(ctx.mol, sub.spine_atom_to_locant)
+            if branch_stereo:
+                rendered = branch_stereo + rendered
         loc = spine_atom_to_locant[s_atom]
         prefix_entries.setdefault(rendered, []).append(loc)
         bindings.append((rendered, sub.covers))
