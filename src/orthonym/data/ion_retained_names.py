@@ -249,7 +249,16 @@ INORGANIC_ANIONS = {
 
     # Oxygen-containing anions (canonical forms)
     'O=[N+]([O-])[O-]': 'nitrate',
-    'O=[N+][O-]': 'nitrite',
+    # v36 B3 data-bug fix: the old key 'O=[N+][O-]' puts a formal + charge on
+    # N with only 3 total bond-order units (RDKit accepts it with an "unusual
+    # valence" warning), which is NOT the real nitrite anion -- verified its
+    # InChIKey differs from both real nitrite and from OPSIN's own parse of
+    # "nitrite" (canonical N(=O)[O-]). The genuine nitrite anion has the
+    # negative charge on the terminal oxygen with a NEUTRAL, normal-valence
+    # N (O=N[O-]); that is what a real nitrite input canonicalizes to, so the
+    # old key was dead (never matched by any real input) AND wrong. Verified
+    # RT: opsin_roundtrip_check('O=N[O-]', 'nitrite') passes.
+    'O=N[O-]': 'nitrite',
     # PA1 sweep: the row `'O=[SH](=O)[O-]': 'sulfate'` was DELETED. WRONG
     # STRUCTURE: that key is HO3S- (hydrogensulfite / bisulfite, HSO3-), not
     # sulfate (O4S2-). The formulae differ by a whole oxygen. The WS-E.3 fix
@@ -268,12 +277,29 @@ INORGANIC_ANIONS = {
     # -> S(=O)(=O)(O)[O-] (the correct mono-anion).
     'O=S(=O)([O-])O': 'hydrogensulfate',
     'O=S([O-])[O-]': 'sulfite',
+    # v36 B3 (e): genuine missing row -- the real bisulfite/hydrogensulfite
+    # mono-anion (HSO3-, the O-protonated tautomer of sulfurous acid's
+    # conjugate base). Verified RT: opsin_roundtrip_check('O=S([O-])O',
+    # 'hydrogensulfite') passes (OPSIN parses to the same InChIKey). Named
+    # 'hydrogensulfite' to match the existing 'hydrogensulfate' row's style
+    # rather than the informal 'bisulfite'.
+    'O=S([O-])O': 'hydrogensulfite',
     'O=P([O-])([O-])[O-]': 'phosphate',
     'O=P([O-])([O-])O': 'hydrogen phosphate',
     'O=P([O-])(O)O': 'dihydrogen phosphate',
+    # v36 B3 (e): genuine missing row -- the fully-deprotonated dianion of
+    # phosphonic acid's P-H tautomer (HPO3(2-)). Verified RT:
+    # opsin_roundtrip_check('O=[PH]([O-])[O-]', 'phosphonate') passes.
+    'O=[PH]([O-])[O-]': 'phosphonate',
     'O=C([O-])[O-]': 'carbonate',
     'O=C([O-])O': 'hydrogen carbonate',
-    '[O-][Cl+][O-]': 'chlorate',  # RDKit canonical form
+    # v36 B3 (d) DATA BUG FIX: this SMILES is ClO2- (2 oxygens) = chlorite,
+    # NOT chlorate (ClO3-, 3 oxygens). Verified: OPSIN round-trip of
+    # 'chlorate' against this SMILES FAILS (wrong InChIKey); 'chlorite'
+    # PASSES. The wrong name was previously caught downstream by the SELF-01
+    # full round-trip gate (0-wrong held), surfacing only as the
+    # 'unknown organic compound' sentinel instead of the correct word.
+    '[O-][Cl+][O-]': 'chlorite',  # RDKit canonical form
 }
 
 
