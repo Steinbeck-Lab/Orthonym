@@ -108,6 +108,19 @@ def test_ring_single_label_placement_general(smiles):
 
 
 # ---------------------------------------------------------------------------
+# Task 3 -- salt / multi-fragment skeleton placement, 11C-choline
+# ---------------------------------------------------------------------------
+
+C11_CHOLINE = "C[N+](C)([11CH3])CCO.[Cl-]"
+
+
+def test_c11_choline_salt_skeleton():
+    name = _name(C11_CHOLINE)
+    assert name and name not in ("unknown organic compound", None), "abstained"
+    assert opsin_roundtrip_check(C11_CHOLINE, name)["passed"], name
+
+
+# ---------------------------------------------------------------------------
 # Regression guard -- the working simple cases must not regress
 # ---------------------------------------------------------------------------
 

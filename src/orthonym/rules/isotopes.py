@@ -402,6 +402,79 @@ def _systematic_parent_fallback(stripped: Chem.Mol) -> Optional[str]:
         return None
 
 
+_MULT_TO_COUNT = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}
+_COUNT_TO_MULT = {v: k for k, v in _MULT_TO_COUNT.items()}
+
+#: A repeated IDENTICAL letter locant (``N``, ``O``, ...) followed by one of
+#: the simple multiplier stems, e.g. the ``N,N,N-tri`` of
+#: ``N,N,N-trimethylethanaminium``. Anchored to start-of-string or a
+#: preceding hyphen so it cannot match mid-word.
+_LETTER_MULT_RE = re.compile(
+    r"(?:^|-)(?P<letter>[A-Z])(?:,(?P=letter))+-(?P<mult>di|tri|tetra|penta|hexa)"
+)
+
+
+def _decorate_letter_multiplier(skeleton, keys, original, stripped) -> Optional[str]:
+    """P-82.2.2.1 de-multiplication for a REPEATED-LETTER-LOCANT substituent
+    cluster (e.g. ``N,N,N-trimethyl``), found ANYWHERE in the skeleton -- not
+    only a leading multiplier at the very front of the whole name (that
+    narrower shape, with a NUMERIC locant list, is :func:`_decorate_demultiplied`).
+
+    A letter locant (``N``, ``O``, ...) cites several substituents on the
+    SAME heteroatom; unlike a numeric gem-locant pair there is no alternative
+    numbered position to disambiguate, so the copies are chemically
+    INTERCHANGEABLE before labelling -- splitting off any ONE of them for the
+    label yields the unique labelled structure, and no permutation search
+    (unlike :func:`_decorate_demultiplied`'s distinct-numeric-position search)
+    is needed.
+
+    Scoped to a single labelled copy of a single nuclide (the verified
+    witness, 11C-choline's ``N,N,N-trimethyl`` -> one 11C-methyl); every
+    candidate is still OPSIN-RT gated against the true original AND the
+    intermediate re-worded-but-unlabelled split is gated against the
+    STRIPPED skeleton (to find the correct substituent-word boundary), so a
+    wrong split point or a wrong final structure can only be discarded, never
+    shipped.
+    """
+    if len(keys) != 1:
+        return None
+    (mass, el), count = keys[0]
+    if count != 1:
+        return None
+    for m in _LETTER_MULT_RE.finditer(skeleton):
+        letter = m.group("letter")
+        mult_count = _MULT_TO_COUNT[m.group("mult")]
+        prefix = skeleton[: m.start("letter")]
+        after = skeleton[m.end():]
+        remaining = mult_count - 1
+        for k in range(1, len(after)):
+            base, tail = after[:k], after[k:]
+            if remaining == 0:
+                bare_seg = ""
+            elif remaining == 1:
+                bare_seg = f"{letter}-{base}-"
+            else:
+                bare_seg = (
+                    ",".join([letter] * remaining) + "-"
+                    + _COUNT_TO_MULT[remaining] + base + "-"
+                )
+            unlabelled_split = f"{prefix}{bare_seg}{letter}-{base}{tail}"
+            if not _isotope_round_trips(unlabelled_split, stripped):
+                continue
+            # Locant None: the descriptor sits immediately after the "N-"
+            # substituent citation already spliced into ``candidate`` below,
+            # so P-82.2.1's "before the part... substituted" scope is already
+            # unambiguous without also repeating the letter INSIDE the
+            # descriptor itself (that would be a different, unverified
+            # spelling -- e.g. ``(N-11C1)`` -- not the one this function is
+            # built to produce).
+            desc = format_isotope_descriptor([(None, mass, el, 1)])
+            candidate = f"{prefix}{bare_seg}{letter}-{desc}{base}{tail}"
+            if _isotope_round_trips(candidate, original):
+                return candidate
+    return None
+
+
 def _decorate_demultiplied(skeleton, keys, original, stripped) -> Optional[str]:
     """Generalized P-82.2.2.1 de-multiplication (single OR mixed nuclides).
 
@@ -615,6 +688,15 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     if demux is not None:
         return demux
 
+    # v36 A3 Task 3 (P-82.2.2.1, letter-locant class): a repeated IDENTICAL
+    # letter-locant multiplier ANYWHERE in the skeleton (e.g. the
+    # ``N,N,N-trimethyl`` of a quaternary ammonium salt cation) -- distinct
+    # from the numeric leading-multiplier shape ``_decorate_demultiplied``
+    # already handles. See that function's docstring for why.
+    letter_demux = _decorate_letter_multiplier(skeleton, keys, original, stripped)
+    if letter_demux is not None:
+        return letter_demux
+
     # P-82.2.1: the descriptor "is inserted before the part of the compound that
     # is isotopically substituted". For a whole-parent label that is the front of
     # the name; for a labeled part after substituent prefixes (the labeled C of
@@ -663,6 +745,10 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
             alt_demux = _decorate_demultiplied(alt_skeleton, keys, original, stripped)
             if alt_demux is not None:
                 return alt_demux
+            alt_letter_demux = _decorate_letter_multiplier(
+                alt_skeleton, keys, original, stripped)
+            if alt_letter_demux is not None:
+                return alt_letter_demux
             alt_best, _alt_loc_rank = _enumerate(alt_skeleton)
             if alt_best is not None:
                 return alt_best
