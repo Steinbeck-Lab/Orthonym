@@ -132,6 +132,7 @@ class StoutClass(_StrEnumBase):
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
     HYDRO_FUSED_PEROXOL = "hydro_fused_peroxol"     # W2E-P1FG (P-63.4.1 1,2,3,4-tetrahydronaphthalene-1-peroxol; priority 49.6)
     THIOIMIDE = "thioimide"                          # W2E-D3 (P-66.1.4.2 acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' -> N-(ethanethioyl)ethanethioamide; priority 49.7 — after HYDRO_FUSED_PEROXOL@49.6, before ORGM@50)
+    NITRAMIDE_SUBSTITUTED = "nitramide_substituted"  # v36 B3 (P-66.1.1.3.1.1 substitutive nitramide/N-nitro: N-(hydroxymethyl)nitramide / N,N-bis(hydroxymethyl)nitramide / N,N'-dinitromethanediamine; priority 49.75 — after THIOIMIDE@49.7, before CYCLIC_POLYESTER@49.8)
     CYCLIC_POLYESTER = "cyclic_polyester"            # W3-P08 (P-65.6.3.5.3 lactide / cyclic di-/polyester -> 1,4-dioxane-2,5-dione; priority 49.8 — after THIOIMIDE@49.7, before ORGM@50)
     AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C (P-61.5.3 ethylideneazinic acid; priority 48.3)
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
@@ -1864,6 +1865,24 @@ def _handle_thioimide(mol, smiles, canonical_smiles, features=None, **kwargs) ->
     return name_thioimide(mol)
 
 
+def _is_nitramide_substituted(mol, smiles, canonical_smiles, features=None,
+                              *, _style: str = "pin", **kwargs) -> bool:
+    """v36 B3 (P-66.1.1.3.1.1); priority 49.75. An N-substituted nitramide
+    (``nitramide`` parent + N-substituent prefixes) or an N,N'-dinitro
+    methylenediamine. PURE graph classifier, fail-closed."""
+    if mol is None:
+        return False
+    from orthonym.rules.nitramide import name_substituted_nitramide
+    return name_substituted_nitramide(mol, style=_style) is not None
+
+
+def _handle_nitramide_substituted(mol, smiles, canonical_smiles, features=None, *,
+                                  style: str = "pin", **kwargs) -> Optional[str]:
+    """Return the substitutive nitramide/N-nitro PIN (P-66.1.1.3.1.1), else None."""
+    from orthonym.rules.nitramide import name_substituted_nitramide
+    return name_substituted_nitramide(mol, style=style)
+
+
 def _is_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """Wave-2 completion (P-21.2.3/P-52.1.3); priority 47.5. An alternating
     homonuclear Group-14/bridge catenated hydride (disiloxane/trisiloxane/
@@ -2292,6 +2311,22 @@ _register_dispatch(
     iupac_section="Blue Book P-66.1.4.2",
     description="Acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' on the "
                 "N-(alkanethioyl)alkanethioamide PIN; fail-closed",
+)
+# --- v36 B3: NITRAMIDE_SUBSTITUTED at priority 49.75 (after THIOIMIDE@49.7,
+# before CYCLIC_POLYESTER@49.8). ``nitramide`` (H2N-NO2) exists only as an
+# exact-whole-molecule retained-name entry, so any N-substituted nitramide
+# (or N,N'-dinitro methylenediamine) had a different canonical SMILES, missed
+# the table entirely, and fell through to GENERAL/decomposition (which named
+# a fragment, dropping the nitro-amide unit -- 'unknown organic compound'
+# after SELF-01). Mirrors THIOIMIDE's excise/N-substituent-cascade pattern
+# (P-66.1.1.3.1.1). Fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.NITRAMIDE_SUBSTITUTED, priority=49.75, tier=1,
+    predicate=_is_nitramide_substituted, handler=_handle_nitramide_substituted,
+    iupac_section="Blue Book P-66.1.1.3.1.1",
+    description="Substitutive N-nitro/nitramide naming: nitramide parent + "
+                "N-substituent prefix(es), or N,N'-dinitromethanediamine; "
+                "fail-closed",
 )
 # --- W3-P08: CYCLIC_POLYESTER at priority 49.8 (after THIOIMIDE@49.7, before
 # ORGM@50). A lactide / cyclic di-/polyester -- a saturated monocyclic C/O ring
