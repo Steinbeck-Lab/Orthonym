@@ -4,6 +4,7 @@ from orthonym.namer import name_compound
 from orthonym.rules.salts import (
     _ion_needs_enclosing_multiplier,
     _apply_stoichiometric_prefix,
+    _DI_COLLISION_ANIONS,
 )
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
@@ -84,3 +85,87 @@ def test_w7_ester_salt_round_trips():
     name = name_compound(W7_ESTER_SALT, style="pin")
     assert name, "abstained on the disodium ester-phosphate salt"
     assert opsin_roundtrip_check(W7_ESTER_SALT, name)["passed"], name
+
+
+# === v36-A1 FABLE finding: the di-collision oxoanion class ==================
+# FABLE cross-model review BLOCKER: for a bare mononuclear oxoanion X, ``di``+X
+# is a REAL OPSIN word for a DIFFERENT (pyro/condensed) species. Ca3(PO4)2 emitted
+# 'tricalcium diphosphate' -> OPSIN reads calcium PYROPHOSPHATE (P2O7) -> SELF-01
+# suppresses (0-wrong safe) -> the salt needlessly ABSTAINS, even though
+# 'tricalcium bis(phosphate)' round-trips. _DI_COLLISION_ANIONS (VERIFIED
+# 2026-08-23 by probing every INORGANIC_ANIONS value + every emittable single-word
+# oxoanion word against opsin_parse("di"+W): 19 collisions) forces the enclosing
+# multiplier bis(W)/tris(W) for these bare words.
+
+
+# Predicate unit (no OPSIN): EVERY verified di-collision word forces enclosing.
+@pytest.mark.parametrize("name", sorted(_DI_COLLISION_ANIONS))
+def test_di_collision_word_forces_enclosing(name):
+    assert _ion_needs_enclosing_multiplier(name) is True
+
+
+# Predicate unit (no OPSIN): the FABLE-cited seed words, spelled out explicitly.
+@pytest.mark.parametrize("name", [
+    "phosphate", "sulfate", "carbonate", "chromate", "sulfite",
+])
+def test_di_collision_seed_words_true(name):
+    assert _ion_needs_enclosing_multiplier(name) is True
+
+
+# Predicate unit (no OPSIN): non-colliding controls keep the simple ``di`` and
+# glue it directly (di<name>) — the class fix must NOT over-broaden.
+@pytest.mark.parametrize("name", ["acetate", "chloride", "benzoate"])
+def test_non_colliding_controls_keep_di(name):
+    assert _ion_needs_enclosing_multiplier(name) is False
+    assert _apply_stoichiometric_prefix(name, 2) == "di" + name
+
+
+def test_collision_word_wraps_with_enclosing_multiplier():
+    # a collision word is wrapped, never glued
+    assert _apply_stoichiometric_prefix("phosphate", 2) == "bis(phosphate)"
+    assert _apply_stoichiometric_prefix("sulfate", 3) == "tris(sulfate)"
+    assert _apply_stoichiometric_prefix("carbonate", 2) == "bis(carbonate)"
+
+
+# --- Integration RED->GREEN (OPSIN): the FABLE witness Ca3(PO4)2 -----------
+# RED (pre-fix, captured in fix1-report.md): name_compound emitted the
+# not-supported placeholder 'calcium compound (not supported)' because
+# 'tricalcium diphosphate' (= pyrophosphate) was SELF-01-suppressed and did NOT
+# round-trip. GREEN: emits 'tricalcium bis(phosphate)', which round-trips.
+CA3_PO4_2 = "[O-]P(=O)([O-])[O-].[O-]P(=O)([O-])[O-].[Ca+2].[Ca+2].[Ca+2]"
+
+
+def test_fable_witness_ca3_po4_2_round_trips():
+    name = name_compound(CA3_PO4_2, style="pin")
+    assert name, "abstained on the FABLE witness Ca3(PO4)2"
+    # must not emit the colliding 'diphosphate' word
+    assert "diphosphate" not in name, f"still emits collision word: {name!r}"
+    result = opsin_roundtrip_check(CA3_PO4_2, name)
+    assert result["passed"], f"{name!r} did not round-trip: {result}"
+
+
+# --- Second colliding-oxoanion salt (RED->GREEN): sodium carbonate, count 2 -
+# RED: 'sodium compound (not supported)' (dicarbonate = pyrocarbonate C2O5,
+# SELF-01-suppressed). GREEN: 'tetrasodium bis(carbonate)', RT-verified.
+NA4_CO3_2 = "[O-]C(=O)[O-].[O-]C(=O)[O-].[Na+].[Na+].[Na+].[Na+]"
+
+
+def test_sodium_carbonate_count2_round_trips():
+    name = name_compound(NA4_CO3_2, style="pin")
+    assert name, "abstained on the disodium-carbonate (count 2) salt"
+    assert "dicarbonate" not in name, f"still emits collision word: {name!r}"
+    assert opsin_roundtrip_check(NA4_CO3_2, name)["passed"], name
+
+
+# --- No-regression guard: aluminium sulfate Al2(SO4)3 (count 3) -------------
+# Pre-fix this PASSED as 'dialuminium trisulfate' (OPSIN read tri+sulfate as
+# 3xSO4). Post-fix it becomes 'dialuminium tris(sulfate)' (the unambiguous
+# enclosing form) which ALSO round-trips -> 0-wrong preserved, no abstain.
+AL2_SO4_3 = ("[O-]S(=O)(=O)[O-].[O-]S(=O)(=O)[O-].[O-]S(=O)(=O)[O-]."
+             "[Al+3].[Al+3]")
+
+
+def test_aluminium_sulfate_count3_no_regression():
+    name = name_compound(AL2_SO4_3, style="pin")
+    assert name, "regressed to abstain on Al2(SO4)3"
+    assert opsin_roundtrip_check(AL2_SO4_3, name)["passed"], name

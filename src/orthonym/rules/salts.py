@@ -83,6 +83,36 @@ COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
 }
 
 
+# P-72.2.2.2.2 / P-16.3.4 (avoid-ambiguity): a bare mononuclear-oxoanion word W
+# whose SIMPLE-multiplied form ``di<W>`` is ITSELF a real OPSIN word for a
+# DIFFERENT, condensed poly species (pyro/di-nuclear). For those the ``di``/``tri``
+# multiplier collides — ``diphosphate`` = P2O7 (pyrophosphate), not 2×PO4;
+# ``disulfate`` = S2O7; ``dicarbonate`` = C2O5; ``dihydrogensulfate`` = neutral
+# H2SO4 — so a count≥2 salt of W MUST take the enclosing multiplier bis(W)/tris(W).
+# Emitting ``di<W>`` names the wrong molecule (SELF-01 then suppresses it, so the
+# salt needlessly ABSTAINS even though ``bis(W)`` round-trips).
+#
+# COMPLETE + EXACT-MATCH set — every entry VERIFIED 2026-08-23 by
+#  + 
+# probe_di_collision_complete.py: for each W, opsin_parse("di"+W) returns a SINGLE
+# connected RDKit fragment (a distinct condensed species). Probed the full
+# candidate universe = every INORGANIC_ANIONS value + every single-word oxoanion
+# the salt anion-naming path can emit + controls; controls
+# (acetate/chloride/bromide/benzoate/methanesulfonate/…) did NOT collide and are
+# absent. ``azanide``/``phosphonate`` also collide as bare words but are covered —
+# together with their SUBSTITUTED parents (methylphosphonate, …) — by the retained
+# ``endswith`` clause below, so they are deliberately not duplicated here.
+# Enclosing forms (bis/tris) RT-verified for every reachable member; the only
+# currently-passing count≥2 rows (Al2(SO4)3 → trisulfate, hexasodium trisulfite)
+# move to tris(sulfate)/tris(sulfite), both RT-valid → 0 regressions.
+_DI_COLLISION_ANIONS = frozenset({
+    'amidosulfate', 'borate', 'carbonate', 'chromate', 'germanate',
+    'hydrogensulfate', 'peroxydisulfate', 'phosphate', 'phosphite', 'selenate',
+    'selenide', 'selenite', 'silicate', 'sulfate', 'sulfite', 'tellurate',
+    'tellurite', 'thiosulfate', 'thiosulfite',
+})
+
+
 def _ion_needs_enclosing_multiplier(name: str) -> bool:
     """True if an ion name must take bis(...)/tris(...) rather than di.../tri...
 
@@ -99,6 +129,9 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
     (see the ⛔ warning in get_multiplier_prefix's docstring, commit b3f6ce7c).
 
     Composite when the ion name:
+      - is a bare mononuclear-oxoanion word whose ``di<name>`` collides with a
+        real condensed poly species (``_DI_COLLISION_ANIONS``, e.g. phosphate →
+        diphosphate=P2O7), or
       - contains '(' , ')' or a space (already enclosed / multi-word), or
       - contains any digit (a locant; `di<name>` fuses ambiguously), or
       - contains '-' (catches no-digit stereo prefixes: D-/L-), or
@@ -106,6 +139,8 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
         where a bare `di-` would fuse into a different word (carried from
         fragment_rules.py:2820-2822).
     """
+    if name in _DI_COLLISION_ANIONS:
+        return True
     if '(' in name or ')' in name or ' ' in name:
         return True
     if any(ch.isdigit() for ch in name):
