@@ -387,17 +387,19 @@ def name_acyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     return _get_chain_prefix(carbon_count) + 'anoyl'
 
 
-def _collect_oxyl_parent_fragment(mol, radical_idx: int, attach_idx: int) -> List[int]:
-    """BFS the atoms of the R group hanging off an R-O. oxyl radical's
-    oxygen, starting at ``attach_idx`` (the O's sole heavy neighbour) and
-    never crossing back through ``radical_idx`` (the radical oxygen itself).
-    Mirrors the R-substituent-fragment collection already used for the
-    ester-alkyl side elsewhere in this codebase (``acid_halides.py``'s
-    ``r_atoms``/``r_root`` walk)."""
+def _collect_fragment_excluding(mol, start_idx: int, exclude: set) -> List[int]:
+    """BFS the atoms of an R group starting at ``start_idx``, never crossing
+    into any atom index in ``exclude``. General shape shared by every
+    R-substituent-fragment walk in this module (mirrors the R-fragment
+    collection already used for the ester-alkyl side elsewhere in this
+    codebase, e.g. ``acid_halides.py``'s ``r_atoms``/``r_root`` walk); an
+    R-O. oxyl radical excludes only the radical oxygen, while an
+    R-O-O. peroxyl radical must exclude BOTH oxygens of the bridge so the
+    peroxide bridge itself is never swept into the R group."""
     from collections import deque
-    seen = {radical_idx}
+    seen = set(exclude)
     frag: List[int] = []
-    queue = deque([attach_idx])
+    queue = deque([start_idx])
     while queue:
         cur = queue.popleft()
         if cur in seen:
@@ -410,18 +412,59 @@ def _collect_oxyl_parent_fragment(mol, radical_idx: int, attach_idx: int) -> Lis
     return frag
 
 
+def _collect_oxyl_parent_fragment(mol, radical_idx: int, attach_idx: int) -> List[int]:
+    """BFS the atoms of the R group hanging off an R-O. oxyl radical's
+    oxygen, starting at ``attach_idx`` (the O's sole heavy neighbour) and
+    never crossing back through ``radical_idx`` (the radical oxygen itself)."""
+    return _collect_fragment_excluding(mol, attach_idx, {radical_idx})
+
+
 def _is_plain_alkyl_radical_fragment(mol, radical_idx: int, attach_idx: int) -> bool:
-    """True iff the R group of an aliphatic R-O. radical is a BARE
-    hydrocarbon (every atom reachable without crossing the radical O is a
-    non-aromatic, non-ring carbon) -- the exact shape the existing retained
-    '-oxyl' contraction (methoxyl/ethoxyl/propoxyl/.../hexoxyl) was already
-    built for. False for anything carrying a ring or any heteroatom
-    substituent, which must go through the general substituent pipeline
-    instead so a substituent is never silently dropped."""
-    for idx in _collect_oxyl_parent_fragment(mol, radical_idx, attach_idx):
+    """True iff the R group of an aliphatic R-O. radical is a BARE, LINEAR,
+    SATURATED hydrocarbon chain rooted AT ``attach_idx`` -- the exact shape
+    the existing retained '-oxyl' contraction (methoxyl/ethoxyl/propoxyl/
+    .../hexoxyl) was already built for (BB P-71.3.4/P-71.2.1.2: 'methoxyl,
+    ethoxyl, propoxyl, butoxyl, *tert*-butoxyl, phenoxyl ... are retained and
+    are preferred IUPAC names' -- a FIXED short list of straight-chain/simple
+    contractions, not a licence to count carbons on ANY hydrocarbon shape).
+
+    FABLE finding (v36 A2 hardening): the original guard checked only
+    aromatic/ring/heteroatom and NOT branching or unsaturation, so a
+    BRANCHED or UNSATURATED alkyl fragment was routed to the same carbon-
+    COUNT contraction as a straight chain -- e.g. propan-2-yl (isopropyl)
+    was misnamed 'propoxyl' (which OPSIN parses back to the straight-chain
+    '[O]CCC', a structural MISMATCH). Tightened to require:
+      (1) ``attach_idx`` itself has AT MOST ONE carbon neighbour inside the
+          fragment (it is a chain TERMINUS, i.e. true C-1 -- excludes
+          propan-2-yl, where the attachment carbon has two branches);
+      (2) every atom in the fragment is a non-aromatic, non-ring carbon with
+          at most two carbon neighbours inside the fragment (excludes any
+          OTHER branch point, e.g. neopentyl/isobutyl);
+      (3) every bond between two fragment atoms is a single bond (excludes
+          any C=C/C#C unsaturation, e.g. ethenyl/allyl).
+    Anything failing (1)-(3) falls through to the general substituent
+    pipeline (``_name_oxyl_parent_group`` / ``(<parent>)oxyl`` via
+    ``_compose_oxyl_name``) instead of being silently misnamed."""
+    frag = _collect_oxyl_parent_fragment(mol, radical_idx, attach_idx)
+    frag_set = set(frag)
+
+    attach_atom = mol.GetAtomWithIdx(attach_idx)
+    attach_heavy_in_frag = [n for n in attach_atom.GetNeighbors()
+                             if n.GetIdx() in frag_set]
+    if len(attach_heavy_in_frag) > 1:
+        return False  # attachment carbon itself branches -> not a chain C-1
+
+    for idx in frag:
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetSymbol() != 'C' or atom.GetIsAromatic() or atom.IsInRing():
             return False
+        heavy_in_frag = [n for n in atom.GetNeighbors() if n.GetIdx() in frag_set]
+        if len(heavy_in_frag) > 2:
+            return False  # branch point elsewhere in the chain
+        for bond in atom.GetBonds():
+            other = bond.GetOtherAtom(atom)
+            if other.GetIdx() in frag_set and bond.GetBondType() != Chem.BondType.SINGLE:
+                return False  # any C=C/C#C unsaturation
     return True
 
 
@@ -439,38 +482,136 @@ def _name_oxyl_parent_group(mol, radical_idx: int, attach_idx: int) -> str:
     return name_substituent_fragment(mol, frag, attach_idx, [radical_idx]) or ''
 
 
-def _compose_oxidanyl(parent: str) -> str:
-    """P-63.2.1 systematic oxyl-radical composition: 'oxidane' (H2O's parent
-    hydride name) elides its final 'e' for the -yl radical suffix
-    ('oxidanyl' == HO.), and a substituent R on that oxygen is cited as its
-    ordinary P-29.2 prefix in front -- '(R)oxidanyl'. A compound/locanted R
-    takes enclosing marks (P-16.5.1.1) via the same ``enclose_if_compound``
-    gate every other compound substituent prefix in this codebase uses."""
+def _radical_name_round_trips(mol, name: str) -> bool:
+    """Best-effort ``-r`` (allowRadicals) OPSIN round-trip check for a P-71
+    radical-name CANDIDATE against ``mol``'s own structure. Two uses in this
+    module: (a) belt-and-suspenders over the shape guards above (never trust
+    a retained/contracted candidate on shape alone -- confirm it actually
+    parses back to the same molecule); (b) the tie-break between P-71.3.4's
+    two composition methods in ``_compose_oxyl_name`` below.
+
+    Fails OPEN (True -- trust the candidate) whenever OPSIN cannot be
+    reached at all: jar absent, JVM unavailable, or a transient parse
+    failure. A no-Java deployment is not a real one here (OPSIN spawns
+    unconditionally elsewhere in this pipeline -- see
+    ``feedback_no_synthetic_no_java_chase``), and the outer OPSIN-validity /
+    SELF-01 gate re-verifies the FINAL emitted name downstream regardless,
+    abstaining on any genuine mismatch -- so this local check only needs to
+    catch a DEFINITE rejection or a DEFINITE wrong-structure parse; it is not
+    the sole gate. Fails CLOSED (False) only on such a definite outcome."""
+    if not name:
+        return False
+    try:
+        from ..validation.opsin_roundtrip import _find_opsin_jar
+        from ..jvm_bridge import opsin_stdout
+    except ImportError:  # pragma: no cover - jvm_bridge/opsin_roundtrip always present
+        return True
+    try:
+        jar = _find_opsin_jar("2.9.0")
+    except Exception:
+        return True
+    if not jar:
+        return True
+    try:
+        txt, served = opsin_stdout(name, allow_radicals=True, jar_path=jar)
+    except Exception:
+        return True
+    if not served:
+        return True  # transient/unavailable -- defer to the outer gate
+    smi = (txt or "").strip()
+    if not smi:
+        return False  # OPSIN definitively rejected the name
+    parsed = Chem.MolFromSmiles(smi)
+    if parsed is None:
+        return False
+    try:
+        return (Chem.InchiToInchiKey(Chem.MolToInchi(parsed))
+                == Chem.InchiToInchiKey(Chem.MolToInchi(mol)))
+    except Exception:
+        return True  # an InChI failure is not evidence of a wrong name
+
+
+def _compose_oxyl_name(mol, parent: str, additive_suffix: str, systematic_suffix: str) -> str:
+    """P-71.3.4 (VERIFIED, BlueBookV2.md:40677-40709): a radical formed by
+    removing the hydrogen of a hydroxy/peroxy characteristic group is named
+    in TWO ways -- (1) additively, ``R`` + 'oxyl'/'peroxyl' (e.g.
+    '(chloroacetyl)oxyl (PIN)', 'hexanoylperoxyl (PIN)', 'butanoyloxyl
+    (PIN)'); (2) by substituting the preselected parent radical
+    'oxidanyl'/'dioxidanyl' with R (e.g. '(chloroacetyl)oxidanyl',
+    'hexanoyldioxidanyl') -- and the Blue Book states, in terms: **"Method
+    (1) generates preferred IUPAC names."** So method (1) is tried FIRST and
+    used whenever it verifies; method (2) is kept only as a round-trip-
+    verified fallback for an R shape method (1) cannot express. '' if
+    NEITHER verifies (fail closed -- never a wrong name).
+
+    A compound/locanted R takes enclosing marks (P-16.5.1.1) via the same
+    ``enclose_if_compound`` gate every other compound substituent prefix in
+    this codebase uses, for both methods alike."""
     from ..assembly.naming_utils import enclose_if_compound
-    return f"{enclose_if_compound(parent)}oxidanyl"
+    enclosed = enclose_if_compound(parent)
+    additive = f"{enclosed}{additive_suffix}"
+    if _radical_name_round_trips(mol, additive):
+        return additive
+    systematic = f"{enclosed}{systematic_suffix}"
+    if _radical_name_round_trips(mol, systematic):
+        return systematic
+    return ''
+
+
+def _name_peroxyl_radical(mol, radical_idx: int, bridge_o_idx: int) -> str:
+    """P-71.3.4: name an R-O-O. peroxyl radical. ``bridge_o_idx`` is the
+    peroxide oxygen bonded to the radical oxygen; its remaining heavy
+    neighbour (excluding the radical O) is the R group's attachment point,
+    named through the SAME substituent-naming chokepoint the plain oxyl
+    branch above uses (``name_substituent_fragment``) so a compound R
+    (branched, substituted, aromatic, ...) is never dropped. Composes via
+    ``_compose_oxyl_name`` (method (1) 'R + peroxyl', PIN, tried first;
+    method (2) '(R)dioxidanyl' as a verified fallback) -- VERIFIED -r
+    round-trip witnesses: 'methylperoxyl' for ``[O]OC``, 'tert-butylperoxyl'
+    for ``[O]OC(C)(C)C``. Scope is a single carbon R group on an otherwise
+    unbranched -O-O. bridge; anything else (a second substituent on the
+    bridge oxygen, a non-carbon R) fails closed to '' so the caller's plain
+    'oxyl' fallback -- never a wrong name -- takes over."""
+    bridge_atom = mol.GetAtomWithIdx(bridge_o_idx)
+    r_neighbors = [n for n in bridge_atom.GetNeighbors() if n.GetIdx() != radical_idx]
+    if len(r_neighbors) != 1 or r_neighbors[0].GetSymbol() != 'C':
+        return ''
+    attach_idx = r_neighbors[0].GetIdx()
+    frag = _collect_fragment_excluding(mol, attach_idx, {radical_idx, bridge_o_idx})
+    if not frag:
+        return ''
+    from ..assembly.substituent_naming import name_substituent_fragment
+    parent = name_substituent_fragment(mol, frag, attach_idx, [bridge_o_idx]) or ''
+    if not parent:
+        return ''
+    return _compose_oxyl_name(mol, parent, 'peroxyl', 'dioxidanyl')
 
 
 def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     """
-    Name an oxyl radical (RO.).
+    Name an oxyl radical (RO.) or a peroxyl radical (ROO.).
 
     Oxygen-centered radicals named as R-oxyl for the small retained set of
     UNSUBSTITUTED R groups (methoxyl/ethoxyl/phenoxyl/propoxyl/.../hexoxyl),
-    or systematically as ``(R)oxidanyl`` (P-63.2.1) when R itself carries a
-    further substituent -- v36 A2 generalisation: the R group is named
+    or per P-71.3.4 method (1) as ``(R)oxyl``/``R-peroxyl`` -- the VERIFIED
+    PIN form ("Method (1) generates preferred IUPAC names",
+    BlueBookV2.md:40679) -- when R itself carries a further substituent, via
+    ``_compose_oxyl_name``. v36 A2 generalisation: the R group is named
     through the existing substituent-naming pipeline instead of being
     collapsed to the unsubstituted retained form (the pre-v36 bug: any
     aromatic-O radical mapped unconditionally to 'phenoxyl', dropping every
-    ring substituent).
+    ring substituent) or misnamed by a bare carbon count that ignored
+    branching/unsaturation (v36 A2 FABLE hardening, see
+    ``_is_plain_alkyl_radical_fragment``).
 
     Args:
         mol: RDKit Mol object
         radical_site: Dictionary from get_radical_sites
 
     Returns:
-        Oxyl radical name (e.g., 'methoxyl', 'phenoxyl',
-        '(4-hydroxyphenyl)oxidanyl'), or '' if the R group cannot be named
-        (fail-closed -- never a wrong name).
+        Oxyl/peroxyl radical name (e.g., 'methoxyl', 'phenoxyl',
+        '(4-hydroxyphenyl)oxyl', 'methylperoxyl'), or '' if the R group
+        cannot be named (fail-closed -- never a wrong name).
 
     Example:
         >>> mol = Chem.MolFromSmiles('[O]C')
@@ -482,10 +623,24 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     radical_atom = mol.GetAtomWithIdx(radical_idx)
 
     heavy_neighbors = list(radical_atom.GetNeighbors())
-    if len(heavy_neighbors) != 1 or heavy_neighbors[0].GetSymbol() != 'C':
+    if len(heavy_neighbors) != 1:
         return 'oxyl'
 
     neighbor = heavy_neighbors[0]
+
+    if neighbor.GetSymbol() == 'O':
+        # R-O-O. peroxyl radical (P-71.3.4): the free valence sits on the
+        # OUTER oxygen of a peroxide bridge. '' (fail-closed) falls through
+        # to the plain 'oxyl' default below rather than mis-cutting the
+        # bridge -- never a wrong name.
+        peroxyl_name = _name_peroxyl_radical(mol, radical_idx, neighbor.GetIdx())
+        if peroxyl_name:
+            return peroxyl_name
+        return 'oxyl'
+
+    if neighbor.GetSymbol() != 'C':
+        return 'oxyl'
+
     attach_idx = neighbor.GetIdx()
 
     if neighbor.GetIsAromatic():
@@ -493,20 +648,28 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
         # returns 'phenoxyl' for the bare unsubstituted ring ('[O]c1ccccc1')
         # BEFORE classify_radical/this function ever run (name_radical.py:
         # the `canonical in RETAINED_RADICALS` check precedes the
-        # classify_radical dispatch), so any aromatic neighbour reaching here
-        # carries a real substituent (or is a larger fused ring system) --
-        # generalise via the substituent pipeline.
+        # classify_radical dispatch) -- but ONLY when style != 'systematic'.
+        # With style='systematic' that lookup is skipped entirely (see
+        # name_radical's `if style != 'systematic':` guard), so the bare
+        # unsubstituted ring DOES reach this function and this branch in
+        # that mode -- the check below is real dispatch, not dead code.
         parent = _name_oxyl_parent_group(mol, radical_idx, attach_idx)
         if not parent:
             return ''
         if parent == 'phenyl':
-            return 'phenoxyl'  # defensive; unreachable given the guard above
-        return _compose_oxidanyl(parent)
+            return 'phenoxyl'
+        return _compose_oxyl_name(mol, parent, 'oxyl', 'oxidanyl')
 
     # Aliphatic R: keep the existing retained '-oxyl' contraction for a PLAIN
-    # (unsubstituted) hydrocarbon chain -- unchanged PINs -- and generalise
-    # via the same substituent pipeline for anything else (a ring or any
-    # heteroatom substituent the old carbon count could not see).
+    # LINEAR SATURATED hydrocarbon chain (see the tightened
+    # _is_plain_alkyl_radical_fragment) -- unchanged PINs -- and generalise
+    # via the same substituent pipeline for anything else (branching,
+    # unsaturation, a ring, or any heteroatom substituent the old carbon
+    # count could not see). The retained candidate is additionally verified
+    # with a -r OPSIN round-trip before being trusted (belt-and-suspenders
+    # over the shape guard): on a mismatch it falls through to the
+    # systematic '(<parent>)oxyl'/'(<parent>)oxidanyl' composition below
+    # instead of shipping an unverified name.
     if _is_plain_alkyl_radical_fragment(mol, radical_idx, attach_idx):
         carbon_count = _count_chain_carbons(mol, attach_idx, {radical_idx})
 
@@ -519,14 +682,16 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
             6: 'hexoxyl',
         }
 
-        if carbon_count in ALKOXY_NAMES:
-            return ALKOXY_NAMES[carbon_count]
-        return _get_chain_prefix(carbon_count) + 'oxyl'
+        retained = ALKOXY_NAMES.get(carbon_count) or (_get_chain_prefix(carbon_count) + 'oxyl')
+        if _radical_name_round_trips(mol, retained):
+            return retained
+        # shape guard passed but the candidate still failed to verify --
+        # fall through to the systematic branch below.
 
     parent = _name_oxyl_parent_group(mol, radical_idx, attach_idx)
     if not parent:
         return ''
-    return _compose_oxidanyl(parent)
+    return _compose_oxyl_name(mol, parent, 'oxyl', 'oxidanyl')
 
 
 def name_divalent_radical(mol, radical_site: Dict[str, Any]) -> str:

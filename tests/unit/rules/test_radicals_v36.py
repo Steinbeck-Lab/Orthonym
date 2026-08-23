@@ -96,3 +96,65 @@ def test_carbon_radical_reaches_floor():
     if name and name not in ("unknown organic compound", None):
         assert _radical_rt(name, CARBON_RADICAL_FLOOR), \
             f"{name!r} not -r-RT for {CARBON_RADICAL_FLOOR}"
+
+
+# v36 A2 FABLE hardening, FIX #1: the pre-fix `_is_plain_alkyl_radical_fragment`
+# checked only aromatic/ring/heteroatom, NOT branching or unsaturation, so a
+# BRANCHED or UNSATURATED alkyl fragment was routed to the linear retained
+# carbon-COUNT contraction and silently misnamed -- e.g. propan-2-yl (isopropyl)
+# was named the straight-chain word 'propoxyl', which OPSIN parses back to
+# '[O]CCC', a structural MISMATCH (suppressed downstream to a needless
+# abstain, never shipped wrong -- 0-wrong held, but breadth was lost). All
+# five below are VERIFIED -r-round-trip MATCHES at HEAD after the fix (the
+# tightened shape guard now falls through to the systematic '(<parent>)oxyl'
+# composition -- P-71.3.4 method (1), the PIN -- for every one of them; run
+# confirmed no xfail is needed).
+BRANCHED_UNSATURATED_ALKOXYL = [
+    "[O]C(C)C",         # (propan-2-yl)oxyl -- was 'propoxyl' (MISMATCH)
+    "[O]CC(C)C",        # (2-methylpropyl)oxyl -- was 'butoxyl' (MISMATCH)
+    "[O]CC(C)(C)C",     # (2,2-dimethylpropyl)oxyl -- was 'pentoxyl' (NOPARSE)
+    "[O]C=C",           # ethenyloxyl -- was 'ethoxyl' (MISMATCH)
+    "[O]CC=C",          # (prop-2-en-1-yl)oxyl -- was 'propoxyl' (MISMATCH)
+]
+
+
+@pytest.mark.parametrize("smiles", BRANCHED_UNSATURATED_ALKOXYL)
+def test_branched_unsaturated_alkoxyl_named_and_rt(smiles):
+    name = _name_be(smiles)
+    assert name and name not in ("unknown organic compound", None), f"abstained on {smiles}"
+    assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
+
+
+# v36 A2 FABLE hardening, FIX #2: peroxyl (R-O-O.) was in scope (spec
+# section C-C1 "aryloxyl/oxyl/peroxyl") but not delivered -- the pre-fix code
+# fell to the non-C-attachment fallback 'oxyl' (which parses back to bare
+# '[OH]', a MISMATCH), needlessly abstaining. P-71.3.4 (BlueBookV2.md:
+# 40677-40709) names these additively -- 'methylperoxyl', 'tert-butylperoxyl'
+# -- and states in terms "Method (1) generates preferred IUPAC names", so
+# these are the PIN forms, not the systematic '(R)dioxidanyl' alternative.
+# VERIFIED -r-round-trip MATCHES at HEAD.
+PEROXYL_WITNESSES = [
+    "[O]OC",            # methylperoxyl
+    "[O]OC(C)(C)C",     # tert-butylperoxyl
+]
+
+
+@pytest.mark.parametrize("smiles", PEROXYL_WITNESSES)
+def test_peroxyl_named_and_rt(smiles):
+    name = _name_be(smiles)
+    assert name and name not in ("unknown organic compound", None), f"abstained on {smiles}"
+    assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
+
+
+# v36 A2 FABLE nit: the substituted-aryloxyl generalisation had only been
+# proven at the default/PIN tier by an external ad hoc probe, never a
+# committed test running the actual PRODUCTION configuration (gate ON, no
+# best-effort tier flags -- `Orthonym(style="pin")`, the same as an
+# un-flagged CLI invocation). Closes that gap directly.
+@pytest.mark.opsin_gate
+def test_substituted_aryloxyl_production_config_pin_tier():
+    smiles = "[O]c1ccc(O)cc1"
+    with jvm_slots(1, purpose="test-radical-prod"):
+        name = Orthonym(style="pin").name(smiles)
+    assert name and name not in ("unknown organic compound", None), f"abstained on {smiles}"
+    assert _radical_rt(name, smiles), f"{name!r} did not -r round-trip for {smiles}"
