@@ -83,8 +83,12 @@ COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
 }
 
 
-def _anion_needs_enclosing_multiplier(name: str) -> bool:
+def _ion_needs_enclosing_multiplier(name: str) -> bool:
     """True if an ion name must take bis(...)/tris(...) rather than di.../tri...
+
+    Applied to BOTH anion and cation words (called from
+    _apply_stoichiometric_prefix, which formats both halves of a salt) —
+    hence "ion", not "anion", in the name.
 
     Orthonym's 0-wrong gate IS OPSIN round-trip, so the trigger set matches
     OPSIN 2.9.0's grammar (probe_salt_spelling.py, 2026-08-23) — STRICTER than
@@ -94,7 +98,7 @@ def _anion_needs_enclosing_multiplier(name: str) -> bool:
     do NOT reuse the substituent-tuned is_complex_substituent/get_multiplier_prefix
     (see the ⛔ warning in get_multiplier_prefix's docstring, commit b3f6ce7c).
 
-    Composite when the name:
+    Composite when the ion name:
       - contains '(' , ')' or a space (already enclosed / multi-word), or
       - contains any digit (a locant; `di<name>` fuses ambiguously), or
       - contains '-' (catches no-digit stereo prefixes: D-/L-), or
@@ -108,6 +112,10 @@ def _anion_needs_enclosing_multiplier(name: str) -> bool:
         return True
     if '-' in name:
         return True
+    # BREADTH-UNVERIFIED (Milestone C3, salt breadth program): the startswith
+    # multiplier-word check above and the endswith stem-collision check below
+    # were not confirmed against an OPSIN round-trip witness at A1 time —
+    # revisit with an OPSIN-RT check when C3 reaches this area.
     if name.startswith(('bis', 'tris', 'tetrakis', 'tetra', 'penta', 'hexa')):
         return True
     if name.endswith(('azanide', 'phosphinate', 'phosphonate')):
@@ -577,7 +585,7 @@ def _apply_stoichiometric_prefix(name: str, count: int) -> str:
     if count == 1:
         return name
 
-    if _anion_needs_enclosing_multiplier(name):
+    if _ion_needs_enclosing_multiplier(name):
         word = COMPLEX_STOICHIOMETRIC_PREFIXES.get(count, f"{count}kis")
         return f"{word}({name})"
 
