@@ -205,7 +205,30 @@ def _get_internal_charge_atoms(mol) -> Set[int]:
     Note: Nitroso (N=O) is excluded -- no formal charges in standard SMILES.
     Note: Only organic azides [N]=[N+]=[N-] are filtered, NOT the azide anion
     [N-]=[N+]=[N-] which is a genuine ion.
+
+    v36 B3 (root cause, mirrors errors.py's carbon-free structural honesty
+    floor): every class above is, by its own P-59/P-74.2 definition, a
+    SUBSTITUENT GROUP hung off a carbon-bearing organic skeleton -- Table 5.1
+    lists nitro/N-oxide/azide/diazo as prefix-only groups, never as a
+    whole-molecule anion word on their own. Two of the five SMARTS above
+    (aliphatic N-oxide ``[N+;!a][O-]``, nitro ``[NX3+](=O)[O-]``) carry no
+    constraint on the group's OTHER substituent, so they also match a bare,
+    carbon-free oxoanion drawn with the same formal-charge pattern (nitrate's
+    ``O=[N+]([O-])[O-]`` matches nitro on one reading and aliphatic N-oxide on
+    the other -- verified). That falsely marks nitrate's own three charge
+    centres "P-59 internal", so ``get_ion_sites`` reports it as carrying NO
+    ionic sites at all and ``route_charged`` bails before the correct
+    ``_name_inorganic_oxoacid_anion`` ever runs (V36-SPY-B3 §4c). A carbon-
+    free molecule is never a substituent on anything -- it IS the whole ion --
+    so short-circuit to "nothing is internal" for it. This is deliberately
+    NOT a per-SMARTS carbon constraint (e.g. requiring `[#6]` on the nitro
+    pattern) because that would also exclude a genuine alkyl NITRATE ESTER
+    substituent (``CCO[N+](=O)[O-]`` -> "nitrooxyethane", whose nitro-nitrogen
+    substituent is an ester oxygen, not carbon) -- verified regression risk,
+    caught empirically before this fix shipped.
     """
+    if not any(atom.GetAtomicNum() == 6 for atom in mol.GetAtoms()):
+        return set()
     internal: Set[int] = set()
     for pat in _INTERNAL_CHARGE_SMARTS:
         for match in mol.GetSubstructMatches(pat):

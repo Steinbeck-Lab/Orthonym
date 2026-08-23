@@ -344,7 +344,20 @@ def _is_mixed_sign_zwitterion(mol, smiles, canonical_smiles, features=None, **kw
     # NOT catch a dropped net charge. Gate the whole door on a full-InChIKey RT
     # (charges + stereo) so this net-charged variant can never ship a neutralised
     # or otherwise wrong molecule -- decline (fall through to GENERAL) instead.
-    return bool(name) and _full_inchikey_rt_ok(mol, name)
+    if bool(name) and _full_inchikey_rt_ok(mol, name):
+        return True
+    # v36 B3: a bare carbon-free oxoanion drawn with an internal +/- pair on
+    # its own central atom (chlorite [O-][Cl+][O-], nitrate once its charge
+    # centres are correctly un-masked from P-59 "internal") has NO neutral
+    # parent for route_charged's generic neutralize/re-enter/re-suffix cascade
+    # to recurse into, yet is EXACTLY the shape name_anion()'s early
+    # carbon-free _name_inorganic_oxoacid_anion branch (+ INORGANIC_ANIONS
+    # retained table) already names correctly. Try it as a second, narrower,
+    # equally RT-gated fallback -- never widens beyond what the handler below
+    # will also re-derive and re-verify.
+    from orthonym.rules.ions import name_anion
+    anion_name = name_anion(mol, style="pin")
+    return bool(anion_name) and _full_inchikey_rt_ok(mol, anion_name)
 
 
 def _is_anion_retained(mol, smiles, canonical_smiles, features=None, *, _style: str = "pin", **kwargs) -> bool:
@@ -812,6 +825,13 @@ def _handle_mixed_sign_zwitterion(mol, smiles, canonical_smiles, features=None, 
     name = route_charged(mol, style)
     if name and _full_inchikey_rt_ok(mol, name):
         return name
+    # v36 B3: mirrors the predicate's second fallback above -- a bare
+    # carbon-free oxoanion (chlorite, nitrate) has no route_charged neutral
+    # parent; name_anion()'s inorganic-oxoacid / retained-table branch does.
+    from orthonym.rules.ions import name_anion
+    anion_name = name_anion(mol, style=style)
+    if anion_name and _full_inchikey_rt_ok(mol, anion_name):
+        return anion_name
     return None
 
 
@@ -996,6 +1016,17 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
     routed = route_charged(mol, style)
     if routed:
         return routed
+    # v36 B3 (mirrors the sibling ANION_SMALL@600 fallback at :901-904): try
+    # the full retained+systematic name_anion() cascade -- which already owns
+    # a carbon-free bare-oxoanion branch (_name_inorganic_oxoacid_anion,
+    # ions.py:927) plus the INORGANIC_ANIONS retained-name table -- BEFORE
+    # falling into the carboxylate-specific neutralize-recurse rebuild below.
+    # Zero new producer code; this only reaches species route_charged already
+    # declined on.
+    from orthonym.rules.ions import name_anion
+    ion_result = name_anion(mol, style=style)
+    if ion_result:
+        return ion_result
     try:
         from rdkit.Chem import RWMol
         from orthonym.rules.ions import classify_anion, _acid_name_to_carboxylate
