@@ -56,3 +56,17 @@ def test_hexapeptide_full_stereo_not_shadowed():
     _assert_full_rt("C#CCCCC[C@@H](C)C(=O)N(C)[C@H](C(=O)N(C)[C@H](C(=O)N[C@H]"
                     "(C(=O)N(C)[C@H](C(=O)N[C@@H](C)C(N)=O)[C@H](C)CC)[C@H](C)CC)"
                     "C(C)C)C(C)C")
+
+
+def test_bond_order_wrong_rung_rescued_from_abstain():
+    # rung 0 names the but-3-yn-2-yloxy ether 'butoxy' (drops the C#C triple bond)
+    # -- E1-complete (atom COUNT covered) but full-RT FAILS, so the pipeline
+    # abstained. The constitution-correct universal floor must be preferred so a
+    # real name ships instead of 'unknown organic compound'. (No defined stereo:
+    # this is why the stereo-gated preference missed it.)
+    _assert_full_rt("C#CCOc1cc(N2C(=O)C3=C(CCCC3)C2=O)c(F)cc1Cl")
+
+
+def test_azine_hydrazone_rescued_from_abstain():
+    # benzaldehyde azine: rung 0's name full-RT-fails; the floor names it right.
+    _assert_full_rt("C(=NN=Cc1ccccc1)c1ccccc1")
