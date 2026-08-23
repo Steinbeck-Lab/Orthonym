@@ -419,10 +419,39 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # whole module is `_general_fallback`-gated in namer.py), so PIN is
     # untouched.
     try:
-        from .universal_substituent import name_universal_substitutive
-        _uni = name_universal_substitutive(mol)
-        if _uni is not None and _uni.name:
-            return _Candidate(name=_uni.name, result_obj=None)
+        # v36 A2 (C2): a SINGLE P-71 free-valence centre that the dedicated
+        # radicals.py/route_charged path already declined (this whole rung is
+        # reached only after that path's own candidate -- if any -- failed
+        # its OPSIN ``-r`` gate check, per this module's header) gets ONE more
+        # attempt here, through ``name_universal_substituent_prefix`` rather
+        # than ``name_universal_substitutive``. The whole-molecule entry point
+        # has NO ``-yl``/``-ylidene``/``-ylidyne`` suffix logic at all, so it
+        # can only ever name the FULLY SATURATED neutral constitution --
+        # measured: '[CH2]CO' -> '1-oxapropane' (ethanol's skeletal-
+        # replacement spelling, wrong formula for the radical) -- which the
+        # caller's own -r round-trip gate correctly rejects, net a wasted
+        # abstain, never a rescue. The substituent-prefix entry point treats
+        # the radical centre as the attachment point of a "-yl" prefix over
+        # the WHOLE heavy-atom set instead, so it CAN cite the missing bond --
+        # measured: '[CH2]CO' -> '3-oxapropan-1-yl' (-r-RT VERIFIED MATCH).
+        # A second radical centre is out of ``_build_ctx``'s scope (see its
+        # docstring) and falls through to the whole-molecule rung below,
+        # which stays a safe (if pointless) abstain for that shape.
+        from ..perception.ions import get_radical_sites
+        radical_sites = get_radical_sites(mol)
+        if len(radical_sites) == 1 and radical_sites[0]['n_electrons'] in (1, 2, 3):
+            from .universal_substituent import name_universal_substituent_prefix
+            all_heavy = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1]
+            _prefix_name = name_universal_substituent_prefix(
+                mol, all_heavy, radical_sites[0]['atom_idx'],
+                bond_order=radical_sites[0]['n_electrons'])
+            if _prefix_name:
+                return _Candidate(name=_prefix_name, result_obj=None)
+        else:
+            from .universal_substituent import name_universal_substitutive
+            _uni = name_universal_substitutive(mol)
+            if _uni is not None and _uni.name:
+                return _Candidate(name=_uni.name, result_obj=None)
     except Exception as exc:  # fail-closed: a producer bug keeps the abstention
         logger.info("t4 universal-substitutive rung raised: %s", exc)
 

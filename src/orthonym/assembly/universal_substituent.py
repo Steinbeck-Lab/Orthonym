@@ -40,12 +40,21 @@ polycyclic ring systems (reusing ``rules.vonbaeyer_universal.
 analyze_cage_universal`` + ``rules.polycyclic._build_parent_with_unsaturation``
 for the parent TEXT only -- NOT ``general_engine``'s substituent-recursion
 tail, which is exactly the declining machinery this module replaces).
-Isotopes, radicals, wildcard atoms and multi-fragment inputs are OUT OF
-SCOPE and void the whole call (``None``).  Indicated hydrogen is also OUT OF
-SCOPE for this task (deferred -- no witness in the B2b brief requires it) and
-voids nothing on its own: this module simply does not special-case it, which
-is a pre-existing gap (unrelated to charge), not something this task
-introduces or worsens.
+Isotopes, wildcard atoms and multi-fragment inputs are OUT OF SCOPE and void
+the whole call (``None``).  Radicals are OUT OF SCOPE for MORE than one
+free-valence centre (P-71.2.3 multi-site / diradicals / radical ions); a
+SINGLE monovalent/divalent/trivalent centre is IN SCOPE for ``_build_ctx``
+(v36 A2, C2) so ``name_universal_substituent_prefix`` can cite it as a
+``-yl``/``-ylidene``/``-ylidyne`` substituent prefix -- see that function's
+docstring and ``t4_coverage._best_effort_candidate``'s radical branch, the
+only wired caller. ``name_universal_substitutive`` (the whole-molecule entry
+point) still has NO suffix logic for that centre and will name the
+constitution as if it were fully saturated -- harmless (the caller's OPSIN
+``-r`` gate rejects the mismatch) but never a rescue on its own. Indicated
+hydrogen is also OUT OF SCOPE for this task (deferred -- no witness in the
+B2b brief requires it) and voids nothing on its own: this module simply does
+not special-case it, which is a pre-existing gap (unrelated to charge), not
+something this task introduces or worsens.
 
 Task B2b (this round) LIFTS the blanket per-atom-charge void and replaces it
 with real charge PERCEPTION, reusing ``assembly.general_engine``'s existing
@@ -611,7 +620,33 @@ def _build_ctx(
     # 4 in this function's docstring -- never a silent, charge-blind name.
     if any(a.GetIsotope() for a in work.GetAtoms()):
         return None
-    if any(a.GetNumRadicalElectrons() for a in work.GetAtoms()):
+    # v36 A2 (C2): the blanket "ANY radical electron -> void" guard used to
+    # live here unconditionally, so a radical the dedicated
+    # radicals.py/route_charged path DECLINES (e.g. it names a chain-hydride
+    # -yl/-ylidene/-ylidyne primitive that itself falls through to a broken
+    # textual fallback -- measured: '[CH2]CO' -> the unparseable 'ethanolyl')
+    # never even got a chance at this floor. This ctx is now buildable for a
+    # SINGLE P-71 monovalent/divalent/trivalent free-valence centre -- the
+    # one shape ``name_universal_substituent_prefix``'s ``bond_order``
+    # parameter (below) knows how to cite as a ``-yl``/``-ylidene``/
+    # ``-ylidyne`` suffix at its own attachment locant. A SECOND radical
+    # centre (P-71.2.3 multi-site, diradicals, radical ions, ...) stays out
+    # of scope -- this floor's ``_render_as_substituent`` only ever cites ONE
+    # attachment/bond-order pair, so a second centre would need a citation
+    # this primitive cannot express; fail closed rather than silently drop
+    # it. (``name_universal_substitutive``, the WHOLE-molecule entry point,
+    # has NO such suffix logic at all and would name the radical as if it
+    # were the fully saturated neutral species -- measured: '1-oxapropane'
+    # for '[CH2]CO', which the caller's own OPSIN -r gate then rejects, so
+    # letting THAT entry point build a ctx here costs nothing: it can only
+    # ever fail the downstream verify, never ship wrong. The actual rescue is
+    # wired at the caller, ``t4_coverage._best_effort_candidate``, which
+    # routes a single free-valence centre through the substituent-prefix
+    # entry point instead.)
+    radical_atoms = [a for a in work.GetAtoms() if a.GetNumRadicalElectrons()]
+    if len(radical_atoms) > 1:
+        return None
+    if radical_atoms and radical_atoms[0].GetNumRadicalElectrons() not in (1, 2, 3):
         return None
     if any(a.GetAtomicNum() == 0 for a in work.GetAtoms()):
         return None  # wildcard atom: unverifiable, never claim to name it
