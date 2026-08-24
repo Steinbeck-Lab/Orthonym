@@ -62,16 +62,20 @@ A2_WITNESSES = [
 # xfail(strict) -> flips GREEN the session that lands the shared-stereo-path primed-locant fix.
 A2_STEREO_CLOSEABLE = ["C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1"]
 
-# Pattern B: mixed-spiro-fused (name_mixed_spiro_fused has no construction path).
+# Pattern B: mixed-spiro-fused. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md): a mix of an
+# OPSIN-grammar bug in name_mixed_spiro_fused's component assembly + stereo-omission (the
+# latter closed by the same deferred shared-stereo-path fix as A2). Abstains today (0-wrong).
 B_WITNESSES = [
     "C1=CCC2(C1)COc1ccccc12",
     "C1=CC2(C=CC1)Cc1ccccc1O2",
     "C1CC[C@@H]2C[C@]3(CC[C@H]2C1)CO3",   # builds spiro[decahydronaphthalene-7,2'-oxirane] (unparseable)
 ]
 
-# Pattern C: multi-component ortho / ortho-peri-fused mancude that genuinely
-# abstains (rt-fails) at the best-effort tier -- neither the retained fused table
-# nor the von-Baeyer floor covers these.
+# Pattern C: multi-component ortho / ortho-peri-fused mancude that genuinely abstains
+# (rt-fails) at the best-effort tier. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md): general
+# N-component fusion nomenclature is a documented large build (name_ortho_fused_bicyclic is
+# 2-ring-only, DEFR-07); the recommended path is -style offline OPSIN-validated
+# fused-template index. Breadth already floor-delivered for 24/41 ortho-fused (see below).
 C_WITNESSES = [
     "c1ccc2c(c1)CO[C@H]2[C@H]1OCc2ccccc21",
     "c1ccc([C@@H]2O[C@@]23CNc2ccccc2CN3)cc1",
@@ -90,7 +94,10 @@ C_COVERED_BY_FLOOR = [
     "c1ccc2nc3ncncc3nc2c1",    # -> benzo[g]pteridine (retained, RT-ok)
 ]
 
-# Pattern D: bridged-fused whole molecule; upstream parent-selection bypass.
+# Pattern D: bridged-fused whole molecule. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md):
+# measurement REFUTES the spy's "pure routing bypass" premise -- detect_bridged_fused
+# returns False and name_bridged_fused_system returns None for this macrocyclic-bridge
+# topology, so it is a detector+construction gap, not a routing patch. Abstains (0-wrong).
 D_WITNESSES = [
     "C1=NC2CCCCCCCCOC3C=NC(CCCCCCCCOC1CC2)CC3",
 ]
