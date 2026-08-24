@@ -3936,13 +3936,31 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
     if not subs:
         return ring_name
 
+    # v36 core-namer: thread the best-effort tier's ``allow_mancude`` into the
+    # complex-ring (spiro / von-Baeyer / mixed-ring parent) substituent enumerator,
+    # exactly as the sibling enumerators do (substituent_naming.py:6657-6667,
+    # rules/fused_rings.py). A ring-bearing compound substituent on a spiro / VB
+    # parent is named by the delegate's mancude / recursive-decoration branches
+    # ONLY under ``allow_mancude=True``; without it ``name_substituent`` returns the
+    # PIN-tier ``None`` and the substituent was silently dropped at the ``continue``
+    # below -> an atom-incomplete partial name (SELF-01 abstains). PIN / default
+    # tier is byte-identical: ``best_effort_ctx`` is False there, so
+    # ``allow_mancude`` is False, the prior call exactly.
+    _cx_mancude = False
+    try:
+        from ..metrics.provenance import best_effort_ctx as _cx_ctx
+        _cx_mancude = bool(_cx_ctx.get())
+    except Exception:
+        _cx_mancude = False
+
     # Group substituents by prefix name, collecting locants
     prefix_groups = defaultdict(list)  # name -> [locant1, locant2, ...]
     for sub_info in subs:
         frag_ha = len(sub_info.frag_atoms)
 
         a_idx = _find_attach_idx_in_frag(mol, sub_info, ring_atoms)
-        prefix_name = name_substituent(mol, sub_info.frag_atoms, a_idx)
+        prefix_name = name_substituent(
+            mol, sub_info.frag_atoms, a_idx, allow_mancude=_cx_mancude)
 
         if not prefix_name or prefix_name == "substituent":
             continue

@@ -51,6 +51,19 @@ FUSED_HETEROCYCLE_WITNESSES = [
 
 WITNESSES = list(FUSED_HETEROCYCLE_WITNESSES)
 
+# --- complex-ring (spiro / von-Baeyer) parent enumerator (Task 3) -------------
+# The composer's complex-ring substituent enumerator
+# (assembly/composer.py::_enrich_complex_ring_with_subs) is the spiro / von-Baeyer
+# sibling of the fused enumerator.  A ring-bearing compound substituent being
+# DROPPED there is off-path in the sampled ChEBI corpus (0 in 520+ molecules;
+# parent selection routes the ring substituent through the fused path instead --
+# invariant 8), so Task 3 is proven at the WIRING level: the composer must thread
+# the best-effort context into ``name_substituent`` as ``allow_mancude=True``
+# exactly as the fused enumerator now does.  At HEAD it always passed ``False``.
+# 9-methylspiro[5.5]undecane routes its substituent enumeration through the
+# enricher, so it exercises the wiring deterministically.
+COMPOSER_WIRING_SMILES = "CC1CCC2(CC1)CCCCC2"
+
 
 def _cn_rt(smiles):
     """Best-effort name + OPSIN full-InChIKey round-trip, in a FRESH process.
@@ -87,6 +100,67 @@ def test_fused_heterocycle_ring_bearing_substituent_names_and_rt(smiles):
         f"{smiles} -> {name!r} (rt={res.get('rt')})")
 
 
+def test_composer_threads_best_effort_allow_mancude():
+    """Task 3: the complex-ring (spiro/VB) substituent enumerator must thread the
+    best-effort context into ``name_substituent`` (``allow_mancude=True``).  RED at
+    HEAD, where the composer always passed ``allow_mancude=False``."""
+    out = subprocess.run(
+        [sys.executable, __file__, "--wiring-probe", COMPOSER_WIRING_SMILES],
+        capture_output=True, text=True, timeout=180,
+    )
+    res = None
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("{") and "enrich_calls" in line:
+            res = json.loads(line)
+    assert res is not None, (
+        f"no wiring-probe result\nstdout:\n{out.stdout[-1500:]}\n"
+        f"stderr:\n{out.stderr[-1500:]}")
+    assert res["enrich_calls"] > 0, (
+        "the composer enricher (_enrich_complex_ring_with_subs) was not reached "
+        f"for {COMPOSER_WIRING_SMILES}: {res}")
+    assert res["any_allow_mancude_true"], (
+        "composer did NOT thread best_effort_ctx -> allow_mancude into "
+        f"name_substituent (v36 Task-3 wiring missing): {res}")
+
+
+def _composer_wiring_probe(smiles):
+    """Report the ``allow_mancude`` values ``_enrich_complex_ring_with_subs``
+    passes into ``name_substituent`` while naming ``smiles`` at the best-effort
+    tier.  The v36 Task-3 wiring makes these True; at HEAD they are always False."""
+    from orthonym.jvm_budget import jvm_slots
+    with jvm_slots(1, purpose="v36-cn-wiring"):
+        import orthonym.assembly.composer as comp
+        import orthonym.assembly.substituent_enumerator as se
+        from orthonym.namer import Orthonym
+        state = {"in": False}
+        seen = []
+        _oe = comp._enrich_complex_ring_with_subs
+        def _we(*a, **k):
+            state["in"] = True
+            try:
+                return _oe(*a, **k)
+            finally:
+                state["in"] = False
+        _ons = se.name_substituent
+        def _wns(mol, frag, attach, *a, allow_mancude=False, **k):
+            if state["in"]:
+                seen.append(bool(allow_mancude))
+            return _ons(mol, frag, attach, *a, allow_mancude=allow_mancude, **k)
+        comp._enrich_complex_ring_with_subs = _we
+        se.name_substituent = _wns
+        try:
+            Orthonym(
+                style="pin", general_fallback=True,
+                general_fallback_unverified=True,
+                allow_aromatic_general=True).name_tiered(smiles)
+        finally:
+            comp._enrich_complex_ring_with_subs = _oe
+            se.name_substituent = _ons
+        return {"enrich_calls": len(seen),
+                "any_allow_mancude_true": any(seen)}
+
+
 def _name_one(smiles):
     from orthonym.jvm_budget import jvm_slots
     with jvm_slots(1, purpose="v36-cn-test"):
@@ -104,4 +178,7 @@ def _name_one(smiles):
 
 
 if __name__ == "__main__":
-    print(json.dumps(_name_one(sys.argv[1])))
+    if len(sys.argv) >= 3 and sys.argv[1] == "--wiring-probe":
+        print(json.dumps(_composer_wiring_probe(sys.argv[2])))
+    else:
+        print(json.dumps(_name_one(sys.argv[1])))
