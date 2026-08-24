@@ -1430,10 +1430,12 @@ def _ring_aza_cation_name(neutral_name: str, mol) -> str:
     (``...octan-8-ium``, P-73.1.2) OR the ``azonia`` replacement (``...8-azonia-
     bicyclo[3.2.1]octane``, P-73.2.2.1.2). Both spellings are OPSIN-valid (SPY-B1
     §3). Build both candidates and RETURN THE FIRST that OPSIN round-trips against
-    ``mol`` (``_quaternary_rt_ok`` -- strict RDKit-canonical identity, fail-closed
-    when the jar is present, fail-open only when it is absent). Any full-stereo
-    name whose descriptor sits at ring position 3 fails to parse -> both candidates
-    reject -> '' (the caller abstains; NEVER an unverified-stereo ship).
+    ``mol`` via ``_cation_name_rt_ok`` (the JPype ``opsin_parse`` path -- full-InChIKey
+    identity, **fail-CLOSED** whether the jar is present OR absent; NOT the subprocess
+    ``_quaternary_rt_ok``, which fails OPEN when the jar is absent and would ship an
+    unverifiable full-stereo name). Any full-stereo name whose descriptor sits at ring
+    position 3 fails to parse -> both candidates reject -> '' (the caller abstains;
+    NEVER an unverified-stereo ship).
 
     Returns '' (fall through to the acyclic transform) unless exactly one skeletal
     ``aza`` locant is present and a candidate round-trips."""
@@ -2162,8 +2164,12 @@ def route_charged(mol, style: str = 'pin') -> str:
         # Verify the naive name round-trips; if it does NOT (and OPSIN is present),
         # re-derive from the SYSTEMATIC amine-principal parent (retained handler
         # excluded) and ship that only if IT round-trips. In a jar-absent config
-        # BOTH checks fail -> the naive name is kept (byte-identical). This never
-        # ships an unverified name and never regresses an already-valid aminium.
+        # BOTH checks fail -> the naive name is kept (byte-identical). This branch
+        # never regresses an already-valid aminium (it fires only when the naive
+        # name already failed RT). NOTE: on the fall-through (`return naive`) this
+        # function CAN still return an unverified acyclic name in a jar-absent
+        # config; the 0-wrong backstop for that path is the top-level SELF-01 gate,
+        # NOT this branch (which only ever ships an RT-verified re-derivation).
         if (len(sites['cations']) == 1 and naive
                 and not _cation_name_rt_ok(naive, mol)):
             cat = mol.GetAtomWithIdx(sites['cations'][0]['atom_idx'])
