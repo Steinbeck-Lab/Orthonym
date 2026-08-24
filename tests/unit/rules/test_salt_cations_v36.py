@@ -224,3 +224,23 @@ def test_h_plus_protonation_site_choice_is_spelling_deterministic(namer):
     assert not is_failure_name(out), f"abstained: {out!r}"
     for smi in _HPLUS_DETERMINISM_SPELLINGS:
         assert _rt_full(smi, out), f"round-trip failed for {smi!r}: {out!r}"
+
+
+# ---------------------------------------------------------------------------
+# FABLE #3 (hardening nit): dispatch_table._handle_poly_anion's name_anion
+# fallback is now wrapped in the same _full_inchikey_rt_ok check the
+# MIXED_SIGN_ZWITTERION door already applies to its identical fallback.
+# Regression only -- confirm the RT gate does not break the working
+# bare-oxoanion path it wraps.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("O=S([O-])[O-]", "sulfite"),
+    ("[O-][N+](=O)[O-]", "nitrate"),
+    ("[O-][Cl+][O-]", "chlorite"),
+])
+def test_poly_anion_name_anion_fallback_rt_gate_regression(namer, smi, expected):
+    out = namer.name(smi)
+    assert out == expected, f"{smi} -> {out!r}"
+    assert _rt_full(smi, out), f"round-trip failed: {out!r}"

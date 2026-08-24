@@ -1024,9 +1024,15 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
     # falling into the carboxylate-specific neutralize-recurse rebuild below.
     # Zero new producer code; this only reaches species route_charged already
     # declined on.
+    # FABLE #3 (hardening): mirror the SAME full-InChIKey RT gate the
+    # MIXED_SIGN_ZWITTERION door applies to this identical name_anion()
+    # fallback (_handle_mixed_sign_zwitterion, :832-835 / its predicate
+    # :359-361) -- in-handler, not relying solely on the outer SELF-01 gate
+    # (constitution-only) to catch a wrong/neutralised emission here.
+    from orthonym.rules.charged_router import _full_inchikey_rt_ok
     from orthonym.rules.ions import name_anion
     ion_result = name_anion(mol, style=style)
-    if ion_result:
+    if ion_result and _full_inchikey_rt_ok(mol, ion_result):
         return ion_result
     try:
         from rdkit.Chem import RWMol
