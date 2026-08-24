@@ -958,6 +958,16 @@ def get_sulfanyl_prefix(
     # residual). Byte-identical for every genuine divalent-ether caller.
     if any(b.GetBondTypeAsDouble() >= 2.0 for b in sulfur.GetBonds()):
         return None
+    # v36 core-namer hardening: the bond-order check above misses a
+    # CHARGE-SEPARATED sulfoxide/sulfone (``C[S+]([O-])CC``) -- its S-O bond is
+    # order 1.0, so ``sulfanyl`` would still be built, silently dropping the
+    # [O-] (a wrong, reduced-thioether molecule). This function's contract is
+    # the divalent ``[SX2]`` chalcogen ether, so fail closed on DEGREE (not just
+    # bond order): any chalcogen bonded to more than its two ether carbons --
+    # oxo, charge-separated oxo, a third substituent, hypervalent S -- is not a
+    # plain ``-X-`` linker.
+    if sulfur.GetDegree() != 2:
+        return None
     c_neighbors = [n for n in sulfur.GetNeighbors() if n.GetSymbol() == "C"]
     if len(c_neighbors) < 2:
         return None
