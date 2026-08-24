@@ -999,6 +999,129 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
     )
 
 
+def _name_base_subcore(mol, pair_atoms: Set[int]) -> Optional[str]:
+    """Name the 2-ring sub-core spanned by ``pair_atoms`` (a fused ring PAIR) via
+    the existing 2-component fused namer. Returns the base component name (e.g.
+    'quinoline', 'pyrido[2,3-d]pyrimidine') or None. Used by the bounded
+    3-component generate-and-test to pick a max-ring retained base (P-25.3.2)."""
+    bonds = [b.GetIdx() for b in mol.GetBonds()
+             if b.GetBeginAtomIdx() in pair_atoms and b.GetEndAtomIdx() in pair_atoms]
+    if not bonds:
+        return None
+    try:
+        sub = Chem.PathToSubmol(mol, bonds)
+        Chem.SanitizeMol(sub)
+    except Exception:
+        return None
+    if sub.GetRingInfo().NumRings() != 2:
+        return None
+    res = name_fused_heterocycle(sub)
+    if res is None:
+        return None
+    return res[0]
+
+
+def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
+    """Bounded 3-component ortho/ortho-peri-fused MANCUDE fusion namer (P-25.3),
+    0-wrong by construction (every candidate is OPSIN-round-trip-gated to the FULL
+    InChI before it can be returned).
+
+    Fusion nomenclature is not derived de-novo here; instead — matching what do (offline OPSIN-validated template index) and
+    the contributor guide invariant 18 (OFFER many, keep the one that round-trips) — a bounded
+    candidate set is generated from the actual ring components (a max-ring retained
+    BASE named from a fused sub-core per P-25.3.2, plus the remaining monocycle as a
+    fusion PREFIX with enumerated attachment locants/letters) and each is OPSIN-
+    parsed; only a candidate whose parse InChI equals the input's is kept, and the
+    deterministic canonical (shortest, then lexicographically least) is returned.
+    Fail-CLOSED (None) on anything outside the handled sub-class, so it never emits
+    an unverified name; the caller keeps its existing behaviour.
+
+    Scope (this session, v36-C1C2C6 Build 2): exactly 3 SSSR rings, the whole
+    molecule is that one cata-fused (no atom in >=3 rings) neutral fully-aromatic
+    ring system with >=1 ring heteroatom, no exocyclic heavy atoms. Higher
+    component counts, peri-fused interior atoms, substituted cores and carbocyclic
+    parents are a NAMED follow-on (see test_c_waveC_v36.py Build-2 xfail)."""
+    import itertools
+    from collections import Counter as _Counter
+    from rdkit.Chem.inchi import MolToInchi
+
+    ri = mol.GetRingInfo()
+    atom_rings = ri.AtomRings()
+    if len(atom_rings) != 3:
+        return None
+    ring_sets = [set(r) for r in atom_rings]
+    ring_atom_set: Set[int] = set().union(*ring_sets)
+    # whole molecule must BE this ring system (bare core, no exocyclic heavy atoms)
+    for a in mol.GetAtoms():
+        if a.GetAtomicNum() != 1 and a.GetIdx() not in ring_atom_set:
+            return None
+    # neutral, fully aromatic, no radicals; and >=1 ring heteroatom (carbo-PAHs
+    # are retained-catalog territory and reach here only if unnamed -> leave them)
+    has_hetero = False
+    for idx in ring_atom_set:
+        a = mol.GetAtomWithIdx(idx)
+        if (not a.GetIsAromatic() or a.GetFormalCharge() != 0
+                or a.GetNumRadicalElectrons() != 0):
+            return None
+        if a.GetAtomicNum() != 6:
+            has_hetero = True
+    if not has_hetero:
+        return None
+    # cata-fused only (no interior/peri atom in >=3 rings)
+    membership = _Counter(idx for r in atom_rings for idx in r)
+    if any(c >= 3 for c in membership.values()):
+        return None
+
+    target_inchi = MolToInchi(mol)
+    if not target_inchi:
+        return None
+
+    from ..validation.opsin_roundtrip import opsin_parse
+    from .fusion_descriptors import _identify_ring_name, get_fusion_prefix
+
+    candidates: Set[str] = set()
+    tried = 0
+    _CAP = 1200  # hard bound on OPSIN probes (safety; the class is small)
+    for i, j in itertools.combinations(range(3), 2):
+        if len(ring_sets[i] & ring_sets[j]) < 2:
+            continue  # rings i,j are not ortho-fused to each other
+        pair_atoms = ring_sets[i] | ring_sets[j]
+        k = ({0, 1, 2} - {i, j}).pop()
+        attached_ring = list(atom_rings[k])
+        if len(set(attached_ring) & pair_atoms) < 2:
+            continue  # the third ring is not fused to this pair -> wrong base pair
+        base = _name_base_subcore(mol, pair_atoms)
+        if not base:
+            continue
+        attached_name = _identify_ring_name(mol, attached_ring)
+        if not attached_name:
+            continue
+        prefix = get_fusion_prefix(attached_name)
+        if not prefix:
+            continue
+        rs = len(attached_ring)
+        loc_pairs = []
+        for a in range(1, rs + 1):
+            b = a + 1 if a < rs else 1
+            loc_pairs.append((a, b))
+            loc_pairs.append((b, a))
+        for (x, y) in loc_pairs:
+            for L in 'abcdefghij':
+                if tried >= _CAP:
+                    break
+                nm = f"{prefix}[{x},{y}-{L}]{base}"
+                tried += 1
+                s = opsin_parse(nm)
+                if not s:
+                    continue
+                om = Chem.MolFromSmiles(s)
+                if om is not None and MolToInchi(om) == target_inchi:
+                    candidates.add(nm)
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda n: (len(n), n))[0]
+
+
 def _core_covers_ring_system(mol, atom_mapping) -> bool:
     """Does the matched fused-ring core cover every atom of the fused ring
     system(s) it sits in? Mirrors composer._fused_core_covers_ring_system (kept
@@ -1340,6 +1463,14 @@ def name_fused_heterocycle(mol):
         poly = _try_polycomponent_fusion_name(mol)
         if poly:
             return (poly, ring_atoms, {}, True)
+        # v36-C1C2C6 Build 2 (P-25.3): bounded 3-component ortho/ortho-peri-fused
+        # mancude namer for a novel system whose senior BASE is a 2-ring retained
+        # component (e.g. pyrimido[4,5-b]quinoline) -- the case _try_polycomponent_
+        # fusion_name cannot reach (it only builds star-of-monocycles bases).
+        # 0-wrong by construction: OPSIN-RT-gated candidate generation.
+        gen = _name_ortho_fused_generate_and_test(mol)
+        if gen:
+            return (gen, ring_atoms, {}, True)
         # Wave-2 P5 fused (Task 7) FAIL-CLOSED follow-up: interior-heteroatom
         # ortho-/peri-fused systems (P-25.3.3.2/.2.1/.2.2/.2.3/.3.3.2) require
         # a superscript interior locant (e.g. 3a1 / 2a1H). OPSIN 2.9 CANNOT

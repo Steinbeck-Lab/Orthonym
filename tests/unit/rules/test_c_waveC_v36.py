@@ -138,6 +138,65 @@ def test_shared_ring_dispatch_canaries_unchanged(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
+# BUILD 2 — general N-component ortho/ortho-peri-fused mancude construction
+# ---------------------------------------------------------------------------
+
+# 3-component novel fused mancude systems whose senior base is a 2-ring retained
+# component (pyrimido[4,5-b]quinoline class). RED at HEAD (name_ortho_fused_
+# bicyclic is 2-component-only; _try_polycomponent_fusion_name builds only
+# star-of-monocycles bases) -> abstained / von-Baeyer.
+BUILD2_3COMP_WITNESSES = [
+    "c1ccc2nc3ncncc3cc2c1",   # -> pyrimido[4,5-b]quinoline (SPY-verified)
+    "c1ccc2nc3ncncc3nc2c1",   # a 3-ring diaza/tetraaza fused mancude
+]
+
+
+@pytest.mark.parametrize("smiles", BUILD2_3COMP_WITNESSES)
+def test_three_component_fused_mancude_names_and_round_trips(smiles):
+    """A genuine 3-component ortho-fused mancude system must build a fusion name
+    that round-trips (0-wrong; the generate-and-test path is OPSIN-RT-gated)."""
+    res = _cn_rt(smiles)
+    name = res.get("name")
+    assert name and "unknown" not in name, f"abstained: {smiles} -> {res}"
+    assert res.get("rt") is True, (
+        f"emitted a non-round-tripping name: {name!r} for {smiles}")
+
+
+def test_pyrimido_quinoline_exact_pin():
+    """The SPY-verified 3-component target must build exactly the OPSIN-feasible
+    fusion PIN ``pyrimido[4,5-b]quinoline``.  RED at HEAD (abstained)."""
+    res = _cn_rt("c1ccc2nc3ncncc3cc2c1")
+    assert res.get("name") == "pyrimido[4,5-b]quinoline", (
+        f"expected pyrimido[4,5-b]quinoline, got {res.get('name')!r}")
+    assert res.get("rt") is True
+
+
+def test_four_component_fused_is_zero_wrong():
+    """0-wrong guard: a 4-component fused mancude either round-trips or abstains,
+    never a wrong molecule (it degrades to a von-Baeyer name today)."""
+    res = _cn_rt("c1ccc2nc3ccc4ncccc4c3nc2c1")
+    name = res.get("name") or ""
+    if name and "unknown" not in name:
+        assert res.get("rt") is True, (
+            f"4-component fused emitted a non-round-tripping name: {name!r}")
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "v36-C1C2C6 Build-2 BOUND: the generate-and-test fusion namer is 3-component "
+    "only. NAMED FOLLOW-ON: 4+-component fusion base-selection (max-ring retained "
+    "base, P-25.3.2) + descriptor construction is not built this session. The "
+    "molecule still names+RTs today via the von-Baeyer no-abstain fallback "
+    "(0-wrong), just not as a fusion PIN."))
+def test_four_component_fused_gets_fusion_name_NAMED_BLOCKER():
+    res = _cn_rt("c1ccc2nc3ccc4ncccc4c3nc2c1")
+    name = res.get("name") or ""
+    assert res.get("rt") is True
+    # DESIRED (not yet built): a fusion name, not a von-Baeyer 'tetracyclo[...]'.
+    assert "cyclo[" not in name and "[" in name, (
+        f"got a von-Baeyer name, not a fusion PIN: {name!r}")
+
+
+# ---------------------------------------------------------------------------
 # subprocess entrypoint (fresh process per witness)
 # ---------------------------------------------------------------------------
 def _name_one(smiles):
