@@ -4429,6 +4429,91 @@ def _name_hw_monocycle_component(
     return name, a2l
 
 
+def _name_skeletal_replacement_monocycle_component(
+    mol, component_atoms: Set[int], spiro_center: int,
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """P-24.5.4: a SATURATED monocyclic ring too large for a Hantzsch-Widman stem
+    (ring size > 10) that carries skeletal heteroatoms is a skeletal-replacement
+    ('a') component. It is named here as its all-carbon parent (``cyclododecane``,
+    ``cycloundecane`` ...) — the form that goes INSIDE the spiro bracket — and its
+    ring heteroatoms are returned in the locant map so ``_name_spiro_vonbaeyer_core``
+    can hoist them to the front 'a'-prefix (``2',12'-dioxa``) per P-24.5.2. This is
+    the ``P-24.5.1 ... before skeletal replacement`` two-step: name the hydrocarbon
+    ring system first, apply 'a' prefixes second.
+
+    Ring is numbered spiro-atom = 1, then the direction giving the lowest
+    heteroatom locant SET (the front-prefix locants). Returns
+    ``(carbon_parent_name, {orig_idx: locant})`` covering EVERY ring atom, or None
+    (fail-closed): carbocyclic ring, ring size <= 10 (HW applies), any ring
+    unsaturation (a mancude large heteromonocycle needs indicated-H — a follow-on),
+    or a ring the walk cannot resolve deterministically."""
+    extracted = _extract_subfragment(mol, component_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    rings = frag.GetRingInfo().AtomRings()
+    if len(rings) != 1:
+        return None
+    ring = list(rings[0])
+    ring_size = len(ring)
+    if ring_size <= 10:
+        return None  # Hantzsch-Widman stem exists -> not this path
+    ring_set = set(ring)
+    hetero = {fi for fi in ring
+              if frag.GetAtomWithIdx(fi).GetAtomicNum() not in (1, 6)}
+    if not hetero:
+        return None  # carbocyclic large ring -> _name_carbocyclic_monocycle_component
+    # Saturated ring only: every ring bond single (a mancude large heteromonocycle
+    # would need indicated hydrogen inside the carbon-parent stem, unsupported here).
+    if any(
+        b.GetBondType() != Chem.BondType.SINGLE
+        for b in frag.GetBonds()
+        if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set
+    ):
+        return None
+    spiro_frag = orig_to_frag.get(spiro_center)
+    if spiro_frag is None or spiro_frag not in ring_set:
+        return None
+    fadj: Dict[int, List[int]] = {a: [] for a in ring}
+    for bond in frag.GetBonds():
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if i in ring_set and j in ring_set:
+            fadj[i].append(j)
+            fadj[j].append(i)
+    # Number from the spiro atom (locant 1); pick the walk direction giving the
+    # lowest heteroatom locant set (P-24.3.3 low-locant preference, applied to the
+    # 'a'-prefix locants since the spiro atom is fixed at 1).
+    best = None  # (het_locs, pos)
+    for first in fadj[spiro_frag]:
+        path = [spiro_frag, first]
+        visited = {spiro_frag, first}
+        cur = first
+        ok = True
+        while len(path) < ring_size:
+            nxts = [nb for nb in fadj[cur] if nb not in visited]
+            if len(nxts) != 1:
+                ok = False
+                break
+            cur = nxts[0]
+            path.append(cur)
+            visited.add(cur)
+        if not ok or len(path) != ring_size:
+            continue
+        pos = {fi: idx + 1 for idx, fi in enumerate(path)}
+        het_locs = sorted(pos[fi] for fi in hetero)
+        if best is None or het_locs < best[0]:
+            best = (het_locs, pos)
+    if best is None:
+        return None
+    pos = best[1]
+    parent = f"cyclo{_get_alkane_name(ring_size)}"
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    a2l = {frag_to_orig[fi]: pos[fi] for fi in ring if fi in frag_to_orig}
+    if len(a2l) != ring_size:
+        return None
+    return parent, a2l
+
+
 def _name_spiro_component(
     mol, component_atoms: Set[int], spiro_center: int,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
@@ -4447,6 +4532,15 @@ def _name_spiro_component(
         )
         if carbo is not None:
             return carbo
+        # Hantzsch-Widman stems exist only for ring sizes 3-10; a larger saturated
+        # heteromonocycle is a skeletal-replacement ('a') component (P-24.5.4):
+        # named as its carbon parent here, heteroatoms hoisted to the front by
+        # _name_spiro_vonbaeyer_core.
+        ring = extracted[0].GetRingInfo().AtomRings()[0]
+        if len(ring) > 10:
+            return _name_skeletal_replacement_monocycle_component(
+                mol, component_atoms, spiro_center
+            )
         return _name_hw_monocycle_component(mol, component_atoms, spiro_center)
     vb = _name_vonbaeyer_spiro_component(mol, component_atoms, spiro_center)
     if vb is not None:
@@ -4693,6 +4787,22 @@ def _name_spiro_vonbaeyer_core(mol):
     if name_a.startswith('bicyclo'):
         a_expressible |= atoms_a
     if name_b.startswith('bicyclo'):
+        a_expressible |= atoms_b
+
+    # P-24.5.4: a large saturated heteromonocycle component named as its carbon
+    # parent (`cyclododecane`, from _name_skeletal_replacement_monocycle_component)
+    # has its skeletal heteroatoms cited by the SAME front 'a'-prefix as a cage's.
+    # Detect it as a `cyclo...`-named component whose ring carries heteroatoms
+    # (a genuine carbocyclic `cyclohexane` component carries none, so it is never
+    # hoisted). HW-named heteromonocycles start with a bracket or a heteroatom stem
+    # (`[1,3]dithiane`, `thiane`, `oxolane`) — never `cyclo` — so they are excluded.
+    def _is_skelrepl_monocycle(cname: str, catoms: Set[int]) -> bool:
+        return cname.startswith('cyclo') and any(
+            mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6) for a in catoms
+        )
+    if _is_skelrepl_monocycle(name_a, atoms_a):
+        a_expressible |= atoms_a
+    if _is_skelrepl_monocycle(name_b, atoms_b):
         a_expressible |= atoms_b
     hetero_prefix = _spiro_vb_a_prefix(
         mol, a_expressible, spiro_center, unprimed_map, primed_map
