@@ -944,6 +944,20 @@ def get_sulfanyl_prefix(
 
     # Find the two C neighbors of S
     sulfur = mol.GetAtomWithIdx(sulfur_idx)
+    # v36 core-namer 0-wrong guard: the ``sulfanyl`` / ``selanyl`` / ``tellanyl``
+    # stem denotes a DIVALENT chalcogen ether ``-X-`` -- this function's own
+    # contract is the SMARTS ``[SX2]([#6])[#6]``. A chalcogen bearing a DOUBLE
+    # bond is a sulfinyl ``-S(=O)-`` / sulfonyl ``-S(=O)(=O)-`` (or the Se/Te
+    # analogue); its oxo cannot be expressed by this stem, so naming it
+    # ``...sulfanyl`` SILENTLY DROPS the =O and denotes a different molecule (the
+    # reduced thioether). The SMARTS-driven callers only ever pass an ``[SX2]``
+    # match, but ``substituent_naming.py``'s chalcogen-attach step dispatches on
+    # the atom SYMBOL alone and so hands this a sulfinyl S (the pantoprazole
+    # class). Fail closed here so that fragment degrades to the oxo-preserving
+    # replacement name instead of a wrong one (invariant 9; SELF-01 backstops any
+    # residual). Byte-identical for every genuine divalent-ether caller.
+    if any(b.GetBondTypeAsDouble() >= 2.0 for b in sulfur.GetBonds()):
+        return None
     c_neighbors = [n for n in sulfur.GetNeighbors() if n.GetSymbol() == "C"]
     if len(c_neighbors) < 2:
         return None

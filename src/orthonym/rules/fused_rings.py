@@ -1720,9 +1720,29 @@ def _identify_fused_substituent(
         if any(_ring_info.NumAtomRings(a) > 0 for a in sub_atoms):
             # Ring-containing substituent (pyridinyl, naphthalenyl, indolyl,
             # naphthalenylmethyl, ...) -> the single WS-A delegate.
+            #
+            # v36 core-namer: thread the best-effort tier's ``allow_mancude``
+            # into the delegate exactly as the sibling enumerator already does at
+            # ``substituent_naming.py:6657-6667``. A decorated / fused ring-bearing
+            # compound substituent (the pantoprazole-class half) is named only by
+            # the delegate's mancude / recursive-decoration branches, which are
+            # gated on ``allow_mancude=True``; the fused-heterocycle enumerator was
+            # the one caller that never passed it, so such a substituent silently
+            # dropped (``continue`` at ``get_fused_heterocycle_substituents:1552``).
+            # ``allow_enumerator_fallback`` stays at its name-producing default
+            # (True). PIN / default tier is byte-identical: ``best_effort_ctx`` is
+            # False there, so ``allow_mancude`` is False, the prior call exactly.
             from .ring_substituents import name_ring_system_substituent
+            _rbs_mancude = False
+            try:
+                from ..metrics.provenance import best_effort_ctx as _rbe_ctx
+                _rbs_mancude = bool(_rbe_ctx.get())
+            except Exception:
+                _rbs_mancude = False
             fallback_name = name_ring_system_substituent(
-                mol, sub_atoms, start_idx
+                mol, sub_atoms, start_idx,
+                allow_enumerator_fallback=True,
+                allow_mancude=_rbs_mancude,
             )
         else:
             from ..assembly.substituent_enumerator import name_substituent
@@ -2028,6 +2048,59 @@ def _identify_fused_substituent(
                             'type': 'functional',
                             'atoms': [start_idx] + alkyl_atoms
                         }
+
+    # v36 core-namer (general ring-bearing compound substituent, best-effort
+    # tier only). Every element-specific branch above returns early for the
+    # shapes it recognises; a ring-bearing compound substituent rooted at a
+    # HETEROATOM linker reaches here unrecognised and used to silently drop
+    # (``return None`` -> caller ``continue``). The pantoprazole C2 half is
+    # exactly this shape: it is rooted at the sulfinyl S (a heteroatom), so it
+    # NEVER reaches the carbon branch's ring delegate above -- the S branch has
+    # no ring-bearing delegate and returned None. Generalise the carbon branch's
+    # move: delegate ANY ring-bearing fragment, whatever its root element, to the
+    # single WS-A delegate ``name_ring_system_substituent``. Gated on
+    # ``best_effort_ctx`` so the PIN / default tier is byte-identical (no new
+    # emission there), and both name-producing flags are passed (the delegate's
+    # own guards + the downstream SELF-01 / RT gate keep it 0-wrong: a fragment
+    # it cannot number returns None, a mis-numbering abstains -- never a wrong
+    # molecule). The same guards the carbon branch uses apply: modest size, only
+    # common-organic elements, and no ring straddling the parent core (which
+    # would mean an incomplete core mapping, not a substituent).
+    _be_ring_sub = False
+    try:
+        from ..metrics.provenance import best_effort_ctx as _rbe_ctx2
+        _be_ring_sub = bool(_rbe_ctx2.get())
+    except Exception:
+        _be_ring_sub = False
+    if _be_ring_sub:
+        _ri = mol.GetRingInfo()
+        _COMMON_ORGANIC2 = {'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'}
+        _frag2 = _bfs_collect_all(mol, start_idx, excluded)
+        if _frag2 and len(_frag2) <= 25:
+            _fset2 = set(_frag2)
+            _straddle = any(
+                (set(_r) & _fset2) and (set(_r) & excluded)
+                for _r in _ri.AtomRings()
+            )
+            _ring_bearing = any(_ri.NumAtomRings(a) > 0 for a in _frag2)
+            _all_common = all(
+                mol.GetAtomWithIdx(idx).GetSymbol() in _COMMON_ORGANIC2
+                for idx in _frag2
+            )
+            if _ring_bearing and not _straddle and _all_common:
+                from .ring_substituents import name_ring_system_substituent
+                _tail_name = name_ring_system_substituent(
+                    mol, sorted(_frag2), start_idx,
+                    allow_enumerator_fallback=True,
+                    allow_mancude=True,
+                )
+                if (_tail_name and _tail_name != 'substituent'
+                        and ' ' not in _tail_name):
+                    return {
+                        'name': _tail_name,
+                        'type': 'functionalized',
+                        'atoms': sorted(_frag2),
+                    }
 
     return None
 
