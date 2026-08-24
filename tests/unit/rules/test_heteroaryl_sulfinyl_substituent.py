@@ -39,9 +39,20 @@ def test_benzene_control_unchanged():
     assert Orthonym(style="pin").name("CS(=O)c1ccccc1") == "(methanesulfinyl)benzene"
 
 
-def test_complex_arm_fails_closed():
-    """A benzyl/aryl-methyl arm (`benzylsulfinyl`) is not yet buildable by the
-    recursive namer -> the coverage guard fails and the molecule abstains (safe,
-    no atom-dropping name). Documented follow-up (blocks the full omeprazole)."""
-    r = _be().name_tiered("O=S(Cc1ccccc1)c1ccncc1")
-    assert r["name"] is None or r["tier"] == "T5"
+def test_complex_arm_names_substitutively():
+    """v36 Wave F (core-namer item 3): a benzyl/aryl-methyl arm now names
+    SUBSTITUTIVELY via the sulfinyl/sulfonyl-rooted guard in
+    ``name_substituent`` -> ``4-(benzylsulfinyl)pyridine`` (was the stale
+    abstain pin, and before the guard the 'a'-replacement
+    ``4-(2-(cyclohexa-1,3,5-trien-1-yl)-1-oxo-1-thiaethyl)pyridine``). OPSIN
+    round-trips to the input InChIKey (change-asserted-value verified)."""
+    from rdkit import Chem
+    from rdkit.Chem import inchi
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    smi = "O=S(Cc1ccccc1)c1ccncc1"
+    r = _be().name_tiered(smi)
+    assert r["name"] == "4-(benzylsulfinyl)pyridine"
+    assert "oxo" not in r["name"] and "thiaethyl" not in r["name"]
+    got = opsin_parse(r["name"])
+    assert got and (inchi.MolToInchiKey(Chem.MolFromSmiles(got))
+                    == inchi.MolToInchiKey(Chem.MolFromSmiles(smi)))

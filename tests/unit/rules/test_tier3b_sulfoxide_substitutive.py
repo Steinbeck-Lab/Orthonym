@@ -20,6 +20,7 @@ all-C chain / plain benzene / plain cycloalkane — else fall back or fail).
 
 import pytest
 from rdkit import Chem
+from rdkit.Chem import inchi
 
 from orthonym import name_compound
 
@@ -116,11 +117,22 @@ class TestConservation:
             "1-(methanesulfinyl)-2-(methylsulfanyl)ethane"
         )
 
-    def test_benzyl_side_declines(self, _validity_gate_on):
-        # A benzyl side is not an honestly-nameable FC side (the old walk
-        # flattened it to 'heptyl'); substitutive needs the benzene-path
-        # S-branch namer (deferred) -> deterministic unknown.
-        assert name_compound("CS(=O)(=O)Cc1ccccc1") == "unknown organic compound"
+    def test_benzyl_side_names_substitutively(self, _validity_gate_on):
+        # A benzyl side was "not an honestly-nameable FC side" and this pinned
+        # the abstention, recording "substitutive needs the benzene-path S-branch
+        # namer (deferred)". That deferral has since closed: the benzene parent
+        # now names the -CH2-S(=O)(=O)-CH3 substituent substitutively as
+        # ``[(methanesulfonyl)methyl]benzene``. Confirmed pre-existing (identical
+        # at HEAD via ), so this is a stale expectation, not a
+        # regression. OPSIN round-trips to the input InChIKey (change-asserted-
+        # value verified).
+        name = name_compound("CS(=O)(=O)Cc1ccccc1")
+        assert name == "[(methanesulfonyl)methyl]benzene"
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        got = opsin_parse(name)
+        assert got and (inchi.MolToInchiKey(Chem.MolFromSmiles(got))
+                        == inchi.MolToInchiKey(Chem.MolFromSmiles(
+                            "CS(=O)(=O)Cc1ccccc1")))
 
     def test_classifier_shapes(self):
         from orthonym.rules.sulfur import _classify_oxide_side

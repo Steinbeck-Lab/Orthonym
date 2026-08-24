@@ -2303,6 +2303,76 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                     return _stereo_route(
                         f"{_HALOGEN_MAP[_x.GetSymbol()]}sulfanyl")
 
+    # ---- Tier 1.85 (v36 Wave F): SULFINYL / SULFONYL-rooted substituent -----
+    # A fragment rooted at a sulfinyl ``-S(=O)-`` or sulfonyl ``-S(=O)(=O)-``
+    # sulfur bridging the parent to exactly ONE in-fragment carbon subtree R is
+    # the substitutive prefix ``{R}sulfinyl`` / ``{R}sulfonyl`` (P-63.6) -- NOT
+    # a skeletal-replacement chain. Without this the sulfinyl-S attach reaches
+    # the last-resort ``terminal_fragment`` replacement generator, which spells
+    # the whole -S(=O)-CH2-Ar half as ``2-[...]-1-oxo-1-thiaethyl`` (an
+    # 'a'-replacement name that round-trips but is NOT the retained/substitutive
+    # PIN spelling): the pantoprazole class. PREFERENCE ORDER: the acid-stem PIN
+    # form (``methanesulfinyl``, ``get_sulfinyl_prefix``) FIRST -- so a simple
+    # ``-S(=O)CH3`` that ever reaches here keeps its PIN spelling and never
+    # regresses to the non-PIN ``methylsulfinyl`` -- then the additive
+    # ``[Rsub]sulfinyl`` form (R named by re-entering ``name_substituent`` on
+    # the strictly-smaller carbon subtree) when the acid-stem producer declines
+    # a compound R. GATED on ``allow_mancude`` (complete/best-effort tier) ->
+    # PIN default byte-identical; fail-closed (falls through to the replacement
+    # generator) for any non-sulfinyl/sulfonyl shape. SELF-01 backstops.
+    if (allow_mancude and attach_idx is not None
+            and attach_idx in frag_atoms_set):
+        _oa = mol.GetAtomWithIdx(attach_idx)
+        if (_oa.GetSymbol() == 'S' and _oa.GetFormalCharge() == 0
+                and _oa.GetTotalNumHs() == 0
+                and _oa.GetNumRadicalElectrons() == 0):
+            _dbl_o = [n for n in _oa.GetNeighbors()
+                      if n.GetSymbol() == 'O' and n.GetDegree() == 1
+                      and n.GetIdx() in frag_atoms_set
+                      and mol.GetBondBetweenAtoms(attach_idx, n.GetIdx())
+                      .GetBondTypeAsDouble() == 2.0]
+            _c_in = [n.GetIdx() for n in _oa.GetNeighbors()
+                     if n.GetIdx() in frag_atoms_set and n.GetAtomicNum() == 6]
+            _s_ext = [n.GetIdx() for n in _oa.GetNeighbors()
+                      if n.GetIdx() not in frag_atoms_set]
+            _kind = {1: 'sulfinyl', 2: 'sulfonyl'}.get(len(_dbl_o))
+            # Exactly: n double-bond oxygens (both in-fragment) + one in-fragment
+            # carbon subtree R + one bond leaving to a parent carbon, and NO other
+            # neighbour (so every S neighbour is accounted -> no silent atom drop).
+            if (_kind is not None and len(_c_in) == 1 and len(_s_ext) == 1
+                    and mol.GetAtomWithIdx(_s_ext[0]).GetSymbol() == 'C'
+                    and _oa.GetDegree() == len(_dbl_o) + 2):
+                _sulf = None
+                try:
+                    from .substituent_prefix_forms import (
+                        get_sulfinyl_prefix, get_sulfonyl_prefix)
+                    _parent_side = sorted(
+                        set(range(mol.GetNumAtoms())) - frag_atoms_set)
+                    _getter = (get_sulfinyl_prefix if _kind == 'sulfinyl'
+                               else get_sulfonyl_prefix)
+                    _acid = _getter(
+                        mol, (attach_idx, _dbl_o[0].GetIdx(), _c_in[0],
+                              _s_ext[0]), principal_chain=_parent_side)
+                    if _acid and _acid.endswith(_kind) and ' ' not in _acid:
+                        _sulf = _acid
+                except Exception:
+                    _sulf = None
+                if _sulf is None:
+                    # Additive [Rsub]{kind}: R is the in-fragment carbon subtree
+                    # (fragment minus S and its =O oxygens), named substitutively.
+                    _r_atoms = (frag_atoms_set - {attach_idx}
+                                - {o.GetIdx() for o in _dbl_o})
+                    if _r_atoms and len(_r_atoms) < len(frag_atoms_set):
+                        _rname = name_substituent(
+                            mol, sorted(_r_atoms), _c_in[0], allow_mancude=True)
+                        if (_rname and _rname != 'substituent'
+                                and ' ' not in _rname
+                                and 'unknown' not in _rname.lower()):
+                            from .naming_utils import enclose_if_compound
+                            _sulf = enclose_if_compound(_rname) + _kind
+                if _sulf and _sulf != 'substituent' and ' ' not in _sulf:
+                    return _stereo_route(_sulf)
+
     # ---- Tier 1.9: the intact -C(=O)OH group is `carboxy`, never `formyl` ----
     # P-65.1.1.2. A graph-shape guard, and it has to be here rather than in
     # `parent_to_prefix`, because that function receives only a NAME.
