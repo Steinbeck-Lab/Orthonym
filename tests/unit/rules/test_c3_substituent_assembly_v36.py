@@ -39,7 +39,11 @@ owns the real fix — NONE is a DROP-24 re-anchor gap in ``assembly/``:
           (``_find_ester_decorations`` → ``_count_acid_fragment_carbons`` →
           ``get_systematic_acylate``): the 5 carbons of
           ``C(=O)N(CH2CH2Cl)(CH2CH2Cl)`` → ``pentanoate``, ignoring N and Cl —
-          a DIFFERENT molecule.
+          a DIFFERENT molecule. (Sharpened: OST's GENERAL ester path already
+          names this acid correctly — ``Cc1ccc(OC(=O)N(CCCl)CCCl)cc1`` →
+          ``4-methylphenyl N,N-bis(2-chloroethyl)carbamate`` RT-True — so the
+          defect is the STEROID ester path preempting the general one with its
+          carbon-count shortcut.)
     → RE-BUCKET to the steroid/scaffold ester engine. (Both the ester
     functional-class target and a substitutive steroid-parent + carbamoyloxy
     form are RT-verified below, so a 0-wrong name exists once that engine is
@@ -96,6 +100,11 @@ CATB3 = (
     "O=C(ON1C(=O)CCC1=O)c1cc(Cl)c2c(c1Cl)C1(OC2=O)c2cc(Cl)c(O)cc2Oc2cc(O)"
     "c(Cl)cc21"
 )
+CATB6 = "O=C1OC2(c3ccc(O)cc3Oc3cc(Oc4ccc(O)cc4)ccc32)c2ccccc21"
+
+# genuine category-(b): two independently-nameable ring systems joined by an
+# ester/ether/carbamate linker. Overlaps C4's charter (see Task 6).
+C3_CATEGORY_B_WITNESSES = {"catb3": CATB3, "catb6": CATB6}
 
 # The four category-(a)/(d) witnesses the plan's Task-2 was meant to close.
 C3_TARGET_WITNESSES = {
@@ -219,14 +228,22 @@ def test_c3_w16_names_GREEN():
 
 
 # --- Task 6: category-(b) two-ring-linker witnesses → coordinate with C4 ------
-def test_c3_categoryb_abstains_cleanly_defer_to_C4():
-    """catb3 is a genuine category-(b) case: two independently-nameable ring
-    systems joined by an ester/carbamate linker. That linker-composition step
-    overlaps C4's charter — do NOT duplicate it in C3. It must abstain CLEANLY
-    (0-wrong: an abstention, never a wrong/atom-dropped molecule) until C4 owns
-    it. The 2 bis-indole peptide-shaped spy witnesses are EXCLUDED from C3
-    entirely (unowned peptide-backbone gap, per the spy)."""
-    name = _c3_name(CATB3)
-    assert is_failure_name(name), (
-        f"catb3 now emits {name!r} — if intentional, this belongs to C4, not C3."
+@pytest.mark.parametrize("key,smiles", sorted(C3_CATEGORY_B_WITNESSES.items()))
+def test_c3_categoryb_abstains_cleanly_defer_to_C4(key, smiles):
+    """Category-(b): two independently-nameable ring systems joined by an
+    ester/ether/carbamate linker. That linker-composition step overlaps C4's
+    charter — do NOT duplicate it in C3. Each must abstain CLEANLY (0-wrong: an
+    abstention, never a wrong/atom-dropped molecule) until C4 owns it. The 2
+    bis-indole peptide-shaped spy witnesses are EXCLUDED from C3 entirely
+    (unowned peptide-backbone gap, per the spy).
+
+    Gate-independent 0-wrong check (as in the RED baseline): C3 must not emit a
+    name that round-trips. At the milestone tier the SELF-01/OPSIN gate makes
+    this an outright abstention; with the gate off, the namer may emit an
+    atom-dropped near-name (e.g. catb6 → ``2-benzofuran-1(3H)-one``, only one
+    ring) that fails OPSIN-RT — never a 0-wrong emission either way."""
+    name, passed = _c3_rt(smiles)
+    assert not passed, (
+        f"{key} now produces a round-tripping name {name!r} — if intentional, "
+        f"this belongs to C4, not C3."
     )
