@@ -64,26 +64,37 @@ pytestmark = pytest.mark.unit
 # Table-2.8 citation order (note ``5-oxa-3-sila`` and ``5-aza-3-bora``: cited by
 # ELEMENT seniority, not by locant); three lambda cases (P-31.1.4.2).
 # ---------------------------------------------------------------------------
+# v36 REBASELINE (2026-08-24): the 25 rows below were re-captured after v34
+# (58209798, analyze_cage_universal) corrected the von-Baeyer heteroatom
+# numbering to give the LOWEST locant set (P-31.1.4.3.4). The pre-v34 captures
+# (3-oxa, 3-oxa-5-aza, 2,4,7-trioxa, 3lambda3-tellura ...) put heteroatoms at
+# NON-minimal locants; a valid lower-locant numbering exists for each (OPSIN
+# round-trips the new full name to the input InChIKey), so the old values
+# VIOLATED the lowest-locant rule and were non-preferred. New values are
+# PIN-correct: locant set lowest, and within a tied set the senior element
+# (O before N/S, per the replacement seniority order) takes the lower locant
+# (e.g. 2-oxa-6-aza, not 6-oxa-2-aza). change-asserted-value: old provably
+# non-minimal (decisive); cross-checked; mutation-verified.
 BASELINE = [
     # --- single occurrence, every element in the table ---
-    ("O1CC2CCC1C2", "3-oxa"),
-    ("S1CC2CCC1C2", "3-thia"),
-    ("[Se]1CC2CCC1C2", "3-selena"),
-    ("[Te]1CC2CCC1C2", "3-tellura"),
-    ("N1CC2CCC1C2", "3-aza"),
-    ("P1CC2CCC1C2", "3-phospha"),
-    ("[AsH]1CC2CCC1C2", "3-arsa"),
-    ("[SbH]1CC2CCC1C2", "3-stiba"),
-    ("[BiH]1CC2CCC1C2", "3-bisma"),
-    ("[SiH2]1CC2CCC1C2", "3-sila"),
-    ("[GeH2]1CC2CCC1C2", "3-germa"),
-    ("[SnH2]1CC2CCC1C2", "3-stanna"),
-    ("[PbH2]1CC2CCC1C2", "3-plumba"),
-    ("B1CC2CCC1C2", "3-bora"),
+    ("O1CC2CCC1C2", "2-oxa"),
+    ("S1CC2CCC1C2", "2-thia"),
+    ("[Se]1CC2CCC1C2", "2-selena"),
+    ("[Te]1CC2CCC1C2", "2-tellura"),
+    ("N1CC2CCC1C2", "2-aza"),
+    ("P1CC2CCC1C2", "2-phospha"),
+    ("[AsH]1CC2CCC1C2", "2-arsa"),
+    ("[SbH]1CC2CCC1C2", "2-stiba"),
+    ("[BiH]1CC2CCC1C2", "2-bisma"),
+    ("[SiH2]1CC2CCC1C2", "2-sila"),
+    ("[GeH2]1CC2CCC1C2", "2-germa"),
+    ("[SnH2]1CC2CCC1C2", "2-stanna"),
+    ("[PbH2]1CC2CCC1C2", "2-plumba"),
+    ("B1CC2CCC1C2", "2-bora"),
     # --- repeats of one element (SIMPLE_MULTIPLIERS) ---
     ("O1COC2CC1C2", "2,4-dioxa"),
     ("N1CNC2CC1C2", "2,4-diaza"),
-    ("O1COC2OC1C2", "2,4,7-trioxa"),
+    ("O1COC2OC1C2", "2,4,6-trioxa"),
     ("S1CSC2CC1C2", "2,4-dithia"),
     # --- all-heteroatom cages ---
     ("[SiH2]1[SiH2][SiH]2[SiH2][SiH2][SiH]1[SiH2]2",
@@ -93,21 +104,21 @@ BASELINE = [
     ("[Te]1[Te][Te]2[Te][Te][Te]1[Te]2",
      "1λ3,2,3,4λ3,5,6,7-heptatellura"),
     # --- multi-element citation order (element seniority, NOT locant order) ---
-    ("O1CC2CNC1C2", "3-oxa-5-aza"),
-    ("O1CC2CSC1C2", "3-oxa-5-thia"),
-    ("S1CC2CNC1C2", "3-thia-5-aza"),
+    ("O1CC2CNC1C2", "2-oxa-6-aza"),
+    ("O1CC2CSC1C2", "2-oxa-6-thia"),
+    ("S1CC2CNC1C2", "2-thia-6-aza"),
     ("O1CSC2CNC1C2", "4-oxa-2-thia-6-aza"),
-    ("[SiH2]1CC2COC1C2", "5-oxa-3-sila"),
-    ("B1CC2CNC1C2", "5-aza-3-bora"),
-    ("[Se]1CC2C[Te]C1C2", "3-selena-5-tellura"),
-    ("P1CC2C[AsH]C1C2", "3-phospha-5-arsa"),
-    ("[SnH2]1CC2C[PbH2]C1C2", "3-stanna-5-plumba"),
-    ("[SbH]1CC2C[BiH]C1C2", "3-stiba-5-bisma"),
+    ("[SiH2]1CC2COC1C2", "2-oxa-6-sila"),
+    ("B1CC2CNC1C2", "2-aza-6-bora"),
+    ("[Se]1CC2C[Te]C1C2", "2-selena-6-tellura"),
+    ("P1CC2C[AsH]C1C2", "2-phospha-6-arsa"),
+    ("[SnH2]1CC2C[PbH2]C1C2", "2-stanna-6-plumba"),
+    ("[SbH]1CC2C[BiH]C1C2", "2-stiba-6-bisma"),
     # --- lambda IS cited (valence exceeds the connectivity-forced value) ---
     ("C1C[SH2]C2CCC1C2", "2λ4-thia"),
     ("C1C[SH4]C2CCC1C2", "2λ6-thia"),
     ("C1C[PH3]C2CCC1C2", "2λ5-phospha"),
-    ("[TeH]1CC2CCC1C2", "3λ3-tellura"),
+    ("[TeH]1CC2CCC1C2", "2λ3-tellura"),
     ("[PH]12CCC(CC1)C2", "1λ4-phospha"),
     ("[SbH]12CCC(CC1)C2", "1λ4-stiba"),
     # --- lambda is SUPPRESSED (bridgehead valence forced by skeletal degree, so
@@ -378,8 +389,8 @@ def test_analyze_cage_universal_refuses_off_table(smiles, allow_mancude):
 
 
 @pytest.mark.parametrize("smiles,expected_prefix", [
-    ("C1CC2CC[Se]C2C1", "6-selena"),
-    ("C1CC2CCOC2C1", "6-oxa"),
+    ("C1CC2CC[Se]C2C1", "2-selena"),
+    ("C1CC2CCOC2C1", "2-oxa"),
 ])
 @pytest.mark.parametrize("allow_mancude", [False, True])
 def test_analyze_cage_universal_still_names_in_table(
@@ -440,8 +451,8 @@ def test_namer_never_gives_a_hydrocarbon_name_to_an_off_table_cage(
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("C1CC2CC[Se]C2C1", "6-selenabicyclo[3.3.0]octane"),
-    ("C1CC2CCOC2C1", "6-oxabicyclo[3.3.0]octane"),
+    ("C1CC2CC[Se]C2C1", "2-selenabicyclo[3.3.0]octane"),
+    ("C1CC2CCOC2C1", "2-oxabicyclo[3.3.0]octane"),
 ])
 def test_namer_still_names_in_table_cages(smiles, expected, no_opsin_jar):
     """The fail-closed rule must cost NOTHING on the 14 in-table elements."""
