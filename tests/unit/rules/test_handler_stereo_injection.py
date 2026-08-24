@@ -493,7 +493,6 @@ def test_cycloalkane_no_exocyclic_ez_misattribution():
     """
     from orthonym import name_compound
     import inspect
-    from orthonym.assembly import composer
     from orthonym.rules.stereochemistry import inject_stereo_from_locant_map
 
     # End-to-end behavioural assertion (plan-specified canary):
@@ -507,18 +506,22 @@ def test_cycloalkane_no_exocyclic_ez_misattribution():
         f"mis-attributed to a ring locant: {name!r}"
     )
 
-    # Source-level mechanism gate. The wiring at composer.py:1808-1825 must
-    # contain BOTH the _ring_is_whole_molecule boolean AND the
-    # include_near_parent_ez=_ring_is_whole_molecule argument forwarding.
-    composer_src = inspect.getsource(composer)
-    assert "_ring_is_whole_molecule" in composer_src, (
-        "BL-02 fix missing: composer.py must compute _ring_is_whole_molecule "
-        "for the cycloalkane/cycloalkene branch."
+    # Source-level mechanism gate. The Tier-A ring injection wiring was
+    # REFACTORED out of composer.py into assembly/handlers/tier_a_ring.py
+    # (v36 Milestone C); re-point the greps there. The live mechanism computes
+    # the per-molecule whole-ring boolean _inpe (via
+    # _ring_is_whole_molecule_for_complex) and forwards it as
+    # include_near_parent_ez=_inpe -- exactly the "do not attribute exocyclic
+    # E/Z to a ring locant when the ring is not the whole molecule" gate.
+    from orthonym.assembly.handlers import tier_a_ring
+    tier_a_src = inspect.getsource(tier_a_ring)
+    assert "_ring_is_whole_molecule_for_complex(" in tier_a_src, (
+        "BL-02 fix missing: tier_a_ring must compute the per-molecule "
+        "whole-ring boolean via _ring_is_whole_molecule_for_complex."
     )
-    assert "include_near_parent_ez=_ring_is_whole_molecule" in composer_src, (
-        "BL-02 fix missing: cycloalkane caller must forward "
-        "include_near_parent_ez=_ring_is_whole_molecule to "
-        "inject_stereo_from_locant_map."
+    assert "include_near_parent_ez=_inpe" in tier_a_src, (
+        "BL-02 fix missing: the Tier-A ring caller must forward the "
+        "per-molecule include_near_parent_ez=_inpe to the stereo injector."
     )
 
     # Signature gate. The injector must accept the include_near_parent_ez
@@ -848,10 +851,16 @@ class TestComplexRingHelpers:
 
 @pytest.mark.unit
 class TestComplexRingTierAWiring:
-    """Static-source verifications for D-01 / D-05 / D-06 wiring (commit 2/5)."""
+    """Static-source verifications for D-01 / D-05 / D-06 wiring (commit 2/5).
+
+    The Tier-A ring injection block was REFACTORED out of ``composer.py`` into
+    ``assembly/handlers/tier_a_ring.py`` (v36 Milestone C); these greps are
+    re-pointed there. Verified the block is present at tier_a_ring.py."""
+
+    _TIER_A = "src/orthonym/assembly/handlers/tier_a_ring.py"
 
     def test_complex_ring_in_handler_set(self):
-        with open("src/orthonym/assembly/composer.py") as f:
+        with open(self._TIER_A) as f:
             src = f.read()
         # Find the Tier-A injection block by anchoring on the handler tuple.
         assert "best.handler in ('benzene', 'heterocycle', 'complex_ring')" in src, (
@@ -859,21 +868,20 @@ class TestComplexRingTierAWiring:
         )
 
     def test_complex_ring_pool_add_passes_parent_atom_indices(self):
-        with open("src/orthonym/assembly/composer.py") as f:
+        with open(self._TIER_A) as f:
             src = f.read()
-        # The pool.add at line ~1404 must pass parent_atom_indices=
+        # The pool.add must pass parent_atom_indices= via the new helper.
         assert "parent_atom_indices=_complex_ring_parent_atom_indices(" in src, (
             "D-05: pool.add for complex_ring must pass parent_atom_indices "
             "via the new helper"
         )
 
     def test_complex_ring_uses_per_molecule_include_near_parent_ez(self):
-        with open("src/orthonym/assembly/composer.py") as f:
+        with open(self._TIER_A) as f:
             src = f.read()
         # D-06: the new wiring must call _ring_is_whole_molecule_for_complex
-        # to compute include_near_parent_ez per-molecule. (The composer.py:7305
-        # hardcoded include_near_parent_ez=True anti-pattern is preserved at
-        # the OLDER path per D-21; the NEW path computes per-molecule.)
+        # to compute include_near_parent_ez per-molecule for the complex_ring
+        # branch (benzene/heterocycle keep include_near_parent_ez=True).
         assert "_ring_is_whole_molecule_for_complex(" in src, (
             "D-06: new wiring must use _ring_is_whole_molecule_for_complex "
             "(per-molecule include_near_parent_ez)"

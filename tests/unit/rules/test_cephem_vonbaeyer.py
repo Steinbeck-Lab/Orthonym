@@ -128,18 +128,19 @@ def test_3_methyl_cephem_names_correctly(opsin_gate):
 
 
 @pytest.mark.opsin_gate
-def test_full_cephalosporin_with_acylamino_still_abstains_not_forced(opsin_gate):
-    """A full cephalosporin core (7-acetamido + 3-methyl analogue) currently
-    still abstains -- an UNRELATED, pre-existing substituent-naming defect
-    (the -NHC(=O)CH3 acylamino group on the secondary-bridge ring carbon is
-    mis-decomposed as a plain 'ethyl' substituent, an atom-drop that SELF-01/
-    OPSIN suppresses with the gate on -- the raw, gate-off candidate is
-    '7-ethyl-8-oxo-...', a WRONG constitution, not this fix's numbering bug).
-    Documented per instructions rather than forced: this ticket's scope is
-    the ring numbering/unsaturation interaction, not the acylamino
-    substituent namer."""
+def test_full_cephalosporin_with_acylamino_names_correctly(opsin_gate):
+    """A full cephalosporin core (7-acetamido + the corrected oct-2-ene / 8-oxo
+    numbering) now names correctly at the PIN tier. This used to abstain on an
+    UNRELATED pre-existing defect (the -NHC(=O)CH3 acylamino group was
+    mis-decomposed as a plain 'ethyl', a WRONG-constitution atom-drop that
+    SELF-01/OPSIN suppressed); that acylamino namer has since been fixed, so the
+    acetamido group is now placed and the whole name round-trips. Golden updated
+    per change-asserted-value (OPSIN RT to the input InChIKey verified below)."""
     smiles = "OC(=O)C1=CCSC2C(NC(=O)C)C(=O)N12"
+    expected = ("7-acetamido-8-oxo-5-thia-1-azabicyclo[4.2.0]"
+                "oct-2-ene-2-carboxylic acid")
     emitted = _namer().name(smiles)
-    assert _abstains(emitted), (
-        f"{smiles} now emits {emitted!r} -- if this now round-trips, replace "
-        f"this abstention pin with a positive assertion")
+    assert not _abstains(emitted), f"{smiles} abstained: {emitted!r}"
+    assert _rt_inchikey(emitted) == _inchikey(smiles), (
+        f"{smiles} -> {emitted!r} does not round-trip to the input molecule")
+    assert emitted == expected, f"spelling changed: {emitted!r} != {expected!r}"

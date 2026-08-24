@@ -267,9 +267,14 @@ ASSEMBLY_POSITIVES = [
     ("CC1CCCC(O)/C=C/C2C(O)CC(O)CC2/C=C/C=C\\C/C=C/C=C\\C(=O)O1",
      "(2E,11Z,13E,16Z,18E)-4,22,24-trihydroxy-8-methyl-10-oxo-9-oxabicyclo"
      "[18.4.0]tetracosa-2,11,13,16,18-pentaene"),
+    # P-16.3.3 enclosing-mark nesting: the compound prefix already contains
+    # parentheses (the (1Z) descriptor), so its own enclosure escalates to
+    # brackets -- '3-[(1Z)-...]', not the doubled-parens '3-((1Z)-...)'.
+    # Golden updated (change-asserted-value: RT-verified by this test's own
+    # InChIKey assertion above).
     ("CCC(C)CC(C)/C=C\\[C@@H]1O[C@H]2[C@H](C(=O)O[C@H]2C)[C@H](O)[C@H]1O",
-     "(1S,3S,4R,5S,6R,9S)-4,5-dihydroxy-9-methyl-7-oxo-3-((1Z)-3,5-"
-     "dimethylhept-1-en-1-yl)-2,8-dioxabicyclo[4.3.0]nonane"),
+     "(1S,3S,4R,5S,6R,9S)-4,5-dihydroxy-9-methyl-7-oxo-3-[(1Z)-3,5-"
+     "dimethylhept-1-en-1-yl]-2,8-dioxabicyclo[4.3.0]nonane"),
     ("CCN1CC(=O)Nc2ccccc2C(=O)Nc2ccccc2C(=O)O[C@H](Cc2ccccc2)C1=O",
      "(7R)-7-benzyl-5-ethyl-3,6,9,17-tetraoxo-8-oxa-2,5,16-triazatricyclo"
      "[16.4.0.0^10,15]docosa-1(22),10,12,14,18,20-hexaene"),
