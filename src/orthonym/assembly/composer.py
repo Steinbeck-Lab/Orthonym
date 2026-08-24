@@ -4450,10 +4450,10 @@ def _assemble_complete_bicyclo_name(mol, features):
 
     # Assemble the name
     # Format: (stereo)-substituent-prefix-heteroatom-prefix-descriptor-parent-unsaturation
+    # v36 Wave E — the stereo prefix is applied LAST (see the end of this function)
+    # so it can be RT-gated at the top level; the constitution (stereo-free) name
+    # is assembled first.
     parts = []
-
-    if stereo_prefix:
-        parts.append(stereo_prefix)
 
     if sub_prefix:
         # SUB-02 (B-fix): a hyphen separates the substituent prefix from the
@@ -4486,8 +4486,31 @@ def _assemble_complete_bicyclo_name(mol, features):
         main_name = f"{main_name}{suffix_str}"
     parts.append(main_name)
 
-    # Join parts
-    name = "".join(parts)
+    # Join the constitution (stereo-free) parts.
+    constitution_name = "".join(parts)
+
+    # Apply stereo. v36 Wave E — 0-wrong hardening: at the TOP LEVEL route the
+    # stereo through inject_stereo_reanchored_rt_gated, which RT-gates the numbering
+    # and OMITS a stereo layer OPSIN cannot verify (rather than shipping a
+    # pseudoasymmetric von-Baeyer descriptor such as `(1r,5s)-` that does not
+    # round-trip — a residual 0-wrong leak: the namer's BBR-GATE stereo carve-out
+    # ships such a name whole because its CONSTITUTION parses). Byte-identical for
+    # every currently-round-tripping stereo name: candidate A reuses the same
+    # collect_stereodescriptors(mol, atom_to_locant) prefix this path already built
+    # (include_near_parent_ez is a no-op), so a round-tripping name keeps its exact
+    # descriptor block. Sub-fragment naming keeps the direct descriptor (no
+    # per-fragment OPSIN calls); the whole-molecule gate downstream still applies.
+    if stereo_prefix:
+        from ..assembly.fragment_naming import is_top_level_naming
+        if is_top_level_naming():
+            from ..rules.stereochemistry import inject_stereo_reanchored_rt_gated
+            name = inject_stereo_reanchored_rt_gated(
+                constitution_name, mol, atom_to_locant,
+            )
+        else:
+            name = stereo_prefix + constitution_name
+    else:
+        name = constitution_name
 
     return (name, ring_atoms, atom_to_locant, True)
 

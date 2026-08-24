@@ -923,7 +923,19 @@ def inject_stereo_reanchored_rt_gated(
                     return candidate_b
             except Exception:
                 pass
-    return candidate_a
+    # v36 Wave E — 0-wrong hardening. Re-anchor FAILED (no OPSIN locant map, or
+    # candidate B still does not full-round-trip): the stereo descriptor cannot be
+    # placed on a numbering OPSIN reads back correctly. Returning candidate A here
+    # ships a name whose stereo layer OPSIN cannot verify — the BBR-GATE stereo
+    # carve-out (namer.py) then emits it whole because its CONSTITUTION parses,
+    # i.e. a WRONG/unverifiable-stereo name reaches T1 (a residual 0-wrong leak).
+    # Instead return the stereo-STRIPPED FLAT name: constitution-correct,
+    # OPSIN-parseable, stereo OMITTED per project policy
+    # (feedback_stereo_omission_is_not_wrong_molecule). ``base_name`` is the
+    # pre-injection constitution name by the caller's ``needs_stereo_injection``
+    # contract; ``strip_stereo`` is applied belt-and-suspenders so any leading
+    # descriptor that did survive on it is also dropped.
+    return strip_stereo(base_name)
 
 
 def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, int]:

@@ -3309,10 +3309,9 @@ def name_polycyclic_complete(mol, features=None):
 
     # 8. Assemble final name
     # Order: (stereo)-substituents-heteroprefix-cycloprefix[descriptor]parent-suffix
+    # The stereo prefix is applied LAST (see step 9) so it can be RT-gated at the
+    # top level; here we build the constitution (stereo-free) name only.
     name_parts = []
-
-    if stereo_prefix:
-        name_parts.append(stereo_prefix)
 
     if substituent_prefix:
         # S1 (v24) — same stray-hyphen class: a substituent prefix attaches DIRECTLY
@@ -3333,9 +3332,32 @@ def name_polycyclic_complete(mol, features=None):
     name_parts.append(desc.descriptor_string)
     name_parts.append(parent_name)
 
-    # Join - the stereo prefix ends with '-'; the substituent prefix's trailing '-'
-    # is handled above (kept before a locant, dropped before the descriptor).
-    name = ''.join(name_parts)
+    # Join the constitution (stereo-free) name. The substituent prefix's trailing
+    # '-' is handled above (kept before a locant, dropped before the descriptor).
+    constitution_name = ''.join(name_parts)
+
+    # 9. Apply stereo. v36 Wave E — 0-wrong hardening: at the TOP LEVEL, route the
+    # stereo through inject_stereo_reanchored_rt_gated, which RT-gates the numbering
+    # and OMITS a stereo layer OPSIN cannot verify (rather than shipping a
+    # pseudoasymmetric von-Baeyer descriptor like `(1r,5s)-` that does not
+    # round-trip — a residual 0-wrong leak via the namer's BBR-GATE stereo
+    # carve-out). This is byte-identical for every currently-round-tripping stereo
+    # name: candidate A reuses the same collect_stereodescriptors(mol, numbering)
+    # this path always used (include_near_parent_ez is a no-op), so a name that
+    # round-trips keeps its exact descriptor block. When naming a SUB-fragment
+    # (not top level) the descriptor is applied directly as before — no per-fragment
+    # OPSIN calls, and the whole-molecule gate downstream still applies.
+    if stereo_prefix:
+        from ..assembly.fragment_naming import is_top_level_naming
+        if is_top_level_naming():
+            from ..rules.stereochemistry import inject_stereo_reanchored_rt_gated
+            name = inject_stereo_reanchored_rt_gated(
+                constitution_name, mol, desc.numbering,
+            )
+        else:
+            name = stereo_prefix + constitution_name
+    else:
+        name = constitution_name
 
     return (name, ring_atoms, desc.numbering, True)
 
