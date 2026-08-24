@@ -55,6 +55,17 @@ from ..perception.rings import (
     is_heterocyclic,
 )
 
+# v36 C5 giant-cage scope guard (identify_polycyclic): no entry in POLYCYCLIC_DATA
+# exceeds ~10 fused rings (max cataloged num_atoms is 40, a cata-fused chain -- see
+# ). A fullerene (C60/C70/
+# ...) is an all-carbon mancude cage with 20-40+ SSSR rings and an automorphism group
+# so large that matching a cataloged PAH SMARTS against it enumerates a combinatorial
+# number of automorphic matches (measured 63.1s on C70). Fullerenes are explicitly
+# out-of-scope (project the contributor guide Scope section); decline fast rather than spin. The
+# threshold sits far above any cataloged/realistic substituted-PAH ring count and far
+# below a fullerene's, so no in-scope molecule can trip it.
+_GIANT_CAGE_RING_THRESHOLD = 20
+
 
 def identify_polycyclic(mol) -> Optional[str]:
     """
@@ -77,6 +88,14 @@ def identify_polycyclic(mol) -> Optional[str]:
         >>> identify_polycyclic(mol)
         'naphthalene'
     """
+    # v36 C5: an all-carbon giant cage (fullerene) is out-of-scope and would spin
+    # in the substructure-matching loop below -- decline fast (see module docstring
+    # on _GIANT_CAGE_RING_THRESHOLD above).
+    if mol.GetRingInfo().NumRings() >= _GIANT_CAGE_RING_THRESHOLD and all(
+        atom.GetSymbol() == 'C' for atom in mol.GetAtoms()
+    ):
+        return None
+
     # First, try exact canonical match (unsubstituted PAH)
     canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
     if is_polycyclic_aromatic(canonical_smiles):
@@ -98,7 +117,11 @@ def identify_polycyclic(mol) -> Optional[str]:
         if pattern is None:
             continue
 
-        matches = mol.GetSubstructMatches(pattern)
+        # v36 C5: only matches[0] is ever read below -- bound the search so a
+        # highly-symmetric giant cage cannot enumerate a combinatorial number of
+        # automorphic matches (measured 63.1s on a C70 fullerene before the scope
+        # guard above; this cap is behaviour-preserving for every other call site).
+        matches = mol.GetSubstructMatches(pattern, maxMatches=1, uniquify=True)
         if matches:
             # Verify that all atoms in the match are aromatic or expected sp3
             # (for fluorene, acenaphthene which have methylene bridges)
