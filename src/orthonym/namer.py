@@ -2360,6 +2360,7 @@ class Orthonym:
                  general_fallback_unverified: bool = False,
                  allow_aromatic_general: bool = False,
                  _principal_group_override: Optional[str] = None,
+                 _seed_excluded_dispatch_classes: frozenset = frozenset(),
                  binding_proof: str = "off"):
         """
         Initialize namer.
@@ -2456,7 +2457,18 @@ class Orthonym:
         # class that produced the name now under gate. Both are per-molecule
         # scratch: name() clears them on entry and in a finally, so nothing
         # leaks between molecules (that would make naming order-dependent).
-        self._excluded_dispatch_classes: frozenset = frozenset()
+        # v36 B2: an OPTIONAL seed of dispatch classes to exclude for EVERY
+        # molecule named by this instance (default empty -> byte-identical). Used
+        # by the aminium suffix-correctness re-derivation in charged_router to
+        # skip the RETAINED_NAME handler (a retained diol-principal name such as
+        # 'trometamol' cannot take a valid '-ium' suffix; excluding it lets the
+        # systematic amine-principal parent be derived instead). It SURVIVES the
+        # per-molecule reset below (that reset restores this seed, not the empty
+        # set) so the exclusion is honoured on the first pass, not only on a
+        # gate-rejection retry.
+        self._seed_excluded_dispatch_classes: frozenset = frozenset(
+            _seed_excluded_dispatch_classes)
+        self._excluded_dispatch_classes: frozenset = self._seed_excluded_dispatch_classes
         self._last_dispatch_class = None
         # Phase 173.6 T3: scoped principal-group override (FG name). Set ONLY by the
         # charged chokepoint's S/P-oxoacid-anion re-entry (_reenter_forced) so the
@@ -2849,7 +2861,7 @@ class Orthonym:
             # gate-rejection exclusion set is PER-MOLECULE; leaking it would
             # make a molecule's name depend on what was named before it, which
             # is precisely the order-dependence this block exists to stop.
-            self._excluded_dispatch_classes = frozenset()
+            self._excluded_dispatch_classes = self._seed_excluded_dispatch_classes
             self._last_dispatch_class = None
             # v25 P0 Task 0.1: reset the typed-abstention telemetry slot per
             # top-level molecule (same invariant as the confidence/pool

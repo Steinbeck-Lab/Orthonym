@@ -1330,6 +1330,31 @@ def _reenter_gated(neutral_smi: str, style: str) -> str:
                      **_best_effort_reenter_kwargs()).name(neutral_smi)
 
 
+def _reenter_amine_forced_no_retained(neutral_smi: str, style: str,
+                                      amine_fg: str) -> str:
+    """v36 B2: re-enter the neutral skeleton with the amine FORCED as the
+    principal characteristic group AND the RETAINED_NAME dispatch handler
+    excluded.
+
+    A retained neutral name whose principal suffix is NOT the amine (trometamol
+    is diol-principal) cannot take a valid ``-ium``/``-aminium`` suffix
+    (``name_aminium_cation`` yields the OPSIN-unparseable ``trometamolium``).
+    Excluding the retained headline lets the systematic amine-principal parent be
+    derived instead (``1,3-dihydroxy-2-(hydroxymethyl)propan-2-amine`` ->
+    ``...propan-2-aminium``, which round-trips). Returns the neutral systematic
+    name, or ``'unknown organic compound'`` / '' if none exists."""
+    from ..namer import Orthonym
+    try:
+        from ..routing.dispatch_table import StoutClass
+        excl = frozenset({StoutClass.RETAINED_NAME})
+    except Exception:
+        excl = frozenset()
+    return Orthonym(style=style, _disable_opsin_validity_gate=True,
+                     _principal_group_override=amine_fg,
+                     _seed_excluded_dispatch_classes=excl,
+                     **_best_effort_reenter_kwargs()).name(neutral_smi)
+
+
 def _heavy_atom_multiset(smiles: str):
     """Counter of heavy-atom element symbols for ``smiles`` (H excluded), or None
     if it cannot be parsed. Used by the atom-coverage guard to detect an
@@ -2129,7 +2154,34 @@ def route_charged(mol, style: str = 'pin') -> str:
         # T1 (Phase 173.6): a senior-group protonated amine becomes an 'azaniumyl'
         # substituent prefix (P-73.1.1/P-74), not 'ium' appended to the parent;
         # a principal amine keeps the proven '-aminium' suffix.
-        return _aminium_or_azaniumyl(neutral_name, len(sites['cations'])) or ''
+        naive = _aminium_or_azaniumyl(neutral_name, len(sites['cations'])) or ''
+        # v36 B2 (aminium-suffix correctness): the naive transform blindly appends
+        # 'ium' to whatever neutral name it is handed. When that neutral name is a
+        # RETAINED name whose principal suffix is NOT the amine (trometamol is
+        # diol-principal), the result is OPSIN-unparseable ('trometamolium').
+        # Verify the naive name round-trips; if it does NOT (and OPSIN is present),
+        # re-derive from the SYSTEMATIC amine-principal parent (retained handler
+        # excluded) and ship that only if IT round-trips. In a jar-absent config
+        # BOTH checks fail -> the naive name is kept (byte-identical). This never
+        # ships an unverified name and never regresses an already-valid aminium.
+        if (len(sites['cations']) == 1 and naive
+                and not _cation_name_rt_ok(naive, mol)):
+            cat = mol.GetAtomWithIdx(sites['cations'][0]['atom_idx'])
+            n_c = sum(1 for nb in cat.GetNeighbors() if nb.GetSymbol() == 'C')
+            amine_fg = {1: 'primary_amine', 2: 'secondary_amine',
+                        3: 'tertiary_amine'}.get(n_c)
+            if amine_fg is not None:
+                try:
+                    sys_neutral = _reenter_amine_forced_no_retained(
+                        neutral_smi, style, amine_fg)
+                except (RecursionError, ValueError, RuntimeError):
+                    sys_neutral = ''
+                if sys_neutral and not _is_malformed_parent(sys_neutral):
+                    rederived = _aminium_or_azaniumyl(
+                        sys_neutral, len(sites['cations'])) or ''
+                    if rederived and _cation_name_rt_ok(rederived, mol):
+                        return rederived
+        return naive
 
     ionized = apply_ion_suffix_to_name(
         neutral_name, total_charge,
