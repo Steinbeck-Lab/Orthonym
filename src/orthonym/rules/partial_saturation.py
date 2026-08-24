@@ -1795,6 +1795,21 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     if not ring_set:
         return None
 
+    # v36 Wave-B BUILD-1 (parent-selection robustness; C3-SPY Site-3): the carbonyl
+    # here is named on its FUSED ring system only (``ring_set``). When that system is
+    # SPIRO- or BRIDGE-joined to further ring atoms — an SSSR ring that shares a
+    # junction atom with ``ring_set`` yet also reaches outside it — this added-
+    # indicated-H parent CANNOT express the joined partner and would silently drop
+    # it, leaving an atom-incomplete partial (a wrong molecule that only SELF-01/the
+    # RT gate catches -> abstain). Fail closed so the WHOLE shared-atom ring system
+    # routes through the complex_ring/spiro namer instead (which names it when it can,
+    # else the RT gate abstains — never a silent drop). A single-bond-linked ring
+    # substituent shares NO atom with ``ring_set`` and is unaffected (still named).
+    for _r in rings:
+        _rset = set(_r)
+        if (_rset & ring_set) and (_rset - ring_set):
+            return None
+
     carbonyls = set(_suffix_carbons(ring_set))
     if not carbonyls:
         return None
