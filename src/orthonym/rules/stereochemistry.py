@@ -853,6 +853,79 @@ def inject_stereo_from_locant_map(
     return f"{prefix}{name}"
 
 
+def inject_stereo_reanchored_rt_gated(
+    base_name: str,
+    mol,
+    builder_map: Optional[Dict[int, Any]],
+    *,
+    include_near_parent_ez: bool = True,
+    input_smiles: Optional[str] = None,
+) -> str:
+    """Inject a P-91 stereo block on *base_name*, RT-gating the LOCANT numbering
+    (the contributor guide invariant 18 — offer numberings, keep the one that round-trips).
+
+    Candidate A uses ``builder_map`` (the handler's own numbering) exactly as
+    ``inject_stereo_from_locant_map`` does. If A full-round-trips (name -> OPSIN
+    -> InChI == input's InChI), A is returned — BYTE-IDENTICAL to the plain
+    injector for every currently-passing name. Only when A does NOT full-round-
+    trip is the numbering RE-ANCHORED to OPSIN's OWN locants for *base_name*
+    (``opsin_atom_locant_map``, the authoritative numbering the name is read back
+    with) and candidate B injected on that map; B is returned ONLY if it
+    full-round-trips. Otherwise A is returned unchanged.
+
+    This rescues the mixed-spiro-fused leak class (a spiro-of-fused-component
+    parent whose ``combined_locants`` map is numbered inconsistently with the
+    printed descriptor, so the stereo descriptor lands on the wrong locant and
+    the full name is OPSIN-unparseable) WITHOUT disturbing a legitimate
+    OPSIN-can't-parse-the-stereo-layer carve-out PIN: that PIN's re-anchored form
+    also fails full-RT (OPSIN cannot parse the layer in ANY spelling), so A is
+    kept. Fail-OPEN on any OPSIN unavailability -> returns A (current behaviour).
+    """
+    candidate_a = inject_stereo_from_locant_map(
+        base_name, mol, builder_map,
+        include_near_parent_ez=include_near_parent_ez,
+    )
+    # Nothing was injected (no stereo needed / map rejected) AND the flat name is
+    # what we have: still RT-gate below, because a rejected map is exactly the
+    # case a re-anchor can rescue.
+    try:
+        from ..validation.opsin_roundtrip import (
+            opsin_roundtrip_check, opsin_atom_locant_map,
+        )
+    except Exception:
+        return candidate_a
+    if input_smiles is None:
+        try:
+            input_smiles = Chem.MolToSmiles(mol)
+        except Exception:
+            return candidate_a
+    try:
+        if opsin_roundtrip_check(input_smiles, candidate_a)["passed"]:
+            return candidate_a  # already correct -> unchanged (byte-identical)
+    except Exception:
+        return candidate_a  # RT unavailable -> fail-OPEN to current behaviour
+    # Candidate A does not full-round-trip: re-anchor to OPSIN's own numbering.
+    try:
+        rmap = opsin_atom_locant_map(base_name, mol)
+    except Exception:
+        rmap = None
+    if rmap:
+        candidate_b = inject_stereo_from_locant_map(
+            base_name, mol, rmap,
+            include_near_parent_ez=include_near_parent_ez,
+        )
+        if candidate_b != candidate_a:
+            try:
+                if opsin_roundtrip_check(input_smiles, candidate_b)["passed"]:
+                    logger.debug(
+                        "stereo re-anchor: %r -> %r (RT-gated)",
+                        candidate_a[:60], candidate_b[:60])
+                    return candidate_b
+            except Exception:
+                pass
+    return candidate_a
+
+
 def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, int]:
     """Build atom-idx → 1-indexed locant map from oriented_ring.
 

@@ -329,6 +329,41 @@ def opsin_stdout(name: str, allow_radicals: bool,
     return ("\n" if smiles is None else str(smiles) + "\n"), True
 
 
+def opsin_extended_smiles(name: str,
+                          jar_path: Optional[str] = None) -> Tuple[Optional[str], bool]:
+    """Exactly what ``java -jar opsin -o extendedsmi`` writes for ONE name.
+
+    Returns ``(extended_smiles, True)`` on success — the ``"<smiles> |$_AV:...$|"``
+    line with per-atom locant annotations — or ``(None, False)`` when the in-process
+    path cannot serve this call (jpype/jar absent, wrong jar version, embedded
+    newline, definitive OPSIN rejection, or a Java-side error), so the caller MUST
+    fall back to its subprocess path. Never raises. Mirrors ``opsin_stdout`` but for
+    the extended-SMILES output mode; used by the stereo-locant re-anchor
+    (``validation.opsin_roundtrip.opsin_atom_locant_map``)."""
+    if not name:
+        return None, False
+    if "\n" in name or "\r" in name:
+        return None, False
+    if not _ensure_jvm() or _N2S_CLS is None:
+        return None, False
+    if jar_path is not None and jar_path != _OPSIN_JAR:
+        return None, False
+    tab = name.find("\t")
+    if tab >= 0:
+        name = name[:tab]
+    try:
+        with _LOCK:
+            _attach_thread()
+            result = _n2s().parseChemicalName(name, _cfg(False))
+            ext = result.getExtendedSmiles()
+    except Exception as exc:  # a Java-side failure is transient, like a crashed CLI
+        logger.debug("in-process OPSIN extendedsmi failed for %r: %s", name, exc)
+        return None, False
+    if ext is None:
+        return None, False  # definitive rejection -> no locants to serve
+    return str(ext), True
+
+
 def centres_stdout(argv: Sequence[str]) -> Optional[str]:
     """Run ``LabelCip.main(argv)`` in-process; return its captured stdout.
 

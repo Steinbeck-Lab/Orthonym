@@ -10,10 +10,11 @@ and OPSIN JAR file(s) in the project root.
 """
 
 import os
+import re
 import subprocess
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple, Union
 from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 
@@ -118,6 +119,111 @@ def opsin_parse(name: str, jar_version: str = "2.9.0") -> Optional[str]:
         return None
 
     return out
+
+
+_AV_LINE_RE = re.compile(r"^(\S+)\s+\|\$_AV:(.*)\$\|\s*$")
+_AV_TOKEN_RE = re.compile(r"^(\d+)('*)([a-z]?)$")
+
+# A locant token as OPSIN's ``$_AV`` field spells it, re-typed for the stereo
+# map format the injector accepts (int / (int, "'") tuple / '<int><letter>'
+# string / (int, "'", 'a') tuple). See rules/stereochemistry.py
+# _render_locant_token + _composite_locant_sort_key.
+Locant = Union[int, str, Tuple]
+
+
+def _parse_av_token(tok: str) -> Optional[Locant]:
+    """Convert one OPSIN ``$_AV`` locant token to the stereo-map format.
+
+    ``'1'`` -> 1 ; ``"1'"`` -> (1, "'") ; ``'7a'`` -> '7a' ;
+    ``"3'a"`` -> (3, "'", 'a'). Returns None for anything unrecognised
+    (a compound/bridge locant OPSIN may emit) — the caller drops it, so a
+    stereocentre with an unmappable locant loses its descriptor (missing beats
+    wrong), never gets a fabricated one."""
+    m = _AV_TOKEN_RE.match(tok)
+    if not m:
+        return None
+    n = int(m.group(1))
+    primes, letter = m.group(2), m.group(3)
+    if not primes and not letter:
+        return n
+    if primes and not letter:
+        return (n, primes)
+    if letter and not primes:
+        return f"{n}{letter}"
+    return (n, primes, letter)
+
+
+def _extended_smiles(name: str, jar_version: str = "2.9.0") -> Optional[str]:
+    """OPSIN ``-o extendedsmi`` output line for *name* (in-process fast path,
+    subprocess fallback), or None if OPSIN rejected/was unavailable."""
+    jar_path = _find_opsin_jar(jar_version)
+    if jar_path is None:
+        return None
+    try:
+        from ..jvm_bridge import opsin_extended_smiles
+        text, served = opsin_extended_smiles(name, jar_path=jar_path)
+        if served:
+            return text
+    except ImportError:  # pragma: no cover - jvm_bridge always present
+        pass
+    try:
+        result = subprocess.run(
+            ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path, "-o", "extendedsmi"],
+            input=name, capture_output=True, text=True, timeout=15,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    lines = (result.stdout or "").strip().split("\n")
+    out = lines[-1].strip() if lines else ""
+    if not out or "could not be interpreted" in out.lower():
+        return None
+    return out
+
+
+def opsin_atom_locant_map(
+    name: str, mol, jar_version: str = "2.9.0",
+) -> Optional[Dict[int, Locant]]:
+    """Re-anchor an IUPAC *name*'s numbering onto *mol*'s atoms via OPSIN.
+
+    Parses *name* with ``-o extendedsmi`` to obtain OPSIN's OWN per-atom locants
+    (the authoritative numbering the name will be read back with), then maps
+    those atoms onto *mol* by constitutional (stereo-insensitive) subgraph
+    isomorphism.  Returns ``{mol_atom_idx: locant_token}`` (tokens in the
+    injector's accepted format) or None when it cannot be built (OPSIN
+    unavailable/rejecting, atom-count/parse mismatch, or no isomorphism).
+
+    This is the ``re-anchor + audit`` primitive (the contributor guide invariant 18): the
+    map is derived FROM the name+structure, never trusted from a builder's
+    internal numbering, and the caller RT-verifies any name decorated with it.
+    """
+    if mol is None:
+        return None
+    ext = _extended_smiles(name, jar_version=jar_version)
+    if not ext:
+        return None
+    m = _AV_LINE_RE.match(ext.strip())
+    if not m:
+        return None
+    smi_part, av = m.group(1), m.group(2)
+    tokens = av.split(";")
+    try:
+        from rdkit import Chem
+        omol = Chem.MolFromSmiles(smi_part)
+    except ImportError:  # pragma: no cover
+        return None
+    if omol is None or omol.GetNumAtoms() != len(tokens):
+        return None
+    # Constitutional isomorphism onto the input graph (chirality ignored — the
+    # locants are constitutional; the stereo layer is what we are re-deriving).
+    match = mol.GetSubstructMatch(omol, useChirality=False)
+    if not match or len(match) != omol.GetNumAtoms():
+        return None
+    result: Dict[int, Locant] = {}
+    for opsin_idx, mol_idx in enumerate(match):
+        loc = _parse_av_token(tokens[opsin_idx].strip())
+        if loc is not None:
+            result[mol_idx] = loc
+    return result or None
 
 
 def opsin_roundtrip_check(

@@ -510,8 +510,10 @@ def name_tier_a_ring(
                 if is_top_level_naming() and _real_coverage >= 0.99:
                     from ...rules.stereochemistry import (
                         needs_stereo_injection, inject_stereo_from_locant_map,
+                        inject_stereo_reanchored_rt_gated,
                     )
                     if needs_stereo_injection(features.mol, candidate_name):
+                        _is_complex = best.handler not in ('benzene', 'heterocycle')
                         if best.handler == 'benzene':
                             atom_to_locant = getattr(
                                 features, 'benzene_atom_to_locant', None,
@@ -531,10 +533,25 @@ def name_tier_a_ring(
                             _inpe = _ring_is_whole_molecule_for_complex(
                                 _complex_result_for_injection, features.mol,
                             )
-                        candidate_name = inject_stereo_from_locant_map(
-                            candidate_name, features.mol, atom_to_locant,
-                            include_near_parent_ez=_inpe,
-                        )
+                        if _is_complex:
+                            # v36-C1C2C6 Pattern A: the complex_ring atom->locant
+                            # map (e.g. a spiro-of-fused-component parent's
+                            # combined_locants) can be numbered inconsistently
+                            # with the printed descriptor, dropping the stereo
+                            # descriptor on the wrong locant -> OPSIN-unparseable.
+                            # RT-gate the numbering and re-anchor to OPSIN's own
+                            # locants when the first candidate fails to round-trip
+                            # (invariant 18; byte-identical for every currently-
+                            # round-tripping name).
+                            candidate_name = inject_stereo_reanchored_rt_gated(
+                                candidate_name, features.mol, atom_to_locant,
+                                include_near_parent_ez=_inpe,
+                            )
+                        else:
+                            candidate_name = inject_stereo_from_locant_map(
+                                candidate_name, features.mol, atom_to_locant,
+                                include_near_parent_ez=_inpe,
+                            )
             return NamingResult(
                 name=candidate_name,
                 tree=NameTreeNode(parent_stem=candidate_name, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=candidate_name),
