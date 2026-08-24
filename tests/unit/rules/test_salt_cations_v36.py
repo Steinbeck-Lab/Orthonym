@@ -156,3 +156,31 @@ def test_trometamol_cation_is_opsin_valid(namer):
     assert not is_failure_name(out), f"abstained: {out!r}"
     assert out != "trometamolium"
     assert _rt_full(TROMETAMOL_CATION, out), f"round-trip failed: {out!r}"
+
+
+# --- Task 4b: [H+]-diamine / base-hemisalt protonation transform (salts.py) ---
+# A base + organic-acid salt is often written with the proton(s) floating as bare
+# [H+] and the base(s) NEUTRAL, the acid fully deprotonated. Protonate the amine
+# site(s) (one [H+] per site) and re-enter the salt namer.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    # 2 ethylamine bases + malonate dianion + 2 [H+]
+    ("CCN.CCN.O=C([O-])CC(=O)[O-].[H+].[H+]", "diethanaminium propanedioate"),
+    # 2 ethylamine bases + oxalate dianion + 2 [H+]
+    ("CCN.CCN.[O-]C(=O)C(=O)[O-].[H+].[H+]", "diethanaminium oxalate"),
+    # ethylenediamine (a diamine) + malonate dianion + 2 [H+] -> bis(aminium)
+    ("NCCN.O=C([O-])CC(=O)[O-].[H+].[H+]",
+     "ethane-1,2-bis(aminium) propanedioate"),
+])
+def test_h_plus_base_hemisalt(namer, smi, expected):
+    out = namer.name(smi)
+    assert out == expected, f"{smi} -> {out!r}"
+    assert _rt_full(smi, out), f"round-trip failed: {out!r}"
+
+
+@pytest.mark.opsin_gate
+def test_h_plus_controls_unchanged(namer):
+    # halide hydroacid path still works (organic base . [H+] . [Cl-])
+    assert namer.name("CCN.[H+].[Cl-]") == "ethanamine hydrochloride"
+    # a bare proton + halide with NO base must still fail closed (0-wrong)
+    assert is_failure_name(namer.name("[H+].[Cl-]"))

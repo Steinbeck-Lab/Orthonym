@@ -24,6 +24,14 @@ from rdkit import Chem
 from ..perception.ions import parse_salt_fragments, get_ion_sites
 from .ions import name_anion, name_cation
 from ..data.ion_retained_names import INORGANIC_CATIONS, INORGANIC_ANIONS
+from ..errors import is_failure_name
+
+# v36 B2: basic (protonatable) amine nitrogen -- an sp3 N that is not an amide,
+# sulfonamide, N-oxide/N-N/N-halide, nitro, or already-charged/aromatic N. Used
+# by the [H+]-diamine-hemisalt transform to place a floating proton.
+_BASIC_AMINE_N = Chem.MolFromSmarts(
+    "[NX3;!$([NX3]=*);!$([NX3][CX3]=[OX1,SX1]);!$([NX3][SX4]);"
+    "!$([NX3][#7,#8]);!$([N+]);!$([n])]")
 
 
 # === VARIABLE-VALENCE METALS (BBR-CHG-169.6-caveat / D-13) ===
@@ -346,6 +354,37 @@ def normalize_imbalanced_acid_salt(smiles: str) -> Optional[str]:
     return balanced
 
 
+def _protonate_amines_with_h_plus(mol, n_protons: int):
+    """v36 B2: consume ``n_protons`` bare [H+] fragments by protonating that many
+    basic amine nitrogens, returning the reconstructed (charge-balanced) mol.
+
+    Every [H+] MUST be consumed (a leftover proton would leave an unbalanced,
+    wrongly-charged species), so this returns None when there are fewer basic
+    amine sites than protons -- the caller then falls through to the fail-closed
+    guard. The choice of WHICH amine is verified downstream: the reconstructed
+    salt is re-named and gated, so a mis-placed proton fails closed (0-wrong)."""
+    try:
+        rw = Chem.RWMol(mol)
+        amine_idxs = [m[0] for m in rw.GetSubstructMatches(_BASIC_AMINE_N)]
+        h_plus_idxs = [a.GetIdx() for a in rw.GetAtoms()
+                       if a.GetAtomicNum() == 1 and a.GetFormalCharge() == 1
+                       and a.GetDegree() == 0]
+        if len(amine_idxs) < n_protons or len(h_plus_idxs) < n_protons:
+            return None
+        for n_idx in amine_idxs[:n_protons]:
+            a = rw.GetAtomWithIdx(n_idx)
+            a.SetFormalCharge(1)
+            a.SetNumExplicitHs(a.GetTotalNumHs() + 1)
+            a.SetNoImplicit(True)
+        for h_idx in sorted(h_plus_idxs[:n_protons], reverse=True):
+            rw.RemoveAtom(h_idx)
+        out = rw.GetMol()
+        Chem.SanitizeMol(out)
+        return out
+    except (RuntimeError, ValueError):
+        return None
+
+
 def name_salt(mol, style: str = 'pin') -> str:
     """
     Name a salt using compositional nomenclature.
@@ -429,6 +468,23 @@ def name_salt(mol, style: str = 'pin') -> str:
                         return f"{organic_name} {salt_suffix}"
                 except (RecursionError, ValueError, RuntimeError):
                     pass
+
+    # v36 B2 ([H+]-diamine hemisalt): a base + organic-acid salt is often written
+    # with the proton(s) floating as bare [H+] and the base(s) left NEUTRAL, the
+    # acid fully deprotonated (witness 9: 2 amine bases + a fumarate DIANION +
+    # 2x[H+]). The hydroacid branch above did NOT fire (the anion is not a halide),
+    # so the protons are still orphaned. PROTONATE the basic amine site(s) --
+    # consuming one [H+] per site, up to the [H+] budget -- and re-enter name_salt
+    # on the reconstructed (charge-balanced) salt, which then routes each cation
+    # through the ordinary cation loop. The recursive name_salt + top-level gate
+    # verify the result, so a mis-protonation fails closed (0-wrong preserved).
+    if (h_plus_frags and not other_cation_frags and neutrals
+            and frags['anions']):
+        protonated = _protonate_amines_with_h_plus(mol, len(h_plus_frags))
+        if protonated is not None:
+            recur = name_salt(protonated, style)
+            if recur and not is_failure_name(recur):
+                return recur
 
     # 0-wrong (Fable-found): a hydroacid written ionically ([H+].[X-], optionally
     # with water) leaves the proton orphaned unless the hydroacid-merge branch above
