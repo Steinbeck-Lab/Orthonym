@@ -361,6 +361,20 @@ def get_double_bond_locant(
     return min(locant_a, locant_b)
 
 
+def _render_locant_token(locant: Union[int, str, Tuple]) -> str:
+    """Render a descriptor locant as its IUPAC token string.
+
+    Scalar locants render byte-identically to ``str(locant)`` — an int ('2') or
+    a composite ring-junction string ('7a'). A PRIMED tuple locant from a
+    multi-component ring — ``(6, "'")`` / ``(3, "''")`` for the 2nd (primed)
+    spiro/fused component — renders as its parts concatenated: ``6'`` / ``3''``.
+    Mirrors ``_composite_locant_sort_key``, which already accepts the tuple.
+    """
+    if isinstance(locant, tuple):
+        return "".join(str(x) for x in locant)
+    return str(locant)
+
+
 def format_stereodescriptor_string(
     descriptors: List[Tuple[int, str]]
 ) -> str:
@@ -391,8 +405,15 @@ def format_stereodescriptor_string(
     if not descriptors:
         return ""
 
-    # Build comma-separated list of "locantCIP"
-    parts = [f"{locant}{cip}" for locant, cip in descriptors]
+    # Build comma-separated list of "locantCIP".
+    # A PRIMED tuple locant from a MULTI-COMPONENT (spiro/fused) name — e.g.
+    # (6, "'") / (3, "''") for the 2nd component — must render as its number
+    # followed by the prime(s) ('6'', '3''') per P-14.3.2, NOT the Python tuple
+    # repr `(6, "'")`. This is the render-side counterpart to
+    # `_composite_locant_sort_key`, which already accepts the (int, "'") tuple.
+    # Scalar int / composite-str locants ('2', '7a') render byte-identically to
+    # str(locant), so the common single-component path is unchanged.
+    parts = [f"{_render_locant_token(locant)}{cip}" for locant, cip in descriptors]
 
     return f"({','.join(parts)})-"
 
@@ -410,13 +431,19 @@ _STEREO_PREFIX_RE = re.compile(
     # already-stereoed and the injector does not double-emit the prefix.
     # Compatible with the existing `(2R)-` / `(R)-` / `(E)-` / `(2R,3S)-`
     # / `(2r,3s)-` matches (the locant prefix is optional via \d*).
-    r'\(\d*[a-z]?[RSrsEZez](,\d*[a-z]?[RSrsEZez])*\)-'
+    # v36-A2: also accept an optional PRIME `'`/`''` after the locant, so a
+    # correct multi-component (spiro/fused) block like `(2S,1'R,3'R,11'R)-` is
+    # recognized as already-stereoed and the injector does not double-emit.
+    # The prime is optional (`'{0,2}`), so unprimed matches are byte-identical.
+    r"\(\d*[a-z]?'{0,2}[RSrsEZez](,\d*[a-z]?'{0,2}[RSrsEZez])*\)-"
 )
 # Pattern B — embedded block (descriptor block anywhere in the name body)
 _STEREO_EMBEDDED_RE = re.compile(
     # Phase 153 D-03: also accept composite locants like '7a', '3a' in
     # embedded blocks (e.g., 'something-(3aR,7aS)-else').
-    r'\(\d*[a-z]?[RSEZrsez](,\d*[a-z]?[RSEZrsez])*\)'
+    # v36-A2: also accept an optional prime `'`/`''` after the locant (primed
+    # spiro/fused component); optional, so unprimed matches are byte-identical.
+    r"\(\d*[a-z]?'{0,2}[RSEZrsez](,\d*[a-z]?'{0,2}[RSEZrsez])*\)"
 )
 # Pattern C — carbohydrate / amino-acid traditional notation
 _CARBOHYDRATE_STEREO_RE = re.compile(r'(alpha|beta|alfa)-[DL]-', re.IGNORECASE)
