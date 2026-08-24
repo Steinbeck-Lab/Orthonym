@@ -85,11 +85,10 @@ D_WITNESSES = [
     "C1=NC2CCCCCCCCOC3C=NC(CCCCCCCCOC1CC2)CC3",
 ]
 
-# Task-1 RED baseline: EVERY witness (A1 included) abstains / rt-fails today. Task
-# 2 promotes A1 out of this list into ``test_a1_witness_names_and_rt``.
+# A2/B/C/D remain a documented abstain until their pattern's task lands. A1 is
+# promoted into ``test_a1_witness_names_and_rt`` (Task 2, VERIFIED fix shipped).
 ABSTAIN_TODAY_WITNESSES = (
-    [("A1", s) for s in A1_WITNESSES]
-    + [("A2", s) for s in A2_WITNESSES]
+    [("A2", s) for s in A2_WITNESSES]
     + [("B", s) for s in B_WITNESSES]
     + [("C", s) for s in C_WITNESSES]
     + [("D", s) for s in D_WITNESSES]
@@ -158,6 +157,21 @@ def test_witness_abstains_today(pattern, smiles):
         pytest.skip("naming exceeded timeout (out-of-scope size)")
     assert not r.passed, (
         f"{pattern} witness unexpectedly round-trips already: {r.name!r}")
+
+
+@pytest.mark.parametrize("smiles", A1_WITNESSES)
+def test_a1_witness_names_and_rt(smiles):
+    """Pattern A1 (Task 2, VERIFIED): a spiro-von-Baeyer name with a BICYCLO cage
+    used to append the unsaturation suffix OUTSIDE the spiro brackets
+    (``...octane-6,2'-oxolane]-3-ene``), which is OPSIN-grammar-invalid. The fix
+    splices it INSIDE the cage component (``...oct-3-ene-6,2'-oxolane]``),
+    re-anchored to that component's numbering. Each witness must now NAME and
+    OPSIN-round-trip to the input's full InChIKey."""
+    try:
+        r = _ring_rt(smiles)
+    except _Timeout:
+        pytest.skip("naming exceeded timeout (out-of-scope size)")
+    assert r.passed, f"A1 witness did not round-trip: name={r.name!r} err={r.error}"
 
 
 # --- Ring-dispatch canary: already-working names unchanged + RT-valid ---------

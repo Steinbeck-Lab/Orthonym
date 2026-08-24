@@ -4468,6 +4468,73 @@ def _name_spiro_component(
     return _tricyclo_plus_spiro_component(mol, set(component_atoms))
 
 
+def _cage_side_ene(mol, cage_a: Set[int], cage_b: Set[int],
+                   locmap_a: Dict[int, int], locmap_b: Dict[int, int]):
+    """Per-side ring DOUBLE-bond locants for the von-Baeyer CAGE components of a
+    monospiro system, each in that component's OWN von-Baeyer numbering.
+
+    Returns ``(side_a_locs, side_b_locs)`` (sorted int lists), or None
+    (fail-closed) if any cage ring bond is aromatic / a triple bond / needs a
+    compound (non-consecutive) locant. Only bonds with BOTH endpoints in a cage
+    side are considered -- a mancude / aromatic / HW / catalog component carries
+    its unsaturation INSIDE its own retained name and is deliberately ignored
+    here (so its aromatic bonds never force a decline)."""
+    cage_all = cage_a | cage_b
+    la: List[int] = []
+    lb: List[int] = []
+    for bond in mol.GetBonds():
+        x, y = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if x not in cage_all or y not in cage_all:
+            continue
+        bt = bond.GetBondType()
+        if bt == Chem.BondType.SINGLE:
+            continue
+        if bt != Chem.BondType.DOUBLE:
+            return None  # aromatic / triple inside a cage -> unsupported
+        if x in cage_a and y in cage_a:
+            lx, ly, tgt = locmap_a.get(x), locmap_a.get(y), la
+        elif x in cage_b and y in cage_b:
+            lx, ly, tgt = locmap_b.get(x), locmap_b.get(y), lb
+        else:
+            return None  # double bond straddling two components (shouldn't occur)
+        if lx is None or ly is None or abs(lx - ly) != 1:
+            return None  # compound / cross-component locant -> unsupported
+        tgt.append(min(lx, ly))
+    la.sort()
+    lb.sort()
+    return la, lb
+
+
+def _splice_cage_ene(component_name: str, int_locs: List[int],
+                     prime: str) -> Optional[str]:
+    """Splice ring unsaturation INSIDE a von-Baeyer CAGE spiro component name,
+    re-anchored to that component's numbering, per P-31.1.5.2 (NOT appended after
+    the spiro bracket -- that is OPSIN-grammar-invalid):
+
+        'bicyclo[3.2.1]octane' + [3], ''  -> 'bicyclo[3.2.1]oct-3-ene'
+        'bicyclo[2.2.2]octane' + [2,5],'' -> 'bicyclo[2.2.2]octa-2,5-diene'
+        <cage in the primed component>    -> 'bicyclo[..]...-3'-ene' (prime kept)
+
+    ``int_locs`` are the component's OWN double-bond locants; ``prime`` is '' for
+    the unprimed component or "'" for the primed one. Returns the unchanged name
+    when there is no cage unsaturation, or None (fail-closed) if the trailing
+    hydride word is not an '...ane' this transform recognises."""
+    if not int_locs:
+        return component_name
+    head, sep, word = component_name.rpartition(']')
+    if not sep or not word.endswith('ane'):
+        return None
+    stem = word[:-3]  # strip the 'ane' hydride suffix -> 'oct', 'nonacos', ...
+    toks = ','.join(f"{n}{prime}" for n in int_locs)
+    if len(int_locs) == 1:
+        ene = f"{stem}-{toks}-ene"
+    else:
+        from ..assembly.naming_utils import get_suffix_multiplier_prefix
+        mult = get_suffix_multiplier_prefix(len(int_locs), 'ene')
+        ene = f"{stem}a-{toks}-{mult}ene"  # euphonic 'a' before di/tri...
+    return f"{head}{sep}{ene}"
+
+
 def _name_spiro_vonbaeyer_core(mol):
     """Shared core for is_spiro_vonbaeyer / name_spiro_vonbaeyer. Returns
     ``(name, all_ring_atoms, combined_locants)`` or None (fail-closed)."""
@@ -4526,6 +4593,20 @@ def _name_spiro_vonbaeyer_core(mol):
     if loc_a is None or loc_b is None:
         return None
 
+    # P-31.1.5.2: ring unsaturation of a von-Baeyer CAGE component is cited INSIDE
+    # that component's bracketed name (re-anchored to its own numbering), NOT
+    # appended after the spiro brackets. Compute the per-side double-bond locants
+    # here (each in its side's numbering) and splice them in as the component
+    # names are assembled below. Fail closed if a cage bond is aromatic / triple /
+    # needs a compound locant (never a silently-saturated name).
+    _cage_a = atoms_a if a_vb else set()
+    _cage_b = atoms_b if b_vb else set()
+    _ene_sides = _cage_side_ene(mol, _cage_a, _cage_b, locmap_a, locmap_b)
+    if _ene_sides is None:
+        return None
+    ene_a, ene_b = _ene_sides
+    _spirobi_trailing = ''
+
     identical = (
         name_a == name_b
         and Chem.MolToSmiles(ext_a[0]) == Chem.MolToSmiles(ext_b[0])
@@ -4535,11 +4616,24 @@ def _name_spiro_vonbaeyer_core(mol):
         if loc_a <= loc_b:
             lo, hi = loc_a, loc_b
             unprimed_map, primed_map = locmap_a, locmap_b
+            ene_unp, ene_pri = ene_a, ene_b
         else:
             lo, hi = loc_b, loc_a
             unprimed_map, primed_map = locmap_b, locmap_a
+            ene_unp, ene_pri = ene_b, ene_a
         component = _strip_consumed_indicated_h(name_a, lo)
         name = f"{lo},{hi}'-spirobi[{component}]"
+        # P-24.3.1 spirobi: unsaturation of the two IDENTICAL cages is cited as a
+        # multiplicative suffix AFTER the closing bracket (`...nonane]-6,6'-diene`,
+        # a Blue-Book PIN form) -- NOT spliced inside (that is the component-name
+        # P-24.5.1 rule, handled in the else branch below). ``_spirobi_trailing``
+        # is appended at the end (after any 'a'-prefix).
+        if ene_unp or ene_pri:
+            _tok = [str(n) for n in ene_unp] + [f"{n}'" for n in ene_pri]
+            from ..assembly.naming_utils import get_suffix_multiplier_prefix
+            _spirobi_trailing = (
+                f"-{','.join(_tok)}-"
+                f"{get_suffix_multiplier_prefix(len(_tok), 'ene')}ene")
     else:
         # P-24.5.1 component-name spiro: cite components in ALPHANUMERICAL order
         # of the component name (NOT ring seniority); first cited is unprimed.
@@ -4547,10 +4641,12 @@ def _name_spiro_vonbaeyer_core(mol):
             first_name, first_loc = name_a, loc_a
             second_name, second_loc = name_b, loc_b
             unprimed_map, primed_map = locmap_a, locmap_b
+            first_ene, second_ene = ene_a, ene_b
         else:
             first_name, first_loc = name_b, loc_b
             second_name, second_loc = name_a, loc_a
             unprimed_map, primed_map = locmap_b, locmap_a
+            first_ene, second_ene = ene_b, ene_a
         if lambda_spiro:
             # P-24.8.4.1: the λ spiro atom + any indicated-H are cited at the
             # FRONT of the name (indicated-H set, then λ set); the descriptor
@@ -4563,11 +4659,19 @@ def _name_spiro_vonbaeyer_core(mol):
             ])
             _, first_bare = _extract_leading_indicated_h(first_name)
             _, second_bare = _extract_leading_indicated_h(second_name)
+            first_bare = _splice_cage_ene(first_bare, first_ene, '')
+            second_bare = _splice_cage_ene(second_bare, second_ene, "'")
+            if first_bare is None or second_bare is None:
+                return None
             name = (f"{front_prefix}spiro[{first_bare}-{first_loc},"
                     f"{second_loc}'-{second_bare}]")
         else:
             first_name = _strip_consumed_indicated_h(first_name, first_loc)
             second_name = _strip_consumed_indicated_h(second_name, second_loc)
+            first_name = _splice_cage_ene(first_name, first_ene, '')
+            second_name = _splice_cage_ene(second_name, second_ene, "'")
+            if first_name is None or second_name is None:
+                return None
             name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
 
     combined_locants: Dict[int, _Locant] = {}
@@ -4604,81 +4708,16 @@ def _name_spiro_vonbaeyer_core(mol):
     elif hetero_prefix:
         name = f"{hetero_prefix}{name}"
 
-    # P-31.1.5.2.1: unsaturation of a von-Baeyer CAGE spiro component is cited by
-    # 'ene'/'diene' AFTER the closing bracket, low locants to spiro junctions
-    # then double bonds (the component numbering already did this). This suffix
-    # applies ONLY to von-Baeyer cage components: a MANCUDE / aromatic / HW /
-    # catalog component (e.g. [1,3,5,2]triazaphosphinine, [1,3,2]benzoxaza-
-    # phosphole) carries its ring unsaturation INSIDE the component name, so its
-    # ring double bonds must be excluded from both the suffix and the fail-closed
-    # guard (otherwise the aromatic C=N/N=P bonds would wrongly force a decline).
-    cage_atoms: Set[int] = set()
-    if a_vb:
-        cage_atoms |= atoms_a
-    if b_vb:
-        cage_atoms |= atoms_b
-    unsat = _spiro_vb_unsaturation_suffix(mol, combined_locants, cage_atoms)
-    if unsat is None:
-        if _has_ring_multiple_bonds(mol, cage_atoms):
-            return None
-    elif unsat:
-        name = name + unsat
+    # Cage unsaturation (P-31.1.5.2) of a COMPONENT-NAME spiro was spliced INSIDE
+    # each component's bracketed name above (re-anchored to that component's
+    # numbering) as the name was assembled -- see ``_cage_side_ene`` /
+    # ``_splice_cage_ene`` -- because the old trailing '-3-ene' form is
+    # OPSIN-grammar-invalid there (v36-C1C2C6 Pattern A1). A SPIROBI (identical
+    # cages, P-24.3.1) instead cites its multiplicative '-6,6'-diene' suffix AFTER
+    # the bracket (a Blue-Book PIN form); that suffix is appended here.
+    if _spirobi_trailing:
+        name = name + _spirobi_trailing
     return name, all_ring_atoms, combined_locants
-
-
-def _has_ring_multiple_bonds(mol, ring_atoms: Set[int]) -> bool:
-    for b in mol.GetBonds():
-        if (b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms
-                and b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)):
-            return True
-    return False
-
-
-def _locant_sort_key(loc: _Locant) -> Tuple[int, int]:
-    """Sort key for a plain-or-primed locant: (prime_count, int)."""
-    if isinstance(loc, tuple):
-        return (len(loc[1]), loc[0])
-    return (0, loc)
-
-
-def _spiro_vb_unsaturation_suffix(
-    mol, combined_locants: Dict[int, _Locant], ring_atoms: Set[int],
-) -> Optional[str]:
-    """P-31.1.5.2.1 '-ene'/'-diene' suffix (e.g. ``-6,6'-diene``) mapping each
-    ring DOUBLE bond onto its combined (primed/unprimed) locant. Returns the
-    suffix string ('' when saturated), or None (fail-closed) for aromatic /
-    triple / non-adjacent-locant ring bonds."""
-    doubles: List[_Locant] = []
-    for b in mol.GetBonds():
-        a, c = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
-        if a not in ring_atoms or c not in ring_atoms:
-            continue
-        bt = b.GetBondType()
-        if bt == Chem.BondType.SINGLE:
-            continue
-        if bt != Chem.BondType.DOUBLE:
-            return None  # aromatic / triple -> unsupported here
-        la, lc = combined_locants.get(a), combined_locants.get(c)
-        if la is None or lc is None:
-            return None
-        # both endpoints must share the same prime tier and be adjacent ints
-        ka, kc = _locant_sort_key(la), _locant_sort_key(lc)
-        if ka[0] != kc[0] or abs(ka[1] - kc[1]) != 1:
-            return None  # compound / cross-component locant -> unsupported
-        doubles.append(la if ka[1] <= kc[1] else lc)
-    if not doubles:
-        return ''
-    doubles.sort(key=_locant_sort_key)
-    from ..assembly.naming_utils import (get_multiplier_prefix,
-                                         get_suffix_multiplier_prefix)
-    tokens = []
-    for loc in doubles:
-        if isinstance(loc, tuple):
-            tokens.append(f"{loc[0]}{loc[1]}")
-        else:
-            tokens.append(str(loc))
-    mult = get_suffix_multiplier_prefix(len(doubles), 'ene')
-    return f"-{','.join(tokens)}-{mult}ene"
 
 
 def _spiro_vb_a_prefix(
