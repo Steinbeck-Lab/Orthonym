@@ -147,6 +147,43 @@ def test_task1_polycyclic_leak_no_unverifiable_stereo_ships(smiles, head_leak):
         assert _constitution_rt(smiles, n), f"constitution mismatch: {n!r}"
 
 
+# =====================================================================
+# TASK 2 — von-Baeyer force-add residual + detect_bridged_fused gap (NAMED BLOCKER)
+# Both are out of the namer's construction reach and correctly ABSTAIN today. These
+# guards lock 0-wrong: each stays abstain-or-RT, never a wrong-molecule ship, so a
+# future coverage attempt cannot silently regress. See V36-WAVEE-TASK2-FINDING.md.
+# =====================================================================
+
+def test_task2b_detect_bridged_fused_correctly_false():
+    """The (b) macrocycle's two 6-rings are NOT ortho-fused to each other, so it is
+    not a P-25.4 bridged-FUSED system: detect_bridged_fused must return False, and
+    name_bridged_fused_system must decline (None) — a detector fix would deliver zero
+    breadth (routing there still abstains)."""
+    from rdkit import Chem
+    from orthonym.rules.bridged_fused import (
+        detect_bridged_fused, name_bridged_fused_system,
+    )
+    m = Chem.MolFromSmiles("C1=NC2CCCCCCCCOC3C=NC(CCCCCCCCOC1CC2)CC3")
+    assert detect_bridged_fused(m) is False
+    assert name_bridged_fused_system(m) is None
+
+
+@pytest.mark.parametrize("smiles", [
+    # (b) bridged-fused / macrocyclic-bridged witness
+    "C1=NC2CCCCCCCCOC3C=NC(CCCCCCCCOC1CC2)CC3",
+    # (a) in-scope force-add-branch witnesses (aromatic-fused-bridged alkaloid cage,
+    #     macrocyclic cyclophane) — genuinely out of von-Baeyer reach
+    "CN1CC[C@]23C(=O)C[C@H]4C(=CCO[C@H]5CC(=O)N(c6cc(O)ccc62)[C@H]3[C@H]54)C1",
+    "c1cc2cc(c1)Oc1ccc(cc1)C[C@@H]1NCCc3ccc(cc31)Oc1cccc3c1[C@@H](C2)NCC3",
+])
+def test_task2_zero_wrong_abstain_or_roundtrip(smiles):
+    """0-wrong guard: an out-of-reach complex polycyclic must either abstain OR emit a
+    name that round-trips — never a wrong-molecule name."""
+    n = _name(smiles)
+    assert n.startswith("unknown") or _rt(smiles, n), \
+        f"shipped a non-round-tripping name for an out-of-reach system: {n!r}"
+
+
 @pytest.mark.parametrize("smiles,expected", [
     # stereo-bearing von-Baeyer PINs whose full name DOES round-trip: byte-identical
     # (composer bicyclo path — _assemble_complete_bicyclo_name)
