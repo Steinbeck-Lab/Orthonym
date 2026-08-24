@@ -22,7 +22,29 @@ BUILD 1 — parent-selection robustness (C3 Site-3 + C1/C2/C6 Pattern-D).
         ``O=C1CCC2(Oc3cccc4cccc(c34)O2)c2cccc(O)c21`` (C3-spy w16)
 
 BUILD 2 — recursive-fragment retained-table reach (C4 glycan aglycone + C3 Site-2)
-    (added below once its spy pins the exact wall.)
+    SPY RESOLUTION (this session): the charter's stated wall is REFUTED / already
+    solved, so no code change lands (invariant 8 — the named site is off-path).
+      * ``assembly/fragment_naming.py::name_fragment_recursively`` ALREADY reaches
+        the steroid/NP retained table: it calls ``namer.name_compound`` (line 543),
+        which owns ``rules/natural_products.py``.  Proven: it names estradiol ->
+        ``(8R,9S,13S,14S,17S)-estra-1,3,5(10)-triene-3,17-diol``.
+      * The 25-atom cap at ``substituent_enumerator.py:4283`` is OFF-PATH for this
+        population: a >25-atom ring substituent (the steroid in cholesteryl
+        glucoside) is named by a DIFFERENT substituent path not subject to it.
+        Lifting the cap 25->999 converts 0/3 glycan witnesses and 0 net on a
+        40-molecule large-abstention sample (the 2 that named there also name at
+        cap=25).  Lifting it only adds garbage-name + giant-molecule-hang exposure
+        for zero yield, so it is NOT lifted.
+      * Steroid glycosides whose aglycone IS retained-table-nameable ALREADY name
+        and round-trip today (estradiol 3-glucoside, cholesteryl glucoside).
+      * NAMED BLOCKER for the g1/g2/g3 glycan witnesses: the AGLYCONE itself is
+        unnameable (``name_compound`` -> ``unknown``) — a cardenolide / sapogenin /
+        macrolide fused steroid+lactone skeleton absent from the retained table and
+        unbuildable by the systematic ring namer (its bare ring core is itself
+        MULTI-FRAGMENT).  That is C1/C2 ring-topology + NP-table COVERAGE work,
+        out of Build-2's scope.  The tests below are regression guards for the
+        already-working class + the reach wiring, and a 0-wrong guard on the
+        witnesses.
 
 Fresh process per witness (warm-cache hazard, the contributor guide).  Run ONLY this file:
     ``.venv/bin/python -m pytest tests/unit/rules/test_c_waveB_v36.py -q``
@@ -127,8 +149,84 @@ def test_kih_fail_closed_on_spiro_joined_carbonyl_system():
 
 
 # ---------------------------------------------------------------------------
+# BUILD 2 — recursive-fragment retained-table reach (findings + regression guards)
+# ---------------------------------------------------------------------------
+
+# Steroid glycoside whose aglycone IS retained-table-nameable — already names +
+# round-trips today (the class Build-2's charter thought was blocked by the cap).
+STEROID_GLYCOSIDE_WORKS = "C[C@]12CC[C@H]3[C@@H](CCc4cc(OC5OC(CO)C(O)C(O)C5O)ccc34)[C@@H]1CC[C@@H]2O"
+
+# TRUE-glycan witnesses (V36-SPY-C4.md g1/g2/g3): abstain because the AGLYCONE is
+# an uncovered fused steroid+lactone/macrolide skeleton (ring-topology COVERAGE gap,
+# out of Build-2's scope) — NOT the recursive-reach / 25-atom-cap wall.
+GLYCAN_COVERAGE_GAP_WITNESSES = [
+    "CC1CCC2(OC1)OC1CC3C4CCC5CC(OC6OC(CO)C(O)C(OC7OC(CO)C(O)C(O)C7O)C6O)CCC5(C)C4CCC3(C)C1C2C",
+    "CCC(C)/C=C/CCCC(C)C(O)C/C=C/C=C/C(=O)OC1C(OC2OC(CO)C(O)C(O)C2O)C(CO)OC2(OCc3cc(O)cc(O)c32)C1O",
+    "CC(=O)OC(CC1C=C(C)C(=O)O1)C(C)C1CCC2C3(C)CCC(OC4OC(CO)C(O)C(O)C4OC4OC(C)C(O)C(O)C4O)C(C)(C)C3CCC2(C)C12COC(=O)C2",
+]
+
+
+def test_recursive_fragment_naming_reaches_steroid_retained_table():
+    """Build-2 SPY: ``name_fragment_recursively`` ALREADY reaches the steroid/NP
+    retained table (it delegates to ``name_compound``).  Regression guard against
+    breaking that wiring — if this fails, the retained table is unreachable from
+    the recursive substituent path (the exact gap the charter feared)."""
+    out = subprocess.run(
+        [sys.executable, __file__, "--reach",
+         "C[C@]12CC[C@H]3[C@@H](CCc4cc(O)ccc34)[C@@H]1CC[C@@H]2O"],
+        capture_output=True, text=True, timeout=180)
+    res = None
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("{") and "frag_name" in line:
+            res = json.loads(line)
+    assert res is not None, f"no reach result\nstdout:\n{out.stdout[-1500:]}"
+    assert res["frag_name"] and "estra" in res["frag_name"], (
+        "name_fragment_recursively did NOT reach the steroid retained table "
+        f"for estradiol: {res}")
+
+
+def test_steroid_glycoside_with_nameable_aglycone_round_trips():
+    """Regression guard: a steroid glycoside whose aglycone is retained-table-
+    nameable names + round-trips today (the >25-atom-substituent case the 25-atom
+    cap was thought to block — it is off-path)."""
+    res = _cn_rt(STEROID_GLYCOSIDE_WORKS)
+    name = res.get("name")
+    assert name and "unknown" not in name, (
+        f"steroid glycoside abstained unexpectedly: {res}")
+    assert res.get("rt") is True, (
+        f"steroid glycoside name does not round-trip: {name!r}")
+
+
+@pytest.mark.parametrize("smiles", GLYCAN_COVERAGE_GAP_WITNESSES)
+def test_glycan_coverage_gap_witnesses_are_zero_wrong(smiles):
+    """The g1/g2/g3 glycan witnesses abstain because their aglycone is an uncovered
+    ring skeleton (documented blocker).  0-wrong guard: each must ABSTAIN or emit a
+    name that round-trips — NEVER a wrong-molecule name."""
+    res = _cn_rt(smiles)
+    name = res.get("name") or ""
+    if name and "unknown" not in name:
+        assert res.get("rt") is True, (
+            f"glycan witness emitted a NON-round-tripping name (wrong molecule): "
+            f"{name!r} for {smiles}")
+
+
+# ---------------------------------------------------------------------------
 # subprocess entrypoint (fresh process per witness)
 # ---------------------------------------------------------------------------
+def _reach_one(smiles):
+    from orthonym.jvm_budget import jvm_slots
+    with jvm_slots(1, purpose="v36-cwaveb-reach"):
+        from orthonym.assembly.fragment_naming import (
+            name_fragment_recursively, start_naming_session, end_naming_session)
+        start_naming_session()
+        try:
+            frag = name_fragment_recursively(smiles)
+        finally:
+            end_naming_session()
+        return {"frag_name": frag}
+
+
 def _name_one(smiles):
     from orthonym.jvm_budget import jvm_slots
     with jvm_slots(1, purpose="v36-cwaveb-test"):
@@ -146,4 +244,7 @@ def _name_one(smiles):
 
 
 if __name__ == "__main__":
-    print(json.dumps(_name_one(sys.argv[1])))
+    if len(sys.argv) >= 3 and sys.argv[1] == "--reach":
+        print(json.dumps(_reach_one(sys.argv[2])))
+    else:
+        print(json.dumps(_name_one(sys.argv[1])))
