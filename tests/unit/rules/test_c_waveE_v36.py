@@ -184,6 +184,30 @@ def test_task2_zero_wrong_abstain_or_roundtrip(smiles):
         f"shipped a non-round-tripping name for an out-of-reach system: {n!r}"
 
 
+# =====================================================================
+# TASK 3 — spiro-von-Baeyer constitutional defects (NAMED BLOCKER, bounded follow-on)
+# The built names are OPSIN-unparseable / wrong-constitution; SELF-01 abstains on them
+# (0-wrong holds). None is a bounded von-Baeyer numbering/bridge fix — each needs a full
+# spiro-component reconstruction. These guards lock 0-wrong. See V36-WAVEE-TASK3-FINDING.md.
+# =====================================================================
+
+@pytest.mark.parametrize("smiles", [
+    # (1) oxine-lactone HW-misclassification signature
+    "CC1=CC[C@]2(OC[C@]34CCC5=C(CC[C@@H]6C(=C5)C=CC(=O)OC6(C)C)[C@]3(C)CC[C@@H]4[C@@H]2C)OC1=O",
+    # (2) pyro/pyrano fusion-component signature
+    "COCc1[nH]nc2c1C1(CCSCC1)C(C#N)=C(N)O2",
+    # (3) naphtho-dioxine peri-fused-as-von-Baeyer signature
+    "O=C1CC[C@@H](O)[C@@H]2C1=CCCC21Oc2cccc3cccc(c23)O1",
+])
+def test_task3_spiro_vb_defect_zero_wrong(smiles):
+    """0-wrong guard: a spiro-von-Baeyer input whose built component name is OPSIN-
+    unparseable / wrong-constitution must ABSTAIN (or emit a name that round-trips) —
+    never ship the malformed built name. A future construction fix must keep this."""
+    n = _name(smiles)
+    assert n.startswith("unknown") or _rt(smiles, n), \
+        f"shipped a non-round-tripping spiro-VB name: {n!r}"
+
+
 @pytest.mark.parametrize("smiles,expected", [
     # stereo-bearing von-Baeyer PINs whose full name DOES round-trip: byte-identical
     # (composer bicyclo path — _assemble_complete_bicyclo_name)
