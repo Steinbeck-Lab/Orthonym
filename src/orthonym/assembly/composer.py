@@ -3962,7 +3962,25 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
         prefix_name = name_substituent(
             mol, sub_info.frag_atoms, a_idx, allow_mancude=_cx_mancude)
 
+        # v36 core-namer FAIL-CLOSED (not silent drop): a RING-BEARING compound
+        # substituent that still cannot render is an atom-significant drop --
+        # emitting the parent without it is an atom-incomplete (wrong-molecule)
+        # partial that only the downstream RT / SELF-01 gate catches. Abort the
+        # whole complex-ring name so the molecule cascades to the best-effort
+        # floor instead of leaking a partial. Scoped to ring-bearing frags: a
+        # trivial or mis-discovered NON-ring drop keeps the prior skip (the RT
+        # gate stays the net for those, and aborting on a mis-discovery would
+        # lose a currently-correct name -- invariant 9). Measured breadth-neutral.
+        _cx_ring_bearing = False
+        try:
+            _cx_ri = mol.GetRingInfo()
+            _cx_ring_bearing = any(
+                _cx_ri.NumAtomRings(x) > 0 for x in sub_info.frag_atoms)
+        except Exception:
+            _cx_ring_bearing = False
         if not prefix_name or prefix_name == "substituent":
+            if _cx_ring_bearing:
+                return None
             continue
         # Quality filter: reject garbled names with spaces
         if ' ' in prefix_name:
@@ -3972,6 +3990,8 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
                 "_enrich_complex_ring_with_subs: reject garbled (HA=%d): %s",
                 frag_ha, prefix_name,
             )
+            if _cx_ring_bearing:
+                return None
             continue
 
         # Locant: prefer the AUTHORITATIVE atom_to_locant for the ring attach

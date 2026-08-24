@@ -124,6 +124,67 @@ def test_composer_threads_best_effort_allow_mancude():
         f"name_substituent (v36 Task-3 wiring missing): {res}")
 
 
+def _make_sub(locant, attach_mol_idx, frag_atoms):
+    from orthonym.assembly.substituent_enumerator import SubstituentInfo
+    return SubstituentInfo(None, locant, attach_mol_idx, list(frag_atoms))
+
+
+def test_composer_fail_closed_on_unnameable_ring_bearing_substituent():
+    """Task 4: a RING-BEARING compound substituent on a complex-ring parent that
+    cannot render must ABORT the whole name (return None), not silently drop the
+    substituent and leak an atom-incomplete partial (a wrong molecule that only
+    the downstream RT/SELF-01 gate would catch). RED at HEAD, where the composer
+    ``continue``d and returned the bare parent."""
+    from rdkit import Chem
+    import orthonym.assembly.composer as comp
+    import orthonym.assembly.substituent_enumerator as se
+    from orthonym.metrics.provenance import best_effort_ctx
+    mol = Chem.MolFromSmiles("c1ccccc1C1CCCCC1")   # phenylcyclohexane
+    ring_atoms = {6, 7, 8, 9, 10, 11}              # the cyclohexane parent
+    a2l = {6: 1, 7: 2, 8: 3, 9: 4, 10: 5, 11: 6}
+    ring_sub = _make_sub(1, 6, [0, 1, 2, 3, 4, 5])  # the phenyl (ring-bearing)
+    _od, _on = se.discover_substituents, se.name_substituent
+    se.discover_substituents = lambda *a, **k: [ring_sub]
+    se.name_substituent = lambda *a, **k: None      # unnameable
+    tok = best_effort_ctx.set(True)
+    try:
+        out = comp._enrich_complex_ring_with_subs(
+            mol, "cyclohexane", ring_atoms, a2l)
+    finally:
+        best_effort_ctx.reset(tok)
+        se.discover_substituents, se.name_substituent = _od, _on
+    assert out is None, (
+        "expected fail-closed (None) on an unnameable ring-bearing substituent, "
+        f"got {out!r} (an atom-incomplete partial)")
+
+
+def test_composer_keeps_skip_for_unnameable_nonring_substituent():
+    """Task 4 scoping (invariant 9): a NON-ring unnameable / mis-discovered drop
+    keeps the prior skip (returns the bare parent) -- only ring-bearing,
+    atom-significant drops abort. Green at HEAD and with the fix."""
+    from rdkit import Chem
+    import orthonym.assembly.composer as comp
+    import orthonym.assembly.substituent_enumerator as se
+    from orthonym.metrics.provenance import best_effort_ctx
+    mol = Chem.MolFromSmiles("CC1CCCCC1")           # methylcyclohexane
+    ring_atoms = {1, 2, 3, 4, 5, 6}
+    a2l = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6}
+    nonring_sub = _make_sub(1, 1, [0])              # the methyl (non-ring)
+    _od, _on = se.discover_substituents, se.name_substituent
+    se.discover_substituents = lambda *a, **k: [nonring_sub]
+    se.name_substituent = lambda *a, **k: None
+    tok = best_effort_ctx.set(True)
+    try:
+        out = comp._enrich_complex_ring_with_subs(
+            mol, "cyclohexane", ring_atoms, a2l)
+    finally:
+        best_effort_ctx.reset(tok)
+        se.discover_substituents, se.name_substituent = _od, _on
+    assert out == "cyclohexane", (
+        "a non-ring drop must keep the prior skip (return the bare parent), "
+        f"got {out!r}")
+
+
 def _composer_wiring_probe(smiles):
     """Report the ``allow_mancude`` values ``_enrich_complex_ring_with_subs``
     passes into ``name_substituent`` while naming ``smiles`` at the best-effort

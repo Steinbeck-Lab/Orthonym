@@ -318,31 +318,40 @@ def name_tier_a_ring(
                     complex_result.ring_atoms,
                     complex_result.atom_to_locant,
                 )
-            # v31 PIN conformance (P-33.3): the complex_ring assembly demotes a
-            # suffixable principal characteristic group to a PREFIX on a SPIRO
-            # parent (`9-carboxyspiro[5.5]undecane`), where the PIN cites it as the
-            # principal SUFFIX (`spiro[5.5]undecane-3-carboxylic acid`). von-Baeyer
-            # parents already suffix correctly -- only spiro demotes (measured).
-            # The general engine builds the correct suffix form; prefer it IFF it
-            # OPSIN-round-trips to the input (re-anchored + RT-gated => 0-wrong;
-            # jar-absent keeps the existing name, fail-closed). Scoped to spiro+PG,
-            # so von-Baeyer / fused parents and PG-free spiro stay byte-identical.
-            if getattr(features, 'principal_group', None) is not None:
-                _alt = _spiro_principal_suffix_preference(features, complex_name)
-                if _alt is not None:
-                    complex_name = _alt
-            _complex_result_for_injection = complex_result
-            _complex_cand = _tier_a_pool.add(
-                complex_name, 'complex_ring', features,
-                parent_atom_indices=_complex_ring_parent_atom_indices(
-                    complex_result, features.mol,
-                ),
-            )
-            if _complex_cand is not None:
-                if _tier_a_pool.selection_mode == 'score_based':
-                    _complex_ring_accepted = True
-                elif _complex_cand.factors.get('ratio', 0) >= 0.40:
-                    _complex_ring_accepted = True
+            # v36 core-namer FAIL-CLOSED: the enricher returns None when a
+            # RING-BEARING compound substituent on the complex-ring parent cannot
+            # render. Emitting the bare parent would be an atom-incomplete
+            # (wrong-molecule) partial, so fall through to the other tiers rather
+            # than pool it -- exactly the "If complex ring naming fails, fall
+            # through" contract already documented below.
+            if complex_name is not None:
+                # v31 PIN conformance (P-33.3): the complex_ring assembly demotes a
+                # suffixable principal characteristic group to a PREFIX on a SPIRO
+                # parent (`9-carboxyspiro[5.5]undecane`), where the PIN cites it as
+                # the principal SUFFIX (`spiro[5.5]undecane-3-carboxylic acid`).
+                # von-Baeyer parents already suffix correctly -- only spiro demotes
+                # (measured). The general engine builds the correct suffix form;
+                # prefer it IFF it OPSIN-round-trips to the input (re-anchored +
+                # RT-gated => 0-wrong; jar-absent keeps the existing name,
+                # fail-closed). Scoped to spiro+PG, so von-Baeyer / fused parents
+                # and PG-free spiro stay byte-identical.
+                if getattr(features, 'principal_group', None) is not None:
+                    _alt = _spiro_principal_suffix_preference(
+                        features, complex_name)
+                    if _alt is not None:
+                        complex_name = _alt
+                _complex_result_for_injection = complex_result
+                _complex_cand = _tier_a_pool.add(
+                    complex_name, 'complex_ring', features,
+                    parent_atom_indices=_complex_ring_parent_atom_indices(
+                        complex_result, features.mol,
+                    ),
+                )
+                if _complex_cand is not None:
+                    if _tier_a_pool.selection_mode == 'score_based':
+                        _complex_ring_accepted = True
+                    elif _complex_cand.factors.get('ratio', 0) >= 0.40:
+                        _complex_ring_accepted = True
         # If complex ring naming fails, fall through.
 
     # === Wave2 T6a fail-closed guard: pure-monocyclic spiro system ===
