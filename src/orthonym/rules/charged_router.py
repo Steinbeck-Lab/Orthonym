@@ -1312,6 +1312,128 @@ def _reenter_forced(neutral_smi: str, style: str, principal_fg: str) -> str:
                      **_best_effort_reenter_kwargs()).name(neutral_smi)
 
 
+def _reenter_gated(neutral_smi: str, style: str) -> str:
+    """v36 B1: re-enter the neutral skeleton with the OPSIN validity gate ON.
+
+    The default ``_reenter`` deliberately DISABLES the gate (SUB-03: a valid-but-
+    unparseable INTERMEDIATE must not be suppressed before the ionize step). But
+    the disabled gate also lets an ATOM-DROPPING retained / natural-product name
+    through unchecked (benzatropine free base -> ``tropane``, dropping the C3
+    diphenylmethoxy). This gated re-entry is the RETRY used by the atom-coverage
+    guard: with the gate ON, SELF-01 rejects the atom-dropping retained name and
+    the pipeline falls through to the systematic von Baeyer / substitutive parent
+    (``3-(diphenylmethoxy)-8-methyl-8-azabicyclo[3.2.1]octane``). Returns
+    ``'unknown organic compound'`` (a malformed-parent sentinel) when no covering
+    systematic name exists -> the caller then abstains (0-wrong)."""
+    from ..namer import Orthonym
+    return Orthonym(style=style,
+                     **_best_effort_reenter_kwargs()).name(neutral_smi)
+
+
+def _heavy_atom_multiset(smiles: str):
+    """Counter of heavy-atom element symbols for ``smiles`` (H excluded), or None
+    if it cannot be parsed. Used by the atom-coverage guard to detect an
+    atom-DROPPING re-entry name (a parseable retained/NP name missing atoms)."""
+    from collections import Counter
+    m = Chem.MolFromSmiles(smiles)
+    if m is None:
+        return None
+    return Counter(a.GetSymbol() for a in m.GetAtoms() if a.GetSymbol() != 'H')
+
+
+def _reenter_atom_coverage(neutral_name: str, neutral_smi: str) -> Optional[bool]:
+    """v36 B1 atom-coverage guard (mirrors ``covered == all-atoms``
+    precondition). Re-parse ``neutral_name`` through OPSIN (PLAIN, neutral-vs-
+    neutral -- valid, unaffected by SUB-03's unparseable-INTERMEDIATE concern) and
+    compare its heavy-atom multiset to ``neutral_smi``:
+
+      * True  -- the name's heavy-atom composition EQUALS the fragment's (covered).
+      * False -- the name PARSES but its composition differs (the atom-DROP
+                 signature: a parseable retained/NP name that silently omits
+                 substituents, e.g. ``tropane`` for the benzatropine free base).
+      * None  -- the name is OPSIN-UNPARSEABLE. This is the legitimate SUB-03
+                 intermediate shape; return None so the caller LEAVES IT as-is
+                 (byte-identical, no retry) -- the atom-drop bug always produces a
+                 PARSEABLE name, so an unparseable one is never the bug.
+    """
+    from ..validation.opsin_roundtrip import opsin_parse
+    try:
+        parsed = opsin_parse(neutral_name)
+    except Exception:
+        return None
+    if not parsed:
+        return None
+    got = _heavy_atom_multiset(parsed)
+    want = _heavy_atom_multiset(neutral_smi)
+    if got is None or want is None:
+        return None
+    return got == want
+
+
+def _cation_name_rt_ok(name: str, mol) -> bool:
+    """Strict 0-wrong RT gate for a hand-derived cation name, via the RELIABLE
+    JPype ``opsin_parse`` (NOT the subprocess ``_quaternary_rt_ok``, which fails
+    OPEN and would let an unverifiable full-stereo name -- one OPSIN cannot parse
+    at ring position 3 -- ship). Parse ``name`` and require a FULL-InChIKey match
+    to ``mol``. Fails CLOSED when OPSIN returns None (unparseable / jar absent):
+    the caller then falls through / abstains -- never ships an unverified name."""
+    if not name:
+        return False
+    from ..validation.opsin_roundtrip import opsin_parse
+    from rdkit.Chem.inchi import MolToInchiKey
+    try:
+        parsed = opsin_parse(name)
+        if not parsed:
+            return False
+        pm = Chem.MolFromSmiles(parsed)
+        if pm is None:
+            return False
+        return MolToInchiKey(pm) == MolToInchiKey(mol)
+    except Exception:
+        return False
+
+
+def _ring_aza_cation_name(neutral_name: str, mol) -> str:
+    """v36 B1: derive the cationic name for a protonated RING nitrogen from the
+    (atom-coverage-verified) neutral von-Baeyer / replacement parent name.
+
+    A ring-N cation cannot use the acyclic ``amine -> aminium`` text transform
+    (``name_aminium_cation`` would emit ``...octanium`` -- OPSIN puts the charge on
+    the wrong atom). The neutral name for such a nitrogen is a skeletal ``aza``
+    replacement (``...8-azabicyclo[3.2.1]octane``); the cation at that same N is
+    named by EITHER the parent-hydride ``-ium`` suffix cited at the aza locant
+    (``...octan-8-ium``, P-73.1.2) OR the ``azonia`` replacement (``...8-azonia-
+    bicyclo[3.2.1]octane``, P-73.2.2.1.2). Both spellings are OPSIN-valid (SPY-B1
+    §3). Build both candidates and RETURN THE FIRST that OPSIN round-trips against
+    ``mol`` (``_quaternary_rt_ok`` -- strict RDKit-canonical identity, fail-closed
+    when the jar is present, fail-open only when it is absent). Any full-stereo
+    name whose descriptor sits at ring position 3 fails to parse -> both candidates
+    reject -> '' (the caller abstains; NEVER an unverified-stereo ship).
+
+    Returns '' (fall through to the acyclic transform) unless exactly one skeletal
+    ``aza`` locant is present and a candidate round-trips."""
+    import re as _re2
+    # Exactly one skeletal 'aza' replacement (a locant + 'aza' + a ring word);
+    # a di-/tri-aza or 0-aza name is out of scope (the correspondence to the single
+    # cation site would be ambiguous).
+    aza = _re2.findall(r'(?<![0-9a-z])(\d+[a-z]?)-aza(?=[a-z])', neutral_name)
+    if len(aza) != 1:
+        return ''
+    loc = aza[0]
+    candidates = []
+    # (1) parent-hydride '-ium' at the aza locant: '...octane' -> '...octan-8-ium'.
+    if neutral_name.endswith('e'):
+        candidates.append(f"{neutral_name[:-1]}-{loc}-ium")
+    # (2) 'azonia' skeletal-replacement cation: '{loc}-aza' -> '{loc}-azonia'.
+    candidates.append(
+        _re2.sub(rf'(?<![0-9a-z]){_re2.escape(loc)}-aza(?=[a-z])',
+                 f'{loc}-azonia', neutral_name, count=1))
+    for cand in candidates:
+        if cand and _cation_name_rt_ok(cand, mol):
+            return cand
+    return ''
+
+
 def _classify_single_anion(mol, sites):
     """Return (cation_class, allowed_suffixes) for a single-/multi-anion fragment.
 
@@ -1931,6 +2053,28 @@ def route_charged(mol, style: str = 'pin') -> str:
     if not neutral_name or _is_malformed_parent(neutral_name):
         return ''
 
+    # --- Step 5b (v36 B1): ATOM-COVERAGE GUARD for the aminium re-entry.
+    # ``_reenter`` runs with the OPSIN validity gate DISABLED (SUB-03), which also
+    # lets an atom-DROPPING retained / natural-product name through unchecked
+    # (benzatropine free base -> ``tropane``, dropping the C3 diphenylmethoxy;
+    # idx10 -> ``1,2-bis(benzoyloxy)benzene``, dropping the whole amine side chain).
+    # Before the ``-ium`` suffix is glued on, verify the neutral name covers ALL
+    # heavy atoms of the fragment; on a PARSEABLE shortfall, retry the re-entry with
+    # the gate ON (SELF-01 then rejects the atom-dropper and the pipeline derives
+    # the systematic parent). Scoped to the aminium branch so no other charged class
+    # changes. This closes the gate-disabled atom-drop door -- a 0-wrong FIX.
+    if cation_kind == 'aminium':
+        if _reenter_atom_coverage(neutral_name, neutral_smi) is False:
+            try:
+                retry = _reenter_gated(neutral_smi, style)
+            except (RecursionError, ValueError, RuntimeError):
+                retry = ''
+            if (retry and not _is_malformed_parent(retry)
+                    and _reenter_atom_coverage(retry, neutral_smi) is not False):
+                neutral_name = retry
+            else:
+                return ''  # no covering systematic name -> abstain (0-wrong)
+
     # --- Step 6: re-apply the class-correct ionic / radical suffix.
     if radical_suffix is not None:
         _radical_center_idx = radical_sites[0]['atom_idx']
@@ -1970,6 +2114,18 @@ def route_charged(mol, style: str = 'pin') -> str:
     # the funnel — so deleting the stub's carbon-counting FALLBACK (Task 2) keeps
     # the aminium output byte-identical (methylaminium / pyrrolidineium etc.).
     if cation_kind == 'aminium':
+        # v36 B1: a protonated RING N (reached here when the ring-aware emitters at
+        # Step 3 declined -- a bridged / von-Baeyer bicyclic they cannot number)
+        # takes the '-ium'/'azonia' cationic form cited at the aza locant, derived
+        # from the (coverage-verified) neutral replacement name and RT-verified.
+        # The acyclic amine->aminium text transform would mis-place the charge
+        # (benzatropine -> 'tropanium'/'...octanium', a different molecule).
+        if len(sites['cations']) == 1:
+            _cat_idx = sites['cations'][0]['atom_idx']
+            if mol.GetAtomWithIdx(_cat_idx).IsInRing():
+                ring_cat = _ring_aza_cation_name(neutral_name, mol)
+                if ring_cat:
+                    return ring_cat
         # T1 (Phase 173.6): a senior-group protonated amine becomes an 'azaniumyl'
         # substituent prefix (P-73.1.1/P-74), not 'ium' appended to the parent;
         # a principal amine keeps the proven '-aminium' suffix.
