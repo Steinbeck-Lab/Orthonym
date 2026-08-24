@@ -46,11 +46,21 @@ A1_WITNESSES = [
     "C1=C\\CCCCCCCCCCCC/C=C\\COC2CC(CCC\\C=C/1)OC1(CCCCO1)C2",           # bicyclo[23.3.1] triene
 ]
 
-# Pattern A2: spiro-von-Baeyer builds a name with a wrong-numbering / SELF-01 bug.
+# Pattern A2: spiro-von-Baeyer builds a name that SELF-01 rejects. MEASURED (Task 3,
+# V36-C1C2C6-TASK3-A2-FINDING.md): the spy's "wrong-numbering" premise is REFUTED --
+# 67/85 spiro-VB fails are STEREO-OMISSION (right constitution + numbering, missing P-91
+# descriptors), only 16 are real constitutional defects. A re-anchored stereo injection
+# closes a measured 40/85 (RT-gated, 0-wrong), but the clean wiring touches the SHARED
+# stereo primitive (format_stereodescriptor_string tuple rendering + _STEREO_PREFIX_RE
+# primed-locant recognition) and must be validated by the full PIN gate -> DEFERRED.
 A2_WITNESSES = [
-    "c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2",   # spy SELF-01 "different molecule"
-    "C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1",     # tricyclo diene component
+    "c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2",   # stereo-omission (primed component)
+    "C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1",     # stereo-omission (measured closeable)
 ]
+
+# The A2 witness measured to RT-pass once its P-91 stereo block is completed (finding doc).
+# xfail(strict) -> flips GREEN the session that lands the shared-stereo-path primed-locant fix.
+A2_STEREO_CLOSEABLE = ["C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1"]
 
 # Pattern B: mixed-spiro-fused (name_mixed_spiro_fused has no construction path).
 B_WITNESSES = [
@@ -172,6 +182,22 @@ def test_a1_witness_names_and_rt(smiles):
     except _Timeout:
         pytest.skip("naming exceeded timeout (out-of-scope size)")
     assert r.passed, f"A1 witness did not round-trip: name={r.name!r} err={r.error}"
+
+
+@pytest.mark.xfail(strict=True, reason="A2 stereo-completion deferred: needs primed-locant "
+                                       "support in the shared stereo primitive (full-gate "
+                                       "change) -- V36-C1C2C6-TASK3-A2-FINDING.md")
+@pytest.mark.parametrize("smiles", A2_STEREO_CLOSEABLE)
+def test_a2_stereo_completion_target(smiles):
+    """Deferred Task-3 target: this spiro-von-Baeyer core is constitution-correct today
+    and abstains only because its P-91 stereo block is missing. A re-anchored injection
+    (VERIFIED to RT-pass by hand) closes it; the wiring is deferred as a shared-stereo-path
+    change requiring the full gate. Flips GREEN when that lands."""
+    try:
+        r = _ring_rt(smiles)
+    except _Timeout:
+        pytest.skip("naming exceeded timeout (out-of-scope size)")
+    assert r.passed, f"A2 stereo target still abstains: name={r.name!r} err={r.error}"
 
 
 # --- Ring-dispatch canary: already-working names unchanged + RT-valid ---------
