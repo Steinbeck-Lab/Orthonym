@@ -4086,6 +4086,25 @@ class Orthonym:
         two arguments -- so the isotope exit (which sits before that block)
         can route through it unchanged.
         """
+        # v36 D1 (coordination retained table): an N-coordinated metal tetrapyrrole
+        # (heme/chlorophyll/cobalamin/siroheme/F430) has no OPSIN-parseable name, so
+        # no real namer produces a verified name for it -- control lands on the metal
+        # sentinel (via _descriptive_fallback, already hooked above) OR, when the
+        # OPSIN validity gate is degraded, on a WRONG best-effort fragment that
+        # bypasses _descriptive_fallback entirely. Override with the exact-InChIKey
+        # ChEBI retained name HERE too, at name()'s single audited exit, so the table
+        # wins deterministically for exactly these structures regardless of gate
+        # state. The exact-InChIKey match (25 curated metal-macrocycles, none of them
+        # PIN-nameable) means no correctly-named / PIN molecule is ever touched.
+        # Placed before the emitted-record below so telemetry logs the final name.
+        try:
+            from .assembly.fragment_naming import is_top_level_naming as _d1_top
+            if _d1_top():
+                _d1_name = _coordination_retained_name(smiles)
+                if _d1_name is not None:
+                    name = _d1_name
+        except Exception:  # pragma: no cover - a lookup must never break naming
+            pass
         # v30 PE-1: record the name actually returned, in its OWN try/except and
         # BEFORE the ``off`` short-circuit below -- otherwise the emitted record
         # would be silently absent in the default binding-proof mode, which is the
@@ -6713,6 +6732,41 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
 # _ORGANIC_ELEMENTS / _METAL_NAMES are bound at module top.
 
 
+def _coordination_retained_name(smiles: str) -> Optional[str]:
+    """v36 Milestone D1: exact-InChIKey retained name for an N-coordinated metal
+    tetrapyrrole (heme / chlorophyll / cobalamin / siroheme / coenzyme F430), or
+    ``None`` when the input is not one of the curated structures.
+
+    OPSIN 2.9.0 cannot parse ANY of these coordination-complex names, so no real
+    namer can ever produce an OPSIN-verified name for them; control otherwise lands
+    on the honest ``"<metal> compound (not supported)"`` sentinel (or, when the OPSIN
+    validity gate is degraded, a WRONG best-effort fragment such as
+    ``"...hexadec-2-en-1-yl propanoate"`` for chlorophyll a). The only sound 0-wrong
+    oracle for the class is therefore exact-structure identity: each table key is the
+    standard InChIKey of one exact ChEBI structure and each value is that structure's
+    ChEBI-accepted name (verbatim) -- the same contract as ``RETAINED_METALLOCENES``
+    and the amino-acid/sugar retained tables. A hit is an exact structural match; a
+    miss returns ``None`` and the caller keeps its own (abstaining) result, so this
+    can never emit a wrong name.
+
+    A cheap bracketed-metal-token pre-check keeps the InChIKey cost off the
+    ~everything-else naming path (``[Fe`` / ``[Mg`` / ``[Co`` / ``[Ni`` uniquely mark
+    an Fe/Mg/Co/Ni atom in a SMILES; no organic bracket atom begins with those).
+    """
+    if not smiles:
+        return None
+    if not ("[Fe" in smiles or "[Mg" in smiles or "[Co" in smiles or "[Ni" in smiles):
+        return None
+    try:
+        from .data.coordination_retained import COORDINATION_RETAINED
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        return COORDINATION_RETAINED.get(Chem.MolToInchiKey(mol))
+    except Exception:  # pragma: no cover - a lookup must never break naming
+        return None
+
+
 def _descriptive_fallback(smiles: str) -> str:
     """Generate a descriptive fallback message instead of bare 'unknown'.
 
@@ -6733,6 +6787,14 @@ def _descriptive_fallback(smiles: str) -> str:
     Returns:
         A descriptive string (never bare 'unknown' for a parseable molecule).
     """
+    # v36 D1: before emitting the honest metal sentinel, consult the exact-InChIKey
+    # coordination retained-name table. A hit (heme/chlorophyll/cobalamin/siroheme/
+    # F430) returns the ChEBI-accepted name; a miss falls through to the sentinel,
+    # exactly as before. Reached only after every real namer declined, so a molecule
+    # the normal namer names is never touched here.
+    _coord = _coordination_retained_name(smiles)
+    if _coord is not None:
+        return _coord
     try:
         mol = Chem.MolFromSmiles(smiles)
     except Exception:

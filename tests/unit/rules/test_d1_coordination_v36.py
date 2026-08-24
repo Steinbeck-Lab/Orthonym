@@ -231,3 +231,46 @@ def test_no_sentinel_or_malformed_names():
         assert "unknown" not in name.lower()
         assert "()" not in name and "--" not in name and "*" not in name
         assert name.strip() == name and name != ""
+
+
+# --------------------------------------------------------------------------- #
+# Task 2 -- dispatch wiring (RED before the hook, GREEN after)
+# --------------------------------------------------------------------------- #
+
+def _name(smiles: str) -> str:
+    from orthonym import Orthonym
+    return Orthonym().name(smiles)
+
+
+_BY_CHEBI = {f["chebi"]: f for f in FIXTURES}
+HEME_B = _BY_CHEBI["CHEBI:17627"]
+CHLOROPHYLL_A = _BY_CHEBI["CHEBI:18230"]
+CYANOCOBALAMIN = _BY_CHEBI["CHEBI:17439"]
+
+# a real ChEBI metal-tetrapyrrole deliberately LEFT OUT of the table (cobyrinic-acid
+# precursor, CHEBI:3789); it takes the SAME metal-sentinel fallback path, so it proves
+# the hook fires only on an exact InChIKey match, never on family resemblance.
+NON_TABLE_METAL = 'C[C@]1(CC(=O)O)C(CCC(=O)O)=C2C[C@@]3(C)C(CC(=O)O)=C(CCC(=O)O)C4=[N+]3[Co-2]35[N]6C(=CC1=[N+]23)[C@@H](CCC(=O)O)[C@](C)(CC(=O)O)[C@]6(C)[C@H]1[C@H](CC(=O)O)[C@@](C)(CCC(=O)O)C(=[N+]15)C4'
+
+
+@pytest.mark.parametrize("fx", [HEME_B, CHLOROPHYLL_A, CYANOCOBALAMIN],
+                         ids=["heme_b", "chlorophyll_a", "cyanocobalamin"])
+def test_canaries_emit_chebi_name(fx):
+    # was "<metal> compound (not supported)"; now the ChEBI retained name.
+    assert _name(fx["smiles"]) == fx["name"]
+
+
+def test_every_table_entry_names_via_dispatch():
+    for fx in FIXTURES:
+        assert _name(fx["smiles"]) == fx["name"], fx["chebi"]
+
+
+def test_non_table_metal_complex_still_abstains():
+    out = _name(NON_TABLE_METAL)
+    assert out not in COORDINATION_RETAINED.values()
+    assert "not supported" in out  # still the honest metal sentinel
+
+
+def test_ordinary_organics_untouched():
+    assert _name("CCO") == "ethanol"
+    assert _name("c1ccccc1") == "benzene"
