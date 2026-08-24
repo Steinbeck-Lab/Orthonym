@@ -91,6 +91,66 @@ class TestSubstitutiveOverAReplacement:
         assert _rt_ok(name, smiles), f"round-trip failed: {name!r}"
 
 
+# --------------------------------------------------------------------------
+# Task 2 -- 2,2,2-trifluoroethoxy miscount (WRONG constitution)
+# --------------------------------------------------------------------------
+
+# (2,2,2-trifluoroethoxy)benzene: F-C(F)(F)-CH2-O-benzene.
+# The -O-CH2-CF3 substituent fragment is atoms {0,1,2,3,4,5}, attach O = 5.
+_TFEO = "FC(F)(F)COc1ccccc1"
+_TFEO_FRAG = [5, 4, 1, 0, 2, 3]
+_TFEO_ATTACH = 5
+LANSOPRAZOLE = "Cc1ccnc(CS(=O)c2[nH]c3ccccc3n2)c1OCC(F)(F)F"
+
+
+class TestTrifluoroethoxyMiscount:
+    def test_backbone_excludes_halogen(self):
+        """The replacement-chain backbone must not step onto a monovalent
+        halogen -- the miscount root cause (O-C-C-F -> '1-oxabutane')."""
+        from orthonym.rules.terminal_fragment import (
+            _backbone_from, _canonical_ranks)
+        mol = Chem.MolFromSmiles(_TFEO)
+        ranks = _canonical_ranks(mol)
+        bb = _backbone_from(mol, set(_TFEO_FRAG), _TFEO_ATTACH, ranks,
+                            stop_at_ring=False)
+        syms = [mol.GetAtomWithIdx(i).GetSymbol() for i in bb]
+        assert syms == ["O", "C", "C"], f"backbone walked into a halogen: {syms}"
+
+    def test_terminal_fragment_correct_constitution(self):
+        """terminal_fragment now names -O-CH2-CF3 with the RIGHT constitution
+        (3 F over a 3-atom O-C-C chain), not the old 2-F/4-atom miscount."""
+        from orthonym.rules.terminal_fragment import terminal_fragment_name
+        mol = Chem.MolFromSmiles(_TFEO)
+        r = terminal_fragment_name(mol, set(_TFEO_FRAG), _TFEO_ATTACH)
+        assert r is not None and r.name
+        assert "trifluoro" in r.name
+        assert "difluoro" not in r.name and "oxabutan" not in r.name, \
+            f"still miscounting: {r.name!r}"
+        assert _rt_ok(f"({r.name})benzene", _TFEO)
+
+    def test_fragment_prefers_trifluoroethoxy(self):
+        from orthonym.assembly.substituent_enumerator import name_substituent
+        mol = Chem.MolFromSmiles(_TFEO)
+        tok = best_effort_ctx.set(True)
+        try:
+            name = name_substituent(mol, _TFEO_FRAG, _TFEO_ATTACH,
+                                    allow_mancude=True)
+        finally:
+            best_effort_ctx.reset(tok)
+        assert name == "2,2,2-trifluoroethoxy"
+        assert _rt_ok(f"({name})benzene", _TFEO)
+
+    def test_lansoprazole_roundtrips_with_trifluoroethoxy(self):
+        namer = _best_effort_namer()
+        name = namer.name(LANSOPRAZOLE)
+        assert name and "unknown" not in name.lower(), \
+            f"abstained/sentinel: {name!r}"
+        assert "2,2,2-trifluoroethoxy" in name, f"missing correct chain: {name!r}"
+        assert "oxabutan" not in name and "difluoro" not in name, \
+            f"miscount leaked: {name!r}"
+        assert _rt_ok(name, LANSOPRAZOLE), f"round-trip failed: {name!r}"
+
+
 class TestCanariesUnchanged:
     """Shared substituent/ring machinery -- these PINs must stay byte-identical."""
 

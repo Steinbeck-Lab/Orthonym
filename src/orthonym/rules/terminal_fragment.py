@@ -41,6 +41,14 @@ from rdkit import Chem
 from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_alkyl_name
 from .ring_replacement import build_replacement_prefix
 
+# Monovalent halogens (F/Cl/Br/I/At) are NEVER skeletal replacement-chain atoms
+# (P-22.2.3 / P-51.4 skeletal replacement uses only C and the 'a'-elements). A
+# halogen is a terminal substituent expressed as a fluoro/chloro/... prefix, so
+# the backbone walk must not step onto one -- doing so miscounts the chain length
+# and drops halogens (``-O-CH2-CF3`` -> ``3,3-difluoro-1-oxabutan-1-yl``, a
+# 4-atom/2-F WRONG constitution for the real 3-atom/3-F chain). v36 Wave F.
+_HALOGEN_ATOMIC_NUMS = frozenset({9, 17, 35, 53, 85})
+
 logger = logging.getLogger(__name__)
 
 #: Mirrors ``terminal_ring.MAX_CAGE_ATOMS``'s intent: a bound past which a
@@ -100,6 +108,10 @@ def _backbone_from(mol, atoms: Set[int], start: int,
         nonlocal best_path, best_key
         children = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
                     if nb.GetIdx() in atoms and nb.GetIdx() not in seen
+                    # A monovalent halogen is a substituent, never a skeletal
+                    # backbone step (v36 Wave F: fixes the trifluoroethoxy
+                    # miscount -- see _HALOGEN_ATOMIC_NUMS).
+                    and nb.GetAtomicNum() not in _HALOGEN_ATOMIC_NUMS
                     and not (stop_at_ring
                              and mol.GetAtomWithIdx(nb.GetIdx()).IsInRing())]
         if not children:
