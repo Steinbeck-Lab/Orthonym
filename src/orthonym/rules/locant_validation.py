@@ -210,6 +210,17 @@ def _is_valid_locant(locant: Any, parent_size: int) -> bool:
             return 0 < base_num <= parent_size
         return False
 
+    # v36-A2: a PRIMED multi-component locant (n, "'"/"''") — the 2nd component
+    # of a spiro/fused name (e.g. (11, "'") for the tricyclo side of
+    # spiro[oxolane-2,12'-tricyclo…]). It is numbered by its OWN component's
+    # namer, so it must NOT be range-checked against parent_size, which reflects
+    # only the UNPRIMED component's size. Accept when its base number is a
+    # positive int (fail-closed on 0 / non-positive / malformed). 0-wrong is
+    # still guaranteed downstream: a mis-attributed descriptor RT-fails → abstain.
+    if isinstance(locant, tuple):
+        base = locant[0] if locant and isinstance(locant[0], int) else None
+        return base is not None and base > 0
+
     # Float, None, or other unexpected type
     return False
 

@@ -14,6 +14,8 @@ the recognizers don't accept a prime after the locant, so a correct
 the scalar-regression tests below guard that (they pass both RED and GREEN).
 """
 
+import pytest
+
 from orthonym.rules.stereochemistry import (
     _STEREO_EMBEDDED_RE,
     _STEREO_PREFIX_RE,
@@ -82,3 +84,93 @@ class TestScalarByteIdenticalRegression:
         assert _STEREO_PREFIX_RE.match("(E)-")
         assert _STEREO_PREFIX_RE.match("(7aS)-")
         assert _STEREO_EMBEDDED_RE.search("foo-(3aR,7aS)-bar")
+
+
+# ---------------------------------------------------------------------------
+# Task 3 — WITNESS RT: spiro-von-Baeyer stereo-completion (needs OPSIN)
+# ---------------------------------------------------------------------------
+# These name real spiro-VB stereo-omission witnesses end-to-end and check the
+# emitted name round-trips to the input's FULL InChI (incl. the stereo layer)
+# via PLAIN OPSIN — the independent 0-wrong gate. Names are NOT string-asserted
+# (a core-namer change may re-spell them); the contract is RT-pass / abstain.
+
+# Witnesses that must round-trip WITH full stereo after the A2 fix (measured):
+_RT_PASS_WITNESSES = [
+    # The finding's RT-verified canonical (2S/1'R/3'R/11'R spiro-oxolane-tricyclo)
+    "C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1",
+    # azaspiro tricyclic
+    "CC1O[C@@]2(CS1)CN1CCC2CC1",
+    # spiro-azatricyclo dienone (single primed R/S)
+    "COc1cc2c3c(c1OC)C1(C=CC(=O)C=C1)C[C@H]3N(C)CC2",
+    # steroidal spiroketal (cholestane 16,22-epoxy-22,27-epoxy)
+    "C[C@@H]1CC[C@@]2(OC1)O[C@H]1C[C@H]3[C@@H]4CC[C@H]5C[C@@H](O)CC[C@]5(C)"
+    "[C@H]4CC[C@]3(C)[C@H]1[C@@H]2C",
+    # spiro-oxiranyl oxatricyclo, multi primed + unprimed block
+    "CC1=C[C@H]2O[C@@H]3[C@H](O)C[C@](C)([C@@]2(CO)[C@H](O)C1=O)[C@]31CO1",
+]
+
+# A witness whose CONSTITUTION (bare core) is OPSIN-unparseable — the stereo
+# block injects fine, but SELF-01 must suppress on the core → abstain (0-wrong).
+_ABSTAIN_WITNESSES = [
+    "c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2",
+]
+
+_ALL_WITNESSES = _RT_PASS_WITNESSES + _ABSTAIN_WITNESSES
+_FAIL_NAMES = {"", "unknown organic compound", "unknown"}
+
+
+def _opsin_available() -> bool:
+    try:
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+
+        return opsin_parse("ethane") is not None
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="module")
+def named_results():
+    """Name every witness ONCE (conserve JVM launches); return {smi: (name, rt)}."""
+    if not _opsin_available():
+        pytest.skip("OPSIN jar unavailable — cannot RT-verify")
+    from orthonym import name_compound
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+
+    out = {}
+    for smi in _ALL_WITNESSES:
+        res = name_compound(smi)
+        name = res.name if hasattr(res, "name") else res
+        emitted = bool(name) and name not in _FAIL_NAMES
+        rt = opsin_roundtrip_check(smi, name)["passed"] if emitted else False
+        out[smi] = (name, emitted, rt)
+    return out
+
+
+class TestSpiroVBStereoCompletionWitnessRT:
+    def test_finding_witness_rt_passes_with_full_stereo(self, named_results):
+        name, emitted, rt = named_results[_RT_PASS_WITNESSES[0]]
+        assert emitted, name
+        assert rt, f"finding witness must RT-pass with full stereo; got {name!r}"
+        # the primed 2nd-component descriptors are present (no tuple-repr garbage)
+        assert "(1, " not in name and "'" in name, name
+
+    @pytest.mark.parametrize("smi", _RT_PASS_WITNESSES)
+    def test_rt_pass_witnesses_roundtrip_full_stereo(self, smi, named_results):
+        name, emitted, rt = named_results[smi]
+        assert emitted, f"expected a stereo-completed name, got abstain: {smi}"
+        assert rt, f"expected full-InChI RT pass, got {name!r} for {smi}"
+
+    @pytest.mark.parametrize("smi", _ABSTAIN_WITNESSES)
+    def test_constitutional_defect_witnesses_abstain(self, smi, named_results):
+        name, emitted, _rt = named_results[smi]
+        # Constitution unparseable → SELF-01 suppresses → abstain (never wrong).
+        assert not emitted, f"expected abstain (0-wrong), got emitted name {name!r}"
+
+    def test_zero_wrong_invariant_all_witnesses(self, named_results):
+        """0-wrong ABSOLUTE: every EMITTED witness name must RT to the full
+        InChI (incl. stereo). No emitted-but-RT-fail is permitted."""
+        for smi, (name, emitted, rt) in named_results.items():
+            if emitted:
+                assert rt, (
+                    f"0-WRONG VIOLATION: emitted {name!r} does NOT RT for {smi}"
+                )
