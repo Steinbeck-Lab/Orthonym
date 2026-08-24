@@ -184,3 +184,43 @@ def test_h_plus_controls_unchanged(namer):
     assert namer.name("CCN.[H+].[Cl-]") == "ethanamine hydrochloride"
     # a bare proton + halide with NO base must still fail closed (0-wrong)
     assert is_failure_name(namer.name("[H+].[Cl-]"))
+
+
+# ---------------------------------------------------------------------------
+# FABLE #1 (determinism BLOCKER): _protonate_amines_with_h_plus must choose
+# the protonation site(s) by a canonical-rank order (not raw atom index /
+# SMARTS-match order), and backtrack over the alternatives, so that every
+# spelling of the SAME molecule gives the SAME result. RED before the fix:
+# '[H+].NCCCNC.CC([O-])=O' named while '[H+].CNCCCN.CC([O-])=O' (identical
+# canonical SMILES) abstained, because the secondary N was protonated first
+# for one atom ordering and that cation failed to name.
+# ---------------------------------------------------------------------------
+
+_HPLUS_DETERMINISM_SPELLINGS = [
+    "[H+].NCCCNC.CC([O-])=O",
+    "[H+].CNCCCN.CC([O-])=O",
+    "[H+].CC([O-])=O.NCCCNC",
+]
+_HPLUS_DETERMINISM_EXPECTED = "3-(methylamino)propan-1-aminium acetate"
+
+
+@pytest.mark.opsin_gate
+def test_h_plus_protonation_site_choice_is_spelling_deterministic(namer):
+    """Same canonical molecule, three different atom orderings in the input
+    SMILES -> the SAME emitted name (and it must be the correct, round-
+    tripping name -- not a shared abstention)."""
+    from rdkit import Chem
+
+    canon = {Chem.CanonSmiles(s) for s in _HPLUS_DETERMINISM_SPELLINGS}
+    assert len(canon) == 1, "test fixture spellings are not the same molecule"
+
+    outputs = {namer.name(s) for s in _HPLUS_DETERMINISM_SPELLINGS}
+    assert len(outputs) == 1, (
+        f"non-deterministic across spellings of the same canonical SMILES: "
+        f"{[(s, namer.name(s)) for s in _HPLUS_DETERMINISM_SPELLINGS]}")
+
+    out = outputs.pop()
+    assert out == _HPLUS_DETERMINISM_EXPECTED, out
+    assert not is_failure_name(out), f"abstained: {out!r}"
+    for smi in _HPLUS_DETERMINISM_SPELLINGS:
+        assert _rt_full(smi, out), f"round-trip failed for {smi!r}: {out!r}"

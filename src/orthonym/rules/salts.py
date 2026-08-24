@@ -17,6 +17,7 @@ Key naming patterns:
 - Stoichiometry: multiplicative prefixes for repeated ions (diacetate)
 """
 
+import itertools
 from typing import Dict, List, Optional, Any
 from collections import Counter
 from rdkit import Chem
@@ -356,33 +357,69 @@ def normalize_imbalanced_acid_salt(smiles: str) -> Optional[str]:
 
 def _protonate_amines_with_h_plus(mol, n_protons: int):
     """v36 B2: consume ``n_protons`` bare [H+] fragments by protonating that many
-    basic amine nitrogens, returning the reconstructed (charge-balanced) mol.
+    basic amine nitrogens, yielding EVERY reconstructed (charge-balanced) mol
+    that results from a distinct choice of which amine site(s) to protonate.
+
+    FABLE #1 (determinism fix): ``GetSubstructMatches`` returns matches in
+    ATOM-INDEX order, which is a PARSE-order artifact -- two SMILES spellings
+    of the identical canonical molecule can enumerate the same amine sites in
+    different orders, so a single ``[:n_protons]`` slice used to make the
+    choice of WHICH amine gets protonated spelling-dependent (two
+    identical-canonical-SMILES inputs producing different names, or one
+    naming and the spelling-equivalent other abstaining). Fixed two ways:
+
+    (a) Candidate sites are sorted by RDKit CANONICAL ATOM RANK
+        (``CanonicalRankAtoms``), not raw atom index. The canonical rank is a
+        function of the molecular graph alone, not of input atom order, so
+        the sort order -- and therefore which site is tried FIRST -- is
+        identical across every spelling of the same molecule.
+    (b) This now returns/yields ALL ``n_protons``-sized combinations of
+        candidate sites (in that same canonical order), not just the first.
+        The caller (``name_salt``) tries them in order and BACKTRACKS to the
+        next candidate whenever one fails to produce a nameable+round-
+        tripping salt, instead of giving up after the first attempt. Every
+        candidate still goes through the full ``name_salt`` recursion (every
+        existing fail-closed guard applies) and the top-level OPSIN gate, so
+        a mis-placed proton still fails closed (0-wrong preserved) -- this
+        only widens the set of placements that get a chance, deterministically.
 
     Every [H+] MUST be consumed (a leftover proton would leave an unbalanced,
-    wrongly-charged species), so this returns None when there are fewer basic
-    amine sites than protons -- the caller then falls through to the fail-closed
-    guard. The choice of WHICH amine is verified downstream: the reconstructed
-    salt is re-named and gated, so a mis-placed proton fails closed (0-wrong)."""
+    wrongly-charged species), so this yields nothing when there are fewer
+    basic amine sites than protons -- the caller then falls through to the
+    fail-closed guard.
+    """
     try:
-        rw = Chem.RWMol(mol)
-        amine_idxs = [m[0] for m in rw.GetSubstructMatches(_BASIC_AMINE_N)]
-        h_plus_idxs = [a.GetIdx() for a in rw.GetAtoms()
+        probe = Chem.RWMol(mol)
+        amine_idxs = [m[0] for m in probe.GetSubstructMatches(_BASIC_AMINE_N)]
+        h_plus_idxs = [a.GetIdx() for a in probe.GetAtoms()
                        if a.GetAtomicNum() == 1 and a.GetFormalCharge() == 1
                        and a.GetDegree() == 0]
         if len(amine_idxs) < n_protons or len(h_plus_idxs) < n_protons:
-            return None
-        for n_idx in amine_idxs[:n_protons]:
-            a = rw.GetAtomWithIdx(n_idx)
-            a.SetFormalCharge(1)
-            a.SetNumExplicitHs(a.GetTotalNumHs() + 1)
-            a.SetNoImplicit(True)
-        for h_idx in sorted(h_plus_idxs[:n_protons], reverse=True):
-            rw.RemoveAtom(h_idx)
-        out = rw.GetMol()
-        Chem.SanitizeMol(out)
-        return out
+            return
+        # Canonical-rank order: spelling-invariant (depends on the graph, not
+        # on input atom order), so the SAME site(s) are tried first for every
+        # spelling of the same molecule.
+        ranks = list(Chem.CanonicalRankAtoms(probe, breakTies=True))
+        amine_idxs = sorted(amine_idxs, key=lambda i: ranks[i])
+        h_plus_idxs = sorted(h_plus_idxs, key=lambda i: ranks[i])[:n_protons]
     except (RuntimeError, ValueError):
-        return None
+        return
+
+    for combo in itertools.combinations(amine_idxs, n_protons):
+        try:
+            rw = Chem.RWMol(mol)
+            for n_idx in combo:
+                a = rw.GetAtomWithIdx(n_idx)
+                a.SetFormalCharge(1)
+                a.SetNumExplicitHs(a.GetTotalNumHs() + 1)
+                a.SetNoImplicit(True)
+            for h_idx in sorted(h_plus_idxs, reverse=True):
+                rw.RemoveAtom(h_idx)
+            out = rw.GetMol()
+            Chem.SanitizeMol(out)
+            yield out
+        except (RuntimeError, ValueError):
+            continue
 
 
 def name_salt(mol, style: str = 'pin') -> str:
@@ -478,10 +515,14 @@ def name_salt(mol, style: str = 'pin') -> str:
     # on the reconstructed (charge-balanced) salt, which then routes each cation
     # through the ordinary cation loop. The recursive name_salt + top-level gate
     # verify the result, so a mis-protonation fails closed (0-wrong preserved).
+    # FABLE #1: try EVERY candidate protonation-site combination (in a
+    # canonical, spelling-invariant order) and BACKTRACK to the next one if
+    # the first fails to name -- never give up after a single try, and never
+    # let the choice depend on which N happened to appear first in the input
+    # SMILES (identical-canonical-SMILES inputs must give identical output).
     if (h_plus_frags and not other_cation_frags and neutrals
             and frags['anions']):
-        protonated = _protonate_amines_with_h_plus(mol, len(h_plus_frags))
-        if protonated is not None:
+        for protonated in _protonate_amines_with_h_plus(mol, len(h_plus_frags)):
             recur = name_salt(protonated, style)
             if recur and not is_failure_name(recur):
                 return recur
