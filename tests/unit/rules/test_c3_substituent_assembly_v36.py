@@ -75,9 +75,18 @@ owns the real fix — NONE is a DROP-24 re-anchor gap in ``assembly/``:
 
 CONCLUSION: no C3 witness is closeable within the strict assembly-only,
 zero-ring-engine charter. This file is therefore the RED baseline + a set of
-RT-verified TARGET names (xfail) that will flip to GREEN automatically once the
-re-bucketed ring/scaffold-engine fixes land — actionable regression scaffolding
-for the re-plan, not dead code.
+RT-verified TARGET names that flip to GREEN as the re-bucketed
+ring/scaffold-engine fixes land — actionable regression scaffolding for the
+re-plan, not dead code.
+
+UPDATE (v36-C3 Task 2', LANDED): the estramustine steroid-ester bugs were fixed
+in ``rules/natural_products.py`` — the ester acid word now routes through the
+GENERAL ester namer (carbamate named as ``N,N-bis(2-chloroethyl)carbamate``, no
+longer carbon-counted to ``pentanoate``) and the euphonic 'a' is restored
+(``estra`` not ``estr``). estramustine + a class of steroid esters now name and
+OPSIN-round-trip; see ``test_c3_estramustine_names_GREEN`` and
+``test_c3_steroid_ester_class_names_and_round_trips`` below. w0/w13/w16 remain
+RED, re-bucketed to spiro-stereo / ring-program milestones.
 
 Regenerate the witness data in minutes via the spy's method
 (`` "Method").
@@ -106,9 +115,12 @@ CATB6 = "O=C1OC2(c3ccc(O)cc3Oc3cc(Oc4ccc(O)cc4)ccc32)c2ccccc21"
 # ester/ether/carbamate linker. Overlaps C4's charter (see Task 6).
 C3_CATEGORY_B_WITNESSES = {"catb3": CATB3, "catb6": CATB6}
 
-# The four category-(a)/(d) witnesses the plan's Task-2 was meant to close.
+# The category-(a)/(d) witnesses the plan's Task-2 was meant to close.
+# estramustine GRADUATED to GREEN (v36-C3 Task 2', see the steroid-ester tests
+# below) — it is named + round-trips today via the rules/natural_products.py
+# steroid-ester fix, so it is no longer part of the RED baseline. w0/w13/w16
+# remain RED, re-bucketed to spiro-stereo / ring-program milestones.
 C3_TARGET_WITNESSES = {
-    "estramustine": ESTRAMUSTINE,
     "w0": W0,
     "w13": W13,
     "w16": W16,
@@ -197,14 +209,66 @@ def test_c3_target_name_round_trips(key, smiles, target):
     assert rt.get("passed"), f"{key} target does not round-trip: {rt.get('error')}"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "estramustine PIN needs rules/natural_products.py fixes (euphonic 'a' in "
-    "_assemble_np_ester_name + carbamate acid in _find_ester_decorations) — a "
-    "scaffold-engine fix, RE-BUCKETED out of C3's assembly-only charter."
-))
 def test_c3_estramustine_names_GREEN():
+    """v36-C3 Task 2' (GREEN): estramustine now names + OPSIN-round-trips via the
+    two rules/natural_products.py steroid-ester fixes:
+      (1) the ester ACID word is built by the GENERAL ester namer instead of
+          naive carbon-counting, so the carbamate is 'N,N-bis(2-chloroethyl)-
+          carbamate', NOT the wrong 'pentanoate' (a 5-carbon guess that dropped
+          the N and both Cl → a different molecule);
+      (2) the euphonic 'a' is restored (IUPAC P-31.1.3.4) so the stem is
+          'estra-1,3,5(10)-trien', not the malformed 'estr-1,3,5(10)-trien'."""
     name, passed = _c3_rt(ESTRAMUSTINE)
     assert passed, f"estramustine did not name+round-trip: {name!r}"
+    # Bug 1 regression guard: never the carbon-counted 'pentanoate'.
+    assert "pentanoate" not in name, (
+        f"estramustine acid carbon-counted again (bug 1 regressed): {name!r}"
+    )
+    # Bug 2 regression guard: the euphonic 'a' stem, never bare 'estr-'.
+    assert "estra" in name and "estr-" not in name, (
+        f"estramustine euphonic 'a' dropped (bug 2 regressed): {name!r}"
+    )
+
+
+# --- v36-C3 Task 2': the steroid-ESTER CLASS names + round-trips ---------------
+# Proves the fix is the CLASS (any steroid ester), not a per-molecule patch: a
+# steroid acetate, a simple acyl ester, and steroid carbamates all name + RT.
+# Includes both the single-ene stem (cholest-5-en-, NO euphonic 'a') and the
+# multi-ene stem (estra-1,3,5(10)-trien-, euphonic 'a') so the P-31.1.3.4 rule
+# is exercised in both directions.
+C3_STEROID_ESTER_WITNESSES = {
+    # 3-O-carbamate estradiol (the flagship): N,N-bis(2-chloroethyl)carbamate.
+    "estramustine": ESTRAMUSTINE,
+    # cholesteryl acetate — single ring double bond → 'cholest-5-en-3beta-yl
+    # acetate' (NO euphonic 'a'); acetate still built correctly by the general
+    # namer (surrogate 'methyl acetate' → 'acetate').
+    "cholesteryl_acetate": (
+        "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](OC(C)=O)"
+        "CC[C@]4(C)[C@H]3CC[C@]12C"
+    ),
+    # estradiol 3-acetate — 3 ring double bonds → euphonic 'a' ('estra-...').
+    "estradiol_3_acetate": (
+        "C[C@]12CC[C@H]3[C@@H](CCc4cc(OC(C)=O)ccc34)[C@@H]1CC[C@@H]2O"
+    ),
+    # estradiol 3-propanoate — a simple non-C2 acyl ester.
+    "estradiol_3_propanoate": (
+        "C[C@]12CC[C@H]3[C@@H](CCc4cc(OC(=O)CC)ccc34)[C@@H]1CC[C@@H]2O"
+    ),
+    # estradiol 3-(N,N-dimethylcarbamate) — a second, distinct carbamate acid,
+    # to prove the general acid namer (not a carbamate special-case) is at work.
+    "estradiol_3_dimethylcarbamate": (
+        "C[C@]12CC[C@H]3[C@@H](CCc4cc(OC(=O)N(C)C)ccc34)[C@@H]1CC[C@@H]2O"
+    ),
+}
+
+
+@pytest.mark.parametrize("key,smiles", sorted(C3_STEROID_ESTER_WITNESSES.items()))
+def test_c3_steroid_ester_class_names_and_round_trips(key, smiles):
+    """Each steroid ester names (non-abstain) AND OPSIN-round-trips to the input
+    — the class-level proof of the v36-C3 Task 2' fix."""
+    name, passed = _c3_rt(smiles)
+    assert not is_failure_name(name), f"{key} abstained: {name!r}"
+    assert passed, f"{key} did not OPSIN-round-trip: {name!r}"
 
 
 @pytest.mark.xfail(strict=True, reason=(

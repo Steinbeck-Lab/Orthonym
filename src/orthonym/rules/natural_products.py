@@ -1787,6 +1787,84 @@ def _assemble_np_name(
             return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, effective_stem)}{unsat_suffix}e"
 
 
+def _name_ester_acid_via_general(
+    mol, carbonyl_idx: int, ester_oxy_idx: int, scaffold_atoms: set
+) -> Optional[str]:
+    """Name the ACID word of a scaffold ester via the GENERAL ester namer.
+
+    Root cause of the estramustine-class defect: ``_find_ester_decorations``
+    used to size the acid by counting its carbons
+    (``_count_acid_fragment_carbons`` -> ``get_systematic_acylate``), which
+    turns a carbamate ``-O-C(=O)-N(CH2CH2Cl)2`` (5 carbons) into
+    ``pentanoate`` -- a DIFFERENT molecule (the N and both Cl dropped). name an ester's acid RECURSIVELY as a parent, never by
+    carbon count.
+
+    General method (no per-acid special case): extract the acid fragment as a
+    METHYL-ester surrogate (cap the ester oxygen with a CH3), name the whole
+    surrogate with the general namer -- always ``"methyl <acid-word>"`` in
+    functional-class form (P-65.6.3.2.1, "All preferred IUPAC names for esters
+    are named by functional class nomenclature") -- and return ``<acid-word>``.
+    For a simple acyl this reproduces the carbon-count result
+    (``methyl acetate`` -> ``acetate``); for a carbamate it yields
+    ``N,N-bis(2-chloroethyl)carbamate``.
+
+    Returns None (caller falls back to carbon-count) when the surrogate can't
+    be built or the general namer does not produce the ``methyl <word>`` form.
+    The composed steroid-ester name is OPSIN-round-trip-gated downstream, so a
+    wrong acid word can never ship (it fails SELF-01 -> abstain).
+    """
+    import logging
+    from .esters import _extract_fragment_smiles
+    from ..namer import name_compound
+    from ..errors import is_failure_name
+
+    # Acid fragment atoms: BFS out from the carbonyl carbon, excluding the ester
+    # oxygen (which leads back to the scaffold) and every scaffold atom -- the
+    # SAME frontier ``_count_acid_fragment_carbons`` walks.
+    visited = {carbonyl_idx, ester_oxy_idx}
+    visited.update(scaffold_atoms)
+    queue = deque([carbonyl_idx])
+    acid_atoms = {carbonyl_idx}
+    while queue:
+        cur = queue.popleft()
+        for nbr in mol.GetAtomWithIdx(cur).GetNeighbors():
+            nbr_idx = nbr.GetIdx()
+            if nbr_idx not in visited:
+                visited.add(nbr_idx)
+                acid_atoms.add(nbr_idx)
+                queue.append(nbr_idx)
+
+    # Methyl-ester surrogate: keep the acid fragment + the ester oxygen, cap the
+    # ester oxygen with a carbon => CH3-O-C(=O)-<acid> (stereochemistry preserved
+    # by _extract_fragment_smiles, which copies the parent molecule).
+    surrogate = _extract_fragment_smiles(
+        mol, acid_atoms | {ester_oxy_idx},
+        cap_atom_idx=ester_oxy_idx, cap_element=6,
+    )
+    if not surrogate:
+        return None
+
+    try:
+        name = name_compound(
+            surrogate, general_fallback=True, general_fallback_unverified=True
+        )
+    except Exception as exc:  # pragma: no cover - defensive; fall back to count
+        logging.getLogger(__name__).debug(
+            "ester acid-word surrogate naming failed for %s: %s", surrogate, exc
+        )
+        return None
+
+    if is_failure_name(name):
+        return None
+    head, _sep, acid_word = name.partition(" ")
+    # We capped with a single carbon, so the O-side alkyl word is always
+    # 'methyl'. Anything else means the general namer produced a non
+    # functional-class form -> decline, let the caller carbon-count.
+    if head != "methyl" or not acid_word:
+        return None
+    return acid_word
+
+
 def _find_ester_decorations(
     mol, scaffold_info: Dict, numbering: Dict[int, int]
 ) -> List[Dict]:
@@ -1856,21 +1934,34 @@ def _find_ester_decorations(
         if carbonyl_idx is None:
             continue  # Not an ester (no C=O found after oxygen)
 
-        # Count carbon atoms in the acid fragment
-        # The acid fragment = carbonyl carbon + everything bonded to it
-        # (except the ester oxygen back to scaffold)
-        acid_carbons = _count_acid_fragment_carbons(
+        # v36-C3 root-cause fix: name the acid word by routing the acid
+        # fragment through Orthonym's GENERAL ester namer, NOT by naive
+        # carbon-counting. Carbon-counting turned the carbamate acid
+        # ``-O-C(=O)-N(CH2CH2Cl)2`` (5 carbons) into ``pentanoate`` -- a
+        # DIFFERENT molecule (N and Cl silently dropped). The general
+        # functional-class ester path names it correctly
+        # (``N,N-bis(2-chloroethyl)carbamate``). Carbon-count stays the
+        # fail-safe fallback when the general path can't produce a
+        # functional-class acid word (so simple acyls are unaffected).
+        acylate_name = _name_ester_acid_via_general(
             mol, carbonyl_idx, first_idx, matched_set
         )
+        if acylate_name is None:
+            # Count carbon atoms in the acid fragment
+            # The acid fragment = carbonyl carbon + everything bonded to it
+            # (except the ester oxygen back to scaffold)
+            acid_carbons = _count_acid_fragment_carbons(
+                mol, carbonyl_idx, first_idx, matched_set
+            )
 
-        # Get acylate name based on acid fragment size
-        acylate_name = get_systematic_acylate(acid_carbons)
+            # Get acylate name based on acid fragment size
+            acylate_name = get_systematic_acylate(acid_carbons)
 
-        # For C2 acid (acetic acid), use the common name "acetate"
-        if acid_carbons == 2:
-            acylate_name = "acetate"
-        elif acid_carbons == 1:
-            acylate_name = "formate"
+            # For C2 acid (acetic acid), use the common name "acetate"
+            if acid_carbons == 2:
+                acylate_name = "acetate"
+            elif acid_carbons == 1:
+                acylate_name = "formate"
 
         # Collect all atoms in this ester group (for exclusion from other detection)
         all_ester_atoms = set(sub["substituent_atoms"])
@@ -2117,6 +2208,15 @@ def _assemble_np_ester_name(
     # double bonds per IUPAC P-31.1.4.3.4 (e.g., {5: 10} renders as "5(10)").
     ene_indicated_h = unsaturation.get("ene_indicated_h", {})
 
+    # v36-C3: euphonic terminal 'a' on the stem when >= 2 unsaturation locants
+    # (IUPAC P-31.1.3.4) -- 'estra-1,3,5(10)-trien', not 'estr-1,3,5(10)-trien'.
+    # This mirrors the identical rule in the non-ester assembler
+    # `_assemble_np_name` (see `effective_stem` there); the ester path used to
+    # concatenate the bare `stem` with the multiplied `-trien` suffix and dropped
+    # the 'a'. A single locant (cholest-5-en-...) and the saturated 'an' path
+    # keep the bare stem, exactly as in the non-ester assembler.
+    effective_stem = stem + "a" if (len(ene_locs) + len(yne_locs)) >= 2 else stem
+
     def _fmt_ene_locant_ester(loc: int) -> str:
         """Render an ene locant with optional indicated-H marker (ester path)."""
         h = ene_indicated_h.get(loc)
@@ -2187,10 +2287,10 @@ def _assemble_np_ester_name(
         # Combine: all prefixes + acyloxy + [stem-stereo] + stem + unsaturation + "e"
         all_prefix = "-".join(p for p in [prefix, acyloxy_prefix] if p)
         ester_consumed = set(ester_locants)
-        return f"{stereo_prefix}{_ester_stemjoin(all_prefix, stem, ester_consumed)}{unsat_suffix}e"
+        return f"{stereo_prefix}{_ester_stemjoin(all_prefix, effective_stem, ester_consumed)}{unsat_suffix}e"
 
     # --- Assemble: stereo_prefix + prefix + [stem-stereo] + stem + unsaturation + yl + space + acylate ---
     # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-yl starts with 'y')
-    parent = f"{stereo_prefix}{_ester_stemjoin(prefix, stem, set(ester_locants))}{unsat_suffix}{yl_suffix}"
+    parent = f"{stereo_prefix}{_ester_stemjoin(prefix, effective_stem, set(ester_locants))}{unsat_suffix}{yl_suffix}"
 
     return f"{parent} {acylate_word}"
