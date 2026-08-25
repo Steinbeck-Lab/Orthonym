@@ -3887,6 +3887,97 @@ def _assemble_complex_ring_name(mol, features):
         return None
 
 
+def _acyloxy_prefix_for_frag(mol, frag_atoms, attach_idx):
+    """v37-SP2.1': name a bare acyloxy substituent (``-O-C(=O)-R`` attached via
+    its ester O, i.e. ``attach_idx`` is that O) as the P-65.6.3.2.3 detachable
+    prefix ``<Racyl>oxy``, using the shared acid engine
+    (``rules.lipids._acyloxy_for_site`` -> full ``name_compound`` on the isolated
+    acid). Returns the bare acyloxy string, or ``None`` (fail-closed) if the
+    fragment is not a plain acyloxy.
+
+    Mirrors the ordinary substitutive path (``substituent_naming.py`` Pass 1c /
+    ``substituent_enumerator`` Tier 1.95). ``name_substituent`` applies acyloxy
+    naming only for RETAINED acids (a static fragment-name cache lookup); a
+    SYSTEMATIC acyl (hydroxy / halo / branched R) falls through to an OPSIN-
+    grammar-invalid oxa-replacement chain (``...-2-oxo-1-oxabutyl``), so the whole
+    complex-ring (spiro-VB) name is suppressed and the molecule abstains -- a
+    breadth loss with 0-wrong already held. Carbamate / carbonate / thiono
+    (``-O-C(=O)-N`` / ``-O-C(=O)-O`` / ``-O-C(=S)-``) are EXCLUDED (the carbonyl C
+    must carry exactly one terminal ``=O`` and at most one all-carbon R); those
+    are owned by the carbamoyloxy path. The entire fragment minus the ester O must
+    be the self-contained acyl side -- otherwise fail closed, so no atom is ever
+    dropped by claiming this shape. The assembled name is SELF-01 round-trip gated
+    downstream (0-wrong)."""
+    from rdkit import Chem
+    frag = set(frag_atoms)
+    if attach_idx not in frag:
+        return None
+    o = mol.GetAtomWithIdx(attach_idx)
+    if (o.GetAtomicNum() != 8 or o.GetFormalCharge() != 0
+            or o.GetTotalNumHs() != 0):
+        return None
+    if mol.GetRingInfo().NumAtomRings(attach_idx) > 0:
+        return None
+    # the ester O bonds the (external) host ring atom and exactly one in-fragment
+    # carbonyl carbon.
+    in_frag_nbrs = [n.GetIdx() for n in o.GetNeighbors() if n.GetIdx() in frag]
+    if len(in_frag_nbrs) != 1:
+        return None
+    carbonyl_c = in_frag_nbrs[0]
+    cc = mol.GetAtomWithIdx(carbonyl_c)
+    if cc.GetAtomicNum() != 6:
+        return None
+    if (mol.GetBondBetweenAtoms(attach_idx, carbonyl_c).GetBondType()
+            != Chem.BondType.SINGLE):
+        return None
+    # plain acyl: exactly one terminal =O, at most one all-carbon R, nothing else.
+    oxo_n = []
+    r_side = []
+    for b in cc.GetBonds():
+        other = b.GetOtherAtom(cc)
+        oi = other.GetIdx()
+        if oi == attach_idx:
+            continue
+        if (b.GetBondType() == Chem.BondType.DOUBLE
+                and other.GetAtomicNum() == 8 and other.GetDegree() == 1):
+            oxo_n.append(oi)
+        elif (b.GetBondType() == Chem.BondType.SINGLE
+              and other.GetAtomicNum() == 6):
+            r_side.append(oi)
+        elif other.GetAtomicNum() == 1:
+            continue
+        else:
+            return None
+    if len(oxo_n) != 1 or len(r_side) > 1:
+        return None
+    # the entire acyl side (from the carbonyl C, not crossing the ester O) must be
+    # self-contained inside the fragment, and it must account for EVERY fragment
+    # atom except the ester O (no silent atom drop -- SP1.1 invariant).
+    acyl_atoms = set()
+    st = [carbonyl_c]
+    while st:
+        x = st.pop()
+        if x in acyl_atoms or x == attach_idx:
+            continue
+        if x not in frag:
+            return None
+        acyl_atoms.add(x)
+        for n in mol.GetAtomWithIdx(x).GetNeighbors():
+            ni = n.GetIdx()
+            if ni != attach_idx and ni not in acyl_atoms:
+                st.append(ni)
+    if acyl_atoms != (frag - {attach_idx}):
+        return None
+    try:
+        from ..rules.lipids import _acyloxy_for_site
+    except Exception:
+        return None
+    acyloxy = _acyloxy_for_site(mol, ("acyl", carbonyl_c, attach_idx))
+    if not acyloxy or ' ' in acyloxy:
+        return None
+    return acyloxy
+
+
 def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
     """Discover and prepend substituent prefixes to a complex ring parent name.
 
@@ -3962,6 +4053,22 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
         a_idx = _find_attach_idx_in_frag(mol, sub_info, ring_atoms)
         prefix_name = name_substituent(
             mol, sub_info.frag_atoms, a_idx, allow_mancude=_cx_mancude)
+
+        # v37-SP2.1': a bare acyloxy substituent (-O-C(=O)-R attached via its
+        # ester O) whose acyl is SYSTEMATIC is mis-spelled by name_substituent as
+        # an OPSIN-grammar-invalid oxa-replacement chain ('...-2-oxo-1-oxabutyl')
+        # -> the whole complex-ring (spiro-VB) name is suppressed and the molecule
+        # abstains (breadth loss; 0-wrong already held). Recognise the acyloxy
+        # shape structurally and name it via the shared acid engine, then enclose
+        # a COMPOUND prefix (P-16.3.3). Byte-identical for a retained acyl:
+        # name_substituent already returns the bare '<acyl>oxy' there, so the
+        # results are equal and the original bare form is kept unchanged; the
+        # override fires ONLY when they differ (the systematic mis-name). SELF-01
+        # round-trip is the 0-wrong gate on the assembled name.
+        _acyloxy = _acyloxy_prefix_for_frag(mol, sub_info.frag_atoms, a_idx)
+        if _acyloxy is not None and _acyloxy != prefix_name:
+            from .naming_utils import enclose_if_compound
+            prefix_name = enclose_if_compound(_acyloxy)
 
         # v36 core-namer FAIL-CLOSED (not silent drop): a RING-BEARING compound
         # substituent that still cannot render is an atom-significant drop --
