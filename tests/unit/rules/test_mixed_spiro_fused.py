@@ -587,3 +587,95 @@ class TestHeteroatomSeniorityWR01:
         assert get_heteroatom_priority("Cl") < get_heteroatom_priority("O")
         assert get_heteroatom_priority("Br") < get_heteroatom_priority("O")
         assert get_heteroatom_priority("I") < get_heteroatom_priority("O")
+
+
+# ===========================================================================
+# v37 Task CT.3 — offer-not-return for spiro-CORE-plus-PENDANT-RING molecules
+# ===========================================================================
+
+def _full_inchikey(smi: str):
+    m = Chem.MolFromSmiles(smi)
+    return Chem.MolToInchiKey(m) if m else None
+
+
+class TestCT3PendantRingOfferNotReturn:
+    """CT.3 (sub-lever B): a spiro/fused system that additionally carries a
+    ring-bearing substituent (a PENDANT ring attached to the core through a
+    single bond) must no longer be REJECTED wholesale by the coverage
+    invariant. The old invariant demanded the combined locant map cover EVERY
+    ring atom in the molecule, so any pendant ring forced
+    ``name_mixed_spiro_fused`` -> None -> abstain. The correct behaviour is to
+    OFFER the spiro CORE parent (fused component + side ring) and let the
+    cascade substituent supplier attach the pendant ring, with the RT gate
+    (SELF-01 / OPSIN full InChIKey) deciding acceptance (invariant 18).
+
+    0-wrong is preserved by the RT gate — this class asserts the *positive*
+    wins (previously-abstaining molecules that now round-trip EXACT) and the
+    core-offer contract at the function level.
+    """
+
+    # Two witnesses validated fresh (full InChIKey incl. stereo) at HEAD:
+    # each carries a pendant aromatic-ring substituent on a spiro/fused core.
+    _PENDANT_WITNESSES = [
+        # spiro[2,3-dihydro-1-benzofuran-2,3'-piperazine] with a pendant
+        # (2-hydroxyphenyl)methylidene substituent.
+        ("O=C1N[C@@]2(Cc3ccccc3O2)C(=O)N/C1=C\\c1ccccc1O",
+         "OMZTVPPJRIMQEW"),
+        # spiro[1,2,3,4-tetrahydroisoquinoline-4,3'-pyrrolidine] with a
+        # pendant (4-bromo-2-fluorophenyl)methyl substituent.
+        ("O=C1CC2(C(=O)N1)C(=O)N(Cc1ccc(Br)cc1F)C(=O)c1ccc(F)cc12",
+         "BMHZAHGTGIZZCT"),
+    ]
+
+    @pytest.mark.unit
+    def test_offers_core_parent_for_pendant_ring(self):
+        """name_mixed_spiro_fused OFFERS a core parent (non-None) for a
+        spiro-core-plus-pendant-ring molecule instead of a terminal None.
+        The returned ring_atoms set is the CORE only (does not include the
+        pendant ring's atoms — those are substituent territory)."""
+        name_mixed_spiro_fused = _import_or_skip("name_mixed_spiro_fused")
+        # The (2-hydroxyphenyl)methylidene benzofuran-piperazine spiro.
+        mol = Chem.MolFromSmiles(
+            "O=C1N[C@@]2(Cc3ccccc3O2)C(=O)N/C1=C\\c1ccccc1O")
+        assert mol is not None
+        result = name_mixed_spiro_fused(mol)
+        assert result is not None, (
+            "CT.3 regression: name_mixed_spiro_fused returned a terminal None "
+            "for a spiro-core-plus-pendant-ring molecule; it must OFFER the "
+            "core parent (invariant 18 offer-not-return)."
+        )
+        name, ring_atoms, _atom_to_locant, _subs = result
+        assert name and name.startswith("spiro["), name
+        # The pendant phenyl ring atoms must NOT be in the core ring set.
+        total_ring_atoms = len({a for r in mol.GetRingInfo().AtomRings()
+                                for a in r})
+        assert len(ring_atoms) < total_ring_atoms, (
+            f"CT.3: core ring set ({len(ring_atoms)}) must exclude the pendant "
+            f"ring atoms (total ring atoms {total_ring_atoms})."
+        )
+
+    @pytest.mark.roundtrip
+    @pytest.mark.skipif(not _opsin_available(),
+                        reason="OPSIN/Java not available")
+    @pytest.mark.parametrize("smiles,expect_block1", _PENDANT_WITNESSES,
+                             ids=["benzofuran-piperazine-spiro",
+                                  "tetrahydroisoquinoline-pyrrolidine-spiro"])
+    def test_pendant_ring_witness_round_trips_exact(self, smiles,
+                                                    expect_block1):
+        """The two validated pendant-ring witnesses emit a FULL name that
+        OPSIN round-trips to the exact input InChIKey (constitution +
+        stereo), through the full best-effort namer."""
+        from orthonym.namer import Orthonym
+        o = Orthonym(style="pin", general_fallback=True,
+                      general_fallback_unverified=True,
+                      allow_aromatic_general=True)
+        name = o.name_with_confidence(smiles).get("name")
+        assert name and name != "unknown organic compound", (
+            f"CT.3: expected an emitted name for {smiles!r}, got {name!r}")
+        parsed = _opsin_parse_one(name)
+        assert parsed is not None, f"OPSIN could not parse {name!r}"
+        rt_key = _full_inchikey(parsed)
+        in_key = _full_inchikey(smiles)
+        assert rt_key == in_key, (
+            f"CT.3 round-trip mismatch on {smiles!r}: name={name!r} "
+            f"input={in_key} round-trip={rt_key}")

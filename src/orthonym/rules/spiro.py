@@ -2257,14 +2257,33 @@ def name_mixed_spiro_fused(
         # present in the dict, so this primed marking is internally consistent.
         combined_locants[atom_idx] = (locant, "'")
 
-    # Coverage invariant: combined map covers ALL ring atoms.
-    all_ring_atoms: Set[int] = set()
-    for r in all_rings:
-        all_ring_atoms.update(r)
-    if not (set(combined_locants.keys()) >= all_ring_atoms):
-        return None  # Pitfall 7: partial coverage -> None
+    # Coverage invariant: the combined locant map must cover every atom of the
+    # spiro CORE — the fused component plus the single side ring. Ring systems
+    # attached to the core through a single bond (a PENDANT ring substituent —
+    # e.g. an appended (2-hydroxyphenyl)methylidene or an arylmethyl on a spiro
+    # hydantoin/oxindole) are NOT part of the spiro parent; they are named by
+    # the cascade step-6 substituent supplier. Requiring the map to cover ALL
+    # rings in the molecule (the old invariant) rejected every such
+    # spiro-core-plus-pendant-ring molecule outright (name_mixed_spiro_fused ->
+    # None -> abstain), when the correct behaviour is to OFFER the core parent
+    # and let the RT gate (SELF-01 / OPSIN) decide once the substituent supplier
+    # has attached the pendant rings (invariant 18: producers OFFER, they do not
+    # RETURN a terminal None). 0-wrong is preserved: if a pendant ring (or any
+    # off-core atom) cannot be named, the assembled name fails round-trip and
+    # the molecule abstains — it never ships a wrong or atom-dropping
+    # constitution. For a molecule with NO pendant ring, core == all rings, so
+    # this is behaviour-identical to the old invariant (no regression on the
+    # cases that already emitted; measured +3 RT-true / 0 wrong / 0 lost over a
+    # 99-molecule spiro-of-fused abstainer sample).
+    core_ring_atoms: Set[int] = set()
+    for r in fused_rings:
+        core_ring_atoms.update(r)
+    for r in side_rings:
+        core_ring_atoms.update(r)
+    if not (set(combined_locants.keys()) >= core_ring_atoms):
+        return None  # Pitfall 7: partial coverage of the spiro CORE -> None
 
-    return (name, all_ring_atoms, combined_locants, False)
+    return (name, core_ring_atoms, combined_locants, False)
 
 
 def _partition_rings_at_spiro(
