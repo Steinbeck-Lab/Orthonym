@@ -467,11 +467,21 @@ def select_parent_unified(
     principal_group,
     principal_group_atoms,
     ring_info: Optional[dict] = None,
+    _offer_rank: int = 0,
 ):
     """Drop-in unified replacement for ``parent_selection.select_parent``.
 
     Pre-empts (admission/priority rules) are preserved from the staged
     implementation; everything else is ONE pooled P-44 comparator sort.
+
+    v37 SP1.3 (offer-not-return, invariant 18): ``_offer_rank`` selects WHICH
+    member of the P-44-ranked pool becomes the parent. ``_offer_rank == 0`` (the
+    default at every normal call site) commits to ``ranked[0]`` — byte-identical
+    to the pre-SP1.3 behaviour for every molecule. A best-effort retry may pass
+    ``_offer_rank == k`` to force the k-th-ranked candidate ONLY after
+    ``ranked[0]`` has already abstained; the P-44 ranking is NEVER reordered and
+    an out-of-range rank clamps back to ``ranked[0]``. Every returned result
+    carries ``parent_pool_size`` so the caller can bound its retry.
     """
     from .parent_selection import (
         ParentSelectionResult, SKELETAL_SUFFIX_PGS,
@@ -552,21 +562,31 @@ def select_parent_unified(
     else:
         label = "only candidate"
 
-    if best.kind == 'chain':
+    # v37 SP1.3: OFFER the ranked pool. ``_offer_rank == 0`` -> ``chosen`` IS
+    # ``best`` (byte-identical). A best-effort retry may force a junior member;
+    # an out-of-range rank clamps to ``best`` so the offer can never fabricate a
+    # parent that was not in the P-44-ranked pool.
+    _pool_size = len(ranked)
+    offer = _offer_rank if 0 <= _offer_rank < _pool_size else 0
+    chosen = ranked[offer]
+
+    if chosen.kind == 'chain':
         return ParentSelectionResult(
             parent_type='chain',
-            parent_atoms=list(best.atoms),
+            parent_atoms=list(chosen.atoms),
             substituent_rings=ring_tuples,
             reasoning=(f"P-44.1 unified comparator: chain wins by {label} "
-                       f"(len={len(best.atoms)}, pool={len(pool)})"),
+                       f"(len={len(chosen.atoms)}, pool={len(pool)})"),
+            parent_pool_size=_pool_size,
         )
-    others = [t for t in ring_tuples if t != tuple(sorted(best.atoms))]
+    others = [t for t in ring_tuples if t != tuple(sorted(chosen.atoms))]
     return ParentSelectionResult(
         parent_type='ring',
-        parent_atoms=list(best.atoms),
+        parent_atoms=list(chosen.atoms),
         substituent_rings=others,
         reasoning=(f"P-44.1 unified comparator: ring wins by {label} "
-                   f"(size={len(best.atoms)}, pool={len(pool)})"),
+                   f"(size={len(chosen.atoms)}, pool={len(pool)})"),
+        parent_pool_size=_pool_size,
     )
 
 

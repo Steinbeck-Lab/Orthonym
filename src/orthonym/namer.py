@@ -13,6 +13,7 @@ import contextvars
 import logging
 import os
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Tuple
 
@@ -2333,6 +2334,15 @@ def _budget_scope(fn):
     return _wrapper
 
 
+# v37 SP1.3: cross-instance recursion guard for the parent-offer retry. The
+# retry spawns FRESH inner instances whose own best-effort ship-failure hooks
+# (`_try_demote_senior_group_rescue`, decomposition, ...) can be top-level
+# (`is_top_level_naming()` keys off the fragment `visited` set, not session
+# depth), so without this a demote-spawned inner could re-enter the parent
+# offer. One flag per thread; set for the whole duration of an outer offer.
+_ALT_PARENT_RESCUE = threading.local()
+
+
 class Orthonym:
     """
     IUPAC nomenclature generator.
@@ -2360,6 +2370,7 @@ class Orthonym:
                  general_fallback_unverified: bool = False,
                  allow_aromatic_general: bool = False,
                  _principal_group_override: Optional[str] = None,
+                 _forced_parent_rank: int = 0,
                  _seed_excluded_dispatch_classes: frozenset = frozenset(),
                  binding_proof: str = "off"):
         """
@@ -2475,6 +2486,16 @@ class Orthonym:
         # anionic group is forced as the principal characteristic group per P-72/P-74.
         # None for every normal name() call -> byte-identical production behaviour.
         self._principal_group_override: Optional[str] = _principal_group_override
+        # v37 SP1.3 (offer-not-return, invariant 18): force the k-th-ranked P-44
+        # parent instead of ``ranked[0]``. 0 for every normal name() call ->
+        # byte-identical. Set >0 ONLY by ``_try_alternate_parent_rescue`` on a
+        # FRESH inner instance, after ``ranked[0]`` has already abstained, and
+        # every candidate it yields is RT-gated before adoption (0-wrong).
+        self._forced_parent_rank: int = _forced_parent_rank
+        # Size of the top-level P-44 parent pool from the most recent top-level
+        # classification (written by _classify). Lets the offer-retry bound its
+        # loop at the real pool length. Reset per top-level name() below.
+        self._top_parent_pool_size: int = 1
         # Phase 156 D-17 + AP-19: per-instance counter dict, NEVER
         # module-global. Pre-seed all seven buckets so callers see a
         # complete histogram even before any name() invocation.
@@ -2863,6 +2884,11 @@ class Orthonym:
             # is precisely the order-dependence this block exists to stop.
             self._excluded_dispatch_classes = self._seed_excluded_dispatch_classes
             self._last_dispatch_class = None
+            # v37 SP1.3: same per-top-level invariant. The pool size is stale
+            # until _classify reruns; default 1 = "no alternative parent" so a
+            # molecule that never reaches P-44 parent selection cannot trigger
+            # the offer-retry on a previous molecule's pool.
+            self._top_parent_pool_size = 1
             # v25 P0 Task 0.1: reset the typed-abstention telemetry slot per
             # top-level molecule (same invariant as the confidence/pool
             # clears above). Side-effect-only — never changes a name.
@@ -3234,6 +3260,18 @@ class Orthonym:
                             besteffort_unverified=self._general_fallback_unverified)
                         if not is_failure_name(_dgated):
                             result = _dgated
+            # v37 SP1.3 (offer-not-return, invariant 18): a molecule whose SENIOR
+            # (ranked[0]) P-44 parent dead-ends can be rescued by a JUNIOR pool
+            # member. Runs ONLY on the ship-a-failure best-effort path (so no
+            # PIN-nameable molecule is re-rooted -- they succeed at ranked[0] and
+            # never reach here), and every junior candidate is RT-gated before
+            # adoption (0-wrong). PIN/default output is byte-identical.
+            if (is_top_level_naming() and is_failure_name(result)
+                    and self._general_fallback_unverified
+                    and not self._disable_opsin_validity_gate):
+                _ap = self._try_alternate_parent_rescue(smiles)
+                if _ap is not None:
+                    result = _ap
             # v33 giants Engine 3: a retained natural-product PARENT HYDRIDE
             # (`ursane`, `hopane`, `cevane`, ... -- the P-101.2.7 Table 10.1
             # stereoparents) IS the PIN, and `_final_opsin_validity_gate`
@@ -4011,6 +4049,98 @@ class Orthonym:
             return None
         except Exception as e:  # fail-closed: keep the abstention
             logger.info("demote-senior-group rescue error (kept abstention): %s", e)
+            return None
+
+    def _try_alternate_parent_rescue(self, smiles: str):
+        """v37 SP1.3 (offer-not-return, invariant 18): best-effort rescue that,
+        when ``ranked[0]`` (the PIN-correct senior parent) leads to an
+        un-nameable remainder, RETRIES the JUNIOR members of the same P-44 pool
+        and adopts the FIRST whose full name round-trips. Returns a POSITIVELY
+        round-tripping name or ``None`` (fail-closed).
+
+        This realises the OFFER the pool always had: ``p44_scorer.pool_candidates``
+        builds >=2 ranked parent candidates for these molecules but
+        ``select_parent_unified`` historically hard-committed ``ranked[0]`` and
+        discarded ``ranked[1:]`` (p44_scorer.py:543-545), and the gate-rejection
+        retry (`_retry_cascade_on_gate_rejection`) only swaps the DISPATCH CLASS
+        for the SAME parent -- so a wrong-parent dead-end was terminal. Here we
+        re-name on a FRESH inner instance with ``_forced_parent_rank=k``, which
+        threads ``_offer_rank=k`` into that instance's every ``select_parent``
+        call (top-level AND its own internal gate-reject retries), so the junior
+        parent stays selected while the dispatch cascade finds a handler for it.
+
+        PIN-safety (invariant 1 + 8): the P-44 ranking is NEVER reordered and
+        ``ranked[0]`` is never changed -- this runs ONLY on the ship-a-failure
+        path at the best-effort tier (the caller checks
+        ``is_top_level_naming() and is_failure_name(result) and
+        self._general_fallback_unverified and not
+        self._disable_opsin_validity_gate``), so every PIN-nameable molecule has
+        already succeeded at ``ranked[0]`` and never reaches here. The RT gate
+        (`_rt_match`) makes it 0-wrong: a junior candidate is adopted only if its
+        full name reproduces the input's full structure -- never an unverified
+        lower-ranked name. Bounded by the real pool length.
+        """
+        # Never nest: a forced-rank inner instance, or an inner spawned by
+        # another best-effort rescue, must not re-enter the offer (its own
+        # ship-failure hooks can be top-level because is_top_level_naming keys
+        # off the fragment `visited` set, not session depth).
+        if self._forced_parent_rank != 0:
+            return None
+        if getattr(_ALT_PARENT_RESCUE, 'active', False):
+            return None
+        if not self._general_fallback_unverified:
+            return None
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                return None
+            # Cheap prune: an alternative parent can only exist when a ring AND
+            # an acyclic carbon chain compete. Molecules without both take a
+            # pre-empt / single-candidate pool (parent_pool_size == 1) and have
+            # nothing to offer -- skip them so the failure path spawns no inner.
+            ri = mol.GetRingInfo()
+            if ri.NumRings() < 1:
+                return None
+            acyclic_c = sum(
+                1 for a in mol.GetAtoms()
+                if a.GetAtomicNum() == 6 and not a.IsInRing())
+            if acyclic_c < 2:
+                return None
+
+            _ALT_PARENT_RESCUE.active = True
+            try:
+                pool_size = None
+                rank = 1
+                # Hard ceiling in case pool_size is somehow never populated;
+                # real pools are 2-4, so this never truncates a genuine pool.
+                while rank < 8:
+                    inner = Orthonym(
+                        style=self.style,
+                        general_fallback=True,
+                        general_fallback_unverified=True,
+                        allow_aromatic_general=self._allow_aromatic_general,
+                        _forced_parent_rank=rank,
+                    )
+                    cand = inner.name(smiles)
+                    if pool_size is None:
+                        pool_size = getattr(inner, '_top_parent_pool_size', 1)
+                    if cand and not is_failure_name(cand):
+                        # RT gate (load-bearing, 0-wrong) -- identical shape to
+                        # the demote-senior-group rescue above.
+                        _permitted, _flagged = self._stereo_emit_decision(mol, cand)
+                        if _permitted:
+                            smi = _validity_gate_name_to_smiles(cand)
+                            if smi is not None and self._rt_match(smiles, smi, _flagged):
+                                return cand
+                    rank += 1
+                    if pool_size is not None and rank >= pool_size:
+                        break
+                return None
+            finally:
+                _ALT_PARENT_RESCUE.active = False
+        except Exception as e:  # fail-closed: keep the abstention
+            logger.info("alternate-parent rescue error (kept abstention): %s", e)
+            _ALT_PARENT_RESCUE.active = False
             return None
 
     def _try_t4_rescue(self, mol, feats, smiles):
@@ -5793,9 +5923,23 @@ class Orthonym:
                     principal_chain=potential_chain,
                     principal_group=features.principal_group,
                     principal_group_atoms=features.principal_group_atoms,
-                    ring_info=_ring_info
+                    ring_info=_ring_info,
+                    # v37 SP1.3: 0 for every normal call (byte-identical);
+                    # >0 only on a best-effort offer-retry inner instance.
+                    _offer_rank=self._forced_parent_rank,
                 )
                 features.parent_selection_result = selection  # Phase 148 D-02 (V18 Appendix A.5)
+                # v37 SP1.3: publish the top-level pool size so the offer-retry
+                # can bound its loop at the real pool length. Guarded to the true
+                # top-level molecule (visited set empty) so a substituent's own
+                # parent selection never clobbers it.
+                try:
+                    from .assembly.fragment_naming import is_top_level_naming as _sp13_top
+                    if _sp13_top():
+                        self._top_parent_pool_size = getattr(
+                            selection, 'parent_pool_size', 1)
+                except Exception:
+                    pass
 
                 if selection.parent_type == 'chain':
                     features.chain_is_parent = True

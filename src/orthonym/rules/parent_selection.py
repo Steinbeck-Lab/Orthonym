@@ -214,6 +214,14 @@ class ParentSelectionResult:
     reasoning: str  # For debugging
     # D-03 (Phase 178): one authoritative principal-ring-system computation.
     principal_ring_system: Optional[Tuple[int, ...]] = None
+    # v37 SP1.3 (offer-not-return, invariant 18): the SIZE of the ranked P-44
+    # parent pool this result was chosen from. 1 for the pre-empt branches and a
+    # single-candidate pool; >=2 when several ring/chain candidates competed.
+    # Pure metadata — no naming logic reads it — surfaced so the best-effort
+    # top-level namer can, ONLY when ``ranked[0]`` abstains, retry the junior
+    # pool members (``_forced_parent_rank``) under an RT gate. ``ranked[0]`` and
+    # every PIN-nameable molecule are byte-identical; this never reorders.
+    parent_pool_size: int = 1
 
 
 def is_principal_group_on_ring(
@@ -754,7 +762,8 @@ def select_parent(
     principal_chain: List[int],
     principal_group: Optional[str],
     principal_group_atoms: List[tuple],
-    ring_info: dict = None
+    ring_info: dict = None,
+    _offer_rank: int = 0,
 ) -> ParentSelectionResult:
     """
     Select parent structure per IUPAC P-44.
@@ -784,7 +793,7 @@ def select_parent(
     from .p44_scorer import select_parent_unified
     return select_parent_unified(
         mol, ring_systems, principal_chain, principal_group,
-        principal_group_atoms, ring_info,
+        principal_group_atoms, ring_info, _offer_rank=_offer_rank,
     )
 
 
