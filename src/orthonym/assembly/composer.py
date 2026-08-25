@@ -4065,8 +4065,18 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
         # results are equal and the original bare form is kept unchanged; the
         # override fires ONLY when they differ (the systematic mis-name). SELF-01
         # round-trip is the 0-wrong gate on the assembled name.
+        # v37: name_substituent now routes a systematic acyloxy through the SAME
+        # recognizer (substituent_enumerator ~:1108), so prefix_name already IS the
+        # bare '<acyl>oxy'. This complex-ring assembler does NOT enclose a compound
+        # token in its normal path (line ~4136 places it bare), so the enclosing
+        # (P-16.3.3) must still happen HERE -- always, whenever the fragment is a
+        # plain acyloxy, not only when it differs from prefix_name (the old
+        # '!= prefix_name' guard went dead once the two producers agreed, dropping
+        # the brackets -> an OPSIN-unparseable '6-3-hydroxy…oxy-…' -> abstain).
+        # enclose_if_compound keeps a RETAINED acyl ('acetyloxy') bare (byte-
+        # identical) and brackets a compound one.
         _acyloxy = _acyloxy_prefix_for_frag(mol, sub_info.frag_atoms, a_idx)
-        if _acyloxy is not None and _acyloxy != prefix_name:
+        if _acyloxy is not None:
             from .naming_utils import enclose_if_compound
             prefix_name = enclose_if_compound(_acyloxy)
 

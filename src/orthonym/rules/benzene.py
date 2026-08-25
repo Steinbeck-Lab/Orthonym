@@ -2151,6 +2151,41 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
         if nbr_symbol == 'O' and nbr.GetTotalNumHs() >= 1:
             return {'name': 'hydroperoxy', 'atoms': [o_idx, nbr.GetIdx()]}
 
+        # v37 (generalizes SP2.1'): -O-C(=O)-R is an ACYLOXY, not an alkoxy. The
+        # alkoxy branch below collects a "pure alkyl" R via _collect_pure_alkyl,
+        # which DROPS the carbonyl =O (and any further hetero) -- measured:
+        # -O-C(=O)CH2C(CH3)2OH on benzoic acid -> '4-(pentyloxy)benzoic acid', a
+        # WRONG molecule the SELF-01 gate then suppresses, so the whole molecule
+        # abstains on the default tier (best-effort already emits the correct acyloxy
+        # via name_substituent). STEP-1 spy (invariant 8) refuted the SP2.1'
+        # 'OPSIN-invalid' premise. Route a plain acyloxy ester to the SAME recognizer
+        # name_substituent uses (composer._acyloxy_prefix_for_frag ->
+        # rules.lipids._acyloxy_for_site -> the full acid engine) for the
+        # P-65.6.3.2.3 '<acyl>oxy' PIN prefix. The recognizer is fail-closed (exactly
+        # one terminal '=O' on the carbonyl C, <=1 all-carbon R, whole acyl side
+        # self-contained, carbamate/carbonate/thiono excluded); on a non-plain shape
+        # it returns None and we FAIL CLOSED here rather than fall through to the
+        # alkyl mis-read (defer > wrong). A RETAINED acyloxy round-trips through the
+        # same acid engine to the same string, so it stays byte-identical; the caller
+        # RT-gates the assembled name downstream (0-wrong).
+        if nbr_symbol == 'C' and any(
+                b.GetBondTypeAsDouble() == 2.0
+                and b.GetOtherAtom(nbr).GetAtomicNum() in (7, 8, 16)
+                for b in nbr.GetBonds()):
+            _acy = None
+            try:
+                from ..assembly.composer import _acyloxy_prefix_for_frag
+                _acy_side = _bfs_substituent_atoms(
+                    mol, nbr.GetIdx(), ring_atoms | {o_idx})
+                _acy_frag = set(_acy_side) | {o_idx}
+                _acy = _acyloxy_prefix_for_frag(mol, _acy_frag, o_idx)
+            except Exception:
+                _acy = None
+            if _acy:
+                return {'name': _acy, 'atoms': sorted(_acy_frag),
+                        'is_complex': True}
+            return None  # acyloxy we cannot name cleanly -> fail closed, never mis-read
+
         # Alkoxy (-O-C...): methoxy, ethoxy, propoxy, etc. An ARYLOXY
         # (-O-aromatic-ring-C) is NOT an alkoxy — route it to Case 1 below so a
         # bare ring gives 'phenoxy' and a decorated ring is built by the

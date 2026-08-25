@@ -1106,6 +1106,39 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                        scope=_LedgerScope.FRAGMENT,
                        detail=f"allow_mancude:{allow_mancude}")
 
+    # v37 (generalizes SP2.1'): a PLAIN acyloxy ester substituent (``-O-C(=O)-R``
+    # attached via its ester O) whose acyl is SYSTEMATIC is named by the cascade,
+    # NOT as the P-65.6.3.2.3 ``<acyl>oxy`` PIN prefix, but as an oxa-replacement
+    # chain (``…-2-oxo-1-oxabutyl``) -- because Tier-1.95 above intercepts only
+    # RETAINED acyls (a static ``FRAGMENT_NAME_CACHE`` lookup) and a systematic acyl
+    # falls through. STEP-1 spy (invariant 8) REFUTED the SP2.1' report's
+    # "OPSIN-grammar-invalid" premise: that oxa-chain form round-trips EXACT in
+    # OPSIN and already ships on the best-effort tier -- so this is a SPELLING gap
+    # there, and on the DEFAULT/PIN tier a BREADTH gap (the systematic acyl frag is
+    # instead dropped -> the whole molecule abstains). Route it through the SAME
+    # recognizer SP2.1' built (``composer._acyloxy_prefix_for_frag`` ->
+    # ``rules.lipids._acyloxy_for_site`` -> the full acid engine), which is
+    # FAIL-CLOSED (ester O = attach; exactly one terminal ``=O`` and <=1 all-carbon
+    # R on the carbonyl C; carbamate/carbonate/thiono excluded; the whole acyl side
+    # must be self-contained -- else ``None``, so no atom is dropped by claiming the
+    # shape). The override fires ONLY when it DIFFERS from the cascade token, so a
+    # RETAINED acyl (Tier-1.95 already returns ``acetyloxy``) and a pure-ether
+    # oxa-replacement chain (no carbonyl -> recognizer ``None``) stay BYTE-IDENTICAL.
+    # Placed BEFORE the B2 stereo-completeness guard below so a stereo-dropped acyl
+    # name is still refused; the caller's SELF-01 OPSIN round-trip is the 0-wrong
+    # net on the assembled name. The recognizer is imported lazily to avoid the
+    # composer<->substituent_enumerator import cycle (same pattern as the
+    # ``from .composer import …`` calls elsewhere in this module).
+    if (attach_idx is not None and 0 <= attach_idx < mol.GetNumAtoms()
+            and mol.GetAtomWithIdx(attach_idx).GetAtomicNum() == 8):
+        try:
+            from .composer import _acyloxy_prefix_for_frag
+            _acyloxy = _acyloxy_prefix_for_frag(mol, frag_atoms, attach_idx)
+        except Exception:  # a producer helper must never crash branch naming
+            _acyloxy = None
+        if _acyloxy and _acyloxy != token and ' ' not in _acyloxy:
+            token = _acyloxy
+
     if free_valence in (2, 3) and _token_asserts_single_free_valence(token):
         # Decorated ring-ylidene (P-29.2 / P-31.1.4.3): a DECORATED monocyclic
         # carbocycle joined to its parent by a DOUBLE bond is an '-ylidene'.
@@ -4233,6 +4266,32 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
         attach_idx = frag_atoms[0]
 
     frag_set_for_chalcogen = set(frag_atoms)
+
+    # v37 (generalizes SP2.1'): a PLAIN acyloxy ester '-O-C(=O)-R' with a SYSTEMATIC
+    # acyl must be caught HERE, before the alkoxy branch below mis-reads the ester O
+    # as a plain ether (measured: '4-(pentyloxy)benzoic acid' for the
+    # -O-C(=O)-CH2-C(CH3)2-OH frag -- a wrong molecule that SELF-01 then suppresses,
+    # so the whole molecule abstains). STEP-1 spy (invariant 8) refuted the SP2.1'
+    # 'OPSIN-invalid' premise (the oxa-chain the best-effort tier emits round-trips
+    # exact); the real gap is a DEFAULT-tier abstain + best-effort ugly spelling.
+    # Route it through the SAME recognizer name_substituent uses
+    # (composer._acyloxy_prefix_for_frag -> rules.lipids._acyloxy_for_site -> the
+    # full acid engine) for the P-65.6.3.2.3 '<acyl>oxy' PIN prefix. The recognizer
+    # is HIGHLY specific and FAIL-CLOSED: the attach atom must be a bare ester O, the
+    # frag-side carbon a carbonyl with exactly one terminal '=O' and <=1 all-carbon
+    # R, the whole acyl side self-contained (else None) -- so it fires ONLY for a
+    # plain acyloxy and never for an ether/peroxide/carbamate/carbonate. A RETAINED
+    # acyloxy is intercepted upstream (Tier 0.5 prefix-form in
+    # classify_and_name_fragment) and never reaches here, so retained spellings are
+    # BYTE-IDENTICAL; the caller's SELF-01 OPSIN round-trip is the 0-wrong net.
+    if attach_idx is not None:
+        try:
+            from .composer import _acyloxy_prefix_for_frag
+            _acyloxy_early = _acyloxy_prefix_for_frag(mol, frag_atoms, attach_idx)
+        except Exception:  # a producer helper must never crash branch naming
+            _acyloxy_early = None
+        if _acyloxy_early and ' ' not in _acyloxy_early:
+            return _acyloxy_early
 
     # DD2 Fix B (Phase D, P-63.3.1(1)): peroxy branch -O-O-R -> (R)peroxy.
     # Checked BEFORE the alkoxy branch because both attach through a divalent O;
