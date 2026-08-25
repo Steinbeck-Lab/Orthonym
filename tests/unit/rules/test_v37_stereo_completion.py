@@ -197,7 +197,7 @@ class TestST3ProofGapRTRescue:
         import orthonym.assembly.t4_coverage as T4
 
         smi = "CC(=O)O[C@@H]1C[C@H]2O[C@@H]3C=C(C)CC[C@]3(C)[C@]1(C)[C@@]21CO1"
-        target = ("(1R,3R,8R,9S,10R,12R)-10-acetyloxy-5,8,9-trimethylspiro"
+        target = ("(1R,3R,8R,9S,10R,12R)-10-(acetyloxy)-5,8,9-trimethylspiro"
                   "[2-oxatricyclo[7.2.1.0^3,8]dodec-4-ene-12,2'-oxirane]")
         orig = CG.certify_general_result
         cap = {}
@@ -238,7 +238,7 @@ class TestST3ProofGapRTRescue:
         import orthonym.assembly.t4_coverage as T4
 
         smi = "CC(=O)O[C@@H]1C[C@H]2O[C@@H]3C=C(C)CC[C@]3(C)[C@]1(C)[C@@]21CO1"
-        target = ("(1R,3R,8R,9S,10R,12R)-10-acetyloxy-5,8,9-trimethylspiro"
+        target = ("(1R,3R,8R,9S,10R,12R)-10-(acetyloxy)-5,8,9-trimethylspiro"
                   "[2-oxatricyclo[7.2.1.0^3,8]dodec-4-ene-12,2'-oxirane]")
         orig = CG.certify_general_result
         cap = {}
@@ -283,5 +283,5 @@ class TestST1KnownFollowOn:
         name = _be_name(smi)
         assert not errors.is_failure_name(name)          # ST.3: no longer abstains
         assert _rt(smi, name)                            # FULL stereo, round-trips
-        assert name == ("(1R,3R,8R,9S,10R,12R)-10-acetyloxy-5,8,9-trimethylspiro"
+        assert name == ("(1R,3R,8R,9S,10R,12R)-10-(acetyloxy)-5,8,9-trimethylspiro"
                         "[2-oxatricyclo[7.2.1.0^3,8]dodec-4-ene-12,2'-oxirane]")
