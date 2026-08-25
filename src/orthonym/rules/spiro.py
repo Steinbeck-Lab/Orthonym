@@ -2357,6 +2357,127 @@ def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: in
     return min(candidate_locants)
 
 
+def _locant_sort_key(loc) -> Tuple[int, str]:
+    """Order a locant that may be a plain int or a letter-suffixed fusion locant
+    (``'4a'``): primary numeric part, then the letter tail (``4`` < ``4a``)."""
+    if isinstance(loc, int):
+        return (loc, "")
+    s = str(loc)
+    digits = "".join(c for c in s if c.isdigit())
+    tail = "".join(c for c in s if not c.isdigit())
+    return (int(digits) if digits else 0, tail)
+
+
+def _reanchor_locmap_to_canonical_spiro(
+    mol, extracted, loc_map: Dict[int, int], spiro_center: int, canonical_loc,
+):
+    """Canonicalise a spiro component's ``{orig_idx: locant}`` map by choosing,
+    among the component fragment's graph automorphisms, the numbering that (1)
+    places the spiro atom at ``canonical_loc`` (the descriptor locant from
+    ``_canonical_spiro_locant``) and (2) gives the LOWEST locants to the
+    substituent-bearing ring atoms (P-31.1.4 lowest-locants rule), broken
+    deterministically so the emitted name is atom-order independent.
+
+    WHY (v37 spiro-hoist). Two coupled defects on the component-spiro path, both
+    invisible until a decorated spiro-of-fused actually emits:
+
+    * DESCRIPTOR/MAP INCONSISTENCY. The spiro descriptor locant is the lowest over
+      the spiro atom's symmetry orbit (P-24.3.3), but a fused-ring catalog numbers
+      the spiro atom at a FIXED, possibly-different locant. When they disagree the
+      substituent citations hoisted from this map (via
+      ``composer._integrate_universal_prefixes`` consuming ``combined_locants``)
+      contradict the descriptor -- fluorescein's benzofuranone carbonyl was cited
+      ``1-oxo`` while the descriptor said ``spiro[...-1,...]``, an impossible
+      collision OPSIN rejects, so the dye abstained. Pinning the spiro atom to
+      ``canonical_loc`` and permuting every other atom along the same automorphism
+      repairs it (carbonyl 1->3, ring carboxy 6->5).
+
+    * SYMMETRIC-COMPONENT NON-DETERMINISM. A symmetric fused component (xanthene's
+      two equivalent benzo rings) admits several automorphisms that all satisfy
+      the spiro constraint; which original substituent lands on which locant then
+      depended on RDKit atom order (``3'-methoxy-6'-phosphonooxy`` vs the swap).
+      The substituent-locant tie-break picks one deterministically.
+
+    Determinism: the automorphism set and the tie-break (lowest substituent-locant
+    tuple, then lowest full-locant tuple) are both atom-order invariant.
+
+    Fail-safe / strict-improvement, scoped by the caller to non-von-Baeyer
+    components (a cage's numbering is rule-fixed, not automorphism-free). Returns
+    the input map when it is already canonical (a clean canary stays byte-
+    identical) or when no automorphism satisfies the spiro constraint (the RT gate
+    then abstains, exactly as before). Every candidate is still RT-gated
+    downstream, so no emission is ever made wrong.
+    """
+    frag, orig_to_frag = extracted
+    if spiro_center not in orig_to_frag:
+        return loc_map
+    target = canonical_loc if canonical_loc is not None \
+        else loc_map.get(spiro_center)
+    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+    # Whole-molecule canonical ranks (atom-order invariant): used to give each
+    # substituent-bearing ring atom an order-invariant SIGNATURE, so a symmetric
+    # component (xanthene's two equal benzo rings) assigns a given substituent to
+    # a given locant deterministically -- the lowest locant going to the
+    # lowest-canonical-rank substituent (a stable proxy for the P-14.5 first-cited
+    # rule; PIN-preference is not guaranteed, but the RT gate backstops and the
+    # result is reproducible across atom orders, which is the hard requirement).
+    try:
+        _ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    except Exception:
+        _ranks = [0] * mol.GetNumAtoms()
+    # Ring atoms carrying an exocyclic (substituent / suffix) neighbour -- the
+    # atoms whose locants the lowest-locants rule minimises. ``sub_sig`` is the
+    # minimum canonical rank over each atom's exocyclic neighbours.
+    sub_atoms = set()
+    sub_sig: Dict[int, int] = {}
+    for orig in loc_map:
+        if orig == spiro_center:
+            continue
+        exo_ranks = [
+            _ranks[nb.GetIdx()]
+            for nb in mol.GetAtomWithIdx(orig).GetNeighbors()
+            if nb.GetIdx() not in loc_map and nb.GetIdx() != spiro_center
+        ]
+        if exo_ranks:
+            sub_atoms.add(orig)
+            sub_sig[orig] = min(exo_ranks)
+    try:
+        autos = frag.GetSubstructMatches(
+            frag, uniquify=False, maxMatches=5000, useChirality=False)
+    except Exception:
+        return loc_map
+    best = None
+    best_key = None
+    for auto in autos:
+        induced: Dict[int, int] = {}
+        ok = True
+        for orig, loc in loc_map.items():
+            fi = orig_to_frag.get(orig)
+            if fi is None or fi >= len(auto):
+                ok = False
+                break
+            img = frag_to_orig.get(auto[fi])
+            if img is None or img not in loc_map:
+                ok = False
+                break
+            induced[orig] = loc_map[img]
+        if not ok:
+            continue
+        if target is not None and induced.get(spiro_center) != target:
+            continue
+        # (locant, substituent-signature) pairs: minimise the locants first
+        # (lowest-locants rule), then bind each locant to a specific substituent
+        # deterministically (breaks the symmetric-component atom-order tie).
+        sub_key = tuple(sorted(
+            (_locant_sort_key(induced[o]), sub_sig[o]) for o in sub_atoms))
+        all_key = tuple(sorted(_locant_sort_key(v) for v in induced.values()))
+        key = (sub_key, all_key)
+        if best_key is None or key < best_key:
+            best_key = key
+            best = induced
+    return best if best is not None else loc_map
+
+
 # --------------------------------------------------------------------------
 # P-24.3.2 -- hydro / indicated-hydrogen hoisting for 'spirobi' components
 #
@@ -4761,6 +4882,28 @@ def _name_spiro_vonbaeyer_core(mol):
     loc_b = _canonical_spiro_locant(ext_b, locmap_b, spiro_center)
     if loc_a is None or loc_b is None:
         return None
+
+    # v37 spiro-hoist: re-anchor each component's substituent-hoisting locmap so
+    # ``locmap[spiro] == descriptor locant``. When the fused-ring catalog numbered
+    # the spiro atom at a locant OTHER than the canonical (lowest-orbit) one used
+    # in the ``spiro[...]`` descriptor, the hoisted substituent citations were
+    # inconsistent with it (fluorescein's carbonyl ``1-oxo`` colliding with
+    # ``spiro[...-1,...]``), making the whole name OPSIN-unparseable.
+    #
+    # SCOPE: only components whose numbering has genuine symmetry freedom -- the
+    # fused-ring CATALOG / retained / fused-PAH components (a symmetric parent like
+    # ``1,3-dihydro-2-benzofuran`` may legitimately be numbered 1<->3). A von
+    # Baeyer cage (``bicyclo[..]``/``tricyclo[..]``) has a RULE-FIXED numbering
+    # that is NOT free to permute by graph automorphism, so re-anchoring one would
+    # emit a different (wrong-numbered) cage name -- these are skipped. It is a
+    # no-op whenever descriptor and map already agree (every clean canary), and
+    # every emission remains RT-gated (0-wrong) regardless.
+    if 'cyclo[' not in name_a:
+        locmap_a = _reanchor_locmap_to_canonical_spiro(
+            mol, ext_a, locmap_a, spiro_center, loc_a)
+    if 'cyclo[' not in name_b:
+        locmap_b = _reanchor_locmap_to_canonical_spiro(
+            mol, ext_b, locmap_b, spiro_center, loc_b)
 
     # P-31.1.5.2: ring unsaturation of a von-Baeyer CAGE component is cited INSIDE
     # that component's bracketed name (re-anchored to its own numbering), NOT
