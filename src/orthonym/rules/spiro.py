@@ -1882,13 +1882,35 @@ def _name_side_ring(
             return None
         if not name:
             return None
-        # For heterocycles, build a simple atom-to-locant map by walking
-        # the ring starting at locant 1 = first heteroatom (consistent
-        # with IUPAC HW). Defer rigorous orient_heterocycle integration
-        # to v19; v18 emits a connectivity-correct map.
-        atom_to_locant = _walk_side_ring_locants(
-            mol, side_ring, hetero_first=True,
-        )
+        # v37 CT.2: for a PARTIALLY-SATURATED mancude heteromonocycle
+        # (thiazoline, dihydropyran, ...) ``name_heterocycle`` numbers the ring
+        # through ``_mancude_hydro_select`` (the authority that owns the hydro /
+        # indicated-H locants). The independent ``_walk_side_ring_locants`` walk
+        # can DISAGREE with that numbering — e.g. it put the thiazoline spiro
+        # atom at ``2`` (a heteroatom-adjacent carbon that cannot be the sp3
+        # spiro junction) while the stem ``4,5-dihydro-1,3-thiazole`` numbers it
+        # ``5``. The spiro locant is then cited inconsistently with the stem and
+        # the assembled name denotes a different constitution (C=N silently
+        # saturated), which SELF-01 rejects -> abstain. Take the map from the
+        # SAME numbering authority so stem and spiro locant agree. Falls back to
+        # the walk for aromatic / fully-saturated rings (unchanged).
+        from .heterocycles import _mancude_hydro_numbering
+        frag_locants = _mancude_hydro_numbering(frag, set(ring_atoms_in_frag))
+        if frag_locants is not None:
+            frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+            atom_to_locant = {
+                frag_to_orig[fi]: loc
+                for fi, loc in frag_locants.items()
+                if fi in frag_to_orig
+            }
+        else:
+            # For heterocycles, build a simple atom-to-locant map by walking
+            # the ring starting at locant 1 = first heteroatom (consistent
+            # with IUPAC HW). Defer rigorous orient_heterocycle integration
+            # to v19; v18 emits a connectivity-correct map.
+            atom_to_locant = _walk_side_ring_locants(
+                mol, side_ring, hetero_first=True,
+            )
     else:
         # Carbocyclic side ring: cyclo<N>ane / cyclo<N>ene if unsaturated
         ring_size = len(side_ring)
