@@ -357,8 +357,16 @@ def audit_von_baeyer_descriptor(
 
 def analyze_cage_universal(
     mol, cage_atoms=None, allow_mancude: bool = False,
+    spiro_atom: Optional[int] = None,
 ) -> Optional[UniversalCage]:
     """Deterministic universal cage analysis; None on any refusal.
+
+    ``spiro_atom`` (default None, original-mol atom index) is the spiro-junction
+    atom when this cage is a COMPONENT of a spiro ring system. When passed, the
+    von-Baeyer numbering selection gives that atom the lowest locant (P-24.5.2),
+    above the heteroatom criteria; it is mapped into the canonical index space
+    used internally before being threaded to ``VonBaeyerAnalyzer.analyze``. Every
+    whole-molecule caller leaves it None, and the result is byte-identical.
 
     v26 P2: when ``allow_mancude`` is True the aromatic/mancude-cage refusal
     below is LIFTED -- the cage is kekulized (already done above) and every
@@ -481,8 +489,14 @@ def analyze_cage_universal(
     analyzer = VonBaeyerAnalyzer()
     if len(analyzer._find_all_bridgeheads(kek, cage_canon)) < 2:
         return None  # spiro / degenerate: out of G2 scope
+    # Map the spiro-junction atom into the canonical index space the analyzer
+    # works in (P-24.5.2 low-locant preference); None -> spiro-blind, byte-
+    # identical to every whole-molecule caller.
+    spiro_canon = (
+        orig_to_canon.get(spiro_atom) if spiro_atom is not None else None
+    )
     try:
-        desc = analyzer.analyze(kek, cage_canon)
+        desc = analyzer.analyze(kek, cage_canon, spiro_atom=spiro_canon)
     except Exception as e:
         logger.info("vonbaeyer_universal: analyze failed: %s", e)
         return None

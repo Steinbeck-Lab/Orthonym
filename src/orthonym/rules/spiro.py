@@ -3955,20 +3955,27 @@ def _name_carbocyclic_monocycle_component(
 
 
 def _tricyclo_plus_spiro_component(
-    mol, component_atoms: Set[int],
+    mol, component_atoms: Set[int], spiro_atom: Optional[int] = None,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
     """P-24.5.1 spiro component that is a TRIcyclic+ von-Baeyer cage (possibly
     hetero / unsaturated). Names it as the full parent hydride via the audited
     ``analyze_cage_universal`` + ``_spell_ring_analysis``, returning
-    ``(name, {orig_idx: locant})`` or None (fail-closed). The spiro-atom locant
-    is read by the caller off the returned map; SELF-01 arbitrates numbering."""
+    ``(name, {orig_idx: locant})`` or None (fail-closed).
+
+    ``spiro_atom`` (default None) is the spiro-junction atom index; when passed
+    it makes the von-Baeyer numbering give that atom the lowest locant per
+    P-24.5.2 (:10272; :10289 "the spiro atom ... is given preference for low
+    locant"). The spiro-atom locant is read by the caller off the returned map;
+    SELF-01 arbitrates. Callers that use this only as a polycyclic-ness predicate
+    pass no spiro atom, so the numbering is byte-identical for them."""
     from .vonbaeyer_universal import (
         analyze_cage_universal, audit_von_baeyer_descriptor,
     )
     from .terminal_ring import _spell_ring_analysis
     try:
         res = analyze_cage_universal(
-            mol, cage_atoms=set(component_atoms), allow_mancude=True)
+            mol, cage_atoms=set(component_atoms), allow_mancude=True,
+            spiro_atom=spiro_atom)
     except Exception:
         return None
     if res is None:
@@ -4584,7 +4591,9 @@ def _name_spiro_component(
     # catalog fused name above covers. Systematic von Baeyer is the last resort
     # for a fused system (P-25 retained names win), so this MUST sit after every
     # catalog namer -- otherwise it intercepts e.g. benzo[1,2-c:4,5-c']dithiophene.
-    return _tricyclo_plus_spiro_component(mol, set(component_atoms))
+    # Thread the spiro junction so P-24.5.2 gives it the lowest locant.
+    return _tricyclo_plus_spiro_component(
+        mol, set(component_atoms), spiro_atom=spiro_center)
 
 
 def _cage_side_ene(mol, cage_a: Set[int], cage_b: Set[int],

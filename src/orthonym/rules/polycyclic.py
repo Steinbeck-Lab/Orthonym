@@ -470,9 +470,19 @@ class VonBaeyerAnalyzer:
                     return False
         return True
 
-    def analyze(self, mol, ring_atoms: Set[int]) -> PolycyclicDescriptor:
+    def analyze(self, mol, ring_atoms: Set[int],
+                spiro_atom: Optional[int] = None) -> PolycyclicDescriptor:
         """
         Main entry point: analyze a polycyclic system and produce its descriptor.
+
+        ``spiro_atom`` (default None) is the atom index of the spiro junction
+        when this cage is a COMPONENT of a spiro ring system; passing it makes
+        the numbering selection give that atom the lowest locant (P-24.5.2),
+        ABOVE the heteroatom criteria. Every whole-molecule caller leaves it None
+        and the analysis is byte-identical. Only the substituted/heteroatom
+        branch honours it -- a spiro component is always "substituted" (its spiro
+        atom bonds into the other component), so it never takes the pure-cage
+        renumber branch; if it somehow did, the criterion is a safe no-op there.
 
         Determinism (WS-D): for an UNSUBSTITUTED cage the cascade is run on a
         copy renumbered into a total RDKit canonical-rank order (identical for
@@ -553,7 +563,7 @@ class VonBaeyerAnalyzer:
             return incumbent
         bridgeheads = self._find_all_bridgeheads(mol, ring_atoms)
         chosen = self._choose_lowest_locant_numbering(
-            mol, ring_atoms, bridgeheads, incumbent
+            mol, ring_atoms, bridgeheads, incumbent, spiro_atom
         )
         # This branch previously returned UNCHECKED -- the whole of site 2.
         chosen.legality = self._legality_verified(mol, ring_atoms, chosen)
@@ -1250,7 +1260,7 @@ class VonBaeyerAnalyzer:
                             out.add(nbr.GetIdx())
         return out
 
-    def _locant_criteria_key(self, mol, ring_atoms, desc):
+    def _locant_criteria_key(self, mol, ring_atoms, desc, spiro_atom=None):
         """The P-23.3.2 -> P-14.4 numbering cascade, as a sort key (lower wins).
 
         Applied ONLY among numberings that produce an identical von Baeyer
@@ -1258,6 +1268,15 @@ class VonBaeyerAnalyzer:
         chooses between numberings that P-23.2 left open.
 
         Order (each verified against BlueBookV2.md, heading + sentence):
+          0. P-24.5.2 (:10272; PIN example :10289 "the spiro atom ... is given
+             preference for low locant"; :10186 "low locants are given to the
+             spiro atom, THEN to the heteroatoms"): when this cage is a component
+             of a spiro ring system, the spiro-junction atom takes the lowest
+             locant, ABOVE the heteroatom criteria. This criterion is present
+             ONLY when ``spiro_atom`` is passed (the tricyclo+ spiro-component
+             path threads it); for every whole-molecule cage caller
+             ``spiro_atom`` is None and the returned key is byte-identical to the
+             pre-spiro 5-tuple, so no whole-molecule numbering can change.
           1. P-23.3.2.1 (:9777) "Low locants are assigned to the heteroatoms
              considered together as a set compared in increasing numerical
              order." Skeletal heteroatoms are part of the parent hydride and so
@@ -1267,6 +1286,10 @@ class VonBaeyerAnalyzer:
              valences (suffixes)".
           4. P-14.4(e) (:3286) saturation/unsaturation.
           5. P-14.4(f) (:3296) detachable alphabetized prefixes.
+
+        This is the tricyclo+ mirror of the spiro-priority already enforced on
+        the spiro BICYCLIC branch (``spiro._name_vonbaeyer_spiro_component._key``,
+        which sorts on ``(spiro_loc, het, sen, ene)``).
         """
         numbering = desc.numbering
         pg_ring_atoms = self._principal_group_ring_atoms(mol, ring_atoms)
@@ -1303,16 +1326,24 @@ class VonBaeyerAnalyzer:
                 if la and lb:
                     unsat.append(min(la, lb))
 
-        return (
+        rest = (
             tuple(sorted(hetero)),
             tuple(r for _, r in sorted(hetero_rank)),
             tuple(sorted(pg)),
             tuple(sorted(unsat)),
             tuple(sorted(prefixes)),
         )
+        if spiro_atom is None:
+            # Byte-identical to the pre-spiro key for every whole-molecule caller.
+            return rest
+        # P-24.5.2: spiro-junction locant is the MOST senior criterion. A spiro
+        # atom missing from this numbering sorts last (never chosen over one that
+        # places it).
+        spiro_loc = numbering.get(spiro_atom, 10 ** 6)
+        return (spiro_loc,) + rest
 
     def _choose_lowest_locant_numbering(self, mol, ring_atoms, bridgeheads,
-                                        incumbent):
+                                        incumbent, spiro_atom=None):
         """Pick the lowest-locant numbering among the legal alternatives.
 
         P-23.2 fixes the descriptor but frequently leaves several numberings
@@ -1352,7 +1383,7 @@ class VonBaeyerAnalyzer:
             return incumbent
 
         best = incumbent
-        best_key = self._locant_criteria_key(mol, ring_atoms, incumbent)
+        best_key = self._locant_criteria_key(mol, ring_atoms, incumbent, spiro_atom)
         for cand in expanded:
             try:
                 desc = self._analyze_impl(mol, ring_atoms, forced=cand)
@@ -1369,7 +1400,7 @@ class VonBaeyerAnalyzer:
             locs = [desc.numbering.get(i) for i in ring_atoms]
             if any(l is None for l in locs) or len(set(locs)) != len(ring_atoms):
                 continue
-            key = self._locant_criteria_key(mol, ring_atoms, desc)
+            key = self._locant_criteria_key(mol, ring_atoms, desc, spiro_atom)
             if key < best_key:
                 best_key = key
                 best = desc
