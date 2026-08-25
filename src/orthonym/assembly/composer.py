@@ -53,6 +53,7 @@ from .naming_utils import (
     alpha_sort_key,
     get_alkyl_name,
     is_complex_substituent,
+    enclose_if_compound,
     should_omit_locant_one,
     _wrap_n_substituent,
     _join_multiplied_suffix,
@@ -6337,11 +6338,29 @@ def _walk_amine_n_substituents(
             # P-62.2.4.1.3 (plan P1AM Task 9): in the COMPLEX-polyamine path a
             # demoted amine N lives INSIDE this branch (-CH2-NH2 = aminomethyl,
             # -CH2CH2-NH2 = 2-aminoethyl). get_alkyl_name counts only carbons
-            # and would DROP the amino N (structure-wrong). When hetero_aware is
-            # set and the fragment carries a non-carbon heavy atom, name it with
-            # the hetero-aware recursive namer instead. Fail-closed on decline.
+            # and would DROP the amino N (structure-wrong). Name it with the
+            # element-agnostic recursive namer instead. Fail-closed on decline.
+            #
+            # v37 SP1.1 (root-cause, invariant 8 re-scope): this detection is now
+            # UNCONDITIONAL (was gated on `hetero_aware`, which was only set on the
+            # polyamine path). get_alkyl_name(cc) counts ONLY carbons, so applying
+            # it to ANY fragment that carries a non-carbon heavy atom silently
+            # drops that atom and names a DIFFERENT molecule -- measured on
+            # COCCNCCC, whose N-substituent -CH2CH2-O-CH3 collapsed to `propyl`
+            # (ether O dropped) -> the wrong `N-propylpropan-1-amine` (SELF-01 then
+            # suppressed it, losing breadth AND masking a latent wrong-molecule
+            # producer). The single-N amine path called this helper WITHOUT
+            # hetero_aware, so every ether/thioether/halo N-substituent that is
+            # not caught as a ring/phenyl/fused-het sub was dropped. A fragment
+            # carrying a non-carbon heavy atom MUST route to the element-agnostic
+            # namer (which retains the heteroatom, e.g. `2-methoxyethyl`) and fail
+            # closed if it declines -- it must never reach get_alkyl_name. The
+            # `hetero_aware` parameter is retained for signature stability but no
+            # longer gates this branch. Callers that consume the returned list
+            # (single-N _assemble_amine_name, _assemble_imine_name, the polyamine
+            # path) all fail closed on a None sub-name.
             _hetero_named = False
-            if (hetero_aware and not has_phenyl and not has_ring_sub
+            if (not has_phenyl and not has_ring_sub
                     and not has_fused_het_sub and cc > 0
                     and any(mol.GetAtomWithIdx(i).GetAtomicNum() not in (1, 6)
                             for i in frag)):
@@ -6451,10 +6470,12 @@ def _assemble_imine_name(features: Any, style: str) -> Optional[str]:
     if not chain_set or c_idx not in chain_set or n_idx in chain_set:
         return None
     n_subs = _walk_amine_n_substituents(mol, n_idx, chain_set)
-    if len(n_subs) != 1:
+    if len(n_subs) != 1 or n_subs[0] is None:
         return None  # unnameable N-substituent -> fail closed downstream
 
-    n_prefix = f"N-{_wrap_n_substituent(n_subs[0])}"
+    # v37 SP1.1: enclose a COMPOUND N-substituent (P-16.3.3) before the italic-N
+    # locant, mirroring the amine path; simple names stay bare.
+    n_prefix = f"N-{_wrap_n_substituent(enclose_if_compound(n_subs[0]))}"
 
     # Base = parent + imine suffix (+ stereo); C-substituent prefixes render
     # separately and merge with the N-block (mirrors _assemble_amine_name).
@@ -6553,6 +6574,11 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     n_subs = _walk_amine_n_substituents(mol, n_idx, chain_set)
     if not n_subs:
         return None  # No N-substituents found, use general path
+    # v37 SP1.1: an un-nameable hetero N-substituent returns None (fail closed) --
+    # never build a name that dropped one of its atoms (mirrors the polyamine
+    # path's None guard). The general/best-effort path or abstention takes over.
+    if any(s is None for s in n_subs):
+        return None
 
     # Build N-prefix (same logic as amide N-substitution)
     from collections import Counter
@@ -6560,12 +6586,21 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     n_prefix_parts = []
     for name in sorted(sub_counts.keys()):
         count = sub_counts[name]
+        # v37 SP1.1 (P-16.3.3 / P-16.5.1.1): a COMPOUND N-substituent
+        # ('2-methoxyethyl', 'cyclohexylmethyl') takes its own enclosing marks
+        # before the italic-N locant, and a DERIVED multiplier (bis/tris) when
+        # repeated -- mirrors the amide N-substituent path (polyfunctional.py:2867).
+        # _wrap_n_substituent deliberately only ESCALATES an existing mark, so the
+        # first-level enclosure must come from enclose_if_compound. Simple names
+        # ('methyl') are returned bare and get_multiplier_prefix gives di/tri, so
+        # N,N-dimethyl and N-ethyl... stay byte-identical.
+        wrapped = _wrap_n_substituent(enclose_if_compound(name))
         if count == 1:
-            n_prefix_parts.append(f"N-{_wrap_n_substituent(name)}")
+            n_prefix_parts.append(f"N-{wrapped}")
         else:
-            mult = SIMPLE_MULTIPLIERS.get(count, str(count))
+            mult = get_multiplier_prefix(count, name)
             n_locants = ",".join(["N"] * count)
-            n_prefix_parts.append(f"{n_locants}-{mult}{_wrap_n_substituent(name)}")
+            n_prefix_parts.append(f"{n_locants}-{mult}{wrapped}")
 
     n_prefix = "-".join(n_prefix_parts)
 

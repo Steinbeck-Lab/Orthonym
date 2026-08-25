@@ -435,23 +435,19 @@ class TestEndToEnd:
     def test_mixed_oxa_aza_e2e(self):
         """P-62.2.2: COCCNCCC = CH3-O-CH2CH2-NH-CH2CH2CH3; PIN is
         N-(2-methoxyethyl)propan-1-amine. Amine Gate 2c correctly blocks the
-        skeletal '2-oxa-5-azaoctane'. The substitutive handler does NOT yet name
-        the ether-bearing N-substituent: it drops the ether O and yields the
-        WRONG molecule 'N-propylpropan-1-amine' (dipropylamine, a different
-        InChIKey). This is the compound-substituent-enumeration atom-drop class
-        (same family as the core-namer pantoprazole drop). With the OPSIN
-        validity gate ON (the production config), SELF-01 catches the wrong
-        molecule and the pipeline ABSTAINS — 0-wrong holds. This test pins that
-        production abstention. It flips to assert N-(2-methoxyethyl)propan-1-amine
-        once the compound-substituent enumerator threads the ether O through
-        (NAMED breadth item: mixed ether+amine N-substituent atom-drop).
+        skeletal '2-oxa-5-azaoctane'; the substitutive handler names it.
 
-        v36 (2026-08-24) change-asserted-value: the prior pin
-        'N-2-methoxyethylmethoxypropan-1-amine' was itself malformed AND ran
-        gate-OFF, so it asserted a wrong-molecule producer output. Not
-        rebaselined to the current (wrong) output; converted to assert the real
-        production behavior instead."""
-        assert name_compound('COCCNCCC') == 'unknown organic compound'
+        v37 SP1.1 (2026-08-25) change-asserted-value: RESOLVED. The
+        compound-substituent atom-drop is fixed at its on-path source
+        (composer._walk_amine_n_substituents no longer applies the carbon-only
+        get_alkyl_name to a heteroatom-bearing N-substituent fragment; it routes
+        to the element-agnostic name_substituent_fragment and fails closed on
+        decline). The ether O is threaded through -> N-(2-methoxyethyl)propan-1-amine,
+        which OPSIN round-trips to the input (UDZCEFCJEGGQOJ). The prior pin
+        asserted the production ABSTAIN ('unknown organic compound'), a placeholder
+        for exactly this fix; flipped to the correct name now that the producer
+        offers it and SELF-01 (gate ON) accepts it."""
+        assert name_compound('COCCNCCC') == 'N-(2-methoxyethyl)propan-1-amine'
 
     def test_coc_not_replacement(self):
         """COC should NOT produce a replacement name."""
