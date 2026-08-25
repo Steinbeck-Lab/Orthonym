@@ -4920,7 +4920,14 @@ def _spiro_vb_a_prefix(
         mult = get_multiplier_prefix(len(entries), prefix_name)
         locs = ','.join(t[0] for t in entries)
         parts.append(f"{locs}-{mult}{prefix_name}")
-    return ''.join(parts)
+    # Join the per-element 'a'-prefix terms with a hyphen -- the PIN separator
+    # between replacement-prefix locant-terms (P-24.5.2 / P-24.2.4), e.g.
+    # ``2-oxa-6-aza``. Sibling spellers ``_build_hetero_prefix`` and
+    # ``build_replacement_prefix`` join the same way; this one had diverged to
+    # ``''.join`` and emitted ``2-oxa6-aza``. The last term connects directly to
+    # the following ``spiro`` descriptor (no trailing hyphen), so a plain
+    # ``'-'.join`` is exactly right.
+    return '-'.join(parts)
 
 
 def is_spiro_vonbaeyer(mol) -> bool:
