@@ -150,18 +150,138 @@ class TestST1NeverWrongAndPinPreserved:
         assert errors.is_failure_name(name)
 
 
+class TestST3ProofGapRTRescue:
+    """ST.3: certify_general_result's RT-gated stereo PROOF-GAP rescue.
+
+    A completable spiro whose reanchored full-stereo name round-trips to the
+    input's FULL isomeric InChIKey used to abstain because
+    ``certify_general_result`` voided it with STEREO_PARENT_BLOCK_AMBIGUOUS -- a
+    binding-spine parent-stereo-block PROOF GAP (``stereo_atom_to_locant`` is
+    int-locant-only, so the compound/primed spiro locants are unmappable), NOT a
+    disproof. ST.3 accepts such a candidate IFF the full-InChIKey OPSIN
+    round-trip -- a strictly stronger oracle than the parent-block proof --
+    positively verifies the whole structure incl. stereo, and ONLY then.
+    """
+
+    # -- two more completable-spiro witnesses (abstain -> FULL stereo) ----------
+    def test_completable_spiro_benzofuran_ships_full_stereo(self):
+        # ABSTAIN pre-ST.3 (HEAD A/B verified) -> full stereo, round-trips.
+        smi = "COC(=O)C1=CC(=O)C=C(OC)[C@@]12Oc1cc(C)cc(O)c1C2=O"
+        name = _be_name(smi)
+        assert not errors.is_failure_name(name)
+        assert _rt(smi, name)
+        assert any(d in name for d in ("R)", "S)", "R,", "S,"))  # carries stereo
+
+    def test_completable_spiro_oxatricyclo_ships_full_stereo(self):
+        # A completable spiro (candidate-A/B) that must keep shipping FULL stereo
+        # through the RT-gated rescue path.
+        smi = ("C=C1C(=O)O[C@H]2[C@H]1[C@@H](OC(=O)[C@](C)(O)CCl)CC(=C)"
+               "[C@@H]1C[C@H](O)[C@@]3(CO3)[C@H]21")
+        name = _be_name(smi)
+        assert not errors.is_failure_name(name)
+        assert _rt(smi, name)
+        assert any(d in name for d in ("R)", "S)", "R,", "S,"))
+
+    # -- LOAD-BEARING: the relaxation must reject a wrong stereoisomer ----------
+    def test_wrong_stereo_candidate_still_rejected_negative_control(self):
+        """The RT gate must accept the CORRECT full-stereo candidate and REJECT a
+        wrong stereoisomer that reaches the SAME proof gap.
+
+        Both candidates hit STEREO_PARENT_BLOCK_AMBIGUOUS (identical constitution
+        -> identically-unanchorable leading block); the ONLY thing that separates
+        them is the full-InChIKey round-trip. Proof that ST.3 accepts by RT, not
+        by relaxing the gate blindly.
+        """
+        import dataclasses
+        from orthonym.validation import coverage_gate as CG
+        import orthonym.assembly.t4_coverage as T4
+
+        smi = "CC(=O)O[C@@H]1C[C@H]2O[C@@H]3C=C(C)CC[C@]3(C)[C@]1(C)[C@@]21CO1"
+        target = ("(1R,3R,8R,9S,10R,12R)-10-acetyloxy-5,8,9-trimethylspiro"
+                  "[2-oxatricyclo[7.2.1.0^3,8]dodec-4-ene-12,2'-oxirane]")
+        orig = CG.certify_general_result
+        cap = {}
+
+        def _cap(mol, result, **kw):
+            if getattr(result, "name", None) == target and "obj" not in cap:
+                cap.update(obj=result, mol=mol,
+                           ac=kw.get("allow_charged", False))
+            return orig(mol, result, **kw)
+
+        CG.certify_general_result = _cap
+        T4.certify_general_result = _cap
+        try:
+            _be_name(smi)
+        finally:
+            CG.certify_general_result = orig
+            T4.certify_general_result = orig
+
+        assert "obj" in cap, "did not capture the full-stereo candidate on-path"
+        eng, mol, ac = cap["obj"], cap["mol"], cap["ac"]
+
+        # correct-stereo candidate: ACCEPTED (RT verifies the full InChIKey)
+        assert orig(mol, eng, allow_charged=ac, structural_only=True) is True
+
+        # wrong-stereo candidate (1R->1S): same proof gap, RT FAILS -> REJECTED
+        wrong = dataclasses.replace(
+            eng, name=eng.name.replace("(1R,", "(1S,", 1))
+        assert wrong.name != eng.name                      # the flip took
+        assert orig(mol, wrong, allow_charged=ac, structural_only=True) is False
+
+    # -- jar-absent / no-OPSIN must stay STRICT (never accept unverified) -------
+    def test_proof_gap_stays_strict_without_opsin(self):
+        """With OPSIN unavailable the RT oracle returns passed=False, so the
+        proof-gap rescue must NOT fire -- the correct candidate is voided
+        (falls back to abstain), never accepted unverified."""
+        import orthonym.validation.opsin_roundtrip as ORT
+        from orthonym.validation import coverage_gate as CG
+        import orthonym.assembly.t4_coverage as T4
+
+        smi = "CC(=O)O[C@@H]1C[C@H]2O[C@@H]3C=C(C)CC[C@]3(C)[C@]1(C)[C@@]21CO1"
+        target = ("(1R,3R,8R,9S,10R,12R)-10-acetyloxy-5,8,9-trimethylspiro"
+                  "[2-oxatricyclo[7.2.1.0^3,8]dodec-4-ene-12,2'-oxirane]")
+        orig = CG.certify_general_result
+        cap = {}
+
+        def _cap(mol, result, **kw):
+            if getattr(result, "name", None) == target and "obj" not in cap:
+                cap.update(obj=result, mol=mol,
+                           ac=kw.get("allow_charged", False))
+            return orig(mol, result, **kw)
+
+        CG.certify_general_result = _cap
+        T4.certify_general_result = _cap
+        try:
+            _be_name(smi)
+        finally:
+            CG.certify_general_result = orig
+            T4.certify_general_result = orig
+        assert "obj" in cap
+        eng, mol, ac = cap["obj"], cap["mol"], cap["ac"]
+
+        real = ORT.opsin_roundtrip_check
+        ORT.opsin_roundtrip_check = lambda *a, **k: {
+            "passed": False, "error": "opsin_parse_failed", "opsin_smiles": None}
+        try:
+            v = orig(mol, eng, allow_charged=ac, structural_only=True)
+        finally:
+            ORT.opsin_roundtrip_check = real
+        assert v is False    # no OPSIN -> stay strict -> abstain, never accept
+
+
 class TestST1KnownFollowOn:
-    @pytest.mark.xfail(strict=False, reason=(
-        "ST.3 follow-on (NOT stereo-site routing): the reanchor builds a "
-        "full-stereo name that RT-verifies, but certify_general_result rejects "
-        "the spiro-vonbaeyer component fallback with STEREO_PARENT_BLOCK_AMBIGUOUS "
-        "(binding-spine parent-stereo-block proof gap — stereo_atom_to_locant is "
-        "int-locant-only), routing to T4 -> abstain. The achiral constitution "
-        "ships, so this violates 'never abstain-when-constitution-RTs' and is a "
-        "documented named-blocker for the ST.3/binding-spine work. Confirmed "
-        "pre-existing (name identical pre/post ST.1)."))
     def test_completable_spiro_certify_gap_documented(self):
+        # ST.3 RESOLVED this (was an xfail canary in ST.1). The reanchor builds a
+        # full-stereo name that RT-verifies, but certify_general_result used to
+        # reject the spiro-vonbaeyer component fallback with
+        # STEREO_PARENT_BLOCK_AMBIGUOUS (binding-spine parent-stereo-block proof
+        # gap — stereo_atom_to_locant is int-locant-only), routing to T4 ->
+        # abstain. ST.3's RT-gated proof-gap rescue in certify_general_result now
+        # accepts it because the full name round-trips to the input's isomeric
+        # InChIKey. So it ships FULL stereo instead of abstaining.
         smi = "CC(=O)O[C@@H]1C[C@H]2O[C@@H]3C=C(C)CC[C@]3(C)[C@]1(C)[C@@]21CO1"
         name = _be_name(smi)
-        assert not errors.is_failure_name(name)          # currently abstains -> xfail
-        assert _rt(smi, name)
+        assert not errors.is_failure_name(name)          # ST.3: no longer abstains
+        assert _rt(smi, name)                            # FULL stereo, round-trips
+        assert name == ("(1R,3R,8R,9S,10R,12R)-10-acetyloxy-5,8,9-trimethylspiro"
+                        "[2-oxatricyclo[7.2.1.0^3,8]dodec-4-ene-12,2'-oxirane]")

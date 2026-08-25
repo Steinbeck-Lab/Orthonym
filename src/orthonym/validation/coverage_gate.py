@@ -75,6 +75,48 @@ _STRUCTURAL_BLOCKING_CODES = frozenset({
     _bs.SUBSTITUENT_STEREO_MISMATCH,                                    # P8 (provable)
 })
 
+#: v37 ST.3: the stereo PROOF-GAP codes -- a rejection here means the
+#: binding-spine could NOT decide (it could not positionally anchor which
+#: leading descriptor block is the parent's, because ``stereo_atom_to_locant``
+#: is int-locant-only and a compound/primed spiro locant is unmappable), NOT
+#: that the stereo is disproved. It is the deny-by-default "never guess" arm of
+#: P8, exactly parallel to ``STEREO_UNVERIFIED``. The DISPROOF codes
+#: (``STEREO_DESCRIPTOR_MISSING``/``_MISMATCH``, the substituent pair) are
+#: DELIBERATELY EXCLUDED: those assert the emitted stereo is demonstrably wrong,
+#: and are never relaxed. A gap in this set is overridden IFF the full-InChIKey
+#: OPSIN round-trip -- a strictly stronger oracle than the parent-block proof --
+#: positively verifies the whole structure incl. every stereodescriptor.
+_STEREO_PROOF_GAP_CODES = frozenset({_bs.STEREO_PARENT_BLOCK_AMBIGUOUS})
+
+
+def _full_inchikey_roundtrips(mol, name: str) -> bool:
+    """True iff *name* OPSIN-round-trips to *mol*'s FULL isomeric InChIKey.
+
+    The ground-truth 0-wrong oracle (SELF-01's own round-trip), computed here so
+    a stereo PROOF-GAP void (``STEREO_PARENT_BLOCK_AMBIGUOUS``) can be overridden
+    ONLY when the whole name -- every atom, bond, charge AND stereodescriptor --
+    is positively verified. Strictly stronger than the binding-spine
+    parent-stereo-block proof it overrides.
+
+    Fail-CLOSED by construction: ``opsin_roundtrip_check`` returns
+    ``passed=False`` for a missing OPSIN jar, an absent JVM, an unparseable name
+    (e.g. pseudoasymmetric ``r``/``s`` OPSIN 2.9.0 cannot read), OR any
+    constitution/stereo mismatch, and any exception here also returns False. So
+    without a working OPSIN this never relaxes the gate, and a wrong stereoisomer
+    (InChI mismatch) is never accepted.
+    """
+    if mol is None or not name:
+        return False
+    try:
+        from rdkit import Chem
+        from .opsin_roundtrip import opsin_roundtrip_check
+        smiles = Chem.MolToSmiles(mol)  # canonical, isomeric (stereo retained)
+        if not smiles:
+            return False
+        return opsin_roundtrip_check(smiles, name).get("passed") is True
+    except Exception:  # fail-closed: a probe bug must never relax the gate
+        return False
+
 
 def certify_general_result(mol, result: "GeneralEngineResult", *,
                            allow_charged: bool = False,
@@ -130,6 +172,27 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
                             "(structural gate passes): %s",
                             result.name, proof.codes())
                 return True
+        else:
+            blocking = [f.code for f in proof.findings if f.severity == "error"]
+        # v37 ST.3: RT-gated stereo PROOF-GAP rescue. When the ONLY thing
+        # blocking certification is a stereo proof gap (STEREO_PARENT_BLOCK_
+        # AMBIGUOUS -- the spine could not anchor which leading block is the
+        # parent's, never a disproof), accept IFF the full name round-trips to
+        # the input's isomeric InChIKey. That oracle is strictly stronger than
+        # the binding-spine parent-stereo-block proof: it verifies every atom,
+        # bond, charge AND stereodescriptor, so a name it passes cannot be a
+        # wrong molecule OR a wrong stereoisomer. A wrong stereoisomer reaches
+        # this same gap (its descriptors are equally unanchorable) and is
+        # rejected by the RT check (InChI mismatch); a DISPROVED descriptor is
+        # STEREO_DESCRIPTOR_MISMATCH, not in _STEREO_PROOF_GAP_CODES, and is
+        # never relaxed. Fail-closed with no OPSIN (passed=False -> stay strict).
+        if (blocking
+                and all(c in _STEREO_PROOF_GAP_CODES for c in blocking)
+                and _full_inchikey_roundtrips(mol, result.name)):
+            logger.info("coverage_gate: stereo proof-gap %s on %r overridden by "
+                        "full-InChIKey OPSIN round-trip", blocking, result.name)
+            return True
+        if structural_only:
             logger.info("coverage_gate: structural void %r: %s",
                         result.name, blocking)
             return False
