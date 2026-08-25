@@ -744,6 +744,36 @@ def _stereo_prefix(mol, atom_to_locant) -> str:
         collect_stereodescriptors(mol, atom_to_locant))
 
 
+def _apply_parent_stereo(name: str, mol, locant_map) -> str:
+    """v37 ST.1 (SC-1): inject parent-scope stereo, RT-gating the numbering at
+    TOP LEVEL exactly as the sibling ring producers do (``composer.py:4615``,
+    ``polycyclic.py:3354``, ``tier_a_ring.py:546``, all v36 Wave-E).
+
+    The general engine used to inject via a plain ``_stereo_prefix`` with NO
+    RT-gate, so an OPSIN-UNPARSEABLE stereo layer (e.g. a pseudoasymmetric
+    ``(1s,4s)-``) was certified "complete" by ``general_engine_stereo_complete``
+    and forced the verified branch to ABSTAIN instead of degrading to the flat
+    constitution (V37-SPY-STEREO.md SC-1). Routing through
+    ``inject_stereo_reanchored_rt_gated`` fixes that at 0-wrong: candidate A
+    reuses the exact ``collect_stereodescriptors(mol, locant_map)`` this path
+    already built, so a currently-round-tripping stereo name is returned
+    BYTE-IDENTICAL; candidate B re-anchors on OPSIN's own numbering (completing
+    more cages to FULL stereo); a layer that cannot be verified either way is
+    STRIPPED to the constitution (stereo omitted per
+    feedback_stereo_omission_is_not_wrong_molecule) — never a wrong stereoisomer.
+
+    Sub-fragment naming (``is_top_level_naming()`` False) keeps the direct prefix
+    (no per-fragment OPSIN calls); the whole-molecule gate downstream still
+    applies. The reanchor fails OPEN to candidate A when OPSIN is unavailable, so
+    a missing JVM never hard-fails a name.
+    """
+    from .fragment_naming import is_top_level_naming
+    if is_top_level_naming():
+        from ..rules.stereochemistry import inject_stereo_reanchored_rt_gated
+        return inject_stereo_reanchored_rt_gated(name, mol, locant_map)
+    return _stereo_prefix(mol, locant_map) + name
+
+
 def _stem_block(mol, chain, atom_to_locant) -> Optional[Tuple[str, str]]:
     """(parent_token, hydride_block) e.g. ('but', 'but-2-ene') or
     ('hex', 'hexane'). None on an unsupported bond pattern."""
@@ -889,8 +919,9 @@ def _assemble(mol, features, chain, part,
         return _refuse("ionic centres not expressible as a chain-parent suffix")
     # v25 G4: parent-scope stereo from structure (substituent-internal
     # stereo is already handled inside name_substituent's stereo route).
+    # v37 ST.1 (SC-1): RT-gated at top level (see _apply_parent_stereo).
     _stereo_locants = {a: atom_to_locant[a] for a in chain}
-    name = _stereo_prefix(mol, _stereo_locants) + name
+    name = _apply_parent_stereo(name, mol, _stereo_locants)
     bindings.append(TokenBinding(tuple(chain), parent_token, 'parent'))
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
                                stereo_atom_to_locant=_stereo_locants)
@@ -1469,15 +1500,25 @@ def _emit_ring_from_analysis(
     elif _has_ionic_centres(mol):
         return _refuse("ionic centres not expressible as a cage-parent suffix")
 
-    # v25 G4: parent-scope stereo from structure (VB locants).
-    name = _stereo_prefix(mol, atom_to_locant) + name
-
-    # v27 P2 (P-65.6.3.2.1): prepend the alcoholic component as a separate word
-    # -> `ethyl <ring>carboxylate` (functional-class ester two-word PIN).
+    # v25 G4 / v37 ST.1 (SC-1): parent-scope stereo from structure (VB locants),
+    # routed through the RT-gated reanchor at TOP LEVEL so an OPSIN-unverifiable
+    # layer degrades to the flat constitution instead of forcing an abstain.
+    #
+    # v27 P2 (P-65.6.3.2.1): the functional-class ester two-word PIN prepends the
+    # alcoholic component as a separate word -> `ethyl <ring>carboxylate`. The
+    # stereodescriptor belongs on the ACID ring component (`ethyl (1R)-...
+    # carboxylate`), so for the ester form inject it directly on the ring word
+    # BEFORE the alcoholic word is prepended (the reanchor front-prepends to the
+    # whole two-word string, which would misplace it as `(1R)-ethyl ...` and fail
+    # RT, stripping a currently-correct descriptor). The non-ester ring form runs
+    # the reanchor on its final constitution.
     if ester_r_word is not None:
+        name = _stereo_prefix(mol, atom_to_locant) + name
         name = ester_r_word + ' ' + name
         bindings.append(TokenBinding(tuple(sorted(ester_r_frag)),
                                      ester_r_word, 'prefix'))
+    else:
+        name = _apply_parent_stereo(name, mol, atom_to_locant)
 
     bindings.extend(_ring_parent_bindings(cage, name, parent_block))
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
@@ -2032,6 +2073,15 @@ def _spiro_vonbaeyer_component_fallback(mol) -> Optional[GeneralEngineResult]:
         return None
     # Ring stereo on the int-locant (unprimed component) atoms; a primed-component
     # stereocentre is out of this best-effort scope and would abstain via RT.
+    # NOTE (v37 ST.1): deliberately NOT routed through the RT-gated reanchor. This
+    # fallback emits int-locant-only (partial) stereo by design and relies on the
+    # downstream _rt_match(stereo_flagged=True) SUBSET tolerance to ship it as a
+    # constitution-correct stereo-omission. The reanchor demands a FULL isomeric
+    # round-trip and would STRIP a partial-but-valid layer, then the stripped
+    # spiro form abstains at certify (STEREO_PARENT_BLOCK_AMBIGUOUS) — a net
+    # regression (measured: witness `C=C1C(=O)O[C@H]2...` shipped OLD, abstained
+    # routed). Completing THESE to full stereo is the ST.3 / binding-spine
+    # follow-on, not stereo-site routing.
     int_a2l = {a: l for a, l in a2l.items() if isinstance(l, int)}
     name = _stereo_prefix(mol, int_a2l) + name
     all_heavy = tuple(sorted(
