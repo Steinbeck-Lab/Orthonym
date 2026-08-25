@@ -576,6 +576,29 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
                 sub_bearing.add(i)
                 break
 
+    # P-23.3.2.2 [BBv2:9789], verbatim at ring_replacement.py:150-152: "If there
+    # is still a choice, low locants are assigned in accord with the decreasing
+    # seniority order of heteroatoms O > S > Se > Te > N > P > ... > B ...". This
+    # element-seniority sub-tiebreak sits BETWEEN the heteroatom locant-SET tier
+    # (P-31.1.4.3.4, the `het` list) and the suffix tier: when two admissible
+    # numberings share the same heteroatom locant SET (e.g. {2,6}), the SENIOR
+    # element must take the LOWER locant. Without it the set-tie fell through to
+    # RDKit atom index -- a SMILES-atom-order artifact (O1CC2CNC1C2 vs its
+    # permutation N1CC2COC1C2 gave two different names for one molecule).
+    # Reuse the canonical numbering-seniority ranks (rank 1 = O, most senior);
+    # an off-table ring heteroatom degrades to least-senior (999), deterministic.
+    from .ring_replacement import HETEROATOM_PREFIXES
+
+    def _sen_vector(a2l):
+        # Locants of the ring heteroatoms, ordered by DECREASING element
+        # seniority (rank ascending). An ORDERED tuple -- compared as a tuple,
+        # never via compare_locant_sets (that set-compare is exactly the bug).
+        ranked = sorted(
+            (HETEROATOM_PREFIXES.get(mol.GetAtomWithIdx(i).GetSymbol(), ('', 999))[1], a2l[i])
+            for i in hetero if i in a2l
+        )
+        return tuple(loc for _rank, loc in ranked)
+
     def _key_lists(a2l):
         het = sorted(a2l[i] for i in hetero if i in a2l)
         suf = sorted(a2l[i] for i in suffix_set if i in a2l)
@@ -584,7 +607,17 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         return (het, suf, ene, sub)
 
     def _cmp(x, y):
-        for sx, sy in zip(_key_lists(x), _key_lists(y)):
+        kx, ky = _key_lists(x), _key_lists(y)
+        # Tier 0: heteroatom locant SET (P-31.1.4.3.4).
+        c = compare_locant_sets(kx[0], ky[0])
+        if c != 0:
+            return c
+        # Tier 1: heteroatom ELEMENT SENIORITY as an ORDERED vector (P-23.3.2.2).
+        vx, vy = _sen_vector(x), _sen_vector(y)
+        if vx != vy:
+            return -1 if vx < vy else 1
+        # Tiers 2-4: suffix -> ene/yne -> substituents (all locant SETS).
+        for sx, sy in zip(kx[1:], ky[1:]):
             c = compare_locant_sets(sx, sy)
             if c != 0:
                 return c
