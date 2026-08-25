@@ -3306,7 +3306,27 @@ def _name_ether_substituted_chain(
             part_strings.append(head)
 
     stem = get_chain_prefix(len(backbone))
-    joined = ''.join(part_strings) if not cite_locants else '-'.join(part_strings)
+    if cite_locants:
+        joined = '-'.join(part_strings)
+    elif len(part_strings) >= 2:
+        # P-16.3.3 / P-16.3.4: >=2 DISTINCT substituent prefixes co-cited on the
+        # same LOCANT-ELIDED position must be set off by enclosing marks. A bare
+        # ''.join fuses adjacent (R)oxy prefixes into ONE compound (chained)
+        # prefix -- 'ethoxymethoxy' reads as an ethoxy-substituted methoxy CHAIN
+        # (CH3CH2-O-CH2-O-, a DIFFERENT constitution), so OPSIN mis-parses
+        # 'ethoxymethoxymethyl' and SELF-01 correctly rejected it, dropping the
+        # engine to the ugly a-replacement rescue. Separate them: the first
+        # prefix stays bare, each LATER distinct prefix is enclosed (already-
+        # enclosed tokens, e.g. an S-branch '(methylsulfanyl)', are left as-is --
+        # they already provide the separation) -> 'ethoxy(methoxy)methyl'
+        # (OPSIN-RT-verified). A single distinct prefix -- incl. the 'di'-
+        # multiplied 'dimethoxy' from -CH(OMe)2 -- is len==1 and stays bare, so
+        # no over-enclosure of the single/identical-group paths.
+        joined = part_strings[0] + ''.join(
+            p if _is_fully_enclosed(p) else apply_enclosing_marks(p, -1)
+            for p in part_strings[1:])
+    else:
+        joined = ''.join(part_strings)
     # v33 Phase 6 E2d: a NON-TERMINAL free valence (k_attach >= 2) must cite its
     # own locant on the parent-hydride stem -- 'propan-2-yl', not 'propyl'
     # (P-29.2, BB:15813 elides the locant only when the free valence
