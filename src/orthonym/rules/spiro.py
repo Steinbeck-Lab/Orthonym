@@ -4012,6 +4012,12 @@ def _name_vonbaeyer_spiro_component(
         _legacy_bicyclo_numbering,
     )
     from .locants import compare_locant_sets
+    # Share the ONE heteroatom-seniority table the tricyclo+ spiro branch already
+    # uses (VonBaeyerAnalyzer._locant_criteria_key), so both spiro von-Baeyer
+    # branches rank heteroatoms by the same P-23.3.1/P-23.3.2.2 order (do not
+    # redefine or hard-code it here). Lazy import -- avoids a module-load cycle.
+    from .polycyclic import VonBaeyerAnalyzer
+    _HETERO_SENIORITY = VonBaeyerAnalyzer._HETERO_SENIORITY
     extracted = _extract_subfragment(mol, component_atoms)
     if extracted is None:
         return None
@@ -4071,9 +4077,20 @@ def _name_vonbaeyer_spiro_component(
             spiro_loc = (a2l.get(spiro_frag, 10 ** 6)
                          if spiro_frag is not None else 0)
             het = sorted(a2l[i] for i in hetero_frag if i in a2l)
+            # P-23.3.2.2 [BBv2:9789]: on a heteroatom locant-SET tie the SENIOR
+            # element (O > S > Se > Te > N > P > ...) takes the LOWER locant.
+            # Heteroatom locants ORDERED by decreasing element seniority (rank
+            # ascending) -> compared as an ordered tuple, never via
+            # compare_locant_sets (a set-compare is exactly the SP1.5 bug: it ties
+            # {2,6} with itself and falls through to candidate/atom-index order).
+            sen = tuple(loc for _rank, loc in sorted(
+                (_HETERO_SENIORITY.get(frag.GetAtomWithIdx(i).GetSymbol(), 99),
+                 a2l[i])
+                for i in hetero_frag if i in a2l
+            ))
             ene = sorted(min(a2l[a], a2l[b]) for a, b in frag_multibonds
                          if a in a2l and b in a2l)
-            return (spiro_loc, het, ene)
+            return (spiro_loc, het, sen, ene)
 
         best = None
         for c in cands:
@@ -4081,16 +4098,24 @@ def _name_vonbaeyer_spiro_component(
             if best is None:
                 best = (k, c)
                 continue
+            # P-24.5.2: lowest spiro-atom locant.
             if k[0] != best[0][0]:
                 if k[0] < best[0][0]:
                     best = (k, c)
                 continue
+            # P-24.2.4.1.1: lowest heteroatom locant SET.
             ch = compare_locant_sets(k[1], best[0][1])
             if ch != 0:
                 if ch < 0:
                     best = (k, c)
                 continue
-            if compare_locant_sets(k[2], best[0][2]) < 0:
+            # P-23.3.2.2: element-seniority tiebreak (ORDERED vector) on a SET tie.
+            if k[2] != best[0][2]:
+                if k[2] < best[0][2]:
+                    best = (k, c)
+                continue
+            # P-31.1.5.2.1: lowest double-bond locants.
+            if compare_locant_sets(k[3], best[0][3]) < 0:
                 best = (k, c)
         numbering = best[1]
     else:
