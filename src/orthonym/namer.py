@@ -2947,6 +2947,17 @@ class Orthonym:
                     self._general_fallback_unverified)
             except Exception:
                 self._be_ctx_token = None
+            # v37 SP1.1b: publish allow_aromatic_general with the same lifetime so
+            # the recursive re-entry (name_compound builds a FRESH namer) gives a
+            # recursively named fragment the SAME tier the top-level call ran at.
+            # Without this a top-level allow_aromatic_general=True was silently lost
+            # on recursion. Top-level only; reset in the finally below.
+            try:
+                from .metrics.provenance import allow_aromatic_general_ctx
+                self._aag_ctx_token = allow_aromatic_general_ctx.set(
+                    self._allow_aromatic_general)
+            except Exception:
+                self._aag_ctx_token = None
         # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
         # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
         # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
@@ -3284,6 +3295,18 @@ class Orthonym:
                 except Exception:
                     pass
                 self._be_ctx_token = None
+            # v37 SP1.1b: torn down with its siblings. A leaked
+            # allow_aromatic_general would put general-tier vocabulary on a LATER
+            # PIN naming in the same process -- an H3 break no single-molecule test
+            # would show (mirrors the best_effort_ctx reasoning above).
+            _aag_tok = getattr(self, '_aag_ctx_token', None)
+            if _aag_tok is not None:
+                try:
+                    from .metrics.provenance import allow_aromatic_general_ctx
+                    allow_aromatic_general_ctx.reset(_aag_tok)
+                except Exception:
+                    pass
+                self._aag_ctx_token = None
             end_naming_session()
 
     def name_tiered(self, smiles: str) -> dict:
@@ -6604,7 +6627,8 @@ def name_compound(smiles: str, style: str = "pin",
                    enable_group_splitting: bool = False,
                    trivial_fallback: bool = False,
                    general_fallback: Optional[bool] = None,
-                   general_fallback_unverified: bool = False,
+                   general_fallback_unverified: Optional[bool] = None,
+                   allow_aromatic_general: Optional[bool] = None,
                    raise_on_limit: bool = False,
                    binding_proof: str = "off"):
     """
@@ -6651,6 +6675,26 @@ def name_compound(smiles: str, style: str = "pin",
             general_fallback = general_fallback_ctx.get()
         except Exception:
             general_fallback = False
+    # v37 SP1.1b: inherit the REST of the best-effort tier the same way. Before
+    # this, only `general_fallback` carried through the recursive re-entry;
+    # `general_fallback_unverified` (published as `best_effort_ctx`) and
+    # `allow_aromatic_general` (published as `allow_aromatic_general_ctx`) were
+    # silently downgraded, so a compound substituent nameable ONLY at the
+    # unverified/aromatic-general tier abstained when reached recursively even
+    # though the whole molecule was named at that tier. An explicit True/False
+    # from the caller still wins; None means "inherit the top-level tier".
+    if general_fallback_unverified is None:
+        try:
+            from .metrics.provenance import best_effort_ctx
+            general_fallback_unverified = best_effort_ctx.get()
+        except Exception:
+            general_fallback_unverified = False
+    if allow_aromatic_general is None:
+        try:
+            from .metrics.provenance import allow_aromatic_general_ctx
+            allow_aromatic_general = allow_aromatic_general_ctx.get()
+        except Exception:
+            allow_aromatic_general = False
 
     namer = Orthonym(
         style=style,
@@ -6659,6 +6703,7 @@ def name_compound(smiles: str, style: str = "pin",
         trivial_fallback=trivial_fallback,
         general_fallback=general_fallback,
         general_fallback_unverified=general_fallback_unverified,
+        allow_aromatic_general=allow_aromatic_general,
         binding_proof=binding_proof,
     )
 

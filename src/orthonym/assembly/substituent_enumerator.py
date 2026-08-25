@@ -4348,33 +4348,44 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     # Use name_fragment_recursively() which has cycle detection via visited set.
     # This handles cases where the fragment is a ring system with heteroatoms
     # that the simpler naming paths above cannot handle (DROP-18/19/24/25).
-    # Guard: only for moderately-sized fragments (<=25 atoms).
-    if len(frag_atoms) <= 25:
-        frag_smiles = _get_frag_smiles(mol, frag_atoms)
-        if frag_smiles and frag_smiles != "unknown":
-            try:
-                from .fragment_naming import name_fragment_recursively
-                from .substituent_naming import (
-                    ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
-                frag_name = name_fragment_recursively(frag_smiles)
-                if frag_name:
-                    # Convert parent name to prefix form (e.g., "benzoic acid" -> not useful,
-                    # but "pyridine" -> "pyridinyl", "cyclohexanone" -> "oxocyclohexyl")
-                    carbon_count = sum(
-                        1 for idx in frag_atoms
-                        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+    #
+    # v37 SP1.1b: the old ``if len(frag_atoms) <= 25`` size cap here dropped a
+    # legitimately nameable large fragment on size alone (the 27-heavy-atom
+    # disaccharide chain hung off a steroid aglycone; SP4 witnesses g1/g3).
+    # Size is NOT the right guard: nameability is. Attempt the recursive name for
+    # any compound fragment and let the RT gate (whole-molecule SELF-01/OPSIN
+    # validity at the top level, and name_compound's own fragment-level check)
+    # decide — a fragment whose name does not round-trip is refused and the whole
+    # molecule abstains, so 0-wrong is preserved by the gate, not by a constant.
+    # Cost is bounded WITHOUT a size cap: name_fragment_recursively charges the
+    # per-top-level work budget (``spend_fragment_work``, the v33 giant-molecule
+    # hang fix) and enforces the ``_MAX_VISITED_SIZE`` depth net, so an
+    # unbounded/expensive fragment abstains fast rather than dropping cheaply.
+    frag_smiles = _get_frag_smiles(mol, frag_atoms)
+    if frag_smiles and frag_smiles != "unknown":
+        try:
+            from .fragment_naming import name_fragment_recursively
+            from .substituent_naming import (
+                ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
+            frag_name = name_fragment_recursively(frag_smiles)
+            if frag_name:
+                # Convert parent name to prefix form (e.g., "benzoic acid" -> not useful,
+                # but "pyridine" -> "pyridinyl", "cyclohexanone" -> "oxocyclohexyl")
+                carbon_count = sum(
+                    1 for idx in frag_atoms
+                    if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+                )
+                prefix_name = parent_to_prefix(
+                    frag_name, chain_length=carbon_count,
+                    attach_locant=ATTACH_LOCANT_UNKNOWN)
+                if prefix_name:
+                    logger.debug(
+                        "DROP-18/19 fallback: recursive naming for %s -> %s",
+                        frag_smiles, prefix_name,
                     )
-                    prefix_name = parent_to_prefix(
-                        frag_name, chain_length=carbon_count,
-                        attach_locant=ATTACH_LOCANT_UNKNOWN)
-                    if prefix_name:
-                        logger.debug(
-                            "DROP-18/19 fallback: recursive naming for %s -> %s",
-                            frag_smiles, prefix_name,
-                        )
-                        return prefix_name
-            except Exception:
-                pass  # Keep falling through to warning
+                    return prefix_name
+        except Exception:
+            pass  # Keep falling through to warning
 
     # If naming infrastructure couldn't handle it, log warning
     frag_smiles = _get_frag_smiles(mol, frag_atoms)

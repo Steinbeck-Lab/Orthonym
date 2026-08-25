@@ -122,6 +122,18 @@ general_fallback_ctx = contextvars.ContextVar(
 # and break hard bound H3 (PIN default byte-identical) at the tier above PIN.
 best_effort_ctx = contextvars.ContextVar(
     "orthonym_best_effort", default=False)
+# v37 SP1.1b: the ``allow_aromatic_general`` opt-in propagated into fragment /
+# component recursion, exactly as ``general_fallback_ctx`` / ``best_effort_ctx``
+# above. ``name_compound`` (the recursive re-entry point, namer.py) builds a FRESH
+# namer, so a top-level ``allow_aromatic_general=True`` was silently lost on
+# recursion (the free function had no such parameter). Unlike ``best_effort_ctx``,
+# this DOES publish the raw ``allow_aromatic_general`` value -- that is safe here
+# because it is read back ONLY by the recursive re-entry (to give a recursively
+# named fragment the SAME tier its top-level call ran at), never used as the
+# best-effort discriminator the ⚠ note above warns against. At the PIN default
+# tier the value is False, so PIN/complete output is byte-identical.
+allow_aromatic_general_ctx = contextvars.ContextVar(
+    "orthonym_allow_aromatic_general", default=False)
 # v30 P3-T1c: a composer (``pin_path``) name whose ring substituent prefix could
 # only be produced by the GENERAL tier -- see ``record_general_ring_prefix``.
 _GENERAL_RING_PREFIX = contextvars.ContextVar(
