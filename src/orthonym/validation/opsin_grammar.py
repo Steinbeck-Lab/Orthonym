@@ -101,6 +101,32 @@ _MAX_EXPANSION_ITERATIONS = 16
 
 _PLACEHOLDER_RE = re.compile(r"%([A-Za-z]+)%")
 
+# The regexTokens.xml resource inside the OPSIN jar is byte-identical to the
+# submodule copy. Reading it from the bundled jar removes the dependency on the
+# OPSIN source tree, so a source install without the submodule still works.
+_REGEX_TOKENS_JAR_ENTRY = "uk/ac/cam/ch/wwmm/opsin/resources/regexTokens.xml"
+
+
+def _read_regex_tokens_xml() -> bytes:
+    """regexTokens.xml bytes from the OPSIN submodule if present, else the bundled jar."""
+    if _REGEX_TOKENS_PATH.exists():
+        return _REGEX_TOKENS_PATH.read_bytes()
+    import glob as _glob
+    import zipfile as _zip
+    for _pat in (str(_PROJECT_ROOT / "opsin-cli-*-jar-with-dependencies.jar"),
+                 str(_PROJECT_ROOT / "opsin-cli-*.jar")):
+        for _jar in sorted(_glob.glob(_pat)):
+            try:
+                with _zip.ZipFile(_jar) as _z:
+                    return _z.read(_REGEX_TOKENS_JAR_ENTRY)
+            except (KeyError, _zip.BadZipFile):
+                continue
+    raise ImportError(
+        "OPSIN grammar XML (regexTokens.xml) not found in the OPSIN submodule or "
+        "the bundled opsin-cli jar. A source checkout with the OPSIN submodule, or "
+        "the bundled opsin-cli-*.jar at the project root, is required."
+    )
+
 
 def _load_opsin_token_regexes() -> Dict[str, "re.Pattern[str]"]:
     """Module-load reader: parse regexTokens.xml -> compiled Python re.Pattern dict.
@@ -118,15 +144,7 @@ def _load_opsin_token_regexes() -> Dict[str, "re.Pattern[str]"]:
             name's underlying OPSIN regex is missing from the XML, or if
             the resolved Python regex fails to compile.
     """
-    if not _REGEX_TOKENS_PATH.exists():
-        raise ImportError(
-            f"OPSIN grammar XML not found: {_REGEX_TOKENS_PATH}. "
-            f"Phase 156 requires the OPSIN codebase under "
-            f"opsin/opsin-core/src/main/resources/."
-        )
-
-    tree = etree.parse(str(_REGEX_TOKENS_PATH))
-    root = tree.getroot()
+    root = etree.fromstring(_read_regex_tokens_xml())
 
     # First pass: collect all <regex name="..." regex="..."/> macros.
     # Filter to actual element nodes (skip XML comments / processing
