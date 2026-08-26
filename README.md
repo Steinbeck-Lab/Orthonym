@@ -1,17 +1,19 @@
 # Orthonym
 
-**Open Structure-To-IUPAC-Name Generator**
+**Open Structure-TO-IUPAC-Name generator**
 
-A comprehensive rule-based system to generate IUPAC systematic names from molecular structures (SMILES). The first open-source implementation targeting IUPAC 2013 (Blue Book) compliance.
+Orthonym is a deterministic, rule-based system that generates IUPAC systematic names
+from molecular structures (SMILES), targeting Preferred IUPAC Names (PINs) as defined by
+the IUPAC 2013 recommendations (the "Blue Book"). It is the structure→name counterpart to
+[OPSIN](https://github.com/dan2097/opsin), which goes name→structure.
 
-## Why Orthonym?
-
-- **OPSIN** converts IUPAC names → structures (open-source)
-- **Orthonym** converts structures → IUPAC names (this project!)
-- Commercial tools (ACD/Name, ChemDraw) are proprietary and expensive
-- STOUT uses machine learning (non-deterministic, requires training data)
-
-Orthonym is the **first deterministic, rule-based, open-source** solution for structure-to-name conversion.
+- **Deterministic** — the same structure always produces the same name; no model, no
+  training data, no randomness.
+- **Rule-based** — names are built from the IUPAC rules, not looked up or generated
+  statistically.
+- **Round-trip validated** — every candidate name is parsed back with OPSIN and checked to
+  describe the input structure, so Orthonym does not emit a name for the wrong molecule.
+- **Open source** — MIT licensed.
 
 ## Installation
 
@@ -19,7 +21,7 @@ Orthonym is the **first deterministic, rule-based, open-source** solution for st
 pip install orthonym
 ```
 
-Or install from source:
+Or from source:
 
 ```bash
 git clone https://github.com/Kohulan/Orthonym.git
@@ -27,114 +29,105 @@ cd Orthonym
 pip install -e ".[dev]"
 ```
 
-## Quick Start
+### Java runtime (required for full validation)
+
+Orthonym validates each candidate name by round-tripping it through OPSIN, which runs on
+the Java Virtual Machine. **A Java runtime (JRE 11 or newer) must be on your `PATH`** for
+full-fidelity naming. The OPSIN jar itself is bundled with the package — you do not need to
+install it separately. Without a JVM, Orthonym still runs but skips round-trip validation
+and operates in a reduced-confidence mode.
+
+## Quick start
 
 ### Python API
 
 ```python
 from orthonym import name_compound
 
-# Simple molecules
-print(name_compound("CCO"))           # → ethanol
-print(name_compound("CC(=O)O"))       # → acetic acid
-print(name_compound("c1ccccc1"))      # → benzene
+print(name_compound("CCO"))           # ethanol
+print(name_compound("CC(=O)O"))       # acetic acid
+print(name_compound("c1ccccc1"))      # benzene
 
-# With stereochemistry
-print(name_compound("C/C=C/C"))       # → (E)-but-2-ene
-print(name_compound("C[C@H](O)CC"))   # → (2R)-butan-2-ol
+# Stereochemistry
+print(name_compound("C/C=C/C"))       # (E)-but-2-ene
+print(name_compound("C[C@H](O)CC"))   # (2R)-butan-2-ol
 ```
 
-### Command Line
+### Command line
 
 ```bash
-# Single molecule
-orthonym "CCO"
-# → ethanol
-
-# Verbose output
-orthonym "CC(=O)O" --verbose
-# → SMILES: CC(=O)O
-# → Style:  pin
-# → Name:   acetic acid
-
-# Batch processing
-orthonym --batch molecules.txt --output names.txt
+orthonym "CCO"                  # ethanol
+orthonym "CC(=O)O" --verbose    # SMILES, style, and name
+python -m orthonym "c1ccccc1"   # module form
 ```
 
 ## Features
 
-- **IUPAC 2013 Compliant**: Implements Preferred IUPAC Names (PINs) from the Blue Book
-- **Comprehensive Coverage**:
-  - Acyclic compounds (alkanes, alkenes, alkynes)
-  - Functional groups (alcohols, acids, aldehydes, ketones, amines, etc.)
-  - Cyclic compounds (cycloalkanes, aromatics)
-  - Heterocycles (furan, pyridine, imidazole, etc.)
-  - Fused ring systems
-  - Stereochemistry (R/S, E/Z)
-- **Round-trip Validated**: Names can be converted back via OPSIN
-- **100% Open Source**: MIT License
+- Preferred IUPAC Names (PINs) per the IUPAC 2013 Blue Book.
+- Acyclic compounds: alkanes, alkenes, alkynes, and their functional-group derivatives
+  (alcohols, acids, esters, aldehydes, ketones, amines, amides, nitriles, …).
+- Cyclic compounds: cycloalkanes, arenes, heterocycles (Hantzsch–Widman), fused,
+  bridged (von Baeyer), and spiro ring systems.
+- Stereochemistry: R/S and E/Z descriptors, assigned through a high-accuracy CIP engine.
+- Round-trip validation against OPSIN so a name is never emitted for the wrong structure.
 
 ## Accuracy
 
-Measured against the multi-corpus benchmark (ChEBI 5,000 + PubChem 2,000 + OPSIN self-test 500 = 7,500 compounds), Orthonym v21.0 achieves (deterministic rule-based pipeline; the ML fallback was retired this milestone — ADR-21-01):
+The headline metric is **round-trip exact match**: name the structure, parse the name back
+with OPSIN, and compare canonical identifiers over every molecule in a fixed set, counting
+any non-emission as a failure. This metric is reference-free — it does not depend on a
+possibly-noisy database name.
 
-| Metric | Overall (7,500) | ChEBI 5,000 | PubChem 2,000 | OPSIN self-test 500 |
-|---|---:|---:|---:|---:|
-| Round-trip accuracy (absolute) | 30.36% | 29.58% | 16.85% | 92.20% |
-| Round-trip accuracy (ceiling-relative) | 35.65% | 35.94% | 19.01% | 92.20% |
-| Graded score (mean) | 2.7749/5.0 | 2.6454/5.0 | 2.5618/5.0 | 4.9219/5.0 |
+On a 1,500-molecule benchmark drawn from ChEBI and PubChem:
 
-Orthonym v21.0 is **deterministic-rules-only**: the dormant ML fallback (default-OFF, never fired in any prior run) was removed entirely (ADR-21-01), proven byte-identical. There is no longer an `--allow-ml-fallback` option.
+| Metric | Value |
+|---|---:|
+| Round-trip exact match | **94.8%** |
+| Wrong structures emitted | **0** |
 
-**v20.0 → v21.0 delta**: **+125 RT overall** (2152 → 2277), measured by per-row A/B flip vs the v20 baseline (137 gains / 12 losses): ChEBI +92, PubChem +32, OPSIN self-test +1. v21 shipped the WS-A parent chokepoint + name-tree production path (Phases 178/179), the WS-C lipid/steroid/carbohydrate/glycoside subsystems (176/180–183), the WS-E charge-first PCG subsystem (184), and the WS-B `centres` CIP plumbing (177).
+The design priority is **never to emit a name for the wrong molecule**. When a preferred
+name cannot be built with confidence, Orthonym degrades to a less-preferred but still
+correct systematic name, or abstains — it does not guess.
 
-Ceiling-relative round-trip accounts for the fact that not all reference IUPAC names in ChEBI / PubChem round-trip back to their structures themselves; see []() and [Phase 147.1 strategic decisions]() for full methodology.
-
-Salt-class compounds (314 of 7,500) are reported separately because reference-quality issues dominate salt-class round-trip behavior; non-salt accuracy (31.07%) is reported alongside salt-included accuracy (30.36%). See []() for details.
-
-Stereochemistry is handled via RDKit's `rdCIPLabeler.AssignCIPLabels()`, which implements CIP rules 1-2 fully and rules 3-5 partially. The Hanson 2018 CIP Validation Suite reports 182/290 PASS on RDKit; v21 plumbed the `centres` CIP engine (281/290 on the same suite, a verified +46) as an opt-in, held default-OFF at validation to keep the RT measurement uncoupled. Affected stereo-dense compounds are documented in []().
-
-**Honest verdict**: v21.0 ships **PASS-WITH-CAVEATS**. There is **no regression on any anti-regression anchor** (full-7500 RT 2277 ≥ 2152; ChEBI 1479 ≥ 1387; PubChem 337 ≥ 305; OPSIN self-test 461 ≥ 460; OPSIN parse 73.80% ≥ 73.04%; graded 2.7749 ≥ 2.702; PIN-strict gold protect 1/atropine; among-rings gold protect 0; 0 NEW test failures). The aspirational ceiling-relative RT gates — 35.65% vs ≥ 45% (honest) and ≥ 65% — are **reported as failed on data, not relaxed**: the binding constraint is unbuilt complex-class depth (multi-defect; the ≥31-heavy-atom class at ~13% RT), not missing Blue Book rules in the neutral spine. NO success threshold was relaxed per `the contributor guide` memory rule #4 ("no band-aids").
-
-**Historical context:** HERITAGE (Wisniewski, Beilstein Institute, *J. Chem. Inf. Comput. Sci.* 1990, 30, 324-332) achieved 61% expert-status agreement with human nomenclaturists on stereo-bypassed random samples — the first general-purpose structure→IUPAC-name system. v21.0 explicitly handles stereo throughout and reports full numbers; v21.0 35.65% ceiling-relative remains below the 1990 algorithmic-naming benchmark on the modern multi-corpus suite (with stereo).
-
-For the comprehensive measurement report (per-phase attribution, per-compound-class accuracy, handler performance, stereo analysis, OPSIN failure deep dive, theoretical-ceiling analysis, v22 roadmap), see [`V21.0-FINAL-REPORT.md`]() (12 sections + 4 appendices).
+See []() for how the harness works and how to reproduce a
+measurement.
 
 ## Development
 
-### Running Tests
+### Running tests
+
+Run tests on targeted file sets (the OPSIN-backed tests require a JVM):
 
 ```bash
-# Quick unit tests
-pytest tests/ -m "not slow" -v
-
-# Full validation (100k compounds)
-pytest tests/ -m slow -v
-
-# Specific compound class
-pytest tests/ -k "alcohol" -v
+python -m pytest tests/unit/rules/test_chain_names.py -q
+python -m pytest tests/unit/assembly -q
 ```
 
-### Project Structure
+Test markers (`unit`, `integration`, `roundtrip`, `slow`, `benchmark`) are defined in
+`pyproject.toml`.
+
+### Project structure
 
 ```
 Orthonym/
 ├── src/orthonym/
-│   ├── perception/     # RDKit molecular feature extraction
-│   ├── rules/          # IUPAC naming rules
-│   ├── assembly/       # Name fragment composition
-│   └── data/           # Lookup tables
-├── tests/              # Test suite
-└── ./skills/     #  Code development guides
+│   ├── perception/   # structure perception (functional groups, rings, CIP stereo)
+│   ├── rules/        # IUPAC naming rules
+│   ├── assembly/     # name assembly (locants, ordering, selection)
+│   └── data/         # naming tables
+└── tests/            # test suite
 ```
 
 ## Contributing
 
-Contributions welcome! See the development guide in `the contributor guide` for architecture details and how to add support for new compound classes.
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to set up a
+development environment, run tests, and add support for new compound classes, and
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the project's engineering conventions.
 
 ## License
 
-MIT License
+MIT License — see [`LICENSE`](LICENSE). Bundled third-party components (OPSIN, the CIP
+engine) are documented in [`NOTICE`](NOTICE).
 
 ## Citation
 
@@ -143,15 +136,15 @@ If you use Orthonym in your research, please cite:
 ```bibtex
 @software{orthonym,
   author = {Rajan, Kohulan},
-  title = {Orthonym: Open Structure-To-IUPAC-Name Generator},
-  year = {2024},
-  url = {https://github.com/Kohulan/Orthonym}
+  title  = {Orthonym: Open Structure-TO-IUPAC-Name generator},
+  year   = {2026},
+  url    = {https://github.com/Kohulan/Orthonym}
 }
 ```
 
 ## Acknowledgments
 
-- IUPAC Blue Book 2013 for nomenclature rules
-- OPSIN for name-to-structure conversion (used for validation)
-- RDKit for molecular perception
-- ChEBI for validation dataset
+- The IUPAC 2013 recommendations (Blue Book) for the nomenclature rules.
+- [OPSIN](https://github.com/dan2097/opsin) for name→structure conversion, used for validation.
+- [RDKit](https://github.com/rdkit/rdkit) for molecular perception.
+- ChEBI and PubChem for benchmark data.

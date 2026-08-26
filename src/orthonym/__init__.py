@@ -12,7 +12,7 @@ Example usage:
     'acetic acid'
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __author__ = "Kohulan Rajan"
 
 from .namer import name_compound, Orthonym, name_with_tree, classify_limit
