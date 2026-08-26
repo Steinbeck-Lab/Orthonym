@@ -107,8 +107,7 @@ core.[0-9]*
 ./
 .superpowers/
 .agents/
-
-
+docs/
 
 data/pubchem_cache.json
 # Full internal engineering invariants live here locally; the tracked
