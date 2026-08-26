@@ -93,16 +93,44 @@ class TestComplexAglyconeGlycosideNames:
 class TestComplexAglyconeGlycosideDeterminism:
     """The derived aglycone substituent must be order-independent (canonical rank)."""
 
-    def test_bornyl_glucoside_deterministic_across_smiles_orders(self):
+    @staticmethod
+    def _reordered_smiles(smiles):
+        """Yield the canonical SMILES + several DETERMINISTIC atom-order variants.
+
+        Determinism matters here: `Chem.MolToSmiles(mol, doRandom=True)` varies
+        run-to-run, so a green pass would not be reproducible. Instead we renumber
+        the atoms by fixed rotations (each a valid permutation) and write each in
+        atom-index order (`canonical=False`), giving distinct-but-reproducible
+        writings of the same molecule to feed back through the namer.
+        """
         from rdkit import Chem
 
-        mol = Chem.MolFromSmiles(BORNYL_GLUCOSIDE)
-        order_a = Chem.MolToSmiles(mol)  # canonical
-        order_b = Chem.MolToSmiles(mol, doRandom=True, canonical=False)
-        name_a = name_compound(order_a)
-        name_b = name_compound(order_b)
-        assert name_a == name_b, (order_a, name_a, order_b, name_b)
-        assert name_a == BORNYL_EXPECTED
+        mol = Chem.MolFromSmiles(smiles)
+        n = mol.GetNumAtoms()
+        out = [Chem.MolToSmiles(mol)]  # canonical
+        for shift in (1, 3, 7, 13):  # fixed rotations -> reproducible orderings
+            order = [(i + shift) % n for i in range(n)]
+            out.append(
+                Chem.MolToSmiles(Chem.RenumberAtoms(mol, order), canonical=False)
+            )
+        return out
+
+    @pytest.mark.parametrize("smiles,expected", [
+        (BORNYL_GLUCOSIDE, BORNYL_EXPECTED),
+        # a second complex-aglycone witness (chain-rooted onto a bicyclic)
+        (MYRTANOL_GLUCOSIDE, None),
+    ])
+    def test_glucoside_deterministic_across_atom_orders(self, smiles, expected):
+        variants = self._reordered_smiles(smiles)
+        assert len(variants) >= 5  # canonical + 4 deterministic reorderings
+        names = [name_compound(v) for v in variants]
+        # Every atom ordering yields the identical name (invariant 4).
+        assert len(set(names)) == 1, dict(zip(variants, names))
+        assert not is_failure_name(names[0]), names[0]
+        # And that name round-trips (0-wrong holds under every ordering).
+        assert opsin_roundtrip_check(smiles, names[0])["passed"], names[0]
+        if expected is not None:
+            assert names[0] == expected
 
 
 @pytest.mark.integration

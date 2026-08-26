@@ -1019,6 +1019,14 @@ def _assemble_glycoside(
                 # ...): their OPSIN behaviour is UNCHANGED, so nothing perturbs the
                 # rest of the naming run. (Back-compat: with no parent_smiles the
                 # structural branch is off, so this is the sole path, as before.)
+                #
+                # ⚠ Case 2a (structural_prefix is None -> ship string_form unverified):
+                # a simple/acyclic aglycone whose string token does NOT round-trip
+                # still ships here without RT-gating -- exactly base's pre-existing
+                # best-effort-tier exposure, neither introduced nor widened by this
+                # change. Closing it (RT-gating the fast path) would re-introduce the
+                # warm-cache OPSIN perturbation documented at branch B / in the
+                # report, so it is deliberately DEFERRED (out of v38 Incr-1a scope).
                 if string_form is not None and (
                     structural_prefix is None
                     or aglycone_prefix == structural_prefix
@@ -1032,6 +1040,17 @@ def _assemble_glycoside(
                 # 0-wrong is ABSOLUTE, so RT-select against the parent (full InChI)
                 # and ship the first that round-trips; if neither does, fall through
                 # (abstain). OPSIN is invoked ONLY here, off the working fast path.
+                #
+                # ⚠ JVM-CONTINGENT byte-identity: the COMPLEX already-working controls
+                # (menthyl / decahydronaphthalenyl / tricyclo-decyl / 1-oxaspiro
+                # glucoside) have a valid string token that DIFFERS from its systematic
+                # form, so they reach HERE and now round-trip through OPSIN -- their
+                # exact output is therefore pinned by the committed byte-identity
+                # controls only when a JVM is present. Without a JVM, opsin_roundtrip_check
+                # returns not-passed and these would regress to abstain. Acceptable per
+                # the project's real-deployment stance (OPSIN spawns unconditionally, so
+                # a no-JVM run is not a real deployment), but RECORDED here rather than
+                # silently relied on. See the Incr-1a report, Finding 2.
                 if parent_smiles:
                     from ..validation.opsin_roundtrip import opsin_roundtrip_check
                     for cand in (string_form, structural_form):
