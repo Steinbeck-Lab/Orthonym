@@ -148,12 +148,6 @@ data/pubchem_cache.json
 /test_pentacyclic_lactone_debug.py
 /test_phase2_fused_rings.py
 
-# Root OPSIN/centres jars: bundled into src/orthonym/ as package data
-# instead (see NOTICE). Root copies stay local. Package-data jars under
-# src/ are NOT matched by these root-anchored rules.
-/opsin-cli-*.jar
-/centres-cli-*.jar
-
 # comparison harnesses + their outputs (local-only; they
 # import external tools not part of Orthonym and are not shipped publicly).
 

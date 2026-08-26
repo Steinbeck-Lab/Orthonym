@@ -30,9 +30,10 @@ pip install -e ".[dev]"
 
 Orthonym validates each candidate name by round-tripping it through OPSIN, which runs on
 the Java Virtual Machine. **A Java runtime (JRE 11 or newer) must be on your `PATH`** for
-full-fidelity naming. The OPSIN jar itself is bundled with the package — you do not need to
-install it separately. Without a JVM, Orthonym still runs but skips round-trip validation
-and operates in a reduced-confidence mode.
+full-fidelity naming. The OPSIN jar ships in the repository (invoked as an external Java
+process — not linked), so a source install already has it; you only need a JVM on your `PATH`.
+Without a JVM, Orthonym still runs but skips round-trip validation and operates in a
+reduced-confidence mode. Bundled jars and their licenses are documented in [`NOTICE`](NOTICE).
 
 ## Quick start
 

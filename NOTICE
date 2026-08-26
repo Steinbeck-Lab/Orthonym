@@ -1,43 +1,16 @@
 Orthonym — Third-Party Vendored Artifacts
 ==========================================
 
-This file records the provenance and licensing of third-party binary
-artifacts vendored into this repository and invoked at runtime via
-subprocess (no source linkage, no relicensing burden).
-
-
-centres-cli-1.5.jar
--------------------
-- Component:  centres (CIP — Cahn-Ingold-Prelog stereo descriptor labeller)
-- Project:    SiMolecule / centres  (reference implementation of the
-              Hanson et al. 2018 CIP algorithm; CDK backend)
-- Version:    1.5 (built from the `develop` branch @ commit d4b3cf0, pom
-              version 1.5-SNAPSHOT; CDK 2.12). Refreshed 2026-06-27 from the
-              previously vendored 1.2.1.
-- Main-Class: com.simolecule.centres.LabelCip
-- Size:       2,421,241 bytes (vendored UNMODIFIED; shaded fat-jar produced by
-              `mvn -pl cdk -am package -DskipTests`).
-- License:    BSD-2-Clause (per the upstream LICENSE file and every source
-              header; Copyright (c) 2020, John Mayfield). NOTE: the upstream
-              Maven pom <licenses> block inconsistently lists LGPL-3.0, but the
-              authoritative LICENSE file + source headers are BSD-2-Clause.
-- Usage:      Invoked out-of-process as an unmodified standalone jar via a
-              subprocess (`java -jar centres-cli-1.5.jar -i smi <file>`)
-              by src/orthonym/perception/centres_bridge.py. Orthonym does
-              NOT link against, statically embed, or modify the jar.
-              `centres_bridge._find_centres_jar()` globs `centres-cli-*.jar`
-              and selects the highest version, so a future engine update needs
-              only a new jar dropped in (no code change).
-- Optional:   Adoption is env-gated (ORTHONYM_USE_CENTRES_CIP, default ON).
-              When the jar or a Java runtime is absent, Orthonym falls back to
-              RDKit's rdCIPLabeler and never hard-fails a name on a missing JVM.
-- Suite:      centres 1.5 scores 279/290 on the Hanson 2018 CIP Validation
-              Suite (vs 281 on 1.2.1 and 235 for RDKit's rdCIPLabeler). The −2
-              vs 1.2.1 is two exotic cyclic-cumulene axial (M/P) labels (VS078,
-              VS287); all R/S/E/Z labels are byte-identical to 1.2.1, and
-              Orthonym computes allene/axial CIP independently, so naming is
-              unaffected. See tests/integration/test_cip_validation.py.
-- Source:     https://github.com/SiMolecule/centres
+This file records the provenance and licensing of third-party binary artifacts
+shipped in this repository and invoked at runtime as unmodified standalone jars
+via subprocess. Orthonym does NOT statically link, embed, or modify these jars;
+its own source remains under the MIT License. However, two of the shipped jars
+are shaded "fat jars" that bundle third-party components under copyleft licenses
+(LGPL / GPL-with-Classpath-exception). Those components are redistributed here in
+binary form, unmodified, and their license terms and source-availability
+obligations travel with them — see each entry below. Their presence does not and
+cannot relicense Orthonym's own MIT-licensed source, because they are invoked as
+separate programs, not linked.
 
 
 opsin-cli-2.9.0-jar-with-dependencies.jar
@@ -45,8 +18,62 @@ opsin-cli-2.9.0-jar-with-dependencies.jar
 - Component:  OPSIN (Open Parser for Systematic IUPAC Nomenclature)
 - Project:    University of Cambridge, Centre for Molecular Informatics
 - Version:    2.9.0
-- License:    MIT
+- License:    MIT (OPSIN itself; Copyright (c) Daniel Lowe and contributors)
+- Bundled-in: This fat jar also shades several dependencies, all freely
+              redistributable: automaton, xsdlib, stax2-api (BSD family);
+              woodstox, commons-io, commons-cli, log4j (Apache-2.0); isorelax
+              (MIT); jna-inchi (LGPL-2.1) wrapping the IUPAC InChI library
+              (IUPAC-InChI-Trust Licence — freely redistributable). Their
+              notices are carried inside the jar's META-INF.
 - Usage:      Invoked out-of-process via subprocess for name->structure
               round-trip validation and the OPSIN grammar validity gate.
               Vendored unmodified; used as a standalone executable jar.
 - Source:     https://github.com/dan2097/opsin
+
+
+centres-cli-1.5.jar   (optional — CIP stereo descriptor labeller)
+-----------------------------------------------------------------
+- Component:  centres (Cahn-Ingold-Prelog stereo descriptor labeller;
+              reference implementation of Hanson et al. 2018), with a CDK backend.
+- Project:    SiMolecule / centres
+- Version:    1.5 (develop @ d4b3cf0, pom 1.5-SNAPSHOT; CDK 2.12). Shaded fat-jar
+              produced by `mvn -pl cdk -am package -DskipTests`, vendored UNMODIFIED.
+- Main-Class: com.simolecule.centres.LabelCip
+- Size:       2,421,241 bytes.
+- License (centres itself): the upstream LICENSE file and source headers state
+              BSD-2-Clause (Copyright (c) 2020, John Mayfield); the upstream Maven
+              pom <licenses> block states LGPL-3.0. This ambiguity is unresolved
+              upstream; we treat the jar as carrying the MORE restrictive terms
+              (LGPL-3.0) to be safe.
+- Bundled copyleft components (the decisive point): as a shaded fat-jar this
+              artifact REDISTRIBUTES, in binary form:
+                * CDK (Chemistry Development Kit) — LGPL-2.1-or-later
+                * javax.vecmath — GPLv2 WITH the Classpath exception
+                * Beam (uk.ac.ebi.beam) — permissive (BSD/MIT family)
+              These licenses' terms and source-availability / relink obligations
+              apply to the redistributed binaries. Corresponding source:
+                * CDK:       https://github.com/cdk/cdk
+                * vecmath:   https://github.com/hharrison/vecmath  (javax.vecmath)
+                * Beam:      https://github.com/johnmay/beam
+                * centres:   https://github.com/SiMolecule/centres
+              LGPL/GPL-with-Classpath both permit unmodified redistribution and
+              use of the jar as a separate invoked program; the Classpath
+              exception on vecmath specifically permits this without extending its
+              terms to the calling work.
+- Usage:      Invoked out-of-process as an unmodified standalone jar via subprocess
+              (`java -jar centres-cli-1.5.jar ...`) by
+              src/orthonym/perception/centres_bridge.py. Orthonym does NOT link
+              against, statically embed, or modify the jar.
+- Optional:   Adoption is env-gated (ORTHONYM_USE_CENTRES_CIP, default ON). When
+              the jar or a Java runtime is absent, Orthonym falls back to RDKit's
+              rdCIPLabeler and never hard-fails a name on a missing JVM. Because it
+              is optional and carries copyleft dependencies, a future release may
+              move it to an on-demand download rather than shipping it in-tree.
+- Suite:      centres 1.5 scores 279/290 on the Hanson 2018 CIP Validation Suite
+              (vs 235 for RDKit's rdCIPLabeler). See
+              tests/integration/test_cip_validation.py.
+- Source:     https://github.com/SiMolecule/centres
+
+RDKit (a runtime dependency installed via pip, BSD-3-Clause) is NOT redistributed
+by this repository and so is not listed here; its license governs the user's own
+installed copy.

@@ -18,5 +18,6 @@ First public release.
 - Round-trip validation against OPSIN: a name is not emitted for the wrong structure.
 - Public Python API (`name_compound`, `name_with_tree`, `Orthonym`) and a command-line
   interface (`orthonym`, `python -m orthonym`).
-- OPSIN and CIP jars bundled as package data (a Java runtime is required for validation).
+- OPSIN and CIP jars shipped in the repository and invoked as external Java processes
+  (a Java runtime is required for validation); licenses documented in NOTICE.
 - Accuracy harness and fixed evaluation splits under the project tooling.
