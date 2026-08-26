@@ -93,18 +93,15 @@ def test_clean_spiro_vb_canary_byte_identical(smi, expected):
     assert got == expected, f"CANARY REGRESSION {smi}: {got!r} != {expected!r}"
 
 
-# --- NAMED 0-WRONG BLOCKER (xfail): stereo-heavy decorated spiro-of-fused -----
-# The dominant real residual is decorated spiro-of-fused TERPENOIDS
-# (spiro-epoxide on an acylated decalin). These are MULTI-BLOCKED (invariant 15):
-# (a) the systematic decalin component is numbered plain 1..10 (no 4a/8a fusion
-#     locants) so the descriptor/substituent locants are OPSIN-invalid, AND
-# (b) the complex_ring path is stereo LOG-ONLY, so the many R/S centres are never
-#     expressed and full-InChIKey RT can never pass.
-# Neither is the hoisting the corenum report named; both are a dedicated
-# ring-numbering + stereo-completion follow-on. Abstains today (0-wrong), never
-# a wrong constitution.
-@pytest.mark.xfail(reason="multi-blocked: decalin 4a/8a numbering + complex_ring "
-                          "stereo completion — dedicated follow-on", strict=False)
+# --- NAMED 0-WRONG BLOCKER (RESOLVED by v38 CP2): decorated spiro-of-fused ----
+# The dominant real residual was decorated spiro-of-fused TERPENOIDS (spiro-epoxide
+# on an acylated decalin), MULTI-BLOCKED (invariant 15) by:
+# (a) the systematic decalin component being numbered plain 1..10 (no 4a/8a fusion
+#     locants) so the descriptor/substituent locants were OPSIN-invalid, AND
+# (b) the complex_ring path being stereo LOG-ONLY.
+# v38 CP2 (fused-atom numbering, P-31.1.4 '4a'/'8a' fusion locants +
+# _enrich_complex_ring_with_subs mixed-locant plumbing) closed BOTH: this witness
+# now names a determinate, full-InChIKey-RT-verified best-effort name (0-wrong).
 @pytest.mark.opsin_gate
 def test_decorated_terpenoid_spiro_epoxide_named_blocker():
     smi = "CC(=O)OC[C@@]12[C@@H](OC(C)=O)C[C@@H](C)[C@](C)([C@@H]3C[C@H]4CCO[C@H]4O3)[C@H]1CC[C@H](O)[C@]21CO1"

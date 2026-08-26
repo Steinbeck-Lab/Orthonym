@@ -55,12 +55,28 @@ A1_WITNESSES = [
 # primed-locant recognition) and must be validated by the full PIN gate -> DEFERRED.
 A2_WITNESSES = [
     "c1cc2c(c3c1CNC3)O[C@@]1(CCC[C@H]3CCCC[C@@H]31)C2",   # stereo-omission (primed component)
-    "C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1",     # stereo-omission (measured closeable)
+    # The second A2 witness (C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1) was
+    # RESOLVED by v38 CP2 (fused-atom numbering): it now names a determinate,
+    # full-InChIKey-RT-verified spiro-VB name (0-wrong). Promoted to
+    # RESOLVED_BY_V38_CP2 below.
 ]
 
-# The A2 witness measured to RT-pass once its P-91 stereo block is completed (finding doc).
-# xfail(strict) -> flips GREEN the session that lands the shared-stereo-path primed-locant fix.
+# The A2 stereo-closeable witness was measured to RT-pass once its P-91 stereo
+# block is completed (finding doc). v38 CP2's fused-component numbering fix
+# delivered exactly that as a side effect, so it now RT-passes (see
+# ``test_a2_stereo_completion_target``, no longer xfail).
 A2_STEREO_CLOSEABLE = ["C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1"]
+
+# v38 CP2 (fused-atom numbering, P-31.1.4 '4a'/'8a' fusion locants) RESOLVED two
+# witnesses that abstained here: a mixed-spiro-fused decalin, and a spiro-VB whose
+# fused sub-component numbering was the blocker. Each now emits a determinate name
+# (identical across randomized atom orders) that OPSIN-round-trips to the input's
+# full InChIKey -- 0-wrong. Kept as a positive canary so a future numbering change
+# cannot silently re-break them.
+RESOLVED_BY_V38_CP2 = [
+    "C1CC[C@@H]2C[C@]3(CC[C@H]2C1)CO3",                   # (2R,4aR,8aR)-spiro[decahydronaphthalene-2,2'-oxirane]
+    "C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1",     # (1'R,2S,3'R,7'R)-spiro[oxolane-2,6'-tricyclo[9.3.0.0^3,7]tetradeca-10,13-diene]
+]
 
 # Pattern B: mixed-spiro-fused. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md): a mix of an
 # OPSIN-grammar bug in name_mixed_spiro_fused's component assembly + stereo-omission (the
@@ -68,7 +84,9 @@ A2_STEREO_CLOSEABLE = ["C1=C[C@H]2C[C@H]3CC[C@]4(CCCO4)[C@@H]3CCC=C2C1"]
 B_WITNESSES = [
     "C1=CCC2(C1)COc1ccccc12",
     "C1=CC2(C=CC1)Cc1ccccc1O2",
-    "C1CC[C@@H]2C[C@]3(CC[C@H]2C1)CO3",   # builds spiro[decahydronaphthalene-7,2'-oxirane] (unparseable)
+    # The third B witness (C1CC[C@@H]2C[C@]3(CC[C@H]2C1)CO3) built an unparseable
+    # spiro[decahydronaphthalene-7,2'-oxirane] at HEAD; v38 CP2 (correct 4a/8a
+    # fusion locants + completed stereo) RESOLVED it -> RESOLVED_BY_V38_CP2 below.
 ]
 
 # Pattern C: multi-component ortho / ortho-peri-fused mancude that genuinely abstains
@@ -191,20 +209,29 @@ def test_a1_witness_names_and_rt(smiles):
     assert r.passed, f"A1 witness did not round-trip: name={r.name!r} err={r.error}"
 
 
-@pytest.mark.xfail(strict=True, reason="A2 stereo-completion deferred: needs primed-locant "
-                                       "support in the shared stereo primitive (full-gate "
-                                       "change) -- V36-C1C2C6-TASK3-A2-FINDING.md")
 @pytest.mark.parametrize("smiles", A2_STEREO_CLOSEABLE)
 def test_a2_stereo_completion_target(smiles):
-    """Deferred Task-3 target: this spiro-von-Baeyer core is constitution-correct today
-    and abstains only because its P-91 stereo block is missing. A re-anchored injection
-    (VERIFIED to RT-pass by hand) closes it; the wiring is deferred as a shared-stereo-path
-    change requiring the full gate. Flips GREEN when that lands."""
+    """Task-3 target, now GREEN: this spiro-von-Baeyer core was constitution-correct
+    but abstained because its P-91 stereo block was missing (V36-C1C2C6-TASK3-A2-FINDING.md).
+    v38 CP2's fused-component numbering fix delivered the closing behaviour as a
+    side effect -- it now names and OPSIN-round-trips to the input's full InChIKey."""
     try:
         r = _ring_rt(smiles)
     except _Timeout:
         pytest.skip("naming exceeded timeout (out-of-scope size)")
     assert r.passed, f"A2 stereo target still abstains: name={r.name!r} err={r.error}"
+
+
+@pytest.mark.parametrize("smiles", RESOLVED_BY_V38_CP2)
+def test_v38_cp2_resolved_witness_names_and_rt(smiles):
+    """v38 CP2 (fused-atom numbering, P-31.1.4) resolved these two previously-
+    abstaining witnesses: each now emits a determinate name that OPSIN-round-trips
+    to the input's full InChIKey (0-wrong). A positive canary against re-breaking."""
+    try:
+        r = _ring_rt(smiles)
+    except _Timeout:
+        pytest.skip("naming exceeded timeout (out-of-scope size)")
+    assert r.passed, f"v38 CP2 witness regressed: name={r.name!r} err={r.error}"
 
 
 # --- Ring-dispatch canary: already-working names unchanged + RT-valid ---------

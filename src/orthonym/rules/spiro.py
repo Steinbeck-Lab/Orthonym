@@ -1639,10 +1639,12 @@ def _extract_subfragment(
 
 def _name_fused_component(
     mol, fused_rings: List[List[int]],
-) -> Optional[Tuple[str, Dict[int, int]]]:
+) -> Optional[Tuple[str, Dict[int, Union[int, str]]]]:
     """Name the fused component fragment.
 
-    Returns (name, frag_atom_idx -> locant_in_name) on success, or None.
+    Returns (name, orig_atom_idx -> locant_in_name) on success, or None. A
+    locant is an integer peripheral position, or a letter-suffixed fusion
+    locant ('4a'/'8a') as a STRING for a ring-fusion atom (P-31.1.4).
 
     Strategy (mirrors the composer cascade):
       1. Build the fragment as an isolated mol.
@@ -1718,31 +1720,74 @@ def _name_fused_component(
         # (Pitfall 7) without inventing new IUPAC numbering rules —
         # for saturated fused bicyclics, the peripheral walk is the
         # canonical IUPAC traversal (P-23.2.5 + P-25.3 inheritance).
-        atom_to_locant_in_frag = _synthesize_fused_locants(frag)
+        # Cited positions steer the fused numbering orientation (P-25.3.1.3
+        # lowest locants): the atoms that carry a decoration — the spiro
+        # junction and every substituent-bearing ring atom, i.e. any component
+        # atom with a neighbour OUTSIDE the fused component.
+        cited_orig = {
+            a for a in fused_atoms
+            if any(nb.GetIdx() not in fused_atoms
+                   for nb in mol.GetAtomWithIdx(a).GetNeighbors())
+        }
+        cited_frag = {orig_to_frag[a] for a in cited_orig if a in orig_to_frag}
+        atom_to_locant_in_frag = _synthesize_fused_locants(frag, cited_frag)
         if not atom_to_locant_in_frag:
             return None
 
-    atom_to_locant_in_orig: Dict[int, int] = {}
+    # Carry the fused numbering back to original atom indices. A letter-suffixed
+    # fusion locant ('4a'/'8a') is kept as a STRING so a substituent on a fusion
+    # atom is cited '4a-methyl'; the spiro DESCRIPTOR locant is an integer
+    # peripheral position (a spiro junction never sits on a fusion atom in this
+    # ortho-fused scope, and name_mixed_spiro_fused voids the candidate if one
+    # somehow did — OPSIN rejects a lettered locant in the spiro slot).
+    atom_to_locant_in_orig: Dict[int, _Locant] = {}
     for frag_idx, locant in atom_to_locant_in_frag.items():
-        if frag_idx in frag_to_orig:
-            base = locant if isinstance(locant, int) else (
-                locant[0] if isinstance(locant, tuple) else 0)
+        if frag_idx not in frag_to_orig:
+            continue
+        if isinstance(locant, int):
+            atom_to_locant_in_orig[frag_to_orig[frag_idx]] = locant
+        elif isinstance(locant, str):
+            if locant:
+                atom_to_locant_in_orig[frag_to_orig[frag_idx]] = locant
+        elif isinstance(locant, tuple) and locant:
+            base = locant[0] if isinstance(locant[0], int) else 0
             if base:
                 atom_to_locant_in_orig[frag_to_orig[frag_idx]] = base
 
     return name, atom_to_locant_in_orig
 
 
-def _synthesize_fused_locants(frag) -> Dict[int, int]:
-    """Synthesize a peripheral-walk locant map for a fused-ring fragment.
+def _synthesize_fused_locants(
+    frag, cited_atoms: Optional[Set[int]] = None,
+) -> Dict[int, Union[int, str]]:
+    """Synthesize the IUPAC fused-ring locant map for a 2-ring ortho-fused
+    saturated bicyclic fragment (decalin / hydrindane / octahydropentalene
+    shape) that ``name_ortho_fused_bicyclic`` named (``decahydronaphthalene``,
+    ``octahydro-1H-indene``, …) but for which it supplied no locant map.
 
-    For 2-ring fused systems (ortho-fused bicyclics) without a catalog
-    entry — used only for saturated fused carbocyclics named as
-    decahydro/octahydro derivatives by `name_ortho_fused_bicyclic`.
+    Numbers per **P-31.1.4 / P-25.3.1.3** (BlueBookV2.md:2855 — a fusion
+    position takes a LETTER following the preceding peripheral locant):
 
-    Returns a Dict[atom_idx -> locant_int] covering all ring atoms.
-    Returns {} if the fragment is not a clean 2-ring fused system or
-    the walk fails.
+      * peripheral atoms get integers ``1..k`` (``k = total ring atoms - 2``);
+      * each of the two ring-fusion atoms gets a **letter locant**
+        ``"{preceding-peripheral}a"`` — decalin (6+6) → ``4a``/``8a``,
+        octahydroindene (6+5) → ``3a``/``7a``, octahydropentalene (5+5) →
+        ``3a``/``6a``. The SMALLER ring is numbered first (the retained-name
+        numbering of naphthalene/indene/pentalene); equal rings are symmetric,
+        so both orders are enumerated and the tie-break resolves them.
+
+    Orientation (which peripheral is ``1``, which fusion is ``{k1}a`` vs
+    ``{k1+k2}a``) is chosen by **lowest locants to the cited positions**
+    (``cited_atoms`` = the spiro junction + substituent-bearing ring atoms),
+    letter locants sorting ``4 < 4a < 5`` (``_locant_sort_key``). Ties are
+    broken **deterministically** on ``Chem.CanonicalRankAtoms(breakTies=True)``
+    — never on raw atom index / iteration order — so the emitted name is
+    identical across atom orders.
+
+    Returns ``{atom_idx -> int | '4a'-style str}`` covering all ring atoms, or
+    ``{}`` when the fragment is not a clean 2-ring ORTHO-fused system (the
+    caller then falls through to its existing degradation — never a fabricated
+    or out-of-range integer).
     """
     ri = frag.GetRingInfo()
     rings = [list(r) for r in ri.AtomRings()]
@@ -1752,8 +1797,13 @@ def _synthesize_fused_locants(frag) -> Dict[int, int]:
     shared = set(r1) & set(r2)
     if len(shared) != 2:
         return {}
+    fa, fb = sorted(shared)
+    # Ortho fusion only: the two shared atoms lie on a common edge. Two
+    # NON-adjacent shared atoms are a bridged (von Baeyer) system whose
+    # numbering is rule-fixed elsewhere — decline rather than mis-letter it.
+    if frag.GetBondBetweenAtoms(fa, fb) is None:
+        return {}
 
-    # Build adjacency limited to ring atoms.
     ring_atoms = set(r1) | set(r2)
     adj: Dict[int, List[int]] = {a: [] for a in ring_atoms}
     for a in ring_atoms:
@@ -1761,93 +1811,86 @@ def _synthesize_fused_locants(frag) -> Dict[int, int]:
             if nbr.GetIdx() in ring_atoms:
                 adj[a].append(nbr.GetIdx())
 
-    # Peripheral walk: start at a non-fusion atom of the LARGER ring,
-    # walk around the periphery (skipping the bridge), assigning 1..N.
-    # The two fusion atoms get '4a'/'8a'-style markers, but for the
-    # spiro-attachment locant we only need INT positions.
-    larger = r1 if len(r1) >= len(r2) else r2
-    smaller = r2 if larger is r1 else r1
+    try:
+        ranks = list(Chem.CanonicalRankAtoms(frag, breakTies=True))
+    except Exception:
+        ranks = list(range(frag.GetNumAtoms()))
 
-    # Find a peripheral start — a non-fusion atom in the larger ring
-    # adjacent to a fusion atom (so locant 1 is "next to" the fusion).
-    fusion = list(shared)
-    start = None
-    for a in larger:
-        if a in shared:
-            continue
-        if any(n in shared for n in adj[a]):
-            start = a
-            break
-    if start is None:
+    def _peripheral_path(ring_set, start_fusion, end_fusion):
+        """Ordered non-fusion atoms of ``ring_set`` as a simple path, starting
+        at the non-fusion ring atom adjacent to ``start_fusion`` and ending at
+        the one adjacent to ``end_fusion``; None if it is not a clean path."""
+        nonfusion = [a for a in ring_set if a not in shared]
+        if not nonfusion:
+            return []
+        starts = [a for a in nonfusion if start_fusion in adj[a]]
+        if not starts:
+            return None
+        cur = min(starts, key=lambda a: ranks[a])
+        path = [cur]
+        seen = {cur}
+        while len(path) < len(nonfusion):
+            nxts = [n for n in adj[cur]
+                    if n in ring_set and n not in shared and n not in seen]
+            if not nxts:
+                break
+            cur = min(nxts, key=lambda a: ranks[a])
+            path.append(cur)
+            seen.add(cur)
+        if len(path) != len(nonfusion):
+            return None
+        if end_fusion not in adj[path[-1]]:
+            return None
+        return path
+
+    # Smaller ring numbered first; equal size -> enumerate both orders.
+    if len(r1) < len(r2):
+        ring_orders = [(set(r1), set(r2))]
+    elif len(r2) < len(r1):
+        ring_orders = [(set(r2), set(r1))]
+    else:
+        ring_orders = [(set(r1), set(r2)), (set(r2), set(r1))]
+
+    numberings: List[Dict[int, Union[int, str]]] = []
+    for ring_a, ring_b in ring_orders:
+        k_a = len(ring_a) - 2
+        k_b = len(ring_b) - 2
+        for f_mid in (fa, fb):
+            f_start = fb if f_mid == fa else fa
+            path_a = _peripheral_path(ring_a, f_start, f_mid)
+            if path_a is None or len(path_a) != k_a:
+                continue
+            path_b = _peripheral_path(ring_b, f_mid, f_start)
+            if path_b is None or len(path_b) != k_b:
+                continue
+            locs: Dict[int, Union[int, str]] = {}
+            n = 1
+            for a in path_a:
+                locs[a] = n
+                n += 1
+            locs[f_mid] = f"{k_a}a"
+            for a in path_b:
+                locs[a] = n
+                n += 1
+            locs[f_start] = f"{k_a + k_b}a"
+            if set(locs.keys()) >= ring_atoms:
+                numberings.append(locs)
+
+    if not numberings:
         return {}
 
-    # Walk around the larger ring's non-fusion atoms first
-    # (start, neighbour, ..., then fusion -> smaller ring -> other fusion -> back).
-    locants: Dict[int, int] = {}
-    visited: Set[int] = set()
-    counter = 1
+    cited = {a for a in (cited_atoms or set()) if a in ring_atoms}
 
-    # Walk larger ring's non-fusion side
-    current = start
-    locants[current] = counter
-    visited.add(current)
-    counter += 1
-    # Step into the larger ring: prefer the non-fusion neighbour
-    next_atom = None
-    for n in adj[current]:
-        if n not in visited and n not in shared:
-            next_atom = n
-            break
-    while next_atom is not None and len(locants) < len(larger) - len(shared) + len(smaller) + len(shared):
-        if next_atom in shared:
-            # Crossed a fusion atom — assign locant and pivot
-            locants[next_atom] = counter
-            visited.add(next_atom)
-            counter += 1
-            # Now traverse smaller ring's non-fusion atoms
-            for sa in smaller:
-                if sa not in visited and sa not in shared:
-                    locants[sa] = counter
-                    visited.add(sa)
-                    counter += 1
-                    # Traverse remaining smaller ring atoms in order
-                    cur = sa
-                    while True:
-                        nxt = None
-                        for n in adj[cur]:
-                            if n not in visited and n in smaller and n not in shared:
-                                nxt = n
-                                break
-                        if nxt is None:
-                            break
-                        locants[nxt] = counter
-                        visited.add(nxt)
-                        counter += 1
-                        cur = nxt
-                    break
-            # Assign the OTHER fusion atom
-            for fa in fusion:
-                if fa not in visited:
-                    locants[fa] = counter
-                    visited.add(fa)
-                    counter += 1
-                    break
-            break
-        else:
-            locants[next_atom] = counter
-            visited.add(next_atom)
-            counter += 1
-            cur_step = None
-            for n in adj[next_atom]:
-                if n not in visited:
-                    cur_step = n
-                    break
-            next_atom = cur_step
+    def _select_key(locs: Dict[int, Union[int, str]]):
+        # (1) lowest locants to the cited positions (spiro atom + substituents);
+        # (2) a fully deterministic, atom-order-invariant binding of every
+        #     locant to the canonical rank of the atom that received it.
+        cited_key = tuple(sorted(_locant_sort_key(locs[a]) for a in cited))
+        bind_key = tuple(sorted(
+            (_locant_sort_key(loc), ranks[a]) for a, loc in locs.items()))
+        return (cited_key, bind_key)
 
-    # Coverage check
-    if not (set(locants.keys()) >= ring_atoms):
-        return {}
-    return locants
+    return min(numberings, key=_select_key)
 
 
 def _name_side_ring(
@@ -2217,6 +2260,13 @@ def name_mixed_spiro_fused(
     s_loc = side_atom_to_locant.get(spiro_center)
     if f_loc is None or s_loc is None:
         return None
+    # VOID (P-24.5.1 + OPSIN): the spiro-descriptor locants MUST be integer
+    # peripheral positions. A lettered fusion locant ('4a') is rejected by OPSIN
+    # in the spiro slot, so a spiro junction that can only be numbered as a
+    # ring-fusion atom fails closed (abstain) rather than emit a fabricated or
+    # invalid locant — 0-wrong is absolute.
+    if not isinstance(f_loc, int) or not isinstance(s_loc, int):
+        return None
 
     # Step 5: assemble the P-24.5.1 nested form.
     #   spiro[<comp1>-<l1>,<l2>'-<comp2>]
@@ -2354,7 +2404,10 @@ def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: in
             candidate_locants.append(loc_map[orig])
     if not candidate_locants:
         return loc_map.get(spiro_center)
-    return min(candidate_locants)
+    # A component map may now carry letter-suffixed fusion locants ('4a'); sort
+    # via _locant_sort_key so min() never compares int with str. The spiro atom
+    # is a peripheral (integer) position in scope, so the result is an int.
+    return min(candidate_locants, key=_locant_sort_key)
 
 
 def _locant_sort_key(loc) -> Tuple[int, str]:

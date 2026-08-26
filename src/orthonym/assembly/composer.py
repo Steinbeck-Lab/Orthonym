@@ -4004,14 +4004,29 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
     if not atom_to_locant:
         return ring_name
 
-    # Build oriented_ring from atom_to_locant: atoms sorted by locant value
-    # This gives extract_ring_substituents the IUPAC numbering order
+    # Build oriented_ring from atom_to_locant: atoms sorted by locant value.
+    # A locant is an int peripheral position, a letter-suffixed fusion locant
+    # STRING ('4a'/'8a', unprimed, sorts among the peripherals -- 4 < 4a < 5),
+    # or an (int, primes) tuple for a primed component locant (sorts after the
+    # unprimed component). Reduce every form to one comparable (group, number,
+    # tail) key so the sort never compares a str with a tuple (which raised
+    # TypeError -> the whole enrichment bailed to the bare name, dropping the
+    # substituent on a fusion atom).
+    def _orient_key(v):
+        if isinstance(v, tuple):
+            base = v[0] if v and isinstance(v[0], int) else 0
+            primes = v[1] if len(v) > 1 and isinstance(v[1], str) else ""
+            return (1, base, primes)
+        if isinstance(v, str):
+            digits = "".join(c for c in v if c.isdigit())
+            tail = "".join(c for c in v if not c.isdigit())
+            return (0, int(digits) if digits else 0, tail)
+        return (0, int(v), "")
+
     try:
         oriented_ring = tuple(
-            a for a, _ in sorted(atom_to_locant.items(), key=lambda x: (
-                # Handle mixed int/str locants: ints sort before strings
-                (0, x[1]) if isinstance(x[1], int) else (1, x[1])
-            ))
+            a for a, _ in sorted(
+                atom_to_locant.items(), key=lambda x: _orient_key(x[1]))
         )
     except (TypeError, ValueError):
         return ring_name
