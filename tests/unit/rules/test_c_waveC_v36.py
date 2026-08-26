@@ -182,11 +182,12 @@ def test_four_component_fused_is_zero_wrong():
 
 
 @pytest.mark.xfail(strict=True, reason=(
-    "v36-C1C2C6 Build-2 BOUND: the generate-and-test fusion namer is 3-component "
-    "only. NAMED FOLLOW-ON: 4+-component fusion base-selection (max-ring retained "
-    "base, P-25.3.2) + descriptor construction is not built this session. The "
-    "molecule still names+RTs today via the von-Baeyer no-abstain fallback "
-    "(0-wrong), just not as a fusion PIN."))
+    "v37 CT.4 built the 4-component CARBOCYCLIC-child case "
+    "(naphtho[2,3-g]quinoxaline). This witness is the HETEROCYCLIC-bicyclic-prefix "
+    "case (quinoxaline + quinoline attached) -- a NAMED FOLLOW-ON not built this "
+    "session: it needs a nameable heterocyclic bicyclic PREFIX + descriptor "
+    "construction, not the naphtho carbocyclic path. The molecule still names+RTs "
+    "via the von-Baeyer no-abstain fallback (0-wrong), just not as a fusion PIN."))
 def test_four_component_fused_gets_fusion_name_NAMED_BLOCKER():
     res = _cn_rt("c1ccc2nc3ccc4ncccc4c3nc2c1")
     name = res.get("name") or ""

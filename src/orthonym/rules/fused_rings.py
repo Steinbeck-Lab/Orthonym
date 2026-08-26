@@ -1122,6 +1122,156 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     return sorted(candidates, key=lambda n: (len(n), n))[0]
 
 
+# Naphthalene has exactly two symmetry-distinct peripheral fusion bonds — the
+# alpha,beta (1,2) and beta,beta (2,3) edges (all other peripheral bonds are
+# equivalent to these under D2h). Cited both orientations; OPSIN + the InChI
+# gate keeps whichever (if any) reproduces the input constitution, and the
+# deterministic canonical pick (P-25.3.1.3 lowest-locants -> lexicographic)
+# selects 2,3 over 3,2 for the linear (PIN) descriptor.
+_NAPHTHO_FUSION_PAIRS = ((1, 2), (2, 1), (2, 3), (3, 2))
+
+
+def _ring_adjacency_ortho(atom_rings: List[Set[int]]) -> Dict[int, Set[int]]:
+    """Undirected ring-adjacency graph: rings sharing >=2 atoms (an ortho fusion
+    bond) are adjacent. Used to enumerate CONNECTED sub-core partitions."""
+    import itertools as _it
+    adj: Dict[int, Set[int]] = {i: set() for i in range(len(atom_rings))}
+    for i, j in _it.combinations(range(len(atom_rings)), 2):
+        if len(atom_rings[i] & atom_rings[j]) >= 2:
+            adj[i].add(j)
+            adj[j].add(i)
+    return adj
+
+
+def _rings_connected(subset: Set[int], adj: Dict[int, Set[int]]) -> bool:
+    """Is the ring-index ``subset`` connected in the ring-adjacency graph?"""
+    if not subset:
+        return False
+    it = iter(subset)
+    seen = {next(it)}
+    stack = list(seen)
+    while stack:
+        c = stack.pop()
+        for nb in adj[c]:
+            if nb in subset and nb not in seen:
+                seen.add(nb)
+                stack.append(nb)
+    return len(seen) == len(subset)
+
+
+def _name_naphtho_fused_generate_and_test(mol) -> Optional[str]:
+    """CT.4 (v37): general N-component ortho-fused MANCUDE PIN construction for
+    the deferred CARBOCYCLIC-CHILD topology that ``_try_polycomponent_fusion_name``
+    (:907) explicitly defers (A10): a senior heterocyclic 2-ring BASE
+    (quinoxaline / quinoline / quinazoline / ...) ortho-fused to a NAPHTHALENE
+    2-ring carbocyclic PREFIX -> e.g. ``naphtho[2,3-g]quinoxaline``.
+
+    This UPGRADES the RT-true von-Baeyer degradation (a valid T3 name) to the
+    fusion PIN; a system it cannot assemble correctly returns None and the caller
+    keeps its existing behaviour (the von-Baeyer no-abstain fallback) -- never
+    wrong, never abstain.
+
+    0-wrong by construction: exactly as ``_name_ortho_fused_generate_and_test``,
+    a bounded candidate set is generated from the actual ring components (a
+    nameable heterocyclic 2-ring BASE named from a fused sub-core per P-25.3.2,
+    plus the naphthalene 2-ring carbocyclic PREFIX with its two symmetry-distinct
+    fusion bonds and enumerated base letters) and each is OPSIN-parsed; only a
+    candidate whose parse InChI equals the input's is kept, and the deterministic
+    canonical (shortest, then lexicographically least) is returned.
+
+    Scope (CT.4): exactly 4 SSSR rings; the whole molecule is that one neutral
+    fully-aromatic cata-fused (no atom in >=3 rings) ring system with >=1 ring
+    heteroatom and no exocyclic heavy atoms; it partitions into a nameable
+    heterocyclic 2-ring base + a naphthalene 2-ring carbocyclic attached
+    component. Higher component counts, 3-ring bases + monocycle prefixes,
+    ortho-peri interior atoms, non-naphthalene carbocyclic prefixes
+    (indeno / azuleno / anthra / phenanthro), multiparent bases and substituted
+    cores are a NAMED follow-on (see test_ct4_ncomponent_fusion.py).
+
+    Source: IUPAC 2013 Blue Book P-25.3.1.3, P-25.3.2, P-25.3.4; FR-2.3.
+    """
+    import itertools
+    from collections import Counter as _Counter
+    from rdkit.Chem.inchi import MolToInchi
+
+    ri = mol.GetRingInfo()
+    atom_rings_t = ri.AtomRings()
+    if len(atom_rings_t) != 4:
+        return None
+    ring_sets: List[Set[int]] = [set(r) for r in atom_rings_t]
+    ring_atom_set: Set[int] = set().union(*ring_sets)
+
+    # Whole molecule must BE this ring system (bare core, no exocyclic heavy).
+    for a in mol.GetAtoms():
+        if a.GetAtomicNum() != 1 and a.GetIdx() not in ring_atom_set:
+            return None
+    # Neutral, fully aromatic, no radicals; >=1 ring heteroatom (all-carbon PAHs
+    # -- naphthacene/chrysene -- are retained/von-Baeyer territory, not this).
+    has_hetero = False
+    for idx in ring_atom_set:
+        a = mol.GetAtomWithIdx(idx)
+        if (not a.GetIsAromatic() or a.GetFormalCharge() != 0
+                or a.GetNumRadicalElectrons() != 0):
+            return None
+        if a.GetAtomicNum() != 6:
+            has_hetero = True
+    if not has_hetero:
+        return None
+    # Cata-fused only (no interior/peri atom shared by >=3 rings).
+    membership = _Counter(idx for r in atom_rings_t for idx in r)
+    if any(c >= 3 for c in membership.values()):
+        return None
+
+    target_inchi = MolToInchi(mol)
+    if not target_inchi:
+        return None
+
+    from ..validation.opsin_roundtrip import opsin_parse
+
+    def _is_naphthalene(atoms: Set[int]) -> bool:
+        """The sub-core spanned by ``atoms`` is a naphthalene: exactly two
+        six-membered rings, every atom an aromatic carbon."""
+        rs = [r for r in ring_sets if r <= atoms]
+        if len(rs) != 2 or any(len(r) != 6 for r in rs):
+            return False
+        return all(mol.GetAtomWithIdx(x).GetSymbol() == 'C'
+                   and mol.GetAtomWithIdx(x).GetIsAromatic() for x in atoms)
+
+    adj = _ring_adjacency_ortho(ring_sets)
+    candidates: Set[str] = set()
+    tried = 0
+    _CAP = 400  # bounded; the class is tiny (<=2 partitions x 4 pairs x 12 letters)
+    for base_idx in itertools.combinations(range(4), 2):
+        base = set(base_idx)
+        attached = set(range(4)) - base
+        if not (_rings_connected(base, adj) and _rings_connected(attached, adj)):
+            continue
+        base_atoms = set().union(*[ring_sets[i] for i in base])
+        att_atoms = set().union(*[ring_sets[i] for i in attached])
+        # Base must be the senior heterocyclic component (P-25.3.2); the all-
+        # carbon naphthalene is the attached PREFIX, never the base.
+        base_name = _name_base_subcore(mol, base_atoms)
+        if not base_name:
+            continue
+        if not _is_naphthalene(att_atoms):
+            continue
+        for (x, y) in _NAPHTHO_FUSION_PAIRS:
+            for L in 'abcdefghijkl':
+                if tried >= _CAP:
+                    break
+                nm = f"naphtho[{x},{y}-{L}]{base_name}"
+                tried += 1
+                s = opsin_parse(nm)
+                if not s:
+                    continue
+                om = Chem.MolFromSmiles(s)
+                if om is not None and MolToInchi(om) == target_inchi:
+                    candidates.add(nm)
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda n: (len(n), n))[0]
+
+
 def _core_covers_ring_system(mol, atom_mapping) -> bool:
     """Does the matched fused-ring core cover every atom of the fused ring
     system(s) it sits in? Mirrors composer._fused_core_covers_ring_system (kept
@@ -1471,6 +1621,15 @@ def name_fused_heterocycle(mol):
         gen = _name_ortho_fused_generate_and_test(mol)
         if gen:
             return (gen, ring_atoms, {}, True)
+        # v37 CT.4 (P-25.3.4): general N-component fusion -- the deferred
+        # carbocyclic-child topology (naphtho[2,3-g]quinoxaline): a senior
+        # heterocyclic 2-ring base ortho-fused to a naphthalene carbocyclic
+        # prefix. UPGRADES the RT-true von-Baeyer degradation to the fusion PIN.
+        # 0-wrong by construction (OPSIN-RT-gated); None -> caller keeps the
+        # von-Baeyer no-abstain fallback.
+        naphtho = _name_naphtho_fused_generate_and_test(mol)
+        if naphtho:
+            return (naphtho, ring_atoms, {}, True)
         # Wave-2 P5 fused (Task 7) FAIL-CLOSED follow-up: interior-heteroatom
         # ortho-/peri-fused systems (P-25.3.3.2/.2.1/.2.2/.2.3/.3.3.2) require
         # a superscript interior locant (e.g. 3a1 / 2a1H). OPSIN 2.9 CANNOT
