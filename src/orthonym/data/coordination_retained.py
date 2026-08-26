@@ -24,8 +24,11 @@ each key is an exact, unambiguous structural match.
 
 Scope (v36-D1 plan IN-list): heme b/c/o, siroheme, chlorophyll/bacteriochlorophyll
 family, the cobalamin group (cyano/adenosyl/methyl/aqua/hydroxo/nitrito/cob(I..III)),
-and coenzyme F430. Explicitly OUT (left abstaining): cobyrinic-acid / corrinoid
-precursors, chlorophyllide/protochlorophyllide precursors, Zn/Cu porphyrin dyes,
+and coenzyme F430. v37 SP5-D1 additionally added the 13 cobyrinic-acid-type corrinoid /
+cobalt-precorrin rows (Co corrin/precorrin, no nucleotide loop) that each passed a strict
+per-row provenance check (verbatim ChEBI name, InChIKey re-derived == key, distinct id,
+opsin_parse == None); see  SP5.1 addendum. Still OUT
+(left abstaining): chlorophyllide/protochlorophyllide precursors, Zn/Cu porphyrin dyes,
 and the general P-69 additive namer (D2). Rows whose ChEBI name is malformed
 (unsigned charge, empty parentheses, stray double-hyphen) or whose structure has
 no standard InChIKey (dative-bond SMILES) are also left out -- they stay abstaining.
@@ -92,5 +95,33 @@ COORDINATION_RETAINED: Dict[str, str] = {
     #   ^ CHEBI:76032 -- chlorophyll-family (hydroxymethyl)
     "SLHJCOLVGKWTAP-KHPXXVTNSA-M": "[methyl (3S,4S,13R,14R)-9-acetyl-14-ethyl-4,8,13,18-tetramethyl-20-oxo-3-(3-oxo-3-{[(2E,6E,10E)-3,7,11,15-tetramethylhexadeca-2,6,10,14-tetraen-1-yl]oxy}propyl)-13,14-dihydrophorbine-21-carboxylatato(3-)-kappa(4)N(23),N(24),N(25),N(26)]magnesate(1-)",
     #   ^ CHEBI:90849 -- bacteriochlorophyll-family magnesate charge variant
+
+    # === Cobyrinic-acid-type corrinoid precursors (Co corrin/precorrin, no nucleotide loop; v37 SP5-D1) ===
+    "BKIWSQUNFCJSOI-LQRHGLAMSA-E": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13-dimethyl-3,7,8,12,13,20-hexahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(10-)}cobaltate(6-)",
+    #   ^ CHEBI:60053 -- cobalt-precorrin (hexahydroporphyrin, cobaltate 6- charge variant)
+    "BKIWSQUNFCJSOI-LQRHGLAMSA-M": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13-dimethyl-3,7,8,12,13,20-hexahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:3790 -- cobalt-precorrin (hexahydroporphyrin, cobalt form)
+    "DFFFCFUPOVLDTP-IICGDJHVSA-M": "3,3',3'',3'''-{[(1R,2S,3S,7S,11S,17R,18R,19R)-2,7,12,18-tetrakis(carboxymethyl)-1,2,7,11,17-pentamethyl-18,19-didehydrocorrin-3,8,13,17-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:3794 -- cobalt-dihydro-hexamethyl corrin (didehydrocorrin)
+    "FKTVLCPLZMVWHD-QOMRAJGQSA-E": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13,15-trimethyl-3,7,8,12,13,20-hexahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(10-)}cobaltate(6-)",
+    #   ^ CHEBI:60060 -- cobalt-precorrin (15-methyl hexahydroporphyrin, cobaltate 6- variant)
+    "FKTVLCPLZMVWHD-QOMRAJGQSA-M": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13,15-trimethyl-3,7,8,12,13,20-hexahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:3791 -- cobalt-precorrin (15-methyl hexahydroporphyrin, cobalt form)
+    "PWLXSVIETQPKMK-WTEINHRPSA-M": "3,3',3'',3'''-{[(1R,2S,3S,7S,11S,17R,18R,19R)-2,7,18-tris(carboxymethyl)-1,2,5,7,11,12,15,17-octamethylcorrin-3,8,13,17-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:3795 -- cobalt octamethylcorrin (corrinoid precursor)
+    "RFBIUXAOZAPWCC-RDKWKEIWSA-M": "3,3',3'',3'''-{[(1R,2S,3S,7S,11S,17R,18R,19R)-2,7,12,18-tetrakis(carboxymethyl)-1,2,7,11,17-pentamethylcorrin-3,8,13,17-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:3789 -- cobalt pentamethylcorrin (cobyrinic-acid-type corrinoid)
+    "RQHZZQLPDALGEQ-CYGMIEPJSA-D": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13,15-trimethyl-7,8,12,13-tetrahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(10-)}cobaltate(8-)",
+    #   ^ CHEBI:73299 -- cobalt-precorrin (15-methyl tetrahydroporphyrin, cobaltate 8- variant)
+    "RQHZZQLPDALGEQ-CYGMIEPJSA-L": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13,15-trimethyl-7,8,12,13-tetrahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:73373 -- cobalt-precorrin (15-methyl tetrahydroporphyrin, cobalt form)
+    "VHHGJROBFDFFAE-AJSUAYSOSA-F": "3,3',3'',3'''-{[(2S,3S,7S,11S,17R)-1-(1-hydroxyethyl)-2,7,12,18-tetrakis(carboxymethyl)-2,7,17-trimethyl-18,19-didehydrocorrin-3,8,13,17-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(9-)}cobaltate(5-) 1(1),2(1)-delta-lactone",
+    #   ^ CHEBI:60061 -- cobalt hydroxyethyl-didehydrocorrin delta-lactone (cobaltate 5-)
+    "XHLLHKIBBMZXKO-LWEGWLRDSA-L": "3,3',3'',3'''-{[(2S,3S,7S,11S,17R,18R)-2,7,12,18-tetrakis(carboxymethyl)-2,7,11,17-tetramethyl-1,19-didehydrocorrin-3,8,13,17-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:52489 -- cobalt 1,19-didehydrocorrin (corrinoid precursor)
+    "XZMXJYDTAININL-QIISWYHFSA-D": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13-dimethyl-7,8,12,13-tetrahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(10-)}cobalt(6-)",
+    #   ^ CHEBI:60049 -- cobalt-precorrin (tetrahydroporphyrin, cobalt 6- variant)
+    "XZMXJYDTAININL-QIISWYHFSA-L": "{3,3',3'',3'''-[(7S,8S,12S,13S)-3,8,13,17-tetrakis(carboxymethyl)-8,13-dimethyl-7,8,12,13-tetrahydroporphyrin-2,7,12,18-tetrayl-kappa(4)N(21),N(22),N(23),N(24)]tetrapropanoato(2-)}cobalt",
+    #   ^ CHEBI:52491 -- cobalt-precorrin (tetrahydroporphyrin, cobalt form)
 }
 
