@@ -171,7 +171,7 @@ class TestThiocarboxylicAcidOPSIN:
         """Parse a name through OPSIN and return the SMILES (or None)."""
         import subprocess
         import glob
-        opsin_jars = glob.glob("/home/kohulan/OpenSTOUT/Orthonym/opsin/opsin-cli/target/opsin-cli-*-jar-with-dependencies.jar")
+        opsin_jars = glob.glob(str(__import__("pathlib").Path(__file__).resolve().parents[3] / "opsin-cli-*-jar-with-dependencies.jar"))
         if not opsin_jars:
             pytest.skip("OPSIN jar not found")
         jar = opsin_jars[0]

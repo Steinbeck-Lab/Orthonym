@@ -237,7 +237,7 @@ class TestCanaryRegression:
             [sys.executable, "-m", "pytest",
              "tests/integration/test_canary_rt75.py", "-x", "-q"],
             capture_output=True, text=True, timeout=120,
-            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable, replaces hardcoded /home/kohulan path per REVIEWS §Plan 03 HIGH #2
+            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable
         )
         assert result.returncode == 0, (
             f"Canary regression detected:\n{result.stdout}\n{result.stderr}"

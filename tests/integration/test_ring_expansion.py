@@ -206,7 +206,7 @@ class TestCanaryStability:
             capture_output=True,
             text=True,
             timeout=600,
-            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable, replaces hardcoded /home/kohulan path per REVIEWS §Plan 03 HIGH #2
+            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable
         )
         # Check that no failures occurred
         assert result.returncode == 0, (

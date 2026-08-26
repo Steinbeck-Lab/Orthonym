@@ -240,7 +240,7 @@ class TestEndToEndFusedRouting:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                cwd='/home/kohulan/OpenSTOUT/Orthonym'
+                cwd=str(__import__('pathlib').Path(__file__).resolve().parents[3])
             )
             output = result.stdout.strip()
             # Filter out the "Run the jar..." header line
@@ -265,7 +265,7 @@ class TestEndToEndFusedRouting:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                cwd='/home/kohulan/OpenSTOUT/Orthonym'
+                cwd=str(__import__('pathlib').Path(__file__).resolve().parents[3])
             )
             output = result.stdout.strip()
             lines = [l for l in output.split('\n') if not l.startswith('Run')]

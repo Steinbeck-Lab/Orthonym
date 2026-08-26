@@ -19,7 +19,7 @@ from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 pytestmark = pytest.mark.opsin_gate
 
-_JAR = "/home/kohulan/OpenSTOUT/Orthonym/opsin-cli-2.9.0-jar-with-dependencies.jar"
+_JAR = str(__import__("pathlib").Path(__file__).resolve().parents[3] / "opsin-cli-2.9.0-jar-with-dependencies.jar")
 
 # best-effort breadth tier (the documented v33 RT-full tier — name_general all-or-none).
 # 0-wrong is delivered by applying the OPSIN full-InChIKey RT gate to its output: a
