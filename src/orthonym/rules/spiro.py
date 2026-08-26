@@ -1740,7 +1740,7 @@ def _name_fused_component(
     # peripheral position (a spiro junction never sits on a fusion atom in this
     # ortho-fused scope, and name_mixed_spiro_fused voids the candidate if one
     # somehow did — OPSIN rejects a lettered locant in the spiro slot).
-    atom_to_locant_in_orig: Dict[int, _Locant] = {}
+    atom_to_locant_in_orig: Dict[int, Union[int, str, Tuple[int, str]]] = {}
     for frag_idx, locant in atom_to_locant_in_frag.items():
         if frag_idx not in frag_to_orig:
             continue

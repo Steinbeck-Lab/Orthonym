@@ -174,3 +174,44 @@ def test_synthesize_fused_locants_decalin_letters():
     assert 9 not in int_locants and 10 not in int_locants
     # the two fusion atoms are exactly the two letter-locant atoms
     assert {a for a, v in locs.items() if not isinstance(v, int)} == fusion_atoms
+
+
+# --- review FINDING 1: primed-fused-component decoration ---------------------
+# When the decalin is the PRIMED spiro component (the side ring sorts
+# alphabetically before ``decahydronaphthalene``) AND a fusion atom bears a
+# substituent, that fusion locant is carried as a primed tuple (``('4a', "'")``).
+# This exercises the composer's mixed int / '4a'-str / (int, primes)-tuple locant
+# ordering (``_enrich_complex_ring_with_subs._orient_key``). Both witnesses must
+# RT-verify (0-wrong), be atom-order deterministic, and cite DISTINCT fusion
+# locants (the '4a' vs '8a' carbon), spelling-agnostic to prime placement.
+
+PRIMED_FUSED_WITNESSES = {
+    "CC12CCC3(CC3)CC2CCCC1": "4a",   # methyl on the fusion carbon nearer 4
+    "CC12CCCCC2CCC2(CC2)C1": "8a",   # methyl on the fusion carbon reached at 8a
+}
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,fusion", sorted(PRIMED_FUSED_WITNESSES.items()))
+def test_primed_fused_component_decoration_rt(smiles, fusion):
+    name = _BE.name(smiles)
+    assert not _is_fail(name), name
+    assert _rt_ok(smiles, name), name
+    # the primed fusion locant is cited (strip primes so this does not pin the
+    # 4a' vs 4'a prime-placement spelling):
+    assert fusion in name.replace("'", ""), (fusion, name)
+
+
+@pytest.mark.opsin_gate
+def test_primed_fused_witnesses_distinct_and_deterministic():
+    names = {}
+    for smiles in PRIMED_FUSED_WITNESSES:
+        m = Chem.MolFromSmiles(smiles)
+        orders = {Chem.MolToSmiles(m)}
+        for _ in range(6):
+            orders.add(Chem.MolToSmiles(m, doRandom=True))
+        seen = {_BE.name(s) for s in orders}
+        assert len(seen) == 1, (smiles, seen)   # atom-order deterministic
+        names[smiles] = seen.pop()
+    # the two distinct fusion positions must give two distinct names
+    assert len(set(names.values())) == 2, names

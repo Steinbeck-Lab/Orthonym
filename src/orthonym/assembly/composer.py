@@ -4012,16 +4012,28 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
     # tail) key so the sort never compares a str with a tuple (which raised
     # TypeError -> the whole enrichment bailed to the bare name, dropping the
     # substituent on a fusion atom).
+    def _split_locant(x):
+        # (number, letter-tail) from a plain int or a '4a'-style string.
+        if isinstance(x, int):
+            return (x, "")
+        s = str(x)
+        digits = "".join(c for c in s if c.isdigit())
+        tail = "".join(c for c in s if not c.isdigit())
+        return (int(digits) if digits else 0, tail)
+
     def _orient_key(v):
+        # (group, number, letter-tail, primes) -- one comparable key for every
+        # locant form. group 0 = unprimed (int / '4a' str), group 1 = primed
+        # ((locant, primes) tuple). A PRIMED FUSION atom is stored as
+        # ('4a', "'") (spiro.py), so parse v[0]'s leading digits + letter tail
+        # even when it is a str -- otherwise ('4a', "'") and ('8a', "'") both
+        # collapsed to base 0 and ordered by dict-insertion, not by locant.
         if isinstance(v, tuple):
-            base = v[0] if v and isinstance(v[0], int) else 0
+            base, tail = _split_locant(v[0]) if v else (0, "")
             primes = v[1] if len(v) > 1 and isinstance(v[1], str) else ""
-            return (1, base, primes)
-        if isinstance(v, str):
-            digits = "".join(c for c in v if c.isdigit())
-            tail = "".join(c for c in v if not c.isdigit())
-            return (0, int(digits) if digits else 0, tail)
-        return (0, int(v), "")
+            return (1, base, tail, primes)
+        base, tail = _split_locant(v)
+        return (0, base, tail, "")
 
     try:
         oriented_ring = tuple(
