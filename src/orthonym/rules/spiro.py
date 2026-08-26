@@ -1676,29 +1676,52 @@ def _name_fused_component(
     core_match = match_fused_heterocycle_core(frag)
     if core_match is not None:
         core_name, atom_mapping_in_frag, _core_smiles = core_match
-        # atom_mapping_in_frag : Dict[int, int|str] — locants for each frag atom
-        # Map back to original atom indices, coercing letter-suffixed
-        # locants like '7a' to base int (7) for the spiro descriptor
-        # (Q-05 OPSIN preview: spiro descriptors use plain integer
-        # locants in both pre- and post-comma positions).
-        atom_to_locant_in_orig: Dict[int, int] = {}
+        # atom_mapping_in_frag : Dict[int, int|str] — locants for each frag atom.
+        # CP2b: carry a letter-suffixed fusion locant ('9a'/'4a') back as a
+        # STRING (not coerced to base int), exactly as the systematic branch does
+        # post-`:1704`, so a SUBSTITUENT on a ring-fusion atom is cited with its
+        # real letter locant ('9a-methyl…') instead of the wrong peripheral
+        # integer ('9-methyl…', a different constitution OPSIN rejects). The
+        # spiro DESCRIPTOR locant stays an integer peripheral position: a spiro
+        # junction that can only be numbered as a fusion atom is VOIDed
+        # (fail-closed) by name_mixed_spiro_fused's guard (`:2268`) — OPSIN
+        # rejects a lettered locant in the spiro slot. (The old int() coercion
+        # here silently mis-lettered fusion-atom decorations; the spirobi hydro
+        # path takes uncoerced locants from `_component_raw_catalog_locants`
+        # directly, so it is unaffected.)
+        atom_to_locant_in_orig: Dict[int, Union[int, str, Tuple[int, str]]] = {}
         for frag_idx, locant in atom_mapping_in_frag.items():
             if frag_idx not in frag_to_orig:
                 continue
-            base: int
             if isinstance(locant, int):
-                base = locant
+                atom_to_locant_in_orig[frag_to_orig[frag_idx]] = locant
             elif isinstance(locant, str):
-                # '7a' -> 7
-                digits = "".join(c for c in locant if c.isdigit())
-                if not digits:
-                    continue
-                base = int(digits)
-            elif isinstance(locant, tuple) and len(locant) >= 1:
+                if locant:
+                    atom_to_locant_in_orig[frag_to_orig[frag_idx]] = locant
+            elif isinstance(locant, tuple) and locant:
                 base = locant[0] if isinstance(locant[0], int) else 0
-            else:
-                continue
-            atom_to_locant_in_orig[frag_to_orig[frag_idx]] = base
+                if base:
+                    atom_to_locant_in_orig[frag_to_orig[frag_idx]] = base
+        # Orient the catalog numbering by LOWEST locants to the cited positions
+        # (P-25.3.1.3 / P-24.5.1) — mirroring the systematic branch's cited-atom
+        # orientation below. A symmetric catalog core (quinolizidine's ring-swap
+        # 3<->7, 2<->8, ... automorphism) has several equally-established
+        # numberings, and ``match_fused_heterocycle_core`` returns an arbitrary
+        # one, so a spiro/substituent citation would flip locants (e.g. spiro
+        # ``3'`` vs ``7'``) with SMILES atom order. Enumerate the component's
+        # automorphism-equivalent numberings and pick the one giving the lowest
+        # locants to the atoms that carry a decoration (the spiro junction + every
+        # substituent-bearing ring atom, i.e. any component atom with a neighbour
+        # OUTSIDE the component), tie-broken DETERMINISTICALLY on
+        # ``Chem.CanonicalRankAtoms(breakTies=True)`` — never on raw atom index.
+        cited_orig = {
+            a for a in fused_atoms
+            if any(nb.GetIdx() not in fused_atoms
+                   for nb in mol.GetAtomWithIdx(a).GetNeighbors())
+        }
+        atom_to_locant_in_orig = _orient_catalog_numbering(
+            frag, orig_to_frag, atom_to_locant_in_orig, cited_orig,
+        )
         return core_name, atom_to_locant_in_orig
 
     # No catalog hit — try systematic ortho-fused naming.
@@ -1755,6 +1778,54 @@ def _name_fused_component(
                 atom_to_locant_in_orig[frag_to_orig[frag_idx]] = base
 
     return name, atom_to_locant_in_orig
+
+
+def _orient_catalog_numbering(
+    frag,
+    orig_to_frag: Dict[int, int],
+    atom_to_locant_in_orig: Dict[int, Union[int, str, Tuple[int, str]]],
+    cited_orig: Set[int],
+) -> Dict[int, Union[int, str, Tuple[int, str]]]:
+    """Choose the LOWEST-locant automorphism numbering of a catalog-matched fused
+    component for the CITED positions, deterministically (P-24.3.3 / P-24.5.1).
+
+    ``match_fused_heterocycle_core`` returns ONE of a symmetric ring system's
+    equally-established numberings — quinolizidine's ring-swap automorphism maps
+    ``3<->7``, ``2<->8``, ``1<->9``, ``4<->6`` while fixing ``5``(N) and ``9a`` —
+    picked by RDKit substructure-match order and therefore SMILES-atom-order
+    dependent. A spiro / substituent citation would then flip (spiro ``3'`` vs
+    ``7'``) with atom order. Enumerating the automorphism-equivalent numberings
+    (``_component_numberings``) and selecting the one giving the lowest locants to
+    the cited atoms (the spiro junction + every substituent-bearing ring atom) —
+    tie-broken on ``Chem.CanonicalRankAtoms(breakTies=True)``, never on raw atom
+    index — makes the emitted locants atom-order-invariant AND lowest (PIN). This
+    mirrors the systematic branch's ``_synthesize_fused_locants`` orientation.
+
+    Letter-suffixed fusion locants are preserved as strings. Falls back to the
+    input map when there is a single numbering or no cited atom to steer it."""
+    cited = {a for a in cited_orig if a in atom_to_locant_in_orig}
+    if not cited:
+        return atom_to_locant_in_orig
+    numberings = _component_numberings(frag, orig_to_frag, atom_to_locant_in_orig)
+    if len(numberings) <= 1:
+        return atom_to_locant_in_orig
+    try:
+        ranks = list(Chem.CanonicalRankAtoms(frag, breakTies=True))
+    except Exception:
+        ranks = list(range(frag.GetNumAtoms()))
+
+    def _select_key(locs: Dict[int, Union[int, str, Tuple[int, str]]]):
+        # (1) lowest locants to the cited positions; (2) a fully deterministic,
+        # atom-order-invariant binding of every locant to the canonical rank of
+        # the atom that received it.
+        cited_key = tuple(sorted(
+            _locant_sort_key(locs[a]) for a in cited if a in locs))
+        bind_key = tuple(sorted(
+            (_locant_sort_key(loc), ranks[orig_to_frag[a]])
+            for a, loc in locs.items() if a in orig_to_frag))
+        return (cited_key, bind_key)
+
+    return min(numberings, key=_select_key)
 
 
 def _synthesize_fused_locants(
