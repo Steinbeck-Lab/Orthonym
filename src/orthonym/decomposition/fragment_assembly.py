@@ -239,6 +239,7 @@ def assemble_fragment_name(
     fragment_names: Dict[str, str],
     style: str = "pin",
     fragment_smiles: Optional[Dict[str, str]] = None,
+    parent_smiles: Optional[str] = None,
 ) -> Optional[str]:
     """Assemble fragment names into a multi-component IUPAC name.
 
@@ -276,7 +277,8 @@ def assemble_fragment_name(
     # signature byte-identical.
     if bond_type == "glycosidic":
         return _assemble_glycoside(
-            fragment_names, style, fragment_smiles=fragment_smiles
+            fragment_names, style, fragment_smiles=fragment_smiles,
+            parent_smiles=parent_smiles,
         )
 
     # v30 task 24: the amide assembler needs the amine SMILES for the acyl-float
@@ -823,10 +825,72 @@ def _aglycone_to_substituent(
     return prefix
 
 
+def _aglycone_structural_substituent(aglycone_smiles: Optional[str]) -> Optional[str]:
+    """Derive the aglycone monovalent substituent prefix from STRUCTURE (v38 Incr-1a).
+
+    Root-cause alternative to the string rule ``_alcohol_to_alkyl``, which FABRICATES
+    an OPSIN-unparseable token for a retained-named aglycone (``borneol`` ->
+    ``borneyl``, not an OPSIN substituent). The aglycone arrives from the glycoside
+    cleavage as an alcohol (the glycosidic O reattached as -OH); we take the carbon
+    that bears that single -OH as the free valence and name the remaining skeleton
+    through the ring-substituent chokepoint ``name_ring_system_substituent`` (P-29.2),
+    yielding e.g. ``4,7,7-trimethylbicyclo[2.2.1]heptan-5-yl``.
+
+    Determinism (invariant 4): the aglycone is re-parsed through its CANONICAL SMILES
+    first, so the von-Baeyer / ring numbering the chokepoint assigns is independent of
+    the incoming atom order (that numbering is otherwise order-dependent).
+
+    Structural seniority guard (D-09, P-102.5.6.1.1): a group senior to hydroxy keeps
+    the substitutive form -> return None. Fail closed (None) on a multi-hydroxy,
+    purely acyclic, or unnameable aglycone -- the caller then keeps its legacy path.
+    """
+    if not aglycone_smiles:
+        return None
+    mol = _Chem.MolFromSmiles(aglycone_smiles)
+    if mol is None:
+        return None
+    # Determinism: canonicalize atom order before the chokepoint numbers the ring.
+    mol = _Chem.MolFromSmiles(_Chem.MolToSmiles(mol))
+    if mol is None:
+        return None
+    # Seniority guard (structural, D-09) -- mirrors _aglycone_to_substituent so a
+    # ketone/acid/aldehyde aglycone is never flipped to the functional-class form.
+    try:
+        pg, _atoms = get_principal_group(mol, detect_functional_groups(mol))
+    except Exception:
+        return None
+    if pg is not None:
+        rank = SENIORITY_ORDER.index(pg) if pg in SENIORITY_ORDER else 999
+        if rank < HYDROXY_TOP:
+            return None
+    # Locate the single glycosidic -OH (degree-1 O carrying >=1 H, bonded to carbon).
+    oh = [
+        (a.GetIdx(), a.GetNeighbors()[0].GetIdx())
+        for a in mol.GetAtoms()
+        if a.GetAtomicNum() == 8 and a.GetDegree() == 1 and a.GetTotalNumHs() >= 1
+        and a.GetNeighbors()[0].GetAtomicNum() == 6
+    ]
+    if len(oh) != 1:
+        return None  # ambiguous / no single attachment -> fail closed
+    o_idx, c_idx = oh[0]
+    frag = [a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() != o_idx]
+    from ..rules.ring_substituents import name_ring_system_substituent
+    try:
+        prefix = name_ring_system_substituent(mol, frag, c_idx, allow_mancude=True)
+    except Exception:
+        return None
+    # Reject the unnameable sentinel and any non-substituent token; a real P-29.2
+    # monovalent prefix ends in "-yl".
+    if not prefix or prefix == "substituent" or not prefix.endswith("yl"):
+        return None
+    return prefix
+
+
 def _assemble_glycoside(
     fragment_names: Dict[str, str],
     style: str,
     fragment_smiles: Optional[Dict[str, str]] = None,
+    parent_smiles: Optional[str] = None,
 ) -> Optional[str]:
     """Assemble glycoside name (Phase 176 / WSD-08: functional-class form).
 
@@ -905,7 +969,7 @@ def _assemble_glycoside(
             + sugar_name.count("furanosyloxy")
         ) <= 1
 
-        if sugar_tuple is not None and aglycone_prefix and single_sugar:
+        if sugar_tuple is not None and single_sugar:
             anomer, config, base = sugar_tuple
             # W6-P1: a uronic sugar core must use the P-102.5.6.6.4.2 head form
             # "glucopyranosiduronic acid" (NOT the wrong "glucuronopyranoside"
@@ -918,10 +982,65 @@ def _assemble_glycoside(
             else:
                 head = sugar_to_glycoside_class_name(anomer, config, base)
             if head:
-                # Two-word functional-class form: "<substituent> <sugar>oside".
-                # The alpha/beta + D/L descriptors come from the sugar tuple and
-                # are never dropped (D-11).
-                return f"{aglycone_prefix} {head}"
+                # Functional-class form "<substituent> <sugar>oside" (P-102.5.6.2.2);
+                # the alpha/beta + D/L descriptors come from the sugar tuple and are
+                # never dropped (D-11). Two aglycone-substituent sources:
+                #   - the string rule (`aglycone_prefix`), byte-identical for every
+                #     already-working glycoside (menthyl/cyclohexyl/phenyl/...);
+                #   - v38 Incr-1a: the aglycone '-yl' derived from STRUCTURE, which
+                #     rescues a retained-named aglycone whose string token is
+                #     fabricated and OPSIN-unparseable (borneol -> 'borneyl').
+                string_form = f"{aglycone_prefix} {head}" if aglycone_prefix else None
+                # v38 Incr-1a: the aglycone '-yl' derived from STRUCTURE
+                # (canonicalised -> deterministic), used to (a) recognise when the
+                # string rule can be trusted WITHOUT OPSIN, and (b) rescue a
+                # fabricated string token. Only computed when the parent SMILES is
+                # available to RT-gate against (single-bond path); the minority
+                # _assemble_by_bond_type route (parent_smiles=None) is unchanged.
+                structural_prefix = (
+                    _aglycone_structural_substituent(aglycone_smiles)
+                    if parent_smiles else None
+                )
+                structural_form = None
+                if structural_prefix:
+                    # Enclose a complex substituent (locants/brackets) per
+                    # P-16.3.3; a bare 'cyclohexyl'/'phenyl' stays unenclosed.
+                    wrapped = (
+                        structural_prefix
+                        if _re.fullmatch(r"[a-z]+yl", structural_prefix)
+                        else f"({structural_prefix})"
+                    )
+                    structural_form = f"{wrapped} {head}"
+
+                # (A) FAST PATH, no OPSIN: trust the string form when the structural
+                # derivation AGREES with it, or when there is no structural
+                # alternative. This covers every already-working glycoside whose
+                # token is a genuine substituent (cyclohexyl/phenyl/methyl/ethyl/
+                # ...): their OPSIN behaviour is UNCHANGED, so nothing perturbs the
+                # rest of the naming run. (Back-compat: with no parent_smiles the
+                # structural branch is off, so this is the sole path, as before.)
+                if string_form is not None and (
+                    structural_prefix is None
+                    or aglycone_prefix == structural_prefix
+                ):
+                    return string_form
+
+                # (B) The string prefix DISAGREES with structure -- either a valid
+                # retained token whose systematic form differs (menthyl) or a
+                # FABRICATED OPSIN-unparseable one (borneol -> 'borneyl'). Both
+                # candidates describe the SAME aglycone but only one is OPSIN-valid.
+                # 0-wrong is ABSOLUTE, so RT-select against the parent (full InChI)
+                # and ship the first that round-trips; if neither does, fall through
+                # (abstain). OPSIN is invoked ONLY here, off the working fast path.
+                if parent_smiles:
+                    from ..validation.opsin_roundtrip import opsin_roundtrip_check
+                    for cand in (string_form, structural_form):
+                        if cand and opsin_roundtrip_check(
+                            parent_smiles, cand
+                        ).get("passed"):
+                            return cand
+                elif string_form is not None:
+                    return string_form
 
     # --- The legacy substitutive fallback is REMOVED (it could not be right) ---
     #

@@ -1449,8 +1449,13 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     # Assemble (delegate to fragment_assembly module)
     # Phase 176 / D-03: thread fragment_smiles additively; only the glycoside
     # assembler reads it, every other assembler ignores the kwarg.
+    # v38 Incr-1a: thread the parent SMILES too -- the glycoside assembler
+    # RT-gates the STRUCTURAL aglycone-substituent fallback against it (0-wrong).
+    # Purely additive; every other assembler ignores the kwarg.
     return assemble_fragment_name(
-        bond["type"], fragment_names, style=style, fragment_smiles=fragment_smiles
+        bond["type"], fragment_names, style=style,
+        fragment_smiles=fragment_smiles,
+        parent_smiles=Chem.MolToSmiles(mol),
     )
 
 
