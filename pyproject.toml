@@ -33,7 +33,6 @@ classifiers = [
 ]
 dependencies = [
     "rdkit>=2023.03.1",
-    "rapidfuzz>=3.14.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +44,7 @@ dev = [
     "black>=23.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
+    "rapidfuzz>=3.14.0",  # eval-only: Damerau-Levenshtein secondary metric (); not used on the naming path
 ]
 # Phase 162 ML Fallback Gate (MLF-01 + CONTEXT D-02 optional extra).
 # Per 162-AUDIT-MLF.md § 1.2 R-01 AUTO-PICK resolution (b):

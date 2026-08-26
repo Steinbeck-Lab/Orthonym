@@ -17,15 +17,12 @@ the IUPAC 2013 recommendations (the "Blue Book"). It is the structure→name cou
 
 ## Installation
 
-```bash
-pip install orthonym
-```
-
-Or from source:
+Install from source:
 
 ```bash
 git clone https://github.com/Kohulan/Orthonym.git
 cd Orthonym
+python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
