@@ -3228,8 +3228,17 @@ class Orthonym:
             # Re-pick the principal group with the acyclic senior groups excluded
             # and re-name via the _principal_group_override seam; RT-verified, so
             # 0-wrong holds. Runs ONLY when we are about to ship a failure.
+            # v37 tier-policy: gated on `_general_fallback` (COMPLETE tier), not
+            # `_general_fallback_unverified` (best-effort). This rescue POSITIVELY
+            # RT-verifies its candidate internally (`_stereo_emit_decision` +
+            # `_rt_match`), and at the COMPLETE tier `_stereo_emit_decision`
+            # returns `(True, False)` only for a FULL-stereo name (else abstain),
+            # so the RT gate is a FULL-InChIKey compare -- an unverified candidate
+            # still returns None and the molecule still abstains. Best-effort is
+            # unchanged (gfu=True implies gf=True); the default/PIN tier never
+            # runs it (`_general_fallback` False) so PIN output is byte-identical.
             if (is_top_level_naming() and is_failure_name(result)
-                    and self._general_fallback_unverified
+                    and self._general_fallback
                     and not self._disable_opsin_validity_gate):
                 _dr = self._try_demote_senior_group_rescue(smiles)
                 if _dr is not None:
@@ -3262,12 +3271,16 @@ class Orthonym:
                             result = _dgated
             # v37 SP1.3 (offer-not-return, invariant 18): a molecule whose SENIOR
             # (ranked[0]) P-44 parent dead-ends can be rescued by a JUNIOR pool
-            # member. Runs ONLY on the ship-a-failure best-effort path (so no
-            # PIN-nameable molecule is re-rooted -- they succeed at ranked[0] and
-            # never reach here), and every junior candidate is RT-gated before
-            # adoption (0-wrong). PIN/default output is byte-identical.
+            # member. Runs ONLY on the ship-a-failure path (so no PIN-nameable
+            # molecule is re-rooted -- they succeed at ranked[0] and never reach
+            # here), and every junior candidate is RT-gated before adoption
+            # (0-wrong). PIN/default output is byte-identical.
+            # v37 tier-policy: gated on `_general_fallback` (COMPLETE tier) -- the
+            # candidate is FULL-InChIKey RT-verified at the complete tier exactly
+            # as the demote-senior rescue above; the method's own internal guard
+            # (below) is loosened to match. Default/PIN tier unaffected.
             if (is_top_level_naming() and is_failure_name(result)
-                    and self._general_fallback_unverified
+                    and self._general_fallback
                     and not self._disable_opsin_validity_gate):
                 _ap = self._try_alternate_parent_rescue(smiles)
                 if _ap is not None:
@@ -3748,16 +3761,31 @@ class Orthonym:
                     # this instance's flags and E1-audits the result internally,
                     # returning an atom-complete name or None (clean abstain).
                     # PIN-isolated: this whole recovery is already
-                    # `_general_fallback`-gated (early `return None` at the top),
-                    # and T4 additionally requires the
-                    # `_general_fallback_unverified` opt-in -- so the PIN/default
-                    # path and the conservative verified-fallback tier never
-                    # reach it. The T4 name is NOT shipped raw: it falls through
-                    # to the SAME stereo-emit decision + OPSIN round-trip ladder
-                    # below that the engine's own name gets, so a T4 name whose
-                    # constitution does not round-trip is suppressed to abstain
-                    # (SELF-01). Task 4 (coverage-by-construction breadth).
-                    if not self._general_fallback_unverified:
+                    # `_general_fallback`-gated (early `return None` at the top).
+                    # The T4 name is NOT shipped raw: it falls through to the SAME
+                    # stereo-emit decision + OPSIN round-trip ladder below that the
+                    # engine's own name gets, so a T4 name whose constitution does
+                    # not round-trip is suppressed to abstain (SELF-01).
+                    # Task 4 (coverage-by-construction breadth).
+                    #
+                    # v37 tier-policy: this is the MEASURED demotion gate for the
+                    # ~88/150 ring+stereo abstainers that ship a FULL-InChIKey
+                    # RT-verified name at best-effort but abstained at COMPLETE
+                    # (spy:  CORESTEREO
+                    # addendum + task-tierpolicy-report.md). It was
+                    # `_general_fallback_unverified` (best-effort only); re-gated
+                    # to `_general_fallback` so a T4 name also ships at the COMPLETE
+                    # tier -- but ONLY through the RT ladder below. At the complete
+                    # tier `_stereo_emit_decision` returns `(True, False)` only for
+                    # a FULL-stereo name (else `(False, False)` -> abstain), so the
+                    # `_rt_match` is a FULL-InChIKey compare; and a T4 name OPSIN
+                    # cannot parse hits `elif ... or _cand_from_t4: return None`
+                    # (below) regardless of tier. An unverified T4 candidate is
+                    # therefore never shipped at COMPLETE -- 0-wrong preserved.
+                    # `name_t4_complete` still requires a live jar (below), and the
+                    # default/PIN tier never reaches here (`_general_fallback`
+                    # False), so PIN output is byte-identical.
+                    if not self._general_fallback:
                         return None
                     # T4 runs the engine at allow_aromatic_general=True
                     # unconditionally, which OPENS the von-Baeyer / mancude-cage
@@ -4088,7 +4116,12 @@ class Orthonym:
             return None
         if getattr(_ALT_PARENT_RESCUE, 'active', False):
             return None
-        if not self._general_fallback_unverified:
+        # v37 tier-policy: run at the COMPLETE tier (`_general_fallback`), not
+        # best-effort-only. The inner candidate is FULL-InChIKey RT-gated below
+        # (`_stereo_emit_decision` -> `(True, False)` only for full stereo at the
+        # complete tier, then `_rt_match`), so an unverified junior parent is
+        # never adopted -- the molecule still abstains. Caller matches this gate.
+        if not self._general_fallback:
             return None
         try:
             mol = Chem.MolFromSmiles(smiles)
