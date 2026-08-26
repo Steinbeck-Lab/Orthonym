@@ -160,3 +160,6 @@ data/pubchem_cache.json
 
 benchmarks/*/rows_comparison.jsonl.gz
 benchmarks/*/hh_10k_*.json
+
+# Stray leftover test-data snippet (unreferenced)
+/test.tsv
