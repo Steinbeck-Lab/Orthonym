@@ -18,8 +18,8 @@ the ordered attach->terminal nitrogen chain distinguishes all of them
     diazo      | R2C=[N+]=[N-] (canonical)       | (2, 2)      | (0, +1, -1)
     diazo      | R2[C-]-[N+]#N (carbanion alt)   | (1, 3)      | (-1, +1, 0)
 
-(read-only, not copied) from ``nitrogen_roles.py``
-``NitrogenChainTemplate`` shape -- ``key`` / ``bond_orders`` / ``charges`` as
+Resonance-template table (independent implementation) --
+a per-cell shape: ``key`` / ``bond_orders`` / ``charges`` as
 per-cell ``None`` wildcard / ``frozenset`` alternatives / exact ``int``, with
 first-match priority. This table has no wildcard cells today: the six rows
 are pairwise distinct as exact tuples (chain length alone separates azido's
@@ -47,7 +47,8 @@ class ResonanceChainTemplate:
     """One row of the closed 3-set. ``matches`` is a per-cell AND across
     ``bond_orders`` and ``charges``: ``None`` wildcards a cell, a
     ``frozenset`` accepts any listed alternative, an ``int`` requires an
-    exact match. First-match wins in table order (mirrors     ``_match_template``) -- today every cell is an exact ``int`` so no two
+    exact match. First-match wins in table order (a defined-order
+    match) -- today every cell is an exact ``int`` so no two
     rows can double-match the same vector, but the priority contract is kept
     for any future wildcarded row."""
 

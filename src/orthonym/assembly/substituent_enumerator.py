@@ -972,7 +972,8 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # latent wrong-molecule). The PIN path already names it correctly via a
     # different entry; this fixes the general-engine `name_substituent` path.
     # Delegates to the existing `get_alkoxy_prefix` (handles alkyl/aryl R and
-    # fails closed on shapes it cannot name). Learned from     # element-dispatched `name_oxygen_subgraph`/`oxy_prefix_from_branch` (refR5).
+    # fails closed on shapes it cannot name). Uses an element-dispatched
+    # oxygen-subgraph prefix construction.
     if attach_idx is not None and 0 <= attach_idx < mol.GetNumAtoms():
         _root = mol.GetAtomWithIdx(attach_idx)
         if (_root.GetSymbol() == 'O' and _root.GetFormalCharge() == 0

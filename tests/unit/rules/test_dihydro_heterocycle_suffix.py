@@ -57,8 +57,8 @@ def test_dihydro_heterocycle_suffix_rt_exact():
 # numbering were unified onto ONE authority (`_mancude_hydro_numbering`), the stem
 # correctly said 2H while `orient_heterocycle_with_substituents` independently
 # numbered PCG-first (locant 2) -> a self-contradictory name -> SELF-01 abstained.
-# Both references ([hetero, indicated_hydrogen, principal, ...] key;
-# single seq map) read the suffix from the same map; Orthonym now does too.
+# The suffix is read from a single [hetero, indicated_hydrogen, principal, ...]
+# keyed map; Orthonym now does the same.
 
 @pytest.mark.parametrize("smi,expected", [
     ("O=C(O)C1=CCCCO1", "3,4-dihydro-2H-pyran-6-carboxylic acid"),

@@ -6,8 +6,8 @@ used to run its `-e`->`-yl` fallback on such a name and fabricate the OPSIN-UNPA
 `urea oximyl` (spliced into `2-amino-5-urea oximylpentanoic acid`). Fail closed instead, so the
 caller degrades to a clean abstention / a valid uglier name rather than shipping garbage.
 
-Learned from `is_complex_prefix` (a space forces parentheses / voids the token)
-and (an unnameable ligand voids the candidate) — refR5 consult. The standalone
+A space in a prefix forces parentheses / voids the token, and an unnameable ligand
+voids the candidate. The standalone
 functional-class name `urea oxime` itself is OPSIN-valid and is NOT affected (this guards only
 the substituent-prefix conversion).
 """

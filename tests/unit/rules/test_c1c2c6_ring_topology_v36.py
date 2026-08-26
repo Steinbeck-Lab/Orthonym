@@ -74,7 +74,7 @@ B_WITNESSES = [
 # Pattern C: multi-component ortho / ortho-peri-fused mancude that genuinely abstains
 # (rt-fails) at the best-effort tier. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md): general
 # N-component fusion nomenclature is a documented large build (name_ortho_fused_bicyclic is
-# 2-ring-only, DEFR-07); the recommended path is -style offline OPSIN-validated
+# 2-ring-only, DEFR-07); the recommended path is an offline OPSIN-validated
 # fused-template index. Breadth already floor-delivered for 24/41 ortho-fused (see below).
 C_WITNESSES = [
     "c1ccc2c(c1)CO[C@H]2[C@H]1OCc2ccccc21",

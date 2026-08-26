@@ -10,7 +10,7 @@ unverified (wrong). Fix routes ring-assembly substituent fragments through the
 existing ``name_ring_assembly_prefix`` (the same P-28.3 builder the whole-
 molecule composer already trusts), with a fail-closed backstop.
 
-Reference note: and decompose biphenyl-as-substituent to
+Note: a naive decomposition renders biphenyl-as-substituent as
 the non-preferred ``4-phenylphenyl``; the bracketed primed ``[1,1'-biphenyl]-4-yl``
 is a net PIN-correctness edge for Orthonym (connector-seeded
 prime-the-second-ring numbering, but the brackets + free-valence demotion are ours).

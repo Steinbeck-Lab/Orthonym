@@ -12,7 +12,7 @@ is a substituent namer, only reached when parent selection already made the amid
 prefix, so seniority is handled upstream (verified: OC(=O)CCN(C)C(C)=O routes here;
 CCN(C)C(C)=O names `N-ethyl-N-methylacetamide` at the suffix path, untouched).
 
-Reference-consult (`_acylamino_amido_prefix`, namer.py:1155-1245):
+Approach:
 rebuild a mono-acid from the acyl subgraph, name it, `oic acid->amido` /
 `carboxylic acid->carboxamido` (+ retained acetamido/formamido), render the
 N-substituent as an `N-` prefix. We reuse the strict `linear_acyl_amido_prefix`

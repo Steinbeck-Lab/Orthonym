@@ -1,6 +1,6 @@
 """Wave 0: OPSIN-free structural verifier.
 
-Two 0-wrong layers modeled on ``audit/reconstruction.py``:
+Two 0-wrong layers (a structural reconstruction verifier):
   * ``has_unverifiable_atoms`` — the wildcard fail-close predicate (this task).
   * ``reconstruct_and_verify`` / ``verify_or_none`` — a sound-over-complete
     name->graph reconstructor + dual oracle (Tasks 2–4).

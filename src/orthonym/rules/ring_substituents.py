@@ -3622,13 +3622,13 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
             # -- a glycosidic / inter-ring link (this ring atom bears
             # -O-(anomeric C of a second ring)). Name that inner ring system
             # RECURSIVELY as a substituent and cite '({inner-yl})oxy'. This is the
-            # nested-ring-oxy case reaches by unbounded recursion; here
+            # nested-ring-oxy case a naive engine reaches by unbounded recursion; here
             # it routes back through name_substituent -> the ring chokepoint ->
             # this function, so a di/tri-saccharide nests naturally (a
             # trisaccharide is just one more level). ADDITIVE: only reached after
             # the hydroxy + linear-alkoxy cases decline, so every simple ring keeps
             # its byte-identical legacy form. Depth-bounded by the shrinking atom
-            # set (the inner subgraph excludes this ring), like .
+            # set (the inner subgraph excludes this ring).
             if (len(o_nbrs) == 1 and o_nbrs[0].GetSymbol() == 'C'
                     and o_nbrs[0].IsInRing()
                     and o_nbrs[0].GetIdx() not in ring_atom_set):

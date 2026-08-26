@@ -326,7 +326,7 @@ def enter_name_scope():
     share both. Crucially, ``isolated_naming_session`` and the nested
     ``end_naming_session`` never reset these, so the memo survives the whole
     molecule (this is what stops a giant from re-exploring the same fragment
-    thousands of times -- per-molecule branch-cache model).
+    thousands of times -- a per-molecule branch-cache model).
     """
     d = getattr(_fragment_guard, 'name_call_depth', 0) + 1
     _fragment_guard.name_call_depth = d

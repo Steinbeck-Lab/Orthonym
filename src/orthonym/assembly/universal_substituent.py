@@ -9,8 +9,8 @@ ITSELF on the branch subgraph and always bottoms out at a valid (possibly
 ugly, non-PIN) systematic token: a simple leaf prefix, a von-Baeyer/'a'-
 replacement skeleton, or a deeper recursive call.  There is no depth cap.
 
-Architecture (``name_subgraph``, NOT copied --
-see ``):
+Architecture (independent implementation, no depth cap --
+a bounded recursive substituent namer):
 
     name(component) = parent(spine) + Sum(name(branch_i) rendered as -yl)
 
@@ -21,7 +21,8 @@ removed before any branch is computed, and branch components are pairwise
 disjoint (each BFS is bounded by a monotonically GROWING exclude set built
 from already-claimed atoms).  So along any recursion path the component size
 strictly decreases every call; recursion cannot be infinite.  Neither
-reference bounds the WORK this can cost on a pathological input (has no budget at all; mitigation is a depth>=1 local decline, exactly
+recursion here could otherwise cost unbounded WORK on a pathological input (a
+depth>=1 local decline is not enough on its own, exactly
 the failure mode this module must NOT reproduce), so this module adds an
 explicit in-algorithm atom/node WORK BUDGET (``_Budget``, charged by
 component size at every call) that fails CLOSED -- returns ``None`` -- when

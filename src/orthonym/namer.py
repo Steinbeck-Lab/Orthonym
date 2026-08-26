@@ -4093,7 +4093,7 @@ class Orthonym:
         both); only fires on the ship-a-failure path so it can never alter a
         passing name. The re-perception mirrors what do --
         cut the ester link atom out of parent selection, recompute seniority (see
-        findings in reference-findings-2026-08-14e.md) -- but here
+        known parent-selection findings) -- but here
         via the existing override rather than a new parent-selection path.
         """
         try:
@@ -6636,8 +6636,8 @@ class Orthonym:
         # C(C)(C)O arm ON A RING is otherwise emitted as a second ring -ol, double-assigning its
         # atom (it is ALSO in ring_substituents) -> an atom-short, wrong parent
         # (cyclohexane-1,2-diol for a mono-ol ring). decide suffix-vs-
-        # prefix by atom<->parent membership (filter_component_groups_to_parent;
-        # core_set membership); the off-parent group's atoms already flow to the
+        # prefix by atom<->parent membership; the off-parent group's atoms
+        # already flow to the
         # substituent enumerator and are named there.
         # .
         #

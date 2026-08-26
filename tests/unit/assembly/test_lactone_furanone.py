@@ -5,8 +5,8 @@ neutral) the ester producer emitted.
 Root cause: `name_general_monocycle` trusted the perceived 'ester' principal group for a
 ring-INTERNAL ester and routed it to the carboxylate suffix. The lactone's carbonyl C and ester
 O are both in the ring, so the exocyclic =O is a ring ketone (-one) and the ring O is the
-heteroatom of the parent (furan/pyran). Learned from /(both decompose the ring
-ester at perception: ring O -> ring heteroatom, exocyclic =O -> oxo/-one) — refR5 consult.
+heteroatom of the parent (furan/pyran). The ring ester decomposes at perception (both the ring
+O -> ring heteroatom and the exocyclic =O -> oxo/-one).
 
 Targets verified by OPSIN round-trip:
   O=C1OCC=C1                -> 2,5-dihydrofuran-2-one  (== furan-2(5H)-one)

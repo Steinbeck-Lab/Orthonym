@@ -406,7 +406,7 @@ def _count_multiple_bonds_in_atom_set(mol: Any, atom_set: Set[int]) -> int:
 #      winning handler's own NamingResult. Handlers RETURN rather than ADD (32 of
 #      36 HANDLER_POLICIES are direct_return=True), so nothing is ever ranked.
 #
-# -style `wins` (correct name available but not selected) = 1 of 309, and
+# 'wins' (correct name available but not selected) = 1 of 309, and
 # that one was a fragment name from an abandoned nested pool, not a rival
 # whole-molecule candidate. Write-up:  "v30 Task 2".
 #

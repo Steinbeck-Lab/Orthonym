@@ -131,7 +131,7 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
 
     Orthonym's 0-wrong gate IS OPSIN round-trip, so the trigger set matches
     OPSIN 2.9.0's grammar (probe_salt_spelling.py, 2026-08-23) — STRICTER than
-    `_needs_complex_fragment_multiplier`, which never validates against
+    a naive multiplier predicate that never validates against
     OPSIN and would emit simple `di` for `2-hydroxypropanoate` (OPSIN rejects
     `di2-hydroxypropanoate`). This is a dedicated salt predicate on purpose;
     do NOT reuse the substituent-tuned is_complex_substituent/get_multiplier_prefix
@@ -146,7 +146,7 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
       - contains '-' (catches no-digit stereo prefixes: D-/L-), or
       - starts with a multiplier word, or ends with a stem-collision suffix
         where a bare `di-` would fuse into a different word (carried from
-        fragment_rules.py:2820-2822).
+        where a bare `di-` would fuse into a different word).
     """
     if name in _DI_COLLISION_ANIONS:
         return True
@@ -570,7 +570,7 @@ def name_salt(mol, style: str = 'pin') -> str:
     # must have produced a name. `cation_list` already excludes H+ fragments
     # that were merged/attempted above (:287-330), so this cannot fire on the
     # legitimate hydroacid-salt H+ merge -- only on a cation this loop itself
-    # could not name (mirrors abort-whole, fragment_rules.py:60-61:
+    # could not name (abort-whole:
     # name every fragment or emit nothing).
     if len(cation_names) != len(cation_list):
         return ''
@@ -606,7 +606,8 @@ def name_salt(mol, style: str = 'pin') -> str:
     # FIND-2 fail-closed (0-wrong): every anion fragment must have produced a
     # name. Silently dropping an unnameable anion (e.g. a chlorosilanolate) and
     # joining only the subset that DID name is a silent atom-drop -- abstain
-    # (return '') instead, mirroring the cation-loop guard above and     # abort-whole (fragment_rules.py:60-61).
+    # (return '') instead, mirroring the cation-loop guard above (abort-whole
+    # -- name every fragment or emit nothing).
     if len(anion_names) != len(frags['anions']):
         return ''
 
@@ -622,7 +623,7 @@ def name_salt(mol, style: str = 'pin') -> str:
     # `neutrals` here is a real extraneous organic/inorganic co-fragment.
     #
     # Previously this ALWAYS aborted (mirroring the cation/anion guards
-    # above and abort-whole, fragment_rules.py:60-61) -- but that
+    # above, an abort-whole guard) -- but that
     # made a recognized water of crystallization (e.g. cetylpyridinium
     # chloride monohydrate, CHEBI:3566) abstain even though the ionic part
     # names cleanly. P-14.8.2 general nomenclature explicitly allows a

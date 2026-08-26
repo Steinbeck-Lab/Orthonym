@@ -1579,7 +1579,7 @@ def _name_aromatic_n_oxide(mol, matches, features: Any = None) -> Optional[str]:
 
     Void-if-ambiguous (0-wrong): a bis/multi-N-oxide (more than one
     simultaneously-oxidised ring N) has no "di-oxide" construction here and
-    is declined outright (parent_rules.py:21470-21489 mirror -- decline
+    is declined outright (a defensive 0-wrong policy -- decline
     rather than silently pick matches[0]). For the single-oxide case, every
     candidate locant is verified by an OPSIN round-trip against the ORIGINAL
     (unreduced) molecule before being emitted; if none verifies, decline

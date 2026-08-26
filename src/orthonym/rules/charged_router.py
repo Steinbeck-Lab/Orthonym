@@ -1367,7 +1367,7 @@ def _heavy_atom_multiset(smiles: str):
 
 
 def _reenter_atom_coverage(neutral_name: str, neutral_smi: str) -> Optional[bool]:
-    """v36 B1 atom-coverage guard (mirrors ``covered == all-atoms``
+    """v36 B1 atom-coverage guard (the ``covered == all-atoms``
     precondition). Re-parse ``neutral_name`` through OPSIN (PLAIN, neutral-vs-
     neutral -- valid, unaffected by SUB-03's unparseable-INTERMEDIATE concern) and
     compare its heavy-atom multiset to ``neutral_smi``:
