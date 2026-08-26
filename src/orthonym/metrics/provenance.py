@@ -134,6 +134,19 @@ best_effort_ctx = contextvars.ContextVar(
 # tier the value is False, so PIN/complete output is byte-identical.
 allow_aromatic_general_ctx = contextvars.ContextVar(
     "orthonym_allow_aromatic_general", default=False)
+# v37 SP5.4: the ``full_coverage`` opt-in (``--emit-tier full-coverage``)
+# propagated into fragment / component recursion, exactly as the three
+# contextvars above. This is the SINGLE bit that arms the D2 general P-69
+# coordination-additive namer (donor-set perception + additive renderer),
+# which lives strictly ABOVE best-effort: full-coverage is best-effort's
+# production superset PLUS this marker. Default False EVERYWHERE, so with the
+# flag off (the default) D2 dispatch is never reached and every tier's output
+# is byte-identical -- the load-bearing isolation property SP5.4 tests. Read
+# back ONLY by the recursive re-entry (``name_compound``) and D2's own dispatch
+# guard; never used as a naming-vocabulary discriminator, so it cannot alter
+# pin/valid/complete/best-effort output.
+full_coverage_ctx = contextvars.ContextVar(
+    "orthonym_full_coverage", default=False)
 # v30 P3-T1c: a composer (``pin_path``) name whose ring substituent prefix could
 # only be produced by the GENERAL tier -- see ``record_general_ring_prefix``.
 _GENERAL_RING_PREFIX = contextvars.ContextVar(

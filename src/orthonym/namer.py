@@ -2369,6 +2369,7 @@ class Orthonym:
                  general_fallback: bool = False,
                  general_fallback_unverified: bool = False,
                  allow_aromatic_general: bool = False,
+                 full_coverage: bool = False,
                  _principal_group_override: Optional[str] = None,
                  _forced_parent_rank: int = 0,
                  _seed_excluded_dispatch_classes: frozenset = frozenset(),
@@ -2455,6 +2456,15 @@ class Orthonym:
         # -> vonbaeyer_universal.analyze_cage_universal(allow_mancude=...).
         # Default False -> default output byte-identical.
         self._allow_aromatic_general: bool = allow_aromatic_general
+        # v37 SP5.4: the full-coverage opt-in (``--emit-tier full-coverage``).
+        # The SINGLE bit that arms the D2 general P-69 coordination-additive
+        # namer, which sits strictly ABOVE best-effort (full-coverage is
+        # best-effort's production superset PLUS this marker). Default False ->
+        # D2 dispatch is never reached and EVERY tier's output is
+        # byte-identical (the SP5.4 isolation property). Published as
+        # ``full_coverage_ctx`` for the recursive re-entry, torn down in the
+        # ``name()`` finally with its three siblings.
+        self._full_coverage: bool = full_coverage
         # SUB-03 (169.5): per-instance bypass for the OPSIN validity gate, used
         # by neutralize-recurse / fragment intermediate naming (those produce an
         # INTERMEDIATE name that is transformed downstream, not a final output,
@@ -2984,6 +2994,16 @@ class Orthonym:
                     self._allow_aromatic_general)
             except Exception:
                 self._aag_ctx_token = None
+            # v37 SP5.4: publish the full-coverage opt-in with the same lifetime
+            # so the recursive re-entry (name_compound builds a FRESH namer)
+            # inherits it. Top-level only; reset in the finally below. Default
+            # False keeps D2 unreachable and every tier byte-identical.
+            try:
+                from .metrics.provenance import full_coverage_ctx
+                self._fc_ctx_token = full_coverage_ctx.set(
+                    self._full_coverage)
+            except Exception:
+                self._fc_ctx_token = None
         # --- Wave-2 P2: isotopic substitution decorator (P-82.2.1 / P-45.4) ---
         # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
         # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
@@ -3358,6 +3378,19 @@ class Orthonym:
                 except Exception:
                     pass
                 self._aag_ctx_token = None
+            # v37 SP5.4: torn down with its three siblings. A leaked
+            # full_coverage flag would arm D2 on a LATER default-tier naming in
+            # the same process -- the exact isolation break SP5.4 exists to
+            # prevent (mirrors the best_effort_ctx / allow_aromatic_general_ctx
+            # reasoning above).
+            _fc_tok = getattr(self, '_fc_ctx_token', None)
+            if _fc_tok is not None:
+                try:
+                    from .metrics.provenance import full_coverage_ctx
+                    full_coverage_ctx.reset(_fc_tok)
+                except Exception:
+                    pass
+                self._fc_ctx_token = None
             end_naming_session()
 
     def name_tiered(self, smiles: str) -> dict:
@@ -3490,12 +3523,33 @@ class Orthonym:
             _token = _pv.gate_token_for_gate_outcome(gate_outcome)
             if _token is not None:
                 gates.append(_token)
+        # v37 SP5.4: honest verification-provenance label for the full-coverage
+        # tier. Derived from what ALREADY shipped, deny-by-default "unverified":
+        #   "identity" -> a D1 exact-InChIKey coordination retained-name hit
+        #   "opsin"    -> the name round-trips through OPSIN (SELF-01 / engine RT)
+        #   "reconstructor" -> (SP5.6, if built) structurally reconstructed
+        #   "unverified"    -> emitted with no passing oracle (T4 / D2 additive),
+        #                      or an abstain row. Never claims a verification the
+        #                      emission did not earn (mirrors the allowlist
+        #                      discipline of ``opsin_label_for_gate_outcome``).
+        verified = "unverified"
+        if name and not is_failure_name(name):
+            _is_d1_identity = False
+            try:
+                _is_d1_identity = _coordination_retained_name(smiles) == name
+            except Exception:
+                _is_d1_identity = False
+            if _is_d1_identity:
+                verified = "identity"
+            elif opsin in ("verified", "verified_constitution_only"):
+                verified = "opsin"
         return {"name": name, "tier": tier, "is_pin": is_pin,
                 "source": source, "opsin": opsin, "gates_passed": gates,
                 "gate_outcome": gate_outcome,
                 "formula": formula, "limit_code": limit_code,
                 "stereo_unexpressed": stereo_unexpressed,
-                "suffix_free_prefix_name": suffix_free_prefix_name}
+                "suffix_free_prefix_name": suffix_free_prefix_name,
+                "verified": verified}
 
     def _retained_structural_preference(self, mol) -> Optional[str]:
         """v26 P6 (Heritage A3): retained/fusion structural-recognizer
@@ -6806,6 +6860,7 @@ def name_compound(smiles: str, style: str = "pin",
                    general_fallback: Optional[bool] = None,
                    general_fallback_unverified: Optional[bool] = None,
                    allow_aromatic_general: Optional[bool] = None,
+                   full_coverage: Optional[bool] = None,
                    raise_on_limit: bool = False,
                    binding_proof: str = "off"):
     """
@@ -6872,6 +6927,16 @@ def name_compound(smiles: str, style: str = "pin",
             allow_aromatic_general = allow_aromatic_general_ctx.get()
         except Exception:
             allow_aromatic_general = False
+    # v37 SP5.4: inherit the full-coverage opt-in through the recursive
+    # re-entry the same way (a FRESH namer would otherwise lose a top-level
+    # full_coverage=True on fragment recursion). An explicit True/False from
+    # the caller still wins; None means "inherit the top-level tier".
+    if full_coverage is None:
+        try:
+            from .metrics.provenance import full_coverage_ctx
+            full_coverage = full_coverage_ctx.get()
+        except Exception:
+            full_coverage = False
 
     namer = Orthonym(
         style=style,
@@ -6881,6 +6946,7 @@ def name_compound(smiles: str, style: str = "pin",
         general_fallback=general_fallback,
         general_fallback_unverified=general_fallback_unverified,
         allow_aromatic_general=allow_aromatic_general,
+        full_coverage=full_coverage,
         binding_proof=binding_proof,
     )
 

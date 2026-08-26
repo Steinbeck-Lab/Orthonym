@@ -33,11 +33,27 @@ def _emit_tier_flags(emit_tier: str) -> dict:
     and best-effort so best-effort candidate production is a superset of
     complete's (the T6.1 fix — previously aag was complete-only, making
     best-effort under-cover the P1 cage machinery).
+
+    v37 SP5.4 adds a fifth tier, ``full-coverage`` (the opt-in flag tier that
+    arms the D2 general P-69 coordination-additive namer):
+
+      full-coverage -> gf=T, gfu=T, aag=T, full_coverage=T
+
+    It is best-effort's production superset (identical gf/gfu/aag triple) PLUS
+    its OWN ``full_coverage`` marker bit -- deliberately NOT aliased to
+    best-effort's triple, so D2's dispatch point downstream can distinguish
+    "best-effort tier" from "full-coverage tier". The ``full_coverage`` key is
+    present (``False``) on every other tier, so a consumer can always read it.
+    With the flag off (every non-full-coverage tier) D2 is never reached and
+    output is byte-identical -- the SP5.4 isolation property.
     """
+    _be_or_fc = emit_tier in ("best-effort", "full-coverage")
     return {
         "general_fallback": emit_tier != "pin",
-        "general_fallback_unverified": emit_tier == "best-effort",
-        "allow_aromatic_general": emit_tier in ("complete", "best-effort"),
+        "general_fallback_unverified": _be_or_fc,
+        "allow_aromatic_general": emit_tier in (
+            "complete", "best-effort", "full-coverage"),
+        "full_coverage": emit_tier == "full-coverage",
     }
 
 
@@ -176,14 +192,18 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--emit-tier",
         dest="emit_tier",
-        choices=["pin", "valid", "complete", "best-effort"],
+        choices=["pin", "valid", "complete", "best-effort", "full-coverage"],
         default="pin",
         help=(
             "Output tier: pin (default, PIN-or-abstain), valid "
             "(adds RT-verified general-engine names), complete (v26; adds "
             "RT-verified aggressive general aromatic/heterocyclic "
             "fallbacks; non-PIN allowed), best-effort (adds E1-certified "
-            "but OPSIN-unverified names)."
+            "but OPSIN-unverified names), full-coverage (v37 SP5; adds the "
+            "opt-in general P-69 coordination-additive namer for "
+            "metal-tetrapyrrole/corrin macrocycles -- construct-or-decline, "
+            "labelled UNVERIFIED where no oracle exists; never surfaces "
+            "through the default plain-string API)."
         ),
     )
     parser.add_argument(
@@ -390,6 +410,7 @@ def main(args: List[str] = None) -> int:
                 general_fallback_unverified=_tier_flags[
                     "general_fallback_unverified"],
                 allow_aromatic_general=_tier_flags["allow_aromatic_general"],
+                full_coverage=_tier_flags.get("full_coverage", False),
                 binding_proof=_binding_proof,
             )
             row = namer.name_tiered(parsed.smiles)
