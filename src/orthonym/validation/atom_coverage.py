@@ -183,6 +183,51 @@ def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
     if not name or not opsin_jar:
         return None
 
+    # PERF (v38 P1): prefer the ONE lazily-started in-process JVM (jvm_bridge,
+    # JPype) over a fresh ~0.82 s cold `java -jar` launch per name -- that
+    # cold-start dominated atom-coverage wall time. ``opsin_stdout`` returns
+    # EXACTLY the bytes this ``java -jar ... -osmi`` invocation would have
+    # written to stdout, so the parsing below is SHARED verbatim between the two
+    # sources and cannot drift. ``served`` is False whenever the in-process path
+    # cannot serve the call (jpype absent, jar unresolvable or a different OPSIN
+    # version than the JVM was started with, an embedded newline, a Java-side
+    # error) -- we then fall through to the subprocess exactly as before, so
+    # correctness never depends on the optimization. The final structure is
+    # canonicalized through RDKit either way, so a name that parses returns a
+    # byte-identical canonical SMILES whether OPSIN ran warm or cold.
+    stdout_text: Optional[str] = None
+    served = False
+    try:
+        from ..jvm_bridge import opsin_stdout
+        stdout_text, served = opsin_stdout(name, allow_radicals=False,
+                                           jar_path=opsin_jar)
+    except ImportError:  # pragma: no cover - jvm_bridge always present
+        served = False
+
+    if not served:
+        stdout_text = _opsin_cli_stdout(name, opsin_jar)
+        if stdout_text is None:
+            return None
+
+    stdout_lines = stdout_text.strip().split("\n") if stdout_text else []
+    if stdout_lines and stdout_lines[0].strip():
+        smiles = stdout_lines[0].strip()
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            return Chem.MolToSmiles(mol, canonical=True)
+    return None
+
+
+def _opsin_cli_stdout(name: str, opsin_jar: str) -> Optional[str]:
+    """Fresh-subprocess OPSIN parse -- exactly the previous cold path.
+
+    Writes ``name`` to a temp file and runs ``java -jar opsin -osmi``, returning
+    the raw stdout text (byte-for-byte what the CLI writes) or ``None`` when the
+    subprocess could not run (temp-file failure, timeout, or any Java-side
+    error). Used only as the fall-through when the in-process JVM in
+    :func:`_parse_name_with_opsin_uncached` cannot serve the call, so the answer
+    is identical -- only slower.
+    """
     # Write single name to temp file
     try:
         with tempfile.NamedTemporaryFile(
@@ -201,15 +246,7 @@ def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
             text=True,
             timeout=30.0,
         )
-
-        stdout_lines = proc.stdout.strip().split("\n") if proc.stdout else []
-        if stdout_lines and stdout_lines[0].strip():
-            smiles = stdout_lines[0].strip()
-            mol = Chem.MolFromSmiles(smiles)
-            if mol is not None:
-                return Chem.MolToSmiles(mol, canonical=True)
-        return None
-
+        return proc.stdout
     except (subprocess.TimeoutExpired, OSError, Exception):
         return None
     finally:
