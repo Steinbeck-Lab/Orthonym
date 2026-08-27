@@ -82,11 +82,18 @@ def test_tier4_substituted_numbering(smiles, expected):
 # ---------------------------------------------------------------------------
 # Fail-closed: [5]helicene's PIN is the fusion name dibenzo[c,g]phenanthrene
 # (helicene series starts at 6 rings), which needs the deferred polycomponent-
-# fusion engine — must stay 'unknown', never a wrong "pentahelicene". In raw
-# (gate-off) mode the substructure matcher over-matches a benzo[c]phenanthrene
-# core (a 4-ring name for the 5-ring system); the production validity gate
-# suppresses that to 'unknown'. The suite autouse-DISABLES the gate, so
-# re-enable it to assert the production behavior (test_tier3b pattern).
+# fusion engine — [5]helicene (pentahelicene) is named by fusion nomenclature as
+# dibenzo[c,g]phenanthrene, which is its PREFERRED IUPAC NAME. "Pentahelicene"/
+# "[5]helicene" is NOT a retained name: P-25.1.2.6 "Polyhelicenes" begins the
+# helicene series at SIX rings ("The series begins with six rings and not five
+# rings ...", BlueBookV2.md:11477/11479), so a five-ring helix has no helicene
+# name and degrades to the fusion PIN. dibenzo[c,g]phenanthrene is marked (PIN)
+# verbatim at BlueBookV2.md:6914 [P-25.3.4.2.1 (c) — phenanthrene base, two benzo
+# first-order attached components preferred to one naphtho]. The engine now
+# BUILDS this correctly (earlier it over-matched a 4-ring benzo[c]phenanthrene
+# core and had to fail closed); OPSIN round-trips the emitted name to the input
+# InChIKey (0-wrong, machine-confirmed via ). The suite
+# autouse-DISABLES the validity gate, so re-enable it to assert production output.
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
@@ -97,8 +104,11 @@ def _validity_gate_on(monkeypatch):
 
 
 @pytest.mark.unit
-def test_pentahelicene_stays_fail_closed(_validity_gate_on):
-    assert "unknown" in name_compound("c1ccc2c(c1)ccc1ccc3ccc4ccccc4c3c12")
+def test_pentahelicene_names_as_fusion_pin(_validity_gate_on):
+    # PIN = dibenzo[c,g]phenanthrene (round-trip verified, 0-wrong); [5]helicene
+    # has no retained helicene name (series starts at 6 rings, P-25.1.2.6).
+    assert name_compound("c1ccc2c(c1)ccc1ccc3ccc4ccccc4c3c12") == \
+        "dibenzo[c,g]phenanthrene"
 
 
 # ---------------------------------------------------------------------------
