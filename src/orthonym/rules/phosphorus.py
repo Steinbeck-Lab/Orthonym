@@ -1493,3 +1493,82 @@ def get_phosphorus_prefix(fg_name: str) -> Optional[str]:
         "phosphate_monoester": None,
     }
     return PHOSPHORUS_PREFIXES.get(fg_name)
+
+
+def carbon_free_phospho_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]:
+    """A CARBON-FREE ``-P(=O)(OH)2`` / ``-P(=O)(O-)2`` substituent fragment ->
+    its RETAINED detachable prefix.
+
+    ``phosphono`` (P-67.1.4.1, the neutral di-hydroxy group) and ``phosphonato``
+    (P-72.6.1 preselected prefix for the ``-P(O)(O-)2`` di-anion, BB :41213).
+
+    Why this exists: the recursive substituent path (``name_substituent_fragment``
+    Step 4) names a fragment by round-tripping it through the WHOLE-molecule
+    namer, but the bare P-oxo fragment ``O=P(O)O`` has NO carbon, so
+    ``name_compound`` classifies it ``inorganic compound (not supported)`` and
+    the fragment was DROPPED (DROP-12). The neutral prefix is exactly the one the
+    FG-on-parent-chain path already emits via
+    ``get_phosphorus_prefix('phosphonic_acid')`` -> ``'phosphono'``; this restores
+    it for the fragment shape the whole-molecule reject cannot see.
+
+    Fail-closed (``None``) for anything that is not exactly this shape:
+    attach atom is P; the fragment is carbon-free with a single P centre; that P
+    carries exactly one ``=O`` and two single-bonded O; and the two single O are
+    BOTH neutral hydroxyl (-> ``phosphono``) or BOTH oxido anions (->
+    ``phosphonato``). A mixed/partial charge, an extra H on P (phosphinic), or a
+    second P (anhydride) declines here and falls through to the existing guards.
+    The top-level SELF-01/OPSIN validity gate voids any non-RT composed name, so
+    0-wrong holds regardless.
+    """
+    if attach_idx is None or attach_idx not in set(sub_atoms):
+        return None
+    sub_set = set(sub_atoms)
+    p_atom = mol.GetAtomWithIdx(attach_idx)
+    if p_atom.GetSymbol() != 'P':
+        return None
+    # Carbon-free, single-P fragment.
+    for i in sub_set:
+        sym = mol.GetAtomWithIdx(i).GetSymbol()
+        if sym == 'C':
+            return None
+        if sym == 'P' and i != attach_idx:
+            return None            # a second P (anhydride/chain) -> not this shape
+    if p_atom.GetTotalNumHs() != 0:
+        return None                # P-H present (phosphinic family) -> decline
+    # The P's oxygen neighbours WITHIN the fragment: exactly one =O + two -O.
+    from rdkit import Chem as _Chem
+    dbl_o = []
+    sgl_o = []
+    other = []
+    for nbr in p_atom.GetNeighbors():
+        if nbr.GetIdx() not in sub_set:
+            continue               # the free valence (bond to the parent chain)
+        if nbr.GetSymbol() != 'O':
+            return None            # any non-O substituent on P -> decline
+        bt = mol.GetBondBetweenAtoms(attach_idx, nbr.GetIdx()).GetBondType()
+        if bt == _Chem.BondType.DOUBLE:
+            dbl_o.append(nbr)
+        elif bt == _Chem.BondType.SINGLE:
+            sgl_o.append(nbr)
+        else:
+            other.append(nbr)
+    if other or len(dbl_o) != 1 or len(sgl_o) != 2:
+        return None
+    # The =O must be a plain oxo (no charge, no H).
+    od = dbl_o[0]
+    if od.GetFormalCharge() != 0 or od.GetTotalNumHs() != 0:
+        return None
+    # Classify the two single O: both neutral -OH, or both anionic -O(-).
+    charges = [o.GetFormalCharge() for o in sgl_o]
+    hcounts = [o.GetTotalNumHs() for o in sgl_o]
+    # Each single O must be terminal (only bonded to P within the fragment).
+    for o in sgl_o:
+        heavy = [n for n in o.GetNeighbors() if n.GetIdx() != attach_idx]
+        if heavy:
+            return None            # an -O-R ester bridge, not a bare acid/anion
+    if all(c == 0 and h >= 1 for c, h in zip(charges, hcounts)):
+        return get_phosphorus_prefix("phosphonic_acid")          # 'phosphono'
+    if all(c == -1 and h == 0 for c, h in zip(charges, hcounts)):
+        # P-72.6.1 preselected anionic prefix (matches rules/ions.py usage).
+        return "phosphonato"
+    return None

@@ -2146,6 +2146,25 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # (falls through to 'substituent') on any decline. The λ5 branch is Task 3.
     if attach_idx is not None and attach_idx in frag_atoms_set:
         if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
+            # v38 DROP-12 (P-67.1.4.1 / P-72.6.1): a CARBON-FREE P-oxo fragment
+            # -- bare -P(=O)(OH)2 (phosphono) / -P(=O)(O-)2 (phosphonato). The
+            # phosphanyl helper below EXCLUDES a phosphonic P=O (it names only a
+            # clean neutral organyl/hydride P), so this shape used to fall through
+            # to the 'substituent' sentinel and be DROPPED -- the same carbon-free
+            # reject as name_substituent_fragment DROP-12 (the whole-molecule
+            # namer calls 'O=P(O)O' inorganic). This restores the retained prefix
+            # the FG-on-parent-chain path already emits; the top-level SELF-01/
+            # OPSIN gate voids any non-RT composed name (0-wrong). Fail-closed on
+            # any other P-oxo shape (see carbon_free_phospho_prefix).
+            try:
+                from ..rules.phosphorus import carbon_free_phospho_prefix
+                _pp = carbon_free_phospho_prefix(
+                    mol, list(frag_atoms_set), attach_idx
+                )
+                if _pp:
+                    return _stereo_route(_pp)
+            except Exception:
+                pass
             try:
                 from ..rules.phosphorus import name_phosphanyl_substituent
                 _ph = name_phosphanyl_substituent(

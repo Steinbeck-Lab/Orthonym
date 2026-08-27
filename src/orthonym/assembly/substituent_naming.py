@@ -6297,6 +6297,24 @@ def name_substituent_fragment(
     if _find_amine_oxide_n(mol, sub_atoms) is not None:
         return _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx)
 
+    # Step 0c (v38 DROP-12, P-67.1.4.1 / P-72.6.1): a CARBON-FREE P-oxo fragment
+    # attached at P -- a bare -P(=O)(OH)2 (phosphono) or -P(=O)(O-)2
+    # (phosphonato). Steps 3-4 name a fragment by round-tripping it through the
+    # whole-molecule namer, but the bare fragment 'O=P(O)O' has 0 carbon, so
+    # name_compound rejects it 'inorganic compound (not supported)' and the
+    # phospho was DROPPED (DROP-12) -> the candidate OPSIN-parses to a DETACHED
+    # free phosphate -> SELF-01 suppresses -> abstain. The neutral prefix here is
+    # exactly the retained one the FG-on-parent-chain path already emits
+    # (get_phosphorus_prefix('phosphonic_acid') -> 'phosphono'); the anionic case
+    # routes before the DROP-26 charge guard below. Fail-closed on any other
+    # P-oxo shape (see carbon_free_phospho_prefix); the top-level SELF-01/OPSIN
+    # gate voids any non-RT composed name, so 0-wrong holds.
+    if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
+        from ..rules.phosphorus import carbon_free_phospho_prefix
+        _pp = carbon_free_phospho_prefix(mol, sub_atoms, attach_idx)
+        if _pp is not None:
+            return _pp
+
     # Step 1: Check retained PREFERRED substituent names FIRST (phenyl, benzyl,
     # retained cycloalkyls, tert-butyl). F-T9/DD6 RET-02: isopropyl/sec-butyl/
     # isobutyl/neopentyl are NOT returned (their located PINs come from Step 2d).
