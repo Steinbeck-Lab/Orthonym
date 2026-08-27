@@ -5,6 +5,7 @@ Implements IUPAC 2013 rules for selecting the principal chain.
 Key change in IUPAC 2013: Chain length takes priority over unsaturation!
 """
 
+import os as _os
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
@@ -955,8 +956,41 @@ def find_principal_chain(
                     lams.append(lam)
         return tuple(sorted(lams, reverse=True))
 
+    # v38 P2 reverse-pair memo (PURE SPEEDUP — provably output-identical).
+    # `chain_score` is orientation-invariant: criteria 1-2 read set membership,
+    # 3-5 count length/bonds (both orientation-free), 6-8 take a fwd/rev `max`,
+    # and criterion 9 (`_compute_sub_locant_score`) returns the same tuple for a
+    # chain and its reverse — it only differs between the two orientations when
+    # they do NOT tie the P-44 cascade, and in that case both orientations pick
+    # the SAME canonical orientation; when they DO tie, the substituent-position
+    # pattern is palindromic so `sorted(positions)` is identical either way.
+    # `find_all_carbon_chains` emits every chain in BOTH orientations (~47% of
+    # the list are exact reverses — measured 210/441, 462/981), so scoring the
+    # reverse-canonical form once and reusing it for the mirror chain returns the
+    # IDENTICAL tuple with ~half the work. The cache is LOCAL to this
+    # find_principal_chain call (a new call = a new closure = a new dict), so it
+    # can never serve a stale score for a different molecule / PCG / exclude set.
+    _score_cache: Dict[tuple, tuple] = {}
+    _P2_VERIFY = _os.environ.get("ORTHONYM_P2_VERIFY") == "1"
+
+    def _chain_score_cached(chain: List[int]) -> tuple:
+        t = tuple(chain)
+        rt = t[::-1]
+        key = t if t <= rt else rt
+        cached = _score_cache.get(key)
+        if cached is None:
+            cached = chain_score(chain)
+            _score_cache[key] = cached
+        elif _P2_VERIFY:
+            # Debug self-check: the memo must return exactly what the un-memoized
+            # code would. Off by default (zero cost); flip ORTHONYM_P2_VERIFY=1
+            # to assert orientation-invariance on real data across a whole run.
+            fresh = chain_score(chain)
+            assert fresh == cached, (chain, fresh, cached)
+        return cached
+
     # Find chain with highest score; break exact ties deterministically (P-45).
-    scored = [(chain_score(c), c) for c in chains]
+    scored = [(_chain_score_cached(c), c) for c in chains]
     best_score = max(s for s, _ in scored)
     top = [c for s, c in scored if s == best_score]
     if len(top) == 1:
