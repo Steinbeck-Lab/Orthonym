@@ -422,6 +422,62 @@ def _protonate_amines_with_h_plus(mol, n_protons: int):
             continue
 
 
+def _reattach_protons_to_acids(mol):
+    """v38 (Sub-gap 2): reconstruct the NEUTRAL free acid of an organic oxoanion
+    written ionically with bare [H+] protons and no neutral base
+    (``dicarboxylate.[H+].[H+]``). Give every deprotonated acid oxygen (``[O-]``)
+    its proton back and drop every bare ``[H+]``, yielding the single neutral parent
+    acid — or None if the shape is not an all-oxygen anion or does not reconstruct
+    cleanly to one organic fragment.
+
+    The placement is FORCED, not searched: a salt is charge-balanced, every ``[H+]``
+    is +1 and every acid-oxygen site is -1, so ``#[H+] == #[O-]`` and each proton
+    returns to one oxygen. There is no site to choose, so the result is deterministic
+    and spelling-invariant. The reconstruction is only a CANDIDATE: the caller names
+    it and the top-level SELF-01 validity gate RT-verifies the full InChIKey against
+    the ionic input (they share one key), so a wrong reconstruction fails closed
+    (0-wrong preserved). Scoped to keep the halide 0-wrong guard (``[H+].[Cl-]``)
+    intact: every anionic site must be OXYGEN (a ``[Cl-]``/``[S-]`` anion returns
+    None), and the neutral parent must be a SINGLE, carbon-bearing (organic) fragment.
+    """
+    try:
+        rw = Chem.RWMol(mol)
+        h_plus_idxs = [a.GetIdx() for a in rw.GetAtoms()
+                       if a.GetAtomicNum() == 1 and a.GetFormalCharge() == 1
+                       and a.GetDegree() == 0]
+        neg_atoms = [a for a in rw.GetAtoms() if a.GetFormalCharge() < 0]
+        if not h_plus_idxs or not neg_atoms:
+            return None
+        # Every anionic site must be OXYGEN (carboxylate / sulfonate / phosphate
+        # oxygen). This is what keeps the branch off the halide 0-wrong guard.
+        if any(a.GetAtomicNum() != 8 for a in neg_atoms):
+            return None
+        # The protons must balance the anionic charge EXACTLY (a leftover proton or
+        # an unprotonated site would leave a wrongly-charged species).
+        neg_total = -sum(a.GetFormalCharge() for a in neg_atoms)
+        if neg_total != len(h_plus_idxs):
+            return None
+        for a in neg_atoms:
+            charge = a.GetFormalCharge()
+            a.SetFormalCharge(0)
+            a.SetNumExplicitHs(a.GetNumExplicitHs() + abs(charge))
+        for h_idx in sorted(h_plus_idxs, reverse=True):
+            rw.RemoveAtom(h_idx)
+        out = rw.GetMol()
+        Chem.SanitizeMol(out)
+    except (RuntimeError, ValueError):
+        return None
+    # A single, neutral, carbon-bearing (organic) parent acid -- never a mixture
+    # of free acids and never an inorganic oxoacid (out of this sub-gap's scope).
+    if Chem.GetFormalCharge(out) != 0:
+        return None
+    if len(Chem.GetMolFrags(out)) != 1:
+        return None
+    if not any(a.GetAtomicNum() == 6 for a in out.GetAtoms()):
+        return None
+    return out
+
+
 def name_salt(mol, style: str = 'pin') -> str:
     """
     Name a salt using compositional nomenclature.
@@ -526,6 +582,30 @@ def name_salt(mol, style: str = 'pin') -> str:
             recur = name_salt(protonated, style)
             if recur and not is_failure_name(recur):
                 return recur
+
+    # v38 (Sub-gap 2): an organic oxoacid written ionically -- the acid fully
+    # deprotonated with its proton(s) floating as bare [H+] and NO neutral base to
+    # carry them (e.g. a dicarboxylate DIANION + 2x[H+]). The amine branch above
+    # needs a neutral base (absent here), so the protons are still orphaned and the
+    # guard below would abstain. REATTACH each proton to its acid oxygen,
+    # reconstructing the neutral free acid, and name THAT via the ordinary namer.
+    # The top-level SELF-01 gate RT-verifies the emitted name's full InChIKey
+    # against the ionic input (identical key), so a wrong reconstruction fails
+    # closed. Scoped (in _reattach_protons_to_acids) to all-[H+] cations +
+    # all-oxygen anions + single organic parent, so it never touches the halide
+    # 0-wrong guard just below.
+    if (h_plus_frags and not other_cation_frags and not neutrals
+            and frags['anions']):
+        neutral_acid = _reattach_protons_to_acids(mol)
+        if neutral_acid is not None:
+            try:
+                from ..assembly.fragment_naming import name_fragment_recursively
+                acid_smiles = Chem.MolToSmiles(neutral_acid, canonical=True)
+                acid_name = name_fragment_recursively(acid_smiles)
+                if acid_name and not is_failure_name(acid_name):
+                    return acid_name
+            except (RecursionError, ValueError, RuntimeError):
+                pass
 
     # 0-wrong (Fable-found): a hydroacid written ionically ([H+].[X-], optionally
     # with water) leaves the proton orphaned unless the hydroacid-merge branch above

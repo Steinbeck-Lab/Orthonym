@@ -946,6 +946,30 @@ def _self_consistency_skeleton(smiles: str) -> Optional[str]:
         return None
 
 
+def _self_consistency_full_key(smiles: str) -> Optional[str]:
+    """The FULL standard InChIKey (skeleton block + stereo block + mobile-H /
+    charge-normalized proton layer) of ``smiles`` — None if RDKit cannot parse it.
+
+    An EQUAL full key between the input structure and a name's OPSIN re-perception
+    is the strongest possible identity signal: it is exactly the project's headline
+    round-trip metric, so two structures with one full InChIKey ARE the same
+    molecule (same constitution, charge and stereo, protonation normalized). SELF-01
+    uses this to short-circuit to "ok" and thereby stops over-rejecting a salt whose
+    input is written ionically (drug.[H+].[Cl-]) while its correct name OPSIN
+    re-perceives as the neutral molecular form (drug.Cl): the two share one InChIKey
+    but differ in the RegistrationHash TAUTOMER layer, so the stereo fallback below
+    used to call them a mismatch. Equal full keys can only turn a spurious mismatch
+    into ok, never the reverse (0-wrong preserved)."""
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        from rdkit.Chem import inchi
+        return inchi.MolToInchiKey(mol) or None
+    except Exception:
+        return None
+
+
 def _self_consistency_net_charge(smiles: str) -> Optional[int]:
     """Net formal charge of ``smiles`` (None if unparseable). The InChIKey skeleton
     block used by _self_consistency_skeleton EXCLUDES the charge/protonation layer
@@ -1041,6 +1065,19 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     stereo carve-out, which judges a stereo-STRIPPED OPSIN parse) compares constitution
     only — a stereo-strict compare there would suppress every stereo-bearing input by
     construction (see the BBR-GATE block below)."""
+    # Strongest identity signal first: an EQUAL FULL InChIKey (skeleton + stereo +
+    # normalized proton layer) means the name denotes the SAME molecule as the input
+    # by the headline round-trip metric — accept immediately. This is 0-wrong-safe
+    # (it only turns a spurious mismatch into ok) and closes a stereo-salt blind
+    # spot: a stereo-bearing ionic salt (drug.[H+].[Cl-]) and the neutral molecular
+    # form its correct name re-perceives to (drug.Cl) share one full key but differ
+    # in the RegistrationHash TAUTOMER layer, so the stereo fallback below wrongly
+    # returned "mismatch" (na>0 skips the na==0 short-circuit). Applies to the
+    # ignore_stereo carve-out too: equal keys are the same molecule there as well.
+    ka = _self_consistency_full_key(input_smiles)
+    kb = _self_consistency_full_key(opsin_smiles)
+    if ka is not None and kb is not None and ka == kb:
+        return "ok"
     a = _self_consistency_skeleton(input_smiles)
     b = _self_consistency_skeleton(opsin_smiles)
     if a is None or b is None:
