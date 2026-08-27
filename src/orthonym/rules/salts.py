@@ -434,11 +434,17 @@ def _reattach_protons_to_acids(mol):
     is +1 and every acid-oxygen site is -1, so ``#[H+] == #[O-]`` and each proton
     returns to one oxygen. There is no site to choose, so the result is deterministic
     and spelling-invariant. The reconstruction is only a CANDIDATE: the caller names
-    it and the top-level SELF-01 validity gate RT-verifies the full InChIKey against
-    the ionic input (they share one key), so a wrong reconstruction fails closed
-    (0-wrong preserved). Scoped to keep the halide 0-wrong guard (``[H+].[Cl-]``)
-    intact: every anionic site must be OXYGEN (a ``[Cl-]``/``[S-]`` anion returns
-    None), and the neutral parent must be a SINGLE, carbon-bearing (organic) fragment.
+    it and the top-level SELF-01 validity gate RT-verifies the reconstructed parent
+    against the ionic input, so a wrong reconstruction fails closed (0-wrong preserved).
+    The oxygen filter admits ANY ``[O-]`` (carboxylate/sulfonate/phosphate, but also an
+    alkoxide/phenoxide/enolate), NOT only genuine acid oxygens — the safety is the GATE
+    CASCADE, not a guaranteed InChIKey collision: for a true oxoanion the neutral acid
+    shares the ionic input's full key and the gate passes; for a bare alkoxide
+    (``CC[O-].[H+]`` -> ethanol) the reconstructed neutral does NOT share the key
+    (whole skeleton block differs), so the gate returns mismatch -> abstain rather than
+    ship. Scoped to keep the halide 0-wrong guard (``[H+].[Cl-]``) intact: every anionic
+    site must be OXYGEN (a ``[Cl-]``/``[S-]`` anion returns None), and the neutral parent
+    must be a SINGLE, carbon-bearing (organic) fragment.
     """
     try:
         rw = Chem.RWMol(mol)
