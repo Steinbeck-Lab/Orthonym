@@ -6309,7 +6309,7 @@ def name_substituent_fragment(
     # routes before the DROP-26 charge guard below. Fail-closed on any other
     # P-oxo shape (see carbon_free_phospho_prefix); the top-level SELF-01/OPSIN
     # gate voids any non-RT composed name, so 0-wrong holds.
-    if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
+    if attach_idx is not None and mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
         from ..rules.phosphorus import carbon_free_phospho_prefix
         _pp = carbon_free_phospho_prefix(mol, sub_atoms, attach_idx)
         if _pp is not None:

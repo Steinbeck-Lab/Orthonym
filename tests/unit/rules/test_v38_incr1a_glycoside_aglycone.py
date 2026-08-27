@@ -25,6 +25,11 @@ from orthonym.namer import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
+# v38 whole-branch review (minor 2): every test here asserts an OPSIN round-trip,
+# so mark the whole module opsin_gate — a Java-free run SKIPS these rather than
+# reporting them as failures (parity with the CP2 / salt / DROP-23 test files).
+pytestmark = pytest.mark.opsin_gate
+
 
 # --- Best-effort tier helper (default tier is a plain name_compound) ----------
 def _best_effort(smiles: str) -> str:

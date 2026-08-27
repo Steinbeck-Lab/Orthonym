@@ -479,10 +479,28 @@ def _p25_8_component_rank(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, .
     if named is None:
         return pad
     _name, a2l = named
+
+    def _base_int(v):
+        # v38 CP2 widened the fused-component locant map to also carry lettered
+        # fusion locants ('4a') and (int, primes) tuples. This P-25.8 (e)-criterion
+        # het-locant tiebreak must use the BASE integer of each (as it did pre-CP2,
+        # when the map was coerced to int upstream) so a heteroatom on a ring-fusion
+        # carbon still contributes its number -- not be silently dropped by an
+        # int-only filter. Returns None only for a locant with no integer part.
+        if isinstance(v, int):
+            return v
+        if isinstance(v, tuple) and v and isinstance(v[0], int):
+            return v[0]
+        if isinstance(v, str):
+            digits = ''.join(c for c in v if c.isdigit())
+            return int(digits) if digits else None
+        return None
+
     het_locs = sorted(
-        a2l[i] for i in a2l
+        b for i in a2l
         if i in system_atoms and mol.GetAtomWithIdx(i).GetAtomicNum() != 6
-        and isinstance(a2l[i], int)
+        for b in (_base_int(a2l[i]),)
+        if b is not None
     )
     if not het_locs:
         return pad
