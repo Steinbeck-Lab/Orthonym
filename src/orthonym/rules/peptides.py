@@ -983,31 +983,57 @@ def _try_n_acyl_cap(mol) -> Optional[str]:
 # Aspartic acid: C(=O)-CH2-CH(NH2)(COOH)      -> 3 carbons ('propan-').
 _OMEGA_CARBOXYL_CHAIN_LENGTH = {"glutamic acid": 4, "aspartic acid": 3}
 
-# The 'amino' substituent prefix (optionally locant-prefixed) ANCHORED at the
-# start of the name, e.g. matches '1-amino' in
+# The leading, ADDRESSABLE 'amino' substituent prefix of a parent/residue acid
+# (or ester) name, anchored at the start, e.g. the 'amino' in
 # '1-aminocyclopropane-1-carboxylic acid'. Substituent prefixes FUSE directly
 # onto the parent hydride name with no space/hyphen ('aminocyclopropane', not
 # 'amino-cyclopropane'), so a token search for a word-bounded 'amino' never
-# matches at all -- anchoring at position 0 instead only fires when 'amino'
-# is the name's SOLE (or alphabetically-first) substituent, i.e. exactly the
-# free-NH2-only non-standard residue shape this lever targets (ACC and
-# similar). A residue with additional earlier-sorting substituents declines
-# here rather than risk swapping the wrong token.
-_AMINO_PREFIX_RE = re.compile(r'^(\d+-)?amino')
+# matches -- anchoring at position 0 instead only fires when 'amino' is the
+# name's SOLE (or alphabetically-first) substituent, i.e. exactly the
+# free-NH2-only residue shape this lever targets. In front of that token the
+# name may legitimately carry (all optional, in this order): an ester O-alkyl
+# functional-class word ('methyl '), a stereodescriptor ('(2S)-', '(2S,3R)-'),
+# and a locant ('2-'). A defined-stereo systematic acid name
+# ('(2S)-2-aminohexanoic acid') or a systematic ester
+# ('methyl (2S)-2-amino-4-methylpentanoate') is therefore spliced at its REAL
+# 'amino' token with everything before it preserved (P-16.5). ``head`` is that
+# preserved prefix; the match end is the position just after 'amino'.
+_AMINO_PREFIX_RE = re.compile(
+    r"^(?P<head>(?:[a-z]+yl )?(?:\([0-9RSEZ,a-z'*]+\)-)?(?:\d+-)?)amino"
+)
+
+
+def _match_amino_prefix(name: str) -> Optional[Tuple[str, int]]:
+    """Return ``(head, tail_index)`` for a leading addressable 'amino'
+    substituent prefix in ``name`` (see ``_AMINO_PREFIX_RE``), or None. ``head``
+    is everything up to and including any ester O-alkyl word / stereodescriptor
+    / locant that precedes the 'amino' token; ``name[tail_index:]`` is what
+    follows 'amino'. Used both to DECIDE whether a systematic parent name is
+    still 'open' for a further residue to splice into, and to PERFORM that
+    splice preserving the ester/stereo context."""
+    m = _AMINO_PREFIX_RE.match(name)
+    if m is None:
+        return None
+    return m.group('head'), m.end()
 
 
 def _swap_amino_for_amido(name: str, amido_group: str) -> Optional[str]:
     """Replace the leading 'amino' substituent prefix in ``name`` with the
-    parenthesized ``amido_group`` at the same locant (P-16.3.3 complex-
-    substituent enclosure), e.g. '1-aminocyclopropane...' + '4-amino-4-
-    carboxybutanamido' -> '1-(4-amino-4-carboxybutanamido)cyclopropane...'.
-    Declines (returns None) when ``name`` does not start with 'amino' --
-    ambiguous, so never guessed."""
-    m = _AMINO_PREFIX_RE.match(name)
-    if m is None:
+    enclosed ``amido_group`` at the same locant (P-16.3.3 complex-substituent
+    enclosure), e.g. '1-aminocyclopropane...' + '4-amino-4-carboxybutanamido'
+    -> '1-(4-amino-4-carboxybutanamido)cyclopropane...', and (with a stereo
+    descriptor on both sides) '(2S)-2-aminohexanoic acid' +
+    '(2S)-2-aminopropanamido' -> '(2S)-2-[(2S)-2-aminopropanamido]hexanoic
+    acid'. The enclosing marks escalate ( -> [ -> { when ``amido_group`` itself
+    already carries brackets (a stereodescriptor's parentheses), per
+    P-16.5.4.1. Declines (returns None) when ``name`` has no addressable
+    leading 'amino' -- ambiguous, so never guessed."""
+    matched = _match_amino_prefix(name)
+    if matched is None:
         return None
-    locant = m.group(1) or ''
-    return f"{locant}({amido_group})" + name[m.end():]
+    head, tail = matched
+    from ..assembly.naming_utils import apply_enclosing_marks
+    return head + apply_enclosing_marks(amido_group, -1) + name[tail:]
 
 
 def _name_gamma_acceptor(remainder_smi: str) -> Optional[Tuple[str, str]]:
@@ -1393,13 +1419,23 @@ _BACKBONE_SUBSTITUTIVE_MAX_RESIDUES = 40
 _BACKBONE_SUBSTITUTIVE_MAX_NONSTANDARD_CALLS = 15
 
 
-def _resolve_free_residue_acid_name(smi: str) -> Optional[str]:
+def _resolve_free_residue_acid_name(
+    smi: str, systematic: bool = False,
+) -> Optional[str]:
     """Name ``smi`` (a SINGLE isolated free-amino-acid fragment -- never a
     multi-residue remainder; the general/composer engine's own parent
     selection does not reliably handle a multi-amide chain, measured
     directly building this producer) as an acid via the general/PIN namer.
     Retained trivial or systematic, whichever the namer itself prefers.
     Fails closed (None) on any error or failure-sentinel output.
+
+    ``systematic=True`` EXCLUDES the retained ``amino_acid`` dispatch class, so
+    a standard residue is named by its fully systematic acid form
+    ('L-alanine' -> '(2S)-2-aminopropanoic acid') -- required when the result
+    must expose an addressable '(stereo)-N-amino' splice point (an amido prefix
+    for a backbone residue, or a swap-mode parent) and to match the reference
+    PIN form. A residue that has no systematic amino-acid form (achiral glycine
+    stays 'glycine') is returned as-is; the caller decides how to fall back.
 
     ``_extract_residues`` stamps an ISOTOPE label on the cut-point oxygen
     of every fragment (its own internal bond-order bookkeeping --
@@ -1419,14 +1455,102 @@ def _resolve_free_residue_acid_name(smi: str) -> Optional[str]:
 
     from ..namer import Orthonym
     from ..errors import is_failure_name
+    kwargs = dict(style="pin", _disable_opsin_validity_gate=True)
+    if systematic:
+        kwargs["_seed_excluded_dispatch_classes"] = ["amino_acid"]
     try:
-        name = Orthonym(
-            style="pin", _disable_opsin_validity_gate=True).name(clean_smi)
+        name = Orthonym(**kwargs).name(clean_smi)
     except Exception:
         return None
     if is_failure_name(name):
         return None
     return name
+
+
+# A carboxylic-acid ESTER group -C(=O)-O-C: SMARTS atoms are
+# [0]=carbonyl C, [1]==O, [2]=ester O, [3]=O-alkyl C.
+_ESTER_GROUP_SMARTS = "[CX3](=O)[OX2][CX4]"
+
+
+def _systematic_amido_form(smi: str) -> Optional[str]:
+    """The '-amido' substituent prefix for a backbone residue ``smi`` to be
+    SPLICED (P-66.1.1.4.3) into an open parent. Built from the residue's fully
+    SYSTEMATIC free-acid name so the prefix carries an addressable
+    '(stereo)-N-amino' token -- both to match the reference PIN form
+    (alanine -> '(2S)-2-aminopropanamido', not the contracted 'alaninamido')
+    and to expose the next splice point. Falls back to the retained standard-
+    residue amido for a residue whose PIN acid has no systematic 'oic acid'
+    form to transform (achiral glycine -> 'glycinamido'). Returns None when
+    neither form is buildable; the caller's ``_rt_verified`` gate is the final
+    backstop, so a bad spelling degrades to abstention, never a wrong name."""
+    acid = _resolve_free_residue_acid_name(smi, systematic=True)
+    if acid is not None:
+        from ..assembly.substituent_naming import acid_name_to_amido_prefix
+        amido = acid_name_to_amido_prefix(acid)
+        if amido is not None:
+            return amido
+    info = _identify_one_residue(smi)
+    if info is not None:
+        stereo_disp = "" if info['stereo'] == "L-" else info['stereo']
+        return _standard_amido_prefix(info['name'], stereo_disp)
+    return None
+
+
+def _name_ester_parent_systematic(parent_frag) -> Optional[str]:
+    """Fully SYSTEMATIC name of a C-terminal ESTER parent (exactly one
+    -C(=O)-O-C ester and NO free -COOH) as '<alkyl> ...oate', with an
+    addressable leading '(stereo)-N-amino' splice point exposed. Built by
+    reconstructing the parent's OWN free acid, naming it systematically, and
+    re-esterifying with the ester's O-alkyl word (taken from the ordinary
+    retained ester name). Returns None on any failure / out-of-scope shape
+    (a non-'oic acid' acid stem, a compound O-alkyl, etc.); the caller's
+    ``_rt_verified`` gate is the final backstop (0-wrong ABSOLUTE)."""
+    ester_pat = Chem.MolFromSmarts(_ESTER_GROUP_SMARTS)
+    if ester_pat is None:
+        return None
+    ematches = parent_frag.GetSubstructMatches(ester_pat)
+    if len(ematches) != 1:
+        return None
+    carbonyl_c, _dbl_o, ester_o, alkyl_c = ematches[0]
+
+    # Cleave the ester O--alkyl bond and cap the acyl oxygen as -OH, giving the
+    # parent's own free carboxylic acid (the acid side keeps the carbonyl C).
+    rw = Chem.RWMol(parent_frag)
+    rw.RemoveBond(ester_o, alkyl_c)
+    o_atom = rw.GetAtomWithIdx(ester_o)
+    o_atom.SetNoImplicit(False)
+    o_atom.SetNumExplicitHs(1)
+    try:
+        Chem.SanitizeMol(rw)
+        mapping: List = []
+        frags = Chem.GetMolFrags(
+            rw, asMols=True, sanitizeFrags=True, fragsMolAtomMapping=mapping)
+    except Exception:
+        return None
+    if len(frags) != 2:
+        return None
+    acid_frag = None
+    for frag, idxs in zip(frags, mapping):
+        if carbonyl_c in idxs:
+            acid_frag = frag
+            break
+    if acid_frag is None:
+        return None
+
+    sys_acid = _resolve_free_residue_acid_name(
+        Chem.MolToSmiles(acid_frag), systematic=True)
+    if sys_acid is None or not sys_acid.endswith("oic acid"):
+        return None
+
+    # O-alkyl word: the leading token of the ordinary (retained) ester name,
+    # e.g. 'methyl L-leucinate' -> 'methyl'. A functional-class ester name is
+    # '<alkyl> <ate-word>'; a name without that space is not an alkyl ester we
+    # can rebuild here.
+    retained = _name_gamma_acceptor(Chem.MolToSmiles(parent_frag))
+    if retained is None or ' ' not in retained[0]:
+        return None
+    alkyl = retained[0].split(' ', 1)[0]
+    return f"{alkyl} {sys_acid[:-len('oic acid')]}oate"
 
 
 def _standard_amido_prefix(aa_name: str, stereo_disp: str) -> Optional[str]:
@@ -1483,7 +1607,7 @@ def _residue_open_forms(
     amido = acid_name_to_amido_prefix(acid_name)
     if acyl is None and amido is None:
         return None
-    is_open = bool(_AMINO_PREFIX_RE.match(acid_name))
+    is_open = _match_amino_prefix(acid_name) is not None
     return acyl, amido, is_open
 
 
@@ -1501,16 +1625,26 @@ def _try_backbone_substitutive(mol) -> Optional[str]:
         return None
 
     cooh_pattern = Chem.MolFromSmarts(_TERMINAL_COOH_SMARTS)
+    ester_pattern = Chem.MolFromSmarts(_ESTER_GROUP_SMARTS)
 
-    # Parent scope: the C-terminal residue must carry EXACTLY one free
-    # carboxylic acid -- a capped (amide/ester/aldehyde) or dual-acid
+    # Parent scope: the C-terminal residue is the parent skeleton and must
+    # carry EXACTLY one senior acid-class group -- either one free carboxylic
+    # acid, OR (no free acid at all) exactly one carboxylic-ESTER C-terminus
+    # (a 'methyl ...oate' parent). An aldehyde / primary-amide / dual-acid
     # C-terminus is out of THIS producer's scope (never guess a different
-    # principal group / parent skeleton).
+    # principal group / parent skeleton); it declines here and the RT-gate is
+    # the final backstop for anything that slips through.
     parent_frag = Chem.MolFromSmiles(residues[-1])
     if parent_frag is None:
         return None
-    if len(parent_frag.GetSubstructMatches(cooh_pattern)) != 1:
-        return None
+    n_parent_cooh = len(parent_frag.GetSubstructMatches(cooh_pattern))
+    parent_is_ester = False
+    if n_parent_cooh != 1:
+        if n_parent_cooh == 0 and ester_pattern is not None and \
+                len(parent_frag.GetSubstructMatches(ester_pattern)) == 1:
+            parent_is_ester = True
+        else:
+            return None
 
     # Side-chain-acid trap: every OTHER residue's own isolated fragment
     # must show EXACTLY the one free acid its own reconstruction
@@ -1533,39 +1667,61 @@ def _try_backbone_substitutive(mol) -> Optional[str]:
     if n_nonstandard > _BACKBONE_SUBSTITUTIVE_MAX_NONSTANDARD_CALLS:
         return None
 
-    acceptor = _name_gamma_acceptor(residues[-1])
-    if acceptor is None:
-        return None
-    name, mode = acceptor
-    is_open = False
-    if mode == 'swap':
-        is_open = bool(_AMINO_PREFIX_RE.match(name))
-        if not is_open:
-            # A systematic parent whose leading substituent is not
-            # addressable (e.g. a defined-stereo CIP locant, or a
-            # multiplied 'x,y-diamino...' prefix) -- nothing can be safely
-            # attached to it; every peptide reaching this producer has
-            # >=1 residue still to add, so decline outright.
+    if parent_is_ester:
+        # An ESTER C-terminus is always a systematic 'swap' parent: name it
+        # fully systematically so its '(stereo)-N-amino' splice point is
+        # exposed ('methyl (2S)-2-amino-4-methylpentanoate').
+        name = _name_ester_parent_systematic(parent_frag)
+        if name is None or _match_amino_prefix(name) is None:
             return None
+        is_open = True
+    else:
+        acceptor = _name_gamma_acceptor(residues[-1])
+        if acceptor is None:
+            return None
+        name, mode = acceptor
+        is_open = False
+        if mode == 'swap':
+            if _match_amino_prefix(name) is None:
+                # The retained systematic acid name has no addressable leading
+                # 'amino' -- a standard-AA free acid the amino_acid table named
+                # 'L-leucine'. Re-derive the fully SYSTEMATIC acid so the
+                # '(stereo)-N-amino' splice point is exposed.
+                name = _resolve_free_residue_acid_name(
+                    residues[-1], systematic=True)
+                if name is None or _match_amino_prefix(name) is None:
+                    # Still not addressable (e.g. a multiplied 'x,y-diamino...'
+                    # parent) -- nothing can be safely attached; decline.
+                    return None
+            is_open = True
 
     for smi in reversed(residues[:-1]):
-        forms = _residue_open_forms(smi)
-        if forms is None:
-            return None
-        acyl, amido, next_is_open = forms
         if is_open:
+            # SPLICE this residue into the open parent's 'amino' as a
+            # systematic '(...)amido' prefix (P-66.1.1.4.3), which itself
+            # re-exposes an 'amino' for the next residue.
+            amido = _systematic_amido_form(smi)
             if amido is None:
                 return None
             name = _swap_amino_for_amido(name, amido)
             if name is None:
                 return None
+            is_open = _match_amino_prefix(amido) is not None
         else:
+            # PREPEND this residue's acyl form onto the closed accumulated
+            # name -- the ordinary flat acylamino convention (retained
+            # 'glycyl'/'alanyl' for a standard residue, systematic for a
+            # non-standard one).
+            forms = _residue_open_forms(smi)
+            if forms is None:
+                return None
+            acyl, _amido, next_is_open = forms
             if acyl is None:
                 return None
             if name.startswith('D-'):
                 name = f"{acyl}-{name}"
             else:
                 name = f"{acyl}{name}"
-        is_open = next_is_open
+            is_open = next_is_open
 
     return name

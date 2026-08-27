@@ -73,6 +73,25 @@ PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 # `is_peptide()` below, so that unrelated path is untouched.
 _TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[NX3H2]"
 
+# v38 (backbone-substitutive ester C-terminus): a peptide whose C-TERMINAL
+# residue's alpha-carboxyl is esterified (-C(=O)-O-C, e.g. a Leu-Leu methyl
+# ester) has NO free -COOH and NO primary carboxamide anywhere, so neither
+# ALPHA_AMINO_ACID_SMARTS (hard-requires `[OX2H1]`) nor
+# _TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS (requires `[NX3H2]`) matches, and
+# `is_peptide()` returned False -- so the dispatcher never reached
+# `rules.peptides.name_peptide`, even though that module's
+# `_try_backbone_substitutive` now names the ester-C-terminus parent
+# systematically ('methyl (2S)-2-[(2S)-2-amino-4-methylpentanamido]-4-
+# methylpentanoate'). This is the exact structural analogue of the v33
+# primary-amide alternative above. Scoped to an ALPHA-amino-acid ester
+# (`[NX3][CX4]` on the ester carbonyl) so it does NOT broadly re-route
+# ordinary esters; combined with the `count_peptide_bonds(mol) >= 1`
+# requirement in `is_peptide()`, an ester with no peptide linkage (a plain
+# amino-acid ester, not a peptide) still does not dispatch here. Like the
+# amide constant it is consulted ONLY by `is_peptide()`, so the standalone
+# free-amino-acid namer's `ALPHA_AMINO_ACID_SMARTS` path is untouched.
+_TERMINAL_ESTER_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2][CX4]"
+
 # SMARTS patterns for additional functional groups (PEP-02 bailout)
 # These detect FGs beyond amino + acid that _name_amino_acid_systematic
 # cannot handle. When found, we bail out to the general polyfunctional pipeline.
@@ -140,10 +159,14 @@ def is_peptide(mol) -> bool:
     # Must have amino acid pattern AND peptide bonds. v33 Task 2.1: OR in the
     # terminal-primary-amide alternative (see the constant's docstring) so a
     # capped-C-terminus peptide still dispatches to `rules.peptides` instead
-    # of silently falling through to "unknown organic compound".
+    # of silently falling through to "unknown organic compound". v38: OR in the
+    # ester-C-terminus alternative too, for the same reason (a '...oate'
+    # C-terminus that _try_backbone_substitutive now names systematically).
     amide_pattern = Chem.MolFromSmarts(_TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS)
     has_amide_alpha = amide_pattern is not None and mol.HasSubstructMatch(amide_pattern)
-    if not (detect_amino_acid(mol) or has_amide_alpha):
+    ester_pattern = Chem.MolFromSmarts(_TERMINAL_ESTER_ALPHA_SMARTS)
+    has_ester_alpha = ester_pattern is not None and mol.HasSubstructMatch(ester_pattern)
+    if not (detect_amino_acid(mol) or has_amide_alpha or has_ester_alpha):
         return False
     return count_peptide_bonds(mol) >= 1
 
