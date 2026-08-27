@@ -3539,7 +3539,23 @@ def acid_name_to_amido_prefix(acid_name: str) -> Optional[str]:
         if re.search(r'(?:di|tri|tetra|penta|hexa)[-,\d]*$', stem.lower()):
             return None
         if stem and not stem[0].isdigit():
-            stem = '2-' + stem
+            # acetamide requires the C2 locant. A leading di/tri/tetra multiplier
+            # on a simple HALOGEN substituent puts that many halogens on C2, so
+            # the locant must be REPEATED: 'dichloroacetic acid' ->
+            # '2,2-dichloroacetamido', 'trifluoroacetic acid' ->
+            # '2,2,2-trifluoroacetamido' (v38: the single '2-' form
+            # '2-dichloroacetamido' dropped a locant and failed OPSIN round-trip,
+            # abstaining the whole molecule once acyclic acyls were routed here).
+            # SCOPED to bare halogens, which cannot nest a group -- so
+            # 'dimethylamino'/'dihydroxy'... keep the single '2-' form they
+            # already took (their multiplier binds a NESTED group, not C2).
+            _MULT = {'di': 2, 'tri': 3, 'tetra': 4}
+            _m = re.match(r'(di|tri|tetra)(chloro|fluoro|bromo|iodo)$',
+                          stem.lower())
+            if _m:
+                stem = ','.join(['2'] * _MULT[_m.group(1)]) + '-' + stem
+            else:
+                stem = '2-' + stem
         return stem + 'acetamido'
     return None
 

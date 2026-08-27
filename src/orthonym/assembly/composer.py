@@ -9523,11 +9523,29 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                     _qq.append(_ni)
         _acyl_has_ring = any(_ri.NumAtomRings(c) > 0 for c in _af)
 
-        if _acyl_has_ring:
-            # Ring in the acyl subtree: extract acyl fragment as acid
-            # SMILES, name it, convert to acyl prefix.
+        def _recursive_acyl_amido(allow_acylamino_fallback):
+            # Method (1) PIN amido prefix (P-66.1.1.4.3) for a well-defined acyl:
+            # extract the acyl fragment as its acid, name it (with a systematic-
+            # style retry that defeats retained amino-acid acid names -- proline/
+            # L-alanine -- and preserves stereo), and convert to the
+            # '...amido'/'...carboxamido' form (benzamido, pyrrolidine-2-
+            # carboxamido, (2S)-2-aminopropanamido).
+            #
+            # v38 (P-66 note (m), BlueBookV2.md:1706 — '1-oxopropyl'-type acyl
+            # prefixes are NOT preferred for PINs): this now covers ACYCLIC
+            # DECORATED acyls too (2-aminopropanoyl, 2,2-dichloroacetyl, ...),
+            # which the strict linear builder and the count fallback both decline
+            # and which otherwise fell through to the non-PIN '(...-1-oxoalkyl)
+            # amino' producer. Previously gated `if _acyl_has_ring`.
+            #
+            # Returns the prefix string, or None to fall through to the existing
+            # fallbacks. `allow_acylamino_fallback` keeps the ring branch's legacy
+            # method-(2) '(...oylamino)' escape byte-identical; the acyclic caller
+            # passes False so it can only ever ADD the PIN '...amido' form and
+            # never a new method-(2) string on a path that used to count-spell.
+            _af2 = set(_af)
             if carbonyl_o is not None:
-                _af.add(carbonyl_o)
+                _af2.add(carbonyl_o)
             try:
                 from rdkit import Chem as _Ch
                 _rw = _Ch.RWMol(mol)
@@ -9535,32 +9553,20 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                 _rw.AddBond(carbonyl_c, _oh, _Ch.BondType.SINGLE)
                 _hh = _rw.AddAtom(_Ch.Atom(1))
                 _rw.AddBond(_oh, _hh, _Ch.BondType.SINGLE)
-                _fa = sorted(_af | {_oh, _hh})
+                _fa = sorted(_af2 | {_oh, _hh})
                 _fs = _Ch.MolFragmentToSmiles(_rw, _fa, canonical=True)
                 if _fs:
                     from .fragment_naming import name_fragment_recursively
                     _an = name_fragment_recursively(_fs)
                     if _an:
-                        # Wave2 T1c (P-66.1.1.4.3): method (1) amido prefix
-                        # is the PIN — benzamido, (4-methylbenzamido),
-                        # (naphthalene-1-carboxamido). The acyl walk now covers
-                        # every acyl atom, so the completeness gate holds and no
-                        # atom is dropped.
-                        if set(sub_atoms) == _af | {idx}:
+                        # The acyl walk covers every acyl atom, so the
+                        # completeness gate holds and no atom is dropped.
+                        if set(sub_atoms) == _af2 | {idx}:
                             from .substituent_naming import (
                                 acid_name_to_amido_prefix,
                             )
                             _amido = acid_name_to_amido_prefix(_an)
                             if _amido is None:
-                                # A RETAINED amino-acid acid name ('proline',
-                                # 'L-proline') has no direct amido form and its
-                                # 'prolyl' peptide form implies L (breaks RT,
-                                # BB:54717). The SYSTEMATIC acid name does
-                                # convert: 'pyrrolidine-2-carboxylic acid' ->
-                                # 'pyrrolidine-2-carboxamido' (stereo preserved).
-                                # Self-scoping: only reached when the default
-                                # amido failed, and only yields a name when the
-                                # systematic acid name is convertible.
                                 _sys = name_fragment_recursively(
                                     _fs, style='systematic')
                                 if _sys:
@@ -9569,27 +9575,33 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                                 if (any(ch.isdigit() for ch in _amido)
                                         or '-' in _amido):
                                     # P-16.5.4 nesting: a compound amido prefix
-                                    # that itself contains enclosing marks
-                                    # (`(2S)-…`, `2-(pyridin-4-yl)…`) must escalate
+                                    # that itself carries enclosing marks
+                                    # (`(2S)-…`, `2-(pyridin-4-yl)…`) escalates
                                     # ()->[]->{}. apply_enclosing_marks(-1)
-                                    # auto-detects the depth from the name's own
-                                    # marks, so a mark-free prefix (`2-phenyl…`)
-                                    # stays `(…)` byte-identical. (Fable review of
-                                    # cbb28539: the hard-coded `f"({_amido})"`
-                                    # shipped `(2-(pyridin-4-yl)acetamido)…` at T1.)
+                                    # auto-detects depth, so a mark-free prefix
+                                    # (`2-phenyl…`) stays `(…)` byte-identical.
                                     from .naming_utils import (
                                         apply_enclosing_marks as _aem,
                                     )
                                     return _aem(_amido, -1)
                                 return _amido
-                        from ..decomposition.fragment_assembly import (
-                            _acid_to_acyl,
-                        )
-                        _ac = _acid_to_acyl(_an)
-                        if _ac:
-                            return f"({_ac}amino)"
+                        if allow_acylamino_fallback:
+                            from ..decomposition.fragment_assembly import (
+                                _acid_to_acyl,
+                            )
+                            _ac = _acid_to_acyl(_an)
+                            if _ac:
+                                return f"({_ac}amino)"
             except Exception:
                 pass  # Fall through to linear chain logic
+            return None
+
+        if _acyl_has_ring:
+            # Ring in the acyl subtree: acid-recursive amido (method (1) PIN),
+            # else the legacy method-(2) '(...oylamino)' escape. Unchanged.
+            _ring_amido = _recursive_acyl_amido(allow_acylamino_fallback=True)
+            if _ring_amido is not None:
+                return _ring_amido
 
         # Wave2 T1c (P-66.1.1.4.3): method (1) — the amido-family prefix
         # (formamido/acetamido/{stem}anamido) is the PIN; the acylamino form
@@ -9603,6 +9615,19 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
         _amido_nm = linear_acyl_amido_prefix(mol, carbonyl_c, idx, sub_atoms)
         if _amido_nm:
             return _amido_nm
+
+        # v38 (P-66 note (m)): an ACYCLIC DECORATED acyl the strict linear amido
+        # builder just declined (a 2-amino/2,2-dichloro/... acyl) -> the acid-
+        # recursive method-(1) amido, the SAME machinery the ring branch uses.
+        # Reached ONLY after linear_acyl_amido_prefix returned None, so every
+        # bare unbranched acyl keeps its existing spelling byte-identically; with
+        # allow_acylamino_fallback=False it can only ADD the PIN '...amido' form.
+        # This replaces the non-PIN '(...-1-oxoalkyl)amino' fall-through below
+        # for decorated acyls (Ala-Ala -> (2S)-2-[(2S)-2-aminopropanamido]…).
+        if not _acyl_has_ring:
+            _acyclic_amido = _recursive_acyl_amido(allow_acylamino_fallback=False)
+            if _acyclic_amido is not None:
+                return _acyclic_amido
 
         # C4d (P-35.4.2 concatenation): an acyl rooted on a CHALCOGEN rather
         # than on carbon -- the carbamate/urethane class R-X-CO-NH-, which
