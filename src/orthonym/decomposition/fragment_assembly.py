@@ -27,7 +27,7 @@ from ..data.sugar_names import (
     recognize_sugar_skeleton,
     sugar_to_glycoside_class_name,
 )
-from ..assembly.naming_utils import _wrap_n_substituent
+from ..assembly.naming_utils import _wrap_n_substituent, enclose_if_compound
 
 # Phase 176 / D-09: structural seniority guard primitives. The aglycone is in
 # scope to flip to the functional-class form iff its principal characteristic
@@ -704,7 +704,8 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # multiple identical N-substituents. In that case, expand the
                 # N-locant: "dimethyl" -> "N,N-dimethyl", not "N-dimethyl".
                 n_locant = _expand_n_locant_for_multiplier(amine_prefix)
-                result = f"{n_locant}{_join_components(amine_prefix, amide_name)}"
+                wrapped_prefix = _wrap_n_substituent(enclose_if_compound(amine_prefix))
+                result = f"{n_locant}{_join_components(wrapped_prefix, amide_name)}"
 
     if result is None:
         # Complex amine: use acyl prefix pattern

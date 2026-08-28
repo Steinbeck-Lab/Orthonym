@@ -29,3 +29,18 @@ def test_simple_substituent_stays_bare(eng):
     assert name is not None
     assert "(methyl)" not in name
     assert "methyl" in name
+
+# W2 — complex N-substituent must be bracket-wrapped (fragment_assembly _assemble_amide)
+def test_w2_n_substituent_wrapped(eng):
+    smi = "O=C1C[C@@H](C(=O)N[C@H]2CCS(=O)(=O)C2)C2(CCCCC2)O1"
+    name = eng.name(smi)
+    assert name is not None and "unknown" not in name.lower()
+    assert "[(3S)-1,1-dioxothiolan-3-yl]" in name
+
+@pytest.mark.roundtrip
+def test_w2_roundtrips_to_input(eng):
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+    smi = "O=C1C[C@@H](C(=O)N[C@H]2CCS(=O)(=O)C2)C2(CCCCC2)O1"
+    name = eng.name(smi)
+    res = opsin_roundtrip_check(smi, name)
+    assert res["passed"], res
