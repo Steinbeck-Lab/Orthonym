@@ -96,23 +96,23 @@ _DESCRIPTIVE_FALLBACK_NAMES: frozenset = _build_descriptive_fallback_names()
 LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
     'WILDCARD_ATOMS': {
         'message': 'compound with wildcard atoms (not supported)',
-        'heritage_ref': 'ERR-311',
+        'design_note_ref': 'ERR-311',
     },
     'UNSUPPORTED_ELEMENT': {
         'message': 'inorganic compound (not supported)',
-        'heritage_ref': 'ERR-210/266',
+        'design_note_ref': 'ERR-210/266',
     },
     'ISOLATED_ATOM': {
         'message': 'isolated atom or substructure too small to name',
-        'heritage_ref': 'ERR-263/266',
+        'design_note_ref': 'ERR-263/266',
     },
     'STRUCTURE_TOO_LARGE': {
         'message': f'structure exceeds the {ATOM_LIMIT}-atom limit',
-        'heritage_ref': 'ERR-212',
+        'design_note_ref': 'ERR-212',
     },
     'UNNAMEABLE': {
         'message': 'unknown organic compound',
-        'heritage_ref': 'ERR-270/274',
+        'design_note_ref': 'ERR-270/274',
     },
     # G0 fail-closed safety (DD7 S1): a ring system Orthonym recognises as
     # complex (polycomponent-fused, bridged-fused, or aromatic-in-a-von-Baeyer
@@ -124,7 +124,7 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
     # Phase-G1+ bridged/polycomponent-fusion builds.
     'UNSUPPORTED_RING_SYSTEM': {
         'message': 'unknown organic compound',
-        'heritage_ref': 'ERR-274',
+        'design_note_ref': 'ERR-274',
     },
 }
 
@@ -133,18 +133,18 @@ class OrthonymLimitError(Exception):
     """Raised (opt-in) when an input is provably out of Orthonym's scope.
 
     Carries a symbolic ``code`` (a key of ``LIMIT_CATALOG``), a human-readable
-    ``message``, the mirrored HERITAGE ``heritage_ref``, and the offending
+    ``message``, the mirrored HERITAGE ``design_note_ref``, and the offending
     ``smiles`` when available. A caller that catches this knows Orthonym
     *cannot handle* the input — as opposed to a returned name, which is a
     best-effort *attempt*.
     """
 
     def __init__(self, code: str, message: str,
-                 heritage_ref: Optional[str] = None,
+                 design_note_ref: Optional[str] = None,
                  smiles: Optional[str] = None):
         self.code = code
         self.message = message
-        self.heritage_ref = heritage_ref
+        self.design_note_ref = design_note_ref
         self.smiles = smiles
         super().__init__(f"[{code}] {message}")
 
@@ -152,7 +152,7 @@ class OrthonymLimitError(Exception):
         return {
             'code': self.code,
             'message': self.message,
-            'heritage_ref': self.heritage_ref,
+            'design_note_ref': self.design_note_ref,
         }
 
 
@@ -162,7 +162,7 @@ def _make(code: str, message: Optional[str] = None,
     return OrthonymLimitError(
         code=code,
         message=message if message is not None else entry['message'],
-        heritage_ref=entry['heritage_ref'],
+        design_note_ref=entry['design_note_ref'],
         smiles=smiles,
     )
 
@@ -287,7 +287,7 @@ def classify_failure_limit(mol: Chem.Mol,
     Returns a code that explains *why* Orthonym could not produce a real name.
     The ``.message`` is byte-identical to the legacy ``_descriptive_fallback``
     string for that branch (so the default always-emit output never changes);
-    the ``.code`` / ``.heritage_ref`` add the new "can't handle" signal. The
+    the ``.code`` / ``.design_note_ref`` add the new "can't handle" signal. The
     richer detail for the size/isolated branches lives in the code, not the
     message, precisely to preserve the legacy strings.
     """

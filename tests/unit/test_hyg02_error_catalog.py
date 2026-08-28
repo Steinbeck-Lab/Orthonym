@@ -27,7 +27,7 @@ def test_wildcard_raises_named_limit():
     err = ei.value
     assert err.code == "WILDCARD_ATOMS"
     assert err.message  # non-empty human message
-    assert err.heritage_ref  # cites the HERITAGE analog
+    assert err.design_note_ref  # cites the HERITAGE analog
     assert err.code in LIMIT_CATALOG
 
 
@@ -82,7 +82,7 @@ def test_name_with_confidence_limit_key():
     md2 = n.name_with_confidence("CC*")
     assert md2.get("limit") is not None
     assert md2["limit"]["code"] == "WILDCARD_ATOMS"
-    assert set(md2["limit"]) == {"code", "message", "heritage_ref"}
+    assert set(md2["limit"]) == {"code", "message", "design_note_ref"}
 
 
 # ---- classifier units ----

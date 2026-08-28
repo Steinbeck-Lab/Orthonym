@@ -61,7 +61,7 @@ def test_aromatic_in_cage_raises_named_limit(smiles):
     with pytest.raises(OrthonymLimitError) as ei:
         Orthonym().name(smiles, raise_on_limit=True)
     assert ei.value.code == "UNSUPPORTED_RING_SYSTEM"
-    assert ei.value.heritage_ref  # cites the HERITAGE analog
+    assert ei.value.design_note_ref  # cites the HERITAGE analog
 
 
 @pytest.mark.parametrize("smiles", AROMATIC_IN_CAGE)
