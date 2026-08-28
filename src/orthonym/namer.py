@@ -3547,7 +3547,7 @@ class Orthonym:
             tier = _offer_winner.tier
         gates = []
         if source == "general_engine":
-            gates.append("E1")
+            gates.append("atom_coverage")
             # E1-path verification is the engine's OWN round-trip check
             # (prov["opsin"]), not a gate outcome, so its token is unchanged.
             if opsin == "verified":

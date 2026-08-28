@@ -21,7 +21,7 @@ class E1Verdict:
     reason: str
 
 
-# --- F-E1: per-token element soundness (sound-by-refusal) -------------------
+# --- element_soundness: per-token element soundness (sound-by-refusal) ------
 # E1 verifies the atom PARTITION but not that a token's CHEMISTRY matches the
 # atoms it claims: it certified a fabricated binding of `ethyl`/`eth` tokens to
 # N and O atoms (`1-ethylethane` for CCN(CC)N=O). No LIVE general-engine result
@@ -111,7 +111,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
     exactly one token, no double-count, no phantom/non-reference atom),
     token-in-name (each non-empty token is a substring of ``name``, tolerating
     the P-16.7.1(a)/P-74.1.1 terminal-'e' elision before a vowel-initial ionic
-    suffix), F-E1 chemistry-soundness (a confidently all-carbon token may not
+    suffix), element_soundness chemistry-soundness (a confidently all-carbon token may not
     bind a heteroatom), G1 charge scope.
     """
     pairs = list(pairs)
@@ -139,7 +139,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
     # suffix (``2-azapropane`` -> ``...2-azapropan-2-ium``), so the FULL token
     # is legitimately absent while its stem (token without the trailing 'e') is
     # present. Accept the stem too. This tolerance is confined to token-in-name;
-    # the stored token stays the FULL form, so P1 and F-E1 both see the real,
+    # the stored token stays the FULL form, so P1 and element_soundness both see the real,
     # classifiable token. Existing GeneralEngineResult callers are unaffected
     # (their parent tokens are already elision-robust stems, e.g. 'but'/'benzen',
     # so the extra clause never changes their verdict); the relaxation only ever
@@ -152,7 +152,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
         if token.endswith("e") and token[:-1] in name:
             continue
         return E1Verdict(False, f"token {token!r} not in name")
-    # F-E1: a CONFIDENTLY all-carbon token may not be bound to a heteroatom.
+    # element_soundness: a CONFIDENTLY all-carbon token may not be bound to a heteroatom.
     # Sound-by-refusal -- only fires on the alkane/alkyl/carbocyclic class; every
     # other token is skipped, so no legitimate certificate is voided.
     for token, atom_ids in pairs:
@@ -189,8 +189,8 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
     * Groups are DEDUPLICATED before binding, so a benign double-listing of an
       atom never trips the partition's ``bound twice`` refusal (a false void that
       would cost breadth — the fix must void ONLY genuine drops).
-    * Each group is bound under the EMPTY token, so the token-in-name and F-E1
-      chemistry checks are SKIPPED here. Those two checks presuppose a
+    * Each group is bound under the EMPTY token, so the token-in-name and
+      element_soundness chemistry checks are SKIPPED here. Those two checks presuppose a
       ``GeneralEngineResult``-style ``(token, atom_ids)`` stream whose token
       strings are reconstructable; a legacy composer producer building the
       partition from atom-index data alone cannot supply faithful token strings

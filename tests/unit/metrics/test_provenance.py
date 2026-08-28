@@ -31,7 +31,7 @@ def test_engine_emission_is_t3_or_t4():
     if row["source"] == "general_engine":
         assert row["tier"] in ("T3", "T4")
         assert row["is_pin"] is False
-        assert "E1" in row["gates_passed"]
+        assert "atom_coverage" in row["gates_passed"]
 
 
 def test_t5_row_carries_formula_and_reason():

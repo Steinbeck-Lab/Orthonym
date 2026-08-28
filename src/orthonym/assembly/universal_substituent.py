@@ -463,7 +463,7 @@ def _name_universal_substitutive_unsafe(
     # total_bound != len(heavy)`` self-check that lived here. That self-check
     # re-derived E1's P1 atom-partition -- GAP via ``covers != heavy``,
     # DOUBLE-COUNT via ``total_bound`` (fix round 1, finding 5) -- but LACKED
-    # E1's token-in-name and F-E1 chemistry-soundness checks, which this now
+    # E1's token-in-name and element_soundness chemistry-soundness checks, which this now
     # gains for free. ``UniversalResult.bindings`` is already E1's
     # ``(token, atom_ids)`` pairs shape, so no adapter is needed.
     # ``allow_charged=True`` because this producer owns the charge axis by a
@@ -752,7 +752,7 @@ def _name_universal_substituent_prefix_unsafe(
     # self-check. Checked against ``comp.name`` (the branch's assembled name
     # BEFORE the ``-yl`` rewrite ``_render_as_substituent`` applies below),
     # which is exactly what the branch's internal tokens compose. Gains
-    # token-in-name + F-E1 over the old union/count self-check.
+    # token-in-name + element_soundness over the old union/count self-check.
     # ``allow_charged=True`` for the same reason as the whole-molecule call --
     # the branch-restricted raw-charge guard just below owns the charge axis.
     from ..validation.e1_certificate import _verify_partition
@@ -886,11 +886,12 @@ def _name_component(
     # ---- branches: every off-spine atom, named by RE-ENTERING this SAME
     # function on its own (strictly smaller) subgraph. NO depth cap. -------
     # Phase E (fix round 1): store the FULL, unstemmed ``spine_core`` token
-    # (``hexane``/``cyclohexane``/``2-azapropane``...). E1's F-E1 all-carbon
-    # classifier and P1 partition both need the true token -- F-E1's grammar
-    # only recognises the FULL suffix form (``hexane``->all-carbon,
-    # ``hexan``->unclassified), so a pre-stemmed token would silently disable
-    # F-E1 for exactly the alkane/cycloalkane class it exists to guard. The
+    # (``hexane``/``cyclohexane``/``2-azapropane``...). E1's element_soundness
+    # all-carbon classifier and P1 partition both need the true token --
+    # element_soundness's grammar only recognises the FULL suffix form
+    # (``hexane``->all-carbon, ``hexan``->unclassified), so a pre-stemmed
+    # token would silently disable element_soundness for exactly the
+    # alkane/cycloalkane class it exists to guard. The
     # parent core's trailing 'e' IS legitimately elided when a charge/ionic
     # suffix is appended below (``_elide_before_ionic_suffix``;
     # P-16.7.1(a)/P-74.1.1), so ``2-azapropane`` is not a literal substring of
