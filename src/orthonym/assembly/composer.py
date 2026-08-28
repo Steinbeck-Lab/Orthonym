@@ -4105,7 +4105,13 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
         # identical) and brackets a compound one.
         _acyloxy = _acyloxy_prefix_for_frag(mol, sub_info.frag_atoms, a_idx)
         if _acyloxy is not None:
-            from .naming_utils import enclose_if_compound
+            # enclose_if_compound is the module-level import (composer.py:56);
+            # a local re-import here previously shadowed it for the WHOLE
+            # function (Python treats a name as local everywhere in a
+            # function if it is ever assigned/imported anywhere in that
+            # function body), which raised UnboundLocalError the moment a
+            # second use was added below in a code path where this acyloxy
+            # branch had not executed first.
             prefix_name = enclose_if_compound(_acyloxy)
 
         # v36 core-namer FAIL-CLOSED (not silent drop): a RING-BEARING compound
@@ -4171,11 +4177,13 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
         locants.sort(key=_loc_sort_key)
         count = len(locants)
         if count == 1:
-            prefix_parts.append(f"{_loc_render(locants[0])}-{name}")
+            prefix_parts.append(f"{_loc_render(locants[0])}-{enclose_if_compound(name)}")
         else:
             locant_str = ",".join(_loc_render(loc) for loc in locants)
             multiplier = get_multiplier_prefix(count, name)
-            prefix_parts.append(f"{locant_str}-{multiplier}{name}")
+            # P-16.3.3: a compound/complex substituent takes enclosing marks; the
+            # multiplicative prefix (bis/tris) is cited outside them (P-14.3.4).
+            prefix_parts.append(f"{locant_str}-{multiplier}{enclose_if_compound(name)}")
 
     # Alphabetize prefixes per IUPAC P-14.4
     prefix_parts.sort(key=lambda x: alpha_sort_key(x))
