@@ -901,6 +901,18 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
         IUPAC 2013 P-29.2 (free-valence morphology), P-29.3.2 (lowest locant
         for the free valence).
     """
+    # M2 Task 1 (tier propagation): the whole-molecule best-effort path
+    # publishes its tier via ``best_effort_ctx`` (metrics/provenance.py; set
+    # at namer.py:3021-3022, reset at :3404-3405). ~25 callers invoke
+    # ``name_substituent`` with the default ``allow_mancude=False``, so a
+    # best-effort whole-molecule run still gated substituent naming at the
+    # DEFAULT tier here and declined fragments the cascade names at
+    # best-effort (measured: ).
+    # Honor the ambient context here, once, so every caller inherits it.
+    # DEFAULT/PIN tier is unchanged: ``best_effort_ctx`` is unset there, so
+    # ``.get()`` is falsy and this is byte-identical to the prior behaviour.
+    from ..metrics.provenance import best_effort_ctx
+    allow_mancude = allow_mancude or bool(best_effort_ctx.get())
     # The bond-order read and the ylidene construction come from the SHARED
     # primitive, not from a private copy here -- this function and
     # carbon_free_valence_prefix used to hold the same two calls, which is the
