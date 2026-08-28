@@ -870,6 +870,144 @@ def carbon_free_valence_prefix(mol, frag_atoms, attach_idx) -> FreeValencePrefix
 # ============================================================================
 
 
+def _route_fragment_to_general_engine(mol, frag_atoms, attach_idx):
+    """M2 Task 2: last-resort route for a branch BOTH the cascade and the
+    Phase-B3 universal-substituent fallback declined (`
+    M2-PRODUCER-SPY.md``: 71 unique root fragments the cascade declines, 59 of
+    them (83%) already nameable by the whole-molecule general engine -- the
+    fused/spiro ring shapes ``universal_substituent``'s own narrower ring
+    logic does not reach, since that module explicitly does NOT reuse
+    ``general_engine``'s substituent-recursion tail).
+
+    Strategy: cap the free valence with an exocyclic ``-OH`` (NOT a bare H)
+    and ask ``name_compound`` to name the capped fragment standalone. The
+    trick is that P-31 principal-characteristic-group numbering gives the
+    lowest locant to THAT ``-OH`` -- the same atom that would carry the free
+    valence -- so for a fragment with no OTHER senior group or pre-existing
+    ``-OH``, the alcohol's own locant IS the free-valence locant P-29.3.2
+    would assign, and ``_alcohol_to_alkyl`` (already used by the amide/ester
+    decomposition path for exactly this ``-ol`` -> ``-yl`` conversion) carries
+    it over unchanged. A bare-H cap would lose that locant entirely -- with no
+    functional group at the attachment atom, the capped fragment's own
+    numbering has nothing to anchor a "this is atom 1" reading, so there is no
+    way to recover which digit in the resulting name is our atom.
+
+    Guarded to fail closed (``None``) rather than ever risk naming a
+    different molecule:
+
+    * the attach atom must be an uncharged CARBON -- adding ``-OH`` to any
+      other element changes the fragment's chemistry (N-OH is a
+      hydroxylamine, O-OH a peroxide, ...);
+    * no ring may be split by the extraction (a ring atom set only PARTIALLY
+      inside ``frag_atoms`` means ``MolFragmentToSmiles`` would sever a ring
+      bond -- one of the SPY's 4 fragmentation artifacts, describing a
+      DIFFERENT, ring-opened molecule);
+    * ``frag_atoms`` must have exactly ONE bond to the rest of the molecule
+      -- the single point of attachment a ``-yl`` prefix describes;
+    * the capped fragment's name must come back as a SINGLE, unmultiplied
+      ``-ol`` (not ``diol``/``triol``/... and not some OTHER suffix) -- any
+      other shape means the injected ``-OH`` did not win P-31 seniority (a
+      senior group already in the fragment out-ranks it) or the fragment
+      already carried its own ``-OH`` (now two), and in both cases the
+      resulting locant is not provably the attachment atom's, so this
+      declines rather than guess.
+
+    The caller's OPSIN round-trip (SELF-01) is still the final 0-wrong net;
+    this only decides whether a candidate is OFFERED.
+
+    Pure: no mutation of ``mol`` (works on a private ``RWMol`` copy).
+    """
+    if attach_idx is None:
+        return None
+    frag_set = set(frag_atoms)
+    if attach_idx not in frag_set or not (0 <= attach_idx < mol.GetNumAtoms()):
+        return None
+    attach_atom = mol.GetAtomWithIdx(attach_idx)
+    if attach_atom.GetSymbol() != 'C' or attach_atom.GetFormalCharge() != 0:
+        return None
+    ring_info = mol.GetRingInfo()
+    for ring in ring_info.AtomRings():
+        ring_set = set(ring)
+        if ring_set & frag_set and not ring_set.issubset(frag_set):
+            return None  # extraction would cut this ring -- decline
+    ext_bonds = [
+        (a_idx, nb.GetIdx())
+        for a_idx in frag_atoms
+        for nb in mol.GetAtomWithIdx(a_idx).GetNeighbors()
+        if nb.GetIdx() not in frag_set
+    ]
+    if len(ext_bonds) != 1:
+        return None  # not a single clean point of attachment
+    try:
+        rw = Chem.RWMol(mol)
+        o_idx = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(attach_idx, o_idx, Chem.BondType.SINGLE)
+        h_idx = rw.AddAtom(Chem.Atom(1))
+        rw.AddBond(o_idx, h_idx, Chem.BondType.SINGLE)
+        cap_atoms = sorted(frag_set | {o_idx, h_idx})
+        frag_smi = Chem.MolFragmentToSmiles(rw, cap_atoms, canonical=True)
+    except Exception:  # a producer bug must never crash branch naming
+        return None
+    if not frag_smi:
+        return None
+    from ..errors import is_refusal_sentinel
+    from ..namer import name_compound
+    try:
+        alcohol_name = name_compound(
+            frag_smi, general_fallback=True,
+            general_fallback_unverified=True, allow_aromatic_general=True)
+    except Exception:
+        return None
+    if not alcohol_name or is_refusal_sentinel(alcohol_name) or ' ' in alcohol_name:
+        return None
+    if alcohol_name.lower().count('hydroxy') > 1:
+        return None  # the fragment already carried its own -OH (now 2+)
+    if alcohol_name.endswith('ol') and 'hydroxy' not in alcohol_name.lower():
+        # Case A: the injected -OH won P-31 suffix seniority (a plain chain
+        # or simple monocycle -- e.g. "cyclohexan-4-ol"). _alcohol_to_alkyl
+        # already carries the -ol locant over to -yl unchanged.
+        if re.search(r'(?:di|tri|tetra|penta)ol\b', alcohol_name.lower()):
+            return None  # a multiplied -ol: our -OH is not the only one
+        from ..decomposition.fragment_assembly import _alcohol_to_alkyl
+        yl_name = _alcohol_to_alkyl(alcohol_name)
+        if not yl_name or ' ' in yl_name or not yl_name.endswith('yl'):
+            return None
+        return yl_name
+    # Case B: the fused/spiro/polycyclic ring producers in this codebase
+    # build SUFFIX-FREE names (`allow_suffix_free`) -- a plain exocyclic -OH
+    # never becomes a principal-characteristic-group suffix there, only a
+    # "<locant>-hydroxy" PREFIX. That locant is still governed by the same
+    # "lowest locant to the (sole) substituent" numbering a free valence
+    # would earn, so recover it from the prefix instead of the suffix: strip
+    # the "<locant>-hydroxy" prefix text out of the name (and the hyphen that
+    # joined it to its neighbour, on whichever side survives) and APPEND
+    # "-<locant>-yl" after the parent stem AS-IS. OPSIN 2.9.0 (verified
+    # directly, not assumed) accepts the free-valence locant+"-yl" appended
+    # to the UNMODIFIED terminal "-e" for a multi-component bracketed parent
+    # ("...azepane]" + "-4-yl" -> "...azepane]-4-yl" parses correctly) --
+    # unlike a von Baeyer/simple-ring name with no closing bracket at the
+    # very end, where the "-e" -> "-yl" contraction is the standard spelling
+    # but OPSIN parses the unstripped "-e-locant-yl" form too (verified:
+    # "cyclohexane-4-yl" and "cyclohexan-4-yl" both parse to the same
+    # structure). So appending unconditionally, without ever stripping the
+    # "-e", is round-trip-safe for both shapes and avoids having to detect
+    # which shape this name is.
+    m = re.search(r'(\d+)-hydroxy', alcohol_name)
+    if not m:
+        return None  # no locant found (or hydroxy unlocanted) -- don't guess
+    locant = m.group(1)
+    start, end = m.span()
+    if start > 0 and alcohol_name[start - 1] == '-':
+        start -= 1
+    remainder = (alcohol_name[:start] + alcohol_name[end:]).lstrip('-')
+    if not remainder:
+        return None
+    yl_name = f'{remainder}-{locant}-yl'
+    if ' ' in yl_name:
+        return None
+    return yl_name
+
+
 def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     """Name a substituent fragment with the free-valence morphology P-29.2 requires.
 
@@ -1285,6 +1423,19 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             _uni = None
         if _uni and not is_refusal_sentinel(_uni) and ' ' not in _uni:
             return _uni
+
+        # M2 Task 2: Phase-B3 above also declined (its own narrower ring
+        # logic doesn't reach fused/spiro shapes the FULL general engine
+        # already names) -- try routing the branch to the whole-molecule
+        # engine via name_compound + an -OH-locant-carried -yl conversion.
+        # Scoped to free_valence == 1 (a plain -yl): the OH-capping trick
+        # only recovers a SINGLE free valence's locant, never an ylidene/
+        # ylidyne's. See _route_fragment_to_general_engine's docstring.
+        if free_valence == 1:
+            _routed = _route_fragment_to_general_engine(
+                mol, frag_atoms, attach_idx)
+            if _routed:
+                return _routed
 
     return token
 

@@ -145,3 +145,147 @@ def test_m4_fold_besteffort_roundtrips(eng, tag, smi):
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
     name = eng.name(smi)
     assert opsin_roundtrip_check(smi, name)["passed"], f"{tag}: {name}"
+
+
+# =============================================================================
+# M2 Task 2 -- route the declined fragment to the general engine (-yl route)
+# =============================================================================
+#
+# Measured (,
+# `.superpowers/sdd/M1-PLAN/m2-task-2-report.md`): after Task 1, 28 of the
+# original 38 tier-propagation candidates still abstain because the cascade
+# DECLINES a ring/cage fragment that the whole-molecule general engine
+# already names standalone. `_route_fragment_to_general_engine`
+# (`substituent_enumerator.py`) closes that gap: it H/OH-caps the declined
+# fragment, names the capped fragment via `name_compound` at best-effort, and
+# converts the result to a `-yl` prefix carrying the correct attachment
+# locant (via the injected -OH's own P-31 locant, whether it wins suffix
+# seniority or falls back to a `<locant>-hydroxy` prefix on the fused/spiro
+# ring producers, which build suffix-free names).
+#
+# ⚠ MEASURED, NOT ASSUMED (a genuine negative finding, not a gap in
+# searching): a fresh-process spy over the FIRST 62 rows of
+# `abstentions/pubchem10k.jsonl` (outer-wrap on `name_substituent`, gate ON,
+# capped per the task's efficiency bound) found 20 real molecules whose
+# naming hits this exact decline (rows 8, 9, 14, 18, 25, 27, 30, 32, 33, 35,
+# 37, 38, 39, 42, 44, 47, 49, 52, 57, 61) -- but EVERY one of them still
+# abstains even with this fix ( on
+# `substituent_enumerator.py`: identical abstain=True with and without the
+# fix), because each carries >=1 OTHER independent blocker elsewhere in the
+# same molecule (the "mean 4.08 distinct blockers per abstainer" finding).
+# A further forward scan of rows 62-165 found 8 rows that now name
+# successfully, but  proved every one of those ALSO
+# already named successfully at HEAD `58fe3146` (before this fix) via a
+# DIFFERENT, pre-existing candidate -- so none of them are attributable to
+# this routing either.
+#
+# The fragments themselves ARE genuinely routable, though (proof by
+# construction, the SAME method the SPY itself used for its "row 20" claim):
+# `_route_fragment_to_general_engine` returns a real, OPSIN-valid `-yl` token
+# for the exact declined fragments from pubchem10k.jsonl rows 42
+# (`Cc1cc2c(nc1OCCN1CCC1)OC1(CC1)CNS2=O`, attach atom 6 -- a
+# spiro-cyclopropane-fused oxathiazine) and 49
+# (`CCN(CC)OCC1C=CC(C2=CC3(CCCNCC3)Oc3ccc(F)cc32)=CN1`, attach atom 11 -- a
+# spiro-benzopyran-azepane). The reason NO single-occurrence molecule
+# (neither a real pubchem10k/pubchem_2000 row nor a constructed single-copy
+# molecule bearing either fragment, `head_ab.sh`-verified) demonstrates the
+# fix in isolation is that the pre-existing "ring/cage-as-parent" universal
+# fallback (built in v33-v37, before M2) ALWAYS offers an alternative
+# candidate that treats the ring system as the parent and everything else as
+# a prefix -- e.g. "4-acetamido-6-fluorospiro[1-benzopyran-2,4'-azepane]"
+# instead of "N-(6-fluorospiro[1-benzopyran-2,4'-azepane]-4-yl)acetamide" --
+# which supersedes the need for substituent-level routing whenever only ONE
+# such ring system is present. Doubling the fragment (two independent
+# occurrences on the same simple acid chain) removes that escape hatch --
+# only ONE ring system can be the parent, so the OTHER MUST be named as a
+# substituent -- and is therefore the smallest construction that isolates
+# the mechanism. Verified via 
+# src/orthonym/assembly/substituent_enumerator.py -- ...`: HEAD (A)
+# abstains (`unknown organic compound`) on both; the working tree (B) names
+# both and both round-trip (OPSIN InChI match True).
+TASK2_ROUTED_WITNESSES = [
+    # row-49 fragment, doubled onto a malonic-acid-shaped chain.
+    "OC(=O)C(C1=CC2(CCCNCC2)Oc2ccc(F)cc21)C3=CC4(CCCNCC4)Oc4ccc(F)cc43",
+    # row-42 fragment, doubled the same way.
+    "OC(=O)C(c1nc2c(cc1C)S(=O)NCC1(CC1)O2)c1nc2c(cc1C)S(=O)NCC1(CC1)O2",
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", TASK2_ROUTED_WITNESSES)
+def test_task2_route_no_placeholder(eng, smi):
+    name = eng.name(smi)
+    assert name is not None
+    assert not is_refusal_sentinel(name), name
+    assert "substituent" not in name
+    assert "unknown" not in name.lower()
+
+
+@pytest.mark.roundtrip
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", TASK2_ROUTED_WITNESSES)
+def test_task2_route_roundtrips(eng, smi):
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+    name = eng.name(smi)
+    assert opsin_roundtrip_check(smi, name)["passed"], name
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi", TASK2_ROUTED_WITNESSES)
+def test_task2_default_tier_unchanged(pin_eng, smi):
+    # PIN default must still abstain byte-identically to pre-fix HEAD --
+    # best_effort_ctx is unset there, so _route_fragment_to_general_engine
+    # is never reached (routing is only ever tried under best_effort_ctx).
+    name = pin_eng.name(smi)
+    assert is_refusal_sentinel(name), (
+        f"PIN default must still abstain (byte-identical to pre-fix HEAD); "
+        f"got a NEW default-tier emission: {name!r}")
+
+
+def test_task2_route_declines_on_ring_cutting_extraction():
+    """Fail-closed guard: a frag_atoms set whose extraction would CUT a ring
+    (one of the SPY's 4 fragmentation artifacts) must decline, never emit a
+    fragment describing a different, ring-opened molecule. Reproduces the
+    exact ring-cutting (frag_atoms, attach_idx) pairs the spy measured as the
+    FIRST candidate attempt for pubchem10k rows 14/38/52 -- each a real
+    intermediate the search tries and must reject."""
+    from rdkit import Chem
+    from orthonym.assembly.substituent_enumerator import (
+        _route_fragment_to_general_engine,
+    )
+
+    cases = [
+        ("CCCN1CCC2(CC1)Oc1ccccc1C1CC(c3ccc(CC)cc3)=NN12",
+         [0, 1, 2, 3, 4, 5, 7, 8], 5),
+        ("N#CCC[C@@H]1CC[C@]2(CCCN(C(=O)c3cccnc3)C2)O1",
+         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 21], 10),
+        ("O=C1CC[C@@]2(CN1Cc1ccccc1)NCCc1[nH]cnc12",
+         [2, 3, 4, 5, 14, 15, 16, 17, 18, 19, 20, 21], 5),
+    ]
+    for smi, frag_atoms, attach_idx in cases:
+        mol = Chem.MolFromSmiles(smi)
+        assert mol is not None, smi
+        result = _route_fragment_to_general_engine(mol, frag_atoms, attach_idx)
+        assert result is None, (smi, frag_atoms, attach_idx, result)
+
+
+def test_task2_route_declines_on_noncarbon_attach():
+    """Fail-closed guard: OH-capping a non-carbon attach atom would change
+    the fragment's chemistry (N-OH is a hydroxylamine, O-OH a peroxide, ...),
+    so the route must decline rather than risk naming a different molecule.
+    Reproduces pubchem10k row 8's NITROGEN-attach candidate (attach atom 14,
+    a clean single-external-bond, non-ring-cutting extraction -- otherwise a
+    working candidate, isolating the carbon-only guard specifically)."""
+    from rdkit import Chem
+    from orthonym.assembly.substituent_enumerator import (
+        _route_fragment_to_general_engine,
+    )
+
+    smi = r"Cc1nn(-c2ccccc2)c(C)c1/C=N\n1c(C(F)(F)F)n[nH]c1=S"
+    mol = Chem.MolFromSmiles(smi)
+    assert mol is not None
+    frag_atoms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    attach_idx = 14
+    assert mol.GetAtomWithIdx(attach_idx).GetSymbol() == "N"
+    result = _route_fragment_to_general_engine(mol, frag_atoms, attach_idx)
+    assert result is None
