@@ -1,15 +1,17 @@
-"""Unit tests for DROP-07 and DROP-17 fixes in composer.py.
+"""Unit tests for the ring_substituent_bare_functional_group and
+substituent_all_candidates_filtered fixes in composer.py.
 
-DROP-07: FG-only ring substituents (halogens, -OH, -NH2, =O as non-principal)
-should produce correct locanted prefixes using oriented_ring locants, not be
-silently skipped to the global FG loop (which lacks ring locant context).
+ring_substituent_bare_functional_group: FG-only ring substituents (halogens,
+-OH, -NH2, =O as non-principal) should produce correct locanted prefixes
+using oriented_ring locants, not be silently skipped to the global FG loop
+(which lacks ring locant context).
 
 Key symptom: monosubstituted halocycloalkanes get a spurious "1-" locant
 (e.g., "1-fluorocyclohexane" instead of "fluorocyclohexane") because the
 global FG loop does not apply should_omit_locant_one().
 
-DROP-17: When BUG-B overfilter removes all FG matches, at least one match
-should be restored to prevent total FG loss.
+substituent_all_candidates_filtered: When BUG-B overfilter removes all FG
+matches, at least one match should be restored to prevent total FG loss.
 """
 
 import pytest
@@ -17,12 +19,14 @@ from orthonym import name_compound
 
 
 # ---------------------------------------------------------------------------
-# DROP-07: FG-only ring substituents with correct locant handling
+# ring_substituent_bare_functional_group: FG-only ring substituents with
+# correct locant handling
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestDROP07FGOnlyRingSubstituents:
-    """DROP-07 fix: FG-only ring substituents emitted with correct ring locants."""
+class TestRingSubstituentBareFunctionalGroup:
+    """ring_substituent_bare_functional_group fix: FG-only ring substituents
+    emitted with correct ring locants."""
 
     def test_fluorocyclohexane_no_spurious_locant(self):
         """Monosubstituted fluorocyclohexane: locant 1 must be elided.
@@ -98,12 +102,13 @@ class TestDROP07FGOnlyRingSubstituents:
 
 
 # ---------------------------------------------------------------------------
-# DROP-17: BUG-B overfilter recovery
+# substituent_all_candidates_filtered: BUG-B overfilter recovery
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-class TestDROP17OverfilterRecovery:
-    """DROP-17 fix: when BUG-B removes all FG matches, at least one is restored."""
+class TestSubstituentAllCandidatesFilteredRecovery:
+    """substituent_all_candidates_filtered fix: when BUG-B removes all FG
+    matches, at least one is restored."""
 
     def test_hydroxy_present_with_hydroxymethyl_branch(self):
         """A compound with -OH and -CH2OH on cyclohexane: hydroxyl info not lost."""

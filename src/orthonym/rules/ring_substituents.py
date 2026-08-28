@@ -581,7 +581,7 @@ def _decorated_heteroaryl_substituent_name(
 
     # v29 Phase 6: CARBOCYCLIC (benzene) rings have no heteroaryl stem, so a
     # DECORATED PHENYL substituent had no producer at all and fell straight
-    # through to DROP-24 — even though it is among the commonest shapes in
+    # through to ring_fragment_declined_by_ring_engine — even though it is among the commonest shapes in
     # drug-like space. Measured on the Phase 5 corpus, every one of these was
     # unnameable at EVERY ring attachment point:
     #     CN(C)c1ccccc1      -> 4-(dimethylamino)phenyl
@@ -2150,8 +2150,8 @@ def name_ring_system_substituent(
         # ring atom (proper subset: ring atoms + decoration atoms). Neither the
         # bare-ring branch nor the ring-on-chain branch matched. Name it by
         # recursing the free-valence numbering cascade over the decorated ring.
-        # Fail closed (None -> enumerator fallback -> DROP-24) on anything not
-        # provably correct, so this only ADDS successful emissions.
+        # Fail closed (None -> enumerator fallback -> ring_fragment_declined_by_ring_engine)
+        # on anything not provably correct, so this only ADDS successful emissions.
         try:
             name = _decorated_heteroaryl_substituent_name(
                 mol, frag_atoms, tuple(frag_ring_atoms), attach_idx,
@@ -2168,7 +2168,7 @@ def name_ring_system_substituent(
             # identical against the PIN gold set, so — exactly as Piece 1 —
             # gate it behind the best-effort tier to keep PIN byte-identical by
             # construction (the v30 axis is best-effort breadth, invariant 16).
-            # Fail closed (None -> enumerator fallback -> DROP-24), so this only
+            # Fail closed (None -> enumerator fallback -> ring_fragment_declined_by_ring_engine), so this only
             # ADDS successful best-effort emissions; SELF-01 backstops a
             # mis-numbering (abstain, never a wrong molecule).
             try:

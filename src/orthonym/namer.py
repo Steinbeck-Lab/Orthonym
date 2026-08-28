@@ -5959,7 +5959,7 @@ class Orthonym:
         features._enable_triviality_controller = self._enable_triviality_controller
         features._triv_oracle = self._triv_oracle
         # Phase 169 D-05: plumb the group-splitting flag + flag-ON-only oracle onto
-        # features so the DROP-23 tier-3 fallback in polyfunctional.py can read them.
+        # features so the substituent_no_prefix_form tier-3 fallback in polyfunctional.py can read them.
         features._enable_group_splitting = self._enable_group_splitting
         features._split_oracle = self._split_oracle
 

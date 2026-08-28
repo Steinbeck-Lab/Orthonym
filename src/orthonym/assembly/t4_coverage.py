@@ -331,7 +331,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
         leaves an unnameable fragment should lose to a competitor parent rather
         than terminate the molecule;
       * a peptide-residue namer for deep peptide/ester side chains (perindopril's
-        ``CCC[C@H](N[C@H](C)C=O)C(=O)OCC`` hits DROP-12 recursion_depth_fallback);
+        ``CCC[C@H](N[C@H](C)C=O)C(=O)OCC`` hits substituent_recursion_depth_exceeded recursion_depth_fallback);
       * charged-parent support (``allow_charged``, ~13/150, mostly out-of-scope
         salts) and spiro/fused/monocycle ring-parent producers (~9/150).
 

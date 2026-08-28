@@ -613,7 +613,7 @@ def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
     Returns the raw organyl word (`2-methylpropyl`, `cyclohexyl`,
     `(2S)-butan-2-yl`) or None when the primitive declines — including when it
     declines a ring-bearing fragment, which it does deliberately rather than
-    anchoring a free valence it cannot place (see the DROP-24 guard in
+    anchoring a free valence it cannot place (see the ring_fragment_declined_by_ring_engine guard in
     assembly/substituent_naming.py).
     """
     attach = _ester_attachment_atom(mol, alkyl_set)
@@ -633,7 +633,7 @@ def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
         word = None
 
     # v31 breadth: name_substituent_fragment DECLINES a ring-bearing alcohol
-    # component (its DROP-24 guard). The legacy count path below then LINEARISES
+    # component (its ring_fragment_declined_by_ring_engine guard). The legacy count path below then LINEARISES
     # the ring -- `CC(=O)O[C@H]1CCCCC[C@@H]1O` came out `(1S,2S)-heptyl acetate`
     # (cycloheptane counted as 7 chain carbons, the -OH silently dropped): a
     # WRONG molecule that SELF-01 suppresses into a silent abstention. The

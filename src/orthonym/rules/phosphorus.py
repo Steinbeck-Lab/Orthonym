@@ -1506,7 +1506,7 @@ def carbon_free_phospho_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]
     Step 4) names a fragment by round-tripping it through the WHOLE-molecule
     namer, but the bare P-oxo fragment ``O=P(O)O`` has NO carbon, so
     ``name_compound`` classifies it ``inorganic compound (not supported)`` and
-    the fragment was DROPPED (DROP-12). The neutral prefix is exactly the one the
+    the fragment was DROPPED (substituent_recursion_depth_exceeded). The neutral prefix is exactly the one the
     FG-on-parent-chain path already emits via
     ``get_phosphorus_prefix('phosphonic_acid')`` -> ``'phosphono'``; this restores
     it for the fragment shape the whole-molecule reject cannot see.

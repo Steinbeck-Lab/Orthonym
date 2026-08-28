@@ -1799,7 +1799,8 @@ def _name_polyfunctional_acyclic_substituent_impl(
     # '3-oxo-3-[(2-sulfanylethyl)amino]propyl' for -CH2CH2C(=O)NHCH2CH2SH
     # (pantetheine's N-substituent arm). Without this pass the amide N reaches
     # Pass 2's plain-N branch below, which requires a bare -NH2 (2 H) and hard
-    # DECLINES the WHOLE fragment for any -NH-R/-NR2 amide nitrogen (DROP-09).
+    # DECLINES the WHOLE fragment for any -NH-R/-NR2 amide nitrogen
+    # (universal_pipeline_unnameable_substituent).
     #
     # Consumes the amide N + its OWN substituent branch(es) (named via the
     # SAME organyl-prefix builders Pass 1b already uses, and assembled through
@@ -2995,7 +2996,8 @@ def _name_ether_substituted_chain(
     # Backbone = carbons reachable from the attachment WITHOUT crossing ANY
     # heteroatom. Must be all-carbon, acyclic, saturated. A heteroatom
     # neighbour simply stops the walk here -- it is classified below as a
-    # potential backbone-attached ether/thioether LINK. (v33 Phase 6 DROP-24
+    # potential backbone-attached ether/thioether LINK. (v33 Phase 6
+    # ring_fragment_declined_by_ring_engine
     # aryloxymethyl fix: this walk used to depend on a whole-fragment
     # heteroatom front filter that rejected on ANY non-O/S atom anywhere in
     # the fragment, including one buried inside an R group -- e.g. the nitro N
@@ -3379,7 +3381,7 @@ def _extract_fragment_smiles(
         return frag_smi
     except Exception as e:
         logger.debug(
-            "DROP-15 substituent_skip: reason=extract_exception atom_count=%d error=%s",
+            "substituent_extraction_exception substituent_skip: reason=extract_exception atom_count=%d error=%s",
             len(sub_atoms), e,
         )
         return None
@@ -6313,16 +6315,18 @@ def name_substituent_fragment(
     if _find_amine_oxide_n(mol, sub_atoms) is not None:
         return _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx)
 
-    # Step 0c (v38 DROP-12, P-67.1.4.1 / P-72.6.1): a CARBON-FREE P-oxo fragment
-    # attached at P -- a bare -P(=O)(OH)2 (phosphono) or -P(=O)(O-)2
-    # (phosphonato). Steps 3-4 name a fragment by round-tripping it through the
-    # whole-molecule namer, but the bare fragment 'O=P(O)O' has 0 carbon, so
-    # name_compound rejects it 'inorganic compound (not supported)' and the
-    # phospho was DROPPED (DROP-12) -> the candidate OPSIN-parses to a DETACHED
-    # free phosphate -> SELF-01 suppresses -> abstain. The neutral prefix here is
-    # exactly the retained one the FG-on-parent-chain path already emits
-    # (get_phosphorus_prefix('phosphonic_acid') -> 'phosphono'); the anionic case
-    # routes before the DROP-26 charge guard below. Fail-closed on any other
+    # Step 0c (v38 substituent_recursion_depth_exceeded, P-67.1.4.1 / P-72.6.1):
+    # a CARBON-FREE P-oxo fragment attached at P -- a bare -P(=O)(OH)2
+    # (phosphono) or -P(=O)(O-)2 (phosphonato). Steps 3-4 name a fragment by
+    # round-tripping it through the whole-molecule namer, but the bare fragment
+    # 'O=P(O)O' has 0 carbon, so name_compound rejects it 'inorganic compound
+    # (not supported)' and the phospho was DROPPED
+    # (substituent_recursion_depth_exceeded) -> the candidate OPSIN-parses to a
+    # DETACHED free phosphate -> SELF-01 suppresses -> abstain. The neutral
+    # prefix here is exactly the retained one the FG-on-parent-chain path
+    # already emits (get_phosphorus_prefix('phosphonic_acid') -> 'phosphono');
+    # the anionic case routes before the charged_fragment_not_directly_nameable
+    # charge guard below. Fail-closed on any other
     # P-oxo shape (see carbon_free_phospho_prefix); the top-level SELF-01/OPSIN
     # gate voids any non-RT composed name, so 0-wrong holds.
     if attach_idx is not None and mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
@@ -6355,7 +6359,8 @@ def name_substituent_fragment(
     # documented as "chalcogen-agnostic", already defaults its own `suffix`
     # param to `"sulfanyl"`, and already recurses the substituent side through
     # THIS SAME function -- `get_sulfanyl_prefix` calls
-    # `name_substituent_fragment` on the arm, so a RING-bearing arm (DROP-24,
+    # `name_substituent_fragment` on the arm, so a RING-bearing arm
+    # (ring_fragment_declined_by_ring_engine,
     # e.g. `-S-c1ccc(O)cc1O` -> '(2,5-dihydroxyphenyl)sulfanyl') is named by
     # the SAME trustworthy ring chokepoint (Step 1c) this function already
     # runs for a standalone ring fragment -- "delegate the ring-side to the
@@ -6894,7 +6899,7 @@ def name_substituent_fragment(
         _ri_guard = mol.GetRingInfo()
         if any(_ri_guard.NumAtomRings(a) > 0 for a in sub_atoms):
             logger.debug(
-                "DROP-24 substituent_skip: reason=ring_fragment_declined_by_"
+                "ring_fragment_declined_by_ring_engine substituent_skip: reason=ring_fragment_declined_by_"
                 "ring_engine atom_count=%d", len(sub_atoms),
             )
             return None
@@ -6939,7 +6944,7 @@ def name_substituent_fragment(
                     return _add_substituent_stereo(
                         mol, sub_atoms, _cp, attach_idx=attach_idx)
         logger.debug(
-            "DROP-26 substituent_skip: reason=charged_fragment_not_direct_"
+            "charged_fragment_not_directly_nameable substituent_skip: reason=charged_fragment_not_direct_"
             "cation_attach atom_count=%d", len(sub_atoms),
         )
         return None
@@ -6958,7 +6963,7 @@ def name_substituent_fragment(
             except (ValueError, KeyError):
                 pass
         logger.warning(
-            "DROP-11 substituent_skip: reason=smiles_extraction_failure atom_count=%d",
+            "substituent_smiles_extraction_failure substituent_skip: reason=smiles_extraction_failure atom_count=%d",
             len(sub_atoms),
         )
         return None
@@ -6979,7 +6984,7 @@ def name_substituent_fragment(
             except (ValueError, KeyError):
                 pass
         logger.warning(
-            "DROP-12 substituent_skip: reason=recursion_depth_fallback frag_smiles=%s",
+            "substituent_recursion_depth_exceeded substituent_skip: reason=recursion_depth_fallback frag_smiles=%s",
             frag_smiles[:60],
         )
         return None

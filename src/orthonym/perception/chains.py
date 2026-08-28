@@ -526,7 +526,7 @@ def find_principal_chain(
         # semantics below let a chain through a mere NEIGHBOUR of the carbonyl
         # score contains_fg=1 / fg_count=1. Criterion 3 (length) then handed the
         # win to a longer carbonyl-FREE chain, the acyl carbons were dropped as
-        # an unnameable substituent (DROP-09) and the '=O' was re-expressed on
+        # an unnameable substituent (universal_pipeline_unnameable_substituent) and the '=O' was re-expressed on
         # the attachment atom -- a SILENT ATOM DROP:
         #   CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C  (C21H42O)
         #     -> '5-butyl-2,4-dimethyltridecan-4-one'  (C19H38O, 2 C GONE)

@@ -1976,7 +1976,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             if not matches:
                 if original_count > 0:
                     logger.debug(
-                        "DROP-17 polyfunc_bugb: fg_name=%s filtered=%d "
+                        "substituent_all_candidates_filtered polyfunc_bugb: fg_name=%s filtered=%d "
                         "(substituent naming handles these on small branches)",
                         fg_name, original_count,
                     )
@@ -2033,7 +2033,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     _amine_kept.append(_match)
             if not _amine_kept:
                 logger.debug(
-                    "DROP-HYG04 polyfunc: skip bare 'amino' FG-prefix for %s — "
+                    "suppress_duplicate_bare_amino_prefix polyfunc: skip bare 'amino' FG-prefix for %s — "
                     "N-substituted amine named in full by the substituent walk",
                     fg_name,
                 )
@@ -2594,7 +2594,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         )
         if not prefix_form:
             # Phase 169 D-01 tier-3 fallback (POLY-01): when a composite loser FG
-            # has no clean strict-IUPAC prefix (the DROP-23 case), decompose it into
+            # has no clean strict-IUPAC prefix (the substituent_no_prefix_form case), decompose it into
             # its ordered sub-group prefix components instead of dropping it. Gated
             # behind the default-OFF flag (Stage A byte-identical); the split only
             # fires for table-listed composites (ester/thioester/iminoester) and is
@@ -2635,7 +2635,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # specialized naming paths, not as simple prefixes. Unchanged drop
                 # path for the OFF / non-splittable / RT-rejected cases.
                 logger.debug(
-                    "DROP-23 substituent_skip: reason=no_fg_prefix_form fg_name=%s",
+                    "substituent_no_prefix_form substituent_skip: reason=no_fg_prefix_form fg_name=%s",
                     fg_name,
                 )
                 continue

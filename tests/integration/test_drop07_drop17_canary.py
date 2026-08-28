@@ -1,7 +1,9 @@
-"""Canary integration tests for DROP-07 and DROP-17 fixes.
+"""Canary integration tests for the ring_substituent_bare_functional_group and
+substituent_all_candidates_filtered fixes.
 
-These use real benchmark SMILES that should produce improved names after
-the DROP-07 (FG-only ring substituent) and DROP-17 (BUG-B overfilter) fixes.
+These use real benchmark SMILES that should produce improved names after the
+ring_substituent_bare_functional_group (FG-only ring substituent) and
+substituent_all_candidates_filtered (BUG-B overfilter) fixes.
 """
 
 import pytest
@@ -9,8 +11,9 @@ from orthonym import name_compound
 
 
 @pytest.mark.integration
-class TestDROP07CanaryCompounds:
-    """Canary tests for compounds affected by DROP-07 fix."""
+class TestRingSubstituentBareFunctionalGroupCanaryCompounds:
+    """Canary tests for compounds affected by the
+    ring_substituent_bare_functional_group fix."""
 
     def test_bromocyclohexane(self):
         """Bromocyclohexane: halogen on ring must appear as 'bromo' prefix."""
@@ -49,8 +52,9 @@ class TestDROP07CanaryCompounds:
 
 
 @pytest.mark.integration
-class TestDROP17CanaryCompounds:
-    """Canary tests for compounds affected by DROP-17 fix."""
+class TestSubstituentAllCandidatesFilteredCanaryCompounds:
+    """Canary tests for compounds affected by the
+    substituent_all_candidates_filtered fix."""
 
     def test_hydroxymethylcyclohexanol(self):
         """Hydroxy + hydroxymethyl on cyclohexane: both hydroxyl contexts present."""

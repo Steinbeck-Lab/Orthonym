@@ -1280,7 +1280,7 @@ _register_inner(
 #     Priority 1490 places it between ring_ester(1450) and ester_family(1500),
 #     intercepting mixed primary + N-substituted acyclic diamides BEFORE the
 #     polyfunctional / ester_family path double-counts the terminal secondary
-#     amide (SELF-01 -> 'unknown') or DROP-03 sweeps the N-alkyl carbons.
+#     amide (SELF-01 -> 'unknown') or principal_group_branch_overlap sweeps the N-alkyl carbons.
 #     TIGHT predicate (exactly 2 chain-end amides) so mono-amides, diacids,
 #     esters, and triamides fall through unchanged. oxamide (2-C diamide) is
 #     caught upstream at dispatch and never reaches here.

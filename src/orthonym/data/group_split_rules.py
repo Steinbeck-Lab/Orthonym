@@ -3,8 +3,9 @@
 Loads ``group_split_rules.json`` — the locked, TOPOLOGY-ONLY split-decomposition
 table (CONTEXT D-02/D-03) — into a ``Dict[str, SplitRule]`` keyed by ``fg_name``.
 
-The split fires at the ``polyfunctional.py:get_fg_prefix_form()`` / ``DROP-23``
-site (CONTEXT D-01/F2 — a coarse string path, NOT an IR tree visitor). When a
+The split fires at the ``polyfunctional.py:get_fg_prefix_form()`` /
+``substituent_no_prefix_form`` site (CONTEXT D-01/F2 — a coarse string path,
+NOT an IR tree visitor). When a
 non-principal composite functional group has no clean strict-IUPAC prefix and
 would otherwise be dropped, the splitter (Plan-02) decomposes it into its
 component sub-prefixes per the topology recorded here.
@@ -23,7 +24,7 @@ Frozen-dataclass discipline mirrors Phase 165 D-04 SACRED + Phase 168's
 
 Graceful degradation (PATTERNS correction): a missing JSON or schema error
 degrades ``SPLIT_RULES`` to ``{}`` so the Plan-02 splitter sees no rules and
-every ``DROP-23`` still drops (status quo) — never a crash. This is the
+every ``substituent_no_prefix_form`` still drops (status quo) — never a crash. This is the
 no-crash invariant.
 
 Self-contained loader (PATTERNS NOTE): the Phase-168 seed precedent uses its OWN

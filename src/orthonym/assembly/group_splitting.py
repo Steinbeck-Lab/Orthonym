@@ -3,7 +3,7 @@
 When a non-principal **composite** functional group (today only the
 empirically-firing ``ester`` / ``thioester`` — see ``data/group_split_rules``)
 has no clean strict-IUPAC prefix and would otherwise be **dropped** at the
-``polyfunctional.py:get_fg_prefix_form()`` / ``DROP-23`` site (CONTEXT D-01/F2),
+``polyfunctional.py:get_fg_prefix_form()`` / ``substituent_no_prefix_form`` site (CONTEXT D-01/F2),
 ``split_composite_fg`` decomposes it into its ordered sub-group prefix
 **components** instead of dropping it:
 
@@ -27,7 +27,7 @@ components.
 **RT safety (CONTEXT D-05, FAIL-CLOSED):** when an ``OpsinOracle`` is supplied
 (flag-ON only), the FULL assembled split name is OPSIN-round-trip-checked; a
 split that does not round-trip (incl. the FAIL-CLOSED ``oracle._jar is None``
-case) is rejected and the caller behaves exactly as today's ``DROP-23``
+case) is rejected and the caller behaves exactly as today's ``substituent_no_prefix_form``
 ``continue`` — never emits a worse name (favorable asymmetry: the status-quo
 dropped-FG name already fails RT, so a rejected split only preserves it).
 
@@ -282,7 +282,7 @@ def split_composite_fg(
 ) -> Optional[List[SplitComponent]]:
     """Decompose a table-listed composite loser into ordered sub-group prefix components.
 
-    Returns ``None`` (the caller then behaves exactly as today's ``DROP-23``
+    Returns ``None`` (the caller then behaves exactly as today's ``substituent_no_prefix_form``
     ``continue``) when:
       * ``fg_name`` is not in the split table (deny-path — functional-class FGs
         stay dropped, CONTEXT D-03), OR

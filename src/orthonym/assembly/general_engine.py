@@ -210,7 +210,7 @@ class GeneralEngineResult:
 
 
 def _refuse(reason: str) -> None:
-    logger.info("general_engine refused: %s", reason)
+    logger.info("general_engine_declined: %s", reason)
     return None
 
 

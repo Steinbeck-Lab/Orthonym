@@ -4299,7 +4299,7 @@ def name_sugar_o_methyl(mol, canonical_smiles: str) -> Optional[str]:
     ``2,3,4,6-tetra-O-methyl-beta-D-glucopyranose``, ``2-O-methyl-alpha-L-
     rhamnopyranose``).
 
-    Strip-and-name (F-OXANE-DROP-safe): every -O-CH3 is stripped to -OH, the
+    Strip-and-name (safe against F-OXANE-DROP): every -O-CH3 is stripped to -OH, the
     residual must be a RECOGNIZED free sugar (name_free_sugar), else fail-closed
     (a non-sugar oxane's residual is not recognized).  An -O-CH3 at the ANOMERIC
     position is a glycoside (methyl glycopyranoside), NOT an O-methyl ether ->

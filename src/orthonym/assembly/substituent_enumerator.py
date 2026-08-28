@@ -2146,12 +2146,13 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # (falls through to 'substituent') on any decline. The λ5 branch is Task 3.
     if attach_idx is not None and attach_idx in frag_atoms_set:
         if mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
-            # v38 DROP-12 (P-67.1.4.1 / P-72.6.1): a CARBON-FREE P-oxo fragment
+            # v38 substituent_recursion_depth_exceeded (P-67.1.4.1 / P-72.6.1): a
+            # CARBON-FREE P-oxo fragment
             # -- bare -P(=O)(OH)2 (phosphono) / -P(=O)(O-)2 (phosphonato). The
             # phosphanyl helper below EXCLUDES a phosphonic P=O (it names only a
             # clean neutral organyl/hydride P), so this shape used to fall through
             # to the 'substituent' sentinel and be DROPPED -- the same carbon-free
-            # reject as name_substituent_fragment DROP-12 (the whole-molecule
+            # reject as name_substituent_fragment substituent_recursion_depth_exceeded (the whole-molecule
             # namer calls 'O=P(O)O' inorganic). This restores the retained prefix
             # the FG-on-parent-chain path already emits; the top-level SELF-01/
             # OPSIN gate voids any non-RT composed name (0-wrong). Fail-closed on
@@ -4418,7 +4419,7 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
                     if _cp:
                         return _cp
         logger.debug(
-            "DROP-26 substituent_skip: reason=charged_fragment_not_direct_"
+            "charged_fragment_not_directly_nameable substituent_skip: reason=charged_fragment_not_direct_"
             "cation_attach atom_count=%d", len(frag_atoms),
         )
         return None
@@ -4426,7 +4427,9 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
     # Fallback: recursive naming for ring-containing compound fragments.
     # Use name_fragment_recursively() which has cycle detection via visited set.
     # This handles cases where the fragment is a ring system with heteroatoms
-    # that the simpler naming paths above cannot handle (DROP-18/19/24/25).
+    # that the simpler naming paths above cannot handle
+    # (n_branch_ring_substituent_unnameable / c_branch_ring_substituent_unnameable /
+    # ring_fragment_declined_by_ring_engine / amine_n_substituent_unnameable).
     #
     # v37 SP1.1b: the old ``if len(frag_atoms) <= 25`` size cap here dropped a
     # legitimately nameable large fragment on size alone (the 27-heavy-atom
@@ -4459,7 +4462,7 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
                     attach_locant=ATTACH_LOCANT_UNKNOWN)
                 if prefix_name:
                     logger.debug(
-                        "DROP-18/19 fallback: recursive naming for %s -> %s",
+                        "ring_substituent_recursive_naming_fallback: recursive naming for %s -> %s",
                         frag_smiles, prefix_name,
                     )
                     return prefix_name

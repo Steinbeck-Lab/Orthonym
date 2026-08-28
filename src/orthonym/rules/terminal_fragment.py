@@ -5,7 +5,7 @@ Why this module exists
 ----------------------
 Phase A measured that 132 of the 162 largest-class abstentions (81.5%) are silent
 ATOM DROPS, median -8 heavy atoms, and that they are multi-blocked at the code
-site: mean 2.69 distinct ``DROP-*`` codes per row, best single-site fix 10/132
+site: mean 2.69 distinct producer-refusal codes per row, best single-site fix 10/132
 (8%). All 17 ``substituent_skip`` sites ``continue`` when a narrow producer
 declines a fragment, which removes that fragment's atoms from the name; because
 selection is ``first_applicable`` at pool size 1, each skip is terminal and

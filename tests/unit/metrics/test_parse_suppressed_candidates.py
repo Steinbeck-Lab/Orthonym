@@ -59,7 +59,8 @@ def test_last_suppression_wins_and_all_are_kept():
 
 def test_no_suppression_yields_no_keys():
     """An empty dict, so callers can `row.update(...)` without adding null keys."""
-    assert parse_suppressed_candidates(["DROP-09 substituent_skip: reason=x"]) == {}
+    assert parse_suppressed_candidates(
+        ["universal_pipeline_unnameable_substituent substituent_skip: reason=x"]) == {}
     assert parse_suppressed_candidates([]) == {}
 
 

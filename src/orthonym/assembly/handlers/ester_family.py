@@ -246,7 +246,7 @@ def name_ester_family(
                 atom_to_locant_hint=None,
             )
         logger.debug(
-            "DROP-22 substituent_skip: reason=polyfunctional_returned_none",
+            "polyfunctional_producer_returned_none substituent_skip: reason=polyfunctional_returned_none",
         )
 
     # ============================================================

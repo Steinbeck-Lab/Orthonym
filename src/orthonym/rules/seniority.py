@@ -822,8 +822,8 @@ PREFIX_FORMS = {
     # form, and @56829 redirects "sulfinamoyl: see aminosulfinyl*". Confirmed in
     # use by the PIN at @36500, `3-[(aminosulfinyl)oxy]propanoic acid (PIN)`.
     # Required so a DEMOTED sulfinamide is not silently dropped by the
-    # `no_fg_prefix_form` skip (_handler_shared.py DROP-16 / polyfunctional.py
-    # DROP-23) when a senior group takes the suffix.
+    # `no_fg_prefix_form` skip (substituent_no_prefix_form, _handler_shared.py /
+    # polyfunctional.py) when a senior group takes the suffix.
     "primary_sulfinamide": "aminosulfinyl",
     "secondary_sulfinamide": "aminosulfinyl",
     "tertiary_sulfinamide": "aminosulfinyl",

@@ -89,40 +89,42 @@ def test_classify_outcome_abstain_on_empty_string():
 
 def test_parse_refusal_codes_extracts_drop_code_and_reason():
     lines = [
-        "orthonym.assembly.substituent_naming|DROP-24 substituent_skip: "
+        "orthonym.assembly.substituent_naming|ring_fragment_declined_by_ring_engine substituent_skip: "
         "reason=ring_fragment_declined_by_ring_engine atom_count=9",
     ]
-    assert parse_refusal_codes(lines) == ["DROP-24:ring_fragment_declined_by_ring_engine"]
+    assert parse_refusal_codes(lines) == [
+        "ring_fragment_declined_by_ring_engine:ring_fragment_declined_by_ring_engine"]
 
 
 def test_parse_refusal_codes_extracts_general_engine_refusal():
-    lines = ["orthonym.assembly.general_engine|general_engine refused: "
+    lines = ["orthonym.assembly.general_engine|general_engine_declined: "
              "branch unnameable (tier-5 fallback)"]
-    assert parse_refusal_codes(lines) == ["REFUSE:branch unnameable"]
+    assert parse_refusal_codes(lines) == ["producer_refused:branch unnameable"]
 
 
 def test_parse_refusal_codes_deduplicates_within_a_molecule():
     """A code firing 5 times on one molecule is still ONE blocker for that molecule."""
-    line = ("orthonym.x|DROP-24 substituent_skip: "
+    line = ("orthonym.x|ring_fragment_declined_by_ring_engine substituent_skip: "
             "reason=ring_fragment_declined_by_ring_engine atom_count=9")
     assert len(parse_refusal_codes([line, line, line])) == 1
 
 
 def test_parse_refusal_codes_captures_drop_codes_that_carry_no_reason_field():
-    """Real call sites omit `reason=` entirely, and one has a non-numeric suffix.
+    """Real call sites omit `reason=` entirely.
 
-    DROP-17 (rules/polyfunctional.py, assembly/handlers/_handler_shared.py) and
-    DROP-HYG04 (rules/polyfunctional.py) log without `reason=`. A regex requiring
-    `reason=` and `\\d+` makes them vanish from the census, so a genuinely
-    blocking site ranks as ZERO purely because of its log format.
+    substituent_all_candidates_filtered (rules/polyfunctional.py,
+    assembly/handlers/_handler_shared.py) and suppress_duplicate_bare_amino_prefix
+    (rules/polyfunctional.py) log without `reason=`. A regex requiring `reason=`
+    makes them vanish from the census, so a genuinely blocking site ranks as
+    ZERO purely because of its log format.
     """
     lines = [
-        "orthonym.rules.polyfunctional|DROP-17 substituent_skip: locant=3",
-        "orthonym.rules.polyfunctional|DROP-HYG04 hygiene_skip: something",
+        "orthonym.rules.polyfunctional|substituent_all_candidates_filtered substituent_skip: locant=3",
+        "orthonym.rules.polyfunctional|suppress_duplicate_bare_amino_prefix hygiene_skip: something",
     ]
     codes = parse_refusal_codes(lines)
-    assert any(c.startswith("DROP-17") for c in codes)
-    assert any(c.startswith("DROP-HYG04") for c in codes)
+    assert any(c.startswith("substituent_all_candidates_filtered") for c in codes)
+    assert any(c.startswith("suppress_duplicate_bare_amino_prefix") for c in codes)
 
 
 def test_parse_refusal_codes_ignores_log_lines_that_do_not_refuse():
@@ -168,7 +170,7 @@ def test_parse_refusal_codes_captures_the_opsin_validity_gate():
     """
     lines = ["orthonym.namer|OPSIN validity gate suppressed unparseable name: "
              "'ruthenium(II) pentaamide'"]
-    assert parse_refusal_codes(lines) == ["GATE-OPSIN:unparseable"]
+    assert parse_refusal_codes(lines) == ["opsin_unparseable:"]
 
 
 def test_parse_refusal_codes_dedups_a_gate_that_fires_on_several_candidates():
@@ -263,11 +265,11 @@ def test_aggregate_counts_structure_wrong_separately_from_abstention():
 
 
 def test_aggregate_refusal_census_counts_molecules_not_occurrences():
-    rows = [_row("ABSTAIN", codes=["DROP-24:x", "DROP-01:y"]),
-            _row("ABSTAIN", codes=["DROP-24:x"])]
+    rows = [_row("ABSTAIN", codes=["ring_fragment_declined_by_ring_engine:x", "substituent_is_bare_functional_group:y"]),
+            _row("ABSTAIN", codes=["ring_fragment_declined_by_ring_engine:x"])]
     census = aggregate(rows)["refusal_census"]
-    assert census["DROP-24:x"] == 2
-    assert census["DROP-01:y"] == 1
+    assert census["ring_fragment_declined_by_ring_engine:x"] == 2
+    assert census["substituent_is_bare_functional_group:y"] == 1
 
 
 def test_aggregate_refusal_census_restricted_to_abstainers_ranks_build_order():
@@ -279,14 +281,14 @@ def test_aggregate_refusal_census_restricted_to_abstainers_ranks_build_order():
     """
     rows = [
         # fires but the molecule recovered and emitted -> must NOT rank
-        _row("EMIT", "T1", codes=["DROP-01:fg_only"]),
-        _row("EMIT", "T1", codes=["DROP-01:fg_only"]),
+        _row("EMIT", "T1", codes=["substituent_is_bare_functional_group:fg_only"]),
+        _row("EMIT", "T1", codes=["substituent_is_bare_functional_group:fg_only"]),
         # genuinely blocked
-        _row("ABSTAIN", codes=["DROP-24:ring_declined"]),
+        _row("ABSTAIN", codes=["ring_fragment_declined_by_ring_engine:ring_declined"]),
     ]
     out = aggregate(rows)
-    assert out["refusal_census"]["DROP-01:fg_only"] == 2
-    assert out["refusal_census_abstain"] == {"DROP-24:ring_declined": 1}
+    assert out["refusal_census"]["substituent_is_bare_functional_group:fg_only"] == 2
+    assert out["refusal_census_abstain"] == {"ring_fragment_declined_by_ring_engine:ring_declined": 1}
 
 
 def test_aggregate_per_fragment_p_is_component_weighted():
@@ -392,10 +394,10 @@ def test_aggregate_carries_the_only_ranked_structure_into_the_summary():
     The measurement costs ~675 s, so a census that lives only in stdout is a
     census whose numbers cannot be re-checked.
     """
-    rows = [_row("EMIT", "T1"), _row("ABSTAIN", codes=["DROP-24:x"])]
+    rows = [_row("EMIT", "T1"), _row("ABSTAIN", codes=["ring_fragment_declined_by_ring_engine:x"])]
     st = aggregate(rows)["refusal_structure"]
     assert st["single_site_ceiling"] == pytest.approx(1.0)
-    assert st["sites"][0]["site"] == "DROP-24:x"
+    assert st["sites"][0]["site"] == "ring_fragment_declined_by_ring_engine:x"
 
 
 # --------------------------------------------------------- residual attribution
@@ -450,7 +452,7 @@ def test_residual_refusal_code_never_displaces_a_producer_attributed_site():
     If it could fire on a coded row it would inflate that row's blocker count and
     corrupt both the depth histogram and every ONLY count.
     """
-    row = {"outcome": "ABSTAIN", "refusal_codes": ["DROP-24:x"],
+    row = {"outcome": "ABSTAIN", "refusal_codes": ["ring_fragment_declined_by_ring_engine:x"],
            "limit_code": "UNNAMEABLE"}
     assert residual_refusal_code(row) is None
 
@@ -486,7 +488,7 @@ def test_refusal_structure_reports_an_unattributable_abstainer_as_a_gap():
 
 def test_refusal_structure_credits_only_to_a_single_blocked_abstainer():
     """One code -> that site is the SOLE blocker, so ONLY == 1. (Acceptance 5a)"""
-    rows = [_row("ABSTAIN", codes=["REFUSE:unsupported suffix for pg='ester'"])]
+    rows = [_row("ABSTAIN", codes=["producer_refused:unsupported suffix for pg='ester'"])]
     st = refusal_structure(rows)
     site = st["sites"][0]
     assert site["touched"] == 1
@@ -500,11 +502,11 @@ def test_refusal_structure_credits_no_only_to_any_site_on_a_four_blocker_row():
 
     This is the whole point of the metric: a molecule blocked by four sites needs
     all four cleared, so no one-site fix converts it. Under the touched ranking
-    such a row credits all four sites equally, which is how DROP-24 became a
+    such a row credits all four sites equally, which is how ring_fragment_declined_by_ring_engine became a
     milestone target at 116 touched while being the sole blocker on 1 molecule.
     """
-    codes = ["DROP-24:ring_declined", "DROP-01:fg_only",
-             "REFUSE:not an analyzable spiro ring system", "DROP-22:pf_none"]
+    codes = ["ring_fragment_declined_by_ring_engine:ring_declined", "substituent_is_bare_functional_group:fg_only",
+             "producer_refused:not an analyzable spiro ring system", "polyfunctional_producer_returned_none:pf_none"]
     st = refusal_structure([_row("ABSTAIN", codes=codes)])
     assert {s["site"] for s in st["sites"]} == set(codes)
     assert all(s["touched"] == 1 for s in st["sites"])
@@ -556,7 +558,7 @@ def test_refusal_structure_ranks_by_only_not_by_touched():
 
     Mirrors the live contrast — a high-touch site that is almost never the sole
     blocker must rank BELOW a low-touch site that usually is. On the v30 P0 run
-    that is DROP-24 (116 touched, ONLY 1) below pg='ester' (36 touched, ONLY 10).
+    that is ring_fragment_declined_by_ring_engine (116 touched, ONLY 1) below pg='ester' (36 touched, ONLY 10).
     """
     rows = ([_row("ABSTAIN", codes=["HIGH_TOUCH", "OTHER"]) for _ in range(9)]
             + [_row("ABSTAIN", codes=["HIGH_TOUCH"])]
@@ -639,9 +641,9 @@ def _term_row(outcome="ABSTAIN", codes=(), code=None, detail=None,
 def test_terminal_attribution_does_not_credit_the_exploratory_producer_codes():
     """The measured [I-](CCO)c1ccccc1 leak class.
 
-    Log-scraped, that molecule names four sites -- DROP-01:fg_only,
-    DROP-24:ring_fragment_declined_by_ring_engine, DROP-18 and
-    REFUSE:branch unnameable -- none of which ended it: a name WAS built and
+    Log-scraped, that molecule names four sites -- substituent_is_bare_functional_group:fg_only,
+    ring_fragment_declined_by_ring_engine:ring_fragment_declined_by_ring_engine, n_branch_ring_substituent_unnameable and
+    producer_refused:branch unnameable -- none of which ended it: a name WAS built and
     the P10 charge-conservation veto (namer.py:3916) removed it. Those four
     codes are EXPLORATORY (they fire while the engine searches candidates), so
     on the terminal basis they must keep `touched` and lose `first`/`ONLY`.
@@ -649,15 +651,15 @@ def test_terminal_attribution_does_not_credit_the_exploratory_producer_codes():
     nothing, which is the whole reason this basis exists.
     """
     row = _term_row(
-        codes=["DROP-01:fg_only", "DROP-24:ring_fragment_declined_by_ring_engine",
-               "DROP-18:<no_reason>", "REFUSE:branch unnameable"],
+        codes=["substituent_is_bare_functional_group:fg_only", "ring_fragment_declined_by_ring_engine:ring_fragment_declined_by_ring_engine",
+               "n_branch_ring_substituent_unnameable:<no_reason>", "producer_refused:branch unnameable"],
         code="GATE_SUPPRESSED", detail="charge_dropped")
     log = refusal_structure([row])
     term = refusal_structure([row], basis="terminal")
 
-    innocent = {"DROP-01:fg_only",
-                "DROP-24:ring_fragment_declined_by_ring_engine",
-                "DROP-18:<no_reason>", "REFUSE:branch unnameable"}
+    innocent = {"substituent_is_bare_functional_group:fg_only",
+                "ring_fragment_declined_by_ring_engine:ring_fragment_declined_by_ring_engine",
+                "n_branch_ring_substituent_unnameable:<no_reason>", "producer_refused:branch unnameable"}
     by_site = {s["site"]: s for s in term["sites"]}
 
     # the four keep `touched` (hazard 3: the union must survive)
@@ -674,24 +676,24 @@ def test_terminal_attribution_does_not_credit_the_exploratory_producer_codes():
     assert term["single_blocked_total"] == 1
 
     # and the LOG basis is left untouched -- it credited nobody with ONLY
-    # (four blockers) but did credit DROP-01 with `first`
+    # (four blockers) but did credit substituent_is_bare_functional_group with `first`
     assert log["single_blocked_total"] == 0
-    assert {s["site"]: s["first"] for s in log["sites"]}["DROP-01:fg_only"] == 1
+    assert {s["site"]: s["first"] for s in log["sites"]}["substituent_is_bare_functional_group:fg_only"] == 1
 
 
 def test_terminal_and_log_bases_disagree_on_the_same_row():
     """A row whose log codes and terminal code name DIFFERENT mechanisms.
 
     Measured on CC1=NC(C=N1)CO: the last thing logged is
-    GATE-OPSIN:unparseable, but the channel recorded
+    opsin_unparseable:, but the channel recorded
     BRANCH_UNNAMEABLE/enumerator_ring_fallback -- a GENERATION-stage failure.
     So the terminal site is not "the last log line" and cannot be derived from
     the log stream at all; the two bases must be able to disagree, and the
     disagreement must be visible rather than reconciled away.
     """
     row = _term_row(
-        codes=["DROP-24:ring_fragment_declined_by_ring_engine",
-               "REFUSE:chain too short", "GATE-OPSIN:unparseable"],
+        codes=["ring_fragment_declined_by_ring_engine:ring_fragment_declined_by_ring_engine",
+               "producer_refused:chain too short", "opsin_unparseable:"],
         code="BRANCH_UNNAMEABLE", detail="enumerator_ring_fallback")
     union, attribution = row_attribution(row, basis="terminal")
     assert attribution == ["TERM:BRANCH_UNNAMEABLE:enumerator_ring_fallback"]
@@ -703,7 +705,7 @@ def test_terminal_and_log_bases_disagree_on_the_same_row():
     assert term["depth_histogram"] == {"4": 1}
     # log basis on the same row attributes the FIRST log code instead
     log_union, log_attr = row_attribution(row, basis="log")
-    assert log_attr[0] == "DROP-24:ring_fragment_declined_by_ring_engine"
+    assert log_attr[0] == "ring_fragment_declined_by_ring_engine:ring_fragment_declined_by_ring_engine"
     assert log_union == row["refusal_codes"]
 
 
@@ -720,10 +722,10 @@ def test_terminal_attribution_never_leaks_between_consecutive_rows():
     * a row the channel could not attribute must fall through to its own
       residual mechanism, not borrow the previous row's site.
     """
-    first = _term_row(codes=["DROP-01:fg_only"],
+    first = _term_row(codes=["substituent_is_bare_functional_group:fg_only"],
                       code="GATE_SUPPRESSED", detail="charge_dropped")
     # named right after `first`, attributed by the channel to something else
-    second = _term_row(codes=["REFUSE:branch unnameable"],
+    second = _term_row(codes=["producer_refused:branch unnameable"],
                        code="BRANCH_UNNAMEABLE", detail="enumerator_last_resort")
     # and a row the channel ran on but could not attribute at all
     third = _term_row(codes=[], code="OTHER", detail=None, ncomp=1)
@@ -753,13 +755,13 @@ def test_terminal_basis_is_refused_for_rows_measured_without_the_channel():
     indistinguishable from "the channel found nothing", which is the project's
     standing 'a PERFECT harness result means it did not RUN' failure mode.
     """
-    old = [_row("EMIT"), _row("ABSTAIN", codes=["DROP-01:fg_only"])]
+    old = [_row("EMIT"), _row("ABSTAIN", codes=["substituent_is_bare_functional_group:fg_only"])]
     assert terminal_basis_available(old) is False
     out = aggregate(old, components_measured=False)
     assert out["refusal_structure_terminal"] is None
     assert out["terminal_basis_available"] is False
 
-    new = [_row("EMIT"), _term_row(codes=["DROP-01:fg_only"],
+    new = [_row("EMIT"), _term_row(codes=["substituent_is_bare_functional_group:fg_only"],
                                    code="GATE_SUPPRESSED", detail="self01_mismatch")]
     assert terminal_basis_available(new) is True
     out2 = aggregate(new, components_measured=False)
@@ -774,23 +776,23 @@ def test_terminal_site_names_the_gap_when_the_channel_recorded_nothing():
     its no-jar / dropped-stereo discards (namer.py:3634) throw a generated
     candidate away without recording, so the channel reports OTHER with no
     detail. Measured example: [Ni+2].[Bi+3] logs
-    REFUSE:multi-fragment (G3 scope) and records nothing. A bare TERM:OTHER
+    producer_refused:multi-fragment (G3 scope) and records nothing. A bare TERM:OTHER
     bucket would absorb exactly the instrument gaps this attribution exists to
     expose, so the site is prefixed TERMGAP: -- named, countable, and
     impossible to mistake for a channel attribution.
     """
-    row = _term_row(codes=["REFUSE:multi-fragment (G3 scope)"],
+    row = _term_row(codes=["producer_refused:multi-fragment (G3 scope)"],
                     code="OTHER", detail=None)
     assert (terminal_site(row)
-            == "TERMGAP:REFUSE:multi-fragment (G3 scope)")
+            == "TERMGAP:producer_refused:multi-fragment (G3 scope)")
     # a detail-bearing OTHER is a real named site, not a gap
     named = _term_row(codes=[], code="OTHER", detail="isotope_decorator_failed")
     assert terminal_site(named) == "TERM:OTHER:isotope_decorator_failed"
     # an unmeasured row is a THIRD, separately labelled case
-    unmeasured = _row("ABSTAIN", codes=["DROP-01:fg_only"])
+    unmeasured = _row("ABSTAIN", codes=["substituent_is_bare_functional_group:fg_only"])
     assert (terminal_site(unmeasured) is None)
     assert (row_attribution(unmeasured, "terminal")[1]
-            == ["TERMGAP-UNMEASURED:DROP-01:fg_only"])
+            == ["TERMGAP-UNMEASURED:substituent_is_bare_functional_group:fg_only"])
     # an EMIT row never has a terminal site, whatever it carries
     assert terminal_site(_term_row("EMIT", code="GATE_SUPPRESSED")) is None
 
@@ -803,7 +805,7 @@ def test_terminal_ceiling_is_flagged_vacuous_and_log_ceiling_is_not():
     treating a 100% ceiling as a finding about the engine.
     """
     rows = [_row("EMIT")] + [
-        _term_row(codes=["DROP-01:fg_only", "DROP-03:pg_branch_overlap"],
+        _term_row(codes=["substituent_is_bare_functional_group:fg_only", "principal_group_branch_overlap:pg_branch_overlap"],
                   code="GATE_SUPPRESSED", detail="self01_mismatch")
         for _ in range(3)]
     log = refusal_structure(rows)
@@ -822,7 +824,7 @@ def test_row_attribution_rejects_an_unknown_basis():
     """A typo'd basis must raise, not silently fall through to `log` and
     report log numbers under a terminal heading."""
     with pytest.raises(ValueError, match="basis must be one of"):
-        row_attribution(_term_row(codes=["DROP-01:fg_only"]), basis="termnial")
+        row_attribution(_term_row(codes=["substituent_is_bare_functional_group:fg_only"]), basis="termnial")
 
 
 def test_terminal_stage_rollup_separates_capability_from_correctness():
@@ -845,14 +847,14 @@ def test_terminal_stage_rollup_separates_capability_from_correctness():
     assert terminal_stage("TERM:NO_PARENT:UNSUPPORTED_RING_SYSTEM") == "needs_engine"
     assert terminal_stage("TERM:OTHER:isotope_decorator_failed") == "other"
     # a log-derived site is NOT silently promoted into an engine bucket
-    assert terminal_stage("TERMGAP:REFUSE:multi-fragment (G3 scope)") == "uninstrumented"
-    assert terminal_stage("TERMGAP-UNMEASURED:DROP-01:fg_only") == "uninstrumented"
+    assert terminal_stage("TERMGAP:producer_refused:multi-fragment (G3 scope)") == "uninstrumented"
+    assert terminal_stage("TERMGAP-UNMEASURED:substituent_is_bare_functional_group:fg_only") == "uninstrumented"
 
     rows = [_row("EMIT"),
             _term_row(code="GATE_SUPPRESSED", detail="self01_mismatch"),
             _term_row(code="GATE_SUPPRESSED", detail="opsin_unparseable"),
             _term_row(code="BRANCH_UNNAMEABLE", detail="enumerator_last_resort"),
-            _term_row(codes=["REFUSE:multi-fragment (G3 scope)"],
+            _term_row(codes=["producer_refused:multi-fragment (G3 scope)"],
                       code="OTHER", detail=None)]
     term = refusal_structure(rows, basis="terminal")
     assert term["terminal_stage_rollup"] == {

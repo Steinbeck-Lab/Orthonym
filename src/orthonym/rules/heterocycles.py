@@ -3758,7 +3758,7 @@ def name_substituted_heterocycle(
                             )
                         if sub_name is None:
                             logger.debug(
-                                "DROP-24 substituent_skip: reason=large_sub_still_unnameable carbon_count=%d",
+                                "ring_fragment_declined_by_ring_engine substituent_skip: reason=large_sub_still_unnameable carbon_count=%d",
                                 carbon_count,
                             )
                             continue

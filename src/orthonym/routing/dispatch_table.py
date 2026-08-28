@@ -1417,7 +1417,8 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
     molecule through the general/composer path -> '(pyrrolidine-2-carboxamido)
     acetic acid', '(2S)-2-[(2S)-2-aminopropanamido]propanoic acid', ...). The
     sub-name is RT-gated AND independently full-InChIKey re-verified (the
-    general/composer path can SILENTLY DROP a backbone substituent -- DROP-09 --
+    general/composer path can SILENTLY DROP a backbone substituent --
+    universal_pipeline_unnameable_substituent --
     and ship a partial name the PIN-path gate misses, the E1-scoping hole; e.g.
     Arg-Gly -> 'aminoguanidinoacetic acid', a DIFFERENT molecule). A residue the
     general path cannot yet build a clean PIN for (branched/exotic side chains --

@@ -3,7 +3,7 @@
 Intercepts the mixed primary + N-substituted (and symmetric) acyclic diamide
 class BEFORE ester_family(@1500) / the polyfunctional path, which otherwise
 double-count the terminal secondary amide (SELF-01 -> 'unknown') or sweep the
-N-alkyl carbons into pg_atom_set and drop them (DROP-03 -> wrong molecule).
+N-alkyl carbons into pg_atom_set and drop them (principal_group_branch_overlap -> wrong molecule).
 
 Dispatched at inner_dispatch priority 1490 (just before ester_family@1500).
 The predicate is TIGHT (exactly 2 amide groups, both carbonyl carbons at chain

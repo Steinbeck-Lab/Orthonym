@@ -1,6 +1,6 @@
-"""v38 DROP-23 phosphodiester-bridge — regression guard + refuted-premise record.
+"""v38 substituent_no_prefix_form phosphodiester-bridge — regression guard + refuted-premise record.
 
-The v38 DROP-23 brief asked to render an asymmetric phosphodiester bridge
+The v38 substituent_no_prefix_form brief asked to render an asymmetric phosphodiester bridge
 ``R-O-P(=O)(OH)-O-R'`` as a substituent prefix instead of dropping it, on the
 premise that the class ABSTAINS today (spy: ``COP(=O)(O)OC[C@H](N)C(=O)O`` →
 ``unknown``).
@@ -28,7 +28,7 @@ regress:
     RT-verified name via ``name_tiered`` at best-effort.
 
 It also documents (``test_weave_renderer_is_head_first_not_pin``) why the sited
-mechanism (reuse ``weave._phosphoryloxy_name`` at ``polyfunctional.py`` DROP-23)
+mechanism (reuse ``weave._phosphoryloxy_name`` at ``polyfunctional.py`` substituent_no_prefix_form)
 must NOT be shipped as written: that renderer emits the *head-first* order
 ``[(methoxy)hydroxyphosphoryl]oxy``, which — running earlier in the cascade than
 the general engine — would OVERRIDE and regress the current PIN-correct T3
@@ -48,8 +48,8 @@ WITNESS = "COP(=O)(O)OC[C@H](N)C(=O)O"  # O-phospho-L-serine methyl ester
 WITNESS_PIN = "(2S)-2-amino-3-{[hydroxy(methoxy)phosphoryl]oxy}propanoic acid"
 
 # --- invariant-14 controls: symmetric / small phosphate (di)esters that ALREADY
-#     name and MUST stay byte-identical (they never reach the DROP-23 site —
-#     polyfunctional declines them, DROP-23 does not fire). ---
+#     name and MUST stay byte-identical (they never reach the substituent_no_prefix_form site —
+#     polyfunctional declines them, substituent_no_prefix_form does not fire). ---
 SYMMETRIC_CONTROLS = {
     "COP(=O)(O)OC": "dimethyl hydrogen phosphate",
     "CCOP(=O)(O)OCC": "diethyl hydrogen phosphate",
@@ -63,7 +63,7 @@ TRIVIAL_CONTROLS = {"CCO": "ethanol", "c1ccccc1": "benzene"}
 @pytest.mark.parametrize("smiles,expected",
                          list(SYMMETRIC_CONTROLS.items()) + list(TRIVIAL_CONTROLS.items()))
 def test_symmetric_diester_controls_byte_identical_default(smiles, expected):
-    """Invariant-14 risk: the DROP-23 signature also fires on passing rows.
+    """Invariant-14 risk: the substituent_no_prefix_form signature also fires on passing rows.
     The symmetric diesters must stay byte-identical at the DEFAULT (PIN) tier."""
     assert name_compound(smiles) == expected
 
@@ -150,7 +150,7 @@ def test_weave_renderer_is_head_first_not_pin():
     """Documents WHY the sited mechanism must not be shipped: the existing
     renderer ``weave._phosphoryloxy_name`` emits the head-first substituent order
     ``[(methoxy)hydroxyphosphoryl]oxy``, which is NOT P-14.5.2 alphabetical.
-    Wired at DROP-23 (earlier in the cascade than the general engine) it would
+    Wired at substituent_no_prefix_form (earlier in the cascade than the general engine) it would
     override and REGRESS the current PIN-correct T3 spelling."""
     from orthonym.decomposition import weave
     mol = Chem.MolFromSmiles(WITNESS)

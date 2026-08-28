@@ -933,7 +933,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
     # not be used for prefix generation on the chain parent (Phase 139 ARCH-01).
     ring_substituents = getattr(features, 'ring_substituents', None)
     oriented_ring = getattr(features, 'oriented_ring', None)
-    # DROP-07 fix: track FG atoms handled by ring alkyl prefixes to prevent
+    # ring_substituent_bare_functional_group fix: track FG atoms handled by ring alkyl prefixes to prevent
     # double-emission in the global FG loop below
     handled_ring_fg_atoms = frozenset()
     if ring_substituents and features.mol and oriented_ring and not getattr(features, 'chain_is_parent', False):
@@ -1031,7 +1031,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
 
         # Unsaturation indicators are NOT functional groups (IUPAC P-31.1).
         # They are handled as -ene/-yne infixes by _build_unsaturation_infix(),
-        # not as prefixes.  Skip to avoid false DROP-16 noise.
+        # not as prefixes.  Skip to avoid false substituent_no_prefix_form noise.
         if fg_name in ('alkene', 'alkyne'):
             continue
 
@@ -1078,7 +1078,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                     filtered.append(match)
             matches = filtered
 
-        # DROP-07 fix: skip FG matches already handled as ring substituents
+        # ring_substituent_bare_functional_group fix: skip FG matches already handled as ring substituents
         # by _generate_ring_alkyl_prefixes() to prevent double-emission.
         # FG SMARTS matches include anchor atoms (e.g., C-F match = (C_idx, F_idx)),
         # so check if ANY atom in the match is in the handled set.
@@ -1240,13 +1240,13 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             original_count = len(matches)
             matches = filtered_branch
             if not matches and original_count > 0:
-                # DROP-17: BUG-B removed all matches. Per-branch containment
-                # check ensures each match is genuinely on a small branch whose
-                # compound name (e.g., "chloromethyl") already includes the FG.
-                # Do NOT blindly restore -- that would cause double-emission.
-                # Only log for diagnostic purposes.
+                # substituent_all_candidates_filtered: BUG-B removed all matches.
+                # Per-branch containment check ensures each match is genuinely
+                # on a small branch whose compound name (e.g., "chloromethyl")
+                # already includes the FG. Do NOT blindly restore -- that would
+                # cause double-emission. Only log for diagnostic purposes.
                 logger.debug(
-                    "DROP-17 all_filtered: fg_name=%s original_count=%d (branch naming handles these)",
+                    "substituent_all_candidates_filtered all_filtered: fg_name=%s original_count=%d (branch naming handles these)",
                     fg_name, original_count,
                 )
 
@@ -1274,7 +1274,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             # By-design: FGs using functional class naming (ether, sulfoxide, etc.)
             # don't have prefix forms — handled by specialized naming paths
             logger.debug(
-                "DROP-16 substituent_skip: reason=no_fg_prefix_form fg_name=%s match_count=%d",
+                "substituent_no_prefix_form substituent_skip: reason=no_fg_prefix_form fg_name=%s match_count=%d",
                 fg_name, len(matches),
             )
 
@@ -2156,7 +2156,7 @@ def _w2_atom_coverage_declines(features, fragments, assembled: str) -> bool:
     """task-W2 (Witness B): does this general-acyclic name silently DROP atoms?
 
     A perceived substituent that FAILS to name — e.g. the carbon-free sulfate
-    ester ``-O-SO2-OH`` of ``COS(=O)(=O)O``, skipped at DROP-01 in
+    ester ``-O-SO2-OH`` of ``COS(=O)(=O)O``, skipped at substituent_is_bare_functional_group in
     ``_generate_alkyl_prefixes`` expecting an FG-prefix that never comes — is
     dropped silently, so the parent-only name ``methane`` ships a DIFFERENT
     molecule when the OPSIN jar is absent (SELF-01 catches it only jar-present).

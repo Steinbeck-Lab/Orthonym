@@ -83,13 +83,45 @@ def classify_outcome(result: Dict[str, Any]) -> str:
 
 # ----------------------------------------------------------- refusal parsing
 
-# The reason= field is OPTIONAL: real call sites log DROP-17 and DROP-HYG04 with
-# no reason at all, and DROP-HYG04's suffix is not numeric. Requiring either would
-# erase those sites from the census, making a genuinely blocking site rank as zero
-# because of its log format rather than its behaviour.
-_DROP_RE = re.compile(r"(DROP-[A-Za-z0-9]+)\b(?:[^|]*?\breason=([A-Za-z0-9_]+))?")
+# The reason= field is OPTIONAL: real call sites log
+# substituent_all_candidates_filtered and suppress_duplicate_bare_amino_prefix
+# with no reason at all. Requiring it would erase those sites from the census,
+# making a genuinely blocking site rank as zero because of its log format
+# rather than its behaviour.
+#
+# The leading token is a compiled alternation of every canonical producer
+# refusal slug (formerly the cryptic numbered producer-refusal codes) actually
+# emitted on the naming path, so a slug that is not one of these is never
+# mistaken for a refusal code. Longest-first ordering is not required: every
+# slug is a
+# complete, disjoint identifier (no slug is a prefix of another), and the
+# trailing ``\b`` guards against a partial-word match regardless.
+_DROP_CODES = (
+    "substituent_is_bare_functional_group",
+    "substituent_ring_atom_overlap",
+    "principal_group_branch_overlap",
+    "ring_substituent_bare_functional_group",
+    "universal_pipeline_unnameable_substituent",
+    "substituent_smiles_extraction_failure",
+    "substituent_recursion_depth_exceeded",
+    "substituent_no_prefix_form",
+    "substituent_all_candidates_filtered",
+    "polyfunctional_producer_returned_none",
+    "ring_fragment_declined_by_ring_engine",
+    "amine_n_substituent_unnameable",
+    "charged_fragment_not_directly_nameable",
+    "suppress_duplicate_bare_amino_prefix",
+    "ring_substituent_fragment_unnameable",
+    "substituent_extraction_exception",
+    "n_branch_ring_substituent_unnameable",
+    "c_branch_ring_substituent_unnameable",
+    "ring_substituent_recursive_naming_fallback",
+)
+_DROP_RE = re.compile(
+    r"\b(" + "|".join(_DROP_CODES) + r")\b(?:[^|]*?\breason=([A-Za-z0-9_]+))?"
+)
 # [^|] guard mirrors _DROP_RE so a capture can never run past its own log record.
-_REFUSE_RE = re.compile(r"general_engine refused:\s*([^|]+?)\s*(?:\(tier|$)")
+_REFUSE_RE = re.compile(r"general_engine_declined:\s*([^|]+?)\s*(?:\(tier|$)")
 
 # v30 P0-T3. The two grammars above see PRODUCER refusals only, and measurement
 # showed that is not where these molecules die: of the 11 abstainers that logged
@@ -111,7 +143,7 @@ _GATE_RES = (
      "self_consistency_rejected:different_molecule"),
     # namer.py:1224 — the pre-emission OPSIN-parse validity gate.
     (re.compile(r"OPSIN validity gate suppressed unparseable name"),
-     "GATE-OPSIN:unparseable"),
+     "opsin_unparseable:"),
 )
 
 
@@ -184,10 +216,10 @@ def parse_refusal_codes(log_lines: Iterable[str]) -> List[str]:
     often does it fire'. Un-deduplicated counts would overstate the dominant
     site and mis-rank the build order.
 
-    Covers producer refusals (``DROP-*``, ``general_engine refused:``) AND the
-    two post-hoc gates that suppress a finished name (``GATE-SELF01``,
-    ``GATE-OPSIN``) — see ``_GATE_RES`` for why omitting the gates made 9 of 11
-    uncoded abstainers unattributable.
+    Covers producer refusals (the canonical refusal slugs, ``general_engine_declined:``)
+    AND the two post-hoc gates that suppress a finished name (the self-consistency
+    rejection, ``opsin_unparseable:``) — see ``_GATE_RES`` for why omitting the
+    gates made 9 of 11 uncoded abstainers unattributable.
     """
     seen: List[str] = []
 
@@ -199,7 +231,7 @@ def parse_refusal_codes(log_lines: Iterable[str]) -> List[str]:
         for m in _DROP_RE.finditer(line):
             add(f"{m.group(1)}:{m.group(2) or '<no_reason>'}")
         for m in _REFUSE_RE.finditer(line):
-            add(f"REFUSE:{m.group(1).strip()}")
+            add(f"producer_refused:{m.group(1).strip()}")
         for pat, code in _GATE_RES:
             if pat.search(line):
                 add(code)
@@ -255,8 +287,9 @@ def residual_refusal_code(row: Dict[str, Any]) -> str | None:
 
 #: The two attribution bases, and WHY there are two rather than one.
 #:
-#: ``log``      — every ``DROP-*`` / ``REFUSE:*`` / ``GATE-*`` code scraped from
-#:                the engine's own log stream for that molecule.
+#: ``log``      — every producer-refusal-slug / ``producer_refused:*`` / gate
+#:                code scraped from the engine's own log stream for that
+#:                molecule.
 #: ``terminal`` — the ONE mechanism the typed abstention channel
 #:                (``metrics.abstention``) recorded as having ended the naming.
 _BASES = ("log", "terminal")
@@ -278,15 +311,17 @@ def terminal_site(row: Dict[str, Any]) -> str | None:
     """The single TERMINAL site for one abstaining ``row``, or ``None``.
 
     Why a terminal basis exists at all — and why it is not merely "the log
-    codes, deduplicated". Producer ``DROP-*`` / ``REFUSE:*`` codes are
-    **EXPLORATORY**: they fire while the engine searches candidates (five
+    codes, deduplicated". Producer refusal-slug / ``producer_refused:*`` codes
+    are **EXPLORATORY**: they fire while the engine searches candidates (five
     substituent tiers, a ring engine, a chain engine) and are frequently NOT
     the mechanism that ended the molecule. Measured instance, the class this
     function exists for::
 
         [I-](CCO)c1ccccc1
-          log codes : DROP-01:fg_only, DROP-24:ring_fragment_declined…,
-                      DROP-18, REFUSE:branch unnameable
+          log codes : substituent_is_bare_functional_group:fg_only,
+                      ring_fragment_declined_by_ring_engine:ring_fragment_declined…,
+                      n_branch_ring_substituent_unnameable,
+                      producer_refused:branch unnameable
           terminal  : GATE_SUPPRESSED / charge_dropped   (namer.py:3916)
 
     A name WAS built for that molecule; a structure-conservation veto removed
@@ -429,9 +464,10 @@ def refusal_structure(rows: Sequence[Dict[str, Any]],
     The ``touched`` census cannot size a fix and has already mis-aimed a
     milestone: per-site ``touched`` percentages sum to ~408% of abstainers
     because a molecule blocked by four sites needs all four cleared, so
-    ``DROP-24`` looked like the top target at 116 touched / 95 first-refusals
-    while being the SOLE blocker on exactly 1 molecule. ``pg='ester'`` is 12th by
-    touched and the largest single-blocked site at 10.
+    ``ring_fragment_declined_by_ring_engine`` looked like the top target at 116
+    touched / 95 first-refusals while being the SOLE blocker on exactly 1
+    molecule. ``pg='ester'`` is 12th by touched and the largest single-blocked
+    site at 10.
 
     Three counts per site, all over the SAME denominator (every abstainer, never
     a filtered subset — a signature computed over a subset is how a lead gets

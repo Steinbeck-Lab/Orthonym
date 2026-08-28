@@ -665,8 +665,9 @@ TERMINAL_GROUPS = {
     "hydrazide",        # Always at chain end (locant 1)
 }
 
-# Token list for DROP-04 validation: ring+heteroatom branch names must contain
-# a recognized ring system identifier to avoid passing linearized-ring names.
+# Token list for ring_heteroatom_branch_token_validation: ring+heteroatom
+# branch names must contain a recognized ring system identifier to avoid
+# passing linearized-ring names.
 _RING_NAME_TOKENS = (
     # Monocyclic
     'cyclo', 'phenyl', 'pyri', 'piper', 'morphol',
@@ -740,9 +741,9 @@ class NameFragment:
     #: EVERY parent/suffix/prefix fragment reports atoms, their union is the
     #: name-side accounting the general-acyclic handler verifies against the whole
     #: molecule, so a silently-dropped substituent (e.g. the carbon-free sulfate
-    #: ester of `COS(=O)(=O)O`, dropped at DROP-01 → `methane`) is caught at
-    #: construction instead of shipping a wrong molecule when the OPSIN jar is
-    #: absent.
+    #: ester of `COS(=O)(=O)O`, dropped as substituent_is_bare_functional_group
+    #: → `methane`) is caught at construction instead of shipping a wrong
+    #: molecule when the OPSIN jar is absent.
     atoms: Optional[frozenset] = None
 
 
@@ -6456,7 +6457,8 @@ def _walk_amine_n_substituents(
                                     has_phenyl = True
                                     break
 
-            # --- Phase 79-01: Direct ring identification for amine N-subs (DROP-25 fix) ---
+            # --- Phase 79-01: Direct ring identification for amine N-subs
+            # (amine_n_substituent_unnameable fix) ---
             # Before branched/linear alkyl naming, check if the fragment IS a ring.
             # This handles non-phenyl ring substituents on amines (piperidinyl, cyclohexyl, etc.)
             has_ring_sub = False
@@ -6553,7 +6555,7 @@ def _walk_amine_n_substituents(
                             n_subs.append(get_alkyl_name(cc))
                         except (ValueError, KeyError):
                             logger.debug(
-                                "DROP-25 substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
+                                "amine_n_substituent_unnameable substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
                                 cc,
                             )
                 else:
@@ -6568,7 +6570,7 @@ def _walk_amine_n_substituents(
                             n_subs.append(sub_name)
                         else:
                             logger.debug(
-                                "DROP-25 substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
+                                "amine_n_substituent_unnameable substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
                                 cc,
                             )
     return n_subs
@@ -8655,7 +8657,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
     # task-W2 (Witness B): the heavy atoms each NAMED substituent group consumes,
     # accumulated alongside `substituent_groups` so the prefix fragment can carry
-    # its own atoms. A substituent that is SKIPPED (DROP-01/… `continue`) never
+    # its own atoms. A substituent that is SKIPPED (substituent_is_bare_functional_group/… `continue`) never
     # reaches an append site, so its atoms are absent here — which is exactly how
     # the handler's coverage close detects a silent drop.
     substituent_group_atoms: Dict[str, set] = defaultdict(set)
@@ -8688,7 +8690,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     break
             if not _attach_via_linker:
                 logger.debug(
-                    "DROP-02 substituent_skip: reason=ring_overlap locant=%d",
+                    "substituent_ring_atom_overlap substituent_skip: reason=ring_overlap locant=%d",
                     sub_info.locant,
                 )
                 continue
@@ -8741,7 +8743,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                                         stack.append(nn.GetIdx())
             if sub_info.frag_atoms & effective_pg:
                 logger.debug(
-                    "DROP-03 substituent_skip: reason=pg_branch_overlap locant=%d pg=%s",
+                    "principal_group_branch_overlap substituent_skip: reason=pg_branch_overlap locant=%d pg=%s",
                     sub_info.locant, features.principal_group,
                 )
                 continue
@@ -8806,7 +8808,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     continue
         if not has_carbon:
             logger.debug(
-                "DROP-01 substituent_skip: reason=fg_only locant=%d (by-design: FG prefix loop handles these)",
+                "substituent_is_bare_functional_group substituent_skip: reason=fg_only locant=%d (by-design: FG prefix loop handles these)",
                 sub_info.locant,
             )
             continue
@@ -8894,7 +8896,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     if _sym not in _ORGANIC_ELEMENTS:
                         raise unsupported_element_branch(_sym)
                 logger.warning(
-                    "DROP-09 substituent_skip: reason=universal_pipeline_unnameable locant=%d",
+                    "universal_pipeline_unnameable_substituent substituent_skip: reason=universal_pipeline_unnameable locant=%d",
                     sub_info.locant,
                 )
                 continue
@@ -9955,7 +9957,8 @@ def _name_n_attached_substituent_fallback(
         if _anilino is not None:
             return _anilino
 
-        # --- Phase 79-01: Direct ring identification for N-branch (DROP-18 fix) ---
+        # --- Phase 79-01: Direct ring identification for N-branch
+        # (n_branch_ring_substituent_unnameable fix) ---
         # Try O(1) ring identification before recursive naming fallback.
         # Only applies when the substituent IS a pure ring (all C atoms are ring atoms).
         from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name
@@ -10019,7 +10022,7 @@ def _name_n_attached_substituent_fallback(
             except Exception:
                 pass
         logger.debug(
-            "DROP-18 substituent_skip: reason=n_branch_nonphenyl_ring_still_unnameable",
+            "n_branch_ring_substituent_unnameable substituent_skip: reason=n_branch_nonphenyl_ring_still_unnameable",
         )
         return None
 
@@ -10133,7 +10136,8 @@ def _name_c_attached_ring_substituent_fallback(
                     # Fused het with linker: fall through to recursive naming
     # --- End Phase 79-02 fused het detection for C-branch ---
 
-    # --- Phase 79-01: Direct ring identification for C-branch (DROP-19 fix) ---
+    # --- Phase 79-01: Direct ring identification for C-branch
+    # (c_branch_ring_substituent_unnameable fix) ---
     # Try O(1) ring identification before recursive naming fallback.
     from ..rules.ring_substituents import get_ring_substituent_name as _get_ring_sub_name_c
     for ring in ring_info.AtomRings():
@@ -10196,7 +10200,7 @@ def _name_c_attached_ring_substituent_fallback(
         except Exception:
             pass
     logger.debug(
-        "DROP-19 substituent_skip: reason=c_branch_ring_sub_still_unnameable",
+        "c_branch_ring_substituent_unnameable substituent_skip: reason=c_branch_ring_sub_still_unnameable",
     )
     return None
 
@@ -10524,7 +10528,7 @@ def _convert_yl_to_ylidene(name: str) -> str:
 def _detect_fg_only_prefix(mol, frag_atoms, attach_mol_idx):
     """Detect the IUPAC prefix for an FG-only ring substituent fragment.
 
-    DROP-07 fix: instead of deferring FG-only ring substituents to the global
+    ring_substituent_bare_functional_group fix: instead of deferring FG-only ring substituents to the global
     FG prefix loop (which lacks ring locant context), detect them here so
     _generate_ring_alkyl_prefixes() can emit them with correct oriented_ring
     locants and proper monosubstituted locant-1 elision.
@@ -10615,7 +10619,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     Uses the unified substituent enumerator (ReplaceCore-based) to extract and
     name every non-hydrogen substituent on the ring parent. FG-only substituents
     (halogens, -OH, -NH2, =O as non-principal) are detected via _detect_fg_only_prefix()
-    and emitted with correct oriented_ring locants (DROP-07 fix).
+    and emitted with correct oriented_ring locants (ring_substituent_bare_functional_group fix).
 
     IUPAC rules for cycloalkane substituent locants:
     - Monosubstituted cycloalkanes: locant 1 is implicit and omitted
@@ -10651,7 +10655,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     # Group substituents by name: {name: [locants]}
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
 
-    # DROP-07 fix: track FG-only substituents handled here to prevent
+    # ring_substituent_bare_functional_group fix: track FG-only substituents handled here to prevent
     # double-emission in the global FG prefix loop of _generate_prefixes()
     handled_ring_fg_atoms = set()
 
@@ -10662,7 +10666,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
             continue
 
         # Check if this is a pure FG-only substituent (no carbon atoms)
-        # DROP-07 fix: detect FG type and emit prefix with correct ring locant
+        # ring_substituent_bare_functional_group fix: detect FG type and emit prefix with correct ring locant
         # instead of deferring to the global FG loop (which lacks ring context)
         has_carbon = any(
             mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
@@ -10676,13 +10680,13 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
                 substituent_groups[fg_prefix].append(sub_info.locant)
                 handled_ring_fg_atoms.update(sub_info.frag_atoms)
                 logger.debug(
-                    "DROP-07 fixed: fg_only_ring_sub prefix=%s locant=%d",
+                    "ring_substituent_bare_functional_group fixed: fg_only_ring_sub prefix=%s locant=%d",
                     fg_prefix, sub_info.locant,
                 )
             else:
                 # Multi-atom FG-only (e.g., -NO2): let global FG loop handle
                 logger.debug(
-                    "DROP-07 substituent_defer: reason=complex_fg_only locant=%d",
+                    "ring_substituent_bare_functional_group substituent_defer: reason=complex_fg_only locant=%d",
                     sub_info.locant,
                 )
             continue
@@ -10736,7 +10740,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
                     pass
             if name is None:
                 logger.warning(
-                    "DROP-08 substituent_skip: reason=unnameable_ring_fragment locant=%d",
+                    "ring_substituent_fragment_unnameable substituent_skip: reason=unnameable_ring_fragment locant=%d",
                     sub_info.locant,
                 )
                 continue

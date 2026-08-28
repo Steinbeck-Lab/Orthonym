@@ -1,6 +1,6 @@
 """Graduated confidence scoring for coverage gate candidate selection.
 
-Replaces the binary accept/reject coverage gate (DROP-20) with a continuous
+Replaces the binary accept/reject coverage gate (binary_accept_reject_coverage_gate) with a continuous
 multi-factor scoring system.  Each handler (complex_ring, heterocycle, benzene)
 produces a CandidateName with a 0.0-1.0 confidence score derived from four
 factors.  The best candidate is selected and returned; no computed name is
