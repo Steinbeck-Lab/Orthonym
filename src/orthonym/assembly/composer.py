@@ -4639,7 +4639,7 @@ def _assemble_complete_bicyclo_name(mol, features):
     # stereo through inject_stereo_reanchored_rt_gated, which RT-gates the numbering
     # and OMITS a stereo layer OPSIN cannot verify (rather than shipping a
     # pseudoasymmetric von-Baeyer descriptor such as `(1r,5s)-` that does not
-    # round-trip — a residual 0-wrong leak: the namer's OPSIN-validity stereo carve-out stereo carve-out
+    # round-trip — a residual 0-wrong leak: the namer's OPSIN-validity stereo carve-out
     # ships such a name whole because its CONSTITUTION parses). Byte-identical for
     # every currently-round-tripping stereo name: candidate A reuses the same
     # collect_stereodescriptors(mol, atom_to_locant) prefix this path already built

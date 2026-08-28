@@ -56,7 +56,7 @@ def test_charged_mol_fails():
 
 
 # --------------------------------------------------------------------------
-# F-E1: per-token element soundness (sound-by-refusal).
+# element_soundness: per-token element soundness (sound-by-refusal).
 # --------------------------------------------------------------------------
 from orthonym.validation.e1_certificate import _token_is_confidently_all_carbon
 

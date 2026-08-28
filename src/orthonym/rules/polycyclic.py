@@ -3371,8 +3371,8 @@ def name_polycyclic_complete(mol, features=None):
     # stereo through inject_stereo_reanchored_rt_gated, which RT-gates the numbering
     # and OMITS a stereo layer OPSIN cannot verify (rather than shipping a
     # pseudoasymmetric von-Baeyer descriptor like `(1r,5s)-` that does not
-    # round-trip — a residual 0-wrong leak via the namer's OPSIN-validity stereo carve-out stereo
-    # carve-out). This is byte-identical for every currently-round-tripping stereo
+    # round-trip — a residual 0-wrong leak via the namer's OPSIN-validity stereo carve-out).
+    # This is byte-identical for every currently-round-tripping stereo
     # name: candidate A reuses the same collect_stereodescriptors(mol, numbering)
     # this path always used (include_near_parent_ez is a no-op), so a name that
     # round-trips keeps its exact descriptor block. When naming a SUB-fragment

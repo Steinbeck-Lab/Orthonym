@@ -1326,7 +1326,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if _validity_gate_status(name) == "unavailable":
         _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name  # transient -> fail-OPEN (never suppress)
-    # DD2 / OPSIN-validity stereo carve-out (Phase D): OPSIN's generation grammar does not recognise the
+    # DD2 / OPSIN-validity grammar carve-out (Phase D): OPSIN's generation grammar does not recognise the
     # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
     # '-dithioperoxol'), so it REJECTS these correct PINs (P-56.2 verbatim:
     # `CH3-S-OH -> methane-SO-thioperoxol (PIN)`). Like the stereo-grammar carve-out

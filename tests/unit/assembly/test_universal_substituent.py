@@ -788,7 +788,7 @@ def test_single_heavy_atom_top_level_input_no_raise():
 # extend, don't duplicate), REPLACING its hand-rolled coverage self-check.
 # These prove (a) the shared core is actually on the execution path -- a dead
 # choke point shows no movement (feedback_choke_point_off_path); (b) the two
-# checks the old self-check lacked (token-in-name, F-E1) now void a universal
+# checks the old self-check lacked (token-in-name, element_soundness) now void a universal
 # name; (c) the charge-suffix-elision false-positive the token-in-name check
 # would otherwise raise is fixed (the elision-robust spine token).
 # ===========================================================================
@@ -846,7 +846,7 @@ def test_phase_e_charged_species_still_names_no_elision_false_positive(smi):
     """Regression: the charge/ionic suffix elides the parent core's trailing
     'e' (``2-azapropane`` -> ``...2-azapropan-2-ium``; P-16.7.1(a)/P-74.1.1),
     which a literal-substring token-in-name check would spuriously reject. The
-    FULL ``spine_core`` token is stored (so F-E1/P1 see the real token); the
+    FULL ``spine_core`` token is stored (so element_soundness/P1 see the real token); the
     elision is tolerated on the token-in-name axis ALONE inside
     ``_verify_partition`` (accepts the stem), so a validly-spelled
     cation/zwitterion still NAMES rather than being over-voided."""
@@ -860,23 +860,23 @@ def test_phase_e_charged_species_still_names_no_elision_false_positive(smi):
 
 
 def test_phase_e_f_e1_is_live_for_all_carbon_spine_through_real_path(monkeypatch):
-    """Fix round 1: the FULL spine token is stored, so E1's F-E1 all-carbon
+    """Fix round 1: the FULL spine token is stored, so E1's element_soundness all-carbon
     classifier is LIVE for the alkane/cycloalkane/retained-ring class it
-    guards (a pre-stemmed ``cyclohexan`` would be unclassifiable -> F-E1
+    guards (a pre-stemmed ``cyclohexan`` would be unclassifiable -> element_soundness
     inert). Two parts, both through the REAL producer (not a hand-built
     token that never gets stemmed):
 
       (a) cyclohexanol's real spine binding token is the FULL ``cyclohexane``
-          and F-E1 classifies it all-carbon;
+          and element_soundness classifies it all-carbon;
       (b) rigging that all-carbon spine token to also cover the hydroxy O
-          (an all-carbon token bound to a heteroatom) is REJECTED by F-E1 ->
+          (an all-carbon token bound to a heteroatom) is REJECTED by element_soundness ->
           the public entry voids. A pre-stemmed token would have shipped."""
     smi = "OC1CCCCC1"  # cyclohexanol: ring spine is naturally all-carbon
     real = name_universal_substitutive(Chem.MolFromSmiles(smi))
     assert real is not None
     spine_tok = real.bindings[0][0]
     assert spine_tok == "cyclohexane"
-    assert e1._token_is_confidently_all_carbon(spine_tok)  # part (a): F-E1 LIVE
+    assert e1._token_is_confidently_all_carbon(spine_tok)  # part (a): element_soundness LIVE
 
     orig = us._name_component
 

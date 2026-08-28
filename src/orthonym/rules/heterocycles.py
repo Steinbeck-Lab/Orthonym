@@ -3001,7 +3001,7 @@ def get_heterocycle_substituents(
             # the ring -- -O-R / -S-R / -Se-R / -Te-R (carbon_count>0 because R has
             # carbons) -- is an (R)oxy / (R)sulfanyl / (R)selanyl / (R)tellanyl
             # prefix. classify_substituent below counts the arm carbons and DROPS
-            # the O/S/Se root (F-OXANE-DROP -> decline -> unknown; e.g. methoxy-/
+            # the O/S/Se root (sugar-ring-oxygen-drop -> decline -> unknown; e.g. methoxy-/
             # methylsulfanyl-pyridine). Name the arm recursively and carry the
             # prefix as hetero_name. Fail-closed: only a clean single-bond ether
             # root with exactly one carbon arm; any decline falls through.
@@ -3102,7 +3102,7 @@ def get_heterocycle_substituents(
                     # An unrecognised no-carbon exocyclic group (e.g. the oxygen
                     # of an -O-SO3H sulfate or -O-PO(OH)2 phosphate ester). BFS
                     # only walks heavy atoms, so this is NEVER just implicit H —
-                    # silently dropping it corrupts the structure (F-OXANE-DROP).
+                    # silently dropping it corrupts the structure (sugar-ring-oxygen-drop).
                     # Record it as unnameable so the assembler declines the whole
                     # heterocycle candidate rather than emit a group-dropping
                     # name. Fail-closed per accuracy-first.
@@ -3560,7 +3560,7 @@ def name_substituted_heterocycle(
 
     Returns None (the heterocycle candidate declines) when an exocyclic
     substituent cannot be named correctly and completely — naming it partially
-    would silently drop atoms (F-OXANE-DROP / structure loss). Callers treat a
+    would silently drop atoms (sugar-ring-oxygen-drop / structure loss). Callers treat a
     None return as a fail-closed decline.
 
     N-substituted groups use N-locant format (N-methyl, N,N-dimethyl).
@@ -3642,7 +3642,7 @@ def name_substituted_heterocycle(
                 # An exocyclic group we cannot name correctly and completely
                 # (e.g. the oxygen of a sulfate/phosphate ester). Decline the
                 # whole heterocycle candidate rather than silently drop the
-                # group (F-OXANE-DROP / structure loss). Fail-closed.
+                # group (sugar-ring-oxygen-drop / structure loss). Fail-closed.
                 return None
             if sub_info.get('is_suffix'):
                 sname = sub_info['suffix_name']
@@ -3692,7 +3692,7 @@ def name_substituted_heterocycle(
                 # heteroatoms (hydroxymethyl, methoxymethyl, aminomethyl) — is
                 # named by the recursive fragment namer. Naming a heteroatom-
                 # bearing substituent from its carbon count alone silently drops
-                # the heteroatoms (F-OXANE-DROP, structure loss), so the
+                # the heteroatoms (sugar-ring-oxygen-drop, structure loss), so the
                 # carbon-count fallback below is reserved for pure C/H fragments.
                 carbon_count = sub_info['carbon_count']
                 sub_atoms = sub_info.get('atoms', [])
@@ -3741,7 +3741,7 @@ def name_substituted_heterocycle(
                         # A heteroatom-bearing substituent the fragment namer
                         # could not name correctly and completely -> decline the
                         # whole heterocycle candidate rather than emit a
-                        # heteroatom-dropping alkyl name (F-OXANE-DROP).
+                        # heteroatom-dropping alkyl name (sugar-ring-oxygen-drop).
                         # Fail-closed per accuracy-first.
                         return None
                     try:

@@ -926,7 +926,7 @@ def inject_stereo_reanchored_rt_gated(
     # v36 Wave E — 0-wrong hardening. Re-anchor FAILED (no OPSIN locant map, or
     # candidate B still does not full-round-trip): the stereo descriptor cannot be
     # placed on a numbering OPSIN reads back correctly. Returning candidate A here
-    # ships a name whose stereo layer OPSIN cannot verify — the OPSIN-validity stereo carve-out stereo
+    # ships a name whose stereo layer OPSIN cannot verify — the OPSIN-validity stereo
     # carve-out (namer.py) then emits it whole because its CONSTITUTION parses,
     # i.e. a WRONG/unverifiable-stereo name reaches T1 (a residual 0-wrong leak).
     # Instead return the stereo-STRIPPED FLAT name: constitution-correct,

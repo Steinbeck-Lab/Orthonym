@@ -1,4 +1,4 @@
-"""v23 Phase 11 (CARB-01) — carbohydrate F-OXANE-DROP root-cause + determinism.
+"""v23 Phase 11 (CARB-01) — carbohydrate sugar-ring-oxygen-drop root-cause + determinism.
 
 These lock in the root-cause fix (the PIN gate does NOT run the unit suite, so a
 regression in the shared ring-substituent numbering path would otherwise slip
@@ -6,7 +6,7 @@ through). The SELF-01 self-consistency gate is OFF in the unit suite (conftest
 autouse fixture), so the substitutive sugar names appear directly rather than
 being suppressed to 'unknown'.
 
-F-OXANE-DROP: a sugar ring that is NOT catalog-recognised (mid-chain-deoxy sugar,
+sugar-ring-oxygen-drop: a sugar ring that is NOT catalog-recognised (mid-chain-deoxy sugar,
 1,5-anhydroalditol, etc.) falls through to the substitutive heterocycle namer.
 That namer used to render an exocyclic -CH2OH as 'methyl' (oxygen dropped =
 structure loss). It must now render it as '(hydroxymethyl)' (a valid,
@@ -33,7 +33,7 @@ import pytest
 from orthonym.namer import name_compound
 
 
-# --- F-OXANE-DROP: exocyclic -CH2OH survives as (hydroxymethyl), lowest-locant -
+# --- sugar-ring-oxygen-drop: exocyclic -CH2OH survives as (hydroxymethyl), lowest-locant -
 
 @pytest.mark.parametrize("smiles, expected", [
     # 1,5-anhydro-D-glucitol (oxane ring; NOT a catalog anhydro sugar -> fallback)
@@ -54,7 +54,7 @@ def test_foxane_drop_no_bare_methyl_for_ch2oh():
     a PIN — see test_thio_anhydro_catalog_pin)."""
     name = name_compound("C1[C@H](O)[C@@H](O)[C@H](O)[C@H](O1)CO")
     assert "hydroxymethyl" in name
-    assert "methyloxane" not in name  # the old F-OXANE-DROP structure-loss output
+    assert "methyloxane" not in name  # the old sugar-ring-oxygen-drop structure-loss output
 
 
 @pytest.mark.parametrize("smiles, expected", [

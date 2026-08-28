@@ -579,7 +579,7 @@ class TestGlycosylamineAndHalide:
 class TestSugarOMethyl:
     """W6-P3 O-methyl (O-alkyl) ether sugars (BB P-102.5.6.1): n-O-methyl- prefix.
 
-    Strip-and-name (F-OXANE-DROP-safe: the residual must be a recognized free
+    Strip-and-name (sugar-ring-oxygen-drop-safe: the residual must be a recognized free
     sugar). The anomeric O-methyl is a GLYCOSIDE (methyl glucopyranoside), NOT an
     O-methyl ether -> fail-closed so the glycoside path handles it. OPSIN-RT gated.
     """
