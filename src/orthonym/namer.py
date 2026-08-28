@@ -5747,8 +5747,19 @@ class Orthonym:
         # predicate's scope; MONONUCLEAR_HYDRIDE / WSD-04 heterocycle defer /
         # etc. are legitimate alternate paths for those, not leaks).
         if name and result.class_id != StoutClass.ORGANOMETALLIC:
-            from .perception.metals import has_covalent_metal_carbon_bond
-            if has_covalent_metal_carbon_bond(mol):
+            from .perception.metals import (
+                has_covalent_metal_carbon_bond, has_metal_coordination_bond,
+            )
+            # v38: extend the veto to DATIVE-bonded coordination compounds
+            # (Gd-DOTA/Mo-N2/Fe-siderophore) — a true metal that coordinates via
+            # O/N/P dative bonds, which has_covalent_metal_carbon_bond misses
+            # (no M-C bond). Same true-metal scope (metalloids excluded) so
+            # boronic acids / silanes are untouched, and dative-only so ionic
+            # and covalently-drawn salts stay nameable. Without this the
+            # decomposition names a leftover ligand fragment and drops the metal
+            # (a silent wrong-molecule the RT/E1 gates do not catch).
+            if (has_covalent_metal_carbon_bond(mol)
+                    or has_metal_coordination_bond(mol)):
                 from .metrics.abstention import AbstentionCode, record_suppression
                 record_suppression(AbstentionCode.GATE_SUPPRESSED,
                                    detail='organometallic_veto', candidate=name)

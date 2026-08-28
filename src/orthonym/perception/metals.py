@@ -690,6 +690,40 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
     return False
 
 
+def has_metal_coordination_bond(mol: "Chem.Mol") -> bool:
+    """v38 (ChEBI 3-way, 2026-08-28): True iff a TRUE metal atom (the SAME
+    ``_TRUE_METAL_SYMBOLS_FOR_VETO`` set as ``has_covalent_metal_carbon_bond``)
+    is an endpoint of a DATIVE (coordination) bond -- a P-69 coordination
+    compound whose metal binds via O/N/P dative bonds rather than a covalent
+    M-C bond, so the C-bond veto above misses it. Confirmed leaks:
+    Gd-DOTA (an MRI agent) -> 'ethanamide', Mo-dinitrogen bis-phosphine ->
+    '(dimethylphosphanyl)benzene', an Fe siderophore -> a huge fatty-acyl
+    diamide -- all silent structure-loss (the decomposition drops the metal and
+    names a leftover ligand fragment; the RT/E1 gates miss it because the metal
+    ends up in a discarded component).
+
+    Scoped exactly like the covalent-C veto so it CANNOT false-positive on the
+    in-scope classes:
+      * metalloids (B/Si/Ge/Sn/As/Sb/Te/...) are excluded from the true-metal
+        set -> boronic acids, silanes, arsanes stay nameable;
+      * only DATIVE bonds count -> an ionic salt's lone metal cation
+        (``[Na+]``, degree 0) has no bond, and a covalently-drawn metal
+        carboxylate (a plain single M-O bond) is not dative, so neither is
+        flagged -- salts remain in scope.
+    PURE: read-only bond/atom inspection; no mol mutation."""
+    if mol is None:
+        return False
+    from rdkit import Chem as _Chem
+    _dative = (_Chem.BondType.DATIVE, _Chem.BondType.DATIVEONE,
+               _Chem.BondType.DATIVEL, _Chem.BondType.DATIVER)
+    for b in mol.GetBonds():
+        if b.GetBondType() in _dative and (
+                b.GetBeginAtom().GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO
+                or b.GetEndAtom().GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO):
+            return True
+    return False
+
+
 def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
     """W8-P9 Task 9.5 (P-69.4): detect a metallacycle — a metal atom (Group
     2-12, per ``data.organometallics.METALLACYCLE_A_PREFIX``) that is itself
