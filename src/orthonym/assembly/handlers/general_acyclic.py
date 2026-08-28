@@ -144,11 +144,15 @@ def name_general_acyclic(
                 list(suffix.locants), parent_size, suffix.count
             )
             if validated_locants != list(suffix.locants) or validated_count != suffix.count:
+                # M3 Task 1: carry `atoms` through the rebuild -- omitting it
+                # would silently re-null the just-populated suffix atoms and
+                # revert this molecule to the coverage close's skip default.
                 suffix = NameFragment(
                     text=suffix.text,
                     locants=tuple(validated_locants),
                     fragment_type="suffix",
                     count=validated_count,
+                    atoms=suffix.atoms,
                 )
             fragments.append(suffix)
 

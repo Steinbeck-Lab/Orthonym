@@ -6306,11 +6306,16 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                 list(suffix.locants), parent_size, suffix.count
             )
             if validated_locants != list(suffix.locants) or validated_count != suffix.count:
+                # M3 Task 1: carry `atoms` through the rebuild (consistency with
+                # the general_acyclic.py sibling rebuild; this amide path is not
+                # on the _w2_atom_coverage_declines close today, but a future
+                # caller must not find the atoms silently dropped here).
                 suffix = NameFragment(
                     text=suffix.text,
                     locants=tuple(validated_locants),
                     fragment_type="suffix",
                     count=validated_count,
+                    atoms=suffix.atoms,
                 )
             fragments.append(suffix)
 

@@ -339,7 +339,10 @@ def _generate_ring_parent(features: Any) -> "NameFragment":
         return NameFragment(
             text=f"cyclo{stem}",
             locants=((), ()),  # No bond locants for saturated rings
-            fragment_type="parent"
+            fragment_type="parent",
+            # M3 Task 1 (task-W2 extension): the ring's own skeletal atoms,
+            # mirroring _generate_chain_parent's atoms=frozenset(principal_chain).
+            atoms=frozenset(principal_ring),
         )
 
     elif ring_type == 'cycloalkene':
@@ -349,7 +352,8 @@ def _generate_ring_parent(features: Any) -> "NameFragment":
         return NameFragment(
             text=f"cyclo{stem}",
             locants=(tuple(ring_double_bond_locants), ()),  # (double_bond_locants, triple_bond_locants)
-            fragment_type="parent"
+            fragment_type="parent",
+            atoms=frozenset(principal_ring),
         )
 
     elif ring_type == 'aromatic':
@@ -886,11 +890,30 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         from ...rules.locant_validation import reconcile_multiplier_count
         fg_count = reconcile_multiplier_count(fg_count, list(locants))
 
+    # M3 Task 1 (task-W2 extension): the heavy atoms the SUFFIX accounts for --
+    # the union of every principal-group SMARTS match (features.
+    # principal_group_atoms), never hand-counted. This was the documented
+    # "suffix fragments -- ALWAYS None" gap that kept the general-acyclic
+    # atom-coverage close (_w2_atom_coverage_declines) permanently skipped for
+    # any functionalized molecule. A match may include an atom already
+    # claimed by the parent (e.g. a ketone's alpha carbons) or by a
+    # substituent branch -- harmless, since verify_atom_coverage dedupes
+    # overlapping groups before checking coverage, it only ever risks
+    # OVER-claiming, never under-claiming (the false-void direction). When
+    # principal_group_atoms is falsy, leave atoms=None (unchanged skip
+    # default) rather than claim an empty set, which would UNDER-claim.
+    _suffix_atoms = None
+    if features.principal_group_atoms:
+        _suffix_atoms = frozenset().union(
+            *(set(_m) for _m in features.principal_group_atoms)
+        )
+
     return NameFragment(
         text=suffix_text,
         locants=locants,
         fragment_type="suffix",
         count=fg_count,
+        atoms=_suffix_atoms,
     )
 
 
@@ -1011,7 +1034,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
     # (composer.py:5044-5066 parity). Without this, a C1 substituent elides its
     # locant whenever its own type-count is 1 even though another substituent exists
     # (e.g. FCCCl -> '1-chloro-2-fluoroethane', not 'chloro-2-fluoroethane').
-    fg_prefix_specs = []  # list of (prefix_text, fg_locants)
+    fg_prefix_specs = []  # list of (prefix_text, fg_locants, atoms)
 
     # DD5 RC-4 (P-44.1.1): subtypes of the principal group's equal-seniority class
     # (e.g. secondary_alcohol when primary_alcohol is principal) are expressed
@@ -1269,7 +1292,14 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
 
             # DEF-4: defer the locant-1 omission decision to the post-loop block,
             # which knows the molecule-wide substituent count.
-            fg_prefix_specs.append((prefix_text, fg_locants))
+            # M3 Task 1 (task-W2 extension): carry the atoms this FG prefix
+            # accounts for -- the union of its own (already-filtered) `matches`,
+            # the same perception data used to compute fg_locants above. This
+            # was the "compound prefix fragments -- often None" gap (chloro,
+            # bromo, hydroxy, amino, ...) that kept the coverage close skipped
+            # for almost every halogenated/substituted molecule.
+            _fg_prefix_atoms = frozenset().union(*(set(_m) for _m in matches))
+            fg_prefix_specs.append((prefix_text, fg_locants, _fg_prefix_atoms))
         elif not prefix_text and matches:
             # By-design: FGs using functional class naming (ether, sulfoxide, etc.)
             # don't have prefix forms — handled by specialized naming paths
@@ -1286,9 +1316,9 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
     # (mirrors composer.py:5044-5066; gold FCCCl -> '1-chloro-2-fluoroethane').
     chain_len = len(getattr(features, 'principal_chain', []))
     existing_sub_positions = sum(len(p.locants) if p.locants else 1 for p in prefixes)
-    fg_sub_positions = sum(len(locs) if locs else 1 for _txt, locs in fg_prefix_specs)
+    fg_sub_positions = sum(len(locs) if locs else 1 for _txt, locs, _atoms in fg_prefix_specs)
     total_substituents = existing_sub_positions + fg_sub_positions
-    for prefix_text, fg_locants in fg_prefix_specs:
+    for prefix_text, fg_locants, fg_atoms in fg_prefix_specs:
         # NOTE: do NOT add an outer `and total_substituents == 1` guard. The
         # is_monosubstituted arg already encodes the single-substituent condition,
         # and should_omit_locant_one Rule 1 (chain_length == 1) must still omit for
@@ -1325,7 +1355,8 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
         prefixes.append(NameFragment(
             text=prefix_text,
             locants=tuple(sorted(fg_locants)) if (fg_locants and not omit_locants) else (),
-            fragment_type="prefix"
+            fragment_type="prefix",
+            atoms=fg_atoms,
         ))
 
     # --- Merge duplicate prefix names ---
