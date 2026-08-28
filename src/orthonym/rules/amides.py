@@ -23,6 +23,7 @@ from ..assembly.naming_utils import (
     is_complex_substituent,
     ALKYL_NAMES,
 )
+from ..errors import is_refusal_sentinel
 
 # Pattern matching a leading positional locant (digit(s)) in a substituent
 # name.  Used to detect compound N-substituent names that need
@@ -419,7 +420,7 @@ def _bfs_substituent(mol, start_idx: int, exclude: set) -> List[int]:
     return atoms
 
 
-def format_n_substitution(substituents: List[Dict]) -> str:
+def format_n_substitution(substituents: List[Dict]) -> Optional[str]:
     """
     Format N-substituents as IUPAC prefix.
 
@@ -432,7 +433,9 @@ def format_n_substitution(substituents: List[Dict]) -> str:
         substituents: List of dicts from get_n_substituents()
 
     Returns:
-        Formatted N-substitution prefix (e.g., "N-methyl", "N,N-dimethyl")
+        Formatted N-substitution prefix (e.g., "N-methyl", "N,N-dimethyl"), or
+        ``None`` if any substituent name is a refusal sentinel (M2 Task 3
+        splice guard, below) -- never a string containing the sentinel.
     """
     if not substituents:
         return ""
@@ -441,6 +444,17 @@ def format_n_substitution(substituents: List[Dict]) -> str:
     groups: Dict[str, int] = defaultdict(int)
     for sub in substituents:
         groups[sub["name"]] += 1
+
+    # M2 Task 3 fail-closed splice guard: a substituent name that is a refusal
+    # sentinel (the substituent cascade's bare 'substituent' placeholder,
+    # 'unknown ...', '(not supported)', empty) must never be woven into the
+    # N-prefix -- e.g. get_multiplier_prefix(2, 'substituent') builds the
+    # literal string 'disubstituent'. VOID this candidate instead; callers
+    # already treat a falsy return as "no N-prefix available" and fall back
+    # or abstain. Mirrors the guard fragment_naming.py already applies at its
+    # name_compound() splice point.
+    if any(is_refusal_sentinel(name) for name in groups):
+        return None
 
     # Build prefix parts
     parts = []

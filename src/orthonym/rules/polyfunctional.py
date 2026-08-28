@@ -43,6 +43,7 @@ from ..assembly.substituent_prefix_forms import (
     get_sulfanyl_prefix as _ASSEMBLY_get_sulfanyl_prefix,
 )
 from .ring_unsaturation import render_ring_unsaturation
+from ..errors import is_refusal_sentinel
 
 
 # Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra…), P-31.1.4.
@@ -3135,6 +3136,15 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 "ASSEMBLY_AUDIT: missing_fg=%s in name=%s smiles=%s",
                 missing_fgs, name, getattr(features, 'canonical_smiles', '?'),
             )
+
+    # M2 Task 3 fail-closed splice guard: a prefix built from a substituent
+    # sub-call can carry the cascade's refusal sentinel (bare 'substituent',
+    # 'unknown ...', '(not supported)') into `all_prefixes` and from there into
+    # this assembled `name`. Never ship that -- void the candidate so the
+    # caller abstains or falls through to another producer, instead of
+    # emitting a name with the placeholder woven in.
+    if is_refusal_sentinel(name):
+        return None
 
     return name
 

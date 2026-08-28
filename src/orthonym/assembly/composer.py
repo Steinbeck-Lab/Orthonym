@@ -121,7 +121,7 @@ from ..rules.polycyclic import (
     _detect_ring_functional_groups,
 )
 from ..rules.bridged_fused import detect_bridged_fused, name_bridged_fused_system
-from ..errors import OrthonymLimitError  # G0 fail-closed refusal (DD7 S1)
+from ..errors import OrthonymLimitError, is_refusal_sentinel  # G0 fail-closed refusal (DD7 S1)
 
 # Partial saturation imports for fused heterocycles
 from ..rules.partial_saturation import (
@@ -4130,7 +4130,13 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
                 _cx_ri.NumAtomRings(x) > 0 for x in sub_info.frag_atoms)
         except Exception:
             _cx_ring_bearing = False
-        if not prefix_name or prefix_name == "substituent":
+        # M2 Task 3: widened from a bare '== "substituent"' equality check to
+        # is_refusal_sentinel so a DECORATED sentinel (an embedded 'unknown
+        # ...', '(not supported)', or 'substituent' picked up from a nested
+        # recursive-naming failure inside name_substituent/_acyloxy_prefix_for_frag)
+        # is caught here too, before it ever reaches the enclose_if_compound
+        # splice below (:4174/:4178) -- never just the exact bare placeholder.
+        if not prefix_name or is_refusal_sentinel(prefix_name):
             if _cx_ring_bearing:
                 return None
             continue

@@ -289,3 +289,88 @@ def test_task2_route_declines_on_noncarbon_attach():
     assert mol.GetAtomWithIdx(attach_idx).GetSymbol() == "N"
     result = _route_fragment_to_general_engine(mol, frag_atoms, attach_idx)
     assert result is None
+
+
+# =============================================================================
+# M2 Task 3 -- central de-mask + splice-guard belt (0-wrong cleanliness)
+# =============================================================================
+#
+# Fail-closed `errors.is_refusal_sentinel` guards added at the splice sites
+# that build an N-prefix / ring-prefix / amide string from a substituent-
+# cascade name: `rules/amides.py` (`format_n_substitution`),
+# `rules/polyfunctional.py` (`name_polyfunctional`'s final assembled `name`),
+# `decomposition/fragment_assembly.py` (`_assemble_amide`'s final `result`),
+# and `assembly/composer.py` (`_enrich_complex_ring_with_subs`, widened from
+# a bare `== "substituent"` equality check to the broader sentinel predicate
+# so a DECORATED placeholder is caught too). Each guard VOIDS the candidate
+# (returns ``None``) instead of splicing the placeholder into a name.
+#
+# This is defense-in-depth, not a breadth lever: Tasks 1-2 already convert or
+# correctly abstain on every measured pubchem10k row, so the regression-trap
+# test below is expected to PASS with zero offenders even without these
+# guards (measured before adding them). The guards protect against any
+# FUTURE producer that reaches one of these sites with an unrouted, unnamed
+# fragment -- a genuine cage that folds to M5, for instance.
+
+
+def _is_whole_name_abstention(nm: str) -> bool:
+    """True when ``nm`` is itself a legitimate, honest whole-molecule refusal
+    sentinel -- NOT a real name with the placeholder woven into it.
+
+    ``Orthonym.name()`` is always-emit (``namer.py:2877``): a molecule it
+    cannot name at all returns one of a small, fixed set of descriptive
+    fallback strings verbatim (``errors.py``'s ``_make``/``classify_scope_
+    limit`` family) -- most commonly the exact string 'unknown organic
+    compound'. That string legitimately CONTAINS 'unknown', so a naive
+    substring test flags every honest abstention as an "offender" -- measured
+    directly: 140/166 rows in this corpus abstain with exactly that string,
+    and 0 of them differ from it by even one character. The defect this test
+    actually guards against is the placeholder EMBEDDED in an otherwise real,
+    longer, differently-shaped name (e.g. 'N,N-disubstituentacetamide',
+    '11-unknownundec-9-enoate') -- distinguished here by exact match against
+    the known pure-refusal forms.
+    """
+    if nm in ("unknown organic compound", "substituent"):
+        return True
+    return nm.endswith(" compound (not supported)") or nm == (
+        "compound with wildcard atoms (not supported)")
+
+
+@pytest.mark.opsin_gate
+def test_placeholder_never_splices(eng):
+    """Regression trap: no emitted name may ever contain the substituent
+    cascade's placeholder or the whole-molecule 'unknown' sentinel SPLICED
+    INTO a real, longer name. A fragment even routing cannot name (e.g. a
+    genuine cage -> M5) must abstain outright (the bare sentinel), never
+    weave 'substituent'/'unknown' into an otherwise-real name.
+
+    Measured (this task, fresh-process probe over all 166 rows, gate ON,
+    ``): 140 rows abstain with the exact honest
+    sentinel 'unknown organic compound' (not an offender -- see
+    ``_is_whole_name_abstention``); 0 timeouts; 0 exceptions; 0 rows where the
+    placeholder is embedded in a longer/different constructed name reach the
+    final ``eng.name()`` result -- Tasks 1-2 (tier propagation + routing) plus
+    the existing OPSIN self-consistency gate (visible in this run's log as
+    'OPSIN validity gate suppressed unparseable name: ...unknown...' for
+    several internal candidates, e.g. 'unknownmethanol') already void every
+    would-be splice before it reaches the caller. This test therefore passes
+    with zero offenders even without the M2 Task 3 guards -- they are
+    defense-in-depth against a FUTURE producer reaching one of the 4 guarded
+    splice sites with an unrouted fragment, not a breadth lever.
+    """
+    import json
+    import pathlib
+
+    rows = [
+        json.loads(line)
+        for line in pathlib.Path(
+            ""
+        ).read_text().splitlines()[:400]
+    ]
+    offenders = [
+        (r["smiles"], nm) for r in rows
+        if (nm := eng.name(r["smiles"]))
+        and ("substituent" in nm or "unknown" in nm.lower())
+        and not _is_whole_name_abstention(nm)
+    ]
+    assert not offenders, offenders[:5]

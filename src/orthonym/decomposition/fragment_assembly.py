@@ -35,6 +35,7 @@ from ..assembly.naming_utils import _wrap_n_substituent, enclose_if_compound
 # structural decision via get_principal_group, NOT a string match on the name.
 from ..perception.functional_groups import detect_functional_groups
 from ..rules.seniority import get_principal_group, SENIORITY_ORDER
+from ..errors import is_refusal_sentinel
 
 # The top of the hydroxy band (P-44.1). primary_alcohol (== 54) admits
 # methanol/ethanol/2-aminoethanol/phenol; everything senior to hydroxy (ketone,
@@ -749,6 +750,17 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     # resulting in "N-acetyl-N-acetyl..." which should be "N,N-diacetyl...".
     if result.count("N-") >= 2:
         result = _group_n_substituents(result)
+
+    # M2 Task 3 fail-closed splice guard: `amine_prefix`/`amine_name` can carry
+    # the substituent cascade's refusal sentinel embedded in a decorated name
+    # through unchanged (e.g. a recursively-named amine like
+    # "N-substituentcyclohexanamine" -> amine_prefix "N-substituentcyclohexyl"
+    # via the multiplier-expand + wrap-and-join above -- see
+    # errors.is_refusal_sentinel's docstring for the measured leak). Check the
+    # fully assembled result ONCE here rather than at each of the two branches
+    # above, so neither can weave the placeholder into a shipped name.
+    if is_refusal_sentinel(result):
+        return None
 
     return result
 
