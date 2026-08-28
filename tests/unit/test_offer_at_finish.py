@@ -88,7 +88,7 @@ class TestNameTieredHonoursWinningOffer:
         nm = Orthonym()
         row = nm.name_tiered("CCO")
         assert row["name"] == "ethanol"
-        assert row["tier"] == "T1"
+        assert row["tier"] == "pin_verified"
         assert row["is_pin"] is True
         assert row["source"] == "pin_path"
 
@@ -106,10 +106,10 @@ class TestNameTieredHonoursWinningOffer:
             # whatever the PRIMARY last set (default "pin_path"), which is
             # the exact staleness this fix corrects for.
             primary = Offer(name="wrong-stereo-name", result_obj=None,
-                             is_pin=True, tier="T1", source="pin_path",
+                             is_pin=True, tier="pin_verified", source="pin_path",
                              complete=True)
             floor = Offer(name=floor_name, result_obj=None, is_pin=False,
-                          tier="T4", source="t4_floor", complete=True)
+                          tier="best_effort", source="t4_floor", complete=True)
             self._offers = [primary, floor]
             self._last_selected_offer = floor
             return floor_name
@@ -118,7 +118,7 @@ class TestNameTieredHonoursWinningOffer:
         nm = Orthonym()
         row = nm.name_tiered("irrelevant-smiles")
         assert row["name"] == floor_name
-        assert row["tier"] == "T4", row
+        assert row["tier"] == "best_effort", row
         assert row["is_pin"] is False, row
         assert row["source"] == "t4_floor", row
 
@@ -136,6 +136,6 @@ class TestNameTieredHonoursWinningOffer:
         monkeypatch.setattr(Orthonym, "name", _fake_name)
         nm = Orthonym()
         row = nm.name_tiered("CCO")
-        assert row["tier"] == "T1"
+        assert row["tier"] == "pin_verified"
         assert row["is_pin"] is True
         assert row["source"] == "pin_path"

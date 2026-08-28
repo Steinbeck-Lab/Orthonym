@@ -10,7 +10,7 @@ pytestmark = pytest.mark.unit
 def test_default_path_is_t1():
     row = Orthonym(_disable_opsin_validity_gate=True).name_tiered("CCO")
     assert row["name"] == "ethanol"
-    assert row["tier"] == "T1" and row["is_pin"] is True
+    assert row["tier"] == "pin_verified" and row["is_pin"] is True
     assert row["source"] == "pin_path"
 
 
@@ -20,7 +20,7 @@ def test_abstention_is_t5():
     # gate disabled -> the wrong legacy candidate ships in unit tests; accept
     # either the shipped string or the failure sentinel, but tier must be
     # T1/T5 accordingly and never T3/T4 with the engine off.
-    assert row["tier"] in ("T1", "T5")
+    assert row["tier"] in ("pin_verified", "abstain")
     assert row["source"] != "general_engine"
 
 
@@ -29,7 +29,7 @@ def test_engine_emission_is_t3_or_t4():
                    general_fallback_unverified=True)
     row = nm.name_tiered("CC1CCC2CCCCC2C1")
     if row["source"] == "general_engine":
-        assert row["tier"] in ("T3", "T4")
+        assert row["tier"] in ("systematic_verified", "best_effort")
         assert row["is_pin"] is False
         assert "atom_coverage" in row["gates_passed"]
 
@@ -37,7 +37,7 @@ def test_engine_emission_is_t3_or_t4():
 def test_t5_row_carries_formula_and_reason():
     nm = Orthonym(_disable_opsin_validity_gate=True)
     row = nm.name_tiered("CC1C2C=CC1c1ccccc12")  # abstains with engine OFF
-    assert row["tier"] == "T5"
+    assert row["tier"] == "abstain"
     assert row["formula"] == "C12H12"
     assert row["limit_code"]
 

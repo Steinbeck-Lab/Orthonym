@@ -24,7 +24,7 @@ from orthonym.assembly.offer_pool import Offer
 pytestmark = pytest.mark.unit
 
 
-def _o(name, is_pin=True, tier="T1", complete=True, source="x"):
+def _o(name, is_pin=True, tier="pin_verified", complete=True, source="x"):
     return Offer(name=name, result_obj=None, is_pin=is_pin, tier=tier,
                  source=source, complete=complete)
 
@@ -64,8 +64,8 @@ class TestSelectRtPassingWiringAtFinish:
     nothing in production builds a second offer yet (L3-1)."""
 
     def test_top_fails_rt_ok_second_passes_second_wins(self, monkeypatch):
-        top = _o("wrong-molecule-name", is_pin=True, tier="T1")     # ranks first
-        second = _o("hydroxyethane", is_pin=False, tier="T3")        # ranks second
+        top = _o("wrong-molecule-name", is_pin=True, tier="pin_verified")     # ranks first
+        second = _o("hydroxyethane", is_pin=False, tier="systematic_verified")        # ranks second
 
         def _fake_rt_ok(name, input_smiles):
             return name != "wrong-molecule-name"
@@ -78,7 +78,7 @@ class TestSelectRtPassingWiringAtFinish:
 
     def test_all_offers_fail_rt_ok_falls_back_to_current_name(self, monkeypatch):
         a = _o("candidate-a")
-        b = _o("candidate-b", is_pin=False, tier="T3")
+        b = _o("candidate-b", is_pin=False, tier="systematic_verified")
         monkeypatch.setattr(namer_mod, "_offer_rt_ok", lambda name, s: False)
         nm = Orthonym()
         nm._offers = [a, b]
@@ -107,7 +107,7 @@ class TestSelectRtPassingWiringAtFinish:
 
     def test_incomplete_offer_never_wins_even_if_rt_ok_true(self, monkeypatch):
         incomplete = _o("partial", complete=False)
-        complete = _o("hydroxyethane", is_pin=False, tier="T3", complete=True)
+        complete = _o("hydroxyethane", is_pin=False, tier="systematic_verified", complete=True)
         monkeypatch.setattr(namer_mod, "_offer_rt_ok", lambda name, s: True)
         nm = Orthonym()
         nm._offers = [incomplete, complete]

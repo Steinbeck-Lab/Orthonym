@@ -24,10 +24,25 @@ from dataclasses import dataclass
 from typing import Any, List, Optional
 
 
+#: Confidence-band names for the result ``tier`` field (renamed from the
+#: T1..T5 codes; single source of truth for the spelling -- `namer.py`
+#: imports these rather than re-spelling the literals).
+PIN_VERIFIED = "pin_verified"            # was T1
+PIN_UNVERIFIED = "pin_unverified"        # was T2 (reserved, unused)
+SYSTEMATIC_VERIFIED = "systematic_verified"  # was T3
+BEST_EFFORT = "best_effort"              # was T4
+ABSTAIN = "abstain"                      # was T5
+
 #: Lower rank sorts first (preferred). Unknown/future tier strings fall back
 #: to 9 in `rank_offers` below -- deny-by-default, never crashes, never sorts
 #: an unrecognised tier ahead of a known one.
-_TIER_RANK = {"T1": 1, "T2": 2, "T3": 3, "T4": 4, "T5": 5}
+_TIER_RANK = {
+    PIN_VERIFIED: 1,
+    PIN_UNVERIFIED: 2,
+    SYSTEMATIC_VERIFIED: 3,
+    BEST_EFFORT: 4,
+    ABSTAIN: 5,
+}
 
 
 @dataclass(frozen=True)

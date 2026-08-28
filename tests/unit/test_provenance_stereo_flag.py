@@ -73,5 +73,5 @@ def test_name_tiered_flag_not_surfaced_on_suppressed_emission(monkeypatch):
 
     monkeypatch.setattr(be, "name", fake_name_fail)
     row = be.name_tiered("C[C@H](O)CCC")
-    assert row["tier"] == "T5"
+    assert row["tier"] == "abstain"
     assert row["stereo_unexpressed"] is False

@@ -325,14 +325,14 @@ def test_general_ring_prefix_emission_is_not_labelled_a_pin():
     demoted = namer.name_tiered('OC(=O)CC12CC3CC(O)(CC(C3)C1)C2')
     assert demoted['name'], demoted
     assert demoted['is_pin'] is False, demoted
-    assert demoted['tier'] in ('T3', 'T4'), demoted
+    assert demoted['tier'] in ('systematic_verified', 'best_effort'), demoted
     # CONTRAST: a composer emission whose ring prefix the PIN route produced is
-    # untouched -- still T1 / is_pin. Without this the test would also pass if the
-    # demotion fired for every composer emission.
+    # untouched -- still pin_verified / is_pin. Without this the test would also
+    # pass if the demotion fired for every composer emission.
     pin_route = namer.name_tiered('OCc1ccc2ccccc2c1')
     assert pin_route['name'] == '(naphthalen-2-yl)methanol', pin_route
     assert pin_route['is_pin'] is True, pin_route
-    assert pin_route['tier'] == 'T1', pin_route
+    assert pin_route['tier'] == 'pin_verified', pin_route
 
 
 @pytest.mark.parametrize('smiles,expected', [

@@ -61,13 +61,13 @@ def test_ring_systems_handles_spiro_as_one_system():
 # ----------------------------------------------------------- classify_outcome
 
 def test_classify_outcome_emit_when_name_present():
-    res = {"name": "benzene", "tier": "T1", "source": "pin_path"}
+    res = {"name": "benzene", "tier": "pin_verified", "source": "pin_path"}
     assert classify_outcome(res) == "EMIT"
 
 
 def test_classify_outcome_abstain_on_none_name():
     """best-effort tier returns name=None on abstention (clean-abstain contract)."""
-    res = {"name": None, "tier": "T5", "source": "abstain"}
+    res = {"name": None, "tier": "abstain", "source": "abstain"}
     assert classify_outcome(res) == "ABSTAIN"
 
 
@@ -77,12 +77,12 @@ def test_classify_outcome_abstain_on_descriptive_failure_name():
     Counting 'unknown organic compound' as an emission is exactly how a breadth
     number becomes a mirage.
     """
-    res = {"name": "unknown organic compound", "tier": "T5", "source": "abstain"}
+    res = {"name": "unknown organic compound", "tier": "abstain", "source": "abstain"}
     assert classify_outcome(res) == "ABSTAIN"
 
 
 def test_classify_outcome_abstain_on_empty_string():
-    assert classify_outcome({"name": "", "tier": "T5"}) == "ABSTAIN"
+    assert classify_outcome({"name": "", "tier": "abstain"}) == "ABSTAIN"
 
 
 # --------------------------------------------------------- parse_refusal_codes
@@ -238,27 +238,27 @@ def test_molecule_components_for_acyclic_molecule_is_single_piece():
 
 # ------------------------------------------------------------------ aggregate
 
-def _row(outcome, tier="T5", codes=(), wrong=False, ncomp=2, ncomp_named=2):
+def _row(outcome, tier="abstain", codes=(), wrong=False, ncomp=2, ncomp_named=2):
     return {"outcome": outcome, "tier": tier, "refusal_codes": list(codes),
             "structure_wrong": wrong, "n_components": ncomp,
             "n_components_named": ncomp_named}
 
 
 def test_aggregate_computes_emit_rate():
-    rows = [_row("EMIT", "T1"), _row("EMIT", "T4"), _row("ABSTAIN"), _row("ABSTAIN")]
+    rows = [_row("EMIT", "pin_verified"), _row("EMIT", "best_effort"), _row("ABSTAIN"), _row("ABSTAIN")]
     out = aggregate(rows)
     assert out["n"] == 4
     assert out["emit_rate"] == pytest.approx(0.5)
 
 
 def test_aggregate_reports_tier_histogram():
-    rows = [_row("EMIT", "T1"), _row("EMIT", "T1"), _row("EMIT", "T4")]
-    assert aggregate(rows)["tiers"] == {"T1": 2, "T4": 1}
+    rows = [_row("EMIT", "pin_verified"), _row("EMIT", "pin_verified"), _row("EMIT", "best_effort")]
+    assert aggregate(rows)["tiers"] == {"pin_verified": 2, "best_effort": 1}
 
 
 def test_aggregate_counts_structure_wrong_separately_from_abstention():
     """T3: constitutionally-wrong count must never be folded into the emit rate."""
-    rows = [_row("EMIT", "T4", wrong=True), _row("EMIT", "T4"), _row("ABSTAIN")]
+    rows = [_row("EMIT", "best_effort", wrong=True), _row("EMIT", "best_effort"), _row("ABSTAIN")]
     out = aggregate(rows)
     assert out["structure_wrong"] == 1
     assert out["emit_rate"] == pytest.approx(2 / 3)
@@ -281,8 +281,8 @@ def test_aggregate_refusal_census_restricted_to_abstainers_ranks_build_order():
     """
     rows = [
         # fires but the molecule recovered and emitted -> must NOT rank
-        _row("EMIT", "T1", codes=["substituent_is_bare_functional_group:fg_only"]),
-        _row("EMIT", "T1", codes=["substituent_is_bare_functional_group:fg_only"]),
+        _row("EMIT", "pin_verified", codes=["substituent_is_bare_functional_group:fg_only"]),
+        _row("EMIT", "pin_verified", codes=["substituent_is_bare_functional_group:fg_only"]),
         # genuinely blocked
         _row("ABSTAIN", codes=["ring_fragment_declined_by_ring_engine:ring_declined"]),
     ]
@@ -363,9 +363,9 @@ def test_aggregate_counts_tautomer_differences_apart_from_wrong_structures():
     phantom 0-wrong violations on the project's #1 invariant.
     """
     rows = [
-        {"outcome": "EMIT", "tier": "T1", "structure_wrong": False,
+        {"outcome": "EMIT", "tier": "pin_verified", "structure_wrong": False,
          "tautomer_differs": True, "n_components": 1, "n_components_named": 1},
-        {"outcome": "EMIT", "tier": "T1", "structure_wrong": True,
+        {"outcome": "EMIT", "tier": "pin_verified", "structure_wrong": True,
          "n_components": 1, "n_components_named": 1},
     ]
     out = aggregate(rows)
@@ -374,9 +374,9 @@ def test_aggregate_counts_tautomer_differences_apart_from_wrong_structures():
 
 
 def test_aggregate_counts_opsin_unparseable_emissions_for_t6():
-    rows = [{"outcome": "EMIT", "tier": "T4", "opsin_unparseable": True,
+    rows = [{"outcome": "EMIT", "tier": "best_effort", "opsin_unparseable": True,
              "n_components": 1, "n_components_named": 1},
-            {"outcome": "EMIT", "tier": "T4", "n_components": 1,
+            {"outcome": "EMIT", "tier": "best_effort", "n_components": 1,
              "n_components_named": 1}]
     assert aggregate(rows)["opsin_unparseable"] == 1
 
@@ -394,7 +394,7 @@ def test_aggregate_carries_the_only_ranked_structure_into_the_summary():
     The measurement costs ~675 s, so a census that lives only in stdout is a
     census whose numbers cannot be re-checked.
     """
-    rows = [_row("EMIT", "T1"), _row("ABSTAIN", codes=["ring_fragment_declined_by_ring_engine:x"])]
+    rows = [_row("EMIT", "pin_verified"), _row("ABSTAIN", codes=["ring_fragment_declined_by_ring_engine:x"])]
     st = aggregate(rows)["refusal_structure"]
     assert st["single_site_ceiling"] == pytest.approx(1.0)
     assert st["sites"][0]["site"] == "ring_fragment_declined_by_ring_engine:x"
@@ -459,7 +459,7 @@ def test_residual_refusal_code_never_displaces_a_producer_attributed_site():
 
 def test_refusal_structure_attributes_every_uncoded_abstainer():
     """T3 acceptance: unattributed abstainers -> 0, and a leftover is LOUD."""
-    rows = [_row("EMIT", "T1"),
+    rows = [_row("EMIT", "pin_verified"),
             {"outcome": "ABSTAIN", "refusal_codes": [],
              "limit_code": "UNSUPPORTED_ELEMENT", "smiles": "[Pd+2]"},
             {"outcome": "EXC", "refusal_codes": [], "exc": "TypeError:x",
@@ -524,7 +524,7 @@ def test_refusal_structure_never_counts_an_uncoded_abstainer_as_single_blocked()
     blocker is unknown — the exact way this instrument would lie in the
     optimistic direction.
     """
-    rows = [_row("EMIT", "T1"),
+    rows = [_row("EMIT", "pin_verified"),
             {"outcome": "ABSTAIN", "refusal_codes": [],
              "limit_code": "UNNAMEABLE", "smiles": "C"}]
     st = refusal_structure(rows)
@@ -541,7 +541,7 @@ def test_refusal_structure_ceiling_is_emitted_plus_only_over_n():
     2 emitted + 2 single-blocked + 1 double-blocked over n=5 -> 4/5.
     The double-blocked row must contribute NOTHING to the ceiling.
     """
-    rows = [_row("EMIT", "T1"), _row("EMIT", "T1"),
+    rows = [_row("EMIT", "pin_verified"), _row("EMIT", "pin_verified"),
             _row("ABSTAIN", codes=["A:1"]),
             _row("ABSTAIN", codes=["B:1"]),
             _row("ABSTAIN", codes=["A:1", "B:1"])]
@@ -591,8 +591,8 @@ def test_refusal_structure_only_is_computed_over_all_abstainers_not_a_subset():
 
 def test_refusal_structure_excludes_emitted_rows_from_every_count():
     """A code can fire and the molecule still name — that site blocks nothing."""
-    rows = [_row("EMIT", "T1", codes=["SURVIVABLE"]),
-            _row("EMIT", "T1", codes=["SURVIVABLE"]),
+    rows = [_row("EMIT", "pin_verified", codes=["SURVIVABLE"]),
+            _row("EMIT", "pin_verified", codes=["SURVIVABLE"]),
             _row("ABSTAIN", codes=["BLOCKING"])]
     st = refusal_structure(rows)
     assert {s["site"] for s in st["sites"]} == {"BLOCKING"}

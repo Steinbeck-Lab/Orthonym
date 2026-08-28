@@ -63,6 +63,9 @@ from .rules.seniority import get_principal_group
 from .rules.locants import orient_chain, build_atom_to_locant
 from .rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 from .assembly.composer import assemble_name
+from .assembly.offer_pool import (
+    PIN_VERIFIED, SYSTEMATIC_VERIFIED, BEST_EFFORT, ABSTAIN,
+)
 from .data import ALL_RETAINED_NAMES as RETAINED_NAMES
 
 # Phase 158 NEW: routing substrate. `StoutClass` + `ClassDispatchResult`
@@ -3434,11 +3437,12 @@ class Orthonym:
         """v25 G3: name + honest tier/provenance labels (observation-only).
 
         Returns ``{name, tier, is_pin, source, opsin, gates_passed}`` where
-        tier is T1 (PIN path) / T3 (engine or trivial-retained, RT-verified)
-        / T4 (engine, E1-only, unverified — requires the
-        ``general_fallback_unverified`` opt-in) / T5 (abstain). T2
-        (systematic-PIN certification) is reserved. Default construction
-        (no flags) keeps today's PIN-or-abstain behavior byte-identically.
+        tier is ``pin_verified`` (PIN path) / ``systematic_verified`` (engine
+        or trivial-retained, RT-verified) / ``best_effort`` (engine,
+        E1-only, unverified — requires the ``general_fallback_unverified``
+        opt-in) / ``abstain``. ``pin_unverified`` (systematic-PIN
+        certification) is reserved. Default construction (no flags) keeps
+        today's PIN-or-abstain behavior byte-identically.
         """
         from .metrics import provenance as _pv
         from .metrics.provenance import clear_provenance, get_provenance
@@ -3473,9 +3477,9 @@ class Orthonym:
         # the very census this field exists to make possible.
         suffix_free_prefix_name = False
         if not name or is_failure_name(name):
-            tier, is_pin, opsin = "T5", False, "n/a"
+            tier, is_pin, opsin = ABSTAIN, False, "n/a"
             source = prov["source"] or "abstain"
-            # v25 G4: descriptive last-resort row — the T5 residual is
+            # v25 G4: descriptive last-resort row — the abstain residual is
             # LABELED (formula + classified reason), never a bare unknown.
             try:
                 _mol = Chem.MolFromSmiles(smiles)
@@ -3491,8 +3495,8 @@ class Orthonym:
             # PIN path nor the general engine can name is a CLEAN abstain — no
             # name. Surfacing the PIN always-emit descriptive residual here (e.g.
             # a partial '…-unknown-…' string, or 'unknown organic compound') would
-            # masquerade a non-name as a name for a T5 row that is already fully
-            # LABELED by (tier=T5, source=abstain, limit_code, formula). Scoped to
+            # masquerade a non-name as a name for an abstain row that is already fully
+            # LABELED by (tier=abstain, source=abstain, limit_code, formula). Scoped to
             # ``self._general_fallback`` so the PIN-default path (and its always-
             # emit ``name()``) is byte-identical; ``name()`` itself is untouched.
             if self._general_fallback:
@@ -3503,25 +3507,25 @@ class Orthonym:
             # prov["opsin"], which is always a non-empty string — so this
             # branch never consulted jar presence and is unchanged.
             opsin = prov["opsin"] or gate_opsin_label
-            tier = "T3" if opsin == "verified" else "T4"
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
             stereo_unexpressed = bool(prov.get("stereo_unexpressed"))
             suffix_free_prefix_name = bool(prov.get("suffix_free_prefix_name"))
         elif source == "trivial_retained":
-            tier, is_pin = "T3", False
+            tier, is_pin = SYSTEMATIC_VERIFIED, False
             opsin = gate_opsin_label
         elif prov.get("general_ring_prefix"):
             # v30 P3-T1c: a composer name carrying a ring substituent prefix only
             # the GENERAL tier could build (a systematic replacement / von Baeyer
             # substituent form). Valid, but not PREFERRED -- the ring PIN may be a
-            # retained name -- so it must not ship as T1/is_pin. Demoted on the
-            # same verified/unverified split the general engine uses, so the tier
+            # retained name -- so it must not ship as pin_verified/is_pin. Demoted on
+            # the same verified/unverified split the general engine uses, so the tier
             # still means what it means everywhere else.
             opsin = gate_opsin_label
-            tier = "T3" if opsin == "verified" else "T4"
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
         else:
-            tier, is_pin = "T1", True
+            tier, is_pin = PIN_VERIFIED, True
             opsin = gate_opsin_label
         # v33 Phase 0 cleanup T1: the branches above derive tier/is_pin/
         # source from the provenance CONTEXTVAR, which reflects whichever
@@ -3535,13 +3539,13 @@ class Orthonym:
         # and its `.name` is exactly what shipped (`_last_selected_offer` is
         # `None` when `select_rt_passing` found no complete+RT-passing offer,
         # in which case `current_name` ships unchanged and there is nothing
-        # to override). Guarded off the T5/abstain branch too, though that is
+        # to override). Guarded off the abstain branch too, though that is
         # belt-and-braces: a winning offer can never be a failure-name
         # sentinel (both offer-construction sites in `_finish` already
         # refuse to append one).
         _offer_winner = getattr(self, "_last_selected_offer", None)
         if (_offer_winner is not None and _offer_winner.name == name
-                and tier != "T5"):
+                and tier != ABSTAIN):
             source = _offer_winner.source
             is_pin = _offer_winner.is_pin
             tier = _offer_winner.tier
@@ -3553,8 +3557,9 @@ class Orthonym:
             if opsin == "verified":
                 gates.append("self_consistency")
         elif opsin != "n/a":
-            # T1 / T3-retained: the token is whatever the gate actually
-            # earned — `SELF-01` only for a full-name SELF-01 "ok",
+            # pin_verified / systematic_verified-retained: the token is
+            # whatever the gate actually earned — `SELF-01` only for a
+            # full-name SELF-01 "ok",
             # `SELF-01(constitution)` for the stereo-stripped verdict, and
             # nothing at all for a carve-out, a bypass or a fail-OPEN.
             _token = _pv.gate_token_for_gate_outcome(gate_outcome)
@@ -4494,7 +4499,7 @@ class Orthonym:
                         # `name` rather than reusing `_result_obj`/`_self01`
                         # above, which were computed against the PRE-veto
                         # name. `is_pin`/`tier` deliberately use the COARSE
-                        # form the brief sanctions for L2 (a `True`/"T1"
+                        # form the brief sanctions for L2 (a `True`/"pin_verified"
                         # default with the 3 known demotions --
                         # general_engine / trivial_retained /
                         # general_ring_prefix -- to `False`), since with one
@@ -4514,17 +4519,19 @@ class Orthonym:
                         if _offer_source == "general_engine":
                             _offer_is_pin = False
                             _offer_tier = (
-                                "T3" if _offer_prov.get("opsin") == "verified"
-                                else "T4")
+                                SYSTEMATIC_VERIFIED
+                                if _offer_prov.get("opsin") == "verified"
+                                else BEST_EFFORT)
                         elif _offer_source == "trivial_retained":
-                            _offer_is_pin, _offer_tier = False, "T3"
+                            _offer_is_pin, _offer_tier = False, SYSTEMATIC_VERIFIED
                         elif _offer_prov.get("general_ring_prefix"):
                             _offer_is_pin = False
                             _offer_tier = (
-                                "T3" if _offer_prov.get("opsin") == "verified"
-                                else "T4")
+                                SYSTEMATIC_VERIFIED
+                                if _offer_prov.get("opsin") == "verified"
+                                else BEST_EFFORT)
                         else:
-                            _offer_is_pin, _offer_tier = True, "T1"
+                            _offer_is_pin, _offer_tier = True, PIN_VERIFIED
                         from .assembly.offer_pool import Offer
                         self._offers = [Offer(
                             name=name, result_obj=_offer_result_obj,
@@ -4739,7 +4746,7 @@ class Orthonym:
                 skip_reanchor=_skip_reanchor, skip_detail=_skip_detail)
             from .assembly.offer_pool import Offer
             self._offers.append(Offer(
-                name=floor_name, result_obj=None, is_pin=False, tier="T4",
+                name=floor_name, result_obj=None, is_pin=False, tier=BEST_EFFORT,
                 source="t4_floor", complete=verdict.complete))
             self._t4_floor_candidate = floor_name
             logger.info(
