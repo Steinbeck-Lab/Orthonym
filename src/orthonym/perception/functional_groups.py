@@ -6,6 +6,7 @@ The principal group (highest seniority) becomes the suffix;
 all others become prefixes.
 """
 
+import weakref
 from collections import defaultdict
 from typing import Dict, List, Set, Tuple
 from rdkit import Chem
@@ -652,7 +653,7 @@ def _add_resonance_twin_matches(mol, results: Dict[str, List[Tuple[int, ...]]]) 
         already[cls].add(key)
 
 
-def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
+def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     """
     Detect all functional groups in a molecule.
 
@@ -789,6 +790,43 @@ def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
                 results['ketone'] = _het_matches
 
     return dict(results)
+
+
+# Per-molecule memoization (perf, 2026-08-28). `detect_functional_groups` was
+# measured at ~37 calls PER MOLECULE (decomposition + retry/recovery cascades each
+# re-perceive), the #1 self-time hot spot on the best-effort path. The result is a
+# pure function of the molecule (SMARTS matches + ring reads, no context flags), so
+# it is safe to compute once per mol object and reuse. Keyed by the RDKit Mol via a
+# WeakKeyDictionary (mols are weakref-able), so the entry is freed when the mol is;
+# distinct Mol objects for the same structure simply miss (correctness preserved).
+# A fresh shallow copy is returned each call so a caller mutating its dict/lists can
+# never corrupt the cached value (the tuples inside are immutable).
+_FG_CACHE: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+
+
+def detect_functional_groups(mol) -> Dict[str, List[Tuple[int, ...]]]:
+    """
+    Detect all functional groups in a molecule (memoized per mol object).
+
+    Returns a dictionary mapping functional group names to lists of atom index
+    tuples. Each tuple contains the indices of atoms in one instance of that group.
+
+    Example:
+        >>> mol = Chem.MolFromSmiles("CC(=O)O")  # acetic acid
+        >>> groups = detect_functional_groups(mol)
+        >>> "carboxylic_acid" in groups
+        True
+        >>> len(groups["carboxylic_acid"])
+        1
+    """
+    cached = _FG_CACHE.get(mol)
+    if cached is None:
+        cached = _detect_functional_groups_impl(mol)
+        try:
+            _FG_CACHE[mol] = cached
+        except TypeError:                     # mol not weakref-able (defensive) — skip cache
+            return cached
+    return {k: list(v) for k, v in cached.items()}
 
 
 def detect_features(mol) -> Dict[str, List[Tuple[int, ...]]]:

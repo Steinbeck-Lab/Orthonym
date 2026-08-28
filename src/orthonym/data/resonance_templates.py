@@ -158,7 +158,26 @@ def _walk_n_chain(mol, attach_idx: int, first_n_idx: int,
         prev, cur = cur, nxt
 
 
+import weakref as _weakref
+
+# Per-mol memoization (perf 2026-08-28): ~130 calls/mol measured. Pure function of
+# the molecule (reads only bond orders / charges / connectivity). Keyed by the RDKit
+# Mol; returns a COPY of the cached list so callers can't corrupt the cache.
+_RES_CACHE = _weakref.WeakKeyDictionary()
+
+
 def find_resonance_chains(mol) -> List[Tuple[str, Tuple[int, ...]]]:
+    cached = _RES_CACHE.get(mol)
+    if cached is None:
+        cached = _find_resonance_chains_impl(mol)
+        try:
+            _RES_CACHE[mol] = cached
+        except TypeError:
+            return list(cached)
+    return list(cached)
+
+
+def _find_resonance_chains_impl(mol) -> List[Tuple[str, Tuple[int, ...]]]:
     """Scan ``mol`` for every linear ``(non-N attach) -> N -> ...`` chain and
     classify it against the closed 3-set.
 

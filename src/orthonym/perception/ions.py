@@ -13,6 +13,7 @@ IUPAC 2013 rules:
 - Zwitterions: named as neutral compounds with +/- indicated
 """
 
+import weakref
 from typing import Any, Dict, List, Optional, Set
 from rdkit import Chem
 
@@ -187,7 +188,25 @@ def _neutralize_pinning_hydrogens(atom) -> None:
     atom.SetFormalCharge(0)
 
 
+_ICA_CACHE: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+
+
 def _get_internal_charge_atoms(mol) -> Set[int]:
+    """Per-mol memoized wrapper (perf 2026-08-28): ~104 calls/mol measured. Pure
+    function of the molecule (SMARTS + structural proof, no context/env). Keyed by
+    the RDKit Mol; returns a COPY of the cached set so the read-only callers can
+    never corrupt the cache. Real work is in _get_internal_charge_atoms_impl."""
+    cached = _ICA_CACHE.get(mol)
+    if cached is None:
+        cached = _get_internal_charge_atoms_impl(mol)
+        try:
+            _ICA_CACHE[mol] = cached
+        except TypeError:
+            return set(cached)
+    return set(cached)
+
+
+def _get_internal_charge_atoms_impl(mol) -> Set[int]:
     """Return atom indices whose formal charges are bonding features, not ionic.
 
     Two complementary mechanisms, because the Blue Book itself describes the

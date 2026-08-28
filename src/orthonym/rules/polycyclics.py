@@ -30,6 +30,7 @@ Integration with fused_rings.py:
 - This module can delegate to fused_rings for heterocyclic detection
 """
 
+import weakref
 from typing import Dict, List, NamedTuple, Optional, Tuple, Set, Any
 from collections import defaultdict, deque
 from rdkit import Chem
@@ -66,8 +67,38 @@ from ..perception.rings import (
 # below a fullerene's, so no in-scope molecule can trip it.
 _GIANT_CAGE_RING_THRESHOLD = 20
 
+# Perf (2026-08-28): pre-compile the PAH SMARTS + sort by size ONCE at import.
+# identify_polycyclic used to sort POLYCYCLIC_DATA and Chem.MolFromSmarts on EVERY
+# call (~34 SMARTS compiles/call — the dominant self-time). Behaviour is identical:
+# same patterns, same largest-first order, same first-match read.
+_COMPILED_PAH = [
+    (name, data, Chem.MolFromSmarts(data['smarts']))
+    for name, data in sorted(POLYCYCLIC_DATA.items(),
+                             key=lambda x: x[1]['num_atoms'], reverse=True)
+]
+_COMPILED_PAH = [(n, d, p) for n, d, p in _COMPILED_PAH if p is not None]
+
+# Per-mol memoization: identify_polycyclic is a pure function of the molecule
+# (ring info + substructure matches + canonical SMILES; no context/env). Keyed by
+# the RDKit Mol; returns an immutable str/None so no copy is needed. A distinct Mol
+# object for the same structure simply misses (correctness preserved).
+_POLY_CACHE: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+_POLY_MISS = object()
+
 
 def identify_polycyclic(mol) -> Optional[str]:
+    cached = _POLY_CACHE.get(mol, _POLY_MISS)
+    if cached is not _POLY_MISS:
+        return cached
+    result = _identify_polycyclic_impl(mol)
+    try:
+        _POLY_CACHE[mol] = result
+    except TypeError:
+        pass
+    return result
+
+
+def _identify_polycyclic_impl(mol) -> Optional[str]:
     """
     Identify if a molecule is a (possibly substituted) polycyclic aromatic.
 
@@ -103,20 +134,10 @@ def identify_polycyclic(mol) -> Optional[str]:
         if result:
             return result['name']
 
-    # Try substructure matching for substituted PAHs
-    # Check from largest to smallest to find the best (largest) match
-    pah_by_size = sorted(
-        POLYCYCLIC_DATA.items(),
-        key=lambda x: x[1]['num_atoms'],
-        reverse=True
-    )
-
-    for pah_name, pah_data in pah_by_size:
-        smarts = pah_data['smarts']
-        pattern = Chem.MolFromSmarts(smarts)
-        if pattern is None:
-            continue
-
+    # Try substructure matching for substituted PAHs. Patterns are pre-compiled
+    # and pre-sorted largest-first at import (see _COMPILED_PAH); this loop used to
+    # re-sort + Chem.MolFromSmarts all ~34 patterns on every call.
+    for pah_name, pah_data, pattern in _COMPILED_PAH:
         # v36 C5: only matches[0] is ever read below -- bound the search so a
         # highly-symmetric giant cage cannot enumerate a combinatorial number of
         # automorphic matches (measured 63.1s on a C70 fullerene before the scope
