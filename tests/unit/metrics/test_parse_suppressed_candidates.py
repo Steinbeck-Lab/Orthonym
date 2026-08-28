@@ -17,7 +17,7 @@ than the one that was suppressed.
 """
 from orthonym.metrics.breadth import parse_suppressed_candidates
 
-SELF01 = "SELF-01 suppressed (different molecule): {!r} (opsin={})"
+SELF01 = "self_consistency rejected (different molecule): {!r} (opsin={})"
 
 
 def test_extracts_name_and_opsin_smiles():
@@ -31,7 +31,7 @@ def test_extracts_name_and_opsin_smiles():
 def test_a_name_containing_primes_is_not_truncated():
     """Greedy match to the LAST "' (opsin=" -- not to the first apostrophe."""
     name = "2,2'-bi-3,1,5-benzoxadiarsepine"
-    lines = ["SELF-01 suppressed (different molecule): "
+    lines = ["self_consistency rejected (different molecule): "
              f"'{name}' (opsin=C1CC[As]OC1)"]
     got = parse_suppressed_candidates(lines)
     assert got["self01_suppressed_name"] == name

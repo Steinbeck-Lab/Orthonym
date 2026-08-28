@@ -261,7 +261,7 @@ def test_carveout_decoration_mutation_no_atom_drop(namer, case):
             f"an abstain {name!r} instead (gate_outcome={gate_outcome!r})."
         )
         assert gate_outcome in (
-            "self01_verified", "self01_verified_constitution_only",
+            "self_consistency_verified", "self_consistency_constitution_only",
         ), (
             f"{case['carveout']}: decorated mutant emitted a real name "
             f"{name!r} but it was NOT independently OPSIN/SELF-01 verified "

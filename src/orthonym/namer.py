@@ -1203,7 +1203,7 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     # mode "on": suppress to the honest descriptive fallback.
     if stats is not None:
         stats["self_consistency_suppressed"] = stats.get("self_consistency_suppressed", 0) + 1
-    logger.warning("SELF-01 suppressed (different molecule): %r (opsin=%s)",
+    logger.warning("self_consistency rejected (different molecule): %r (opsin=%s)",
                    name[:80], opsin_smiles)
     from .metrics.abstention import AbstentionCode, record_suppression
     record_suppression(AbstentionCode.GATE_SUPPRESSED, detail='self01_mismatch',
@@ -3551,7 +3551,7 @@ class Orthonym:
             # E1-path verification is the engine's OWN round-trip check
             # (prov["opsin"]), not a gate outcome, so its token is unchanged.
             if opsin == "verified":
-                gates.append("SELF-01")
+                gates.append("self_consistency")
         elif opsin != "n/a":
             # T1 / T3-retained: the token is whatever the gate actually
             # earned — `SELF-01` only for a full-name SELF-01 "ok",

@@ -44,16 +44,16 @@ GATE_OUTCOME_DESCRIPTIVE_FALLBACK = "descriptive_fallback"
 GATE_OUTCOME_SUPPRESSED = "suppressed"
 #: OPSIN parsed the FULL name and SELF-01 returned verdict "ok". The ONE
 #: state that may claim a bare SELF-01.
-GATE_OUTCOME_SELF01 = "self01_verified"
+GATE_OUTCOME_SELF01 = "self_consistency_verified"
 #: the BBR-GATE stereo carve-out: SELF-01 judged the stereo-STRIPPED parse, so
 #: the CONSTITUTION is verified and the stereo layer is NOT.
-GATE_OUTCOME_SELF01_CONSTITUTION_ONLY = "self01_verified_constitution_only"
+GATE_OUTCOME_SELF01_CONSTITUTION_ONLY = "self_consistency_constitution_only"
 #: SELF-01 ran and could not compare (fail-OPEN) — nothing was proven.
-GATE_OUTCOME_SELF01_INCONCLUSIVE = "self01_inconclusive"
+GATE_OUTCOME_SELF01_INCONCLUSIVE = "self_consistency_inconclusive"
 #: SELF-01 was a no-op (`_SC_MODE == "off"`, or no input SMILES to compare to).
-GATE_OUTCOME_SELF01_SKIPPED = "self01_skipped"
+GATE_OUTCOME_SELF01_SKIPPED = "self_consistency_skipped"
 #: SELF-01 PROVED a different molecule but `_SC_MODE == "warn"` shipped it.
-GATE_OUTCOME_SELF01_WARN_MISMATCH = "self01_warn_mismatch"
+GATE_OUTCOME_SELF01_WARN_MISMATCH = "self_consistency_warn_mismatch"
 #: prefix for the ten by-design `return name` carve-outs: `carveout:<slug>`.
 GATE_OUTCOME_CARVEOUT_PREFIX = "carveout:"
 
@@ -70,8 +70,8 @@ _VERIFIED_GATE_OUTCOMES = {
 #: deliberately a DIFFERENT token from `SELF-01`: the stereo carve-out checked
 #: the constitution only, and folding it into either bucket would lose that.
 _GATE_TOKENS = {
-    GATE_OUTCOME_SELF01: "SELF-01",
-    GATE_OUTCOME_SELF01_CONSTITUTION_ONLY: "SELF-01(constitution)",
+    GATE_OUTCOME_SELF01: "self_consistency",
+    GATE_OUTCOME_SELF01_CONSTITUTION_ONLY: "self_consistency_constitution_only",
 }
 
 _SOURCE = contextvars.ContextVar("orthonym_prov_source", default=None)

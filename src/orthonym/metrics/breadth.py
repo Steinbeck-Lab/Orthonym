@@ -107,8 +107,8 @@ _REFUSE_RE = re.compile(r"general_engine refused:\s*([^|]+?)\s*(?:\(tier|$)")
 # the stereo backstop, which is detection-only.
 _GATE_RES = (
     # namer.py:951 — SELF-01 rejected the candidate as a DIFFERENT molecule.
-    (re.compile(r"SELF-01 suppressed \(different molecule\)"),
-     "GATE-SELF01:different_molecule"),
+    (re.compile(r"self_consistency rejected \(different molecule\)"),
+     "self_consistency_rejected:different_molecule"),
     # namer.py:1224 — the pre-emission OPSIN-parse validity gate.
     (re.compile(r"OPSIN validity gate suppressed unparseable name"),
      "GATE-OPSIN:unparseable"),
@@ -127,7 +127,7 @@ _GATE_RES = (
 # candidate. ``re.search`` rather than ``match`` so a logger prefix
 # ("WARNING:orthonym.namer:") does not defeat it.
 _SELF01_PAYLOAD_RE = re.compile(
-    r"SELF-01 suppressed \(different molecule\): '(.*)' \(opsin=(.*)\)\s*$"
+    r"self_consistency rejected \(different molecule\): '(.*)' \(opsin=(.*)\)\s*$"
 )
 
 

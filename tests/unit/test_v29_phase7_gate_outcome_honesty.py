@@ -35,8 +35,8 @@ from orthonym.metrics import provenance as pv
 #   C/C(=C\\C1C=CC=C1)/C(=O)O -> exit line 1110, BBR-GATE stereo carve-out
 T1_LEAKS = {
     "CC=C.C=C.[Ti+2]": "carveout:organometallic_additive",
-    "C[C@@H]1C[C@H]1CO": "self01_verified_constitution_only",
-    r"C/C(=C\C1C=CC=C1)/C(=O)O": "self01_verified_constitution_only",
+    "C[C@@H]1C[C@H]1CO": "self_consistency_constitution_only",
+    r"C/C(=C\C1C=CC=C1)/C(=O)O": "self_consistency_constitution_only",
 }
 
 
@@ -52,7 +52,7 @@ def test_genuinely_verified_name_still_reports_self01():
     assert row["name"] == "ethanol"
     assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert row["opsin"] == "verified"
-    assert "SELF-01" in row["gates_passed"]
+    assert "self_consistency" in row["gates_passed"]
 
 
 # --------------------------------------------------------------------------
@@ -73,8 +73,8 @@ def test_t1_leaks_do_not_claim_bare_self01():
         assert row["gate_outcome"] == expected_outcome, (
             f"{smiles}: expected gate outcome {expected_outcome!r}, "
             f"got {row['gate_outcome']!r} (name={row['name']!r})")
-        assert "SELF-01" not in row["gates_passed"], (
-            f"{smiles} claims a bare SELF-01 it did not earn: "
+        assert "self_consistency" not in row["gates_passed"], (
+            f"{smiles} claims a bare self_consistency it did not earn: "
             f"{row['gates_passed']}")
         checked += 1
     assert checked == 3
@@ -88,8 +88,8 @@ def test_stereo_carveout_is_labelled_constitution_only():
     row = Orthonym().name_tiered("C[C@@H]1C[C@H]1CO")
     assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY
     assert row["opsin"] == "verified_constitution_only"
-    assert "SELF-01(constitution)" in row["gates_passed"]
-    assert "SELF-01" not in row["gates_passed"]
+    assert "self_consistency_constitution_only" in row["gates_passed"]
+    assert "self_consistency" not in row["gates_passed"]
 
 
 # --------------------------------------------------------------------------
@@ -107,7 +107,7 @@ def test_carveout_reports_its_slug():
     assert row["gate_outcome"] == "carveout:organometallic_additive"
     assert row["gate_outcome"].startswith("carveout:")
     assert row["opsin"] == "unverified"
-    assert row["gates_passed"] == [] or "SELF-01" not in row["gates_passed"]
+    assert row["gates_passed"] == [] or "self_consistency" not in row["gates_passed"]
 
 
 # --------------------------------------------------------------------------
@@ -119,7 +119,7 @@ def test_gate_disabled_never_reports_verified():
     assert row["name"] == "ethanol"
     assert row["gate_outcome"] == pv.GATE_OUTCOME_DISABLED
     assert row["opsin"] == "unverified"
-    assert "SELF-01" not in row["gates_passed"]
+    assert "self_consistency" not in row["gates_passed"]
 
 
 # --------------------------------------------------------------------------
@@ -158,13 +158,13 @@ def test_consecutive_molecules_each_report_their_own_gate_branch():
     second = nm.name_tiered("CCO")                     # genuinely verified
     assert first["gate_outcome"] == "carveout:organometallic_additive"
     assert second["gate_outcome"] == pv.GATE_OUTCOME_SELF01
-    assert "SELF-01" in second["gates_passed"]
+    assert "self_consistency" in second["gates_passed"]
 
     third = nm.name_tiered("CCO")
     fourth = nm.name_tiered("CC=C.C=C.[Ti+2]")
     assert third["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert fourth["gate_outcome"] == "carveout:organometallic_additive"
-    assert "SELF-01" not in fourth["gates_passed"]
+    assert "self_consistency" not in fourth["gates_passed"]
 
 
 @pytest.mark.opsin_gate
@@ -214,7 +214,7 @@ def test_stale_outcome_cannot_leak_onto_a_molecule_the_gate_never_saw():
         f"stale gate outcome leaked onto the next molecule: expected "
         f"{pv.GATE_OUTCOME_NOT_RUN!r}, got {ungated['gate_outcome']!r} — "
         f"`clear_provenance` did not reset the contextvar")
-    assert "SELF-01" not in ungated["gates_passed"]
+    assert "self_consistency" not in ungated["gates_passed"]
 
     # (d) The reverse order must not leak either: the recorder still reports
     #     its own outcome after the ungated molecule left `not_run` behind.

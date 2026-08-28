@@ -155,9 +155,9 @@ def test_parse_refusal_codes_captures_the_self01_gate_suppression():
     ranks the producers only, while the project record says the 0-wrong margin is
     the GATE.
     """
-    lines = ["orthonym.namer|SELF-01 suppressed (different molecule): "
+    lines = ["orthonym.namer|self_consistency rejected (different molecule): "
              "'palladium(II) acetate' (opsin=CC(=O)[O-].CC(=O)[O-].[Pd+2])"]
-    assert parse_refusal_codes(lines) == ["GATE-SELF01:different_molecule"]
+    assert parse_refusal_codes(lines) == ["self_consistency_rejected:different_molecule"]
 
 
 def test_parse_refusal_codes_captures_the_opsin_validity_gate():
@@ -173,9 +173,9 @@ def test_parse_refusal_codes_captures_the_opsin_validity_gate():
 
 def test_parse_refusal_codes_dedups_a_gate_that_fires_on_several_candidates():
     """SELF-01 rejecting four candidates is still ONE blocker for the molecule."""
-    line = ("orthonym.namer|SELF-01 suppressed (different molecule): 'x' (opsin=C)")
+    line = ("orthonym.namer|self_consistency rejected (different molecule): 'x' (opsin=C)")
     assert parse_refusal_codes([line, line, line, line]) == [
-        "GATE-SELF01:different_molecule"]
+        "self_consistency_rejected:different_molecule"]
 
 
 # -------------------------------------------------------- molecule_components
