@@ -118,12 +118,14 @@ class TestMultiAmideEndToEnd:
         )
 
     def test_peptide_with_terminal_nh2_unchanged(self):
-        """Glycylglycine (terminal NH2) should still use peptide namer."""
+        """Gly-Gly (terminal NH2) routes through the peptide dispatch. v38: its
+        PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md; peptide names
+        are non-PIN). Full-InChIKey round-trip verified."""
         smiles = "NCC(=O)NCC(=O)O"
         result = name_compound(smiles)
 
-        assert result == "glycylglycine", (
-            f"Peptide with terminal NH2 should produce glycylglycine. Got: {result}"
+        assert result == "(2-aminoacetamido)acetic acid", (
+            f"Gly-Gly should produce the substitutive PIN. Got: {result}"
         )
 
     def test_2_amide_chain_without_terminal_nh2(self):

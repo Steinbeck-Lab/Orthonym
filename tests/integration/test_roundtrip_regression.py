@@ -305,13 +305,17 @@ def _opsin_parse(name: str) -> str:
 
 # Peptide names verified through OPSIN exact round-trip
 PHASE22_PEPTIDE_ROUNDTRIP = [
-    # Dipeptides
-    ("NCC(=O)NCC(=O)O", "glycylglycine"),
-    # P-103.3.4: L descriptor omitted for Table-10.4 amino acids in peptides.
-    ("NCC(=O)N[C@@H](C)C(=O)O", "glycylalanine"),
-    ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O", "alanylalanine"),
-    ("N[C@@H](C)C(=O)NCC(=O)O", "alanylglycine"),
-    # Tripeptide
+    # Dipeptides. v38 (V38-PEPTIDE-PIN-VERDICT.md): the peptide PIN is the
+    # SUBSTITUTIVE form (Chapter P-10 identifies no PINs -> retained peptide
+    # names are non-PIN). Each expected name below is full-InChIKey round-trip
+    # verified (and the test body re-asserts the OPSIN round-trip too).
+    ("NCC(=O)NCC(=O)O", "(2-aminoacetamido)acetic acid"),
+    ("NCC(=O)N[C@@H](C)C(=O)O", "(2S)-2-(2-aminoacetamido)propanoic acid"),
+    ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O",
+     "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"),
+    ("N[C@@H](C)C(=O)NCC(=O)O", "2-[(2S)-2-aminopropanamido]ethanoic acid"),
+    # Tripeptide: the substitutive path cannot build it yet, so it falls back to
+    # the retained peptide name (unchanged, still round-trips).
     (
         "NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O",
         "glycylalanylleucine",

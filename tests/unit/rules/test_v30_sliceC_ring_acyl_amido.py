@@ -24,15 +24,19 @@ class TestSystematicStyleThreadedThroughFragmentNamer:
 
     def test_default_and_systematic_differ_for_amino_acid(self):
         # The default (pin) path returns the retained name; systematic bypasses
-        # it. We do NOT assert the retained string as a golden value — OPSIN reads
-        # 'proline' as L-proline, a different molecule from the stereo-unspecified
-        # fragment (BB:54717), which is exactly why the amido path needs the
-        # systematic form. Assert only the contract: the two styles diverge and
-        # the systematic one is the convertible acid.
-        default = name_fragment_recursively("OC(=O)C1CCCN1")
-        systematic = name_fragment_recursively("OC(=O)C1CCCN1", style="systematic")
+        # it. Use DEFINED-stereo L-proline here: the v33 Phase-1 stereo-honesty
+        # fix now makes the default path DECLINE the retained name for a
+        # stereo-UNSPECIFIED proline fragment too (bare 'proline' implies L, a
+        # different molecule -- BB:54717), so 'OC(=O)C1CCCN1' would return the
+        # systematic acid in BOTH styles and the contract would be untestable.
+        # With defined stereo the default legitimately returns the retained
+        # 'L-proline', which differs from the systematic acid -- the actual
+        # style-threading contract this test exists to pin.
+        default = name_fragment_recursively("OC(=O)[C@@H]1CCCN1")
+        systematic = name_fragment_recursively("OC(=O)[C@@H]1CCCN1", style="systematic")
         assert default != systematic
-        assert systematic == "pyrrolidine-2-carboxylic acid"
+        assert default == "L-proline"
+        assert systematic == "(2S)-pyrrolidine-2-carboxylic acid"
 
     def test_systematic_style_bypasses_retained(self):
         assert (name_fragment_recursively("OC(=O)C1CCCN1", style="systematic")

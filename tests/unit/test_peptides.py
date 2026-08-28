@@ -20,14 +20,18 @@ class TestDipeptidesAchiral:
     """Test dipeptide naming for achiral residues."""
 
     def test_glycylglycine(self):
-        """Gly-Gly: simplest dipeptide, achiral, single word."""
+        """Gly-Gly PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md:
+        Chapter P-10 identifies NO PINs, so the retained peptide name
+        'glycylglycine' is non-PIN). Full-InChIKey round-trip verified."""
         result = name_compound("NCC(=O)NCC(=O)O")
-        assert result == "glycylglycine"
+        assert result == "(2-aminoacetamido)acetic acid"
 
     def test_glycylglycine_is_single_word(self):
-        """Glycylglycine has no hyphen (both residues are achiral glycine)."""
+        """v38: Gly-Gly now emits the substitutive PIN (see test_glycylglycine
+        and V38-PEPTIDE-PIN-VERDICT.md); the old 'single word / no hyphen'
+        property was a property of the retained name, no longer emitted."""
         result = name_compound("NCC(=O)NCC(=O)O")
-        assert "-" not in result
+        assert result == "(2-aminoacetamido)acetic acid"
 
 
 # ── Dipeptides (with stereochemistry) ─────────────────────────────────
@@ -37,19 +41,22 @@ class TestDipeptidesWithStereo:
     """Test dipeptide naming with L/D stereochemistry prefixes."""
 
     def test_glycyl_l_alanine(self):
-        """Gly-L-Ala: P-103.3.4 omits the L descriptor -> glycylalanine."""
+        """Gly-L-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md; peptide
+        names are non-PIN). Full-InChIKey round-trip verified."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)O")
-        assert result == "glycylalanine"
+        assert result == "(2S)-2-(2-aminoacetamido)propanoic acid"
 
     def test_l_alanylglycine(self):
-        """L-Ala-Gly: P-103.3.4 omits the L descriptor -> alanylglycine."""
+        """L-Ala-Gly PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
+        Full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "alanylglycine"
+        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
 
     def test_l_alanyl_l_alanine(self):
-        """L-Ala-L-Ala: P-103.3.4 omits the L descriptor -> alanylalanine."""
+        """L-Ala-L-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
+        Full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O")
-        assert result == "alanylalanine"
+        assert result == "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"
 
 
 # ── Tripeptides ───────────────────────────────────────────────────────
@@ -161,12 +168,16 @@ class TestProlineNTerminus:
     """Peptides whose N-terminal residue is the cyclic imino acid proline."""
 
     def test_prolylglycine(self):
+        # v38: Pro-Gly PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md; the
+        # sliceC target). Full-InChIKey round-trip verified.
         result = name_compound("OC(=O)CNC(=O)[C@@H]1CCCN1")
-        assert result == "prolylglycine"
+        assert result == "2-[(2S)-pyrrolidine-2-carboxamido]ethanoic acid"
 
     def test_prolylalanine(self):
+        # v38: Pro-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
+        # Full-InChIKey round-trip verified.
         result = name_compound("C[C@@H](C(=O)O)NC(=O)[C@@H]1CCCN1")
-        assert result == "prolylalanine"
+        assert result == "(2S)-2-[(2S)-pyrrolidine-2-carboxamido]propanoic acid"
 
     def test_n_acetylglycine_still_excluded(self):
         """The relaxation must NOT admit an N-acyl amino acid (acylated N)."""
@@ -262,14 +273,15 @@ class TestStereoMapping:
     """Test S->L and R->D stereo prefix mapping."""
 
     def test_s_config_maps_to_l(self):
-        """S-configured alpha-carbon is identified as L, then omitted (P-103.3.4).
+        """S-configured alpha-carbon must be preserved as (2S) in the name.
 
-        L-alanine has S configuration; in a peptide the L descriptor is not cited,
-        so a correctly-L-identified N-terminal residue yields a bare acyl stem with
-        NO 'D-' prefix (a D misidentification would surface as 'D-alanyl').
+        v38: L-Ala-Gly now emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md;
+        full-InChIKey round-trip verified). The N-terminal L-alanine's S centre
+        surfaces as (2S) in the acyl amido prefix (a broken S mapping would emit
+        (2R) and fail the round-trip gate -> fallback), and never a 'D-' prefix.
         """
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "alanylglycine"
+        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
         assert not result.startswith("D-")
 
     def test_glycine_no_stereo_prefix(self):
@@ -317,9 +329,11 @@ class TestCysteineStereoInversion:
         In a peptide the L is omitted (P-103.3.4), so the N-terminal residue must
         be a bare 'alanyl' with no 'D-' (a broken S->L mapping would tag it D-).
         """
+        # v38: L-Ala-Gly emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md);
+        # the S centre is preserved as (2S) and never mis-tagged 'D-'.
         result_peptide = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result_peptide == "alanylglycine", \
-            f"Expected alanylglycine, got: {result_peptide}"
+        assert result_peptide == "2-[(2S)-2-aminopropanamido]ethanoic acid", \
+            f"got: {result_peptide}"
 
     def test_benchmark_peptide_with_l_cysteine_1(self):
         """Benchmark peptide 1: Lys-Thr-Cys, C-terminal L-cysteine (L omitted)."""
@@ -381,15 +395,18 @@ class TestStereoHonestyUndefinedResidues:
 
     def test_stereo_unspecified_glycine_only_dipeptide_still_names(self):
         """Gly-Gly has NO stereocentre at all (both residues achiral) -- the
-        stereo-honesty guard must not affect it; must still name normally."""
+        stereo-honesty guard must not affect it; must still name normally.
+        v38: names via the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT
+        verified), not the retained peptide name."""
         result = name_compound("NCC(=O)NCC(=O)O")
-        assert result == "glycylglycine"
+        assert result == "(2-aminoacetamido)acetic acid"
 
     def test_defined_stereo_dipeptide_unchanged(self):
         """CRITICAL guard: a normal DEFINED-stereo peptide (L-Ala-Gly) must
-        be completely unaffected by the stereo-honesty check."""
+        be completely unaffected by the stereo-honesty check. v38: names via
+        the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT verified)."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "alanylglycine"
+        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
 
     def test_defined_stereo_tripeptide_unchanged(self):
         """CRITICAL guard: Gly-L-Ala-L-Leu, all-defined, unaffected."""

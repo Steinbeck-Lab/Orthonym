@@ -1368,10 +1368,88 @@ def _handle_natural_product(mol, smiles, canonical_smiles, features=None, *,
     return name_natural_product(mol)
 
 
+# Re-entrancy flag for _handle_peptide's substitutive sub-namer (see its body).
+_PEPTIDE_SUBST_ACTIVE = False
+
+# Size ceiling for the substitutive sub-namer attempt. Above it, the general
+# path cannot build a clean substitutive PIN anyway (it drops backbone atoms on
+# big/branched peptides -> RT-fails -> retained fallback), so a full general pass
+# on, say, a 30-residue lysinamide (~240 heavy atoms) is pure wasted cost (~50 s).
+# Small di/tri-peptides (the ones that DO build a substitutive PIN) are well
+# under this. Skip the attempt above it and go straight to the retained name.
+# Set at 120 to skip ONLY the pathological giants (a 30-residue ~240-HA peptide)
+# while leaving every realistic di–deca-peptide's behaviour byte-identical (the
+# sub-namer run also warms stereo perception the retained fallback then reuses,
+# so a too-low cap would silently drop stereo descriptors from a mid-size
+# peptide's retained name).
+_PEPTIDE_SUBST_MAX_HEAVY = 120
+
+
+def _rt_full_match(name: str, mol) -> bool:
+    """True iff ``name`` OPSIN-parses to the SAME full InChIKey as ``mol``.
+    Fail-closed: any parse/RDKit error returns False. Used by _handle_peptide to
+    reject a substitutive sub-name that silently dropped a backbone atom before
+    trusting it over the retained peptide name (0-wrong)."""
+    try:
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        from rdkit import Chem
+        osmi = opsin_parse(name)
+        if not osmi:
+            return False
+        om = Chem.MolFromSmiles(osmi)
+        if om is None:
+            return False
+        return Chem.MolToInchiKey(om) == Chem.MolToInchiKey(mol)
+    except Exception:
+        return False
+
+
 def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
                     style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:1080-1083."""
+    """v38: peptide / N-acyl-amino-acid PINs are the SUBSTITUTIVE form.
+
+    Chapter P-10 identifies NO preferred IUPAC names (P-100, BlueBookV2.md:2052:
+    "Preferred IUPAC names (PINs) for the natural products in Chapter P-10 are
+    not identified"), and P-34.1's exhaustive PIN functional-parent lists exclude
+    every amino acid -- so the retained acyl-prefix peptide name (glycylglycine)
+    and retained amino-acid parents are NON-PIN. PREFER the general substitutive
+    amido PIN by re-naming with the PEPTIDE class excluded (which routes the
+    molecule through the general/composer path -> '(pyrrolidine-2-carboxamido)
+    acetic acid', '(2S)-2-[(2S)-2-aminopropanamido]propanoic acid', ...). The
+    sub-name is RT-gated AND independently full-InChIKey re-verified (the
+    general/composer path can SILENTLY DROP a backbone substituent -- DROP-09 --
+    and ship a partial name the PIN-path gate misses, the E1-scoping hole; e.g.
+    Arg-Gly -> 'aminoguanidinoacetic acid', a DIFFERENT molecule). A residue the
+    general path cannot yet build a clean PIN for (branched/exotic side chains --
+    leucyl, arginyl, ...) fails that check and falls back to the retained peptide
+    name, so the peptide never silently abstains (breadth-preserving). 0-wrong is
+    unaffected."""
     from orthonym.rules.peptides import name_peptide
+    from orthonym.errors import is_failure_name
+    # Re-entrancy guard: the substitutive sub-namer routes the whole molecule
+    # through the general/composer path, whose fragment-level naming can re-reach
+    # this handler on a sub-fragment that is itself a small peptide. Without this
+    # guard each level would spawn a fresh sub-namer -> exponential blow-up/hang.
+    # Only the TOP-level peptide gets the substitutive attempt.
+    global _PEPTIDE_SUBST_ACTIVE
+    _in = canonical_smiles or smiles
+    if (_in and not _PEPTIDE_SUBST_ACTIVE
+            and mol.GetNumHeavyAtoms() <= _PEPTIDE_SUBST_MAX_HEAVY):
+        try:
+            from orthonym.namer import Orthonym
+            _PEPTIDE_SUBST_ACTIVE = True
+            try:
+                _subst = Orthonym(
+                    style=style,
+                    _seed_excluded_dispatch_classes=frozenset({StoutClass.PEPTIDE}),
+                ).name(_in)
+            finally:
+                _PEPTIDE_SUBST_ACTIVE = False
+            if (_subst and not is_failure_name(_subst)
+                    and _rt_full_match(_subst, mol)):
+                return _subst
+        except Exception:
+            _PEPTIDE_SUBST_ACTIVE = False
     return name_peptide(mol)
 
 

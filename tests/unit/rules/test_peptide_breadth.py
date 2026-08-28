@@ -131,12 +131,14 @@ class TestLeverANAcylCap:
 
     def test_simple_fatty_acyl_dipeptide(self):
         """A plainer synthetic case: dodecanoyl (lauroyl) cap on Gly-Gly.
-        Hand-RT-verified: 'dodecanoylglycylglycine'. Was ABSTAIN before this
-        change ('unknown organic compound')."""
+        v38 (V38-PEPTIDE-PIN-VERDICT.md): the peptide PIN is the SUBSTITUTIVE
+        form, so this reroutes off the Lever-A retained name
+        'dodecanoylglycylglycine' to '(2-dodecanamidoacetamido)acetic acid'.
+        Full-InChIKey round-trip verified."""
         smi = "CCCCCCCCCCCC(=O)NCC(=O)NCC(=O)O"
         result = name_compound(smi)
         assert not is_failure_name(result), result
-        assert result == "dodecanoylglycylglycine", result
+        assert result == "(2-dodecanamidoacetamido)acetic acid", result
         assert _full_rt(smi, result), result
 
     def test_single_residue_n_acetylglycine_unchanged(self):
@@ -231,10 +233,13 @@ class TestRegressionUnaffected:
     path) and the pre-existing isopeptide fail-closed guards are unchanged."""
 
     def test_glycylglycine_unchanged(self):
-        assert name_compound("NCC(=O)NCC(=O)O") == "glycylglycine"
+        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_alanylglycine_unchanged(self):
-        assert name_compound("N[C@@H](C)C(=O)NCC(=O)O") == "alanylglycine"
+        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        assert (name_compound("N[C@@H](C)C(=O)NCC(=O)O")
+                == "2-[(2S)-2-aminopropanamido]ethanoic acid")
 
     def test_glutathione_achiral_still_declines_or_roundtrips(self):
         """The ACHIRAL-drawn glutathione test molecule (no stereo defined

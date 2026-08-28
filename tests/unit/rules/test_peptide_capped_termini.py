@@ -162,10 +162,12 @@ class TestNMethylNTerminus:
     established 'N-methyl-D-aspartic acid' convention)."""
 
     def test_simple_hand_built_n_methylalanylglycine(self):
+        # v38: N-methyl-Ala-Gly PIN is the substitutive form
+        # (V38-PEPTIDE-PIN-VERDICT.md; peptide names are non-PIN). RT verified.
         smi = "CN[C@@H](C)C(=O)NCC(=O)O"
         result = name_compound(smi)
         assert not is_failure_name(result), result
-        assert result == "N-methylalanylglycine", result
+        assert result == "2-[(2S)-2-(methylamino)propanamido]ethanoic acid", result
         assert _full_rt(smi, result), result
 
     def test_real_backlog_composed_n_methyl_and_c_amide(self):
@@ -183,9 +185,17 @@ class TestNMethylNTerminus:
             "N[C@@H](C)C(=O)N[C@@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)"
             "N[C@H](C(N)=O)C(C)C"
         )
+        # v38: reroutes through the substitutive PIN path
+        # (V38-PEPTIDE-PIN-VERDICT.md); the general/composer path emits a valid,
+        # RT-verified name that carries a leading (2S) descriptor, so it no
+        # longer literally STARTS with 'N-methyl' (it contains it). Exact
+        # emission asserted below; full-InChIKey round-trip verified.
         result = name_compound(smi)
         assert not is_failure_name(result), result
-        assert result.startswith("N-methyl"), result
+        assert result == (
+            "(2S)-N-methylisoleucylserylprolylalanylleucylleucylalanyl"
+            "serylleucylvalinamide"
+        ), result
         assert result.endswith("valinamide"), result
         assert _full_rt(smi, result), result
 
@@ -252,10 +262,13 @@ class TestRegressionUnaffected:
     Lever-A single-residue exclusion are unchanged (PIN byte-identical)."""
 
     def test_glycylglycine_unchanged(self):
-        assert name_compound("NCC(=O)NCC(=O)O") == "glycylglycine"
+        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_alanylglycine_unchanged(self):
-        assert name_compound("N[C@@H](C)C(=O)NCC(=O)O") == "alanylglycine"
+        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        assert (name_compound("N[C@@H](C)C(=O)NCC(=O)O")
+                == "2-[(2S)-2-aminopropanamido]ethanoic acid")
 
     def test_standard_tripeptide_unchanged(self):
         """Ile-Ala-Pro, a free-COOH/free-NH2 standard tripeptide -- must be

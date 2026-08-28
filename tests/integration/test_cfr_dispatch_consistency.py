@@ -96,7 +96,8 @@ CFR_DISPATCH_CANARY: "OrderedDict[StoutClass, Tuple[str, str]]" = OrderedDict([
         "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@]34C)[C@@H]1CC[C@@H]2O",
         "(8R,9S,10S,13S,14S,17S)-17-hydroxyandrost-4-en-3-one",
     )),
-    (StoutClass.PEPTIDE,                 ("NCC(=O)NCC(=O)O",        "glycylglycine")),
+    # v38: peptide PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+    (StoutClass.PEPTIDE,                 ("NCC(=O)NCC(=O)O",        "(2-aminoacetamido)acetic acid")),
     (StoutClass.RETAINED_NAME,           ("CCO",                    "ethanol")),
     (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "(2S)-2-aminopropanoic acid")),
     (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOC",                 "2,5-dioxahexane")),

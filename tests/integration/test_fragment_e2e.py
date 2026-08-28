@@ -27,31 +27,32 @@ class TestPeptideE2E:
 
     @pytest.mark.integration
     def test_glycylglycine(self):
-        """Gly-Gly dipeptide -> 'glycylglycine'."""
+        """Gly-Gly dipeptide. v38: the peptide PIN is the SUBSTITUTIVE form
+        (V38-PEPTIDE-PIN-VERDICT.md; Chapter P-10 identifies no PINs, so the
+        retained peptide name is non-PIN). Full-InChIKey round-trip verified."""
         result = name_compound("NCC(=O)NCC(=O)O")
-        assert result == "glycylglycine"
+        assert result == "(2-aminoacetamido)acetic acid"
 
     @pytest.mark.integration
     def test_l_alanyl_l_alanine(self):
-        """L-Ala-L-Ala dipeptide -> 'alanylalanine'.
-
-        P-103.3.4 (BlueBookV2.md:54717): the stereodescriptor 'L' is NOT
-        indicated in peptide names for Table-10.4 residues, so both L-alanine
-        components drop their descriptor. (Only 'D' is cited.)"""
+        """L-Ala-L-Ala dipeptide. v38 substitutive PIN
+        (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O")
-        assert result == "alanylalanine"
+        assert result == "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"
 
     @pytest.mark.integration
     def test_glycyl_l_alanine(self):
-        """Gly-L-Ala dipeptide -> 'glycylalanine' (P-103.3.4: L omitted)."""
+        """Gly-L-Ala dipeptide. v38 substitutive PIN
+        (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)O")
-        assert result == "glycylalanine"
+        assert result == "(2S)-2-(2-aminoacetamido)propanoic acid"
 
     @pytest.mark.integration
     def test_l_alanylglycine(self):
-        """L-Ala-Gly dipeptide -> 'alanylglycine' (P-103.3.4: L omitted)."""
+        """L-Ala-Gly dipeptide. v38 substitutive PIN
+        (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "alanylglycine"
+        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
 
     @pytest.mark.integration
     def test_tripeptide_gly_ala_leu(self):

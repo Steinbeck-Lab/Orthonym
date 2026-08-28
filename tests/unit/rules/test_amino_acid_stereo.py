@@ -117,8 +117,9 @@ class TestWSD07RetainedStereo:
 
     def test_peptide_not_regressed(self):
         # get_amino_acid_name is shared by name_peptide; the default (no-descriptor)
-        # path must keep peptides intact.
-        assert name_compound("NCC(=O)NCC(=O)O") == "glycylglycine"
+        # path must keep peptides intact. v38: the peptide PIN is now the
+        # SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_nonstandard_aa_keeps_systematic(self):
         # A non-standard AA (D-2-aminobutanoic acid) keeps the systematic name —

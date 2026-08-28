@@ -153,7 +153,8 @@ class TestRegressionUnaffected:
     PIN byte-identical -- this producer is tried LAST, only on decline."""
 
     def test_glycylglycine_unchanged(self):
-        assert name_compound("NCC(=O)NCC(=O)O") == "glycylglycine"
+        # v38: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+        assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_standard_tripeptide_unchanged(self):
         smi = "CC[C@H](C)[C@H](N)C(=O)N[C@@H](C)C(=O)N1CCC[C@@H]1C(=O)O"

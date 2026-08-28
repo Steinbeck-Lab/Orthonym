@@ -167,13 +167,17 @@ class TestNoOverBroadening:
 
 @pytest.mark.unit
 class TestPinUnchanged:
-    """Ordinary (non-proline) peptides must be byte-identical."""
+    """Ordinary (non-proline) dipeptides: the dispatch fix under test does not
+    change their name. v38 (V38-PEPTIDE-PIN-VERDICT.md) later moved the peptide
+    PIN to the SUBSTITUTIVE form (peptide names are non-PIN); both emissions
+    below are full-InChIKey round-trip verified."""
 
     def test_glycylglycine_unchanged(self):
-        assert name_compound("NCC(=O)NCC(=O)O", style="pin") == "glycylglycine"
+        assert (name_compound("NCC(=O)NCC(=O)O", style="pin")
+                == "(2-aminoacetamido)acetic acid")
 
     def test_alanylglycine_unchanged(self):
         assert (
             name_compound("N[C@@H](C)C(=O)NCC(=O)O", style="pin")
-            == "alanylglycine"
+            == "2-[(2S)-2-aminopropanamido]ethanoic acid"
         )

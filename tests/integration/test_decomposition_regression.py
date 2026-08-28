@@ -154,8 +154,9 @@ AMIDE_CANARIES = [
     # retained name and uses the systematic form (v33 Phase-1 stereo honesty).
     ("NCC(=O)O", "glycine"),
     ("CC(N)C(=O)O", "2-aminopropanoic acid"),
-    # Peptides (contain amide bonds, handled by peptide route)
-    ("NCC(=O)NCC(=O)O", "glycylglycine"),
+    # Peptides (contain amide bonds, handled by peptide route). v38: the peptide
+    # PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
+    ("NCC(=O)NCC(=O)O", "(2-aminoacetamido)acetic acid"),
 ]
 
 
