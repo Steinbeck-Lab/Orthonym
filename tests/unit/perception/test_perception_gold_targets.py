@@ -1,9 +1,9 @@
-"""Phase 169.7 BBR-PERC — RED gold-target tripwires (DEF-5).
+"""Phase 169.7 functional-group perception fix — RED gold-target tripwires (DEF-5).
 
 These are the executable form of CONTEXT D-15: "flip exactly these gold target
 rows to MATCH". Each is the 3 DEF-5 perception targets from the PIN-strict gold
 oracle (``). They are marked
-``xfail(strict=True)`` so that the moment the BBR-PERC fix lands (Plan 02 for
+``xfail(strict=True)`` so that the moment the functional-group perception fix lands (Plan 02 for
 hydroxylamine/selenide, Plan 03 for the azide chain-exclusion) the test XPASSES,
 which ``strict=True`` turns into a hard error — forcing the implementing plan to
 REMOVE the marker and leave a permanent green tripwire.
@@ -43,9 +43,9 @@ def test_azidomethane_not_diazabutane(namer):
     assert namer.name("CN=[N+]=[N-]") == "azidomethane"
 
 
-@pytest.mark.unit  # Phase 171 BBR-ASM FIXED the enclosing parens (selanyl now classed complex)
+@pytest.mark.unit  # Phase 171 assembly/parenthesisation fix FIXED the enclosing parens (selanyl now classed complex)
 def test_methyl_propyl_selenide(namer):
     # DEF-5: selenide is the Se analogue of an ether (P-63.6). 169.7 delivered the
-    # perception + (methylselanyl) naming + locant; Phase 171 BBR-ASM added the
+    # perception + (methylselanyl) naming + locant; Phase 171 assembly/parenthesisation fix added the
     # enclosing parens by adding selanyl/tellanyl to the complex-substituent suffixes.
     assert namer.name("CCC[Se]C") == "1-(methylselanyl)propane"

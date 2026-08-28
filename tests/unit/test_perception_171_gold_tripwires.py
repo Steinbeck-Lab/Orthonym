@@ -1,4 +1,4 @@
-"""Phase 171 BBR-PARENT/BBR-ASM/BBR-CHG — RED gold-target tripwires (DEF-1/3/4/8).
+"""Phase 171 parent-selection + assembly/parenthesisation + charged-species fixes — RED gold-target tripwires (DEF-1/3/4/8).
 
 The executable form of 171-CONTEXT D-15 / the PIN-strict gold oracle
 (``). Each target is marked
@@ -37,12 +37,12 @@ def namer():
 
 # --- DEF-1 — parent spine: ring senior to chain regardless of size (P-44.1.2.2), WS-1 ---
 
-@pytest.mark.unit  # WS-1 BBR-PARENT (171-03) FIXED: deleted the len(ring)>=chain_len size gate (P-44.1.2.2)
+@pytest.mark.unit  # WS-1 parent-selection fix (171-03) FIXED: deleted the len(ring)>=chain_len size gate (P-44.1.2.2)
 def test_def1_heptylbenzene(namer):
     assert namer.name("CCCCCCCc1ccccc1") == "heptylbenzene"
 
 
-@pytest.mark.unit  # WS-1 BBR-PARENT (171-03) FIXED: ring senior regardless of size (P-44.1.2.2)
+@pytest.mark.unit  # WS-1 parent-selection fix (171-03) FIXED: ring senior regardless of size (P-44.1.2.2)
 def test_def1_octylcyclohexane(namer):
     # Gold PIN corrected in 171: CCCCCCCCC1CCCCC1 has 8 non-ring carbons (octyl),
     # RT-verified to the exact input; the curated 'nonylcyclohexane' was off by one.
@@ -51,17 +51,17 @@ def test_def1_octylcyclohexane(namer):
 
 # --- DEF-4 — locant-1 elision uses molecule-wide count (P-14.3.4), WS-3 ---
 
-@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: molecule-wide locant-1 count + Rule 5 chain==2
+@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: molecule-wide locant-1 count + Rule 5 chain==2
 def test_def4_1_chloropentane(namer):
     assert namer.name("ClCCCCC") == "1-chloropentane"
 
 
-@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED
+@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED
 def test_def4_1_chloro_2_fluoropropane(namer):
     assert namer.name("ClCC(F)C") == "1-chloro-2-fluoropropane"
 
 
-@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED
+@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED
 def test_def4_1_chloro_2_fluoroethane(namer):
     assert namer.name("FCCCl") == "1-chloro-2-fluoroethane"
 
@@ -108,17 +108,17 @@ def test_def3_monosubstituted_ethane_sulfonate_still_elides(namer):
 
 # --- DEF-8 — assembly: bis()/enclosing marks + P-46 compound-substituent locants, WS-3 ---
 
-@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: one paren predicate + P-46 + amide locant
+@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: one paren predicate + P-46 + amide locant
 def test_def8_bis_chloroethyl_acetamide(namer):
     assert namer.name("O=C(CCl)N(CCCl)CCCl") == "2-chloro-N,N-bis(2-chloroethyl)acetamide"
 
 
-@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: P-46 attachment=locant-1 + enclosing parens
+@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: P-46 attachment=locant-1 + enclosing parens
 def test_def8_4_chlorobutylbenzene(namer):
     assert namer.name("ClCCCCc1ccccc1") == "(4-chlorobutyl)benzene"
 
 
-@pytest.mark.unit  # WS-3 BBR-ASM (171-02) FIXED: selanyl/tellanyl now complex -> enclosing parens
+@pytest.mark.unit  # WS-3 assembly/parenthesisation fix (171-02) FIXED: selanyl/tellanyl now complex -> enclosing parens
 def test_def8_methylselanyl_propane(namer):
     assert namer.name("CCC[Se]C") == "1-(methylselanyl)propane"
 
