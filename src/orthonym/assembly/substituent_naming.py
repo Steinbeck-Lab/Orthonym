@@ -7363,7 +7363,13 @@ def _compose_n_substituent_prefix(sub_prefixes: List[str]) -> str:
     for name in sorted(counts.keys()):
         count = counts[name]
         mult = get_multiplier_prefix(count, name)
-        if is_complex_substituent(name) and count > 1:
+        # Witness (2026-08-28, Task 3): a SINGLE complex N-substituent on an
+        # onium cation (e.g. propan-2-ylazaniumyl from CC(C)[NH2+]CC(=O)[O-])
+        # reached this bare else-branch because the guard required count > 1.
+        # P-16.3.3 requires the enclosing mark regardless of count; keep the
+        # bare "(name)" form here (not enclose_if_compound) so existing
+        # count>1 spellings (bis/tris(...)) are unchanged.
+        if is_complex_substituent(name):
             parts.append((name, f"{mult}({name})"))
         else:
             parts.append((name, f"{mult}{name}"))

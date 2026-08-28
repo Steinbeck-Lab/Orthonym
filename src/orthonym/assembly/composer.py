@@ -4408,14 +4408,14 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
         is_acyloxy = prefix_name in ester_prefix_groups
         if total_substituents == 1:
             # Single substituent on ring: no locant needed
-            prefix_parts.append(prefix_name)
+            prefix_parts.append(enclose_if_compound(prefix_name))
         elif count == 1:
             # One instance of this prefix: need locant
             locant = ring_atom_to_locant.get(attach_atoms_list[0], 1)
             if is_acyloxy:
                 prefix_parts.append(f"{locant}-({prefix_name})")
             else:
-                prefix_parts.append(f"{locant}-{prefix_name}")
+                prefix_parts.append(f"{locant}-{enclose_if_compound(prefix_name)}")
         else:
             # Multiple instances of same prefix: locants + multiplier
             locants = sorted(
@@ -4429,7 +4429,7 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
                 )
             else:
                 prefix_parts.append(
-                    f"{locant_str}-{multiplier}{prefix_name}"
+                    f"{locant_str}-{multiplier}{enclose_if_compound(prefix_name)}"
                 )
 
     # Sort alphabetically per IUPAC P-14.4
@@ -7563,17 +7563,17 @@ def _detect_fused_het_inner_subs(
         return ""
 
     # Build prefix string sorted by IUPAC alphabetization
-    from ..assembly.naming_utils import get_multiplier_prefix, is_complex_substituent
+    from ..assembly.naming_utils import get_multiplier_prefix, is_complex_substituent, enclose_if_compound
     prefix_parts = []
     for name in sorted(sub_groups.keys(), key=alpha_sort_key):
         locs = sorted(sub_groups[name], key=lambda x: (int(x) if str(x).isdigit() else 999, str(x)))
         count = len(locs)
         loc_str = ','.join(str(l) for l in locs)
         if count == 1:
-            prefix_parts.append(f'{loc_str}-{name}')
+            prefix_parts.append(f'{loc_str}-{enclose_if_compound(name)}')
         else:
             mult = get_multiplier_prefix(count, name)
-            prefix_parts.append(f'{loc_str}-{mult}{name}')
+            prefix_parts.append(f'{loc_str}-{mult}{enclose_if_compound(name)}')
 
     return '-'.join(prefix_parts) + '-' if prefix_parts else ""
 
