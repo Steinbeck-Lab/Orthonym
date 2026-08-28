@@ -2841,7 +2841,7 @@ def get_heterocycle_substituents(
     from ..perception.rings import get_containing_ring_system
     from .seniority import get_prefix, get_suffix
 
-    # WS-4 / BBR-RSFX (DEF-6): when a senior characteristic group sits on the ring,
+    # WS-4 / ring-suffix fix (DEF-6): when a senior characteristic group sits on the ring,
     # express it as a SUFFIX (P-33), not a detachable prefix. We recognise the
     # principal group GENERICALLY off the seniority tables: a no-carbon substituent
     # whose prefix form equals get_prefix(principal_group) AND whose class has a ring
@@ -3155,7 +3155,7 @@ def get_heterocycle_substituents(
                 'is_ring': is_ring,
                 'ring_name': ring_name,
             }
-            # WS-4 / BBR-RSFX (DEF-6): is THIS no-carbon group the principal group?
+            # WS-4 / ring-suffix fix (DEF-6): is THIS no-carbon group the principal group?
             # If its prefix form matches the principal group's prefix and that class
             # has a ring suffix, emit it as the suffix (-one/-ol/-amine/...) instead
             # of a prefix. The matched ring-suffix takes priority over carbon-suffix
@@ -3972,7 +3972,7 @@ def name_substituted_heterocycle(
     # Add suffix-type functional groups
     if suffix_fg:
         from .seniority import get_suffix as _get_ring_suffix
-        # WS-4 / BBR-RSFX: the PRINCIPAL group's ring suffix wins (it is, by
+        # WS-4 / ring-suffix fix: the PRINCIPAL group's ring suffix wins (it is, by
         # seniority, senior to any co-present carb* suffix). Otherwise fall back
         # to the fixed carb* priority list.
         pg_ring_suffix = _get_ring_suffix(principal_group, is_ring=True) if principal_group else None

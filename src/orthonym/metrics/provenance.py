@@ -16,7 +16,7 @@ from typing import Optional
 #                    and _validity_gate_jar_present())
 # i.e. from *jar presence*. That is not evidence that THIS name passed
 # anything: `namer._final_opsin_validity_gate` has ten `return name`
-# carve-outs that never reach `_self_consistency_decision`, plus a BBR-GATE
+# carve-outs that never reach `_self_consistency_decision`, plus a OPSIN-validity stereo carve-out
 # stereo branch that judges only the stereo-STRIPPED parse. Measured at
 # `a6cf6157` ( §2): three names
 # OPSIN cannot parse at all reported `gates_passed: ['SELF-01']`.
@@ -45,7 +45,7 @@ GATE_OUTCOME_SUPPRESSED = "suppressed"
 #: OPSIN parsed the FULL name and SELF-01 returned verdict "ok". The ONE
 #: state that may claim a bare SELF-01.
 GATE_OUTCOME_SELF01 = "self_consistency_verified"
-#: the BBR-GATE stereo carve-out: SELF-01 judged the stereo-STRIPPED parse, so
+#: the OPSIN-validity stereo carve-out stereo carve-out: SELF-01 judged the stereo-STRIPPED parse, so
 #: the CONSTITUTION is verified and the stereo layer is NOT.
 GATE_OUTCOME_SELF01_CONSTITUTION_ONLY = "self_consistency_constitution_only"
 #: SELF-01 ran and could not compare (fail-OPEN) — nothing was proven.

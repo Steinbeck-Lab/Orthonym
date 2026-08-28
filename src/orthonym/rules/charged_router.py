@@ -89,7 +89,7 @@ from ..perception.ions import get_ion_sites, _get_internal_charge_atoms
 # =============================================================================
 _MAX_CHARGED_ROUTE_HEAVY_ATOMS = 50
 
-# BBR-CHG-169.6-caveats (Phase 169.7): canonical SMILES of retained charged species
+# charged-species fix, 169.6 caveats (Phase 169.7): canonical SMILES of retained charged species
 # that LACK a valid systematic PIN — their neutralize->re-name chokepoint path yields
 # an OPSIN-unparseable form (the 169.6 'unknown'/wrong-retained regression). These use
 # their sanctioned retained name (P-72/P-73/P-74). NARROW by design: alkoxides and
@@ -1668,7 +1668,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     if mol.GetNumHeavyAtoms() > _MAX_CHARGED_ROUTE_HEAVY_ATOMS:
         return ''
 
-    # --- Step 2b (BBR-CHG-169.6-caveats, Phase 169.7): retained-name-first ONLY for
+    # --- Step 2b (charged-species fix, 169.6 caveats, Phase 169.7): retained-name-first ONLY for
     # the CATEGORY of retained charged species that LACK a valid systematic PIN — i.e.
     # whose neutralize -> re-name -> re-apply-suffix path produces an OPSIN-unparseable
     # systematic form that the SUB-03 gate then suppresses to 'unknown' (the documented

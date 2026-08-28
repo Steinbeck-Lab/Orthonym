@@ -922,7 +922,7 @@ def get_sulfanyl_prefix(
     each match (chalcogen, C1, C2).
 
     Lifted from rules/polyfunctional._get_sulfanyl_prefix verbatim with a NEW
-    None-guard at function entry per Phase 160.1 RESEARCH §4. BBR-PERC (169.7)
+    None-guard at function entry per Phase 160.1 RESEARCH §4. functional-group perception fix (169.7)
     added the ``suffix`` param (default "sulfanyl" → backward-compatible).
 
     Args:
@@ -1859,7 +1859,7 @@ def get_substituent_prefix_form(
         return get_sulfonyl_prefix(mol, atoms, principal_chain)
     if fg_name == "thioether":
         return get_sulfanyl_prefix(mol, atoms, principal_chain)
-    # BBR-PERC (169.7): Se/Te ether analogues → (alkyl)selanyl/tellanyl (P-63.6).
+    # functional-group perception fix (169.7): Se/Te ether analogues → (alkyl)selanyl/tellanyl (P-63.6).
     if fg_name == "selenoether":
         return get_sulfanyl_prefix(mol, atoms, principal_chain, suffix="selanyl")
     if fg_name == "telluroether":
@@ -1942,7 +1942,7 @@ _PREFIX_FORM_FG_NAMES = (
     "primary_amide", "secondary_amide", "tertiary_amide",
     "nitrile",
     "sulfoxide", "sulfone", "thioether",
-    "selenoether", "telluroether",  # BBR-PERC (169.7)
+    "selenoether", "telluroether",  # functional-group perception fix (169.7)
     "carbamate", "urea", "thiourea",
     "isocyanate", "isothiocyanate",
     "amidine",  # R8b (P-66.4.1.3.1): carbamimidoyl prefix

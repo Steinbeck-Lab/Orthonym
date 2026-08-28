@@ -170,7 +170,7 @@ SENIORITY_ORDER = [
     "stibonic_acid",
     "stibinic_acid",
     "boronic_acid",    # P-68.3 boron acid
-    # BBR-PERC (169.7): free inorganic oxoacids — P-67 functional parents. Ranked in
+    # functional-group perception fix (169.7): free inorganic oxoacids — P-67 functional parents. Ranked in
     # the acid tier so they win PCG when perceived; NAMING is P-67 (downstream). Listed
     # so get_principal_group recognizes them (no KeyError) and they are not silently dropped.
     "phosphoric_acid",
@@ -297,13 +297,13 @@ SENIORITY_ORDER = [
     "enol",
     "alcohol",         # PERC-05: generic catch-all, same seniority tier as other alcohols
     # Class 17 "Hydroxy compounds and chalcogen analogues" (alcohols/phenols/thiol/
-    # selenol/tellurol) — all senior to class 18 hydroperoxide. BBR-HYG/DEF-D-09 (169.7):
+    # selenol/tellurol) — all senior to class 18 hydroperoxide. name-hygiene fix/DEF-D-09 (169.7):
     # hydroperoxide MOVED below the chalcogen-ols (was incorrectly above thiol with a
     # factually-wrong "Class 19" comment). Verified BlueBookV2 P-41 Table 4.1 lines
     # ~18190-18191: "17 Hydroxy compounds and chalcogen analogues" then "18 Hydroperoxides".
     "thiol",
     "selenol",
-    "tellurol",        # BBR-PERC (169.7): Te analogue of -ol/-selenol (P-63.1.5)
+    "tellurol",        # functional-group perception fix (169.7): Te analogue of -ol/-selenol (P-63.1.5)
     "hydroperoxide",   # P-41 Table 4.1 class 18 (peroxol -OOH); junior to class-17 hydroxy/thiol
     # DD2 Fix C (Phase D): chalcogen hydroperoxol analogues (P-63.4.2 / P-33.2.2(3)),
     # same class-18 tier as hydroperoxide, in the P-63.7 chalcogen sub-order
@@ -312,7 +312,7 @@ SENIORITY_ORDER = [
     "os_thioperoxol",  # R-O-SH -> -OS-thioperoxol
     "dithioperoxol",   # R-S-SH -> dithioperoxol (suffix) / disulfanyl (prefix)
 
-    # Hydroxylamines (BBR-PERC, 169.7: P-68.3 class 21; ranked just above amines)
+    # Hydroxylamines (functional-group perception fix, 169.7: P-68.3 class 21; ranked just above amines)
     "hydroxylamine",
 
     # Amines
@@ -350,7 +350,7 @@ SENIORITY_ORDER = [
     "sulfoxide",
     "sulfone",
     "thioether",  # Also called sulfide
-    # BBR-PERC (169.7): Se/Te ether analogues, same tier as thioether (P-63.6)
+    # functional-group perception fix (169.7): Se/Te ether analogues, same tier as thioether (P-63.6)
     "selenoether",
     "telluroether",
 
@@ -365,7 +365,7 @@ SENIORITY_ORDER = [
     "primary_phosphine",
 ]
 
-# BBR-PERC/DEF-3 (Phase 169.7): groups present in SENIORITY_ORDER for ranking but
+# functional-group perception fix/DEF-3 (Phase 169.7): groups present in SENIORITY_ORDER for ranking but
 # which are ALWAYS detachable prefixes — never a principal (suffix) group (P-33).
 # get_principal_group skips these so a prefix-only-only molecule is named with the
 # group as a prefix (azidomethane) instead of dropping it. These mirror the
@@ -620,7 +620,7 @@ SUFFIX_FORMS = {
     "alcohol": ("ol", "ol"),  # PERC-05: generic catch-all suffix form
     "thiol": ("thiol", "thiol"),
     "selenol": ("selenol", "selenol"),
-    "tellurol": ("tellurol", "tellurol"),  # BBR-PERC (169.7): Te -ol analogue (P-63.1.5)
+    "tellurol": ("tellurol", "tellurol"),  # functional-group perception fix (169.7): Te -ol analogue (P-63.1.5)
     "hydroperoxide": ("peroxol", "peroxol"),
     # DD2 Fix C (Phase D, P-63.4.2 / P-33.2.2(3)): chalcogen peroxol analogues.
     # The italic chalcogen-pair descriptor ('SO'/'OS') is carried in the suffix
@@ -629,7 +629,7 @@ SUFFIX_FORMS = {
     "so_thioperoxol": ("SO-thioperoxol", "SO-thioperoxol"),
     "os_thioperoxol": ("OS-thioperoxol", "OS-thioperoxol"),
     "dithioperoxol": ("dithioperoxol", "dithioperoxol"),
-    # BBR-PERC (169.7): hydroxylamine + free oxoacids + Se/Te ethers are named via
+    # functional-group perception fix (169.7): hydroxylamine + free oxoacids + Se/Te ethers are named via
     # their handler / functional-parent (P-67/P-68.3) / functional-class (P-63.6) paths,
     # NOT as a chain suffix — None per the SUFFIX_FORMS contract (like thioether).
     "hydroxylamine": None,
@@ -768,7 +768,7 @@ PREFIX_FORMS = {
     "alcohol": "hydroxy",  # PERC-05: generic catch-all prefix form
     "thiol": "sulfanyl",
     "selenol": "selanyl",
-    "tellurol": "tellanyl",   # BBR-PERC (169.7): Te analogue of sulfanyl/selanyl (P-63.1.5)
+    "tellurol": "tellanyl",   # functional-group perception fix (169.7): Te analogue of sulfanyl/selanyl (P-63.1.5)
     "hydroperoxide": "hydroperoxy",
     # DD2 Fix C (Phase D): demoted-prefix forms of the chalcogen peroxol analogues
     # (P-63.4 / P-63.3.1). -S-OH -> hydroxysulfanyl; -O-SH -> sulfanyloxy;
@@ -776,7 +776,7 @@ PREFIX_FORMS = {
     "so_thioperoxol": "hydroxysulfanyl",
     "os_thioperoxol": "sulfanyloxy",
     "dithioperoxol": "disulfanyl",
-    # BBR-PERC (169.7): hydroxylamine + free oxoacids are functional parents
+    # functional-group perception fix (169.7): hydroxylamine + free oxoacids are functional parents
     # (P-67/P-68.3); not expressed as detachable prefixes (None, like thioether).
     "hydroxylamine": None,
     "phosphoric_acid": None,
@@ -878,7 +878,7 @@ PREFIX_FORMS = {
     # Ethers and thioethers
     "ether": None,  # Named by substitution: methoxy, ethoxy, etc.
     "thioether": None,  # IUPAC P-63.2: functional class naming (dialkyl sulfide)
-    # BBR-PERC (169.7): Se/Te ethers use the dynamic (alkyl)selanyl/tellanyl generator
+    # functional-group perception fix (169.7): Se/Te ethers use the dynamic (alkyl)selanyl/tellanyl generator
     # in substituent_prefix_forms.get_substituent_prefix_form (parallel to thioether).
     "selenoether": None,  # IUPAC P-63.6: (alkyl)selanyl substitutive prefix
     "telluroether": None,  # IUPAC P-63.6: (alkyl)tellanyl substitutive prefix
@@ -984,7 +984,7 @@ def get_principal_group(
     """
     for fg_name in SENIORITY_ORDER:
         if fg_name in functional_groups and functional_groups[fg_name]:
-            # BBR-PERC/DEF-3 (169.7): a principal characteristic group MUST be
+            # functional-group perception fix/DEF-3 (169.7): a principal characteristic group MUST be
             # suffix-capable (P-33). The pseudohalide / special prefix-only groups
             # (azido/azo/cyanate/thiocyanate/diazo/disulfide/hydrazine) are kept in
             # SENIORITY_ORDER for RANKING but can never be the principal group — they

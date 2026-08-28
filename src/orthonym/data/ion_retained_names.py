@@ -65,7 +65,7 @@ RETAINED_ANIONS = {
     # Alkynide anions
     '[C-]#C': 'ethynide',  # Terminal alkynide
 
-    # BBR-CHG-169.6-caveats (Phase 169.7): retained charged-species names recovered
+    # charged-species fix, 169.6 caveats (Phase 169.7): retained charged-species names recovered
     # from the 169.6 route_charged regression (neutralize-first produced OPSIN-
     # unparseable forms -> suppressed). All RT-verified; sanctioned by P-72/P-74.
     # HOO- : BB P-72.2.2.2.2 (line 41031) "The retained names hydroxide, for HO-,
@@ -168,7 +168,7 @@ RETAINED_CATIONS = {
     'C[OH+]C': 'dimethyloxonium',
 
     # Sulfonium cations
-    '[SH3+]': 'sulfonium',  # BBR-CHG-169.6-caveat: parent sulfonium (P-73.1.1.1 Table 7.3); RT-verified
+    '[SH3+]': 'sulfonium',  # charged-species fix, 169.6 caveat: parent sulfonium (P-73.1.1.1 Table 7.3); RT-verified
     'C[SH2+]': 'methylsulfonium',
     'C[SH+]C': 'dimethylsulfonium',
     'C[S+](C)C': 'trimethylsulfonium',

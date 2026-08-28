@@ -4467,7 +4467,7 @@ def _assemble_complete_bicyclo_name(mol, features):
     for r in ri.AtomRings():
         ring_atoms.update(r)
 
-    # WS-6 / BBR-RCON (DEF-7): identify the ring atoms bearing the principal
+    # WS-6 / ring-construction fix (DEF-7): identify the ring atoms bearing the principal
     # characteristic group so von Baeyer numbering gives the suffix the lowest
     # locant (P-14.4(c)). Same extraction as the cyclo/heterocycle paths: a ring C
     # whose FG-match heteroatom is exocyclic (the ketone carbonyl C, a C-OH, ...).
@@ -4639,7 +4639,7 @@ def _assemble_complete_bicyclo_name(mol, features):
     # stereo through inject_stereo_reanchored_rt_gated, which RT-gates the numbering
     # and OMITS a stereo layer OPSIN cannot verify (rather than shipping a
     # pseudoasymmetric von-Baeyer descriptor such as `(1r,5s)-` that does not
-    # round-trip — a residual 0-wrong leak: the namer's BBR-GATE stereo carve-out
+    # round-trip — a residual 0-wrong leak: the namer's OPSIN-validity stereo carve-out stereo carve-out
     # ships such a name whole because its CONSTITUTION parses). Byte-identical for
     # every currently-round-tripping stereo name: candidate A reuses the same
     # collect_stereodescriptors(mol, atom_to_locant) prefix this path already built
@@ -5071,7 +5071,7 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
 
     if substituents and atom_to_locant:
         # Generate substituted name with N-locants and C-locants.
-        # WS-4 / BBR-RSFX: pass the principal group so a senior FG on the ring is
+        # WS-4 / ring-suffix fix: pass the principal group so a senior FG on the ring is
         # emitted as a suffix (-one/-ol/-amine), not a detachable prefix.
         result = name_substituted_heterocycle(
             features.mol,
@@ -6022,7 +6022,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             if prefixes:
                 prefix_parts = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
-                    # P-14.3.4 (Phase 171 BBR-ASM, DEF-4): render the prefix LOCANT.
+                    # P-14.3.4 (Phase 171 assembly/parenthesisation fix, DEF-4): render the prefix LOCANT.
                     # _generate_prefixes is inconsistent — alkyl prefixes embed the
                     # locant in .text ('3-methyl') while FG prefixes keep it separate
                     # ('chloro', locants=(2,)). The old .text-only append silently
@@ -6244,7 +6244,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             if prefixes:
                 prefix_parts = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
-                    # P-14.3.4 (Phase 171 BBR-ASM, DEF-4): render the prefix LOCANT.
+                    # P-14.3.4 (Phase 171 assembly/parenthesisation fix, DEF-4): render the prefix LOCANT.
                     # _generate_prefixes is inconsistent — alkyl prefixes embed the
                     # locant in .text ('3-methyl') while FG prefixes keep it separate
                     # ('chloro', locants=(2,)). The old .text-only append silently
@@ -6790,7 +6790,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     other_prefixes = _generate_prefixes(features)
     c_prefix_parts = []
     for p in sorted(other_prefixes, key=lambda x: alpha_sort_key(x.text)):
-        # P-14.3.4 (Phase 171 BBR-ASM, DEF-4): _generate_prefixes is inconsistent —
+        # P-14.3.4 (Phase 171 assembly/parenthesisation fix, DEF-4): _generate_prefixes is inconsistent —
         # alkyl prefixes embed the locant in .text ('3-methyl') while FG prefixes
         # keep it separate ('hydroxy', locants=(2,)). Prepend .locants only when the
         # text lacks a leading digit (same shape as amide handler composer.py:3713).
@@ -8103,7 +8103,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # surfaces as unknown rather than crashing / dropping the ring.
         if base_name is None:
             # v25 P0 Task 0.1: an unnameable ring BRANCH is the root cause of
-            # the eventual abstention (the E2 recursive-namer census bucket).
+            # the eventual abstention (the recursive-substituent-namer census bucket).
             from ..metrics.abstention import AbstentionCode, record_abstention
             record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                               detail='ring_substituent_unnameable')
@@ -9852,7 +9852,7 @@ def _name_heteroatom_substituent(mol, sub_atoms: List[int], principal_chain: Lis
         return _name_c_attached_chain_substituent_fallback(
             mol, sub_atoms, sub_set, chain_set, attach_atom
         )
-    # BBR-PERC (169.7): Se/Te-attached substituent → (alkyl)selanyl/tellanyl (P-63.6).
+    # functional-group perception fix (169.7): Se/Te-attached substituent → (alkyl)selanyl/tellanyl (P-63.6).
     # Without this branch a -Se-R / -Te-R substituent falls through to the Tier-4
     # recursive namer, producing an OPSIN-unparseable "methaneselenolyl" form that the
     # validity gate then suppresses to "unknown". Reuses the chalcogen-agnostic prefix

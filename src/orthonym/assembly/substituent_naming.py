@@ -5173,7 +5173,8 @@ def _check_retained_substituent(
     # deliberately NOT returned: their PINs are the located/systematic forms
     # (propan-2-yl, butan-2-yl, 2-methylpropyl, 2,2-dimethylpropyl), built by
     # the general structure-derived producer `_located_acyclic_alkyl_name`
-    # (Step 2d / Tier 1.8, shipped in E2/SEN-04) once this returns None.
+    # (Step 2d / Tier 1.8, shipped in the recursive-substituent-namer bucket /
+    # SEN-04) once this returns None.
     # Wave2 T5b hardening: the fragment must be EXACTLY the C4H9 skeleton —
     # a heteroatom-bearing fragment (e.g. -C(CH3)2CH2OH) satisfied the old
     # carbon-count test and was silently flattened to 'tert-butyl', DROPPING
@@ -6344,7 +6345,7 @@ def name_substituent_fragment(
     if retained:
         return _add_substituent_stereo(mol, sub_atoms, retained, attach_idx=attach_idx)
 
-    # Step 1b (BBR-PERC, 169.7; widened v33 Phase 6 E2a to include plain 'S'):
+    # Step 1b (functional-group perception fix, 169.7; widened v33 Phase 6 E2a to include plain 'S'):
     # chalcogen-ether substituent -S-R / -Se-R / -Te-R → (alkyl)sulfanyl /
     # (alkyl)selanyl / (alkyl)tellanyl (P-63.2.5 / P-63.6). Without this,
     # Step 4's recursive path names it as the parent hydride "methanethiol" /
@@ -6774,7 +6775,7 @@ def name_substituent_fragment(
     if unsat_oxo is not None:
         return _add_substituent_stereo(mol, sub_atoms, unsat_oxo, attach_idx=attach_idx)
 
-    # Step 2c (Phase 171 BBR-ASM, DEF-8 / P-46): saturated linear chain with halogen
+    # Step 2c (Phase 171 assembly/parenthesisation fix, DEF-8 / P-46): saturated linear chain with halogen
     # substituents, numbered from the attachment point. MUST precede the recursive
     # path, which renames the extracted fragment as a free molecule and loses the
     # attachment constraint ('CCCCCl' -> '1-chlorobutane' -> 'chlorobutyl', no locant).

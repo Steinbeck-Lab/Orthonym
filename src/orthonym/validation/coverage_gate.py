@@ -7,7 +7,7 @@ Root-cause of the per-lane drift Fable named
 ``assembly/t4_coverage.py`` ran E1 + ``verify_spine`` (escalated), while the
 inline G1 lane (``namer.py:3900``) and the multifragment/recovery lane
 (``namer.py:3161``) ran E1 ONLY, with the ``_stereo_emit_decision`` cardinality
-check and the stereo-insensitive BBR-GATE downstream. A name whose bindings
+check and the stereo-insensitive OPSIN-validity stereo carve-out downstream. A name whose bindings
 partition the atoms correctly but silently re-fragment a ring (cyclohexane
 spelled as two disjoint propyl halves) passes E1 outright and was shippable via
 the two unwired lanes. This gate is the ONE place that answers "is this

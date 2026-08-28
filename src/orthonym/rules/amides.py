@@ -33,7 +33,7 @@ _POSITIONAL_LOCANT_RE = re.compile(r'(?:^|\b)\d')
 def _has_positional_locants(name: str) -> bool:
     """Whether an N-substituent needs enclosing marks (parentheses).
 
-    Phase 171 BBR-ASM (DEF-8 consolidation): this is no longer a divergent
+    Phase 171 assembly/parenthesisation fix (DEF-8 consolidation): this is no longer a divergent
     digit-only test. The audit (06 §3.1) found that the parenthesization decision
     here disagreed with the bis/tris multiplier decision (get_multiplier_prefix ->
     is_complex_substituent) for digit-less complex substituents like 'chloroethyl'
@@ -446,7 +446,7 @@ def format_n_substitution(substituents: List[Dict]) -> str:
     parts = []
     for name in sorted(groups.keys(), key=alpha_sort_key):
         count = groups[name]
-        # IUPAC P-16.3.5 / P-16.5.1.1 (Phase 171 BBR-ASM, DEF-8): a complex
+        # IUPAC P-16.3.5 / P-16.5.1.1 (Phase 171 assembly/parenthesisation fix, DEF-8): a complex
         # (substituted/compound) substituent is enclosed in parentheses whenever
         # cited — at count 1 AND when multiplied with bis/tris. The paren decision
         # MUST use the SAME predicate (is_complex_substituent) that

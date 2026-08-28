@@ -35,7 +35,7 @@ _BASIC_AMINE_N = Chem.MolFromSmarts(
     "!$([NX3][#7,#8]);!$([N+]);!$([n])]")
 
 
-# === VARIABLE-VALENCE METALS (BBR-CHG-169.6-caveat / D-13) ===
+# === VARIABLE-VALENCE METALS (charged-species fix, 169.6 caveat / D-13) ===
 # Metals that exhibit more than one common oxidation state and therefore carry a
 # Stock oxidation-state numeral in their salt cation word (IR-5.4.2.2 / P-65.6.2.1):
 # e.g. gold(I) chloride, iron(II/III). FIXED-valence metals (group 1/2, Al, Zn, Ag,

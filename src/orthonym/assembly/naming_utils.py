@@ -286,7 +286,7 @@ _ALKYL_ROOTS_FULL = (
 # Chalcogen compound-substituent suffixes that, fused to an alkyl root, form a
 # COMPLEX (compound) substituent requiring enclosing marks per IUPAC P-16.5.1.1 /
 # P-63.6 — '(methylsulfanyl)', '(methylselanyl)', '(methyltellanyl)'. Phase 171
-# BBR-ASM (DEF-8): the Se/Te analogues (selanyl/tellanyl + the oxidized
+# assembly/parenthesisation fix (DEF-8): the Se/Te analogues (selanyl/tellanyl + the oxidized
 # seleninyl/selenonyl/tellurinyl/telluronyl) were missing, so 'methylselanyl' was
 # wrongly classed simple -> '1-methylselanylpropane' instead of PIN
 # '1-(methylselanyl)propane'.
@@ -1315,7 +1315,7 @@ def is_complex_substituent(name: str) -> bool:
     # "*Parentheses (round brackets) ... are used to enclose multiplied components
     # that are: (a) simple substituent prefixes having locants*"; and
     # 'N-tert-butyl' is not a Blue Book example -- verified absent.)
-    # Phase 171 BBR-ASM: without this,
+    # Phase 171 assembly/parenthesisation fix: without this,
     # coupling the paren/bis decision to is_complex_substituent over-parenthesised
     # tert-butyl. The leading-digit case above still catches genuine compounds.
     # v29 P3: the strip is the SHARED primitive, not an inline copy.
@@ -2706,8 +2706,8 @@ def locant_sort_key(locant) -> Tuple[int, int, str]:
 def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     """Format a substituent with locants and multiplier prefix.
 
-    BBR-HYG(e) / DEF-8 inventory (Phase 169.7 — begin; consolidation lands in
-    BBR-ASM / Phase 171). This is the ONE correct substituent-prefix + needs-parens
+    name-hygiene fix, item (e) / DEF-8 inventory (Phase 169.7 — begin; consolidation lands in
+    assembly/parenthesisation fix / Phase 171). This is the ONE correct substituent-prefix + needs-parens
     reference (P-16.3.5 / P-16.3.3). Phase 171 consolidates the divergent
     needs-parens / enclosing-mark / prefix-assembly predicates onto THIS function;
     do NOT add a 4th. The divergent predicates as of 169.7:
@@ -2966,7 +2966,7 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
     text = _LOCANT_PREFIX_RE.sub('', text)
     text = _INDICATED_H_PREFIX_RE.sub('', text)
 
-    # P-14.5.2 (Phase 171 BBR-ASM, DEF-8): a COMPOUND substituent cited as a
+    # P-14.5.2 (Phase 171 assembly/parenthesisation fix, DEF-8): a COMPOUND substituent cited as a
     # fully-enclosed unit is alphabetized on the first letter of its COMPLETE
     # name — its INTERNAL multiplying prefix (di/tri…) is part of the name and
     # is NOT ignored ('(2,4-dimethylpentyl)' sorts at 'd', before 'ethyl';

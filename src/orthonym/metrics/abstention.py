@@ -58,7 +58,7 @@ class AbstentionCode(str, Enum):
     #: G0 UNSUPPORTED_RING_SYSTEM fail-closed refusal).
     NO_PARENT = "NO_PARENT"
     #: A substituent branch / fragment could not be named while the parent
-    #: could (the presumptive E2 recursive-namer bucket).
+    #: could (the presumptive recursive-substituent-namer bucket).
     BRANCH_UNNAMEABLE = "BRANCH_UNNAMEABLE"
     #: A fully generated candidate name was suppressed by a correctness
     #: gate (SELF-01 OPSIN validity, P10 structure-conservation, the

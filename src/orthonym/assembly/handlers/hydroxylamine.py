@@ -1,4 +1,4 @@
-"""BBR-PERC (Phase 169.7) hydroxylamine handler.
+"""functional-group perception fix (Phase 169.7) hydroxylamine handler.
 
 Names substituted hydroxylamines on the retained parent hydride ``hydroxylamine``
 (H2N-OH, P-68.3.1.1). Substituents on the nitrogen take the ``N-`` locant; those

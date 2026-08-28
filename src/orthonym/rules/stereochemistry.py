@@ -534,7 +534,7 @@ def _looks_like_peptide(name: str) -> bool:
         residues += 1
     return False
 
-# BBR-GATE (Phase 169.7): a LEADING stereo / relative-configuration descriptor-block
+# OPSIN-validity stereo carve-out (Phase 169.7): a LEADING stereo / relative-configuration descriptor-block
 # matcher for strip_stereo. Mirrors  (the
 # validation precedent). Matches a leading (...)- block whose contents are PURELY
 # stereo descriptors (digits, optional composite-locant letter, r/s/e/z/R/S/E/Z/*,
@@ -565,7 +565,7 @@ _STRIP_STEREO_NESTED_RE = re.compile(
 
 def strip_stereo(name: str) -> str:
     """Return *name* with leading stereo / relative-config descriptor blocks removed
-    (to a fixpoint) — the BBR-GATE "where does OPSIN fail" probe (CONTEXT D-05).
+    (to a fixpoint) — the OPSIN-validity stereo carve-out "where does OPSIN fail" probe (CONTEXT D-05).
 
     READ-ONLY: this is NOT a postprocessor on shipped names. The validity gate uses it
     only to test whether a name's CONSTITUTIONAL (stereo-stripped) form parses; the
@@ -926,7 +926,7 @@ def inject_stereo_reanchored_rt_gated(
     # v36 Wave E — 0-wrong hardening. Re-anchor FAILED (no OPSIN locant map, or
     # candidate B still does not full-round-trip): the stereo descriptor cannot be
     # placed on a numbering OPSIN reads back correctly. Returning candidate A here
-    # ships a name whose stereo layer OPSIN cannot verify — the BBR-GATE stereo
+    # ships a name whose stereo layer OPSIN cannot verify — the OPSIN-validity stereo carve-out stereo
     # carve-out (namer.py) then emits it whole because its CONSTITUTION parses,
     # i.e. a WRONG/unverifiable-stereo name reaches T1 (a residual 0-wrong leak).
     # Instead return the stereo-STRIPPED FLAT name: constitution-correct,

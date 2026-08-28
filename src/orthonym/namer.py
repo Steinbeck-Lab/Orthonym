@@ -1064,10 +1064,10 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     Constitution = InChIKey skeleton block (formula + connectivity + mobile-H;
     stereo- and charge-insensitive) PLUS net formal charge. On the stereo-strict
     primary path this ALSO fails a stereo CONFLICT (same amount of specified stereo,
-    different RegistrationHash canonical layer). ``ignore_stereo=True`` (the BBR-GATE
+    different RegistrationHash canonical layer). ``ignore_stereo=True`` (the OPSIN-validity
     stereo carve-out, which judges a stereo-STRIPPED OPSIN parse) compares constitution
     only — a stereo-strict compare there would suppress every stereo-bearing input by
-    construction (see the BBR-GATE block below)."""
+    construction (see the OPSIN-validity stereo carve-out block below)."""
     # Strongest identity signal first: an EQUAL FULL InChIKey (skeleton + stereo +
     # normalized proton layer) means the name denotes the SAME molecule as the input
     # by the headline round-trip metric — accept immediately. This is 0-wrong-safe
@@ -1180,7 +1180,7 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     primary path, stereo-CONFLICT) mismatch — never on a stereo-omission / tautomer
     difference, never when the comparison is inconclusive (fail-OPEN). In mode "warn"
     it logs + counts the would-suppression but ships the name unchanged; in mode "off"
-    it is a no-op. ``ignore_stereo=True`` is used by the BBR-GATE stereo carve-out,
+    it is a no-op. ``ignore_stereo=True`` is used by the OPSIN-validity stereo carve-out,
     which judges a stereo-STRIPPED parse and must stay stereo-insensitive."""
     from .metrics import provenance as _pv
     if _SC_MODE == "off" or not smiles:
@@ -1326,7 +1326,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if _validity_gate_status(name) == "unavailable":
         _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name  # transient -> fail-OPEN (never suppress)
-    # DD2 / BBR-GATE (Phase D): OPSIN's generation grammar does not recognise the
+    # DD2 / OPSIN-validity stereo carve-out (Phase D): OPSIN's generation grammar does not recognise the
     # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
     # '-dithioperoxol'), so it REJECTS these correct PINs (P-56.2 verbatim:
     # `CH3-S-OH -> methane-SO-thioperoxol (PIN)`). Like the stereo-grammar carve-out
@@ -1412,7 +1412,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if _HALOGEN_UIDE_PIN_RE.match(name):
         _record_gate_outcome(_pv.carveout_outcome("halogen_uide"), name)
         return name
-    # BBR-GATE / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
+    # OPSIN-validity stereo carve-out / DEF-9 (Phase 169.7): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
     # constitutional form parses — then OPSIN's narrower generation-side stereo
     # grammar must NOT gate Orthonym correctness (audit Dim-08 §C; the verbatim
@@ -6415,7 +6415,7 @@ class Orthonym:
                                 sub_positions.add(idx)
                                 break
 
-                    # WS-4 / BBR-RSFX (DEF-6): identify the ring atoms bearing the
+                    # WS-4 / ring-suffix fix (DEF-6): identify the ring atoms bearing the
                     # principal characteristic group so the suffix gets the lowest
                     # locant (P-14.4(c)), after the heteroatom. Same extraction as
                     # the cycloalkene branch: a ring C whose FG-match heteroatom is

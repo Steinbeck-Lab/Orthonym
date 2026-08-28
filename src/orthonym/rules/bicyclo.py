@@ -501,7 +501,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     """
     Generate IUPAC numbering for a bicyclo system.
 
-    ``suffix_ring_atoms`` (WS-6 / BBR-RCON): ring atoms that bear the principal
+    ``suffix_ring_atoms`` (WS-6 / ring-construction fix): ring atoms that bear the principal
     characteristic group (e.g. the ring carbon double-bonded to =O of a ketone, or
     the ring carbon bearing an exocyclic -OH). When given, the admissible numbering
     that gives those atoms the lowest locants (after heteroatoms) is chosen per
@@ -544,7 +544,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
 
     suffix_set = {i for i in (suffix_ring_atoms or set()) if i in ring_atoms}
 
-    # WS-6 / BBR-RCON (DEF-7): enumerate the ADMISSIBLE von Baeyer numberings
+    # WS-6 / ring-construction fix (DEF-7): enumerate the ADMISSIBLE von Baeyer numberings
     # (P-23.2.3 keeps the descriptor: bridgeheads at 1 and 1+longest, main bridges
     # before the secondary bridge) and pick the one with the lowest locants in
     # P-14.4 order: heteroatoms -> principal-group suffix -> ene/yne -> substituents.

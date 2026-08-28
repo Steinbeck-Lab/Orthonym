@@ -1005,7 +1005,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                                for nbr in features.mol.GetAtomWithIdx(_a).GetNeighbors()):
                             branch_attachment_atoms.add(_a)
 
-    # DEF-4 (P-14.3.4, Phase 171 BBR-ASM): the locant-1 omission decision must use
+    # DEF-4 (P-14.3.4, Phase 171 assembly/parenthesisation fix): the locant-1 omission decision must use
     # the MOLECULE-WIDE substituent count, not the per-FG-type count. Collect FG
     # prefix specs here, then emit them after the loop once the total is known
     # (composer.py:5044-5066 parity). Without this, a C1 substituent elides its
@@ -1278,7 +1278,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                 fg_name, len(matches),
             )
 
-    # DEF-4 (P-14.3.4, Phase 171 BBR-ASM): emit the collected FG prefixes using a
+    # DEF-4 (P-14.3.4, Phase 171 assembly/parenthesisation fix): emit the collected FG prefixes using a
     # MOLECULE-WIDE substituent count for the locant-1 omission decision. 'prefixes'
     # already holds the alkyl/ring substituents; count their attachment positions
     # plus the FG positions. The omission only fires for a genuinely single-

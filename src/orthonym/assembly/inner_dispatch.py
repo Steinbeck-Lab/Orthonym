@@ -1216,7 +1216,7 @@ _register_inner(
     side_effect_inventory=(),
 )
 
-# --- BBR-PERC (Phase 169.7): hydroxylamine handler. Parent hydride "hydroxylamine"
+# --- functional-group perception fix (Phase 169.7): hydroxylamine handler. Parent hydride "hydroxylamine"
 #     (P-68.3.1.1) with N-/O- substituent locants. Fires when the perceived
 #     hydroxylamine FG is the PCG (senior to amine in SENIORITY_ORDER) — otherwise
 #     the N,O are dropped and the molecule names as the bare chain (CCCNO -> propane).
