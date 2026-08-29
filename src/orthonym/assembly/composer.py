@@ -3199,7 +3199,37 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
 
     # Generate systematic name (detected_fgs hoisted above the orientation call,
     # which now needs it for the shared functional-class promotion guard).
-    return name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents, detected_fgs)
+    _bz_name = name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents, detected_fgs)
+
+    # ── M3 Task 2 (task-W2 extension): jar-independent whole-graph
+    # atom-coverage close, mirroring the heterocycle close at
+    # ``_assemble_heterocycle_name`` (composer.py:5105-5144, "task-W2
+    # Witness-A"). get_benzene_substituents (rules/benzene.py) can silently
+    # omit an exocyclic group it declines to name -- e.g. an N-substituent on
+    # a ring amide it cannot attach -- shipping a fragment-parent name
+    # (`3-(trifluoromethyl)benzamide` for a 17-heavy-atom
+    # N-carbamimidoylbenzamide input, jar-absent: measured
+    # ). Verify the emitted name
+    # accounts for EVERY heavy atom via the shared E1 partition primitive
+    # (`_ring_handler_parent_atom_indices` unions ring ∪ substituent atoms,
+    # the complete name-side accounting for this top-level benzene path).
+    # Decline (fail-closed) if any atom is unbound; skip (never void) when the
+    # coverage data itself is unpopulated -- an un-instrumented case must
+    # never be false-voided. Gated UNCONDITIONALLY (pure Python/RDKit;
+    # redundant-but-harmless with SELF-01 jar-present, load-bearing
+    # jar-absent).
+    if _bz_name is not None:
+        _bz_groups = _ring_handler_parent_atom_indices(features, 'benzene')
+        if _bz_groups is not None:
+            from ..validation.e1_certificate import verify_atom_coverage
+            _verdict = verify_atom_coverage(mol, _bz_name, [_bz_groups])
+            if not _verdict.ok:
+                logger.debug(
+                    "W2 benzene atom-coverage decline: name=%s reason=%s smiles=%s",
+                    _bz_name, _verdict.reason, getattr(features, 'canonical_smiles', '?'),
+                )
+                return None
+    return _bz_name
 
 
 def _assemble_polycyclic_name(features: Any, style: str) -> str:
