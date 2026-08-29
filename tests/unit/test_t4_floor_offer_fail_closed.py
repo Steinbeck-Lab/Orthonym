@@ -63,16 +63,21 @@ def test_wrong_molecule_stub_does_not_ship_fable_reproduction(monkeypatch):
     # CQ5 Task A (2026-08-29): this molecule is no longer a bare abstainer. The
     # best-effort RT-failure fall-through (`_try_besteffort_clean_general_fallthrough`)
     # now offers the general engine's whole-graph systematic candidate computed in
-    # a clean context, and for this input it ships
-    # `1-[(6S)-2,6-dimethyl-4-oxo-1-thiacyclohex-2-en-3-yl]ethan-1-one` from
-    # source=general_engine -- a name that OPSIN-round-trips to the input at the
-    # FULL InChIKey (incl. the 6S stereocentre), verified independently of the
-    # namer (RDKit InChIKey compare). So the honest outcome is now a CORRECT name,
-    # not silence -- but the FABLE 0-wrong invariant is unchanged and is what this
-    # test guards: the stubbed WRONG t4_floor offer must never win, and whatever
-    # DOES ship must round-trip. Encoding 0-wrong directly is strictly stronger
-    # than the old "must abstain" (which rested on the now-refuted premise that no
-    # verified candidate existed).
+    # a clean context, from source=general_engine -- a name that OPSIN-round-trips
+    # to the input at the FULL InChIKey (incl. the 6S stereocentre), verified
+    # independently of the namer (RDKit InChIKey compare). The EXACT spelling is
+    # not asserted (this test is name-agnostic) and it depends on parent selection
+    # in the recovery, which the `name_t4_complete` stub above perturbs: as this
+    # test runs (T4 stubbed) it ships
+    # `1-[(6S)-2,6-dimethyl-4-oxo-1-thiacyclohex-2-en-3-yl]ethan-1-one`, while
+    # PLAIN best-effort (no stub) ships the ring-parent form
+    # `(6S)-2,6-di(methan-1-yl)-4-oxo-3-(1-oxoethan-1-yl)-1-thiacyclohex-2-ene` --
+    # both verified full-InChIKey RT-correct 2026-08-29. So the honest outcome is
+    # now a CORRECT name, not silence -- but the FABLE 0-wrong invariant is
+    # unchanged and is what this test guards: the stubbed WRONG t4_floor offer must
+    # never win, and whatever DOES ship must round-trip. Encoding 0-wrong directly
+    # is strictly stronger than the old "must abstain" (which rested on the
+    # now-refuted premise that no verified candidate existed).
     if out is not None and not is_failure_name(out):
         from orthonym.validation.opsin_roundtrip import opsin_parse
         from rdkit import Chem
