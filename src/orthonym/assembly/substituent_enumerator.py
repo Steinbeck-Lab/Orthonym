@@ -2554,10 +2554,25 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                       if n.GetIdx() not in frag_atoms_set]
             _kind = {1: 'sulfinyl', 2: 'sulfonyl'}.get(len(_dbl_o))
             # Exactly: n double-bond oxygens (both in-fragment) + one in-fragment
-            # carbon subtree R + one bond leaving to a parent carbon, and NO other
+            # carbon subtree R + one bond leaving to a parent atom, and NO other
             # neighbour (so every S neighbour is accounted -> no silent atom drop).
+            #
+            # CQ1 Task B (B1, best-effort): the parent-side atom may be C (a
+            # sulfone) OR N (a ring-N sulfonamide, e.g. the N-sulfonyl of a
+            # diaza-spiro/-cycloalkane). The substituent prefix `{R}sulfonyl` /
+            # `{R}sulfinyl` (P-63.6) is the SAME regardless of the atom it attaches
+            # TO -- that atom is on the PARENT, not part of the substituent. Before
+            # this the N-parent case (`CCS(=O)(=O)N1CC2(CCNC2)C1`) failed the guard,
+            # fell to the skeletal-replacement generator, and emitted a
+            # constitution-WRONG `1-(1-oxo-2-oxa-1λ6-thiaeth-1-en-1-yl)ethyl` token
+            # (an extra in-chain oxa + one dropped =O) that the whole-graph RT gate
+            # then voided -> abstain. Allowing N converts the ring-N-sulfonyl class
+            # to `{R}sulfonyl`, which OPSIN round-trips. Still best-effort-gated
+            # (`allow_mancude`) so PIN is byte-identical, and SELF-01/RT backstops
+            # any shape whose additive R does not round-trip. O/other parent-side
+            # atoms stay fail-closed (sulfonate-ester ambiguity), unchanged.
             if (_kind is not None and len(_c_in) == 1 and len(_s_ext) == 1
-                    and mol.GetAtomWithIdx(_s_ext[0]).GetSymbol() == 'C'
+                    and mol.GetAtomWithIdx(_s_ext[0]).GetSymbol() in ('C', 'N')
                     and _oa.GetDegree() == len(_dbl_o) + 2):
                 _sulf = None
                 try:
