@@ -648,11 +648,31 @@ def _walk_ring_between_spiros(
     exit_spiro: int,
     already_visited: Set[int],
 ) -> List[int]:
-    """Walk through a middle ring from entry_spiro to exit_spiro."""
+    """Walk through a middle ring from entry_spiro to exit_spiro.
+
+    P-24.2.2 "Linear polyspiro alicyclic ring systems"
+    (``BlueBookV2/BlueBookV2.md:9977``): *"...proceeding consecutively, always
+    by the SHORTER path, to the other terminal ring through each spiro atom
+    and then back to the first spiro atom..."* -- the first middle-ring arc
+    (numbered right after the first spiro atom) must be the one with FEWER
+    linking atoms; the longer arc is only numbered later, on the way back
+    (the descriptor's 4th/last segment). ``_compute_spiro_segments`` (the
+    descriptor-string builder) already applies ``min(seg_a, seg_b)`` first --
+    this picker used to choose the OPPOSITE (more unvisited atoms = the
+    LONGER arc) first, so the numbering silently disagreed with its own
+    descriptor string whenever the two arcs differ in length.
+    Invisible for symmetric middle rings (both arcs equal, e.g. every
+    existing ``dispiro[a.b.c.b]``-shaped test/fixture) and for all-carbon
+    skeletons (swapping the two arcs is a graph automorphism, so the wrong
+    choice still names the same molecule) -- it only produces a WRONG name
+    once a heteroatom breaks that symmetry (confirmed: OPSIN round-trip
+    ``inchi_mismatch`` on ``C1C2(CCC2)C11CCO1`` and ``C1CC11CCC11CO1``,
+    fixed by this change; see ``tests/unit/rules/test_vonbaeyer_spiro.py``).
+    """
     path1, path2 = _find_two_paths(mol, ring, entry_spiro, exit_spiro)
     unvisited1 = sum(1 for a in path1 if a not in already_visited)
     unvisited2 = sum(1 for a in path2 if a not in already_visited)
-    return path1 if unvisited1 >= unvisited2 else path2
+    return path1 if unvisited1 <= unvisited2 else path2
 
 
 def _walk_unvisited_ring_atoms(

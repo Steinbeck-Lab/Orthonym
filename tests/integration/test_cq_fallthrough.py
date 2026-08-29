@@ -44,8 +44,16 @@ WITNESSES = [
     ("Oc1c(N=Nc2cccc(C(F)(F)F)c2)c2cc(F)cc(F)c2n1C1CSC1", None),
 ]
 
-# A QM9 dispiro whose name_general output carries a WRONG dispiro descriptor that
-# does NOT round-trip. It must STAY abstained (0-wrong; invariant 9).
+# A QM9 dispiro. At the time this Task-A test file was written, name_general's
+# output for it carried a WRONG dispiro descriptor (adjacent spiro atoms --
+# `rules/spiro.py::_walk_ring_between_spiros` picked the LONGER middle-ring arc
+# first, disagreeing with the descriptor string's own shorter-arc-first
+# convention) that did NOT round-trip, so it correctly stayed abstained
+# (0-wrong; invariant 9). Task F (CQ5/QM9 finding,
+# `.superpowers/sdd/CQ1-IMPL-PLAN/task-F-report.md`) fixed that root cause in
+# ``rules/spiro.py`` directly (P-24.2.2), so this molecule now NAMES correctly
+# at both tiers -- see ``test_dispiro_now_converts_after_taskF_descriptor_fix``
+# below, which supersedes the old "stays abstained" assertion.
 NEGATIVE_DISPIRO = "C1C2(CCC2)C11CCO1"
 
 # PIN gold controls (byte-identical current PIN output; must not shift).
@@ -107,13 +115,22 @@ def test_pin_gold_byte_identical(smiles, expected):
     assert Orthonym().name(smiles) == expected
 
 
-def test_negative_dispiro_stays_abstained():
-    """The general engine builds a WRONG dispiro descriptor for this QM9 cage
-    that does not round-trip; the RT gate must keep it abstained (invariant 9 —
-    verify what SHIPS, never ship a non-round-tripping name)."""
+def test_dispiro_now_converts_after_taskF_descriptor_fix():
+    """Task F fixed the ``rules/spiro.py`` root cause (P-24.2.2 shorter-arc-
+    first numbering), so this molecule -- formerly this file's "stays
+    abstained" negative witness -- now emits a real, OPSIN-RT-verified name at
+    BOTH best-effort and PIN tiers (a genuine PIN improvement: it previously
+    had no PIN output at all, so this is not a byte-identity regression)."""
     out = _besteffort().name(NEGATIVE_DISPIRO)
-    assert is_failure_name(out), (
-        f"shipped a non-round-tripping name {out!r} for the dispiro negative")
+    assert not is_failure_name(out), (
+        f"best-effort still abstains on the Task-F-fixed dispiro {NEGATIVE_DISPIRO!r}")
+    assert _rt_inchikey_match(out, NEGATIVE_DISPIRO), (
+        f"shipped name {out!r} does not OPSIN-round-trip to {NEGATIVE_DISPIRO!r}")
+
+    pin_out = Orthonym().name(NEGATIVE_DISPIRO)
+    assert not is_failure_name(pin_out), (
+        f"PIN tier still abstains on the Task-F-fixed dispiro {NEGATIVE_DISPIRO!r}")
+    assert _rt_inchikey_match(pin_out, NEGATIVE_DISPIRO)
 
 
 def test_determinism_two_smiles_orders():
