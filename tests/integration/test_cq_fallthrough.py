@@ -19,6 +19,7 @@ tiers are untouched (gated on ``_general_fallback_unverified``).
 """
 from rdkit import Chem
 import random
+from unittest.mock import patch
 
 import pytest
 
@@ -131,6 +132,41 @@ def test_dispiro_now_converts_after_taskF_descriptor_fix():
     assert not is_failure_name(pin_out), (
         f"PIN tier still abstains on the Task-F-fixed dispiro {NEGATIVE_DISPIRO!r}")
     assert _rt_inchikey_match(pin_out, NEGATIVE_DISPIRO)
+
+
+def test_negative_rt_mismatch_stays_abstained():
+    """v39 Task F round 2, smaller finding 1: this file's original negative
+    witness (a QM9 dispiro whose name_general output carried a WRONG
+    descriptor) was CONSUMED when Task F fixed that root cause -- the
+    molecule now correctly converts (see
+    ``test_dispiro_now_converts_after_taskF_descriptor_fix`` above), leaving
+    this file with NO regression coverage for invariant 9 ("a wrong name is
+    never shipped"). A search for a fresh, naturally-occurring RT-wrong
+    general-engine candidate (dispiro/trispiro/cage variants, several dozen
+    constructed + randomized-atom-order probes) found none currently live --
+    every candidate tried round-trips (0-wrong is, at present, measured
+    robust here). Rather than leave this regression UNTESTED (or invent a
+    fake "fix" for a bug that does not reproduce), this tests the gate
+    MECHANISM directly, the same way ``test_oligosaccharides_be_rt_gate.py``
+    already does in this tree: force ``Orthonym._rt_match`` (spy-confirmed
+    the actual gate this witness's fall-through consults -- 3 calls,
+    ``certify_general_result`` 5 calls, ``opsin_roundtrip_check`` 0 calls) to
+    report a mismatch for a real witness that would otherwise convert, and
+    assert the pipeline abstains rather than shipping it. This is immune to
+    going stale when some future patch fixes a specific bug (a real-molecule
+    -based test would silently stop testing anything), and proves the exact
+    mechanism this file's fall-through was built around never ships an
+    RT-failing candidate."""
+    be = _besteffort()
+    smi = WITNESSES[1][0]
+    assert not is_failure_name(be.name(smi)), (
+        "sanity: this witness must normally convert (so the mock below is "
+        "the only thing causing the abstain)")
+    with patch.object(Orthonym, "_rt_match", staticmethod(lambda *a, **kw: False)):
+        out = be.name(smi)
+    assert is_failure_name(out), (
+        f"shipped {out!r} for {smi!r} even though _rt_match reported no "
+        f"match -- invariant 9 violated")
 
 
 def test_determinism_two_smiles_orders():

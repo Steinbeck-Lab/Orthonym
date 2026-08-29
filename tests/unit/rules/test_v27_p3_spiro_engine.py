@@ -188,8 +188,17 @@ def _ring_frag_attach(mol):
 @pytest.mark.parametrize("smi,expected", [
     # hetero spiro substituent (was carbocyclic-only -> "substituent")
     ("C1OCCC12CCC(CC2)CC(=O)O", "2-oxaspiro[4.5]decan-8-yl"),
-    # polyspiro substituent
-    ("C1CCC12CCC1(CCC1)CC2CC(=O)O", "dispiro[3.2.3.2]dodecan-12-yl"),
+    # polyspiro substituent. v39 Task F round 2: this dispiro skeleton's two
+    # equal-length middle-ring arcs (both 2 carbons) are a genuine P-24.2.2
+    # numbering tie the descriptor/spiro-atom-locant rules do not resolve
+    # (same descriptor "dispiro[3.2.3.2]", same spiro-atom locants {4,7}
+    # either way) -- P-31.1.4.3.4 (lowest locant to the free valence) then
+    # picks locant 5 over the old code's arbitrary 12. Both denote the
+    # IDENTICAL molecule (confirmed: OPSIN-parsing "dispiro[3.2.3.2]dodecan-
+    # 5-yl"acetic acid and the -12-yl form give the same InChIKey,
+    # HCHGJBAWDHMYAZ-UHFFFAOYSA-N -- a real molecular symmetry, not a bug),
+    # so this is a PIN correction, not a behavior regression.
+    ("C1CCC12CCC1(CCC1)CC2CC(=O)O", "dispiro[3.2.3.2]dodecan-5-yl"),
 ])
 def test_universal_spiro_substituent(smi, expected):
     """Java-free unit test of the P3 spiro `-yl` producer (the fragment namer),

@@ -808,7 +808,8 @@ def analyze_spiro_universal(
         numbering = get_spiro_numbering(
             sub, center, suffix_ring_atoms=fv_sub)
     else:
-        numbering = _get_polyspiro_numbering(sub, spiro_sub)
+        numbering = _get_polyspiro_numbering(
+            sub, spiro_sub, suffix_ring_atoms=fv_sub)
     # numbering must cover exactly the (ring-only) submol atoms
     if not numbering or set(numbering.keys()) != set(range(sub.GetNumAtoms())):
         return None

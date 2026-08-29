@@ -776,10 +776,71 @@ def _build_polyspiro_numbering_sequence(
     return sequence
 
 
+def _dispiro_numbering_candidates(
+    mol, ring_chain: List[List[int]], spiro_chain: List[int],
+) -> List[Dict[int, int]]:
+    """Enumerate every P-24.2.2-legal numbering of a 3-ring (dispiro) chain.
+
+    P-24.2.2 fixes the numbering ONLY where the two options actually differ
+    (the smaller terminal ring first; the shorter middle-ring arc first). It
+    leaves three genuine free choices unresolved, each a real degree of
+    freedom the Blue Book does not break itself:
+      (1) which physical terminal ring is numbered first, when the two
+          terminal rings TIE in size;
+      (2) the traversal DIRECTION within each terminal ring (which of the
+          spiro atom's two ring-neighbours starts the count);
+      (3) which middle-ring arc is numbered first, when the two arcs TIE
+          in length.
+    Task F (v39) found that leaving these to raw RDKit ring/neighbour
+    iteration order (rather than enumerating them) made the heteroatom locant
+    depend on the input SMILES atom order -- a determinism-gate violation,
+    even though every resulting name still round-trips to the same molecule.
+    This enumerates every combination so the caller can apply P-24.2.4.1.1's
+    "low locants to heteroatoms" rule DETERMINISTICALLY (mirrors
+    ``get_spiro_numbering``, the monospiro sibling, which resolves the same
+    two kinds of freedom the same way)."""
+    term1, mid, term2 = ring_chain
+    s1, s2 = spiro_chain
+
+    orientations = [(term1, term2, s1, s2)]
+    if len(term1) == len(term2):
+        orientations.append((term2, term1, s2, s1))
+
+    candidates: List[Dict[int, int]] = []
+    for t1, t2, a1, a2 in orientations:
+        path_x, path_y = _find_two_paths(mol, mid, a1, a2)
+        int_x, int_y = path_x[1:-1], path_y[1:-1]
+        if len(int_x) < len(int_y):
+            mid_orders = [(int_x, int_y)]
+        elif len(int_y) < len(int_x):
+            mid_orders = [(int_y, int_x)]
+        else:
+            mid_orders = [(int_x, int_y), (int_y, int_x)]
+
+        t1_traversals = _spiro_ring_traversals(mol, t1, a1)
+        t2_traversals = _spiro_ring_traversals(mol, t2, a2)
+        for first_mid, second_mid in mid_orders:
+            for t1_seq in t1_traversals:
+                for t2_seq in t2_traversals:
+                    sequence = (list(t1_seq) + [a1] + list(first_mid) + [a2]
+                                + list(t2_seq) + list(second_mid))
+                    if len(sequence) == len(set(sequence)):
+                        candidates.append(
+                            {atom_idx: i + 1
+                             for i, atom_idx in enumerate(sequence)})
+    return candidates
+
+
 def _get_polyspiro_numbering(
-    mol, spiro_atoms: Set[int]
+    mol, spiro_atoms: Set[int], suffix_ring_atoms: Optional[Set[int]] = None,
 ) -> Optional[Dict[int, int]]:
-    """Generate IUPAC numbering for a polyspiro system."""
+    """Generate IUPAC numbering for a polyspiro system.
+
+    ``suffix_ring_atoms`` (Phase 4 SUBST-01 parity with ``get_spiro_numbering``,
+    the monospiro sibling): the free valence of a spiro SUBSTITUENT, P-31.1.4.3.4
+    -- ranked after heteroatoms in the lowest-locant tiebreak below, so a
+    polyspiro substituent's attachment point gets the lowest locant available
+    once the heteroatom placement (if any) is settled."""
     ri = mol.GetRingInfo()
     all_rings = [list(r) for r in ri.AtomRings()]
 
@@ -796,11 +857,40 @@ def _get_polyspiro_numbering(
     if ring_chain is None:
         return None
 
-    sequence = _build_polyspiro_numbering_sequence(mol, ring_chain, spiro_chain)
-    if not sequence:
-        return None
+    # v39 Task F round 2: choose DETERMINISTICALLY among every P-24.2.2-legal
+    # numbering (see _dispiro_numbering_candidates) by P-24.2.4.1.1 lowest
+    # heteroatom locants, then a canonical-rank tiebreak -- same selection
+    # shape as ``get_spiro_numbering``'s monospiro ``_key``. Falls back to the
+    # single-candidate sequential walk only if the candidate enumeration finds
+    # nothing (defensive; every dispiro chain _build_ring_chain accepts should
+    # enumerate at least the one candidate the old walk produced).
+    candidates = _dispiro_numbering_candidates(mol, ring_chain, spiro_chain)
+    if not candidates:
+        sequence = _build_polyspiro_numbering_sequence(
+            mol, ring_chain, spiro_chain)
+        if not sequence:
+            return None
+        return {atom_idx: i + 1 for i, atom_idx in enumerate(sequence)}
 
-    return {atom_idx: i + 1 for i, atom_idx in enumerate(sequence)}
+    canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    suffix_set = set(suffix_ring_atoms or ())
+
+    def _key(mapping: Dict[int, int]):
+        heteros = [(a, loc) for a, loc in mapping.items()
+                   if mol.GetAtomWithIdx(a).GetSymbol() != 'C']
+        het_locs = sorted(loc for _a, loc in heteros)
+        het_by_seniority = sorted(
+            (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc)
+            for a, loc in heteros)
+        # Phase 4 SUBST-01 parity: lowest locants to the free-valence/suffix
+        # atoms, ranked after heteroatoms (same order as get_spiro_numbering).
+        suffix_locs = sorted(loc for a, loc in mapping.items()
+                              if a in suffix_set)
+        seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
+        canon_seq = tuple(canon[a] for a in seq)
+        return (het_locs, het_by_seniority, suffix_locs, canon_seq)
+
+    return min(candidates, key=_key)
 
 
 def _spiro_ring_traversals(
