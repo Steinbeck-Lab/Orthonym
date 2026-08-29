@@ -1640,6 +1640,66 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 16,
         'iupac_locants': {0: 7, 1: 6, 2: '5a', 3: 5, 4: 4, 5: '3a', 6: 3, 7: 2, 8: 1, 9: '10a', 10: 10, 11: 9, 12: '8a', 13: 8, 14: '10c', 15: '10b'},
     },
+    # M6 Kind-C catalog expansion (2026-08-29): 2-ring fused cores measured
+    # ABSENT from this catalog (`fused_component_uncatalogued`, guard
+    # spiro.py:1468 / composer.py's plain ortho-fused branch), sized in
+    #  + M6-KINDB-CONFIRM.md. The routing
+    # to `match_fused_heterocycle_core` already exists and self-activates once
+    # these are cataloged. Each name below OPSIN-round-trips (constitution-only
+    # InChI match) to exactly this bare core before being added; the
+    # `iupac_locants` map is re-anchored FROM the OPSIN name via
+    # `validation.opsin_roundtrip.opsin_atom_locant_map` (name -> extendedsmi ->
+    # substructure isomorphism onto this canonical SMILES), never hand-derived.
+    #
+    # 9H-fluorene (bare parent; witness ring system from an N-triflyloxime
+    # substituent, e.g. O=S(=O)(ON=C(c1ccc2c(c1)Cc1ccccc1-2)C(F)(F)F)C(F)(F)F).
+    'c1ccc2c(c1)Cc1ccccc1-2': {
+        'name': '9H-fluorene',
+        'tautomer_locant': 9,
+        'ring_system': 'tricyclic',
+        'parent_atoms': 13,
+        'iupac_locants': {5: 1, 0: 2, 1: 3, 2: 4, 3: '4a', 12: '4b', 11: 5, 10: 6, 9: 7, 8: 8, 7: '8a', 6: 9, 4: '9a'},
+    },
+    # 3,4-dihydro-2H-1,4-benzoxazine (benzomorpholine parent; witness ring
+    # system from a spiro-decorated derivative, e.g.
+    # CN1CCC(n2cc(-c3ccc4c(c3)OCC3(...)N4)cn2)CC1). OPSIN also accepts the
+    # bracket form "3,4-dihydro-2H-benzo[b][1,4]oxazine" for the same
+    # structure; this catalog uses the classical-locant spelling to match
+    # the sibling entries '3,4-dihydro-2H-1-benzopyran' /
+    # '3,4-dihydro-2H-1-benzothiopyran' already in this table.
+    'c1ccc2c(c1)NCCO2': {
+        'name': '3,4-dihydro-2H-1,4-benzoxazine',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-6-saturated',
+        'parent_atoms': 10,
+        'iupac_locants': {9: 1, 8: 2, 7: 3, 6: 4, 4: '4a', 3: '8a', 2: 8, 1: 7, 0: 6, 5: 5},
+    },
+    # pyrazolo[1,5-a]pyrazine (bridgehead-N 5-6 fusion; witness ring system
+    # from Cn1ccc(-c2cn3nccc3c(...)n2)n1). Bridgehead N takes a plain
+    # peripheral locant (8) and the carbon fusion atom takes the lettered
+    # locant ('3a'), matching the indolizine / imidazo[1,2-a]pyridine
+    # convention already in this table.
+    'c1cn2nccc2cn1': {
+        'name': 'pyrazolo[1,5-a]pyrazine',
+        'tautomer_locant': None,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 9,
+        'iupac_locants': {3: 1, 4: 2, 5: 3, 6: '3a', 2: 8, 1: 7, 0: 6, 8: 5, 7: 4},
+    },
+    # 5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole (partially
+    # saturated 5-5 heteroaromatic fusion; witness ring system from
+    # [O-][NH+](O)c1ccc([C@@H]2Nn3c(nnc3-c3cccnc3)S2)cc1, a common
+    # 6-aryl-5,6-dihydrotriazolothiadiazole scaffold). OPSIN rejects the
+    # mirror-bracket "[1,3,4]thiadiazolo[2,3-b][1,2,4]triazole" spelling
+    # and the [3,2-b] fusion-locant variant names a DIFFERENT structure
+    # (verified non-match) -- only the [3,4-b] form round-trips to this core.
+    'c1nnc2n1NCS2': {
+        'name': '5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole',
+        'tautomer_locant': None,
+        'ring_system': 'triazolothiadiazole',
+        'parent_atoms': 8,
+        'iupac_locants': {2: 1, 1: 2, 0: 3, 4: 4, 3: '7a', 7: 7, 6: 6, 5: 5},
+    },
 }
 
 
