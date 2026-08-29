@@ -60,11 +60,27 @@ def test_wrong_molecule_stub_does_not_ship_fable_reproduction(monkeypatch):
     assert getattr(sel, "name", None) != WRONG
     assert getattr(sel, "source", None) != "t4_floor", (
         "the stubbed (wrong) t4_floor offer must not have won at all")
-    # This molecule has no other verified candidate (measured, both before and
-    # after this fix -- task-A-fixround1-findings.md): the honest outcome is a
-    # clean abstention, never a silently-shipped wrong molecule.
-    assert out is None or is_failure_name(out), (
-        f"expected an honest abstention, got {out!r}")
+    # CQ5 Task A (2026-08-29): this molecule is no longer a bare abstainer. The
+    # best-effort RT-failure fall-through (`_try_besteffort_clean_general_fallthrough`)
+    # now offers the general engine's whole-graph systematic candidate computed in
+    # a clean context, and for this input it ships
+    # `1-[(6S)-2,6-dimethyl-4-oxo-1-thiacyclohex-2-en-3-yl]ethan-1-one` from
+    # source=general_engine -- a name that OPSIN-round-trips to the input at the
+    # FULL InChIKey (incl. the 6S stereocentre), verified independently of the
+    # namer (RDKit InChIKey compare). So the honest outcome is now a CORRECT name,
+    # not silence -- but the FABLE 0-wrong invariant is unchanged and is what this
+    # test guards: the stubbed WRONG t4_floor offer must never win, and whatever
+    # DOES ship must round-trip. Encoding 0-wrong directly is strictly stronger
+    # than the old "must abstain" (which rested on the now-refuted premise that no
+    # verified candidate existed).
+    if out is not None and not is_failure_name(out):
+        from orthonym.validation.opsin_roundtrip import opsin_parse
+        from rdkit import Chem
+        osmi = opsin_parse(out)
+        assert osmi is not None, f"shipped name does not OPSIN-parse: {out!r}"
+        assert (Chem.MolToInchiKey(Chem.MolFromSmiles(osmi))
+                == Chem.MolToInchiKey(Chem.MolFromSmiles(NOT_RUN_ABSTAINER))), (
+            f"shipped a non-round-tripping (wrong-molecule) name: {out!r}")
 
 
 def test_verified_floor_offer_still_wins_when_never_gated(monkeypatch):

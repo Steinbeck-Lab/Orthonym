@@ -3367,6 +3367,30 @@ class Orthonym:
                 _np_sys = self._try_np_systematic_downgrade(smiles, result)
                 if _np_sys is not None:
                     result = _np_sys
+            # CQ5 Task A (offer-not-return, invariant 18): the committed primary
+            # was voided by the RT/validity gate and every rescue above still
+            # ships a failure. The general engine DID build a whole-graph
+            # systematic candidate that OPSIN round-trips, but it was never
+            # consulted: the late `_try_general_engine_recovery` at the top of
+            # this failure block re-ran the engine INSIDE this name() session,
+            # where the best-effort contextvars are set + session_depth is
+            # elevated, so its substituent recursion emits the SAME RT-failing
+            # form the primary did (measured: witnesses in
+            #  + task-A-report.md; the good name
+            # is produced only when the recursion runs in a clean, depth-0
+            # context). Re-invoke the SAME RT-gated recovery in that clean
+            # context and adopt its result IFF it is a real (RT-verified) name;
+            # else keep the abstain. 0-wrong holds by the recovery's own OPSIN
+            # round-trip gate (invariant 9 — a candidate that does not round-trip
+            # returns None here). Best-effort only (`_general_fallback_unverified`)
+            # and on the ship-a-failure path only, so no currently-shipping name
+            # can change and PIN/complete output is byte-identical.
+            if (is_top_level_naming() and is_failure_name(result)
+                    and self._general_fallback_unverified
+                    and not self._disable_opsin_validity_gate):
+                _ft = self._try_besteffort_clean_general_fallthrough(smiles)
+                if _ft is not None and not is_failure_name(_ft):
+                    result = _ft
             # HYG-02: post-failure limit (opt-in). If naming produced no real
             # name, map the failure to a named code. Keyed off an actual failure
             # so it can never fire on a successfully-named compound.
@@ -4122,6 +4146,70 @@ class Orthonym:
             logger.info(
                 "general engine late recovery error (kept abstention): %s", e)
         return None
+
+    def _try_besteffort_clean_general_fallthrough(
+            self, smiles: str) -> Optional[str]:
+        """CQ5 Task A: the RT-failure fall-through (best-effort tier only).
+
+        Re-invoke the RT-gated ``_try_general_engine_recovery`` in a CLEAN naming
+        context so the general engine reaches the RT-verifying systematic /
+        replacement-nomenclature candidate that the in-``name()`` recovery misses.
+
+        Two things break the in-``name()`` recovery for the converting witnesses
+        (spy-confirmed on all three, invariant 8 — ``
+        + ``task-A-report.md``):
+
+        * The best-effort contextvars (``best_effort_ctx`` etc.) are SET, so the
+          substituent recursion (which re-enters through ``name_compound`` and
+          reads them) uses the best-effort substituent path, which emits the SAME
+          RT-failing substituent form the primary did rather than the systematic
+          replacement-nomenclature form that round-trips.
+        * ``session_depth`` is already >= 1, so the substituent recursion consumes
+          ``MAX_NAMING_DEPTH`` from an elevated floor and a deep substituent hits
+          the cap prematurely, degrading to a worse name (exactly the reason the
+          T4 sub-branch already wraps its call in ``isolated_naming_session``).
+
+        Resetting the four propagation contextvars to their defaults and running
+        in a depth-0 isolated session reproduces the state a fresh top-level call
+        gets, under which ``name_general`` produces the RT-verifying candidate.
+        The recovery's OWN OPSIN round-trip gate still decides what ships, so a
+        candidate that does not round-trip returns ``None`` (0-wrong; invariant 9
+        — verify what SHIPS, not just that the bad path stopped). Never raises.
+
+        Gated by the caller on ``_general_fallback_unverified`` + the
+        ship-a-failure path, so PIN/complete output is byte-identical and no
+        currently-shipping name can change (offer-not-return; invariant 18).
+        """
+        if not self._general_fallback_unverified:
+            return None
+        from .assembly.fragment_naming import isolated_naming_session
+        from .metrics.provenance import (
+            general_fallback_ctx, best_effort_ctx,
+            allow_aromatic_general_ctx, full_coverage_ctx)
+        _toks = None
+        try:
+            _toks = (
+                general_fallback_ctx.set(False),
+                best_effort_ctx.set(False),
+                allow_aromatic_general_ctx.set(False),
+                full_coverage_ctx.set(False),
+            )
+            with isolated_naming_session():
+                return self._try_general_engine_recovery(smiles)
+        except Exception as e:  # fail-closed: keep the abstention
+            logger.info(
+                "best-effort clean fall-through error (kept abstention): %s", e)
+            return None
+        finally:
+            if _toks is not None:
+                for _var, _tok in zip(
+                        (general_fallback_ctx, best_effort_ctx,
+                         allow_aromatic_general_ctx, full_coverage_ctx),
+                        _toks):
+                    try:
+                        _var.reset(_tok)
+                    except Exception:
+                        pass
 
     def _try_demote_senior_group_rescue(self, smiles: str):
         """v30 tail #7: best-effort rescue that re-picks the principal group with
