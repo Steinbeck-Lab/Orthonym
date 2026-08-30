@@ -1280,7 +1280,11 @@ def _mixed_spiro_fused_leaf(
     """
     from ..rules.spiro import name_mixed_spiro_fused
     try:
-        res = name_mixed_spiro_fused(ctx.mol)
+        # allow_vonbaeyer_component: the FLOOR additionally degrades a
+        # spiro-of-bicyclic (the (c)-aliphatic bucket) to the P-24.5.1 separable
+        # ``spiro[bicyclo[...]-x,y'-<comp2>]`` covering name. PIN path is
+        # untouched (name_mixed_spiro_fused default keeps the flag off).
+        res = name_mixed_spiro_fused(ctx.mol, allow_vonbaeyer_component=True)
     except Exception:
         return None
     if res is None:

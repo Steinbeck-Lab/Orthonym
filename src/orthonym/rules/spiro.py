@@ -1494,7 +1494,7 @@ def get_rings_from_spiro_center(
 # ============================================================================
 
 
-def is_mixed_spiro_fused(mol) -> bool:
+def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False) -> bool:
     """
     Detect a mixed spiro / fused ring system AMENABLE TO HERITAGE §4 NAMING.
 
@@ -1569,13 +1569,18 @@ def is_mixed_spiro_fused(mol) -> bool:
     # _name_fused_component falls through to a generic synthesis that
     # rarely produces a roundtrippable name) OR Von Baeyer treatment
     # (better preserved by the existing polycyclic-bridged dispatch).
-    if len(fused_rings) > 2:
+    # Task C: the 2-ring cap is a CATALOG limit (FUSED_HETEROCYCLE_DATA covers
+    # benzo-fused 2-ring surfaces). The floor's von-Baeyer route
+    # (allow_vonbaeyer) names an N-ring saturated bicyclo/tricyclo component
+    # through analyze_cage_universal, so the cap is lifted there; the PIN path
+    # (default) keeps the conservative 2-ring bound.
+    if len(fused_rings) > 2 and not allow_vonbaeyer:
         return False
     # Verify the fused component has a CATALOG name BEFORE claiming the
     # input as mixed-spiro-fused. Without this guard the dispatch hijacks
     # molecules whose fused part is uncategorized (e.g., 12-ring fused
     # natural-product backbones) and produces partial names.
-    fused_named = _name_fused_component(mol, fused_rings)
+    fused_named = _name_fused_component(mol, fused_rings, allow_vonbaeyer=allow_vonbaeyer)
     if fused_named is None:
         return False
     return True
@@ -1747,8 +1752,45 @@ def _extract_subfragment(
     return frag, orig_to_frag
 
 
+def _name_vonbaeyer_fused_component(
+    mol, fused_atoms: Set[int],
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """Name a SATURATED von-Baeyer fused/bridged component as
+    ``<hetero>bicyclo[...]<parent>`` (Task C, floor-only route for the
+    (c)-aliphatic spiro-of-fused bucket).
+
+    A monospiro atom can join a von-Baeyer bicyclic/tricyclic component
+    (``bicyclo[2.2.1]heptane``, ``3-azabicyclo[3.3.0]octane``,
+    ``7-oxabicyclo[4.1.0]heptane`` ...) to a second ring. Such a component has
+    no ortho-fusion / retained-catalog name, so ``_name_fused_component``'s two
+    systematic branches decline and ``name_mixed_spiro_fused`` used to abstain.
+    P-24.5.1 names the whole thing in the SEPARABLE form
+    ``spiro[bicyclo[...]-x,y'-<comp2>]``; this builds the von-Baeyer half via
+    the shared ``analyze_cage_universal`` engine (which numbers the component in
+    ORIGINAL-mol indices, so the spiro-junction atom gets its von-Baeyer locant
+    directly). Returns ``(name, orig_idx -> int locant)`` or None. The offer RT
+    gate is the backstop (a wrong descriptor voids -> abstain, never a wrong
+    ship)."""
+    from .vonbaeyer_universal import analyze_cage_universal
+    from .polycyclic import _build_parent_with_unsaturation
+    cage = analyze_cage_universal(mol, cage_atoms=set(fused_atoms),
+                                  allow_mancude=True)
+    if cage is None:
+        return None
+    parent_block = _build_parent_with_unsaturation(
+        cage.total_atoms, cage.unsaturation, fg_suffix=None)
+    name = cage.hetero_prefix + cage.descriptor + parent_block
+    atom_to_locant = {
+        a: loc for a, loc in cage.atom_to_locant.items()
+        if isinstance(loc, int)
+    }
+    if not (set(atom_to_locant.keys()) >= set(fused_atoms)):
+        return None  # partial numbering -> fail closed
+    return name, atom_to_locant
+
+
 def _name_fused_component(
-    mol, fused_rings: List[List[int]],
+    mol, fused_rings: List[List[int]], allow_vonbaeyer: bool = False,
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]]]]:
     """Name the fused component fragment.
 
@@ -1841,6 +1883,15 @@ def _name_fused_component(
         # name (e.g., algorithmic _try_algorithmic_fusion_name).
         result = name_fused_heterocycle(frag)
         if result is None:
+            # Task C (floor-only): a SATURATED von-Baeyer fused/bridged
+            # component (bicyclo/tricyclo) has no ortho-fusion name — degrade
+            # to its von-Baeyer name so the P-24.5.1 separable spiro form is
+            # still reachable. Gated to the best-effort floor
+            # (allow_vonbaeyer); the PIN path (default False) is untouched.
+            if allow_vonbaeyer:
+                vb = _name_vonbaeyer_fused_component(mol, fused_atoms)
+                if vb is not None:
+                    return vb
             return None
 
     name, _ring_atoms, atom_to_locant_in_frag, _subs_included = result
@@ -2507,10 +2558,16 @@ def _build_lambda_ih_front_prefix(
 
 
 def name_mixed_spiro_fused(
-    mol,
+    mol, allow_vonbaeyer_component: bool = False,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
     """
     Build the HERITAGE §4 separable-parts name for a mixed spiro/fused system.
+
+    ``allow_vonbaeyer_component`` (Task C, best-effort FLOOR only): additionally
+    name a SATURATED von-Baeyer fused/bridged component (bicyclo/tricyclo) via
+    ``analyze_cage_universal``, so a spiro-of-bicyclic degrades to the P-24.5.1
+    separable ``spiro[bicyclo[...]-x,y'-<comp2>]`` covering name instead of
+    abstaining. Default False keeps the PIN path byte-identical.
 
     Algorithm (Phase 151-02 D-13 + HERITAGE §4):
       1. Identify the spiro centre (must be exactly 1 in v18 scope).
@@ -2536,7 +2593,7 @@ def name_mixed_spiro_fused(
     Source: 151-CONTEXT.md D-13; HERITAGE-1990-insights.md §4;
             IUPAC P-24; Q-05 OPSIN preview (151-AUDIT-B.md).
     """
-    if not is_mixed_spiro_fused(mol):
+    if not is_mixed_spiro_fused(mol, allow_vonbaeyer=allow_vonbaeyer_component):
         return None
 
     spiro_atoms = get_spiro_atoms(mol)
@@ -2560,7 +2617,8 @@ def name_mixed_spiro_fused(
         return None  # v19: multi-side-ring mixed (rare)
 
     # Step 2: name the fused component
-    fused_named = _name_fused_component(mol, fused_rings)
+    fused_named = _name_fused_component(
+        mol, fused_rings, allow_vonbaeyer=allow_vonbaeyer_component)
     if fused_named is None:
         return None
     fused_name, fused_atom_to_locant = fused_named

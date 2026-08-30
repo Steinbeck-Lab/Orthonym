@@ -106,3 +106,40 @@ def test_floor_name_round_trips_to_input_constitution(smi, core_sub):
     assert _const(parsed) == _const(smi), (
         f"wrong constitution: {res.name} -> {parsed}"
     )
+
+
+# --- (c)-aliphatic: spiro-of-von-Baeyer-bicyclic degrades to the P-24.5.1
+#     separable form spiro[bicyclo[...]-x,y'-<comp2>] (floor-only) ------------
+
+VONBAEYER_SPIRO = [
+    # bicyclo[3.2.0]hept-2-ene spiro 1,3-dioxolane
+    ("C1=CC2C(C1)CC21OCCO1", "bicyclo[3.2.0]"),
+    # 3-azabicyclo[3.3.0]octane spiro piperidine
+    ("CNC(=O)[C@]12CCC3(CCN(C(C)=O)CC3)[C@H]1CN(S(C)(=O)=O)C2", "bicyclo[3.3.0]"),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.roundtrip
+@pytest.mark.parametrize("smi,desc", VONBAEYER_SPIRO)
+def test_vonbaeyer_spiro_of_fused_floor_round_trips(smi, desc):
+    """The (c)-aliphatic bucket: a spiro atom joining a von-Baeyer bicyclic to a
+    second ring now degrades to a valid covering von-Baeyer separable spiro name
+    (was None -> abstain), full-InChIKey RT-correct."""
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    m = Chem.MolFromSmiles(smi)
+    res = name_universal_substitutive(m)
+    assert res is not None, "floor voided on a spiro-of-vonBaeyer core"
+    assert desc in res.name, res.name
+    parsed = opsin_parse(res.name)
+    assert parsed is not None, f"OPSIN could not parse: {res.name}"
+    assert _const(parsed) == _const(smi), f"{res.name} -> {parsed}"
+
+
+def test_vonbaeyer_component_is_floor_only_pin_untouched():
+    """`name_mixed_spiro_fused` default (PIN path) still declines a
+    spiro-of-vonBaeyer core; only the floor flag names it."""
+    from orthonym.rules.spiro import name_mixed_spiro_fused
+    m = Chem.MolFromSmiles("C1=CC2C(C1)CC21OCCO1")
+    assert name_mixed_spiro_fused(m) is None                       # PIN default
+    assert name_mixed_spiro_fused(m, allow_vonbaeyer_component=True) is not None
