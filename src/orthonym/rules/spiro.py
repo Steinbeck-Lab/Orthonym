@@ -2878,11 +2878,36 @@ def _name_general_monospiro_fused(
         return None  # the two rings are themselves fused -> not spiro-separable
     a_rings = [all_rings[i] for i in comp_a]
     b_rings = [all_rings[i] for i in comp_b]
-    # Scope: this is the both-sides-FUSED namer. A pure spiro of two MONOCYCLES
-    # (spiro[4.5]decane) is a von-Baeyer spiro that ``analyze_spiro_universal``
-    # names better (single descriptor), so defer to it -- otherwise this greedy
-    # separable form would intercept and slightly regress the ZINC pure-spiro
-    # conversion. At least one side must be a genuine fused/bridged component.
+    return _assemble_monospiro_from_sides(
+        mol, spiro_center, a_rings, b_rings, allow_vonbaeyer, force_vonbaeyer)
+
+
+def _assemble_monospiro_from_sides(
+    mol, spiro_center: int,
+    a_rings: List[List[int]], b_rings: List[List[int]],
+    allow_vonbaeyer: bool, force_vonbaeyer: bool = False,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Shared P-24.5.1 separable-name assembly for a monospiro system ALREADY
+    partitioned at its single spiro atom into two ring sides (``a_rings`` /
+    ``b_rings`` are lists of SSSR ring atom lists; the spiro atom appears in both
+    sides). Names EACH side as a full parent via ``_name_component_either``
+    (a single ring -> monocycle namer; a multi-ring fused/bridged system ->
+    ``_name_fused_component``, which degrades a saturated von-Baeyer cage through
+    ``analyze_cage_universal`` under ``allow_vonbaeyer``), orders the two
+    alphanumerically (P-24.5.1 Note, first-cited unprimed), primes the second and
+    returns the ``name_spiro_system`` shape ``(name, core_atoms,
+    combined_locants, False)`` or None.
+
+    Factored out of ``_name_general_monospiro_fused`` so the masked-spiro namer
+    (``_name_masked_spiro``, whose spiro atom is invisible to ``get_spiro_atoms``)
+    reuses the identical assembly. Fail-closed on a lettered spiro locant, a
+    naming decline or partial core coverage; every caller is offer-RT-gated."""
+    # Scope: a pure spiro of two MONOCYCLES (spiro[4.5]decane) is a von-Baeyer
+    # spiro that ``analyze_spiro_universal`` names better (single descriptor), so
+    # defer to it -- otherwise this greedy separable form would intercept and
+    # slightly regress the ZINC pure-spiro conversion. At least one side must be
+    # a genuine fused/bridged component. (A masked spiro atom is in >=3 SSSR
+    # rings, so one side always carries >=2 rings and this never fires there.)
     if len(a_rings) == 1 and len(b_rings) == 1:
         return None
     a_atoms = set().union(*a_rings)
@@ -2926,6 +2951,162 @@ def _name_general_monospiro_fused(
     if not (set(combined_locants.keys()) >= core_ring_atoms):
         return None
     return (name, core_ring_atoms, combined_locants, False)
+
+
+def find_masked_spiro_atoms(
+    mol, restrict_atoms: Optional[Set[int]] = None,
+) -> Set[int]:
+    """Detect MASKED spiro atoms — a spiro atom that is ALSO a von-Baeyer
+    bridgehead, so it lies in >=3 SSSR rings and ``get_spiro_atoms`` (which needs
+    EXACTLY 2 SSSR-ring membership) misses it entirely.
+
+    Root-cause detection rule (general, M4 L1a): within a connected ring system,
+    the TRUE masked spiro atom is a ring atom in >=3 SSSR rings whose removal
+    splits its OWN ring-atom-induced subgraph into EXACTLY 2 connected
+    ring-components — a genuine spiro cut-vertex. An atom in >=3 SSSR rings whose
+    removal leaves its ring system in 1 component is a bicyclo/von-Baeyer
+    BRIDGEHEAD (the other bridges keep it connected), NOT spiro, and is excluded.
+
+    The split is evaluated per-ring-system (the atom's own connected component of
+    ring atoms), so a molecule with several disjoint ring systems or a pendant
+    ring never miscounts. ``restrict_atoms`` scopes the whole search to one ring
+    system. Returns the set of masked spiro atom indices (usually 0 or 1).
+    """
+    ri = mol.GetRingInfo()
+    scope = set(restrict_atoms) if restrict_atoms is not None else None
+    sssr = [set(r) for r in ri.AtomRings()
+            if scope is None or set(r) <= scope]
+    ring_atoms: Set[int] = set()
+    for r in sssr:
+        ring_atoms.update(r)
+    # membership count over SSSR rings
+    cnt: Dict[int, int] = {}
+    for r in sssr:
+        for a in r:
+            cnt[a] = cnt.get(a, 0) + 1
+    # ring-atom-induced adjacency (ring bonds only, within scope)
+    adj: Dict[int, Set[int]] = {a: set() for a in ring_atoms}
+    for b in mol.GetBonds():
+        u, v = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if u in ring_atoms and v in ring_atoms and b.IsInRing():
+            adj[u].add(v)
+            adj[v].add(u)
+
+    def _own_system(seed: int) -> Set[int]:
+        seen = {seed}
+        stack = [seed]
+        while stack:
+            y = stack.pop()
+            for z in adj[y]:
+                if z not in seen:
+                    seen.add(z)
+                    stack.append(z)
+        return seen
+
+    def _splits_into_two(a: int) -> bool:
+        system = _own_system(a)
+        nodes = system - {a}
+        if not nodes:
+            return False
+        seen: Set[int] = set()
+        ncomp = 0
+        for s in nodes:
+            if s in seen:
+                continue
+            ncomp += 1
+            if ncomp > 2:
+                return False
+            stack = [s]
+            while stack:
+                y = stack.pop()
+                if y in seen:
+                    continue
+                seen.add(y)
+                stack.extend((adj[y] & nodes) - seen)
+        return ncomp == 2
+
+    return {a for a in ring_atoms if cnt.get(a, 0) >= 3 and _splits_into_two(a)}
+
+
+def _name_masked_spiro(
+    mol, allow_vonbaeyer: bool = True, force_vonbaeyer: bool = False,
+    restrict_atoms: Optional[Set[int]] = None,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """M4 L1a (best-effort FLOOR only): name a MASKED-SPIRO system — a monospiro
+    whose spiro atom is ALSO a von-Baeyer bridgehead (>=3 SSSR rings), invisible
+    to ``get_spiro_atoms`` so every other spiro namer bails and the whole system
+    VOIDS. These are P-24.5 spiro-with-von-Baeyer-component systems.
+
+    Algorithm: detect the true spiro cut-vertex (``find_masked_spiro_atoms``),
+    split its ring-atom subgraph at it into two sides (each + the spiro atom),
+    then hand both sides to the shared ``_assemble_monospiro_from_sides`` — which
+    names each as a full parent (a von-Baeyer bicyclic via
+    ``analyze_cage_universal``; a single ring via the monocycle namer) and builds
+    the P-24.5.1 separable ``spiro[<sideA>-x,y'-<sideB>]`` name with the combined
+    (primed-second) locant map.
+
+    ``restrict_atoms`` scopes to ONE ring system (a molecule may hold several
+    disjoint spiro cores). Returns the ``name_spiro_system`` shape or None
+    (fail-closed on !=1 masked atom, a non-two-way split, a naming decline, or a
+    lettered spiro locant). Every emission is offer-RT-gated (0-wrong); the PIN /
+    default path never reaches this floor, so it stays byte-identical."""
+    masked = find_masked_spiro_atoms(mol, restrict_atoms)
+    if len(masked) != 1:
+        return None
+    spiro_center = next(iter(masked))
+
+    ri = mol.GetRingInfo()
+    scope = set(restrict_atoms) if restrict_atoms is not None else None
+    sssr = [set(r) for r in ri.AtomRings()
+            if scope is None or set(r) <= scope]
+    ring_atoms: Set[int] = set()
+    for r in sssr:
+        ring_atoms.update(r)
+    adj: Dict[int, Set[int]] = {a: set() for a in ring_atoms}
+    for b in mol.GetBonds():
+        u, v = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if u in ring_atoms and v in ring_atoms and b.IsInRing():
+            adj[u].add(v)
+            adj[v].add(u)
+
+    # the spiro atom's own ring system, then split at the spiro atom
+    system = {spiro_center}
+    stack = [spiro_center]
+    while stack:
+        y = stack.pop()
+        for z in adj[y]:
+            if z not in system:
+                system.add(z)
+                stack.append(z)
+    nodes = system - {spiro_center}
+    seen: Set[int] = set()
+    sides: List[Set[int]] = []
+    for s in nodes:
+        if s in seen:
+            continue
+        comp: Set[int] = set()
+        st = [s]
+        while st:
+            y = st.pop()
+            if y in seen:
+                continue
+            seen.add(y)
+            comp.add(y)
+            st.extend((adj[y] & nodes) - seen)
+        sides.append(comp)
+    if len(sides) != 2:
+        return None
+    side_a_atoms = sides[0] | {spiro_center}
+    side_b_atoms = sides[1] | {spiro_center}
+    # assign each SSSR ring (of this system) to the side that contains it — a
+    # ring through the spiro atom belongs to exactly one side (its non-spiro
+    # atoms lie in one component); rings of other disjoint systems are excluded.
+    a_rings = [list(r) for r in sssr if r <= side_a_atoms]
+    b_rings = [list(r) for r in sssr if r <= side_b_atoms]
+    if not a_rings or not b_rings:
+        return None
+    return _assemble_monospiro_from_sides(
+        mol, spiro_center, a_rings, b_rings, allow_vonbaeyer, force_vonbaeyer)
 
 
 _POLYSPIRO_MULT = {2: "dispiro", 3: "trispiro", 4: "tetraspiro", 5: "pentaspiro"}

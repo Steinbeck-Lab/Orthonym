@@ -96,8 +96,22 @@ B_WITNESSES = [
 # fused-template index. Breadth already floor-delivered for 24/41 ortho-fused (see below).
 C_WITNESSES = [
     "c1ccc2c(c1)CO[C@H]2[C@H]1OCc2ccccc21",
-    "c1ccc([C@@H]2O[C@@]23CNc2ccccc2CN3)cc1",
+    # The second C witness (c1ccc([C@@H]2O[C@@]23CNc2ccccc2CN3)cc1) was NOT an
+    # ortho-fused abstainer at all: it is a MASKED-SPIRO core (a spiro-oxirane on a
+    # benzo-fused diazocine BRIDGEHEAD, so the spiro atom sits in >=3 SSSR rings and
+    # get_spiro_atoms missed it). M4 L1a's masked-spiro floor lever now names it and
+    # it full-InChIKey-round-trips -> promoted to C_RESOLVED_BY_MASKED_SPIRO below.
     "c1ccc2c(c1)CCOCCCOCc1ccccc1CCOCCCOCc1ccccc1CCOCCCOC2",  # ortho-peri-fused
+]
+
+# M4 L1a (masked-spiro floor lever): a monospiro whose spiro atom is ALSO a
+# von-Baeyer bridgehead (>=3 SSSR-ring membership) is invisible to get_spiro_atoms,
+# so every spiro namer used to bail and the core VOIDED. The lever detects the true
+# spiro cut-vertex, splits at it and assembles the P-24.5.1 separable name. This
+# core now emits a determinate name that OPSIN-round-trips to the input's full
+# InChIKey (0-wrong). Positive canary against re-breaking.
+C_RESOLVED_BY_MASKED_SPIRO = [
+    "c1ccc([C@@H]2O[C@@]23CNc2ccccc2CN3)cc1",  # -> (4S,3'S)-3'-(cyclohexa-1,3,5-trien-1-yl)spiro[2,5-diazabicyclo[5.4.0]undeca-1(11),7,9-triene-4,2'-oxirane]
 ]
 
 # MEASUREMENT (best-effort tier, this session): the von-Baeyer best-effort FLOOR
@@ -235,6 +249,19 @@ def test_v38_cp2_resolved_witness_names_and_rt(smiles):
 
 
 # --- Ring-dispatch canary: already-working names unchanged + RT-valid ---------
+
+@pytest.mark.parametrize("smiles", C_RESOLVED_BY_MASKED_SPIRO)
+def test_masked_spiro_core_names_and_rt(smiles):
+    """M4 L1a: a masked-spiro core (spiro atom that is also a von-Baeyer
+    bridgehead, >=3 SSSR rings, invisible to get_spiro_atoms) used to VOID; the
+    masked-spiro floor lever now emits a P-24.5.1 separable name that
+    OPSIN-round-trips to the input's full InChIKey (0-wrong)."""
+    try:
+        r = _ring_rt(smiles)
+    except _Timeout:
+        pytest.skip("naming exceeded timeout (out-of-scope size)")
+    assert r.passed, f"masked-spiro core did not round-trip: name={r.name!r} err={r.error}"
+
 
 @pytest.mark.parametrize("smiles", C_COVERED_BY_FLOOR)
 def test_pattern_c_breadth_already_delivered_by_floor(smiles):

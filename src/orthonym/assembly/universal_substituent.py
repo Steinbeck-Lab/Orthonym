@@ -1414,7 +1414,7 @@ def _mixed_spiro_fused_leaf(
     """
     from ..rules.spiro import (
         name_mixed_spiro_fused, _name_general_monospiro_fused,
-        _name_linear_polyspiro_fused,
+        _name_linear_polyspiro_fused, _name_masked_spiro,
     )
     fvb = ctx.force_vonbaeyer_spiro
     # ``restrict_atoms`` = THIS ring system: a molecule can hold several DISJOINT
@@ -1447,6 +1447,19 @@ def _mixed_spiro_fused_leaf(
             # linear polyspiro fallback: dispiro/trispiro chain of fused/ring
             # components (the polyspiro (c)-bucket). Floor-only; offer-RT-gated.
             res = _name_linear_polyspiro_fused(
+                ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb,
+                restrict_atoms=restrict)
+        if res is None:
+            # M4 L1a: MASKED-SPIRO fallback -- a monospiro whose spiro atom is
+            # ALSO a von-Baeyer bridgehead, so it sits in >=3 SSSR rings and
+            # ``get_spiro_atoms`` (exactly-2 membership) misses it: every namer
+            # above declines and ``analyze_cage_universal`` builds a whole-system
+            # cage descriptor that the von-Baeyer audit correctly REJECTS (it is
+            # spiro, not a cage). ``_name_masked_spiro`` detects the true spiro
+            # cut-vertex, splits at it and assembles the P-24.5.1 separable
+            # ``spiro[<sideA>-x,y'-<sideB>]`` covering name. Floor-only;
+            # offer-RT-gated (a wrong descriptor voids -> abstain, 0-wrong).
+            res = _name_masked_spiro(
                 ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb,
                 restrict_atoms=restrict)
     except Exception:
