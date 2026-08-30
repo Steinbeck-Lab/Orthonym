@@ -3089,8 +3089,15 @@ def _name_linear_polyspiro_fused(
         for atom_idx, locant in amap.items():
             if atom_idx in combined_locants:
                 continue  # already assigned by a lower-prime component (spiro atom)
-            if not isinstance(locant, int):
-                continue
+            # Keep EVERY ring atom, including a fused component's ring-FUSION
+            # atoms whose locant is a lettered string ('4a', '8a'). Dropping
+            # them here (the old ``isinstance(locant, int)`` skip) made the
+            # coverage invariant below fail for any spiro chain that includes a
+            # fused component (e.g. a chromane / benzopyran side), so the whole
+            # core abstained. The spiro-DESCRIPTOR junction locants are proven
+            # integer separately above (P-24.5.1); this map only feeds
+            # substituent placement, and ``_locant_display`` renders a primed
+            # lettered locant (('8a', "'") -> "8a'") correctly.
             combined_locants[atom_idx] = locant if p == 0 else (locant, _pr(p))
     if not (set(combined_locants.keys()) >= core_ring_atoms):
         return None
