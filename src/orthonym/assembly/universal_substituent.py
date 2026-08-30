@@ -1128,7 +1128,10 @@ def _bfs_component(mol, start: int, exclude: FrozenSet[int]) -> FrozenSet[int]:
 def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int]:
     """Neighbors of *atom* usable for CHAIN-spine walking: heavy, in
     *component*, NOT a ring atom (rings are branch ports, not chain
-    continuations -- see module docstring on chain/ring composition), and
+    continuations -- see module docstring on chain/ring composition), an
+    element ON the skeletal ALLOW-LIST (M1: ``_is_skeletal_spine_element`` --
+    carbon or a ``REPLACEMENT_TERMS``-spellable heteroatom; the primary gate,
+    generalizing the terminal-halogen exclusion), and
     NOT the nitrogen of a nitro group (Task B2b, ``_is_nitro_root``): nitro
     is always resolved as a branch via the dedicated ``_nitro_shortcut``
     leaf, never mechanically threaded into a replacement-nomenclature chain
@@ -1160,20 +1163,23 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             continue
         if ctx.ring_system_of.get(j) is not None:
             continue
+        if not _is_skeletal_spine_element(ctx.mol, j):
+            continue  # ALLOW-LIST (M1): only carbon + a REPLACEMENT_TERMS-
+            #            spellable heteroatom MAY thread the chain spine. Every
+            #            other element (halogen, metal, noble gas, Al/Ga/In/Tl,
+            #            an exotic-valence centre, ...) is COUNTED in the chain
+            #            length but SILENTLY SKIPPED by _build_hetero_prefix
+            #            (phantom carbon + dropped atom -> wrong constitution:
+            #            CHF2 -> "1-fluoroethan-1-yl", commit d3590326 for the
+            #            halogen instance). Sent instead to _discover_branches ->
+            #            _leaf_shortcut (a monovalent halogen renders fluoro/
+            #            chloro/bromo/iodo; an unspellable element fails closed).
+            #            Generalizes the terminal-halogen exclusion to the whole
+            #            non-skeletal class -- see _SKELETAL_SPINE_ELEMENTS.
         if _is_nitro_root(ctx.mol, j):
             continue
         if _is_phosphinate_oxide_root(ctx.mol, j):
             continue
-        if _is_terminal_halogen(ctx.mol, j):
-            continue  # a monovalent halogen (F/Cl/Br/I) is ALWAYS a substituent
-            #            prefix (fluoro/chloro/bromo/iodo via _leaf_shortcut),
-            #            NEVER a skeletal chain atom. Threading it into the spine
-            #            absorbed it as a phantom carbon and dropped the halogen
-            #            (measured: CHF2 -> "1-fluoroethan-1-yl", CF3 ->
-            #            "1,1-difluoroethan-1-yl", and a plain haloalkane like
-            #            CCCCl VOIDED the whole molecule). Excluding it (exactly
-            #            as nitro-N / phosphinate-P / charged-leaf above) sends it
-            #            to _discover_branches -> the _leaf_shortcut halogen leaf.
         if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom) is not None:
             continue  # terminal charged atom a charged-leaf owns -> branch, not
             #            spine (a carbanion / heteroatom-hydride anion this leaf
@@ -1416,6 +1422,17 @@ def _name_ring_spine(
     ring_tuple = next((r for r in ri.AtomRings() if set(r) == ring_atoms), None)
     if ring_tuple is None:
         return None
+    # ALLOW-LIST (M1), ring-builder side: this monocyclic namer spells its ring
+    # heteroatoms through the SAME ``_build_hetero_prefix`` the chain spine uses,
+    # which SILENTLY SKIPS any element not in REPLACEMENT_TERMS -> a non-skeletal
+    # ring atom (a halogen ring / λ-halane such as iodinane ``I1CCCCC1``, a
+    # metallacycle, ...) would be rendered as a phantom CARBOcycle, a wrong
+    # constitution. Fail CLOSED (void -> abstain) instead, symmetric to the
+    # chain walker/builder guards -- such a ring is unnameable by this floor
+    # anyway (no 'ioda'/metal morpheme), so voiding only converts a
+    # phantom-carbon name into a clean abstention, never loses a correct name.
+    if any(not _is_skeletal_spine_element(mol, a) for a in ring_tuple):
+        return None
     n = len(ring_tuple)
     base = list(ring_tuple)
 
@@ -1541,6 +1558,22 @@ def _name_chain_spine(
             path = rev
 
     if not path:
+        return None
+    # ALLOW-LIST (M1), builder side: a chain spine may be built ONLY from
+    # skeletal elements (carbon + a REPLACEMENT_TERMS-spellable heteroatom).
+    # ``_tree_neighbors`` already keeps a non-skeletal atom from being THREADED
+    # into a multi-atom spine, but a non-skeletal atom can still arrive here as
+    # the FORCED ROOT of a size-1 (or root-only) branch component -- e.g. a
+    # ``C=I`` iodine ylidene, whose double-bonded I matches no ``_LEAF_DOUBLE``
+    # leaf and so falls through to here. Building a 1-atom "chain" from it would
+    # SILENTLY DROP the atom in ``_build_hetero_prefix`` (I not in
+    # REPLACEMENT_TERMS) and render a PHANTOM ``methane`` -- a wrong
+    # constitution. Fail CLOSED instead (void -> abstain), so the whole
+    # non-skeletal class fails closed uniformly rather than a leaf-shortcut
+    # subset failing closed and the ylidene/exotic-valence tail leaking a
+    # phantom carbon. A legitimate chain path is all-skeletal, so this never
+    # fires on a real name.
+    if any(not _is_skeletal_spine_element(mol, a) for a in path):
         return None
     n = len(path)
     atom_to_locant = {a: i + 1 for i, a in enumerate(path)}
@@ -1902,31 +1935,46 @@ def _nitro_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     return None
 
 
-# F / Cl / Br / I / At -- the monovalent halogens. Always a terminal
-# substituent prefix (P-29.3 / P-35.1 fluoro/chloro/bromo/iodo), never a
-# skeletal chain or 'a'-replacement atom.
-_HALOGEN_ANUMS = frozenset({9, 17, 35, 53, 85})
+# --- skeleton-membership ALLOW-LIST (M1: the composition-correctness lever) --
+#
+# WHICH elements MAY thread the chain spine, as a closed ALLOW-LIST rather than
+# a growing list of per-element/per-shape EXCLUSIONS (halogen, ...). Derived
+# DIRECTLY from ``REPLACEMENT_TERMS`` -- the same table ``_build_hetero_prefix``
+# uses to SPELL a skeletal heteroatom -- plus carbon. This tie is the whole
+# point and the 0-wrong-critical invariant:
+#
+#   * Every element ``_build_hetero_prefix`` can spell IS in the allow-list, so
+#     the allow-list can NEVER drop a legitimate skeletal heteroatom (which
+#     would regress a correct name) -- membership and spellability are the same
+#     set BY CONSTRUCTION, they cannot drift apart.
+#   * Every element it CANNOT spell (a halogen, a metal, a noble gas, Al/Ga/In/
+#     Tl, At, an exotic-valence centre, ...) is OUT. Such an atom threaded into
+#     the spine was COUNTED in the chain length (a phantom carbon) yet SILENTLY
+#     SKIPPED by ``_build_hetero_prefix`` (``if sym in REPLACEMENT_TERMS``) --
+#     i.e. dropped, yielding a name of a DIFFERENT constitution. The terminal
+#     halogen was one instance (CHF2 -> ``1-fluoroethan-1-yl``, commit
+#     d3590326); this allow-list closes the WHOLE class in one check.
+#
+# Excluded atoms become off-spine substituent branches (``_discover_branches``
+# -> ``_leaf_shortcut``): a monovalent halogen renders as ``fluoro``/``chloro``/
+# ``bromo``/``iodo`` (P-29.3 / P-35.1); an element with no leaf/branch spelling
+# fails CLOSED (the whole call voids -> abstain), never a phantom-carbon name.
+# ``SKELETON_ATOMS = {"C", *REPLACEMENT}`` and # carbon-only spine -- SAME pattern, Orthonym's own (organic-only) replacement
+# table (organometallic 'a'-replacement is out of scope, P-69). Blue Book
+# P-15.4 / P-21 ('a'-replacement skeletal-element set).
+_SKELETAL_SPINE_ELEMENTS = frozenset({"C"}) | frozenset(REPLACEMENT_TERMS)
 
 
-def _is_terminal_halogen(mol, j: int) -> bool:
-    """True if atom *j* is a terminal (monovalent) halogen -- used by
-    ``_tree_neighbors`` to keep a halogen OUT of chain-spine continuation, so it
-    is always resolved as a branch via ``_leaf_shortcut``'s halogen leaf
-    (``fluoro``/``chloro``/``bromo``/``iodo``), never absorbed into the parent
-    skeleton as a phantom chain atom (which silently dropped the halogen and
-    inflated the parent by one carbon -- CHF2 -> ``1-fluoroethan-1-yl``).
-
-    Requires exactly one heavy neighbour so a rare hypervalent/charged halogen
-    (e.g. an iodine(III/V) centre) stays threadable rather than being forced to
-    a leaf it does not fit -- mirroring the shape-guarded nitro/phosphinate
-    predicates below."""
-    atom = mol.GetAtomWithIdx(j)
-    if atom.GetAtomicNum() not in _HALOGEN_ANUMS:
-        return False
-    if atom.GetFormalCharge() != 0:
-        return False
-    heavy_nbrs = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
-    return len(heavy_nbrs) == 1
+def _is_skeletal_spine_element(mol, j: int) -> bool:
+    """True if atom *j*'s element MAY be a chain-spine ('a'-replacement)
+    skeletal atom -- carbon or a heteroatom ``REPLACEMENT_TERMS`` (and hence
+    ``_build_hetero_prefix``) can actually name. Used by ``_tree_neighbors`` as
+    the primary spine-membership gate: an element NOT in this set is kept OUT of
+    chain-spine continuation and resolved as an off-spine branch instead, so it
+    can never be absorbed into the parent skeleton as a phantom carbon (the
+    silent-drop mechanism that mis-rendered every non-skeletal terminal atom;
+    see ``_SKELETAL_SPINE_ELEMENTS``)."""
+    return mol.GetAtomWithIdx(j).GetSymbol() in _SKELETAL_SPINE_ELEMENTS
 
 
 def _is_nitro_root(mol, j: int) -> bool:
