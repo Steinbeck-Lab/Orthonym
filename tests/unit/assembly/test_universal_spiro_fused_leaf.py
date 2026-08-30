@@ -143,3 +143,34 @@ def test_vonbaeyer_component_is_floor_only_pin_untouched():
     m = Chem.MolFromSmiles("C1=CC2C(C1)CC21OCCO1")
     assert name_mixed_spiro_fused(m) is None                       # PIN default
     assert name_mixed_spiro_fused(m, allow_vonbaeyer_component=True) is not None
+
+
+# --- both-sides-fused: a monospiro joining TWO fused/bridged ring systems -----
+
+BOTH_SIDES_FUSED = [
+    # 1,3-dihydro-2-benzofuran spiro xanthene
+    ("C1OC2(c3ccccc31)c1ccccc1Oc1ccccc12", "9'-xanthene]"),
+    # tetrahydroisoquinoline spiro a trioxatricyclododecatriene
+    ("C1NC2(Cc3ccccc31)OCc1cc3c(cc12)OCO3", "trioxatricyclo"),
+    # dihydrobenzofuran spiro an azabicyclodecene
+    ("C1CCC2=C(CC[C@]3(C2)Cc2ccccc2O3)N1", "2-azabicyclo[4.4.0]"),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.roundtrip
+@pytest.mark.parametrize("core_smi,sub", BOTH_SIDES_FUSED)
+def test_both_sides_fused_monospiro_round_trips(core_smi, sub):
+    """The both-sides-fused (c)-bucket: a spiro atom joining two fused/bridged
+    ring systems now names each side independently and joins the P-24.5.1
+    separable form (was None -> abstain), RT-correct to the CORE constitution."""
+    from orthonym.rules.spiro import _name_general_monospiro_fused
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    m = Chem.MolFromSmiles(core_smi)
+    res = _name_general_monospiro_fused(m)
+    assert res is not None, "both-sides-fused namer declined a separable core"
+    assert sub in res[0], res[0]
+    parsed = opsin_parse(res[0])
+    assert parsed is not None, f"OPSIN rejected: {res[0]}"
+    core = Chem.MolFragmentToSmiles(m, atomsToUse=sorted(res[1]))
+    assert _const(parsed) == _const(core), f"{res[0]} -> {parsed}"

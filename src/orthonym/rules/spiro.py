@@ -2754,6 +2754,108 @@ def _partition_rings_at_spiro(
     return comp_a, comp_b
 
 
+def _name_component_either(mol, ring_list, allow_vonbaeyer):
+    """Name ONE spiro-side component (a list of ring atom lists): a single ring
+    via ``_name_side_ring``, a multi-ring fused/bridged system via
+    ``_name_fused_component``. Returns ``(name, atom_to_locant)`` or None."""
+    if len(ring_list) == 1:
+        return _name_side_ring(mol, ring_list[0])
+    return _name_fused_component(mol, ring_list, allow_vonbaeyer=allow_vonbaeyer)
+
+
+def _name_general_monospiro_fused(
+    mol, allow_vonbaeyer: bool = True,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Task C (floor-only): the P-24.5.1 separable name for a monospiro system
+    whose BOTH sides may be fused/bridged ring systems — the ``both-sides-fused``
+    (c)-bucket that ``name_mixed_spiro_fused`` declines (it requires one side to
+    be a single ring).
+
+    Partitions the spiro system at the single spiro atom into two independent
+    ring components (``_partition_rings_at_spiro`` over the spiro subsystem,
+    pendant rings excluded), names EACH with the full ring-parent / von-Baeyer
+    engine (recursive pattern), then assembles
+    ``spiro[<comp1>-x,y'-<comp2>]`` in alphanumerical component order. Every
+    emission is offer-RT-gated (0-wrong). Returns the ``name_spiro_system`` shape
+    or None.
+    """
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) != 1:
+        return None
+    spiro_center = next(iter(spiro_atoms))
+    ri = mol.GetRingInfo()
+    all_rings = [list(r) for r in ri.AtomRings()]
+    rings_at = [i for i, r in enumerate(all_rings) if spiro_center in r]
+    if len(rings_at) != 2:
+        return None
+    # fused adjacency over all rings; the two sides are the fused-reachable
+    # closures of the spiro atom's two rings (pendant ring systems, not fused to
+    # either, are naturally excluded and handled by the substituent supplier).
+    n = len(all_rings)
+    fused_adj = {i: [] for i in range(n)}
+    for i in range(n):
+        for j in range(i + 1, n):
+            if len(set(all_rings[i]) & set(all_rings[j])) >= 2:
+                fused_adj[i].append(j); fused_adj[j].append(i)
+
+    def closure(start):
+        seen = {start}; stack = [start]
+        while stack:
+            cur = stack.pop()
+            for nb in fused_adj[cur]:
+                if nb not in seen:
+                    seen.add(nb); stack.append(nb)
+        return seen
+
+    comp_a = closure(rings_at[0])
+    comp_b = closure(rings_at[1])
+    if comp_a & comp_b:
+        return None  # the two rings are themselves fused -> not spiro-separable
+    a_rings = [all_rings[i] for i in comp_a]
+    b_rings = [all_rings[i] for i in comp_b]
+    a_atoms = set().union(*a_rings)
+    b_atoms = set().union(*b_rings)
+    if a_atoms & b_atoms != {spiro_center}:
+        return None  # the two sides must meet ONLY at the spiro atom
+
+    a_named = _name_component_either(mol, a_rings, allow_vonbaeyer)
+    b_named = _name_component_either(mol, b_rings, allow_vonbaeyer)
+    if a_named is None or b_named is None:
+        return None
+    a_name, a_map = a_named
+    b_name, b_map = b_named
+    a_loc = a_map.get(spiro_center)
+    b_loc = b_map.get(spiro_center)
+    # spiro-descriptor locants must be integer peripheral positions (P-24.5.1);
+    # a lettered fusion locant is OPSIN-invalid in the spiro slot -> fail closed.
+    if not isinstance(a_loc, int) or not isinstance(b_loc, int):
+        return None
+
+    # Alphanumerical component order (P-24.5.1 Note): first-cited unprimed.
+    a_primed = _component_alpha_key(a_name) > _component_alpha_key(b_name)
+    if not a_primed:
+        first_name, first_loc, second_name, second_loc = a_name, a_loc, b_name, b_loc
+        unprimed_map, primed_map = a_map, b_map
+    else:
+        first_name, first_loc, second_name, second_loc = b_name, b_loc, a_name, a_loc
+        unprimed_map, primed_map = b_map, a_map
+    first_name = _strip_consumed_indicated_h(first_name, first_loc)
+    second_name = _strip_consumed_indicated_h(second_name, second_loc)
+    name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
+
+    combined_locants: Dict[int, _Locant] = {}
+    for atom_idx, locant in unprimed_map.items():
+        combined_locants[atom_idx] = locant
+    for atom_idx, locant in primed_map.items():
+        if atom_idx == spiro_center:
+            continue
+        combined_locants[atom_idx] = (locant, "'")
+    core_ring_atoms = a_atoms | b_atoms
+    if not (set(combined_locants.keys()) >= core_ring_atoms):
+        return None
+    return (name, core_ring_atoms, combined_locants, False)
+
+
 def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: int):
     """Lowest locant the spiro atom may take given the component's symmetry
     (P-24.3.3). ``extracted`` is the (frag_mol, orig_to_frag) tuple from
