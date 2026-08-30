@@ -171,6 +171,7 @@ from .general_engine import (
     _zwitterion_suffix_plan,
     _elide_before_ionic_suffix,
     _stereo_prefix,
+    _MULT_SIMPLE,
 )
 
 
@@ -905,6 +906,17 @@ def _name_component(
     if needs_charge and charge_suffix_text is None:
         return None  # genuine ionic centre on this spine, not expressible
 
+    # ---- M2 inc4: internal semipolar-oxide cation(s) on THIS spine (N-oxide /
+    # phosphine oxide / sulfoxide) get a paired ``-ium`` suffix; their ``[O-]``
+    # renders as an ``oxido`` branch leaf. These are P-59/P-74.2.1 INTERNAL
+    # charges get_ion_sites strips, so they are disjoint from the genuine-ion
+    # charge above -- a spine that carries BOTH a genuine skeletal charge and an
+    # internal oxide is a compound zwitterion out of this floor's scope (void).
+    oxide_suffix_text, oxide_ids = _resolve_internal_oxide_suffix(
+        ctx, spine_atom_to_locant)
+    if oxide_suffix_text is not None and needs_charge:
+        return None  # genuine charge + internal oxide on one spine: out of scope
+
     # ---- branches: every off-spine atom, named by RE-ENTERING this SAME
     # function on its own (strictly smaller) subgraph. NO depth cap. -------
     # Phase E (fix round 1): store the FULL, unstemmed ``spine_core`` token
@@ -924,8 +936,11 @@ def _name_component(
         (spine_core, frozenset(spine_atoms)),
     ]
     charged_accum: set = set(charge_ids)
-    internal_accum: set = set()  # Task B2b fix round 1 + M2: rendered
+    internal_accum: set = set(oxide_ids)  # Task B2b fix round 1 + M2: rendered
     #                              internal-charge atoms (nitro/azido/diazo/...)
+    #                              plus M2 inc4 semipolar-oxide cations whose
+    #                              ``-ium`` this spine appends (their ``[O-]``
+    #                              adds itself as an ``oxido`` leaf below).
     prefix_entries: Dict[str, List[int]] = {}
     for s_atom, root, order, branch_atoms in _discover_branches(
         mol, spine_atoms, component,
@@ -971,13 +986,16 @@ def _name_component(
     else:
         full_name = spine_core
 
-    if needs_charge:
-        # Appended to the FULLY assembled name (prefixes + parent core), not
-        # just ``spine_core`` -- mirrors general_engine's own ordering
-        # (``_append_charge_suffix`` is called on the substituent-decorated
-        # name), so P-16.7.1(a)/P-74.1.1 elision targets the parent
-        # hydride's own trailing 'e', never truncates a substituent prefix.
-        full_name = _elide_before_ionic_suffix(full_name, charge_suffix_text)
+    # A genuine skeletal charge and an internal semipolar-oxide ``-ium`` are
+    # mutually exclusive on one spine (the compound case voided above), so at most
+    # one suffix applies. Appended to the FULLY assembled name (prefixes + parent
+    # core), not just ``spine_core`` -- mirrors general_engine's own ordering
+    # (``_append_charge_suffix`` is called on the substituent-decorated name), so
+    # P-16.7.1(a)/P-74.1.1 elision targets the parent hydride's own trailing 'e',
+    # never truncates a substituent prefix.
+    ionic_suffix = charge_suffix_text if needs_charge else oxide_suffix_text
+    if ionic_suffix is not None:
+        full_name = _elide_before_ionic_suffix(full_name, ionic_suffix)
 
     covers = frozenset(a for _t, ids in bindings for a in ids)
     return _ComponentResult(
@@ -1860,7 +1878,7 @@ _LEAF_DOUBLE = {
 # token is produced by exactly one shortcut and covers exactly that group's
 # internally-charged atoms -- see the membership check in ``_name_component``.
 _INTERNAL_CHARGE_LEAF_TOKENS = frozenset(
-    {"nitro", "azido", "diazo", "nitrooxy", "isocyano"})
+    {"nitro", "azido", "diazo", "nitrooxy", "isocyano", "oxido"})
 
 
 def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
@@ -1900,6 +1918,15 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     isocyano = _isocyano_shortcut(mol, component, attach_hint)
     if isocyano is not None:
         return isocyano
+    # M2 inc4: the anionic oxygen of a P-74.2.1 semipolar oxide (aromatic /
+    # amine N-oxide, phosphine oxide, sulfoxide) -- a lone terminal ``[O-]``
+    # single-bonded to an ``N+``/``P+``/``S+`` -- rendered as the ``oxido``
+    # prefix (its INTERNAL charge, paired with the cation's ``-ium`` suffix the
+    # spine appends; NOT the genuine-anion ``oxido`` of _charged_leaf_shortcut,
+    # which routes a charge-carrying alkoxide/carboxylate via a different path).
+    semipolar_oxido = _semipolar_oxido_shortcut(mol, component, attach_hint)
+    if semipolar_oxido is not None:
+        return semipolar_oxido
 
     # Task B2b: a GENUINELY charged atom anywhere in this branch (nitro,
     # just checked, is the only exception) must NEVER take one of the
@@ -2437,6 +2464,99 @@ def _isocyano_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     if len(outside) != 1:
         return None
     return "isocyano", frozenset(component)
+
+
+# ===========================================================================
+# M2 inc4: semipolar oxide  X(+)-[O-]  (X in N/P/S) -- ``oxido`` + ``-ium``
+#   aromatic / amine N-oxide, phosphine oxide, sulfoxide (P-74.2.1)
+# ===========================================================================
+
+def _semipolar_oxide_partner(mol, x_idx: int) -> Optional[int]:
+    """If atom *x_idx* is the CATION of a P-74.2.1 semipolar oxide -- an
+    ``N``/``P``/``S`` carrying formal charge ``+1`` and a TERMINAL anionic oxygen
+    ``[O-]`` (heavy-degree 1, H-free, single-bonded, ``-1``) -- return that
+    oxygen's index, else ``None``.
+
+    This is the zwitterionic drawing of an N-oxide (aromatic or amine), a
+    phosphine oxide, or a sulfoxide (the anion element the Blue Book uses to draw
+    the class -- see ``perception.ions._semipolar_chalcogenide_atoms``). A nitro
+    or nitrate-ester nitrogen is EXCLUDED (it carries a ``=O`` as well and is
+    rendered as its own whole leaf); requiring EXACTLY one oxygen neighbour and no
+    double-bonded O on the cation keeps those out."""
+    x = mol.GetAtomWithIdx(x_idx)
+    if x.GetSymbol() not in ("N", "P", "S") or x.GetFormalCharge() != 1:
+        return None
+    if _is_nitro_root(mol, x_idx) or _is_nitrooxy_root(mol, x_idx):
+        return None
+    o_partner = None
+    for nb in x.GetNeighbors():
+        if nb.GetAtomicNum() <= 1:
+            continue
+        bond = mol.GetBondBetweenAtoms(x_idx, nb.GetIdx())
+        bt = round(bond.GetBondTypeAsDouble()) if bond is not None else 0
+        if (nb.GetSymbol() == "O" and nb.GetFormalCharge() == -1
+                and nb.GetDegree() == 1 and nb.GetTotalNumHs() == 0 and bt == 1):
+            if o_partner is not None:
+                return None  # two anionic oxides -> not a plain oxide (out of scope)
+            o_partner = nb.GetIdx()
+        elif nb.GetSymbol() == "O" and bt >= 2:
+            return None  # a =O on the cation -> nitro/nitrate/etc., not this class
+    return o_partner
+
+
+def _semipolar_oxido_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """A lone terminal ``[O-]`` that is the anionic oxygen of a semipolar oxide
+    (its sole heavy neighbour is an ``N+``/``P+``/``S+`` cation, see
+    ``_semipolar_oxide_partner``) -- rendered as the ``oxido`` substituent prefix.
+    Returns ``("oxido", {O})`` or ``None``. The paired ``-ium`` on the cation is
+    appended by the spine (``_resolve_internal_oxide_suffix``); both atoms are
+    tracked ``internal_atoms`` (``oxido`` in ``_INTERNAL_CHARGE_LEAF_TOKENS``)."""
+    if len(component) != 1:
+        return None
+    o = mol.GetAtomWithIdx(attach_hint)
+    if (o.GetSymbol() != "O" or o.GetFormalCharge() != -1
+            or o.GetTotalNumHs() != 0 or o.GetDegree() != 1):
+        return None
+    heavy = [n for n in o.GetNeighbors() if n.GetAtomicNum() > 1]
+    if len(heavy) != 1:
+        return None
+    if _semipolar_oxide_partner(mol, heavy[0].GetIdx()) != attach_hint:
+        return None
+    return "oxido", frozenset(component)
+
+
+def _resolve_internal_oxide_suffix(
+    ctx: _Ctx, spine_atom_to_locant: Dict[int, int],
+) -> Tuple[Optional[str], FrozenSet[int]]:
+    """Does THIS spine carry any P-74.2.1 semipolar-oxide cation (an ``N+``/
+    ``P+``/``S+`` whose terminal ``[O-]`` partner renders as ``oxido``)? If so,
+    return the ``-<locants>-[di/tri...]ium`` suffix text and the cation atom ids
+    (recorded ``internal_atoms``, NOT ``charged`` -- these are internal charges
+    get_ion_sites strips, so they are invisible to ``_resolve_spine_charge``).
+    Returns ``(None, frozenset())`` when the spine carries none.
+
+    The paired ``oxido`` anions are rendered as ordinary branch leaves
+    (``_semipolar_oxido_shortcut``); this only adds the cation's ``-ium``, so the
+    assembled name is ``<n>-oxido...-<n>-ium`` (OPSIN-RT-verified: the kekulized
+    ``1-oxido-1-azacyclohexa-1,3,5-trien-1-ium`` is pyridine N-oxide)."""
+    locants: List[int] = []
+    ids: set = set()
+    for atom_idx, loc in spine_atom_to_locant.items():
+        if _semipolar_oxide_partner(ctx.mol, atom_idx) is not None:
+            locants.append(loc)
+            ids.add(atom_idx)
+    if not locants:
+        return None, frozenset()
+    locants.sort()
+    n = len(locants)
+    if n == 1:
+        mult = ""
+    else:
+        mult = _MULT_SIMPLE.get(n)
+        if mult is None:
+            return None, frozenset()  # multiplicity beyond the simple table
+    text = "-" + ",".join(map(str, locants)) + "-" + mult + "ium"
+    return text, frozenset(ids)
 
 
 def _phosphinate_oxide_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):

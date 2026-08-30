@@ -362,6 +362,42 @@ def test_m2_isocyanide_on_decorated_backbone_zero_wrong():
             assert verify_or_none(result.name, smi) == result.name, smi
 
 
+def test_m2_n_oxide_named_not_voided():
+    """M2 inc4: an N-oxide (aromatic or aliphatic amine) ``>[N+]-[O-]`` -- the
+    DOMINANT residual centre (~962 net-neutral void molecules) -- is now rendered
+    as the substitutive zwitterion ``<n>-oxido...-<n>-ium`` (the O- as ``oxido``,
+    the N+ as ``-ium``, both P-59/P-74.2.1 internal). OPSIN-RT-verified: the
+    kekulized ``1-oxido-1-azacyclohexa-1,3,5-trien-1-ium`` parses back to pyridine
+    N-oxide, etc."""
+    for smi in ("[O-][n+]1ccccc1", "Cc1cccc[n+]1[O-]", "[O-][n+]1ccc(C)cc1"):
+        result, verified = _name_and_verify(smi)
+        assert verified == result.name, smi
+        assert "oxido" in result.name and "ium" in result.name, (smi, result.name)
+
+
+def test_m2_n_oxide_on_decorated_backbone_zero_wrong():
+    """An N-oxide embedded in a larger molecule (real census witnesses) composes
+    (``oxido``/``-ium`` + the rest) and full-InChIKey RT-verifies, or degrades to
+    abstain -- never wrong-constitution."""
+    for smi in ("Cc1c(C(=O)O)ccc(-c2cc[n+]([O-])cc2)c1C",
+                "CN(C(=O)Oc1cc[n+]([O-])cc1)c1ccccc1"):
+        result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+        if result is not None:
+            assert "oxido" in result.name, (smi, result.name)
+            assert verify_or_none(result.name, smi) == result.name, smi
+
+
+def test_m2_phosphine_oxide_semipolar_named_or_abstains():
+    """A charge-drawn phosphine oxide ``R3[P+]-[O-]`` uses the SAME oxido/-ium
+    mechanism (``oxido(triphenyl)phosphanium`` RT-verified); composes or abstains,
+    never wrong-constitution (0-wrong)."""
+    for smi in ("[O-][P+](c1ccccc1)(c1ccccc1)c1ccccc1",):
+        result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+        if result is not None:
+            assert "oxido" in result.name and "ium" in result.name, (smi, result.name)
+            assert verify_or_none(result.name, smi) == result.name, smi
+
+
 def test_m2_polynitro_now_named_not_voided():
     """A side benefit of the ``_walkable_pieces`` seed fix (M2 inc3): a polynitro
     ``C(-NO2)n`` -- previously voided because a nitro fragment could seed a
@@ -463,18 +499,10 @@ def test_charged_substituent_on_neutral_parent_carries_on_branch_name():
 # voids every one: none is spellable by this producer, so the floor degrades
 # to abstain, never mis-names.
 _INTERNAL_CHARGE_VOID_WITNESSES = [
-    ("N-oxide (aliphatic, TMAO)",        "C[N+](C)([O-])C"),
-    ("N-oxide (aromatic, pyridine)",     "[O-][n+]1ccccc1"),
-    ("N-oxide (NMMO)",                   "C[N+]1([O-])CCOCC1"),
-    ("N-oxide (2-methylpyridine)",       "Cc1cccc[n+]1[O-]"),
-    ("nitrone",                          "CC=[N+](C)[O-]"),
-    ("nitrile oxide",                    "CC#[N+][O-]"),
-    ("nitronate",                        "CC=[N+]([O-])[O-]"),
-    ("aci-nitro",                        "CC=[N+]([O-])O"),
-    ("thionitro",                        "CC[N+](=S)[O-]"),
-    ("S-oxide (charge-drawn, DMSO)",     "C[S+](C)[O-]"),
-    ("P-oxide (charge-drawn)",           "C[P+](C)(C)[O-]"),
-    ("S-oxide (ethyl-methyl)",           "C[S+]([O-])CC"),
+    ("nitronate (net -1 anion)",         "CC=[N+]([O-])[O-]"),
+    ("S-imide ylide (S+/N-)",            "C[S+]([N-]C)C"),
+    ("P-N ylide (P+/N-)",                "C[P+](C)(C)[N-]C"),
+    ("diazomethanide (net-0, C-/N+)",    "[CH2-][N+]#N"),
 ]
 
 
@@ -485,19 +513,45 @@ _INTERNAL_CHARGE_VOID_WITNESSES = [
 def test_internal_charge_classes_void_never_misname(label, smiles):
     """Fix round 1: an internal-charge class the module cannot spell must VOID
     (return None), never emit a coverage-complete name of a different molecule.
-    This is the fail-closed regression suite for the whole class.
+    This is the fail-closed regression suite for the residual class.
 
-    Polynitro is included deliberately: its nitro groups get shredded (a nitro
-    O can seed a spine, or be a raw-``GetNeighbors`` branch root), so they are
-    NEVER rendered as a ``_nitro_shortcut`` leaf -- their O(-) raw charge is
-    unconsumed and trips the guard. (A future task may NAME polynitro; for now,
-    voiding is correct and sufficient -- degrade to abstain, never mis-name.)"""
+    After M2 the semipolar-OXIDE family (N-oxide/nitrone/nitrile-oxide/aci-nitro/
+    thionitro/phosphine-oxide/sulfoxide) is NAMED via ``oxido``/``-ium`` (see
+    ``test_m2_semipolar_oxide_family_now_named``); what remains here is what still
+    has no faithful spelling in this floor -- a net-charged nitronate, and ylides
+    whose anion is a heteroatom on a cation the ``oxido`` leaf does not cover
+    (S+/N-, P+/N-, C-/N+). Each carries a raw formal charge that is neither a
+    genuine ion the suffix machinery consumes nor a rendered internal leaf, so the
+    raw-charge guard voids it -- degrade to abstain, never mis-name."""
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None
     assert name_universal_substitutive(mol) is None, (
         f"{label} ({smiles!r}) must VOID -- an internal charge this producer "
         f"cannot spell must never be absorbed into the skeleton as if neutral"
     )
+
+
+@pytest.mark.parametrize(
+    "smiles,expected", [
+        ("[O-][n+]1ccccc1", "1-oxido-1-azacyclohexa-1,3,5-trien-1-ium"),
+        ("CC=[N+](C)[O-]", "2-oxido-2-azabut-2-en-2-ium"),               # nitrone
+        ("CC#[N+][O-]", "1-oxido-1-azaprop-1-yn-1-ium"),                 # nitrile oxide
+        ("CC=[N+]([O-])O", "2-oxido-1-oxa-2-azabut-2-en-2-ium"),         # aci-nitro
+        ("CC[N+](=S)[O-]", "2-oxido-1-thia-2-azabut-1-en-2-ium"),       # thionitro
+        ("C[S+](C)[O-]", "2-oxido-2-thiapropan-2-ium"),                  # sulfoxide (DMSO)
+    ],
+    ids=["pyridine-Noxide", "nitrone", "nitrile-oxide", "aci-nitro",
+         "thionitro", "sulfoxide"],
+)
+def test_m2_semipolar_oxide_family_now_named(smiles, expected):
+    """M2 inc4: the whole P-74.2.1 semipolar-oxide family -- an ``X(+)-[O-]``
+    centre (X in N/P/S) -- is now rendered as the substitutive ``oxido``/``-ium``
+    zwitterion instead of voiding. Every one is full-InChIKey RT-verified (0-wrong,
+    the same molecule incl. charge/tautomer); these are best-effort systematic
+    names, not necessarily PINs (T4 floor)."""
+    result, verified = _name_and_verify(smiles)
+    assert result.name == expected, (smiles, result.name)
+    assert verified == result.name, smiles
 
 
 def test_np_ylide_zwitterion_names_and_verifies():
