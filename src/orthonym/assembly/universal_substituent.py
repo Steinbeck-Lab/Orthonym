@@ -129,9 +129,10 @@ BFS seed / branch root, so polynitro mis-named too). The fix is ONE general
 RAW-formal-charge void guard at the top-level entry point: VOID the whole
 result whenever any atom carries a nonzero raw formal charge that was NOT
 consumed by (a) the genuine-ion suffix machinery
-(``cation_sites | anion_sites``, asserted resolved) or (b) a nitro group
-actually rendered by ``_nitro_shortcut`` (tracked as
-``_ComponentResult.nitro_atoms``). ``get_ion_sites`` lists every
+(``cation_sites | anion_sites``, asserted resolved) or (b) a P-59/P-74.2.1
+internal centre actually rendered by a dedicated internal-charge leaf
+(nitro/azido/diazo/..., tracked as
+``_ComponentResult.internal_atoms``). ``get_ion_sites`` lists every
 nonzero-charge atom then removes the internal set, so
 ``cation_sites | anion_sites`` is EXACTLY the non-internal raw-charged atoms
 -- the guard therefore fires precisely on the internal charges, closing the
@@ -293,32 +294,37 @@ class _ComponentResult:
     #                                              symmetric to the atom-
     #                                              coverage assertion, but
     #                                              for CHARGE correctness.
-    nitro_atoms: FrozenSet[int] = frozenset()     # Task B2b fix round 1:
-    #                                              atom indices (N + both its
-    #                                              O) that were RENDERED as a
-    #                                              nitro group via
-    #                                              ``_nitro_shortcut``
-    #                                              SOMEWHERE within this
-    #                                              component (this level's own
-    #                                              leaf, unioned with every
-    #                                              child branch's own
-    #                                              `nitro_atoms`). Threaded --
+    internal_atoms: FrozenSet[int] = frozenset()  # Task B2b fix round 1 +
+    #                                              M2: atom indices whose P-59
+    #                                              INTERNAL / P-74.2.1 semipolar
+    #                                              formal charge was RENDERED by
+    #                                              a dedicated internal-charge
+    #                                              leaf (``_nitro_shortcut`` ->
+    #                                              nitro; M2 ``_azide_shortcut``
+    #                                              -> azido; ``_diazo_shortcut``
+    #                                              -> diazo; the ``oxido``/-ium
+    #                                              N-/P-/S-oxide pair) SOMEWHERE
+    #                                              within this component (this
+    #                                              level's own leaf, unioned with
+    #                                              every child branch's own
+    #                                              `internal_atoms`). Threaded --
     #                                              not re-derived by string-
-    #                                              matching the "nitro" token
-    #                                              at the top level -- because
-    #                                              a nitro nested inside a
-    #                                              rendered ``-yl`` substituent
-    #                                              is folded into that
-    #                                              substituent's token and
-    #                                              would be invisible to such a
-    #                                              scan. Consumed by the
+    #                                              matching a token at the top
+    #                                              level -- because such a centre
+    #                                              nested inside a rendered
+    #                                              ``-yl`` substituent is folded
+    #                                              into that substituent's token
+    #                                              and would be invisible to such
+    #                                              a scan. Consumed by the
     #                                              top-level RAW-formal-charge
-    #                                              void guard: nitro's P-59
-    #                                              INTERNAL charges are the one
-    #                                              internal-charge shape this
+    #                                              void guard: these P-59/P-74.2.1
+    #                                              internal charges are the
+    #                                              internal-charge shapes this
     #                                              module can actually spell,
-    #                                              so they are the sole
-    #                                              exception (b) to that guard.
+    #                                              so they are exception (b) to
+    #                                              that guard (get_ion_sites
+    #                                              STRIPS them, so they never
+    #                                              appear in ``all_charge_ids``).
     spine_atom_to_locant: Optional[Dict[int, int]] = None  # WS-STEREO: the
     #                                              atom->locant map of THIS
     #                                              level's OWN spine (chain,
@@ -457,13 +463,14 @@ def _name_universal_substitutive_unsafe(
     # atoms are precisely ``{raw-charged} - all_charge_ids``. VOID whenever
     # any atom carries a nonzero raw formal charge that was NOT consumed by
     # (a) the genuine-ion suffix machinery (``all_charge_ids``, asserted
-    # resolved above) or (b) a nitro group actually rendered by
-    # ``_nitro_shortcut`` (``comp.nitro_atoms`` -- the one internal-charge
-    # shape this module can spell). This also closes polynitro shredding: a
-    # torn-apart nitro is never rendered as a nitro leaf, so its O(-) raw
-    # charge is unconsumed and trips the guard, voiding the whole molecule
-    # (correct -- degrade to abstain, never mis-name).
-    charge_ok = all_charge_ids | comp.nitro_atoms
+    # resolved above) or (b) a P-59 internal / P-74.2.1 semipolar centre
+    # actually rendered by a dedicated internal-charge leaf (nitro / azido /
+    # diazo / the ``oxido``+``-ium`` N-/P-/S-oxide pair -- ``comp.internal_atoms``,
+    # the internal-charge shapes this module can spell). This also closes
+    # polynitro shredding: a torn-apart nitro is never rendered as a nitro leaf,
+    # so its O(-) raw charge is unconsumed and trips the guard, voiding the whole
+    # molecule (correct -- degrade to abstain, never mis-name).
+    charge_ok = all_charge_ids | comp.internal_atoms
     for a in ctx.mol.GetAtoms():
         if a.GetFormalCharge() != 0 and a.GetIdx() not in charge_ok:
             return None  # unspellable internal charge -> void, never mis-name
@@ -782,7 +789,7 @@ def _name_universal_substituent_prefix_unsafe(
         if s['atom_idx'] in frag)
     if comp.charged != frag_charge_ids:
         return None
-    charge_ok = comp.charged | comp.nitro_atoms
+    charge_ok = comp.charged | comp.internal_atoms
     for idx in frag:
         if ctx.mol.GetAtomWithIdx(idx).GetFormalCharge() != 0 and idx not in charge_ok:
             return None
@@ -830,16 +837,19 @@ def _name_component(
         shortcut = _leaf_shortcut(mol, component, attach_hint)
         if shortcut is not None:
             token, atoms = shortcut
-            # Task B2b fix round 1: record a rendered nitro group's atoms so
-            # the top-level raw-charge guard knows its P-59 internal charges
-            # ARE accounted for (exception (b)). ``_nitro_shortcut`` is the
-            # sole producer of the "nitro" token, so this single-site check
-            # is exact -- no other leaf carries a formal charge.
-            nitro_atoms = atoms if token == "nitro" else frozenset()
+            # Task B2b fix round 1 + M2: record an internal-charge leaf's atoms
+            # so the top-level raw-charge guard knows their P-59/P-74.2.1 internal
+            # charges ARE accounted for (exception (b)). Each internal-charge leaf
+            # token (nitro / azido / diazo) is produced by exactly one shortcut
+            # and covers exactly the internal-charged atoms of that group, so this
+            # token-set membership check is exact -- no OTHER leaf carries a
+            # formal charge (the neutral leaves bail on any charged atom, and the
+            # charged-terminal leaf uses its own ``charged`` field).
+            internal_atoms = atoms if token in _INTERNAL_CHARGE_LEAF_TOKENS else frozenset()
             return _ComponentResult(
                 name=token, bindings=[(token, atoms)], covers=atoms,
                 attach_locant=None, is_prefix_ready=True,
-                nitro_atoms=nitro_atoms,
+                internal_atoms=internal_atoms,
             )
 
         # WS7 (v34 composed-charge): a lone charged TERMINAL atom -- the bare
@@ -848,7 +858,7 @@ def _name_component(
         # skeleton, or a terminal ``-NH3(+)`` -- is rendered with its CHARGED
         # substituent prefix (``oxido``/``sulfido``/``azaniumyl``) and its atom
         # recorded in ``charged`` so the top-level charge-coverage assertion
-        # sees it accounted for (symmetric to the ``nitro_atoms`` thread above).
+        # sees it accounted for (symmetric to the ``internal_atoms`` thread above).
         # This is the coverage-floor's own FG-anion/terminal-cation handler; a
         # SKELETAL (non-terminal) charge is still resolved by
         # ``_resolve_spine_charge`` below.
@@ -914,7 +924,8 @@ def _name_component(
         (spine_core, frozenset(spine_atoms)),
     ]
     charged_accum: set = set(charge_ids)
-    nitro_accum: set = set()  # Task B2b fix round 1: rendered-nitro atoms
+    internal_accum: set = set()  # Task B2b fix round 1 + M2: rendered
+    #                              internal-charge atoms (nitro/azido/diazo/...)
     prefix_entries: Dict[str, List[int]] = {}
     for s_atom, root, order, branch_atoms in _discover_branches(
         mol, spine_atoms, component,
@@ -939,7 +950,7 @@ def _name_component(
         prefix_entries.setdefault(rendered, []).append(loc)
         bindings.append((rendered, sub.covers))
         charged_accum |= sub.charged
-        nitro_accum |= sub.nitro_atoms
+        internal_accum |= sub.internal_atoms
 
     prefix_parts = []
     for name, locs in prefix_entries.items():
@@ -972,7 +983,7 @@ def _name_component(
     return _ComponentResult(
         name=full_name, bindings=bindings, covers=covers,
         attach_locant=attach_locant, charged=frozenset(charged_accum),
-        nitro_atoms=frozenset(nitro_accum),
+        internal_atoms=frozenset(internal_accum),
         spine_atom_to_locant=dict(spine_atom_to_locant),
     )
 
@@ -1178,6 +1189,13 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             #            non-skeletal class -- see _SKELETAL_SPINE_ELEMENTS.
         if _is_nitro_root(ctx.mol, j):
             continue
+        if _is_azide_root(ctx.mol, j):
+            continue  # M2: azide N_alpha is always the ``azido`` branch leaf,
+            #            never threaded into the chain (its +1/-1 internal
+            #            charge carries no trace as a plain ``aza`` -- nitro
+            #            case, generalised). Ring path already branches it.
+        if _is_diazo_root(ctx.mol, j):
+            continue  # M2: diazo N_beta likewise -- always the ``diazo`` leaf.
         if _is_phosphinate_oxide_root(ctx.mol, j):
             continue
         if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom) is not None:
@@ -1731,6 +1749,16 @@ _LEAF_DOUBLE = {
 }
 
 
+# M2: leaf tokens whose atoms carry a P-59 internal / P-74.2.1 semipolar formal
+# charge that the leaf itself spells (so ``get_ion_sites`` strips those atoms and
+# they never reach the genuine-ion charge machinery). ``_name_component`` records
+# such a leaf's atoms in ``_ComponentResult.internal_atoms`` so the top-level and
+# prefix-path raw-formal-charge void guards know the charge IS accounted for. Each
+# token is produced by exactly one shortcut and covers exactly that group's
+# internally-charged atoms -- see the membership check in ``_name_component``.
+_INTERNAL_CHARGE_LEAF_TOKENS = frozenset({"nitro", "azido", "diazo"})
+
+
 def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     """A handful of common small groups named directly rather than via the
     generic chain/replacement machinery. Returns ``(token, atom_ids)`` or
@@ -1744,6 +1772,18 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     nitro = _nitro_shortcut(mol, component, attach_hint)
     if nitro is not None:
         return nitro
+
+    # M2: the other P-59 internal centres this module can spell as a TERMINAL
+    # substituent leaf -- azide (``azido``) and diazo (``diazo``). Like nitro,
+    # their charges are internal (get_ion_sites strips them), so they are
+    # checked HERE, before the generic charge guard below, and their atoms are
+    # tracked as ``internal_atoms`` (via ``_INTERNAL_CHARGE_LEAF_TOKENS``).
+    azide = _azide_shortcut(mol, component, attach_hint)
+    if azide is not None:
+        return azide
+    diazo = _diazo_shortcut(mol, component, attach_hint)
+    if diazo is not None:
+        return diazo
 
     # Task B2b: a GENUINELY charged atom anywhere in this branch (nitro,
     # just checked, is the only exception) must NEVER take one of the
@@ -1998,6 +2038,148 @@ def _is_nitro_root(mol, j: int) -> bool:
         bt = round(bond.GetBondTypeAsDouble())
         kinds.append((bt, o_atom.GetFormalCharge(), o_atom.GetTotalNumHs()))
     return sorted(kinds) == sorted([(2, 0, 0), (1, -1, 0)])
+
+
+# ===========================================================================
+# M2: organic azide  -N=[N+]=[N-]  (<-> resonance twin  -[N-]-[N+]#N)
+# ===========================================================================
+
+def _azide_nitrogens(mol, alpha_idx: int):
+    """If *alpha_idx* is the ATTACHMENT nitrogen (N_alpha) of a terminal organic
+    azide ``R-N=[N+]=[N-]`` -- or its charge-separated resonance twin
+    ``R-[N-]-[N+]#N``, which RDKit does not normalise -- return the frozenset of
+    its three nitrogen indices ``{alpha, beta, gamma}``, else ``None``.
+
+    The centre is defined by CONNECTIVITY + CHARGE, not one literal bond-order
+    pattern (so both drawings match): N_alpha has exactly one N neighbour
+    (N_beta, the central nitrogen, always ``+1`` in an azide); N_beta has exactly
+    two N neighbours (alpha, gamma) and no other heavy neighbour and no H; the
+    terminal N_gamma is heavy-degree 1 (only bonded to beta) and H-free; and the
+    end nitrogens {alpha, gamma} carry ``{0, -1}`` so the group is net-neutral.
+    Nitro/nitrogen-hydride/azide-anion shapes fail one of these exactly."""
+    a = mol.GetAtomWithIdx(alpha_idx)
+    if a.GetSymbol() != "N" or a.GetTotalNumHs() != 0:
+        return None
+    a_n = [n for n in a.GetNeighbors() if n.GetSymbol() == "N"]
+    if len(a_n) != 1:
+        return None
+    beta = a_n[0]
+    if beta.GetFormalCharge() != 1 or beta.GetTotalNumHs() != 0:
+        return None
+    b_n = [n for n in beta.GetNeighbors() if n.GetSymbol() == "N"]
+    b_heavy = [n for n in beta.GetNeighbors() if n.GetAtomicNum() > 1]
+    if len(b_n) != 2 or len(b_heavy) != 2:
+        return None  # central N must bond exactly alpha + gamma, nothing else
+    gamma = next((n for n in b_n if n.GetIdx() != alpha_idx), None)
+    if gamma is None:
+        return None
+    g_heavy = [n for n in gamma.GetNeighbors() if n.GetAtomicNum() > 1]
+    if len(g_heavy) != 1 or g_heavy[0].GetIdx() != beta.GetIdx():
+        return None  # gamma must be the true terminus
+    if gamma.GetTotalNumHs() != 0:
+        return None
+    if sorted([a.GetFormalCharge(), gamma.GetFormalCharge()]) != [-1, 0]:
+        return None
+    return frozenset({alpha_idx, beta.GetIdx(), gamma.GetIdx()})
+
+
+def _is_azide_root(mol, j: int) -> bool:
+    """True if atom *j* is an azide's ATTACHMENT nitrogen (see
+    ``_azide_nitrogens``) -- used by ``_tree_neighbors`` to keep the azide out
+    of ordinary chain-spine continuation, so its three nitrogens are always
+    resolved as ONE branch by ``_azide_shortcut`` (the ``azido`` leaf) rather
+    than threaded into a replacement-nomenclature chain as plain ``aza`` atoms
+    (which would silently drop the +1/-1 internal charge -- the nitro case,
+    generalised)."""
+    return _azide_nitrogens(mol, j) is not None
+
+
+def _azide_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """``-N=[N+]=[N-]`` (or its resonance twin) attached via N_alpha, exactly
+    the three azide nitrogens -- rendered as the ``azido`` substituent prefix
+    (P-61.5 / P-59 internal charge; OPSIN-RT-verified: ``azidobenzene`` and
+    ``1-azidohexane`` both parse back to the input constitution). Returns
+    ``("azido", atom_ids)`` or ``None`` (fall through)."""
+    if len(component) != 3:
+        return None
+    az = _azide_nitrogens(mol, attach_hint)
+    if az is None or az != component:
+        return None
+    # attach_hint must be the real attachment: one heavy neighbour OUTSIDE the
+    # azide (the parent R). This also rejects a bare HN3-style fragment.
+    outside = [n for n in mol.GetAtomWithIdx(attach_hint).GetNeighbors()
+               if n.GetAtomicNum() > 1 and n.GetIdx() not in component]
+    if len(outside) != 1:
+        return None
+    return "azido", frozenset(component)
+
+
+# ===========================================================================
+# M2: diazo  >C=[N+]=[N-]  (<-> resonance twin  >C(-)-[N+]#N)
+# ===========================================================================
+
+def _diazo_nitrogens(mol, beta_idx: int):
+    """If *beta_idx* is the ATTACHMENT nitrogen (N_beta) of a terminal diazo
+    group ``>C=[N+]=[N-]`` -- or its resonance twin ``>C(-)-[N+]#N`` -- return
+    the frozenset ``{beta, gamma}`` of its two nitrogens, else ``None``.
+
+    N_beta is the central ``+1`` nitrogen doubly/singly bonded to the parent
+    carbon and to the terminal N_gamma; both nitrogens are heavy-degree bounded
+    to the diazo skeleton (beta: one C + gamma; gamma: only beta) and H-free,
+    and the group is net-neutral (gamma is ``-1``, or ``0`` in the twin where
+    beta stays ``+1`` and the carbon carries the ``-1`` -- handled by requiring
+    beta ``+1`` and beta+gamma summing with the parent to zero locally)."""
+    beta = mol.GetAtomWithIdx(beta_idx)
+    if beta.GetSymbol() != "N" or beta.GetFormalCharge() != 1 or beta.GetTotalNumHs() != 0:
+        return None
+    heavy = [n for n in beta.GetNeighbors() if n.GetAtomicNum() > 1]
+    if len(heavy) != 2:
+        return None
+    n_nbr = [n for n in heavy if n.GetSymbol() == "N"]
+    c_nbr = [n for n in heavy if n.GetSymbol() == "C"]
+    if len(n_nbr) != 1 or len(c_nbr) != 1:
+        return None
+    gamma = n_nbr[0]
+    g_heavy = [n for n in gamma.GetNeighbors() if n.GetAtomicNum() > 1]
+    if len(g_heavy) != 1 or g_heavy[0].GetIdx() != beta_idx or gamma.GetTotalNumHs() != 0:
+        return None
+    # net-neutral over the two-N terminus: gamma is the -1 end (canonical
+    # drawing) or 0 (twin, where the parent carbon holds the -1). Either way the
+    # two nitrogens carry a total of 0 or -1; the parent-carbon charge closes it.
+    if gamma.GetFormalCharge() not in (-1, 0):
+        return None
+    return frozenset({beta_idx, gamma.GetIdx()})
+
+
+def _is_diazo_root(mol, j: int) -> bool:
+    """True if atom *j* is a diazo group's attachment nitrogen (see
+    ``_diazo_nitrogens``) -- used by ``_tree_neighbors`` to keep it off the
+    chain spine (its ``+1`` N would otherwise thread in as a plain ``aza`` atom,
+    dropping the internal charge), so the two diazo nitrogens are always
+    resolved as one ``diazo`` branch leaf."""
+    return _diazo_nitrogens(mol, j) is not None
+
+
+def _diazo_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """``=[N+]=[N-]`` (or its resonance twin) attached via N_beta to a parent
+    carbon -- rendered as the ``diazo`` substituent prefix (P-66.4.1.2.1; OPSIN-
+    RT-verified: ``ethyl 2-diazoacetate`` and ``(diazomethyl)benzene`` both parse
+    back to the input). Returns ``("diazo", atom_ids)`` or ``None``.
+
+    ``diazo`` is prefix-ready (``is_prefix_ready``) and already encodes its
+    double-bond attachment, so ``_render_as_substituent`` returns it unchanged
+    regardless of the discovered bond order (mirrors ``oxo``/``nitro``)."""
+    if len(component) != 2:
+        return None
+    dz = _diazo_nitrogens(mol, attach_hint)
+    if dz is None or dz != component:
+        return None
+    # the parent carbon must be OUTSIDE this two-atom branch
+    outside = [n for n in mol.GetAtomWithIdx(attach_hint).GetNeighbors()
+               if n.GetAtomicNum() > 1 and n.GetIdx() not in component]
+    if len(outside) != 1 or outside[0].GetSymbol() != "C":
+        return None
+    return "diazo", frozenset(component)
 
 
 def _phosphinate_oxide_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):

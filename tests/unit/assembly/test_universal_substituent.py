@@ -258,6 +258,64 @@ def test_internally_charged_species_now_named_not_voided():
 
 
 # ===========================================================================
+# M2 (internal/semipolar charge): the P-59 internal centres get_ion_sites
+# STRIPS -- so they void the raw-formal-charge guard -- now rendered by
+# dedicated leaves instead. Each is net-neutral and OPSIN-round-trips (the
+# spelling was verified against OPSIN 2.9.0 before wiring).
+# ===========================================================================
+
+def test_m2_azide_terminal_named_not_voided():
+    """M2 inc1: an organic azide ``-N=[N+]=[N-]`` (P-59 internal, net-0) is
+    rendered as the ``azido`` prefix (OPSIN-RT-verified: ``azidobenzene`` ->
+    the input) rather than voiding on the raw-charge guard. The DOMINANT
+    residual centre (~1354 of the M2 class)."""
+    for smi in ("c1ccccc1N=[N+]=[N-]", "CCCCCCN=[N+]=[N-]"):
+        result, verified = _name_and_verify(smi)
+        assert verified == result.name, smi
+        assert "azido" in result.name, (smi, result.name)
+
+
+def test_m2_azide_resonance_twin_named():
+    """The charge-separated resonance drawing ``R-[N-]-[N+]#N`` denotes the
+    same azide and must also render ``azido`` (RDKit does not normalise
+    resonance forms; the leaf accepts both bond patterns)."""
+    result, verified = _name_and_verify("c1ccccc1[N-][N+]#N")
+    assert verified == result.name
+    assert "azido" in result.name
+
+
+def test_m2_azide_on_decorated_backbone():
+    """A real ZINC-residual azide witness composes: the azido leaf plus the
+    rest of the graph, full-InChIKey verified."""
+    smi = "C[C@H](CN=[N+]=[N-])NC(=O)[C@@H](O)CCNC(=O)[C@H]1CCC(C)(C)C1"
+    result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+    if result is not None:  # composition of the rest may still bar it; 0-wrong
+        assert "azido" in result.name
+        assert verify_or_none(result.name, smi) == result.name
+
+
+def test_m2_diazo_terminal_named_not_voided():
+    """M2 inc1: a diazo group ``>C=[N+]=[N-]`` (P-66.4.1.2.1 / P-59 internal,
+    net-0) is rendered as the ``diazo`` prefix rather than voiding on the
+    raw-charge guard. Each emission is full-InChIKey RT-verified (0-wrong)."""
+    for smi in ("C=[N+]=[N-]", "CC=[N+]=[N-]", "CC(=[N+]=[N-])C"):
+        result, verified = _name_and_verify(smi)
+        assert verified == result.name, smi
+        assert "diazo" in result.name, (smi, result.name)
+
+
+def test_m2_diazo_composed_backbone_is_zero_wrong():
+    """A diazo group on a decorated backbone either composes (``diazo`` +
+    RT-verified) or degrades to abstain (composition limit) -- never a
+    wrong-constitution emission. 0-wrong is the invariant, coverage the goal."""
+    for smi in ("CC(=[N+]=[N-])C(=O)OCC", "O=C(O)C=[N+]=[N-]"):
+        result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+        if result is not None:
+            assert "diazo" in result.name, (smi, result.name)
+            assert verify_or_none(result.name, smi) == result.name, smi
+
+
+# ===========================================================================
 # Task B2b: charge / indicated-H as suffixes (step 4 of the design).
 # ===========================================================================
 
@@ -345,11 +403,6 @@ _INTERNAL_CHARGE_VOID_WITNESSES = [
     ("N-oxide (aromatic, pyridine)",     "[O-][n+]1ccccc1"),
     ("N-oxide (NMMO)",                   "C[N+]1([O-])CCOCC1"),
     ("N-oxide (2-methylpyridine)",       "Cc1cccc[n+]1[O-]"),
-    ("azide (ethyl)",                    "CCN=[N+]=[N-]"),
-    ("azide (resonance twin)",           "CC[N-][N+]#N"),
-    ("azide (cyclohexyl)",               "[N-]=[N+]=NC1CCCCC1"),
-    ("diazo (methane)",                  "C=[N+]=[N-]"),
-    ("diazo (ethane)",                   "CC=[N+]=[N-]"),
     ("nitrone",                          "CC=[N+](C)[O-]"),
     ("nitrile oxide",                    "CC#[N+][O-]"),
     ("nitronate",                        "CC=[N+]([O-])[O-]"),
