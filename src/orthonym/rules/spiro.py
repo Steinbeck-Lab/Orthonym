@@ -1791,8 +1791,16 @@ def _name_vonbaeyer_fused_component(
 
 def _name_fused_component(
     mol, fused_rings: List[List[int]], allow_vonbaeyer: bool = False,
+    force_vonbaeyer: bool = False,
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]]]]:
     """Name the fused component fragment.
+
+    ``force_vonbaeyer`` (Task C floor retry): bypass the catalog / systematic
+    fusion namer entirely and name the component as its faithful kekulized
+    von-Baeyer polyene. Used ONLY on the offer-RT-gated retry path for a
+    molecule whose systematic fused-spiro name failed round-trip (a wrong or
+    unparseable fusion descriptor) -- the von-Baeyer form is always
+    constitution-faithful, so this recovers breadth at 0-wrong (uglier name).
 
     Returns (name, orig_atom_idx -> locant_in_name) on success, or None. A
     locant is an integer peripheral position, or a letter-suffixed fusion
@@ -1815,6 +1823,9 @@ def _name_fused_component(
         return None
     frag, orig_to_frag = extracted
     frag_to_orig = {v: k for k, v in orig_to_frag.items()}
+
+    if force_vonbaeyer:
+        return _name_vonbaeyer_fused_component(mol, fused_atoms)
 
     # Prefer the heterocycle catalog path first — direct call to
     # match_fused_heterocycle_core preserves the locant mapping that
@@ -2559,6 +2570,7 @@ def _build_lambda_ih_front_prefix(
 
 def name_mixed_spiro_fused(
     mol, allow_vonbaeyer_component: bool = False,
+    force_vonbaeyer_component: bool = False,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
     """
     Build the HERITAGE §4 separable-parts name for a mixed spiro/fused system.
@@ -2593,7 +2605,8 @@ def name_mixed_spiro_fused(
     Source: 151-CONTEXT.md D-13; HERITAGE-1990-insights.md §4;
             IUPAC P-24; Q-05 OPSIN preview (151-AUDIT-B.md).
     """
-    if not is_mixed_spiro_fused(mol, allow_vonbaeyer=allow_vonbaeyer_component):
+    allow_vb = allow_vonbaeyer_component or force_vonbaeyer_component
+    if not is_mixed_spiro_fused(mol, allow_vonbaeyer=allow_vb):
         return None
 
     spiro_atoms = get_spiro_atoms(mol)
@@ -2618,7 +2631,8 @@ def name_mixed_spiro_fused(
 
     # Step 2: name the fused component
     fused_named = _name_fused_component(
-        mol, fused_rings, allow_vonbaeyer=allow_vonbaeyer_component)
+        mol, fused_rings, allow_vonbaeyer=allow_vb,
+        force_vonbaeyer=force_vonbaeyer_component)
     if fused_named is None:
         return None
     fused_name, fused_atom_to_locant = fused_named
@@ -2754,17 +2768,18 @@ def _partition_rings_at_spiro(
     return comp_a, comp_b
 
 
-def _name_component_either(mol, ring_list, allow_vonbaeyer):
+def _name_component_either(mol, ring_list, allow_vonbaeyer, force_vonbaeyer=False):
     """Name ONE spiro-side component (a list of ring atom lists): a single ring
     via ``_name_side_ring``, a multi-ring fused/bridged system via
     ``_name_fused_component``. Returns ``(name, atom_to_locant)`` or None."""
     if len(ring_list) == 1:
         return _name_side_ring(mol, ring_list[0])
-    return _name_fused_component(mol, ring_list, allow_vonbaeyer=allow_vonbaeyer)
+    return _name_fused_component(mol, ring_list, allow_vonbaeyer=allow_vonbaeyer,
+                                 force_vonbaeyer=force_vonbaeyer)
 
 
 def _name_general_monospiro_fused(
-    mol, allow_vonbaeyer: bool = True,
+    mol, allow_vonbaeyer: bool = True, force_vonbaeyer: bool = False,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
     """Task C (floor-only): the P-24.5.1 separable name for a monospiro system
     whose BOTH sides may be fused/bridged ring systems — the ``both-sides-fused``
@@ -2825,8 +2840,8 @@ def _name_general_monospiro_fused(
     if a_atoms & b_atoms != {spiro_center}:
         return None  # the two sides must meet ONLY at the spiro atom
 
-    a_named = _name_component_either(mol, a_rings, allow_vonbaeyer)
-    b_named = _name_component_either(mol, b_rings, allow_vonbaeyer)
+    a_named = _name_component_either(mol, a_rings, allow_vonbaeyer, force_vonbaeyer)
+    b_named = _name_component_either(mol, b_rings, allow_vonbaeyer, force_vonbaeyer)
     if a_named is None or b_named is None:
         return None
     a_name, a_map = a_named
@@ -2895,7 +2910,7 @@ def _fused_components_atoms(mol) -> List[Set[int]]:
 
 
 def _name_linear_polyspiro_fused(
-    mol, allow_vonbaeyer: bool = True,
+    mol, allow_vonbaeyer: bool = True, force_vonbaeyer: bool = False,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
     """Task C (floor-only): the P-24.4 separable name for a LINEAR polyspiro
     system — ``dispiro``/``trispiro``… of fused/ring components joined in a chain
@@ -2943,7 +2958,7 @@ def _name_linear_polyspiro_fused(
     # order the chain from a deterministic endpoint: name both terminals, start
     # from the alphanumerically-smaller (tie -> lower min atom index).
     def _term_name(k):
-        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer)
+        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer, force_vonbaeyer)
         return r
     end_named = {k: _term_name(k) for k in endpoints}
     if any(v is None for v in end_named.values()):
@@ -2980,7 +2995,7 @@ def _name_linear_polyspiro_fused(
     # name every component; collect its spiro-atom -> locant map
     named = []
     for k in order:
-        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer)
+        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer, force_vonbaeyer)
         if r is None:
             return None
         named.append(r)  # (name, atom_to_locant)
@@ -3027,7 +3042,7 @@ def _name_linear_polyspiro_fused(
     return (name, core_ring_atoms, combined_locants, False)
 
 
-def _name_component_either_atoms(mol, comp_atoms: Set[int], allow_vonbaeyer):
+def _name_component_either_atoms(mol, comp_atoms: Set[int], allow_vonbaeyer, force_vonbaeyer=False):
     """Name ONE component given its ATOM set: a single ring via
     ``_name_side_ring``, a multi-ring fused/bridged system via
     ``_name_fused_component``. Returns ``(name, atom_to_locant)`` or None."""
@@ -3035,7 +3050,7 @@ def _name_component_either_atoms(mol, comp_atoms: Set[int], allow_vonbaeyer):
     ring_list = [list(r) for r in ri.AtomRings() if set(r) <= comp_atoms]
     if not ring_list:
         return None
-    return _name_component_either(mol, ring_list, allow_vonbaeyer)
+    return _name_component_either(mol, ring_list, allow_vonbaeyer, force_vonbaeyer)
 
 
 def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: int):

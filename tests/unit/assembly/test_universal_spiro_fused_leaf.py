@@ -225,3 +225,34 @@ def test_linear_polyspiro_declines_monospiro():
     from orthonym.rules.spiro import _name_linear_polyspiro_fused
     m = Chem.MolFromSmiles("C1=CC2C(C1)CC21OCCO1")  # monospiro
     assert _name_linear_polyspiro_fused(m) is None
+
+
+# --- von-Baeyer retry: a fused-spiro whose SYSTEMATIC fusion name is wrong/
+#     unparseable ships the faithful von-Baeyer polyene form instead -----------
+
+@pytest.mark.opsin_gate
+@pytest.mark.roundtrip
+def test_force_vonbaeyer_spiro_recovers_wrong_fusion_descriptor():
+    """furo[3,4-c]pyridine spiro pyrrolidine: the systematic fusion name is
+    round-trip-WRONG, so the ``force_vonbaeyer_spiro`` retry names the fused
+    component as its von-Baeyer polyene and the molecule ships 0-wrong."""
+    from orthonym.assembly.universal_substituent import name_universal_substitutive
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    from orthonym.validation.reconstruct import verify_or_none
+    smi = "O=C1OC2(CCNC2)c2ccncc21"
+    m = Chem.MolFromSmiles(smi)
+    # the forced form names the fused component as an oxa-aza-bicyclo polyene
+    res = name_universal_substitutive(m, force_vonbaeyer_spiro=True)
+    assert res is not None and "bicyclo[" in res.name, res
+    assert verify_or_none(res.name, Chem.MolToSmiles(m)) is not None
+    assert _const(opsin_parse(res.name)) == _const(smi)
+
+
+def test_force_vonbaeyer_spiro_default_off_is_systematic():
+    """Default (no force) keeps the systematic naming for a catalog fused core
+    (retry is opt-in, never the default nomenclature)."""
+    from orthonym.assembly.universal_substituent import name_universal_substitutive
+    # an indole spiro that names via the systematic separable form
+    smi = "O=C(Nc1cccc2c1CCC2)C1=CC2(CCNCC2)Oc2ccccc21"
+    r_default = name_universal_substitutive(Chem.MolFromSmiles(smi))
+    assert r_default is not None and "1-benzopyran" in r_default.name

@@ -241,6 +241,12 @@ class _Ctx:
     # call to decide whether ITS OWN spine needs a charge suffix.
     cation_sites: List[Dict[str, object]]
     anion_sites: List[Dict[str, object]]
+    # Task C: when True the spiro ring-leaf FORCES the von-Baeyer form of a fused
+    # spiro component (skipping the systematic fusion namer), so the floor can
+    # RETRY a molecule whose systematic fused-spiro name failed the offer RT gate
+    # (a wrong/unparseable fusion descriptor) with the always-faithful kekulized
+    # von-Baeyer polyene instead. Default off; set only on the retry path.
+    force_vonbaeyer_spiro: bool = False
 
 
 @dataclass(frozen=True)
@@ -337,6 +343,7 @@ class _ComponentResult:
 
 def name_universal_substitutive(
     mol, atom_work_budget: int = DEFAULT_ATOM_WORK_BUDGET,
+    force_vonbaeyer_spiro: bool = False,
 ) -> Optional[UniversalResult]:
     """Name *mol* unconditionally, or return ``None`` (void -- never partial).
 
@@ -387,13 +394,14 @@ def name_universal_substitutive(
     if mol is None:
         return None
     try:
-        return _name_universal_substitutive_unsafe(mol, atom_work_budget)
+        return _name_universal_substitutive_unsafe(
+            mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro)
     except Exception:
         return None
 
 
 def _name_universal_substitutive_unsafe(
-    mol, atom_work_budget: int,
+    mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
 ) -> Optional[UniversalResult]:
     """The real body -- may raise; ``name_universal_substitutive`` is the
     only caller and converts every exception to ``None``."""
@@ -410,7 +418,8 @@ def _name_universal_substitutive_unsafe(
     # ``atom_work_budget`` alone, so a caller cannot re-enable the crash by
     # passing a larger budget (that budget still legitimately raises the
     # RECURSIVE-work ceiling; it cannot raise the raw-size safety ceiling).
-    built = _build_ctx(mol, atom_work_budget)
+    built = _build_ctx(mol, atom_work_budget,
+                       force_vonbaeyer_spiro=force_vonbaeyer_spiro)
     if built is None:
         return None
     ctx, heavy = built
@@ -584,7 +593,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
 
 
 def _build_ctx(
-    mol, atom_work_budget: int,
+    mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
 ) -> Optional[Tuple["_Ctx", FrozenSet[int]]]:
     """Shared whole-molecule perception + ``_Ctx`` setup for BOTH public
     entry points (``name_universal_substitutive`` on the whole graph and
@@ -691,7 +700,8 @@ def _build_ctx(
 
     ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
                budget=_Budget(atom_work_budget), canon_rank=canon_rank,
-               cation_sites=cation_sites, anion_sites=anion_sites)
+               cation_sites=cation_sites, anion_sites=anion_sites,
+               force_vonbaeyer_spiro=force_vonbaeyer_spiro)
     return ctx, heavy
 
 
@@ -1282,22 +1292,31 @@ def _mixed_spiro_fused_leaf(
         name_mixed_spiro_fused, _name_general_monospiro_fused,
         _name_linear_polyspiro_fused,
     )
+    fvb = ctx.force_vonbaeyer_spiro
     try:
         # allow_vonbaeyer_component: the FLOOR additionally degrades a
         # spiro-of-bicyclic (the (c)-aliphatic bucket) to the P-24.5.1 separable
         # ``spiro[bicyclo[...]-x,y'-<comp2>]`` covering name. PIN path is
         # untouched (name_mixed_spiro_fused default keeps the flag off).
-        res = name_mixed_spiro_fused(ctx.mol, allow_vonbaeyer_component=True)
+        # ``force_vonbaeyer`` (retry path): name a fused spiro component as its
+        # faithful von-Baeyer polyene instead of the systematic fusion name, so
+        # a molecule whose systematic name failed the offer RT gate (wrong /
+        # unparseable fusion descriptor) still ships a 0-wrong covering name.
+        res = name_mixed_spiro_fused(
+            ctx.mol, allow_vonbaeyer_component=True,
+            force_vonbaeyer_component=fvb)
         if res is None:
             # both-sides-fused fallback: a monospiro whose BOTH sides are
             # fused/bridged systems (name_mixed_spiro_fused requires one side to
             # be a single ring). Names each side independently and joins the
             # P-24.5.1 separable form. Floor-only; offer-RT-gated.
-            res = _name_general_monospiro_fused(ctx.mol, allow_vonbaeyer=True)
+            res = _name_general_monospiro_fused(
+                ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb)
         if res is None:
             # linear polyspiro fallback: dispiro/trispiro chain of fused/ring
             # components (the polyspiro (c)-bucket). Floor-only; offer-RT-gated.
-            res = _name_linear_polyspiro_fused(ctx.mol, allow_vonbaeyer=True)
+            res = _name_linear_polyspiro_fused(
+                ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb)
     except Exception:
         return None
     if res is None:

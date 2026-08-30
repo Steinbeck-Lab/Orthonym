@@ -231,6 +231,15 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
         uni = name_universal_substitutive(mol)
         if uni is not None and uni.name and verify_or_none(uni.name, smi) is not None:
             return _Candidate(name=uni.name, result_obj=None)
+        # Task C retry: the systematic fused-spiro name (a fusion descriptor the
+        # numbering subsystem got wrong or OPSIN cannot parse) failed the gate.
+        # Retry FORCING the von-Baeyer polyene form of the fused spiro
+        # component -- always constitution-faithful, so it recovers breadth at
+        # 0-wrong with an uglier (non-PIN, floor-only) covering name.
+        uni_vb = name_universal_substitutive(mol, force_vonbaeyer_spiro=True)
+        if uni_vb is not None and uni_vb.name \
+                and verify_or_none(uni_vb.name, smi) is not None:
+            return _Candidate(name=uni_vb.name, result_obj=None)
     except Exception as exc:  # fail-closed: keep the rung, never abstain
         logger.info("t4 verified-floor preference raised: %s", exc)
     return candidate
