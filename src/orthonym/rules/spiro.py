@@ -1494,7 +1494,8 @@ def get_rings_from_spiro_center(
 # ============================================================================
 
 
-def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False) -> bool:
+def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False,
+                         restrict_atoms: Optional[Set[int]] = None) -> bool:
     """
     Detect a mixed spiro / fused ring system AMENABLE TO HERITAGE §4 NAMING.
 
@@ -1529,12 +1530,21 @@ def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False) -> bool:
     if mol is None:
         return False
     spiro_atoms = get_spiro_atoms(mol)
+    if restrict_atoms is not None:
+        # Task C: name ONE ring system of a molecule that has several disjoint
+        # spiro cores (two bridged spiro-hydantoins, a spiro core plus a
+        # spiro-substituent ...). Consider only the spiro atoms and rings inside
+        # this system, so the sibling spiro core is not miscounted as a second
+        # spiro atom (which would void this monospiro-only namer).
+        spiro_atoms = {a for a in spiro_atoms if a in restrict_atoms}
     if not spiro_atoms:
         return False
     if len(spiro_atoms) != 1:
         return False  # v18 scope: monospiro mixed only.
     ri = mol.GetRingInfo()
-    if ri.NumRings() <= len(spiro_atoms) + 1:
+    n_rings_here = (sum(1 for r in ri.AtomRings() if set(r) <= restrict_atoms)
+                    if restrict_atoms is not None else ri.NumRings())
+    if n_rings_here <= len(spiro_atoms) + 1:
         return False  # pure spiro — defer to is_spiro_system
     # FALSE-POSITIVE GUARD per RESEARCH Pitfall 3: steroid + alkaloid
     # backbones short-circuit to False.
@@ -1552,7 +1562,8 @@ def is_mixed_spiro_fused(mol, allow_vonbaeyer: bool = False) -> bool:
     # restrictions once both-sides-fused / multi-spiro-mixed naming is
     # implemented.
     spiro_center = list(spiro_atoms)[0]
-    all_rings = [list(r) for r in ri.AtomRings()]
+    all_rings = [list(r) for r in ri.AtomRings()
+                 if restrict_atoms is None or set(r) <= restrict_atoms]
     classification = _classify_rings_around_spiro_center(
         mol, spiro_center, all_rings,
     )
@@ -2571,6 +2582,7 @@ def _build_lambda_ih_front_prefix(
 def name_mixed_spiro_fused(
     mol, allow_vonbaeyer_component: bool = False,
     force_vonbaeyer_component: bool = False,
+    restrict_atoms: Optional[Set[int]] = None,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
     """
     Build the HERITAGE §4 separable-parts name for a mixed spiro/fused system.
@@ -2606,10 +2618,16 @@ def name_mixed_spiro_fused(
             IUPAC P-24; Q-05 OPSIN preview (151-AUDIT-B.md).
     """
     allow_vb = allow_vonbaeyer_component or force_vonbaeyer_component
-    if not is_mixed_spiro_fused(mol, allow_vonbaeyer=allow_vb):
+    if not is_mixed_spiro_fused(mol, allow_vonbaeyer=allow_vb,
+                                restrict_atoms=restrict_atoms):
         return None
 
     spiro_atoms = get_spiro_atoms(mol)
+    if restrict_atoms is not None:
+        # Task C: name ONLY this ring system's spiro core when the molecule has
+        # several disjoint spiro cores (each is named independently by the
+        # per-ring-system recursion; the sibling core is a substituent branch).
+        spiro_atoms = {a for a in spiro_atoms if a in restrict_atoms}
     if len(spiro_atoms) != 1:
         # v18 scope: monospiro mixed only. Multi-spiro mixed is logged
         # to HERITAGE-followups for v19 in Task 2 commit message.
@@ -2617,7 +2635,8 @@ def name_mixed_spiro_fused(
     spiro_center = list(spiro_atoms)[0]
 
     ri = mol.GetRingInfo()
-    all_rings = [list(r) for r in ri.AtomRings()]
+    all_rings = [list(r) for r in ri.AtomRings()
+                 if restrict_atoms is None or set(r) <= restrict_atoms]
 
     classification = _classify_rings_around_spiro_center(
         mol, spiro_center, all_rings,
@@ -2780,6 +2799,7 @@ def _name_component_either(mol, ring_list, allow_vonbaeyer, force_vonbaeyer=Fals
 
 def _name_general_monospiro_fused(
     mol, allow_vonbaeyer: bool = True, force_vonbaeyer: bool = False,
+    restrict_atoms: Optional[Set[int]] = None,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
     """Task C (floor-only): the P-24.5.1 separable name for a monospiro system
     whose BOTH sides may be fused/bridged ring systems — the ``both-sides-fused``
@@ -2792,14 +2812,17 @@ def _name_general_monospiro_fused(
     engine (recursive pattern), then assembles
     ``spiro[<comp1>-x,y'-<comp2>]`` in alphanumerical component order. Every
     emission is offer-RT-gated (0-wrong). Returns the ``name_spiro_system`` shape
-    or None.
-    """
+    or None. ``restrict_atoms`` scopes to ONE ring system of a molecule with
+    several disjoint spiro cores."""
     spiro_atoms = get_spiro_atoms(mol)
+    if restrict_atoms is not None:
+        spiro_atoms = {a for a in spiro_atoms if a in restrict_atoms}
     if len(spiro_atoms) != 1:
         return None
     spiro_center = next(iter(spiro_atoms))
     ri = mol.GetRingInfo()
-    all_rings = [list(r) for r in ri.AtomRings()]
+    all_rings = [list(r) for r in ri.AtomRings()
+                 if restrict_atoms is None or set(r) <= restrict_atoms]
     rings_at = [i for i, r in enumerate(all_rings) if spiro_center in r]
     if len(rings_at) != 2:
         return None
@@ -2911,6 +2934,7 @@ def _fused_components_atoms(mol) -> List[Set[int]]:
 
 def _name_linear_polyspiro_fused(
     mol, allow_vonbaeyer: bool = True, force_vonbaeyer: bool = False,
+    restrict_atoms: Optional[Set[int]] = None,
 ) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
     """Task C (floor-only): the P-24.4 separable name for a LINEAR polyspiro
     system — ``dispiro``/``trispiro``… of fused/ring components joined in a chain
@@ -2928,9 +2952,13 @@ def _name_linear_polyspiro_fused(
     Returns the ``name_spiro_system`` shape or None (fail-closed on any non-path
     topology, lettered spiro locant, or naming decline)."""
     spiro_atoms = get_spiro_atoms(mol)
+    if restrict_atoms is not None:
+        spiro_atoms = {a for a in spiro_atoms if a in restrict_atoms}
     if len(spiro_atoms) < 2:
         return None
     comps = _fused_components_atoms(mol)
+    if restrict_atoms is not None:
+        comps = [c for c in comps if c <= restrict_atoms]
     ncomp = len(comps)
     # spiro-component graph: each spiro atom joins the 2 components it lies in.
     edges: List[Tuple[int, int, int]] = []  # (comp_i, comp_j, spiro_atom)

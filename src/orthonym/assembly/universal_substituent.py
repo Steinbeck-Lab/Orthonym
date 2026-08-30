@@ -1293,6 +1293,12 @@ def _mixed_spiro_fused_leaf(
         _name_linear_polyspiro_fused,
     )
     fvb = ctx.force_vonbaeyer_spiro
+    # ``restrict_atoms`` = THIS ring system: a molecule can hold several DISJOINT
+    # spiro cores (two chain-bridged spiro-hydantoins, a spiro core plus a
+    # spiro-substituent), and each ring system is named independently by the
+    # per-ring-system recursion. Without this the namers saw the WHOLE molecule's
+    # spiro atoms (>1) and voided every disjoint core as "multi-spiro".
+    restrict = set(ring_atoms)
     try:
         # allow_vonbaeyer_component: the FLOOR additionally degrades a
         # spiro-of-bicyclic (the (c)-aliphatic bucket) to the P-24.5.1 separable
@@ -1304,19 +1310,21 @@ def _mixed_spiro_fused_leaf(
         # unparseable fusion descriptor) still ships a 0-wrong covering name.
         res = name_mixed_spiro_fused(
             ctx.mol, allow_vonbaeyer_component=True,
-            force_vonbaeyer_component=fvb)
+            force_vonbaeyer_component=fvb, restrict_atoms=restrict)
         if res is None:
             # both-sides-fused fallback: a monospiro whose BOTH sides are
             # fused/bridged systems (name_mixed_spiro_fused requires one side to
             # be a single ring). Names each side independently and joins the
             # P-24.5.1 separable form. Floor-only; offer-RT-gated.
             res = _name_general_monospiro_fused(
-                ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb)
+                ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb,
+                restrict_atoms=restrict)
         if res is None:
             # linear polyspiro fallback: dispiro/trispiro chain of fused/ring
             # components (the polyspiro (c)-bucket). Floor-only; offer-RT-gated.
             res = _name_linear_polyspiro_fused(
-                ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb)
+                ctx.mol, allow_vonbaeyer=True, force_vonbaeyer=fvb,
+                restrict_atoms=restrict)
     except Exception:
         return None
     if res is None:

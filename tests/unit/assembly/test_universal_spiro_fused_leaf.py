@@ -248,6 +248,27 @@ def test_force_vonbaeyer_spiro_recovers_wrong_fusion_descriptor():
     assert _const(opsin_parse(res.name)) == _const(smi)
 
 
+@pytest.mark.opsin_gate
+@pytest.mark.roundtrip
+@pytest.mark.parametrize("smi", [
+    # two chain-bridged spiro-hydantoin cores
+    "O=C(CN1C(=O)NC2(CCc3ccccc32)C1=O)NN1C(=O)NC2(CCCCC2)C1=O",
+    # a spiro-fused core plus a spiro-dioxolane substituent
+    "O=C1CSC2(C(=O)N(CN3CCC4(CC3)OCCO4)c3ccccc32)N1c1ccc(F)cc1",
+])
+def test_disjoint_spiro_cores_each_named_independently(smi):
+    """A molecule with SEVERAL disjoint spiro cores: each ring system is named
+    on its own (the spiro leaf restricts to THIS ring system, so a sibling core
+    is not miscounted as a second spiro atom), and the whole composes 0-wrong."""
+    from orthonym.namer import Orthonym
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    nm = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                   allow_aromatic_general=True)
+    name = nm.name(smi)
+    assert name and name != "unknown organic compound", name
+    assert _const(opsin_parse(name)) == _const(smi), name
+
+
 def test_force_vonbaeyer_spiro_default_off_is_systematic():
     """Default (no force) keeps the systematic naming for a catalog fused core
     (retry is opt-in, never the default nomenclature)."""
