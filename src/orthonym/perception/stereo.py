@@ -66,8 +66,14 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
             pb = probe.GetBondWithIdx(idx)
             if pb.HasProp('_CIPCode') and pb.GetProp('_CIPCode') in ('E', 'Z'):
                 mol.GetBondWithIdx(idx).SetProp('_CIPCode', pb.GetProp('_CIPCode'))
-    except (ValueError, RuntimeError, KeyError):
-        return  # fail-open: keep whatever the primary labeller produced
+    except Exception:
+        # Fail-open on ANYTHING: this fill is a purely-additive enhancement, so a
+        # failure must leave the primary (centres) labels intact and MUST NOT
+        # propagate. A narrower clause let an unlisted exception escape to
+        # assign_stereochemistry's outer ``except Exception``, which re-ran the
+        # RDKit-only labeller on a mol centres had ALREADY labelled -- silently
+        # downgrading it from the 279/290 engine to 235/290 (FABLE review #3).
+        return
 
 
 def assign_stereochemistry(mol) -> None:

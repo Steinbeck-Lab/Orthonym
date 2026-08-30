@@ -1376,26 +1376,43 @@ def _ring_system_for_component(
 # Ring spine construction (monocyclic own-built + polycyclic reuse)
 # ===========================================================================
 
-def _locant_sort_key(loc) -> Tuple[int, int]:
-    """Total order over a locant that may be a plain int, a primed display
-    string (``"5'"``), or a ``rules.spiro._Locant`` tuple ``(5, "'")``.
+def _locant_sort_key(loc) -> Tuple[int, int, str]:
+    """Total order over a locant that may be a plain int, a display string
+    (``"5'"``, ``"4a"``, ``"8a'"``), or a ``rules.spiro._Locant`` tuple
+    ``(5, "'")`` / ``(``"8a"``, "'")``.
 
-    Sort is (prime_rank, number): all unprimed locants precede all
-    single-primed, which precede double-primed, and within a rank by number.
-    This is the ordering P-31.1.4 / OPSIN expect for a spiro locant set, and
-    it lets the SAME ``sorted(...)`` in ``_name_component`` handle both the
-    ordinary int-locant spines and the mixed-spiro-fused string-locant leaf.
+    Sort is ``(prime_rank, number, letter)``: all unprimed locants precede all
+    single-primed, which precede double-primed; within a prime rank by number;
+    and within a number a bare position precedes its lettered ring-FUSION
+    positions (``4 < 4a < 5``, P-14.5.2). This is the ordering P-31.1.4 / OPSIN
+    expect for a spiro locant set, and it lets the SAME ``sorted(...)`` in
+    ``_name_component`` handle both the ordinary int-locant spines and the
+    mixed-spiro-fused string-locant leaf.
+
+    ⚠ M4-L2 admits a fused component's LETTERED fusion locants (``4a``/``8a``)
+    into the combined map, so the key MUST be letter-aware: the old
+    ``(prime_rank, number)`` form collided ``8a`` with ``8'`` (both rank 1) and
+    raised ``ValueError`` on ``("8a", "'")`` (``int("8a")``) -- a wrong
+    substituent citation order the full-InChIKey offer gate cannot see, plus a
+    crash that fell through to abstain (FABLE review #17).
     """
+    def _split(base: str) -> Tuple[int, str]:
+        # split a bare position string ("8" / "8a" / "12b") into (number, letter)
+        i = 0
+        while i < len(base) and base[i].isdigit():
+            i += 1
+        num = int(base[:i]) if i else 0
+        return num, base[i:]
     if isinstance(loc, tuple):
         base, prime = loc[0], loc[1]
-        return (len(prime), int(base))
+        num, letter = _split(str(base))
+        return (len(prime), num, letter)
     if isinstance(loc, str):
-        i = 0
-        while i < len(loc) and loc[i].isdigit():
-            i += 1
-        num = int(loc[:i]) if i else 0
-        return (len(loc) - i, num)   # trailing primes = the suffix length
-    return (0, int(loc))
+        stripped = loc.rstrip("'")
+        nprime = len(loc) - len(stripped)     # trailing primes = the suffix length
+        num, letter = _split(stripped)
+        return (nprime, num, letter)
+    return (0, int(loc), "")
 
 
 def _locant_display(loc) -> str:
