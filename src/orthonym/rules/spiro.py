@@ -2965,6 +2965,18 @@ def _name_linear_polyspiro_fused(
         junction.append(s); order.append(k); prev, cur = cur, k
     if len(order) != len(core_nodes):
         return None
+    # Scope (two-path rule): the SEPARABLE named form is for a
+    # chain with at least one POLYCYCLIC (fused/bridged, must-be-named)
+    # component. An ALL-MONOCYCLIC dispiro/polyspiro takes the numeric
+    # ``dispiro[a.b.c.d]`` von-Baeyer path instead, which
+    # ``analyze_spiro_universal`` already produces and which is its PIN -- so
+    # defer to it rather than ship (or block it with) a separable form OPSIN may
+    # reject. Count rings per component.
+    ri2 = mol.GetRingInfo()
+    def _ring_count(atoms):
+        return sum(1 for r in ri2.AtomRings() if set(r) <= atoms)
+    if all(_ring_count(comps[k]) == 1 for k in order):
+        return None
     # name every component; collect its spiro-atom -> locant map
     named = []
     for k in order:

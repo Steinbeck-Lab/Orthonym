@@ -178,11 +178,10 @@ def test_both_sides_fused_monospiro_round_trips(core_smi, sub):
 
 # --- linear polyspiro: a dispiro/trispiro chain of fused/ring components ------
 
+# separable named form fires only for a chain with a POLYCYCLIC component
 POLYSPIRO = [
-    # dispiro: two piperidines spiro'd on a central dioxa-tricyclic
+    # dispiro: two piperidines spiro'd on a central dioxa-tricyclic (polycyclic)
     ("CN1CCC2(CC1)CC(=O)c1c(ccc3c1OC1(CCN(C)CC1)CC3=O)O2", "dispiro["),
-    # trispiro chain
-    ("O=C1CCC2(CC1)OCC1(CO2)CCC2(CC1)OCCO2", "trispiro["),
 ]
 
 
@@ -190,8 +189,9 @@ POLYSPIRO = [
 @pytest.mark.roundtrip
 @pytest.mark.parametrize("core_smi,mult", POLYSPIRO)
 def test_linear_polyspiro_round_trips(core_smi, mult):
-    """The polyspiro (c)-bucket: a linear dispiro/trispiro chain now assembles
-    the P-24.4 separable form (was None -> abstain), RT-correct to the CORE."""
+    """The polyspiro (c)-bucket with a POLYCYCLIC component: a linear
+    dispiro/trispiro chain assembles the P-24.4 separable form (was None ->
+    abstain), RT-correct to the CORE."""
     from orthonym.rules.spiro import _name_linear_polyspiro_fused
     from orthonym.validation.opsin_roundtrip import opsin_parse
     m = Chem.MolFromSmiles(core_smi)
@@ -204,7 +204,23 @@ def test_linear_polyspiro_round_trips(core_smi, mult):
     assert _const(parsed) == _const(core), f"{res[0]} -> {parsed}"
 
 
-def test_linear_polyspiro_declines_nonchain_and_monospiro():
+def test_all_monocyclic_polyspiro_defers_to_numeric():
+    """two-path rule: an ALL-MONOCYCLIC dispiro takes the NUMERIC
+    von-Baeyer ``dispiro[a.b.c.d]`` path (analyze_spiro_universal), so the
+    separable namer defers (returns None) and the numeric PIN ships RT-correct."""
+    from orthonym.rules.spiro import _name_linear_polyspiro_fused
+    from orthonym.assembly.universal_substituent import name_universal_substitutive
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    smi = "O1CCC2(CC1)CCC1(CCOCC1)CC2"  # dispiro of oxanes + central cyclohexane
+    m = Chem.MolFromSmiles(smi)
+    assert _name_linear_polyspiro_fused(m) is None
+    res = name_universal_substitutive(m)
+    assert res is not None
+    assert "dispiro[" in res.name and res.name[0].isdigit() or "dispiro[5" in res.name
+    assert _const(opsin_parse(res.name)) == _const(smi)
+
+
+def test_linear_polyspiro_declines_monospiro():
     """Fail-closed: a monospiro (n_spiro<2) is not this namer's job."""
     from orthonym.rules.spiro import _name_linear_polyspiro_fused
     m = Chem.MolFromSmiles("C1=CC2C(C1)CC21OCCO1")  # monospiro
