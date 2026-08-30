@@ -15,6 +15,7 @@ IUPAC 2013 Fusion Descriptor Rules:
 Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 """
 
+import re
 from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
@@ -88,6 +89,17 @@ FUSION_PREFIXES: Dict[str, str] = {
     'pyrazine': 'pyrazino',
     'pyridazine': 'pyridazino',
     'triazine': 'triazino',
+    # 6-membered O/S/Se/Te heterocycles. P-25.3.2.4 (BlueBookV2.md:11905): the
+    # attached-component prefix ADDS 'o' when there is no final 'e' -- "pyrano
+    # from pyran". :12030 gives "selenopyrano (from selenopyran, PIN)". These
+    # were NOT in this table, so get_fusion_prefix's old general rule truncated
+    # '-an' -> 'pyro'/'thiopyro' (OPSIN-unparseable). Cross-checked against
+    # OPSIN's own fusionComponents token list (pyrano/thiopyrano/selenopyrano/
+    # telluropyrano).
+    'pyran': 'pyrano',
+    'thiopyran': 'thiopyrano',
+    'selenopyran': 'selenopyrano',
+    'telluropyran': 'telluropyrano',
 
     # Fused heterocycles (for multi-fused systems)
     '1H-indole': 'indolo',
@@ -336,34 +348,45 @@ def get_fusion_prefix(ring_name: str) -> str:
         >>> get_fusion_prefix('pyrrole')
         'pyrrolo'
     """
-    # Check lookup table first
-    if ring_name in FUSION_PREFIXES:
-        return FUSION_PREFIXES[ring_name]
+    # Normalise a leading indicated-hydrogen descriptor (e.g. '2H-pyran'): the
+    # attached-component prefix drops it (the fused system's own indicated H is
+    # computed separately). This closes the '2H-pyran' -> '2h-pyro' casing +
+    # truncation defect if such a name ever reaches here.
+    core = re.sub(r'^\d+[Hh]-', '', ring_name)
 
-    # Apply general rules for unknown rings
-    name = ring_name.lower()
+    # 1) Curated contracted retained forms (P-25.3.2.2): benzo, furo, thieno,
+    #    pyrido, pyrano, ...
+    if core in FUSION_PREFIXES:
+        return FUSION_PREFIXES[core]
 
-    # Rule: -ene -> -o (benzene -> benzo)
+    # 2) The authoritative monocyclic registry is the source of truth for the
+    #    attached-component prefix (pyran -> pyrano). This function historically
+    #    kept its OWN lookup table that lacked 'pyran', so the general rule below
+    #    truncated it to the OPSIN-unparseable 'pyro'. Consult the registry the
+    #    rest of the fusion machinery already trusts (get_component_prefix).
+    if core in MONOCYCLIC_COMPONENTS:
+        return MONOCYCLIC_COMPONENTS[core]['prefix']
+
+    # 3) General rules for names not covered above. P-25.3.2.4
+    #    (BlueBookV2.md:11905): "The names of attached components are formed by
+    #    replacing the last letter 'e' by 'o' ... (or by ADDING the letter 'o'
+    #    when no final letter 'e' is present, i.e., pyrano from pyran)."
+    name = core.lower()
     if name.endswith('ene'):
         return name[:-3] + 'o'
-
-    # Rule: -an -> -o (furan -> furo, pyran -> pyro)
-    if name.endswith('an'):
-        return name[:-2] + 'o'
-
-    # Rule: -ane -> -o (thiane -> thio)
-    if name.endswith('ane'):
-        return name[:-3] + 'o'
-
-    # Rule: -ole -> -olo (pyrrole -> pyrrolo, imidazole -> imidazolo)
     if name.endswith('ole'):
         return name[:-1] + 'o'
-
-    # Rule: -ine -> -ino (pyridine -> pyridino)
     if name.endswith('ine'):
         return name[:-1] + 'o'
-
-    # Default: add 'o' suffix
+    if name.endswith('ane'):
+        return name[:-3] + 'o'
+    # NOTE: the historical '-an -> -o' truncation was DELETED here -- it produced
+    # the OPSIN-unparseable 'pyro' from 'pyran', violating P-25.3.2.4 ("pyrano
+    # from pyran", no final 'e' -> ADD 'o'). 'furan'/'pyran' are contracted /
+    # regular forms now resolved by the table + registry above, so a bare '-an'
+    # name correctly falls through to the "add 'o'" default below.
+    if name.endswith('e'):
+        return name[:-1] + 'o'
     return name + 'o'
 
 

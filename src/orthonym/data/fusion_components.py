@@ -331,15 +331,24 @@ def get_component_prefix(name: str) -> str:
     """
     if name in MONOCYCLIC_COMPONENTS:
         return MONOCYCLIC_COMPONENTS[name]['prefix']
-    # Fallback: apply general suffix rules
+    # Fallback, P-25.3.2.4 (BlueBookV2.md:11905): "The names of attached
+    # components are formed by replacing the last letter 'e' by 'o' ... (or by
+    # ADDING the letter 'o' when no final letter 'e' is present, i.e., pyrano
+    # from pyran)."
     if name.endswith('ene'):
         return name[:-3] + 'o'
     if name.endswith('ole'):
         return name[:-1] + 'o'
     if name.endswith('ine'):
         return name[:-1] + 'o'
-    if name.endswith('an'):
-        return name[:-2] + 'o'
+    if name.endswith('ane'):
+        return name[:-3] + 'o'
+    # NOTE: the historical '-an' -> '-o' truncation was DELETED here -- it turned
+    # 'pyran' into the OPSIN-unparseable 'pyro', violating P-25.3.2.4 ("pyrano
+    # from pyran"). 'pyran'/'furan' live in MONOCYCLIC_COMPONENTS above, so a bare
+    # '-an' name correctly falls through to the "add 'o'" default below.
+    if name.endswith('e'):
+        return name[:-1] + 'o'
     return name + 'o'
 
 
