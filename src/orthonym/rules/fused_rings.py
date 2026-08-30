@@ -409,7 +409,21 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
                 and at.GetTotalNumHs() == 0 and at.GetFormalCharge() == 0
                 and not _ring_double_bond(at, ring_atom_set)):
             continue                            # benign divalent chalcogen -> not a hydro pos
-        return None                             # saturated N / charged / hypervalent -> defer
+        # Task C: a SATURATED sp3 ring NITROGEN in the added-hydro region is a
+        # HYDRO position, not a defer. In a partially-saturated mancude system
+        # (e.g. 4,5,6,7-tetrahydro-imidazo[5,4-c]pyridine) the pyridine-type
+        # =N- of the mancude parent becomes -NH- under the ring saturation, so
+        # it belongs in the max-double-bond partition exactly like a saturated
+        # carbon. The pyrrole-type NH the old comment worried about is AROMATIC
+        # (excluded at line 398), so a NON-aromatic sp3 N reaching here was
+        # pyridine-type. Admit a neutral sp3 N as a hydro candidate; a
+        # charged/hypervalent N still defers. A post-check below fails closed if
+        # any N would be cited as INDICATED hydrogen (the genuinely ambiguous
+        # case), so only the unambiguous all-N-hydro partition proceeds.
+        if sym == 'N' and at.GetFormalCharge() == 0:
+            sat.append(a)
+            continue
+        return None                             # charged / hypervalent -> defer
     if not sat:
         return None                             # fully mancude -> legacy/aromatic path
 
@@ -476,6 +490,13 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
 
     # --- 5. Assemble '<hydro>-<indicatedH>-<mancude parent>' (P-58.2.1.2) ---
     _key, _sig, cand, ih_set, subs = best
+    # Task C fail-closed: a saturated N admitted above may only be a HYDRO atom.
+    # If the chosen partition would cite a nitrogen as INDICATED hydrogen, the
+    # pyrrole-vs-pyridine ambiguity the old defer guarded against is live for
+    # THIS system -- defer to the legacy path rather than risk a wrong
+    # constitution. (Carbon indicated-H, the common ``5H`` case, is unaffected.)
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in ih_set):
+        return None
     hydro_atoms = [a for a in sat if a not in ih_set]
     if not hydro_atoms:
         return None                             # pure indicated H (no hydro) -> legacy path
