@@ -2813,6 +2813,13 @@ def _name_general_monospiro_fused(
         return None  # the two rings are themselves fused -> not spiro-separable
     a_rings = [all_rings[i] for i in comp_a]
     b_rings = [all_rings[i] for i in comp_b]
+    # Scope: this is the both-sides-FUSED namer. A pure spiro of two MONOCYCLES
+    # (spiro[4.5]decane) is a von-Baeyer spiro that ``analyze_spiro_universal``
+    # names better (single descriptor), so defer to it -- otherwise this greedy
+    # separable form would intercept and slightly regress the ZINC pure-spiro
+    # conversion. At least one side must be a genuine fused/bridged component.
+    if len(a_rings) == 1 and len(b_rings) == 1:
+        return None
     a_atoms = set().union(*a_rings)
     b_atoms = set().union(*b_rings)
     if a_atoms & b_atoms != {spiro_center}:
