@@ -158,7 +158,9 @@ from .naming_utils import (
     format_substituent_prefix,
 )
 from ..rules.skeletal_replacement import REPLACEMENT_TERMS, _A_CITATION_ORDER
-from ..rules.vonbaeyer_universal import analyze_cage_universal
+from ..rules.vonbaeyer_universal import (
+    analyze_cage_universal, analyze_spiro_universal,
+)
 from ..rules.polycyclic import _build_parent_with_unsaturation
 # Task B2b: reuse general_engine's own charge-suffix primitives so this
 # module spells charge the SAME way as the rest of the codebase (never
@@ -1226,6 +1228,25 @@ def _name_ring_spine(
         # a mancude cage is untouched.
         cage = analyze_cage_universal(mol, cage_atoms=set(ring_atoms),
                                       allow_mancude=True)
+        if cage is None:
+            # Spiro ring systems are not von-Baeyer cages, so
+            # ``analyze_cage_universal`` voids on them -- yet a spiro ring is a
+            # perfectly nameable branch parent (``analyze_spiro_universal``
+            # already produces its descriptor, hetero prefix and numbering for
+            # ~74% of the spiro abstention residual). Without this fall-through
+            # the unconditional core VOIDED on every spiro-ring branch (measured
+            # 2026-08-30: spiro[2.3]hexane -> None), silently abstaining the
+            # whole enclosing best-effort candidate. ``analyze_spiro_universal``
+            # returns the SAME field shape as the cage (descriptor / total_atoms
+            # / unsaturation / hetero_prefix / cage_atoms / atom_to_locant), so
+            # the shared emission tail below is unchanged. ``free_valence_atoms``
+            # biases the spiro numbering to give the attachment the lowest
+            # locant (P-29.3, substituent use). best-effort FLOOR only (never
+            # reached at PIN tier), so PIN's own spiro producers are untouched.
+            fv = [attach_hint] if attach_hint is not None else None
+            cage = analyze_spiro_universal(
+                mol, cage_atoms=set(ring_atoms), allow_mancude=True,
+                free_valence_atoms=fv)
         if cage is None:
             return None
         parent_block = _build_parent_with_unsaturation(
