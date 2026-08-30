@@ -26,6 +26,7 @@ _INTERNAL_CHARGE_SMARTS = [
     Chem.MolFromSmarts('[N+;!a][O-]'),            # aliphatic N-oxide (cyclic + acyclic)
     Chem.MolFromSmarts('[N;+0]=[N+]=[N-]'),        # organic azide (NOT azide anion [N-]=[N+]=[N-])
     Chem.MolFromSmarts('[#6]=[N+]=[N-]'),         # diazo
+    Chem.MolFromSmarts('[C-]#[N+]'),              # isocyanide R-[N+]#[C-] (P-66.5.3)
 ]
 # Filter out any None from failed SMARTS compilation
 _INTERNAL_CHARGE_SMARTS = [p for p in _INTERNAL_CHARGE_SMARTS if p is not None]

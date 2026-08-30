@@ -338,6 +338,47 @@ def test_m2_nitrate_ester_on_ring_and_backbone_zero_wrong():
             assert verify_or_none(result.name, smi) == result.name, smi
 
 
+def test_m2_isocyanide_named_not_voided():
+    """M2 inc3: an isocyanide ``R-[N+]#[C-]`` (P-66.5.3 / P-59 internal, net-0 --
+    R-N=C has no uncharged depiction) is rendered as the ``isocyano`` prefix
+    rather than the previous charged ``azaethynyl-ium-ide`` monstrosity. Its
+    C-/N+ are reclassified P-59 internal in ``perception.ions`` (the root cause),
+    so ``get_ion_sites`` strips them and the leaf carries them. OPSIN-RT-verified
+    (``isocyanobenzene`` / ``isocyanomethane`` -> the input)."""
+    for smi in ("[C-]#[N+]c1ccccc1", "[C-]#[N+]C", "[C-]#[N+]CCCC"):
+        result, verified = _name_and_verify(smi)
+        assert verified == result.name, smi
+        assert "isocyano" in result.name, (smi, result.name)
+        assert "ium" not in result.name and "-id" not in result.name, (smi, result.name)
+
+
+def test_m2_isocyanide_on_decorated_backbone_zero_wrong():
+    """A real census witness (di-isocyano arene) composes or abstains, never
+    wrong-constitution."""
+    for smi in ("[C-]#[N+]c1ccc(Oc2ccc([N+]#[C-])c(C)c2)cc1C",):
+        result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+        if result is not None:
+            assert "isocyano" in result.name, (smi, result.name)
+            assert verify_or_none(result.name, smi) == result.name, smi
+
+
+def test_m2_polynitro_now_named_not_voided():
+    """A side benefit of the ``_walkable_pieces`` seed fix (M2 inc3): a polynitro
+    ``C(-NO2)n`` -- previously voided because a nitro fragment could seed a
+    degenerate spine -- now composes cleanly (the carbon parent + N nitro leaves),
+    full-InChIKey RT-verified. Each nitro group is P-59 internal, so 0-wrong holds
+    (a shredded/unspellable nitro still voids on the raw-charge guard)."""
+    cases = {
+        "C([N+](=O)[O-])[N+](=O)[O-]": "1,1-dinitromethane",
+        "[O-][N+](=O)CC[N+](=O)[O-]": "1,2-dinitroethane",
+        "[O-][N+](=O)C([N+](=O)[O-])[N+](=O)[O-]": "1,1,1-trinitromethane",
+    }
+    for smi, expected in cases.items():
+        result, verified = _name_and_verify(smi)
+        assert result.name == expected, (smi, result.name)
+        assert verified == result.name, smi
+
+
 # ===========================================================================
 # Task B2b: charge / indicated-H as suffixes (step 4 of the design).
 # ===========================================================================
@@ -434,9 +475,6 @@ _INTERNAL_CHARGE_VOID_WITNESSES = [
     ("S-oxide (charge-drawn, DMSO)",     "C[S+](C)[O-]"),
     ("P-oxide (charge-drawn)",           "C[P+](C)(C)[O-]"),
     ("S-oxide (ethyl-methyl)",           "C[S+]([O-])CC"),
-    ("polynitro (dinitromethane)",       "C([N+](=O)[O-])[N+](=O)[O-]"),
-    ("polynitro (1,2-dinitroethane)",    "[O-][N+](=O)CC[N+](=O)[O-]"),
-    ("polynitro (trinitromethane)",      "[O-][N+](=O)C([N+](=O)[O-])[N+](=O)[O-]"),
 ]
 
 

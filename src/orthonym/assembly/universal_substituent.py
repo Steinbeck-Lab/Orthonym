@@ -1196,6 +1196,10 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             #            case, generalised). Ring path already branches it.
         if _is_diazo_root(ctx.mol, j):
             continue  # M2: diazo N_beta likewise -- always the ``diazo`` leaf.
+        if _is_isocyano_root(ctx.mol, j):
+            continue  # M2 inc3: the isocyanide N (R-[N+]#[C-]) is always the
+            #            ``isocyano`` branch leaf, never threaded into the chain
+            #            (its N+ would drop the internal charge as a plain aza).
         if _is_nitrooxy_root(ctx.mol, j):
             continue  # M2 inc2: the ester O of a nitrate ester -O-NO2 is always
             #            the anchor of the ``nitrooxy`` branch leaf (which carries
@@ -1567,7 +1571,25 @@ def _name_chain_spine(
         # CANONICAL rank (fix round 1, finding 4), not raw atom index, so the
         # SAME molecule from a differently-numbered SMILES starts from the
         # same graph-invariant seed.
-        seed = min(component, key=lambda a: ctx.canon_rank[a])
+        # Seed the diameter from the LARGEST spine-walkable piece, not from a
+        # global canonical-rank minimum. The walkable graph is a forest once the
+        # off-spine leaf roots (nitro/azide/diazo/isocyanide/nitrooxy/phosphinate)
+        # are held off-spine, and an internal-charge leaf can STRAND a skeletal
+        # carbon in its own singleton piece -- e.g. the carbon of an isocyanide
+        # ``R-[N+]#[C-]`` whose only neighbour is the off-spine isocyanide N.
+        # Seeding there would pick that carbon as a degenerate 1-atom "methane"
+        # parent and thread the REAL chain (R) in as a charge-dropping azachain
+        # branch (measured: butyl isocyanide -> ``1-(1-azapentan-1-ylidyne)methane``,
+        # which voids). Choosing the senior (largest) piece makes R the parent and
+        # the small group falls out as its proper branch leaf. No-op when the
+        # walkable graph is connected -- the overwhelmingly common case.
+        eligible = component - _offspine_leaf_atoms(mol, component)
+        if not eligible:
+            eligible = component  # degenerate: whole graph is a leaf group
+        pieces = _walkable_pieces(ctx, eligible, component)
+        main = max(pieces,
+                   key=lambda p: (len(p), -min(ctx.canon_rank[a] for a in p)))
+        seed = min(main, key=lambda a: ctx.canon_rank[a])
         u = _farthest_from(ctx, seed, component)
         path = _farthest_path_from(ctx, u, component)
         # Free choice of numbering direction: lowest locants to heteroatoms,
@@ -1646,6 +1668,80 @@ def _chain_score(ctx: _Ctx, order: List[int], component: Optional[FrozenSet[int]
     # numbering (never falls back to raw atom index / iteration order).
     canon_tie = tuple(ctx.canon_rank[a] for a in order)
     return (hetero, unsat, branch_locants, canon_tie)
+
+
+def _is_offspine_root(mol, j: int) -> bool:
+    """True if atom *j* is the anchor of an internal-charge / semipolar leaf
+    group that is ALWAYS resolved as an off-spine branch (nitro / azide / diazo /
+    isocyanide / nitrate-ester / phosphinate). Such an atom is never a chain-spine
+    member, so ``_walkable_pieces`` treats it as a piece BOUNDARY -- it does not
+    expand a spine-walk through it (mirroring ``_tree_neighbors`` keeping these
+    off-spine, but applied to the SOURCE so a piece cannot leak across one)."""
+    return (_is_nitro_root(mol, j) or _is_azide_root(mol, j)
+            or _is_diazo_root(mol, j) or _is_isocyano_root(mol, j)
+            or _is_nitrooxy_root(mol, j) or _is_phosphinate_oxide_root(mol, j))
+
+
+def _offspine_leaf_atoms(mol, component: FrozenSet[int]) -> FrozenSet[int]:
+    """Every atom in *component* that belongs to an internal-charge / semipolar
+    leaf group (nitro / azide / diazo / isocyanide / nitrate-ester / phosphinate)
+    -- i.e. that will be claimed WHOLE by a branch leaf and must therefore never
+    be a chain-spine member OR a spine seed. The isocyanide is the sharp case: its
+    terminal CARBON is a skeletal atom stranded off the excluded isocyanide N, so
+    without this exclusion it could seed a degenerate 1-atom parent (see
+    ``_name_chain_spine``); the nitrate ester's own N/O likewise form a spurious
+    2-atom piece larger than a one-carbon parent."""
+    leaf: set = set()
+    for j in component:
+        atoms = None
+        if _is_azide_root(mol, j):
+            atoms = _azide_nitrogens(mol, j)
+        elif _is_diazo_root(mol, j):
+            atoms = _diazo_nitrogens(mol, j)
+        elif _is_isocyano_root(mol, j):
+            atoms = _isocyanide_atoms(mol, j)
+        elif _is_nitrooxy_root(mol, j):
+            atoms = _nitrooxy_atoms(mol, j)
+        elif _is_nitro_root(mol, j):
+            atoms = frozenset({j} | {n.GetIdx() for n in mol.GetAtomWithIdx(j).GetNeighbors()
+                                     if n.GetSymbol() == "O"})
+        elif _is_phosphinate_oxide_root(mol, j):
+            atoms = frozenset({j} | {n.GetIdx() for n in mol.GetAtomWithIdx(j).GetNeighbors()
+                                     if n.GetSymbol() == "O"})
+        if atoms:
+            leaf |= set(atoms)
+    return frozenset(leaf & component)
+
+
+def _walkable_pieces(ctx: _Ctx, eligible: FrozenSet[int],
+                     component: FrozenSet[int]) -> List[set]:
+    """Partition the spine-eligible atoms *eligible* into spine-walkable connected
+    pieces. Two atoms are in the same piece iff a chain-spine walk
+    (``_tree_neighbors``, over the full *component*) connects them through
+    eligible atoms only, without crossing an off-spine leaf root
+    (``_is_offspine_root``). Deterministic (canonical-rank visit order). Returns
+    one piece for a connected walkable graph (the common case), so the caller's
+    seed choice is unchanged there."""
+    seen: set = set()
+    pieces: List[set] = []
+    for a in sorted(eligible, key=lambda x: ctx.canon_rank[x]):
+        if a in seen:
+            continue
+        piece: set = set()
+        stack = [a]
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            piece.add(x)
+            if _is_offspine_root(ctx.mol, x):
+                continue  # boundary: never continue a spine THROUGH this atom
+            for nb in _tree_neighbors(ctx, x, component):
+                if nb in eligible and nb not in seen:
+                    stack.append(nb)
+        pieces.append(piece)
+    return pieces
 
 
 def _farthest_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> int:
@@ -1763,7 +1859,8 @@ _LEAF_DOUBLE = {
 # prefix-path raw-formal-charge void guards know the charge IS accounted for. Each
 # token is produced by exactly one shortcut and covers exactly that group's
 # internally-charged atoms -- see the membership check in ``_name_component``.
-_INTERNAL_CHARGE_LEAF_TOKENS = frozenset({"nitro", "azido", "diazo", "nitrooxy"})
+_INTERNAL_CHARGE_LEAF_TOKENS = frozenset(
+    {"nitro", "azido", "diazo", "nitrooxy", "isocyano"})
 
 
 def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
@@ -1797,6 +1894,12 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     nitrooxy = _nitrooxy_shortcut(mol, component, attach_hint)
     if nitrooxy is not None:
         return nitrooxy
+    # M2 inc3: the isocyanide ``R-[N+]#[C-]`` (P-66.5.3 ``isocyano``; R-N=C has
+    # no uncharged depiction, so its C-/N+ are P-59 internal -- reclassified as
+    # such in ``perception.ions`` so ``get_ion_sites`` strips them here).
+    isocyano = _isocyano_shortcut(mol, component, attach_hint)
+    if isocyano is not None:
+        return isocyano
 
     # Task B2b: a GENUINELY charged atom anywhere in this branch (nitro,
     # just checked, is the only exception) must NEVER take one of the
@@ -2271,6 +2374,69 @@ def _nitrooxy_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     if len(outside) != 1:
         return None
     return "nitrooxy", frozenset(component)
+
+
+# ===========================================================================
+# M2 inc3: isocyanide  R-[N+]#[C-]  (rendered ``isocyano``, P-66.5.3)
+# ===========================================================================
+
+def _isocyanide_atoms(mol, n_idx: int):
+    """If *n_idx* is the ATTACHMENT nitrogen of an isocyanide ``R-[N+]#[C-]``,
+    return the frozenset ``{N, C}`` of its two atoms, else ``None``.
+
+    Defined by CONNECTIVITY + CHARGE (mirroring the azide/diazo leaves): the N is
+    ``+1``, H-free, bonded to exactly one carbon that is the terminal isocyanide
+    carbon (``-1``, heavy-degree 1, triple-bonded to the N) plus exactly one
+    other heavy atom (the parent R). A nitrilium ``R-C#[N+]-R`` (its C is not
+    ``-1``) or a cyanide ``[C-]#N`` (its N is not ``+1``) fail this exactly."""
+    n = mol.GetAtomWithIdx(n_idx)
+    if n.GetSymbol() != "N" or n.GetFormalCharge() != 1 or n.GetTotalNumHs() != 0:
+        return None
+    heavy = [nb for nb in n.GetNeighbors() if nb.GetAtomicNum() > 1]
+    if len(heavy) != 2:
+        return None
+    c_term = [nb for nb in heavy
+              if nb.GetSymbol() == "C" and nb.GetFormalCharge() == -1]
+    if len(c_term) != 1:
+        return None
+    c = c_term[0]
+    c_heavy = [nb for nb in c.GetNeighbors() if nb.GetAtomicNum() > 1]
+    if len(c_heavy) != 1 or c_heavy[0].GetIdx() != n_idx or c.GetTotalNumHs() != 0:
+        return None  # the isocyanide carbon must be the true terminus
+    bond = mol.GetBondBetweenAtoms(n_idx, c.GetIdx())
+    if bond is None or round(bond.GetBondTypeAsDouble()) != 3:
+        return None
+    return frozenset({n_idx, c.GetIdx()})
+
+
+def _is_isocyano_root(mol, j: int) -> bool:
+    """True if atom *j* is the attachment nitrogen of an isocyanide (see
+    ``_isocyanide_atoms``) -- used by ``_tree_neighbors`` to keep it OUT of
+    chain-spine continuation, so the two isocyanide atoms are always resolved as
+    ONE ``isocyano`` branch leaf (carrying their P-59 internal charge), never
+    threaded into the skeleton as a plain ``aza`` that drops the charge."""
+    return _isocyanide_atoms(mol, j) is not None
+
+
+def _isocyano_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """``R-[N+]#[C-]`` attached via N, exactly the two isocyanide atoms --
+    rendered as the ``isocyano`` substituent prefix (P-66.5.3; OPSIN-RT-verified:
+    ``isocyanobenzene`` and ``isocyanomethane`` both parse back to the input).
+    Returns ``("isocyano", atom_ids)`` or ``None`` (fall through). The C-/N+ are
+    P-59 internal charges (get_ion_sites strips them; tracked as
+    ``internal_atoms`` via ``_INTERNAL_CHARGE_LEAF_TOKENS``)."""
+    if len(component) != 2:
+        return None
+    iso = _isocyanide_atoms(mol, attach_hint)
+    if iso is None or iso != component:
+        return None
+    # attach_hint (the N) must have exactly one heavy neighbour OUTSIDE the group
+    # -- the real parent R (also rejects a bare, unattached isocyanide fragment).
+    outside = [nb for nb in mol.GetAtomWithIdx(attach_hint).GetNeighbors()
+               if nb.GetAtomicNum() > 1 and nb.GetIdx() not in component]
+    if len(outside) != 1:
+        return None
+    return "isocyano", frozenset(component)
 
 
 def _phosphinate_oxide_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
