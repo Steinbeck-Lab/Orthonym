@@ -2128,13 +2128,27 @@ def _name_side_ring(
                 if fi in frag_to_orig
             }
         else:
-            # For heterocycles, build a simple atom-to-locant map by walking
-            # the ring starting at locant 1 = first heteroatom (consistent
-            # with IUPAC HW). Defer rigorous orient_heterocycle integration
-            # to v19; v18 emits a connectivity-correct map.
-            atom_to_locant = _walk_side_ring_locants(
-                mol, side_ring, hetero_first=True,
-            )
+            # Task C: a FULLY-SATURATED heteromonocyclic side ring (imidazolidine,
+            # piperidine, pyrrolidine, 1,3-diazinane, oxane ...) is NOT mancude, so
+            # ``_mancude_hydro_numbering`` declines. The old fallback,
+            # ``_walk_side_ring_locants``, numbered the ring by an INDEPENDENT walk
+            # from one heteroatom that DISAGREED with the name: for imidazolidine
+            # it placed the two ring N's at locants 1 and 4 (walking around) while
+            # the NAME ``imidazolidine`` fixes N at 1,3, and it handed the spiro
+            # CARBON a locant that landed on a nitrogen position (``3'``). OPSIN
+            # rejects ``spiro[chromane-4,3'-imidazolidine]`` (a spiro junction on
+            # an N) but accepts the name-consistent ``...-4,5'-...`` (the spiro C
+            # at a carbon). ``_number_hetero_side_ring`` gives the heteroatoms
+            # their canonical lowest locants (P-31.1.4.3.3, so the stem and the
+            # numbering agree) and the spiro junction the lowest locant among
+            # those (P-24.3.3), DETERMINISTICALLY (independent of RDKit atom order,
+            # unlike ``orient_heterocycle``). (Reached only via
+            # ``name_mixed_spiro_fused``; every emission is still offer-RT-gated.)
+            atom_to_locant = _number_hetero_side_ring(mol, list(side_ring))
+            if not atom_to_locant:
+                atom_to_locant = _walk_side_ring_locants(
+                    mol, side_ring, hetero_first=True,
+                )
     else:
         # Carbocyclic side ring: cyclo<N>ane / cyclo<N>ene if unsaturated
         ring_size = len(side_ring)
@@ -2160,6 +2174,87 @@ def _name_side_ring(
         )
 
     return name, atom_to_locant
+
+
+def _number_hetero_side_ring(mol, side_ring: List[int]) -> Optional[Dict[int, int]]:
+    """Number a saturated heteromonocyclic spiro side ring DETERMINISTICALLY and
+    consistently with its stem name (Task C).
+
+    P-31.1.4.3.3/.4 give the heteroatoms the lowest locants as a set, then the
+    most-senior heteroatom the lowest locant; P-24.3.3 then gives the spiro
+    junction the lowest locant among the numberings that still satisfy the
+    heteroatom rule. This is the ONE numbering that is (a) consistent with the
+    stem produced by ``name_heterocycle`` (so ``imidazolidine``'s two N's sit at
+    1,3 and the spiro CARBON never lands on an N — the OPSIN-fatal
+    ``spiro[...-3'-imidazolidine]`` defect) and (b) independent of RDKit atom
+    order (``orient_heterocycle`` alone gave the spiro atom 2/3/4/5 depending on
+    input order — a determinism hazard).
+
+    Enumerates all 2N cyclic numberings (N rotations x 2 directions), keeps the
+    ones minimising the heteroatom key, then picks the lowest spiro locant, then
+    the lowest substituent-bearing (decorated) locants, tie-broken on a
+    canonical atom-rank signature. Returns ``orig_atom_idx -> locant`` or None.
+    """
+    ring_set = set(side_ring)
+    n = len(side_ring)
+    if n < 3:
+        return None
+    adj: Dict[int, List[int]] = {a: [] for a in side_ring}
+    for a in side_ring:
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() in ring_set:
+                adj[a].append(nb.GetIdx())
+    if any(len(v) != 2 for v in adj.values()):
+        return None  # not a simple monocycle
+
+    # single cyclic order (walk from the lowest-index atom)
+    start = min(side_ring)
+    order = [start, adj[start][0]]
+    while len(order) < n:
+        cur = order[-1]
+        nxt = [x for x in adj[cur] if x != order[-2]]
+        if not nxt:
+            return None
+        order.append(nxt[0])
+
+    spiro_set = get_spiro_atoms(mol) & ring_set
+    decorated = {
+        a for a in side_ring
+        if any(nb.GetIdx() not in ring_set
+               for nb in mol.GetAtomWithIdx(a).GetNeighbors())
+    }
+    try:
+        canon = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    except Exception:
+        canon = [0] * mol.GetNumAtoms()
+
+    def numbering(rot: int, direction: int) -> Dict[int, int]:
+        seq = order[rot:] + order[:rot]
+        if direction == -1:
+            seq = [seq[0]] + list(reversed(seq[1:]))
+        return {a: i + 1 for i, a in enumerate(seq)}
+
+    best = None
+    for rot in range(n):
+        for direction in (1, -1):
+            m = numbering(rot, direction)
+            hetero_locs = sorted(
+                m[a] for a in side_ring
+                if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
+            )
+            # senior heteroatom lowest: (seniority, locant) ascending
+            senior = tuple(sorted(
+                (get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), m[a])
+                for a in side_ring
+                if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
+            ))
+            spiro_loc = min((m[a] for a in spiro_set), default=n + 1)
+            deco = tuple(sorted(m[a] for a in decorated))
+            canon_sig = tuple(m[a] for a in sorted(side_ring, key=lambda x: canon[x]))
+            key = (tuple(hetero_locs), senior, spiro_loc, deco, canon_sig)
+            if best is None or key < best[0]:
+                best = (key, m)
+    return best[1] if best else None
 
 
 def _walk_side_ring_locants(
