@@ -74,6 +74,37 @@ def test_side_ring_numbering_is_deterministic():
     assert n1 == n2 == "spiro[2,3-dihydro-1H-indole-3,3'-pyrrolidine]"
 
 
+def test_sulfone_side_ring_is_lambda2_skeleton_not_lambda4():
+    """A ring S(=O)(=O) side ring: the exocyclic =O are SUBSTITUENTS (composed as
+    1,1-dioxo), so the ring S stays a plain divalent thioether -> `1,3-thiazolidine`,
+    NOT the mis-valenced `1λ4,3-thiazolidine` the degree-based extraction produced
+    (it turned the sulfone S into [SH2]). Governing: P-22.2 / P-73 (oxide as oxo)."""
+    from orthonym.rules.spiro import (
+        _name_side_ring, get_spiro_atoms, _classify_rings_around_spiro_center,
+    )
+    smi = "O=C1CS(=O)(=O)[C@]2(C(=O)N(Cc3ccc(F)cc3)c3ccccc32)N1c1ccc(F)c(F)c1"
+    m = Chem.MolFromSmiles(smi)
+    sp = list(get_spiro_atoms(m))[0]
+    rings = [list(r) for r in m.GetRingInfo().AtomRings()]
+    _fr, sr = _classify_rings_around_spiro_center(m, sp, rings)
+    name, _map = _name_side_ring(m, sr[0])
+    assert name == "1,3-thiazolidine", name       # not 1λ4,3-thiazolidine
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.roundtrip
+def test_sulfone_spiro_indoline_round_trips_end_to_end():
+    """The sulfone-thiazolidinone spiro oxindole ships 0-wrong (was abstain)."""
+    from orthonym.namer import Orthonym
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    smi = "O=C1CS(=O)(=O)[C@]2(C(=O)N(Cc3ccc(F)cc3)c3ccccc32)N1c1ccc(F)c(F)c1"
+    nm = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                   allow_aromatic_general=True)
+    name = nm.name(smi)
+    assert name and name != "unknown organic compound", name
+    assert _const(opsin_parse(name)) == _const(smi), name
+
+
 def test_number_hetero_side_ring_places_heteroatoms_lowest():
     """Unit: imidazolidine ring numbered N=1,3 and the spiro carbon lowest."""
     # spiro[indane-1,4'-imidazolidine] core

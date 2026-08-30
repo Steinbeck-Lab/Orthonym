@@ -1713,7 +1713,7 @@ def _classify_rings_around_spiro_center(
 
 
 def _extract_subfragment(
-    mol, atom_indices: Set[int],
+    mol, atom_indices: Set[int], skeletal_revert: bool = False,
 ) -> Optional[Tuple[Chem.Mol, Dict[int, int]]]:
     """Build an RDKit Mol containing only the specified atoms (and the
     bonds between them). Returns (frag_mol, orig_to_frag_idx_map)
@@ -1724,6 +1724,19 @@ def _extract_subfragment(
     atom. This preserves valence so the fragment sanitizes cleanly and
     downstream naming helpers (which expect bare-skeleton input) see
     a chemically valid molecule.
+
+    ``skeletal_revert`` (Task C, side-ring naming): an out-of-fragment neighbor
+    reached by a DOUBLE/TRIPLE bond (an exocyclic =O / =N / =S substituent -- a
+    sulfone/sulfoxide oxide, a carbonyl, an imine) is a SUBSTITUENT, not part of
+    the ring skeleton. Counting it as explicit H (the default) mis-valences the
+    ring atom -- a sulfone S(=O)(=O) becomes ``[SH2]`` (λ⁴) instead of the plain
+    divalent ring S (λ², ``1,3-thiazolidine``), and the whole molecule then
+    abstains. Under ``skeletal_revert`` such a multiple-bond substituent adds NO
+    explicit H, so the ring atom reverts to its STANDARD skeletal valence (filled
+    by implicit H) and the =O/=N/=S is named separately as an ``oxo``/``dioxo``
+    substituent by the whole-molecule composer. Single-bond out-of-fragment
+    neighbors still add one H each (unchanged). Used only by ``_name_side_ring``;
+    the fused-component path keeps the degree-based default.
 
     The fragment is sanitized so downstream naming helpers see a
     well-formed molecule (aromaticity perception, ring info, valence).
@@ -1742,7 +1755,16 @@ def _extract_subfragment(
             1 for n in atom.GetNeighbors()
             if n.GetIdx() in atom_indices
         )
-        out_of_frag_neighbors = atom.GetDegree() - original_in_frag_neighbors
+        if skeletal_revert:
+            # count only SINGLE-bond out-of-fragment neighbors; a multiple-bond
+            # exocyclic substituent reverts the ring atom to skeletal valence.
+            out_of_frag_neighbors = sum(
+                1 for b in atom.GetBonds()
+                if b.GetOtherAtom(atom).GetIdx() not in atom_indices
+                and b.GetBondType() == Chem.BondType.SINGLE
+            )
+        else:
+            out_of_frag_neighbors = atom.GetDegree() - original_in_frag_neighbors
         new_atom.SetNumExplicitHs(
             atom.GetTotalNumHs() + out_of_frag_neighbors
         )
@@ -2195,7 +2217,12 @@ def _name_side_ring(
     Returns (name, atom_idx_in_orig -> locant) or None.
     """
     side_atoms = set(side_ring)
-    extracted = _extract_subfragment(mol, side_atoms)
+    # skeletal_revert: a ring atom's exocyclic =O/=N/=S (sulfone/sulfoxide oxide,
+    # carbonyl, imine) is a SUBSTITUENT, not a skeletal H — so the ring S of a
+    # sulfone stays a plain divalent thioether (λ², ``1,3-thiazolidine``) and the
+    # composer adds the ``1,1-dioxo`` separately, instead of the mis-valenced
+    # ``[SH2]`` (λ⁴) the degree-based default produced (Task C).
+    extracted = _extract_subfragment(mol, side_atoms, skeletal_revert=True)
     if extracted is None:
         return None
     frag, orig_to_frag = extracted
