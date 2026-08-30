@@ -733,6 +733,21 @@ def _build_ctx(
 
     if len(Chem.GetMolFrags(work)) != 1:
         return None  # multi-fragment: out of scope for this producer
+    # OUT-OF-SCOPE ORGANOMETALLIC (P-69): abstain on a genuine metal/organometal
+    # complex, exactly as the PIN/default path does ("<metal> compound (not
+    # supported)"). Sn/Pb are in REPLACEMENT_TERMS (`stanna`/`plumba`), so without
+    # this guard the best-effort core would build a replacement name whose OPSIN
+    # re-perception mis-valences the metal and never full-round-trips -- a
+    # precision leak that ships an unverifiable name. ``detect_metal_complex``
+    # flags exactly the out-of-scope complexes (organotin/ferrocene) and returns
+    # None for an IN-scope covalent Si/B/Ge heterocycle (silacyclohexane,
+    # borinane), so this abstains the former without touching the latter.
+    try:
+        from ..perception.metals import detect_metal_complex
+        if detect_metal_complex(work) is not None:
+            return None
+    except Exception:
+        pass  # detector must never break naming; fall through
     # Task B2b: the blanket "ANY nonzero per-atom formal charge -> void"
     # guard that used to live here is GONE -- charge is now perceived and
     # spelled properly (see the module docstring's charge-scope paragraph

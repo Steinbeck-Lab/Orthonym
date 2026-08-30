@@ -1218,7 +1218,8 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
 
 def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                                stats: Optional[Dict[str, int]] = None,
-                               *, besteffort_unverified: bool = False) -> str:
+                               *, besteffort_unverified: bool = False,
+                               general_fallback_tier: bool = False) -> str:
     """SUB-03 real-OPSIN validity gate (D-11/D-12/D-13).
 
     Suppress an OPSIN-unparseable production name to the EXISTING
@@ -1304,6 +1305,34 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # OPSIN subprocess on the common parsed path.
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is not None:
+        # BE-STRICT full-RT (2026-08-30, user-directed): at the general-fallback
+        # tiers (best-effort / complete) the contract is a FULL round-trip
+        # (constitution AND stereo AND charge), so a name that OPSIN parses to a
+        # DIFFERENT full InChIKey than the input — a wrong molecule, an
+        # OPSIN-valence artifact (e.g. an organo-tin `stanna`-replacement name
+        # whose re-parsed Sn valence differs), OR a stereo-INCOMPLETE name (a
+        # stereo-stripped/omitted descriptor is a WRONG name, not a lesser one) —
+        # MUST abstain, never ship. The PIN/default tier keeps the skeleton-based
+        # SELF-01 below (stereo-tolerant by design for the gold PINs), so the 1656
+        # gate is byte-identical (this branch is skipped when general_fallback_tier
+        # is False). Fail-OPEN only when the input key is uncomputable.
+        if general_fallback_tier and smiles is not None:
+            _in_key = _self_consistency_full_key(smiles)
+            if _in_key is not None:
+                _out_key = _self_consistency_full_key(opsin_smiles)
+                # abstain when the round-trip CANNOT be confirmed equal: either the
+                # OPSIN output is itself RDKit-unparseable (an organo-metal valence
+                # artifact — _out_key None) OR it computes to a DIFFERENT full key
+                # (wrong molecule / stereo-incomplete). Only a computable, EQUAL key
+                # ships at the RT-verified tier.
+                if _out_key is None or _out_key != _in_key:
+                    from .metrics.abstention import AbstentionCode, record_suppression
+                    record_suppression(
+                        AbstentionCode.GATE_SUPPRESSED,
+                        detail='full_rt_unconfirmed_general_fallback', candidate=name)
+                    _suppressed_to = _descriptive_fallback(smiles)
+                    _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+                    return _suppressed_to
         # W3-P10: correct-by-construction polyacid prefix-derivative PIN that OPSIN
         # RE-PARSES to the wrong constitution (locant-assignment bug). Ship it —
         # the BB is the sole PIN authority and OPSIN's bug must not gate us.
@@ -1326,6 +1355,28 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     if _validity_gate_status(name) == "unavailable":
         _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name  # transient -> fail-OPEN (never suppress)
+    # BE-STRICT (2026-08-30, user-directed): at the general-fallback tiers
+    # (best-effort / complete — ``general_fallback_tier`` True), the contract is
+    # an OPSIN-ROUND-TRIP-VERIFIED name, so an OPSIN-DEFINITIVELY-REJECTED name
+    # cannot be verified and MUST abstain rather than ship. This makes the
+    # "ship-an-OPSIN-unparseable name" carve-outs below (thioperoxol / inositol /
+    # np_stereoparent / dianhydride / phane / halogen-uide / the stereo-layer
+    # carve-out) PIN/DEFAULT-TIER ONLY: those names are the correct, gold-validated
+    # PIN and MUST still ship at the PIN tier (``general_fallback_tier`` False, so
+    # this branch is skipped and the 1656 PIN gold gate is byte-identical). At the
+    # RT-verified tiers a correct-but-OPSIN-unparseable name is an honest abstain,
+    # never a stereo-stripped or unparseable emission (accuracy #1: a name that
+    # does not round-trip is not a shippable name). Closes the precision leak that
+    # let 5/1435 OPSIN-unparseable names ship at best-effort (FABLE + the 1500-mol
+    # head-to-head). PIN path untouched.
+    if general_fallback_tier:
+        from .metrics.abstention import AbstentionCode, record_suppression
+        record_suppression(
+            AbstentionCode.GATE_SUPPRESSED,
+            detail='opsin_unparseable_general_fallback', candidate=name)
+        _suppressed_to = _descriptive_fallback(smiles)
+        _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+        return _suppressed_to
     # DD2 / OPSIN-validity grammar carve-out (Phase D): OPSIN's generation grammar does not recognise the
     # P-63.4.2 chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
     # '-dithioperoxol'), so it REJECTS these correct PINs (P-56.2 verbatim:
@@ -2868,7 +2919,8 @@ class Orthonym:
             )
             if _final_opsin_validity_gate(
                     cand, smiles, self._grammar_stats,
-                    besteffort_unverified=self._general_fallback_unverified) \
+                    besteffort_unverified=self._general_fallback_unverified,
+                    general_fallback_tier=self._general_fallback) \
                     not in _DESCRIPTIVE_FALLBACK_NAMES:
                 return cand
         return gated
@@ -3226,7 +3278,7 @@ class Orthonym:
                         _pre_gate = result
                         result = _final_opsin_validity_gate(
                             result, smiles, self._grammar_stats,
-                            besteffort_unverified=self._general_fallback_unverified,
+                            besteffort_unverified=self._general_fallback_unverified, general_fallback_tier=self._general_fallback,
                         )
                         # v29 Phase 4: the gate is now a FILTER over the
                         # cascade, not a terminal abort. Only fires when a real
@@ -3326,7 +3378,8 @@ class Orthonym:
                     if _dname and not is_failure_name(_dname):
                         _dgated = _final_opsin_validity_gate(
                             _dname, smiles, self._grammar_stats,
-                            besteffort_unverified=self._general_fallback_unverified)
+                            besteffort_unverified=self._general_fallback_unverified,
+                            general_fallback_tier=self._general_fallback)
                         if not is_failure_name(_dgated):
                             result = _dgated
             # v37 SP1.3 (offer-not-return, invariant 18): a molecule whose SENIOR
@@ -5113,7 +5166,7 @@ class Orthonym:
                     if not self._disable_opsin_validity_gate:
                         name = _final_opsin_validity_gate(
                             name, smiles, self._grammar_stats,
-                            besteffort_unverified=self._general_fallback_unverified,
+                            besteffort_unverified=self._general_fallback_unverified, general_fallback_tier=self._general_fallback,
                         )
             metadata = retrieve_confidence()
             # v29 C4: no candidate was scored (early-return path). This used to
