@@ -1196,6 +1196,13 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             #            case, generalised). Ring path already branches it.
         if _is_diazo_root(ctx.mol, j):
             continue  # M2: diazo N_beta likewise -- always the ``diazo`` leaf.
+        if _is_nitrooxy_root(ctx.mol, j):
+            continue  # M2 inc2: the ester O of a nitrate ester -O-NO2 is always
+            #            the anchor of the ``nitrooxy`` branch leaf (which carries
+            #            the whole -O-N(+)(=O)[O-] group + its internal charges),
+            #            never threaded into the chain as a plain skeletal ``oxa``
+            #            (which would strand the nitro N+/O- as an unconsumed
+            #            internal charge -> void -- the nitro case, generalised).
         if _is_phosphinate_oxide_root(ctx.mol, j):
             continue
         if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom) is not None:
@@ -1756,7 +1763,7 @@ _LEAF_DOUBLE = {
 # prefix-path raw-formal-charge void guards know the charge IS accounted for. Each
 # token is produced by exactly one shortcut and covers exactly that group's
 # internally-charged atoms -- see the membership check in ``_name_component``.
-_INTERNAL_CHARGE_LEAF_TOKENS = frozenset({"nitro", "azido", "diazo"})
+_INTERNAL_CHARGE_LEAF_TOKENS = frozenset({"nitro", "azido", "diazo", "nitrooxy"})
 
 
 def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
@@ -1784,6 +1791,12 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     diazo = _diazo_shortcut(mol, component, attach_hint)
     if diazo is not None:
         return diazo
+    # M2 inc2: the nitrate ester ``-O-[N+](=O)[O-]`` (P-67.1.4.3.1 preselected
+    # ``nitrooxy``; its N+/O- are P-59 internal charges get_ion_sites strips).
+    # Attached via the ester O, exactly the four ester-O/N/=O/O- atoms.
+    nitrooxy = _nitrooxy_shortcut(mol, component, attach_hint)
+    if nitrooxy is not None:
+        return nitrooxy
 
     # Task B2b: a GENUINELY charged atom anywhere in this branch (nitro,
     # just checked, is the only exception) must NEVER take one of the
@@ -2180,6 +2193,84 @@ def _diazo_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     if len(outside) != 1 or outside[0].GetSymbol() != "C":
         return None
     return "diazo", frozenset(component)
+
+
+# ===========================================================================
+# M2 inc2: nitrate ester  -O-[N+](=O)[O-]  (rendered ``nitrooxy``, P-67.1.4.3.1)
+# ===========================================================================
+
+def _nitrooxy_atoms(mol, ester_o_idx: int):
+    """If *ester_o_idx* is the ester oxygen of a nitrate ester
+    ``R-O-[N+](=O)[O-]`` (the ester of nitric acid), return the frozenset of its
+    four atoms ``{ester_O, N, =O, O-}``, else ``None``.
+
+    The centre is defined by CONNECTIVITY + CHARGE (mirroring ``_nitro_shortcut``
+    but anchored at the ESTER oxygen, one atom further out): the ester O is a
+    neutral, H-free, degree-2 oxygen bonded to exactly one nitrogen (the nitrate
+    N) and one other heavy atom (the parent R); that nitrogen is a genuine nitro
+    nitrogen -- ``+1``, degree 3, its other two neighbours both terminal oxygens,
+    one ``=O`` neutral and one single-bonded ``[O-]``. A plain nitro (no ester O),
+    a nitrite ester ``-O-N=O``, or an orthonitrate fail one of these exactly."""
+    o = mol.GetAtomWithIdx(ester_o_idx)
+    if o.GetSymbol() != "O" or o.GetFormalCharge() != 0 or o.GetTotalNumHs() != 0:
+        return None
+    heavy = [n for n in o.GetNeighbors() if n.GetAtomicNum() > 1]
+    if len(heavy) != 2:
+        return None
+    n_nbrs = [n for n in heavy if n.GetSymbol() == "N"]
+    r_nbrs = [n for n in heavy if n.GetSymbol() != "N"]
+    if len(n_nbrs) != 1 or len(r_nbrs) != 1:
+        return None
+    n = n_nbrs[0]
+    # the ester O -> N bond must be a single bond (an ester linkage)
+    bond_on = mol.GetBondBetweenAtoms(ester_o_idx, n.GetIdx())
+    if bond_on is None or round(bond_on.GetBondTypeAsDouble()) != 1:
+        return None
+    if n.GetFormalCharge() != 1 or n.GetTotalNumHs() != 0 or n.GetDegree() != 3:
+        return None
+    other_o = [nb for nb in n.GetNeighbors() if nb.GetIdx() != ester_o_idx]
+    if len(other_o) != 2:
+        return None
+    kinds = []
+    for oa in other_o:
+        if oa.GetSymbol() != "O" or oa.GetDegree() != 1:
+            return None  # each terminal O must bond ONLY to this N
+        bond = mol.GetBondBetweenAtoms(n.GetIdx(), oa.GetIdx())
+        bt = round(bond.GetBondTypeAsDouble())
+        kinds.append((bt, oa.GetFormalCharge(), oa.GetTotalNumHs()))
+    if sorted(kinds) != sorted([(2, 0, 0), (1, -1, 0)]):
+        return None
+    return frozenset({ester_o_idx, n.GetIdx()} | {oa.GetIdx() for oa in other_o})
+
+
+def _is_nitrooxy_root(mol, j: int) -> bool:
+    """True if atom *j* is the ester oxygen of a nitrate ester (see
+    ``_nitrooxy_atoms``) -- used by ``_tree_neighbors`` to keep it OUT of chain-
+    spine continuation, so the whole ``-O-NO2`` group is always resolved as ONE
+    ``nitrooxy`` branch leaf (carrying the nitro N+/O- internal charge), never
+    threaded into the skeleton as a plain ``oxa`` that strands the charge."""
+    return _nitrooxy_atoms(mol, j) is not None
+
+
+def _nitrooxy_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+    """``-O-[N+](=O)[O-]`` attached via the ester O, exactly the four nitrate-
+    ester atoms -- rendered as the ``nitrooxy`` substituent prefix (P-67.1.4.3.1
+    preselected; OPSIN-RT-verified: ``nitrooxymethane`` and ``1-(nitrooxy)ethane``
+    both parse back to the input constitution). Returns ``("nitrooxy", atom_ids)``
+    or ``None`` (fall through). The N+/O- are P-59 internal charges (tracked as
+    ``internal_atoms`` via ``_INTERNAL_CHARGE_LEAF_TOKENS``)."""
+    if len(component) != 4:
+        return None
+    nit = _nitrooxy_atoms(mol, attach_hint)
+    if nit is None or nit != component:
+        return None
+    # attach_hint (the ester O) must have exactly one heavy neighbour OUTSIDE the
+    # group -- the real parent R (also rejects a bare, unattached nitrate ion).
+    outside = [n for n in mol.GetAtomWithIdx(attach_hint).GetNeighbors()
+               if n.GetAtomicNum() > 1 and n.GetIdx() not in component]
+    if len(outside) != 1:
+        return None
+    return "nitrooxy", frozenset(component)
 
 
 def _phosphinate_oxide_leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):

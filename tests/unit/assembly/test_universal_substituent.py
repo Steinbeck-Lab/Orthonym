@@ -315,6 +315,29 @@ def test_m2_diazo_composed_backbone_is_zero_wrong():
             assert verify_or_none(result.name, smi) == result.name, smi
 
 
+def test_m2_nitrate_ester_named_not_voided():
+    """M2 inc2: a nitrate ester ``R-O-[N+](=O)[O-]`` (P-67.1.4.3.1 preselected,
+    P-59 internal, net-0) is rendered as the ``nitrooxy`` prefix rather than
+    voiding on the raw-charge guard. OPSIN-RT-verified (``nitrooxymethane`` ->
+    the input); the census's 3rd-largest residual centre (~83 molecules)."""
+    for smi in ("CO[N+](=O)[O-]", "CCO[N+](=O)[O-]"):
+        result, verified = _name_and_verify(smi)
+        assert verified == result.name, smi
+        assert "nitrooxy" in result.name, (smi, result.name)
+
+
+def test_m2_nitrate_ester_on_ring_and_backbone_zero_wrong():
+    """A nitrate ester on a decorated backbone / ring either composes
+    (``nitrooxy`` + RT-verified) or degrades to abstain -- never
+    wrong-constitution."""
+    for smi in ("CC(C)(C(=O)O)C1CCC(O[N+](=O)[O-])CC1",
+                "O=[N+]([O-])OC[C@H]1OC[C@H](O[N+](=O)[O-])[C@H]1O"):
+        result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+        if result is not None:
+            assert "nitrooxy" in result.name, (smi, result.name)
+            assert verify_or_none(result.name, smi) == result.name, smi
+
+
 # ===========================================================================
 # Task B2b: charge / indicated-H as suffixes (step 4 of the design).
 # ===========================================================================
@@ -407,7 +430,6 @@ _INTERNAL_CHARGE_VOID_WITNESSES = [
     ("nitrile oxide",                    "CC#[N+][O-]"),
     ("nitronate",                        "CC=[N+]([O-])[O-]"),
     ("aci-nitro",                        "CC=[N+]([O-])O"),
-    ("nitrate ester",                    "CCO[N+](=O)[O-]"),
     ("thionitro",                        "CC[N+](=S)[O-]"),
     ("S-oxide (charge-drawn, DMSO)",     "C[S+](C)[O-]"),
     ("P-oxide (charge-drawn)",           "C[P+](C)(C)[O-]"),
