@@ -1151,6 +1151,16 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             continue
         if _is_phosphinate_oxide_root(ctx.mol, j):
             continue
+        if _is_terminal_halogen(ctx.mol, j):
+            continue  # a monovalent halogen (F/Cl/Br/I) is ALWAYS a substituent
+            #            prefix (fluoro/chloro/bromo/iodo via _leaf_shortcut),
+            #            NEVER a skeletal chain atom. Threading it into the spine
+            #            absorbed it as a phantom carbon and dropped the halogen
+            #            (measured: CHF2 -> "1-fluoroethan-1-yl", CF3 ->
+            #            "1,1-difluoroethan-1-yl", and a plain haloalkane like
+            #            CCCCl VOIDED the whole molecule). Excluding it (exactly
+            #            as nitro-N / phosphinate-P / charged-leaf above) sends it
+            #            to _discover_branches -> the _leaf_shortcut halogen leaf.
         if _charged_leaf_shortcut(ctx.mol, frozenset({j}), atom) is not None:
             continue  # terminal charged atom a charged-leaf owns -> branch, not
             #            spine (a carbanion / heteroatom-hydride anion this leaf
@@ -1747,6 +1757,33 @@ def _nitro_shortcut(mol, component: FrozenSet[int], attach_hint: int):
     if sorted(kinds) == sorted([(2, 0, 0), (1, -1, 0)]):
         return "nitro", frozenset(component)
     return None
+
+
+# F / Cl / Br / I / At -- the monovalent halogens. Always a terminal
+# substituent prefix (P-29.3 / P-35.1 fluoro/chloro/bromo/iodo), never a
+# skeletal chain or 'a'-replacement atom.
+_HALOGEN_ANUMS = frozenset({9, 17, 35, 53, 85})
+
+
+def _is_terminal_halogen(mol, j: int) -> bool:
+    """True if atom *j* is a terminal (monovalent) halogen -- used by
+    ``_tree_neighbors`` to keep a halogen OUT of chain-spine continuation, so it
+    is always resolved as a branch via ``_leaf_shortcut``'s halogen leaf
+    (``fluoro``/``chloro``/``bromo``/``iodo``), never absorbed into the parent
+    skeleton as a phantom chain atom (which silently dropped the halogen and
+    inflated the parent by one carbon -- CHF2 -> ``1-fluoroethan-1-yl``).
+
+    Requires exactly one heavy neighbour so a rare hypervalent/charged halogen
+    (e.g. an iodine(III/V) centre) stays threadable rather than being forced to
+    a leaf it does not fit -- mirroring the shape-guarded nitro/phosphinate
+    predicates below."""
+    atom = mol.GetAtomWithIdx(j)
+    if atom.GetAtomicNum() not in _HALOGEN_ANUMS:
+        return False
+    if atom.GetFormalCharge() != 0:
+        return False
+    heavy_nbrs = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+    return len(heavy_nbrs) == 1
 
 
 def _is_nitro_root(mol, j: int) -> bool:
