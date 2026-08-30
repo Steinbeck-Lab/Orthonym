@@ -1846,24 +1846,64 @@ def _name_fused_component(
     name, _ring_atoms, atom_to_locant_in_frag, _subs_included = result
 
     if not atom_to_locant_in_frag:
-        # Systematic fallback (e.g., 'decahydronaphthalene') yields a
-        # name but no locant map. Synthesize a peripheral-numbering walk
-        # to produce a connectivity-correct locant map covering all
-        # ring atoms. This honors the cascade-step-6 coverage invariant
-        # (Pitfall 7) without inventing new IUPAC numbering rules —
-        # for saturated fused bicyclics, the peripheral walk is the
-        # canonical IUPAC traversal (P-23.2.5 + P-25.3 inheritance).
-        # Cited positions steer the fused numbering orientation (P-25.3.1.3
-        # lowest locants): the atoms that carry a decoration — the spiro
-        # junction and every substituent-bearing ring atom, i.e. any component
-        # atom with a neighbour OUTSIDE the fused component.
+        # Systematic fallback: ``name_fused_heterocycle`` /
+        # ``name_ortho_fused_bicyclic`` returned a NAME (e.g.
+        # ``6,7-dihydro-5H-cyclopenta[d]pyrimidine``) but an EMPTY locant map.
+        # Task C: the old fallback, ``_synthesize_fused_locants``, walked the
+        # periphery WITHOUT respecting the stem's heteroatom positions, so it
+        # placed the spiro carbon at locant 1 — but the NAME
+        # ``cyclopenta[d]pyrimidine`` fixes a pyrimidine NITROGEN at 1, so
+        # ``spiro[...-1,3'-...]`` puts the spiro junction on an N and OPSIN
+        # rejects it. ``compute_fused_numbering`` is the SAME authority
+        # ``name_fused_heterocycle`` used to spell the name (fused_rings.py:293/
+        # 426), so its numbering is CONSISTENT with the stem — the pyrimidine
+        # N's sit at 1,3 and the spiro carbon necessarily lands on a valid
+        # carbon peripheral locant. ``_orient_catalog_numbering`` then picks the
+        # automorphism giving the cited atoms (spiro junction + every
+        # substituent-bearing ring atom) the lowest locants (P-25.3.1.3 /
+        # P-24.5.1). Falls back to the legacy walk only if the authority
+        # declines (all-carbon systems where both agree anyway).
         cited_orig = {
             a for a in fused_atoms
             if any(nb.GetIdx() not in fused_atoms
                    for nb in mol.GetAtomWithIdx(a).GetNeighbors())
         }
-        cited_frag = {orig_to_frag[a] for a in cited_orig if a in orig_to_frag}
-        atom_to_locant_in_frag = _synthesize_fused_locants(frag, cited_frag)
+        # The right numbering AUTHORITY depends on whether the fused component
+        # carries heteroatoms, because the two candidates disagree and each is
+        # right for exactly one case:
+        #   * HETEROATOM-containing (cyclopenta[d]pyrimidine, benzo[d]pyrimidine,
+        #     furo[3,4-b]pyridine ...): the heteroatoms have FIXED canonical
+        #     locants (N at 1,3 in a pyrimidine). ``_synthesize_fused_locants``'s
+        #     peripheral walk IGNORED them and put the spiro CARBON at locant 1 —
+        #     a nitrogen position — so OPSIN rejected the descriptor.
+        #     ``compute_fused_numbering`` is the authority that spelled the name
+        #     (fused_rings.py:293/426) and respects the heteroatom positions, so
+        #     the spiro carbon lands on a valid carbon locant consistent with the
+        #     stem.
+        #   * ALL-CARBON (hexahydronaphthalene, decahydronaphthalene ...): there
+        #     is no heteroatom constraint; the name-builder oriented the hydro
+        #     prefix to the lowest carbon locants and the peripheral walk matches
+        #     it, whereas ``compute_fused_numbering`` can pick a DIFFERENT
+        #     automorphism (spiro 1 -> 8) that desyncs from the baked-in
+        #     ``1,2,3,4,5,6-hexahydro`` prefix. Keep the legacy walk here.
+        # (Any residual mismatch is caught by the offer RT gate — abstain, never
+        # a wrong constitution.)
+        frag_has_hetero = any(
+            frag.GetAtomWithIdx(i).GetSymbol() != 'C'
+            for i in range(frag.GetNumAtoms())
+        )
+        atom_to_locant_in_frag = None
+        if frag_has_hetero:
+            from .fusion_numbering import compute_fused_numbering
+            from .fused_rings import _fused_locant_to_output
+            cfn = compute_fused_numbering(frag, set(range(frag.GetNumAtoms())))
+            if cfn:
+                atom_to_locant_in_frag = {
+                    a: _fused_locant_to_output(loc) for a, loc in cfn.items()
+                }
+        if not atom_to_locant_in_frag:
+            cited_frag = {orig_to_frag[a] for a in cited_orig if a in orig_to_frag}
+            atom_to_locant_in_frag = _synthesize_fused_locants(frag, cited_frag)
         if not atom_to_locant_in_frag:
             return None
 
