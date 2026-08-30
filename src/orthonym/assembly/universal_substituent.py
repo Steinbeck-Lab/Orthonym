@@ -559,8 +559,9 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     the ORIGINAL input's FULL InChIKey (constitution AND stereo AND charge) via
     ``validation.reconstruct.verify_or_none``. A wrong/uncertain descriptor
     fails that gate and the cascade falls through -- it can only ever IMPROVE a
-    name (block-1 -> full), never make one wrong. Up to two OPSIN verifies (the
-    user-chosen cascade cost); ``plain`` needs none.
+    name (block-1 -> full), never make one wrong. Up to FOUR OPSIN verifies (full,
+    ring cis-, ring trans-, top-only — the user-chosen cascade cost); ``plain``
+    needs none.
     """
     from ..validation.reconstruct import verify_or_none
 
@@ -624,7 +625,17 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
             if ctx.mol.GetAtomWithIdx(a).IsInRing()
             and ctx.mol.GetAtomWithIdx(a).HasProp("_CIPCode")
         ]
-        if len(ring_stereo_centres) == 2:
+        # cis/trans (P-31.1.4) is the relation of two substituents on ONE ring.
+        # When the two stereocentres sit in DIFFERENT rings of a fused/spiro spine,
+        # a leading cis-/trans- denotes ring-FUSION stereo, not the substituent
+        # relation, so it must not be offered there -- guard on same-ring
+        # membership (FABLE review #6). The offer full-InChIKey gate would still
+        # veto a wrong sense, but a coincidental match could ship an ill-defined
+        # name; this keeps the descriptor semantically correct by construction.
+        same_ring = (len(ring_stereo_centres) == 2
+                     and ctx.mol.GetRingInfo().AreAtomsInSameRing(
+                         ring_stereo_centres[0], ring_stereo_centres[1]))
+        if same_ring:
             for rel in ("cis-", "trans-"):
                 rel_name = rel + comp_full.name
                 if rel_name not in candidates:
