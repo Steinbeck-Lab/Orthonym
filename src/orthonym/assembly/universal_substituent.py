@@ -933,7 +933,10 @@ def _name_component(
 
     prefix_parts = []
     for name, locs in prefix_entries.items():
-        locs = sorted(locs)
+        # Prime-aware sort: a mixed-spiro-fused leaf hands us display-string
+        # locants (``"5'"``) whose natural order is (prime_rank, number), not
+        # lexicographic; ordinary int locants sort identically under this key.
+        locs = sorted(locs, key=_locant_sort_key)
         prefix_parts.append((alpha_sort_key(name),
                               format_substituent_prefix(name, locs, len(locs))))
     prefix_parts.sort(key=lambda t: t[0])
@@ -1216,6 +1219,89 @@ def _ring_system_for_component(
 # Ring spine construction (monocyclic own-built + polycyclic reuse)
 # ===========================================================================
 
+def _locant_sort_key(loc) -> Tuple[int, int]:
+    """Total order over a locant that may be a plain int, a primed display
+    string (``"5'"``), or a ``rules.spiro._Locant`` tuple ``(5, "'")``.
+
+    Sort is (prime_rank, number): all unprimed locants precede all
+    single-primed, which precede double-primed, and within a rank by number.
+    This is the ordering P-31.1.4 / OPSIN expect for a spiro locant set, and
+    it lets the SAME ``sorted(...)`` in ``_name_component`` handle both the
+    ordinary int-locant spines and the mixed-spiro-fused string-locant leaf.
+    """
+    if isinstance(loc, tuple):
+        base, prime = loc[0], loc[1]
+        return (len(prime), int(base))
+    if isinstance(loc, str):
+        i = 0
+        while i < len(loc) and loc[i].isdigit():
+            i += 1
+        num = int(loc[:i]) if i else 0
+        return (len(loc) - i, num)   # trailing primes = the suffix length
+    return (0, int(loc))
+
+
+def _locant_display(loc) -> str:
+    """Render a locant (int / primed string / ``_Locant`` tuple) as the token
+    that goes into the name: ``5`` -> ``"5"``, ``(5, "'")`` -> ``"5'"``,
+    ``"5'"`` -> ``"5'"``."""
+    if isinstance(loc, tuple):
+        from ..rules.spiro import _prime_token
+        return _prime_token(loc[0], loc[1])
+    return str(loc)
+
+
+def _mixed_spiro_fused_leaf(
+    ctx: _Ctx, ring_atoms: FrozenSet[int], attach_hint: Optional[int],
+) -> Optional[Tuple[FrozenSet[int], str, Dict[int, object], Optional[int]]]:
+    """Best-effort FLOOR wiring of ``rules.spiro.name_mixed_spiro_fused`` as a
+    ring-leaf parent (Task C, the reverted-L2 fall-through, re-anchored).
+
+    A spiro atom that joins a FUSED ring component (indane / chromene /
+    indoline / cyclopenta[b]pyridine ...) to a second ring is a
+    ``mixed-spiro-fused`` system: it is neither a von-Baeyer cage
+    (``analyze_cage_universal`` voids) nor a plain von-Baeyer spiro
+    (``analyze_spiro_universal`` would kekulise the aromatic component into a
+    polyene that OPSIN reads as a different constitution).
+    ``name_mixed_spiro_fused`` builds the P-24.5.1 separable name
+    (``spiro[<fused-comp>-x,y'-<comp2>]``) and returns a combined
+    atom->locant map whose SECOND-cited component carries primed locants as a
+    ``_Locant`` tuple ``(n, "'")``.
+
+    We render each such tuple to its display string (``"5'"``) HERE, via
+    ``_prime_token`` -- the L2 defect was leaking the raw ``(1, "'")`` tuple
+    into ``format_substituent_prefix``. Downstream sorting is prime-aware
+    (``_locant_sort_key``).
+
+    Fail-closed: returns None (fall through to the von-Baeyer spiro floor)
+    unless the named spiro CORE is exactly this component's ring system, so a
+    molecule with a second, unrelated ring system is never mis-attributed.
+    Every emission is still offer-RT-gated by the caller (0-wrong).
+    """
+    from ..rules.spiro import name_mixed_spiro_fused
+    try:
+        res = name_mixed_spiro_fused(ctx.mol)
+    except Exception:
+        return None
+    if res is None:
+        return None
+    name, core_ring_atoms, combined_locants, _subs = res
+    # The spiro CORE named must be exactly the ring system we were asked to
+    # spine (spiro-grouped ring system == fused component + side ring). If the
+    # molecule carries another spiro/fused system, decline and let the caller's
+    # von-Baeyer floor (or a deeper branch) handle this one.
+    if set(core_ring_atoms) != set(ring_atoms):
+        return None
+    # Render the combined map to display-string locants (primes resolved).
+    atom_to_locant: Dict[int, object] = {
+        a: _locant_display(loc) for a, loc in combined_locants.items()
+    }
+    attach_locant = (
+        atom_to_locant.get(attach_hint) if attach_hint is not None else None
+    )
+    return frozenset(core_ring_atoms), name, atom_to_locant, attach_locant
+
+
 def _name_ring_spine(
     ctx: _Ctx, component: FrozenSet[int], ring_atoms: FrozenSet[int],
     attach_hint: Optional[int],
@@ -1236,6 +1322,19 @@ def _name_ring_spine(
         # instead of shipping an uglier, non-PIN, but round-trip-verified
         # name. Never reached at PIN tier, so PIN's own (correct) refusal for
         # a mancude cage is untouched.
+        #
+        # Task C: a spiro atom joining a FUSED ring component to a second ring
+        # (indane / chromene / indoline / cyclopenta[b]pyridine spiro-...) is a
+        # mixed-spiro-fused system that neither ``analyze_cage_universal`` nor
+        # ``analyze_spiro_universal`` names correctly -- the former voids, the
+        # latter kekulises the aromatic component into a polyene of a DIFFERENT
+        # constitution. Offer the P-24.5.1 separable name FIRST; it is
+        # offer-RT-gated by the caller, so a wrong-constitution fusion name is
+        # voided rather than shipped. Only when it declines do we fall through
+        # to the von-Baeyer spiro floor below (the (c)-bucket covering name).
+        mixed = _mixed_spiro_fused_leaf(ctx, ring_atoms, attach_hint)
+        if mixed is not None:
+            return mixed
         cage = analyze_cage_universal(mol, cage_atoms=set(ring_atoms),
                                       allow_mancude=True)
         if cage is None:
