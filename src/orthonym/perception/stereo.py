@@ -37,6 +37,39 @@ _USE_CENTRES_CIP = os.environ.get(
 ).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _fill_missing_bond_cip_from_rdkit(mol) -> None:
+    """Complementary rdCIPLabeler pass: FILL double-bond ``_CIPCode`` that the
+    primary labeller (centres) left empty, without touching any label it set.
+
+    The vendored ``centres`` engine is the CIP source-of-truth for atoms (279/290
+    vs rdCIPLabeler's 235/290 on the Hanson 2018 suite) but does NOT emit an E/Z
+    label for an *exocyclic* double bond to an aromatic-flagged ring atom -- the
+    o-/p-quinoid and fulvenoid (``-ylidene``) systems -- so those bonds reached
+    ``collect_stereodescriptors`` with no ``_CIPCode`` and their stereo was
+    silently dropped (M3 finding, 2026-08-30). rdCIPLabeler labels them correctly.
+
+    This runs rdCIPLabeler on a COPY and copies over ``_CIPCode`` ONLY for a
+    DOUBLE bond that (a) mol currently has no E/Z code for and (b) the copy codes
+    ``E``/``Z``. It never overwrites a code centres already set, so centres keeps
+    ownership of every atom and every bond it did label. Additive-only and
+    fail-open: any error leaves the primary labels unchanged.
+    """
+    try:
+        needs = [b.GetIdx() for b in mol.GetBonds()
+                 if b.GetBondType() == Chem.BondType.DOUBLE
+                 and not (b.HasProp('_CIPCode') and b.GetProp('_CIPCode') in ('E', 'Z'))]
+        if not needs:
+            return
+        probe = Chem.Mol(mol)  # preserves atom/bond indices and bond stereo
+        rdCIPLabeler.AssignCIPLabels(probe)
+        for idx in needs:
+            pb = probe.GetBondWithIdx(idx)
+            if pb.HasProp('_CIPCode') and pb.GetProp('_CIPCode') in ('E', 'Z'):
+                mol.GetBondWithIdx(idx).SetProp('_CIPCode', pb.GetProp('_CIPCode'))
+    except (ValueError, RuntimeError, KeyError):
+        return  # fail-open: keep whatever the primary labeller produced
+
+
 def assign_stereochemistry(mol) -> None:
     """
     Assign CIP stereochemistry labels to a molecule (idempotent guard).
@@ -67,6 +100,9 @@ def assign_stereochemistry(mol) -> None:
         try:
             from .centres_bridge import centres_label_mol
             if centres_label_mol(mol):
+                # centres owns atoms + the bonds it labelled; fill only the
+                # exocyclic-ylidene double bonds it leaves unlabelled (M3).
+                _fill_missing_bond_cip_from_rdkit(mol)
                 mol.SetProp(_CIP_ASSIGNED_PROP, '1')
                 return
         except Exception as exc:  # pragma: no cover - defensive; fall back to RDKit
