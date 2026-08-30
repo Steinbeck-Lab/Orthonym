@@ -2863,6 +2863,169 @@ def _name_general_monospiro_fused(
     return (name, core_ring_atoms, combined_locants, False)
 
 
+_POLYSPIRO_MULT = {2: "dispiro", 3: "trispiro", 4: "tetraspiro", 5: "pentaspiro"}
+
+
+def _fused_components_atoms(mol) -> List[Set[int]]:
+    """Connected components of the ring-FUSED adjacency graph (rings sharing an
+    edge), returned as atom sets. Spiro-joined rings (single shared atom) are in
+    DIFFERENT components; a pendant ring system is its own component."""
+    ri = mol.GetRingInfo()
+    rings = [set(r) for r in ri.AtomRings()]
+    n = len(rings)
+    adj: Dict[int, List[int]] = {i: [] for i in range(n)}
+    for i in range(n):
+        for j in range(i + 1, n):
+            if len(rings[i] & rings[j]) >= 2:
+                adj[i].append(j); adj[j].append(i)
+    seen: Set[int] = set()
+    comps: List[Set[int]] = []
+    for i in range(n):
+        if i in seen:
+            continue
+        stack = [i]; atoms: Set[int] = set()
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x); atoms |= rings[x]
+            stack.extend(adj[x])
+        comps.append(atoms)
+    return comps
+
+
+def _name_linear_polyspiro_fused(
+    mol, allow_vonbaeyer: bool = True,
+) -> Optional[Tuple[str, Set[int], Dict[int, _Locant], bool]]:
+    """Task C (floor-only): the P-24.4 separable name for a LINEAR polyspiro
+    system — ``dispiro``/``trispiro``… of fused/ring components joined in a chain
+    at ≥2 spiro atoms (the polyspiro (c)-bucket ``name_mixed_spiro_fused`` and the
+    monospiro namer both decline).
+
+    Topology: the FUSED components form a PATH graph whose edges are the spiro
+    atoms (a spiro atom joins two adjacent components at a single shared atom).
+    Names each component with the full ring-parent/von-Baeyer engine (the
+    monospiro recursive pattern iterated along the chain), then assembles
+    ``<mult>spiro[C0-l0,l1a'-C1-l1b',l2a''-C2-…]`` with prime rank = position in
+    the chain and each junction citing its two components' spiro locants.
+
+    Deterministic terminal ordering; every emission is offer-RT-gated (0-wrong).
+    Returns the ``name_spiro_system`` shape or None (fail-closed on any non-path
+    topology, lettered spiro locant, or naming decline)."""
+    spiro_atoms = get_spiro_atoms(mol)
+    if len(spiro_atoms) < 2:
+        return None
+    comps = _fused_components_atoms(mol)
+    ncomp = len(comps)
+    # spiro-component graph: each spiro atom joins the 2 components it lies in.
+    edges: List[Tuple[int, int, int]] = []  # (comp_i, comp_j, spiro_atom)
+    for s in spiro_atoms:
+        in_comps = [k for k, atoms in enumerate(comps) if s in atoms]
+        if len(in_comps) != 2:
+            return None  # a spiro atom must join exactly two fused components
+        edges.append((in_comps[0], in_comps[1], s))
+    # nodes of the spiro core = components touched by a spiro atom
+    core_nodes = set()
+    for i, j, _s in edges:
+        core_nodes.add(i); core_nodes.add(j)
+    # the core must be a simple PATH: |edges| == |nodes|-1, all degree <= 2,
+    # exactly two endpoints of degree 1, and connected.
+    if len(edges) != len(core_nodes) - 1:
+        return None
+    deg: Dict[int, int] = {k: 0 for k in core_nodes}
+    nbr: Dict[int, List[Tuple[int, int]]] = {k: [] for k in core_nodes}
+    for i, j, s in edges:
+        deg[i] += 1; deg[j] += 1
+        nbr[i].append((j, s)); nbr[j].append((i, s))
+    endpoints = [k for k in core_nodes if deg[k] == 1]
+    if len(endpoints) != 2 or any(deg[k] > 2 for k in core_nodes):
+        return None
+    # order the chain from a deterministic endpoint: name both terminals, start
+    # from the alphanumerically-smaller (tie -> lower min atom index).
+    def _term_name(k):
+        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer)
+        return r
+    end_named = {k: _term_name(k) for k in endpoints}
+    if any(v is None for v in end_named.values()):
+        return None
+    e0, e1 = endpoints
+    key0 = (_component_alpha_key(end_named[e0][0]), min(comps[e0]))
+    key1 = (_component_alpha_key(end_named[e1][0]), min(comps[e1]))
+    start = e0 if key0 <= key1 else e1
+    # walk the path
+    order: List[int] = [start]
+    junction: List[int] = []  # spiro atom between order[i] and order[i+1]
+    prev = None
+    cur = start
+    while True:
+        nxts = [(k, s) for (k, s) in nbr[cur] if k != prev]
+        if not nxts:
+            break
+        k, s = nxts[0]
+        junction.append(s); order.append(k); prev, cur = cur, k
+    if len(order) != len(core_nodes):
+        return None
+    # name every component; collect its spiro-atom -> locant map
+    named = []
+    for k in order:
+        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer)
+        if r is None:
+            return None
+        named.append(r)  # (name, atom_to_locant)
+    # spiro locants must be integer peripheral positions in BOTH components
+    for pos, s in enumerate(junction):
+        li = named[pos][1].get(s)
+        lj = named[pos + 1][1].get(s)
+        if not isinstance(li, int) or not isinstance(lj, int):
+            return None
+    # assemble '<mult>spiro[C0-l0,l1a'-C1-l1b',l2a''-C2-...]'
+    mult = _POLYSPIRO_MULT.get(len(junction))
+    if mult is None:
+        return None
+
+    def _pr(n):  # prime string of rank n
+        return "'" * n
+
+    c0_name = _strip_consumed_indicated_h(named[0][0], named[0][1][junction[0]])
+    tokens = [c0_name]
+    for pos, s in enumerate(junction):
+        left = f"{named[pos][1][s]}{_pr(pos)}"
+        right = f"{named[pos + 1][1][s]}{_pr(pos + 1)}"
+        comp_name = named[pos + 1][0]
+        # strip indicated-H consumed by THIS component's spiro junction(s)
+        comp_name = _strip_consumed_indicated_h(comp_name, named[pos + 1][1][s])
+        tokens.append(f"-{left},{right}-{comp_name}")
+    name = f"{mult}[{''.join(tokens)}]"
+
+    # combined locants: component at chain position p gets prime rank p; a shared
+    # spiro atom is kept at its LOWER-prime component's locant.
+    combined_locants: Dict[int, _Locant] = {}
+    core_ring_atoms: Set[int] = set()
+    for p, k in enumerate(order):
+        core_ring_atoms |= comps[k]
+        amap = named[p][1]
+        for atom_idx, locant in amap.items():
+            if atom_idx in combined_locants:
+                continue  # already assigned by a lower-prime component (spiro atom)
+            if not isinstance(locant, int):
+                continue
+            combined_locants[atom_idx] = locant if p == 0 else (locant, _pr(p))
+    if not (set(combined_locants.keys()) >= core_ring_atoms):
+        return None
+    return (name, core_ring_atoms, combined_locants, False)
+
+
+def _name_component_either_atoms(mol, comp_atoms: Set[int], allow_vonbaeyer):
+    """Name ONE component given its ATOM set: a single ring via
+    ``_name_side_ring``, a multi-ring fused/bridged system via
+    ``_name_fused_component``. Returns ``(name, atom_to_locant)`` or None."""
+    ri = mol.GetRingInfo()
+    ring_list = [list(r) for r in ri.AtomRings() if set(r) <= comp_atoms]
+    if not ring_list:
+        return None
+    return _name_component_either(mol, ring_list, allow_vonbaeyer)
+
+
 def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: int):
     """Lowest locant the spiro atom may take given the component's symmetry
     (P-24.3.3). ``extracted`` is the (frag_mol, orig_to_frag) tuple from

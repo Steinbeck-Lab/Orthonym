@@ -1280,6 +1280,7 @@ def _mixed_spiro_fused_leaf(
     """
     from ..rules.spiro import (
         name_mixed_spiro_fused, _name_general_monospiro_fused,
+        _name_linear_polyspiro_fused,
     )
     try:
         # allow_vonbaeyer_component: the FLOOR additionally degrades a
@@ -1293,6 +1294,10 @@ def _mixed_spiro_fused_leaf(
             # be a single ring). Names each side independently and joins the
             # P-24.5.1 separable form. Floor-only; offer-RT-gated.
             res = _name_general_monospiro_fused(ctx.mol, allow_vonbaeyer=True)
+        if res is None:
+            # linear polyspiro fallback: dispiro/trispiro chain of fused/ring
+            # components (the polyspiro (c)-bucket). Floor-only; offer-RT-gated.
+            res = _name_linear_polyspiro_fused(ctx.mol, allow_vonbaeyer=True)
     except Exception:
         return None
     if res is None:

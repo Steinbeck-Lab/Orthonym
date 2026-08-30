@@ -174,3 +174,38 @@ def test_both_sides_fused_monospiro_round_trips(core_smi, sub):
     assert parsed is not None, f"OPSIN rejected: {res[0]}"
     core = Chem.MolFragmentToSmiles(m, atomsToUse=sorted(res[1]))
     assert _const(parsed) == _const(core), f"{res[0]} -> {parsed}"
+
+
+# --- linear polyspiro: a dispiro/trispiro chain of fused/ring components ------
+
+POLYSPIRO = [
+    # dispiro: two piperidines spiro'd on a central dioxa-tricyclic
+    ("CN1CCC2(CC1)CC(=O)c1c(ccc3c1OC1(CCN(C)CC1)CC3=O)O2", "dispiro["),
+    # trispiro chain
+    ("O=C1CCC2(CC1)OCC1(CO2)CCC2(CC1)OCCO2", "trispiro["),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.roundtrip
+@pytest.mark.parametrize("core_smi,mult", POLYSPIRO)
+def test_linear_polyspiro_round_trips(core_smi, mult):
+    """The polyspiro (c)-bucket: a linear dispiro/trispiro chain now assembles
+    the P-24.4 separable form (was None -> abstain), RT-correct to the CORE."""
+    from orthonym.rules.spiro import _name_linear_polyspiro_fused
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    m = Chem.MolFromSmiles(core_smi)
+    res = _name_linear_polyspiro_fused(m)
+    assert res is not None, "linear polyspiro namer declined a chain core"
+    assert res[0].startswith(mult), res[0]
+    parsed = opsin_parse(res[0])
+    assert parsed is not None, f"OPSIN rejected: {res[0]}"
+    core = Chem.MolFragmentToSmiles(m, atomsToUse=sorted(res[1]))
+    assert _const(parsed) == _const(core), f"{res[0]} -> {parsed}"
+
+
+def test_linear_polyspiro_declines_nonchain_and_monospiro():
+    """Fail-closed: a monospiro (n_spiro<2) is not this namer's job."""
+    from orthonym.rules.spiro import _name_linear_polyspiro_fused
+    m = Chem.MolFromSmiles("C1=CC2C(C1)CC21OCCO1")  # monospiro
+    assert _name_linear_polyspiro_fused(m) is None
