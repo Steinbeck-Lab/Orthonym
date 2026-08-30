@@ -371,7 +371,7 @@ import contextlib as _contextlib
 
 
 @_contextlib.contextmanager
-def isolated_naming_session():
+def isolated_naming_session(reset_cache: bool = False):
     """Run a nested naming as if it were a fresh TOP-LEVEL call.
 
     Saves the current session state (``session_depth`` + cache + visited),
@@ -385,25 +385,54 @@ def isolated_naming_session():
     in-scope suppressed cohort). Isolating the session gives T4 the full depth-0
     budget, exactly as a direct call gets. Restores on exit so the enclosing
     session continues unperturbed. Never raises out of the restore.
+
+    ``reset_cache`` (CQ5 Task 1, default False = the T4-producer behaviour below):
+    ALSO save the whole-molecule fragment memo cache, install a fresh empty one for
+    the isolated body, and restore the original on exit. The default keeps the
+    cache LIVE (see the giant-hang note below); the opt-in is for the best-effort
+    clean fall-through, which simulates a fresh TOP-LEVEL ``name()`` and so needs
+    the fresh cache a true top-level call gets from ``enter_name_scope``. WHY it
+    matters: the memo caches ``(canonical SMILES -> name)``, and the comment below
+    calls that "a context-free pure function" -- but a cached entry for a substituent
+    the PRIMARY pass could not name (it hit ``MAX_NAMING_DEPTH`` from the elevated
+    session floor and was memoized as a ``recursion_depth_fallback`` SKIP) is NOT
+    context-free: the skip is a function of the depth budget at cache time, not of
+    the SMILES alone. Resetting the session depth alone (below) gives the isolated
+    body the full recursion budget, but with the poisoned skip still in the shared
+    cache the deep substituent is read back as unnameable and the good name is never
+    produced -- exactly the ``COP(=O)(C=C(F)F)C=C(F)F`` drop (RISK 4). A fresh cache
+    lets the isolated body re-derive those fragments from the depth-0 budget.
     """
     saved_depth = getattr(_fragment_guard, 'session_depth', 0)
     saved_visited = getattr(_fragment_guard, 'visited', None)
     # v33 giant-molecule hang fix: the fragment CACHE is deliberately NOT reset or
-    # restored here. It memoizes (canonical SMILES -> name), a context-free pure
-    # function, so keeping it live across the isolation boundary is always correct
-    # and prevents a >60-heavy-atom molecule from re-naming the same fragment on
-    # every nested recovery entry (the best-effort HANG). Only the depth budget
-    # (session_depth + visited) is reset -- the sole reason this isolation exists:
-    # give the nested T4 producer the full recursion budget a standalone call gets.
-    # The inner ``start_naming_session`` keeps, not clobbers, this cache (it only
-    # allocates one when ``cache is None``).
+    # restored here (unless ``reset_cache``). It memoizes (canonical SMILES -> name),
+    # a context-free pure function, so keeping it live across the isolation boundary
+    # is always correct and prevents a >60-heavy-atom molecule from re-naming the
+    # same fragment on every nested recovery entry (the best-effort HANG). Only the
+    # depth budget (session_depth + visited) is reset -- the sole reason this
+    # isolation exists: give the nested T4 producer the full recursion budget a
+    # standalone call gets. The inner ``start_naming_session`` keeps, not clobbers,
+    # this cache (it only allocates one when ``cache is None``).
+    #
+    # ``reset_cache`` opts INTO cache isolation too: it saves the live cache and
+    # installs a fresh ``{}`` for the isolated body, restoring the original on exit.
+    # ``start_naming_session`` sees a non-None cache and keeps this fresh one. This
+    # is bounded against the giant-hang by the per-``name()`` work budget, which is
+    # name-scope-owned and NOT reset here, so a giant's fall-through re-explore
+    # shares the already-partly-spent budget and abstains fast rather than hanging.
+    saved_cache = getattr(_fragment_guard, 'cache', None)
     _fragment_guard.session_depth = 0
     _fragment_guard.visited = set()
+    if reset_cache:
+        _fragment_guard.cache = {}
     try:
         yield
     finally:
         _fragment_guard.session_depth = saved_depth
         _fragment_guard.visited = saved_visited
+        if reset_cache:
+            _fragment_guard.cache = saved_cache
 
 
 def get_naming_depth() -> int:

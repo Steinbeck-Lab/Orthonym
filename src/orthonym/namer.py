@@ -4155,9 +4155,9 @@ class Orthonym:
         context so the general engine reaches the RT-verifying systematic /
         replacement-nomenclature candidate that the in-``name()`` recovery misses.
 
-        Two things break the in-``name()`` recovery for the converting witnesses
-        (spy-confirmed on all three, invariant 8 — ``
-        + ``task-A-report.md``):
+        THREE things break the in-``name()`` recovery for the converting witnesses
+        (spy-confirmed, invariant 8 — `` +
+        ``task-A-report.md`` + ``task1-report.md``):
 
         * The best-effort contextvars (``best_effort_ctx`` etc.) are SET, so the
           substituent recursion (which re-enters through ``name_compound`` and
@@ -4168,13 +4168,23 @@ class Orthonym:
           ``MAX_NAMING_DEPTH`` from an elevated floor and a deep substituent hits
           the cap prematurely, degrading to a worse name (exactly the reason the
           T4 sub-branch already wraps its call in ``isolated_naming_session``).
+        * CQ5 Task 1 (RISK 4): the whole-molecule fragment MEMO CACHE is still the
+          PRIMARY pass's, and it holds ``recursion_depth_fallback`` SKIP entries for
+          the deep substituents the primary could not name (poisoned by the same
+          elevated ``session_depth``). ``isolated_naming_session`` deliberately keeps
+          that cache live (the giant-hang fix), so a depth-0 reset alone reads the
+          poisoned skips back and still misses the good name — the
+          ``COP(=O)(C=C(F)F)C=C(F)F`` drop. ``reset_cache=True`` installs a fresh
+          empty cache for the isolated body, so the deep substituents are re-derived
+          from the depth-0 budget; it is restored on exit.
 
-        Resetting the four propagation contextvars to their defaults and running
-        in a depth-0 isolated session reproduces the state a fresh top-level call
-        gets, under which ``name_general`` produces the RT-verifying candidate.
-        The recovery's OWN OPSIN round-trip gate still decides what ships, so a
-        candidate that does not round-trip returns ``None`` (0-wrong; invariant 9
-        — verify what SHIPS, not just that the bad path stopped). Never raises.
+        Resetting the four propagation contextvars to their defaults and running in
+        a depth-0 isolated session WITH a fresh memo cache reproduces the state a
+        fresh top-level call gets, under which ``name_general`` produces the
+        RT-verifying candidate. The recovery's OWN OPSIN round-trip gate still
+        decides what ships, so a candidate that does not round-trip returns ``None``
+        (0-wrong; invariant 9 — verify what SHIPS, not just that the bad path
+        stopped). Never raises.
 
         Gated by the caller on ``_general_fallback_unverified`` + the
         ship-a-failure path, so PIN/complete output is byte-identical and no
@@ -4194,7 +4204,7 @@ class Orthonym:
                 allow_aromatic_general_ctx.set(False),
                 full_coverage_ctx.set(False),
             )
-            with isolated_naming_session():
+            with isolated_naming_session(reset_cache=True):
                 return self._try_general_engine_recovery(smiles)
         except Exception as e:  # fail-closed: keep the abstention
             logger.info(
