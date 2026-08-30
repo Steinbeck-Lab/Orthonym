@@ -606,6 +606,29 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         full_name = (top_block + comp_full.name) if top_block else comp_full.name
         if full_name != plain:
             candidates.append(full_name)
+    # rung 1b: RING relative-stereo (cis/trans, P-31.1.4). ``_stereo_prefix``
+    # emits an ABSOLUTE R/S block for the top-spine ring (``(1r,3R)-``), which
+    # OPSIN CANNOT parse for a saturated ring -- so rung 1's ``top_block``
+    # candidate is unparseable and the whole stereo layer is dropped, abstaining
+    # a molecule whose stereo IS expressible as the relative ``cis``/``trans``
+    # prefix. When the top spine is a ring bearing EXACTLY TWO stereocentres,
+    # offer ``cis-``/``trans-`` composed with the branch-recursive stereo
+    # (``comp_full.name`` already carries every branch's own descriptors); the
+    # full-InChIKey gate below keeps whichever round-trips, so offering BOTH is
+    # 0-wrong by construction (a wrong relative sense simply fails the gate).
+    # Bounded to 2 ring stereocentres because cis/trans is defined for a pair;
+    # 3+ ring centres need the r/c/t reference system (not attempted here).
+    if comp_full is not None and comp.spine_atom_to_locant:
+        ring_stereo_centres = [
+            a for a in comp.spine_atom_to_locant
+            if ctx.mol.GetAtomWithIdx(a).IsInRing()
+            and ctx.mol.GetAtomWithIdx(a).HasProp("_CIPCode")
+        ]
+        if len(ring_stereo_centres) == 2:
+            for rel in ("cis-", "trans-"):
+                rel_name = rel + comp_full.name
+                if rel_name not in candidates:
+                    candidates.append(rel_name)
     # rung 2: top-spine-only stereo (the previous WS-STEREO candidate)
     if top_block:
         top_name = top_block + plain
