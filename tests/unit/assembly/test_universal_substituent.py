@@ -398,6 +398,31 @@ def test_m2_phosphine_oxide_semipolar_named_or_abstains():
             assert verify_or_none(result.name, smi) == result.name, smi
 
 
+def test_m2_charge_separated_chalcogenide_named_via_neutral_form():
+    """M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide -- a sulfonyl /
+    sulfone / phosphoryl drawn ``X(+)(=O)[O-]`` (a =O on the cation, so the
+    ``oxido``/``-ium`` leaf declines) -- has a valid uncharged depiction with the
+    SAME InChIKey (P-74.2.1). It is named via that neutral form and full-InChIKey
+    RT-verifies against the CHARGED input (0-wrong; the neutralization is the
+    ``perception.ions`` semipolar detector's own proven InChIKey-equal rewrite)."""
+    cases = ["O=[P+]([O-])CCCF",
+             "CN([S+](=O)([O-])c1ccccc1)C",
+             "CC1(COc2cccnc2)COc2ccc(C(=O)N3CC[S+](=O)([O-])CC3)cc2N1"]
+    for smi in cases:
+        result = name_universal_substitutive(Chem.MolFromSmiles(smi))
+        assert result is not None, f"expected a name for {smi!r}"
+        assert verify_or_none(result.name, smi) == result.name, (smi, result.name)
+
+
+def test_m2_neutralize_does_not_touch_n_oxide():
+    """The neutralize fallback must NEVER fire on an N-oxide (a second-row cation
+    with NO uncharged depiction -- ``N=O`` would be pentavalent) -- that stays on
+    the ``oxido``/``-ium`` path. Guarded by the ions semipolar detector, which
+    rejects any rewrite whose InChIKey differs."""
+    result, _ = _name_and_verify("[O-][n+]1ccccc1")
+    assert result.name == "1-oxido-1-azacyclohexa-1,3,5-trien-1-ium"
+
+
 def test_m2_polynitro_now_named_not_voided():
     """A side benefit of the ``_walkable_pieces`` seed fix (M2 inc3): a polynitro
     ``C(-NO2)n`` -- previously voided because a nitro fragment could seed a

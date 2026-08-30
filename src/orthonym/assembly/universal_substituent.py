@@ -401,8 +401,31 @@ def name_universal_substitutive(
     if mol is None:
         return None
     try:
-        return _name_universal_substitutive_unsafe(
+        res = _name_universal_substitutive_unsafe(
             mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro)
+        if res is not None:
+            return res
+        # M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide the primary
+        # path could not spell -- a sulfonyl/sulfone/phosphoryl drawn
+        # ``X(+)(=O)[O-]`` (the ``=O`` on the cation makes the ``oxido``/``-ium``
+        # leaf decline, and the raw-charge guard then voids). Such a P-74.2.1
+        # semipolar chalcogenide has a valid UNCHARGED depiction with the SAME
+        # InChIKey; name THAT neutral form. This is NOT an N-oxide (a second-row
+        # cation has no uncharged depiction -- ``N=O`` is pentavalent), which the
+        # ions semipolar detector already excludes by rejecting any InChIKey-
+        # different rewrite, so this fallback never disturbs the ``oxido``/``-ium``
+        # path. 0-wrong: the caller full-InChIKey RT-verifies the name against the
+        # original CHARGED input, and neutral==charged there by construction.
+        # Guard with the SAME size cap the primary path uses: an oversized input
+        # voids on SIZE (never on charge separation), so skip the fallback's
+        # bond-scan / re-name entirely rather than pay it twice on a giant.
+        if mol.GetNumHeavyAtoms() <= min(atom_work_budget, _MAX_ATOMS_FOR_PERCEPTION):
+            neutral = _neutralize_semipolar_chalcogenides(mol)
+            if neutral is not None:
+                return _name_universal_substitutive_unsafe(
+                    neutral, atom_work_budget,
+                    force_vonbaeyer_spiro=force_vonbaeyer_spiro)
+        return None
     except Exception:
         return None
 
@@ -598,6 +621,54 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         if verified is not None:
             return verified
     return plain
+
+
+def _neutralize_semipolar_chalcogenides(mol):
+    """Return a copy of *mol* with every PROVEN P-74.2.1 semipolar chalcogenide
+    ``X(+)-[A-]`` pair (A in O/S/Se/Te) rewritten to its uncharged depiction
+    ``X=A`` -- or ``None`` if the molecule has no such pair or the rewrite fails.
+
+    Atom indices are preserved (only bond orders / formal charges / pinned H
+    change), so the resulting name's atom bindings still map to the input's atoms
+    and the caller's full-InChIKey RT verification against the ORIGINAL charged
+    input holds by construction. The pair set comes from
+    ``ions._semipolar_chalcogenide_atoms``, which has ALREADY confirmed the
+    uncharged form is the SAME species (identical InChIKey) and, being a
+    third/fourth-row-cation test, EXCLUDES an N-oxide (whose ``N=O`` depiction is
+    pentavalent and fails that check) -- so this only ever fires for a sulfonyl/
+    sulfoxide/sulfone/phosphoryl drawn charge-separated, never for the N-oxide the
+    ``oxido``/``-ium`` path owns."""
+    from ..perception.ions import (
+        _semipolar_chalcogenide_atoms, _BOND_ORDER_UP, _neutralize_pinning_hydrogens,
+    )
+    atoms = _semipolar_chalcogenide_atoms(mol)
+    if not atoms:
+        return None
+    rw = Chem.RWMol(mol)
+    cations: set = set()
+    for bond in list(rw.GetBonds()):
+        a, b = bond.GetBeginAtom(), bond.GetEndAtom()
+        for cation, anion in ((a, b), (b, a)):
+            if (cation.GetIdx() in atoms and anion.GetIdx() in atoms
+                    and cation.GetFormalCharge() >= 1
+                    and anion.GetFormalCharge() == -1
+                    and anion.GetDegree() == 1 and anion.GetTotalNumHs() == 0):
+                raised = _BOND_ORDER_UP.get(bond.GetBondType())
+                if raised is None:
+                    return None
+                bond.SetBondType(raised)
+                _neutralize_pinning_hydrogens(anion)
+                cations.add(cation.GetIdx())
+    if not cations:
+        return None
+    for c in cations:
+        _neutralize_pinning_hydrogens(rw.GetAtomWithIdx(c))
+    m2 = rw.GetMol()
+    try:
+        Chem.SanitizeMol(m2)
+    except Exception:
+        return None
+    return m2
 
 
 def _build_ctx(
