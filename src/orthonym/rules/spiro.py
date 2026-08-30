@@ -837,7 +837,7 @@ def _get_polyspiro_numbering(
     """Generate IUPAC numbering for a polyspiro system.
 
     ``suffix_ring_atoms`` (Phase 4 SUBST-01 parity with ``get_spiro_numbering``,
-    the monospiro sibling): the free valence of a spiro SUBSTITUENT, P-31.1.4.3.4
+    the monospiro sibling): the free valence of a spiro SUBSTITUENT, P-31.1.4
     -- ranked after heteroatoms in the lowest-locant tiebreak below, so a
     polyspiro substituent's attachment point gets the lowest locant available
     once the heteroatom placement (if any) is settled."""
@@ -945,9 +945,9 @@ def get_spiro_numbering(
     Among the directional choices (which spiro-neighbour starts each ring, and
     — when the two rings are the same size — which ring is numbered first), the
     chosen numbering gives the LOWEST locants to the heteroatoms considered
-    together, then to the most senior heteroatom (P-31.1.4.3.4 / P-24.2.4.1),
+    together, then to the most senior heteroatom (P-31.1.4 / P-24.2.4.1),
     then — Phase 4 SUBST-01, mirroring ``get_bicyclo_numbering`` — to the
-    ``suffix_ring_atoms`` (the free valence of a spiro SUBSTITUENT, P-31.1.4.3.4).
+    ``suffix_ring_atoms`` (the free valence of a spiro SUBSTITUENT, P-31.1.4).
     A spelling-independent canonical-rank tiebreak makes the result fully
     deterministic for symmetric systems (e.g. spiro[5.5] acetals). This both
     fixes the latent SMILES-order dependence in heteroatom locants (a tetra-
@@ -1006,7 +1006,7 @@ def get_spiro_numbering(
             (a, loc) for a, loc in mapping.items()
             if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
         ]
-        # (1) lowest locants for ALL heteroatoms together (P-31.1.4.3.4)
+        # (1) lowest locants for ALL heteroatoms together (P-31.1.4)
         het_locs = sorted(loc for _a, loc in heteros)
         # (2) then lowest locants to the most senior heteroatom (O > S > ...)
         het_by_seniority = sorted(
@@ -4269,7 +4269,7 @@ def _name_carbocyclic_monocycle_component(
     assembler is responsible for the P-24.5.1 primed/unprimed placement of the
     OTHER (non-first-cited) component and RT-verifies the whole name (SELF-01). The
     numbering walks from the spiro atom (locant 1) in the direction giving the
-    C=C set the lowest locants (P-31.1.4.3.4); a saturated ring is byte-identical
+    C=C set the lowest locants (P-31.1.4); a saturated ring is byte-identical
     to the old output (no ene infix)."""
     extracted = _extract_subfragment(mol, component_atoms)
     if extracted is None:
@@ -4815,7 +4815,7 @@ def _name_hw_monocycle_component(
             pos = {fi: idx + 1 for idx, fi in enumerate(path)}
             het_locs = sorted(pos[fi] for fi in hetero_frag)
             # Element-seniority tie-break: lowest locants to the most senior
-            # element (P-31.1.4.3.4). Represent as (locant, priority) sorted.
+            # element (P-31.1.4). Represent as (locant, priority) sorted.
             het_prio = sorted((pos[fi], _HP.get(_sym(fi), 999)) for fi in hetero_frag)
             spiro_loc = pos[spiro_frag]
             key = (het_locs, [p for _, p in het_prio], spiro_loc)
