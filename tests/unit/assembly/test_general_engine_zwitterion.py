@@ -298,17 +298,38 @@ def test_skeletal_zwitterion_takes_the_skeletal_branch(smiles, expected, inchike
     assert "ium" in text
 
 
-def test_skeletal_branch_declines_a_ring_aminide():
-    """``classify_anion`` returns 'aminide' for a ring N(-), deliberately absent
-    from ``_ZWIT_SKELETAL_ANION_BASES`` -- the Blue Book's aminide zwitterion
-    (:42460) needs an N-substituted aminide this producer cannot build, so it
-    must fail closed rather than invent a suffix."""
-    mol = Chem.MolFromSmiles("C[N+]12[N-]CC(CC1)CC2")
+def test_skeletal_branch_accepts_a_RING_aminide_declines_an_EXOCYCLIC_one():
+    """P-72.2.2.1: a deprotonated RING nitrogen is a SKELETAL anion (azolide/
+    azinide/azanide) and spells ``-ide`` on the ring parent, so the both-skeletal
+    zwitterion plan must ACCEPT it -- ``classify_anion`` labels it 'aminide' but
+    ``_skeletal_anion_base`` reads a ring N(-) as ``-ide`` (verified round-trip:
+    ``C[N+]12[N-]CC(CC1)CC2`` -> ``1-methyl-1,7-diazabicyclo[2.2.2]octan-1-ium-
+    7-ide``, full-InChIKey RT True).
+
+    An EXOCYCLIC aminide -- the Blue Book's own :42460
+    ``1H-1,2,4-triazol-4-ium-3-aminide``, an N-substituted amide anion this
+    producer cannot build -- must still fail closed (the aminide N is not in a
+    ring, so ``_skeletal_anion_base`` returns None)."""
     from orthonym.rules.ions import classify_anion
     from orthonym.perception.ions import get_ion_sites
-    assert classify_anion(mol, get_ion_sites(mol)["anions"][0]) == "aminide"
-    a2l = {a.GetIdx(): a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
-    assert ge._zwitterion_suffix_plan(mol, a2l) is None
+
+    # RING-skeletal aminide -> accepted as -ide.
+    ring = Chem.MolFromSmiles("C[N+]12[N-]CC(CC1)CC2")
+    assert classify_anion(ring, get_ion_sites(ring)["anions"][0]) == "aminide"
+    a2l = {a.GetIdx(): a.GetIdx() for a in ring.GetAtoms() if a.IsInRing()}
+    plan = ge._zwitterion_suffix_plan(ring, a2l)
+    assert plan is not None
+    held, text = plan
+    assert held == frozenset()
+    assert text.endswith("ide") and "ium" in text
+
+    # EXOCYCLIC aminide (a deprotonated -NH2 substituent) -> still declines.
+    exo = Chem.MolFromSmiles("[NH-]c1n[nH]c[nH+]1")
+    exo_anion = get_ion_sites(exo)["anions"][0]
+    assert classify_anion(exo, exo_anion) == "aminide"
+    assert not exo.GetAtomWithIdx(exo_anion["atom_idx"]).IsInRing()
+    a2l_exo = {a.GetIdx(): a.GetIdx() for a in exo.GetAtoms() if a.IsInRing()}
+    assert ge._zwitterion_suffix_plan(exo, a2l_exo) is None
 
 
 # --------------------------------------------------------------------------

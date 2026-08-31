@@ -237,6 +237,42 @@ def _common_refusal(mol, allow_charged: bool = False) -> Optional[str]:
     return None
 
 
+def _skeletal_anion_base(mol, acls, atom_idx) -> Optional[str]:
+    """P-72.2.2.1 skeletal-atom ``-ide``/``-uide`` base for an anion ALREADY
+    known to sit on the parent-hydride skeleton (a ring/chain atom of the
+    numbered parent).
+
+    ``classify_anion`` returns ``'carbanion'``/``'heteroatom_hydride_anion'``
+    (H+ loss from a skeletal C or Group-14/15 heteroatom) -> ``-ide``, and
+    ``'uide_anion'`` (H- addition) -> ``-uide``. It ALSO returns ``'aminide'``
+    for a deprotonated nitrogen, and for a **ring** nitrogen that has lost H+
+    that aminide IS the skeletal anion -- an azolide / azinide -- spelled
+    ``-ide`` on the ring parent (``pyrrol-1-ide``, ``1,2,3-triazol-1-ide``,
+    ``1,3,5-triazin-1-ide``; every one OPSIN-round-trips). An ACYCLIC aminide is
+    an amine substituent (``-NH-``) that is not skeletal to a hydrocarbon/ring
+    parent -- the Blue Book's own ``...triazol-4-ium-3-aminide`` (:42460) is an
+    N-substituted EXOCYCLIC aminide the ring/cage producer cannot build -- so it
+    returns None (fail closed), leaving that class to the PIN/cage path.
+
+    The VALENCE GATE mirrors ``classify_anion``'s ``heteroatom_hydride_anion``
+    branch: re-adding one H to a clean skeletal ``-ide`` N must restore standard
+    N valence 3 (``degree + H + 1 == 3``), which an aromatic ring N(-) (degree 2,
+    0 H) satisfies. Shared by ``_charge_suffix_text`` (net-charged single-sign)
+    and ``_zwitterion_suffix_plan`` (net-neutral both-skeletal) so the two never
+    disagree about what a ring-N anion spells. References: IUPAC 2013 P-72.2.2.1.
+    """
+    if acls in ('carbanion', 'heteroatom_hydride_anion'):
+        return 'ide'
+    if acls == 'uide_anion':
+        return 'uide'
+    if acls == 'aminide':
+        atom = mol.GetAtomWithIdx(atom_idx)
+        if (atom.GetSymbol() == 'N' and atom.IsInRing()
+                and atom.GetDegree() + atom.GetTotalNumHs() + 1 == 3):
+            return 'ide'
+    return None
+
+
 def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
                         ) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """v26 P5 (BB P-73 cations / P-74 anions): the charge-suffix string for
@@ -308,13 +344,11 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
         if abs(int(site.get('charge', 0))) != 1:
             return None  # multiply-charged single atom -> tight scope
         if negative:
-            acls = classify_anion(mol, site)
-            if acls in ('carbanion', 'heteroatom_hydride_anion'):
-                base = 'ide'          # P-72.2.2.1: loss of H+ from a skeletal atom
-            elif acls == 'uide_anion':
-                base = 'uide'         # P-72.3: hydride ADDED to a skeletal atom
-            else:
-                return None           # FG anion -> PIN path owns it
+            # P-72.2.2.1 skeletal -ide/-uide (incl. a ring-N azolide/azinide);
+            # an FG anion (carboxylate/alkoxide/exocyclic aminide) -> None, PIN owns it.
+            base = _skeletal_anion_base(mol, classify_anion(mol, site), idx)
+            if base is None:
+                return None
         else:
             ccls = classify_cation(mol, site)
             if ccls == 'ylium':
@@ -541,7 +575,11 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
     anion_idx = anion['atom_idx']
     held: set = set()
     if anion_idx in atom_to_locant:
-        anion_base = _ZWIT_SKELETAL_ANION_BASES.get(classify_anion(mol, anion))
+        # Shared skeletal -ide/-uide base (a ring-N azolide/azinide reads 'ide'
+        # here too, via _skeletal_anion_base, so the both-skeletal zwitterion and
+        # the single-sign charge suffix never disagree). _ZWIT_SKELETAL_ANION_BASES
+        # stays the cage-path reference for the carbanion/hydride cases it lists.
+        anion_base = _skeletal_anion_base(mol, classify_anion(mol, anion), anion_idx)
         if anion_base is None:
             return None
         anion_locant = atom_to_locant[anion_idx]
@@ -565,6 +603,108 @@ def _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion: bool = True):
     text = '-%s-%s-%s-%s' % (cation_locant, cation_base,
                             anion_locant, anion_base)
     return frozenset(held), text
+
+
+def _prefix_spells_charge(token: str, negative: bool) -> bool:
+    """True iff a substituent PREFIX token spells an ionic morpheme of the given
+    sign -- the audit that a substituent-borne charge is actually expressed by
+    its own name before its atom is CLAIMED as charge-covered (P3 totality).
+
+    A cationic substituent carries ``-ium`` (``...prop-1-en-1-ium-1-yl``,
+    ``iminium``, ``ylium`` -- all contain ``ium``). An anionic substituent
+    carries ``-ide``/``-uide``/``-olate``. This is a necessary-condition boundary
+    check, not the constitution authority: the whole-name SELF-01 round-trip is
+    what proves the charge lands on the right atom, so a token that passes here
+    but mis-places the charge is caught downstream and abstains (0-wrong)."""
+    if negative:
+        return any(m in token for m in ('ide', 'uide', 'olate'))
+    return 'ium' in token
+
+
+def _distribute_ring_zwitterion_charges(
+    name, mol, atom_to_locant, frag_bindings, has_fg_suffix,
+):
+    """NET-NEUTRAL zwitterion whose ionic centres split between the ring PARENT
+    and its SUBSTITUENTS (P-74.1.1 / P-74.1.2).
+
+    The class: an aromatic azolide/azinide ring anion (a deprotonated ring N,
+    ``-ide`` on the ring parent) conjugated to an exocyclic amidinium/iminium/
+    guanidinium cation that rides inside a substituent prefix
+    (``1,3-diazaprop-1-en-1-ium-1-yl`` etc., which ``name_substituent`` already
+    spelled). Neither ``_charge_suffix_text`` (single-sign, net-charged) nor the
+    both-skeletal ``_zwitterion_suffix_plan`` covers a parent-vs-substituent
+    split, so the mixed-sign zwitterion reached the ``_has_ionic_centres``
+    backstop and abstained.
+
+    Handles three parent shapes: (a) BOTH ionic centres skeletal to the ring
+    parent -> ``_zwitterion_suffix_plan`` cumulative suffix; (b) the parent bears
+    one sign only (a skeletal ``-ide``/``-ium`` via ``_charge_suffix_text``
+    ``parent_only``) and the OPPOSITE sign rides in substituent prefixes; (c) the
+    parent is neutral and every charge rides in substituents. Every genuine
+    charged atom is CLAIMED (parent suffix atoms + a per-substituent-charge
+    ``role='charge'`` binding) so P3 charge-totality proves the name accounts for
+    the whole charge state; SELF-01 then verifies the constitution.
+
+    Returns ``(new_name, [charge TokenBindings])`` or ``None`` to FAIL CLOSED
+    (a substituent charge whose prefix does not spell it; an atom no substituent
+    owns; an -olate held-out the substituent path already named as a prefix).
+    """
+    cations_raw, anions_raw = _genuine_ion_sites(mol)
+    sites = [(s, False) for s in cations_raw] + [(s, True) for s in anions_raw]
+    if not sites:
+        return None
+    if any(abs(int(s.get('charge', 0))) != 1 for s, _ in sites):
+        return None  # multiply-charged single atom -> tight scope
+    parent_atoms = set(atom_to_locant)
+    genuine = {s['atom_idx'] for s, _ in sites}
+    claimed: set = set()
+    charge_bindings: List[TokenBinding] = []
+
+    parent_sites = [(s, neg) for s, neg in sites if s['atom_idx'] in parent_atoms]
+    parent_has_cation = any(not neg for _, neg in parent_sites)
+    parent_has_anion = any(neg for _, neg in parent_sites)
+
+    # --- parent charge suffix ---
+    if parent_has_cation and parent_has_anion:
+        # (a) both centres skeletal to the ring parent -> P-74.1.1 cumulative
+        # suffix. An -olate held-out is the cage producer's job, not this
+        # substituent-discovering path, so decline it (allow_fg_anion False).
+        plan = _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion=False)
+        if plan is None:
+            return None
+        held, ztext = plan
+        if held:
+            return None
+        name = _elide_before_ionic_suffix(name, ztext)
+        pids = tuple(sorted(s['atom_idx'] for s, _ in parent_sites))
+        claimed.update(pids)
+        charge_bindings.append(TokenBinding((), '', 'charge', charge_atom_ids=pids))
+    elif parent_sites:
+        # (b) single-sign parent skeletal suffix (-ide azolide / -ium azinium).
+        res = _charge_suffix_text(mol, atom_to_locant, parent_only=True)
+        if res is None:
+            return None
+        cs, cids = res
+        name = _elide_before_ionic_suffix(name, cs)
+        claimed.update(cids)
+        charge_bindings.append(TokenBinding((), '', 'charge', charge_atom_ids=cids))
+
+    # --- substituent-borne charges (opposite sign, inside a named prefix) ---
+    for s, neg in sites:
+        idx = s['atom_idx']
+        if idx in claimed:
+            continue
+        owner = next((fb for fb in frag_bindings if idx in fb.atom_ids), None)
+        if owner is None:
+            return None  # a charged atom no substituent owns -> fail closed
+        if not _prefix_spells_charge(owner.token, neg):
+            return None  # the prefix does not spell this charge -> fail closed
+        claimed.add(idx)
+        charge_bindings.append(TokenBinding((), '', 'charge', charge_atom_ids=(idx,)))
+
+    if claimed != genuine:
+        return None  # some charge left unexpressed -> fail closed
+    return name, charge_bindings
 
 
 def name_general_chain(
@@ -1953,7 +2093,14 @@ def name_general_monocycle(
     else:
         name = core
 
-    # v26 P5: charge suffix on a ring skeletal atom (fail closed otherwise).
+    # Charge handling (best-effort / allow_charged only; PIN default is
+    # byte-identical because every branch below is behind allow_charged):
+    #   * NET-charged, single sign on the parent -> P5 skeletal suffix (v26 P5).
+    #   * NET-neutral zwitterion (P-74.1.1/.2) -> distribute the charge: the ring
+    #     parent expresses its own sign as a skeletal -ide/-ium suffix and the
+    #     opposite sign rides inside a substituent's prefix (the azolide + exocyclic
+    #     amidinium class), or BOTH centres are skeletal to the ring parent
+    #     (triazin-1-ide-5-ium). Every charged atom is CLAIMED; SELF-01 verifies.
     if allow_charged and Chem.GetFormalCharge(mol) != 0:
         charge_result = _append_charge_suffix(name, mol, atom_to_locant,
                                               has_fg_suffix=bool(suffix_core))
@@ -1962,6 +2109,15 @@ def name_general_monocycle(
         name, charge_atom_ids = charge_result
         bindings.append(TokenBinding((), '', 'charge',
                                      charge_atom_ids=charge_atom_ids))
+    elif allow_charged and _has_ionic_centres(mol):
+        dist = _distribute_ring_zwitterion_charges(
+            name, mol, atom_to_locant, frag_bindings,
+            has_fg_suffix=bool(suffix_core))
+        if dist is None:
+            return _refuse("zwitterion ionic centres not expressible as a "
+                           "monocycle-parent suffix")
+        name, extra_charge_bindings = dist
+        bindings.extend(extra_charge_bindings)
     elif _has_ionic_centres(mol):
         # P-74.1.1 (:42419) fail-closed backstop -- see the chain producer.
         return _refuse("ionic centres not expressible as a monocycle-parent "
