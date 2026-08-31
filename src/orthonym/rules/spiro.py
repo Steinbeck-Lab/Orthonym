@@ -820,6 +820,20 @@ def _dispiro_numbering_candidates(
         t1_traversals = _spiro_ring_traversals(mol, t1, a1)
         t2_traversals = _spiro_ring_traversals(mol, t2, a2)
         for first_mid, second_mid in mid_orders:
+            # P-24.2.2 (BlueBookV2/BlueBookV2.md:9977): the descriptor is cited
+            # "...through each spiro atom and then BACK TO THE FIRST spiro atom".
+            # The first middle arc (segment ``b``) is numbered forward, a1->a2,
+            # right after the first spiro atom; the second/return arc (the last
+            # descriptor segment, ``d``) is numbered on the way back, a2->a1, so
+            # the atom adjacent to the SECOND spiro atom takes the lower locant.
+            # ``_find_two_paths`` yields both interiors in a1->a2 order, so the
+            # return arc must be reversed. Invisible for symmetric middle rings
+            # (both arcs equal) and all-carbon skeletons (arc swap is a graph
+            # automorphism), it only fixes a name once a heteroatom or exocyclic
+            # group breaks that symmetry -- e.g. C1CC11COC11CCC1 was numbered
+            # 9-oxadispiro[2.0.3.2]nonane (a DIFFERENT molecule on OPSIN reparse)
+            # instead of the descriptor-consistent 8-oxadispiro[2.0.3.2]nonane.
+            second_mid = list(second_mid)[::-1]
             for t1_seq in t1_traversals:
                 for t2_seq in t2_traversals:
                     sequence = (list(t1_seq) + [a1] + list(first_mid) + [a2]
