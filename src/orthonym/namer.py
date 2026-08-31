@@ -3770,7 +3770,21 @@ class Orthonym:
         from .rules.stereochemistry import general_engine_stereo_complete
         if general_engine_stereo_complete(mol, cand):
             return (True, False)
-        if self._general_fallback_unverified:
+        # User directive 2026-08-31 (accurate-or-abstain, scoped to the ROUND-TRIP
+        # metric): a name that OMITS stereo the input asserts does NOT round-trip to
+        # the exact input stereoisomer -- under full standard InChIKey it is a FAIL,
+        # not a valid superset (it also cannot BEAT a reference that emits full
+        # stereo). So best-effort must ABSTAIN a stereo-incomplete name exactly like
+        # the complete tier, never ship it stripped. The completable classes already
+        # returned (True, False) above (general_engine_stereo_complete); only
+        # genuinely unexpressible/incomplete stereo (e.g. OPSIN-unparseable
+        # pseudo-asymmetric) reaches here, and stripping it was the precision leak
+        # surfaced by the 4-corpus head-to-head (tropan-3-ol etc.). Set
+        # ORTHONYM_BE_STRIP_STEREO=1 to restore the old P-91.2.2 ship-stripped
+        # behaviour (measurement/back-compat only).
+        import os as _os
+        if self._general_fallback_unverified and _os.environ.get(
+                "ORTHONYM_BE_STRIP_STEREO") == "1":
             return (True, True)
         return (False, False)
 
