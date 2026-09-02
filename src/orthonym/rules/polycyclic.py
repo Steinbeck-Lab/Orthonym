@@ -631,6 +631,19 @@ class VonBaeyerAnalyzer:
             main_ring, bh_pair = self._select_pin_orientation(
                 mol, ring_atoms, main_ring, main_bridge, bh_pair
             )
+            # v41 M4#2 Fix B: _select_pin_orientation may swap which bridgehead is
+            # locant 1, but _find_main_bridge stored main_bridge.atoms[0] adjacent to
+            # the ORIGINAL bh_pair[0]. Re-derive the main bridge for the chosen bh_pair
+            # so atoms[0] is adjacent to the live locant-1 bridgehead, matching
+            # reconstruct_von_baeyer_skeleton's convention (main bridge "beginning with
+            # the atom next to the first bridgehead", P-23.2.3 :9589). Same atom set
+            # (a swap only reverses the traversal), just correctly oriented -- this is
+            # exactly what the forced= path already does per candidate. Without it the
+            # engine emits the byte-correct descriptor string but a numbering whose
+            # main-bridge edges disagree with it, so the audit rejects the PIN.
+            main_bridge = self._find_main_bridge(
+                mol, ring_atoms, main_ring, bh_pair
+            )
         secondary_bridges = self._find_secondary_bridges(
             mol, ring_atoms, main_ring, main_bridge, bh_pair
         )

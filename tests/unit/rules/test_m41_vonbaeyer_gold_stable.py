@@ -96,20 +96,29 @@ _PIN_WINS = [
     ("C12CC34CCCC(CC(CCCC1)CCC2)(CC3)C4", "tetracyclo[7.4.3.2^3,7.1^3,7]nonadecane"),
 ]
 
+# v41 M4#2 Fix B (main-bridge numbering direction, BlueBookV2.md:9749 / 9753 / 9731):
+# re-deriving the main bridge for the orientation _select_pin_orientation chooses lets
+# these three emit their exact Blue Book PIN (they previously degraded to a legacy
+# non-preferred name because the main-bridge numbering ran backwards and the
+# reconstruction audit rejected the byte-correct descriptor). 9731's PIN carries a
+# dependent bridge (0^11,25) the existing Step-6 resolver numbers correctly.
+_PIN_WINS_M42_FIX_B = [
+    ("C12C3C4CCC(CC(CCC1)CCC2)(CC4)C3", "tetracyclo[6.3.3.2^3,6.1^2,6]heptadecane"),
+    ("C12C3C4CCC(CC(CCC1)CCC2)(C4)CC3", "tetracyclo[6.3.3.2^2,6.1^3,6]heptadecane"),
+    ("C12C3C4CCCC5CCCC(C(C6CCCC(CCC1)CC26)C3)C4C5",
+     "hexacyclo[15.3.2.2^3,7.1^2,12.0^13,21.0^11,25]pentacosane"),
+]
 
-@pytest.mark.parametrize("smiles,pin", _PIN_WINS)
+
+@pytest.mark.parametrize("smiles,pin", _PIN_WINS + _PIN_WINS_M42_FIX_B)
 def test_subpart1_pin_win(smiles, pin):
     assert name_compound(smiles) == pin
 
 
-# The four subpart-#2 cases degrade cleanly with NO regression: 9749/9753/9731
-# fall back to their exact legacy (valid, round-tripping, non-preferred) name,
-# and 9739 abstains -- each identical to the HEAD output before the fix.
+# Only 9739 still degrades (needs Fix A -- the branched-component / dependent-bridge
+# discovery fix). It abstains cleanly -- never a wrong name (0-wrong) -- identical to
+# the HEAD output before M4#2.
 _DEGRADES = [
-    ("C12C3C4CCC(CC(CCC1)CCC2)(CC4)C3", "tetracyclo[6.3.1.3^3,7.2^1,9]heptadecane"),
-    ("C12C3C4CCC(CC(CCC1)CCC2)(C4)CC3", "tetracyclo[7.2.1.3^3,7.2^1,8]heptadecane"),
-    ("C12C3C4CCCC5CCCC(C(C6CCCC(CCC1)CC26)C3)C4C5",
-     "hexacyclo[9.9.1.2^2,6.2^16,20.0^10,25.0^12,22]pentacosane"),
     ("C12CC3CCCCC4CCCCC(CC(CCC5CC5CC1)CCCC2)CC(C4)C3",
      "unknown organic compound"),
 ]

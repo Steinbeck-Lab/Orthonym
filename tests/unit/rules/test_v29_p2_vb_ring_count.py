@@ -211,16 +211,29 @@ BB_MAIN_BRIDGE_PIN_CASES = [
      "C12CC34CCCC(CC(CCCC1)CCC2)(CC3)C4", 19, 4, 13, 3, 4),
 ]
 
-BB_MAIN_BRIDGE_SUBPART2_CASES = [
+# v41 M4#2 splits the subpart-2 cases by the defect that blocked each (see
+# .planning/audit-v41/M4-2-CODEMAP.md): Finding B = main-bridge numbering direction
+# (fixed in Task 1), Finding A = branched-component/dependent-bridge discovery (Task 2).
+# Fix B (main-bridge orientation) alone reaches the PIN for all three of these --
+# including 9731, whose descriptor DOES carry a dependent bridge (0^11,25): the
+# existing discovery + Step-6 resolver number that dependent bridge correctly once
+# the main bridge is oriented right, so 9731 needs no discovery change.
+BB_SUBPART2_FINDING_B_CASES = [
     (9749, "tetracyclo[6.3.3.2^3,6.1^2,6]",
      "C12C3C4CCC(CC(CCC1)CCC2)(CC4)C3", 17, 4, 11, 3, 3),
     (9753, "tetracyclo[6.3.3.2^2,6.1^3,6]",
      "C12C3C4CCC(CC(CCC1)CCC2)(C4)CC3", 17, 4, 11, 3, 3),
-    (9739, "pentacyclo[13.7.4.3^3,8.0^18,20.1^13,28]",
-     "C12CC3CCCCC4CCCCC(CC(CCC5CC5CC1)CCCC2)CC(C4)C3", 30, 5, 22, 4, 7),
     (9731, "hexacyclo[15.3.2.2^3,7.1^2,12.0^13,21.0^11,25]",
      "C12C3C4CCCC5CCCC(C(C6CCCC(CCC1)CC26)C3)C4C5", 25, 6, 20, 2, 3),
 ]
+# Only 9739 needs Fix A: a branched (>=3-endpoint) component whose collapse to one
+# 2-endpoint bridge drops an atom (26), so the dependent bridge 1^13,28 is never built.
+BB_SUBPART2_FINDING_A_CASES = [
+    (9739, "pentacyclo[13.7.4.3^3,8.0^18,20.1^13,28]",
+     "C12CC3CCCCC4CCCCC(CC(CCC5CC5CC1)CCCC2)CC(C4)C3", 30, 5, 22, 4, 7),
+]
+BB_MAIN_BRIDGE_SUBPART2_CASES = (
+    BB_SUBPART2_FINDING_B_CASES + BB_SUBPART2_FINDING_A_CASES)
 
 BB_MAIN_BRIDGE_CASES = BB_MAIN_BRIDGE_PIN_CASES + BB_MAIN_BRIDGE_SUBPART2_CASES
 
@@ -299,15 +312,36 @@ def test_subpart1_reaches_blue_book_pin(
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason=(
-    "v41 M4 subpart #1 makes the main BICYCLE preferred for these, but the FULL "
-    "descriptor needs subpart #2 (consistent numbering of the secondary / "
-    "dependent bridges -- their PIN attachment positions exceed the main-bicycle "
-    "atom count, or the secondary-bridge numbering is not self-consistent). "
-    "Until subpart #2 the engine DEGRADES (legacy non-preferred name, or "
-    "abstain) rather than emit these PINs -- never a wrong name (0-wrong)."))
 @pytest.mark.parametrize(
-    "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_MAIN_BRIDGE_SUBPART2_CASES)
+    "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_SUBPART2_FINDING_B_CASES)
+def test_subpart2_finding_b_main_bridge_direction(
+        bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
+    """v41 M4#2 Fix B (P-23.2.6.3 main-bridge numbering direction): the engine
+    already builds the byte-correct BB descriptor string, but Step 2 of
+    ``_order_and_number_secondary_bridges`` numbered the main bridge in stored order
+    with no direction check (unlike Step 5), so after ``_select_pin_orientation``
+    swaps the bridgehead pair the numbering ran backwards and the reconstruction
+    audit correctly rejected it. ``_orient_main_bridge`` fixes the direction to match
+    the audit, so the PIN is emitted legally."""
+    mol, cage = _cage_of(smiles)
+    desc = VonBaeyerAnalyzer().analyze(mol, cage)
+    assert desc is not None and desc.legality is True, (
+        f"BlueBookV2.md:{bb_line}: expected legal PIN, got "
+        f"{getattr(desc, 'descriptor_string', None)!r} "
+        f"legality={getattr(desc, 'legality', None)}")
+    assert desc.descriptor_string == bb_desc, (
+        f"BlueBookV2.md:{bb_line}: {bb_desc!r} vs {desc.descriptor_string!r}")
+
+
+@pytest.mark.unit
+@pytest.mark.xfail(strict=True, reason=(
+    "v41 M4#2 Fix A pending: these two need the branched-component / dependent-bridge "
+    "discovery fix (Finding A). Their PIN attachment positions exceed the main-bicycle "
+    "atom count -> a genuine dependent bridge. Until Fix A the engine DEGRADES (legacy "
+    "non-preferred name, or abstain) rather than emit these PINs -- never a wrong name "
+    "(0-wrong). Fix B (main-bridge direction) is already shipped."))
+@pytest.mark.parametrize(
+    "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_SUBPART2_FINDING_A_CASES)
 def test_descriptor_equals_blue_book_pending_subpart2(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
     assert _our_descriptor(smiles) == bb_desc
