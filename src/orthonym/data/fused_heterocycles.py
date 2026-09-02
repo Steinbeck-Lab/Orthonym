@@ -17,6 +17,9 @@ from collections import Counter
 from typing import Dict, Optional, Tuple, List, Any, Union
 from rdkit import Chem
 
+from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
+    spend_perf_work, spend_analysis_call)
+
 
 # Fused heterocycle data - canonical SMILES verified with RDKit
 # Format: canonical_smiles -> {name, tautomer_locant, ring_system, parent_atoms, iupac_locants}
@@ -2128,6 +2131,14 @@ def _match_fused_heterocycle_core_impl(
 
     candidates = _gather_candidates(q_rank, q_hetset)
 
+    # M2.5: charge one ANALYSIS-CALL unit per core-matcher call. This matcher is
+    # re-run per ring-bearing fragment throughout the recursive substituent
+    # enumeration; a large cyclic glyco-/thio-peptide re-invokes it THOUSANDS of
+    # times (measured: vancomycin 1059, thiopeptide 1198 vs chlorophyll 128).
+    # The call budget is armed at the outermost name() and shared with the
+    # von-Baeyer analyze site, so the call-count explosion class exhausts it.
+    spend_analysis_call()
+
     def _prefilter(rec: '_PatternRec') -> bool:
         # Necessary conditions for rec.pattern ⊑ mol (never prunes a real match).
         if rec.num_heavy > q_heavy:
@@ -2186,6 +2197,7 @@ def _match_fused_heterocycle_core_impl(
             continue
         if not _prefilter(rec):
             continue
+        spend_perf_work()  # M2.5: charge each (post-prefilter) substructure match attempt
         if mol.HasSubstructMatch(rec.pattern):
             # uniquify=False so symmetry-equivalent automorphic matches are all
             # available for the substituent-locant minimization (see fast-path).

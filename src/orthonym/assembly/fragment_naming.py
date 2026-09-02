@@ -314,6 +314,130 @@ def end_naming_session():
 # counter, independent of the session/isolation machinery.
 _WORK_BUDGET = 6000
 
+# ── M2.5: per-top-level budgets against the macrocycle compute-bound HANG ────
+# ``_WORK_BUDGET`` above bounds the NUMBER of fragment-naming attempts; it never
+# sees what makes a fully-reduced symmetric metallo-macrocycle or a large cyclic
+# glyco-/thio-peptide spin compute-bound for >20 min. Task 2B profiling (5 pinned
+# witnesses vs the nameable porphyrin/chlorophyll controls, M2-5-HANG-LIVESPY /
+# -TASK2A-REFUTED) found TWO ORTHOGONAL explosion modes, needing two budgets:
+#
+#   1. INNER-OP explosion (metallo-corrins): millions of iterations of the
+#      ``polycyclic`` von-Baeyer main-ring path DFS + the ``_best_disjoint_pair``
+#      O(paths^2) pairing loop, spread over only a MODEST number of analysis
+#      CALLS (a call-count budget cannot see it). Bounded by ``_PERF_BUDGET``.
+#   2. CALL-COUNT explosion (cob(III)yrinate; vancomycin; the thiopeptide): the
+#      substituent recursion re-invokes the expensive analyses THOUSANDS of times
+#      (von-Baeyer ``analyze`` / the fused-heterocycle core matcher), each call
+#      individually cheap so the inner-op budget barely moves. Bounded by
+#      ``_ANALYSIS_CALL_BUDGET``.
+#
+# No size / aromatic / path-count prefilter separates the hangs from the nameable
+# controls: the corrins are SMALLER and have FEWER paths per pair than the
+# nameable Mg-chlorophyll (measured). The two cumulative budgets do — every
+# nameable control (porphyrin analyze=2/match=4; steroid 5/15; chlorophyll
+# inner=7.3M, analyze=19, match=128) sits comfortably below both thresholds,
+# while every witness blows past one of them.
+#
+# ⚠ MEASURED LIMIT (inv 16): the Ni/Fe corrins do LESS total inner work in their
+# first ~14 s than the nameable chlorophyll does in its ENTIRE run (both ~7M
+# inner ops), so NO inner-op threshold that still names chlorophyll can abstain
+# them in <10 s — the honest bound for that class is ~20-30 s. That is already a
+# categorical fix (a >20-min compute-bound hang -> a bounded, DETERMINISTIC
+# abstain); sub-10 s for that class would need a deeper root-cause change (dedup
+# the substituent recursion's redundant re-analysis of the giant symmetric ring).
+#
+# DETERMINISTIC by construction (fixed operation/call counts, reset at the true
+# outermost ``name()`` — never wall-clock; SIGALRM is swallowed under the live
+# OPSIN JVM). 0-wrong is unaffected: an exhausted budget raises
+# ``PerfBudgetExceeded`` which unwinds to the outermost ``name()`` and converts
+# to the SAME clean abstain the engine already emits for an unnameable input
+# (inv 9: a clean abstain, never a partial / atom-dropped / wrong name). A
+# molecule that never approaches either budget is byte-identical.
+import os as _os  # noqa: E402  (used for the budget-tuning env overrides below)
+# Constants are env-overridable (tuning / an OFF switch, mirroring
+# ORTHONYM_JVM_BUDGET): set to 0 to DISABLE that budget (never raises).
+# Measured selectivity (M2.5 Task 2B, 200 drug-like pubchem rows): max inner-op
+# 17,988 and max analysis-calls 138 — both hundreds/several-x below these — so
+# the guard abstains ZERO nameable molecules; the only nameable molecule near a
+# ceiling is Mg-chlorophyll (7.29M inner / 147 calls), which both budgets clear.
+_PERF_BUDGET = int(_os.environ.get("ORTHONYM_PERF_OP_BUDGET", 12_000_000))          # inner-op ceiling (chlorophyll 7.29M)
+_ANALYSIS_CALL_BUDGET = int(_os.environ.get("ORTHONYM_ANALYSIS_CALL_BUDGET", 500))  # analysis-call ceiling (chlorophyll 147)
+
+
+class PerfBudgetExceeded(BaseException):
+    """Raised when a per-top-level macrocycle-hang budget (``_PERF_BUDGET`` or
+    ``_ANALYSIS_CALL_BUDGET``) is exhausted mid-analysis.
+
+    Derives from ``BaseException`` (NOT ``Exception``) deliberately: the hot
+    loops live many frames below dozens of broad ``except Exception:`` handlers
+    on the recursive naming path, any one of which would otherwise swallow the
+    signal and let the hang resume. As a ``BaseException`` it unwinds straight
+    to the ``_budget_scope`` wrapper around the true-outermost ``name()``, which
+    is the ONLY site that catches it and turns it into a clean abstain. It must
+    never escape that boundary. (No bare ``except:`` exists in the package, so
+    nothing between the hot loop and that boundary intercepts it.)"""
+
+
+# Measurement hook: when ORTHONYM_PERF_BUDGET_MEASURE is set in the env, the
+# spend_* functions count into these process-globals (readable from a monitor
+# thread — the per-molecule thread-locals are not) and NEVER raise, so the exact
+# per-molecule counts can be sized empirically. Off in production: one boolean
+# test per charge, negligible.
+_PERF_MEASURE = bool(_os.environ.get("ORTHONYM_PERF_BUDGET_MEASURE"))
+_PERF_SPENT_TOTAL = [0]
+_ANALYSIS_SPENT_TOTAL = [0]
+
+
+def spend_perf_work(n: int = 1) -> None:
+    """Charge ``n`` INNER-OP units (polycyclic path DFS / pairing loop; fused
+    per-candidate substructure attempt) against ``_PERF_BUDGET``.
+
+    Raises ``PerfBudgetExceeded`` when exhausted. A no-op when no budget is armed
+    (a direct producer call outside any ``name()`` scope keeps its exact prior
+    behaviour), and a pure counter when measurement mode is on.
+    """
+    if _PERF_MEASURE:
+        _PERF_SPENT_TOTAL[0] += n
+        return
+    pb = getattr(_fragment_guard, 'perf_budget', None)
+    if pb is None:
+        return
+    pb -= n
+    if pb <= 0:
+        _fragment_guard.perf_budget = 0
+        raise PerfBudgetExceeded()
+    _fragment_guard.perf_budget = pb
+
+
+def spend_analysis_call(n: int = 1) -> None:
+    """Charge ``n`` EXPENSIVE-ANALYSIS-CALL units (one von-Baeyer ``analyze`` /
+    one fused-heterocycle core-match) against ``_ANALYSIS_CALL_BUDGET``.
+
+    Same contract as ``spend_perf_work`` — raises ``PerfBudgetExceeded`` when
+    exhausted, no-op outside a name() scope, counter in measurement mode.
+    """
+    if _PERF_MEASURE:
+        _ANALYSIS_SPENT_TOTAL[0] += n
+        return
+    ab = getattr(_fragment_guard, 'analysis_budget', None)
+    if ab is None:
+        return
+    ab -= n
+    if ab <= 0:
+        _fragment_guard.analysis_budget = 0
+        raise PerfBudgetExceeded()
+    _fragment_guard.analysis_budget = ab
+
+
+def disarm_hang_budgets() -> None:
+    """Disable both macrocycle-hang budgets for the remainder of this name()
+    scope. Called at the outermost boundary ONCE the abstain decision is made,
+    so the descriptive/coordination-fallback finishing work (which itself
+    re-enters the fused matcher and von-Baeyer via ``_classify``) cannot
+    re-trigger ``PerfBudgetExceeded`` and escape the boundary."""
+    _fragment_guard.perf_budget = None
+    _fragment_guard.analysis_budget = None
+
 
 def enter_name_scope():
     """Arm the per-top-level fragment work budget AND memo cache at the outermost
@@ -332,10 +456,18 @@ def enter_name_scope():
     _fragment_guard.name_call_depth = d
     if d == 1:
         _fragment_guard.work_budget = _WORK_BUDGET
+        # M2.5: arm both macrocycle-hang budgets for the whole molecule alongside
+        # the fragment budget; disarmed only by the matching outermost exit. A
+        # constant of 0 (env OFF switch) leaves the budget unarmed (None) so the
+        # corresponding spend_* is a permanent no-op.
+        _fragment_guard.perf_budget = _PERF_BUDGET if _PERF_BUDGET > 0 else None
+        _fragment_guard.analysis_budget = (
+            _ANALYSIS_CALL_BUDGET if _ANALYSIS_CALL_BUDGET > 0 else None)
         # The name scope OWNS the fragment memo cache for the whole molecule.
         # Allocate a fresh one here so a leaked cache from a prior molecule can
         # never carry over (start_naming_session then keeps this live cache).
         _fragment_guard.cache = {}
+    return d
 
 
 def exit_name_scope():
@@ -345,6 +477,8 @@ def exit_name_scope():
     if d <= 0:
         _fragment_guard.name_call_depth = 0
         _fragment_guard.work_budget = None
+        _fragment_guard.perf_budget = None
+        _fragment_guard.analysis_budget = None
         _fragment_guard.cache = None
     else:
         _fragment_guard.name_call_depth = d

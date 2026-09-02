@@ -25,6 +25,9 @@ from typing import Dict, List, Optional, Set, Tuple
 from itertools import combinations
 from rdkit import Chem
 
+from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
+    spend_perf_work, spend_analysis_call)
+
 logger = logging.getLogger(__name__)
 
 
@@ -272,6 +275,7 @@ def find_longest_path(mol, start: int, end: int, allowed_atoms: Set[int]) -> Lis
     def dfs(current, visited, path):
         nonlocal best_path, expansions
         expansions += 1
+        spend_perf_work()  # M2.5: charge the per-molecule op budget (raises to abstain)
         if expansions > _MAX_DFS_EXPANSIONS:
             return  # WR-02 cap: abort exploration, keep best-so-far
         if current == end:
@@ -311,6 +315,7 @@ def _find_all_simple_paths(mol, start: int, end: int, allowed_atoms: Set[int]) -
     def dfs(current, visited, path):
         nonlocal expansions
         expansions += 1
+        spend_perf_work()  # M2.5: charge the per-molecule op budget (raises to abstain)
         if expansions > _MAX_DFS_EXPANSIONS:
             return  # WR-02 cap: abort enumeration, keep paths-so-far
         if current == end:
@@ -515,6 +520,12 @@ class VonBaeyerAnalyzer:
             PolycyclicDescriptor with all VB information, ``legality`` set, or
             None when the cascade could not produce an analysis at all.
         """
+        # M2.5: charge one ANALYSIS-CALL unit. The substituent recursion of a
+        # symmetric cob(III)yrinate re-invokes von-Baeyer analyze THOUSANDS of
+        # times (measured 553 in 16 s vs the nameable chlorophyll's 19); the
+        # call budget (armed at the outermost name(), shared with the fused
+        # matcher) exhausts on that explosion and abstains the whole molecule.
+        spend_analysis_call()
         if self._is_unsubstituted_ring_system(mol, ring_atoms):
             order = self._canonical_atom_order(mol)
             if order is not None:
@@ -914,6 +925,7 @@ class VonBaeyerAnalyzer:
             for i, p1 in enumerate(all_paths):
                 p1_interior = set(p1[1:-1])
                 for p2 in all_paths[i + 1:]:
+                    spend_perf_work()  # M2.5: charge the O(paths^2) pairing loop
                     p2_interior = set(p2[1:-1])
                     if p1_interior & p2_interior:
                         continue

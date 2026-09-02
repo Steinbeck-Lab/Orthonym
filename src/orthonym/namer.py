@@ -2416,10 +2416,52 @@ def _budget_scope(fn):
     """
     @_functools.wraps(fn)
     def _wrapper(self, *args, **kwargs):
-        from .assembly.fragment_naming import enter_name_scope, exit_name_scope
-        enter_name_scope()
+        from .assembly.fragment_naming import (
+            enter_name_scope, exit_name_scope, PerfBudgetExceeded,
+            disarm_hang_budgets)
+        depth = enter_name_scope()
         try:
             return fn(self, *args, **kwargs)
+        except PerfBudgetExceeded:
+            # M2.5: the per-top-level OPERATION budget was exhausted deep inside
+            # a combinatorial ring analysis (a genuinely explosive symmetric
+            # metallo-macrocycle / large cyclic peptide). PerfBudgetExceeded is
+            # a BaseException, so it unwound PAST every broad ``except Exception``
+            # on the recursive path to here. Convert it to the SAME clean abstain
+            # the engine emits for any unnameable input -- ONLY at the true
+            # outermost name() (depth == 1); a nested scope re-raises so the
+            # signal keeps unwinding. inv 9: this is a clean abstain (the
+            # descriptive/coordination fallback), never a partial or wrong name.
+            if depth != 1:
+                raise
+            # Disarm both budgets FIRST: the descriptive/coordination fallback
+            # below re-enters the fused matcher + von-Baeyer via _classify, and
+            # with a still-exhausted budget that would re-raise and escape this
+            # boundary (the exit_name_scope in finally runs only after).
+            disarm_hang_budgets()
+            smiles = args[0] if args else kwargs.get('smiles')
+            logger.warning(
+                "PERF BUDGET exhausted: abstaining on smiles=%s (macrocycle-hang guard)",
+                (smiles or '')[:60])
+            try:
+                from .metrics.abstention import AbstentionCode, record_abstention
+                record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                                  detail='perf_op_budget')
+            except Exception:
+                pass
+            # Route the abstain through name()'s single audited exit (_finish),
+            # but SUPPRESS the T4 floor-offer: the budget fired precisely because
+            # this molecule's naming EXPLODES, so re-running the full T4 producer
+            # here (a) is now unbudgeted and could re-hang, and (b) for these
+            # metallo-macrocycles ships an OPSIN-UNPARSEABLE coordination name
+            # its RT gate wrongly accepts (a pre-existing spelling-layer gap this
+            # hang guard must not unmask -- inv 9). The clean sentinel / curated
+            # coordination-retained name is the correct abstain.
+            self._suppress_floor_offer = True
+            try:
+                return self._finish(_descriptive_fallback(smiles), smiles)
+            finally:
+                self._suppress_floor_offer = False
         finally:
             exit_name_scope()
     return _wrapper
@@ -4713,13 +4755,15 @@ class Orthonym:
                         # primary already full-RT-passes) and the PIN-first
                         # byte-identity argument (a pin-strict run never
                         # reaches this line at all).
-                        if self._general_fallback_unverified:
+                        if (self._general_fallback_unverified
+                                and not getattr(self, '_suppress_floor_offer', False)):
                             self._maybe_append_t4_floor_offer(
                                 _cov_mol, smiles, name,
                                 primary_is_failure=False)
                         name = self._select_rt_passing_offer_name(name, smiles)
                 elif (_cov_is_top_level() and is_failure_name(name)
-                        and self._general_fallback_unverified):
+                        and self._general_fallback_unverified
+                        and not getattr(self, '_suppress_floor_offer', False)):
                     # v33 Phase 0 L3-1: the CRITICAL wiring wrinkle the task
                     # brief flags -- the block above never runs for a
                     # failure-name sentinel (its own guard,
