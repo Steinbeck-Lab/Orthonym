@@ -3189,6 +3189,13 @@ class Orthonym:
             _bal = normalize_imbalanced_acid_salt(smiles)
             if _bal is not None:
                 smiles = _bal
+        # v41 M1 (Levers C1/E): open the scoped-per-call memo so name_substituent /
+        # name_pipeline_only memos live for exactly this naming call and are torn
+        # down in the finally below (bounded, determinism-safe). push_scope returns
+        # None on a nested re-entry (the inner call shares the outer cache), so only
+        # the outermost frame tears it down. See assembly/memo.py.
+        from .assembly.memo import push_scope as _memo_push, pop_scope as _memo_pop
+        _memo_scope_token = _memo_push()
         try:
             # HYG-02 + Wave-0 D1: structural scope pre-check, now UNCONDITIONAL.
             # A wildcard atom makes the input InChIKey uncomputable, so the
@@ -3504,6 +3511,9 @@ class Orthonym:
             return self._finish(
                 self._apply_trivial_fallback(result, smiles), smiles)
         finally:
+            # v41 M1: tear down the memo scope opened before this try (only the
+            # outermost frame holds a real token; nested re-entries got None).
+            _memo_pop(_memo_scope_token)
             # v25 G3: unwind the propagation ctx published above (top-level
             # sessions only set a token; nested calls leave it None).
             _tok = getattr(self, '_gf_ctx_token', None)
@@ -7264,18 +7274,42 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
     Returns:
         IUPAC name string, or None if naming fails.
     """
+    # v41 M1 (Lever E): memoize the whole pipeline call, ctx-keyed. The
+    # decomposition engine calls this re-entrantly on the same (smiles, style)
+    # within one molecule (~9 dup calls / 0.85 s marginal on the perf sample). A
+    # naive (smiles, style) key is PROVEN output-changing -- the result depends on
+    # the ambient tier contextvars (1 same-key-different-result observed), so those
+    # four vars are IN the key. push_scope creates a scope iff none is open (a
+    # standalone call), else shares the outer name() scope. Fail-open + verify-mode
+    # checked; plan .planning/audit-v40/PERF-OPTIMIZATION-PLAN.md Step 2.
+    from .assembly.memo import push_scope, pop_scope, cache_or_compute
+    from .metrics.provenance import (
+        general_fallback_ctx, best_effort_ctx,
+        allow_aromatic_general_ctx, full_coverage_ctx,
+    )
+
+    def _body():
+        try:
+            namer = Orthonym(style=style)
+            return namer._name_impl(smiles, _skip_decomposition=True)
+        except OrthonymLimitError:
+            # G0 (DD7 S1, WR-03): a fragment-level fail-closed refusal is "no
+            # name", not a crash — propagate as None so the decomposition engine
+            # treats the fragment as out-of-scope and tries another strategy.
+            # Caught explicitly (before the broad except) so the intent is
+            # documented and a genuine fragment bug is not silently conflated with
+            # a legitimate refusal.
+            return None
+        except Exception:
+            return None
+
+    _memo_token = push_scope()
     try:
-        namer = Orthonym(style=style)
-        return namer._name_impl(smiles, _skip_decomposition=True)
-    except OrthonymLimitError:
-        # G0 (DD7 S1, WR-03): a fragment-level fail-closed refusal is "no name",
-        # not a crash — propagate as None so the decomposition engine treats the
-        # fragment as out-of-scope and tries another strategy. Caught explicitly
-        # (before the broad except) so the intent is documented and a genuine
-        # fragment bug is not silently conflated with a legitimate refusal.
-        return None
-    except Exception:
-        return None
+        _key = (smiles, style, general_fallback_ctx.get(), best_effort_ctx.get(),
+                allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+        return cache_or_compute("name_pipeline_only", _key, _body)
+    finally:
+        pop_scope(_memo_token)
 
 
 # Metals/inorganic elements and the metal-name map now live in orthonym.errors
