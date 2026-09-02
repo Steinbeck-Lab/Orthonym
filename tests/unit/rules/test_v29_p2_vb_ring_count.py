@@ -10,13 +10,16 @@ Two things are locked here.
    T3b ``MAX_CAGE_RINGS`` was compared against that over-count, so a cap meant
    to bound "8 rings" refused *heptacyclo* (7-ring) cages.
 
-2. The P-23.2.4 main-bridge defect that is the real reason not to raise
-   ``MAX_CAGE_RINGS``. ``_find_main_ring`` only ever offers a 0-atom (direct
-   bond) or 1-atom (common neighbour) main bridge, so a bridgehead pair joined
-   by a 2+-atom bridge is never even a candidate. Its score tuple carries a
-   ``main_bridge_len`` comment citing P-23.2.4, but the value it scores can only
-   ever be 0 or 1. Blue Book ground truth below shows the consequence: the main
-   RING size comes out right every time and the main BRIDGE does not.
+2. P-23.2.4 main-bridge selection (v41 M4 subpart #1, FIXED). ``_find_main_ring``
+   used to offer only a 0-atom (direct bond) or 1-atom (common neighbour) main
+   bridge, so a bridgehead pair joined by a 2+-atom bridge was never a candidate
+   and the ``main_bridge_len`` slot of its score could hold only 0 or 1 -- the
+   main RING size came out right every time and the main BRIDGE did not. Case 3
+   in ``_find_main_ring`` (a 2+-atom main bridge) plus the largest-bridge
+   selection in ``_find_main_bridge`` now produce the preferred main bicycle;
+   ``BB_MAIN_BRIDGE_PIN_CASES`` reach the exact Blue Book PIN, while
+   ``BB_MAIN_BRIDGE_SUBPART2_CASES`` still need consistent secondary/dependent
+   bridge numbering (subpart #2) and DEGRADE cleanly until then.
 
 Ground truth is the Blue Book itself, cited by ``BlueBookV2/BlueBookV2.md`` line.
 The structures were obtained by parsing each cited Blue Book name to a structure
@@ -177,26 +180,49 @@ def test_ovalene_stays_refused():
 
 
 # --------------------------------------------------------------------------
-# 3. The P-23.2.4 main-bridge defect (why the cap VALUE must not rise yet).
+# 3. P-23.2.4 main-bridge selection (v41 M4 subpart #1).
 #    (bb_line, bb_descriptor, smiles, bb_atoms, bb_ring_count,
 #     bb_main_ring_atoms, bb_main_bridge_len, bb_balance)
-# --------------------------------------------------------------------------
-BB_MAIN_BRIDGE_CASES = [
+#
+# ``_find_main_ring`` used to offer only a 0-atom (direct bond) or 1-atom
+# (common neighbour) main bridge, so a bridgehead pair joined by a 2+-atom bridge
+# was never a candidate and the ``main_bridge_len`` slot of its score could hold
+# only 0 or 1. v41 M4 subpart #1 adds Case 3 (a 2+-atom main bridge) and makes
+# ``_find_main_bridge`` select the LARGEST bridge (P-23.2.4), so the preferred
+# main bicycle (P-23.2.4 largest main bridge, P-23.2.6.2.1 symmetric division) is
+# now produced.
+#
+# PIN_CASES: subpart #1 alone reaches the exact Blue Book PIN end to end.
+# SUBPART2_CASES: subpart #1 makes the main BICYCLE preferred, but the FULL
+# descriptor additionally needs consistent numbering of the secondary / dependent
+# bridges (subpart #2, the dependent-bridge discovery-fixpoint). Their PIN
+# positions 25/28 exceed the main-bicycle atom count -> a dependent secondary
+# bridge (9739, 9731), or a secondary-bridge numbering the current machinery
+# cannot make self-consistent (9749, 9753). The engine DEGRADES cleanly there:
+# the preferred main bicycle whose descriptor fails the legality audit is
+# replaced by the legacy 0/1-atom-main-bridge result (a valid, RT-correct but
+# non-preferred name) or an abstain -- never a wrong name (0-wrong holds).
+BB_MAIN_BRIDGE_PIN_CASES = [
     (9631, "tricyclo[9.3.3.1^1,11]",
      "C123CCCCCCCCCC(CCC1)(CCC2)C3", 18, 3, 14, 3, 3),
     (9721, "tetracyclo[4.4.2.2^2,5.2^7,10]",
      "C12C3CCC(C(C4CCC1CC4)CC2)CC3", 16, 4, 10, 2, 4),
+    (9761, "tetracyclo[7.4.3.2^3,7.1^3,7]",
+     "C12CC34CCCC(CC(CCCC1)CCC2)(CC3)C4", 19, 4, 13, 3, 4),
+]
+
+BB_MAIN_BRIDGE_SUBPART2_CASES = [
     (9749, "tetracyclo[6.3.3.2^3,6.1^2,6]",
      "C12C3C4CCC(CC(CCC1)CCC2)(CC4)C3", 17, 4, 11, 3, 3),
     (9753, "tetracyclo[6.3.3.2^2,6.1^3,6]",
      "C12C3C4CCC(CC(CCC1)CCC2)(C4)CC3", 17, 4, 11, 3, 3),
-    (9761, "tetracyclo[7.4.3.2^3,7.1^3,7]",
-     "C12CC34CCCC(CC(CCCC1)CCC2)(CC3)C4", 19, 4, 13, 3, 4),
     (9739, "pentacyclo[13.7.4.3^3,8.0^18,20.1^13,28]",
      "C12CC3CCCCC4CCCCC(CC(CCC5CC5CC1)CCCC2)CC(C4)C3", 30, 5, 22, 4, 7),
     (9731, "hexacyclo[15.3.2.2^3,7.1^2,12.0^13,21.0^11,25]",
      "C12C3C4CCCC5CCCC(C(C6CCCC(CCC1)CC26)C3)C4C5", 25, 6, 20, 2, 3),
 ]
+
+BB_MAIN_BRIDGE_CASES = BB_MAIN_BRIDGE_PIN_CASES + BB_MAIN_BRIDGE_SUBPART2_CASES
 
 
 def _our_descriptor(smiles):
@@ -243,47 +269,45 @@ def test_blue_book_datum_is_self_consistent(
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_MAIN_BRIDGE_CASES)
-def test_main_ring_right_main_bridge_wrong(
+    "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_MAIN_BRIDGE_PIN_CASES)
+def test_subpart1_reaches_blue_book_pin(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
-    """The defect, characterised positively so it cannot rot into a vague xfail.
+    """v41 M4 subpart #1 (P-23.2.4 / P-23.2.6.2.1): the preferred main bicycle
+    is now produced AND the full descriptor equals the Blue Book PIN.
 
-    P-23.2.1 (main ring = as many skeletal atoms as possible) is satisfied on
-    every one of these: our main ring has exactly the Blue Book's atom count.
-    What fails is the next criterion -- P-23.2.4 (``:9603``, the main bridge
+    P-23.2.1 (main ring = as many skeletal atoms as possible) was always
+    satisfied -- our main ring has exactly the Blue Book's atom count. What used
+    to fail was the next criterion, P-23.2.4 (``:9603``, the main bridge
     "includes as many of the atoms as possible that are not included in the main
     ring") and P-23.2.6.2.1 (``:9661``, "the main ring must be divided as
-    symmetrically as possible by the main bridge"): our main bridge is shorter
-    than the Blue Book's, or (case ``:9721``) equal but dividing the main ring
-    less symmetrically.
-
-    Root cause: ``_find_main_ring`` enumerates main-bridgehead pairs only via a
-    direct bond (0-atom bridge) or a common neighbour (1-atom bridge), so a pair
-    joined by a 2+-atom bridge is never a candidate and the ``main_bridge_len``
-    slot of its score tuple can only hold 0 or 1.
+    symmetrically as possible by the main bridge"). ``_find_main_ring`` Case 3
+    (a 2+-atom main bridge) plus ``_find_main_bridge``'s largest-bridge selection
+    fix both: the main-ring size, main-bridge length AND balance now match the
+    Blue Book, and so does the whole descriptor string.
     """
     ours = _our_descriptor(smiles)
     assert ours is not None, f"BlueBookV2.md:{bb_line}: analyzer returned None"
-    our_mr, our_mb, our_bal = _split(ours)
-    assert our_mr == mr, (
-        f"BlueBookV2.md:{bb_line}: main-ring size should still be right "
-        f"(P-23.2.1); BB {mr}, ours {our_mr} from {ours!r}")
-    assert our_mb < mb or (our_mb == mb and our_bal < bal), (
-        f"BlueBookV2.md:{bb_line}: expected the KNOWN P-23.2.4 shortfall "
-        f"(BB main bridge {mb}, balance {bal}); ours {ours!r} gives main "
-        f"bridge {our_mb}, balance {our_bal}. If this now matches the Blue "
-        f"Book, the defect is fixed -- delete this test and unmark the strict "
-        f"xfail below.")
+    # Main bicycle: main-ring size, main-bridge length, and balance all preferred.
+    assert _split(ours) == (mr, mb, bal), (
+        f"BlueBookV2.md:{bb_line}: main bicycle should be preferred "
+        f"(P-23.2.4/P-23.2.6.2.1); BB (mr={mr}, mb={mb}, bal={bal}), "
+        f"ours {ours!r} -> {_split(ours)}")
+    # And the whole descriptor is the Blue Book PIN.
+    assert ours == bb_desc, (
+        f"BlueBookV2.md:{bb_line}: descriptor should equal the Blue Book PIN "
+        f"{bb_desc!r}, got {ours!r}")
 
 
 @pytest.mark.unit
 @pytest.mark.xfail(strict=True, reason=(
-    "P-23.2.4 / P-23.2.6.2.1 not implemented: _find_main_ring can only offer a "
-    "0- or 1-atom main bridge, so these Blue Book PIN descriptors come back "
-    "with a non-preferred main bicycle. Structurally valid, NOT preferred. "
-    "Fixing this is the precondition for raising MAX_CAGE_RINGS."))
+    "v41 M4 subpart #1 makes the main BICYCLE preferred for these, but the FULL "
+    "descriptor needs subpart #2 (consistent numbering of the secondary / "
+    "dependent bridges -- their PIN attachment positions exceed the main-bicycle "
+    "atom count, or the secondary-bridge numbering is not self-consistent). "
+    "Until subpart #2 the engine DEGRADES (legacy non-preferred name, or "
+    "abstain) rather than emit these PINs -- never a wrong name (0-wrong)."))
 @pytest.mark.parametrize(
-    "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_MAIN_BRIDGE_CASES)
-def test_descriptor_equals_blue_book(
+    "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_MAIN_BRIDGE_SUBPART2_CASES)
+def test_descriptor_equals_blue_book_pending_subpart2(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
     assert _our_descriptor(smiles) == bb_desc

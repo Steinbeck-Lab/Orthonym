@@ -526,6 +526,33 @@ class VonBaeyerAnalyzer:
         # call budget (armed at the outermost name(), shared with the fused
         # matcher) exhausts on that explosion and abstains the whole molecule.
         spend_analysis_call()
+        result = self._analyze_once(mol, ring_atoms, spiro_atom)
+        # P-23.2.4/P-23.2.6.2.1 main-bridge PREFERENCE (Case 3 in _find_main_ring
+        # + the largest-main-bridge selection in _find_main_bridge) is applied
+        # first. It is preference-only: on a cage whose secondary bridges cannot
+        # be numbered consistently under the preferred main bicycle the result
+        # fails the legality audit. Rather than let a preference improvement cost
+        # a legal (if non-preferred) name -- a regression -- degrade cleanly by
+        # re-running the cascade with the preference disabled and returning that
+        # legacy result whenever it is legal. Molecules whose preferred main
+        # bicycle IS numbered consistently are unaffected (single pass).
+        if (result is not None and result.legality is False
+                and getattr(self, "_allow_multiatom_bridge", True)):
+            self._allow_multiatom_bridge = False
+            try:
+                legacy = self._analyze_once(mol, ring_atoms, spiro_atom)
+            finally:
+                self._allow_multiatom_bridge = True
+            if legacy is not None and legacy.legality:
+                return legacy
+        return result
+
+    def _analyze_once(self, mol, ring_atoms: Set[int],
+                      spiro_atom: Optional[int] = None) -> "PolycyclicDescriptor":
+        """One pass of the von Baeyer cascade (both the pure-cage and the
+        substituted/heteroatom branches). Factored out of :meth:`analyze` so the
+        P-23.2.4 main-bridge preference can be retried-then-degraded without
+        re-charging the analysis-call budget. See :meth:`analyze`."""
         if self._is_unsubstituted_ring_system(mol, ring_atoms):
             order = self._canonical_atom_order(mol)
             if order is not None:
@@ -966,6 +993,57 @@ class VonBaeyerAnalyzer:
                     p1, p2 = pair
                     ring = p1 + p2[1:-1][::-1]
                     _consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 1)
+
+            # Case 3 (P-23.2.4 / P-23.2.6.2.1): a 2+-atom main bridge. Cases 1
+            # and 2 only ever offer a 0- or 1-atom main bridge, so a bridgehead
+            # pair joined to the rest of the cage by a longer third path never had
+            # its true, larger main bridge scored -- the ``main_bridge_len`` slot
+            # of the score tuple could hold only 0 or 1, and Blue Book PINs such
+            # as tricyclo[9.3.3.1^1,11] (BlueBookV2.md:9631) came out with a
+            # non-preferred main bicycle. The three primary segments of the main
+            # bicycle are three mutually interior-disjoint bh1->bh2 paths: the two
+            # longest form the main ring (P-23.2.1, largest ring), and the longest
+            # of the remaining disjoint paths is the main bridge (P-23.2.4, largest
+            # bridge). The (ring_size, main_bridge_len, balance) score then ranks
+            # this faithfully against Cases 1/2, and among equal main bridges
+            # prefers the more symmetric main-ring division (P-23.2.6.2.1). Cases
+            # 1/2 are kept: this is a strict ADD, skipped whenever the largest
+            # available main bridge is only 0 or 1 atom.
+            #
+            # Case 3 is preference-only and can, on a cage whose secondary
+            # bridges cannot be numbered consistently under the new main bicycle,
+            # yield a descriptor that fails the legality audit. ``analyze`` runs
+            # the cascade with this enabled first and, only if the result is
+            # illegal, re-runs it disabled -- so the preferred main bridge can
+            # never COST a legal (if non-preferred) name (accurate-or-degrade,
+            # never a regression).
+            if not getattr(self, "_allow_multiatom_bridge", True):
+                continue
+            all_paths = _find_all_simple_paths(mol, bh1, bh2, ring_atoms)
+            interiors = [set(p[1:-1]) for p in all_paths]
+            npaths = len(all_paths)
+            for i in range(npaths):
+                p1 = all_paths[i]
+                int_i = interiors[i]
+                for j in range(i + 1, npaths):
+                    spend_perf_work()  # M2.5: charge the O(paths^2) pairing loop
+                    int_j = interiors[j]
+                    if int_i & int_j:
+                        continue
+                    used = int_i | int_j
+                    # Largest remaining interior-disjoint path is the main bridge.
+                    best_mb_len = -1
+                    for k in range(npaths):
+                        if k == i or k == j or interiors[k] & used:
+                            continue
+                        if len(interiors[k]) > best_mb_len:
+                            best_mb_len = len(interiors[k])
+                    if best_mb_len < 2:
+                        # 0/1-atom main bridges are already covered by Cases 1/2.
+                        continue
+                    p2 = all_paths[j]
+                    ring = p1 + p2[1:-1][::-1]
+                    _consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, best_mb_len)
 
         # Fallback: use largest ring method (for bicyclo or unusual cases)
         if best_ring is None:
@@ -1484,30 +1562,38 @@ class VonBaeyerAnalyzer:
         bh1, bh2 = bh_pair
         main_ring_set = set(main_ring)
 
-        # Check if bridgeheads have a direct bond NOT via main ring atoms
-        bh1_atom = mol.GetAtomWithIdx(bh1)
-        bh1_neighbors = {n.GetIdx() for n in bh1_atom.GetNeighbors()}
-
-        if bh2 in bh1_neighbors:
-            # Direct bond exists - check if it's via a main ring atom or a direct bond
-            # A direct bond means 0-atom bridge
-            return BridgeInfo(atoms=[], length=0, start_bh=bh1, end_bh=bh2)
-
-        # Find atoms outside main ring that connect the bridgeheads
+        # Find atoms outside the main ring that connect the two main bridgeheads.
         allowed = (ring_atoms - main_ring_set) | {bh1, bh2}
 
         if len(allowed) <= 2:
-            # No atoms outside main ring - check for direct bond
-            if bh2 in bh1_neighbors:
-                return BridgeInfo(atoms=[], length=0, start_bh=bh1, end_bh=bh2)
+            # No atoms outside the main ring: the main bridge is a 0-atom bridge
+            # (a direct bond between the bridgeheads) or absent -- both length 0.
             return BridgeInfo(atoms=[], length=0, start_bh=bh1, end_bh=bh2)
 
-        # Find the shortest path (main bridge should be minimal)
-        path = self._find_shortest_path(mol, bh1, bh2, allowed)
-        if not path or len(path) < 2:
+        # P-23.2.4 "Selection of the main bridge" (BlueBookV2.md:9603): the main
+        # bridge "is the bridge that includes as many of the atoms as possible
+        # that are not included in the main ring" -- i.e. the LONGEST bridge
+        # between the two main bridgeheads through non-main-ring atoms, not the
+        # shortest. (VB-5 in the class docstring always said "longest"; the
+        # implementation took the shortest path, so whenever a bridgehead pair
+        # was joined by more than one non-main-ring path the main bridge was
+        # understated and a longer path was demoted to a secondary bridge -- e.g.
+        # tricyclo[9.3.3.1^1,11] came out as the non-preferred [9.3.1.3^1,11].)
+        # A 0-atom direct bond, if present, is enumerated as the length-2 path
+        # [bh1, bh2] and so competes as a 0-length candidate. Deterministic
+        # tie-break among equal-length longest bridges: the lowest canonical-rank
+        # interior (spelling-invariant, matching _find_main_ring's tie key).
+        paths = _find_all_simple_paths(mol, bh1, bh2, allowed)
+        paths = [p for p in paths if len(p) >= 2]
+        if not paths:
             return BridgeInfo(atoms=[], length=0, start_bh=bh1, end_bh=bh2)
+        try:
+            ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+        except Exception:
+            ranks = list(range(mol.GetNumAtoms()))
+        best = max(paths, key=lambda p: (len(p), tuple(-ranks[a] for a in p[1:-1])))
 
-        bridge_atoms = path[1:-1]  # Exclude bridgeheads
+        bridge_atoms = best[1:-1]  # Exclude bridgeheads
         return BridgeInfo(
             atoms=bridge_atoms,
             length=len(bridge_atoms),

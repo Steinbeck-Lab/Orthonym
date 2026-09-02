@@ -37,13 +37,21 @@ from orthonym.rules.polycyclic import (
     name_polycyclic_with_heteroatoms,
 )
 
-# Cages whose emitted descriptor drops a bridge: the brackets account for fewer
-# atoms than the cage has. Both are from the systematic N<=12 enumeration; the
-# second is the `tetracyclo[5.1.1.2^3,6]dodecane` case (11 bracketed atoms,
-# `dodecane` = 12) recorded in 
+# A cage whose emitted descriptor does NOT rebuild the cage bond set, so the
+# legality audit must reject it and every producer must refuse. From the
+# systematic N<=12 enumeration
+# (.planning/audit-v29/TaskS-vonbaeyer-legality.md). The specific descriptor
+# string, and whether it fails on the atom-count arithmetic or on the bond-set
+# edge-audit, are implementation details the v41 P-23.2.4 main-bridge selection
+# legitimately changed (it now emits ``tetracyclo[4.2.2.1^1,9.1^3,5]``, whose
+# bracket sum matches the atom count but whose bonds still do not rebuild the
+# cage) -- so this pins only the DURABLE invariant: legality=False + refusal.
+#
+# (The 10-atom cage ``C1CC23CC(C2)C12CC3C2`` used to sit here too; the same
+# main-bridge fix turns it into a LEGAL, OPSIN-round-tripping name -- a breadth
+# gain, pinned by test_main_bridge_fix_rescues_a_previously_refused_cage below.)
 ILLEGAL_CAGES = [
-    ("C1CC23CC(C2)C12CC3C2", 10, "tetracyclo[3.1.1.2^1,4]", 9),
-    ("C1C2CC1C1CCC3(C2)CC1C3", 12, "tetracyclo[5.1.1.2^3,6]", 11),
+    ("C1C2CC1C1CCC3(C2)CC1C3", 12),
 ]
 
 # Cages whose descriptor does rebuild them. These must keep naming exactly as
@@ -73,26 +81,40 @@ def test_analyze_marks_a_rebuilding_descriptor_legal(smiles, expected):
     assert desc.legality is True
 
 
-@pytest.mark.parametrize("smiles,n_cage,expected,bracket_atoms", ILLEGAL_CAGES)
-def test_analyze_marks_a_bridge_dropping_descriptor_illegal(
-        smiles, n_cage, expected, bracket_atoms):
+@pytest.mark.parametrize("smiles,n_cage", ILLEGAL_CAGES)
+def test_analyze_marks_an_unrebuildable_descriptor_illegal(smiles, n_cage):
     mol, ring = _cage(smiles)
     desc = VonBaeyerAnalyzer().analyze(mol, ring)
     assert len(ring) == n_cage
-    assert desc.descriptor_string == expected
-    # P-23.2.6.1.4 (BlueBookV2.md:9651, under P-23.2.6.1 "Naming polycyclic
-    # alicyclic hydrocarbons"): the alkane stem equals the bracket sum + 2. Here
-    # it does not, which is precisely what used to be logged and ignored.
-    assert sum(desc.bridge_lengths) + 2 == bracket_atoms
-    assert bracket_atoms != n_cage
+    assert desc is not None
+    # The descriptor+numbering does not rebuild the cage bond set, so the
+    # Java-free legality audit refuses to certify it -- whether it trips on the
+    # P-23.2.6.1.4 atom-count arithmetic (BlueBookV2.md:9651) or on the
+    # bond-set edge-audit. Either way nothing correct can be spelled from it.
     assert desc.legality is False
+
+
+def test_main_bridge_fix_rescues_a_previously_refused_cage():
+    """v41 M4 subpart #1 side effect (verified 0-wrong improvement): the P-23.2.4
+    largest-main-bridge selection turns a cage HEAD refused -- its shortest-bridge
+    descriptor ``tetracyclo[3.1.1.2^1,4]`` dropped an atom (9 bracketed, 10 in the
+    cage) -- into one that names with a LEGAL descriptor. The name OPSIN-round-
+    trips to the input InChIKey (verified separately), so this is a breadth gain
+    under the legality gate, not a hole."""
+    mol, ring = _cage("C1CC23CC(C2)C12CC3C2")
+    desc = VonBaeyerAnalyzer().analyze(mol, ring)
+    assert desc.descriptor_string == "tetracyclo[2.2.2.1^1,8.1^2,4]"
+    assert desc.legality is True
+    base = generate_polycyclic_name(mol)
+    assert base is not None
+    assert base.startswith("tetracyclo[2.2.2.1^1,8.1^2,4]")
 
 
 # --------------------------------------------------------------------------
 # The three producers refuse an unverified descriptor
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,_n,_d,_b", ILLEGAL_CAGES)
-def test_name_polycyclic_complete_fails_closed(smiles, _n, _d, _b):
+@pytest.mark.parametrize("smiles,_n", ILLEGAL_CAGES)
+def test_name_polycyclic_complete_fails_closed(smiles, _n):
     """Raising, not returning None: returning None cascades to a fragment namer
     that would name a single sub-ring (same reason as the G0 aromaticity
     refusal directly above the gate)."""
@@ -101,13 +123,13 @@ def test_name_polycyclic_complete_fails_closed(smiles, _n, _d, _b):
         name_polycyclic_complete(mol)
 
 
-@pytest.mark.parametrize("smiles,_n,_d,_b", ILLEGAL_CAGES)
-def test_generate_polycyclic_name_refuses(smiles, _n, _d, _b):
+@pytest.mark.parametrize("smiles,_n", ILLEGAL_CAGES)
+def test_generate_polycyclic_name_refuses(smiles, _n):
     assert generate_polycyclic_name(Chem.MolFromSmiles(smiles)) is None
 
 
-@pytest.mark.parametrize("smiles,_n,_d,_b", ILLEGAL_CAGES)
-def test_name_polycyclic_with_heteroatoms_refuses(smiles, _n, _d, _b):
+@pytest.mark.parametrize("smiles,_n", ILLEGAL_CAGES)
+def test_name_polycyclic_with_heteroatoms_refuses(smiles, _n):
     """All-carbon input routes through `generate_polycyclic_name`, so this also
     covers the no-heteroatom delegation at the top of that function."""
     assert name_polycyclic_with_heteroatoms(Chem.MolFromSmiles(smiles)) is None

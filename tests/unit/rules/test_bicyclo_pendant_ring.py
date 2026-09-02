@@ -145,7 +145,11 @@ class TestVonBaeyerByteIdenticalRegression:
         ("C1CC2CCC1(C)C2", "1-methylbicyclo[2.2.1]heptane"),
         ("OC1CC2CCC1CC2", "bicyclo[2.2.2]octan-2-ol"),
         ("C1CC2CC1C(=O)C2", "bicyclo[2.2.1]heptan-2-one"),
-        ("C1CC2CCC1C1CCCC21", "tricyclo[4.3.0.2^2,5]undecane"),
+        # v41 M4#1 P-23.2.4: main bridge maximized (2) before symmetric division,
+        # so tricyclo[5.2.2.0^2,6] (main bridge 2) is preferred over the older
+        # tricyclo[4.3.0.2^2,5] (main bridge 0). Both OPSIN-round-trip to the same
+        # C11 cage; the new form is the more P-23.2.4-conformant decomposition.
+        ("C1CC2CCC1C1CCCC21", "tricyclo[5.2.2.0^2,6]undecane"),
     ]
 
     def test_byte_identical_names(self):

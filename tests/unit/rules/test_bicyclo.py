@@ -560,14 +560,17 @@ class TestSUB02NegativeCanary:
         assert name_compound("C12C3C4C1C5C2C3C45") == "cubane"
 
     def test_negative_bridged_tricyclic_unchanged(self):
-        # 13B(d): the P-23.2.1 main-ring fix now selects the maximal (9-membered)
-        # main ring for this tricyclic, giving tricyclo[5.2.1.1^4,10]undecane
-        # (branches 5,2 + 1-atom main bridge) instead of the older non-maximal
-        # tricyclo[3.3.1.2(4,6)] (8-membered main ring). Both descriptors
+        # 13B(d) + v41 M4#1: the P-23.2.1 main-ring fix selects the maximal
+        # (9-membered) main ring (branches 5,2), and the v41 P-23.2.4 main-bridge
+        # fix then selects the maximal (2-atom) main bridge -- giving
+        # tricyclo[5.2.2.0^4,10]undecane, not the older tricyclo[5.2.1.1^4,10]
+        # (main bridge 1, secondary bridge 1). P-23.2.4 (BlueBookV2.md:9603): the
+        # main bridge "includes as many of the atoms as possible that are not
+        # included in the main ring", so 2 is preferred over 1. Both descriptors
         # round-trip to the same C11 cage via OPSIN; the new form is the more
-        # P-23.2.1-conformant decomposition and uses PIN superscript typography.
+        # P-23.2.4-conformant decomposition.
         assert name_compound("C1CC2CCC3CCC1C2C3") == \
-            "tricyclo[5.2.1.1^4,10]undecane"
+            "tricyclo[5.2.2.0^4,10]undecane"
 
 
 @pytest.mark.unit
