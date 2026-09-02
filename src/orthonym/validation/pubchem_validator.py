@@ -15,8 +15,15 @@ import time
 from pathlib import Path
 from typing import Dict, Optional
 
-import requests
-import requests.utils
+# ``requests`` is only needed for the optional PubChem network lookup below; it
+# is NOT required for core naming. Import it lazily so that ``import orthonym``
+# succeeds on a minimal install that omits it -- the lookup degrades to "no
+# result" rather than making the whole package unimportable.
+try:
+    import requests
+    import requests.utils
+except ModuleNotFoundError:  # pragma: no cover - exercised on minimal installs
+    requests = None
 
 
 # Default cache location: project_root/data/pubchem_cache.json
@@ -104,6 +111,10 @@ def lookup_name_pubchem(
 
     # Offline mode: no API calls
     if skip_api:
+        return None
+
+    # No network library available -> behave like offline mode.
+    if requests is None:
         return None
 
     # Rate limiting before API call
