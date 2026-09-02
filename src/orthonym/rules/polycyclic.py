@@ -2923,6 +2923,39 @@ def get_polycyclic_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
+            # v41 macrocycle F3: a branch that carries a HETEROATOM beyond a plain
+            # C/H alkyl (an ester/acyloxy -O-C(=O)-, an acyl -C(=O)-, a hydroxymethyl
+            # -CH2OH), OR a 0-carbon heteroatom branch (a hydroperoxy -OOH), is named
+            # by the GENERAL CASCADE, which carries the _is_acyloxy guard and produces
+            # the correct token (acetyloxy / methoxycarbonyl / hydroperoxy...). The naive
+            # _ALKOXY_NAMES / get_alkyl_name paths below are a drifted second detector
+            # that mis-named these by carbon count alone (acetate -> 'ethoxy' dropping
+            # the carbonyl O; -OOH -> dropped entirely) -- a WRONG CONSTITUTION that
+            # SELF-01 then abstained on. Route them to the cascade instead. Pure
+            # hydrocarbyl branches (no non-C/H heteroatom) keep the existing fast path
+            # (byte-identical). Fail-open: a cascade None/refusal falls through to the
+            # legacy paths (which may still be lossy -> SELF-01 abstains, never wrong).
+            # Skip the exocyclic =C ylidene branch (handled above at :2894); this only
+            # sees SINGLE-bond branches here.
+            _branch_has_hetero = any(
+                mol.GetAtomWithIdx(i).GetAtomicNum() not in (1, 6)
+                for i in sub_atoms)
+            if _branch_has_hetero or carbon_count == 0:
+                from ..assembly.substituent_enumerator import name_substituent
+                _tok = None
+                try:
+                    _tok = name_substituent(mol, list(sub_atoms), nbr_idx)
+                except Exception:  # noqa: BLE001 -- cascade decline is not a crash
+                    _tok = None
+                if _tok and _tok != 'substituent' and not _tok.startswith('C'):
+                    substituents.append({
+                        'locant': locant,
+                        'name': _tok,
+                        'atom_indices': sub_atoms,
+                    })
+                    continue
+                # else fall through to the legacy paths (fail-open)
+
             # Check for alkoxy substituent: starts with O, followed by alkyl
             # e.g., -O-CH3 (methoxy), -O-C2H5 (ethoxy)
             first_atom = mol.GetAtomWithIdx(nbr_idx)

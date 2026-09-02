@@ -114,3 +114,28 @@ def test_f1_compound_substituent_prefix_is_enclosed():
                re.search(r"-\(\S+ylidene\)", c) for c in cands), (
         f"{F2_WITNESS_CID}: expected the compound ylidene prefix in enclosing marks "
         f"(P-16.3.3); got {cands!r}")
+
+
+@pytest.mark.unit
+def test_f3b_hydroperoxy_token_is_parseable():
+    """v41 F3b (P-21.2.2 / P-29.3.3): a hydroperoxy substituent ``-OOH`` (parent
+    ``dioxidane``) names as the OPSIN-parseable ``dioxidanyl``, not the malformed
+    ``dioxidyl`` (which drops the ``-an-`` of the heteroatom mononuclear-hydride stem).
+    Fast — no cage naming."""
+    from rdkit import Chem
+    from orthonym.assembly.substituent_enumerator import name_substituent
+    from orthonym.assembly.substituent_naming import parent_to_prefix
+    # direct: the hydride family keeps its 'an' stem
+    assert parent_to_prefix("dioxidane", 2, attach_locant=None) == "dioxidanyl"
+    assert parent_to_prefix("oxidane", 1, attach_locant=None) == "oxidanyl"
+    # end to end: -OOH on a ring -> a parseable token
+    m = Chem.MolFromSmiles("OOC1CCCCC1")
+    ring = set()
+    for r in m.GetRingInfo().AtomRings():
+        ring.update(r)
+    attach = next(a.GetIdx() for a in m.GetAtoms()
+                  if a.GetIdx() not in ring
+                  and any(n.GetIdx() in ring for n in a.GetNeighbors()))
+    branch = [i for i in range(m.GetNumAtoms()) if i not in ring]
+    tok = name_substituent(m, branch, attach)
+    assert tok == "dioxidanyl", f"expected dioxidanyl, got {tok!r}"
