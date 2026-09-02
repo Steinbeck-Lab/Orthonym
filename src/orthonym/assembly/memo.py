@@ -1,4 +1,4 @@
-"""Scoped-per-call memoization infrastructure (v41 M1, Levers C1 + E).
+"""Scoped-per-call memoization infrastructure (, ).
 
 A byte-identity-preserving cache whose lifetime is exactly ONE top-level naming
 call. The engine re-names the same substituent fragments many times inside one
@@ -17,7 +17,7 @@ Design invariants (each is load-bearing for the 0-wrong / byte-identity contract
   every call recomputes. A cache MISS can never corrupt output; only a false HIT
   could, and that is exactly what a COMPLETE key and ``verify`` mode prevent.
 * **``verify`` mode is the continuous completeness check.** It always recomputes
-  and raises :class:`MemoMismatch` the instant a stored value disagrees with a
+  and raises:class:`MemoMismatch` the instant a stored value disagrees with a
   fresh one for the same key -- turning an incomplete key into a loud failure
   rather than a silent wrong name.
 
@@ -63,7 +63,7 @@ def push_scope():
     """Open a memo scope for this (and nested) calls, unless one is already open.
 
     Returns a ContextVar token when THIS call created the scope (the caller owns
-    teardown and must pass the token to :func:`pop_scope`), or ``None`` when a
+    teardown and must pass the token to:func:`pop_scope`), or ``None`` when a
     scope already existed (a nested re-entry -- it shares the outer cache and must
     NOT reset it).
     """
@@ -73,7 +73,7 @@ def push_scope():
 
 
 def pop_scope(token):
-    """Tear down the scope created by the matching :func:`push_scope`. A ``None``
+    """Tear down the scope created by the matching:func:`push_scope`. A ``None``
     token (nested re-entry) is a no-op, so only the outermost frame tears down."""
     if token is not None:
         _cache_var.reset(token)
@@ -83,11 +83,11 @@ def cache_or_compute(namespace, key, compute_fn):
     """Return the memoized value for ``(namespace, key)``, computing it via
     ``compute_fn`` on a miss.
 
-    * ``ORTHONYM_MEMO=off`` OR no active scope -> always ``compute_fn()``
+    * ``ORTHONYM_MEMO=off`` OR no active scope -> always ``compute_fn``
       (fail-open; never caches).
     * ``on`` -> return the cached value if present, else compute + store + return.
     * ``verify`` -> ALWAYS recompute; if a value is already stored for the key and
-      differs, raise :class:`MemoMismatch`; then store + return the fresh value.
+      differs, raise:class:`MemoMismatch`; then store + return the fresh value.
     """
     if _MODE == "off":
         return compute_fn()

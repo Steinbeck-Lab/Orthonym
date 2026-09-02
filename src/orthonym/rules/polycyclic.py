@@ -87,7 +87,7 @@ def von_baeyer_ring_count(mol, cage_atoms) -> Optional[int]:
     ``cyclo_ring_count_word`` spells -- the two are the count and its word, so
     they live together here.
 
-    Why this is NOT ``GetRingInfo().NumRings()`` (v29 Phase 2 T3b)
+    Why this is NOT ``GetRingInfo.NumRings`` (b)
     -------------------------------------------------------------
     RDKit's ring info is the **symmetrized** SSSR, which deliberately keeps
     extra symmetry-equivalent smallest rings, so its cardinality OVER-COUNTS the
@@ -107,7 +107,7 @@ def von_baeyer_ring_count(mol, cage_atoms) -> Optional[int]:
     Two other places in the tree already compute this quantity correctly but
     privately -- ``VonBaeyerAnalyzer._get_ring_count`` (as ``E - V + 1``, so it
     under-counts a DISCONNECTED atom set) and ``rules/bicyclo.py:163``, whose
-    comment had already diagnosed the hazard in prose ("cycle_rank ... is always
+    comment had already diagnosed the hazard in prose ("cycle_rank... is always
     reliable regardless of SSSR issues"). Neither was the bug, so neither is
     rerouted here: ``_get_ring_count`` has 7 PIN-path call sites and swapping its
     disconnected-set behaviour is a separate, separately-gated change. New
@@ -400,8 +400,8 @@ class VonBaeyerAnalyzer:
         *"The name is terminated by the name of the alkane representing the
         total number of ring atoms; this number corresponds to the sum of the
         arabic numbers in the numerical descriptor enclosed by brackets plus two
-        (for the two main bridgehead atoms)."*  This code cited P-23.2.6.1.1 for
-        it until v29 Task S2; that rule (``:9645``) is a different clause -- it
+        (for the two main bridgehead atoms)."* This code cited P-23.2.6.1.1 for
+        it until; that rule (``:9645``) is a different clause -- it
         fixes the ring-count WORD ('tricyclo', 'tetracyclo') -- and is enforced
         separately inside ``audit_von_baeyer_descriptor``.
 
@@ -423,7 +423,7 @@ class VonBaeyerAnalyzer:
         """True iff the descriptor STRING rebuilds exactly this cage under this
         numbering -- the proof ``_descriptor_is_valid`` is not.
 
-        ``audit_von_baeyer_descriptor`` (v29 Task S) reconstructs the skeleton
+        ``audit_von_baeyer_descriptor`` reconstructs the skeleton
         the emitted string denotes from P-23.2.3 / P-23.2.5.2 / P-23.2.6.3 and
         requires SET EQUALITY with the molecule's own cage bonds in locant
         space. It proves LEGALITY (this name denotes this molecule under this
@@ -433,7 +433,7 @@ class VonBaeyerAnalyzer:
         arithmetic clause is the cheap pre-filter and names the specific
         P-23.2.6.1.4 violation in the log. Composing adds no false rejection --
         measured 0 cages with ``audit=True, arith=False`` over 8,201 enumerated
-        cages and over 1,547 accepted corpus cages (v29 Task S2).
+        cages and over 1,547 accepted corpus cages.
 
         Deliberately Java-free: both downstream OPSIN gates are documented
         FAIL-OPEN when no jar is present, so with Java absent this is the only
@@ -458,7 +458,7 @@ class VonBaeyerAnalyzer:
     def _is_unsubstituted_ring_system(mol, ring_atoms: Set[int]) -> bool:
         """True iff no ring atom carries an exocyclic heavy-atom substituent.
 
-        Only such 'pure cages' (prismane, cubane, nortricyclene, ...) are
+        Only such 'pure cages' (prismane, cubane, nortricyclene,...) are
         renumbered for determinism: their name is just the descriptor + parent,
         so re-numbering the core can only permute the secondary-bridge
         superscript locants -- which OPSIN round-trips either way -- and can
@@ -503,7 +503,7 @@ class VonBaeyerAnalyzer:
         the un-renumbered path, so the sentence was true only vacuously, and it
         read as a validation that did not exist: the fallback result was
         returned with no check at all, which is how descriptors whose brackets
-        do not account for every skeletal atom reached the namer (v29 Task S2).
+        do not account for every skeletal atom reached the namer.
 
         What IS guaranteed: every return path is adjudicated by
         ``_legality_verified`` and the verdict published as
@@ -520,10 +520,10 @@ class VonBaeyerAnalyzer:
             PolycyclicDescriptor with all VB information, ``legality`` set, or
             None when the cascade could not produce an analysis at all.
         """
-        # M2.5: charge one ANALYSIS-CALL unit. The substituent recursion of a
+        # charge one ANALYSIS-CALL unit. The substituent recursion of a
         # symmetric cob(III)yrinate re-invokes von-Baeyer analyze THOUSANDS of
         # times (measured 553 in 16 s vs the nameable chlorophyll's 19); the
-        # call budget (armed at the outermost name(), shared with the fused
+        # call budget (armed at the outermost name, shared with the fused
         # matcher) exhausts on that explosion and abstains the whole molecule.
         spend_analysis_call()
         result = self._analyze_once(mol, ring_atoms, spiro_atom)
@@ -550,9 +550,9 @@ class VonBaeyerAnalyzer:
     def _analyze_once(self, mol, ring_atoms: Set[int],
                       spiro_atom: Optional[int] = None) -> "PolycyclicDescriptor":
         """One pass of the von Baeyer cascade (both the pure-cage and the
-        substituted/heteroatom branches). Factored out of :meth:`analyze` so the
+        substituted/heteroatom branches). Factored out of:meth:`analyze` so the
         P-23.2.4 main-bridge preference can be retried-then-degraded without
-        re-charging the analysis-call budget. See :meth:`analyze`."""
+        re-charging the analysis-call budget. See:meth:`analyze`."""
         if self._is_unsubstituted_ring_system(mol, ring_atoms):
             order = self._canonical_atom_order(mol)
             if order is not None:
@@ -631,12 +631,12 @@ class VonBaeyerAnalyzer:
             main_ring, bh_pair = self._select_pin_orientation(
                 mol, ring_atoms, main_ring, main_bridge, bh_pair
             )
-            # v41 M4#2 Fix B: _select_pin_orientation may swap which bridgehead is
+            # _select_pin_orientation may swap which bridgehead is
             # locant 1, but _find_main_bridge stored main_bridge.atoms[0] adjacent to
             # the ORIGINAL bh_pair[0]. Re-derive the main bridge for the chosen bh_pair
             # so atoms[0] is adjacent to the live locant-1 bridgehead, matching
             # reconstruct_von_baeyer_skeleton's convention (main bridge "beginning with
-            # the atom next to the first bridgehead", P-23.2.3 :9589). Same atom set
+            # the atom next to the first bridgehead", P-23.2.3:9589). Same atom set
             # (a swap only reverses the traversal), just correctly oriented -- this is
             # exactly what the forced= path already does per candidate. Without it the
             # engine emits the byte-correct descriptor string but a numbering whose
@@ -795,7 +795,7 @@ class VonBaeyerAnalyzer:
         # candidate lost", not "this molecule cannot be named". The decision is
         # made once, on the result `analyze` actually returns, by
         # `_legality_verified`, and published as `PolycyclicDescriptor.legality`
-        # for the name-producers to enforce. Until v29 Task S2 there was no such
+        # for the name-producers to enforce. Until there was no such
         # decision anywhere and this log line was the whole of the response.
         total_bridge_len = sum(bridge_lengths)
         if total_bridge_len + 2 != total_atoms:
@@ -921,10 +921,10 @@ class VonBaeyerAnalyzer:
         best_bh_pair = None
         # Score tuple, compared with ">" (higher wins). Faithful to the
         # P-23.2.1 -> P-23.2.4 -> P-23.2.6.2.1 cascade:
-        #   (ring_size,            # P-23.2.1: main ring includes max skeletal atoms
-        #    main_bridge_len,      # P-23.2.4: main bridge as large as possible
-        #    balance,              # P-23.2.6.2.1: main ring divided as symmetrically as possible
-        #    tie_key)              # deterministic canon-rank tie-break (lowest ranks win)
+        # (ring_size, # P-23.2.1: main ring includes max skeletal atoms
+        # main_bridge_len, # P-23.2.4: main bridge as large as possible
+        # balance, # P-23.2.6.2.1: main ring divided as symmetrically as possible
+        # tie_key) # deterministic canon-rank tie-break (lowest ranks win)
         best_score = None
         # Every decomposition tied at the top of the STRUCTURAL part of the score
         # (ring_size, main_bridge_len, balance). These all yield the same von
@@ -1371,8 +1371,8 @@ class VonBaeyerAnalyzer:
         chooses between numberings that P-23.2 left open.
 
         Order (each verified against BlueBookV2.md, heading + sentence):
-          0. P-24.5.2 (:10272; PIN example :10289 "the spiro atom ... is given
-             preference for low locant"; :10186 "low locants are given to the
+          0. P-24.5.2 (:10272; PIN example:10289 "the spiro atom... is given
+             preference for low locant";:10186 "low locants are given to the
              spiro atom, THEN to the heteroatoms"): when this cage is a component
              of a spiro ring system, the spiro-junction atom takes the lowest
              locant, ABOVE the heteroatom criteria. This criterion is present
@@ -1516,7 +1516,7 @@ class VonBaeyerAnalyzer:
         :9591: *"The bicyclic ring system is numbered starting with one of the
         bridgeheads and proceeding first along the longer segment of the main
         ring to the second bridgehead, then back to the first bridgehead along
-        the unnumbered segment of the main ring."*  Either bridgehead may start;
+        the unnumbered segment of the main ring."* Either bridgehead may start;
         the longer segment must come first, so the direction is free only when
         the two segments are equal.
         """
@@ -1651,7 +1651,7 @@ class VonBaeyerAnalyzer:
         is the uncovered component atoms on the path (excluding ``ep`` and the
         junction), or ``(None, [])`` if no covered atom is reachable.
 
-        Deterministic: sorted neighbours, shortest path. v41 M4#2 Fix A.
+        Deterministic: sorted neighbours, shortest path.
         """
         # Direct length-0 dependent bond: ep is adjacent to a covered atom already.
         direct = [nb for nb in sorted(adj.get(ep, [])) if nb in covered]
@@ -1680,7 +1680,7 @@ class VonBaeyerAnalyzer:
         way ``_order_and_number_secondary_bridges`` Steps 1-2 number them (main ring
         1..n in order, then the main bridge). Lets the branched-component tie-break
         rank endpoints by their P-23.2.6.2.4 LOCANT rather than by raw atom index.
-        v41 M4#2 Fix A (FABLE point 1)."""
+        (a review point 1)."""
         loc = {}
         for i, a in enumerate(main_ring):
             loc.setdefault(a, i + 1)
@@ -1694,7 +1694,7 @@ class VonBaeyerAnalyzer:
 
     def _decompose_branched_component(self, mol, component, endpoints, assigned, adj,
                                       main_ring=None, main_bridge=None, bh_pair=None):
-        """v41 M4#2 Fix A: decompose a BRANCHED secondary-bridge component (one that
+        """decompose a BRANCHED secondary-bridge component (one that
         attaches to ≥3 assigned endpoints, or whose 2-endpoint longest path leaves
         component atoms uncovered) into an independent bridge plus dependent
         bridge(s).
@@ -1711,7 +1711,7 @@ class VonBaeyerAnalyzer:
         returns ``None`` if it cannot, so the caller degrades rather than silently
         dropping an atom -- the old bug this replaces).
 
-        Trunk tie-break (FABLE point 1): among equal-length trunks the winner is the
+        Trunk tie-break: among equal-length trunks the winner is the
         one whose two endpoints have the LOWEST locants (P-23.2.6.2.4), computed from
         the main-ring/main-bridge numbering; atom index is only the final determinism
         backstop. Because the locant of an endpoint depends on the main-ring
@@ -1806,7 +1806,7 @@ class VonBaeyerAnalyzer:
 
         secondary_bridges = []
 
-        # --- Phase 1: Find bridges through unassigned atoms ---
+        # --- Find bridges through unassigned atoms ---
         if unassigned:
             # Find bridges formed by unassigned atoms
             # Each bridge connects two assigned (numbered) atoms through unassigned atoms
@@ -1854,7 +1854,7 @@ class VonBaeyerAnalyzer:
                     component_plus_endpoints = component | {ep1, ep2}
                     path = find_longest_path(mol, ep1, ep2, component_plus_endpoints)
 
-                    # v41 M4#2 Fix A: a SIMPLE component has exactly 2 endpoints and a
+                    # a SIMPLE component has exactly 2 endpoints and a
                     # path that covers every component atom -- keep that byte-identical.
                     # A BRANCHED component (≥3 endpoints, or a 2-endpoint path that
                     # leaves atoms uncovered) previously collapsed to this one path and
@@ -1905,7 +1905,7 @@ class VonBaeyerAnalyzer:
                     )
                     secondary_bridges.append(bridge)
 
-        # --- Phase 2: Detect zero-length secondary bridges ---
+        # --- Detect zero-length secondary bridges ---
         # When all ring atoms are already assigned (e.g., cubane), unassigned is
         # empty but additional zero-length bridges may exist as direct bonds
         # between already-numbered atoms that are NOT edges of the main ring
@@ -1932,7 +1932,7 @@ class VonBaeyerAnalyzer:
 
         accounted_edges = main_ring_edges | main_bridge_edges
 
-        # Also add edges from bridges found via unassigned atoms (Phase 1)
+        # Also add edges from bridges found via unassigned atoms
         for bridge in secondary_bridges:
             full_sb = [bridge.start_bh] + bridge.atoms + [bridge.end_bh]
             for i in range(len(full_sb) - 1):
@@ -1959,7 +1959,7 @@ class VonBaeyerAnalyzer:
                         zero_length_candidates.append(edge)
                         accounted_edges.add(edge)  # Don't double count
 
-            # Determinism (WS-D): RDKit GetBonds() iteration order is NOT
+            # Determinism (WS-D): RDKit GetBonds iteration order is NOT
             # canonical even after RenumberAtoms, and on over-determined cages
             # (cubane, prismane, homocubane) there are more unaccounted ring
             # bonds than zero-length bridges needed, so the [:needed_more] slice
@@ -1978,8 +1978,8 @@ class VonBaeyerAnalyzer:
                 )
                 secondary_bridges.append(bridge)
 
-        # Bridge ordering is handled by _order_and_number_secondary_bridges()
-        # in analyze(), which implements proper VB-7 independent/dependent
+        # Bridge ordering is handled by _order_and_number_secondary_bridges
+        # in analyze, which implements proper VB-7 independent/dependent
         # classification and multi-criteria sort.
 
         return secondary_bridges
@@ -2047,7 +2047,7 @@ class VonBaeyerAnalyzer:
 
         # Step 3: Classify secondary bridges as independent or dependent
         # VB-5: Independent = both endpoints on main ring or main bridge
-        #        Dependent = at least one endpoint on a secondary bridge
+        # Dependent = at least one endpoint on a secondary bridge
         main_ring_set = set(main_ring)
         main_bridge_atom_set = set(main_bridge.atoms) if main_bridge else set()
         assigned = main_ring_set | main_bridge_atom_set
@@ -2065,7 +2065,7 @@ class VonBaeyerAnalyzer:
         # Step 4: Sort independent bridges by VB-7 numbering criteria
         # VB-7: "beginning with the one attached to the highest-numbered bridgehead"
         # VB-7.2: "longer bridges numbered before shorter bridges"
-        # Matches OPSIN: (-locant_high, -locant_low, -bridge_length)
+        # Matches OPSIN: (locant_high, -locant_low, -bridge_length)
         def _numbering_sort_key(bridge, numb):
             loc1 = numb.get(bridge.start_bh, 0)
             loc2 = numb.get(bridge.end_bh, 0)
@@ -2301,7 +2301,7 @@ def _get_largest_connected_ring_component(mol, ring_atoms: Set[int]) -> Set[int]
     ring systems as a single bridged polycyclic.
 
     Two ring atoms are "connected" if the bond between them is itself part
-    of a ring (IsInRing() == True). Bonds between ring atoms that are NOT
+    of a ring (IsInRing == True). Bonds between ring atoms that are NOT
     ring bonds (e.g., the biaryl bond in biphenyl) do not connect components.
 
     Args:
@@ -2352,7 +2352,7 @@ def _get_largest_connected_ring_component(mol, ring_atoms: Set[int]) -> Set[int]
 
 
 def vonbaeyer_cage_has_aromaticity(mol, cage_atoms) -> bool:
-    """G0 fail-closed safety (DD7 S1 — "fail closed, never hallucinate").
+    """G0 fail-closed safety (S1 — "fail closed, never hallucinate").
 
     Von Baeyer (P-23) and bicyclo nomenclature describe SATURATED bridged ring
     skeletons; unsaturation is expressible only as ``-ene``/``-yne`` with
@@ -2367,7 +2367,7 @@ def vonbaeyer_cage_has_aromaticity(mol, cage_atoms) -> bool:
 
     ``cage_atoms`` MUST be the EXACT atom set the namer numbers — the von-Baeyer
     descriptor's ``numbering`` keys for ``name_polycyclic_complete``, or
-    ``get_complete_bicyclo_data()['ring_atoms']`` for the bicyclo path — NOT the
+    ``get_complete_bicyclo_data['ring_atoms']`` for the bicyclo path — NOT the
     molecule's largest connected ring component. Keying off the actual cage
     means a PENDANT aromatic ring joined by a single (non-ring) bond — e.g. a
     naphthyl on norbornane, even when the naphthyl is LARGER than the cage — is
@@ -2389,7 +2389,7 @@ def generate_polycyclic_name(mol) -> Optional[str]:
     Only base name -- no substituents, unsaturation, or stereo.
 
     This function is an internal helper that will be called by
-    name_polycyclic_complete() in Plan 16-03.
+    name_polycyclic_complete in Plan 16-03.
 
     Args:
         mol: RDKit Mol object
@@ -2426,7 +2426,7 @@ def generate_polycyclic_name(mol) -> Optional[str]:
     # Analyze the system
     desc = analyzer.analyze(mol, ring_atoms)
 
-    # Legality gate (v29 Task S2) -- the descriptor and the alkane stem below
+    # Legality gate -- the descriptor and the alkane stem below
     # are both read straight off `desc`, so an unverified descriptor here spells
     # a cage the molecule does not have. Measured at HEAD, this function emitted
     # `tetracyclo[3.1.1.2^1,4]decane` for C1CC23CC(C2)C12CC3C2: the brackets
@@ -2550,7 +2550,7 @@ def is_polycyclic_system(mol) -> bool:
 # Heteroatom Replacement Prefix (Placeholder for Plan 16-02)
 # ============================================================================
 
-# v29 Phase 2 T2a: the replacement-prefix table and its λ helper moved to
+# a: the replacement-prefix table and its λ helper moved to
 # ``rules/ring_replacement.py`` (the single source of truth, so extending the
 # element table is a data-only change in one place). Re-exported here because the
 # name ``polycyclic.HETEROATOM_PREFIXES`` is part of this module's surface.
@@ -2571,7 +2571,7 @@ def get_heteroatom_replacement_prefix(
     owns the construction (element table, Table-2.8 citation order, λ tokens,
     multiplying prefixes, the no-trailing-hyphen rule of P-23.3.1). The string
     returned here is byte-identical to what this function built inline before
-    v29 Phase 2 — the three PIN callers (``name_polycyclic_complete``,
+    — the three PIN callers (``name_polycyclic_complete``,
     ``bicyclo.py``) see no change.
 
     Args:
@@ -2756,7 +2756,7 @@ def name_polycyclic_with_heteroatoms(mol) -> Optional[str]:
     # Analyze the system to get descriptor and numbering
     desc = analyzer.analyze(mol, ring_atoms)
 
-    # Legality gate (v29 Task S2). Doubly load-bearing here: an unverified
+    # Legality gate. Doubly load-bearing here: an unverified
     # descriptor is spelled below AND its numbering is what places every
     # 'oxa'/'aza'/'thia' locant, so a numbering the descriptor disagrees with
     # puts the heteroatoms on the wrong skeletal positions.
@@ -2828,7 +2828,7 @@ def get_polycyclic_substituents(
     Detect substituents attached to a polycyclic ring system.
 
     For each ring atom, checks neighbors not in ring_atoms. Traces each
-    substituent branch and determines its name using get_alkyl_name().
+    substituent branch and determines its name using get_alkyl_name.
 
     Args:
         mol: RDKit Mol object
@@ -2881,7 +2881,7 @@ def get_polycyclic_substituents(
             # which means with no JVM present the wrong name shipped.
             #
             # Carbon is therefore named here as the P-29.2 free-valence prefix
-            # it is (methylidene / ethylidene / propan-2-ylidene / ...), and
+            # it is (methylidene / ethylidene / propan-2-ylidene /...), and
             # the whole ring system fails closed when it cannot be. Non-carbon
             # keeps the existing skip: promoting an unrecognised ring C=O to an
             # 'oxo' prefix would ship a non-PIN name where the code correctly
@@ -2923,23 +2923,23 @@ def get_polycyclic_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            # v41 macrocycle F3: an OXYGEN-attached ACYLOXY (-O-C(=O)-, an ester) or
-            # PEROXY (-O-O-, a hydroperoxy) branch is named by the GENERAL CASCADE, which
+            # macrocycle F3: an OXYGEN-attached ACYLOXY (O-C(=O)-, an ester) or
+            # PEROXY (O-O-, a hydroperoxy) branch is named by the GENERAL CASCADE, which
             # produces the correct token (acetyloxy / hydroperoxy). The naive _ALKOXY_NAMES
             # path below is a drifted detector that mis-named these by carbon count alone
             # (acetate -O-C(=O)-CH3 -> 'ethoxy', dropping the carbonyl O; -OOH -> dropped) --
             # a WRONG CONSTITUTION that SELF-01 then abstained on.
             #
-            # SCOPE (): fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
+            # SCOPE: fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
             # acyloxy/peroxy branches, so it can NEVER change a default/PIN-tier name.
-            #  - best-effort gate: at the PIN tier these cages correctly ABSTAIN (a
-            #    substituent-prefix form of an ester/hydroperoxy is not the PIN); F3 must
-            #    not emit a non-PIN prefix at the PIN tier ("non-PIN forms are best-effort
-            #    only"). A carbon-attached ester (-C(=O)OMe) is NOT diverted -- it keeps its
-            #    functional-class ester PIN ('methyl ...carboxylate'), which F3 must not
-            #    displace with '(methoxycarbonyl)'.
-            #  - O-attached acyloxy/peroxy only: simple alkoxy (-O-alkyl) and every
-            #    carbon-attached branch keep the existing paths (byte-identical).
+            # - best-effort gate: at the PIN tier these cages correctly ABSTAIN (a
+            # substituent-prefix form of an ester/hydroperoxy is not the PIN); F3 must
+            # not emit a non-PIN prefix at the PIN tier ("non-PIN forms are best-effort
+            # only"). A carbon-attached ester (C(=O)OMe) is NOT diverted -- it keeps its
+            # functional-class ester PIN ('methyl...carboxylate'), which F3 must not
+            # displace with '(methoxycarbonyl)'.
+            # - O-attached acyloxy/peroxy only: simple alkoxy (O-alkyl) and every
+            # carbon-attached branch keep the existing paths (byte-identical).
             # Fail-open: a cascade None/refusal falls through to the legacy paths.
             from ..metrics.provenance import best_effort_ctx as _f3_be_ctx
             _first = mol.GetAtomWithIdx(nbr_idx)
@@ -3163,7 +3163,7 @@ def get_polycyclic_stereo(mol, numbering: Dict[int, int]) -> str:
 # FG seniority for determining principal group on polycyclic rings.
 # Higher index = higher seniority. Order follows IUPAC P-41 (the same relative
 # order as seniority.SENIORITY_ORDER): carboxylic_acid > nitrile > aldehyde >
-# ketone > alcohol > amine. WSD-01 (Phase 175) added 'nitrile' (between aldehyde
+# ketone > alcohol > amine. WSD-01 added 'nitrile' (between aldehyde
 # and carboxylic_acid) and 'amine' (below alcohol); the pre-existing
 # alcohol<ketone<aldehyde<carboxylic_acid relative order is preserved.
 _FG_SENIORITY = {
@@ -3466,7 +3466,7 @@ def name_polycyclic_complete(mol, features=None):
     Generate the complete IUPAC name for a polycyclic bridged system.
 
     This is the FINAL public API for polycyclic naming. It supersedes
-    generate_polycyclic_name() which only generates base names.
+    generate_polycyclic_name which only generates base names.
 
     Produces complete names including:
     - Stereodescriptors: "(1R,4S)-"
@@ -3541,7 +3541,7 @@ def name_polycyclic_complete(mol, features=None):
     # Analyze the system
     desc = analyzer.analyze(mol, ring_atoms)
 
-    # G0 fail-closed safety (DD7 S1): von Baeyer cannot represent aromaticity.
+    # G0 fail-closed safety (S1): von Baeyer cannot represent aromaticity.
     # Check the EXACT cage atoms the descriptor numbers (WR-01: NOT the largest
     # ring component — a pendant aromatic ring never enters desc.numbering). If
     # the cage carries an aromatic atom, naming it here would silently
@@ -3549,7 +3549,7 @@ def name_polycyclic_complete(mol, features=None):
     # named limit, caught at Orthonym.name). Raising (not returning None) is
     # required so the molecule fails closed rather than cascading to a fragment
     # namer that would name a single sub-ring ('cyclopentene' for benzonorbornadiene).
-    # v22 Phase G1 (DD7 COV-01): a fused-aromatic core + bridge
+    # (COV-01): a fused-aromatic core + bridge
     # (benzonorbornadiene-type) has a CORRECT bridged-fused PIN
     # (1,4-dihydro-1,4-methanonaphthalene); von Baeyer would de-aromatise it.
     # Try the P-25.4 constructor whenever the cage carries RDKit aromaticity OR
@@ -3564,7 +3564,7 @@ def name_polycyclic_complete(mol, features=None):
     if bridged is not None:
         return bridged
     if vonbaeyer_cage_has_aromaticity(mol, desc.numbering):
-        # v23 IH-01 (Phase 2): a partially-saturated PAH (e.g. 9,10-dihydro-
+        # IH-01: a partially-saturated PAH (e.g. 9,10-dihydro-
         # anthracene) reaches this von-Baeyer path because its cage still
         # carries the intact aromatic ring(s); von Baeyer would de-aromatise
         # it into a WRONG saturated cage. The carbocyclic partial-saturation
@@ -3590,7 +3590,7 @@ def name_polycyclic_complete(mol, features=None):
         from ..errors import unsupported_ring_system
         raise unsupported_ring_system()
 
-    # LEGALITY GATE (v29 Task S2). Everything below SPELLS `desc`: its
+    # LEGALITY GATE. Everything below SPELLS `desc`: its
     # descriptor string, its numbering (stereo, substituent and heteroatom
     # locants) and its atom count all feed the name. A descriptor that does not
     # rebuild this cage names a DIFFERENT molecule, so refuse rather than emit.
@@ -3623,7 +3623,7 @@ def name_polycyclic_complete(mol, features=None):
     )
 
     # 4. Get unsaturation.
-    # v41 macrocycle F2 (P-31.1.4.2(1)): a ring double bond whose two locants are NOT
+    # macrocycle F2 (P-31.1.4.2(1)): a ring double bond whose two locants are NOT
     # consecutive (it spans a bridge, e.g. (15,36)) must be cited with the compound
     # locant ``15(36)``, not the bare ``min`` — the bare form makes OPSIN read the wrong
     # (15=16) bond and, when 16 is a carbonyl, raises ``C valency: 5`` (a cumulated
@@ -3645,7 +3645,7 @@ def name_polycyclic_complete(mol, features=None):
         unsaturation = get_polycyclic_unsaturation(mol, ring_atoms, desc.numbering)
     else:
         # STRING locants, already P-31.1.4.2(1)-formatted and sorted by (lo,hi); pass
-        # them through unchanged (``_build_parent_with_unsaturation`` str()-formats and
+        # them through unchanged (``_build_parent_with_unsaturation`` str-formats and
         # must not re-sort them lexically).
         unsaturation = {
             'double_bonds': list(_ring_unsat.double_locants),
@@ -3674,7 +3674,7 @@ def name_polycyclic_complete(mol, features=None):
     name_parts = []
 
     if substituent_prefix:
-        # S1 (v24) — same stray-hyphen class: a substituent prefix attaches DIRECTLY
+        # S1 — same stray-hyphen class: a substituent prefix attaches DIRECTLY
         # to the parent hydride (P-31/P-23). Keep its trailing '-' ONLY when a
         # locant-initial heteroatom replacement prefix follows (3,3-dimethyl-2-oxabicyclo…);
         # drop it when the letter-initial descriptor follows directly, else we emit
@@ -3696,7 +3696,7 @@ def name_polycyclic_complete(mol, features=None):
     # '-' is handled above (kept before a locant, dropped before the descriptor).
     constitution_name = ''.join(name_parts)
 
-    # 9. Apply stereo. v36 Wave E — 0-wrong hardening: at the TOP LEVEL, route the
+    # 9. Apply stereo. Wave E — 0-wrong hardening: at the TOP LEVEL, route the
     # stereo through inject_stereo_reanchored_rt_gated, which RT-gates the numbering
     # and OMITS a stereo layer OPSIN cannot verify (rather than shipping a
     # pseudoasymmetric von-Baeyer descriptor like `(1r,5s)-` that does not
@@ -3733,7 +3733,7 @@ def _assemble_substituent_prefix(
     Includes functional group prefixes (hydroxy-, oxo-, etc.) when present.
 
     Args:
-        substituents: List of substituent dicts from get_polycyclic_substituents()
+        substituents: List of substituent dicts from get_polycyclic_substituents
         fg_prefixes: Optional list of FG prefix dicts with 'name' and 'locant' keys
 
     Returns:
@@ -3772,7 +3772,7 @@ def _assemble_substituent_prefix(
     sorted_names = sorted(grouped.keys(), key=alpha_sort_key)
 
     # Build prefix parts
-    # v41 macrocycle F1 (P-16.3.3 / P-29.6.1): a COMPOUND substituent prefix (one that
+    # macrocycle F1 (P-16.3.3 / P-29.6.1): a COMPOUND substituent prefix (one that
     # carries an internal locant or is multi-token, e.g. the ylidene
     # ``3-methoxy-3-oxopropan-2-ylidene``) is cited in enclosing marks —
     # ``20-(3-methoxy-3-oxopropan-2-ylidene)`` — not bare; the bare form leaves OPSIN
@@ -3940,24 +3940,24 @@ def _build_parent_with_unsaturation(
     # P-16.7 "ELISION OF VOWELS", P-16.7.1(a) (BlueBookV2.md:7595): "the
     # terminal letter 'e' in names of parent hydrides or endings 'ene' and
     # 'yne' when followed by a suffix or 'en' ending beginning with 'a', 'e',
-    # 'i', 'o', 'u', or 'y'".  Restated at :25013 -- "If, and only if, the
+    # 'i', 'o', 'u', or 'y'". Restated at:25013 -- "If, and only if, the
     # COMPLETE SUFFIX (that is, the suffix plus its multiplying prefixes, if
     # any) begins with a vowel, a terminal letter 'e' (if any) of the parent
     # hydride name is elided."
     #
-    # This used to be decided here twice and wrongly.  The unsaturated branch
+    # This used to be decided here twice and wrongly. The unsaturated branch
     # did not decide at all -- `unsat_parts` hardcodes '-en'/'-yn', so the
     # terminal 'e' of the 'ene'/'yne' ending was dropped unconditionally and
-    # 'oct-2-ene-4,8-dione' came out 'oct-2-en-4,8-dione'.  The saturated
+    # 'oct-2-ene-4,8-dione' came out 'oct-2-en-4,8-dione'. The saturated
     # branch tested the BARE suffix ('one') rather than the complete one
-    # ('dione'), so 'pentane-2,4-dione' came out 'pentan-2,4-dione'.  Both are
+    # ('dione'), so 'pentane-2,4-dione' came out 'pentan-2,4-dione'. Both are
     # consonant-initial complete suffixes, which RETAIN the 'e'.
     #
     # `format_suffix_with_locants` already owns exactly this decision for the
     # general chain engine -- it routes the multiplier through
     # `_join_multiplied_suffix` (tetra+ol -> tetrol, P-63.1.2) and then tests
-    # the complete suffix against the shared `_ELISION_VOWELS`.  Delegating to
-    # it removes the second implementation rather than repairing it.  The
+    # the complete suffix against the shared `_ELISION_VOWELS`. Delegating to
+    # it removes the second implementation rather than repairing it. The
     # unsaturation block is passed as part of the stem because it carries its
     # own locants ('-2,5-dien') and is not the plain 'an'/'en' infix the helper
     # names that parameter for.
