@@ -1675,7 +1675,25 @@ class VonBaeyerAnalyzer:
                     q.append((nb, path + [nb]))
         return None, []
 
-    def _decompose_branched_component(self, mol, component, endpoints, assigned, adj):
+    def _endpoint_locants(self, main_ring, main_bridge):
+        """The locant each main-ring / main-bridge atom will receive, computed the
+        way ``_order_and_number_secondary_bridges`` Steps 1-2 number them (main ring
+        1..n in order, then the main bridge). Lets the branched-component tie-break
+        rank endpoints by their P-23.2.6.2.4 LOCANT rather than by raw atom index.
+        v41 M4#2 Fix A (FABLE point 1)."""
+        loc = {}
+        for i, a in enumerate(main_ring):
+            loc.setdefault(a, i + 1)
+        n = len(loc)
+        if main_bridge and main_bridge.atoms:
+            for a in main_bridge.atoms:
+                if a not in loc:
+                    n += 1
+                    loc[a] = n
+        return loc
+
+    def _decompose_branched_component(self, mol, component, endpoints, assigned, adj,
+                                      main_ring=None, main_bridge=None, bh_pair=None):
         """v41 M4#2 Fix A: decompose a BRANCHED secondary-bridge component (one that
         attaches to ≥3 assigned endpoints, or whose 2-endpoint longest path leaves
         component atoms uncovered) into an independent bridge plus dependent
@@ -1691,15 +1709,30 @@ class VonBaeyerAnalyzer:
 
         Returns a ``list[BridgeInfo]`` covering EVERY component atom (fail-closed:
         returns ``None`` if it cannot, so the caller degrades rather than silently
-        dropping an atom -- the old bug this replaces). Deterministic: lowest-index
-        endpoint pair for the trunk, remaining endpoints in ascending order.
+        dropping an atom -- the old bug this replaces).
 
-        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-23.1.8 / P-23.2.6.3.
+        Trunk tie-break (FABLE point 1): among equal-length trunks the winner is the
+        one whose two endpoints have the LOWEST locants (P-23.2.6.2.4), computed from
+        the main-ring/main-bridge numbering; atom index is only the final determinism
+        backstop. Because the locant of an endpoint depends on the main-ring
+        orientation, ``_select_pin_orientation``'s lowest-locant search now selects
+        the PIN decomposition -- which an orientation-invariant atom-index tie-break
+        could not.
+
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-23.1.8 / P-23.2.6.2.4 / P-23.2.6.3.
         """
         comp = set(component)
         eps = sorted(endpoints)
+        ep_loc = (self._endpoint_locants(main_ring, main_bridge)
+                  if main_ring is not None else {})
+        _BIG = 10 ** 9
+
+        def _loc(a):
+            return ep_loc.get(a, _BIG)
+
         # Trunk (independent bridge): longest endpoint-to-endpoint path covering the
-        # most component atoms; tie-break by (ep_lo, ep_hi, path) for determinism.
+        # most component atoms; tie-break by lowest endpoint LOCANTS (P-23.2.6.2.4),
+        # then raw atom index + path as the deterministic backstop.
         best = None
         for i in range(len(eps)):
             for j in range(i + 1, len(eps)):
@@ -1710,7 +1743,8 @@ class VonBaeyerAnalyzer:
                 interior = path[1:-1]
                 if not set(interior) <= comp:
                     continue
-                key = (-len(interior), a, b, tuple(path))
+                lo_loc, hi_loc = sorted((_loc(a), _loc(b)))
+                key = (-len(interior), lo_loc, hi_loc, a, b, tuple(path))
                 if best is None or key < best[0]:
                     best = (key, a, b, interior)
         if best is None:
@@ -1843,7 +1877,8 @@ class VonBaeyerAnalyzer:
                                 is_secondary=True))
                     else:
                         decomposed = self._decompose_branched_component(
-                            mol, component, endpoints, assigned, adj)
+                            mol, component, endpoints, assigned, adj,
+                            main_ring, main_bridge, bh_pair)
                         if decomposed is not None:
                             secondary_bridges.extend(decomposed)
                         elif path and len(path) >= 2:
