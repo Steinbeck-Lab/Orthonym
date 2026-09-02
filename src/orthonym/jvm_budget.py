@@ -78,7 +78,7 @@ _ENV_OFF = "ORTHONYM_JVM_BUDGET"
 
 
 class BudgetTimeout(RuntimeError):
-    """Raised by :func:`jvm_slots` when ``on_timeout='raise'`` and the wait expired."""
+    """Raised by:func:`jvm_slots` when ``on_timeout='raise'`` and the wait expired."""
 
 
 def is_enabled() -> bool:
@@ -314,12 +314,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     """``python -m orthonym.jvm_budget`` -- show the current budget."""
     st = status()
     print(f"JVM budget: {st['total'] - st['free']}/{st['total']} slots held "
-          f"({'enabled' if st['enabled'] else 'DISABLED'})  dir={st['slot_dir']}")
+          f"({'enabled' if st['enabled'] else 'DISABLED'}) dir={st['slot_dir']}")
     for h in st["held"]:
         age = f"{h.get('age_s')}s" if h.get("age_s") is not None else "?"
-        print(f"  slot {h['slot']:>3}  pid={h.get('pid')}  {h.get('purpose')}  age={age}")
+        print(f" slot {h['slot']:>3} pid={h.get('pid')} {h.get('purpose')} age={age}")
     if not st["held"]:
-        print("  (all slots free -- no OPSIN/JVM job is running)")
+        print(" (all slots free -- no OPSIN/JVM job is running)")
     return 0
 
 

@@ -1,4 +1,4 @@
-"""v25 P0 Task 0.3 — the corrected three-metric coverage instrument.
+""" P0.3 — the corrected three-metric coverage instrument.
 
 Pure classifiers + aggregator. NO Java and NO Orthonym naming happen in
 this module: the round-trip is performed by an injected callable
@@ -6,7 +6,7 @@ this module: the round-trip is performed by an injected callable
 branch with a dict-backed fake OPSIN. The production runner
 (``) supplies the real OPSIN subprocess.
 
-Corrected metric contract (binds the v25 ship gate — see the master plan
+Corrected metric contract (binds the ship gate — see the master plan
 "Metric definitions"):
 
 * ``coverage`` = emitted / total. "Emitted" = Orthonym produced a real

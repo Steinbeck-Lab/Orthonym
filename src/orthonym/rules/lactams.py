@@ -18,10 +18,10 @@ Naming algorithm:
 Reference: IUPAC 2013 Blue Book, P-25.5.3 (Lactams), P-31.1.3 (Replacement)
 
 Examples:
-    C1CC(=O)N1     (beta-lactam)       -> azetidin-2-one
-    C1CCC(=O)N1    (gamma-lactam)      -> pyrrolidin-2-one
-    C1CCCC(=O)N1   (delta-lactam)      -> piperidin-2-one
-    C1CCCCC(=O)N1  (epsilon-lactam)    -> azepan-2-one
+    C1CC(=O)N1 (beta-lactam) -> azetidin-2-one
+    C1CCC(=O)N1 (gamma-lactam) -> pyrrolidin-2-one
+    C1CCCC(=O)N1 (delta-lactam) -> piperidin-2-one
+    C1CCCCC(=O)N1 (epsilon-lactam) -> azepan-2-one
 """
 
 from collections import deque
@@ -310,7 +310,7 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
 
-    # Discover exocyclic substituents via universal pipeline (Phase 86).
+    # Discover exocyclic substituents via universal pipeline.
     # Parent atoms = ring atoms; exclude = carbonyl O (=O of the lactam).
     from ..assembly.substituent_enumerator import discover_substituents, name_substituent
     from ..assembly.composer import _find_attach_idx_in_frag
@@ -338,13 +338,13 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
 
     # ------------------------------------------------------------------ #
-    # A lactam's ring nitrogen is NUMBERED, so its substituent takes the  #
-    # arabic ring locant -- not an italic 'N'.  (P-66.1.5.1 / P-66.1.3.)  #
+    # A lactam's ring nitrogen is NUMBERED, so its substituent takes the #
+    # arabic ring locant -- not an italic 'N'. (P-66.1.5.1 / P-66.1.3.) #
     # ------------------------------------------------------------------ #
     # P-66.1.5 "Lactams, lactims, sultams, and sultims" -> P-66.1.5.1 "Lactams and
-    # lactims" (BB:33222, :33224): "Lactams are named in two ways: (1) as
-    # heterocyclic pseudoketones; (2) ...". The decisive sentence is the LAST one
-    # (BB:33229): "Method (1) generates preferred IUPAC names."  The PIN parent is
+    # lactims" (BB:33222,:33224): "Lactams are named in two ways: (1) as
+    # heterocyclic pseudoketones; (2)...". The decisive sentence is the LAST one
+    # (BB:33229): "Method (1) generates preferred IUPAC names." The PIN parent is
     # therefore a HETEROCYCLE carrying ring numbering, not an amide -- and the
     # rule's own examples number the lactam nitrogen '1': BB:33232
     # `pyrrolidin-2-one (PIN) butano-4-lactam` and BB:33236
@@ -360,13 +360,13 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     #
     # The Blue Book prints the numeral for a substituted ring amide nitrogen and
     # marks the italic form "not":
-    #   BB:27249  `pyrrolidine-1,2-diol (PIN)  1-hydroxypyrrolidin-2-ol
-    #              N-hydroxypyrrolidin-2-ol`   <- the italic form is the GENERAL name
-    #   BB:40645  `2,5-dioxopyrrolidin-1-yl (PIN)  succinimidyl`  (N = locant 1)
-    #   BB:4679   `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine` (nicotine; no `(PIN)`
-    #              marker on that line -- it is an example in the salts list)
-    #   BB:33847  `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide;
-    #              substitution is not allowed on succinimide)`
+    # BB:27249 `pyrrolidine-1,2-diol (PIN) 1-hydroxypyrrolidin-2-ol
+    # N-hydroxypyrrolidin-2-ol` <- the italic form is the GENERAL name
+    # BB:40645 `2,5-dioxopyrrolidin-1-yl (PIN) succinimidyl` (N = locant 1)
+    # BB:4679 `3-[(2S)-1-methylpyrrolidin-2-yl]pyridine` (nicotine; no `(PIN)`
+    # marker on that line -- it is an example in the salts list)
+    # BB:33847 `1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide;
+    # substitution is not allowed on succinimide)`
     # ⚠ Read that last one whole. Its parenthetical was once quoted here truncated at
     # `(not N-bromosuccinimide)`, which reads as the Blue Book rejecting the italic
     # form -- but the reason it actually gives is the RETAINED-NAME restriction on
@@ -376,7 +376,7 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     # ⚠ Do NOT re-derive this from anywhere in P-65.2.3 ("di-, tri-, tetra-, and
     # polycarbonic acids"). P-65.2.3.1.2.1 (BB:31041) governs SUPERSCRIPTED locants
     # (N^2, N^3) in polycarbonic-acid chains, and reads "nitrogen atoms that are not
-    # AMIDE LINKAGES that are part of the chain ..." -- a sibling fix quoted it with
+    # AMIDE LINKAGES that are part of the chain..." -- a sibling fix quoted it with
     # "amide linkages" elided, which inverts it (corrected 2026-08-02). Its neighbour
     # P-65.2.3.1.4 (BB:31107) does state the italic-N convention cleanly -- "italic
     # letter locants N, N', etc. are used to designate substitution on nitrogen atoms
@@ -407,8 +407,8 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     # HAS a numeral. A locant-less ring N keeps the italic-'N' spelling byte for
     # byte -- routing it into `format_substituent_prefix` would render its missing
     # locant, so this fallback is load-bearing, not decorative.
-    groups = defaultdict(list)    # sub_name -> [numeric locants]  (N and C alike)
-    n_groups = defaultdict(list)  # sub_name -> [locants]  italic-'N' fallback only
+    groups = defaultdict(list)    # sub_name -> [numeric locants] (N and C alike)
+    n_groups = defaultdict(list)  # sub_name -> [locants] italic-'N' fallback only
 
     for sub_info in subs:
         attach_idx = _find_attach_idx_in_frag(mol, sub_info, effective_parent)

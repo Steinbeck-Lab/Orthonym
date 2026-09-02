@@ -1,4 +1,4 @@
-"""Phase 160 phosphinic_acid handler — direct-return shim.
+""" phosphinic_acid handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphinic_acid``. Verbatim
 move of composer.py:1064-1079 dispatch logic.

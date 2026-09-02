@@ -1,4 +1,4 @@
-"""Phase 160 ring_assembly handler — direct-return shim.
+""" ring_assembly handler — direct-return shim.
 
 1-line wrapper around ``rules.ring_assemblies.name_ring_assembly``. Verbatim
 move of composer.py:979-993 dispatch logic.

@@ -1,4 +1,4 @@
-"""v29 Phase 1: the independent morpheme-arity oracle.
+""": the independent morpheme-arity oracle.
 
 WHY this module exists
 ----------------------
@@ -48,7 +48,7 @@ Four specific refusals follow from that contract, and each is deliberate:
   components SHARE their fusion atoms, so a fusion prefix's atoms cannot be
   summed with the base component's at all.
 
-WHY AGREEMENT IS NOT ENOUGH (the v29 confident-wrong defect)
+WHY AGREEMENT IS NOT ENOUGH
 ------------------------------------------------------------
 "Enumerate every decomposition and require agreement" is sound only if the
 correct decomposition is among those enumerated. When a morpheme is MISSING
@@ -95,29 +95,29 @@ A VIEW OVER SHIPPED DATA, NOT A NEW CATALOG
 Every count below is derived from a table this project already ships, so the
 oracle cannot drift away from the tables the namer itself names from:
 
-===========================  =========================================
-Morpheme class               Source
-===========================  =========================================
-chain stems (meth-, dec-)    ``data.chain_names.get_chain_prefix``
+=========================== =========================================
+Morpheme class Source
+=========================== =========================================
+chain stems (meth-, dec-) ``data.chain_names.get_chain_prefix``
                              (inverted over n=1..``_MAX_CHAIN``)
-suffix particles (-ol, -ic)  ``data.opsin_imports.suffix_rules`` --
+suffix particles (-ol, -ic) ``data.opsin_imports.suffix_rules`` --
                              ``OPSIN_SUFFIX_APPLICABILITY`` bridges the
                              surface morpheme to a rule, whose
                              ``addgroup`` SMILES gives the atom count
-substituent prefixes         ``data.opsin_imports`` group tables
-(hydroxy-, nitro-, chloro-)  (SMILES per entry)
-retained/trivial names       ``data.ALL_RETAINED_NAMES`` (inverted) and
+substituent prefixes ``data.opsin_imports`` group tables
+(hydroxy-, nitro-, chloro-) (SMILES per entry)
+retained/trivial names ``data.ALL_RETAINED_NAMES`` (inverted) and
                              ``data/iupac_2013_pin_list.json``
-ring systems, aryl groups    ``data.opsin_imports`` aryl/cyclic tables
-ring substituents (phenyl-)  ``rules.ring_substituents`` chained to the
+ring systems, aryl groups ``data.opsin_imports`` aryl/cyclic tables
+ring substituents (phenyl-) ``rules.ring_substituents`` chained to the
                              parent ring's own count
-fusion prefixes (benzo-)     ``data.fusion_components`` ``ring_size``
-Hantzsch-Widman stems        ``data.hw_stems.HW_STEMS`` (inverted)
-replacement prefixes (aza-)  ``rules.skeletal_replacement``
-multipliers (di-, bis-)      ``assembly.naming_utils`` (inverted)
-elided stems (thiazol-)      terminal-'e' elision (P-16.7.1(a)) of the
+fusion prefixes (benzo-) ``data.fusion_componentsring_size``
+Hantzsch-Widman stems ``data.hw_stems.HW_STEMS`` (inverted)
+replacement prefixes (aza-) ``rules.skeletal_replacement``
+multipliers (di-, bis-) ``assembly.naming_utils`` (inverted)
+elided stems (thiazol-) terminal-'e' elision (P-16.7.1(a)) of the
                              skeletons the tables above agreed on
-===========================  =========================================
+=========================== =========================================
 
 Only morphemes that NO shipped table covers are written by hand, in
 ``_STRUCTURAL_AFFIXES`` below, and each carries a comment saying why it is not
@@ -220,7 +220,7 @@ _STEREO_GROUP = re.compile(
     r")\)-?"
 )
 
-# Hypervalence: out of scope for Phase 1 (see module docstring).
+# Hypervalence: out of scope (see module docstring).
 _LAMBDA = re.compile(r"lambda|λ")
 
 # von Baeyer / spiro heads. 'cyclo' alone is monocyclic and needs no
@@ -299,7 +299,7 @@ _CARB_FORM_SURFACES: Dict[str, str] = {
 }
 
 # OPSIN group_type whose suffix semantics are the ordinary chain/ring ones.
-# The other types (acidStem, aminoAcid, carbohydrate, ...) attach the SAME
+# The other types (acidStem, aminoAcid, carbohydrate,...) attach the SAME
 # surface morpheme with a different atom accounting -- e.g. surface 'yl' is
 # the 0-atom radical suffix on a standardGroup but the 1-atom 'oyl' rule on an
 # acidStem. Restricting to standardGroup is what makes the surface->count map
@@ -1234,7 +1234,7 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
         # count already includes -- "heptyl" is 7 atoms whether or not two of
         # them are relabelled O by "1,3-dioxa"), so a locant-count multiplier
         # in front of one can never add atoms, unlike a multiplier in front of
-        # a genuine SUBST/ATTACH group ("dimethylamino"). Phase 0c Task 2b
+        # a genuine SUBST/ATTACH group ("dimethylamino"). Task 2b
         # regression: without this, a SUBST prefix earlier in the SAME
         # composite token (e.g. "2-hydroxy-2-oxo-1,3-dioxa-6-aza-2-phosphaheptyl")
         # set ``seen_content`` before the multiplier was reached, so the
@@ -1312,7 +1312,7 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
 def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
     """How many heavy atoms does ``token`` spell?
 
-    ``kind`` may be a :class:`~orthonym.validation.binding_spine.BindingKind`
+    ``kind`` may be a:class:`~orthonym.validation.binding_spine.BindingKind`
     or the equivalent plain string. It does NOT select a lexicon -- there is one
     lexicon and every reading is always enumerated (see ``_lexicon``). It settles
     one positional question only: whether a characteristic-group suffix may open
@@ -1437,16 +1437,16 @@ def lexicon_sources() -> Tuple[str, ...]:
 
 
 # ---------------------------------------------------------------------------
-# P-29.2 free-valence morphology (Phase 1b)
+# P-29.2 free-valence morphology
 # ---------------------------------------------------------------------------
 #
 # A second, much smaller text oracle with the same contract as ``token_arity``:
 # it reads a prefix token's ENDING and reports how many free valences that text
 # asserts. IUPAC 2013 P-29.2:
 #
-#     -yl       one free valence
-#     -ylidene  two on the same skeletal atom
-#     -ylidyne  three on the same skeletal atom
+# -yl one free valence
+# -ylidene two on the same skeletal atom
+# -ylidyne three on the same skeletal atom
 #
 # It lives here, next to ``token_arity``, because it is pure text analysis with
 # no knowledge of any graph, and because it is SHARED: the substituent producer
@@ -1481,7 +1481,7 @@ _MULTIPLIED_FREE_VALENCE = re.compile(
 class FreeValenceEstimate:
     """How many free valences a token's text asserts, or an explicit refusal.
 
-    Mirrors :class:`ArityEstimate`: ``confident`` is the only field a caller
+    Mirrors:class:`ArityEstimate`: ``confident`` is the only field a caller
     may branch on, ``free_valences`` is meaningful ONLY when it is True and is
     ``None`` otherwise, and ``basis`` always explains the answer.
     """

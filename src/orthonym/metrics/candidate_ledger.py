@@ -1,9 +1,9 @@
-"""Append-only candidate ledger (v30 PE-1, the ``audit`` instrument's recorder).
+"""Append-only candidate ledger.
 
 Every oracle this project owns answers *"does the EMITTED name denote the right
 molecule?"* — round-trip, SELF-01, E1, ``bb_conformance``. None answers **"was a
 correct name ever BUILT, and if so what threw it away?"**, which is the question
-that defeated v30 PB task 5 and PA-1: three correct fixes moved dev500 by ~0
+that defeated PB and PA-1: three correct fixes moved dev500 by ~0
 because hand-picked target lists kept landing off the mass.
 
 This module is that missing recorder. It is deliberately modelled on
@@ -154,7 +154,7 @@ def record_candidate(
     """Append one event. No-op unless ``enable()`` was called on this thread.
 
     ``scope=None`` (the default) resolves scope and depth from the current naming
-    depth via :func:`resolve_scope`; pass an explicit scope only to override that,
+    depth via:func:`resolve_scope`; pass an explicit scope only to override that,
     as the substituent-cascade hook does (it knows it produced a fragment name
     regardless of the depth it was called at).
 

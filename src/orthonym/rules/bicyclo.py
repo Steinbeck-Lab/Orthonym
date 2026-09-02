@@ -80,11 +80,11 @@ def find_true_bridgeheads(mol) -> Set[int]:
         Set of atom indices that are true bridgeheads
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> find_true_bridgeheads(mol)
-        {2, 5}  # or similar indices for the bridgehead carbons
+        {2, 5} # or similar indices for the bridgehead carbons
     """
-    # SUB-02/D-07+D-08: delegate to the SINGLE consolidated predicate
+    # SUB-02/+: delegate to the SINGLE consolidated predicate
     # (perception.rings.find_ring_bridgeheads, ring_neighbours >= 3). The old
     # body required exactly 3 TOTAL neighbours all-in-ring, which wrongly
     # excluded substituted/quaternary bridgeheads (camphor's gem-dimethyl) —
@@ -123,16 +123,16 @@ def is_bicyclo_system(mol) -> bool:
         True if molecule is a bicyclo system suitable for bicyclo[x.y.z] naming
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> is_bicyclo_system(mol)
         True
-        >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
+        >>> mol = Chem.MolFromSmiles('C1CCCCC1') # cyclohexane
         >>> is_bicyclo_system(mol)
         False
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene (aromatic fused)
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene (aromatic fused)
         >>> is_bicyclo_system(mol)
         False
-        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin (zero-bridge fused)
+        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1') # decalin (zero-bridge fused)
         >>> is_bicyclo_system(mol)
         False
     """
@@ -235,7 +235,7 @@ def find_bridge_paths(mol, bridgehead1: int, bridgehead2: int) -> List[List[int]
         including both bridgeheads
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> bridgeheads = list(find_true_bridgeheads(mol))
         >>> paths = find_bridge_paths(mol, bridgeheads[0], bridgeheads[1])
         >>> len(paths)
@@ -302,10 +302,10 @@ def get_bridge_lengths(mol, bridgehead1: int, bridgehead2: int) -> List[int]:
         List of bridge lengths sorted descending
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> bridgeheads = list(find_true_bridgeheads(mol))
         >>> get_bridge_lengths(mol, bridgeheads[0], bridgeheads[1])
-        [2, 2, 1]  # bicyclo[2.2.1]
+        [2, 2, 1] # bicyclo[2.2.1]
     """
     paths = find_bridge_paths(mol, bridgehead1, bridgehead2)
 
@@ -333,10 +333,10 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
         Descriptor string like "bicyclo[2.2.1]", or None if not a bicyclo system
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> generate_bicyclo_descriptor(mol)
         'bicyclo[2.2.1]'
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1CC2')  # bicyclo[2.2.2]octane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1CC2') # bicyclo[2.2.2]octane
         >>> generate_bicyclo_descriptor(mol)
         'bicyclo[2.2.2]'
     """
@@ -344,7 +344,7 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
         return None
 
     # Scope the bridgehead count to the connected ring component (same fix
-    # as is_bicyclo_system, v33 Phase 6 lead b): a pendant ring single-bonded
+    # as is_bicyclo_system, lead b): a pendant ring single-bonded
     # to the core must not inflate the whole-molecule bridgehead count and
     # falsely disqualify a genuinely bicyclic core.
     ri = mol.GetRingInfo()
@@ -390,9 +390,9 @@ def name_bicyclo_system(mol) -> Optional[str]:
         or None if not a bicyclo system
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> name_bicyclo_system(mol)
-        'norbornane'  # or 'bicyclo[2.2.1]heptane' depending on retained name preference
+        'norbornane' # or 'bicyclo[2.2.1]heptane' depending on retained name preference
         >>> mol = Chem.MolFromSmiles('C1CC2CCC1CC2')
         >>> name_bicyclo_system(mol)
         'bicyclo[2.2.2]octane'
@@ -474,7 +474,7 @@ def get_bicyclo_ring_atoms(mol) -> Optional[Set[int]]:
         Set of atom indices in the ring system, or None if not bicyclo
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> get_bicyclo_ring_atoms(mol)
         {0, 1, 2, 3, 4, 5, 6}
     """
@@ -526,7 +526,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         Dict mapping atom_idx -> IUPAC locant (1-indexed), or None if not bicyclo
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> numbering = get_bicyclo_numbering(mol)
         >>> len(numbering)
         7
@@ -534,7 +534,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     if not is_bicyclo_system(mol):
         return None
 
-    # Scope to the connected ring component (v33 Phase 6 lead b) before
+    # Scope to the connected ring component before
     # counting bridgeheads, so a pendant ring's junction atom is never
     # mistaken for a 3rd bridgehead.
     ring_atoms = get_bicyclo_ring_atoms(mol) or set()
@@ -578,7 +578,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
 
     # P-23.3.2.2 [BBv2:9789], verbatim at ring_replacement.py:150-152: "If there
     # is still a choice, low locants are assigned in accord with the decreasing
-    # seniority order of heteroatoms O > S > Se > Te > N > P > ... > B ...". This
+    # seniority order of heteroatoms O > S > Se > Te > N > P >... > B...". This
     # element-seniority sub-tiebreak sits BETWEEN the heteroatom locant-SET tier
     # (P-31.1.4.3.4, the `het` list) and the suffix tier: when two admissible
     # numberings share the same heteroatom locant SET (e.g. {2,6}), the SENIOR
@@ -632,7 +632,7 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     shortest bridge). Preserved verbatim as the tie-break default so
     unsubstituted / symmetric bicyclics stay byte-identical.
 
-    P-23.2.3 direction fix (cephem von Baeyer defect, v33 Phase 3): the
+    P-23.2.3 direction fix (cephem von Baeyer defect): the
     SECONDARY (second-longest) bridge must be numbered continuing FROM the
     second bridgehead BACK toward the first -- see this module's own
     ``get_bicyclo_numbering`` docstring example for norbornane, "Second
@@ -648,7 +648,7 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     that bridge, where the old forward order silently swapped it onto the
     wrong ring atom -- a WRONG MOLECULE, not merely a mis-numbered one.
     """
-    # Scope to the connected ring component (v33 Phase 6 lead b): a pendant
+    # Scope to the connected ring component: a pendant
     # ring's junction atom must not be mistaken for a 3rd bridgehead.
     ring_atoms = get_bicyclo_ring_atoms(mol)
     if not ring_atoms:
@@ -758,7 +758,7 @@ def get_bicyclo_substituents(mol, ring_atoms: Set[int]) -> Dict[int, List[Dict]]
     re-deriving it (or forgetting to).
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('CC1CC2CCC1C2')  # methylnorbornane
+        >>> mol = Chem.MolFromSmiles('CC1CC2CCC1C2') # methylnorbornane
         >>> ring_atoms = get_bicyclo_ring_atoms(mol)
         >>> subs = get_bicyclo_substituents(mol, ring_atoms)
         >>> # Should find methyl substituent
@@ -868,7 +868,7 @@ def detect_bicyclo_unsaturation(mol, ring_atoms: Set[int]) -> Dict:
         - 'triple_bonds': list of (atom_idx1, atom_idx2) tuples for triple bonds
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1=CC2CCC1C2')  # norbornene
+        >>> mol = Chem.MolFromSmiles('C1=CC2CCC1C2') # norbornene
         >>> ring_atoms = get_bicyclo_ring_atoms(mol)
         >>> unsat = detect_bicyclo_unsaturation(mol, ring_atoms)
         >>> len(unsat['double_bonds'])
@@ -946,7 +946,7 @@ def get_complete_bicyclo_data(mol, suffix_ring_atoms: Optional[Set[int]] = None)
     # Get unsaturation
     unsaturation = detect_bicyclo_unsaturation(mol, ring_atoms)
 
-    # Get bridgeheads. Scoped to the connected ring component (v33 Phase 6
+    # Get bridgeheads. Scoped to the connected ring component (
     # lead b), same as is_bicyclo_system: a pendant ring's junction atom
     # must not be mistaken for a 3rd bridgehead.
     bridgeheads = find_ring_bridgeheads(mol, ring_atoms)

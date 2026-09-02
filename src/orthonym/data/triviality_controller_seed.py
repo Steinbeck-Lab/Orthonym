@@ -1,23 +1,23 @@
-"""Phase 168 Plan-01: Triviality-controller seed-table loader.
+""": Triviality-controller seed-table loader.
 
 Loads ``triviality_controller_seed.json`` (the locked PIN-authority seed per
-CONTEXT D-03) into a ``Dict[str, SeedEntry]`` keyed by canonical SMILES, with:
+CONTEXT) into a ``Dict[str, SeedEntry]`` keyed by canonical SMILES, with:
 
-* the Phase 150 ``_PIN_DENY`` gate enforced at LOAD time (CONTEXT D-11 —
+* ``_PIN_DENY`` gate enforced at LOAD time (CONTEXT —
   deny-list-by-data; a deny-listed name in the JSON is a hard load error),
-* canonicalization-idempotence enforced per entry (CONTEXT D-13 —
+* canonicalization-idempotence enforced per entry (CONTEXT —
   ``Chem.CanonSmiles`` is the single source of truth for the match key),
-* an optional design-time OPSIN L1 round-trip pre-validator (CONTEXT D-07 T1;
+* an optional design-time OPSIN L1 round-trip pre-validator (CONTEXT T1;
   ``validate=True`` / ` --rt``).
 
-Frozen-dataclass discipline mirrors Phase 165 D-04 SACRED: ``SeedEntry`` is
+Frozen-dataclass discipline mirrors SACRED: ``SeedEntry`` is
 ``@dataclass(frozen=True)`` and is never mutated after construction.
 
-Graceful degradation (Phase 150 WR-06): a missing JSON or schema error degrades
+Graceful degradation (WR-06): a missing JSON or schema error degrades
 ``SEED_TABLE`` to ``{}`` so the downstream controller becomes a no-op, never a
 crash.
 
-Source: 168-CONTEXT.md D-03, D-07, D-11, D-13; 168-RESEARCH.md section 5.4;
+Source: 168-CONTEXT.md,,,; 168-RESEARCH.md section 5.4;
 168-PATTERNS.md "NEW: src/orthonym/data/triviality_controller_seed.py".
 """
 
@@ -41,16 +41,16 @@ logger = logging.getLogger(__name__)
 
 
 class SubstitutionType(str, Enum):
-    """IUPAC 2013 P-15.1.8.1-.3 retained-name substitution Types (CONTEXT D-02).
+    """IUPAC 2013 P-15.1.8.1-.3 retained-name substitution Types (CONTEXT).
 
-    * ``TYPE_1``  — P-15.1.8.1: unlimited substitution (benzene, pyridine, ...).
+    * ``TYPE_1`` — P-15.1.8.1: unlimited substitution (benzene, pyridine,...).
     * ``TYPE_2A`` — P-15.1.8.2.1: substitution requires the senior group be
-      expressed; principal-group-bound (phenol, aniline, benzoic acid, ...).
+      expressed; principal-group-bound (phenol, aniline, benzoic acid,...).
     * ``TYPE_2B`` — P-15.1.8.2.2: closed compulsory-prefix-only list
       (formic acid + halogen/nitro/nitroso/alkoxy).
     * ``TYPE_2C`` — P-15.1.8.2.3: per-name-specific permission (anisole,
       hydroxylamine); defaults to Type 3 unless a locus override is set.
-    * ``TYPE_3``  — P-15.1.8.3: no substitution except functionalisation
+    * ``TYPE_3`` — P-15.1.8.3: no substitution except functionalisation
       (toluene, the xylene isomers).
     """
 
@@ -63,9 +63,9 @@ class SubstitutionType(str, Enum):
 
 @dataclass(frozen=True)
 class SeedEntry:
-    """One locked seed-table entry (CONTEXT D-03 + D-13).
+    """One locked seed-table entry (CONTEXT +).
 
-    Immutable by Phase 165 D-04 SACRED discipline. ``canonical_smiles`` is the
+    Immutable by SACRED discipline. ``canonical_smiles`` is the
     ``Chem.CanonSmiles``-stable match key; ``retained_pin_name`` is the
     substitution target the controller emits.
     """
@@ -86,8 +86,8 @@ class SeedEntry:
 def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, SeedEntry]:
     """Load + validate the seed JSON into a canonical-SMILES-keyed dict.
 
-    Enforces the D-11 deny gate and the D-13 canonicalization-idempotence gate at
-    load. With ``validate=True`` additionally runs the D-07 T1 OPSIN-RT
+    Enforces the deny gate and the canonicalization-idempotence gate at
+    load. With ``validate=True`` additionally runs the T1 OPSIN-RT
     design-time pre-validator (off by default — runs at CI lint time, not at
     every import).
 
@@ -101,14 +101,14 @@ def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, See
     pinned = data.get("rdkit_version_pin")
     if pinned and pinned != rdkit.__version__:
         logger.warning(
-            "Phase 168 seed table was OPSIN-RT-validated against rdkit %s but "
-            "this process runs rdkit %s; re-run  "
+            " seed table was OPSIN-RT-validated against rdkit %s but "
+            "this process runs rdkit %s; re-run "
             "--rt to re-confirm round-trips (R-10).",
             pinned, rdkit.__version__,
         )
 
     # Pattern S3 lazy-import: data/__init__.py may not be fully initialised when
-    # this module is imported during package init, and Plan-02 wires the two
+    # this module is imported during package init, and wires the two
     # together — importing _PIN_DENY at module top would risk a circular import.
     from orthonym.data import _PIN_DENY  # noqa: PLC0415
 
@@ -119,7 +119,7 @@ def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, See
         if name_lower in _PIN_DENY:
             raise ValueError(
                 f"Seed table contains deny-listed name {name!r}: violates "
-                f"Phase 168 D-11 (deny-list-by-data). Remove from seed JSON."
+                f" (deny-list-by-data). Remove from seed JSON."
             )
 
         stored = raw["canonical_smiles"]
@@ -127,7 +127,7 @@ def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, See
         if canon != stored:
             raise ValueError(
                 f"Seed entry {name!r} canonical_smiles is not Chem.CanonSmiles-stable "
-                f"(D-13 idempotence): stored={stored!r} canon={canon!r}. Re-canonicalise."
+                f"(idempotence): stored={stored!r} canon={canon!r}. Re-canonicalise."
             )
 
         loc = raw.get("locant_context")
@@ -154,10 +154,10 @@ def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, See
 
 
 def _t1_opsin_rt_validate_all(entries: Dict[str, SeedEntry]) -> None:
-    """CONTEXT D-07 T1 design-time OPSIN L1 round-trip pre-validator.
+    """CONTEXT T1 design-time OPSIN L1 round-trip pre-validator.
 
     Reuses ``find_opsin_jar`` + ``smiles_match_via_inchi`` from
-    `` verbatim (Phase 150 oracle). Raises
+    `` verbatim (oracle). Raises
     ``ValueError`` on the first entry that fails to round-trip.
 
     Attachment-point (P-29.6.1 substituent-prefix) entries — whose canonical
@@ -219,7 +219,7 @@ def _t1_opsin_rt_validate_all(entries: Dict[str, SeedEntry]) -> None:
 
 
 def _load_validator_helpers():
-    """Lazily import the Phase 150 OPSIN-RT helpers from `the project tooling`.
+    """Lazily import OPSIN-RT helpers from `the project tooling`.
 
     Returns ``(find_opsin_jar, smiles_match_via_inchi)`` or ``None`` if the
     script (or its imports) cannot be loaded — the caller then skips validation
@@ -244,6 +244,6 @@ try:
     SEED_TABLE: Dict[str, SeedEntry] = load_seed_table(_SEED_PATH, validate=False)
 except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
     logger.error(
-        "Phase 168 seed-table load failed: %s; triviality controller will be a no-op", e,
+        " seed-table load failed: %s; triviality controller will be a no-op", e,
     )
     SEED_TABLE = {}

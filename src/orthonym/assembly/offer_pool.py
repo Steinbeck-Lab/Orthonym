@@ -1,8 +1,8 @@
-"""v33 Phase 0 Task L2.1: whole-molecule Offer + rank_offers/select_offer.
+""".1: whole-molecule Offer + rank_offers/select_offer.
 
 A NEW, small, PURE module -- deliberately NOT built on `assembly.candidate_pool`
-or wired through `assembly.inner_dispatch`. The L2 SPY (task-L2-brief.md,
-invariant 17) proved those are the wrong vehicle: `candidate_pool.best()` ranks
+or wired through `assembly.inner_dispatch`. The L2 (task-L2-brief.md,
+) proved those are the wrong vehicle: `candidate_pool.best()` ranks
 parent SKELETONS by the P-44 seniority criteria and `CandidateName` carries no
 `is_pin`/`tier`/coverage field at all, and restructuring `dispatch_inner` would
 hit `tier_a_ring.py:540-542`, which scrubs its own rejected candidates from the
@@ -97,7 +97,7 @@ def select_offer(offers: List[Offer]) -> Optional[Offer]:
 
 
 def select_rt_passing(offers: List[Offer], rt_ok) -> Optional[Offer]:
-    """v33 Phase 0 L4-core: the RT/PIN-gate-over-offers SELECTION PRIMITIVE.
+    """ L4-core: the RT/PIN-gate-over-offers SELECTION PRIMITIVE.
 
     Walks ``rank_offers(offers)`` in order and returns the FIRST offer that is
     both ``.complete`` and passes the caller-injected ``rt_ok(offer) -> bool``

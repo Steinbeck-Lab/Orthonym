@@ -1,4 +1,4 @@
-"""v29 Phase 1: the proof ledger -- assert the spine on the FINAL name.
+""": the proof ledger -- assert the spine on the FINAL name.
 
 WHY this module exists
 ----------------------
@@ -132,9 +132,9 @@ def finalize(final_name: str, *, mode: str = "audit") -> Optional[SpineProof]:
 
 
 def get_proof() -> Dict[str, Any]:
-    """The ledger's current state, for telemetry and the Task 7 census.
+    """The ledger's current state, for telemetry and the census.
 
-    ``ok is None`` and ``codes == ()`` mean no verdict exists yet (nothing
+    ``ok is None`` and ``codes ==`` mean no verdict exists yet (nothing
     recorded, or recorded but not finalized) -- deliberately distinct from
     ``ok is False`` with codes, which is a real failed proof.
     """

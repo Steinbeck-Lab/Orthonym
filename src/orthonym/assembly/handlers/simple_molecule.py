@@ -1,9 +1,9 @@
-"""Phase 160 simple_molecule handler — LIFT (single-atom / very simple).
+""" simple_molecule handler — LIFT (single-atom / very simple).
 
 Verbatim move of composer.py:1388-1392 dispatch logic. The underlying
-``_name_simple_molecule`` body STAYS in composer.py during Plan-02 and
-moves to this module in Plan-03 commit 03-10 (composer.py thinning) per
-CONTEXT D-24 incremental migration.
+``_name_simple_molecule`` body STAYS in composer.py during and
+moves to this module in (composer.py thinning) per
+CONTEXT incremental migration.
 
 IUPAC cite: P-14 (simple molecules; noble gases / single-atom symbols).
 
@@ -43,7 +43,7 @@ def name_simple_molecule(
 ) -> Optional[NamingResult]:
     """Direct-return simple-molecule handler.
 
-    Plan-10 DECOMP-02 OBSERVABLE CLOSURE: this is the FIRST tree-emitting
+     OBSERVABLE CLOSURE: this is the FIRST tree-emitting
     handler in Orthonym. The NameTreeNode contains only ``parent_stem``
     (the noble-gas / atom name) because simple molecules have no locants,
     no prefixes, no suffix, no stereo. ``name_tree_to_string(tree)`` is

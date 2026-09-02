@@ -1,4 +1,4 @@
-"""Phase 160 sulfoxide handler — Tier B shim (gate 0.40).
+""" sulfoxide handler — Tier B shim (gate 0.40).
 
 1-line wrapper around ``rules.sulfur.name_sulfoxide``. Verbatim move
 of composer.py:966-979 dispatch logic (sulfoxide branch of the shared

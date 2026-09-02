@@ -13,11 +13,11 @@ Algorithm:
 5. Return None for non-natural-product molecules
 
 Decoration enumeration (steroids):
-- Hydroxyl groups  -> prefix "hydroxy" with locant
-- Ketone groups    -> suffix "-one" with locant
-- Double bonds     -> suffix "-ene" with locant
-- Triple bonds     -> suffix "-yne" with locant
-- Ester groups     -> functional class format: parent-yl acylate (IUPAC P-65.6)
+- Hydroxyl groups -> prefix "hydroxy" with locant
+- Ketone groups -> suffix "-one" with locant
+- Double bonds -> suffix "-ene" with locant
+- Triple bonds -> suffix "-yne" with locant
+- Ester groups -> functional class format: parent-yl acylate (IUPAC P-65.6)
 """
 
 from collections import defaultdict, deque
@@ -44,8 +44,8 @@ from ..perception.natural_products import (
 # these constants define the ring junction atoms where angular methyls attach.
 #
 # IUPAC steroid nomenclature:
-#   C-18: angular methyl at ring C/D junction (bonded to C-13)
-#   C-19: angular methyl at ring A/B junction (bonded to C-10)
+# C-18: angular methyl at ring C/D junction (bonded to C-13)
+# C-19: angular methyl at ring A/B junction (bonded to C-10)
 #
 # Nor-detection: if a scaffold's numbering includes locant 18 or 19, but the
 # actual molecule is missing the methyl carbon at that position, it's a nor-
@@ -233,11 +233,11 @@ def format_np_modification_prefix(modifications: List[Dict]) -> str:
 
 
 # ----------------------------------------------------------------------------
-# Phase 160.1 D-19 + D-20 + ADR-19-05: IUPAC-canonical aromatic-ring ene
+# .1 + +: IUPAC-canonical aromatic-ring ene
 # locants for retained-NP scaffolds.
 #
 # Replaces Chem.Kekulize-based aromatic-ring ene detection (which is
-# PYTHONHASHSEED-sensitive per Phase 145.2 D-09 — RDKit's Kekulize algorithm
+# PYTHONHASHSEED-sensitive.2 — RDKit's Kekulize algorithm
 # is deterministic within a process but sensitive to upstream atom-iteration
 # order, producing different equally-valid Kekulé forms across processes).
 #
@@ -259,10 +259,10 @@ _NP_AROMATIC_RING_LOCANTS: Dict[str, List[Tuple[int, int, Optional[int]]]] = {
     # the ring-junction double bond per P-31.1.4.3.4; without it, the 5-en
     # is ambiguous between C5-C6 and C5-C10).
     "estrane": [(1, 2, None), (3, 4, None), (5, 10, 10)],
-    # Future aromatic-NP scaffolds attach by adding rows here as Phase 161+
+    # Future aromatic-NP scaffolds attach by adding rows here as +
     # ships them; e.g.:
-    #   "morphinan": [(1, 2, None), (3, 4, None), ...],
-    #   "ergoline": [...],
+    # "morphinan": [(1, 2, None), (3, 4, None),...],
+    # "ergoline": [...],
 }
 
 
@@ -296,7 +296,7 @@ def name_natural_product(mol) -> Optional[str]:
     if scaffold_info is None:
         return None
 
-    # v33 Phase 1 (C2a) STEREO HONESTY -- STEROID-SCOPED, FULLY-FLAT-ONLY (coordinator
+    # (C2a) STEREO HONESTY -- STEROID-SCOPED, FULLY-FLAT-ONLY (coordinator
     # ruling, 2026-08-16, fix round 2). The scaffold match is stereo-RELAXED
     # (perception/natural_products.py:40-67), so a stereo-UNDEFINED steroid matches a
     # config-defined scaffold. A FULLY stereo-undefined steroid (no matched-scaffold
@@ -325,7 +325,7 @@ def name_natural_product(mol) -> Optional[str]:
     # declined whenever ANY matched stereocentre was undefined
     # (with a Blue-Book-cited C-5 exception, P-101.2.6/BlueBookV2.md:51045, for the one
     # ring position steroid names leave free); that broke WSC-02-shaped partially-defined
-    # steroids. Measured (coordinator SPY): all 25 fabrication witnesses have ZERO
+    # steroids. Measured (coordinator): all 25 fabrication witnesses have ZERO
     # matched-scaffold stereocentres defined -- so the correct, measured criterion is
     # "zero defined AND at least one undefined", not "any undefined". This criterion
     # SUBSUMES the round-1 C-5 exception: a bare androstane/gonane/estrane test SMILES
@@ -335,8 +335,8 @@ def name_natural_product(mol) -> Optional[str]:
     # -- no dead code kept).
     #
     # Scoped to scaffold_class == "steroid" ONLY (fix round 1, unchanged): a coordinator
-    # SPY found ALL 25 fabrication witnesses in this codebase are steroid-class and ZERO
-    # are alkaloid-class. Alkaloid retained names (tropane, berberine, ajmaline, ...) are
+    # found ALL 25 fabrication witnesses in this codebase are steroid-class and ZERO
+    # are alkaloid-class. Alkaloid retained names (tropane, berberine, ajmaline,...) are
     # constitutional parents that do not assert the flagged ring configuration (e.g.
     # tropane's bridgehead centres are ring-closure-constrained, not a free config the
     # name implies), so applying this guard to them was an over-broad breadth regression,
@@ -397,8 +397,8 @@ def name_natural_product(mol) -> Optional[str]:
                     )
 
                 name_ab = _assemble_unsat(stereo_prefix, ring_ab)
-                # Phase 181 D-08: ship α/β only if it OPSIN-round-trips, else whole-graph R/S --
-                # but ONLY if THAT round-trips too (Fable BLOCKER, 2026-08-12): an unverified
+                # : ship α/β only if it OPSIN-round-trips, else whole-graph R/S --
+                # but ONLY if THAT round-trips too (BLOCKER, 2026-08-12): an unverified
                 # whole-graph fallback can OVER-specify an undefined centre (SELF-01 tolerates
                 # nb>na, namer.py:992) and ship a wrong stereoisomer. If neither candidate
                 # round-trips, honest-fail (None) so the systematic pipeline gets a chance
@@ -411,8 +411,8 @@ def name_natural_product(mol) -> Optional[str]:
                     return None  # Fall through to systematic naming
                 return name_ab
             else:
-                # Phase 0b: a SATURATED bare scaffold with defined stereo must emit its ring
-                # descriptors too, else Phase 0's SELF-01 gate abstains the whole molecule.
+                # : a SATURATED bare scaffold with defined stereo must emit its ring
+                # descriptors too, else 's SELF-01 gate abstains the whole molecule.
                 #
                 # Gate on `ring_ab` alone, NOT `stereo_prefix or ring_ab` (measured regression
                 # 2026-08-12): `_collect_np_stereo`'s non-steroid / converter-unavailable
@@ -443,7 +443,7 @@ def name_natural_product(mol) -> Optional[str]:
                     if _alpha_beta_rt_ok(mol, name_ab):
                         return name_ab
                     # α/β did not round-trip -> try the whole-graph R/S fallback, but ONLY ship
-                    # IT if it round-trips too (Fable BLOCKER, 2026-08-12): an unverified
+                    # IT if it round-trips too (BLOCKER, 2026-08-12): an unverified
                     # whole-graph name can OVER-specify an undefined centre (SELF-01 tolerates
                     # nb>na, namer.py:992) and ship a wrong stereoisomer -- the exact bug this
                     # branch was built to fix, reproduced on
@@ -540,18 +540,18 @@ def name_natural_product_with_substituents(
     stereo_prefix, ring_ab = _collect_np_stereo(mol, numbering, scaffold_info)
 
     # 0. Find ester decorations first (they consume atoms that would otherwise
-    #    be counted as hydroxyls or ketones)
+    # be counted as hydroxyls or ketones)
     esters = _find_ester_decorations(mol, scaffold_info, numbering)
     ester_consumed_atoms = set()
     for e in esters:
         ester_consumed_atoms.update(e["all_atoms"])
 
-    # 0a/0b/0c. Phase 182 (WSC-03, D-02/D-03): conjugate decorations — sulfate ester,
+    # 0a/0b/0c. (WSC-03,): conjugate decorations — sulfate ester,
     # mono-phosphate ester, glycosyl/uronyl. Each finder delegates fragment classification
     # to conjugate_controller.classify_conjugate and returns ester-shaped dicts carrying a
     # `word` key. Consuming these atoms here automatically dissolves the `androstan-3-olate`
-    # mis-assignment (D-05): once the conjugate-O linker is excluded, the OH/oxo finders no
-    # longer see it. Fires ONLY when a finder returns a non-empty list (D-09) — non-conjugate
+    # mis-assignment: once the conjugate-O linker is excluded, the OH/oxo finders no
+    # longer see it. Fires ONLY when a finder returns a non-empty list — non-conjugate
     # inputs reach an empty `conjugates` list and stay byte-identical.
     conjugates = (
         _find_sulfate_conjugates(mol, scaffold_info, numbering)
@@ -583,7 +583,7 @@ def name_natural_product_with_substituents(
     methoxys = _find_methoxys(mol, scaffold_info, numbering,
                               exclude_atoms=all_exclude)
 
-    # 0f (v30 tail #13): generic glycosyloxy / ring-oxy decorations — a scaffold
+    # 0f: generic glycosyloxy / ring-oxy decorations — a scaffold
     # -O-(ring system) the defined-sugar conjugate finder cannot match. Consumes
     # the ether O + the whole ring subgraph so the OH finder and completeness
     # invariant never double-count or drop them.
@@ -625,26 +625,26 @@ def name_natural_product_with_substituents(
     n_alkyls = _find_n_alkyl(mol, matched_set, numbering,
                              exclude_atoms=all_exclude)
 
-    # Phase 182 (WSC-03, D-07): multi-conjugate seniority. The single-conjugate cohort is
+    # (WSC-03): multi-conjugate seniority. The single-conjugate cohort is
     # binding this phase; if >1 conjugate fragment is present (e.g. a disulfate) there is no
     # confidently-nameable prefix form for the non-senior fragments yet, so honest-fail
     # (return None → systematic pipeline) rather than guess. The completeness invariant below
     # would in any case reject a name that drops the second fragment. Multi-conjugate prefix
-    # treatment (sulfooxy/phosphonooxy/glycosyloxy) is Phase 183/184.
+    # treatment (sulfooxy/phosphonooxy/glycosyloxy) is /184.
     if len(conjugates) > 1:
         return None
 
-    # Phase 182 (WSC-03, D-07): a conjugate mixed with a real acyl ester (e.g. a steroid
+    # (WSC-03): a conjugate mixed with a real acyl ester (e.g. a steroid
     # 17-acetate 3-sulfate) is NOT expressible as a single functional-class join — the
     # `_assemble_np_ester_name` mixed-acid `else` branch keys on `ester["acylate"]`, which a
     # conjugate dict (carrying `word`) does not have. There is no confidently-correct PIN for
     # the mixed case yet (the non-senior fragment would need a sulfooxy/acyloxy prefix), so
     # honest-fail (None → systematic pipeline) rather than emit a wrong/partial name or rely on
-    # a downstream KeyError. Mixed conjugate+ester is Phase 183/184 scope.
+    # a downstream KeyError. Mixed conjugate+ester is /184 scope.
     if conjugates and esters:
         return None
 
-    # If no decorations found, return bare scaffold name. Phase 182 (D-09): also require
+    # If no decorations found, return bare scaffold name.: also require
     # `not conjugates` so a scaffold carrying ONLY a conjugate (and no other decoration)
     # still enters assembly instead of short-circuiting to the bare scaffold name.
     if (not hydroxyls and not ketones and not methyls and not halogens
@@ -655,8 +655,8 @@ def name_natural_product_with_substituents(
             return modification_prefix + scaffold_name
         return scaffold_name
 
-    # Phase 182 (WSC-03, D-08): no-silent-drop completeness invariant. Runs ONLY when a
-    # conjugate fired (D-09 — non-conjugate inputs are entirely untouched), so it can never
+    # (WSC-03): no-silent-drop completeness invariant. Runs ONLY when a
+    # conjugate fired (— non-conjugate inputs are entirely untouched), so it can never
     # false-fail a name that does not go through the conjugate path. Assert every heavy atom
     # in a scaffold-substituent subgraph is claimed by exactly one named feature; any
     # unclaimed heavy atom → honest-fail (return None → systematic pipeline), NEVER emit a
@@ -722,18 +722,18 @@ def name_natural_product_with_substituents(
             return None  # honest-fail → systematic pipeline; NEVER emit a name omitting atoms
 
     # 4/5. Assemble the name. `ring_ab` non-empty ⇒ the steroid α/β path fired; we ship α/β
-    # ONLY if it OPSIN-round-trips, else fall back to the whole-graph R/S name (Phase 181 D-08).
+    # ONLY if it OPSIN-round-trips, else fall back to the whole-graph R/S name.
     # This makes α/β strictly non-regressing: the few decorated steroids whose α/β name OPSIN
     # cannot parse (complex polysubstituted pregnanes) or whose decorated ring-fusion α/β is
     # ambiguous keep the existing R/S name that OPSIN does round-trip. Fail-OPEN when OPSIN is
     # absent (same posture as the SUB-03 validity gate) so the path is verifiable, not mandatory.
     def _assemble_steroid(sp, rab):
-        # Phase 182 (WSC-03): a conjugate (sulfate / mono-phosphate / glycosyl) takes the
-        # senior `-yl` attachment exactly like an ester (D-07); pass conjugates as
+        # (WSC-03): a conjugate (sulfate / mono-phosphate / glycosyl) takes the
+        # senior `-yl` attachment exactly like an ester; pass conjugates as
         # ester-shaped dicts carrying a `word` key into the proven `_assemble_np_ester_name`
         # emitter (which already demotes scaffold OH/=O to hydroxy/oxo prefixes and renders
         # α/β). For the binding single-conjugate cohort `esters` is empty, so `joined` is the
-        # single conjugate; mixed conjugate+ester is honest-failed upstream (D-07 / >1 guard).
+        # single conjugate; mixed conjugate+ester is honest-failed upstream (>1 guard).
         joined = esters + conjugates
         if joined:
             return _assemble_np_ester_name(
@@ -749,7 +749,7 @@ def name_natural_product_with_substituents(
             glycosyloxys=glycosyloxys,
         )
 
-    # v30 tail #13: a generic glycosyloxy decoration is cited with a plain
+    # tail #13: a generic glycosyloxy decoration is cited with a plain
     # numeric substituent locant, which the steroid α/β assembly does not compose
     # cleanly with the ring-face descriptors (it produced a malformed duplicate
     # '3alpha-...oxy-3alpha-cholest'). Force the whole-graph R/S prefix for the
@@ -764,10 +764,10 @@ def name_natural_product_with_substituents(
     name_ab = _assemble_steroid(stereo_prefix, ring_ab)
     if ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
         # Steroid α/β did not OPSIN-round-trip → fall back to the whole-graph R/S name
-        # (Phase 181 D-08). This single check covers the conjugate path too, since the
+        # . This single check covers the conjugate path too, since the
         # conjugate name carries α/β when ring_ab is present.
         fallback = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering), {})
-        # Phase 182 (D-10): for a conjugate we must NEVER ship a name that does not RT —
+        # : for a conjugate we must NEVER ship a name that does not RT —
         # prior behaviour on these rows is already RT-False (the conjugate was dropped), so a
         # non-RT R/S fallback is no better. If the R/S conjugate name also fails RT, honest-fail
         # (None) to the systematic pipeline rather than ship a worse name. Fail-OPEN when OPSIN
@@ -775,7 +775,7 @@ def name_natural_product_with_substituents(
         if conjugates and not _alpha_beta_rt_ok(mol, fallback):
             return None
         return fallback
-    # Phase 182 (D-10): a conjugate with no α/β (ring_ab empty) skipped the gate above; still
+    # : a conjugate with no α/β (ring_ab empty) skipped the gate above; still
     # require the conjugate name to OPSIN-round-trip before shipping, else honest-fail.
     if conjugates and not ring_ab and not _alpha_beta_rt_ok(mol, name_ab):
         return None
@@ -819,12 +819,12 @@ def _collect_np_stereo(mol, numbering: Dict[int, int], scaffold_info: Optional[D
 
     Returns a 2-tuple ``(leading_prefix, ring_ab)``:
 
-    - For a steroid where the P-101.2.6 α/β converter resolves (Phase 181, WSC-02):
+    - For a steroid where the P-101.2.6 α/β converter resolves (WSC-02):
       ``leading_prefix`` is the acyclic side-chain R/S block (e.g. ``"(22R)-"`` or "")
       and ``ring_ab`` is ``{locant: 'alpha'/'beta'}`` for the cited ring stereocentres.
-      The assembler interleaves ``ring_ab`` INLINE at each locant + on the stem (D-04/D-06).
+      The assembler interleaves ``ring_ab`` INLINE at each locant + on the stem.
     - For a non-steroid NP, or a steroid where the converter signals the per-molecule
-      no-mix fallback (D-08), ``leading_prefix`` is the existing whole-graph R/S block
+      no-mix fallback, ``leading_prefix`` is the existing whole-graph R/S block
       (e.g. ``"(5R,8S,...)-"``, byte-identical to prior behaviour) and ``ring_ab`` is ``{}``.
 
     Args:
@@ -839,7 +839,7 @@ def _collect_np_stereo(mol, numbering: Dict[int, int], scaffold_info: Optional[D
 
     assign_stereochemistry(mol)
 
-    # Phase 181 (WSC-02): steroid ring-face α/β branch (D-08 gate). Root-cause at the
+    # (WSC-02): steroid ring-face α/β branch (gate). Root-cause at the
     # emitter; the converter round-trips through OPSIN by construction. None ⇒ fall back
     # to the existing whole-graph R/S string (never mix ring α/β with ring R/S).
     if scaffold_info is not None and scaffold_info.get("scaffold_class") == "steroid":
@@ -856,7 +856,7 @@ def _collect_np_stereo(mol, numbering: Dict[int, int], scaffold_info: Optional[D
 
 
 def _whole_graph_rs_prefix(mol, numbering: Dict[int, int]) -> str:
-    """Build the legacy whole-graph R/S leading block (the α/β fallback name, Phase 181)."""
+    """Build the legacy whole-graph R/S leading block (the α/β fallback name)."""
     from ..rules.stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 
     descriptors = collect_stereodescriptors(mol, numbering)
@@ -864,7 +864,7 @@ def _whole_graph_rs_prefix(mol, numbering: Dict[int, int]) -> str:
 
 
 def _alpha_beta_rt_ok(mol, name: str) -> bool:
-    """Return True iff the steroid α/β `name` OPSIN-round-trips to `mol` (Phase 181 D-08).
+    """Return True iff the steroid α/β `name` OPSIN-round-trips to `mol`.
 
     Fail-OPEN: when OPSIN/Java is unavailable the round-trip cannot be checked, so we ship
     the α/β name (the same posture as the SUB-03 validity gate, which cannot suppress without
@@ -1087,23 +1087,23 @@ def _find_scaffold_unsaturation(
 ) -> Dict[str, object]:
     """Find double and triple bonds within the scaffold.
 
-    Detects explicit DOUBLE and TRIPLE bonds directly.  For aromatic rings
+    Detects explicit DOUBLE and TRIPLE bonds directly. For aromatic rings
     (IUPAC P-31.1.3.4), Kekulizes a *copy* of the molecule to resolve
     aromatic bonds into canonical alternating DOUBLE/SINGLE pattern, then
-    counts the resulting DOUBLE bonds between aromatic C-C atoms.  The
+    counts the resulting DOUBLE bonds between aromatic C-C atoms. The
     original molecule is never mutated.
 
     Aromatic bonds that are *inherent* to the scaffold pattern (e.g.
     morphinan Ring A, whose SMARTS already contains ``c`` atoms) are excluded
     because the base scaffold name already encodes that aromaticity.
 
-    Phase 160.1 D-19 + D-20 + ADR-19-05: for retained-NP scaffolds with
+    .1 + +: for retained-NP scaffolds with
     fully-aromatic rings (``scaffold_class in _NP_AROMATIC_RING_LOCANTS``),
     the canonical aromatic-ring ene locants come from the per-scaffold
     canonical-locant table BEFORE Kekulize. This produces IUPAC-canonical
     locants deterministically across all PYTHONHASHSEED values (replacing
     the previous Chem.Kekulize-based detection which was PYTHONHASHSEED-
-    sensitive per Phase 145.2 D-09). The Kekulize path is preserved for
+    sensitive.2). The Kekulize path is preserved for
     novel aromatic substituents OUTSIDE the scaffold and for non-cataloged
     scaffold classes.
 
@@ -1137,7 +1137,7 @@ def _find_scaffold_unsaturation(
     yne_locants: List[int] = []
     ene_indicated_h: Dict[int, int] = {}
 
-    # Phase 160.1 D-19 + D-20 + ADR-19-05: deterministic aromatic-ring
+    # .1 + +: deterministic aromatic-ring
     # canonical locants from the per-scaffold-class table when the scaffold
     # is cataloged AND the molecule has aromatic atoms inside the scaffold.
     # This bypasses the PYTHONHASHSEED-sensitive Chem.Kekulize call for
@@ -1162,7 +1162,7 @@ def _find_scaffold_unsaturation(
             if mol.GetAtomWithIdx(idx).GetIsAromatic()
         }
         if runtime_aromatic_atoms:
-            # Phase 160.2 Plan-04-02 WR-03 closure: ``high`` is intentionally
+            # .2 -02 WR-03 closure: ``high`` is intentionally
             # unused in the loop body (the ``_NP_AROMATIC_RING_LOCANTS`` table
             # schema declares (lower_locant, higher_locant, indicated_h) but
             # this site only consumes ``lower_locant`` and ``indicated_h``).
@@ -1233,7 +1233,7 @@ def _find_scaffold_unsaturation(
         lower_loc = min(b_loc, e_loc)
 
         if bond.GetBondType() == Chem.BondType.DOUBLE:
-            # Phase 160.1 D-20: skip aromatic bonds already accounted for
+            # .1: skip aromatic bonds already accounted for
             # by the canonical-locant table (atoms in table_handled_atoms).
             if (
                 b_atom.GetIsAromatic() and e_atom.GetIsAromatic()
@@ -1263,7 +1263,7 @@ def _find_epoxy_bridges(
     """Find epoxy bridges (oxygen bridging two scaffold atoms).
 
     An epoxy bridge is an oxygen atom whose ONLY heavy-atom neighbors are both
-    scaffold atoms with IUPAC locants.  Phenolic/enol oxygens (aromatic or
+    scaffold atoms with IUPAC locants. Phenolic/enol oxygens (aromatic or
     doubly bonded) are excluded.
 
     Returns sorted list of (lower_locant, higher_locant) tuples.
@@ -1355,7 +1355,7 @@ def _find_n_alkyl(
 def _trace_alkyl_chain(mol, start_idx: int, exclude_set: set) -> int:
     """Trace a simple unbranched alkyl chain starting from start_idx.
 
-    Returns the chain length (number of carbons).  Returns 0 if the
+    Returns the chain length (number of carbons). Returns 0 if the
     fragment is not a simple unbranched all-carbon chain.
     """
     visited = set()
@@ -1452,7 +1452,7 @@ def _find_generic_glycosyloxy(
     exclude_atoms: Optional[set] = None,
 ) -> List[Tuple[int, str, frozenset]]:
     """Find GENERIC (stereo-undefined) glycosyloxy / ring-oxy decorations
-    (v30 tail #13, P-63.2.2.2).
+    .
 
     A scaffold atom bearing ``-O-(anomeric C of a ring system)`` — a glycosidic
     or any ring-to-ring ether link — that the DEFINED-sugar conjugate finder
@@ -1584,7 +1584,7 @@ def _assemble_np_name(
     glycosyloxys = glycosyloxys or []
     ring_ab = ring_ab or {}
 
-    # Phase 181 (WSC-02): render a ring locant with its ring-face α/β descriptor when one
+    # (WSC-02): render a ring locant with its ring-face α/β descriptor when one
     # was cited (Latin, no hyphen between locant and greek per P-101.2.6.1.1); else plain.
     def _greek_locant(loc):
         return f"{loc}{ring_ab[loc]}" if loc in ring_ab else str(loc)
@@ -1617,7 +1617,7 @@ def _assemble_np_name(
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("methoxy", f"{locant_str}-{multiplier}methoxy"))
 
-    # Generic glycosyloxy / ring-oxy prefixes (v30 tail #13): each is already a
+    # Generic glycosyloxy / ring-oxy prefixes: each is already a
     # compound '{ring}oxy' token; cite it locant-first with enclosing marks, and
     # alphabetize by the bare oxy token (multiple distinct sugars each cited
     # separately -- no di/tri multiplier over compound prefixes).
@@ -1658,7 +1658,7 @@ def _assemble_np_name(
     # not cholest-5,7-dien). For a single locant, no 'a' (cholest-5-en).
     ene_locs = unsaturation.get("ene", [])
     yne_locs = unsaturation.get("yne", [])
-    # Phase 160.1 D-20 + ADR-19-05: indicated-H locant map for ring-junction
+    # .1 +: indicated-H locant map for ring-junction
     # double bonds per IUPAC P-31.1.4.3.4 (e.g., {5: 10} renders as "5(10)").
     ene_indicated_h = unsaturation.get("ene_indicated_h", {})
     total_unsat_locants = len(ene_locs) + len(yne_locs)
@@ -1714,11 +1714,11 @@ def _assemble_np_name(
         ketone_word = f"{multiplier}one"
         ketone_suffix = f"-{locant_str}-{ketone_word}"
 
-    # Phase 181 (WSC-02): free ring-face descriptors not consumed by any substituent/suffix
+    # (WSC-02): free ring-face descriptors not consumed by any substituent/suffix
     # locant (typically C-5, and any cited inverted bridgehead with no decoration) are
     # prepended to the stem as "{loc}{greek}-" — INLINE on the stem, NEVER a leading
     # parenthesised block (the OPSIN-unparseable anti-pattern). The side-chain R/S block
-    # (stereo_prefix) stays at the very front (D-06).
+    # (stereo_prefix) stays at the very front.
     _consumed = (set(hydroxyls) | set(methyls) | set(methoxys) | set(ketones)
                  | {loc for loc, _ in halogens} | {loc for loc, _ in n_alkyls})
     _free = sorted(loc for loc in ring_ab if loc not in _consumed)
@@ -1934,7 +1934,7 @@ def _find_ester_decorations(
         if carbonyl_idx is None:
             continue  # Not an ester (no C=O found after oxygen)
 
-        # v36-C3 root-cause fix: name the acid word by routing the acid
+        # -C3 root-cause fix: name the acid word by routing the acid
         # fragment through Orthonym's GENERAL ester namer, NOT by naive
         # carbon-counting. Carbon-counting turned the carbamate acid
         # ``-O-C(=O)-N(CH2CH2Cl)2`` (5 carbons) into ``pentanoate`` -- a
@@ -1976,13 +1976,13 @@ def _find_ester_decorations(
 
 
 # ---------------------------------------------------------------------------
-# Phase 182 (WSC-03): conjugate finders — sulfate / mono-phosphate / glycosyl.
+# (WSC-03): conjugate finders — sulfate / mono-phosphate / glycosyl.
 #
 # Each mirrors `_find_ester_decorations`: it walks `get_scaffold_substituents`,
 # skips substituents whose attachment is not in the numbering, requires the linker
 # atom to be an ester-type O (no H, so an -OH hydroxyl is never treated as a linker),
 # and delegates the fragment classification to the class-agnostic
-# `conjugate_controller.classify_conjugate` primitive (D-02). Detection is purely
+# `conjugate_controller.classify_conjugate` primitive. Detection is purely
 # structural — never molecule-specific (no CHEBI literals, no name lookups).
 #
 # Returns `[{locant, kind, word, all_atoms, linker_kind}]` where `all_atoms` is the
@@ -2025,7 +2025,7 @@ def _find_phosphate_conjugates(
     """Detect `scaffold-O-P(=O)(O[H/⁻])(O[H/⁻])` mono-phosphate conjugates (RESEARCH Pattern 2).
 
     The classifier returns None for di/tri-phosphate or any P-O-P bridge, so those
-    (out-of-scope, Phase 183/184) keep their legacy output.
+    (out-of-scope, /184) keep their legacy output.
     """
     return _find_conjugates_of_kind(mol, scaffold_info, numbering, "phosphate")
 
@@ -2082,10 +2082,10 @@ def _acylate_to_acyloxy(acylate: str) -> str:
     (-yloxy) for use in substitutive naming of mixed-acid esters.
 
     Examples:
-        "acetate"    -> "acetyloxy"
+        "acetate" -> "acetyloxy"
         "propanoate" -> "propanoyloxy"
-        "benzoate"   -> "benzoyloxy"
-        "formate"    -> "formyloxy"
+        "benzoate" -> "benzoyloxy"
+        "formate" -> "formyloxy"
 
     Args:
         acylate: Acylate name (e.g., "acetate", "propanoate").
@@ -2144,7 +2144,7 @@ def _assemble_np_ester_name(
     halogens = halogens or []
     ring_ab = ring_ab or {}
 
-    # Phase 181 (WSC-02): render a ring locant with its ring-face α/β descriptor (Latin,
+    # (WSC-02): render a ring locant with its ring-face α/β descriptor (Latin,
     # no locant-greek hyphen) when cited; else plain.
     def _greek_locant(loc):
         return f"{loc}{ring_ab[loc]}" if loc in ring_ab else str(loc)
@@ -2188,7 +2188,7 @@ def _assemble_np_ester_name(
     # Join multiple prefix parts with hyphen: "3-hydroxy" + "7-oxo" -> "3-hydroxy-7-oxo"
     prefix = "-".join(prefix_parts)
 
-    # Phase 181 (WSC-02): free ring-face descriptors not consumed by any prefix/ester locant
+    # (WSC-02): free ring-face descriptors not consumed by any prefix/ester locant
     # (e.g. "5alpha-") are prepended to the stem INLINE (never a leading parenthesis).
     _ester_consumed_base = (set(hydroxyls) | set(methyls) | set(ketones)
                             | {loc for loc, _ in halogens})
@@ -2204,11 +2204,11 @@ def _assemble_np_ester_name(
     # --- Build unsaturation suffix ---
     ene_locs = unsaturation.get("ene", [])
     yne_locs = unsaturation.get("yne", [])
-    # Phase 160.1 D-20 + ADR-19-05: indicated-H locant map for ring-junction
+    # .1 +: indicated-H locant map for ring-junction
     # double bonds per IUPAC P-31.1.4.3.4 (e.g., {5: 10} renders as "5(10)").
     ene_indicated_h = unsaturation.get("ene_indicated_h", {})
 
-    # v36-C3: euphonic terminal 'a' on the stem when >= 2 unsaturation locants
+    # -C3: euphonic terminal 'a' on the stem when >= 2 unsaturation locants
     # (IUPAC P-31.1.3.4) -- 'estra-1,3,5(10)-trien', not 'estr-1,3,5(10)-trien'.
     # This mirrors the identical rule in the non-ester assembler
     # `_assemble_np_name` (see `effective_stem` there); the ester path used to
@@ -2250,7 +2250,7 @@ def _assemble_np_ester_name(
         unsat_suffix = "an"
 
     # --- Build yl suffix and acylate word ---
-    # Phase 182 (WSC-03): conjugate dicts carry a `word` key (e.g. "sulfate",
+    # (WSC-03): conjugate dicts carry a `word` key (e.g. "sulfate",
     # "beta-D-glucopyranosiduronic acid") and have NO "acylate". Prefer `word` so the
     # single-conjugate functional-class join `{parent-yl} {word}` works without KeyError;
     # real ester dicts still resolve via their `acylate` key.

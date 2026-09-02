@@ -1,4 +1,4 @@
-"""Phase 160 lactam handler — direct-return shim with coverage gate.
+""" lactam handler — direct-return shim with coverage gate.
 
 Parallel to lactone handler; verbatim lift of composer.py:830-852
 (inline branch) wrapping ``rules.lactams.is_monocyclic_lactam`` +

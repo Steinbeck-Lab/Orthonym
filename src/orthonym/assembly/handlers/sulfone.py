@@ -1,4 +1,4 @@
-"""Phase 160 sulfone handler — Tier B shim (gate 0.40).
+""" sulfone handler — Tier B shim (gate 0.40).
 
 1-line wrapper around ``rules.sulfur.name_sulfone``. Verbatim move
 of composer.py:966-978 dispatch logic (sulfone branch parallel to

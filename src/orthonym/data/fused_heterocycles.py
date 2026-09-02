@@ -17,7 +17,7 @@ from collections import Counter
 from typing import Dict, Optional, Tuple, List, Any, Union
 from rdkit import Chem
 
-from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
+from ..assembly.fragment_naming import (  # macrocycle-hang budgets
     spend_perf_work, spend_analysis_call)
 
 
@@ -1643,7 +1643,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 16,
         'iupac_locants': {0: 7, 1: 6, 2: '5a', 3: 5, 4: 4, 5: '3a', 6: 3, 7: 2, 8: 1, 9: '10a', 10: 10, 11: 9, 12: '8a', 13: 8, 14: '10c', 15: '10b'},
     },
-    # Kind-C catalog expansion (2026-08-29): 2-ring fused cores measured
+    # Kind-C catalog expansion: 2-ring fused cores measured
     # ABSENT from this catalog (`fused_component_uncatalogued`, guard
     # spiro.py:1468 / composer.py's plain ortho-fused branch), sized in
     # + -KINDB-CONFIRM.md. The routing
@@ -1655,7 +1655,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # substructure isomorphism onto this canonical SMILES), never hand-derived.
     #
     # 9H-fluorene (bare parent; witness ring system from an N-triflyloxime
-    # substituent, e.g. O=S(=O)(ON=C(c1ccc2c(c1)Cc1ccccc1-2)C(F)(F)F)C(F)(F)F).
+    # substituent, e.g. O=S(=O)(ON=CCc1ccccc1-2)C(F)(F)F)C(F)(F)F).
     'c1ccc2c(c1)Cc1ccccc1-2': {
         'name': '9H-fluorene',
         'tautomer_locant': 9,
@@ -1665,7 +1665,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # 3,4-dihydro-2H-1,4-benzoxazine (benzomorpholine parent; witness ring
     # system from a spiro-decorated derivative, e.g.
-    # CN1CCC(n2cc(c3ccc4c(c3)OCC3(...)N4)cn2)CC1). OPSIN also accepts the
+    # CN1CCC(n2ccOCC3(...)N4)cn2)CC1). OPSIN also accepts the
     # bracket form "3,4-dihydro-2H-benzo[b][1,4]oxazine" for the same
     # structure; this catalog uses the classical-locant spelling to match
     # the sibling entries '3,4-dihydro-2H-1-benzopyran' /
@@ -1872,7 +1872,7 @@ def _get_substructure_patterns() -> Dict[str, Chem.Mol]:
 # atom of the SAME element ⇒ count(e, pattern) ≤ count(e, query) ∀e
 # (this subsumes the heteroatom-set ⊆ condition used for bucketing).
 # * total heavy-atom count: ≤, for the same reason.
-# A HARD old-vs-new equivalence test (tests/unit/data/) gates this.
+# A HARD old-vs-new equivalence test (tests/unit/data) gates this.
 # =========================================================================
 
 class _PatternRec:
@@ -2197,7 +2197,7 @@ def _match_fused_heterocycle_core_impl(
             continue
         if not _prefilter(rec):
             continue
-        spend_perf_work()  # M2.5: charge each (post-prefilter) substructure match attempt
+        spend_perf_work()  # charge each (post-prefilter) substructure match attempt
         if mol.HasSubstructMatch(rec.pattern):
             # uniquify=False so symmetry-equivalent automorphic matches are all
             # available for the substituent-locant minimization (see fast-path).

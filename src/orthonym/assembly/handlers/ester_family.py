@@ -1,13 +1,13 @@
-"""Phase 160 Plan-06 composite handler: ester family (polyfunctional → multi_ester → ester).
+""" composite handler: ester family (polyfunctional → multi_ester → ester).
 
-Per CONTEXT D-28 (gap-closure) + ADR-19-02 §3.1 Option A: encodes the
+Per CONTEXT (gap-closure) + §3.1 Option A: encodes the
 multi-try-on-None cascade for the 3 ester-family handlers as a SINGLE
 composite handler so the dispatch_inner first-match-wins interface
-(CONTEXT D-22) stays untouched.
+(CONTEXT) stays untouched.
 
 LIFT SOURCE: composer.py:859-949 (verbatim, with ``return pool.best().name``
 replaced by ``return NamingResult(name=pool.best().name,
-tree=<coarse NameTreeNode>, atom_to_locant_hint=None)`` — Phase 165 SCORE-01
+tree=<coarse NameTreeNode>, atom_to_locant_hint=None)`` —
 attaches a coarse tree at every return site).
 
 Internal cascade order (preserved from composer.py inline body):
@@ -37,11 +37,11 @@ def _is_ester_family(features: Any) -> bool:
     produce a name (mirrors the success-condition gates inside
     rules.polyfunctional.name_polyfunctional and rules.esters.name_ester).
 
-    Per CONTEXT D-25 + AP-160-26 predicate-purity. Pure read-only on
-    features (RingInfo + atom traversal are OK — D-25 bans mutation, not
+    Per CONTEXT + predicate-purity. Pure read-only on
+    features (RingInfo + atom traversal are OK — bans mutation, not
     expensive reads).
 
-    Why tight, not broad: dispatch_inner is first-match-wins (D-22). If
+    Why tight, not broad: dispatch_inner is first-match-wins. If
     the predicate matched ``is_polyfunctional`` unconditionally, ring-
     assembly-dominant molecules would be preempted from ring_assembly
     @2500 by this handler @1500 and fall back to a wrong name. IUPAC
@@ -62,7 +62,7 @@ def _is_ester_family(features: Any) -> bool:
     # Sub-path 1: polyfunctional. Only match conditions name_polyfunctional
     # actually handles successfully.
     if getattr(features, 'is_polyfunctional', False):
-        # AM-2 ROOT-2 (plan P1AM Task 11, P-66.1.1.3 / P-41): DECLINE a single
+        # AM-2 ROOT-2 (plan P1AM, P-66.1.1.3 / P-41): DECLINE a single
         # acyclic amide whose only junior group is an amine — the dedicated
         # amide handler (@5200, _assemble_amide_name) names it correctly; the
         # polyfunctional path double-expresses the amide N (a WRONG name, not a
@@ -87,7 +87,7 @@ def _is_ester_family(features: Any) -> bool:
         ):
             return True
 
-        # v28 Cluster D (P-41 / P-63.6): no-PCG polyfunctional on a SATURATED
+        # Cluster D (P-41 / P-63.6): no-PCG polyfunctional on a SATURATED
         # acyclic (chain) parent — every group is prefix-only (pg is None), so
         # name_polyfunctional's no-suffix arm builds the substitutive name
         # ('1-(methanesulfinyl)-2-(methylsulfanyl)ethane'). Mirror that arm's
@@ -143,7 +143,7 @@ def _is_ester_family(features: Any) -> bool:
             if total_heavy <= 0:
                 return False
             ring_set = set(ring_atoms)
-            # W2F-P3 (P-44.1.1): mirror name_polyfunctional's ring-as-parent
+            # (P-44.1.1): mirror name_polyfunctional's ring-as-parent
             # size guard AND its PCG-on-ring exception — when the principal
             # group is attached to the ring, the ring necessarily holds the PCG
             # and MUST be the parent regardless of relative size (a large
@@ -185,18 +185,18 @@ def name_ester_family(
 
     Returns the FIRST sub-path's NamingResult; returns None if all fall through.
 
-    Byte-identical preservation per DECOMP-03: each sub-path's pool.add call
+    Byte-identical preservation per: each sub-path's pool.add call
     is preserved verbatim from composer.py:859-949 (same handler_id, same
     features argument, same return type semantics).
 
-    Per Phase 160.1 D-18 / ADR-19-04 handler contract: when pool.add()
+    .1 / handler contract: when pool.add()
     accepts a candidate but pool.best() returns None (pool rejected the
     candidate per quality threshold / wildcard / ratio-floor), the handler
-    raises AttributeError verbatim mirroring the pre-Plan-03-01 inline
+    raises AttributeError verbatim mirroring the pre--01 inline
     cascade behavior at composer.py:875 (`return pool.best().name`).
 
     The AttributeError propagates UN-WRAPPED through dispatch_inner per
-    the Phase 160.1 D-16 exception list in dispatch_inner; namer's broad
+    .1 exception list in dispatch_inner; namer's broad
     `except (TypeError, KeyError, IndexError, AttributeError)` at
     namer.py:1888 catches it and falls through to _descriptive_fallback
     (wildcard-bearing molecules) OR — when called recursively from the
@@ -205,7 +205,7 @@ def name_ester_family(
 
     This is the SAME exception flow as the pre-amendment inline cascade
     at composer.py:875 (`return pool.best().name`); it is NOT a new
-    behavior. The cascade-removal sweep (Plan-03-01) keeps the exception
+    behavior. The cascade-removal sweep (-01) keeps the exception
     propagation path that decomposition engine + namer.name_compound's
     broad except both depend on.
     """
@@ -226,11 +226,11 @@ def name_ester_family(
                 )
             pool = get_current_pool()
             pool.add(poly_name, "polyfunctional", features)
-            # Phase 160.1 Plan-03-01 D-16: pool.best().name raises
+            # .1 -01: pool.best().name raises
             # AttributeError when pool.best() is None — mirrors the
             # pre-amendment inline cascade at composer.py:875 verbatim.
             # The AttributeError is propagated un-wrapped through
-            # dispatch_inner per the D-16 exception list, then caught by
+            # dispatch_inner per the exception list, then caught by
             # namer.name_compound's broad `except (TypeError, KeyError,
             # IndexError, AttributeError)` at namer.py:1888, falling
             # through to _descriptive_fallback (or the decomposition
@@ -267,10 +267,10 @@ def name_ester_family(
                 _try_functional_class_diol_diester,
             )
             ester_type = classify_multi_ester(features.mol, all_esters)
-            # Phase 160.1 Plan-03-01 D-16: all multi_ester sub-paths mirror
+            # .1 -01: all multi_ester sub-paths mirror
             # the pre-amendment inline cascade verbatim — pool.best().name
             # raises AttributeError when pool.best() is None, propagated
-            # un-wrapped through dispatch_inner per D-16 to namer's broad
+            # un-wrapped through dispatch_inner per to namer's broad
             # except (TypeError, KeyError, IndexError, AttributeError).
             if ester_type == "dicarboxylic_diester":
                 diester_name = name_dicarboxylic_diester(features.mol, all_esters)
@@ -336,9 +336,9 @@ def name_ester_family(
     # ============================================================
     # Sub-path 3: ester (composer.py:931-949 verbatim lift)
     # ============================================================
-    # Phase 160.1 Plan-03-01 D-16: mirrors the pre-amendment inline cascade
+    # .1 -01: mirrors the pre-amendment inline cascade
     # verbatim — pool.best().name raises AttributeError when pool.best()
-    # is None, propagated un-wrapped through dispatch_inner per D-16.
+    # is None, propagated un-wrapped through dispatch_inner per.
     if getattr(features, 'principal_group', None) == "ester":
         ester_match = getattr(features, 'ester_match', None)
         if ester_match:

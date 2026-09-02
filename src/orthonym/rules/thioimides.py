@@ -5,7 +5,7 @@ to a common nitrogen, ``R-C(=S)-NH-C(=S)-R'``. The Blue Book PIN names one
 thioacyl group as the parent alkanethioamide suffix and cites the other as an
 ``N-(alkanethioyl)`` acyl substituent prefix (BB verbatim example)::
 
-    CC(=S)NC(C)=S  ->  N-(ethanethioyl)ethanethioamide   (PIN)
+    CC(=S)NC(C)=S -> N-(ethanethioyl)ethanethioamide (PIN)
 
 This mirrors the shipped O-imide behaviour, which the decomposition engine
 produces (``CCC(=O)NC=O -> N-propanoylformamide``): the LESS-senior (shorter)

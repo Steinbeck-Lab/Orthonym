@@ -1,4 +1,4 @@
-"""P-102.7 disaccharide / oligosaccharide whole-structure assembler (Phase 183, WSC-04, D-02).
+"""P-102.7 disaccharide / oligosaccharide whole-structure assembler (WSC-04).
 
 A NEW module that reasons over the WHOLE multi-ring sugar structure to emit the
 IUPAC 2013 carbohydrate-specific name forms (P-102.7) the generic decomposition
@@ -12,27 +12,27 @@ path cannot produce:
   anomeric carbons are in the glycosidic linkage, e.g. sucrose): parent chosen by
   P-102.4, cited ``-oside``: ``beta-D-fructofuranosyl alpha-D-glucopyranoside``.
 
-The assembler (D-02) does NOT route through ``decomposition/`` (which emits the
+The assembler does NOT route through ``decomposition/`` (which emits the
 substitutive ``bis(glycosyloxy)...`` P-68 form, structurally wrong for sugars). It
 detects the units + the inter-unit glycosidic bond directly with a RING-RESTRICTED
 SMARTS over the whole structure (Pitfall 4 — the aglycone carbon must be in a SECOND
-recognized sugar ring, so a single monoglycoside (Phase 176) is NOT pulled in),
+recognized sugar ring, so a single monoglycoside is NOT pulled in),
 splits each unit with the proven ``conjugate_controller._extract_capped_sugar``
 primitive (FragmentOnBonds + restore the anomeric -OH; a ``rules/`` sibling, not a
 ``decomposition/`` import), names each per its OWN ring via the
 ``lookup_sugar`` -> ``recognize_sugar_skeleton`` -> ``name_monosaccharide_systematic``
-cascade (D-05/D-09 — never inherit an anomer across units), derives the directional
+cascade (— never inherit an anomer across units), derives the directional
 ``(c->c')`` ASCII linkage locants by ring-walking from each unit's anomeric carbon
-(D-07), enforces the no-silent-drop completeness invariant over the ORIGINAL mol's
-heavy atoms reconciling the single shared bridging O (D-12, Pitfall 7), and gates the
-assembled name on an OPSIN round-trip fallback (D-13) before shipping -- fail-OPEN
+(), enforces the no-silent-drop completeness invariant over the ORIGINAL mol's
+heavy atoms reconciling the single shared bridging O (Pitfall 7), and gates the
+assembled name on an OPSIN round-trip fallback before shipping -- fail-OPEN
 when Java/OPSIN is absent on the PIN/default tier (unchanged), fail-CLOSED on the
-best-effort tier (v33 Task 1.1: that tier has no downstream SELF-01 backstop, so
+best-effort tier (.1: that tier has no downstream SELF-01 backstop, so
 this gate is the only thing standing between an unverified name and T4 output).
 
 Root-cause-only (the contributor guide): no postprocessor, no regex / string surgery on any
 derived base, no per-molecule hardcode. Every gate failure returns ``None`` so the
-molecule cascade-continues to the existing pipeline (fail-closed, D-11). The input
+molecule cascade-continues to the existing pipeline (fail-closed). The input
 mol is never mutated (the unit split copies via the reused capper).
 
 Blue Book: P-102.7 (@54101), P-102.7.1.1 glycosyl glycoside (@54109),
@@ -62,10 +62,10 @@ _ARROW = "->"
 
 
 # --------------------------------------------------------------------------- #
-# Per-unit recognition (D-05 / D-09 cascade)
+# Per-unit recognition (cascade)
 # --------------------------------------------------------------------------- #
 def _recognize_unit(mol, detach_carbon: int, bridging_o_idx: int) -> Optional[Tuple[str, str, str]]:
-    """Recognize a single sugar unit from its OWN ring (never inherited, D-09).
+    """Recognize a single sugar unit from its OWN ring (never inherited).
 
     Isolates the unit by cleaving the bond from ``detach_carbon`` (the ring carbon
     bonded to the inter-unit bridging O) to ``bridging_o_idx`` with the proven
@@ -96,7 +96,7 @@ def _recognize_unit(mol, detach_carbon: int, bridging_o_idx: int) -> Optional[Tu
     if sugar_mol is None:
         return None
 
-    # Catalog FIRST (D-05 — keeps cataloged sugars byte-identical).
+    # Catalog FIRST (— keeps cataloged sugars byte-identical).
     tup = lookup_sugar(Chem.MolToSmiles(sugar_mol))
     if tup is not None:
         return tup
@@ -106,10 +106,10 @@ def _recognize_unit(mol, detach_carbon: int, bridging_o_idx: int) -> Optional[Tu
     # Decorated (deoxy/amino/uronic/o_sulfo/o_phospho/o_acyl/n_acyl) unit via
     # the systematic engine: it returns a full name string; carry it as a
     # base-only tuple (no separate anomer/config -- the systematic name
-    # already embeds them). ``for_glycosidic_unit=True`` (v33 Task 1.2) is
+    # already embeds them). ``for_glycosidic_unit=True`` is
     # what makes a decorated ring (sulfo/O-acyl/N-acyl) recognizable AT ALL
     # here -- it both threads the O-acyl/N-acyl decoration into the name
-    # (default-off elsewhere, Task 1.4's job) and skips the "defer to the
+    # (default-off elsewhere,.4's job) and skips the "defer to the
     # standalone functional-class ester name" check that would otherwise
     # fire for a catalog-residual sulfate/phosphate, since this unit is
     # about to be embedded inside a larger glycosidic name, not shipped
@@ -121,13 +121,13 @@ def _recognize_unit(mol, detach_carbon: int, bridging_o_idx: int) -> Optional[Tu
 
 
 # --------------------------------------------------------------------------- #
-# Ring numbering -> IUPAC carbohydrate locants (D-07, Open Q2)
+# Ring numbering -> IUPAC carbohydrate locants (Open Q2)
 # --------------------------------------------------------------------------- #
 def _ring_carbon_locants(mol, ring: Tuple[int, ...], ring_oxygen: int,
                          anomeric_idx: int) -> Dict[int, int]:
     """Number a sugar ring's carbons C1.. by IUPAC carbohydrate convention.
 
-    Anomeric carbon = C1; walk the ring away from the ring-O (C2, C3, ...); the
+    Anomeric carbon = C1; walk the ring away from the ring-O (C2, C3,...); the
     exocyclic ``CH2OH``/``COOH`` carbon attached to the last ring carbon = the next
     locant (C6 on a hexopyranose). Returns ``{atom_idx: locant}`` for the ring
     carbons plus the exocyclic terminal carbon, used to read the attachment locant.
@@ -194,7 +194,7 @@ def _anomeric_locant(mol, ring: Tuple[int, ...], ring_oxygen: int,
 
 
 # --------------------------------------------------------------------------- #
-# Unit / glycosidic-bond classification (whole structure, D-02 / D-06)
+# Unit / glycosidic-bond classification (whole structure,)
 # --------------------------------------------------------------------------- #
 def _ring_of(mol, atom_idx: int) -> Optional[Tuple[int, ...]]:
     """The single SSSR ring containing ``atom_idx`` (None if 0 or >1)."""
@@ -215,7 +215,7 @@ def _unit_atoms(mol, ring: Tuple[int, ...], bridging_os: Set[int]) -> Set[int]:
     BFS out from each ring atom, NOT crossing a bridging O (the shared inter-unit
     linker) and NOT entering another ring. Collects the ring atoms and their
     pendant substituent atoms (hydroxyls, the CH2OH tail, etc.) so the completeness
-    invariant (D-12) can reconcile every heavy atom.
+    invariant can reconcile every heavy atom.
     """
     ringset = set(ring)
     claimed: Set[int] = set(ringset)
@@ -246,13 +246,13 @@ def _unit_atoms(mol, ring: Tuple[int, ...], bridging_os: Set[int]) -> Set[int]:
 def _classify_units(mol) -> Optional[Dict]:
     """Detect a LINEAR chain of >=2 recognized sugar units + decide the name shape.
 
-    Implements the perception half of the assembler (D-02/D-05/D-06/D-09):
+    Implements the perception half of the assembler (/):
 
     1. Detect inter-unit glycosidic bonds with the RING-RESTRICTED SMARTS over the
        WHOLE structure (Pitfall 4); require BOTH ring carbons to live in a recognized
        sugar ring (the both-rings-are-sugars gate -- a monoglycoside is excluded).
-    2. Recognize each unit per its OWN ring (D-09, never inherited).
-    3. Decide the shape (D-06): a unit whose anomeric carbon carries a FREE hemiacetal
+    2. Recognize each unit per its OWN ring (never inherited).
+    3. Decide the shape: a unit whose anomeric carbon carries a FREE hemiacetal
        -OH (exocyclic O with an H, degree 1, NOT the bridging O) is the reducing end ->
        ``glycosylglycose``; none free (all anomeric C linked) -> ``glycoside``;
        neither (O-substituted anomeric, no free/linked) -> None (fail-closed).
@@ -345,7 +345,7 @@ def _classify_units(mol) -> Optional[Dict]:
         )
         if (not is_bridging) and (not is_free_oh):
             # O-substituted anomeric (acylated/methylated): neither free nor the
-            # inter-unit bond -> out of scope (D-06, Open Q1 strict).
+            # inter-unit bond -> out of scope (Open Q1 strict).
             return None
 
         # Find the ring carbon that bears an inter-unit bridging O (the linker we cap
@@ -367,7 +367,7 @@ def _classify_units(mol) -> Optional[Dict]:
         if detach_carbon is None:
             return None
 
-        # Recognize the unit per its OWN ring (D-09, never inherited).
+        # Recognize the unit per its OWN ring (never inherited).
         tup = _recognize_unit(mol, detach_carbon, detach_bridging_o)
         if tup is None:
             return None
@@ -387,7 +387,7 @@ def _classify_units(mol) -> Optional[Dict]:
         return None  # >1 free anomeric -OH -> not a single linear reducing chain
     shape = "glycosylglycose" if n_reducing == 1 else "glycoside"
 
-    # Heavy-atom accounting for the completeness invariant (D-12): each unit's atoms
+    # Heavy-atom accounting for the completeness invariant: each unit's atoms
     # + the shared bridging O(s). Track over the ORIGINAL mol's atom set.
     consumed: Set[int] = set(bridging_os)
     for u in unit_records:
@@ -405,13 +405,13 @@ def _classify_units(mol) -> Optional[Dict]:
 
 
 # --------------------------------------------------------------------------- #
-# RT-fallback gate (D-13, mirror natural_products._alpha_beta_rt_ok)
+# RT-fallback gate (mirror natural_products._alpha_beta_rt_ok)
 # --------------------------------------------------------------------------- #
 def _sugar_name_rt_ok(mol, name: str, relax_atoms: Optional[Set[int]] = None) -> bool:
     """Return True iff ``name`` OPSIN-round-trips to ``mol``.
 
-    Tier-split (v33 Task 1.1): on the PIN/default tier this is fail-OPEN, BYTE-
-    IDENTICAL to its pre-v33 behaviour -- when OPSIN/Java is unavailable or the
+    Tier-split: on the PIN/default tier this is fail-OPEN, BYTE-
+    IDENTICAL to its pre- behaviour -- when OPSIN/Java is unavailable or the
     round-trip check itself raises, we ship the name (the SUB-03 validity-gate
     posture), because that tier's own downstream ``_final_opsin_validity_gate`` /
     SELF-01 gate is the real backstop and already measures 0 wrong here
@@ -427,7 +427,7 @@ def _sugar_name_rt_ok(mol, name: str, relax_atoms: Optional[Set[int]] = None) ->
     change -- only the "cannot check" branches (missing jar / exception) flip.
 
     ``relax_atoms`` (the reducing-end anomeric carbon, when its descriptor is omitted
-    per D-09) have their chirality cleared on a copy of ``mol`` before the InChI
+    per) have their chirality cleared on a copy of ``mol`` before the InChI
     comparison, so an honestly-unspecified reducing anomer still RT-validates the rest
     of the structure (the name asserts "anomer unspecified", which must compare against
     the structure with that one centre relaxed -- never invent an alpha/beta).
@@ -456,7 +456,7 @@ def _sugar_name_rt_ok(mol, name: str, relax_atoms: Optional[Set[int]] = None) ->
 def _count_sugar_rings(mol) -> int:
     """Count 5-/6-membered rings with exactly one ring oxygen (a pyranose/furanose
     ring proxy). A disaccharide has 2; a trisaccharide+ has 3+. Used to fail closed
-    on >=3-unit saccharides, which the binary assembler mis-parses (v23 Phase 5)."""
+    on >=3-unit saccharides, which the binary assembler mis-parses."""
     n = 0
     for ring in mol.GetRingInfo().AtomRings():
         if len(ring) in (5, 6) and sum(
@@ -467,23 +467,23 @@ def _count_sugar_rings(mol) -> int:
 
 
 # --------------------------------------------------------------------------- #
-# Public entry point (D-02)
+# Public entry point
 # --------------------------------------------------------------------------- #
 def _name_disaccharide_binary(mol) -> Optional[str]:
     """Name a BINARY disaccharide (2 units, 1 link) by the P-102.7 form, else
-    ``None``.  This is the proven binary assembler; the public
+    ``None``. This is the proven binary assembler; the public
     :func:`name_disaccharide` wraps it and falls back to the general
     :func:`name_linear_oligosaccharide` for 3+ unit chains and the 1->6 links the
     ring-restricted SMARTS here misses.
 
     Composes the glycosylglycose / glycosyl-glycoside form with ASCII ``(c->c')``
     linkage locants and per-unit anomers (none invented for an unspecified reducing
-    end, D-09), enforces the completeness invariant (D-12), and gates on the RT
-    fallback (D-13) before shipping. Returns ``None`` for any out-of-scope topology
+    end), enforces the completeness invariant, and gates on the RT
+    fallback before shipping. Returns ``None`` for any out-of-scope topology
     (branched / non-linear / C-glycoside / polymeric / unrecognized unit / dropped
     atom / RT-fail) so the molecule cascade-continues.
     """
-    # v23 Phase 5: trisaccharide+ are out of scope (deferred to v24). The binary
+    # : trisaccharide+ are out of scope (deferred to). The binary
     # assembler only validates the disaccharide (gold + RT gate), and its
     # unit-parser can mis-read a 3rd sugar ring as a glycosyloxy substituent rather
     # than a separate unit — bypassing the len(units)!=2 guard below and emitting a
@@ -493,7 +493,7 @@ def _name_disaccharide_binary(mol) -> Optional[str]:
     # OWN production output is already 'unknown' — its malformed name comes from a
     # DIFFERENT path (the heterocycle handler's sugar-substituent naming), which the
     # SUB-03 validity gate suppresses; that path over-claiming pure oligosaccharides
-    # is a separate pre-existing issue (shared substituent layer, v24 carbohydrate
+    # is a separate pre-existing issue (shared substituent layer, carbohydrate
     # scope), not addressed by hardening THIS assembler.
     if _count_sugar_rings(mol) >= 3:
         return None
@@ -504,7 +504,7 @@ def _name_disaccharide_binary(mol) -> Optional[str]:
     units: List[Dict] = info["units"]
     shape: str = info["shape"]
 
-    # --- Completeness invariant (D-12, Pitfall 7): every ORIGINAL heavy atom must be
+    # --- Completeness invariant (Pitfall 7): every ORIGINAL heavy atom must be
     # consumed by exactly one unit or be a shared bridging O. ---
     all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     if info["consumed"] != all_heavy:
@@ -519,16 +519,16 @@ def _name_disaccharide_binary(mol) -> Optional[str]:
 
     # Identify the glycosyl (substituent) unit and the parent unit.
     if shape == "glycosylglycose":
-        # Reducing end is FORCED parent (D-06); the other unit is the glycosyl.
+        # Reducing end is FORCED parent; the other unit is the glycosyl.
         parent = next(u for u in units if u["is_reducing"])
         glycosyl = next(u for u in units if not u["is_reducing"])
     else:
-        # No free hemiacetal -> glycoside; parent by P-102.4 (D-08).
+        # No free hemiacetal -> glycoside; parent by P-102.4.
         parent, glycosyl = _choose_glycoside_parent(mol, units)
         if parent is None:
             return None
 
-    # --- Derive the (c->c') linkage locants (D-07). c = glycosyl anomeric locant
+    # --- Derive the (c->c') linkage locants. c = glycosyl anomeric locant
     # (1 aldose / 2 ketose); c' = the parent carbon bearing the glycosidic O. ---
     link = info["links"][0]
     anomeric_c, ring_o, bridging_o, aglycone_c = link
@@ -555,10 +555,10 @@ def _name_disaccharide_binary(mol) -> Optional[str]:
         if c_prime is None:
             return None
         # P-102.7.1.2: the reducing-end anomer MUST be cited when it is DEFINED
-        # (beta-maltose -> ...-(1->4)-beta-D-glucopyranose).  W6B-T10 root-cause
-        # fix: previously the anomer was always dropped (D-09) even for a defined
+        # (beta-maltose ->...-(1->4)-beta-D-glucopyranose). W6B-T10 root-cause
+        # fix: previously the anomer was always dropped even for a defined
         # reducing centre, which is only correct for an UNSPECIFIED (mutarotating)
-        # anomer.  When the reducing anomeric atom has no defined chirality, keep
+        # anomer. When the reducing anomeric atom has no defined chirality, keep
         # the omit-and-relax path (the name does not assert the anomer).
         parent_anomeric = parent["anomeric_idx"]
         anomeric_defined = (
@@ -568,12 +568,12 @@ def _name_disaccharide_binary(mol) -> Optional[str]:
         if anomeric_defined and par_anomer and par_config:
             parent_str = f"{par_anomer}-{par_config}-{par_base}"
         elif anomeric_defined:
-            # v33 Task 1.2 fix: a SYSTEMATIC base (from
+            # .2 fix: a SYSTEMATIC base (from
             # ``name_monosaccharide_systematic``, e.g. a sulfo/O-acyl/N-acyl-
             # decorated reducing end) already folds its anomer+config INTO
             # ``par_base`` when the fingerprint-recovered anomer is known --
             # ``par_anomer``/``par_config`` being empty here means "embedded",
-            # NOT "unspecified".  The OLD code treated any empty par_anomer/
+            # NOT "unspecified". The OLD code treated any empty par_anomer/
             # par_config as "unspecified" and relaxed a centre the name
             # actually asserts, which then RT-fails (OPSIN parses the
             # asserted anomer, but the relaxed comparison target has that
@@ -589,19 +589,19 @@ def _name_disaccharide_binary(mol) -> Optional[str]:
             return None
         name = f"{glycosyl_str} {parent_str}"
 
-    # --- RT-fallback gate (D-13) ---
+    # --- RT-fallback gate ---
     if not _sugar_name_rt_ok(mol, name, relax_atoms=relax or None):
         return None
     return name
 
 
 def name_disaccharide(mol) -> Optional[str]:
-    """Public entry (D-02): name a linear di/oligo-saccharide by the P-102.7 form.
+    """Public entry: name a linear di/oligo-saccharide by the P-102.7 form.
 
     Tries the proven binary disaccharide assembler first (byte-identical to the
     prior behaviour); if it declines, falls back to the general linear
     oligosaccharide namer (W6B-T11) which handles 3+ unit reducing chains and the
-    1->6 links the binary ring-restricted SMARTS misses.  ``None`` (fail-closed)
+    1->6 links the binary ring-restricted SMARTS misses. ``None`` (fail-closed)
     for any out-of-scope topology.
     """
     result = _name_disaccharide_binary(mol)
@@ -620,8 +620,8 @@ def _extract_unit_capped(mol, ringset: Set[int],
                          bond_pairs: List[Tuple[int, int]]) -> Optional[str]:
     """Isolate ONE sugar unit by capping ALL its inter-unit bonds (each a
     ``(unit_carbon, bridging_o)`` pair) and restoring the -OH on every unit-side
-    carbon.  Returns the canonical SMILES of the isolated unit, or ``None``.
-    Multi-bond generalization of :func:`_extract_capped_sugar` (a middle unit of a
+    carbon. Returns the canonical SMILES of the isolated unit, or ``None``.
+    Multi-bond generalization of:func:`_extract_capped_sugar` (a middle unit of a
     chain carries two bridging bonds)."""
     if not bond_pairs:
         return None
@@ -632,7 +632,7 @@ def _extract_unit_capped(mol, ringset: Set[int],
             return None
         bond_ids.append(b.GetIdx())
     try:
-        # v33 P0 L3-2b: explicit dummyLabels=(0, 0) per bond, mirroring
+        # P0 L3-2b: explicit dummyLabels=(0, 0) per bond, mirroring
         # _extract_capped_sugar's dummyLabels=[(0, 0)] — WITHOUT it RDKit
         # isotope-labels each dummy with the cleaved bond partner's atom index,
         # and at.SetAtomicNum(8) below never clears that isotope. The stray
@@ -679,9 +679,9 @@ def _oligo_topology(mol) -> Optional[Dict]:
 
     Returns ``{units, links, order, parent_ui, bridging_os}`` for a chain of >=2
     glycosidically-linked sugar rings with a unique free-hemiacetal reducing end
-    and no branching, else ``None``.  Shared by :func:`name_linear_oligosaccharide`
-    (which adds recognition + assembly + RT) and :func:`_has_oligo_chain` (the cheap
-    dispatch predicate).  Recognition and RT are NOT done here."""
+    and no branching, else ``None``. Shared by:func:`name_linear_oligosaccharide`
+    (which adds recognition + assembly + RT) and:func:`_has_oligo_chain` (the cheap
+    dispatch predicate). Recognition and RT are NOT done here."""
     if mol is None:
         return None
     from collections import Counter
@@ -728,7 +728,7 @@ def _oligo_topology(mol) -> Optional[Dict]:
                     carbon_to_unit.setdefault(nbr.GetIdx(), ui)
 
     # 2. Glycosidic links: each unit's anomeric exocyclic O, if a bridging ether O
-    #    (no H, 2 carbons) whose OTHER carbon maps to a DIFFERENT sugar unit.
+    # (no H, 2 carbons) whose OTHER carbon maps to a DIFFERENT sugar unit.
     links: List[Tuple[int, int, int, int, int]] = []  # donor,acc,anom_c,bridge_o,acc_c
     bridging_os: Set[int] = set()
     for ui, u in enumerate(units):
@@ -751,11 +751,11 @@ def _oligo_topology(mol) -> Optional[Dict]:
         return None
 
     # 3. Reducing parent = the unique non-donor unit; its anomeric is EITHER a
-    #    free -OH (a true reducing end) OR capped with a simple ALKYL/ARYL
-    #    group (v33 Engine-2 fix (b), e.g. a methyl glycoside used as a
-    #    synthetic capping group in a GAG fragment) -- both are valid chain
-    #    termini for this namer. A cap belonging to ANOTHER recognized sugar
-    #    ring is a genuine non-reducing glycoside (deferred elsewhere).
+    # free -OH (a true reducing end) OR capped with a simple ALKYL/ARYL
+    # group, e.g. a methyl glycoside used as a
+    # synthetic capping group in a GAG fragment) -- both are valid chain
+    # termini for this namer. A cap belonging to ANOTHER recognized sugar
+    # ring is a genuine non-reducing glycoside (deferred elsewhere).
     donors = {l[0] for l in links}
     non_donors = [ui for ui in range(len(units)) if ui not in donors]
     if len(non_donors) != 1:
@@ -778,7 +778,7 @@ def _oligo_topology(mol) -> Optional[Dict]:
     if any(v > 1 for v in Counter(l[1] for l in links).values()):
         return None  # a unit accepts >1 glycosyl -> BRANCHED
 
-    # 4. Order the linear chain: walk parent <- donor <- ... (must cover every unit).
+    # 4. Order the linear chain: walk parent <- donor <-... (must cover every unit).
     donor_of: Dict[int, Tuple] = {}
     for l in links:
         if l[1] in donor_of:
@@ -803,14 +803,14 @@ def _oligo_topology(mol) -> Optional[Dict]:
 
 
 def _has_oligo_chain(mol) -> bool:
-    """Cheap NO-OPSIN dispatch precondition for :func:`name_linear_oligosaccharide`."""
+    """Cheap NO-OPSIN dispatch precondition for:func:`name_linear_oligosaccharide`."""
     return _oligo_topology(mol) is not None
 
 
 def _has_extended_oligo(mol) -> bool:
     """Cheap NO-OPSIN dispatch precondition for the NON-REDUCING /
     :func:`name_nonreducing_oligosaccharide` and BRANCHED /
-    :func:`name_branched_oligosaccharide` namers (v33 glyco slices 1-2).
+    :func:`name_branched_oligosaccharide` namers.
 
     Mirrors their topology detection (>=3 units + an anomeric<->anomeric central
     bond, or a unit accepting >1 glycosyl) WITHOUT the RT gate, so the dispatch
@@ -844,13 +844,13 @@ def _glycoside_cap_name(mol, o_idx: int, cap_c_idx: int) -> Optional[str]:
     substituent word of P-102.5.6.2.2, e.g. ``methyl`` in ``methyl
     alpha-D-glucopyranoside``) as a substituent prefix.
 
-    First tries :func:`~orthonym.assembly.substituent_naming.
-    _located_acyclic_alkyl_name` DIRECTLY on the original ``mol`` (v33 Task
+    First tries:func:`~orthonym.assembly.substituent_naming.
+    _located_acyclic_alkyl_name` DIRECTLY on the original ``mol`` (Task
     1.3): given the cap's own atom set + its attachment atom, that primitive
     derives the free-valence locant FROM THE STRUCTURE (P-46.1.8) and covers a
     functionalized acyclic cap (a halogen/hydroxyl/primary-amine branch), e.g.
     the common synthetic ``5-aminopentyl``/``2-aminoethyl`` glycoconjugate
-    linker. That is the root-cause fix for a real defect this session's SPY
+    linker. That is the root-cause fix for a real defect this session's
     found: the fallback path below always guessed ``attach_locant=1``, which
     is only correct when the free valence happens to sit at the cap's OWN
     lowest-locant end -- wrong whenever a senior characteristic group (e.g.
@@ -929,7 +929,7 @@ def _capped_parent_glycoside_str(anomer: str, config: str, base: str) -> Optiona
     """Build the P-102.5.6.2.2 glycoside head for a (possibly decorated,
     non-uronic) base, with the anomer-config descriptor correctly placed
     AFTER any base-name prefixes and immediately before the ``-oside`` stem
-    (mirrors :func:`_glycosyl_term`'s ``-osyl`` sibling -- OPSIN rejects the
+    (mirrors:func:`_glycosyl_term`'s ``-osyl`` sibling -- OPSIN rejects the
     naive anomer-config-PREFIX order for a decorated base, see
     :func:`_split_decorated_sugar_base`). A uronic base is deferred (returns
     ``None``): this relaxation's confirmed target is a plain amino/deoxy/
@@ -954,11 +954,11 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
     """Name a LINEAR reducing oligosaccharide (>=2 units) by P-102.7.2.2:
     ``glycosyl-(1->c')-[glycosyl-(1->c')-]n-glycose`` (maltotriose ->
     ``alpha-D-glucopyranosyl-(1->4)-alpha-D-glucopyranosyl-(1->4)-D-glucopyranose``;
-    isomaltose 1->6).  Fail-closed (``None``) on: a BRANCHED chain (a unit accepts
+    isomaltose 1->6). Fail-closed (``None``) on: a BRANCHED chain (a unit accepts
     >1 glycosyl), a NON-reducing chain (no free-hemiacetal parent -> P-102.7.2.1
     glycoside, deferred), >1 reducing unit, an unrecognized unit, a dropped atom,
-    or an RT-fail.  Each unit is recognized from its OWN isolated ring (D-09); the
-    whole name is OPSIN-RT gated (D-13)."""
+    or an RT-fail. Each unit is recognized from its OWN isolated ring; the
+    whole name is OPSIN-RT gated."""
     topo = _oligo_topology(mol)
     if topo is None:
         return None
@@ -969,17 +969,17 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
     bridging_os = topo["bridging_os"]
     parent_cap_c = topo.get("parent_cap_c")
 
-    # 5. Isolate + recognize each unit (D-09), collecting its bridging bonds.
+    # 5. Isolate + recognize each unit, collecting its bridging bonds.
     unit_bridge_bonds: Dict[int, List[Tuple[int, int]]] = {ui: [] for ui in range(len(units))}
     for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
         unit_bridge_bonds[donor_ui].append((anom_c, o_idx))
         unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
     cap_name: Optional[str] = None
     if parent_cap_c is not None:
-        # v33 Engine-2 fix (b): an alkyl/aryl-capped terminus (e.g. a methyl
-        # glycoside).  Cleave the cap bond too so the ISOLATED parent fragment
+        # Engine-2 fix (b): an alkyl/aryl-capped terminus (e.g. a methyl
+        # glycoside). Cleave the cap bond too so the ISOLATED parent fragment
         # (used for classification/recognition only) gets a free anomeric -OH;
-        # the cap itself is named separately and prefixed as "{cap} ..." in a
+        # the cap itself is named separately and prefixed as "{cap}..." in a
         # P-102.5.6.2.2 glycoside head below, never as a free sugar.
         parent_anom_o = units[parent_ui]["anomeric_exo_o"]
         unit_bridge_bonds[parent_ui].append((units[parent_ui]["anomeric_idx"], parent_anom_o))
@@ -999,7 +999,7 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
             return None
         tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
         if tup is None:
-            # v33 Task 1.2: for_glycosidic_unit=True threads O-acyl/N-acyl/
+            # .2: for_glycosidic_unit=True threads O-acyl/N-acyl/
             # O-sulfo/O-phospho ring decoration into this chain unit's name
             # (see the identical comment on _recognize_unit's call).
             systematic = name_monosaccharide_systematic(sm, for_glycosidic_unit=True)
@@ -1008,9 +1008,9 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
             return None
         tuples[ui] = tup
 
-    # 6. Assemble in name order (terminal donor ... -> reducing parent).
+    # 6. Assemble in name order (terminal donor... -> reducing parent).
     #
-    # v33 Engine-2 fix (b): a capped parent is NOT cited with the P-102.7.2.2
+    # Engine-2 fix (b): a capped parent is NOT cited with the P-102.7.2.2
     # "(1->c')" suffix chain -- OPSIN rejects "glycosyl-(1->c')-methyl
     # alpha-D-glucopyranoside" (VERIFIED, this session). The P-102.5.6.2.2
     # glycoside instead takes its substituent as a PREFIX: "methyl c'-O-
@@ -1051,7 +1051,7 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
             anom_defined = (mol.GetAtomWithIdx(units[ui]["anomeric_idx"]).GetChiralTag()
                             != Chem.ChiralType.CHI_UNSPECIFIED)
             if anom_defined and pa and pc:
-                # v33 P0 L3-2b: see _split_decorated_sugar_base — a decorated
+                # P0 L3-2b: see _split_decorated_sugar_base — a decorated
                 # base (e.g. GlcNAc's "2-acetamido-2-deoxy-glucopyranose") needs
                 # the anomer-config descriptor inserted AFTER its own prefixes,
                 # not prepended ahead of them (OPSIN rejects the naive order).
@@ -1092,7 +1092,7 @@ def name_linear_oligosaccharide(mol) -> Optional[str]:
     if name is None:
         name = "-".join(parts)
 
-    # 7. Completeness invariant (D-12) + RT gate (D-13).
+    # 7. Completeness invariant + RT gate.
     all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     consumed: Set[int] = set(bridging_os)
     for u in units:
@@ -1112,9 +1112,9 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
     Builds the glycosyl TREE rooted at the unique free-hemiacetal reducing unit and
     renders it recursively: at each branch point the highest-locant child continues
     the main chain inline, every other child is a bracketed side chain cited before
-    it.  Fail-closed (``None``) on: no reducing parent (non-reducing -> the
+    it. Fail-closed (``None``) on: no reducing parent (non-reducing -> the
     glycoside namer), a cycle, an unrecognized unit, a dropped atom, or an RT-fail.
-    0-wrong via the OPSIN-RT gate (D-13); it only fires where the linear namer already
+    0-wrong via the OPSIN-RT gate; it only fires where the linear namer already
     declined (a branch), so it cannot regress a passing name."""
     detected = _detect_sugar_units_links(mol)
     if detected is None:
@@ -1132,7 +1132,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
 
     # Reducing parent = the unique unit that donates nothing. Its anomeric O is
     # EITHER a free -OH (a true reducing end) OR capped with a simple ALKYL/ARYL
-    # group (v33 Task 1.3: generalizes _oligo_topology's Engine-2 fix (b),
+    # group,
     # e.g. an aminopentyl/aminoethyl synthetic linker on a BRANCHED glycan tree
     # -- that relaxation previously existed only in the LINEAR namer, so any
     # branched tree with a capped root was structurally unreachable regardless
@@ -1177,7 +1177,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
         unit_bridge_bonds[acc_ui].append((acc_c, o_idx))
     cap_name: Optional[str] = None
     if parent_cap_c is not None:
-        # v33 Task 1.3: also cut the aglycone bond so the ISOLATED parent
+        # .3: also cut the aglycone bond so the ISOLATED parent
         # fragment (used for recognition) gets a free anomeric -OH rather than
         # carrying the whole capping chain as an unrecognized substituent
         # (mirrors name_linear_oligosaccharide's identical step).
@@ -1199,7 +1199,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
             return None
         tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
         if tup is None:
-            # v33 Task 1.2: for_glycosidic_unit=True threads O-acyl/N-acyl/
+            # .2: for_glycosidic_unit=True threads O-acyl/N-acyl/
             # O-sulfo/O-phospho ring decoration into this chain unit's name
             # (see the identical comment on _recognize_unit's call).
             systematic = name_monosaccharide_systematic(sm, for_glycosidic_unit=True)
@@ -1262,7 +1262,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
                     != Chem.ChiralType.CHI_UNSPECIFIED)
 
     if parent_cap_c is not None:
-        # v33 Task 1.3: a CAPPED root (P-102.5.6.2.2 glycoside) -- mirrors
+        # .3: a CAPPED root (P-102.5.6.2.2 glycoside) -- mirrors
         # name_linear_oligosaccharide's identical relaxation, generalized so a
         # BRANCHED tree can also sit behind an alkyl/aryl-capped reducing
         # terminus (e.g. a synthetic aminopentyl/aminoethyl linker on a
@@ -1274,7 +1274,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
         glyco_head = _capped_parent_glycoside_str(pa, pc, pb)
         if glyco_head is None:
             return None
-        # Scope (v33 Task 1.3): exactly ONE direct substituent on the capped
+        # Scope: exactly ONE direct substituent on the capped
         # root ring -- any deeper branching in that substituent's OWN subtree
         # is handled generically by _render's existing recursion. A root that
         # itself carries >1 direct O-substituent (P-102.5.6.2.2's multi-O-
@@ -1316,7 +1316,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
             return None
         candidates = [candidate]
 
-    # Completeness invariant (D-12) -- structural, independent of which name
+    # Completeness invariant -- structural, independent of which name
     # candidate is tried below.
     all_heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
     consumed: Set[int] = set(bridging_os)
@@ -1325,7 +1325,7 @@ def name_branched_oligosaccharide(mol) -> Optional[str]:
     if consumed != all_heavy:
         return None
 
-    # RT gate (D-13): the first candidate that round-trips wins; 0-wrong via
+    # RT gate: the first candidate that round-trips wins; 0-wrong via
     # fail-closed (None) if none does.
     for candidate in candidates:
         if _sugar_name_rt_ok(mol, candidate, relax_atoms=relax or None):
@@ -1403,7 +1403,7 @@ def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
     e.g. raffinose ->
     ``alpha-D-galactopyranosyl-(1->6)-alpha-D-glucopyranosyl beta-D-fructofuranoside``.
 
-    Scope (v33 slice 1, fail-closed outside it): exactly ONE glycosyl-glycoside
+    Scope: exactly ONE glycosyl-glycoside
     central bond (an anomeric<->anomeric bridge), of whose two units exactly one is
     a LEAF (no other glycosidic link) -> the glycoside PARENT; the other roots a
     single LINEAR glycosyl chain covering every remaining unit. Both the completeness
@@ -1417,7 +1417,7 @@ def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
         return None  # 2-unit non-reducing (sucrose) is the binary assembler's job
 
     # 1. Central glycosyl-glycoside bond: a bridge O whose BOTH carbons are anomeric
-    #    (of different units) -> two reciprocal links sharing that O.
+    # (of different units) -> two reciprocal links sharing that O.
     by_o: Dict[int, List] = {}
     for l in links:
         by_o.setdefault(l[3], []).append(l)
@@ -1440,7 +1440,7 @@ def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
     chain_links = [l for l in links if l[3] != central_o]
 
     # 3. Parent = the central unit that is a LEAF (roots nothing in chain_links);
-    #    the other central unit roots the glycosyl chain.
+    # the other central unit roots the glycosyl chain.
     donors = {l[0] for l in chain_links}
     acceptors = {l[1] for l in chain_links}
     uA, uB = central_units
@@ -1475,7 +1475,7 @@ def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
     if len(seen) != len(units) or len(order) != len(units) - 1:
         return None  # disconnected / not a single linear glycosyl chain
 
-    # 5. Recognize every unit (capped at ALL its glycosidic bonds, D-09).
+    # 5. Recognize every unit (capped at ALL its glycosidic bonds).
     bridging_os = {l[3] for l in links}
     unit_bridge_bonds: Dict[int, List[Tuple[int, int]]] = {ui: [] for ui in range(len(units))}
     for donor_ui, acc_ui, anom_c, o_idx, acc_c in links:
@@ -1500,7 +1500,7 @@ def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
             return None
         tup = lookup_sugar(Chem.MolToSmiles(sm)) or recognize_sugar_skeleton(sm)
         if tup is None:
-            # v33 Task 1.2: for_glycosidic_unit=True threads O-acyl/N-acyl/
+            # .2: for_glycosidic_unit=True threads O-acyl/N-acyl/
             # O-sulfo/O-phospho ring decoration into this chain unit's name
             # (see the identical comment on _recognize_unit's call).
             systematic = name_monosaccharide_systematic(sm, for_glycosidic_unit=True)
@@ -1511,7 +1511,7 @@ def name_nonreducing_oligosaccharide(mol) -> Optional[str]:
 
     # 6. Assemble: glycosyl chain (terminal -> root) + " " + parent glycoside head.
     parts: List[str] = []
-    for ui in reversed(order):  # terminal donor first ... root glycosyl last
+    for ui in reversed(order):  # terminal donor first... root glycosyl last
         ga, gc, gb = tuples[ui]
         gterm = _glycosyl_term(ga, gc, gb)
         if gterm is None:
@@ -1555,14 +1555,14 @@ def _split_decorated_sugar_base(base: str) -> Tuple[str, str]:
     ``("2-acetamido-2-deoxy", "glucopyranose")``; an undecorated base (no
     hyphen) returns ``("", base)``.
 
-    v33 P0 L3-2b: mirrors ``sugar_names.name_free_sugar``'s F-CATALOG-JOIN fix
-    (v23 Phase 5, ``sugar_names.py:2105-2110``) — "a prefix-bearing catalog base
+     P0 L3-2b: mirrors ``sugar_names.name_free_sugar``'s F-CATALOG-JOIN fix
+     — "a prefix-bearing catalog base
     needs the configurational descriptor inserted BEFORE the stem, AFTER the
     prefixes". ``_glycosyl_term``/the parent-string builder below used the
     naive ``anomer-config-base`` order unconditionally, which OPSIN accepts for
     an undecorated base (no prefixes to misplace the descriptor ahead of) but
     REJECTS for a decorated one: OPSIN parses ``2-acetamido-2-deoxy-beta-D-
-    glucopyranose`` but not ``beta-D-2-acetamido-2-deoxy-glucopyranose``
+    glucopyranose`` but not ``beta--acetamido-2-deoxy-glucopyranose``
     (verified via ``opsin_roundtrip_check``). Every existing disaccharide test
     uses an undecorated base (glucopyranose/fructofuranose), so this never had
     a failing case until an amino-sugar (GlcNAc/GalNAc) unit exercised it.
@@ -1573,7 +1573,7 @@ def _split_decorated_sugar_base(base: str) -> Tuple[str, str]:
     return "", base
 
 
-# v33 Engine-2: the CATALOG uronic-acid base (``lookup_sugar``'s
+# Engine-2: the CATALOG uronic-acid base (``lookup_sugar``'s
 # ``URONIC_ACID_NAMES``/``recognize_sugar_skeleton``'s fingerprint recovery,
 # e.g. ``"glucuronopyranose"``) ends in ``"ose"`` like an ordinary sugar, so
 # ``_glycosyl_term``'s naive ``-ose``->``-osyl`` slice would emit
@@ -1600,12 +1600,12 @@ def _glycosyl_term(anomer: str, config: str, base: str) -> Optional[str]:
     """Build a glycosyl substituent term ``{anomer}-{config}-{base}yl`` (-ose -> -osyl),
     with the configurational descriptor correctly placed AFTER any base-name
     prefixes and immediately before the ``-osyl`` stem for a decorated base
-    (see :func:`_split_decorated_sugar_base`).
+    (see:func:`_split_decorated_sugar_base`).
 
     Uses the structural ``-ose`` -> ``-osyl`` slice; never string-surgery on a derived
     base beyond the canonical suffix transform.
 
-    A base ending in ``"uronic acid"`` (v33 Engine-2: a decorated uronic unit
+    A base ending in ``"uronic acid"`` (Engine-2: a decorated uronic unit
     from ``name_monosaccharide_systematic``'s free-acid form, e.g. ``"2-O-
     sulfo-alpha-L-idopyranuronic acid"``) inserts ``"osyl"`` immediately
     before ``"uronic acid"`` -- ``"...idopyranosyluronic acid"`` -- a fixed,
@@ -1657,14 +1657,14 @@ def _attachment_locant(mol, parent: Dict, attach_carbon: int) -> Optional[int]:
 
 
 def _unit_carbon_count(mol, unit: Dict) -> int:
-    """Total carbons of a unit (ring + claimed exocyclic substituent atoms, D-08 step b)."""
+    """Total carbons of a unit (ring + claimed exocyclic substituent atoms, step b)."""
     return sum(
         1 for i in unit["atoms"] if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
     )
 
 
 def _choose_glycoside_parent(mol, units: List[Dict]) -> Tuple[Optional[Dict], Optional[Dict]]:
-    """P-102.4 parent choice for the no-free-hemiacetal glycoside case (D-08).
+    """P-102.4 parent choice for the no-free-hemiacetal glycoside case.
 
     Cascade (linear di only here): (b) greatest carbon count -> parent; (c) on a tie,
     alphabetical by config-prefix / trivial stem -- the EARLIER stem is cited first as

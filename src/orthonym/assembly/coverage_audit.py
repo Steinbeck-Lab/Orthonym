@@ -1,4 +1,4 @@
-"""Producer-agnostic coverage verdict for the ``_finish`` choke (v33 Phase 0 L0/L1).
+"""Producer-agnostic coverage verdict for the ``_finish`` choke.
 
 Two carrier-specific proofs feed ONE verdict:
   * ``GeneralEngineResult`` (has ``.bindings``) -> ``certify_general_result``
@@ -68,7 +68,7 @@ def audit_coverage(mol, name: str, result_obj,
             IGNORED when ``result_obj`` is not None (the GER path never needs
             it -- E1 is Java-free and strictly more informative: it covers
             bonds/charge, not merely constitution).
-        skip_reanchor: v33 Phase 0 L0 review fix (C1/C2). When ``True`` (and
+        skip_reanchor: L0 review fix (C1/C2). When ``True`` (and
             ``self01_complete`` is ``None``), skip the ``validate_atom_coverage``
             re-anchor ENTIRELY -- no OPSIN subprocess is spawned -- and return
             ``complete=True, method="unavailable"`` directly. Set by the caller
@@ -78,11 +78,11 @@ def audit_coverage(mol, name: str, result_obj,
             disabled/unavailable/not_run means no real gate decision exists to
             reuse or repeat. Ignored when ``self01_complete`` is not ``None``
             (a real verdict always wins) and ignored on the GER path.
-        skip_detail: the :class:`CoverageVerdict` ``detail`` to use when
+        skip_detail: the:class:`CoverageVerdict` ``detail`` to use when
             ``skip_reanchor`` fires; defaults to a generic message.
 
     Returns:
-        A :class:`CoverageVerdict`. Fail-closed (``complete=False``) on an
+        A:class:`CoverageVerdict`. Fail-closed (``complete=False``) on an
         exception in the GER path; fail-OPEN (``complete=True,
         method="unavailable"``) on an exception, OPSIN-unavailable, or
         ``skip_reanchor`` in the bare-str path -- SHADOW must never break a

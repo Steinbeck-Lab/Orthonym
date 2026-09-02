@@ -1,6 +1,6 @@
 """Mononuclear parent-hydride namer (P-68 / P-21.1 / P-31.1.4.2 λ-convention).
 
-(v23 Phase 10 adds a sibling ``name_dinuclear_hydride`` for the two-atom
+(adds a sibling ``name_dinuclear_hydride`` for the two-atom
 Group-14/Group-15 catenated hydride ``germylstibane`` family — P-69.5.3 — at
 the bottom of this module; it reuses the structural guards but is a distinct
 entry point with its own dispatch slot.)
@@ -9,18 +9,18 @@ Names a single non-carbon "hub" atom — a Group-15 pnictogen (P/As/Sb/Bi), a
 chalcogen (S/Se/Te) or iodine — as a *substitutive parent hydride* (P-68.3),
 optionally bearing the λ-convention when the hub valence is non-standard::
 
-    FS(F)(F)(F)(F)F   -> hexafluoro-lambda6-sulfane    (SF6, λ6 nonstandard)
-    FS(F)(F)F         -> tetrafluoro-lambda4-sulfane    (SF4, λ4)
-    FP(F)(F)(F)F      -> pentafluoro-lambda5-phosphane  (PF5, λ5)
-    FI(F)(F)(F)F      -> pentafluoro-lambda5-iodane      (IF5, λ5)
-    ClP(Cl)Cl         -> trichlorophosphane              (PCl3, standard valence)
-    FS(F)             -> difluorosulfane                 (SF2, standard valence)
-    F[Si](F)(F)F      -> tetrafluorosilane               (SiF4, Group-14, std valence)
-    Cl[Ge](Cl)(Cl)Cl  -> tetrachlorogermane              (GeCl4, Group-14)
-    Cl[As](Cl)Cl      -> trichloroarsane                 (AsCl3, Group-15)
-    C[As](C)C         -> trimethylarsane                 (organyl As, Group-15)
-    c1ccccc1[As]...   -> triphenylarsane
-    [AsH3]            -> arsane                           (bare parent hydride)
+    FS(F)(F)(F)(F)F -> hexafluoro-lambda6-sulfane (SF6, λ6 nonstandard)
+    FS(F)(F)F -> tetrafluoro-lambda4-sulfane (SF4, λ4)
+    FP(F)(F)(F)F -> pentafluoro-lambda5-phosphane (PF5, λ5)
+    FI(F)(F)(F)F -> pentafluoro-lambda5-iodane (IF5, λ5)
+    ClP(Cl)Cl -> trichlorophosphane (PCl3, standard valence)
+    FS(F) -> difluorosulfane (SF2, standard valence)
+    F[Si](F)(F)F -> tetrafluorosilane (SiF4, Group-14, std valence)
+    Cl[Ge](Cl)(Cl)Cl -> tetrachlorogermane (GeCl4, Group-14)
+    Cl[As](Cl)Cl -> trichloroarsane (AsCl3, Group-15)
+    C[As](C)C -> trimethylarsane (organyl As, Group-15)
+    c1ccccc1[As]... -> triphenylarsane
+    [AsH3] -> arsane (bare parent hydride)
 
 Every emitted name round-trips through OPSIN 2.9.0 to the input structure (the
 λ-convention parses; ``lambda`` ASCII spelling mirrors the spiro gold
@@ -77,7 +77,7 @@ _HUB_STEMS = {
     'Sb': 'stibane',
     'Bi': 'bismuthane',
     'I': 'iodane',
-    # v23 Phase 8: Group-14 Si/Ge for the ALL-HALOGEN regime only (P-68.2.1.1 +
+    # : Group-14 Si/Ge for the ALL-HALOGEN regime only (P-68.2.1.1 +
     # P-67.1.2.5.2: "halides of silicic acid are substitutive names") — SiF4 ->
     # tetrafluorosilane, GeCl4 -> tetrachlorogermane. Kept OUT of _ORGANYL_HUBS so
     # the carbon-substituted forms (tetramethylsilane) stay with the P-69
@@ -136,11 +136,11 @@ _MIXED_HALO_ORGANYL_HUBS = frozenset({'B', 'Ga', 'In', 'Tl',
                                       'Si', 'Ge', 'Sn', 'Pb', 'I'})
 
 
-# === v23 Phase 10 (P-69.5.3): di-nuclear Group-14 / Group-15 catenated hydride ===
+# === (P-69.5.3): di-nuclear Group-14 / Group-15 catenated hydride ===
 # A Group-14 atom bonded to a senior Group-15 parent hydride. Per P-41 the
 # Group-15 element outranks Group-14, so it is the PARENT hydride and the
 # Group-14 element is the -yl substituent prefix:
-#   [GeH3][SbH2] -> germylstibane    [SiH3][AsH2] -> silylarsane
+# [GeH3][SbH2] -> germylstibane [SiH3][AsH2] -> silylarsane
 # Only As/Sb/Bi parents (P stays with rules.phosphorus.name_phosphine — no
 # double-claim; N is not a metal in this family). Only the Group-14 substituent
 # prefixes silyl/germyl/stannyl/plumbyl.
@@ -233,7 +233,7 @@ def _classify_organyls(mol, hub) -> Optional[List[str]]:
             return None
         names.append(name)
     # Defensive: every heavy atom is the hub or a carbon.
-    # v29 P3-FIX Item 9: this used to say the per-neighbour walk "rejects any
+    # P3-FIX Item 9: this used to say the per-neighbour walk "rejects any
     # heteroatom inside a substituent". It does NOT -- `organyl_prefix_name`
     # admits `_PREFIX_ONLY_ELEMENTS = {F, Cl, Br, I, At}` inside the fragment
     # (P-59 Table 28 cites halogens only as prefixes, so one can never demand a
@@ -283,12 +283,12 @@ def _classify_mixed_halo_organyl(mol, hub) -> Optional[List[str]]:
             names.append(name)
             n_org += 1
         else:
-            return None  # stray heteroatom (boron oxoacid O, amino N, ...)
+            return None  # stray heteroatom (boron oxoacid O, amino N,...)
     if n_halo == 0 or n_org == 0:
         return None  # not mixed -> a dedicated pure regime handles it
     # Full coverage: every heavy atom is the hub, a counted terminal halogen, or a
     # carbon inside a verified organyl.
-    # v29 P3-FIX Item 9: the parenthetical used to claim `organyl_prefix_name`
+    # P3-FIX Item 9: the parenthetical used to claim `organyl_prefix_name`
     # "rejected any internal heteroatom". It does not -- it admits F/Cl/Br/I/At
     # inside the fragment. The all-carbon requirement below is what actually
     # holds, and it is what makes the claim true of THIS function rather than of
@@ -309,10 +309,10 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
     no enclosing marks, each SUBSEQUENT unique group is enclosed in parentheses
     with its multiplying prefix OUTSIDE the marks.
 
-        ['chloro','chloro','chloro','methyl'] -> 'trichloro(methyl)'   (BB 35754)
-        ['chloro','chloro','methyl']          -> 'dichloro(methyl)'    (BB 39668)
-        ['chloro','methyl','methyl']          -> 'chlorodi(methyl)'    (BB 25866)
-        ['bromo','chloro','phenyl']           -> 'bromo(chloro)(phenyl)' (BB 35750)
+        ['chloro','chloro','chloro','methyl'] -> 'trichloro(methyl)' (BB 35754)
+        ['chloro','chloro','methyl'] -> 'dichloro(methyl)' (BB 39668)
+        ['chloro','methyl','methyl'] -> 'chlorodi(methyl)' (BB 25866)
+        ['bromo','chloro','phenyl'] -> 'bromo(chloro)(phenyl)' (BB 35750)
 
     Returns None if a multiplicity exceeds the supported multiplier table."""
     from collections import Counter
@@ -321,7 +321,7 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
                                          enclose_if_compound,
                                          multiplied_component,
                                          prefix_citation_sort_key)
-    # v29 P3-CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
+    # P3-CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
     # it), but the multiplier WORD now comes from the shared primitive, which
     # knows P-16.3.5(a). This table could only ever say `di`/`tri`, so a
     # SUBSTITUTED prefix here emitted `tri(2-methylpropyl)arsane` where the
@@ -329,7 +329,7 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
     _SUPPORTED_COUNTS = frozenset(range(1, 9))
     counts = Counter(names)
     parts = []
-    # v29 P3: the organyl guard feeding this is the shared chokepoint, so a prefix
+    # P3: the organyl guard feeding this is the shared chokepoint, so a prefix
     # may now carry a locant, a retained italicized prefix, or its own marks. Raw
     # `sorted()` keyed `tert-butyl` on its 't'; P-14.5.2/P-14.5.4 keys on the
     # letters ('butyl'), which is also what decides whether the compound prefix
@@ -346,7 +346,7 @@ def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
             parts.append(multiplied_component(counts[name], name, marked))
         else:
             # Subsequent: marks always, multiplier OUTSIDE them (BB 25866
-            # 'chlorodi(methyl)'), escalating ( -> [ over an inner pair.
+            # 'chlorodi(methyl)'), escalating (-> [ over an inner pair.
             parts.append(multiplied_component(
                 counts[name], name, apply_enclosing_marks(name, -1)))
     return ''.join(parts)
@@ -369,12 +369,12 @@ def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
     """P-67.1.5.1 / P-68.3: a pnictogen-rooted substituent (As/Sb/Bi) named on the
     parent hydride arsane/stibane/bismuthane -> ``{prefixes}{arsanyl|stibanyl|bismuthanyl}``.
 
-        -As(OH)2  -> dihydroxyarsanyl  (P-67.1.5.1: -COOH is senior to -As(OH)2,
+        -As(OH)2 -> dihydroxyarsanyl (P-67.1.5.1: -COOH is senior to -As(OH)2,
                                         so the arsonic acid is cited as a prefix)
-        -AsH2     -> arsanyl
+        -AsH2 -> arsanyl
         -As(CH3)2 -> dimethylarsanyl
-        -Sb(C6H5)2 -> diphenylstibanyl  (P-68.3.2.3.2.2: stibanyl preselected prefix)
-        -BiH2     -> bismuthanyl
+        -Sb(C6H5)2 -> diphenylstibanyl (P-68.3.2.3.2.2: stibanyl preselected prefix)
+        -BiH2 -> bismuthanyl
 
     Named for the historical As-only origin; now general over the whole Group-15
     (pnictogen) family As/Sb/Bi (Bi added for symmetry; all share the '-anyl' stem).
@@ -455,17 +455,17 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
     lam = nonstandard_bonding_number(mol, hub_idx)
 
     # --- Bare parent hydride (P-21.1.1.1 / P-52.1.1): the hub is the ONLY
-    #     heavy atom (single-fragment guard above makes zero heavy neighbours
-    #     equivalent), saturated with hydrogen. [SiH4] -> silane, [SH2] ->
-    #     sulfane, and the lambda-convention hypervalent forms (P-21.1.2):
-    #     [PH5] -> lambda5-phosphane, [SH4] -> lambda4-sulfane,
-    #     [IH3] -> lambda3-iodane. ---
+    # heavy atom (single-fragment guard above makes zero heavy neighbours
+    # equivalent), saturated with hydrogen. [SiH4] -> silane, [SH2] ->
+    # sulfane, and the lambda-convention hypervalent forms (P-21.1.2):
+    # [PH5] -> lambda5-phosphane, [SH4] -> lambda4-sulfane,
+    # [IH3] -> lambda3-iodane. ---
     if not any(n.GetSymbol() != 'H' for n in hub.GetNeighbors()):
         return _assemble("", lam, stem)
 
     # --- All-halogen regime (every hub element; hub degree >= 2 excludes the
-    #     diatomic interhalogens ICl/IBr). Halogens are simple substituents:
-    #     alphanumerical concatenation with NO enclosing marks (P-16.5.1.1). ---
+    # diatomic interhalogens ICl/IBr). Halogens are simple substituents:
+    # alphanumerical concatenation with NO enclosing marks (P-16.5.1.1). ---
     halo_counts = _classify_halogens(mol, hub)
     if halo_counts is not None and hub.GetDegree() >= 2:
         halo_parts = []
@@ -483,10 +483,10 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
             return _assemble(prefix_block, lam, stem)
 
     # --- Mixed halogen + organyl regime (P-61.3.2.1 / P-67.1.2.5.2 / P-68.5.1):
-    #     Group-13 (B/Ga/In/Tl) + Group-14 (Si/Ge/Sn/Pb) at any valence, plus a
-    #     hypervalent iodine hub (lambda != None so CH3-I stays a halo-alkane).
-    #     CH3-SiCl3 -> trichloro(methyl)silane, CH3-BCl2 -> dichloro(methyl)borane,
-    #     CH3-ICl2 -> dichloro(methyl)-lambda3-iodane. ---
+    # Group-13 (B/Ga/In/Tl) + Group-14 (Si/Ge/Sn/Pb) at any valence, plus a
+    # hypervalent iodine hub (lambda != None so CH3-I stays a halo-alkane).
+    # CH3-SiCl3 -> trichloro(methyl)silane, CH3-BCl2 -> dichloro(methyl)borane,
+    # CH3-ICl2 -> dichloro(methyl)-lambda3-iodane. ---
     if hub.GetSymbol() in _MIXED_HALO_ORGANYL_HUBS and not (
             hub.GetSymbol() in _HALOGENS and lam is None):
         mixed = _classify_mixed_halo_organyl(mol, hub)
@@ -496,17 +496,17 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
                 return _assemble(prefix_block, lam, stem)
 
     # --- P-44.1.2: a phosphane hub bearing a SILYL (SiH3) substituent (with
-    #     optional pure-hydrocarbyl organyls). P > Si in the seniority of
-    #     classes, so P is the parent; the SiH3 is the 'silyl' substituent
-    #     (name_phosphine only counts C neighbours and would silently DROP the
-    #     silyl). Only fires when >=1 silyl is present, so plain C-only
-    #     phosphanes stay with name_phosphine (no double-path). ---
+    # optional pure-hydrocarbyl organyls). P > Si in the seniority of
+    # classes, so P is the parent; the SiH3 is the 'silyl' substituent
+    # (name_phosphine only counts C neighbours and would silently DROP the
+    # silyl). Only fires when >=1 silyl is present, so plain C-only
+    # phosphanes stay with name_phosphine (no double-path). ---
     if hub.GetSymbol() == 'P':
         subs = _classify_phosphane_subs(mol, hub)
         if subs is not None and 'silyl' in subs:
             prefix_block = _build_substituent_string(subs)
             return _assemble(prefix_block, lam, stem)
-        # v30 T4 degrade floor (best-effort ONLY): a pure-organyl phosphane whose
+        # T4 degrade floor (best-effort ONLY): a pure-organyl phosphane whose
         # substituent is a RING (tricyclododecylphosphane) is never reached by
         # name_phosphine -- the ring routing bypasses it -- and would otherwise
         # abstain (measured DEGRADE row). _classify_phosphane_subs already names the
@@ -550,35 +550,35 @@ _HETERONE_STEMS = {'Si': 'silanone', 'Ge': 'germanone',
 
 # P-61.6 "HETERONES" (BlueBookV2.md:25977) enumerates the heterone class as
 # exactly four groups, mapped 1:1 onto four preselected prefixes:
-#   "Compounds containing the -PO, -PO2, -AsO or -AsO2 are called heterones
-#    (see P-64.1.2.2, P-64.4). In the presence of a more senior characteristic
-#    group they are described by the compound prefixes oxophosphanyl,
-#    dioxo-lambda5-phosphanyl, oxoarsanyl, and dioxo-lambda5-arsanyl."
-# The two -XO2 members are DIONES. P-64.1.2.2 "Heterones" (:28281) supplies the
+# "Compounds containing the -PO, -PO2, -AsO or -AsO2 are called heterones
+# (see P-64.1.2.2, P-64.4). In the presence of a more senior characteristic
+# group they are described by the compound prefixes oxophosphanyl,
+# dioxo-lambda5-phosphanyl, oxoarsanyl, and dioxo-lambda5-arsanyl."
+# The two -XO2 members are DIONES. P-64.1.2.2 "Heterones" (28281) supplies the
 # suffix: "Heterones are compounds having an oxygen atom formally doubly bonded
-# to a heteroatom ... They are named in the same way as ketones" -- so two oxo
+# to a heteroatom... They are named in the same way as ketones" -- so two oxo
 # groups on one parent take the multiplied '-dione', and the hub's bonding
 # number of 5 supplies the lambda descriptor (P-31.1.4.2). Worked (PIN)
 # examples, both re-opened at write time:
-#   CH3-PO2   methyl-lambda5-phosphanedione (PIN)   :28287, under P-64.1.2.2
-#   C6H5-PO2  phenyl-lambda5-phosphanedione (PIN)   :25983, under P-61.6
+# CH3-PO2 methyl-lambda5-phosphanedione (PIN):28287, under P-64.1.2.2
+# C6H5-PO2 phenyl-lambda5-phosphanedione (PIN):25983, under P-61.6
 #
 # Membership of THIS dict is the element gate for the dione, and it is
 # deliberately narrower than _HETERONE_STEMS:
-#   * Si/Ge are absent -- P-61.6 does not place them in the class, and RDKit
-#     rejects a two-oxo Si/Ge hub outright (valence), so there is no molecule.
-#   * 'arsanedione' is not printed verbatim in the Blue Book, but it is fully
-#     DETERMINED by the two rules above: P-61.6 declares -AsO2 a heterone in the
-#     same sentence as -PO2 and prints its preselected prefix
-#     dioxo-lambda5-arsanyl (:25977, and the prefix table :55895 with structure
-#     O2As-), while the 'arsane' stem, its lambda5 form and the mononuclear
-#     '-one'/'-dione' suffix are each printed elsewhere (arsanone PIN :25985,
-#     trimethyl-lambda5-arsanone :43057, phosphanedione PIN x2). Every morpheme
-#     is printed and the elision follows phosphane+dione exactly.
-#   * The CHALCOGEN analogue (R-PS2, R3P=S) is deliberately NOT built. The Blue
-#     Book prints no worked example of a thione suffix on a phosphane stem, so
-#     its spelling would have to be invented; it stays fail-closed via the
-#     terminal-oxygen check below. See 
+# * Si/Ge are absent -- P-61.6 does not place them in the class, and RDKit
+# rejects a two-oxo Si/Ge hub outright (valence), so there is no molecule.
+# * 'arsanedione' is not printed verbatim in the Blue Book, but it is fully
+# DETERMINED by the two rules above: P-61.6 declares -AsO2 a heterone in the
+# same sentence as -PO2 and prints its preselected prefix
+# dioxo-lambda5-arsanyl (25977, and the prefix table:55895 with structure
+# O2As-), while the 'arsane' stem, its lambda5 form and the mononuclear
+# '-one'/'-dione' suffix are each printed elsewhere (arsanone PIN:25985,
+# trimethyl-lambda5-arsanone:43057, phosphanedione PIN x2). Every morpheme
+# is printed and the elision follows phosphane+dione exactly.
+# * The CHALCOGEN analogue (R-PS2, R3P=S) is deliberately NOT built. The Blue
+# Book prints no worked example of a thione suffix on a phosphane stem, so
+# its spelling would have to be invented; it stays fail-closed via the
+# terminal-oxygen check below. See
 _HETERONE_DIONE_STEMS = {'P': 'phosphanedione', 'As': 'arsanedione'}
 
 
@@ -590,7 +590,7 @@ def name_heterone(mol) -> Optional[str]:
 
     Covers BOTH oxo counts of the P-61.6 heterone class -- the mono-oxo -PO/-AsO
     ('-one') and the DIONE -PO2/-AsO2 ('-dione'), CH3-PO2 ->
-    methyl-lambda5-phosphanedione (PIN, BB :28287). The oxo count selects the
+    methyl-lambda5-phosphanedione (PIN, BB:28287). The oxo count selects the
     stem dict; see _HETERONE_DIONE_STEMS for the derivation and for why Si/Ge
     and the P=S chalcogen analogue stay fail-closed.
 
@@ -840,11 +840,11 @@ def _compose_io_prefixes(items) -> Optional[str]:
     ``items`` is a list of ``(name, is_complex)`` tuples. Returns the composed
     string, or None if a multiplicity exceeds the supported table.
 
-        [('methylimino', True)]                       -> '(methylimino)'
+        [('methylimino', True)] -> '(methylimino)'
         [('methyl',False),('methyl',False),('phenylimino',True)]
                                                        -> 'dimethyl(phenylimino)'
-        [('phenyl',False),('phenyl',False)]           -> 'diphenyl'
-        [('ethyl',False),('methyl',False)]            -> 'ethyl(methyl)'
+        [('phenyl',False),('phenyl',False)] -> 'diphenyl'
+        [('ethyl',False),('methyl',False)] -> 'ethyl(methyl)'
     """
     from collections import Counter
 
@@ -856,16 +856,16 @@ def _compose_io_prefixes(items) -> Optional[str]:
     complex_names = {n for n, c in items if c}
     counts = Counter(names)
     parts = []
-    # v29 P3: the S-organyls now come from the shared chokepoint, so a prefix here
+    # P3: the S-organyls now come from the shared chokepoint, so a prefix here
     # may carry a locant or a retained italicized prefix. Two consequences:
-    #   * order by P-14.5.2/P-14.5.4, not raw string order;
-    #   * the multiplier goes OUTSIDE the marks. BB 7272 (P-16.5.1.3.1) verbatim:
-    #     "When the simple substituent groups are accompanied by multiplicative
-    #     prefixes such as 'di' and 'tri', the multiplicative prefixes are NOT
-    #     included in the parentheses" -- BB 16286 spells the resulting shape,
-    #     `tert-butyldi(methyl)phosphane` (PIN). The old `f"({mult}{name})"` put
-    #     them inside and produced `imino(dimethyl)` and, once widened, the
-    #     ambiguous `imino(dipropan-2-yl)`.
+    # * order by P-14.5.2/P-14.5.4, not raw string order;
+    # * the multiplier goes OUTSIDE the marks. BB 7272 (P-16.5.1.3.1) verbatim:
+    # "When the simple substituent groups are accompanied by multiplicative
+    # prefixes such as 'di' and 'tri', the multiplicative prefixes are NOT
+    # included in the parentheses" -- BB 16286 spells the resulting shape,
+    # `tert-butyldi(methyl)phosphane` (PIN). The old `f"({mult}{name})"` put
+    # them inside and produced `imino(dimethyl)` and, once widened, the
+    # ambiguous `imino(dipropan-2-yl)`.
     for i, name in enumerate(sorted(counts, key=prefix_citation_sort_key)):
         mult = _IO_PREFIX_MULT.get(counts[name])
         if mult is None:
@@ -881,7 +881,7 @@ def _compose_io_prefixes(items) -> Optional[str]:
 
 
 def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:
-    """P-68.4.3.3 / .4 / .5 / .6 / .7 / .8: the mononuclear lambda-sulfane
+    """P-68.4.3.3 /.4 /.5 /.6 /.7 /.8: the mononuclear lambda-sulfane
     imine/oxide family — a single non-ring chalcogen hub E in {S, Se, Te} of
     non-standard valence (lambda4 / lambda6) bearing any combination of
 
@@ -896,12 +896,12 @@ def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:
     oxo is present the imines are the suffix (``-imine``/``-diimine``/
     ``-triimine``)::
 
-        (C2H5)2S=N-C6H5      -> S,S-diethyl-N-phenyl-lambda4-sulfanimine  (.3)
-        CH3-N=S(=O)2         -> (methylimino)-lambda6-sulfanedione        (.4)
-        (C6H5)2S(=NH)2       -> diphenyl-lambda6-sulfanediimine           (.5)
-        (CH3)2S(=O)=N-C6H5   -> dimethyl(phenylimino)-lambda6-sulfanone   (.6)
-        CH3-N=S=N-CH2CH3     -> ethyl(methyl)-lambda4-sulfanediimine      (.7)
-        CH3-N=S(=NCH3)=NC6H5 -> dimethyl(phenyl)-lambda6-sulfanetriimine  (.8)
+        (C2H5)2S=N-C6H5 -> S,S-diethyl-N-phenyl-lambda4-sulfanimine (.3)
+        CH3-N=S(=O)2 -> (methylimino)-lambda6-sulfanedione (.4)
+        (C6H5)2S(=NH)2 -> diphenyl-lambda6-sulfanediimine (.5)
+        (CH3)2S(=O)=N-C6H5 -> dimethyl(phenylimino)-lambda6-sulfanone (.6)
+        CH3-N=S=N-CH2CH3 -> ethyl(methyl)-lambda4-sulfanediimine (.7)
+        CH3-N=S(=NCH3)=NC6H5 -> dimethyl(phenyl)-lambda6-sulfanetriimine (.8)
 
     Italic element locants (``S,S-`` / ``N-``) are cited ONLY when substituents
     sit on BOTH the hub AND an imine nitrogen (P-68.4.3.3 example); when all
@@ -1137,7 +1137,7 @@ def name_dinuclear_hydride(mol) -> Optional[str]:
     senior, so it is the PARENT hydride (arsane/stibane/bismuthane) and the
     Group-14 element is the substituent prefix (silyl/germyl/stannyl/plumbyl)::
 
-        [GeH3][SbH2] -> germylstibane       (Sb senior -> stibane parent)
+        [GeH3][SbH2] -> germylstibane (Sb senior -> stibane parent)
         [SiH3][AsH2] -> silylarsane
         [PbH3][BiH2] -> plumbylbismuthane
 

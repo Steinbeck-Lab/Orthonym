@@ -7,17 +7,17 @@ mononuclear hydride -> ``hexafluoro-lambda6-sulfane`` (SF6).
 
 This module is the single source of truth for the standard-bonding-number table
 and the "is this valence non-standard?" decision. It was promoted verbatim from
-``rules/spiro.py`` (v22 G4) so that the spiro numberer, the acyclic
+``rules/spiro.py`` so that the spiro numberer, the acyclic
 skeletal-replacement namer (P-21.2.4), and the mononuclear-hydride / chalcogen /
 halogen namers all share one fail-closed implementation rather than each
 re-deriving Table 2.8.
 
 References:
-    IUPAC 2013 Blue Book, P-14.1.2/3     (standard / nonstandard bonding number)
-    IUPAC 2013 Blue Book, P-15.4.1.3     (λ placement: after the locant, no hyphen)
-    IUPAC 2013 Blue Book, Table 1.5      (standard bonding numbers) [BBv2:6436]
-    IUPAC 2013 Blue Book, P-21.2.4       (λ in chains / replacement nomenclature)
-    IUPAC 2013 Blue Book, P-68 / P-69    (mononuclear hydrides bearing λ)
+    IUPAC 2013 Blue Book, P-14.1.2/3 (standard / nonstandard bonding number)
+    IUPAC 2013 Blue Book, P-15.4.1.3 (λ placement: after the locant, no hyphen)
+    IUPAC 2013 Blue Book, Table 1.5 (standard bonding numbers) [BBv2:6436]
+    IUPAC 2013 Blue Book, P-21.2.4 (λ in chains / replacement nomenclature)
+    IUPAC 2013 Blue Book, P-68 / P-69 (mononuclear hydrides bearing λ)
 
 Fail-closed contract: a λ is emitted ONLY for a neutral atom present in
 ``STANDARD_BONDING_NUMBER`` whose actual valence differs from its standard

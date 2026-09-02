@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from itertools import combinations
 from rdkit import Chem
 
-from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
+from ..assembly.fragment_naming import (  # macrocycle-hang budgets
     spend_perf_work, spend_analysis_call)
 
 logger = logging.getLogger(__name__)
@@ -275,7 +275,7 @@ def find_longest_path(mol, start: int, end: int, allowed_atoms: Set[int]) -> Lis
     def dfs(current, visited, path):
         nonlocal best_path, expansions
         expansions += 1
-        spend_perf_work()  # M2.5: charge the per-molecule op budget (raises to abstain)
+        spend_perf_work()  # charge the per-molecule op budget (raises to abstain)
         if expansions > _MAX_DFS_EXPANSIONS:
             return  # WR-02 cap: abort exploration, keep best-so-far
         if current == end:
@@ -315,7 +315,7 @@ def _find_all_simple_paths(mol, start: int, end: int, allowed_atoms: Set[int]) -
     def dfs(current, visited, path):
         nonlocal expansions
         expansions += 1
-        spend_perf_work()  # M2.5: charge the per-molecule op budget (raises to abstain)
+        spend_perf_work()  # charge the per-molecule op budget (raises to abstain)
         if expansions > _MAX_DFS_EXPANSIONS:
             return  # WR-02 cap: abort enumeration, keep paths-so-far
         if current == end:
@@ -588,8 +588,8 @@ class VonBaeyerAnalyzer:
 
         # Substituted / heteroatom cages: the canonical renumber above is unsafe
         # here (it shifts substituent locants), but the numbering freedom that
-        # P-23.2 leaves open is still governed -- P-23.3.2 (:9777) and P-14.4
-        # (:3219). Rank the legal alternatives on locants instead of leaving the
+        # P-23.2 leaves open is still governed -- P-23.3.2 (9777) and P-14.4
+        # (3219). Rank the legal alternatives on locants instead of leaving the
         # arbitrary canonical-rank backstop to decide.
         incumbent = self._analyze_impl(mol, ring_atoms)
         if incumbent is None:
@@ -664,8 +664,8 @@ class VonBaeyerAnalyzer:
         # Split main ring into two branches (paths between bridgeheads)
         # main_ring is ordered: bh1 -> longer path -> bh2 -> shorter path -> back to bh1
         # So branch1 = main_ring[0:bh2_pos+1] and branch2 = main_ring[bh2_pos:]
-        branch1 = main_ring[:bh2_pos + 1]  # bh1 ... bh2 (longer)
-        branch2 = main_ring[bh2_pos:]      # bh2 ... back toward bh1 (shorter, includes bh2 but ring wraps)
+        branch1 = main_ring[:bh2_pos + 1]  # bh1... bh2 (longer)
+        branch2 = main_ring[bh2_pos:]      # bh2... back toward bh1 (shorter, includes bh2 but ring wraps)
 
         # Branch lengths (atoms between bridgeheads, exclusive of bridgeheads)
         branch1_len = len(branch1) - 2  # exclude both bridgeheads
@@ -783,7 +783,7 @@ class VonBaeyerAnalyzer:
 
         total_atoms = len(ring_atoms)
 
-        # P-23.2.6.1.4 (:9651, under P-23.2.6.1 "Naming polycyclic alicyclic
+        # P-23.2.6.1.4 (9651, under P-23.2.6.1 "Naming polycyclic alicyclic
         # hydrocarbons"): the alkane stem equals the bracket sum + 2. A
         # violation means the descriptor drops a skeletal atom the stem still
         # counts -- `tetracyclo[5.1.1.2^3,6]dodecane` brackets 11 atoms and says
@@ -859,7 +859,7 @@ class VonBaeyerAnalyzer:
         Returns:
             Set of bridgehead atom indices
         """
-        # SUB-02/D-08: delegate to the SINGLE consolidated predicate (identical
+        # SUB-02/: delegate to the SINGLE consolidated predicate (identical
         # ring_neighbours>=3 rule, operating on the passed ring component).
         from ..perception.rings import find_ring_bridgeheads
         return find_ring_bridgeheads(mol, ring_atoms)
@@ -965,7 +965,7 @@ class VonBaeyerAnalyzer:
             for i, p1 in enumerate(all_paths):
                 p1_interior = set(p1[1:-1])
                 for p2 in all_paths[i + 1:]:
-                    spend_perf_work()  # M2.5: charge the O(paths^2) pairing loop
+                    spend_perf_work()  # charge the O(paths^2) pairing loop
                     p2_interior = set(p2[1:-1])
                     if p1_interior & p2_interior:
                         continue
@@ -1039,7 +1039,7 @@ class VonBaeyerAnalyzer:
                 p1 = all_paths[i]
                 int_i = interiors[i]
                 for j in range(i + 1, npaths):
-                    spend_perf_work()  # M2.5: charge the O(paths^2) pairing loop
+                    spend_perf_work()  # charge the O(paths^2) pairing loop
                     int_j = interiors[j]
                     if int_i & int_j:
                         continue
@@ -1305,7 +1305,7 @@ class VonBaeyerAnalyzer:
     #: be order-dependent).
     _MAX_LOCANT_CANDIDATES = 64
 
-    #: P-23.3.1 (:9765) heteroatom citation order, used by P-23.3.2.2 as the
+    # : P-23.3.1 (9765) heteroatom citation order, used by P-23.3.2.2 as the
     #: "decreasing seniority order of heteroatoms" tie-break.
     _HETERO_SENIORITY = {
         sym: rank for rank, sym in enumerate(
@@ -1371,7 +1371,7 @@ class VonBaeyerAnalyzer:
         chooses between numberings that P-23.2 left open.
 
         Order (each verified against BlueBookV2.md, heading + sentence):
-          0. P-24.5.2 (:10272; PIN example:10289 "the spiro atom... is given
+          0. P-24.5.2 (10272; PIN example:10289 "the spiro atom... is given
              preference for low locant";:10186 "low locants are given to the
              spiro atom, THEN to the heteroatoms"): when this cage is a component
              of a spiro ring system, the spiro-junction atom takes the lowest
@@ -1380,15 +1380,15 @@ class VonBaeyerAnalyzer:
              path threads it); for every whole-molecule cage caller
              ``spiro_atom`` is None and the returned key is byte-identical to the
              pre-spiro 5-tuple, so no whole-molecule numbering can change.
-          1. P-23.3.2.1 (:9777) "Low locants are assigned to the heteroatoms
+          1. P-23.3.2.1 (9777) "Low locants are assigned to the heteroatoms
              considered together as a set compared in increasing numerical
              order." Skeletal heteroatoms are part of the parent hydride and so
-             precede suffixes -- P-14.4 preamble (1) (:3226).
-          2. P-23.3.2.2 (:9789) heteroatoms in decreasing seniority order.
-          3. P-14.4(c) (:3256) "principal characteristic groups and free
+             precede suffixes -- P-14.4 preamble (1) (3226).
+          2. P-23.3.2.2 (9789) heteroatoms in decreasing seniority order.
+          3. P-14.4(c) (3256) "principal characteristic groups and free
              valences (suffixes)".
-          4. P-14.4(e) (:3286) saturation/unsaturation.
-          5. P-14.4(f) (:3296) detachable alphabetized prefixes.
+          4. P-14.4(e) (3286) saturation/unsaturation.
+          5. P-14.4(f) (3296) detachable alphabetized prefixes.
 
         This is the tricyclo+ mirror of the spiro-priority already enforced on
         the spiro BICYCLIC branch (``spiro._name_vonbaeyer_spiro_component._key``,
@@ -1452,9 +1452,9 @@ class VonBaeyerAnalyzer:
         P-23.2 fixes the descriptor but frequently leaves several numberings
         open (which main bridgehead is locant 1, the traversal direction, and --
         on a symmetric cage -- which of several equivalent decompositions is
-        used). P-23.3.2 (:9777) *"When there is a choice for numbering, the
+        used). P-23.3.2 (9777) *"When there is a choice for numbering, the
         following criteria are applied in order until a decision can be made"*
-        and P-14.4 (:3219) then govern that choice; before this pass it was made
+        and P-14.4 (3219) then govern that choice; before this pass it was made
         by an arbitrary canonical-rank backstop.
 
         Only candidates whose ``descriptor_string`` is IDENTICAL to the
@@ -1512,7 +1512,7 @@ class VonBaeyerAnalyzer:
     def _orientation_variants(self, main_ring, bh_pair):
         """Legal (ring, bh_pair) orientations of one fixed decomposition.
 
-        P-23.2.3 "Numbering bicyclic alicyclic hydrocarbons" (:9589), sentence
+        P-23.2.3 "Numbering bicyclic alicyclic hydrocarbons" (9589), sentence
         :9591: *"The bicyclic ring system is numbered starting with one of the
         bridgeheads and proceeding first along the longer segment of the main
         ring to the second bridgehead, then back to the first bridgehead along
@@ -2554,7 +2554,7 @@ def is_polycyclic_system(mol) -> bool:
 # ``rules/ring_replacement.py`` (the single source of truth, so extending the
 # element table is a data-only change in one place). Re-exported here because the
 # name ``polycyclic.HETEROATOM_PREFIXES`` is part of this module's surface.
-from .ring_replacement import (  # noqa: E402,F401  (re-export)
+from .ring_replacement import (  # noqa: E402,F401 (re-export)
     HETEROATOM_PREFIXES,
     build_replacement_prefix as _build_ring_replacement_prefix,
     vb_lambda_for_atom as _vb_lambda_for_atom,
@@ -3351,7 +3351,7 @@ def _detect_ring_functional_groups(
 
     # --- 5. Detect -NH2 / -NHR attached to ring carbons (amine) [WSD-01/RING-09] ---
     # Mirrors the alcohol block: a single-bonded exocyclic N that is a genuine
-    # primary/secondary amine (sp3, >=1 H, not an amide/imine/nitrile N).
+    # primary/secondary amine.
     amine_locants = []
     for atom_idx in ring_atoms:
         atom = mol.GetAtomWithIdx(atom_idx)

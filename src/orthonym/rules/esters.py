@@ -127,7 +127,7 @@ def acid_fragment_has_ring(mol, acid_atoms: List[int]) -> bool:
 def acid_is_ring_acid(mol, acid_atoms: List[int]) -> bool:
     """True iff the acid's carbonyl carbon is DIRECTLY bonded to a ring atom.
 
-    WS-A task 9: only then do the ring-acid forms apply (benzoic,
+    WS-A: only then do the ring-acid forms apply (benzoic,
     cyclohexanecarboxylic — P-65.1.7). An acid fragment that merely CONTAINS
     a ring further down the chain (cyclohexyl-CH2CH2CH2-COO-) is a CHAIN
     acid with a ring substituent ('4-cyclohexylbutanoate'); naming it
@@ -297,7 +297,7 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
         Acid stem name (e.g., "acetic", "propanoic", "benzoic")
     """
     # Check if acid fragment IS a ring acid (carbonyl C bonded to the ring —
-    # WS-A task 9: a ring merely elsewhere in the fragment is a chain acid
+    # WS-A: a ring merely elsewhere in the fragment is a chain acid
     # with a ring substituent, never 'Xcarboxylic').
     if acid_is_ring_acid(mol, acid_atoms):
         ring_name = get_ring_acid_name(mol, acid_atoms)
@@ -346,45 +346,45 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     # preferred IUPAC names": formic, oxalic, acetic, benzoic, oxamic. No fatty
     # acid is among them.
     #
-    # P-65.1.2 "Systematic names" (heading :29858) states the disposal rule at
+    # P-65.1.2 "Systematic names" (heading:29858) states the disposal rule at
     # :29860 -- "Except for formic acid, acetic acid, oxalic acid (see
     # P-65.1.1.1), and oxamic acid (see P-65.1.1.1), systematically formed names
     # are preferred IUPAC names; the names given in P-65.1.1.2 are retained
     # names for use in general nomenclature."
     #
     # The Blue Book prints the (PIN) marker on the SYSTEMATIC name in every
-    # fatty row it lists -- :29787 "palmitic acid  hexadecanoic acid (PIN)",
-    # :29791 "stearic acid  octadecanoic acid (PIN)".
+    # fatty row it lists --:29787 "palmitic acid hexadecanoic acid (PIN)",
+    # :29791 "stearic acid octadecanoic acid (PIN)".
     #
-    # This stem feeds the ester acyl word, and P-65.6.3.2.1 (:31659) -- "All
+    # This stem feeds the ester acyl word, and P-65.6.3.2.1 (31659) -- "All
     # preferred IUPAC names for esters are named by functional class
     # nomenclature" -- takes that word from the PIN acid, e.g. "ethyl acetate
     # (PIN)" (acetic IS retained) but "ethyl methyl butanedioate (PIN)" (NOT
     # succinate). So the saturated straight-chain rows C12/C14/C16/C18/C20 were
-    # REMOVED (Task J2): they made the ester path emit 'ethyl palmitate' while the
+    # REMOVED: they made the ester path emit 'ethyl palmitate' while the
     # acid path for the same chain already emitted the PIN 'hexadecanoic acid'.
     # Falling through to get_acid_stem() below yields the PIN stem.
     #
-    # Task J3 removed the four remaining (unsaturated) rows -- (18,1) 'oleic',
+    # removed the four remaining (unsaturated) rows -- (18,1) 'oleic',
     # (18,2) 'linoleic', (18,3) 'linolenic', (20,4) 'arachidonic' -- so the whole
     # table is gone. This stem ALSO feeds the acyl PREFIX via
-    # get_acyloxy_prefix(), and P-65.6.3.2.3 "Esters cited as prefixes" (:31696)
+    # get_acyloxy_prefix(), and P-65.6.3.2.3 "Esters cited as prefixes" (31696)
     # settles that position directly. Its worked examples straddle the boundary:
-    #   :31711  3-(benzoyloxy)propanoic acid (PIN)
-    #           -- benzoic IS retained as a PIN (P-65.1.1.1), so 'benzoyloxy' is
-    #              preferred and MUST survive;
-    #   :31723  3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
-    #             3-(nicotinoyloxy)propanoic acid
-    #           -- nicotinic acid is retained for GENERAL nomenclature only
-    #              (P-65.1.1.2.2 list, 'nicotinic acid pyridine-3-carboxylic acid
-    #              (PIN)' at :29773), and the trivial-derived acyloxy prefix is
-    #              printed as the NON-preferred alternative.
-    # 'oleic acid' sits in that same general-only list (:29785, 'oleic acid
+    # :31711 3-(benzoyloxy)propanoic acid (PIN)
+    # -- benzoic IS retained as a PIN (P-65.1.1.1), so 'benzoyloxy' is
+    # preferred and MUST survive;
+    # :31723 3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
+    # 3-(nicotinoyloxy)propanoic acid
+    # -- nicotinic acid is retained for GENERAL nomenclature only
+    # (P-65.1.1.2.2 list, 'nicotinic acid pyridine-3-carboxylic acid
+    # (PIN)' at:29773), and the trivial-derived acyloxy prefix is
+    # printed as the NON-preferred alternative.
+    # 'oleic acid' sits in that same general-only list (29785, 'oleic acid
     # (9Z)-octadec-9-enoic acid (PIN)'), so 'oleoyloxy' is non-PIN for the same
     # reason 'nicotinoyloxy' is. Appendix 2 confirms per row -- its legend
-    # (:55416) reads "The symbol * designates the preferred prefix", and it
-    # prints '(9Z)-octadec-9-enoyl* = oleoyl' (:56443), 'hexadecanoyl* =
-    # palmitoyl' (:56482), 'octadecanoyl* = stearoyl' (:56441).
+    # (55416) reads "The symbol * designates the preferred prefix", and it
+    # prints '(9Z)-octadec-9-enoyl* = oleoyl' (56443), 'hexadecanoyl* =
+    # palmitoyl' (56482), 'octadecanoyl* = stearoyl' (56441).
     #
     # J2 deferred these four rows fearing that an unsaturated acid falling
     # through would be caught by the SATURATED get_acid_stem() and become a WRONG
@@ -396,7 +396,7 @@ def get_acid_fragment_name(mol, acid_atoms: List[int]) -> str:
     # Book PINs. get_acid_stem() is reached for an unsaturated acid only if that
     # branch returns falsy, which was already true for every unsaturated chain
     # outside the four deleted rows, so the rows were never the guard.
-    # See 
+    # See
 
     # For unsaturated acids, extract the
     # fragment and name it via the naming pipeline to get the full systematic
@@ -417,7 +417,7 @@ def _extract_fragment_smiles(mol, keep_atoms: set, cap_atom_idx: int,
 
     Works by copying the whole molecule, removing all bonds that cross
     the fragment boundary, extracting the desired fragment, and capping
-    the attachment point.  Because we copy the molecule rather than
+    the attachment point. Because we copy the molecule rather than
     building from scratch, all E/Z and R/S stereochemistry is preserved.
 
     Args:
@@ -469,7 +469,7 @@ def _name_acid_fragment_with_unsaturation(mol, acid_atoms: List[int]) -> Optiona
     """Extract an unsaturated acid fragment and name it via the pipeline.
 
     Uses RWMol bond-removal to extract the fragment, preserving E/Z
-    stereochemistry.  Caps the carbonyl carbon with -OH to form a
+    stereochemistry. Caps the carbonyl carbon with -OH to form a
     carboxylic acid, then names it to get the full systematic name
     including double bond positions (e.g., "(4E)-octa-4,7-dienoic").
 
@@ -533,7 +533,7 @@ def _name_alkyl_fragment_with_unsaturation(
     """Extract an unsaturated alkyl fragment and name it via the pipeline.
 
     Uses RWMol bond-removal to extract the fragment, preserving E/Z
-    stereochemistry.  Caps the attachment carbon with -OH to form an
+    stereochemistry. Caps the attachment carbon with -OH to form an
     alcohol, names it, then converts the alcohol name to the alkyl form.
 
     Args:
@@ -632,7 +632,7 @@ def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
         # degrade to the legacy word, never break ester naming outright.
         word = None
 
-    # v31 breadth: name_substituent_fragment DECLINES a ring-bearing alcohol
+    # breadth: name_substituent_fragment DECLINES a ring-bearing alcohol
     # component (its ring_fragment_declined_by_ring_engine guard). The legacy count path below then LINEARISES
     # the ring -- `CC(=O)O[C@H]1CCCCC[C@@H]1O` came out `(1S,2S)-heptyl acetate`
     # (cycloheptane counted as 7 chain carbons, the -OH silently dropped): a
@@ -672,7 +672,7 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
     # Check if alkyl fragment contains a ring
     has_ring = any(mol.GetAtomWithIdx(idx).IsInRing() for idx in alkyl_atoms)
 
-    # WS-A task 9: the ring-branch shortcuts below ('benzyl',
+    # WS-A: the ring-branch shortcuts below ('benzyl',
     # 'n-phenylalkyl') and the carbon-count tail name SATURATED carriers
     # only — an unsaturated non-ring carbon makes every count-based form
     # describe a DIFFERENT molecule ((2E)-prop-2-enyl emitted as 'propyl',
@@ -695,7 +695,7 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
     if has_ring and _has_nonring_unsat:
         return ""
 
-    # --- v29 Phase 5: delegate to the centralized substituent primitive -----
+    # ---: delegate to the centralized substituent primitive -----
     # Everything below this point derives the organyl word from a CARBON COUNT
     # plus a branch check that only looks at the attachment carbon. Branching
     # anywhere else is silently lost, so CC(=O)OCC(C)C (isobutyl) came out
@@ -897,7 +897,7 @@ def _find_acid_principal_chain(mol, acid_atoms: List[int]) -> Optional[List[int]
         return None
 
     # BFS/DFS to find the longest carbon chain from carbonyl_c.
-    # WS-A task 9: a parent CHAIN never runs through ring atoms — rings
+    # WS-A: a parent CHAIN never runs through ring atoms — rings
     # attach as substituents (the walk previously absorbed a cyclohexyl
     # into the "chain", mis-counting the acid length).
     acid_carbons = {idx for idx in acid_atoms
@@ -977,7 +977,7 @@ def _name_amino_acid_ester(
     if ate_stem is None:
         return None  # out of scope (diacid / 2-stereocentre / non-standard AA)
 
-    # v33 Phase 0 T5 (stereo honesty, mirrors L3-2e + the amino_acids.py
+    # T5 (stereo honesty, mirrors L3-2e + the amino_acids.py
     # standalone-AA fix): `_get_stereo_prefix` falls back to "" both for TRUE
     # achirality (glycine) and for a genuine alpha-carbon stereocentre the
     # INPUT never defines (no wedge/parity). Emitting the bare '-ate' stem in
@@ -985,9 +985,9 @@ def _name_amino_acid_ester(
     # docstring's "" carve-out describes -- it silently asserts the implicit-L
     # convention on a structure that does not define it (`## **P-103.1.3.1**
     # The stereodescriptors 'D' and 'L'`, BlueBookV2.md:54291: "The
-    # stereodescriptor 'xi' ... indicates unknown configuration"). DECLINE
+    # stereodescriptor 'xi'... indicates unknown configuration"). DECLINE
     # (return None) so the caller falls through to the ordinary systematic
-    # ester path -- no regression, see `name_ester`'s docstring at :1024-1026.
+    # ester path -- no regression, see `name_ester`'s docstring at:1024-1026.
     from .peptides import _get_stereo_prefix, _alpha_stereo_undefined
     if _alpha_stereo_undefined(acid_mol, aa_name):
         return None
@@ -1031,7 +1031,7 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if not acid_atoms or not alkyl_atoms:
         return None  # Cannot determine fragments
 
-    # v24 W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters use the
+    # W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters use the
     # retained '-ate' stem (e.g. 'methyl L-alaninate') for the in-scope
     # single-alpha-stereocentre monocarboxylic standard AAs + glycine. Tried
     # BEFORE the normal alkanoate/ring-acid path; declines (returns None,
@@ -1041,7 +1041,7 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     if aa_ester_name is not None:
         return aa_ester_name
 
-    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): a mono-ester of carbonic
+    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC): a mono-ester of carbonic
     # acid whose OTHER acid function is an acyl HALIDE, X-C(=O)-O-R, is named as
     # the functional-class '<R> carbono<halide>idate' (benzyl carbonochloridate).
     # This is perceived as ester+acid_halide on the SAME carbonyl; the acid-side
@@ -1075,11 +1075,11 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
                     return _cc
 
     # Guard: a true RING ACID (carbonyl bonded to the ring) whose ring
-    # naming fails defers to complex naming. WS-A task 9: an acid that
+    # naming fails defers to complex naming. WS-A: an acid that
     # merely CONTAINS a ring down-chain is a chain acid with a ring
     # substituent — it takes the chain path below.
     #
-    # v33 Phase 6 (C): anchored on the KNOWN carbonyl carbon
+    # (C): anchored on the KNOWN carbonyl carbon
     # (``ester_match[0]``) via ``_carbonyl_is_ring_bonded``, never on a
     # BFS-scanned ``acid_atoms`` set -- see that helper's docstring for why
     # ``acid_is_ring_acid`` can wander into a second ester's atoms and
@@ -1094,7 +1094,7 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)
 
-    # v33 Phase 6: the acid-side word (chain-vs-ring selection, acid-side
+    # : the acid-side word (chain-vs-ring selection, acid-side
     # substituent discovery, and R/S stereo citation) is built by the shared
     # primitive so `name_polyfunctional_diester_free_hydroxy` (the
     # diacylglycerol-shape multi-ester path) builds it identically for
@@ -1130,7 +1130,7 @@ def _build_ester_acid_word(
     """Build the acid-side word ('<stereo><prefixes><acid>oate') for ONE
     ester match (P-65.6.3.2: the ester's suffix half).
 
-    v33 Phase 6: extracted verbatim from ``name_ester`` (which used to build
+    : extracted verbatim from ``name_ester`` (which used to build
     this inline) so it is a SINGLE source of truth, shared by ``name_ester``
     itself and by ``name_polyfunctional_diester_free_hydroxy`` (the
     diacylglycerol-shape path, which builds the acid word for whichever of
@@ -1146,12 +1146,12 @@ def _build_ester_acid_word(
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)
 
-    # --- Phase 86-02: Acid-side substituent discovery via universal pipeline ---
+    # --- -02: Acid-side substituent discovery via universal pipeline ---
     # Find the principal chain in the acid fragment to correctly identify
     # chain length (excluding branch carbons) and discover substituents.
     acid_set = set(acid_atoms)
-    # WS-A task 9: chain-vs-ring acid naming is decided by the CARBONYL
-    # bond, not mere ring presence (see acid_is_ring_acid). v33 Phase 6 (C):
+    # WS-A: chain-vs-ring acid naming is decided by the CARBONYL
+    # bond, not mere ring presence (see acid_is_ring_acid). (C):
     # anchored on the KNOWN carbonyl carbon (``ester_match[0]``), never a
     # BFS-scanned ``acid_atoms`` set -- see ``_carbonyl_is_ring_bonded``.
     acid_has_ring = _carbonyl_is_ring_bonded(mol, ester_match[0])
@@ -1242,7 +1242,7 @@ def _build_ester_acid_word(
                     break
 
             if start_atom is not None:
-                # v33 Phase 6 (C): try BOTH ring-walk directions and pick
+                # (C): try BOTH ring-walk directions and pick
                 # the one giving lowest locants to the ring's OTHER
                 # substituents (P-31.1.4.2.4 (f)/(g)), reusing the SAME
                 # pg-aware orientation primitive the free-acid path already
@@ -1285,7 +1285,7 @@ def _build_ester_acid_word(
             if ester_o is not None:
                 exclude.add(ester_o)
 
-            # v33 Phase 6 Wave 2 (#6): a SECOND, non-principal ester whose
+            # Wave 2 (#6): a SECOND, non-principal ester whose
             # alcohol-side atom sits directly ON this ring (Ar-O-C(=O)R,
             # e.g. an aryl acetate substituent on the same ring that also
             # carries THIS ester's acid) is invisible to the exclude set
@@ -1338,7 +1338,7 @@ def _build_ester_acid_word(
 
     acylate_name = get_acylate_name(acid_name)
 
-    # v33 Phase 6 (C), nit-1: P-14.3.3 "Citation of locants" is
+    # (C), nit-1: P-14.3.3 "Citation of locants" is
     # deny-by-default -- once the ring bears a substituent prefix (an
     # essential locant), the ring's OWN suffix-attachment locant must also
     # be cited ('methyl 2-methylcyclohexane-1-carboxylate', never
@@ -1424,7 +1424,7 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
     # atoms so the acid parent cites only its chain stereo. A RING acid (the ring IS
     # the parent) still cites its ring stereo.
     #
-    # v33 Phase 6 (C): anchored on the KNOWN carbonyl carbon
+    # (C): anchored on the KNOWN carbonyl carbon
     # (``ester_match[0]``), never a BFS-scanned ``acid_atoms`` set -- see
     # ``_carbonyl_is_ring_bonded``.
     _chain_acid = not _carbonyl_is_ring_bonded(mol, ester_match[0])
@@ -1574,7 +1574,7 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
     """Name an ester whose acid OR alcohol component is not the ordinary
     carbon-on-oxygen carboxylic ester (P-65.6.3.1.2 / P-65.6.3.2.1 / P-65.6.3.4):
 
-      * pseudoester   R-CO-O-Z  (Z a Group-13/14/15 organyl) -> 'Zyl acylate'
+      * pseudoester R-CO-O-Z (Z a Group-13/14/15 organyl) -> 'Zyl acylate'
                       (CH3-CO-O-Si(CH3)3 -> 'trimethylsilyl acetate')
       * sulfonic ester R-SO2-O-R' -> 'R'yl R-sulfonate'
                       (CH3-SO2-O-CH3 -> 'methyl methanesulfonate')
@@ -1669,60 +1669,60 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
 #
 # When an ester is named as a substituent prefix (e.g., on a ring parent),
 # the R-CO-O- portion is named as an "acyloxy" group:
-#   acid name (drop "-ic") + "-yloxy"
+# acid name (drop "-ic") + "-yloxy"
 #
 # P-65.6.3.2.3 "Esters cited as prefixes" (BlueBookV2.md:31696) is the governing
 # rule -- "an ester group is indicated by prefixes as 'acyloxy' for the group
 # R-CO-O-" -- and it is also the rule cited by every acyloxy row of Appendix 2.
 # (The section heading P-65.6.3.2.2 previously named here does not exist in the
-# book; grep returns the .2.3 heading only.)
+# book; grep returns the.2.3 heading only.)
 #
 # THE RULE, in one line: the acyloxy prefix is the PIN ACYL GROUP name + 'oxy'.
 # It is NOT "the trivial form if one exists". P-65.6.3.2.3's own examples give
 # both sides of the boundary:
-#   :31711  3-(benzoyloxy)propanoic acid (PIN)
-#           benzoic acid IS retained as a preferred IUPAC name (P-65.1.1.1
-#           :29715, "Only the following five carboxylic acids retained names and
-#           are also preferred IUPAC names"), so 'benzoyloxy' is PREFERRED.
-#   :31723  3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
-#             3-(nicotinoyloxy)propanoic acid
-#           nicotinic acid is retained for GENERAL nomenclature only
-#           (P-65.1.1.2.2 heading :29745; its row at :29773 reads "nicotinic acid
-#           pyridine-3-carboxylic acid (PIN)"), so the trivial-derived acyloxy
-#           prefix is the NON-preferred alternative.
+# :31711 3-(benzoyloxy)propanoic acid (PIN)
+# benzoic acid IS retained as a preferred IUPAC name (P-65.1.1.1
+# :29715, "Only the following five carboxylic acids retained names and
+# are also preferred IUPAC names"), so 'benzoyloxy' is PREFERRED.
+# :31723 3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)
+# 3-(nicotinoyloxy)propanoic acid
+# nicotinic acid is retained for GENERAL nomenclature only
+# (P-65.1.1.2.2 heading:29745; its row at:29773 reads "nicotinic acid
+# pyridine-3-carboxylic acid (PIN)"), so the trivial-derived acyloxy
+# prefix is the NON-preferred alternative.
 # Also from the same rule: "The systematic name 'acetyloxy' is preferred to the
 # contracted name 'acetoxy'."
 #
 # Per-row PIN status. The preferred ACYL prefixes are enumerated by P-65.1.7.2
-# (:30432) "Acyl groups derived from carboxylic acids having retained names that
-# are preferred IUPAC names ... i.e., carboacyl groups" and listed under
-# P-65.1.7.2.1 (:30438): acetyl (:30442), formyl (:30444), benzoyl (:30446),
-# oxalyl (:30450), oxalo (:30454). Appendix 2 confirms each row independently --
-# its legend (:55416) reads "The symbol * designates the preferred prefix":
+# (30432) "Acyl groups derived from carboxylic acids having retained names that
+# are preferred IUPAC names... i.e., carboacyl groups" and listed under
+# P-65.1.7.2.1 (30438): acetyl (30442), formyl (30444), benzoyl (30446),
+# oxalyl (30450), oxalo (30454). Appendix 2 confirms each row independently --
+# its legend (55416) reads "The symbol * designates the preferred prefix":
 #
-#   PIN, must survive:  formyloxy* (:56044), acetyloxy* (:55432 "acetoxy =
-#                       acetyloxy*"), benzoyloxy* (:55589, :56544)
-#   NON-PIN:            propionyloxy -- Appendix 2 prints "propanoyloxy* =
-#                       propionyloxy" (:56658, :56680), so propanoyloxy is
-#                       preferred; propionic acid is general-only (:29789)
-#   NON-PIN:            palmitic/stearic/oleic -- general-only (P-65.1.1.2.2
-#                       :29745; rows :29787, :29791, :29785). Appendix 2:
-#                       "hexadecanoyl* = palmitoyl" (:56482, :56511),
-#                       "octadecanoyl* = stearoyl" (:56441, :56491, :56760),
-#                       "(9Z)-octadec-9-enoyl* = oleoyl" (:56443, :56452, :56489)
-#   NOT IN THE BOOK AT ALL (0 hits, controls prove the grep finds known
-#   positives): lauric, myristic, arachidic, arachidonic, linoleic, linolenic,
-#                       valeric, caproic -- and 'butyryloxy', 'valeryloxy',
-#                       'caproyloxy', 'oxalyloxy', 'lactyloxy',
-#                       'palmitoyloxy', 'lauroyloxy', 'stearoyloxy',
-#                       'oleoyloxy', 'arachidoyloxy' are each 0 hits, while
-#                       'hexadecanoyloxy' (:31846, :55170, :55199) and
-#                       'octadecanoyloxy' (:55162) do appear.
+# PIN, must survive: formyloxy* (56044), acetyloxy* (55432 "acetoxy =
+# acetyloxy*"), benzoyloxy* (55589,:56544)
+# NON-PIN: propionyloxy -- Appendix 2 prints "propanoyloxy* =
+# propionyloxy" (56658,:56680), so propanoyloxy is
+# preferred; propionic acid is general-only (29789)
+# NON-PIN: palmitic/stearic/oleic -- general-only (P-65.1.1.2.2
+# :29745; rows:29787,:29791,:29785). Appendix 2:
+# "hexadecanoyl* = palmitoyl" (56482,:56511),
+# "octadecanoyl* = stearoyl" (56441,:56491,:56760),
+# "(9Z)-octadec-9-enoyl* = oleoyl" (56443,:56452,:56489)
+# NOT IN THE BOOK AT ALL (0 hits, controls prove the grep finds known
+# positives): lauric, myristic, arachidic, arachidonic, linoleic, linolenic,
+# valeric, caproic -- and 'butyryloxy', 'valeryloxy',
+# 'caproyloxy', 'oxalyloxy', 'lactyloxy',
+# 'palmitoyloxy', 'lauroyloxy', 'stearoyloxy',
+# 'oleoyloxy', 'arachidoyloxy' are each 0 hits, while
+# 'hexadecanoyloxy' (31846,:55170,:55199) and
+# 'octadecanoyloxy' (55162) do appear.
 #
 # ⚠ WHY THE NON-PIN ROWS BELOW ARE STILL HERE. This function is a SPELLING
 # CONVERTER: it turns a stem that a caller ALREADY CHOSE into its 'oxy' form. It
 # is not the PIN decision point -- that is get_acid_fragment_name(), which is
-# where Tasks J2 and J3 made the fix. Measured (fresh process per molecule, spy
+# where Tasks J2 and J3 made the fix. Measured (fresh process per molecule,
 # on this function): after J3 no namer path supplies ANY of the trivial keys
 # below except formic/acetic/benzoic, which are the three PIN rows. Deleting the
 # non-PIN rows would therefore change no emitted name, and would make this
@@ -1734,33 +1734,33 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
 # ⚠ DO NOT ADD A ROW KEYED ON A SYSTEMATIC STEM. Five such rows
 # ('dodecanoic'/'tetradecanoic'/'hexadecanoic'/'octadecanoic'/'icosanoic' ->
 # 'lauroyloxy'/'myristoyloxy'/'palmitoyloxy'/'stearoyloxy'/'arachidoyloxy') were
-# removed in Task J3. They were the LIVE defect: they took a stem that was
+# removed in. They were the LIVE defect: they took a stem that was
 # already the PIN and converted it BACK to the non-PIN word, which is how
-# '(palmitoyloxy)acetic acid' survived the Task J2 fix to the ester word. A
+# '(palmitoyloxy)acetic acid' survived the fix to the ester word. A
 # systematic key here cannot ever be correct -- by construction its input is
-# already preferred. See 
+# already preferred. See
 TRIVIAL_ACID_TO_ACYLOXY = {
     # --- preferred prefixes (PIN); these MUST survive ---
-    "formic": "formyloxy",           # formyloxy*  Appendix 2 :56044
-    "acetic": "acetyloxy",           # acetyloxy*  Appendix 2 :55432
-    "benzoic": "benzoyloxy",         # benzoyloxy* Appendix 2 :55589, :56544
+    "formic": "formyloxy",           # formyloxy* Appendix 2:56044
+    "acetic": "acetyloxy",           # acetyloxy* Appendix 2:55432
+    "benzoic": "benzoyloxy",         # benzoyloxy* Appendix 2:55589,:56544
     # --- general-nomenclature spellings only; NON-PIN, and unreachable from the
     # --- namer after J2/J3. Retained solely so a direct caller gets the
     # --- documented general form instead of a fabrication (see note above).
-    "propionic": "propionyloxy",     # non-PIN: propanoyloxy* :56658
+    "propionic": "propionyloxy",     # non-PIN: propanoyloxy*:56658
     "butyric": "butyryloxy",
     "valeric": "valeryloxy",
     "caproic": "caproyloxy",
     "oxalic": "oxalyloxy",
     "lactic": "lactyloxy",
-    "lauric": "lauroyloxy",          # C12:0  non-PIN: dodecanoyl*  :55953
-    "myristic": "myristoyloxy",      # C14:0  non-PIN: tetradecanoyl
-    "palmitic": "palmitoyloxy",      # C16:0  non-PIN: hexadecanoyl* :56482
-    "stearic": "stearoyloxy",        # C18:0  non-PIN: octadecanoyl* :56441
-    "oleic": "oleoyloxy",            # C18:1  non-PIN: (9Z)-octadec-9-enoyl* :56443
-    "linoleic": "linoleoyloxy",      # C18:2  non-PIN
-    "linolenic": "linolenoyloxy",    # C18:3  non-PIN
-    "arachidic": "arachidoyloxy",    # C20:0  non-PIN: icosanoyl
+    "lauric": "lauroyloxy",          # C12:0 non-PIN: dodecanoyl*:55953
+    "myristic": "myristoyloxy",      # C14:0 non-PIN: tetradecanoyl
+    "palmitic": "palmitoyloxy",      # C16:0 non-PIN: hexadecanoyl*:56482
+    "stearic": "stearoyloxy",        # C18:0 non-PIN: octadecanoyl*:56441
+    "oleic": "oleoyloxy",            # C18:1 non-PIN: (9Z)-octadec-9-enoyl*:56443
+    "linoleic": "linoleoyloxy",      # C18:2 non-PIN
+    "linolenic": "linolenoyloxy",    # C18:3 non-PIN
+    "arachidic": "arachidoyloxy",    # C20:0 non-PIN: icosanoyl
     "arachidonic": "arachidonoyloxy", # C20:4 non-PIN
 }
 
@@ -1895,7 +1895,7 @@ def name_ester_as_prefix(mol, ester_match: tuple) -> Optional[str]:
             # =CH2 branch '2-methyl' (SATURATED, = a DIFFERENT molecule,
             # isobutyryloxy) for one atom ordering while the standard path below
             # correctly gives '2-methylprop-2-enoyloxy'. Same bug shape as this
-            # file's `_has_nonring_unsat` guard (:681). Defer ANY unsaturated acid
+            # file's `_has_nonring_unsat` guard (681). Defer ANY unsaturated acid
             # fragment to the standard get_acid_fragment_name path, which handles
             # unsaturation (ene/yne locants) correctly regardless of atom order.
             _acid_unsaturated = any(
@@ -2026,10 +2026,10 @@ def detect_exocyclic_esters(mol) -> List[dict]:
 #
 # Dicarboxylic acid diesters: two ester groups sharing a diacid backbone.
 # Named as "[multiplier]alkyl [parent]anedioate".
-#   e.g., COC(=O)CC(=O)OC -> "dimethyl propanedioate"
+# e.g., COC(=O)CC(=O)OC -> "dimethyl propanedioate"
 #
 # Trivial diacid names used where available:
-#   oxalic -> oxalate, malonic -> malonate, succinic -> succinate, etc.
+# oxalic -> oxalate, malonic -> malonate, succinic -> succinate, etc.
 # Otherwise systematic: get_chain_prefix(N) + "anedioate"
 
 
@@ -2148,7 +2148,7 @@ def _insert_ring_ester_locant(acylate_name: str, locant: int = 1) -> str:
     a name's scope is essential (a substituent prefix on the same ring
     takes one), every locant in that scope must be cited, including the
     parent's own suffix attachment. Retained trivial acyl stems
-    ('benzoate', 'acetate', ...) do not match this systematic
+    ('benzoate', 'acetate',...) do not match this systematic
     '-carboxylate' suffix and are returned unchanged -- a retained
     parent's single attachment point needs no numeral (P-14.3.4 licence).
     """
@@ -2167,7 +2167,7 @@ def _carbonyl_is_ring_bonded(mol, carbonyl_c: int) -> bool:
     atom set) is itself in a ring (lactone-like) or directly bonded to a
     ring atom (benzoic-/cyclohexanecarboxylic-shape).
 
-    v33 Phase 6 Wave 2 (#6, review fix): ``acid_is_ring_acid(mol,
+     Wave 2 (#6, review fix): ``acid_is_ring_acid(mol,
     acid_atoms)`` decides this by scanning a whole ``acid_atoms`` set for
     the FIRST carbon that looks like a carbonyl and returning based on
     THAT one. For a multi-ester molecule, ``parse_ester_fragments``'s BFS
@@ -2195,7 +2195,7 @@ def _name_ring_principal_independent_esters(
     NON-PRINCIPAL esters sit on that same ring -- either directly
     (Ar-O-C(=O)R) or through a single pendant atom (Ar-CH2-O-C(=O)R).
 
-    v33 Phase 6 Wave 2 (#6): the OLD code named the non-principal acid
+     Wave 2 (#6): the OLD code named the non-principal acid
     ALONE (dropping the alcohol-side linking atom entirely -- the
     methylene of a '-CH2-O-C(=O)R' arm) and space-joined it in front of
     the whole name with no locant -- a wrong-molecule / OPSIN-unparseable
@@ -2216,7 +2216,7 @@ def _name_ring_principal_independent_esters(
     is proven wrong (dropped atom, no locant), never an acceptable
     "uglier but honest" degrade.
 
-    v33 Phase 6 Wave 2 (#6, review fix): every structural decision here
+     Wave 2 (#6, review fix): every structural decision here
     is anchored on the PRINCIPAL ester's own known match atoms
     (``principal['match']``), NEVER on ``principal['acid_atoms']`` --
     that set can be contaminated with a second ester's atoms (see
@@ -2265,7 +2265,7 @@ def _name_ring_principal_independent_esters(
     from ..assembly.substituent_naming import name_substituent_fragment
 
     # Classify each non-principal ester's shape relative to the ring.
-    entries = []  # [{'ring_atom': int, 'prefix_name': str}, ...]
+    entries = []  # [{'ring_atom': int, 'prefix_name': str},...]
     for ester in non_principal:
         match = ester['match']
         ester_o = match[2]
@@ -2352,7 +2352,7 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
 
     Independent esters are multiple ester groups that do not share an acid
     backbone (not dicarboxylic diester) or alcohol backbone (not polyol
-    polyester).  The most senior ester bond becomes the principal suffix
+    polyester). The most senior ester bond becomes the principal suffix
     (-oate) and the remaining ester bonds become acyloxy prefixes.
 
     Strategy:
@@ -2395,7 +2395,7 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
     # Principal ester: name as "alkyl [acid]oate"
     principal = ester_data[0]
 
-    # v33 Phase 6 Wave 2 (#6): when the PRINCIPAL ester's acid is a RING
+    # Wave 2 (#6): when the PRINCIPAL ester's acid is a RING
     # acid, the OLD space-joined/unlocanted acyloxy-prefix path below is
     # PROVEN WRONG (it drops the alcohol-side linking atom of any
     # non-principal ester whose alkyl carbon is a pendant substituent on
@@ -2553,7 +2553,7 @@ def _find_backbone_carbons(mol, c1: int, c2: int, ester_oxygens: set) -> Optiona
 # ---------------------------------------------------------------------------
 # When BOTH ester carbonyls are bonded to a ring, the parent is the ring
 # di-carboxylic acid (benzene-1,3-dicarboxylic acid), NOT an acyclic -dioate
-# chain.  The legacy backbone BFS (_find_backbone_carbons) walks THROUGH the
+# chain. The legacy backbone BFS (_find_backbone_carbons) walks THROUGH the
 # ring carbons and linearises the ring, so dimethyl isophthalate became
 # "dimethyl pentanedioate" — a constitutionally different molecule.
 
@@ -2583,7 +2583,7 @@ def _build_diacid_from_diester(mol, ester_matches):
 
     For each ester (carbonyl_c, =O, ester_o, alkyl_c) the ester_o--alkyl_c bond
     is broken and the entire alkyl fragment removed; the ester oxygen keeps its
-    bond to the carbonyl carbon and sanitises to -C(=O)OH.  Returns None on
+    bond to the carbonyl carbon and sanitises to -C(=O)OH. Returns None on
     failure.
     """
     rw = Chem.RWMol(mol)
@@ -2658,7 +2658,7 @@ def _both_ester_carbonyls_on_ring(mol, ester_matches) -> bool:
 def _acid_name_to_ate(acid_name: str) -> Optional[str]:
     """Convert an acid name to its ester anion stem (P-65.6.3.2):
     '...ic acid' -> '...ate' (dicarboxylic acid -> dicarboxylate; dioic ->
-    dioate).  Returns None when the input is not an '-ic acid' form."""
+    dioate). Returns None when the input is not an '-ic acid' form."""
     if acid_name and acid_name.endswith("ic acid"):
         return acid_name[: -len("ic acid")] + "ate"
     return None
@@ -2670,7 +2670,7 @@ def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
     Builds the di-acid, names it via the GENERAL pipeline (bypassing the
     retained-name dispatch so the SYSTEMATIC PIN benzene-1,3-dicarboxylic acid
     is used, not the non-PIN retained 'isophthalic acid'), then converts the
-    '-ic acid' suffix to '-ate' and prefixes the alkyl group(s).  Fail-closed.
+    '-ic acid' suffix to '-ate' and prefixes the alkyl group(s). Fail-closed.
     """
     if len(ester_matches) != 2:
         return None
@@ -2718,20 +2718,20 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
 
     The ester stays the principal group (suffix '-oate'); every junior group
     (acyl halide -> oxo+halo, ketone/aldehyde -> oxo, nitrile -> cyano, -OH ->
-    hydroxy, ...) is a prefix on the acid-side chain (IUPAC P-65.6.3 + P-41:
+    hydroxy,...) is a prefix on the acid-side chain (IUPAC P-65.6.3 + P-41:
     esters outrank acyl halides/amides/nitriles/aldehydes/ketones/alcohols).
 
     Strategy (mirrors the diester ring path): build the ACID analog (ester ->
     free -COOH), name it via the GENERAL pipeline (which already emits those
     junior groups as prefixes), then convert '-ic acid' -> '-ate' and prepend
-    the alkyl group as a separate word.  The junior groups must lie on the ACID
-    side; the removed alkyl side must be a plain hydrocarbon.  Fail-closed.
+    the alkyl group as a separate word. The junior groups must lie on the ACID
+    side; the removed alkyl side must be a plain hydrocarbon. Fail-closed.
     """
     _acid_atoms, alkyl_atoms = parse_ester_fragments(mol, ester_match)
     if not alkyl_atoms:
         return None
 
-    # v24 W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters (the alpha-amino
+    # W8 P3 (P-103.2.6, BB 54595-54608): amino-acid esters (the alpha-amino
     # group is what routes a molecule like 'methyl alaninate' through this
     # POLYFUNCTIONAL path rather than the plain single-FG name_ester) use the
     # retained '-ate' stem (e.g. 'methyl L-alaninate'). Tried BEFORE the
@@ -2745,7 +2745,7 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
     # side must be named as ONE complete substituent word or its atoms would be
     # silently dropped into a different molecule. A plain hydrocarbon alkyl side
     # takes the fast path; an alkyl side that carries its OWN junior functional
-    # groups (oxo, hydroxy, halo, ...) is legal (P-65.6.3 -- the ester stays
+    # groups (oxo, hydroxy, halo,...) is legal (P-65.6.3 -- the ester stays
     # senior, the alcohol side's groups are prefixes on that substituent) PROVIDED
     # the recursive substituent namer expresses the whole fragment. That namer is
     # complete-by-construction (it names the entire fragment or declines), so it
@@ -2773,7 +2773,7 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
 
     # W8-P6 Cluster D (P-93.4.1.3): the alkyl (alcohol-side) component, cited
     # as a separate word, must carry its OWN stereodescriptor immediately
-    # before it -- mirrors name_ester's STER-12 collector (:1094-1103), which
+    # before it -- mirrors name_ester's STER-12 collector (1094-1103), which
     # this polyfunctional-routed path (taken whenever the acid side carries a
     # junior functional group, e.g. -OH, alongside the ester) never called,
     # silently dropping a chiral alkyl fragment's descriptor.
@@ -2798,7 +2798,7 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple) -> Optional[str]
 
     # P-66.1.6.1.2.1 (BB 33398): if the acid analog is EXACTLY one of the
     # retained / functional-replacement inorganic-acid parents (carbamimidic
-    # acid, carbonimidic acid, ...), its '-ic acid' name is the PIN stem — the
+    # acid, carbonimidic acid,...), its '-ic acid' name is the PIN stem — the
     # general chain pipeline (which does not consult the inorganic-acids
     # dispatch row @40) would emit the systematic-but-non-PIN
     # '1-aminomethanimidic acid' instead. Only substitute when the whole acid
@@ -2839,7 +2839,7 @@ def name_polyfunctional_diester_free_hydroxy(
     and the free hydroxyl(s) to 'hydroxy' prefixes, both cited on the 'yl'
     word, exactly as P-65.6.3.3.4.2's worked examples do it.
 
-    v33 Phase 6: this closes the gap where ``name_polyfunctional_ester_via_
+    : this closes the gap where ``name_polyfunctional_ester_via_
     acid`` (the single-ester acid-analog strategy) declines outright for
     >1 ester match, and the legacy EL-02 fallback in
     ``rules/polyfunctional.py::name_polyfunctional`` then demoted BOTH
@@ -2855,7 +2855,7 @@ def name_polyfunctional_diester_free_hydroxy(
         chain, and neither acid is a ring acid;
       - every atom of `principal_chain` not consumed by an ester attachment
         is either UNDECORATED or bears exactly one free hydroxyl (any other
-        decoration -- halogen, amine, a third ester, ... -- declines);
+        decoration -- halogen, amine, a third ester,... -- declines);
       - the two acids' principal-chain lengths are NOT tied (a tie is
         outside this narrow scope).
     """
@@ -2913,7 +2913,7 @@ def name_polyfunctional_diester_free_hydroxy(
 
     # Any OTHER backbone position must carry a free chain hydroxyl (the
     # only junior decoration this path knows how to place). Anything else
-    # (halogen, amine, a third ester, ...) declines fail-closed.
+    # (halogen, amine, a third ester,...) declines fail-closed.
     consumed = {principal['attach'], demoted['attach']}
     hydroxy_atoms = []
     for a in principal_chain:
@@ -3116,11 +3116,11 @@ def _get_dioate_name(backbone_length: int) -> str:
 #
 # Fully-esterified polyols (triacetin, triglycerides) are named using
 # acyloxy prefixes on the polyol backbone:
-#   "locants-multiplier(acyloxy)parent"
+# "locants-multiplier(acyloxy)parent"
 #
 # Examples:
-#   triacetin -> "1,2,3-tri(acetyloxy)propane"
-#   mixed triester -> "1,3-di(acetyloxy)-2-(propanoyloxy)propane"
+# triacetin -> "1,2,3-tri(acetyloxy)propane"
+# mixed triester -> "1,3-di(acetyloxy)-2-(propanoyloxy)propane"
 
 
 def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str]:
@@ -3203,7 +3203,7 @@ def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str
     diyl = f"{parent_prefix}ane-{loc_str}-diyl"
 
     # (3) multiplied acid anion: 'di' + 'acetate' -> 'diacetate' (P-16.3.3,
-    #     'di' before a consonant, no elision).
+    # 'di' before a consonant, no elision).
     return f"{diyl} di{anions[0]}"
 
 

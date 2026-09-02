@@ -24,8 +24,8 @@ from ..data.amino_acids import get_amino_acid_name, is_standard_amino_acid
 # [CX4] - sp3 carbon (alpha carbon)
 # [CX3](=O)[OX2H1] - carboxylic acid
 #
-# v33 Phase 2 Task 2.0: N broadened to also admit H0 -- mirrors
-# rules/peptides.py's own `_PEPTIDE_BOND_SMARTS` broadening (v30). A
+# .0: N broadened to also admit H0 -- mirrors
+# rules/peptides.py's own `_PEPTIDE_BOND_SMARTS` broadening. A
 # peptide's C-TERMINAL residue's own N-Calpha-COOH triad is what this
 # pattern is meant to catch (N here can be the free N-terminus of a
 # mono-residue "peptide", OR the amide N carried over from the PRECEDING
@@ -36,34 +36,34 @@ from ..data.amino_acids import get_amino_acid_name, is_standard_amino_acid
 # -- the H1/H2-only pattern silently missed every X-...-Pro peptide, which
 # is why `is_peptide()` (below) returned False even though
 # `rules.peptides.name_peptide()` already named these correctly once
-# reached directly ( sec.4).
+# reached directly (sec.4).
 # Was previously kept in sync with `peptides.py`'s pattern only by name, not
 # by value -- this restores that sync.
 ALPHA_AMINO_ACID_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2H1]"
 
 # SMARTS for peptide bond (secondary amide linkage between amino acids)
 # [NX3;H0,H1] - secondary OR tertiary amide nitrogen (NH, or ring N with no H
-#   left once acylated -- a C-terminal cyclic imino acid such as proline)
+# left once acylated -- a C-terminal cyclic imino acid such as proline)
 # [CX3](=O) - carbonyl carbon
 # [CX4] - alpha carbon on the acid side
 # This detects -C(=O)-NH-CH- (and -C(=O)-N(ring)-CH- for Pro/Hyp) linkages
 # typical of peptide bonds.
 #
-# v33 Phase 2 Task 2.0: broadened to H0,H1 to match
+# .0: broadened to H0,H1 to match
 # rules/peptides.py's `_PEPTIDE_BOND_SMARTS` exactly (same rationale as
 # ALPHA_AMINO_ACID_SMARTS above) -- a dipeptide whose ONLY bond is an X-Pro
 # bond (Pro as the sole C-terminal residue) has no OTHER bond to fall back
 # on, so this constant must admit H0 too, not just the amino-acid pattern.
 PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 
-# v33 Phase 2 Task 2.1 (capped termini): a peptide whose C-TERMINAL residue's
+# .1 (capped termini): a peptide whose C-TERMINAL residue's
 # alpha-carboxyl is a PRIMARY CARBOXAMIDE (-C(=O)NH2, e.g. a bioactive
 # peptide's amidated C-terminus) has NO free -COOH anywhere in the whole
 # molecule, so ALPHA_AMINO_ACID_SMARTS (which hard-requires `[OX2H1]`) never
 # matches and `is_peptide()` returned False -- the dispatcher never called
 # `rules.peptides.name_peptide` at all, even once that module's own
 # `_is_valid_peptide`/producer were extended to accept this cap
-# ( sec.3: 71% of the true-
+# (sec.3: 71% of the true-
 # peptide backlog is exactly this "both termini capped" shape). Deliberately
 # a SEPARATE constant rather than broadening `ALPHA_AMINO_ACID_SMARTS`
 # itself: that constant also gates `detect_amino_acid`/`name_amino_acid`,
@@ -73,7 +73,7 @@ PEPTIDE_BOND_SMARTS = "[CX3](=O)[NX3;H0,H1][CX4]"
 # `is_peptide()` below, so that unrelated path is untouched.
 _TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[NX3H2]"
 
-# v38 (backbone-substitutive ester C-terminus): a peptide whose C-TERMINAL
+# (backbone-substitutive ester C-terminus): a peptide whose C-TERMINAL
 # residue's alpha-carboxyl is esterified (-C(=O)-O-C, e.g. a Leu-Leu methyl
 # ester) has NO free -COOH and NO primary carboxamide anywhere, so neither
 # ALPHA_AMINO_ACID_SMARTS (hard-requires `[OX2H1]`) nor
@@ -82,7 +82,7 @@ _TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[NX3H2]"
 # `rules.peptides.name_peptide`, even though that module's
 # `_try_backbone_substitutive` now names the ester-C-terminus parent
 # systematically ('methyl (2S)-2-[(2S)-2-amino-4-methylpentanamido]-4-
-# methylpentanoate'). This is the exact structural analogue of the v33
+# methylpentanoate'). This is the exact structural analogue of the
 # primary-amide alternative above. Scoped to an ALPHA-amino-acid ester
 # (`[NX3][CX4]` on the ester carbonyl) so it does NOT broadly re-route
 # ordinary esters; combined with the `count_peptide_bonds(mol) >= 1`
@@ -98,7 +98,7 @@ _TERMINAL_ESTER_ALPHA_SMARTS = "[NX3;H2,H1,H0][CX4][CX3](=O)[OX2][CX4]"
 _EXTRA_FG_SMARTS = [
     '[OX2H1;!$([OX2H1]C=O)]',  # Hydroxy OH (not in COOH)
     '[SX2H1]',                   # Thiol SH
-    # v23 Phase 12 (F-THIOETHER-DROP, BB P-103 audit F1): a thioether -S- (both
+    # (F-THIOETHER-DROP, BB P-103 audit F1): a thioether -S- (both
     # neighbours carbon) is NOT a chain atom — the carbon-count systematic namer
     # would count the S-alkyl carbon(s) as backbone and silently DROP the sulfur
     # (methionine homologues / S-alkyl-cysteines named as plain '2-aminoalkanoic
@@ -106,13 +106,13 @@ _EXTRA_FG_SMARTS = [
     # emits the (alkylsulfanyl) prefix (2-amino-3-(ethylsulfanyl)propanoic acid).
     # Disulfides (S has an S neighbour) and ring S (rings already bail above) are
     # excluded by the two-carbon-neighbour requirement.
-    # v26 BP-3 C1 (P-63.1.5): the Se/Te ether analogues have the SAME defect — the
+    # BP-3 C1 (P-63.1.5): the Se/Te ether analogues have the SAME defect — the
     # carbon-count backbone walks through -Se-/-Te- and drops the chalcogen
     # (C[Se]CC(N)C(=O)O was named '2-aminobutanoic acid', a different molecule).
     # Bail so the polyfunctional pipeline emits the (methylselanyl)/(methyltellanyl)
     # prefix (verified: 2-amino-3-(methylselanyl)propanoic acid).
     '[SX2]([#6])[#6]',           # Thioether C-S-C
-    '[SeX2]([#6])[#6]',          # Selenoether C-Se-C  (P-63.1.5 selanyl)
+    '[SeX2]([#6])[#6]',          # Selenoether C-Se-C (P-63.1.5 selanyl)
     '[TeX2]([#6])[#6]',          # Telluroether C-Te-C (P-63.1.5 tellanyl)
     '[F,Cl,Br,I]',               # Halogen
     '[N+](=O)[O-]',              # Nitro
@@ -156,10 +156,10 @@ def is_peptide(mol) -> bool:
     Returns:
         True if molecule is a peptide (has amino acid pattern AND peptide bonds)
     """
-    # Must have amino acid pattern AND peptide bonds. v33 Task 2.1: OR in the
+    # Must have amino acid pattern AND peptide bonds..1: OR in the
     # terminal-primary-amide alternative (see the constant's docstring) so a
     # capped-C-terminus peptide still dispatches to `rules.peptides` instead
-    # of silently falling through to "unknown organic compound". v38: OR in the
+    # of silently falling through to "unknown organic compound".: OR in the
     # ester-C-terminus alternative too, for the same reason (a '...oate'
     # C-terminus that _try_backbone_substitutive now names systematically).
     amide_pattern = Chem.MolFromSmarts(_TERMINAL_PRIMARY_AMIDE_ALPHA_SMARTS)
@@ -245,7 +245,7 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     For standard amino acids, returns trivial name.
     For non-standard, returns systematic name.
 
-    Phase 141-02: SMILES lookup is checked BEFORE the alpha-amino acid SMARTS
+    -02: SMILES lookup is checked BEFORE the alpha-amino acid SMARTS
     gate. This allows non-alpha amino acids (taurine, creatine, etc.) that are
     in the OPSIN vocabulary to be named correctly via direct SMILES lookup.
 
@@ -288,7 +288,7 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
         canonical_smiles, mol=mol, with_descriptor=is_top_level_naming(),
     )
     if trivial:
-        # v33 Phase 1 (C2b) STEREO HONESTY: the blanket policy is TOP-LEVEL naming +
+        # (C2b) STEREO HONESTY: the blanket policy is TOP-LEVEL naming +
         # an undefined real stereocentre -> decline the retained AA name and fall
         # through to the stereo-free systematic name below. Config-fabrication is the
         # PRIMARY reason (a retained AA name implies a specific configuration -- L,
@@ -333,7 +333,7 @@ def _verify_denoted_alkanoic_backbone(mol, aa_atoms) -> Optional[int]:
 
     Args:
         mol: RDKit Mol object.
-        aa_atoms: the 5-tuple from :func:`get_amino_acid_atoms` --
+        aa_atoms: the 5-tuple from:func:`get_amino_acid_atoms` --
             (N, alpha_C, carbonyl_C, carbonyl_O, acid_O).
 
     Returns:
@@ -461,7 +461,7 @@ def _name_amino_acid_systematic(mol) -> str:
     if _has_extra_functional_groups(mol):
         return None
 
-    # v23 Phase 12 (P-103.2.3 branched systematic AA, BB audit): the carbon-count
+    # (P-103.2.3 branched systematic AA, BB audit): the carbon-count
     # stem below assumes a SINGLE unbranched chain (it names every carbon as
     # backbone -> '2-amino{stem}anoic acid'). A branched side chain (a carbon with
     # >2 carbon neighbours, e.g. CC[C@H](C)[C@@H](N)C(=O)O = a 3-methylpentanoic
@@ -476,15 +476,15 @@ def _name_amino_acid_systematic(mol) -> str:
         return None  # branched side chain -> general pipeline
 
     # TASK-I (root cause): the stem used to come from a whole-molecule carbon count
-    #   carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
+    # carbon_count = sum(1 for atom in mol.GetAtoms() if atom.GetSymbol() == 'C')
     # guarded by the DENY-LIST above. A carbon count cannot see whether those carbons
     # are actually one unbranched saturated chain, so every heteroatom or unsaturation
     # the deny-list had not yet enumerated was silently CONTRACTED -- its flanking
     # carbons counted into the backbone and the atom itself dropped from the name.
     # Three holes were open simultaneously, each emitting a DIFFERENT MOLECULE:
-    #   CNCC(=O)O       sarcosine  -> '2-aminopropanoic acid'  (= alanine)
-    #   COCC(N)C(=O)O   O-Me-serine-> '2-aminobutanoic acid'   (ether O dropped)
-    #   C=CCC(N)C(=O)O  allylgly   -> '2-aminopentanoic acid'  (= norvaline)
+    # CNCC(=O)O sarcosine -> '2-aminopropanoic acid' (= alanine)
+    # COCC(N)C(=O)O O-Me-serine-> '2-aminobutanoic acid' (ether O dropped)
+    # C=CCC(N)C(=O)O allylgly -> '2-aminopentanoic acid' (= norvaline)
     # and CNCCNCCNCC(=O)O dropped TWO nitrogens. A deny-list can only exclude the
     # holes already found; it is the wrong shape for a fail-closed namer.
     #

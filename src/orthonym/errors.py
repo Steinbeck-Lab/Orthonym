@@ -1,4 +1,4 @@
-"""Named limit/error catalog for out-of-scope inputs (HYG-02, Phase 173).
+"""Named limit/error catalog for out-of-scope inputs (HYG-02).
 
 Orthonym's default posture is *always-emit*: it returns a name (or a
 descriptive fallback string) for every input. That reaches inputs a
@@ -73,7 +73,7 @@ def _build_descriptive_fallback_names() -> frozenset:
     The OPSIN validity gate (`namer._final_opsin_validity_gate`) skips
     re-gating these — they are intentional descriptive fallbacks that do
     not OPSIN-parse, so re-suppressing them is wasted work and must not
-    alter output. Relocated here (v21 ML retirement, ADR-21-01) from the
+    alter output. Relocated here from the
     deleted `ml_fallback.quality_gate`; behaviour is byte-identical.
     """
     base = {
@@ -114,7 +114,7 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
         'message': 'unknown organic compound',
         'design_note_ref': 'ERR-270/274',
     },
-    # G0 fail-closed safety (DD7 S1): a ring system Orthonym recognises as
+    # G0 fail-closed safety (S1): a ring system Orthonym recognises as
     # complex (polycomponent-fused, bridged-fused, or aromatic-in-a-von-Baeyer
     # cage) but cannot yet name CORRECTLY. Raised mid-assembly to refuse rather
     # than emit a structurally-wrong de-aromatised cage / phantom substituent.
@@ -169,7 +169,7 @@ def _make(code: str, message: Optional[str] = None,
 
 def unsupported_ring_system(smiles: Optional[str] = None) -> OrthonymLimitError:
     """Build the G0 fail-closed refusal for a complex ring system Orthonym
-    cannot yet name correctly (DD7 S1). Raised mid-assembly by the von-Baeyer /
+    cannot yet name correctly (S1). Raised mid-assembly by the von-Baeyer /
     bicyclo / polycomponent-fusion paths; caught once at ``Orthonym.name``
     (default path returns ``.message`` = 'unknown organic compound';
     ``raise_on_limit=True`` re-raises this error)."""
@@ -233,7 +233,7 @@ def is_refusal_sentinel(name: Optional[str]) -> bool:
 
     This is the slot-level predicate. It is deliberately built ON TOP of
     ``is_failure_name`` rather than beside it: that function already recognises
-    three of the four sentinel families exactly (empty, ``'unknown ...'``, and the
+    three of the four sentinel families exactly (empty, ``'unknown...'``, and the
     ``'... (not supported)'`` descriptive fallbacks), and duplicating them is how
     this class of bug reached six copies in the first place. What it does NOT
     recognise is the substituent cascade's bare ``'substituent'`` placeholder,
@@ -308,7 +308,7 @@ def classify_failure_limit(mol: Chem.Mol,
     # byte-identical — the sole metal is trivially lowest.
     non_organic = {atom.GetSymbol() for atom in mol.GetAtoms()
                    if atom.GetSymbol() not in _ORGANIC_ELEMENTS}
-    # v36 B3 honesty floor: the ORIGINAL non_organic test above is
+    # B3 honesty floor: the ORIGINAL non_organic test above is
     # ELEMENT-SET-based, so a bare carbon-free ion built entirely from
     # `_ORGANIC_ELEMENTS` (nitrate O=[N+]([O-])[O-], sulfite, [S-2], [H+]) has
     # an EMPTY non_organic set and used to fall through to the "unknown

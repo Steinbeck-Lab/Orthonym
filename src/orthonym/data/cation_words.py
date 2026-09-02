@@ -1,6 +1,6 @@
 """Element -> cation word table for salt composition (IUPAC 2013 P-65.6.2.1).
 
-Phase 169.6 Plan 04 (CHOKE-01, D-07/D-08).
+.6 Plan 04 (CHOKE-01,).
 
 P-65.6.2.1 (verbatim, BlueBookV2 line 31563): "Neutral salts of acids are named
 by citing the name of the cation(s) followed by the name of the anion (see
@@ -27,13 +27,13 @@ def get_cation_word(frag_mol) -> Optional[str]:
     """Return the salt-composition cation word for a counter-cation fragment.
 
     P-65.6.2.1 (metals) / P-73.1.1 (ammonium). Handles:
-      - a monatomic metal cation ([Na+], [K+], [Ca+2], ...) -> the element word
-        from ``namer._METAL_NAMES`` (sodium / potassium / calcium / ...);
+      - a monatomic metal cation ([Na+], [K+], [Ca+2],...) -> the element word
+        from ``namer._METAL_NAMES`` (sodium / potassium / calcium /...);
       - the ammonium cation [NH4+] -> ``ammonium``.
 
     Returns the cation word, or None for a cation that is NOT a simple
     metal/ammonium counter-cation (an organic cation, a coordination complex,
-    etc.) -> the caller composes it via route_charged / honest-fails (D-08).
+    etc.) -> the caller composes it via route_charged / honest-fails.
     """
     if frag_mol is None:
         return None

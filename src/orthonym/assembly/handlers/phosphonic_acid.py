@@ -1,4 +1,4 @@
-"""v23 Phase 9 phosphonic_acid handler — substituent-prefix PIN (P-67.1.1.2).
+""" phosphonic_acid handler — substituent-prefix PIN (P-67.1.1.2).
 
 Parallel to ``handlers.phosphinic_acid``. Without this handler an organyl
 phosphonic acid R-P(=O)(OH)2 falls through to the generic suffix assembler and

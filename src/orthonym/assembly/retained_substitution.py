@@ -1,18 +1,18 @@
-"""Phase 168 — Continuous Triviality Controller (P2; HERITAGE-derived tree visitor).
+""" — Continuous Triviality Controller (P2; HERITAGE-derived tree visitor).
 
 Implements TRIV-01/02/03 via a pure functional transform ``NameTreeNode -> NameTreeNode'``:
   - Depth-first leaves-first traversal (Pitfall 4 avoidance: rewrite children BEFORE the
     parent's swap-decision so the parent sees the post-swap children).
-  - Per-Type runtime dispatch (D-02; P-15.1.8.1..3): Type 1 unconditional, Type 2a
+  - Per-Type runtime dispatch (P-15.1.8.1..3): Type 1 unconditional, Type 2a
     principal-group-bound, Type 2b SMARTS closed-list, Type 2c per-entry-override-or-Type-3,
     Type 3 bare-only + locant_context.
-  - Multiplier-feedback after every swap (D-05; TRIV-02): re-derive the di<->bis multiplier
+  - Multiplier-feedback after every swap (TRIV-02): re-derive the di<->bis multiplier
     on the swapped node via ``get_multiplier_prefix`` (which consults ``is_complex_substituent``)
     — never a static per-entry flag.
   - Re-alphabetization of the node whose prefixes changed, applied when that node is
-    re-emitted (D-06): ``_alphabetize_prefixes`` (NOT a sibling-reorder at the swapped node's
+    re-emitted: ``_alphabetize_prefixes`` (NOT a sibling-reorder at the swapped node's
     own level — the leaves-first walk re-alphabetizes a parent when the parent is visited).
-  - T2 runtime OPSIN-RT cache (D-07; TRIV-03; memoized per ``(post_swap_subtree_str,
+  - T2 runtime OPSIN-RT cache (TRIV-03; memoized per ``(post_swap_subtree_str,
     pre_swap_canon)`` in a plain dict). On RT mismatch: silently keep systematic form +
     emit ``ControllerEvent(kind='swap_reject_rt_unsafe')``.
 
@@ -35,15 +35,15 @@ Recovery reach is bounded (#4, reviews iter 1): ``match_token_atoms_in_mol`` can
 specific IR node to a specific physical duplicate fragment; for duplicate substituents it picks
 a deterministic-but-arbitrary match. The recovered fragment SMILES is correct for true
 duplicates (same canonical SMILES), but recovery can MISS for nested substituents — so
-``controller_fired_count`` may trail ``controller_reach_count`` even for seed members. Plan-04
-reports BOTH counts (CONTEXT D-04) and never claims reach the recovery cannot deliver.
+``controller_fired_count`` may trail ``controller_reach_count`` even for seed members.
+reports BOTH counts (CONTEXT) and never claims reach the recovery cannot deliver.
 
 Thread-safety (#6 REJECTED, reviews iter 1): the OPSIN-RT cache is a plain per-instance dict.
 The benchmark (benchmark_multi_corpus.py) is single-threaded over rows (max_workers=1 timeout
-wrapper at :191; serial rows at :446; no --threads arg) and each OpsinOracle belongs to one
+wrapper at:191; serial rows at:446; no --threads arg) and each OpsinOracle belongs to one
 Orthonym instance — no lock needed.
 
-Module boundary preserved per D-12: this module is the ONLY new code in the assembly package;
+Module boundary preserved per: this module is the ONLY new code in the assembly package;
 name_tree.py, name_tree_to_string.py, naming_utils.py stay UNTOUCHED.
 """
 
@@ -85,7 +85,7 @@ _MULT_COUNT: Dict[str, int] = {
 
 @dataclass(frozen=True)
 class ControllerEvent:
-    """Phase 168 diagnostic event (RESEARCH section 4.5)."""
+    """ diagnostic event (RESEARCH section 4.5)."""
 
     kind: str  # "swap_emit" | "swap_reject_type_check" | "swap_reject_rt_unsafe" |
     # "passthrough_coarse" | "passthrough_not_in_seed" | "recovery_miss"
@@ -97,7 +97,7 @@ class ControllerEvent:
 
 
 class OpsinOracle:
-    """T2 runtime OPSIN-RT cache (D-07 + RESEARCH R-02 + Pitfall 5).
+    """T2 runtime OPSIN-RT cache (+ RESEARCH R-02 + Pitfall 5).
 
     Plain per-instance dict cache keyed by ``(post_swap_subtree_str, pre_swap_canon)``.
     #6 REJECTED (reviews iter 1): no lock needed — the benchmark is single-threaded over rows.
@@ -115,7 +115,7 @@ class OpsinOracle:
         self._events: list = []  # ControllerEvent diagnostic log
 
     def rt_safe(self, pre_swap_canon: str, post_swap_subtree_str: str) -> bool:
-        """CONTEXT D-07 T2: parse ``post_swap_subtree_str`` via OPSIN, canonicalize, compare to
+        """CONTEXT T2: parse ``post_swap_subtree_str`` via OPSIN, canonicalize, compare to
         ``pre_swap_canon``. Cached per ``(post_swap_subtree_str, pre_swap_canon)``."""
         key = (post_swap_subtree_str, pre_swap_canon)
         if key in self._cache:
@@ -171,10 +171,10 @@ class OpsinOracle:
         subprocess call shared by ``name_to_smiles`` and ``parse_status``.
 
         Returns ``(raw_smiles_or_None, ran)``:
-          * ``ran=True,  raw=<smiles>`` — OPSIN parsed the name, emitted SMILES;
-          * ``ran=True,  raw=None``     — OPSIN ran but emitted nothing (it
+          * ``ran=True, raw=<smiles>`` — OPSIN parsed the name, emitted SMILES;
+          * ``ran=True, raw=None`` — OPSIN ran but emitted nothing (it
             DEFINITIVELY rejected the name as unparseable);
-          * ``ran=False, raw=None``     — the parse could NOT be performed
+          * ``ran=False, raw=None`` — the parse could NOT be performed
             (subprocess timeout / ``OSError`` such as a fork failure under memory
             pressure). This is a transient/environmental failure that callers
             MUST NOT treat as a rejection (CR-01).
@@ -188,7 +188,7 @@ class OpsinOracle:
         # on the optimization; it only removes JVM-startup latency.
         # PERF tier 1: the ONE in-process JVM (jvm_bridge, JPype) -- a JNI call
         # instead of a process launch. It returns exactly the bytes
-        # `java -jar ... -r -osmi` writes to stdout, so the (raw, ran) mapping
+        # `java -jar... -r -osmi` writes to stdout, so the (raw, ran) mapping
         # here is identical to the one-shot subprocess path's below. When it
         # cannot serve the call it reports served=False and we drop to the
         # persistent server, then to the one-shot subprocess -- the tiers below
@@ -244,7 +244,7 @@ class OpsinOracle:
         # completes the CR-01 hardening, which previously caught only
         # TimeoutExpired/OSError and let a non-zero exit collapse to "rejected"
         # — the cause of valid heavy aminium names being suppressed to
-        # "unknown organic compound" under load (v21 ADR-21-01 close finding).
+        # "unknown organic compound" under load.
         if result.returncode != 0:
             logger.debug(
                 "OpsinOracle OPSIN non-zero exit (%s) for %r — treating as "
@@ -294,8 +294,8 @@ class OpsinOracle:
         """Three-valued OPSIN parse outcome for the SUB-03 validity gate (CR-01).
 
         Returns one of:
-          * ``"parsed"``      — OPSIN accepted the name (emitted SMILES);
-          * ``"rejected"``    — OPSIN ran and definitively rejected it (no SMILES);
+          * ``"parsed"`` — OPSIN accepted the name (emitted SMILES);
+          * ``"rejected"`` — OPSIN ran and definitively rejected it (no SMILES);
           * ``"unavailable"`` — the parse could not be performed (no JAR / timeout
             / ``OSError``).
 
@@ -323,25 +323,25 @@ class OpsinOracle:
 
 
 def _recompute_multiplicative_prefix(old_mult: Optional[str], new_name: str) -> Optional[str]:
-    """TRIV-02 (D-05): re-derive the di<->bis multiplier for a repeated substituent whose name
+    """TRIV-02: re-derive the di<->bis multiplier for a repeated substituent whose name
     changed, using ``get_multiplier_prefix`` — never a static per-entry flag. Preserves the
     occurrence count encoded by the old multiplier; returns None when the node carried no
     multiplier.
 
     ⚠ **Docstring corrected 2026-07-30.** It said ``get_multiplier_prefix`` "consults
-    ``is_complex_substituent`` internally". It does **not** — measured with a spy,
+    ``is_complex_substituent`` internally". It does **not** — measured with a,
     ``is_complex_substituent`` records **zero** calls from it; the predicate actually
     consulted is ``is_substituted_substituent`` (plus
     ``CATENATION_AMBIGUOUS_PREFIXES``). The two genuinely disagree, so the wrong name
     was not a harmless synonym:
 
-        1,2-xylene    complex=True  substituted=False  -> 'di'
-        bromomethyl   complex=True  substituted=True   -> 'bis'
-        propan-2-yl   complex=True  substituted=False  -> 'di'
+        1,2-xylene complex=True substituted=False -> 'di'
+        bromomethyl complex=True substituted=True -> 'bis'
+        propan-2-yl complex=True substituted=False -> 'di'
 
     and ``substituted`` is the one that matches the Blue Book — ``:25811``
     ``1,2-bis(bromomethyl)benzene (PIN)`` against ``:25719``'s ``di(propan-2-yl)``.
-    A stale docstring naming the wrong predicate is how commit ``b3f6ce7c`` came to
+    A stale docstring naming the wrong predicate is how commit `` came to
     re-point this at ``is_complex_substituent`` and regress it in both directions.
 
     This matters because the serializer renders ``node.multiplicative_prefix`` verbatim
@@ -382,10 +382,10 @@ def apply_triviality_controller(
     *,
     enabled: bool = False,
 ) -> NameTreeNode:
-    """Phase 168 entry point (CONTEXT D-01 + TRIV-01).
+    """ entry point (CONTEXT + TRIV-01).
 
-    - When ``enabled=False``: returns the input tree UNCHANGED (Stage A default-OFF invariant per D-08).
-    - When ``enabled=True`` + ``is_coarse_node(tree)``: returns the input tree UNCHANGED (D-04 coarse passthrough).
+    - When ``enabled=False``: returns the input tree UNCHANGED (Stage A default-OFF invariant per).
+    - When ``enabled=True`` + ``is_coarse_node(tree)``: returns the input tree UNCHANGED (coarse passthrough).
     - Otherwise: depth-first leaves-first walk; per-Type dispatch; rewrite-on-match + RT-gate.
     """
     if not enabled:
@@ -406,7 +406,7 @@ def _walk(
     Children are rewritten FIRST so the parent's swap-decision sees the post-swap children.
     """
     if is_coarse_node(node):
-        return node  # D-04 coarse passthrough
+        return node  # coarse passthrough
 
     # Rewrite children first (leaves-first).
     new_prefixes = tuple(
@@ -425,10 +425,10 @@ def _walk(
 
     seed_entry = SEED_TABLE.get(canonical)
     if seed_entry is None:
-        # Not in seed table => keep systematic (preserve children rewrite + re-alphabetize per D-06).
+        # Not in seed table => keep systematic (preserve children rewrite + re-alphabetize per).
         return _replace_preserving_or_resetting_legacy(node, new_prefixes)
 
-    # Per-Type runtime dispatch (CONTEXT D-02; RESEARCH section 2.1).
+    # Per-Type runtime dispatch (CONTEXT; RESEARCH section 2.1).
     if not _type_check(node, mol, seed_entry, principal_group, opsin_oracle):
         # Type check refused: keep systematic. #2 fix: reset fragment_legacy IFF a child changed.
         return _replace_preserving_or_resetting_legacy(node, new_prefixes)
@@ -436,7 +436,7 @@ def _walk(
     # Build the candidate rewrite (this DOES change parent_stem => fragment_legacy=None per #2/Pitfall 1).
     rewritten = _build_rewrite(node, seed_entry, new_prefixes)
 
-    # T2 runtime RT-safety check (CONTEXT D-07 + TRIV-03 "RT-safety by construction").
+    # T2 runtime RT-safety check (CONTEXT + TRIV-03 "RT-safety by construction").
     # CR-03 (code review 2026-05-30): a swap is emitted ONLY when the oracle verifies that the
     # post-swap subtree round-trips. No oracle => the round-trip CANNOT be verified => FAIL CLOSED
     # (keep the systematic form). Previously a None oracle fell straight through to
@@ -449,7 +449,7 @@ def _walk(
     from .name_tree_to_string import name_tree_to_string
     post_swap_str = name_tree_to_string(rewritten, style="pin")
     if not opsin_oracle.rt_safe(canonical, post_swap_str):
-        # RT-unsafe => silently reject swap (the systematic form is kept). CONTEXT D-07 + Pitfall 6.
+        # RT-unsafe => silently reject swap (the systematic form is kept). CONTEXT + Pitfall 6.
         # #2 fix: reset fragment_legacy IFF a child changed (the swap of THIS node is rejected,
         # but a child below may have changed).
         return _replace_preserving_or_resetting_legacy(node, new_prefixes)
@@ -462,20 +462,20 @@ def _build_rewrite(
     seed_entry,
     new_prefixes: Tuple[NameTreeNode, ...],
 ) -> NameTreeNode:
-    """Rewrite a node to its retained-PIN form (CONTEXT D-01 + RESEARCH section 4.1).
+    """Rewrite a node to its retained-PIN form (CONTEXT + RESEARCH section 4.1).
 
     CRITICAL INVARIANT per #2 + Pitfall 1: this function DOES change ``parent_stem``, so it MUST
     set ``fragment_legacy=None`` to force the serializer to use explicit fields rather than the
     stale legacy string at name_tree_to_string.py:96.
 
-    TRIV-02 (D-05): the di<->bis multiplier is re-derived via ``_recompute_multiplicative_prefix``
+    TRIV-02: the di<->bis multiplier is re-derived via ``_recompute_multiplicative_prefix``
     (which calls ``get_multiplier_prefix``), and the parenthesization hint is re-derived via
     ``is_complex_substituent`` (P-16.3.4) — both single-source-of-truth predicates, never a static
     flag.
 
     CR-01 + CR-02 (code review 2026-05-30): the seed ``retained_pin_name`` comes in two shapes,
     and the rewrite MUST reset the fields the retained string already subsumes or the serializer
-    DOUBLE-renders them (name_tree_to_string.py:185-187 re-prepends locants; :192 re-appends
+    DOUBLE-renders them (name_tree_to_string.py:185-187 re-prepends locants;:192 re-appends
     suffix):
 
       * Type 1 (P-15.1.8.1) — a BARE parent hydride ("benzene", "furan", "1H-pyrrole"). The
@@ -513,10 +513,10 @@ def _build_rewrite(
         locants=new_locants,
         indicated_h=(),                 # subsumed by the retained parent name (e.g. "1H-pyrrole")
         unsaturation_locants=((), ()),  # subsumed by the retained stem (e.g. "furan", "indene")
-        prefixes=_alphabetize_prefixes(new_prefixes),  # D-06 always-re-run
+        prefixes=_alphabetize_prefixes(new_prefixes),  # always-re-run
         multiplicative_prefix=_recompute_multiplicative_prefix(
-            node.multiplicative_prefix, new_name),  # TRIV-02 (D-05)
-        parenthesization_hint=is_complex_substituent(new_name),  # P-16.3.4 (D-05)
+            node.multiplicative_prefix, new_name),  # TRIV-02
+        parenthesization_hint=is_complex_substituent(new_name),  # P-16.3.4
         iupac_section_cite=seed_entry.iupac_p_section,
         fragment_legacy=None,  # CRITICAL — force serializer to use explicit fields (#2 / Pitfall 1)
     )
@@ -529,7 +529,7 @@ def _type_check(
     principal_group: Optional[str],
     opsin_oracle: Optional[OpsinOracle],  # WARNING #7 fix: propagated for Type 2b prefix recovery
 ) -> bool:
-    """Per-Type runtime check (CONTEXT D-02 + RESEARCH section 2.1)."""
+    """Per-Type runtime check (CONTEXT + RESEARCH section 2.1)."""
     from ..data.triviality_controller_seed import SubstitutionType
 
     st = seed_entry.substitution_type
@@ -557,8 +557,8 @@ def _type_2a_check(node: NameTreeNode, principal_group: Optional[str], seed_entr
     NOTE (#8, reviews iter 1): ``principal_group`` is the MOLECULE-LEVEL PCG
     (features.principal_group), not a fragment-level group. So a phenol/aniline fragment occurring
     as a NON-principal substituent on a higher-seniority parent (e.g. an ester) will NOT swap (the
-    required PG won't match). This is the correct conservative PIN behavior per CONTEXT D-02; it
-    bounds Type 2a coverage. A Plan-03 fixture pins the intended stay-systematic behavior.
+    required PG won't match). This is the correct conservative PIN behavior per CONTEXT; it
+    bounds Type 2a coverage. A fixture pins the intended stay-systematic behavior.
     """
     required = seed_entry.principal_group_required
     if not required:
@@ -604,7 +604,7 @@ def _type_2b_check(
 
 
 def _type_2c_check(node: NameTreeNode, mol: "Chem.Mol", seed_entry) -> bool:
-    """Type 2c (P-15.1.8.2.3): per-name-specific (CONTEXT D-02 default-to-Type-3)."""
+    """Type 2c (P-15.1.8.2.3): per-name-specific (CONTEXT default-to-Type-3)."""
     if seed_entry.locus_override_rule_id is None:
         return _type_3_check(node, seed_entry)
     return False

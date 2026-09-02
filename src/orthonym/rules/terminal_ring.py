@@ -1,4 +1,4 @@
-"""v30 P3-T1b: the TERMINAL ring namer -- the audited systematic generator that
+""": the TERMINAL ring namer -- the audited systematic generator that
 stands where the ``'substituent'`` refusal sentinel used to.
 
 Why this module exists
@@ -93,13 +93,13 @@ __all__ = [
 class TerminalRingName:
     """One audited terminal ring name.
 
-    ``name``      the emitted string -- the parent hydride when
+    ``name`` the emitted string -- the parent hydride when
                   ``free_valence`` is None, else the ``…-<loc>-yl`` substituent
                   token.
-    ``numbering``  atom idx -> ring locant, the SAME map the name was spelled
+    ``numbering`` atom idx -> ring locant, the SAME map the name was spelled
                   from (never re-derived), so a consumer can place its own
                   substituent locants consistently.
-    ``basis``      which generator + audit produced it: ``'monocycle'``,
+    ``basis`` which generator + audit produced it: ``'monocycle'``,
                   ``'von_baeyer'`` or ``'spiro'``.
     """
 

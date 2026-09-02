@@ -7,7 +7,7 @@ IUPAC cite: P-66.1.6.1.3 "Chalcogen analogues of urea and isourea"
 (``BlueBookV2/BlueBookV2.md:33437``), subsection P-66.1.6.1.3.1 (``:33439``):
 *"Chalcogen analogues of urea are named by functional replacement nomenclature
 using the prefixes 'thio', 'seleno', and 'telluro'. Preferred IUPAC names use
-the letter locants N, and N'."*  Worked ``(PIN)`` examples: ``thiourea (PIN)``
+the letter locants N, and N'."* Worked ``(PIN)`` examples: ``thiourea (PIN)``
 (``:33444``) and ``N-(butan-2-yl)selenourea (PIN)`` (``:33451``).
 
 Why the parent is the thiourea and not the ring the molecule also carries:
@@ -64,7 +64,7 @@ def name_thiourea(
         return None
 
     # The retained chalcogen-urea parent has NO numbered skeleton -- its only
-    # locants are the italic letters N / N' (P-66.1.6.1.3.1, BB:33439; :33446
+    # locants are the italic letters N / N' (P-66.1.6.1.3.1, BB:33439;:33446
     # "Numerical locants are no longer used for thiourea in the IUPAC preferred
     # name"). Declaring that scope stops a numeric front-of-name stereo block
     # being prepended: `(1S,3R,5S)-N-[1-(bicyclo[2.2.1]heptan-2-yl)ethyl]-N'-

@@ -3,7 +3,7 @@
 ONE name-builder for the functional-replacement / functional-class derivatives of
 the retained acid *parents* (carbonic, carbamic, phosphoric, sulfuric, …), used by
 BOTH the carbon acids (P-65.2 carbonic family) and the non-carbon oxoacids (P-67).
-Per the v23 cross-cutting design (§7, FRN-infix owner = Phase 9) the construction
+Per the cross-cutting design (§7, FRN-infix owner =) the construction
 logic lives here once, not duplicated per family.
 
 This module is PURE string assembly: it does NOT perceive structure. The caller
@@ -12,18 +12,18 @@ replacement a given structure represents — keyed on the exact canonical SMILES
 fail-closed — and asks this engine to spell the name. Keeping perception out of
 the builder is what makes it safely reusable and free of false positives.
 
-Coverage in v23 Phase 9 = the OPSIN-round-trippable plain forms:
-  * chalcogen / peroxo infix replacement on a retained acid  (``carbonoperoxoic``,
+Coverage in = the OPSIN-round-trippable plain forms:
+  * chalcogen / peroxo infix replacement on a retained acid (``carbonoperoxoic``,
     ``carbonodithioic``, ``carbonotrithioic``)
-  * the =O -> =NH imido replacement                          (``carbonimidic``,
+  * the =O -> =NH imido replacement (``carbonimidic``,
     ``carbamimidic``)
-  * multiplicative poly-acids                                (``dicarbonic``,
+  * multiplicative poly-acids (``dicarbonic``,
     ``tricarbonic``)
-  * acyl-halide functional-class words                       (``phosphoryl
+  * acyl-halide functional-class words (``phosphoryl
     trichloride``, ``sulfuryl dichloride``)
 The italic O/S/Se tautomer-locant word-forms (``carbonothioic S-acid``) are
-DEFERRED to Phase 19 — OPSIN rejects the word-form, so they require name-exact
-gold rather than round-trip validation (V23 plan §6, Phase 19).
+DEFERRED to — OPSIN rejects the word-form, so they require name-exact
+gold rather than round-trip validation.
 """
 import re
 from typing import Dict, List, Optional, Tuple
@@ -35,7 +35,7 @@ _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
 # oxoacid functional-replacement engine. Each combining form carries a trailing
 # linking ``o`` that is elided before a vowel (P-67.1.2.3.5). The chalcogen /
 # peroxo infixes (thio/seleno/telluro/peroxo) do NOT belong here — they never
-# elide their ``o`` and are spelled by :func:`build_frn_acid_name`. Keyed by the
+# elide their ``o`` and are spelled by:func:`build_frn_acid_name`. Keyed by the
 # combining form so the builder both validates the infix and orders it
 # alphabetically. ---
 _CLASS_INFIX = {
@@ -62,14 +62,14 @@ def build_p_frn_acid_name(front_prefix: str, parent_stem: str,
     (P-67.1.2.4) whose replacements are class infixes (amido / halido /
     pseudohalido), NOT chalcogen infixes.
 
-    ``front_prefix``  — already-assembled detachable-prefix string cited in front
+    ``front_prefix`` — already-assembled detachable-prefix string cited in front
                         (organyl on P: ``"methyl"`` / ``"phenyl"``; or the
                         N-locant amido substituents: ``"N,N-dimethyl"``). ``""``
                         for the bare parent.
-    ``parent_stem``   — parent-acid stem WITHOUT its linking vowel: ``"phosphor"``
+    ``parent_stem`` — parent-acid stem WITHOUT its linking vowel: ``"phosphor"``
                         (phosphoric), ``"phosphon"`` (phosphonic), ``"phosphin"``
                         (phosphinic), ``"arsor"``/``"arson"`` etc.
-    ``infix_counts``  — ``{combining-form: multiplicity}`` for the class infixes
+    ``infix_counts`` — ``{combining-form: multiplicity}`` for the class infixes
                         present, e.g. ``{"amido": 1}`` / ``{"chlorido": 1}`` /
                         ``{"cyanatido": 1}``.
 
@@ -114,10 +114,10 @@ def build_frn_acid_name(base_stem: str, infix: str, count: int = 1) -> Optional[
     Examples::
 
         build_frn_acid_name("carbon", "peroxo", 1) -> "carbonoperoxoic acid"
-        build_frn_acid_name("carbon", "thio", 2)   -> "carbonodithioic acid"
-        build_frn_acid_name("carbon", "thio", 3)   -> "carbonotrithioic acid"
-        build_frn_acid_name("carbon", "imido", 1)  -> "carbonimidic acid"
-        build_frn_acid_name("carbam", "imido", 1)  -> "carbamimidic acid"
+        build_frn_acid_name("carbon", "thio", 2) -> "carbonodithioic acid"
+        build_frn_acid_name("carbon", "thio", 3) -> "carbonotrithioic acid"
+        build_frn_acid_name("carbon", "imido", 1) -> "carbonimidic acid"
+        build_frn_acid_name("carbam", "imido", 1) -> "carbamimidic acid"
     """
     if count not in _MULT:
         return None
@@ -125,7 +125,7 @@ def build_frn_acid_name(base_stem: str, infix: str, count: int = 1) -> Optional[
         # carbon + o + [di|tri] + thio + ic acid
         return f"{base_stem}o{_MULT[count]}{infix}ic acid"
     if infix in _IMIDO_INFIX:
-        # carbon + imid + ic acid   (linking o elided; multiplier rare, supported)
+        # carbon + imid + ic acid (linking o elided; multiplier rare, supported)
         return f"{base_stem}{_MULT[count]}{_IMIDO_INFIX[infix]}ic acid"
     return None
 

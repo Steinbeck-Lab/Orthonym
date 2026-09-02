@@ -1,4 +1,4 @@
-"""Scoped-per-call memoization infrastructure (, ).
+"""Scoped-per-call memoization infrastructure.
 
 A byte-identity-preserving cache whose lifetime is exactly ONE top-level naming
 call. The engine re-names the same substituent fragments many times inside one

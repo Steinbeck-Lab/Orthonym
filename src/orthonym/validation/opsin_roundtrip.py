@@ -134,7 +134,7 @@ Locant = Union[int, str, Tuple]
 def _parse_av_token(tok: str) -> Optional[Locant]:
     """Convert one OPSIN ``$_AV`` locant token to the stereo-map format.
 
-    ``'1'`` -> 1 ; ``"1'"`` -> (1, "'") ; ``'7a'`` -> '7a' ;
+    ``'1'`` -> 1; ``"1'"`` -> (1, "'"); ``'7a'`` -> '7a';
     ``"3'a"`` -> (3, "'", 'a'). Returns None for anything unrecognised
     (a compound/bridge locant OPSIN may emit) — the caller drops it, so a
     stereocentre with an unmappable locant loses its descriptor (missing beats
@@ -188,11 +188,11 @@ def opsin_atom_locant_map(
     Parses *name* with ``-o extendedsmi`` to obtain OPSIN's OWN per-atom locants
     (the authoritative numbering the name will be read back with), then maps
     those atoms onto *mol* by constitutional (stereo-insensitive) subgraph
-    isomorphism.  Returns ``{mol_atom_idx: locant_token}`` (tokens in the
+    isomorphism. Returns ``{mol_atom_idx: locant_token}`` (tokens in the
     injector's accepted format) or None when it cannot be built (OPSIN
     unavailable/rejecting, atom-count/parse mismatch, or no isomorphism).
 
-    This is the ``re-anchor + audit`` primitive (the contributor guide invariant 18): the
+    This is the ``re-anchor + audit`` primitive (the contributor guide): the
     map is derived FROM the name+structure, never trusted from a builder's
     internal numbering, and the caller RT-verifies any name decorated with it.
     """
@@ -295,7 +295,7 @@ def opsin_roundtrip_check(
 def opsin_parse_both_versions(name: str) -> dict:
     """Cross-validate name against OPSIN 2.8.0 and 2.9.0.
 
-    Per D-19: Test against both versions to identify version-specific
+    Per: Test against both versions to identify version-specific
     parsing differences.
 
     Args:
@@ -303,8 +303,8 @@ def opsin_parse_both_versions(name: str) -> dict:
 
     Returns:
         Dict with keys:
-            - v28: str or None -- SMILES from OPSIN 2.8.0
-            - v29: str or None -- SMILES from OPSIN 2.9.0
+            -: str or None -- SMILES from OPSIN 2.8.0
+            -: str or None -- SMILES from OPSIN 2.9.0
             - agree: bool -- whether both versions produce the same result
     """
     v28 = opsin_parse(name, jar_version="2.8.0")

@@ -1,4 +1,4 @@
-"""Phase 160 phosphate_ester handler — direct-return shim.
+""" phosphate_ester handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphate_ester``. Verbatim
 move of composer.py:992-1013 dispatch logic; handles the three phosphate
@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 _PHOSPHATE_ESTER_GROUPS = (
     'phosphate_triester', 'phosphate_diester', 'phosphate_monoester',
-    # v30 tail #16: the trivalent-P phosphite triester routes to the same
+    # tail #16: the trivalent-P phosphite triester routes to the same
     # functional-class namer (its "phosphite" stem was previously unreachable).
     'phosphite_triester',
-    # v30 tail #17: the phosphonic-acid diester (one P-C ligand) -> same namer,
+    # tail #17: the phosphonic-acid diester (one P-C ligand) -> same namer,
     # its "phosphonate" stem carries the P-C ligand as the carbon prefix.
     'phosphonate_diester',
 )

@@ -1,4 +1,4 @@
-"""v27 P5: general fusion-nomenclature PARENT producer (P-25.3), a PIN-quality
+""" P5: general fusion-nomenclature PARENT producer (P-25.3), a PIN-quality
 upgrade over the von-Baeyer polyene the complete-tier engine ships for mancude
 fused ring systems.
 

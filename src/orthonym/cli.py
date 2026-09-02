@@ -17,15 +17,15 @@ from . import name_compound, __version__
 def _emit_tier_flags(emit_tier: str) -> dict:
     """Map a ``--emit-tier`` value to the Orthonym general-engine flag triple.
 
-    Single source of truth for the tier -> namer-flag contract (v27 Phase 6
+    Single source of truth for the tier -> namer-flag contract (
     T6.1). Both the CLI (``main``) and ``tests/unit/test_emit_tier_flags.py``
     read this so the invariant table cannot silently drift.
 
     Invariant table (0-wrong-critical):
-      pin         -> gf=F, gfu=F, aag=F   (PIN-or-abstain; byte-identical default)
-      valid       -> gf=T, gfu=F, aag=F   (RT-verified general-engine names)
-      complete    -> gf=T, gfu=F, aag=T   (RT-verified aggressive aromatic/hetero)
-      best-effort -> gf=T, gfu=T, aag=T   (complete's production PLUS the T4
+      pin -> gf=F, gfu=F, aag=F (PIN-or-abstain; byte-identical default)
+      valid -> gf=T, gfu=F, aag=F (RT-verified general-engine names)
+      complete -> gf=T, gfu=F, aag=T (RT-verified aggressive aromatic/hetero)
+      best-effort -> gf=T, gfu=T, aag=T (complete's production PLUS the T4
                                            OPSIN-unverified opt-in)
 
     ``general_fallback_unverified`` (gfu) is the UNIQUE best-effort
@@ -34,7 +34,7 @@ def _emit_tier_flags(emit_tier: str) -> dict:
     complete's (the T6.1 fix — previously aag was complete-only, making
     best-effort under-cover the P1 cage machinery).
 
-    v37 SP5.4 adds a fifth tier, ``full-coverage`` (the opt-in flag tier that
+     adds a fifth tier, ``full-coverage`` (the opt-in flag tier that
     arms the D2 general P-69 coordination-additive namer):
 
       full-coverage -> gf=T, gfu=T, aag=T, full_coverage=T
@@ -45,7 +45,7 @@ def _emit_tier_flags(emit_tier: str) -> dict:
     "best-effort tier" from "full-coverage tier". The ``full_coverage`` key is
     present (``False``) on every other tier, so a consumer can always read it.
     With the flag off (every non-full-coverage tier) D2 is never reached and
-    output is byte-identical -- the SP5.4 isolation property.
+    output is byte-identical -- the isolation property.
     """
     _be_or_fc = emit_tier in ("best-effort", "full-coverage")
     return {
@@ -107,7 +107,7 @@ def main(args: List[str] = None) -> int:
         help="Show confidence metadata alongside the name"
     )
 
-    # Phase 156 Plan-03 Task 4 (CONTEXT.md D-17 telemetry):
+    # (CONTEXT.md telemetry):
     # Print the OPSIN-grammar pre-validation seven-bucket counter
     # histogram to stderr after naming. Always goes through the
     # `Orthonym(...).get_validation_stats()` accessor — never reads
@@ -115,32 +115,32 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--validation-stats",
         action="store_true",
-        help="Print OPSIN grammar validation counters (D-17 telemetry) to stderr"
+        help="Print OPSIN grammar validation counters (telemetry) to stderr"
     )
 
-    # Phase 158 Plan-03 Task 9 (CONTEXT.md D-16 telemetry):
+    # (CONTEXT.md telemetry):
     # Print the CFR class-first dispatch counter histogram to stderr
     # after naming. Default-OFF (additive; existing CLI behavior
     # unchanged). Goes through Orthonym(...).get_dispatch_stats()
-    # accessor per CONTEXT D-16 + AP-6 (never reads a module-global
+    # accessor per CONTEXT + AP-6 (never reads a module-global
     # counter). Stderr-only emission keeps stdout clean for piped use.
     parser.add_argument(
         "--dispatch-stats",
         action="store_true",
-        help="Print CFR dispatch counters (Phase 158 D-16 telemetry) to stderr"
+        help="Print CFR dispatch counters (telemetry) to stderr"
     )
 
-    # Phase 160 Plan-04 (CONTEXT D-19) + Phase 165: --dump-tree emits the
+    # (CONTEXT) +: --dump-tree emits the
     # NameTreeNode IR for the given SMILES. Default format is "text"
     # (chemist-readable indented tree); --format json emits dataclasses.asdict()
     # JSON for machine consumption. The CLI invokes Orthonym.name_with_tree(smi)
-    # which returns NamingResult(name, tree, atom_to_locant_hint). Phase 165:
+    # which returns NamingResult(name, tree, atom_to_locant_hint).:
     # every reachable handler plus the ion/retained boundary fallback populates
     # a tree, so the dump always shows a structured-or-coarse IR (recursive).
     parser.add_argument(
         "--dump-tree",
         action="store_true",
-        help="Dump the NameTreeNode IR for the given SMILES (Phase 160 DECOMP-04)"
+        help="Dump the NameTreeNode IR for the given SMILES "
     )
 
     parser.add_argument(
@@ -150,24 +150,24 @@ def main(args: List[str] = None) -> int:
         help="Output format for --dump-tree (default: text)"
     )
 
-    # Phase 168 Triviality Controller (TRIV-01/02/03 + CONTEXT D-08).
-    triv_group = parser.add_argument_group("Triviality Controller (Phase 168)")
+    # Triviality Controller (TRIV-01/02/03 + CONTEXT).
+    triv_group = parser.add_argument_group("Triviality Controller ")
     triv_group.add_argument(
         "--enable-triviality-controller",
         dest="enable_triviality_controller",
         action="store_true",
         default=False,
         help=(
-            "Enable the triviality controller (Phase 168). Default OFF "
+            "Enable the triviality controller. Default OFF "
             "(Stage A SACRED canary invariant). When True, the controller "
             "swaps systematic PIN-eligible parents (benzene/phenol/aniline/"
             "benzoic acid/etc.) to retained PIN forms at the name-tree IR "
-            "layer per IUPAC P-15.1.8.1..3. See 168-CONTEXT.md D-08. Env "
+            "layer per IUPAC P-15.1.8.1..3. See 168-CONTEXT.md. Env "
             "override: ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1."
         ),
     )
 
-    # Task 1.9 (PIN-policy): --trivial fallback flag. Default OFF (PIN fails
+    # .9 (PIN-policy): --trivial fallback flag. Default OFF (PIN fails
     # closed). When set, a general-only (PIN-denied) retained name is returned
     # ONLY when the default pipeline could not derive a PIN — a fallback, never
     # a downgrade of a derivable PIN.
@@ -184,7 +184,7 @@ def main(args: List[str] = None) -> int:
         ),
     )
 
-    # v25 G3: confidence-tiered output surface. Default 'pin' is the
+    # G3: confidence-tiered output surface. Default 'pin' is the
     # existing PIN-or-abstain behavior byte-identically; 'valid' adds
     # RT-verified general-engine names (T3); 'best-effort' additionally
     # ships E1-certified names OPSIN could not verify (T4). No tier ever
@@ -196,10 +196,10 @@ def main(args: List[str] = None) -> int:
         default="pin",
         help=(
             "Output tier: pin (default, PIN-or-abstain), valid "
-            "(adds RT-verified general-engine names), complete (v26; adds "
+            "(adds RT-verified general-engine names), complete (adds "
             "RT-verified aggressive general aromatic/heterocyclic "
             "fallbacks; non-PIN allowed), best-effort (adds E1-certified "
-            "but OPSIN-unverified names), full-coverage (v37 SP5; adds the "
+            "but OPSIN-unverified names), full-coverage (adds the "
             "opt-in general P-69 coordination-additive namer for "
             "metal-tetrapyrrole/corrin macrocycles -- construct-or-decline, "
             "labelled UNVERIFIED where no oracle exists; never surfaces "
@@ -212,15 +212,15 @@ def main(args: List[str] = None) -> int:
         default=False,
         help=(
             "Emit the provenance row as JSON instead of the bare name "
-            "(v25 G3): {name,tier,is_pin,source,opsin,gates_passed,"
+            ": {name,tier,is_pin,source,opsin,gates_passed,"
             "gate_outcome,formula,limit_code,stereo_unexpressed}. "
             "'opsin' is one of verified / verified_constitution_only "
-            "(v29 P7: SELF-01 judged a stereo-STRIPPED parse, so the "
+            "(P7: SELF-01 judged a stereo-STRIPPED parse, so the "
             "constitution is verified and the stereo layer is NOT) / "
-            "unverified / n/a. 'gate_outcome' (v29 P7) reports what the "
+            "unverified / n/a. 'gate_outcome' reports what the "
             "OPSIN validity gate ACTUALLY DID for this name -- "
             "self01_verified, not_run, bypassed, suppressed, "
-            "gate_disabled, unavailable, carveout:<slug>, ... -- rather "
+            "gate_disabled, unavailable, carveout:<slug>,... -- rather "
             "than merely whether an OPSIN jar was present."
         ),
     )
@@ -230,7 +230,7 @@ def main(args: List[str] = None) -> int:
         action="store_true",
         default=False,
         help=(
-            "DIAGNOSTIC (v25): bypass the PIN path and print the general "
+            "DIAGNOSTIC: bypass the PIN path and print the general "
             "engine's raw emission (E1-audited, NOT OPSIN-RT-gated) or its "
             "refusal reason. Never a PIN; for inspection/comparison only."
         ),
@@ -242,7 +242,7 @@ def main(args: List[str] = None) -> int:
         choices=["off", "audit", "enforce"],
         default="off",
         help=(
-            "v29 P1 name<->graph binding proof: off (default, no proof work "
+            " P1 name<->graph binding proof: off (default, no proof work "
             "at all), audit (re-assert the producer's binding spine against "
             "the FINAL returned name and log the findings; the name is never "
             "changed), enforce (additionally abstain when that proof fails). "
@@ -265,7 +265,7 @@ def main(args: List[str] = None) -> int:
         return 1
 
     try:
-        # Phase 156 Plan-03 Task 4: --validation-stats branch goes
+        # : --validation-stats branch goes
         # through Orthonym(...).get_validation_stats() per AP-19
         # (never read a module-global counter). Branch is taken BEFORE
         # the existing default `print(name)` so the histogram is the
@@ -279,12 +279,12 @@ def main(args: List[str] = None) -> int:
             print(f"Validation stats: {stats}", file=sys.stderr)
             return 0
 
-        # Phase 158 Plan-03 Task 9 + Phase 160 D-18: --dispatch-stats
+        # +: --dispatch-stats
         # branch goes through Orthonym(...).get_dispatch_stats() AND
-        # Orthonym(...).get_inner_dispatch_stats() per CONTEXT D-16 +
-        # D-18 + AP-6 (never read a module-global counter). Default-OFF;
+        # Orthonym(...).get_inner_dispatch_stats() per CONTEXT +
+        # + AP-6 (never read a module-global counter). Default-OFF;
         # stderr-only. Histogram is sorted by count descending for
-        # readability; StoutClass members print by .name (uppercase
+        # readability; StoutClass members print by.name (uppercase
         # identifier). Inner handler_ids print as-is (lowercase snake_case).
         if parsed.dispatch_stats:
             from orthonym.namer import Orthonym
@@ -293,7 +293,7 @@ def main(args: List[str] = None) -> int:
             name = namer.name(parsed.smiles)
             print(name)
             stats = namer.get_dispatch_stats()
-            print("\n--- CFR Dispatch Stats (Phase 158 outer) ---", file=sys.stderr)
+            print("\n--- CFR Dispatch Stats (outer) ---", file=sys.stderr)
             # Sort by count descending; tie-break by class_id.value for determinism
             for class_id, count in sorted(
                 stats.items(),
@@ -302,22 +302,22 @@ def main(args: List[str] = None) -> int:
                 class_name = (
                     class_id.name if isinstance(class_id, StoutClass) else str(class_id)
                 )
-                print(f"  {class_name}: {count}", file=sys.stderr)
-            # Phase 160 D-18: also print inner-dispatch counters.
+                print(f" {class_name}: {count}", file=sys.stderr)
+            # : also print inner-dispatch counters.
             inner_stats = namer.get_inner_dispatch_stats()
-            print("\n--- Inner Dispatch Stats (Phase 160 inner) ---", file=sys.stderr)
+            print("\n--- Inner Dispatch Stats (inner) ---", file=sys.stderr)
             if not inner_stats:
-                print("  (no inner-dispatch hits; molecule routed via CFR fast-path)",
+                print(" (no inner-dispatch hits; molecule routed via CFR fast-path)",
                       file=sys.stderr)
             else:
                 for handler_id, count in sorted(
                     inner_stats.items(),
                     key=lambda kv: (-kv[1], kv[0]),
                 ):
-                    print(f"  {handler_id}: {count}", file=sys.stderr)
+                    print(f" {handler_id}: {count}", file=sys.stderr)
             return 0
 
-        # Phase 160 Plan-04 (CONTEXT D-19): --dump-tree dispatches BEFORE
+        # (CONTEXT): --dump-tree dispatches BEFORE
         # the default print(name) branch so the IR is the sole stdout
         # emission. Default format is "text" (chemist-readable indented
         # tree); --format json emits dataclasses.asdict() JSON.
@@ -342,16 +342,16 @@ def main(args: List[str] = None) -> int:
                 _print_tree_text(result)
             return 0
 
-        # Phase 168 D-08: thread the triviality-controller flag through
+        # : thread the triviality-controller flag through
         # name_compound. getattr defensive pattern preserves backwards compat.
-        # Task 1.9: also thread the --trivial fallback flag.
+        # .9: also thread the --trivial fallback flag.
         name_kwargs = {
             "enable_triviality_controller": getattr(
                 parsed, "enable_triviality_controller", False),
             "trivial_fallback": getattr(parsed, "trivial_fallback", False),
         }
 
-        # v25: --engine-only diagnostic branch (before the tier branch: a
+        # : --engine-only diagnostic branch (before the tier branch: a
         # pure inspection surface, never a production emit path).
         if getattr(parsed, "engine_only", False):
             import json as _json
@@ -385,13 +385,13 @@ def main(args: List[str] = None) -> int:
             }))
             return 0
 
-        # v25 G3: tiered-output branch. Constructs the namer directly (the
+        # G3: tiered-output branch. Constructs the namer directly (the
         # tier flags are namer-level), prints JSON with --provenance or the
         # bare name otherwise. Dispatches before the legacy branches so the
         # default (--emit-tier pin, no --provenance) path below stays
         # byte-identical.
         _emit_tier = getattr(parsed, "emit_tier", "pin")
-        # v29 P1: --binding-proof also selects this branch, because it is the
+        # P1: --binding-proof also selects this branch, because it is the
         # only single-SMILES surface that constructs the namer directly (the
         # default path goes through name_compound). Without it the flag would
         # parse and then silently do nothing -- the same failure mode the
@@ -419,9 +419,9 @@ def main(args: List[str] = None) -> int:
             elif row["name"]:
                 print(row["name"])
             else:
-                # v28 Composer1 Task 5 fix: a clean T5 abstain has
+                # Composer1 fix: a clean T5 abstain has
                 # name=None by design (honest "no name" contract — see
-                # name_tiered's v28 Composer1 Task 5 comment). Printing
+                # name_tiered's Composer1 comment). Printing
                 # bare `None` to stdout would be confusing/broken output
                 # for this documented flag; print a labeled abstention
                 # indicator instead. Never fabricates a name.
@@ -431,8 +431,8 @@ def main(args: List[str] = None) -> int:
         if parsed.confidence:
             result = name_compound(parsed.smiles, style=parsed.style,
                                    include_confidence=True, **name_kwargs)
-            print(f"Name:       {result['name']}")
-            # v29 C4-D: an UNMEASURED candidate reports confidence None /
+            print(f"Name: {result['name']}")
+            # C4-D: an UNMEASURED candidate reports confidence None /
             # factors {} rather than a fabricated 1.0 (the old behaviour scored
             # a name that dropped two thirds of the molecule as perfect). Print
             # the honest verdict; never format None as a number.
@@ -441,7 +441,7 @@ def main(args: List[str] = None) -> int:
                 print("Confidence: unverified (no coverage measurement was taken)")
             else:
                 print(f"Confidence: {_conf:.4f}")
-            print(f"Handler:    {result['handler']}")
+            print(f"Handler: {result['handler']}")
             if result.get('factors'):
                 print("Factors:")
                 for k, v in result['factors'].items():
@@ -450,8 +450,8 @@ def main(args: List[str] = None) -> int:
         elif parsed.verbose:
             name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
             print(f"SMILES: {parsed.smiles}")
-            print(f"Style:  {parsed.style}")
-            print(f"Name:   {name}")
+            print(f"Style: {parsed.style}")
+            print(f"Name: {name}")
         else:
             name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
             print(name)
@@ -501,7 +501,7 @@ def _process_batch(input_file: str, output_file: str, style: str,
                                        include_confidence=True,
                                        trivial_fallback=trivial_fallback,
                                        binding_proof=binding_proof)
-                # v29 C4-D: None means UNMEASURED, not zero — emit the token
+                # C4-D: None means UNMEASURED, not zero — emit the token
                 # 'unverified' rather than formatting None or implying 0.0000.
                 _conf = result.get('confidence')
                 _conf_col = ('unverified' if _conf is None
@@ -542,7 +542,7 @@ def _process_batch(input_file: str, output_file: str, style: str,
 
 
 def _render_node(node, indent: str = "", is_last: bool = True) -> None:
-    """Phase 165 D-04: recursively render a NameTreeNode with indented
+    """: recursively render a NameTreeNode with indented
     box-drawing connectors. Nested ``prefixes[]`` subtrees render recursively
     so a multi-prefix molecule shows its full structure (not a flat list)."""
     connector = "+-" if is_last else "|-"
@@ -563,25 +563,25 @@ def _render_node(node, indent: str = "", is_last: bool = True) -> None:
 
 
 def _print_tree_text(result) -> None:
-    """Phase 160 D-19 / Phase 165 D-04 text renderer for ``--dump-tree``.
+    """ / text renderer for ``--dump-tree``.
 
     Renders a ``NamingResult`` as an indented, chemist-readable tree with
-    recursive ``prefixes[]`` subtrees. Phase 165: every reachable handler plus
+    recursive ``prefixes[]`` subtrees.: every reachable handler plus
     the ion/retained boundary fallback (namer.name_with_tree) populates a tree,
     so the Phase-160 ``tree=None`` placeholder is retired.
     """
     tree = result.tree
     if tree is None:
-        # Defensive only: name_with_tree's SC-3 fallback guarantees a non-null
+        # Defensive only: name_with_tree's fallback guarantees a non-null
         # tree for any non-empty name; this branch is reachable only for an
         # empty name (degenerate input).
-        print(f"NameTree: {result.name!r}  (tree=None)")
+        print(f"NameTree: {result.name!r} (tree=None)")
         return
     cite = f", cite={tree.iupac_section_cite}" if tree.iupac_section_cite else ""
-    print(f"NameTree: {result.name}  (class_id={tree.class_id or 'unspecified'}{cite})")
+    print(f"NameTree: {result.name} (class_id={tree.class_id or 'unspecified'}{cite})")
     _render_node(tree, indent="", is_last=True)
     if result.atom_to_locant_hint is not None:
-        print(f"   (atom_to_locant_hint: {result.atom_to_locant_hint!r})")
+        print(f" (atom_to_locant_hint: {result.atom_to_locant_hint!r})")
 
 
 if __name__ == "__main__":

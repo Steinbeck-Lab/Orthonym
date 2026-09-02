@@ -55,21 +55,21 @@ class PolycyclicInfo(NamedTuple):
 def get_ring_count(mol) -> int:
     """
     Calculate the number of independent rings using the cycle rank formula.
-    
+
     For a connected molecule: rings = bonds - atoms + 1
     This equals the number of cuts needed to convert to an acyclic structure.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Number of rings (cycle rank)
-        
+
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> get_ring_count(mol)
         2
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> get_ring_count(mol)
         3
     """
@@ -96,12 +96,12 @@ def get_ring_count(mol) -> int:
 def count_cuts_to_open(mol) -> int:
     """
     Count how many bonds must be cut to make the ring system acyclic.
-    
+
     This is equivalent to the ring count (cycle rank).
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Number of cuts needed
     """
@@ -115,7 +115,7 @@ def count_cuts_to_open(mol) -> int:
 def classify_bridged_system(mol) -> Optional[str]:
     """
     Classify a bridged polycyclic system by its ring count.
-    
+
     Classification:
     - bicyclo: 2 rings
     - tricyclo: 3 rings
@@ -123,18 +123,18 @@ def classify_bridged_system(mol) -> Optional[str]:
     - pentacyclo: 5 rings
     - hexacyclo: 6 rings
     - heptacyclo: 7 rings
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Classification string, or None if not a bridged polycyclic
-        
+
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> classify_bridged_system(mol)
         'bicyclo'
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> classify_bridged_system(mol)
         'tricyclo'
     """
@@ -162,15 +162,15 @@ def classify_bridged_system(mol) -> Optional[str]:
 def is_tricyclo_system(mol) -> bool:
     """
     Check if molecule is a tricyclo (3-ring bridged) system.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         True if molecule has exactly 3 rings in bridged configuration
-        
+
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> is_tricyclo_system(mol)
         True
     """
@@ -180,10 +180,10 @@ def is_tricyclo_system(mol) -> bool:
 def is_tetracyclo_system(mol) -> bool:
     """
     Check if molecule is a tetracyclo (4-ring bridged) system.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         True if molecule has exactly 4 rings in bridged configuration
     """
@@ -193,10 +193,10 @@ def is_tetracyclo_system(mol) -> bool:
 def is_pentacyclo_or_higher(mol) -> bool:
     """
     Check if molecule is pentacyclo or higher (5+ rings).
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         True if molecule has 5 or more rings
     """
@@ -211,29 +211,29 @@ def is_pentacyclo_or_higher(mol) -> bool:
 def find_all_bridgeheads(mol) -> Set[int]:
     """
     Find all bridgehead atoms in a polycyclic system.
-    
+
     A bridgehead atom is:
     1. In 2 or more rings
     2. Has 3+ neighbors all within the ring system
-    
+
     This extends the bicyclo bridgehead detection to handle
     systems with more than 2 bridgeheads.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Set of atom indices that are bridgeheads
-        
+
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
         >>> len(find_all_bridgeheads(mol))
         2
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
-        >>> len(find_all_bridgeheads(mol))  
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
+        >>> len(find_all_bridgeheads(mol))
         4
     """
-    # SUB-02/D-08: delegate to the SINGLE consolidated predicate. The former
+    # SUB-02/: delegate to the SINGLE consolidated predicate. The former
     # body's extra filters (atom_ring_count>=2, total-neighbours>=3) are
     # redundant given ring_neighbours>=3 (an atom with >=3 ring neighbours is
     # necessarily in >=2 rings and has >=3 total neighbours), so this is a
@@ -245,10 +245,10 @@ def find_all_bridgeheads(mol) -> Set[int]:
 def get_ring_atoms(mol) -> Set[int]:
     """
     Get all atoms that are part of the ring system.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Set of atom indices in any ring
     """
@@ -266,14 +266,14 @@ def get_ring_atoms(mol) -> Set[int]:
 def find_all_bridge_paths(mol, bridgeheads: Set[int]) -> List[BridgeInfo]:
     """
     Find all bridges between any pair of bridgehead atoms.
-    
+
     A bridge is a path between two bridgeheads that doesn't pass
     through any other bridgehead.
-    
+
     Args:
         mol: RDKit Mol object
         bridgeheads: Set of bridgehead atom indices
-        
+
     Returns:
         List of BridgeInfo objects for each bridge
     """
@@ -318,7 +318,7 @@ def _find_paths_between(
 ) -> List[List[int]]:
     """
     Find all simple paths between two atoms that don't pass through other bridgeheads.
-    
+
     Uses BFS to find all paths.
     """
     all_paths: List[List[int]] = []
@@ -359,15 +359,15 @@ def _find_paths_between(
 def find_main_ring(mol, bridgeheads: Set[int]) -> Optional[List[int]]:
     """
     Find the main ring for IUPAC numbering purposes.
-    
+
     The main ring is defined as:
     1. The largest ring containing exactly 2 bridgeheads
     2. If tie, the ring with the most atoms
-    
+
     Args:
         mol: RDKit Mol object
         bridgeheads: Set of bridgehead atom indices
-        
+
     Returns:
         List of atom indices in the main ring, in order, or None
     """
@@ -402,13 +402,13 @@ def find_main_ring(mol, bridgeheads: Set[int]) -> Optional[List[int]]:
 def identify_main_bridgeheads(mol, bridgeheads: Set[int]) -> Optional[Tuple[int, int]]:
     """
     Identify the two main bridgeheads for the primary bicyclic skeleton.
-    
+
     These are the bridgeheads in the main ring that will be numbered 1 and n.
-    
+
     Args:
         mol: RDKit Mol object
         bridgeheads: Set of all bridgehead atom indices
-        
+
     Returns:
         Tuple of (primary_bh, secondary_bh) or None
     """
@@ -434,21 +434,21 @@ def identify_main_bridgeheads(mol, bridgeheads: Set[int]) -> Optional[Tuple[int,
 def analyze_polycyclic_system(mol) -> Optional[PolycyclicInfo]:
     """
     Perform complete analysis of a bridged polycyclic system.
-    
+
     Returns all information needed for IUPAC naming:
     - System classification
     - Bridgehead positions
     - Main ring
     - All bridges with lengths
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         PolycyclicInfo namedtuple or None if not a valid polycyclic
-        
+
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> info = analyze_polycyclic_system(mol)
         >>> info.system_type
         'tricyclo'
@@ -503,11 +503,11 @@ def analyze_polycyclic_system(mol) -> Optional[PolycyclicInfo]:
 def get_ring_heteroatoms(mol, ring_atoms: Set[int]) -> List[Tuple[int, str]]:
     """
     Find heteroatoms (non-carbon) in the ring system.
-    
+
     Args:
         mol: RDKit Mol object
         ring_atoms: Set of atom indices in the ring system
-        
+
     Returns:
         List of (atom_idx, element_symbol) for each heteroatom
     """
@@ -556,10 +556,10 @@ def get_heteroatom_prefix(symbol: str) -> Optional[str]:
     Do not merge the two.
 
     Args:
-        symbol: Element symbol (O, N, S, ...)
+        symbol: Element symbol (O, N, S,...)
 
     Returns:
-        The IUPAC replacement prefix (oxa, aza, thia, ...), or ``None`` when the
+        The IUPAC replacement prefix (oxa, aza, thia,...), or ``None`` when the
         element is off-table and the caller must refuse.
     """
     from .ring_replacement import HETEROATOM_PREFIXES

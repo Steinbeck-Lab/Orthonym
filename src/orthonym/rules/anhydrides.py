@@ -2,16 +2,16 @@
 Anhydride naming using IUPAC functional class nomenclature.
 
 Anhydrides use "functional class" naming:
-    Symmetric:  "{acid name} anhydride"
-    Mixed:      "{acid1} {acid2} anhydride" (alphabetical order)
-    Cyclic:     "{diacid name} anhydride"
+    Symmetric: "{acid name} anhydride"
+    Mixed: "{acid1} {acid2} anhydride" (alphabetical order)
+    Cyclic: "{diacid name} anhydride"
 
 Examples:
-    CC(=O)OC(=O)C       -> ethanoic anhydride (symmetric)
-    CC(=O)OC(=O)CC      -> ethanoic propanoic anhydride (mixed, alphabetical)
-    CCC(=O)OC(=O)CCC    -> butanoic anhydride (symmetric)
-    O=C1CCC(=O)O1       -> butanedioic anhydride (cyclic, from succinic acid)
-    O=C1CCCC(=O)O1      -> pentanedioic anhydride (cyclic, from glutaric acid)
+    CC(=O)OC(=O)C -> ethanoic anhydride (symmetric)
+    CC(=O)OC(=O)CC -> ethanoic propanoic anhydride (mixed, alphabetical)
+    CCC(=O)OC(=O)CCC -> butanoic anhydride (symmetric)
+    O=C1CCC(=O)O1 -> butanedioic anhydride (cyclic, from succinic acid)
+    O=C1CCCC(=O)O1 -> pentanedioic anhydride (cyclic, from glutaric acid)
 
 The acid name derives from the acyl fragment:
     ethanoyl + ethanoyl -> ethanoic acid -> "ethanoic anhydride"
@@ -72,16 +72,16 @@ def name_anhydride(features) -> Optional[str]:
     # Each re-detects its own bridge on the mol; the base carbon/O core below
     # never matches them, so ordering these first is safe (they return only on a
     # genuine bridge match).
-    _sn = _name_sulfonic_anhydride(mol)          # P-65.7.1  R-SO2-O-SO2-R'
+    _sn = _name_sulfonic_anhydride(mol)          # P-65.7.1 R-SO2-O-SO2-R'
     if _sn:
         return _sn
-    _cn = _name_chalcogen_anhydride(mol)         # P-65.7.3  R-CO-S/Se/Te-CO-R'
+    _cn = _name_chalcogen_anhydride(mol)         # P-65.7.3 R-CO-S/Se/Te-CO-R'
     if _cn:
         return _cn
-    _pn = _name_peroxy_anhydride(mol)            # P-65.7.4  R-CO-OO-CO-R'
+    _pn = _name_peroxy_anhydride(mol)            # P-65.7.4 R-CO-OO-CO-R'
     if _pn:
         return _pn
-    _mi = _name_mixed_inorganic_anhydride(mol)   # P-65.7.2  R-CO-O/S-C#N (cyanic/thiocyanic)
+    _mi = _name_mixed_inorganic_anhydride(mol)   # P-65.7.2 R-CO-O/S-C#N (cyanic/thiocyanic)
     if _mi:
         return _mi
 
@@ -94,7 +94,7 @@ def name_anhydride(features) -> Optional[str]:
     if not matches:
         return None
 
-    # W3-P06 Task 8 (P-65.7.6.1): di- and polyanhydrides — TWO or more -CO-O-CO-
+    # W3-P06 (P-65.7.6.1): di- and polyanhydrides — TWO or more -CO-O-CO-
     # linkages. Must be handled before the single-match path (which takes
     # matches[0] and whose acyl-BFS would cross the 2nd linkage -> wrong name).
     if len(matches) >= 2:
@@ -141,7 +141,7 @@ def name_anhydride(features) -> Optional[str]:
 
     if is_cyclic:
         # PIN (P-65.7.7.1 method 1): the heterocyclic-pseudoketone dione
-        # (oxolane-2,5-dione, furan-2,5-dione, 2-benzofuran-1,3-dione, ...).
+        # (oxolane-2,5-dione, furan-2,5-dione, 2-benzofuran-1,3-dione,...).
         # Produced from WITHIN this priority-1200 handler so the lactone@1300
         # handler (which also matches a cyclic anhydride) cannot grab + mis-name it.
         dione = _name_cyclic_anhydride_dione(mol, c1_idx, c2_idx, bridge_o, ring_set)
@@ -152,7 +152,7 @@ def name_anhydride(features) -> Optional[str]:
         # declines.
         return _name_cyclic_anhydride(total_chain_length)
 
-    # W3-P06 Task 3 (P-65.5.3.2): the diacyl halide of dicarbonic acid,
+    # W3-P06 (P-65.5.3.2): the diacyl halide of dicarbonic acid,
     # X-CO-O-CO-X. BOTH carbonyl carbons are 'carbono' units (bridge O + one =O +
     # exactly one halide, NO carbon neighbour) -> 'dicarbonic <halide word(s)>'
     # (dicarbonic dichloride; mixed -> alphabetical 'dicarbonic bromide chloride',
@@ -165,7 +165,7 @@ def name_anhydride(features) -> Optional[str]:
 
     # Acyclic anhydride: name each acyl fragment as its corresponding acid.
     # Uses _name_acyl_acid() which calls _integrate_universal_prefixes()
-    # per D-01 to discover branch substituents on acyl chains.
+    # per to discover branch substituents on acyl chains.
     acid1_name, sub1 = _name_acyl_acid(mol, c1_idx, bridge_o, anhydride_info['o1'])
     acid2_name, sub2 = _name_acyl_acid(mol, c2_idx, bridge_o, anhydride_info['o2'])
 
@@ -455,7 +455,7 @@ def _name_mixed_inorganic_anhydride(mol) -> Optional[str]:
 def _name_chalcogen_anhydride(mol) -> Optional[str]:
     """P-65.7.3: R-CO-X-CO-R' (X = S/Se/Te) -> '<acid stem(s)> {class}anhydride'.
 
-    Each acyl side is named as its corresponding acid (benzoic, acetic, ...); the
+    Each acyl side is named as its corresponding acid (benzoic, acetic,...); the
     class term is thio/seleno/telluroanhydride per the bridge element. Symmetric
     -> '{acid} thioanhydride' (benzoic thioanhydride); mixed -> alphabetical two
     words. Returns None when no -CO-X-CO- core is present."""
@@ -508,7 +508,7 @@ def _name_chalcogen_dianhydride(mol, matches) -> Optional[str]:
     """P-65.7.6.4.1: chalcogen analogue of a di-/poly-anhydride, ALL linkages
     the SAME chalcogen -> '<residues in occurrence order> {mult}({chalcogen}
     anhydride)' (BB 32446: 'CH3-CO-S-CO-CH2-CH2-CO-S-CO-CH3 diacetic
-    butanedioic bis(thioanhydride) (PIN)'). Mirrors :func:`_name_dianhydride`'s
+    butanedioic bis(thioanhydride) (PIN)'). Mirrors:func:`_name_dianhydride`'s
     residue walk (occurrence order starting from the alphabetically-lower
     terminal; identical residues numeric-collapsed) but the class term is
     'bis-'/'tris-'/... WRAPPING the singular chalcogen-anhydride word, per
@@ -592,11 +592,11 @@ def _name_cyclic_chalcogen_dione(mol, c1: int, c2: int, bridge_x: int) -> Option
     dropping 'hexahydro' gives the mancude/aromatic form here).
 
     Exact-canonical-SMILES lookup only (mirrors the O-bridge dione's retained-
-    table branch in :func:`_name_cyclic_anhydride_dione`) -- no general
+    table branch in:func:`_name_cyclic_anhydride_dione`) -- no general
     saturated-chalcogen-oxa-dione engine is built this cycle (P4-8 design-
-    contract item; the O-only :func:`_name_saturated_oxa_dione` stems are not
+    contract item; the O-only:func:`_name_saturated_oxa_dione` stems are not
     generalised to S/Se/Te). Fail-closed (None) for anything not in the table,
-    so the caller (:func:`_name_chalcogen_anhydride`) abstains rather than
+    so the caller (func:`_name_chalcogen_anhydride`) abstains rather than
     mis-name a cyclic structure it cannot fully resolve.
     """
     from ..data.retained_names import get_retained_name
@@ -798,7 +798,7 @@ def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
         frag_atoms: Set of atom indices in the fragment.
 
     Returns:
-        Ordered list of atom indices [start, ..., end].
+        Ordered list of atom indices [start,..., end].
     """
     carbon_set = {i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C'}
 
@@ -826,7 +826,7 @@ def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
 def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     """Name an acyl fragment as its corresponding acid, with substituent prefixes.
 
-    Uses _integrate_universal_prefixes() (per D-01) to discover branch
+    Uses _integrate_universal_prefixes() (per) to discover branch
     substituents on the acyl chain. For simple linear chains, falls back
     to the fast _build_acid_name() path.
 
@@ -867,11 +867,11 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     # Ring acyl (benzoyl -> "benzoic", cyclohexanecarbonyl ->
     # "cyclohexanecarboxylic") or a simple acyclic chain (1C -> "formic",
     # 2C -> "acetic", fatty/unsaturated, else systematic) is named by the
-    # canonical retained-aware acid namer.  Per IUPAC P-65.1.1.1 these
+    # canonical retained-aware acid namer. Per IUPAC P-65.1.1.1 these
     # retained acid names ARE the PINs cited in the anhydride functional-class
     # name (acetic anhydride, benzoic anhydride), so the systematic-only
     # _build_acid_name path produced the wrong stem (ethanoic; heptanoic for a
-    # linearised benzene ring).  Branched or heteroatom-substituted *acyclic*
+    # linearised benzene ring). Branched or heteroatom-substituted *acyclic*
     # acids still need the substituent-prefix path below.
     from .esters import acid_is_ring_acid, get_acid_fragment_name
     frag_list = list(frag_atoms)
@@ -881,7 +881,7 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
         return get_acid_fragment_name(mol, frag_list), False
 
     # Branched or has heteroatom substituents: use _integrate_universal_prefixes()
-    # per D-01 to discover and name substituents on the acyl chain.
+    # per to discover and name substituents on the acyl chain.
     principal_chain = _find_longest_chain(mol, carbonyl_c, frag_atoms)
     chain_set = set(principal_chain)
 
@@ -904,7 +904,7 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
         exclude_atoms=exclude,
     )
 
-    # W3-P06 Task 5 (P-65.1.1.1): a substituted 2-carbon acid uses the RETAINED
+    # W3-P06 (P-65.1.1.1): a substituted 2-carbon acid uses the RETAINED
     # 'acetic' stem with UNLOCANTED substituent prefixes (chloroacetic,
     # dichloroacetic) — acetic has a single substitutable carbon, so no locant is
     # cited (BB 30346 'difluoroacetic acid (not 2,2-difluoroacetic acid)'; BB

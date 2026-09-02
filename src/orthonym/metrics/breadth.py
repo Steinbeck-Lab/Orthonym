@@ -1,7 +1,7 @@
-"""v29 breadth metrics — the pinned definitions behind the breadth instrument.
+""" breadth metrics — the pinned definitions behind the breadth instrument.
 
-Why this module exists: every breadth figure quoted before v29 came from an
-ad-hoc harness in a session , and at least one was a ~4x mirage
+Why this module exists: every breadth figure quoted before came from an
+ad-hoc harness in a session, and at least one was a ~4x mirage
 because the harness and the production producer disagreed about what counts as
 an emission. These functions are the single definition of each metric, unit
 tested in ``tests/unit/metrics/test_breadth.py``, so a number measured in one
@@ -123,9 +123,9 @@ _DROP_RE = re.compile(
 # [^|] guard mirrors _DROP_RE so a capture can never run past its own log record.
 _REFUSE_RE = re.compile(r"general_engine_declined:\s*([^|]+?)\s*(?:\(tier|$)")
 
-# v30 P0-T3. The two grammars above see PRODUCER refusals only, and measurement
+# P0-T3. The two grammars above see PRODUCER refusals only, and measurement
 # showed that is not where these molecules die: of the 11 abstainers that logged
-# no code at all on the v30 P0 best-effort run, NINE were terminated by a
+# no code at all on the P0 best-effort run, NINE were terminated by a
 # post-hoc GATE — the name was built, then suppressed. The gate's own log line
 # was being read as noise (the superseded
 # ``test_parse_refusal_codes_ignores_unrelated_log_noise`` asserted exactly that),
@@ -253,7 +253,7 @@ def residual_refusal_code(row: Dict[str, Any]) -> str | None:
 
     * ``SKIP`` — RDKit could not parse the input; the namer never ran.
     * ``EXC`` — an unhandled exception. NOT a refusal: a crash the instrument's
-      own ``except`` turned into an abstainer row. On the v30 P0 run this was one
+      own ``except`` turned into an abstainer row. On the P0 run this was one
       row, ``TypeError: '<' not supported between instances of 'str' and 'int'``.
     * ``TIMEOUT`` — the instrument's own per-molecule SIGALRM, not an engine
       decision.
@@ -287,11 +287,11 @@ def residual_refusal_code(row: Dict[str, Any]) -> str | None:
 
 #: The two attribution bases, and WHY there are two rather than one.
 #:
-#: ``log``      — every producer-refusal-slug / ``producer_refused:*`` / gate
-#:                code scraped from the engine's own log stream for that
-#:                molecule.
+# : ``log`` — every producer-refusal-slug / ``producer_refused:*`` / gate
+# : code scraped from the engine's own log stream for that
+# : molecule.
 #: ``terminal`` — the ONE mechanism the typed abstention channel
-#:                (``metrics.abstention``) recorded as having ended the naming.
+# : (``metrics.abstention``) recorded as having ended the naming.
 _BASES = ("log", "terminal")
 
 #: Prefix for a site attributed by the typed abstention channel.
@@ -318,11 +318,11 @@ def terminal_site(row: Dict[str, Any]) -> str | None:
     function exists for::
 
         [I-](CCO)c1ccccc1
-          log codes : substituent_is_bare_functional_group:fg_only,
+          log codes: substituent_is_bare_functional_group:fg_only,
                       ring_fragment_declined_by_ring_engine:ring_fragment_declined…,
                       n_branch_ring_substituent_unnameable,
                       producer_refused:branch unnameable
-          terminal  : GATE_SUPPRESSED / charge_dropped   (namer.py:3916)
+          terminal: GATE_SUPPRESSED / charge_dropped (namer.py:3916)
 
     A name WAS built for that molecule; a structure-conservation veto removed
     it. On the log basis four innocent sites collect ``first``/``ONLY`` credit
@@ -379,9 +379,9 @@ def terminal_site(row: Dict[str, Any]) -> str | None:
 #: censuses cannot drift into two vocabularies for the same axis:
 #:
 #: * ``needs_engine`` — the pipeline produced NO candidate. Only new naming
-#:   CAPABILITY recovers these.
-#: * ``suppressed``   — a candidate WAS built and a gate/downgrade removed it.
-#: * ``other``        — the channel fired but named no specific mechanism.
+# : CAPABILITY recovers these.
+# : * ``suppressed`` — a candidate WAS built and a gate/downgrade removed it.
+# : * ``other`` — the channel fired but named no specific mechanism.
 #: * ``uninstrumented`` — no channel record; the site came from the log stream.
 #:
 #: ⚠ ``suppressed`` is NOT the same as "recoverable by re-emitting". A
@@ -474,9 +474,9 @@ def refusal_structure(rows: Sequence[Dict[str, Any]],
     promoted to a defect class):
 
     * ``touched`` — abstainers on which the site fired at all. NOT additive.
-    * ``first``   — abstainers where it fired first. Systematically over-credits
+    * ``first`` — abstainers where it fired first. Systematically over-credits
       whichever site happens to sit earliest in the pipeline.
-    * ``only``    — abstainers naming this site and NO other. The honest ceiling
+    * ``only`` — abstainers naming this site and NO other. The honest ceiling
       of a one-site fix.
 
     ``single_site_ceiling`` = ``(emitted + Σ only) / n`` and is an OPTIMISTIC
@@ -485,12 +485,12 @@ def refusal_structure(rows: Sequence[Dict[str, Any]],
     "total_refuse=1 does NOT mean single-blocked … 1 of 10 emitted").
 
     Depth-0 abstainers are reported as ``uncoded_abstainers`` and attributed
-    separately via :func:`residual_refusal_code`. They are NEVER folded into
+    separately via:func:`residual_refusal_code`. They are NEVER folded into
     ``only`` or the ceiling: uncoded is the opposite of known-single, and
     counting them would inflate the ceiling with rows whose blocker is unknown.
 
-    ``basis`` (v30 P0-T4) selects the ATTRIBUTION source; see
-    :func:`row_attribution` and :func:`terminal_site` for why there are two.
+    ``basis`` selects the ATTRIBUTION source; see
+    :func:`row_attribution` and:func:`terminal_site` for why there are two.
 
     * ``"log"`` (default, unchanged) — every code the engine logged. ``first``
       and ``ONLY`` therefore go to whichever EXPLORATORY producer code fired
@@ -744,16 +744,16 @@ def aggregate(rows: Sequence[Dict[str, Any]],
         # T6: emitted names OPSIN could not parse at all.
         "opsin_unparseable": sum(1 for r in rows if r.get("opsin_unparseable")),
         # Tracked APART from structure_wrong: a mobile-H tautomer difference is
-        # not a wrong structure. The first v29 baseline reported 2 "wrong"
+        # not a wrong structure. The first baseline reported 2 "wrong"
         # names that were both tautomers (benzimidazole NH, guanidine); folding
         # those into T3 would manufacture phantom 0-wrong violations.
         "tautomer_differs": sum(1 for r in rows if r.get("tautomer_differs")),
         "refusal_census": dict(census.most_common()),
         "refusal_census_abstain": dict(census_abstain.most_common()),
-        # v30 P0-T2: the ONLY-ranked structure. Carried into the run JSON so the
+        # P0-T2: the ONLY-ranked structure. Carried into the run JSON so the
         # build order is queryable without re-running a 675 s measurement.
         "refusal_structure": refusal_structure(rows),
-        # v30 P0-T4: the same structure on TERMINAL attribution. `None`, not an
+        # P0-T4: the same structure on TERMINAL attribution. `None`, not an
         # empty-looking structure, when the rows were measured before the
         # abstention channel was wired -- a zero here would be indistinguishable
         # from "the channel found nothing".

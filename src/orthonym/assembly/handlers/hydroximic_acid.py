@@ -6,8 +6,8 @@ general-only '-hydroximic acid' suffix (P-65.1.3.3.1 Note). This mirrors the
 hydroxamic-acid handler ('N-hydroxy<stem>amide') exactly one class up.
 
 Examples:
-- CC(O)=NO   -> 'N-hydroxyethanimidic acid'   (acetohydroximic acid)
-- OC=NO      -> 'N-hydroxymethanimidic acid'   (formohydroximic acid)
+- CC(O)=NO -> 'N-hydroxyethanimidic acid' (acetohydroximic acid)
+- OC=NO -> 'N-hydroxymethanimidic acid' (formohydroximic acid)
 
 The imidic-acid core is named by the full production pipeline: we remove the
 -OH from the imino nitrogen (=N-OH -> =NH), name the resulting imidic acid,
@@ -36,7 +36,7 @@ def name_hydroximic_acid(
 
     Names the imidic-acid core (=N-OH stripped to =NH) via the full pipeline,
     then prepends 'N-hydroxy'. Returns None on any failure so the cascade
-    continues (fail-safe per ADR-19-04).
+    continues (fail-safe per).
     """
     from rdkit import Chem
 

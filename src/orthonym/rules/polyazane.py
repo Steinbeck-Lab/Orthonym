@@ -2,8 +2,8 @@
 
 Acyclic chains of nitrogen atoms joined by N-N bonds:
 
-    saturated    : NN -> hydrazine, NNN -> triazane, NNNN -> tetraazane, ...
-    unsaturated  : N=N -> diazene, N=NN -> triaz-1-ene, N=NNN -> tetraaz-1-ene
+    saturated: NN -> hydrazine, NNN -> triazane, NNNN -> tetraazane,...
+    unsaturated: N=N -> diazene, N=NN -> triaz-1-ene, N=NNN -> tetraaz-1-ene
     azo (P-68.3.1.3.2): R-N=N-R -> 1,2-dimethyldiazene / 1,2-diphenyldiazene
     substituted hydrazine: CNN -> methylhydrazine
 
@@ -149,7 +149,7 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     parts = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        # v29 P3-CLOSEOUT Item A: multiplier word from the shared primitive
+        # P3-CLOSEOUT Item A: multiplier word from the shared primitive
         # (P-16.3.5(a) bis/tris for a SUBSTITUTED prefix); the local table
         # could only say di/tri, so `1,2-di(cyclohexylmethyl)hydrazine`
         # shipped where `1,2-bis(...)` is required.
@@ -171,8 +171,8 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     to the detachable substituent prefixes; cites organyl substituents with
     N-chain locants. Returns the full substituted name, or None (fail-closed).
 
-        Ph-N=N-NH-Ph  ->  1,3-diphenyltriaz-1-ene   (P-68.3.1.4.2)
-        CH3-NH-NH-NH2 ->  1-methyltriazane          (P-68.3.1.4.1)
+        Ph-N=N-NH-Ph -> 1,3-diphenyltriaz-1-ene (P-68.3.1.4.2)
+        CH3-NH-NH-NH2 -> 1-methyltriazane (P-68.3.1.4.1)
 
     A locant-bearing / substituted substituent name is enclosed in parentheses
     and multiplied with the SIMPLE multiplier ('di', not 'bis' — BB verbatim
@@ -218,7 +218,7 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     # Cite prefixes in P-14.5 alphanumerical order, each with its locant set;
     # join with a hyphen between a letter and a following locant digit.
     #
-    # v29 P3-FIX Item 8: this used `alpha_sort_key`, while the ORIENTATION
+    # P3-FIX Item 8: this used `alpha_sort_key`, while the ORIENTATION
     # tie-break 25 lines up (`_analyse`) uses `prefix_citation_sort_key`. Two
     # different orders in one code path: the direction was chosen to give the
     # lowest locant to the prefix cited first under one rule, and then the
@@ -233,7 +233,7 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     parts: List[str] = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        # v29 P3-CLOSEOUT Item A: arity bound stays local (fail closed); the
+        # P3-CLOSEOUT Item A: arity bound stays local (fail closed); the
         # multiplier WORD comes from the shared primitive so a SUBSTITUTED
         # prefix here can take bis/tris (P-16.3.5(a)).
         if len(locs) not in _SUB_MULTIPLIER:
@@ -256,7 +256,7 @@ def _name_azoxy(mol) -> Optional[str]:
     ([O-]-[N+]=N-): one chain nitrogen is a degree-3 [N+] bearing an -O(-), the
     other a degree-2 neutral =N; each nitrogen bears one organyl group.
 
-        C6H5-N=N(O)-C6H5  ->  diphenyldiazene oxide   (BB 38857)
+        C6H5-N=N(O)-C6H5 -> diphenyldiazene oxide (BB 38857)
 
     SCOPE (fail-closed -> None): only the SYMMETRIC diaryl/dialkyl case
     (R == R'), which per the BB example omits the oxide locant
@@ -370,7 +370,7 @@ def name_formazan(mol) -> Optional[str]:
     hydrazinyl-terminal N (C3=N4-N5). Organyl substituents on N1/C3/N5 are cited
     by those locants:
 
-        Ph-NH-N=CH-N=N-Ph  ->  1,5-diphenylformazan   (BB 38938)
+        Ph-NH-N=CH-N=N-Ph -> 1,5-diphenylformazan (BB 38938)
 
     Fail-closed (returns None): the UNSUBSTITUTED parent (kept on the retained
     RETAINED_NAME table), any charge/radical, a ring skeleton atom, a
@@ -419,7 +419,7 @@ def name_formazan(mol) -> Optional[str]:
         placed = [(loc, nm) for loc, nm in ((1, s1), (3, s3), (5, s5)) if nm]
         if not placed:
             return None                    # bare formazan -> retained table
-        # v29 P3-FIX Item 5: this site was WIDENED by the Phase 3 organyl
+        # P3-FIX Item 5: this site was WIDENED by organyl
         # migration but its composer was left on pre-migration raw code, so the
         # newly-admitted compound prefixes were mis-spelled three ways at once:
         # a local `_SUB_MULTIPLIER` table that knows neither the P-16.3.5(a)

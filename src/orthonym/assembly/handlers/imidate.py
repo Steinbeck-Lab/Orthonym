@@ -1,4 +1,4 @@
-"""Phase 163 imidate handler — Tier-D iminoester functional-class naming.
+""" imidate handler — Tier-D iminoester functional-class naming.
 
 IUPAC cite: P-65.1.7 (imidic acids and imidates; "alkyl alkanimidate"
 functional-class naming for R-C(=NH)-O-R').
@@ -7,8 +7,8 @@ Mirrors handlers/isothiocyanate.py structurally: predicate-pure + direct-
 return + pool.add() + _inject_stereo_if_missing wrapping.
 
 References:
-- handlers/isothiocyanate.py (Tier-B retained-name handler; structural template per CONTEXT D-03)
-- functional_groups.py iminoester SMARTS (Phase 163 Plan-02 commit 163-02-04 addition)
+- handlers/isothiocyanate.py (Tier-B retained-name handler; structural template per CONTEXT)
+- functional_groups.py iminoester SMARTS (addition)
 - 163-AUDIT-FRN.md § 6 (per-fixture spec + intercept analysis + predicate purity proof)
 - 163-AUDIT-FRN.md § 7 (INNER_DISPATCH priority 2900 LOCK)
 """
@@ -21,9 +21,9 @@ from ..name_tree import NameTreeNode, NamingResult
 
 def _is_imidate(features: Any) -> bool:
     """Predicate: iminoester is the principal group, or iminoester is the
-    sole characteristic group (no higher-seniority PG present) (D-07 pure).
+    sole characteristic group (no higher-seniority PG present) (pure).
 
-    CR-fix (Phase 163 post-merge): consult features.principal_group so the
+    CR-fix (post-merge): consult features.principal_group so the
     handler defers to higher-seniority groups (carboxylic_acid, ester, amide,
     nitrile, etc.) when those win the seniority cascade. Previous version
     claimed dispatch slot 2900 whenever any iminoester SMARTS matched, which
@@ -37,12 +37,12 @@ def _is_imidate(features: Any) -> bool:
     group is present; in that case (or principal_group is None for pure-
     imidate compounds) this predicate fires.
 
-    Per D-07 + Phase 158 D-26 + Phase 160 D-25 hard invariant: NO mol
+    Per + + hard invariant: NO mol
     mutation; NO features mutation; NO module-global state R/W; NO
     exception swallowing.
     """
     fg = getattr(features, 'functional_groups', None) or {}
-    # W2F-P6 (P-66.1.6.1.2.1): also fire on the N-substituted carbamimidate
+    # (P-66.1.6.1.2.1): also fire on the N-substituted carbamimidate
     # ester (dedicated SMARTS; amidine is suppressed on its atoms so pg is None).
     if not (fg.get('iminoester') or fg.get('carbamimidate')):
         return False
@@ -53,10 +53,10 @@ def _is_imidate(features: Any) -> bool:
 def name_imidate(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Phase 163 Tier-D iminoester functional-class handler.
+    """ Tier-D iminoester functional-class handler.
 
     Emits "alkyl alkanimidate" PIN per IUPAC P-65.1.7. Style parameter is
-    ignored per CONTEXT D-04 (single PIN per compound).
+    ignored per CONTEXT (single PIN per compound).
 
     Algorithm (per AUDIT § 6):
     1. Get iminoester atom-match: (C_carbonyl, =NH, O, C_alkyl) tuple.
@@ -67,7 +67,7 @@ def name_imidate(
        excluding =NH and =O paths. Generate chain stem with -imidate suffix.
     4. Emit two-word name: "{alkyl} {stem}imidate".
 
-    Returns None if either branch fails (gate-fail per ADR-19-04 contract;
+    Returns None if either branch fails (gate-fail per contract;
     dispatch_inner cascades to next entry).
     """
     from ..candidate_pool import get_current_pool
@@ -78,7 +78,7 @@ def name_imidate(
     if mol is None:
         return None
 
-    # W2F-P6 (P-66.1.6.1.2.1): the N-substituted carbamimidate ester
+    # (P-66.1.6.1.2.1): the N-substituted carbamimidate ester
     # R''2N-C(=NR')-O-R owns the whole -O-C(=N-)-N unit (a diamino imidate;
     # the central C carries NO carbon, so the parent acid is carbamimidic acid
     # -> the retained stem 'carbamimidate'). When present, name it here with
@@ -167,12 +167,12 @@ def _name_carbamimidate(mol: Any, match: "tuple[int, ...]") -> Optional[str]:
     """P-66.1.6.1.2.1 (BB 33408): R''2N-C(=NR')-O-R -> the carbamimidate ester
     PIN 'R N'-R'-N,N-R''-carbamimidate'.
 
-    N = amino (sp3) N substituents; N' = imino (=N-) N substituent. The whole
+    N = amino N substituents; N' = imino (=N-) N substituent. The whole
     prefix set is cited alphanumerically by substituent name (methyl < phenyl).
     Unsubstituted -> 'R carbamimidate'. Fail closed (None) on any un-nameable
     ester-alkyl side or N-substituent fragment.
 
-    PURE per D-07: read-only mol queries; no mutation.
+    PURE per: read-only mol queries; no mutation.
 
     ``match`` = (central_C, imino_N, amino_N, ester_O, alkyl_C) per the
     carbamimidate SMARTS ``[CX3](=[NX2])([NX3])[OX2][#6]``.
@@ -233,7 +233,7 @@ def _retained_imidate_stem(mol: Any, c_carbonyl_idx: int, nh_idx: int,
                            o_idx: int, c_alkyl_idx: int) -> Optional[str]:
     """P-66.1.6.1.2.1 (BB 33398): if the imidate's ACID analog (ester
     -O-alkyl replaced by -OH) is EXACTLY a tabled retained / functional-
-    replacement inorganic acid (carbamimidic acid, carbonimidic acid, ...),
+    replacement inorganic acid (carbamimidic acid, carbonimidic acid,...),
     return its '-ate' stem ('carbamimidate'), else None (chain path owns it).
 
     PURE: builds a throwaway RWMol copy; no mutation of the input mol."""
@@ -269,7 +269,7 @@ def _collect_subgraph(mol: Any, anchor_idx: int,
                       exclude: "set[int]") -> "tuple[int, ...]":
     """BFS subgraph collection from anchor, excluding given atom indices.
 
-    PURE per D-07: read-only mol traversal; no mutation.
+    PURE per: read-only mol traversal; no mutation.
     """
     visited: "set[int]" = set()
     stack = [anchor_idx]
@@ -289,14 +289,14 @@ def _name_alkyl_fragment(mol: Any, atoms: "tuple[int, ...]",
                          anchor: int) -> Optional[str]:
     """Generate the alkyl-word for the R'-O- side of the imidate.
 
-    CR-02 fix (Phase 163 post-merge): delegate to the universal substituent
+    CR-02 fix (post-merge): delegate to the universal substituent
     naming pipeline (substituent_enumerator.name_substituent) so branched
     and substituted alkyl sides — isopropyl, 2-hydroxyethyl, tert-butyl,
     benzyl, etc. — are rendered correctly instead of being collapsed to a
     linear chain by atom count. The previous version returned ``propyl``
     for isopropyl, ``ethyl`` for 2-hydroxyethyl, etc.
 
-    PURE per D-07: read-only mol queries; no mutation.
+    PURE per: read-only mol queries; no mutation.
     """
     if not atoms:
         return None
@@ -308,7 +308,7 @@ def _name_alkyl_fragment(mol: Any, atoms: "tuple[int, ...]",
     except Exception:
         # Last-resort fallback (mirrors prior linear-only behavior) so a
         # downstream change in name_substituent never silently drops the
-        # whole handler. Per D-07 contract this fallback also pure.
+        # whole handler. Per contract this fallback also pure.
         n_carbons = sum(
             1 for idx in atoms
             if mol.GetAtomWithIdx(idx).GetAtomicNum() == 6
@@ -330,20 +330,20 @@ def _name_chain_with_imidate_suffix(mol: Any, atoms: "tuple[int, ...]",
                                     anchor: int) -> Optional[str]:
     """Generate the chain-stem-with-imidate-suffix for the R-C(=N)- side.
 
-    CR-03 fix (Phase 163 post-merge): find the longest carbon chain through
+    CR-03 fix (post-merge): find the longest carbon chain through
     the anchor C(=N) and enumerate branch substituents via the composer's
     universal-prefix integrator. The previous version counted atoms only,
     producing ``methyl pentanimidate`` for tert-butyl acetimidate
     (CC(C)(C)C(=N)OC; correct stem is 2,2-dimethylpropanimidate).
 
     Naming rules per IUPAC P-65.6.3.3.7.1:
-    - aromatic ring at anchor -> "benzimidate" (retained PIN, FRN-D-04)
+    - aromatic ring at anchor -> "benzimidate" (retained PIN, FRN-)
     - N-C linear stem -> "{chainprefix}animidate" (SYSTEMATIC PIN; BBv2 L31993:
       'methyl ethanimidate (PIN) methyl acetimidate' -> acetimidate is general-
       nomenclature only, so 2C uses 'ethanimidate' like every other length)
     - branched stem -> "{locant-substituent-list}{chainprefix}animidate"
 
-    PURE per D-07: read-only mol queries; no mutation.
+    PURE per: read-only mol queries; no mutation.
     """
     if not atoms:
         return None
@@ -417,7 +417,7 @@ def _find_longest_carbon_chain(mol: Any, start: int,
     """DFS the longest simple carbon path starting from ``start`` within
     ``frag_atoms``. Mirrors anhydrides._find_longest_chain.
 
-    PURE per D-07: read-only mol queries; no mutation.
+    PURE per: read-only mol queries; no mutation.
     """
     carbon_set = {
         i for i in frag_atoms

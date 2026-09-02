@@ -1,11 +1,11 @@
 # Derived from OPSIN (Open Parser for Systematic IUPAC Nomenclature),
 # MIT License, Copyright (c) Daniel Lowe and contributors.
-# Source project: https://github.com/dan2097/opsin  — see the repository NOTICE file.
+# Source project: https://github.com/dan2097/opsin — see the repository NOTICE file.
 """
 OPSIN XML Data Imports - consolidated exports.
 
 Auto-generated data modules from OPSIN XML resource files.
-See  for the generation pipeline.
+See for the generation pipeline.
 
 Main export: OPSIN_RETAINED_NAMES -- merged SMILES-to-name lookup
 from aryl_groups, simple_groups, cyclic_groups, and natural_products.
@@ -49,24 +49,24 @@ def _select_primary_name(names):
 def _build_retained_names() -> Dict[str, str]:
     """Build consolidated SMILES-to-name lookup from 4 OPSIN sources.
 
-    Phase 150 D-02: broadened from 2 sources (cyclic + NP) to 4
+    : broadened from 2 sources (cyclic + NP) to 4
     (adds aryl + simple). Stem-vs-PIN classification + round-trip gate
-    happens DOWNSTREAM in data/__init__.py:_is_promotable (Phase 150's
+    happens DOWNSTREAM in data/__init__.py:_is_promotable ('s
     3-signal AND classifier).
 
-    Source: 150-CONTEXT.md D-02.
+    Source: 150-CONTEXT.md.
     Source: 150-RESEARCH.md section 4.3.
     """
     merged: Dict[str, str] = {}
 
-    # 4-source merge per CONTEXT D-02 (Phase 150 broadens from 2 to 4
+    # 4-source merge per CONTEXT (broadens from 2 to 4
     # sources). Cyclic + NP first (higher-quality data); aryl + simple
     # appended.
     sources = [
         OPSIN_CYCLIC_GROUPS,
         OPSIN_NATURAL_PRODUCTS,
-        OPSIN_ARYL_GROUPS,           # NEW per D-02
-        OPSIN_SIMPLE_GROUPS,         # NEW per D-02
+        OPSIN_ARYL_GROUPS,           # NEW per
+        OPSIN_SIMPLE_GROUPS,         # NEW per
     ]
 
     for source in sources:
@@ -76,7 +76,7 @@ def _build_retained_names() -> Dict[str, str]:
             # sense.
             if meta.get("subType") in ("saltComponent", "chalcogenide"):
                 continue
-            # Phase 150 REVIEW CR-02 root-cause fix: skip composite-key
+            # REVIEW CR-02 root-cause fix: skip composite-key
             # entries. The "||" discriminator records OPSIN parser-side
             # transformations (addGroup / addBond / addHeteroAtom) that
             # would need the full OPSIN parser to materialise the actual
@@ -104,7 +104,7 @@ def _build_retained_names() -> Dict[str, str]:
     return merged
 
 
-# Consolidated SMILES -> name lookup (D-04)
+# Consolidated SMILES -> name lookup
 OPSIN_RETAINED_NAMES: Dict[str, str] = _build_retained_names()
 
 

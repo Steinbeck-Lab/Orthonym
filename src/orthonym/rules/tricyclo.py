@@ -76,10 +76,10 @@ def _get_alkane_name(carbon_count: int) -> str:
 def is_tricyclo_system(mol) -> bool:
     """
     Check if molecule is a tricyclo (3-ring bridged) system.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         True if molecule has exactly 3 rings
     """
@@ -93,12 +93,12 @@ def is_tricyclo_system(mol) -> bool:
 def _find_main_bicyclic_skeleton(mol, bridgeheads: Set[int]) -> Optional[Dict]:
     """
     Identify the main bicyclic skeleton within a tricyclo system.
-    
+
     The main skeleton consists of:
     - Two "main" bridgeheads (furthest apart)
     - The largest ring containing them
     - The primary bridge between them
-    
+
     Returns:
         Dict with 'main_bh1', 'main_bh2', 'main_ring_atoms', 'main_bridge'
     """
@@ -142,7 +142,7 @@ def _find_main_bicyclic_skeleton(mol, bridgeheads: Set[int]) -> Optional[Dict]:
     branch1 = best_ring[bh1_idx:bh2_idx+1]  # From bh1 to bh2
     branch2 = best_ring[bh2_idx:] + best_ring[:bh1_idx+1]  # From bh2 back to bh1
     
-    # Find the main bridge (third path not in the ring) 
+    # Find the main bridge (third path not in the ring)
     main_bridge = _find_bridge_between(mol, bh1, bh2, ring_atoms, set(best_ring))
     
     return {
@@ -201,7 +201,7 @@ def _find_paths_between_bridgeheads(
 ) -> List[List[int]]:
     """
     Find all simple paths between two bridgeheads.
-    
+
     Paths don't pass through other bridgeheads.
     """
     all_paths: List[List[int]] = []
@@ -244,15 +244,15 @@ def _find_paths_between_bridgeheads(
 def generate_tricyclo_descriptor(mol) -> Optional[str]:
     """
     Generate the tricyclo[a.b.c.d^e,f] descriptor for a molecule.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Descriptor string like "tricyclo[3.3.1.1^3,7]", or None
-        
+
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> generate_tricyclo_descriptor(mol)
         'tricyclo[3.3.1.1^3,7]'
     """
@@ -301,7 +301,7 @@ def generate_tricyclo_descriptor(mol) -> Optional[str]:
 def _find_secondary_bridge_length(mol, skeleton: Dict, bridgeheads: Set[int]) -> int:
     """
     Find the length of the secondary bridge (third ring closure).
-    
+
     The secondary bridge connects the third ring to the main skeleton.
     """
     ring_atoms = get_ring_atoms(mol)
@@ -365,17 +365,17 @@ def _find_secondary_bridge_locants(
 def get_tricyclo_numbering(mol) -> Optional[Dict[int, int]]:
     """
     Generate IUPAC numbering for a tricyclo system.
-    
+
     Numbering rules:
     1. Start at one main bridgehead (position 1)
     2. Number along longer branch of main ring to other bridgehead
     3. Number back along shorter branch toward position 1
     4. Number main bridge atoms
     5. Number secondary bridge atoms
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Dict mapping atom_idx -> IUPAC locant (1-indexed), or None
     """
@@ -438,15 +438,15 @@ def get_tricyclo_numbering(mol) -> Optional[Dict[int, int]]:
 def name_tricyclo_system(mol) -> Optional[str]:
     """
     Generate the full IUPAC name for a tricyclo system.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Full IUPAC name like "tricyclo[3.3.1.1^3,7]decane", or None
-        
+
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
         >>> name_tricyclo_system(mol)
         'tricyclo[3.3.1.1^3,7]decane'
     """
@@ -482,7 +482,7 @@ TRICYCLO_RETAINED_NAMES = {
     'C1C2CC3CC1CC(C2)C3': 'adamantane',
     'C1C2CC3CC(C2)CC1C3': 'adamantane',  # Alternative SMILES
     
-    # Twistane: tricyclo[4.4.0.0^3,8]decane  
+    # Twistane: tricyclo[4.4.0.0^3,8]decane
     'C1CC2CC3CCCC1C23': 'twistane',
 }
 
@@ -490,10 +490,10 @@ TRICYCLO_RETAINED_NAMES = {
 def get_retained_tricyclo_name(canonical_smiles: str) -> Optional[str]:
     """
     Look up retained name for a tricyclo compound.
-    
+
     Args:
         canonical_smiles: Canonical SMILES string
-        
+
     Returns:
         Retained name if found, None otherwise
     """
@@ -527,12 +527,12 @@ def is_retained_tricyclo(canonical_smiles: str) -> bool:
 def generate_polycyclo_descriptor(mol) -> Optional[str]:
     """
     Generate descriptor for any bridged polycyclic system.
-    
+
     Handles bicyclo, tricyclo, tetracyclo, etc.
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         Descriptor string or None
     """
@@ -626,7 +626,7 @@ def name_polycyclo_system(mol) -> Optional[str]:
     if classification == 'tricyclo':
         return name_tricyclo_system(mol)
 
-    # Phase 151 D-04 routing: ≥4-ring (tetracyclo / pentacyclo / higher)
+    # routing: ≥4-ring (tetracyclo / pentacyclo / higher)
     # systems delegate to the dedicated polycyclic_von_baeyer module which
     # owns is_higher_polycyclo + name_higher_polycyclo + the
     # cascade-step-6 supplier. See 151-AUDIT-A.md verdict THIN_WRAPPER.
@@ -779,15 +779,15 @@ def _generate_heteroatom_prefix(
 def name_polycyclo_with_functional_groups(mol) -> Optional[str]:
     """
     Name a polycyclic system that also has functional groups.
-    
+
     This handles cases like the diterpenoid where we have:
     - Hexacyclo ring system
     - Multiple ester groups
     - Lactone ring
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         IUPAC name combining polycyclic parent with functional group suffixes
     """

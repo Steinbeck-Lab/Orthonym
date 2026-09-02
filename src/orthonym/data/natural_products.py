@@ -64,15 +64,15 @@ NATURAL_PRODUCT_SCAFFOLDS = {
     "c1cc2c3c(c[nH]c3c1)C[C@H]1NCCC[C@H]21": {
         "name": "ergoline", "stem": "ergolin", "class": "alkaloid",
     },
-    # Aconitane scaffold (Phase 141 -- OPSIN entry)
+    # Aconitane scaffold (-- OPSIN entry)
     "C1C[C@H]2CN[C@@H]3[C@@H]4C[C@H]2[C@@]3(C1)[C@@H]1C[C@@H]2CC[C@H]4[C@H]1C2": {
         "name": "aconitane", "stem": "aconit", "class": "alkaloid",
     },
-    # Berberine scaffold (Phase 141 -- OPSIN entry)
+    # Berberine scaffold (-- OPSIN entry)
     "c1ccc2c(c1)CC1c3ccccc3CCN1C2": {
         "name": "berberine", "stem": "berbin", "class": "alkaloid",
     },
-    # Ajmaline scaffold (Phase 141 -- OPSIN entry)
+    # Ajmaline scaffold (-- OPSIN entry)
     "CC[C@@H]1CN2[C@H]3C[C@]45C[C@H]3[C@H]1C[C@H]2[C@@H]4N(C)c1ccccc15": {
         "name": "ajmaline", "stem": "ajmal", "class": "alkaloid",
     },
@@ -81,7 +81,7 @@ NATURAL_PRODUCT_SCAFFOLDS = {
     # NOTE: Menthane (CC1CCC(C(C)C)CC1) intentionally NOT in scaffolds --
     # too generic (matches any substituted cyclohexane, causes false positives
     # on steroids). Kept as derivative entry only.
-    # NOTE: Prostane (CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC) intentionally NOT
+    # NOTE: Prostane intentionally NOT
     # in scaffolds -- too generic (cyclopentane + long chains matches many
     # non-prostanoid compounds like prostaglandins, steroids). Kept as
     # derivative entry only.
@@ -94,32 +94,32 @@ NATURAL_PRODUCT_SCAFFOLDS = {
 # Key = pre-canonicalized SMILES, value = retained/trivial name.
 
 NATURAL_PRODUCT_DERIVATIVES = {
-    # ---- v23 Phase 14: NP parent-hydride catalog growth (P-101.2.7 Table 10.1) ----
+    # ----: NP parent-hydride catalog growth (P-101.2.7 Table 10.1) ----
     # Bare stereoparents recognised by exact canonical SMILES (the audit p100-101
-    # F8/F10 coverage reservoir).  All OPSIN-RT.  The exact lookup runs BEFORE
+    # F8/F10 coverage reservoir). All OPSIN-RT. The exact lookup runs BEFORE
     # scaffold decoration, so the spiroketal steroids below intercept the prior
     # (valid-but-non-retained) '16,22-epoxycholestane' / wrong-stereo names.
-    #   tetrapyrroles / corrinoid (Table 10.1d) — were 'unknown':
+    # tetrapyrroles / corrinoid (Table 10.1d) — were 'unknown':
     "C1=Cc2cc3ccc(cc4nc(cc5ccc(cc1n2)[nH]5)C=C4)[nH]3": "porphyrin",
     "C1=C2CCC(=N2)C=C2CCC(N2)C2CCC(=N2)C=C2CCC1=N2": "corrin",
     "C1=CC(=CC2=NC(=CC3=NC(=Cc4ccc[nH]4)C=C3)C=C2)N=C1": "21H-biline",
-    #   steroid stereoparents (Table 10.1b) — spirostan/furostan were non-retained
-    #   epoxy-names; gorgostane leaked an OPSIN-unparseable name; poriferastane was
-    #   mis-named 'stigmastane' (C-24 epimer, a stereo error SELF-01 cannot catch):
+    # steroid stereoparents (Table 10.1b) — spirostan/furostan were non-retained
+    # epoxy-names; gorgostane leaked an OPSIN-unparseable name; poriferastane was
+    # mis-named 'stigmastane' (C-24 epimer, a stereo error SELF-01 cannot catch):
     "CC1CC[C@@]2(OC1)O[C@H]1C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]1[C@@H]2C": "spirostan",
     "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]2[C@@H]1C": "furostan",
     "CC(C)[C@@H](C)[C@@]1(C)C[C@@H]1[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C": "gorgostane",
     "CC[C@@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C": "poriferastane",
 
-    # ---- v23 Phase 14 CONTINUATION: name-exact terpene/alkaloid stereoparent catalog ----
-    # (P-101.2.7 Table 10.1 a/c).  OPSIN cannot parse these parent-hydride names AND
+    # ---- CONTINUATION: name-exact terpene/alkaloid stereoparent catalog ----
+    # (P-101.2.7 Table 10.1 a/c). OPSIN cannot parse these parent-hydride names AND
     # PubChem name-lookup resolves none, so they are NAME-EXACT (no RT oracle): each
     # structure was sourced from ChEBI and cross-confirmed against Wikidata + PubChem
     # (byte-identical InChIKey incl. the stereo layer), and verified permutation-stable
-    # (deterministic canonical SMILES).  The name-exact ones are whitelisted in
+    # (deterministic canonical SMILES). The name-exact ones are whitelisted in
     # namer._final_opsin_validity_gate via NAME_EXACT_NP_PARENTS (the thioperoxol/inositol
-    # template).  Recognition is exact-canonical-SMILES (correct by construction).
-    #   diterpenes / triterpenes / sesquiterpenes:
+    # template). Recognition is exact-canonical-SMILES (correct by construction).
+    # diterpenes / triterpenes / sesquiterpenes:
     "CC(C)[C@H]1CC[C@H]2[C@@H](CC[C@H]3C(C)(C)CCC[C@]23C)C1": "abietane",
     "C[C@@H]1C[C@]23CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]2CC[C@H]1C3": "kaurane",
     "C[C@@H]1CCC[C@@]2(C)CC[C@H]3[C@H](C)CC[C@@H](C[C@H]12)C3(C)C": "taxane",
@@ -140,17 +140,17 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC[C@@H](C)CC[C@H]1[C@@H](C)CC[C@H]2C(C)(C)CCC[C@]12C": "labdane",
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@]12C": "dammarane",
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@@H]3CCC4[C@@H](CCCC4(C)C)[C@]3(C)CC[C@]12C": "cucurbitane",
-    #   W8-P7a.2 complex diterpene/triterpene parents (Table 10.1c) — two-source
-    #   verified (PubChem + NCI CACTUS, full InChIKey agreement); OPSIN-unparseable
-    #   -> name-exact. Direct structural analogs of the abietane/lanostane class
-    #   above (unwieldy systematic von-Baeyer name -> semisystematic PIN, P-101.2):
+    # W8-P7a.2 complex diterpene/triterpene parents (Table 10.1c) — two-source
+    # verified (PubChem + NCI CACTUS, full InChIKey agreement); OPSIN-unparseable
+    # -> name-exact. Direct structural analogs of the abietane/lanostane class
+    # above (unwieldy systematic von-Baeyer name -> semisystematic PIN, P-101.2):
     "CC1(C)CCC[C@]2(C)[C@H]3CCCC[C@@H]3CC[C@@H]12": "podocarpane",  # OEWMDAWVOVKZEQ
     "CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@H]1CC[C@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@@]12C": "protostane",  # OORMXZNMRWBSTK
     "C[C@@H]1[C@@H]2CCC(C)(C)[C@H]2CC[C@@]23C[C@@H](CC[C@@H]12)[C@@H](C)C3": "grayanotoxane",  # OPCBUBFCCPXFES
     "CC[C@]1(C)CC[C@]2(C)[C@H](CC[C@@H]3[C@H]2CCCC3(C)C)C1": "rosane",  # CZEZFPXHDTYEBI
-    #   W8-P7a.2c bicyclic+ sesqui/di/sesterterpene parents (Table 10.1c) — analogs of
-    #   cadinane/guaiane/eudesmane above; two-source verified; OPSIN-unparseable. himachalane/
-    #   ophiobolane were mis-named (drop); picrasane/trichothecane have a skeletal ether O:
+    # W8-P7a.2c bicyclic+ sesqui/di/sesterterpene parents (Table 10.1c) — analogs of
+    # cadinane/guaiane/eudesmane above; two-source verified; OPSIN-unparseable. himachalane/
+    # ophiobolane were mis-named (drop); picrasane/trichothecane have a skeletal ether O:
     "C[C@H]1CC[C@H]2C(C)(C)CCC[C@]2(C)[C@H]1C": "drimane",  # CVRSZZJUWRLRDE
     "CC(C)[C@@H]1CC[C@H](C)[C@@H]2CCC[C@@]2(C)C1": "ambrosane",  # TUKMYOLTOOBHQF
     "CC(C)[C@@H]1CC[C@H]2CCC[C@H](C)[C@@]2(C)C1": "eremophilane",  # AJWBFJHTFGRNDG
@@ -159,10 +159,10 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC(C)CCC[C@H](C)[C@H]1CC[C@]2(C)C[C@H]3[C@H](CC[C@@H]3C)[C@@H](C)CC[C@@H]12": "ophiobolane",  # YDDRLCGKYATUCE
     "C[C@@H]1CCC[C@]2(C)[C@H]3CC[C@H](C)[C@@H]4CCO[C@H](C[C@@H]12)[C@]34C": "picrasane",  # XKTUNHQVVRTGNO
     "CC1CC[C@@]2(C)[C@@H](C1)O[C@@H]1CC[C@@]2(C)[C@@H]1C": "trichothecane",  # IZGCNPIQWCRGSF
-    #   prostanoids (Table 10.1d) — these DO OPSIN-RT, but the retained NP parent is the PIN:
+    # prostanoids (Table 10.1d) — these DO OPSIN-RT, but the retained NP parent is the PIN:
     "CCCCCCCC[C@H]1CCC[C@@H]1CCCCCCC": "prostane",
     "CCCCCCCC[C@H]1OCCC[C@@H]1CCCCCCC": "thromboxane",
-    #   alkaloid stereoparents (Table 10.1a):
+    # alkaloid stereoparents (Table 10.1a):
     "c1ccc2c3c([nH]c2c1)[C@@H]1C[C@@H]2CCCC[C@H]2CN1CC3": "yohimban",
     "C1CCN2C[C@@H]3C[C@@H](CN4CCCC[C@@H]34)[C@H]2C1": "sparteine",
     "CC[C@H]1C[C@@H]2C[C@H]3c4[nH]c5ccccc5c4CCN(C2)[C@@H]13": "ibogamine",
@@ -171,11 +171,11 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "C/C=C1/CN2[C@H]3C[C@@H]1[C@@H](C)[C@@H]2Cc1c3[nH]c2ccccc12": "sarpagan",
     "C1=C2CN3CC[C@]45c6ccccc6N6CC[C@H](OC1)[C@@H]([C@H]64)[C@H]2C[C@H]35": "strychnidine",
     "C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6": "hetisane",
-    #   W8-P7a.2b clean saturated CHN alkaloid parent hydrides (Table 10.1a) —
-    #   two-source verified (PubChem + NCI CACTUS, full InChIKey); OPSIN-unparseable
-    #   -> name-exact. Analogs of the yohimban/aspidospermidine class above. Several
-    #   currently ship WRONG atom-dropped names (cevane->methylpiperidine etc.) — this
-    #   closes those structural leaks too:
+    # W8-P7a.2b clean saturated CHN alkaloid parent hydrides (Table 10.1a) —
+    # two-source verified (PubChem + NCI CACTUS, full InChIKey); OPSIN-unparseable
+    # -> name-exact. Analogs of the yohimban/aspidospermidine class above. Several
+    # currently ship WRONG atom-dropped names (cevane->methylpiperidine etc.) — this
+    # closes those structural leaks too:
     "C[C@H]1CC[C@H]2[C@H](C)[C@H]3CC[C@@H]4[C@@H](C[C@H]5[C@H]4CC[C@@H]4CCCC[C@@]45C)[C@@H]3CN2C1": "cevane",  # GRTNBDIOACKBEA
     "C[C@H]1[C@H]2CC[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]23CN1C": "conanine",  # ICKQFGPZAUSMPE
     "CC[C@H]1C[C@H]2c3[nH]c4ccccc4c3CCN2C[C@@H]1CC": "corynan",  # YRMJWKVAHZDIHE
@@ -361,8 +361,8 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "O=C1C[C@H]2SCC=CN12":
         "ceph-3-em",
 
-    # ---- Flavonoid / chromene derivatives (Phase 89) ----
-    # flavone / flavanone / isoflavone DE-HEADLINED (v26 BP-4 Phase 4): these are
+    # ---- Flavonoid / chromene derivatives ----
+    # flavone / flavanone / isoflavone DE-HEADLINED: these are
     # general-nomenclature trivial names only, not PINs (P-102.6.1.4 L53955 prints
     # them in the general column; the PIN column is '...-4H-1-benzopyran-4-one').
     # Removed from this dict + added pin:false to iupac_2013_pin_list.json, exactly
@@ -371,10 +371,10 @@ NATURAL_PRODUCT_DERIVATIVES = {
     # ('2-phenyl-4H-1-benzopyran-4-one' etc.) and places substituents via the
     # systematic 1-benzopyran numbering. 'flavone' stays in retained_names.py so
     # --trivial still emits it via GENERAL_RETAINED_NAMES.
-    # chromanone de-headlined (v23 IH-01h): PIN is 2,3-dihydro-4H-1-benzopyran-4-one
+    # chromanone de-headlined: PIN is 2,3-dihydro-4H-1-benzopyran-4-one
     # (P-64.2.2.2.2: the 4-one substitutes the 4H >CH2; chroman-4-one is the chromane-stem
     # acceptable name) -> emitted by the cyclic-oxo engine. Also pin:false in the PIN list.
-    # chromone de-headlined (v23 IH-01f): PIN is 4H-1-benzopyran-4-one (1-benzopyran is
+    # chromone de-headlined: PIN is 4H-1-benzopyran-4-one (1-benzopyran is
     # the PIN ring parent per P-19(d); P-64.2.2.2.2 ketone = substitution of the >CH2) ->
     # emitted by the cyclic-oxo engine. Also pin:false in iupac_2013_pin_list.json.
 
@@ -382,7 +382,7 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)[C@@]1(C)CC3)C(C)C":
         "ergosta-7,24(28)-dien-3-ol",
 
-    # ---- Terpenoid scaffolds (Phase 89) ----
+    # ---- Terpenoid scaffolds ----
     "CC1CCC2CC1C2(C)C":
         "pinane",
     "CC12CCC(CC1)C2(C)C":
@@ -403,11 +403,11 @@ NATURAL_PRODUCT_DERIVATIVES = {
 }
 
 
-# v23 Phase 14 CONTINUATION: the terpene/alkaloid stereoparent retained names that
-# OPSIN cannot parse (verified name_to_smiles -> None for each).  Whitelisted in
+# CONTINUATION: the terpene/alkaloid stereoparent retained names that
+# OPSIN cannot parse (verified name_to_smiles -> None for each). Whitelisted in
 # namer._final_opsin_validity_gate so the name-exact PIN ships (the thioperoxol/inositol
-# template).  prostane/thromboxane/aconitane are EXCLUDED — those names DO OPSIN-RT and
-# pass the gate normally.  Recognition stays exact-canonical-SMILES (fail-closed).
+# template). prostane/thromboxane/aconitane are EXCLUDED — those names DO OPSIN-RT and
+# pass the gate normally. Recognition stays exact-canonical-SMILES (fail-closed).
 NAME_EXACT_NP_PARENTS = frozenset({
     "abietane", "kaurane", "taxane", "lupane", "oleanane", "ursane", "lanostane", "hopane",
     "gammacerane", "eudesmane", "cadinane", "guaiane", "germacrane", "pimarane", "gibbane",
@@ -434,7 +434,7 @@ NAME_EXACT_NP_PARENTS = frozenset({
 # (data/iupac_2013_pin_list.json), so an adjudicated non-PIN row here reached the
 # DEFAULT --style pin path even when the SAME name was already denied for the
 # retained-names dict -- `camphor` is keyed in BOTH this table and
-# retained_names.py, and a runtime spy showed the emission came from here, so
+# retained_names.py, and a runtime showed the emission came from here, so
 # the deny row on the other surface was inert. Rows are demoted, not deleted:
 # a denied name stays in NATURAL_PRODUCT_DERIVATIVES for general nomenclature
 # and is simply withheld from the PIN lookup.
@@ -496,14 +496,14 @@ def get_scaffold_patterns() -> dict:
 # Each map: query atom index (position in scaffold SMILES) -> IUPAC locant.
 # When a molecule is matched against a scaffold, matched_atoms[query_pos] gives
 # the target molecule's atom index. Combined with the numbering map, this gives:
-#   iupac_locant = NUMBERING_MAP[query_pos]
-#   target_atom  = matched_atoms[query_pos]
+# iupac_locant = NUMBERING_MAP[query_pos]
+# target_atom = matched_atoms[query_pos]
 #
 # Numbering follows IUPAC 2013 steroid conventions:
-#   Ring A: 1-5,10    Ring B: 5-10    Ring C: 8,9,11-14    Ring D: 13-17
-#   C-18: angular methyl on C-13
-#   C-19: angular methyl on C-10
-#   C-20+: side chain
+# Ring A: 1-5,10 Ring B: 5-10 Ring C: 8,9,11-14 Ring D: 13-17
+# C-18: angular methyl on C-13
+# C-19: angular methyl on C-10
+# C-20+: side chain
 
 STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
     # Gonane (17 carbons, no angular methyls)
@@ -590,7 +590,7 @@ STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
 
 
 # ---------------------------------------------------------------------------
-# 4. Alkaloid numbering maps  (query atom position → IUPAC locant)
+# 4. Alkaloid numbering maps (query atom position → IUPAC locant)
 # ---------------------------------------------------------------------------
 # Same principle as STEROID_NUMBERING_MAPS: the key is the canonical SMILES
 # of the scaffold, and the value maps each query atom index (from
@@ -626,15 +626,15 @@ ALKALOID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
     # IUPAC numbering: C-1/C-5 bridgeheads, C-2/C-3/C-4 (3-carbon bridge),
     # C-6/C-7 (2-carbon bridge), N-8 (one-atom bridge). N-methyl not numbered.
     # Scaffold SMILES atom layout: CN1[C@@H]2CCC[C@H]1CC2
-    #   Atom 0: C (N-methyl, NOT part of numbered skeleton)
-    #   Atom 1: N (bridgehead nitrogen)
-    #   Atom 2: C (bridgehead connecting N to 3-bridge and 2-bridge)
-    #   Atom 3: C (3-carbon bridge, position 2)
-    #   Atom 4: C (3-carbon bridge, position 3)
-    #   Atom 5: C (3-carbon bridge, position 4)
-    #   Atom 6: C (bridgehead connecting N to 3-bridge and 2-bridge)
-    #   Atom 7: C (2-carbon bridge, position 6)
-    #   Atom 8: C (2-carbon bridge, position 7)
+    # Atom 0: C (N-methyl, NOT part of numbered skeleton)
+    # Atom 1: N (bridgehead nitrogen)
+    # Atom 2: C (bridgehead connecting N to 3-bridge and 2-bridge)
+    # Atom 3: C (3-carbon bridge, position 2)
+    # Atom 4: C (3-carbon bridge, position 3)
+    # Atom 5: C (3-carbon bridge, position 4)
+    # Atom 6: C (bridgehead connecting N to 3-bridge and 2-bridge)
+    # Atom 7: C (2-carbon bridge, position 6)
+    # Atom 8: C (2-carbon bridge, position 7)
     "CN1[C@@H]2CCC[C@H]1CC2": {
         # 0: N-methyl -- NOT mapped (substituent on N, not part of skeleton)
         1: 8,    # N (bridgehead nitrogen)

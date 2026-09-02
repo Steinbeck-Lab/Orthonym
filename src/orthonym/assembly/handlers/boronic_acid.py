@@ -1,12 +1,12 @@
-"""Phase 160 boronic_acid handler — Tier B retained-name (gate 0.40).
+""" boronic_acid handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:1205-1214 (inline branch) +
-composer.py:2450-2497 (_name_boronic_acid body). Per CONTEXT D-24,
-body stays in composer.py until Plan-03 commit 03-10.
+composer.py:2450-2497 (_name_boronic_acid body). Per CONTEXT,
+body stays in composer.py until.
 
 Note: this handler's inline branch is OUT-OF-LINE in source code
 (composer.py:1205 is further down than carbamic_acid/urea/etc. at L855-892).
-The plan-02 priority of 1000 maintains the dispatch ordering at the
+The priority of 1000 maintains the dispatch ordering at the
 inner-dispatch layer (vs the original 1205 source-line position). Per
 audit § 1: cross-predicate mutex (principal_group is a single string)
 means dispatch-order vs source-order cannot create a byte-diff for
@@ -34,7 +34,7 @@ def _is_boronic_acid(features: Any) -> bool:
 def name_boronic_acid(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Phase 160 Tier-B boronic acid handler.
+    """ Tier-B boronic acid handler.
 
     Note: inline branch at composer.py:1213 passes no explicit atom_to_locant
     to _inject_stereo_if_missing (default None). We mirror that here.

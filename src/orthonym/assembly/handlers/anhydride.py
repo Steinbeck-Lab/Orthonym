@@ -1,4 +1,4 @@
-"""Phase 160 anhydride handler — direct-return shim.
+""" anhydride handler — direct-return shim.
 
 1-line wrapper around ``rules.anhydrides.name_anhydride``. Verbatim move
 of composer.py:921-934 dispatch logic.

@@ -9,7 +9,7 @@ all other groups become prefixes.
 from typing import Optional, Tuple, List, Dict
 
 
-# IM-01 (2026-04-25): per-FG SMARTS attachment atom override.
+# IM-01: per-FG SMARTS attachment atom override.
 #
 # Most functional-group SMARTS lead with the locant-bearing atom (the C of
 # -COOH in [CX3](=O)[OX2H1]; the C of -OH in [CX4][OX2H1]). Parent-selection
@@ -28,10 +28,10 @@ from typing import Optional, Tuple, List, Dict
 # comparators take ``min(locants)`` to match P-31.1.4. Default for any FG
 # not present is ``[0]`` (preserves existing behaviour).
 #
-# Source: 
+# Source:
 PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
     "disulfide": [1, 2],  # [#6][SX2][SX2][#6] -- the two S sulfurs
-    # WS-A task 9: the ketone family SMARTS '[#6][CX3](=X)[#6]' leads with a
+    # WS-A: the ketone family SMARTS '[#6][CX3](=X)[#6]' leads with a
     # FLANKING carbon; the locant-bearing atom is the carbonyl/thiocarbonyl
     # carbon at match index 1. Without these entries every on-ring/on-chain/
     # locant computation used the flanking atom (an aryl ketone's "attachment"
@@ -59,35 +59,35 @@ PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
     "primary_amine": [1],
     "secondary_amine": [1, 2],
     "tertiary_amine": [1, 2, 3],
-    # v29 P7 C2: the aromatic/enolic members of the same -ol/-amine family were
+    # P7 C2: the aromatic/enolic members of the same -ol/-amine family were
     # left out of the Wave2 T3a block above, so they fell through to the
     # default index 0 -- which for all three SMARTS is the HETEROATOM:
-    #   phenol         [OX2H][cX3]          -> 0 is O, the aromatic C is 1
-    #   aromatic_amine [NX3H2][cX3]         -> 0 is N, the aromatic C is 1
-    #   enol           [OX2H][CX3]=[CX3]    -> 0 is O, the hydroxy C is 1
+    # phenol [OX2H][cX3] -> 0 is O, the aromatic C is 1
+    # aromatic_amine [NX3H2][cX3] -> 0 is N, the aromatic C is 1
+    # enol [OX2H][CX3]=[CX3] -> 0 is O, the hydroxy C is 1
     # A heteroatom is never a parent-hydride skeletal atom, so every consumer
     # asking "is the PG on this ring/chain, and at which locant?" got 'no'.
     # After general_engine._inline_suffix_locant began refusing on an empty
-    # anchor set (Task 5, 5f46d505) that silently destroyed correct names.
+    # anchor set that silently destroyed correct names.
     #
     # P-62.2.1.2 (BlueBookV2/BlueBookV2.md:26168) -- "Primary amines, R-NH2,
     # are systematically named in the following ways: (1) by adding the suffix
-    # 'amine' to the name of the parent hydride".  The suffix attaches to the
+    # 'amine' to the name of the parent hydride". The suffix attaches to the
     # PARENT HYDRIDE; its examples are `quinolin-4-amine (PIN)` and
     # `1-benzofuran-2-amine (PIN)` -- the locant is the ring carbon.
     # P-63.1.2 "Systematic names of alcohols, phenols, enols, and ynols"
-    # (:26826) -- "(1) substitutively, using the suffix 'ol' ... the starting
-    # point and the direction of numbering ... are chosen so as to give lowest
-    # locants to the 'ol' suffixes"; `naphthalen-1-ol (PIN)` (:26820) and
+    # (26826) -- "(1) substitutively, using the suffix 'ol'... the starting
+    # point and the direction of numbering... are chosen so as to give lowest
+    # locants to the 'ol' suffixes"; `naphthalen-1-ol (PIN)` (26820) and
     # `2-nitrobenzene-1,3-diol (PIN)` cite ring carbons -- the hydroxy oxygen
     # has no skeletal locant at all.
-    # P-14.3.3 "Citation of locants" (:2869) -- "the name 2-chloroethan-1-ol is
+    # P-14.3.3 "Citation of locants" (2869) -- "the name 2-chloroethan-1-ol is
     # the PIN": the '1' is the carbon bearing the -OH, not the oxygen.
     "phenol": [1],
     "aromatic_amine": [1],
     "enol": [1],
     # imine `[CX3]=[NX2;...]` ALREADY leads with the carbon, so [0] is exactly
-    # the default and this entry changes no behaviour today.  Pinned anyway:
+    # the default and this entry changes no behaviour today. Pinned anyway:
     # parent_selection.py:52 and general_engine.py:66 both assert "imine
     # already leads with C" in prose, and that is an unenforced dependency on
     # SMARTS atom order -- reordering the pattern would move every imine locant
@@ -107,7 +107,7 @@ SENIORITY_ORDER = [
     "thioic_S_acid",
     "thioic_O_acid",
     "dithioic_acid",
-    # Phase 163 Tier FRN-A: chalcogen acids (P-65.3) — additive per CONTEXT D-08;
+    # Tier FRN-A: chalcogen acids (P-65.3) — additive per CONTEXT;
     # position locked by AUDIT-FRN § 5; parallel to thioic_S_acid/O_acid/dithioic
     "selenoic_Se_acid",
     "selenoic_O_acid",
@@ -151,7 +151,7 @@ SENIORITY_ORDER = [
     # block); grouped with its sulfinic parent.
     "sulfinimidic_acid",
     "sulfenic_acid",   # IUPAC P-65.3.1.4: between sulfinic and phosphonic
-    # v23 Phase 9 (P-65.3.0 Table 6.2): Se/Te chalcogen-suffix acids, parallel to
+    # (P-65.3.0 Table 6.2): Se/Te chalcogen-suffix acids, parallel to
     # sulfonic/sulfinic. Standalone naming is rank-independent; this relative
     # position only governs polyfunctional Se/Te-vs-S ties (S>Se>Te, -onic>-inic;
     # near-zero corpus) — additive, so the byte-positions of the rows above hold.
@@ -181,11 +181,11 @@ SENIORITY_ORDER = [
     # Acid derivatives
     "anhydride",
     "ester",
-    # Phase 163 Tier FRN-D: iminoester at ester-tier per AUDIT-FRN § 5 LOCK
+    # Tier FRN-D: iminoester at ester-tier per AUDIT-FRN § 5 LOCK
     # ("alkyl alkanimidate" functional-class parallel to "alkyl alkanoate" per P-65.1.7)
     "iminoester",
     "thioester",
-    # Phase 163 Tier FRN-E: chalcogen-esters (P-65.6 extension) — additive per CONTEXT D-08
+    # Tier FRN-E: chalcogen-esters (P-65.6 extension) — additive per CONTEXT
     "selenoester",
     "telluroester",
     # W3-P07 (P-65.6.3.1.2 / P-65.6.3.4): pseudoester (R-CO-O-Z, Z a Group-13/14/15
@@ -217,7 +217,7 @@ SENIORITY_ORDER = [
     "primary_amide",
     "secondary_amide",
     "tertiary_amide",
-    # Phase 163 Tier FRN-B: chalcogen amides (P-66.1.4.1.1 + P-66.6.3) — additive per CONTEXT D-08
+    # Tier FRN-B: chalcogen amides (P-66.1.4.1.1 + P-66.6.3) — additive per CONTEXT
     # thioamide ranks below amide and above sulfonamide; selenoamide/telluroamide parallel
     "thioamide",
     "selenoamide",
@@ -260,12 +260,12 @@ SENIORITY_ORDER = [
     # Wave2 T3d (P-66.4.2, BB Table 6.1 item 18): amidrazone / hydrazonamide ranks
     # immediately below amidine (item 17).
     "hydrazonamide",
-    # Wave-2 P1AM Task 7 (P-66.4.2.1, BB 34460): the imidohydrazide amidrazone
+    # Wave-2 P1AM (P-66.4.2.1, BB 34460): the imidohydrazide amidrazone
     # tautomer — an imidamide (amidine) is senior to an imidohydrazide; keep it
     # adjacent to hydrazonamide (same amidrazone class, tautomer pair).
     "imidohydrazide",
 
-    # v30 tail #17: an ester of a phosphonic acid R-P(=O)(OR')2. Per P-41 an
+    # tail #17: an ester of a phosphonic acid R-P(=O)(OR')2. Per P-41 an
     # ester ranks above a nitrile, so the phosphonate diester is the senior
     # parent when it co-occurs with a nitrile / isocyanide (diisopropyl
     # (1-cyano-1-isocyanoethyl)phosphonate). Functional-class named via
@@ -281,11 +281,11 @@ SENIORITY_ORDER = [
     "aldehyde",
     "ketone",
     "thioaldehyde",
-    # Phase 163 Tier FRN-C aldehydes (P-66.6.3) — additive per CONTEXT D-08
+    # Tier FRN-C aldehydes (P-66.6.3) — additive per CONTEXT
     "selenoaldehyde",
     "telluroaldehyde",
     "thioketone",
-    # Phase 163 Tier FRN-C ketones (P-66.6.3) — additive per CONTEXT D-08
+    # Tier FRN-C ketones (P-66.6.3) — additive per CONTEXT
     "selenoketone",
     "telluroketone",
 
@@ -297,7 +297,7 @@ SENIORITY_ORDER = [
     "enol",
     "alcohol",         # PERC-05: generic catch-all, same seniority tier as other alcohols
     # Class 17 "Hydroxy compounds and chalcogen analogues" (alcohols/phenols/thiol/
-    # selenol/tellurol) — all senior to class 18 hydroperoxide. name-hygiene fix/DEF-D-09 (169.7):
+    # selenol/tellurol) — all senior to class 18 hydroperoxide. name-hygiene fix/DEF- (169.7):
     # hydroperoxide MOVED below the chalcogen-ols (was incorrectly above thiol with a
     # factually-wrong "Class 19" comment). Verified BlueBookV2 P-41 Table 4.1 lines
     # ~18190-18191: "17 Hydroxy compounds and chalcogen analogues" then "18 Hydroperoxides".
@@ -305,7 +305,7 @@ SENIORITY_ORDER = [
     "selenol",
     "tellurol",        # functional-group perception fix (169.7): Te analogue of -ol/-selenol (P-63.1.5)
     "hydroperoxide",   # P-41 Table 4.1 class 18 (peroxol -OOH); junior to class-17 hydroxy/thiol
-    # DD2 Fix C (Phase D): chalcogen hydroperoxol analogues (P-63.4.2 / P-33.2.2(3)),
+    # Fix C (Phase D): chalcogen hydroperoxol analogues (P-63.4.2 / P-33.2.2(3)),
     # same class-18 tier as hydroperoxide, in the P-63.7 chalcogen sub-order
     # -OOH (peroxol) > -SOH > -OSH > -SSH.
     "so_thioperoxol",  # R-S-OH -> -SO-thioperoxol (replaces retired sulfenic acid)
@@ -334,7 +334,7 @@ SENIORITY_ORDER = [
     "thiocyanate",  # P-65.5: prefix-only (pseudohalide)
     "diazo",           # P-61.5: prefix-only
     "disulfide",       # P-63.6.2: prefix-only
-    "peroxide",        # DD2 Fix B (Phase D): R-OO-R' substitutive (R)peroxy prefix (P-63.3.1(1))
+    "peroxide",        # Fix B (Phase D): R-OO-R' substitutive (R)peroxy prefix (P-63.3.1(1))
     "hydrazine_fg",    # P-62.4: prefix-only
     # Wave2 T2b: terminal N-heteroatom preselected prefixes (P-35.2.2 /
     # P-68.3.1.1.1.5 / P-35.3.1) — prefix-only, junior to all suffix groups
@@ -365,7 +365,7 @@ SENIORITY_ORDER = [
     "primary_phosphine",
 ]
 
-# functional-group perception fix/DEF-3 (Phase 169.7): groups present in SENIORITY_ORDER for ranking but
+# functional-group perception fix/DEF-3 (.7): groups present in SENIORITY_ORDER for ranking but
 # which are ALWAYS detachable prefixes — never a principal (suffix) group (P-33).
 # get_principal_group skips these so a prefix-only-only molecule is named with the
 # group as a prefix (azidomethane) instead of dropping it. These mirror the
@@ -380,7 +380,7 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
                      # no suffix form — pg='isocyanide' made the general handler
                      # misread N#C as an amine ('(methylamino)methane', suppressed)
     "disulfide",     # P-63.6.2
-    "peroxide",      # DD2 Fix B (Phase D): R-OO-R' is prefix-only ((R)peroxy), never a suffix
+    "peroxide",      # Fix B (Phase D): R-OO-R' is prefix-only ((R)peroxy), never a suffix
     "hydrazine_fg",  # P-62.4
     # Wave2 T3b (P-63.6): sulfoxides/sulfones have NO suffix form
     # (SUFFIX_FORMS None) — the PIN is substitutive with sulfinyl/sulfonyl
@@ -417,9 +417,9 @@ _PREFIX_ONLY_PRINCIPAL = frozenset({
     "n_iodoamine",
 })
 
-# ASML-18 / D-08: Map subtypes to canonical parent for seniority comparison.
+# ASML-18 /: Map subtypes to canonical parent for seniority comparison.
 # IUPAC P-65.1: All alcohol types have equal seniority; all amine types have equal seniority.
-# Used only in get_principal_group() for equalization; SENIORITY_ORDER stays intact per D-09.
+# Used only in get_principal_group() for equalization; SENIORITY_ORDER stays intact per.
 _SENIORITY_PARENT = {
     "primary_alcohol": "alcohol",
     "secondary_alcohol": "alcohol",
@@ -432,10 +432,10 @@ _SENIORITY_PARENT = {
     "aromatic_amine": "amine",
 }
 
-# DD5 RC-4 (P-44.1.1): reverse index class -> subtypes, in SENIORITY_ORDER order.
+# RC-4 (P-44.1.1): reverse index class -> subtypes, in SENIORITY_ORDER order.
 # get_principal_group returns the UNION of match tuples over EVERY present subtype
 # of the chosen group's equal-seniority class, so the whole class is expressed in
-# ONE multiplied suffix (a primary + a secondary OH on the chain -> ...-1,n-diol,
+# ONE multiplied suffix (a primary + a secondary OH on the chain ->...-1,n-diol,
 # not n-hydroxy-...-1-ol). Classes NOT in _SENIORITY_PARENT (acids, carbonyls, …)
 # are their own singleton class -> the union is byte-identical for them.
 _SENIORITY_CLASS_MEMBERS: Dict[str, List[str]] = {}
@@ -450,7 +450,7 @@ del _sub, _cls
 # (heteroatom, bearing-carbon) 2-tuple shape (RC-4).
 _CLASS_CHARACTERISTIC_Z: Dict[str, int] = {"alcohol": 8, "amine": 7}
 
-# DD5 RC-4 scope: classes for which get_principal_group unions across subtypes
+# RC-4 scope: classes for which get_principal_group unions across subtypes
 # (and chains/prefixes count/skip the class). SCOPED to alcohols: a mixed
 # primary+secondary OH chain is a diol (P-44.1.1). Amines are EXCLUDED — a mixed
 # primary+secondary amine carries N-substituents on the secondary N (N-methyl…)
@@ -506,7 +506,7 @@ SUFFIX_FORMS = {
     "thioic_S_acid": ("thioic S-acid", "carbothioic S-acid"),
     "thioic_O_acid": ("thioic O-acid", "carbothioic O-acid"),
     "dithioic_acid": ("dithioic acid", "carbodithioic acid"),
-    # Phase 163 Tier FRN-A: chalcogen-acid SUFFIX_FORMS (parallel to thioic_*_acid) per AUDIT-FRN § 5
+    # Tier FRN-A: chalcogen-acid SUFFIX_FORMS (parallel to thioic_*_acid) per AUDIT-FRN § 5
     "selenoic_Se_acid": ("selenoic Se-acid", "carboselenoic Se-acid"),
     "selenoic_O_acid": ("selenoic O-acid", "carboselenoic O-acid"),
     "diselenoic_acid": ("diselenoic acid", "carbodiselenoic acid"),
@@ -541,7 +541,7 @@ SUFFIX_FORMS = {
     # 'sulfinimidic acid' (methanesulfinimidic acid, PIN @31220).
     "sulfinimidic_acid": ("sulfinimidic acid", "sulfinimidic acid"),
     "sulfinic_acid": ("sulfinic acid", "sulfinic acid"),
-    # v23 Phase 9 (P-65.3): Se/Te suffix-acid forms (chain stem + suffix, e.g.
+    # (P-65.3): Se/Te suffix-acid forms (chain stem + suffix, e.g.
     # ethaneselenonic acid), parallel to sulfonic.
     "selenonic_acid": ("selenonic acid", "selenonic acid"),
     "seleninic_acid": ("seleninic acid", "seleninic acid"),
@@ -572,7 +572,7 @@ SUFFIX_FORMS = {
     "primary_amide": ("amide", "carboxamide"),
     "secondary_amide": ("amide", "carboxamide"),
     "tertiary_amide": ("amide", "carboxamide"),
-    # Phase 163 Tier FRN-B: chalcogen-amide SUFFIX_FORMS (P-66.1.4.1.1 + P-66.6.3 PIN)
+    # Tier FRN-B: chalcogen-amide SUFFIX_FORMS (P-66.1.4.1.1 + P-66.6.3 PIN)
     "thioamide": ("thioamide", "carbothioamide"),
     "selenoamide": ("selenoamide", "carboselenoamide"),
     "telluroamide": ("telluroamide", "carbotelluroamide"),
@@ -601,9 +601,9 @@ SUFFIX_FORMS = {
     "ketone": ("one", "one"),
     "thioaldehyde": ("thial", "carbothialdehyde"),
     "thioketone": ("thione", "thione"),
-    # Phase 163 Tier FRN-C: chalcogen-aldehyde/ketone SUFFIX_FORMS per AUDIT-FRN § 5 LOCK
+    # Tier FRN-C: chalcogen-aldehyde/ketone SUFFIX_FORMS per AUDIT-FRN § 5 LOCK
     # PIN short form -selenal / -tellural (parallel to -thial per P-66.6.3)
-    # v22 C-T2 (V-2): the added-carbon ("carbo*") forms are carboselenaldehyde /
+    # C-T2 (V-2): the added-carbon ("carbo*") forms are carboselenaldehyde /
     # carbotelluraldehyde (Blue Book Table 28, BB ~line 18827/18829) — NOT the
     # "carboseleno-/carbotelluro-aldehyde" (extra 'o') typo, which mirrored the
     # acid/amide infix form by mistake. cf. the correct "carbothialdehyde" above.
@@ -622,7 +622,7 @@ SUFFIX_FORMS = {
     "selenol": ("selenol", "selenol"),
     "tellurol": ("tellurol", "tellurol"),  # functional-group perception fix (169.7): Te -ol analogue (P-63.1.5)
     "hydroperoxide": ("peroxol", "peroxol"),
-    # DD2 Fix C (Phase D, P-63.4.2 / P-33.2.2(3)): chalcogen peroxol analogues.
+    # Fix C (Phase D, P-63.4.2 / P-33.2.2(3)): chalcogen peroxol analogues.
     # The italic chalcogen-pair descriptor ('SO'/'OS') is carried in the suffix
     # string; the emission layer inserts the carbon locant before it
     # (methane-SO-thioperoxol; propane-1-SO-thioperoxol).
@@ -651,7 +651,7 @@ SUFFIX_FORMS = {
     # PIN is 'N-hydroxy<stem>amide', not the retained 'hydroxamic acid' suffix.
     # Suffix path suppressed (None) — composer dispatches via _assemble_hydroxamic_name().
     "hydroxamic_acid": None,
-    # --- Phase 93-01: close SENIORITY_ORDER suffix gaps ---
+    # --- -01: close SENIORITY_ORDER suffix gaps ---
     # FGs with real suffix forms
     # P-66.3.1.1: acyclic hydrazide suffix is stem + 'hydrazide' (no '-o-' infix);
     # 'pentanoic acid' -> 'pentanehydrazide' (h is consonant, no vowel elision).
@@ -667,8 +667,8 @@ SUFFIX_FORMS = {
     "imide": ("imide", "dicarboximide"),  # IUPAC P-66.2
     # FGs with functional class naming only (no substitutive suffix)
     "thioester": None,           # IUPAC P-65.3.1: functional class naming (S-alkyl alkanethioate)
-    # Phase 163 Tier FRN-D + FRN-E: functional-class (handler-emitted) — SUFFIX_FORMS = None
-    "iminoester": None,          # P-65.1.7: emitted via handlers/imidate.py per CONTEXT D-03
+    # Tier FRN-D + FRN-E: functional-class (handler-emitted) — SUFFIX_FORMS = None
+    "iminoester": None,          # P-65.1.7: emitted via handlers/imidate.py per CONTEXT
     "selenoester": None,         # P-65.6: functional-class "Se-alkyl alkaneselenoate"
     "telluroester": None,        # P-65.6: functional-class "Te-alkyl alkanetelluroate"
     "pseudoester": None,         # W3-P07 P-65.6.3.1.2: functional-class "Zyl acylate" (handler-emitted)
@@ -692,27 +692,27 @@ SUFFIX_FORMS = {
     "azo": None,                 # IUPAC P-67.2: prefix-only
     "cyanate": None,             # IUPAC P-65.5: prefix-only (pseudohalide)
     "thiocyanate": None,         # IUPAC P-65.5: prefix-only (pseudohalide)
-    # Phase 109: 6 new FG classes
+    # : 6 new FG classes
     "acid_iodide": ("oyl iodide", "carbonyl iodide"),  # IUPAC P-65.5.1
     "amidine": ("imidamide", "carboximidamide"),        # IUPAC P-66.4.1
     # Wave2 T3d (P-66.4.2, BB Table 6.1 item 18): amidrazone — chain
     # 'hydrazonamide' (ethanehydrazonamide), ring/appended-C 'carbohydrazonamide'
     # (benzenecarbohydrazonamide).
     "hydrazonamide": ("hydrazonamide", "carbohydrazonamide"),
-    # Wave-2 P1AM Task 7 (P-66.4.2.1): amidrazone =NH tautomer — chain
+    # Wave-2 P1AM (P-66.4.2.1): amidrazone =NH tautomer — chain
     # 'imidohydrazide', ring/appended-C 'carboximidohydrazide'.
     "imidohydrazide": ("imidohydrazide", "carboximidohydrazide"),
     # Wave2 T3d (P-66.1.1 item 25): sulfinimidamide, same word chain/ring
     # (like sulfonamide/sulfonimidamide).
     "sulfinimidamide": ("sulfinimidamide", "sulfinimidamide"),
-    # DD2 Fix C (Phase D): R-S-OH is now perceived as `so_thioperoxol` and emitted
+    # Fix C (Phase D): R-S-OH is now perceived as `so_thioperoxol` and emitted
     # as `-SO-thioperoxol` (P-56.2 PIN). `sulfenic_acid` is retired from the PIN path
     # (perception suppresses it on overlap) — this legacy suffix is unreachable for
     # R-S-OH and kept only as a defensive label.
     "sulfenic_acid": ("sulfenic acid", "sulfenic acid"),  # IUPAC P-65.3.1.4 (retired PIN; see so_thioperoxol)
     "diazo": None,               # P-61.5: prefix-only
     "disulfide": None,           # P-63.6.2: prefix-only
-    "peroxide": None,            # DD2 Fix B (Phase D): prefix-only ((R)peroxy)
+    "peroxide": None,            # Fix B (Phase D): prefix-only ((R)peroxy)
     "hydrazine_fg": None,        # P-62.4: prefix-only
     # Wave2 T2b: terminal N-heteroatom preselected prefixes — prefix-only
     "aminooxy": None,            # P-68.3.1.1.1.5
@@ -725,14 +725,14 @@ SUFFIX_FORMS = {
 }
 
 # Prefix forms for non-principal groups
-# Audit (Phase 113-01): verified all SENIORITY_ORDER entries have a PREFIX_FORMS
+# Audit (-01): verified all SENIORITY_ORDER entries have a PREFIX_FORMS
 # key. None entries are genuinely functional-class-only (no IUPAC prefix form).
 PREFIX_FORMS = {
     "carboxylic_acid": "carboxy",
     "thioic_S_acid": "sulfanylcarbonyl",  # IUPAC P-65.1.1.4: S-acid prefix (-C(=O)SH)
     "thioic_O_acid": "carbothioyl",      # IUPAC P-65.1.1.4: O-acid prefix (-C(=S)OH)
     "dithioic_acid": "dithiocarboxy",     # IUPAC P-65.1.1.4: dithioic acid prefix (-C(=S)SH)
-    # Phase 163 Tier FRN-A: chalcogen-acid PREFIX_FORMS (parallel to thioic_*_acid) per AUDIT-FRN § 5
+    # Tier FRN-A: chalcogen-acid PREFIX_FORMS (parallel to thioic_*_acid) per AUDIT-FRN § 5
     "selenoic_Se_acid": "selanylcarbonyl",
     "selenoic_O_acid": "carboselenoyl",
     "diselenoic_acid": "diselenocarboxy",
@@ -749,7 +749,7 @@ PREFIX_FORMS = {
     "sulfonimidic_acid": None,     # W3-P04 (P-65.3.1.4): demoted-prefix fails closed
     "sulfinimidic_acid": None,     # W3-P04 (P-65.3.1.4): demoted-prefix fails closed
     "sulfinic_acid": "sulfino",
-    # v23 Phase 9 (P-65.3.2.1): Se/Te prefix forms (demoted when a senior group present)
+    # (P-65.3.2.1): Se/Te prefix forms (demoted when a senior group present)
     "selenonic_acid": "selenono",
     "seleninic_acid": "selenino",
     "telluronic_acid": "tellurono",
@@ -757,7 +757,7 @@ PREFIX_FORMS = {
     "aldehyde": "oxo",  # or "formyl" for terminal
     "ketone": "oxo",
     "thioketone": "sulfanylidene",  # P-63.1.5: =S as non-principal prefix
-    # Phase 163 Tier FRN-C: =Se / =Te ketone non-principal prefix (parallel to sulfanylidene) per AUDIT-FRN § 5
+    # Tier FRN-C: =Se / =Te ketone non-principal prefix (parallel to sulfanylidene) per AUDIT-FRN § 5
     "selenoketone": "selanylidene",
     "telluroketone": "tellanylidene",
     "primary_alcohol": "hydroxy",
@@ -770,7 +770,7 @@ PREFIX_FORMS = {
     "selenol": "selanyl",
     "tellurol": "tellanyl",   # functional-group perception fix (169.7): Te analogue of sulfanyl/selanyl (P-63.1.5)
     "hydroperoxide": "hydroperoxy",
-    # DD2 Fix C (Phase D): demoted-prefix forms of the chalcogen peroxol analogues
+    # Fix C (Phase D): demoted-prefix forms of the chalcogen peroxol analogues
     # (P-63.4 / P-63.3.1). -S-OH -> hydroxysulfanyl; -O-SH -> sulfanyloxy;
     # -S-SH -> disulfanyl (terminal disulfide, P-35.2.2).
     "so_thioperoxol": "hydroxysulfanyl",
@@ -830,7 +830,7 @@ PREFIX_FORMS = {
     # C1 (P-65.3.1): -SO2-NH-NH2 as a substituent prefix (defensive; target
     # compounds are mono-functional so it is normally the principal suffix).
     "sulfonohydrazide": "hydrazinesulfonyl",
-    # P-66.4.1.3.4 (BB 34346/55487, W2E-P1FG Task 13): the PRESELECTED prefix
+    # P-66.4.1.3.4 (BB 34346/55487, W2E-P1FG): the PRESELECTED prefix
     # for -S(O)(=NH)-NH2 is 'S-aminosulfonimidoyl' (the italic 'S' locant
     # disambiguates substitution on the imido N); bare 'sulfonimidoyl' is the
     # divalent connector, so it must NOT be the FG prefix here. Mirrors the
@@ -843,7 +843,7 @@ PREFIX_FORMS = {
     # are already handled via the acylamino naming pathway in the pipeline.
     # Adding carbamoyl for sec/tert causes double-naming (e.g., "ethanoylamino" + "carbamoyl").
     "primary_amide": "carbamoyl",
-    # Phase 163 Tier FRN-B: chalcogen-amide PREFIX_FORMS (parallel to primary_amide carbamoyl) per AUDIT-FRN § 5
+    # Tier FRN-B: chalcogen-amide PREFIX_FORMS (parallel to primary_amide carbamoyl) per AUDIT-FRN § 5
     "thioamide": "carbamothioyl",
     "selenoamide": "carbamoselenoyl",
     "telluroamide": "carbamotelluroyl",
@@ -911,7 +911,7 @@ PREFIX_FORMS = {
     "cyanate": "cyanato",                 # IUPAC P-65.5
     "thiocyanate": "thiocyanato",         # IUPAC P-65.5
     "azo": "diazenyl",                    # IUPAC P-67.2
-    # --- Phase 93-01: close SENIORITY_ORDER prefix gaps ---
+    # --- -01: close SENIORITY_ORDER prefix gaps ---
     "anhydride": None,            # IUPAC P-65.1: functional class naming only
     "secondary_amide": None,      # Named via acylamino pathway in universal pipeline
     "tertiary_amide": None,       # Named via acylamino pathway in universal pipeline
@@ -921,7 +921,7 @@ PREFIX_FORMS = {
     "thiohydrazide": "hydrazinecarbothioyl",       # P-66.3.4 / Table 4.4
     "hydrazidine": "hydrazinecarbohydrazonoyl",    # P-66.4.3.4.1 (BB 56105)
     "hydrazonamide": "carbamohydrazonoyl",         # P-66.4.2.3.2 (BB 34498)
-    "imidohydrazide": None,  # demoted case: Task 6 owns the chain-end split; ring prefix P-66.4.2.3.6 not yet built -- fail closed
+    "imidohydrazide": None,  # demoted case: owns the chain-end split; ring prefix P-66.4.2.3.6 not yet built -- fail closed
     # P-66.4.1.3.4 (BB 34352/55484): the preselected prefix for the WHOLE
     # H2N-S(=NH)- group is 'S-aminosulfinimidoyl' -- the old bare
     # 'sulfinimidoyl' is the divalent -S(=NH)- connector (P-65.3.2.3) and
@@ -943,21 +943,21 @@ PREFIX_FORMS = {
     "seleninimidamide": None,   # demoted case fails closed (P-66.4.1.1)
     "imide": None,                # Named as heterocyclic ring substituent
     "thioaldehyde": "thioxo",     # IUPAC P-63.1.5: =S as non-principal prefix (parallel to "oxo")
-    # Phase 163 Tier FRN-C: =Se / =Te non-principal prefix (parallel to thioxo) per AUDIT-FRN § 5
+    # Tier FRN-C: =Se / =Te non-principal prefix (parallel to thioxo) per AUDIT-FRN § 5
     "selenoaldehyde": "selenoxo",
     "telluroaldehyde": "telluroxo",
     "thioester": None,            # W3-P08: functional-class via chalcogen_ester handler ("S-alkyl alkanethioate"); no prefix form
-    # Phase 163 Tier FRN-D + FRN-E: functional-class — no prefix form
+    # Tier FRN-D + FRN-E: functional-class — no prefix form
     "iminoester": None,
     "selenoester": None,
     "telluroester": None,
-    # Phase 109: 6 new FG classes
+    # : 6 new FG classes
     "acid_iodide": "iodocarbonyl",     # IUPAC P-65.5.1.4
     "amidine": "carbamimidoyl",         # IUPAC P-66.4.1.3.1 (was "amidino" — wrong per BB P-66.4.1.3.1)
     "sulfenic_acid": "sulfeno",        # IUPAC P-65.3.1.4
     "diazo": "diazo",                  # P-61.5
     "disulfide": "disulfanediyl",      # P-63.6.2 (divalent bridge; substitutive (R)disulfanyl via get_disulfanyl_prefix)
-    # DD2 Fix B (Phase D): R-OO-R' substituent prefix is (R)peroxy, generated
+    # Fix B (Phase D): R-OO-R' substituent prefix is (R)peroxy, generated
     # dynamically by substituent_prefix_forms.get_peroxy_prefix (None here, like ether/ester).
     "peroxide": None,                  # P-63.3.1(1): (R)peroxy via get_peroxy_prefix
     "hydrazine_fg": "hydrazinyl",      # P-62.4
@@ -995,7 +995,7 @@ def get_principal_group(
             # this function's contract: "the group that will be expressed as a suffix".
             if fg_name in _PREFIX_ONLY_PRINCIPAL:
                 continue
-            # DD5 RC-4 (P-44.1.1): the principal characteristic group is the WHOLE
+            # RC-4 (P-44.1.1): the principal characteristic group is the WHOLE
             # equal-seniority class. When fg_name maps to an equalized class
             # (alcohol/amine), return the UNION of match tuples over every present
             # subtype, normalized to the senior subtype's (heteroatom, bearing-C)

@@ -53,10 +53,10 @@ class ReconResult:
 class NameFacts:
     parent_kind: str                 # "chain" | "carbocycle"
     parent_length: int
-    replacements: tuple = ()         # ((locant, "O"|"N"|"S"|"P"), ...)
-    unsaturations: tuple = ()        # ((locant, 2|3), ...)
-    principal_group: Optional[tuple] = None   # (key, (locants,))
-    substituents: tuple = ()         # ((name, locant), ...) NAME, never input SMILES
+    replacements: tuple = ()         # ((locant, "O"|"N"|"S"|"P"),...)
+    unsaturations: tuple = ()        # ((locant, 2|3),...)
+    principal_group: Optional[tuple] = None   # (key, (locants))
+    substituents: tuple = ()         # ((name, locant),...) NAME, never input SMILES
     indicated_h: tuple = ()
     net_charge: int = 0
     isotopes: bool = False

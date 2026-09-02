@@ -2,10 +2,10 @@
 
 WHY
 ---
-Both JVM bridges shelled out ``java -jar ...`` **per call**. Measured 2026-07-30 by
+Both JVM bridges shelled out ``java -jar...`` **per call**. Measured 2026-07-30 by
 counting ``subprocess`` invocations whose argv contains ``java`` over 15 molecules
 spanning all naming classes: 65 spawns (4.33/molecule) before any fix, 37 (2.47/molecule)
-after the ``_java_available`` probe was cached in ``91a1a51b``. Of those 37, **30 came
+after the ``_java_available`` probe was cached in ``. Of those 37, **30 came
 from ``centres_label_batch``** — a function named "batch" that production calls twice per
 molecule with ONE molecule each, so its batching never amortised anything. Each spawn is
 ~130 ms of pure process launch.
@@ -43,7 +43,7 @@ Rather than re-parse anything, the OPSIN entry point returns the exact bytes the
 have written to stdout, so each caller keeps its own existing output handling unchanged and
 merely receives it from a cheaper source.
 
-Validation ( harnesses, denominators asserted): 217 distinct real names x both
+Validation (harnesses, denominators asserted): 217 distinct real names x both
 shipped configs = 434 pairs, **0 mismatches** vs the real CLI; centres 508 SMILES as one
 batch plus 60 single calls, **0 mismatches**.
 
@@ -56,7 +56,7 @@ SAFETY
   provenance — and centres 1.5).
 * **Fallback, never failure.** Every entry point returns a sentinel meaning "I could not
   do this; use your subprocess path" when jpype is absent, the jars are missing, or the
-  JVM will not start. A missing JVM must never hard-fail a name (``centres_bridge`` D-13).
+  JVM will not start. A missing JVM must never hard-fail a name (``centres_bridge``).
 * **fork-safe.** A JVM does not survive ``fork()``, and `` uses
   ``mp.Pool`` (processes). A child that inherited a parent's JVM would see
   ``isJVMStarted() == True`` while the JVM's threads no longer exist — and a JNI call into
@@ -176,7 +176,7 @@ def _start(pid: int) -> bool:
         # /tmp/hsperfdata_<user>/<pid> file, which is what lets a later JVM print
         # a warning onto stdout. See orthonym/jvm_flags.py for the mechanism.
         base = [f"-Xmx{xmx}", *JVM_HYGIENE_FLAGS]
-        # JDK 24+ prints a 4-line "restricted method ... System::load" warning to
+        # JDK 24+ prints a 4-line "restricted method... System::load" warning to
         # stderr for JPype's own native load. Harmless, but every worker process
         # would emit it, so silence it where supported. The flag is UNKNOWN to
         # JDK < 24 and would abort start-up there, hence the retry without it --

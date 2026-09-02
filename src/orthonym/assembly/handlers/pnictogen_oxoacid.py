@@ -3,8 +3,8 @@
 Exact analogues of ``handlers.phosphonic_acid`` / ``handlers.phosphinic_acid``.
 The Blue Book gives all four as PRESELECTED names (BB L36051-36054)::
 
-    AsH(O)(OH)2  arsonic acid    AsH2(O)OH  arsinic acid
-    SbH(O)(OH)2  stibonic acid   SbH2(O)OH  stibinic acid
+    AsH(O)(OH)2 arsonic acid AsH2(O)OH arsinic acid
+    SbH(O)(OH)2 stibonic acid SbH2(O)OH stibinic acid
 
 and the substituent-prefix PIN forms verbatim -- ``ethylstibinic acid``
 (BB L36064), ``methyl(phenyl)arsinic acid`` (BB L36066),

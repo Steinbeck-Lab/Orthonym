@@ -32,8 +32,8 @@ from typing import Optional
 from rdkit import Chem
 
 # purine-2,6-dione core with IUPAC locants encoded as atom-map numbers.
-#   6-ring: N1-C2(=O)-N3-C4 ... C5-C6(=O)-N1
-#   5-ring: C4-N9-C8-N7-C5      (fused across the shared C4-C5 bond)
+# 6-ring: N1-C2(=O)-N3-C4... C5-C6(=O)-N1
+# 5-ring: C4-N9-C8-N7-C5 (fused across the shared C4-C5 bond)
 # ``~`` (any bond) makes the match independent of Kekule/aromatic perception;
 # the two ring carbonyls are pinned by explicit ``=O``. The connectivity is
 # asymmetric (N1 is the only ring N between two carbonyls; C2 the only ring C
@@ -168,7 +168,7 @@ def _collect_substituents(mol, atom_mapping, core_atoms, identify_fn):
         for nb in atom.GetNeighbors():
             nidx = nb.GetIdx()
             # ``core_atoms`` already contains the two parent -2,6-dione carbonyl
-            # oxygens (they are part of the SMARTS match: [#6:2](=O) / ...=O), so
+            # oxygens (they are part of the SMARTS match: [#6:2](=O) /...=O), so
             # they are skipped here. Any OTHER exocyclic =O -- e.g. the C8=O of a
             # purine-2,6,8-trione (uric acid family) -- is NOT in the pattern and
             # deliberately falls through to identify_fn below, which types it as

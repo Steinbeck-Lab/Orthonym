@@ -3,7 +3,7 @@ purine numbering; indicated H derived from the graph; P-62/P-66 amine suffix).
 
 Names a SUBSTITUTED purine ring system -- the adenine/hypoxanthine/purine
 skeleton carrying ring-N substituents and/or exocyclic characteristic groups --
-as a whole-molecule parent (`9-methyl-9H-purin-6-amine`) and (Task 3) as a
+as a whole-molecule parent (`9-methyl-9H-purin-6-amine`) and as a
 `-yl` substituent (`6-amino-9H-purin-9-yl`). Declines the bare retained bases
 (adenine/guanine/hypoxanthine) for their standard tautomers, which keep their
 retained names via another path.
@@ -24,7 +24,7 @@ from typing import Optional
 from rdkit import Chem
 
 # Bare purine skeleton, IUPAC locants encoded as atom-map numbers.
-#   6-ring: N1-C2-N3-C4 ... C5-C6-N1   5-ring: C4-N9-C8-N7-C5 (fused C4-C5)
+# 6-ring: N1-C2-N3-C4... C5-C6-N1 5-ring: C4-N9-C8-N7-C5 (fused C4-C5)
 # ``~`` (any bond) makes the match Kekule/aromatic independent. The carbon
 # skeleton is asymmetric (N1 neighbours the degree-2 C6; N3 neighbours the
 # degree-3 fusion C4), so the match orientation -- hence the numbering -- is
@@ -94,7 +94,7 @@ def name_substituted_purine(mol) -> Optional[str]:
         # substituent -- i.e. denote a DIFFERENT molecule. Fail closed at the
         # source rather than trust an incomplete collection -- UNLESS best-effort
         # is on, in which case retry any unidentified/incomplete branch with the
-        # general recursive substituent namer (v33 Defect B): this is what lets a
+        # general recursive substituent namer: this is what lets a
         # giant arm -- e.g. a nucleotide's ribose-diphosphate-pantetheine chain on
         # a purine N9, as in acetyl-CoA -- be named as an ordinary ring substituent
         # instead of silently dropping the whole molecule to a malformed von

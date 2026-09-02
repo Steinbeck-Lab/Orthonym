@@ -247,7 +247,7 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
     },
 
     # =========================================================================
-    # ADDITIONAL MONOCYCLIC AND POLYCYCLIC REFERENCES (Phase 89)
+    # ADDITIONAL MONOCYCLIC AND POLYCYCLIC REFERENCES
     # =========================================================================
 
     'pyrazine': {
@@ -316,11 +316,11 @@ def get_aromatic_reference(mol: Chem.Mol) -> Optional[Tuple[str, str]]:
         None otherwise.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2')  # tetrahydroquinoline
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2') # tetrahydroquinoline
         >>> get_aromatic_reference(mol)
         ('quinoline', 'c1ccc2ncccc2c1')
 
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # dihydroindole
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2') # dihydroindole
         >>> get_aromatic_reference(mol)
         ('indole', 'c1ccc2[nH]ccc2c1')
     """
@@ -401,7 +401,7 @@ def get_carbocyclic_aromatic_reference(mol: Chem.Mol) -> Optional[Tuple[str, str
         None otherwise.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2') # tetrahydronaphthalene
         >>> get_carbocyclic_aromatic_reference(mol)
         ('naphthalene', 'c1ccc2ccccc2c1')
     """

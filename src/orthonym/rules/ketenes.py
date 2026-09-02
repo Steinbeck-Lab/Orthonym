@@ -4,8 +4,8 @@ Ketene is the class name for H2C=C=O and its derivatives. The unsubstituted
 structure and its halogen derivatives are named on the ``ethenone`` parent
 (BB verbatim examples)::
 
-    C=C=O          -> ethenone         (PIN)
-    BrC(Br)=C=O    -> dibromoethenone  (PIN; "not dibromoketene")
+    C=C=O -> ethenone (PIN)
+    BrC(Br)=C=O -> dibromoethenone (PIN; "not dibromoketene")
 
 SCOPE (fail-closed, accuracy-first): the exact terminal heterocumulene
 O=C=C< where the sp carbon carries NOTHING else and the terminal carbon

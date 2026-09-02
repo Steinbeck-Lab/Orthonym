@@ -59,7 +59,7 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
 
     # A RING sulfur is never an acyclic functional-class sulfide ("R R' sulfide",
     # P-63.6.2.1) — it is a skeletal heteroatom named by the ring system (thiophene,
-    # thiane, the epithio bridge of a bridged-fused parent, ...). Characterising its
+    # thiane, the epithio bridge of a bridged-fused parent,...). Characterising its
     # two ring branches as substituent groups LINEARISES the ring into a phantom
     # chain (e.g. the S-bridged 1,4-epithio-1,4-dihydronaphthalene -> "didecyl
     # sulfide" for some SMILES spellings — an order-dependent WRONG name). Decline so
@@ -338,7 +338,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # of S is the amide N, not a carbon) can have its R-sulfonyl stem built: cap S
     # with -OH after detaching the N and the arm names as the R-sulfonic acid
     # (`4-aminobenzene-1-sulfonic acid`), rewritten to `...sulfonyl` (task #28,
-    # unblocks the substituted-arene `{Ar}sulfonamido` PIN, BB P-66.1.1.4.3 :33034).
+    # unblocks the substituted-arene `{Ar}sulfonamido` PIN, BB P-66.1.1.4.3:33034).
     # Purely additive: sulfone/sulfoxide callers require two-carbon S (SMARTS), so
     # this branch only fires where the old carbon-only filter returned None. The
     # cap-name-rewrite is fail-closed (a non-clean `... sulfonic/sulfinic acid`
@@ -362,7 +362,7 @@ def _acid_stem_unsaturated_oxide_prefix(
     # Isolate the fragment bearing the CAPPED SULFONYL S. Selecting the first piece
     # that contains ANY sulfur mis-picks the detached PARENT when that parent itself
     # holds a ring sulfur (a thiazole / thiophene host): the wrong piece has _acid_s=0
-    # so guard 1 spuriously fires. v30 #29 gap-a: `2-(4-aminobenzene-1-sulfonamido)-
+    # so guard 1 spuriously fires. #29 gap-a: `2-(4-aminobenzene-1-sulfonamido)-
     # 1,3-thiazole-5-carboxylic acid` abstained because the thiazole piece `Nc1nccs1`
     # was chosen over the arene sulfonic acid `Nc1ccc(S(=O)(=O)O)cc1`. RWMol.AddAtom
     # appends and RemoveBond does not reindex, so ``sulfur_idx`` is still valid in
@@ -382,10 +382,10 @@ def _acid_stem_unsaturated_oxide_prefix(
     if acid_smiles is None:
         return None
     # Two soundness guards on the acid-stem -> acyl rewrite. That rewrite trusts a
-    # gate-DISABLED acid sub-namer, which a fable review of 7c621b84 showed could emit a
-    # wrong constitution for the N-parent (sulfonamido) case. 8afa533c added the guards
+    # gate-DISABLED acid sub-namer, which showed could emit a
+    # wrong constitution for the N-parent (sulfonamido) case.
     # but scoped them to the N-parent branch to avoid a gold-risk on a path it had not
-    # itself broken. v30 F6 confirmed the CARBON-parent sulfone/sulfoxide-prefix path
+    # itself broken. F6 confirmed the CARBON-parent sulfone/sulfoxide-prefix path
     # has the SAME false friends (`CS(=O)(=O)CCS(O)(=O)=O` -> `ethane-1,2-disulfonyl`),
     # so both guards now fire for either parent element (C or N). Failing closed here
     # returns the caller to its own fail-closed handling; the corrupted stem never ships.
@@ -398,13 +398,13 @@ def _acid_stem_unsaturated_oxide_prefix(
     # OPSIN-unparseable). Fail closed unless exactly ONE S bears an -OH/-O- (the one we
     # just capped) -- an RT-invisible defect, so a structural guard, not a round-trip.
     #
-    # ⚠ Guard 1 and guard 2 are COMPLEMENTARY, not redundant (fable review of F6): guard 2
+    # ⚠ Guard 1 and guard 2 are COMPLEMENTARY, not redundant (review of F6): guard 2
     # CANNOT catch the multiplied-acid case, because 'ethane-1,2-disulfonic acid' is the
     # CORRECT name of the capped fragment and re-anchors skeleton-EXACT -- the corruption
     # lives entirely in the suffix->acyl STRIP, which guard 2 never inspects. Do NOT delete
     # guard 1 as "redundant with guard 2".
     #
-    # NOTE (fable review of F6): this counts ANY S bearing a single-bonded O, so it also
+    # NOTE (review of F6): this counts ANY S bearing a single-bonded O, so it also
     # vetoes a sulfonate/sulfinate ESTER arm, a mesyloxy arm, and a charge-separated
     # sulfoxide arm -- broader than "competing acid". Today that is pure gain: the
     # gate-disabled acid sub-namer mis-names every one of those (silent atom drop / SO3H
@@ -446,15 +446,15 @@ def _acid_stem_unsaturated_oxide_prefix(
     _sk_frag = _self_consistency_skeleton(acid_smiles)
     if _sk_name is None or _sk_frag is None or _sk_name != _sk_frag:
         return None
-    # v30 #36 (fable F6 finding 3): the skeleton block above is the InChIKey first
-    # block, which EXCLUDES stereo (ADR-18-07), so a WRONG CIP descriptor (E/Z, R/S)
+    # #36 (F6 finding 3): the skeleton block above is the InChIKey first
+    # block, which EXCLUDES stereo, so a WRONG CIP descriptor (E/Z, R/S)
     # from the gate-disabled acid sub-namer would re-anchor skeleton-exact and ship a
     # wrong-stereo `...sulfinyl/sulfonyl` prefix. Also require the C6 RegistrationHash
     # stereo layer (stereo-bearing, tautomer-canonical) to match — gate-INDEPENDENT,
     # fail-closed on mismatch/unhashable. No live witness today (the sub-namer routes
     # stereo through the standard CIP path, so its descriptors are correct), so this is
-    # defence-in-depth closing the gap invariant 2 requires: honest WITHOUT the gate,
-    # for both the N-parent (8afa533c) and carbon-parent (F6) paths.
+    # defence-in-depth closing the gap requires: honest WITHOUT the gate,
+    # for both the N-parent and carbon-parent (F6) paths.
     _st_name = _registration_stereo_layer(_reparsed)
     _st_frag = _registration_stereo_layer(acid_smiles)
     if _st_name is None or _st_frag is None or _st_name != _st_frag:

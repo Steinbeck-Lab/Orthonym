@@ -1,8 +1,8 @@
-"""Phase 160 amine handler — Tier-2 mid-tier direct-return (fast-path).
+""" amine handler — Tier-2 mid-tier direct-return (fast-path).
 
 Verbatim lift of composer.py:1374-1386 (inline dispatch branch). Body
 ``_assemble_amine_name`` at composer.py:4296-4536 (241 LOC) STAYS until
-Plan-03 commit 03-10 (composer.py thinning) per CONTEXT D-24.
+ (composer.py thinning) per CONTEXT.
 
 Predicate gates on:
 1. ``principal_group in {secondary_amine, tertiary_amine}`` (primary_amine
@@ -10,9 +10,9 @@ Predicate gates on:
 2. ``not is_polyfunctional`` (mutex with polyfunctional inline branch at
    composer.py:870)
 3. ``not is_cyclic OR chain_is_parent`` (Tier-A mutex — same pattern as
-   partial_sat handler in Plan-02 commit 02-24)
+   partial_sat handler in)
 
-Byte-identical contract per CONTEXT D-21 (DECOMP-03): predicate gates capture
+Byte-identical contract per CONTEXT: predicate gates capture
 the inline cascade-order semantics so dispatch_inner reaches this handler
 only when the inline amine branch at composer.py:1374 would have fired.
 
@@ -20,7 +20,7 @@ IUPAC cite: P-66.6.1 (amines).
 
 References:
 - composer.py:1374-1386 (inline dispatch branch; RETAINED as Tier-A-rejection
-  fallback; Plan-03 commit 03-10 consolidates).
+  fallback; consolidates).
 - composer.py:870-888 (polyfunctional inline branch — runs BEFORE amine).
 - composer.py:4296-4536 (``_assemble_amine_name`` body; STAYS until 03-10).
 - handlers/amide.py (sibling handler with same mutex pattern).
@@ -51,7 +51,7 @@ def _is_amine(features: Any) -> bool:
     - NOT is_polyfunctional
     - (NOT is_cyclic OR chain_is_parent) (Tier-A mutex)
 
-    Pure read-only per CONTEXT D-25.
+    Pure read-only per CONTEXT.
     """
     if getattr(features, 'principal_group', None) not in _AMINE_PRINCIPAL_GROUPS:
         return False
@@ -71,7 +71,7 @@ def name_amine(
 
     Verbatim semantics of composer.py:1374-1386. Returns
     ``NamingResult(name=best.name, tree=best.tree, atom_to_locant_hint=None)``
-    after ``pool.add(name, 'amine', features, tree=...)`` (Phase 165 SCORE-01:
+    after ``pool.add(name, 'amine', features, tree=...)`` (
     counted coarse node, parity-safe via fragment_legacy). Returns None if
     ``_assemble_amine_name`` returns falsy (per inline guard at composer.py:1375).
     """
@@ -91,15 +91,15 @@ def name_amine(
             "amine", _ha, amine_name[:60],
         )
 
-    # Phase 165 SCORE-01: _assemble_amine_name builds the name via N-prefix
-    # string concatenation (no fragment list) -> counted coarse node (D-03),
+    # : _assemble_amine_name builds the name via N-prefix
+    # string concatenation (no fragment list) -> counted coarse node,
     # parity-safe via fragment_legacy. A structured upgrade requires a
     # fragments-based refactor of _assemble_amine_name (deferred; documented A1).
     tree = NameTreeNode(
         parent_stem=amine_name, fragment_legacy=amine_name,
         class_id="amine", iupac_section_cite="P-62",
     )
-    # Phase 145.1: route through pool.add() — direct_return handler.
+    # .1: route through pool.add() — direct_return handler.
     pool = get_current_pool()
     pool.add(amine_name, "amine", features, tree=tree)
     best = pool.best()

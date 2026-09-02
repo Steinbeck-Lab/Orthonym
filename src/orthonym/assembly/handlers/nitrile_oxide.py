@@ -1,4 +1,4 @@
-"""P-66.5.4.1/2 neutral nitrile-oxide functional-class suffix handler (W2F p4).
+"""P-66.5.4.1/2 neutral nitrile-oxide functional-class suffix handler (p4).
 
 A neutral nitrile oxide ``R-C#[N+]-[O-]`` is named by functional-class method (1)
 of P-66.5.4.1 — the separate word ``oxide`` appended to the nitrile name
@@ -25,8 +25,8 @@ compound prefix (P-16.3.3, a general substituent-rendering feature).
 
 Registered in inner_dispatch at priority 975 (specialty-intercept tier, before the
 acid/ester handlers so the senior nitrile oxide wins) — predicate-pure +
-direct-return + ``pool.add`` + ``_inject_stereo_if_missing`` (D-25 side_effect
-inventory ()).
+direct-return + ``pool.add`` + ``_inject_stereo_if_missing`` (side_effect
+inventory).
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def _nitrile_ring_is_aromatic(mol: Any, nitrile_c_idx: int) -> bool:
 
 
 def _is_nitrile_oxide(features: Any) -> bool:
-    """Predicate (D-07 pure, read-only): a NEUTRAL single-fragment molecule bearing
+    """Predicate (pure, read-only): a NEUTRAL single-fragment molecule bearing
     EXACTLY ONE ``R-C#[N+]-[O-]`` nitrile-oxide group.
 
     Neutral-only (net charge 0) excludes the anion/salt (prefix path owns it).

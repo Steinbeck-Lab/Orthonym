@@ -6,8 +6,8 @@ unsymmetrical R2C=N-N=CR'2 (P-68.3.1.2.3.2). Preferred IUPAC names are formed
 SUBSTITUTIVELY as 'ylidene' derivatives of the parent hydride hydrazine, NOT by
 functional-class nomenclature ('acetone azine'):
 
-    (CH3)2C=N-N=C(CH3)2   -> di(propan-2-ylidene)hydrazine   (symmetric, P-...3.1)
-    CH3CH2C(CH3)=N-N=C6H10 -> (butan-2-ylidene)(cyclohexylidene)hydrazine  (P-...3.2)
+    (CH3)2C=N-N=C(CH3)2 -> di(propan-2-ylidene)hydrazine (symmetric, P-...3.1)
+    CH3CH2C(CH3)=N-N=C6H10 -> (butan-2-ylidene)(cyclohexylidene)hydrazine (P-...3.2)
 
 The two C=N carbons carry the ylidene fragments. This handler perceives the
 acyclic C=N-N=C motif on the molecule graph (NOT via a global-table SMARTS — the

@@ -12,7 +12,7 @@ from rdkit import Chem
 
 from ..rules.lambda_convention import nonstandard_bonding_number
 
-# v33 Phase 6 (heteroatom-only-suffix acids): characteristic-heteroatom
+# (heteroatom-only-suffix acids): characteristic-heteroatom
 # (atomic number) for FG classes whose SMARTS matches S/P + O with NO carbon
 # atom in the match tuple. sulfonic_acid, sulfinic_acid, phosphonic_acid and
 # the sulfonic-family imidic/peroxoic/thioic S variants all use a RECURSIVE
@@ -48,7 +48,7 @@ _HETEROACID_CHARACTERISTIC_Z: Dict[str, int] = {
     "sulfonoperoxoic_acid": 16, "sulfonothioic_S_acid": 16,
     "sulfonimidic_acid": 16, "sulfinimidic_acid": 16,
     "phosphonic_acid": 15, "phosphinic_acid": 15,
-    # v33 Phase 6 Wave 2 (#4): same bearing-carbon defect for the remaining
+    # Wave 2 (#4): same bearing-carbon defect for the remaining
     # Group-15/16 oxoacid FG classes (functional_groups.py ~94-114). arsonic_acid
     # and stibonic_acid use the same recursive carbon guard as sulfonic_acid
     # ("[AsX4;$([AsX4][#6])](=O)([OX2H1])[OX2H1]") -- carbon absent from the
@@ -344,7 +344,7 @@ def _get_non_principal_terminal_carbons(
     # chain, expressed as 'oxo' (=O) + 'halo' (X): Blue Book P-65.5.4 worked
     # examples — "methyl 4-chloro-4-oxobutanoate" (PIN, line 5108),
     # "3-chloro-3-oxopropanoic acid" (PIN, line 31531) — NOT the longer-prefix
-    # "...carbonochloridoyl...".  (The 'carbonochloridoyl'/'chlorocarbonyl'
+    # "...carbonochloridoyl...". (The 'carbonochloridoyl'/'chlorocarbonyl'
     # prefix IS the PIN only on a RING parent, e.g. "2-carbonochloridoyl-
     # benzoic acid" line 31533, where the carbon cannot be a ring member; that
     # path does not use chain enumeration so it is unaffected.)
@@ -372,13 +372,13 @@ def _get_non_principal_terminal_carbons(
         # the acid-halide note above. The 'carbamimidoyl' prefix is the PIN only
         # for RING parents / genuinely off-chain amidine carbons (BB 34332);
         # those never use chain enumeration so they are unaffected.
-        # P-66.4.2.3.2 (BB 34498, plan P1AM Task 6): the amidrazone
+        # P-66.4.2.3.2 (BB 34498, plan P1AM): the amidrazone
         # (hydrazonamide) carbon at a chain end stays IN the chain and is
         # expressed via 'amino' + 'hydrazinylidene' prefixes, mirroring the
         # AM-4 amidine note above. 'carbamohydrazonoyl' remains the PIN
         # prefix only for ring/off-chain amidrazone carbons.
         # ('hydrazidine' stays excluded: its chain-end split form
-        # (P-66.4.3.4.1 hydrazinyl+hydrazinylidene) is Task 7 scope-checked
+        # (P-66.4.3.4.1 hydrazinyl+hydrazinylidene) is scope-checked
         # and currently fails closed.)
         'hydrazidine': 0,
     }
@@ -485,7 +485,7 @@ def find_principal_chain(
     # let a 1-carbon "chain" out-score the genuine ethane-1,2-diamine backbone.
     fg_bearing_carbons: List[Set[int]] = []
     if principal_group and principal_group in functional_groups:
-        # DD5 RC-4 (P-44.1.1): count the principal characteristic group over its
+        # RC-4 (P-44.1.1): count the principal characteristic group over its
         # WHOLE equal-seniority class (e.g. primary + secondary OH = two hydroxy
         # PCGs), so the chain bearing all of them wins on PCG count (the di-OH
         # chain -> 3-(4-chlorobutyl)pentane-1,4-diol, not the longer 1-OH chain).
@@ -498,7 +498,7 @@ def find_principal_chain(
         _members = _SENIORITY_CLASS_MEMBERS.get(_parent_class)
         _het_z = _CLASS_CHARACTERISTIC_Z.get(_parent_class)
         if _het_z is None:
-            # v33 Phase 6: heteroatom-only-suffix acid classes (sulfonic/
+            # : heteroatom-only-suffix acid classes (sulfonic/
             # sulfinic/phosphonic/phosphinic + the sulfonic-family imidic/
             # peroxoic/thioic S variants) are singleton classes -- never a
             # _SENIORITY_PARENT value -- so _parent_class is always None for
@@ -519,7 +519,7 @@ def find_principal_chain(
                 _normalize_pcg_match(mol, m, _het_z)
                 for sub in _members for m in functional_groups.get(sub, [])
             ]
-        # v29 R1 (P-44.1.1): a SKELETAL-suffix PCG -- the '-one' family -- puts
+        # R1 (P-44.1.1): a SKELETAL-suffix PCG -- the '-one' family -- puts
         # the characteristic group's OWN atom into the parent hydride, so only
         # that atom may satisfy "this chain bears the PCG". The ketone SMARTS
         # '[#6][CX3](=O)[#6]' carries BOTH FLANKING carbons, and the whole-match
@@ -528,18 +528,18 @@ def find_principal_chain(
         # win to a longer carbonyl-FREE chain, the acyl carbons were dropped as
         # an unnameable substituent (universal_pipeline_unnameable_substituent) and the '=O' was re-expressed on
         # the attachment atom -- a SILENT ATOM DROP:
-        #   CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C  (C21H42O)
-        #     -> '5-butyl-2,4-dimethyltridecan-4-one'  (C19H38O, 2 C GONE)
+        # CCCCCCCCC(CCCC)C(C)(CC(C)C)C(=O)C (C21H42O)
+        # -> '5-butyl-2,4-dimethyltridecan-4-one' (C19H38O, 2 C GONE)
         #
         # P-64.2.2.1 "Acyclic ketones" (BlueBookV2/BlueBookV2.md:28346) -- "(1)
-        # substitutively, using the suffix 'one' ... Method (1) generates
+        # substitutively, using the suffix 'one'... Method (1) generates
         # preferred IUPAC names"; its examples `butan-2-one (PIN)`,
         # `heptan-3-one (PIN)` and `5-methylhexan-2-one (PIN)` all number the
         # CARBONYL CARBON as a skeletal atom of the parent chain.
-        # P-44.1.1 (:18875) -- "The senior parent structure has the maximum
+        # P-44.1.1 (18875) -- "The senior parent structure has the maximum
         # number of substituents corresponding to the principal characteristic
-        # group (suffix)"; P-44.1 (:18873) -- these criteria "must always be
-        # applied before those applicable to ... chains (see P-44.3)". A chain
+        # group (suffix)"; P-44.1 (18873) -- these criteria "must always be
+        # applied before those applicable to... chains (see P-44.3)". A chain
         # without the carbonyl carbon bears ZERO ketones, so it loses at
         # P-44.1.1 before chain length is ever consulted.
         #
@@ -591,7 +591,7 @@ def find_principal_chain(
                 )
             if het is None:
                 # Legacy fallback: count where any match atom is on the chain --
-                # narrowed by v29 R1 to the PCG's own skeletal atom for the
+                # narrowed by R1 to the PCG's own skeletal atom for the
                 # SKELETAL_SUFFIX_PGS families (see the P-44.1.1 note above), so
                 # a chain through a flanking carbon no longer counts the group.
                 fg_bearing_carbons.append(_pcg_anchor_atoms(match))
@@ -868,7 +868,7 @@ def find_principal_chain(
                 sub_count, sub_locants_score)
     
     def _p45_alpha_key(chain: List[int]) -> tuple:
-        """DD5 RC-1 (P-45.2.3 / P-45.2.2 / P-45.5): deterministic candidate
+        """ RC-1 (P-45.2.3 / P-45.2.2 / P-45.5): deterministic candidate
         comparator for chains that TIE on every chain_score term.
 
         Replaces the arbitrary ``max()`` fall-through (which returned whichever
@@ -937,7 +937,7 @@ def find_principal_chain(
         descending; the chain with the lexicographically-greatest tuple wins.
 
         For ``OC(=O)C(CP)C[PH4]`` the chain through the -CH2-PH4 arm makes λ5-P a
-        direct substituent (key ``(5,)``); the chain through the -CH2-PH2 arm has
+        direct substituent (key ``(5)``); the chain through the -CH2-PH2 arm has
         no directly-attached λ atom (key ``()``) — so the former is the parent,
         giving ``3-(λ5-phosphanyl)-2-(phosphanylmethyl)propanoic acid`` (PIN), not
         the ``[not] 3-phosphanyl-2-(λ5-phosphanylmethyl)…`` alternative.
@@ -956,7 +956,7 @@ def find_principal_chain(
                     lams.append(lam)
         return tuple(sorted(lams, reverse=True))
 
-    # v38 P2 reverse-pair memo (PURE SPEEDUP — provably output-identical).
+    # P2 reverse-pair memo (PURE SPEEDUP — provably output-identical).
     # `chain_score` is orientation-invariant: criteria 1-2 read set membership,
     # 3-5 count length/bonds (both orientation-free), 6-8 take a fwd/rev `max`,
     # and criterion 9 (`_compute_sub_locant_score`) returns the same tuple for a
@@ -1012,7 +1012,7 @@ def find_principal_chain(
 def _orient_chain_for_lowest_locants(chain: List[int], priority_atoms: Set[int]) -> List[int]:
     """
     Orient chain so priority atoms have lowest locants.
-    
+
     Uses first-point-of-difference rule.
     """
     forward_locants = [
@@ -1033,7 +1033,7 @@ def _orient_chain_for_lowest_locants(chain: List[int], priority_atoms: Set[int])
 def _compare_locants(set_a: List[int], set_b: List[int]) -> bool:
     """
     Compare two locant sets using first-point-of-difference rule.
-    
+
     Returns True if set_a is preferred (lower).
     """
     a_sorted = sorted(set_a)
@@ -1053,11 +1053,11 @@ def _compare_locants(set_a: List[int], set_b: List[int]) -> bool:
 def get_substituents(mol, main_chain: List[int]) -> Dict[int, List[List[int]]]:
     """
     Find substituents attached to the main chain.
-    
+
     Args:
         mol: RDKit Mol object
         main_chain: List of atom indices in main chain (ordered)
-        
+
     Returns:
         Dict mapping chain position (1-indexed) to list of substituent atom lists.
         Each substituent is represented as a list of its atom indices.
@@ -1089,12 +1089,12 @@ def get_substituents(mol, main_chain: List[int]) -> Dict[int, List[List[int]]]:
 def _bfs_substituent(mol, start_idx: int, exclude_set: Set[int]) -> List[int]:
     """
     Find all atoms in a substituent using BFS.
-    
+
     Args:
         mol: RDKit Mol object
         start_idx: Starting atom index (first atom of substituent)
         exclude_set: Set of atom indices to exclude (main chain atoms)
-        
+
     Returns:
         List of atom indices in the substituent
     """
@@ -1144,11 +1144,11 @@ def is_ring_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> bo
         True if the substituent contains a complete ring, False otherwise
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccccc1C')  # toluene
+        >>> mol = Chem.MolFromSmiles('c1ccccc1C') # toluene
         >>> # Phenyl atoms: 0-5, Methyl: 6
         >>> is_ring_substituent(mol, [0, 1, 2, 3, 4, 5], {6})
         True
-        >>> mol2 = Chem.MolFromSmiles('CCCCC')  # pentane
+        >>> mol2 = Chem.MolFromSmiles('CCCCC') # pentane
         >>> is_ring_substituent(mol2, [0, 1, 2], set())
         False
     """
@@ -1190,7 +1190,7 @@ def classify_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> D
         - 'ring_atoms': tuple of ring atom indices (only if type='ring')
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccccc1CCC(=O)O')  # phenylpropanoic acid
+        >>> mol = Chem.MolFromSmiles('c1ccccc1CCC(=O)O') # phenylpropanoic acid
         >>> classify_substituent(mol, [0,1,2,3,4,5], {6,7,8,9,10})
         {'type': 'ring', 'name': 'phenyl', 'atoms': [0,1,2,3,4,5], 'ring_atoms': (0,1,2,3,4,5)}
     """
@@ -1212,7 +1212,7 @@ def classify_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> D
             break
 
     if contained_ring:
-        # This is a ring substituent. WS-A task 9: name the WHOLE fragment
+        # This is a ring substituent. WS-A: name the WHOLE fragment
         # through the single ring-substituent chokepoint with its attachment
         # atom — the old per-first-SSSR-ring lookup truncated a fused system
         # to its first ring (naphthalenyl -> 'phenyl', a DIFFERENT group) and

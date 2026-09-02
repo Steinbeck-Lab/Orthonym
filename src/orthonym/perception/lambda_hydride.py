@@ -13,9 +13,9 @@ the phosphorus is to hydrogen. Fail-closed: a charged P, a radical, a ring P, or
 any O/N/S neighbour / multiple bond declines.
 
 References:
-    IUPAC 2013 Blue Book, P-14.1.1/P-14.1.2  (bonding number, Table 1.3)
-    IUPAC 2013 Blue Book, P-14.1.3           (λ-convention on neutral atoms)
-    IUPAC 2013 Blue Book, P-45.3.1           (λ5-phosphanyl substituent)
+    IUPAC 2013 Blue Book, P-14.1.1/P-14.1.2 (bonding number, Table 1.3)
+    IUPAC 2013 Blue Book, P-14.1.3 (λ-convention on neutral atoms)
+    IUPAC 2013 Blue Book, P-45.3.1 (λ5-phosphanyl substituent)
 """
 
 from rdkit import Chem

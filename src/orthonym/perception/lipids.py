@@ -1,9 +1,9 @@
-"""Lipid backbone detection for the P-107 backbone-aware assembler (Phase 180, WSC-01).
+"""Lipid backbone detection for the P-107 backbone-aware assembler (WSC-01).
 
 `detect_lipid_backbone(mol)` is a PURE, hard-gated structural deriver: it recognizes
 the three lipid backbone families and classifies each backbone position, or returns
 ``None`` on any dirty/unrecognized decoration so the molecule defers to the general
-pipeline (D-06, fail-safe → zero non-lipid regression). It is the acyclic
+pipeline (fail-safe → zero non-lipid regression). It is the acyclic
 generalization of the Phase-176 ``recognize_sugar_skeleton`` ring deriver.
 
 The detector does NOT name anything — it produces a structured ``BackboneMatch`` that
@@ -11,9 +11,9 @@ the Form-B assembler (``rules/lipids.py``) consumes. The only mutation is the
 idempotent CIP-label assignment (the accepted sugar-deriver seam).
 
 Families (Blue Book P-107):
-  - "glyceride"     — propane-1,2,3-triyl core, O's acylated / phospho / free-OH (P-107.2)
-  - "phospholipid"  — glyceride where one primary O is a phosphate diester to a head group (P-107.3)
-  - "sphingolipid"  — long-chain 2-amino-1,3-diol (sphinganine/sphingosine); N-acyl = ceramide (P-107.4.3)
+  - "glyceride" — propane-1,2,3-triyl core, O's acylated / phospho / free-OH (P-107.2)
+  - "phospholipid" — glyceride where one primary O is a phosphate diester to a head group (P-107.3)
+  - "sphingolipid" — long-chain 2-amino-1,3-diol (sphinganine/sphingosine); N-acyl = ceramide (P-107.4.3)
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ _CIP_ASSIGNED_PROP = "_orthonym_cip_assigned"
 # Anchor: three contiguous sp3 carbons, each bearing exactly one O — the
 # propane-1,2,3-triyl-O core. (Terminal-internal-terminal CH2-CH-CH2.)
 _GLYCEROL_ANCHOR = Chem.MolFromSmarts("[CH2X4][CHX4][CH2X4]")
-# Sphingoid: HO-CH2(C1)-CH(N)(C2)-CH(O)(C3)- ; C1-O may be OH or O-glycosyl.
+# Sphingoid: HO-CH2(C1)-CH(N)(C2)-CH(O)(C3)-; C1-O may be OH or O-glycosyl.
 _SPHINGOID_ANCHOR = Chem.MolFromSmarts("[OX2][CH2X4][CHX4]([NX3])[CHX4][OX2H1]")
 
 
@@ -110,7 +110,7 @@ def _classify_oxygen_site(mol, c_idx, o_idx):
             if sugar is not None:
                 return ("glycosyl", o_idx, sugar)
             return None  # ring carbon we can't resolve as a clean sugar → defer
-        # plain ether (O-alkyl) or vinyl-ether → defer (ether/plasmalogen, D-06)
+        # plain ether (O-alkyl) or vinyl-ether → defer (ether/plasmalogen)
         return None
 
     return None
@@ -193,7 +193,7 @@ def _classify_head_group(mol, p_idx, backbone_o_idx):
         # glycerol head group: O-CH2-CH(OH)-CH2-OH
         if _is_glycerol_headgroup(mol, head_o):
             return ("glycerol", head_o)
-    # an esterified head we don't recognize → defer (D-06)
+    # an esterified head we don't recognize → defer
     return None
 
 
@@ -329,7 +329,7 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
             sites[2] = ("n_acyl", acyl_c, n)
         else:
             # bare sphingoid (free amine) — defer: the systematic 2-aminoalkane-1,3-diol
-            # already names; claiming it risks regression (D-06/D-11). Documented in SUMMARY.
+            # already names; claiming it risks regression. Documented in SUMMARY.
             return None
 
         # Walk the linear sphingoid chain C1->Cn (C1 = the CH2-O end) for the
@@ -341,11 +341,11 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
                     if nb.GetAtomicNum() == 6 and nb.GetIdx() != prev and nb.GetIdx() not in chain]
             if len(nxts) != 1:
                 if len(nxts) > 1:
-                    return None  # branched sphingoid → honest-gate (D-06/D-11)
+                    return None  # branched sphingoid → honest-gate
                 break
             prev, cur = cur, nxts[0]
             chain.append(cur)
-        chain_pos = {idx: i + 1 for i, idx in enumerate(chain)}  # C1=1 ...
+        chain_pos = {idx: i + 1 for i, idx in enumerate(chain)}  # C1=1...
         double_bonds = []
         for i in range(len(chain) - 1):
             b = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
@@ -371,7 +371,7 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
 # Public entry point
 # --------------------------------------------------------------------------- #
 def detect_lipid_backbone(mol) -> Optional[BackboneMatch]:
-    """Detect a clean lipid backbone, or return None (hard gate / fail-safe, D-06)."""
+    """Detect a clean lipid backbone, or return None (hard gate / fail-safe)."""
     if mol is None:
         return None
     # sphingoid first (its 1,3-diol-2-amino core is more specific than the glycerol triol)

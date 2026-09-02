@@ -26,19 +26,19 @@ from rdkit.Chem import rdchem
 from ..perception.rings import get_ring_info, is_aromatic_ring
 
 
-# Phase 155.B D-09: detect indicated-H prefix in a ring stem name like
+# .B: detect indicated-H prefix in a ring stem name like
 # "1H-indole" so name_ring_assembly can replicate the descriptor across
 # all primed rings ("1H,1'H-2,2'-biindole") instead of leaving it embedded
 # as a substring of a single ring name ("2,2'-bi1H-indole").
-# Source: 155-CONTEXT.md D-09; HERITAGE-followups.md Follow-up 12 placement
-#         subset; IUPAC P-31.1.4.
+# Source: 155-CONTEXT.md; HERITAGE-followups.md Follow-up 12 placement
+# subset; IUPAC P-31.1.4.
 _INDICATED_H_RE = re.compile(r"^(\d+)H-(.*)$")
 
-# Phase 155 WR-05: detect embedded P-31.1.4.4 indicated-H descriptors inside
+# WR-05: detect embedded P-31.1.4.4 indicated-H descriptors inside
 # a ring stem name like "phenanthridin-6(5H)-one" or "acridin-9(10H)-one".
 # The placement-replication logic in `_INDICATED_H_RE` only covers the
 # leading "<n>H-" prefix form; embedded "(<n>H)" descriptors require a
-# different per-ring threading strategy (deferred to Phase 151 Follow-up
+# different per-ring threading strategy (deferred to Follow-up
 # 12's deeper assembly-builder rewrite). Until that rewrite lands, ring
 # assemblies whose component stem carries an embedded descriptor fail
 # closed (return None) rather than emit the buggy mid-string `bi...`
@@ -46,10 +46,10 @@ _INDICATED_H_RE = re.compile(r"^(\d+)H-(.*)$")
 # Source: 155-REVIEW.md WR-05; IUPAC P-31.1.4.4.
 _INDICATED_H_EMBEDDED_RE = re.compile(r"\(\d+H\)")
 
-# Phase 151-03 D-21 type alias: cascade-step-6 supplier returns int|tuple
+# -03 type alias: cascade-step-6 supplier returns int|tuple
 # locants. Tuples are reserved for fusion-atom locants like (8, 'a');
 # ring assemblies use plain ints because primes are name-format-layer only
-# (per 151-PATTERNS.md Pattern S-3 and CONTEXT D-19/D-20).
+# (per 151-PATTERNS.md Pattern S-3 and CONTEXT).
 _Locant = Union[int, Tuple[int, str]]
 
 
@@ -68,7 +68,7 @@ ASSEMBLY_MULTIPLIERS = {
     # P-28.5 / IUPAC multiplying affixes: ring assemblies of more than six (and
     # beyond the old deci cap) identical cyclic systems. OPSIN-verified that the
     # explicit-locant assembly with 'undeci' (11) round-trips. Counts above 12
-    # keep the .get(count)->None decline (no OPSIN-verifiable affix -> fail closed).
+    # keep the.get(count)->None decline (no OPSIN-verifiable affix -> fail closed).
     11: "undeci",
     12: "dodeci",
 }
@@ -80,7 +80,7 @@ ASSEMBLY_MULTIPLIERS = {
 # cyclopentylidene) and von Baeyer polycyclics (bicyclo[2.2.1]heptane,
 # spiro[...]). Mancude rings (phenyl, pyridine, furan, naphthalene, indole) are
 # NOT enclosed: 1,1'-biphenyl, 2,2'-bipyridine, 2,3'-bifuran, 1,2'-binaphthalene.
-# Worked examples P-28.2.1; all PINs OPSIN-RT-verified (v22 G3 / COV-03).
+# Worked examples P-28.2.1; all PINs OPSIN-RT-verified.
 _VON_BAEYER_NAME_RE = re.compile(
     r"^cyclo[a-z]+(?:ane|ene|yne|adiene|atriene|ylidene)$"
 )
@@ -165,7 +165,7 @@ def _system_signature(mol, system_atoms: Set[int]) -> Tuple:
 
     Note (W8-P11 leak fix): element/size/aromaticity alone cannot
     distinguish e.g. cyclooctane from cyclooctene (both all-carbon,
-    ring_sizes=(8,), non-aromatic). Without a saturation check, a
+    ring_sizes=(8), non-aromatic). Without a saturation check, a
     cyclooctene+cyclooctane pair joined by a single bond falsely compared
     EQUAL and was accepted as an identical-ring "bi-" assembly; the namer
     then applied the FIRST ring's (unsaturated) name to BOTH components,
@@ -462,7 +462,7 @@ def _check_all_connected(
 def _check_path_topology(
     num_systems: int, connections: List[Tuple[int, int, int, int]]
 ) -> bool:
-    """Phase 151-03 D-15: linear-path requirement for ring assemblies.
+    """-03: linear-path requirement for ring assemblies.
 
     Every system must have degree <= 2 in the inter-system bond graph.
     Branched arrangements (e.g., 1,3,5-triphenylbenzene where the central
@@ -479,7 +479,7 @@ def _check_path_topology(
         ``connections`` (a linear path / single bond ring assembly);
         False otherwise.
 
-    Source: 151-CONTEXT.md D-15.
+    Source: 151-CONTEXT.md.
     Source: 151-RESEARCH.md §"Code Examples" Example 4.
     Source: HERITAGE-1990 §5; IUPAC Blue Book P-28.2.
     """
@@ -491,7 +491,7 @@ def _check_path_topology(
         deg[s2] += 1
     if not all(d <= 2 for d in deg.values()):
         return False
-    # Phase 151-04 WR-02: reject cyclic ring-system arrangements.
+    # -04 WR-02: reject cyclic ring-system arrangements.
     # A linear path of N systems has exactly N-1 inter-system bonds.
     # A cycle has N (every node degree 2 — passes the degree check).
     # IUPAC P-28.2 requires a linear path; a cyclic arrangement is a
@@ -505,7 +505,7 @@ def _order_systems_along_path(
     num_systems: int,
     connections: List[Tuple[int, int, int, int]],
 ) -> Optional[List[int]]:
-    """Phase 151-04 BLK-02 Scenario A root-cause fix.
+    """-04 BLK-02 Scenario A root-cause fix.
 
     Given a linear-path inter-system bond graph (verified by
     ``_check_path_topology``), return the system indices in path order
@@ -535,7 +535,7 @@ def _order_systems_along_path(
         ordering cannot be determined (caller should fall through).
 
     Source: IUPAC Blue Book P-28.2.1 (single-prime namespace = middle ring).
-    Source: 151-04-PLAN.md Task 3 Scenario A.
+    Source: 151-04-PLAN.md Scenario A.
     """
     if num_systems <= 1:
         return list(range(num_systems))
@@ -599,23 +599,23 @@ def detect_ring_assembly(
           - count: number of identical ring systems
           - ring_type: 'carbocyclic' or 'heterocyclic'
 
-    Phase 154.B D-11 cross-handler contract:
+    .B cross-handler contract:
         Ring-assembly detection (this function) and multiplicative naming
         (rules.multiplicative.name_multiplicative) are MUTUALLY EXCLUSIVE
-        by topology.  Ring assemblies = identical rings joined directly by
-        a single bond (no bridge atom).  Multiplicative = identical parent
-        units joined by 1+ bridge atoms (oxy / methylene / nitrilo / ...).
+        by topology. Ring assemblies = identical rings joined directly by
+        a single bond (no bridge atom). Multiplicative = identical parent
+        units joined by 1+ bridge atoms (oxy / methylene / nitrilo /...).
         The split is enforced symmetrically:
           - this function rejects atom-bridged cases via
             _find_inter_system_bonds (which only matches ring-to-ring
             single bonds; bridge atoms are NOT in rings, so atom-bridged
             cases never produce inter-system bonds)
           - name_multiplicative rejects single-bond-only cases via
-            _is_pure_single_bond_assembly at the entry point (D-11 guard)
+            _is_pure_single_bond_assembly at the entry point (guard)
         Cross-handler regression test:
         tests/integration/test_assembly_vs_multiplicative_dispatch.py.
 
-    Source: 154-CONTEXT.md D-11; 151-CONTEXT.md D-15 (path-topology contract).
+    Source: 154-CONTEXT.md; 151-CONTEXT.md (path-topology contract).
     """
     if len(ring_systems) < 2:
         return None
@@ -629,7 +629,7 @@ def detect_ring_assembly(
     if not _check_all_connected(len(ring_systems), connections):
         return None
 
-    # Phase 151-03 D-15: linear-path requirement (every system degree <= 2).
+    # -03: linear-path requirement (every system degree <= 2).
     # Rejects branched arrangements like 1,3,5-triphenylbenzene where the
     # central system has degree 3. HERITAGE-1990 §5 + IUPAC P-28.2.
     if not _check_path_topology(len(ring_systems), connections):
@@ -678,7 +678,7 @@ def detect_ring_assembly(
     # This is already ensured by _find_inter_system_bonds checking that
     # both atoms are IN ring systems.
 
-    # Phase 151-04 BLK-02 Scenario A root-cause fix: reorder ring_systems
+    # -04 BLK-02 Scenario A root-cause fix: reorder ring_systems
     # along the inter-system path so the middle ring of a ter-/quater-/
     # quinque- assembly lands at the correct primed-namespace index.
     # Without this reordering, ``get_ring_systems`` returns systems in
@@ -814,7 +814,7 @@ def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
         return None
     can_smi = Chem.MolToSmiles(sub_mol, canonical=True)
 
-    # Step 3: Try fused heterocycle dictionary (fast path, 150+ entries from Phase 109)
+    # Step 3: Try fused heterocycle dictionary (fast path, 150+ entries)
     from ..data.fused_heterocycles import get_fused_heterocycle_name
     fused_result = get_fused_heterocycle_name(sub_mol)
     if fused_result:
@@ -828,7 +828,7 @@ def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
     if retained:
         return retained
 
-    # Step 5: Try algorithmic fused ring generator (Phase 112 fallback)
+    # Step 5: Try algorithmic fused ring generator (fallback)
     from .fused_rings import _try_algorithmic_fusion_name
     algo_name = _try_algorithmic_fusion_name(sub_mol)
     if algo_name:
@@ -926,11 +926,11 @@ def _number_carbocyclic_from_anchor(
     mol, system_atoms: Set[int], anchor_atom: int,
     other_inter_system_atoms: Set[int],
 ) -> Optional[Dict[int, int]]:
-    """Phase 151-03 D-18 / D-19: per-ring numbering for a carbocyclic
+    """-03 /: per-ring numbering for a carbocyclic
     assembly component anchored at ``anchor_atom`` (which becomes locant 1).
 
     Numbers the ring atoms in the direction that gives the lowest locant
-    set for the OTHER inter-system bond atoms (D-19 first-point-of-difference
+    set for the OTHER inter-system bond atoms (first-point-of-difference
     via ``compare_locant_sets``). Used by ``_compute_per_system_ring_locants``
     to produce the per-system IUPAC locant maps that drive name emission
     AND the cascade-step-6 supplier.
@@ -949,9 +949,9 @@ def _number_carbocyclic_from_anchor(
         Dict mapping atom_idx -> int locant covering all ring atoms in
         the (single-)ring system. Returns None for multi-ring systems
         (those use absolute numbering via _get_ring_parent_name). For
-        single-ring systems, the lowest-locant direction wins per D-19.
+        single-ring systems, the lowest-locant direction wins per.
 
-    Source: 151-CONTEXT.md D-18, D-19, D-20.
+    Source: 151-CONTEXT.md,,.
     Source: HERITAGE-1990 §3 (criterion order — lowest-locant tiebreak).
     Source: IUPAC Blue Book P-28.2.1.
     """
@@ -999,17 +999,17 @@ def _number_carbocyclic_from_anchor(
 def _compute_per_system_ring_locants(
     mol, assembly_info: Dict,
 ) -> Optional[List[Dict[int, int]]]:
-    """Phase 151-03 D-18 / D-21: per-system IUPAC locant maps for a ring
+    """-03 /: per-system IUPAC locant maps for a ring
     assembly. Each entry is a Dict[int, int] mapping atom_idx -> locant
     (within that system's own numbering).
 
     For carbocyclic single-ring components: locant 1 = the inter-system
     bond atom going TOWARDS the lower-indexed neighbour ring; the second
     bond atom (if present) gets the lowest-locant ring-walk distance per
-    D-19 ``compare_locant_sets`` tiebreak.
+     ``compare_locant_sets`` tiebreak.
 
     For heterocyclic components: heteroatom-priority numbering via
-    ``_get_connection_locant`` (existing logic, D-18 own-numbering).
+    ``_get_connection_locant`` (existing logic, own-numbering).
 
     For multi-ring fused components (e.g., biindole): absolute numbering
     by per-component canonical SMILES lookup is delegated to
@@ -1025,7 +1025,7 @@ def _compute_per_system_ring_locants(
         position (matching assembly_info['ring_systems'] order). Returns
         None if any system cannot be numbered fully.
 
-    Source: 151-CONTEXT.md D-18, D-19, D-21.
+    Source: 151-CONTEXT.md,,.
     Source: 151-PATTERNS.md Pattern S-3 (cascade-step-6 supplier).
     """
     ring_systems = assembly_info["ring_systems"]
@@ -1070,7 +1070,7 @@ def _compute_per_system_ring_locants(
                 mol.GetAtomWithIdx(i).GetSymbol() != "C" for i in ring
             )
             if not has_hetero:
-                # Carbocyclic single ring: number from anchor with D-19
+                # Carbocyclic single ring: number from anchor with
                 # lowest-locant tiebreak on other_atoms.
                 m = _number_carbocyclic_from_anchor(
                     mol, sys_atoms, anchor_atom, other_atoms
@@ -1083,7 +1083,7 @@ def _compute_per_system_ring_locants(
         # IUPAC P-25 absolute numbering (heteroatom = locant 1). Walking
         # direction is chosen to give the LOWEST locant set to the
         # inter-system bond atoms (P-28.2.1 connection-locant lowest-locant
-        # rule + D-19 first-point-of-difference via compare_locant_sets).
+        # rule + first-point-of-difference via compare_locant_sets).
         sys_map: Dict[int, int] = {}
         if len(sys_rings) == 1:
             ring = sys_rings[0]
@@ -1270,7 +1270,7 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
         # as origins for a deterministic, lowest-locant choice. Using only the
         # first junction made the disubstituted-middle-ring numbering
         # SMILES-order dependent (2'-carboxy-3'-chloro vs 3'-carboxy-2'-chloro;
-        # v30 #41, the >=2-substituent sibling of the single-substituent fix in
+        # #41, the >=2-substituent sibling of the single-substituent fix in
         # _get_substituent_info).
         conn_atoms = []
         for a1, a2, s1, s2 in connections:
@@ -1396,7 +1396,7 @@ def _get_substituent_info(
             # rings are equivalent, so the substituent's lowest achievable
             # locant is the min over all junction origins. Using only the
             # FIRST connection made the locant SMILES-order-dependent
-            # (2' vs 3'; v30 #41, fable a998bea712). Taking the min is both
+            # (2' vs 3'; #41, a998bea712). Taking the min is both
             # deterministic and the IUPAC lowest-locant choice.
             conn_atoms = []
             for a1, a2, s1, s2 in connections:
@@ -1471,7 +1471,7 @@ def _name_substituent(mol, sub_atoms: List[int],
 
     # P-29.2 free-valence gate. Every route below names the fragment from its
     # ATOM COUNT, which cannot distinguish -CH3 from =CH2:
-    # 'C=C1CCC(C2CCCCC2)CC1' came out as 4-methyl-1,1'-bi(cyclohexane), a
+    # 'C=C1CCCCC1' came out as 4-methyl-1,1'-bi(cyclohexane), a
     # different molecule. Shared primitive, same three-way contract as the two
     # general chokepoints; a single bond defers and changes nothing.
     from ..assembly.substituent_enumerator import carbon_free_valence_prefix
@@ -1580,7 +1580,7 @@ def _name_substituent(mol, sub_atoms: List[int],
     # Last resort: FAIL CLOSED. This used to return the literal word
     # "substituent", which is not a nomenclature term at all -- it named
     # nothing and merely deferred the failure to whoever spelled it into a
-    # name. v29 P7 T3 made ``parent_to_prefix`` legitimately return None for a
+    # name. P7 T3 made ``parent_to_prefix`` legitimately return None for a
     # functional parent that has no '-yl' form, which put this branch back on
     # the execution path, so the placeholder is now reachable rather than
     # theoretical. Returning None makes every caller abstain (P-14: a name we
@@ -1689,11 +1689,11 @@ def _ring_assembly_pcg_suffix(mol, sub_atoms: List[int],
     suffix table). Returns the suffix stem, or None if the group is not a
     single-kind suffix-expressible PCG handled here.
 
-      -C(=O)OH -> 'carboxylic acid'   (added exocyclic C)
-      -CHO     -> 'carbaldehyde'       (added exocyclic C)
-      -C#N     -> 'carbonitrile'       (added exocyclic C)
-      -NH2     -> 'amine'              (direct ring attachment)
-      -OH      -> 'ol'                 (direct ring attachment)
+      -C(=O)OH -> 'carboxylic acid' (added exocyclic C)
+      -CHO -> 'carbaldehyde' (added exocyclic C)
+      -C#N -> 'carbonitrile' (added exocyclic C)
+      -NH2 -> 'amine' (direct ring attachment)
+      -OH -> 'ol' (direct ring attachment)
     """
     if _is_carboxyl_substituent(mol, sub_atoms, attachment_atom):
         return 'carboxylic acid'
@@ -1759,7 +1759,7 @@ def _mixed_ring_assembly_prefix_name(
     supported carbocyclic-biaryl class, so the caller abstains rather than ship
     a garbage/dropped prefix (the local ``_name_substituent`` can still return an
     ``"unknown organic compound"`` mangle for groups it cannot name -- a no-Java
-    leak. Its former ``"substituent"`` placeholder is gone: v29 P7 T4 made that
+    leak. Its former ``"substituent"`` placeholder is gone: P7 T4 made that
     branch return None, so an unnameable group now fails closed at the source).
 
     Supported: demoted suffix-expressible PCG kinds (carboxy/formyl/cyano/
@@ -2016,17 +2016,17 @@ def name_ring_assembly(
     if ring_name is None:
         return None
 
-    # Phase 155 WR-05: ring stems carrying an embedded P-31.1.4.4 indicated-H
+    # WR-05: ring stems carrying an embedded P-31.1.4.4 indicated-H
     # descriptor (e.g. "phenanthridin-6(5H)-one", "acridin-9(10H)-one") need a
     # per-ring threading strategy the placement-subset fix doesn't implement;
     # fail closed (return None) so a higher-level fallback can attempt naming
     # rather than emit the buggy mid-string `2,2'-biphenanthridin-6(5H)-one`
-    # form. Deeper rewrite is Phase 151 Follow-up 12 main-thread territory.
+    # form. Deeper rewrite is Follow-up 12 main-thread territory.
     if _INDICATED_H_EMBEDDED_RE.search(ring_name):
         return None
 
     # Build connection locant string per IUPAC P-28.2.1.
-    # Phase 151-03 D-18 / D-19: use per-system numbering so ter-/quater-
+    # -03 /: use per-system numbering so ter-/quater-
     # assemblies emit the correct middle-ring back-attachment locant
     # (4 for para-terphenyl, 6 for terpyridine, 5 for terthiophene).
     # The pre-151-03 path called _get_connection_locant per pair, which
@@ -2058,7 +2058,7 @@ def name_ring_assembly(
     # nitro, halogen, alkyl, alkoxy). A blanket check here short-circuits both.
     # The abstention belongs where the prefix-only path actually consumes
     # ``s['name']`` -- see the veto loop below, which has fail-closed on a
-    # missing name since c6b9f6ba (P-29.2). v29 P7 T4 (b0ec23eb) added the
+    # missing name since c6b9f6ba (P-29.2). P7 T4 added the
     # hoisted duplicate and it cost the P2-RING-ASSEMBLY-MIXED gold target
     # (4'-nitro[1,1'-biphenyl]-4-carboxylic acid -> abstention): nitro reaches
     # ``_name_substituent`` first, gets None, and the assembly died before the
@@ -2123,7 +2123,7 @@ def name_ring_assembly(
         loc2 = _lookup_locant(per_system_locants, s2, a2, ring_systems[s2])
         prime1 = _format_prime(s1)
         prime2 = _format_prime(s2)
-        # IUPAC P-28.2.1 + P-28.3.1 (8 Oct 2025 erratum): "lowest locants ...
+        # IUPAC P-28.2.1 + P-28.3.1 (8 Oct 2025 erratum): "lowest locants...
         # then order of citation" — the unprimed (first-cited) ring takes the
         # lower attachment locant. For a 2-component assembly of identical rings
         # with no distinguishing substituent, get_ring_systems order is
@@ -2152,16 +2152,16 @@ def name_ring_assembly(
             return None
         return f"{connection_str}-{multiplier}{_enclose_component(ylidene)}"
 
-    # Phase 155.B D-09: indicated-H placement subset for ring assemblies.
+    # .B: indicated-H placement subset for ring assemblies.
     # If ring_name carries an indicated-H prefix like "1H-indole", emit the
     # descriptor once per primed ring ("1H,1'H-2,2'-biindole") instead of
     # leaving it embedded inside the multiplied stem ("2,2'-bi1H-indole",
-    # the buggy pre-fix output).  The deeper assembly-builder rewrite
+    # the buggy pre-fix output). The deeper assembly-builder rewrite
     # (per-ring indicated-H locants generically threaded into the assembly
-    # base-name for biindole-class assemblies) stays in Phase 151's deferred-
+    # base-name for biindole-class assemblies) stays's deferred-
     # warnings backlog (Follow-up 12 main thread).
-    # Source: 155-CONTEXT.md D-09; HERITAGE-followups.md Follow-up 12 placement
-    #         subset; IUPAC P-31.1.4.  Reuses _format_prime above.
+    # Source: 155-CONTEXT.md; HERITAGE-followups.md Follow-up 12 placement
+    # subset; IUPAC P-31.1.4. Reuses _format_prime above.
     indicated_h_match = _INDICATED_H_RE.match(ring_name)
     if indicated_h_match:
         locant_int, ring_stem = (
@@ -2206,7 +2206,7 @@ def name_ring_assembly(
     # PRINCIPAL characteristic group as a prefix would be wrong here regardless
     # of spelling — it is the suffix rule above that forces the enclosed-parent
     # shape, not any defect in the prefix vocabulary.
-    # (Historical note, corrected v29 P7 Task 3: this comment used to justify
+    # (Historical note, corrected P7: this comment used to justify
     # itself by claiming the generic namer emits 'formaldehydyl' / 'hydrogen
     # cyanidyl'. It did, but that was a defect in parent_to_prefix, now fixed —
     # CHO -> 'formyl' and HCN -> 'cyano'. Do not re-derive a nomenclature rule
@@ -2269,16 +2269,16 @@ def name_ring_assembly(
 
     # Fail-closed veto: a MIXED -CHO / -C#N on a ring assembly.
     #
-    # ⚠ Corrected v29 P7 Task 3 — this comment previously read "a -CHO / -C#N
+    # ⚠ Corrected P7 — this comment previously read "a -CHO / -C#N
     # on a ring assembly has NO valid prefix form". That is FALSE as a
     # nomenclature claim, and the Blue Book says so directly:
-    #   P-66.6.1.3 (BB:35000, under P-66.6 ALDEHYDES): "... a -CHO group is
-    #     expressed by the preferred prefix 'oxo' if located at an end of a
-    #     carbon chain, or, otherwise, by the preferred prefix 'formyl'."
-    #     BB:35009 is a verbatim ring example: '4-formylcyclohexane-1-
-    #     carboxylic acid (PIN)'.
-    #   P-66.5.1.1.4 (BB:34734): the -CN group "is designated by the preferred
-    #     prefix 'cyano'".
+    # P-66.6.1.3 (BB:35000, under P-66.6 ALDEHYDES): "... a -CHO group is
+    # expressed by the preferred prefix 'oxo' if located at an end of a
+    # carbon chain, or, otherwise, by the preferred prefix 'formyl'."
+    # BB:35009 is a verbatim ring example: '4-formylcyclohexane-1-
+    # carboxylic acid (PIN)'.
+    # P-66.5.1.1.4 (BB:34734): the -CN group "is designated by the preferred
+    # prefix 'cyano'".
     # Both groups DO have valid preferred prefixes. What was true was the
     # empirical half: parent_to_prefix emitted 'formaldehydyl' / 'hydrogen
     # cyanidyl'. That was a defect in the converter, not a fact about IUPAC,
@@ -2389,7 +2389,7 @@ def name_ring_assembly_prefix(
     if ring_name is None:
         return None
 
-    # Phase 155 WR-05: same fail-closed as in `name_ring_assembly` for embedded
+    # WR-05: same fail-closed as in `name_ring_assembly` for embedded
     # P-31.1.4.4 descriptors. Both call sites must agree on the contract.
     if _INDICATED_H_EMBEDDED_RE.search(ring_name):
         return None
@@ -2400,7 +2400,7 @@ def name_ring_assembly_prefix(
     # carbocyclic connection atom, so a ter-/quater- assembly SUBSTITUENT
     # emitted the buggy '1,1':1',1''-terphenyl' (the middle ring's back-
     # attachment locant must be 4' for para-terphenyl). This bug was fixed on
-    # the parent path (151-03 D-18/D-19) but the substituent-prefix path kept
+    # the parent path (151-03) but the substituent-prefix path kept
     # the old code; a biphenyl (single junction) is unaffected either way.
     per_system_locants = _compute_per_system_ring_locants(mol, assembly_info)
 
@@ -2434,23 +2434,23 @@ def name_ring_assembly_prefix(
     if attach_system_idx is None:
         return None
 
-    # Free-valence (-yl) locant. Two fable BLOCKERs live here because the legacy
+    # Free-valence (-yl) locant. Two BLOCKERs live here because the legacy
     # _get_substituent_locant numbered the attachment ring in ISOLATION:
-    #   (1) for a HETEROCYCLE it used orient_heterocycle ignorant of the junction
-    #       and placed the -yl on a JUNCTION atom ('[2,2'-bithiophen]-2-yl',
-    #       correct '5-yl'); and
-    #   (3) for a MULTI-RING FUSED component it emitted a PARSEABLE-WRONG name
-    #       ('[1,1'-binaphthalen]-2-yl' for a 2,2'-binaphthalene) that SELF-01
-    #       masks — the producer must be honest WITHOUT the gate (8afa533c).
+    # (1) for a HETEROCYCLE it used orient_heterocycle ignorant of the junction
+    # and placed the -yl on a JUNCTION atom ('[2,2'-bithiophen]-2-yl',
+    # correct '5-yl'); and
+    # (3) for a MULTI-RING FUSED component it emitted a PARSEABLE-WRONG name
+    # ('[1,1'-binaphthalen]-2-yl' for a 2,2'-binaphthalene) that SELF-01
+    # masks — the producer must be honest WITHOUT the gate.
     # Fix, by attachment-ring kind (carbocyclic monocycle is UNCHANGED, so
     # '[1,1'-biphenyl]-3-yl' etc. stay byte-identical):
-    #   * fused / multi-ring          -> fail closed (never guess, finding 3);
-    #   * heterocyclic monocycle      -> the per-system heteroatom-priority map,
-    #     which numbers junction-aware and consistent with the connection string
-    #     (finding 1: bithiophene 5, bipyridine 5);
-    #   * carbocyclic monocycle       -> the existing _get_substituent_locant,
-    #     which applies the P-31.1.4.3.4 lowest-free-valence-locant rule the
-    #     per-system connection-locant minimiser does not.
+    # * fused / multi-ring -> fail closed (never guess, finding 3);
+    # * heterocyclic monocycle -> the per-system heteroatom-priority map,
+    # which numbers junction-aware and consistent with the connection string
+    # (finding 1: bithiophene 5, bipyridine 5);
+    # * carbocyclic monocycle -> the existing _get_substituent_locant,
+    # which applies the P-31.1.4.3.4 lowest-free-valence-locant rule the
+    # per-system connection-locant minimiser does not.
     _attach_sys_atoms = ring_systems[attach_system_idx]
     _attach_sys_rings = [
         r for r in mol.GetRingInfo().AtomRings() if set(r) <= _attach_sys_atoms]
@@ -2485,7 +2485,7 @@ def name_ring_assembly_prefix(
         )
     attach_prime = _format_prime(attach_system_idx)
 
-    # Phase 155.B D-09: indicated-H placement subset for ring-assembly
+    # .B: indicated-H placement subset for ring-assembly
     # SUBSTITUENT prefix path. Mirrors the parent-path replication in
     # `name_ring_assembly` (line 1201-1212) so a biindole-bearing
     # substituent emits `[1H,1'H-2,2'-biindol]-5-yl` instead of the pre-fix
@@ -2493,8 +2493,8 @@ def name_ring_assembly_prefix(
     # the replication contract -- a biindole-bearing molecule names
     # consistently whether the assembly is parent or substituent.
     # Source: 155-REVIEW.md WR-01; HERITAGE-followups.md Follow-up 12
-    #         placement subset; IUPAC P-31.1.4.  Reuses _format_prime
-    #         and _INDICATED_H_RE.
+    # placement subset; IUPAC P-31.1.4. Reuses _format_prime
+    # and _INDICATED_H_RE.
     indicated_h_match = _INDICATED_H_RE.match(ring_name)
     if indicated_h_match:
         locant_int, ring_stem = (
@@ -2685,11 +2685,11 @@ def name_mixed_ring_prefix(
 
 
 # ============================================================================
-# Phase 151-03 D-21: cascade-step-6 supplier (get_ring_assembly_iupac_locants)
+# -03: cascade-step-6 supplier (get_ring_assembly_iupac_locants)
 # ============================================================================
 
 def get_ring_assembly_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
-    """Phase 151-03 D-21 cascade-step-6 supplier for ring assemblies size >= 2.
+    """-03 cascade-step-6 supplier for ring assemblies size >= 2.
 
     Returns the per-system IUPAC numbering of every ring atom merged into a
     single ``Dict[int, int]`` covering ALL ring atoms in the assembly.
@@ -2712,7 +2712,7 @@ def get_ring_assembly_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
             (size < 2, mixed signatures, branched topology, oversize, etc.),
           * any system's per-ring numbering produces partial coverage.
 
-    Source: 151-CONTEXT.md D-18, D-19, D-21.
+    Source: 151-CONTEXT.md,,.
     Source: 151-PATTERNS.md Pattern S-3 (cascade-step-6 supplier contract).
     Source: 151-RESEARCH.md §"OPSIN Compatibility Evidence" (12 named cases).
     """

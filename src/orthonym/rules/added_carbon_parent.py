@@ -1,4 +1,4 @@
-"""Added-carbon multi-suffix parent naming (DD1 Fix 2, Blue Book P-65.1.1.1 /
+"""Added-carbon multi-suffix parent naming (Fix 2, Blue Book P-65.1.1.1 /
 P-66.1.1.1.1.2 / P-66.5.1.1.2).
 
 When **three or more** carboxylic-acid / carboxamide / carbonitrile groups are
@@ -8,9 +8,9 @@ so the PIN names the **parent hydride formed by removing the carbonyl/nitrile
 carbons** and appends a multiplied ``carbo*`` *added-carbon* suffix, citing one
 locant per attachment atom::
 
-    NC(=O)C(C(=O)N)C(=O)N      -> methanetricarboxamide
-    CCCC(C#N)(C#N)C#N          -> butane-1,1,1-tricarbonitrile
-    OC(=O)CC(C(=O)O)CC(=O)O    -> propane-1,2,3-tricarboxylic acid
+    NC(=O)C(C(=O)N)C(=O)N -> methanetricarboxamide
+    CCCC(C#N)(C#N)C#N -> butane-1,1,1-tricarbonitrile
+    OC(=O)CC(C(=O)O)CC(=O)O -> propane-1,2,3-tricarboxylic acid
 
 Why ``n >= 3`` and NOT geminal-2: two such groups can ALWAYS be routed as the two
 termini of a single chain (``HOOC-CH2-COOH`` -> propanedioic acid, the carbonyl
@@ -123,7 +123,7 @@ def _substituent_constitution_ok(mol, frag_atoms, attach_idx, sub_name: str) -> 
     heavy-atom count, different connectivity), so a None/sentinel check (and even a
     heavy-COUNT check) is insufficient. OPSIN-parse ``<sub_name>benzene`` and require
     its InChIKey skeleton to equal that of the REAL fragment-on-benzene; fail CLOSED
-    on any parse failure / missing jar / mismatch. Fixes the fable BLOCKER 1 (a
+    on any parse failure / missing jar / mismatch. Fixes the BLOCKER 1 (a
     nitrite shipping as a nitro compound gate-off) without depending on SELF-01."""
     from ..namer import _validity_gate_name_to_smiles, _self_consistency_skeleton
 
@@ -142,7 +142,7 @@ def _whole_name_stereo_ok(mol, name: str) -> bool:
     """Gate-INDEPENDENT stereo-aware re-anchor for the UNSATURATED added-carbon
     branch (aconitic family). The ene locant and the E/Z descriptor are spelled by
     this namer, so a spelling slip could ship a wrong constitution/geometry gate-off
-    (T4 producers must re-anchor or fail closed -- ed52fa98 / 8afa533c). OPSIN-parse
+    (T4 producers must re-anchor or fail closed). OPSIN-parse
     the WHOLE name and require its InChIKey (constitution AND stereo, full key) to
     equal the input's; fail CLOSED on no-jar / parse-fail / mismatch."""
     from rdkit import Chem
@@ -187,7 +187,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
 
     # All non-added carbons must lie ON this single chain (no branches). Every
     # parent carbon's heavy neighbour must be a parent/added carbon OR a nameable
-    # exocyclic SUBSTITUENT (v30: citric-acid family -- a 2-hydroxy on the core;
+    # exocyclic SUBSTITUENT (citric-acid family -- a 2-hydroxy on the core;
     # previously ANY extra neighbour returned None -> the molecule fell to a wrong
     # pentanedioic-chain candidate). Collect each substituent fragment and name it
     # via the recursive substituent namer; fail closed on anything un-nameable so a
@@ -263,7 +263,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             sub_name = name_substituent(mol, sorted(frag), ni)
             if not sub_name or sub_name == "substituent":
                 return None  # un-nameable substituent -> fail closed (0-wrong)
-            # v30 fable BLOCKER 1: name_substituent's symbols-only fallback mis-names
+            # BLOCKER 1: name_substituent's symbols-only fallback mis-names
             # constitutional isomers (nitrite -O-N=O -> 'nitro'); a gate-independent
             # CONSTITUTION re-anchor rejects that before it can ship gate-off.
             if not _substituent_constitution_ok(mol, frag, ni, sub_name):
@@ -283,15 +283,15 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
 
     subs_alpha = sorted(named_subs, key=lambda t: alpha_sort_key(t[1]))
 
-    # Stereo — computed BEFORE numbering so P-14.4(j) can break a locant tie (fable
-    # review of a4240802). The core is saturated (unsaturation rejected above), so this
+    # Stereo — computed BEFORE numbering so P-14.4(j) can break a locant tie (
+    # ). The core is saturated (unsaturation rejected above), so this
     # is R/S CHAIN stereocentres. Fail CLOSED if any DEFINED stereocentre is off the
     # parent chain (would live inside a substituent), is unassignable, is pseudo-
     # asymmetric r/s or axial M/P (OPSIN-unparseable / out of scope), or any stereo
     # double bond exists — a flat name would drop or mis-spell it. Uses the vendored-
-    # `centres` CIP path. (Fable RISK 3 — a stale parse-time legacy _CIPCode surviving
+    # `centres` CIP path. (RISK 3 — a stale parse-time legacy _CIPCode surviving
     # for an atom centres declined — is LATENT (no witness in the >=3-COOH acyclic class,
-    # invariant 10); NOT hardened here because clearing _CIPCode breaks assign's
+    # ); NOT hardened here because clearing _CIPCode breaks assign's
     # repopulation. Tracked as a follow-up.)
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)

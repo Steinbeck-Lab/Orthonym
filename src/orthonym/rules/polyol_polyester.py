@@ -2,7 +2,7 @@
 
 The composer names a pure polyol (`1,5,6-tris(2,3-dihydroxypropoxy)hexane-2,3,4-triol`)
 cleanly because its only characteristic group is the alcohol. When the SAME polyol
-carries one or more esters (v30 tail #21, a hexitol tris-methacrylate), the ester
+carries one or more esters, the ester
 is senior (P-41), so parent selection commits to the ester and `name_ester`
 LINEARISES the 23-carbon polyol OR side into a wrong 'tricosyl 2-methylpropanoate'
 (SELF-01-suppressed), and the multiplicative-ester PIN neither reference builds.
@@ -54,12 +54,12 @@ def name_acyclic_polyol_polyester(mol) -> Optional[str]:
         return None
 
     # --- Classify every oxygen. ---
-    # free_oh[core_c]           -> a -OH on that core carbon
-    # ether_arm[(core_c, o)]    -> a bridging ether O to an arm (alkoxy prefix)
-    # acyloxy[(core_c, o, cc)]  -> an -O-C(=O)- ester (acyloxy prefix)
+    # free_oh[core_c] -> a -OH on that core carbon
+    # ether_arm[(core_c, o)] -> a bridging ether O to an arm (alkoxy prefix)
+    # acyloxy[(core_c, o, cc)] -> an -O-C(=O)- ester (acyloxy prefix)
     # Any oxygen that does not fit exactly one role -> decline.
     # --- Ester carbonyl carbons (-C(=O)-O-): excluded from the parent carbon
-    #     skeleton so an arm's ester O separates the arm from the core cleanly. ---
+    # skeleton so an arm's ester O separates the arm from the core cleanly. ---
     def _is_ester_carbonyl(a) -> bool:
         if a.GetSymbol() != 'C':
             return False
@@ -114,9 +114,9 @@ def name_acyclic_polyol_polyester(mol) -> Optional[str]:
         return None  # branched core beyond a single chain -> decline (v1)
 
     # --- Classify EACH CORE CARBON's own substituents. Arm-internal oxygens
-    #     (an -OH or ester INSIDE an arm) are named by name_substituent on the
-    #     arm, never classified here -- only the O directly bonded to a core
-    #     carbon is a core role (suffix -ol / alkoxy prefix / acyloxy prefix). ---
+    # (an -OH or ester INSIDE an arm) are named by name_substituent on the
+    # arm, never classified here -- only the O directly bonded to a core
+    # carbon is a core role (suffix -ol / alkoxy prefix / acyloxy prefix). ---
     core_set = set(core)
     prefix_on: Dict[int, List[str]] = {}
     suffix_carbons: Set[int] = set()

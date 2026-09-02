@@ -71,7 +71,7 @@ def _get_visited() -> set:
 # regardless of recursion state. Analogous to retained_names.py but for
 # fragments produced during recursive decomposition of complex molecules.
 #
-# Every entry was verified against name_compound at depth 0 (2026-02-25).
+# Every entry was verified against name_compound at depth 0.
 # Only fragments with CORRECT verified names are included.
 FRAGMENT_NAME_CACHE: Dict[str, str] = {
     # --- Simple alkanes ---
@@ -353,7 +353,7 @@ _WORK_BUDGET = 6000
 # to the SAME clean abstain the engine already emits for an unnameable input
 # (a clean abstain, never a partial / atom-dropped / wrong name). A
 # molecule that never approaches either budget is byte-identical.
-import os as _os  # noqa: E402  (used for the budget-tuning env overrides below)
+import os as _os  # noqa: E402 (used for the budget-tuning env overrides below)
 # Constants are env-overridable (tuning / an OFF switch, mirroring
 # ORTHONYM_JVM_BUDGET): set to 0 to DISABLE that budget (never raises).
 # Measured selectivity (200 drug-like pubchem rows): max inner-op
@@ -520,7 +520,7 @@ def isolated_naming_session(reset_cache: bool = False):
     budget, exactly as a direct call gets. Restores on exit so the enclosing
     session continues unperturbed. Never raises out of the restore.
 
-    ``reset_cache`` (, default False = the the best-effort tier-producer behaviour below):
+    ``reset_cache`` (default False = the the best-effort tier-producer behaviour below):
     ALSO save the whole-molecule fragment memo cache, install a fresh empty one for
     the isolated body, and restore the original on exit. The default keeps the
     cache LIVE (see the giant-hang note below); the opt-in is for the best-effort

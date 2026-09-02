@@ -1,17 +1,17 @@
 """
-v32 Phase 2 Step 2 -- the assembly WEAVER ().
+ Step 2 -- the assembly WEAVER.
 
-Step 1 (`be810755`) made every fragment of a multi-linkage molecule name
+Step 1 made every fragment of a multi-linkage molecule name
 successfully, but the whole molecule still abstained because the flat
 weaver (`fragment_assembly.py`'s `_assemble_by_bond_type` / the
 `_assemble_multi_*` star assemblers) can only combine fragments whose
 STANDALONE names happen to carry a matching suffix (an acid, an alcohol, an
-amine, ...). A T4-rescued or seniority-demoted fragment often carries none
+amine,...). A T4-rescued or seniority-demoted fragment often carries none
 (a ring parent with every group demoted to a prefix), so the converter
 returns ``None`` and the fragment is either silently dropped or space-joined
 -- OPSIN then sees disconnected components and SELF-01 rejects the name.
 
-This module is the fix the spy recommends: a **core-and-arms composer**
+This module is the fix the recommends: a **core-and-arms composer**
 that never converts a standalone fragment NAME -- it builds every arm's
 prefix directly from the ORIGINAL (uncapped) molecule, anchored at the real
 attachment atom, via `assembly.substituent_enumerator.name_substituent` (the
@@ -23,7 +23,7 @@ Scope (v1, FAILS CLOSED outside it -- never guesses, never ships a partial):
 
 - A single connected component, wholly ACYCLIC (no ring anywhere in the
   molecule). A ring hub (e.g. a GPI-anchor's mannose core) is out of scope
-  for this version and declines honestly -- see the spy's (ii) bucket.
+  for this version and declines honestly -- see the 's (ii) bucket.
 - A carbon-only "core" chain, selected as the carbon-only connected
   component (after excluding ester-carbonyl carbons, so an acyl group never
   fuses onto the backbone graph) with the most external heavy-atom
@@ -37,7 +37,7 @@ Scope (v1, FAILS CLOSED outside it -- never guesses, never ships a partial):
   `name_substituent` (an ordinary alkoxy substituent) or via the narrow
   charged-onium-arm builder below (Part B -- e.g. choline). Any other shape
   on a core atom (a non-oxygen substituent, a charged/anionic phosphate,
-  more than one free valence per position, ...) declines the WHOLE
+  more than one free valence per position,...) declines the WHOLE
   molecule -- never a partial name.
 
 Part B (narrow, PC-family): a cut quaternary-ammonium/onium arm reached via

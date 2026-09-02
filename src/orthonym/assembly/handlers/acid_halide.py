@@ -1,7 +1,7 @@
-"""Phase 160 acid_halide handler — direct-return shim.
+""" acid_halide handler — direct-return shim.
 
 1-line wrapper around ``rules.acid_halides.name_acid_halide`` per
-CONTEXT D-03 + Phase 158 AP-5 (no-logic-in-shim discipline). Verbatim
+CONTEXT + AP-5 (no-logic-in-shim discipline). Verbatim
 move of the dispatch logic at composer.py:919-932.
 
 IUPAC cite: P-66.5 (acyl halides; functional class naming
@@ -42,13 +42,13 @@ def name_acid_halide(
 
     Verbatim lift of composer.py:919-932. Lazy import keeps the
     handlers.acid_halide -> rules.acid_halides chain off the module-
-    import-time graph (Phase 158 D-22 + PATTERNS § Lazy Import).
+    import-time graph (+ PATTERNS § Lazy Import).
     """
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
     from ...rules.acid_halides import name_acid_halide as _name_acid_halide
 
-    # v29 P7 C1: the producer records which parent it numbered the name in; the
+    # P7 C1: the producer records which parent it numbered the name in; the
     # stereo injector below must not re-infer it (measured: both
     # features.principal_chain and features.chain_is_parent report "chain" on
     # ring-parented names -- see composer._inject_stereo_if_missing).

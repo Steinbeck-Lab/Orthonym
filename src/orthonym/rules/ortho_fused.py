@@ -19,25 +19,25 @@ from rdkit.Chem import Mol
 def detect_lactone(ring_atoms: List[int], mol: Mol) -> Optional[Dict]:
     """
     Detect if a ring is a lactone (cyclic ester).
-    
+
     A lactone contains the -C(=O)O- pattern within the ring structure.
-    
+
     IUPAC lactone classification:
     - γ-lactone (5-membered): oxolan-2-one
     - δ-lactone (6-membered): oxan-2-one
     - ε-lactone (7-membered): oxepan-2-one
-    
+
     Args:
         ring_atoms: List of atom indices forming the ring
         mol: RDKit Mol object
-    
+
     Returns:
         Dictionary with keys:
         - 'carbonyl_idx': Index of the carbonyl carbon
         - 'ester_O_idx': Index of the ester oxygen in the ring
         - 'ring_size': Number of atoms in the ring
         - 'type': Lactone type ('gamma', 'delta', 'epsilon', etc.)
-        
+
         Returns None if not a lactone
     """
     if len(ring_atoms) < 4:  # Lactones need at least 4 atoms (β-lactone minimum)
@@ -115,10 +115,10 @@ def detect_lactone(ring_atoms: List[int], mol: Mol) -> Optional[Dict]:
 def identify_fused_rings(mol: Mol) -> List[Tuple[List[int], List[int], List[int]]]:
     """
     Identify pairs of ortho-fused rings (sharing 2 adjacent atoms and 1 bond).
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         List of tuples: (ring1_atoms, ring2_atoms, shared_atoms)
     """
@@ -148,19 +148,19 @@ def identify_fused_rings(mol: Mol) -> List[Tuple[List[int], List[int], List[int]
 def classify_heterocycle_priority(ring_atoms: List[int], mol: Mol) -> int:
     """
     Classify heterocycle priority according to IUPAC rules.
-    
+
     IUPAC P-25.3.3.2 Priority (highest to lowest):
     1. Nitrogen-containing heterocycles
     2. Oxygen-containing heterocycles
     3. Sulfur-containing heterocycles
     4. Carbocycles (all carbon)
-    
+
     Within each class, larger rings have priority.
-    
+
     Args:
         ring_atoms: List of atom indices in the ring
         mol: RDKit Mol object
-        
+
     Returns:
         Priority score (higher = more preferred as base component)
     """
@@ -183,17 +183,17 @@ def determine_base_component(rings: List[Tuple[List[int], List[int], List[int]]]
                              mol: Mol) -> Optional[Tuple[List[int], List[int]]]:
     """
     Determine the base component (parent ring) for a fused system.
-    
+
     IUPAC P-25.3.2.4 rules for base component selection:
     1. Heterocyclic ring preferred over carbocyclic
     2. Among heterocycles: N > O > S (P-25.3.3.2)
     3. Larger ring preferred
     4. Lactone rings get special consideration
-    
+
     Args:
         rings: List of fused ring pairs from identify_fused_rings()
         mol: RDKit Mol object
-        
+
     Returns:
         Tuple of (base_ring_atoms, attached_ring_atoms) or None
     """
@@ -226,16 +226,16 @@ def get_bicyclo_descriptor(base_ring: List[int], attached_ring: List[int],
                            shared_atoms: List[int], mol: Mol) -> str:
     """
     Generate bicyclo descriptor [x.y.z] for fused ring system.
-    
+
     For ortho-fused systems, one bridge has 0 atoms (the shared bond).
     Numbers are listed in descending order.
-    
+
     Args:
         base_ring: Atoms in the base ring
         attached_ring: Atoms in the attached ring
         shared_atoms: The 2 atoms shared between rings
         mol: RDKit Mol object
-        
+
     Returns:
         Bicyclo descriptor string like "[4.3.0]"
     """
@@ -270,26 +270,26 @@ def number_bicyclic_system(base_ring: List[int], attached_ring: List[int],
                            lactone_info: Optional[Dict] = None) -> Dict[int, int]:
     """
     Number bicyclic system according to IUPAC bicyclo rules.
-    
+
     IUPAC P-31.1.3.1 bicyclo numbering:
     1. Start at one bridgehead atom
     2. Number along the longest bridge first
     3. Then the second longest bridge
     4. The fused bond (0-length bridge) is between the two bridgeheads
-    
+
     For bicyclo[4.3.0]nonane:
     - Position 1: first bridgehead
     - Positions 2-5: longest bridge (4 atoms)
-    - Position 6: second bridgehead  
+    - Position 6: second bridgehead
     - Positions 7-9: second bridge (3 atoms back to pos 1)
-    
+
     Args:
         base_ring: Atoms in base ring
         attached_ring: Atoms in attached ring
         shared_atoms: Bridgehead atoms
         mol: RDKit Mol object
         lactone_info: Lactone detection info if present
-        
+
     Returns:
         Dict mapping atom index to IUPAC locant
     """
@@ -407,12 +407,12 @@ def number_bicyclic_system(base_ring: List[int], attached_ring: List[int],
 def get_substituents(mol: Mol, ring_atoms: set, atom_to_locant: Dict[int, int]) -> List[Tuple[int, str]]:
     """
     Identify substituents on the bicyclic system.
-    
+
     Args:
         mol: RDKit Mol object
         ring_atoms: Set of atoms in the bicyclic system
         atom_to_locant: Mapping of atom idx to IUPAC locant
-        
+
     Returns:
         List of (locant, substituent_name) tuples
     """
@@ -528,16 +528,16 @@ def name_fused_lactone_system(mol: Mol, base_ring: List[int], attached_ring: Lis
                               shared_atoms: List[int], lactone_info: Dict) -> str:
     """
     Generate IUPAC name for a fused lactone system.
-    
+
     Format: [substituents]-bicyclo[x.y.z]parent-2-one
-    
+
     Args:
         mol: RDKit Mol object
         base_ring: Atoms in lactone ring
         attached_ring: Atoms in attached ring
         shared_atoms: Bridgehead atoms
         lactone_info: Lactone detection info
-        
+
     Returns:
         IUPAC systematic name
     """
@@ -632,15 +632,15 @@ def name_fused_lactone_system(mol: Mol, base_ring: List[int], attached_ring: Lis
 def name_ortho_fused_system(mol: Mol) -> Optional[str]:
     """
     Name ortho-fused ring systems using IUPAC Blue Book rules.
-    
+
     Priority:
     1. Check for retained names (handled by existing fused_heterocycles)
     2. Identify lactone systems
     3. Apply systematic bicyclo/fusion naming
-    
+
     Args:
         mol: RDKit Mol object
-        
+
     Returns:
         IUPAC systematic name or None if naming fails
     """

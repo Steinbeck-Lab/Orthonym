@@ -53,12 +53,12 @@ TRIVIAL_ACID_TO_ACYLATE = {
     # systematic acid names". That is backwards for a preferred IUPAC name: it
     # takes a stem that is ALREADY the PIN and converts it into one that is not.
     #
-    # P-65.1.2 "Systematic names" (BlueBookV2.md heading :29858, rule :29860) --
+    # P-65.1.2 "Systematic names" (BlueBookV2.md heading:29858, rule:29860) --
     # "Except for formic acid, acetic acid, oxalic acid (see P-65.1.1.1), and
     # oxamic acid (see P-65.1.1.1), systematically formed names are preferred
     # IUPAC names; the names given in P-65.1.1.2 are retained names for use in
     # general nomenclature." The Blue Book prints (PIN) on the systematic side
-    # of every fatty row: :29787 "palmitic acid  hexadecanoic acid (PIN)".
+    # of every fatty row::29787 "palmitic acid hexadecanoic acid (PIN)".
     #
     # Re-adding any of them silently reverts the fix: with the count map in
     # rules/esters.py corrected but these rows present, all five esters STILL

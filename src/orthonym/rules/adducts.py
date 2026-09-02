@@ -78,7 +78,7 @@ def _name_component(frag_smi: str, style: str, *,
     same as routing/dispatch_table._handle_multi_component_neutral), so the
     per-fragment OPSIN validity gate stays ON in production.
 
-    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+     P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN behaviour) select the ``complete`` tier for the
     per-component namer, so a component nameable only by the general engine
     (e.g. a silyl-heteroarene, a von-Baeyer polyene cage) is named rather than
@@ -173,7 +173,7 @@ def _hydrate_word_form(named: List[Tuple[str, int]],
 
     Defined ONLY when every non-water component shares one count p; the
     prefix encodes the reduced water:parent ratio w/p — n/1 -> mono/di/
-    tri/... , 1/2 -> hemi, 3/2 -> sesqui (P-14.8.2 line 4657; BB line 4686
+    tri/..., 1/2 -> hemi, 3/2 -> sesqui (P-14.8.2 line 4657; BB line 4686
     pairs (2/2/3) with 'sesquihydrate'). Anything else returns None and
     the caller emits the always-valid proportion notation instead.
     """
@@ -228,11 +228,11 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
       * any charged fragment (salt/ion routing owns charged input);
       * ANY component the single-component pipeline cannot name.
 
-    v26 P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+     P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN output) select the ``complete`` tier for the
-    per-component namer (see :func:`_name_component`), so a multi-fragment
+    per-component namer (see:func:`_name_component`), so a multi-fragment
     input whose only unnameable part was a general-engine-only component
-    (silyl-heteroarene, von-Baeyer polyene cage, ...) is named under
+    (silyl-heteroarene, von-Baeyer polyene cage,...) is named under
     ``complete`` instead of abstaining. All other scope (charge / single-atom /
     proportion assembly / P-14.8 ordering) is unchanged.
     """

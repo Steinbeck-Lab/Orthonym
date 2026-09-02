@@ -1,4 +1,4 @@
-"""Class-agnostic conjugate-fragment classifier (Phase 182, WSC-03, D-02).
+"""Class-agnostic conjugate-fragment classifier (WSC-03).
 
 A NEW standalone, class-agnostic primitive: given a molecule, a scaffold attachment
 atom, the linker atom (``first_idx``) reached through it, and the scaffold atom set, it
@@ -8,16 +8,16 @@ plus the consumed-atom set. Returns ``None`` (fail-closed) for anything else.
 
 This is the cross-class deliverable (WSC-03 crit #2): the signature is
 ``classify_conjugate(mol, attach_idx, first_idx, scaffold_atoms)`` with NO
-steroid-specific branch, so the glycoside (Phase 176) and lipid (Phase 180) paths can
+steroid-specific branch, so the glycoside and lipid paths can
 call the SAME primitive later. This phase *wires* it into the NP subsystem (182-02);
 the *logic* here is class-agnostic.
 
 Charge -> word is derived **in place** from the protonation/ionisation state of the
-acid centre on the ORIGINAL molecule (D-04) — never neutralize-then-rename (the WS-E
+acid centre on the ORIGINAL molecule — never neutralize-then-rename (the WS-E
 failure mode), never a per-molecule hardcode:
-  -OSO2[O-]  -> "sulfate"            -OSO2OH    -> "hydrogen sulfate"
-  -OPO(OH)2  -> "dihydrogen phosphate"  mono-anion -> "hydrogen phosphate"
-  di-anion   -> "phosphate"
+  -OSO2[O-] -> "sulfate" -OSO2OH -> "hydrogen sulfate"
+  -OPO(OH)2 -> "dihydrogen phosphate" mono-anion -> "hydrogen phosphate"
+  di-anion -> "phosphate"
   (BB P-65.6.3.3.5 @31935 partial esters/salts; P-102.5.6.1.2 @53199 phosphate
    ionisation; word examples @35968 / @35940 / @41005.)
 
@@ -44,7 +44,7 @@ from orthonym.data.sugar_names import (
     uronic_glycoside_head,
 )
 
-# Charge -> word, keyed on the number of *protonated* terminal acidic oxygens (D-04).
+# Charge -> word, keyed on the number of *protonated* terminal acidic oxygens.
 SULFATE_WORD = {1: "hydrogen sulfate", 0: "sulfate"}
 PHOSPHATE_WORD = {2: "dihydrogen phosphate", 1: "hydrogen phosphate", 0: "phosphate"}
 
@@ -152,7 +152,7 @@ def _extract_capped_sugar(mol, anomeric_idx: int, linker_o_idx: int) -> Optional
     glucuronides (RESEARCH Open Q2). NO string surgery.
 
     Mirrors the RDKit primitives in ``decomposition/fragment_capping.cleave_and_cap``;
-    kept inline so the classifier stays self-contained (D-02 — no import from
+    kept inline so the classifier stays self-contained (— no import from
     ``decomposition/``).
     """
     bond = mol.GetBondBetweenAtoms(anomeric_idx, linker_o_idx)

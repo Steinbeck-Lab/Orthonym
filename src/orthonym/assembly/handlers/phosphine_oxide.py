@@ -1,4 +1,4 @@
-"""Phase 160 phosphine_oxide handler — direct-return shim.
+""" phosphine_oxide handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphine_oxide``. Verbatim
 move of composer.py:974-989 dispatch logic.

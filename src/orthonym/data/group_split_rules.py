@@ -1,29 +1,29 @@
-"""Phase 169 Plan-01: Group-split topology-table loader.
+""": Group-split topology-table loader.
 
 Loads ``group_split_rules.json`` — the locked, TOPOLOGY-ONLY split-decomposition
-table (CONTEXT D-02/D-03) — into a ``Dict[str, SplitRule]`` keyed by ``fg_name``.
+table (CONTEXT) — into a ``Dict[str, SplitRule]`` keyed by ``fg_name``.
 
 The split fires at the ``polyfunctional.py:get_fg_prefix_form()`` /
-``substituent_no_prefix_form`` site (CONTEXT D-01/F2 — a coarse string path,
+``substituent_no_prefix_form`` site (CONTEXT /F2 — a coarse string path,
 NOT an IR tree visitor). When a
 non-principal composite functional group has no clean strict-IUPAC prefix and
-would otherwise be dropped, the splitter (Plan-02) decomposes it into its
+would otherwise be dropped, the splitter decomposes it into its
 component sub-prefixes per the topology recorded here.
 
-**Single source of truth (CONTEXT D-02):** this table records ONLY the
+**Single source of truth (CONTEXT):** this table records ONLY the
 decomposition TOPOLOGY — which sub-fragments (chalcogen / heteroatom linker) the
 composite splits into, and a ``resolves_via`` pointer naming the existing
 ``fg_name`` / dispatcher key whose ``seniority.PREFIX_FORMS`` /
 ``assembly.substituent_prefix_forms`` entry supplies the prefix STRING at
-runtime. The prefix output strings (``oxo``, the alkoxy/sulfanyl forms, ...) are
+runtime. The prefix output strings (``oxo``, the alkoxy/sulfanyl forms,...) are
 NEVER stored here — duplicating them would fork the authority and invite drift.
 
-Frozen-dataclass discipline mirrors Phase 165 D-04 SACRED + Phase 168's
+Frozen-dataclass discipline mirrors SACRED + 's
 ``triviality_controller_seed.py``: ``SplitRule`` / ``SplitComponent`` are
 ``@dataclass(frozen=True)`` and are never mutated after construction.
 
 Graceful degradation (PATTERNS correction): a missing JSON or schema error
-degrades ``SPLIT_RULES`` to ``{}`` so the Plan-02 splitter sees no rules and
+degrades ``SPLIT_RULES`` to ``{}`` so the splitter sees no rules and
 every ``substituent_no_prefix_form`` still drops (status quo) — never a crash. This is the
 no-crash invariant.
 
@@ -31,7 +31,7 @@ Self-contained loader (PATTERNS NOTE): the Phase-168 seed precedent uses its OWN
 module, NOT a ``data/__init__.py`` merge — this module mirrors that path and does
 not touch ``data/__init__.py``.
 
-Source: 169-CONTEXT.md D-01, D-02, D-03, D-04; 169-RESEARCH.md section "The #1
+Source: 169-CONTEXT.md,,,; 169-RESEARCH.md section "The #1
 Gate" + "Code Examples"; 169-PATTERNS.md "data/group_split_rules.json + loader".
 """
 
@@ -59,7 +59,7 @@ class SplitComponent:
 
     ``resolves_via`` names the existing ``fg_name`` / dispatcher key whose
     PREFIX_FORMS / substituent_prefix_forms entry supplies the prefix STRING at
-    runtime — the string itself is never stored here (CONTEXT D-02).
+    runtime — the string itself is never stored here (CONTEXT).
     """
 
     role: str                      # "chalcogen" | "linker"
@@ -70,10 +70,10 @@ class SplitComponent:
 
 @dataclass(frozen=True)
 class SplitRule:
-    """One locked split-decomposition entry, keyed by ``fg_name`` (CONTEXT D-03).
+    """One locked split-decomposition entry, keyed by ``fg_name`` (CONTEXT).
 
-    Immutable by Phase 165 D-04 SACRED discipline. Holds ONLY topology +
-    provenance — no prefix output strings (CONTEXT D-02).
+    Immutable by SACRED discipline. Holds ONLY topology +
+    provenance — no prefix output strings (CONTEXT).
     """
 
     fg_name: str
@@ -90,9 +90,9 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
 
     Warns (does not fail) if the table's ``rdkit_version_pin`` differs from the
     running RDKit — re-run ` --rt`` to
-    re-confirm round-trips (mirrors the Phase 168 R-10 warning).
+    re-confirm round-trips (mirrors R-10 warning).
 
-    With ``validate=True`` additionally runs the CONTEXT D-04 design-time
+    With ``validate=True`` additionally runs the CONTEXT design-time
     OPSIN-RT re-confirmation of each entry's documented example (off by default —
     runs at CI lint time, not at every import). Raises ``ValueError`` on the
     first entry that fails to round-trip. Raises the JSON-load errors on a
@@ -104,8 +104,8 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
     pinned = data.get("rdkit_version_pin")
     if pinned and pinned != rdkit.__version__:
         logger.warning(
-            "Phase 169 split table was OPSIN-RT-verified against rdkit %s but "
-            "this process runs rdkit %s; re-run  "
+            " split table was OPSIN-RT-verified against rdkit %s but "
+            "this process runs rdkit %s; re-run "
             "--rt to re-confirm round-trips.",
             pinned, rdkit.__version__,
         )
@@ -139,7 +139,7 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
 
 
 def _opsin_rt_validate_examples(entries) -> None:
-    """CONTEXT D-04 design-time OPSIN-RT re-confirmation (opt-in; slow).
+    """CONTEXT design-time OPSIN-RT re-confirmation (opt-in; slow).
 
     Parses each entry's documented example name through OPSIN ``-osmi`` and
     confirms it is non-empty. The connectivity-InChI equality check the full
@@ -150,11 +150,11 @@ def _opsin_rt_validate_examples(entries) -> None:
     import shutil
 
     if shutil.which("java") is None:
-        logger.warning("java not on PATH; skipping D-04 OPSIN-RT re-confirmation.")
+        logger.warning("java not on PATH; skipping OPSIN-RT re-confirmation.")
         return
     jar = Path(__file__).resolve().parents[3] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
     if not jar.exists():
-        logger.warning("OPSIN jar not found; skipping D-04 OPSIN-RT re-confirmation.")
+        logger.warning("OPSIN jar not found; skipping OPSIN-RT re-confirmation.")
         return
     for raw in entries:
         # Pull the documented example name out of the notes ("-> <name> (").
@@ -184,6 +184,6 @@ try:
     SPLIT_RULES: Dict[str, SplitRule] = load_split_rules(_RULES_PATH, validate=False)
 except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
     logger.error(
-        "Phase 169 split-table load failed: %s; group-splitting will be a no-op", e,
+        " split-table load failed: %s; group-splitting will be a no-op", e,
     )
     SPLIT_RULES = {}

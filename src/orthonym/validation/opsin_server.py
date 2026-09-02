@@ -9,9 +9,9 @@ long-lived JVM fed over a pipe gives one startup for the whole run.
 
 Contract preserved verbatim for the caller (``OpsinOracle._invoke_opsin``):
 ``invoke(name) -> (raw_smiles_or_None, ran)``
-  * ``(smiles, True)``  — OPSIN parsed the name;
-  * ``(None,   True)``  — OPSIN ran and DEFINITIVELY rejected it (blank line);
-  * ``(None,   False)`` — the parse could not be performed (server absent /
+  * ``(smiles, True)`` — OPSIN parsed the name;
+  * ``(None, True)`` — OPSIN ran and DEFINITIVELY rejected it (blank line);
+  * ``(None, False)`` — the parse could not be performed (server absent /
     dead / read timeout / protocol anomaly). The caller treats this as
     transient and MUST fall back (to a one-shot ``subprocess.run``), so
     correctness NEVER depends on this optimization — it only removes latency.
@@ -37,7 +37,7 @@ _EOF = object()  # sentinel pushed by the reader when OPSIN's stdout closes
 
 
 class PersistentOpsin:
-    """One long-lived ``java -jar opsin ...`` process fed names over stdin."""
+    """One long-lived ``java -jar opsin...`` process fed names over stdin."""
 
     def __init__(self, jar: str, args: Tuple[str, ...] = ("-r", "-osmi"),
                  read_timeout: float = 15.0):

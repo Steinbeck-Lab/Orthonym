@@ -1,32 +1,32 @@
-"""Phase 160.1 substituent prefix-form table for non-principal FG-bearing substituents.
+""".1 substituent prefix-form table for non-principal FG-bearing substituents.
 
 Per IUPAC 2013 §P-65 + §P-66, a NON-PRINCIPAL functional group MUST be
 expressed via its IUPAC-defined prefix form when it appears as a substituent:
 
-    -C(=O)OCH3   ->  methoxycarbonyl    (P-65.6.3)
-    -C(=O)NH2    ->  carbamoyl          (P-66.6.1)
-    -C(=O)NHCH3  ->  N-methylcarbamoyl  (P-66.6.1)
-    -NHC(=O)OCH3 ->  (methoxycarbonyl)amino  (P-66.6.4)
-    -OCH3        ->  methoxy            (P-63.2.5)
-    -S(=O)CH3    ->  methylsulfinyl     (P-63.6)
+    -C(=O)OCH3 -> methoxycarbonyl (P-65.6.3)
+    -C(=O)NH2 -> carbamoyl (P-66.6.1)
+    -C(=O)NHCH3 -> N-methylcarbamoyl (P-66.6.1)
+    -NHC(=O)OCH3 -> (methoxycarbonyl)amino (P-66.6.4)
+    -OCH3 -> methoxy (P-63.2.5)
+    -S(=O)CH3 -> methylsulfinyl (P-63.6)
     ... (14 rows total — see 160.1-AUDIT-SUBENUM.md §1)
 
 This module is the SHARED chemistry-rule table consulted by:
 
   1. ``rules/polyfunctional.py`` (principal-chain context; existing caller;
-     backwards-compat preserved via re-export shim per Phase 160.1 CONTEXT D-03).
+     backwards-compat preserved via re-export shim.1 CONTEXT).
   2. ``assembly/substituent_enumerator.py:name_substituent`` Tier-0.5 hook
-     (sub-fragment context; NEW caller per Phase 160.1 CONTEXT D-04).
+     (sub-fragment context; NEW caller.1 CONTEXT).
 
-5 generators lifted verbatim from ``rules/polyfunctional.py`` per CONTEXT D-03;
-3 NEW generators will be added in Plan-02-02 per RESEARCH §6 (secondary/tertiary
+5 generators lifted verbatim from ``rules/polyfunctional.py`` per CONTEXT;
+3 NEW generators will be added in -02 per RESEARCH §6 (secondary/tertiary
 amide carbamoyl forms + carbamate orientation-checking form);
 1 dispatcher ``get_substituent_prefix_form(fg_name, mol, atoms, principal_chain)``
-mirrors ``rules/polyfunctional.get_fg_prefix_form`` per CONTEXT D-03 + RESEARCH §6.
+mirrors ``rules/polyfunctional.get_fg_prefix_form`` per CONTEXT + RESEARCH §6.
 
 All functions are PURE: read-only on (mol, atoms, principal_chain);
 no side effects; no pool.add(); no MolecularFeatures mutation. Per CONTEXT
-D-25 inheritance from Phase 160 + Phase 158 D-26.
+ inheritance +.
 
 None-guard for principal_chain: per RESEARCH §4, every lifted function adds
 ``chain_set = set(principal_chain) if principal_chain else set()`` at entry,
@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import threading
 
-# Phase 160.2 Plan-04-02 WR-04 closure: removed unused ``import logging``
+# .2 -02 WR-04 closure: removed unused ``import logging``
 # and ``logger = logging.getLogger(__name__)`` — no ``logger.*`` call sites
 # in 1041 LOC (verified via grep). Maintainers who want to add debug
 # instrumentation should re-add the import + module-local logger then.
@@ -143,7 +143,7 @@ def get_alkoxy_prefix(
     and name it as alkoxy.
 
     Lifted from rules/polyfunctional._get_alkoxy_prefix verbatim with a NEW
-    None-guard at function entry per Phase 160.1 RESEARCH §4 lift-blocking
+    None-guard at function entry.1 RESEARCH §4 lift-blocking
     analysis: when ``principal_chain`` is None (the Tier-0.5 sub-fragment
     caller passes None), ``chain_set`` becomes empty and the orientation
     guard falls back cleanly to the smaller-fragment selection.
@@ -152,7 +152,7 @@ def get_alkoxy_prefix(
         mol: RDKit Mol object.
         ether_atoms: Atom indices from ether SMARTS match (O, C, C).
         principal_chain: Atom indices of the principal chain; may be None for
-            the Tier-0.5 sub-fragment caller per Phase 160.1 CONTEXT D-04.
+            the Tier-0.5 sub-fragment caller.1 CONTEXT.
 
     Returns:
         Alkoxy prefix (e.g., ``"methoxy"``, ``"ethoxy"``), or None if naming
@@ -230,7 +230,7 @@ def get_alkoxy_prefix(
         # dec is None -> a BARE ring (decorated_ring_substituent_name only handles
         # DECORATED rings). Bare benzene contracts to the retained 'phenoxy'; a bare
         # heteroaryl or fused-aryl ring is named from its full aromatic ring SYSTEM
-        # as '<ring>-yloxy' (W8-P2 Task 2.1, P-63.2.2.2 / P-29.3.1) instead of being
+        # as '<ring>-yloxy' (W8-P2.1, P-63.2.2.2 / P-29.3.1) instead of being
         # dropped (the drop shipped a bare-parent name like 'ethanoic acid' gate-off).
         # Atom-drop veto: name ONLY when the perceived aromatic ring system is exactly
         # the collected fragment — any undecorated extra atom means an unhandled
@@ -260,7 +260,7 @@ def get_alkoxy_prefix(
         return None
 
     # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
-    # HYG-04 (Phase 167): single shared aryl-count helper (was inline benzyloxy here).
+    # HYG-04: single shared aryl-count helper (was inline benzyloxy here).
     # Local import: file documents circular-import sensitivity (see header).
     from .substituent_naming import _name_aryl_methyl_ether
     _aryl_ether = _name_aryl_methyl_ether(mol, sub_carbon, oxygen_idx)
@@ -342,12 +342,12 @@ def get_alkoxycarbonyl_prefix(
     Per IUPAC P-65.6.3, when an ester group ``-C(=O)-O-R`` is not the principal
     characteristic group, it is expressed as an alkoxycarbonyl prefix::
 
-        -COOCH3   -> methoxycarbonyl
-        -COOC2H5  -> ethoxycarbonyl
-        -COOPh    -> phenoxycarbonyl
+        -COOCH3 -> methoxycarbonyl
+        -COOC2H5 -> ethoxycarbonyl
+        -COOPh -> phenoxycarbonyl
 
     Lifted from rules/polyfunctional._get_alkoxycarbonyl_prefix verbatim with a
-    NEW None-guard at function entry per Phase 160.1 RESEARCH §4: when
+    NEW None-guard at function entry.1 RESEARCH §4: when
     ``principal_chain`` is None (Tier-0.5 sub-fragment caller), ``chain_set``
     becomes empty and the orientation guard auto-fails to the SMARTS-based
     alkyl-side discrimination.
@@ -357,7 +357,7 @@ def get_alkoxycarbonyl_prefix(
         ester_atoms: Tuple from ester SMARTS ``[CX3](=O)[OX2][#6]``:
                      (carbonyl_C, carbonyl_O, ester_O, alkyl_C).
         principal_chain: Atom indices of the principal chain; may be None for
-            the Tier-0.5 sub-fragment caller per Phase 160.1 CONTEXT D-04.
+            the Tier-0.5 sub-fragment caller.1 CONTEXT.
 
     Returns:
         Alkoxycarbonyl prefix string, or None if this ester should not
@@ -374,7 +374,7 @@ def get_alkoxycarbonyl_prefix(
 
     # Guard 2: orientation check — alkoxycarbonyl only applies when the
     # carbonyl C is on or bonded to the principal chain, meaning the ester
-    # extends as -C(=O)-O-R away from the chain.  When the ester O is on
+    # extends as -C(=O)-O-R away from the chain. When the ester O is on
     # the chain instead (chain-O-C(=O)-R), the ester is an acyloxy
     # substituent, handled by _check_for_acyloxy() in composer.py.
     carbonyl_c = ester_atoms[0]
@@ -383,7 +383,7 @@ def get_alkoxycarbonyl_prefix(
         c_on_chain = carbonyl_c in chain_set
         o_on_chain = ester_o in chain_set
         if c_on_chain:
-            # W2F-P2 (P-65.6.3.3.5 method (1), BB 31958-31962): a CHAIN-MEMBER
+            # (P-65.6.3.3.5 method (1), BB 31958-31962): a CHAIN-MEMBER
             # ester carbonyl is expressed substitutively as oxo + alkoxy on the
             # acid parent ('5-butoxy-2-methyl-5-oxopentanoic acid'), never as
             # R-oxycarbonyl (double-counts the carbonyl carbon = names a
@@ -452,7 +452,7 @@ def get_alkoxycarbonyl_prefix(
             return "(benzyloxy)carbonyl"
 
     # Guard 3: the alkyl (OR) fragment must be pure carbon (no heteroatoms)
-    # for simple alkoxycarbonyl naming.  Heteroatom-containing fragments
+    # for simple alkoxycarbonyl naming. Heteroatom-containing fragments
     # (e.g., amino acid side chains) need complex naming beyond the scope
     # of this prefix generator.
     has_heteroatom = any(
@@ -517,12 +517,12 @@ def get_alkoxycarbonimidoyl_prefix(
     principal characteristic group (e.g. a senior carboxylic acid outranks it),
     is therefore expressed as an ``R-oxycarbonimidoyl`` prefix::
 
-        -C(=NH)OCH3   -> methoxycarbonimidoyl
-        -C(=NH)OC2H5  -> ethoxycarbonimidoyl
-        -C(=NH)OPh    -> phenoxycarbonimidoyl
+        -C(=NH)OCH3 -> methoxycarbonimidoyl
+        -C(=NH)OC2H5 -> ethoxycarbonimidoyl
+        -C(=NH)OPh -> phenoxycarbonimidoyl
         -C(=NH)OCH2Ph -> (benzyloxy)carbonimidoyl
 
-    This is the exact analogue of :func:`get_alkoxycarbonyl_prefix` (the ester
+    This is the exact analogue of:func:`get_alkoxycarbonyl_prefix` (the ester
     row): the OR fragment is named identically (that side is C=O vs C=NH
     agnostic); only the double-bonded heteroatom differs, so the suffix is
     ``carbonimidoyl`` instead of ``carbonyl``. All of the ester row's guards
@@ -535,7 +535,7 @@ def get_alkoxycarbonimidoyl_prefix(
             ``[CX3](=[NX2H1])[OX2][#6]``:
             ``(carbonyl_C, imino_N, ester_O, alkyl_C)``. Note position [1] is
             the imino nitrogen (not a carbonyl oxygen); the shared ester helpers
-            :func:`parse_ester_fragments` / :func:`is_lactone` use only tuple
+            :func:`parse_ester_fragments` /:func:`is_lactone` use only tuple
             positions [0] and [2], so the tuple is directly reusable.
         principal_chain: Atom indices of the principal chain; may be None for
             the Tier-0.5 sub-fragment caller (mirrors the ester generator).
@@ -631,7 +631,7 @@ def get_alkoxycarbonimidoyl_prefix(
     # (composed_prefix_organyl_name -> composed_alkoxy_prefix), NEVER a carbon
     # COUNT: a count cannot tell propyl from propan-2-yl / prop-2-en-1-yl, so the
     # refuted ALKOXY_NAMES[count] table named four different C3/C4 groups with
-    # one string (this file's own C4d/F-spell-oxy notes, :319/:1213). The
+    # one string (this file's own C4d/F-spell-oxy notes,:319/:1213). The
     # primitive returns the correct alkoxy or None (fail closed). ``sub_carbon``
     # is the SMARTS alkyl_C (deterministic), NOT ``alkyl_atoms[0]`` — that is a
     # set-ordered BFS whose first element varies with SMILES numbering.
@@ -679,7 +679,7 @@ def get_sulfinyl_prefix(
     SMARTS ``[SX3](=[OX1])([#6])[#6]`` matches (S, O, C1, C2).
 
     Lifted from rules/polyfunctional._get_sulfinyl_prefix verbatim with a NEW
-    None-guard at function entry per Phase 160.1 RESEARCH §4.
+    None-guard at function entry.1 RESEARCH §4.
 
     Args:
         mol: RDKit Mol object.
@@ -765,7 +765,7 @@ def get_sulfonyl_prefix(
     SMARTS ``[SX4](=[OX1])(=[OX1])([#6])[#6]`` matches (S, O1, O2, C1, C2).
 
     Lifted from rules/polyfunctional._get_sulfonyl_prefix verbatim with a NEW
-    None-guard at function entry per Phase 160.1 RESEARCH §4.
+    None-guard at function entry.1 RESEARCH §4.
 
     Args:
         mol: RDKit Mol object.
@@ -840,7 +840,7 @@ def _acyl_on_chalcogen_name(mol, acyl_c: int, chalcogen_idx: int) -> Optional[st
         if b.GetBondTypeAsDouble() in (1.0, 1.5) and other.GetSymbol() == "C":
             r_side.append(other.GetIdx())
             continue
-        return None  # =S, N, second O-function, charged O, ... -> fail-closed
+        return None  # =S, N, second O-function, charged O,... -> fail-closed
     if len(oxo) != 1 or len(r_side) > 1:
         return None
 
@@ -922,7 +922,7 @@ def get_sulfanyl_prefix(
     each match (chalcogen, C1, C2).
 
     Lifted from rules/polyfunctional._get_sulfanyl_prefix verbatim with a NEW
-    None-guard at function entry per Phase 160.1 RESEARCH §4. functional-group perception fix (169.7)
+    None-guard at function entry.1 RESEARCH §4. functional-group perception fix (169.7)
     added the ``suffix`` param (default "sulfanyl" → backward-compatible).
 
     Args:
@@ -944,7 +944,7 @@ def get_sulfanyl_prefix(
 
     # Find the two C neighbors of S
     sulfur = mol.GetAtomWithIdx(sulfur_idx)
-    # v36 core-namer 0-wrong guard: the ``sulfanyl`` / ``selanyl`` / ``tellanyl``
+    # core-namer 0-wrong guard: the ``sulfanyl`` / ``selanyl`` / ``tellanyl``
     # stem denotes a DIVALENT chalcogen ether ``-X-`` -- this function's own
     # contract is the SMARTS ``[SX2]([#6])[#6]``. A chalcogen bearing a DOUBLE
     # bond is a sulfinyl ``-S(=O)-`` / sulfonyl ``-S(=O)(=O)-`` (or the Se/Te
@@ -954,11 +954,11 @@ def get_sulfanyl_prefix(
     # match, but ``substituent_naming.py``'s chalcogen-attach step dispatches on
     # the atom SYMBOL alone and so hands this a sulfinyl S (the pantoprazole
     # class). Fail closed here so that fragment degrades to the oxo-preserving
-    # replacement name instead of a wrong one (invariant 9; SELF-01 backstops any
+    # replacement name instead of a wrong one (SELF-01 backstops any
     # residual). Byte-identical for every genuine divalent-ether caller.
     if any(b.GetBondTypeAsDouble() >= 2.0 for b in sulfur.GetBonds()):
         return None
-    # v36 core-namer hardening: the bond-order check above misses a
+    # core-namer hardening: the bond-order check above misses a
     # CHARGE-SEPARATED sulfoxide/sulfone (``C[S+]([O-])CC``) -- its S-O bond is
     # order 1.0, so ``sulfanyl`` would still be built, silently dropping the
     # [O-] (a wrong, reduced-thioether molecule). This function's contract is
@@ -987,7 +987,7 @@ def get_sulfanyl_prefix(
         frag2 = _count_fragment_atoms(mol, c2, {sulfur_idx})
         sub_carbon = c1 if frag1 <= frag2 else c2
 
-    # W2F-P2 (P-35.5.1, BB 18128): acyl-on-chalcogen. When the substituent-side
+    # (P-35.5.1, BB 18128): acyl-on-chalcogen. When the substituent-side
     # carbon bears a =O/=S it is an ACYL group (thioester S-side); the alkyl
     # counter below would collapse the carbonyl into the alkyl count
     # ('ethylsulfanyl' for CH3-CO-S- — a DIFFERENT molecule). Name it as the
@@ -1245,10 +1245,10 @@ def _name_alkyl_branch_from_atom(
     """Helper: produce the alkyl-group name (e.g., "methyl", "ethyl") for the
     fragment starting at ``alkyl_atom`` and bounded by ``exclude``.
 
-    Used by the 3 NEW Phase 160.1 Plan-02-02 generators to name the alkyl
+    Used by the 3 NEW.1 -02 generators to name the alkyl
     portion attached to the amide-N or carbamate-N/O. The carbon count is
     derived from a BFS over the fragment (carbons only); ``get_alkyl_name``
-    maps the count to the IUPAC stem ("methyl", "ethyl", "propyl", ...).
+    maps the count to the IUPAC stem ("methyl", "ethyl", "propyl",...).
 
     Heteroatom-bearing alkyl fragments return None (the caller falls through
     to a different prefix form).
@@ -1331,8 +1331,8 @@ def get_n_alkyl_carbamoyl_prefix(
     principal group AND attached to the parent through the carbonyl-C,
     the prefix form is ``N-(alkyl)carbamoyl``::
 
-        -C(=O)NHCH3   -> N-methylcarbamoyl
-        -C(=O)NHC2H5  -> N-ethylcarbamoyl
+        -C(=O)NHCH3 -> N-methylcarbamoyl
+        -C(=O)NHC2H5 -> N-ethylcarbamoyl
 
     Returns None for:
 
@@ -1372,7 +1372,7 @@ def get_n_alkyl_carbamoyl_prefix(
     # Guard 3: orientation — carbamoyl form requires attach through carbonyl_C.
     # In principal-chain context: reject N-attached and backbone-amide cases.
     # In sub-fragment context (principal_chain=None): trust the caller — the
-    # Tier-0.5 hook (Plan-02-04) pre-filters by attach_idx.
+    # Tier-0.5 hook (-04) pre-filters by attach_idx.
     if chain_set:
         c_on_chain = carbonyl_c in chain_set
         n_on_chain = amide_n in chain_set
@@ -1388,10 +1388,10 @@ def get_n_alkyl_carbamoyl_prefix(
     if not alkyl_name:
         return None
 
-    # P-16.3.4 (BlueBookV2.md:7085) "Parentheses (round brackets) ... are used
-    # to enclose multiplied components that are: ... (b) simple substituent
+    # P-16.3.4 (BlueBookV2.md:7085) "Parentheses (round brackets)... are used
+    # to enclose multiplied components that are:... (b) simple substituent
     # prefixes modified by 'ene' and 'yne' endings and that have locants"
-    # (:7104, example 'di(prop-1-en-2-yl)' (preferred prefix)). Until the bond-
+    # (7104, example 'di(prop-1-en-2-yl)' (preferred prefix)). Until the bond-
     # order guard above was fixed, every name reaching this interpolation was a
     # bare saturated stem ('propyl') that needs no marks; now that an alkenyl /
     # alkynyl / located prefix can arrive, it must be enclosed or the locant
@@ -1409,9 +1409,9 @@ def get_n_n_dialkyl_carbamoyl_prefix(
 
     Per IUPAC P-66.6.1::
 
-        -C(=O)N(CH3)2      -> N,N-dimethylcarbamoyl
-        -C(=O)N(CH3)(C2H5) -> N-ethyl-N-methylcarbamoyl  (alphabetized)
-        -C(=O)N(C2H5)2     -> N,N-diethylcarbamoyl
+        -C(=O)N(CH3)2 -> N,N-dimethylcarbamoyl
+        -C(=O)N(CH3)(C2H5) -> N-ethyl-N-methylcarbamoyl (alphabetized)
+        -C(=O)N(C2H5)2 -> N,N-diethylcarbamoyl
 
     Returns None for cyclic tertiary amide, backbone amide, or N-attached
     orientation (same gates as ``get_n_alkyl_carbamoyl_prefix``).
@@ -1450,8 +1450,8 @@ def get_n_n_dialkyl_carbamoyl_prefix(
     # 'di', NOT 'bis': P-16.3.5 (BlueBookV2.md:7104) reserves 'bis'/'tris' for
     # "(a) compound or complex (i.e. substituted) prefixes" -- every clause of
     # it is gated on the component being SUBSTITUTED, and an unsubstituted
-    # alkenyl prefix is not. P-16.3.4(b) (:7104) supplies the parentheses, and
-    # BB :38230 carries the PIN '1,1-dimethyl-3,4-di(prop-1-en-2-yl)germolane'.
+    # alkenyl prefix is not. P-16.3.4(b) (7104) supplies the parentheses, and
+    # BB:38230 carries the PIN '1,1-dimethyl-3,4-di(prop-1-en-2-yl)germolane'.
     if alkyl1 == alkyl2:
         return f"N,N-di{enclose_if_compound(alkyl1)}carbamoyl"
 
@@ -1550,9 +1550,9 @@ def _carbamoyl_with_distal_substituents(
     -> None (fail closed).
 
     ``stem`` selects the acyl: ``"carbamoyl"`` for urea (P-66.1.6.1.1.3) or
-    ``"carbamothioyl"`` for thiourea (P-66.1.6.1.3.3 :33489 lists the
+    ``"carbamothioyl"`` for thiourea (P-66.1.6.1.3.3:33489 lists the
     unsubstituted ``carbamothioylamino``; ``carbamothioyl`` itself is a
-    retained preferred prefix per P-65.2.1.5 :30869 and P-66.1.4.4 :33198,
+    retained preferred prefix per P-65.2.1.5:30869 and P-66.1.4.4:33198,
     *"carbamothioyl (not thiocarbamoyl) for -CS-NH2"*). Defaulted so the urea
     caller is byte-identical.
     """
@@ -1624,7 +1624,7 @@ def get_n_substituted_carbamothioylamino_prefix(
     Residue R3 root cause. This row used to be the STATIC lookup
     ``PREFIX_FORMS['thiourea']`` -> ``"carbamothioylamino"``, returned
     unconditionally and ignoring ``atoms`` entirely. ``carbamothioylamino`` is
-    the MONOVALENT group ``H2N-CS-NH-`` (P-66.1.6.1.3.3, BlueBookV2.md :33489).
+    the MONOVALENT group ``H2N-CS-NH-`` (P-66.1.6.1.3.3, BlueBookV2.md:33489).
     When the 4-atom core bridges two parts of the molecule — both nitrogens
     substituted — the static string named a two-attachment bridge with a
     one-attachment prefix: everything past the distal nitrogen was orphaned and
@@ -1642,23 +1642,23 @@ def get_n_substituted_carbamothioylamino_prefix(
     urea.
 
       * unsubstituted distal N -> ``"carbamothioylamino"``
-        (the enumerated preferred prefix, :33489; BB example :33501
+        (the enumerated preferred prefix,:33489; BB example:33501
         ``3-(carbamothioylamino)propanoic acid (PIN)``);
       * substituted distal N -> ``"(methylcarbamothioyl)amino"`` /
         ``"(dimethylcarbamothioyl)amino"``. P-66.1.6.1.3.3 enumerates NO
         substituted-distal-N row — the form is derived across the
-        P-66.1.6.1.3.1 chalcogen-replacement relationship (:33439) from the oxo
+        P-66.1.6.1.3.1 chalcogen-replacement relationship (33439) from the oxo
         `(PIN)` example ``2-[(methylcarbamoyl)amino]naphthalene-1-carboxylic
-        acid`` (:33354);
+        acid`` (33354);
       * both nitrogens substituted / ambiguous orientation -> None. The caller
         falls through and the molecule re-parents onto the retained thiourea
-        (P-44.1.1 :18875 over P-41 Table 4.1: amides class 11 :18184 outrank
-        carbon rings class 40 :18216).
+        (P-44.1.1:18875 over P-41 Table 4.1: amides class 11:18184 outrank
+        carbon rings class 40:18216).
 
     Se/Te analogues return None. P-66.1.6.1.3.3 enumerates only the sulfur
     prefix, and no ``carbamoselenoyl``/``carbamotelluroyl`` spelling appears
     anywhere in the Blue Book, so inventing one would risk a wrong name; the
-    Se/Te RETAINED PARENT is built instead (P-66.1.6.1.3.1 :33451
+    Se/Te RETAINED PARENT is built instead (P-66.1.6.1.3.1:33451
     ``N-(butan-2-yl)selenourea (PIN)``).
     """
     if not atoms:
@@ -1687,11 +1687,11 @@ def _compute_branch_b_carbamoyloxy_name(
 
     For ``-OC(=O)NR1R2`` substituents (attached through the ester-O):
 
-      * ``-OC(=O)NH2``           → ``"carbamoyloxy"``
-      * ``-OC(=O)NHCH3``         → ``"(N-methylcarbamoyl)oxy"``
-      * ``-OC(=O)NHC2H5``        → ``"(N-ethylcarbamoyl)oxy"``
-      * ``-OC(=O)N(CH3)2``       → ``"(N,N-dimethylcarbamoyl)oxy"``
-      * ``-OC(=O)N(CH3)(C2H5)``  → ``"(N-ethyl-N-methylcarbamoyl)oxy"``  (alphabetized)
+      * ``-OC(=O)NH2`` → ``"carbamoyloxy"``
+      * ``-OC(=O)NHCH3`` → ``"(N-methylcarbamoyl)oxy"``
+      * ``-OC(=O)NHC2H5`` → ``"(N-ethylcarbamoyl)oxy"``
+      * ``-OC(=O)N(CH3)2`` → ``"(N,N-dimethylcarbamoyl)oxy"``
+      * ``-OC(=O)N(CH3)(C2H5)`` → ``"(N-ethyl-N-methylcarbamoyl)oxy"`` (alphabetized)
 
     Mirrors ``get_n_alkyl_carbamoyl_prefix`` + ``get_n_n_dialkyl_carbamoyl_prefix``
     conventions (uses explicit ``N-`` locants) then appends ``oxy``.
@@ -1765,7 +1765,7 @@ def get_carbamoyloxy_prefix(
 
     In sub-fragment context (``principal_chain=None``) defaults to Branch A
     naming for ``-NHC(=O)OR`` fragments (the more-common substituent shape per
-    CONTEXT D-05 row 11); Branch B is invoked by the Tier-0.5 caller when
+    CONTEXT row 11); Branch B is invoked by the Tier-0.5 caller when
     attach_idx == ester_O.
 
     Args:
@@ -1827,8 +1827,8 @@ def get_substituent_prefix_form(
     ``atoms``, or ``None`` if no prefix-form rule applies (caller falls back
     to its default behavior).
 
-    Per Phase 160.1 CONTEXT D-05 closed-set: extending beyond these 14 rows
-    is v19+1 scope. Sibling phases (Phase 163 FRN P-25.3 functional
+    .1 CONTEXT closed-set: extending beyond these 14 rows
+    is v19+1 scope. Sibling phases (FRN P-25.3 functional
     replacement, v19+1 hydroxamic / hydrazide / phosphorus) attach by adding
     ADDITIONAL rows below — never deleting or modifying existing rows.
 
@@ -1839,7 +1839,7 @@ def get_substituent_prefix_form(
         atoms: Atom indices from the SMARTS match for ``fg_name``.
         principal_chain: Atom indices of the principal chain; may be None for
             the Tier-0.5 sub-fragment caller (substituent_enumerator) per
-            Phase 160.1 CONTEXT D-04. Lifted generators internally None-guard.
+            .1 CONTEXT. Lifted generators internally None-guard.
 
     Returns:
         IUPAC-canonical prefix-form string, or None when no rule applies.
@@ -1847,7 +1847,7 @@ def get_substituent_prefix_form(
     # --- Dynamic (lifted) generators — rows 1, 2, 7, 8, 9, 10 ---
     if fg_name == "ester":
         return get_alkoxycarbonyl_prefix(mol, atoms, principal_chain)
-    # v31 row 15 (P-65.2.1.5): imidate (iminoester) -C(=NH)OR ->
+    # row 15 (P-65.2.1.5): imidate (iminoester) -C(=NH)OR ->
     # R-oxycarbonimidoyl. Exact analogue of the ester row above.
     if fg_name == "iminoester":
         return get_alkoxycarbonimidoyl_prefix(mol, atoms, principal_chain)
@@ -1865,7 +1865,7 @@ def get_substituent_prefix_form(
     if fg_name == "telluroether":
         return get_sulfanyl_prefix(mol, atoms, principal_chain, suffix="tellanyl")
 
-    # --- Dynamic (NEW Plan-02-02) — rows 4, 5, 11 ---
+    # --- Dynamic (NEW -02) — rows 4, 5, 11 ---
     if fg_name == "secondary_amide":
         return get_n_alkyl_carbamoyl_prefix(mol, atoms, principal_chain)
     if fg_name == "tertiary_amide":
@@ -1916,19 +1916,19 @@ def get_substituent_prefix_form(
                 return None
         return None
 
-    # --- Phase 163 FRN attachment slot ---
-    # Phase 163 FRN attachment: thio/seleno/telluro/imino chalcogen replacement
-    # (additive on dispatcher; NO Plan-02 row deletion; NO signature change).
+    # --- FRN attachment slot ---
+    # FRN attachment: thio/seleno/telluro/imino chalcogen replacement
+    # (additive on dispatcher; NO row deletion; NO signature change).
 
     # Unknown / out-of-table → fall through; caller may consult PREFIX_FORMS
     # directly for any other static prefix (e.g., carboxylic_acid → "carboxy",
     # hydroxyl → "hydroxy", amino, etc.). Returning None signals "this row
-    # is not in the 14-row Phase 160.1 closed-set".
+    # is not in the 14-row.1 closed-set".
     return None
 
 
 # ====================================================================
-# Tier-0.5 hook — Phase 160.1 CONTEXT D-04 substituent_enumerator wiring
+# Tier-0.5 hook —.1 CONTEXT substituent_enumerator wiring
 # ====================================================================
 
 # The 14-row prefix-form FG names in dispatcher order. Lazy-compiled SMARTS
@@ -1937,7 +1937,7 @@ def get_substituent_prefix_form(
 # instead of ~ 14 × 50µs compile + match cost).
 _PREFIX_FORM_FG_NAMES = (
     "ester",
-    "iminoester",  # v31 row 15 (P-65.2.1.5): -C(=NH)OR -> R-oxycarbonimidoyl
+    "iminoester",  # row 15 (P-65.2.1.5): -C(=NH)OR -> R-oxycarbonimidoyl
     "ether", "vinyl_ether", "aromatic_ether",
     "primary_amide", "secondary_amide", "tertiary_amide",
     "nitrile",
@@ -1950,7 +1950,7 @@ _PREFIX_FORM_FG_NAMES = (
 
 _PREFIX_FORM_PATTERNS: dict = {}  # Lazily populated on first call
 
-# Phase 160.2 Plan-04-03a WR-05 closure: lock guarding the lazy-init of
+# .2 -03a WR-05 closure: lock guarding the lazy-init of
 # ``_PREFIX_FORM_PATTERNS``. Industry-standard double-check pattern
 # (first check WITHOUT lock for fast-path; re-check INSIDE lock to ensure
 # one-time init under concurrent first-call). Closes the thread-safety
@@ -1962,7 +1962,7 @@ _PREFIX_FORM_CACHE_LOCK = threading.Lock()
 def _ensure_patterns_cached() -> None:
     """Lazy-compile the 14 SMARTS patterns once per process.
 
-    Phase 160.2 Plan-04-03a WR-05 closure: thread-safe via
+    .2 -03a WR-05 closure: thread-safe via
     ``threading.Lock`` double-check pattern. Concurrent first calls
     re-acquire-and-recheck under the lock so the population loop runs
     exactly once across all threads (mirroring the standard
@@ -1991,7 +1991,7 @@ def _check_substituent_prefix_form(
 ) -> Optional[str]:
     """Tier-0.5 prefix-form check for FG-bearing substituent fragments.
 
-    Per Phase 160.1 CONTEXT D-04 + IUPAC P-65 / P-66 prefix-form rules, a
+    .1 CONTEXT + IUPAC P-65 / P-66 prefix-form rules, a
     substituent fragment that ENTIRELY contains one of the 14 non-principal
     functional groups is named via the IUPAC-canonical prefix form (e.g.,
     ``-C(=O)OCH3 → "methoxycarbonyl"`` per P-65.6.3), short-circuiting the
@@ -2029,7 +2029,7 @@ def _check_substituent_prefix_form(
         matches = mol.GetSubstructMatches(pattern)
         for match in matches:
             match_set = set(match)
-            # --- Phase 160.2 Plan-04-01: CR-01 fix per IUPAC P-66.6.4 ---
+            # ---.2 -01: CR-01 fix per IUPAC P-66.6.4 ---
             # Branch B carbamate (-OC(=O)NH2): when attach_idx points at the
             # ester_O (match[3]) the prefix is ``carbamoyloxy`` (P-66.6.4),
             # NOT ``(R-oxycarbonyl)amino`` (Branch A) or some unrelated
@@ -2043,7 +2043,7 @@ def _check_substituent_prefix_form(
             # INSIDE the substituent fragment (synthetic-direct call where
             # the fragment IS the full SMARTS match). Accept both shapes so
             # the documented Tier-0.5 → Branch B routing fires uniformly.
-            # See 160.2-AUDIT-DECOMP-CLOSURE.md §5 + 160.1-REVIEW.md CR-01.
+            # See 160.2-AUDIT-.md §5 + 160.1-REVIEW.md CR-01.
             if (
                 fg_name == "carbamate"
                 and len(match) >= 5
@@ -2058,7 +2058,7 @@ def _check_substituent_prefix_form(
                 # ``_compute_branch_b_carbamoyloxy_name``).
                 core_set = match_set - {match[4]}
                 if core_set.issubset(frag_atoms_set):
-                    # Phase 160.2 follow-up: N-substituted Branch B per
+                    # .2 follow-up: N-substituted Branch B per
                     # IUPAC P-66.6.4. NH2 → "carbamoyloxy"; NHR →
                     # "(N-Rcarbamoyl)oxy"; NR1R2 →
                     # "(N,N-(R1)(R2)carbamoyl)oxy" (alphabetized).
@@ -2066,7 +2066,7 @@ def _check_substituent_prefix_form(
                     if branch_b is not None:
                         return branch_b
             # --- End CR-01 fix ---
-            # v27 P2 (P-63.6): a sulfoxide/sulfone SUBSTITUENT attaches through
+            # P2 (P-63.6): a sulfoxide/sulfone SUBSTITUENT attaches through
             # its SULFUR, so the SMARTS' *other* carbon (R' on the parent side)
             # lives OUTSIDE the fragment. The strict match_set==frag_atoms_set
             # test below would then reject the match and the fragment would fall
@@ -2106,10 +2106,10 @@ def _check_substituent_prefix_form(
             # FG must EQUAL the fragment (no extra atoms). This is the
             # IUPAC P-65/P-66 prefix-form precondition: the substituent
             # fragment must be the FG itself, not a larger group containing
-            # the FG (CONTEXT D-04 strict scope).
+            # the FG (CONTEXT strict scope).
             if match_set != frag_atoms_set:
                 continue
-            # v22 C-T2 (V-3): the ether (alkoxy) prefix form is an attach-via-O
+            # C-T2 (V-3): the ether (alkoxy) prefix form is an attach-via-O
             # prefix (R-O-). It is only valid when the substituent actually
             # attaches through the ether oxygen (match[0] for the O-ether SMARTS).
             # When the fragment attaches via a CARBON (e.g. -CH2-O-CH3,
@@ -2134,7 +2134,7 @@ def _check_substituent_prefix_form(
                     and attach_idx is not None
                     and len(match) >= 2 and attach_idx != match[1]):
                 continue
-            # v31 (same bug shape as the ether + isocyanate guards above, P-63.6):
+            # (same bug shape as the ether + isocyanate guards above, P-63.6):
             # the (R)sulfinyl / (R)sulfonyl prefix form attaches through the SULFUR
             # (match[0] for both the sulfoxide `[SX3](=O)([#6])[#6]` and sulfone
             # SMARTS). When the fragment attaches via a CARBON CARRIER instead
@@ -2148,7 +2148,7 @@ def _check_substituent_prefix_form(
                     and attach_idx is not None
                     and len(match) >= 1 and attach_idx != match[0]):
                 continue
-            # v31 (same bug shape as the ether/isocyanate/sulfoxide guards above,
+            # (same bug shape as the ether/isocyanate/sulfoxide guards above,
             # P-65.6.3 / P-65.2.1.5): the {alkoxy}carbonyl / {alkoxy}carbonimidoyl
             # prefix attaches through the carbonyl/imidoyl CARBON (match[0] of the
             # ester [CX3](=O)[OX2][#6] and iminoester [CX3](=[NX2H1])[OX2][#6]

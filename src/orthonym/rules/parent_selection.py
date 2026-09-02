@@ -31,12 +31,12 @@ from .locants import compare_locant_sets
 from .ring_selection import ring_system_score
 from .seniority import PG_ATTACHMENT_INDICES
 
-# WS-A task 9 (P-66.6.1): these suffixes decorate a SKELETAL atom of the
+# WS-A (P-66.6.1): these suffixes decorate a SKELETAL atom of the
 # parent — there is no exocyclic-carbon '-one' suffix (unlike the carbo-
 # suffixes -carboxylic acid / -carbaldehyde / -carbonitrile, whose carbon
 # is exocyclic by design). For these PGs, "on ring" means the suffix atom
 # IS a ring atom; the bonded-to-ring relaxation is invalid and mis-parented
-# every aryl ketone (O=C(c1ccccc1)Cc1cnc[nH]1 named bare 'benzene').
+# every aryl ketone (O=CCc1cnc[nH]1 named bare 'benzene').
 SKELETAL_SUFFIX_PGS = {
     "ketone",
     "thioketone",
@@ -63,7 +63,7 @@ SKELETAL_SUFFIX_PGS = {
     "imine",
 }
 
-# v29 Phase 8: the PGs whose characteristic heteroatom can carry MORE THAN ONE
+# : the PGs whose characteristic heteroatom can carry MORE THAN ONE
 # bearing carbon, and can therefore BRIDGE two parent candidates. These are the
 # only subtypes for which the RC-4 (heteroatom, bearing-C) normalisation in
 # seniority._normalize_pcg_match loses information -- it keeps one carbon and
@@ -121,10 +121,10 @@ def _pg_attachment_atoms(
 def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
     """Build atom-to-locant map using IUPAC ring numbering.
 
-    Per ASML-19 / D-10 / Phase 147 D-01: uses actual IUPAC ring numbering
+    Per ASML-19 / /: uses actual IUPAC ring numbering
     when available, instead of sorted atom index positional proxy.
 
-    Phase 147 extension: accepts both int locants and ``(int, str)`` tuple
+     extension: accepts both int locants and ``(int, str)`` tuple
     locants (for fusion atoms like ``'4a' -> (4, 'a')``). When ANY tuple
     value is present, ALL int values are coerced to ``(n, '')`` tuples
     so the returned dict is homogeneous — this is REQUIRED because
@@ -138,7 +138,7 @@ def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
     2. Fallback: sorted atom indices mapped to 1-indexed positions
        (correct for carbocyclic rings where any consistent numbering
         produces equivalent comparison results due to ring symmetry,
-        preserved for back-compat with pre-147 callers per D-09)
+        preserved for back-compat with pre-147 callers per)
 
     Args:
         ring_set: Set of atom indices in the ring system
@@ -157,13 +157,13 @@ def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
     Source: https://iupac.qmul.ac.uk/BlueBook/P1.html P-14.5.2, P-14.7
-    Source: Phase 147 CONTEXT D-01 (tuple encoding), D-09 (back-compat),
-            RESEARCH §3 Risk 3 (min() hazard at :416 site).
+    Source: CONTEXT (tuple encoding), (back-compat),
+            RESEARCH §3 Risk 3 (min() hazard at:416 site).
     """
     if ring_info and ring_info.get("iupac_locants"):
         iupac = ring_info["iupac_locants"]
         # Only include atoms that are in ring_set; accept int OR tuple
-        # locants (Phase 147). Other types (e.g. legacy strings like '3a')
+        # locants. Other types (e.g. legacy strings like '3a')
         # are filtered and may trigger the sorted fallback below.
         ring_pos = {}
         for atom_idx in ring_set:
@@ -173,7 +173,7 @@ def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
                     ring_pos[atom_idx] = locant
         # Use authoritative locants only when coverage is complete.
         if len(ring_pos) == len(ring_set):
-            # Phase 147: enforce homogeneity invariant. If any tuple
+            # : enforce homogeneity invariant. If any tuple
             # locant is present, coerce all int values to (n, '') tuples
             # so downstream min()/sort() operations on ring_pos values
             # never TypeError on mixed int/tuple comparison.
@@ -185,7 +185,7 @@ def _build_ring_pos(ring_set: Set[int], ring_info: dict = None) -> dict:
             return ring_pos
         # Partial coverage -> sorted fallback (back-compat with pre-147
         # callers; cascade step 6 in candidate_pool.py gates on complete
-        # coverage via _has_iupac_locants per Phase 146 D-02).
+        # coverage via _has_iupac_locants).
 
     # Fallback: sorted atom indices (correct for carbocyclic rings).
     ring_sorted = sorted(ring_set)
@@ -203,7 +203,7 @@ class ParentSelectionResult:
         reasoning: Explanation for debugging
         principal_ring_system: The senior ring system chosen by the single
             authoritative among-rings computation (P-44.2). Populated once by
-            namer._classify (Phase 178 D-03 chokepoint consolidation); the
+            namer._classify (chokepoint consolidation); the
             derived ``senior_ring_system`` / ``principal_ring`` feature fields
             are read from this one value. ``None`` until populated (e.g. pure
             acyclic, or before the post-pass runs).
@@ -212,9 +212,9 @@ class ParentSelectionResult:
     parent_atoms: List[int]
     substituent_rings: List[Tuple[int, ...]]  # Rings that become substituents
     reasoning: str  # For debugging
-    # D-03 (Phase 178): one authoritative principal-ring-system computation.
+    # : one authoritative principal-ring-system computation.
     principal_ring_system: Optional[Tuple[int, ...]] = None
-    # v37 SP1.3 (offer-not-return, invariant 18): the SIZE of the ranked P-44
+    # (offer-not-return): the SIZE of the ranked P-44
     # parent pool this result was chosen from. 1 for the pre-empt branches and a
     # single-candidate pool; >=2 when several ring/chain candidates competed.
     # Pure metadata — no naming logic reads it — surfaced so the best-effort
@@ -268,7 +268,7 @@ def is_principal_group_on_ring(
             if attachment_atom in ring_atoms_set:
                 return True
 
-            # WS-A task 9: skeletal suffixes (-one family) have no exocyclic
+            # WS-A: skeletal suffixes (-one family) have no exocyclic
             # form — membership above is the ONLY way they can be on-ring.
             if principal_group in SKELETAL_SUFFIX_PGS:
                 continue
@@ -279,7 +279,7 @@ def is_principal_group_on_ring(
                 if neighbor.GetIdx() in ring_atoms_set:
                     return True
 
-    # v29 Phase 8 (P-44.1): a characteristic heteroatom that BRIDGES two parent
+    # (P-44.1): a characteristic heteroatom that BRIDGES two parent
     # candidates -- a secondary/tertiary amine N bonded to a carbon of EACH ring
     # -- is attached to BOTH of them, so P-44.1 disqualifies neither and the
     # P-44.2 ring-seniority tiebreak is what decides (namer.py:4321 already says
@@ -626,9 +626,9 @@ def _compare_multiple_bond_locants(
     # Use compare_locant_sets for first-point-of-difference comparison
     # compare_locant_sets returns: -1 (a preferred), 0 (tie), 1 (b preferred)
     # We pass chain as a, ring as b:
-    #   -1 (chain preferred) -> return 1 (chain wins)
-    #    1 (ring preferred)  -> return -1 (ring wins)
-    #    0                   -> return 0
+    # -1 (chain preferred) -> return 1 (chain wins)
+    # 1 (ring preferred) -> return -1 (ring wins)
+    # 0 -> return 0
     cmp = compare_locant_sets(chain_bond_locants, ring_bond_locants)
     return -cmp
 
@@ -696,7 +696,7 @@ def _compare_substituent_locants(
 
 def _count_bridging_heteroatoms(mol, chain: List[int]) -> int:
     """Count bridging heteroatoms (non-C with >=2 chain neighbours) in a
-    skeletal chain. WS-A task 9: P-51.4 admits chain replacement
+    skeletal chain. WS-A: P-51.4 admits chain replacement
     nomenclature ('2,5,8,11-tetraoxadodecane') at >= 4 hetero units — the
     no-PG skeletal-chain candidacy gate."""
     chain_set = set(chain)
@@ -723,7 +723,7 @@ def _has_bridging_heteroatom(mol, chain: List[int]) -> bool:
     NOT bridging.
 
     This guard prevents skeletal chains from being preferred just because
-    they pick up a terminal functional group atom (Phase 91.1 lesson).
+    they pick up a terminal functional group atom (.1 lesson).
 
     Args:
         mol: RDKit Mol object
@@ -768,7 +768,7 @@ def select_parent(
     """
     Select parent structure per IUPAC P-44.
 
-    v25 G1: the staged class-specific cascade (with its fail-open
+     G1: the staged class-specific cascade (with its fail-open
     default-to-ring) was root-cause-replaced by ONE pooled Blue Book P-44
     comparator over ring+chain candidates -- see
     ``rules/p44_scorer.select_parent_unified`` for the rule cascade
@@ -825,7 +825,7 @@ def _count_pg_on_ring(
             if attachment in ring_atoms:
                 count += 1
                 break
-            # WS-A task 9: skeletal suffixes (-one family) count on-ring
+            # WS-A: skeletal suffixes (-one family) count on-ring
             # ONLY by membership — no bonded-to-ring relaxation.
             if principal_group in SKELETAL_SUFFIX_PGS:
                 continue

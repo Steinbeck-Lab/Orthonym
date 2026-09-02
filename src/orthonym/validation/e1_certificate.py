@@ -1,4 +1,4 @@
-"""v25 G1: E1 atom-coverage certificate.
+""" G1: E1 atom-coverage certificate.
 
 Verifies a GeneralEngineResult's atom->token partition: every heavy atom of
 the molecule is bound by EXACTLY ONE token, every token occurs in the
@@ -30,7 +30,7 @@ class E1Verdict:
 # tier, which ships on the certificate rather than on OPSIN-RT.
 #
 # The check is CONSERVATIVE and SOUND-BY-REFUSAL (mirrors name_morphemes' own
-# contract, and invariant 9: a false rejection would regress breadth / unmask a
+# contract, and: a false rejection would regress breadth / unmask a
 # worse generator). It rejects ONLY when a token is CONFIDENTLY all-carbon (a
 # plain alkane/alkyl stem or a carbocyclic retained name) yet is bound to a
 # NON-carbon heavy atom. Any token that could legitimately carry a heteroatom
@@ -89,19 +89,19 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
 
     Extracted verbatim from the historical ``verify_certificate`` body so that
     ONE certification core is shared across every producer whose output is an
-    atom->token partition (invariant 12: extend, don't duplicate). Two callers
+    atom->token partition. Two callers
     today: ``verify_certificate`` (the object-shape wrapper below, for a
     ``GeneralEngineResult``) and the universal recursive namer
     (``assembly/universal_substituent.py``), whose ``UniversalResult.bindings``
-    is *already* ``Tuple[Tuple[str, FrozenSet[int]], ...]`` -- exactly ``pairs``.
+    is *already* ``Tuple[Tuple[str, FrozenSet[int]],...]`` -- exactly ``pairs``.
 
     Args:
-      * ``name``   -- the emitted name string (token-in-name check target).
-      * ``pairs``  -- any iterable of ``(token, atom_ids)`` 2-tuples. Materialised
+      * ``name`` -- the emitted name string (token-in-name check target).
+      * ``pairs`` -- any iterable of ``(token, atom_ids)`` 2-tuples. Materialised
         here (``list``), so a one-shot generator is fine (iterated three times).
       * ``allow_charged`` -- lifts the G1 net-formal-charge refusal, for a caller
         that owns the charge axis by a stronger, earlier check (the universal
-        namer's per-atom raw-formal-charge void guard, task B2b, is exactly that).
+        namer's per-atom raw-formal-charge void guard,, is exactly that).
       * ``atoms`` -- restricts the partition's reference set to a given heavy-atom
         index set (a BRANCH subgraph). ``None`` (the whole-molecule default used
         by ``verify_certificate``) => every heavy atom of ``mol``, byte-identical
@@ -174,7 +174,7 @@ def _verify_partition(mol, name, pairs, allow_charged: bool = False,
 def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
     """Producer-side atom-COVERAGE close (the task-W2 reusable template).
 
-    A thin wrapper over :func:`_verify_partition` for the recurring producer
+    A thin wrapper over:func:`_verify_partition` for the recurring producer
     situation the W2 jar-absent-proper fix addresses: *"here are the atom groups
     my emitted ``name`` accounts for — confirm together they cover EVERY heavy
     atom of ``mol``, else I must decline (fail-closed) rather than ship a name
@@ -183,7 +183,7 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
     This is the OPSIN-free, jar-independent guard that catches an atom-drop at
     CONSTRUCTION (defense-in-depth: jar-present SELF-01 would also catch it, but
     only after a JVM round-trip; jar-absent nothing else does). It reuses the E1
-    partition primitive rather than duplicating a coverage check (invariant 12:
+    partition primitive rather than duplicating a coverage check (
     extend, don't duplicate) and is deliberately scoped to the COVERAGE axis:
 
     * Groups are DEDUPLICATED before binding, so a benign double-listing of an
@@ -204,9 +204,9 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
     Args:
       * ``atom_id_groups`` -- iterable of iterables of heavy-atom indices, one per
         name-piece the producer emitted (ring atoms, each named substituent's
-        atoms, suffix atoms, ...). Their UNION is the accounted set.
+        atoms, suffix atoms,...). Their UNION is the accounted set.
 
-    Returns an :class:`E1Verdict`; ``.ok`` is False (with an ``unbound heavy
+    Returns an:class:`E1Verdict`; ``.ok`` is False (with an ``unbound heavy
     atoms`` reason) when any heavy atom is left unaccounted. Callers decline
     (return ``None`` / abstain) on a non-ok verdict.
     """
@@ -223,7 +223,7 @@ def verify_atom_coverage(mol, name, atom_id_groups, allow_charged: bool = True):
 def verify_certificate(mol, result, allow_charged: bool = False) -> E1Verdict:
     """Atom-partition certificate for a GeneralEngineResult.
 
-    v26 P5: ``allow_charged`` (set only under ``complete``) lifts the
+     P5: ``allow_charged`` (set only under ``complete``) lifts the
     net-formal-charge refusal -- the charge is expressed as a
     ``-ylium``/``-ide``/``-uide``/``-ium`` suffix on an already-bound skeletal
     atom, so it introduces NO new atom and the partition is still complete.

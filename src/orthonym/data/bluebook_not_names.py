@@ -1,8 +1,8 @@
 """Blue Book tier-3 corpus: names the Blue Book marks ``not`` (discarded).
 
-GENERATED — do not hand-edit.  Regenerate with::
+GENERATED — do not hand-edit. Regenerate with::
 
-    .venv/bin/python  \
+    .venv/bin/python \
         --out src/orthonym/data/bluebook_not_names.py
 
 Authority: ``BlueBookV2/BlueBookV2.md``, the sole PIN authority for this repo.
@@ -18,11 +18,11 @@ is "discarded or no longer recommended" and has no acceptable status at all.
 Emitting one is an accuracy defect, so ``rules.parent_ranking`` uses this table
 as a fail-closed veto on general-nomenclature fall-through emissions.
 
-The table is an EXACT-MATCH veto over lowercase/whitespace-collapsed names.  It
+The table is an EXACT-MATCH veto over lowercase/whitespace-collapsed names. It
 may only ever suppress, so every extraction compromise is in the safe direction:
 rows damaged by OCR or surviving markup are DROPPED (a false negative — the veto
 does not fire), never loosened into a prefix or substring match (which could
-veto a correct name).  See the extractor's docstring for the four hazards.
+veto a correct name). See the extractor's docstring for the four hazards.
 
 Counts at generation time: candidates=839, dropped_prose=17, dropped_short=2, raw_clauses=837, unique_unusable_markup_or_ocr=68, unique_usable=718
 """

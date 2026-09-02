@@ -1,19 +1,19 @@
 """Nucleoside / nucleotide decoration engine (Blue Book P-105.2 / P-106).
 
-v23 Phase 14. Bare nucleosides (adenosine, guanosine, inosine, xanthosine,
+. Bare nucleosides (adenosine, guanosine, inosine, xanthosine,
 cytidine, thymidine, uridine + the 2'-deoxy series) are named by exact-SMILES
-retained-name lookup (``data/retained_names.py``).  This module handles the
+retained-name lookup (``data/retained_names.py``). This module handles the
 **decorated** species that those exact keys cannot reach:
 
 * nucleoside 5'-phosphates / di- / tri-phosphates — ``adenosine 5'-(tetrahydrogen
   triphosphate)`` (ATP), ``adenosine 5'-(trihydrogen diphosphate)`` (ADP),
-  ``2'-deoxyadenosine 5'-(dihydrogen phosphate)`` (dAMP);  (P-106.1/.2)
+  ``2'-deoxyadenosine 5'-(dihydrogen phosphate)`` (dAMP); (P-106.1/.2)
 * O-acyl esters on the sugar — ``adenosine 2',3',5'-triacetate`` (P-105.2.1).
 
 The engine is **strip-and-recognise**: it perceives the nucleoside *core* (a
 furanose N-glycosidically bonded to a nucleobase), strips the recognised sugar
 decorations back to the free hydroxyls, canonicalises the bare nucleoside and
-looks it up in the retained-name catalog.  Anything it cannot account for —
+looks it up in the retained-name catalog. Anything it cannot account for —
 a modified base, a phosphate at a non-5' ring position it cannot number, a
 cyclic phosphate, a mixed decoration set it has no grammar for — makes it
 **return ``None`` (fail-closed)**, so the molecule falls through to the general
@@ -30,24 +30,24 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
-# Phosphate H-count -> word (P-106.1/.2).  The "<n>hydrogen" multiplier counts
+# Phosphate H-count -> word (P-106.1/.2). The "<n>hydrogen" multiplier counts
 # the free acidic -OH groups on the linear terminal polyphosphate ester:
-#   mono:  -O-P(=O)(OH)2                          -> 2 OH -> dihydrogen phosphate
-#   di:    -O-P(=O)(OH)-O-P(=O)(OH)2              -> 3 OH -> trihydrogen diphosphate
-#   tri:   -O-P(=O)(OH)-O-P(=O)(OH)-O-P(=O)(OH)2  -> 4 OH -> tetrahydrogen triphosphate
+# mono: -O-P(=O)(OH)2 -> 2 OH -> dihydrogen phosphate
+# di: -O-P(=O)(OH)-O-P(=O)(OH)2 -> 3 OH -> trihydrogen diphosphate
+# tri: -O-P(=O)(OH)-O-P(=O)(OH)-O-P(=O)(OH)2 -> 4 OH -> tetrahydrogen triphosphate
 _HYDROGEN_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa", 7: "hepta"}
 _PHOSPHATE_STEM = {1: "phosphate", 2: "diphosphate", 3: "triphosphate", 4: "tetraphosphate"}
 
-# O-acyl ester: acyl carbon count -> functional-class ester word.  Straight-chain only.
+# O-acyl ester: acyl carbon count -> functional-class ester word. Straight-chain only.
 _ACYL_NAME = {1: "formate", 2: "acetate", 3: "propanoate", 4: "butanoate"}
 _PRIME_MULT = {2: "di", 3: "tri", 4: "tetra"}
 
 # ---------------------------------------------------------------------------
 # Base-ring numbering + tautomer-robust base classification (P-105.2.1 ring
-# substitution).  The base TYPE is read off the EXOCYCLIC heteroatom markers
+# substitution). The base TYPE is read off the EXOCYCLIC heteroatom markers
 # (N=amino/imino, O=oxo/hydroxy) at each ring locant — this is robust to the
 # amino<->imino / keto<->enol tautomer (and the m7G charge) that ring-N
-# alkylation forces.  Carbon groups on a ring atom (or on an exocyclic amino N)
+# alkylation forces. Carbon groups on a ring atom (or on an exocyclic amino N)
 # are SUBSTITUENTS, cited by base locant.
 # ---------------------------------------------------------------------------
 _PURINE_SMARTS = Chem.MolFromSmarts("[#7:1]1~[#6:2]~[#7:3]~[#6:4]2~[#7:9]~[#6:8]~[#7:7]~[#6:5]2~[#6:6]~1")
@@ -73,10 +73,10 @@ _NUCLEOSIDE_STEM = {                              # (base, sugar) -> bare nucleo
 
 def _base_numbering(mol: Chem.Mol, base_n: int) -> Optional[Dict[int, int]]:
     """{atom idx -> IUPAC base locant}, anchored so the glycosidic N is 9 (purine)
-    or 1 (pyrimidine).  None if the base is neither purine nor pyrimidine."""
+    or 1 (pyrimidine). None if the base is neither purine nor pyrimidine."""
     # uniquify=False: the pyrimidine ring is symmetric between N1 and N3 (both flank
     # C2), so the default uniquify drops one of the two anchorings non-deterministically
-    # by atom order.  Enumerate all and pick the one anchoring the glycosidic N at its
+    # by atom order. Enumerate all and pick the one anchoring the glycosidic N at its
     # canonical locant (9 purine / 1 pyrimidine) — deterministic.
     for patt, glyc in ((_PURINE_SMARTS, 9), (_PYRIMIDINE_SMARTS, 1)):
         for match in mol.GetSubstructMatches(patt, uniquify=False):
@@ -103,8 +103,8 @@ def _classify_base(mol: Chem.Mol, core: _Core):
     """Return (bare_nucleoside_name, [(locant_str, alkyl_word)], strip_atoms) or None.
 
     Reads the base TYPE from exocyclic N/O markers (tautomer/charge robust) and the
-    sugar type (ribo vs 2'-deoxy) from C2'.  Carbon groups on a ring atom or on an
-    exocyclic amino N become substituents (locant = ``L`` or ``N<L>``).  Fail-closed
+    sugar type (ribo vs 2'-deoxy) from C2'. Carbon groups on a ring atom or on an
+    exocyclic amino N become substituents (locant = ``L`` or ``N<L>``). Fail-closed
     on any non-alkyl base group it cannot name."""
     num = _base_numbering(mol, core.base_n)
     if num is None:
@@ -164,7 +164,7 @@ def _classify_base(mol: Chem.Mol, core: _Core):
 
 
 def _assemble_base_substituents(bare: str, subs: List[Tuple[str, str]]) -> Optional[str]:
-    """Assemble ``<locant>-<alkyl><nucleoside>`` (P-105.2.1).  Single substituent, or
+    """Assemble ``<locant>-<alkyl><nucleoside>`` (P-105.2.1). Single substituent, or
     several identical-word substituents with a multiplier; mixed words -> None."""
     if not subs:
         return None
@@ -213,7 +213,7 @@ def _find_core(mol: Chem.Mol) -> Optional[_Core]:
     A furanose candidate is a 5-membered non-aromatic ring with exactly one ring
     O and four ring C, where one ring C (the anomeric C1') is bonded to a ring
     nitrogen of an N-heterocycle (the base) and another ring C (C4') bears an
-    exocyclic carbon (C5').  Returns ``None`` (fail-closed) on any ambiguity.
+    exocyclic carbon (C5'). Returns ``None`` (fail-closed) on any ambiguity.
     """
     ri = mol.GetRingInfo()
     for ring in ri.AtomRings():
@@ -424,7 +424,7 @@ def _lookup_bare(bare: Chem.Mol) -> Optional[str]:
 
 def _name_base_substituted(mol: Chem.Mol, core: _Core) -> Optional[str]:
     """Name a base-substituted nucleoside (P-105.2.1) e.g. 1-methyladenosine,
-    N6-methyladenosine, 5-methyluridine.  None if the base is unsubstituted (->
+    N6-methyladenosine, 5-methyluridine. None if the base is unsubstituted (->
     retained-name path) or carries a group the classifier cannot name."""
     res = _classify_base(mol, core)
     if res is None:

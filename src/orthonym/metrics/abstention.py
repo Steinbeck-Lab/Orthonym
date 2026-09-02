@@ -1,10 +1,10 @@
-"""Typed abstention limit-codes (v25 P0 Task 0.1).
+"""Typed abstention limit-codes.
 
 Orthonym's fail-closed paths all collapse into one descriptive fallback
 string, which is right for the naming contract but blind for measurement:
-the v25 coverage program needs to know *which* mechanism abstained so the
+the coverage program needs to know *which* mechanism abstained so the
 recoverable buckets can be counted before any coverage engine is scoped
-(the census in ``, Task 0.2).
+(the census in ``,.2).
 
 This module is a per-top-level-naming-session telemetry slot, deliberately
 side-effect-only:
@@ -119,7 +119,7 @@ def record_suppression(code: AbstentionCode, detail: Optional[str] = None,
     overridden (first-wins among themselves). Never raises.
     """
     try:
-        # v30 PE-1: mirror into the candidate ledger BEFORE the first-writer-wins
+        # PE-1: mirror into the candidate ledger BEFORE the first-writer-wins
         # logic below discards this event. That precedence rule is right for "which
         # site declined" and wrong for "what was thrown away" -- a suppression that
         # loses the race here still destroyed a candidate, and the ledger must see

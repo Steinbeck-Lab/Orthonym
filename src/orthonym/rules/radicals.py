@@ -424,11 +424,11 @@ def _is_plain_alkyl_radical_fragment(mol, radical_idx: int, attach_idx: int) -> 
     SATURATED hydrocarbon chain rooted AT ``attach_idx`` -- the exact shape
     the existing retained '-oxyl' contraction (methoxyl/ethoxyl/propoxyl/
     .../hexoxyl) was already built for (BB P-71.3.4/P-71.2.1.2: 'methoxyl,
-    ethoxyl, propoxyl, butoxyl, *tert*-butoxyl, phenoxyl ... are retained and
+    ethoxyl, propoxyl, butoxyl, *tert*-butoxyl, phenoxyl... are retained and
     are preferred IUPAC names' -- a FIXED short list of straight-chain/simple
     contractions, not a licence to count carbons on ANY hydrocarbon shape).
 
-    FABLE finding (v36 A2 hardening): the original guard checked only
+     finding: the original guard checked only
     aromatic/ring/heteroatom and NOT branching or unsaturation, so a
     BRANCHED or UNSATURATED alkyl fragment was routed to the same carbon-
     COUNT contraction as a straight chain -- e.g. propan-2-yl (isopropyl)
@@ -564,7 +564,7 @@ def _name_peroxyl_radical(mol, radical_idx: int, bridge_o_idx: int) -> str:
     neighbour (excluding the radical O) is the R group's attachment point,
     named through the SAME substituent-naming chokepoint the plain oxyl
     branch above uses (``name_substituent_fragment``) so a compound R
-    (branched, substituted, aromatic, ...) is never dropped. Composes via
+    (branched, substituted, aromatic,...) is never dropped. Composes via
     ``_compose_oxyl_name`` (method (1) 'R + peroxyl', PIN, tried first;
     method (2) '(R)dioxidanyl' as a verified fallback) -- VERIFIED -r
     round-trip witnesses: 'methylperoxyl' for ``[O]OC``, 'tert-butylperoxyl'
@@ -599,12 +599,12 @@ def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
     or per P-71.3.4 method (1) as ``(R)oxyl``/``R-peroxyl`` -- the VERIFIED
     PIN form ("Method (1) generates preferred IUPAC names",
     BlueBookV2.md:40679) -- when R itself carries a further substituent, via
-    ``_compose_oxyl_name``. v36 A2 generalisation: the R group is named
+    ``_compose_oxyl_name``. A2 generalisation: the R group is named
     through the existing substituent-naming pipeline instead of being
-    collapsed to the unsubstituted retained form (the pre-v36 bug: any
+    collapsed to the unsubstituted retained form (the pre- bug: any
     aromatic-O radical mapped unconditionally to 'phenoxyl', dropping every
     ring substituent) or misnamed by a bare carbon count that ignored
-    branching/unsaturation (v36 A2 FABLE hardening, see
+    branching/unsaturation (A2 hardening, see
     ``_is_plain_alkyl_radical_fragment``).
 
     Args:
@@ -769,7 +769,7 @@ def name_aryl_radical(mol, radical_site: Dict[str, Any]) -> str:
 # ending (methane->methyl, silane->silyl). That contraction is the P-71.2.1.1 rule
 # and is correct ONLY for Group-14 mononuclear hydrides / acyclic-hydrocarbon
 # termini / monocyclic saturated hydrocarbon rings. For a NON-Group-14 heteroatom
-# parent hydride (azane, sulfane, borane, ...) the P-71.2.1.2 general method elides
+# parent hydride (azane, sulfane, borane,...) the P-71.2.1.2 general method elides
 # ONLY the final 'e' (azane->azanyl, sulfane->sulfanyl, borane->boranyl) — so the
 # chokepoint produced the WRONG 'azyl'/'sulfyl'/'boryl'. These namers own the
 # heteroatom cases with the correct, element-keyed contraction and fail closed
@@ -920,7 +920,7 @@ def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
     contraction):
 
       * P-71.2.1.2 / P-71.2.2.2 mononuclear parent-hydride radicals — azanyl,
-        azanylidene, sulfanyl, boranyl, silyl, germyl, ...
+        azanylidene, sulfanyl, boranyl, silyl, germyl,...
       * P-71.3.2 amine / imine / amide compound-suffix radicals — methanaminyl,
         propan-1-iminyl, formamidyl.
       * P-71.3.3 multiplicative poly-amine radicals — (ethane-1,2-diyl)bis(aminyl).

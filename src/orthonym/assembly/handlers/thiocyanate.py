@@ -28,7 +28,7 @@ from ..name_tree import NameTreeNode, NamingResult
 
 
 def _is_thiocyanate(features: Any) -> bool:
-    """Predicate (D-07 pure): the thiocyanate ester R-S-C#N is the sole
+    """Predicate (pure): the thiocyanate ester R-S-C#N is the sole
     characteristic group. Fires ONLY when principal_group is None so a
     polyfunctional molecule carrying a senior group (where thiocyanate is a
     plain prefix) is never hijacked. NO mol/features mutation; NO module state.
@@ -49,7 +49,7 @@ def name_thiocyanate(
     carbon neighbour that is NOT the nitrile carbon (the organyl R), name that
     R fragment via the universal substituent pipeline, and join as
     ``"<R> thiocyanate"``. Returns None (defer / fail-closed) if the R cannot
-    be named. Style is ignored (single PIN per compound, CONTEXT D-04); the
+    be named. Style is ignored (single PIN per compound, CONTEXT); the
     thiocyanate ester PIN IS functional-class, so it is NOT declined under 'pin'.
     """
     from ..candidate_pool import get_current_pool

@@ -49,7 +49,7 @@ def strip_isotopes(mol: Chem.Mol) -> Tuple[Chem.Mol, Dict[int, int]]:
     # ([H]C([H])([H])CO != CCO) and could perturb skeleton perception. Collapse
     # them back into the implicit H count so the skeleton is the true unlabeled
     # parent. RemoveHs is a no-op for heavy-atom labels (14C etc). label_map
-    # keys index the ORIGINAL mol (element symbols are read there in Task 3), so
+    # keys index the ORIGINAL mol (element symbols are read there in), so
     # the index shift RemoveHs introduces on the returned copy is irrelevant —
     # the copy is used only for its canonical skeleton SMILES + heavy-atom count.
     try:
@@ -77,14 +77,14 @@ def format_isotope_descriptor(groups) -> str:
     """Build the parenthesized isotopic descriptor from grouped labels.
 
     ``groups`` = list of (locant, mass, element, count):
-      locant None  -> no leading locant (single-position parent / front
+      locant None -> no leading locant (single-position parent / front
                       descriptor, e.g. (2H3)methoxybenzene, (12C1)methane).
-      locant int   -> the count locants are repeated then hyphen-joined to the
+      locant int -> the count locants are repeated then hyphen-joined to the
                       nuclide, e.g. (2,2,2-2H3), (2-14C1).
     Multiple groups at (possibly) the same place are cited alphabetically by
     element then by mass number (P-82.2.1 / P-82.3); groups are comma-joined.
     The count subscript is ALWAYS emitted (P-82.2.1 line 43720 + tritium
-    parseability, Task 4).
+    parseability).
     """
     def _one(locant, mass, element, count):
         sym = nuclide_symbol(mass, element)
@@ -160,12 +160,12 @@ def _insertion_offsets(skel: str) -> List[int]:
     """Offsets in ``skel`` at which an isotopic descriptor may be inserted.
 
     P-82.2.1: the descriptor "is inserted before the part of the compound that is
-    isotopically substituted".  The enumeration does not parse the skeleton's
+    isotopically substituted". The enumeration does not parse the skeleton's
     grammar -- it offers every plausible offset and lets the OPSIN round-trip
     oracle pick the one that is right -- so the only thing that matters here is
     that no legal placement is left out of the candidate set.
 
-    Alphabetic starts cover a bare parent stem.  They do NOT cover a parent
+    Alphabetic starts cover a bare parent stem. They do NOT cover a parent
     carrying an indicated hydrogen: the slot before ``1H-pyrrole`` begins with a
     digit, so a labelled molecule that also has substituent prefixes had nowhere
     legal to put the descriptor and failed closed -- ``[2H]C1=C(N(C=C1)C)[N+](=O)[O-]``
@@ -178,7 +178,7 @@ def _insertion_offsets(skel: str) -> List[int]:
         2,3-dihydro(15N)-1H-indole (PIN)
         2,3-dihydro(2,3-2H2,15N)-1H-indole (PIN)
 
-    -- descriptor, then a hyphen, then the indicated-hydrogen prefix.  So the
+    -- descriptor, then a hyphen, then the indicated-hydrogen prefix. So the
     descriptor replaces the hyphen that introduces that prefix, and the offset to
     offer is the hyphen's own index: ``1-methyl-2-nitro`` + ``(3-2H1)`` +
     ``-1H-pyrrole``.
@@ -215,11 +215,11 @@ def _find_best_placement(
     spelling and ONE ``(mass, element) -> count`` key list, OPSIN-RT gated
     against ``original``; ``(None, None, None, None)`` if nothing round-trips.
 
-    Extracted (v36 A3) from what was a same-shaped closure named ``_enumerate``
+    Extracted from what was a same-shaped closure named ``_enumerate``
     inside ``_decorate_isotopic_name_inner`` so BOTH the single-attachment
     path there (unchanged behaviour -- it now calls this with its own
     ``keys``/``original``) and the multi-attachment placement below
-    (:func:`_decorate_multi_position`, called once per attachment GROUP with a
+    (func:`_decorate_multi_position`, called once per attachment GROUP with a
     masked ``original``) share ONE oracle-driven search, instead of two
     independently-maintained copies that could drift apart.
 
@@ -257,7 +257,7 @@ def _find_best_placement(
 def _mask_isotopes(mol: Chem.Mol, keep_indices) -> Chem.Mol:
     """A COPY of ``mol`` with every isotope label cleared except at
     ``keep_indices``. Used to test ONE attachment-group's placement in
-    isolation -- see :func:`_decorate_multi_position`.
+    isolation -- see:func:`_decorate_multi_position`.
 
     A cleared D/T is an EXPLICIT plain-1H atom (same reasoning as
     ``strip_isotopes``): left alone, its canonical SMILES prints a literal
@@ -292,8 +292,8 @@ def _partition_by_attachment(
     An explicit-H label (D/T, ``strip_isotopes`` never removes them from
     ``label_map`` even though ``RemoveHs`` collapses the STRIPPED copy) is
     attached to exactly one heavy neighbour; every D/T sharing that neighbour
-    (the two D's of an NH2, the two of a CH2, ...) is one group. A labelled
-    HEAVY atom (13C, 18F, 11C, ...) is its own attachment point.
+    (the two D's of an NH2, the two of a CH2,...) is one group. A labelled
+    HEAVY atom (13C, 18F, 11C,...) is its own attachment point.
 
     A single-group molecule (everything shares one neighbour, or there is
     only one labelled atom) returns a length-1 list, so the existing
@@ -329,7 +329,7 @@ def _decorate_multi_position(
     atoms sitting at MORE than one structurally distinct position -- e.g.
     per-deuterated glycine has D on the amino N, the alpha C, and the
     carboxyl O, three unrelated "parts". Each group's own winning
-    ``(offset, descriptor)`` is found INDEPENDENTLY by :func:`_find_best_placement`
+    ``(offset, descriptor)`` is found INDEPENDENTLY by:func:`_find_best_placement`
     against an isotope-MASKED copy of ``original`` carrying ONLY that group's
     labels -- valid because OPSIN scopes each parenthesized descriptor to the
     substring it precedes, independent of any other descriptor elsewhere in
@@ -405,7 +405,7 @@ def _systematic_parent_fallback(stripped: Chem.Mol) -> Optional[str]:
 _MULT_TO_COUNT = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}
 _COUNT_TO_MULT = {v: k for k, v in _MULT_TO_COUNT.items()}
 
-#: A repeated IDENTICAL letter locant (``N``, ``O``, ...) followed by one of
+# : A repeated IDENTICAL letter locant (``N``, ``O``,...) followed by one of
 #: the simple multiplier stems, e.g. the ``N,N,N-tri`` of
 #: ``N,N,N-trimethylethanaminium``. Anchored to start-of-string or a
 #: preceding hyphen so it cannot match mid-word.
@@ -418,14 +418,14 @@ def _decorate_letter_multiplier(skeleton, keys, original, stripped) -> Optional[
     """P-82.2.2.1 de-multiplication for a REPEATED-LETTER-LOCANT substituent
     cluster (e.g. ``N,N,N-trimethyl``), found ANYWHERE in the skeleton -- not
     only a leading multiplier at the very front of the whole name (that
-    narrower shape, with a NUMERIC locant list, is :func:`_decorate_demultiplied`).
+    narrower shape, with a NUMERIC locant list, is:func:`_decorate_demultiplied`).
 
-    A letter locant (``N``, ``O``, ...) cites several substituents on the
+    A letter locant (``N``, ``O``,...) cites several substituents on the
     SAME heteroatom; unlike a numeric gem-locant pair there is no alternative
     numbered position to disambiguate, so the copies are chemically
     INTERCHANGEABLE before labelling -- splitting off any ONE of them for the
     label yields the unique labelled structure, and no permutation search
-    (unlike :func:`_decorate_demultiplied`'s distinct-numeric-position search)
+    (unlike:func:`_decorate_demultiplied`'s distinct-numeric-position search)
     is needed.
 
     Scoped to a single labelled copy of a single nuclide (the verified
@@ -481,9 +481,9 @@ def _decorate_demultiplied(skeleton, keys, original, stripped) -> Optional[str]:
     Split a leading-locant simple multiplier (e.g. ``1,2-dimethoxyethane``) and
     scope a DISTINCT nuclide descriptor to each labeled copy, leaving at most one
     copy bare. Handles both:
-      * single-group  — one labeled copy among bare copies
+      * single-group — one labeled copy among bare copies
                         (P-82.2.2.1 + P-45.4.1, e.g. 1-(13C1)methoxy-2-methoxyethane)
-      * mixed         — DISTINCT nuclides on DISTINCT copies, where — because the
+      * mixed — DISTINCT nuclides on DISTINCT copies, where — because the
                         parent is symmetric — BOTH numbering directions round-trip
                         and P-45.4.2/.4.3 must choose (e.g.
                         1-(18O1)methoxy-2-(13C1)methoxyethane: 18O Z=8 > 13C Z=6).
@@ -617,7 +617,7 @@ def _decorate_demultiplied(skeleton, keys, original, stripped) -> Optional[str]:
 # general rule is NOT implemented. What IS implemented below is the half with a verbatim
 # Blue Book anchor: when the descriptor itself needs a locant, P-82.6.1.1 restores the
 # parent's locants. See the open-defect note in
-# 
+#
 # ─────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -652,7 +652,7 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
 
 def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
                                   label_map) -> Optional[str]:
-    """Body of :func:`decorate_isotopic_name`, run inside the ambient isotopic scope."""
+    """Body of:func:`decorate_isotopic_name`, run inside the ambient isotopic scope."""
     stripped_smiles = Chem.MolToSmiles(stripped)
     # Skeleton in systematic style so parents carry locants (ethan-1-ol, not
     # ethanol) — the descriptor's locant needs a locanted parent.
@@ -688,7 +688,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     if demux is not None:
         return demux
 
-    # v36 A3 Task 3 (P-82.2.2.1, letter-locant class): a repeated IDENTICAL
+    # A3 (P-82.2.2.1, letter-locant class): a repeated IDENTICAL
     # letter-locant multiplier ANYWHERE in the skeleton (e.g. the
     # ``N,N,N-trimethyl`` of a quaternary ammonium salt cation) -- distinct
     # from the numeric leading-multiplier shape ``_decorate_demultiplied``
@@ -710,7 +710,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # tried first — locants are omitted when the position is unambiguous; then
     # integer locants ascending (lowest-locant-first). Among round-trippers,
     # P-45.4.2/.4.3 (higher Z then higher mass at the lower locant) breaks ties.
-    # (v36 A3: the search itself now lives in the module-level
+    # (A3: the search itself now lives in the module-level
     # ``_find_best_placement`` so the multi-attachment path below can reuse it
     # unchanged; this closure is a thin adapter preserving the existing
     # ``(candidate, loc_rank)`` contract used by the rest of this function.)
@@ -725,16 +725,16 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
 
     best, loc_rank = _enumerate(skeleton)
     if best is None:
-        # v36 A3 Task 1 (P-82.6.3.2 + multi-position placement): the single
+        # A3 (P-82.6.3.2 + multi-position placement): the single
         # combined descriptor above shares ONE locant across every labelled
         # atom of a nuclide, which cannot express labels sitting at more than
         # one structurally distinct position (per-D-glycine: D on the amino
         # N, the alpha C, AND the carboxyl O). Try, in order:
-        #   (a) one descriptor per attachment group, on THIS skeleton;
-        #   (b) if the skeleton itself has no slot at all for some part of
-        #       the label (a retained parent with an unnumbered position,
-        #       P-82.6.3.2), retry every placement strategy against a MORE
-        #       fully systematic alternate parent.
+        # (a) one descriptor per attachment group, on THIS skeleton;
+        # (b) if the skeleton itself has no slot at all for some part of
+        # the label (a retained parent with an unnumbered position,
+        # P-82.6.3.2), retry every placement strategy against a MORE
+        # fully systematic alternate parent.
         groups = _partition_by_attachment(original, label_map)
         if len(groups) > 1:
             multi = _decorate_multi_position(skeleton, groups, original, n_pos)
@@ -766,7 +766,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # necessary in unmodified names. However, if isotopic modification requires a locant
     # to specify its position, then all locants must be specified and none are omitted."
     # Its own example prints the elided form as the REJECTED one (BB:44186):
-    #     13CH3-CH2-OH   (2-13C)ethan-1-ol   [not (2-13C)ethanol]
+    # 13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]
     #
     # `loc_rank >= 1` is precisely "the isotopic modification requires a locant": the
     # enumeration tries the locant-FREE descriptor first, so a locant is only reached

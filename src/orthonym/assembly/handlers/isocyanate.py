@@ -1,9 +1,9 @@
-"""Phase 160 isocyanate handler — Tier B retained-name (gate 0.40).
+""" isocyanate handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:828-836 (inline branch) +
 composer.py:2180-2190 (_name_isocyanate body) + composer.py:2204-2230
-(shared _name_iso_x_cyanate helper). Per CONTEXT D-24 incremental-
-migration discipline, bodies stay in composer.py until Plan-03 commit
+(shared _name_iso_x_cyanate helper). Per CONTEXT incremental-
+migration discipline, bodies stay in composer.py until commit
 03-10 thinning.
 
 IUPAC cite: P-66.5.4.3 (isocyanates; functional class naming).
@@ -25,7 +25,7 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_isocyanate(features: Any) -> bool:
     """Mirrors composer.py:828 (isocyanate FG present AND principal_group is None).
 
-    Pure read-only per CONTEXT D-25 / AP-160-26.
+    Pure read-only per CONTEXT /.
     """
     fg = getattr(features, 'functional_groups', None) or {}
     return bool(fg.get('isocyanate')) and getattr(features, 'principal_group', None) is None
@@ -34,7 +34,7 @@ def _is_isocyanate(features: Any) -> bool:
 def name_isocyanate(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """Phase 160 Tier-B isocyanate handler.
+    """ Tier-B isocyanate handler.
 
     Verbatim semantics of composer.py:828-836 (inline branch).
     """
