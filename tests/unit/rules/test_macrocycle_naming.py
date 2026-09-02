@@ -29,42 +29,52 @@ _SMILES = json.loads((Path(__file__).parent / "_macrocycle_smiles.json").read_te
 F2_WITNESS_CID = "25180764"
 
 
+# Subprocess: build the whole-cage candidate with the macrocycle-hang budget disabled
+# (read at import -> must be a subprocess), wrap the named site, print the captured
+# strings. `SITE` selects what to capture: "parent" = _build_parent_with_unsaturation
+# (F2's ene locant); "candidate" = the whole complex_ring candidate name (F1's brackets).
 _SUBPROC = r'''
 import os, sys, json
-os.environ["ORTHONYM_PERF_OP_BUDGET"] = "0"       # disable macrocycle-hang budgets
-os.environ["ORTHONYM_ANALYSIS_CALL_BUDGET"] = "0"  # (read at import -> so, subprocess)
+os.environ["ORTHONYM_PERF_OP_BUDGET"] = "0"
+os.environ["ORTHONYM_ANALYSIS_CALL_BUDGET"] = "0"
 import logging; logging.getLogger().setLevel(logging.CRITICAL)
 from rdkit import RDLogger; RDLogger.DisableLog("rdApp.*")
 from orthonym.rules import polycyclic as poly
+from orthonym.assembly import candidate_pool as cp_mod
 from orthonym import Orthonym
-smiles = sys.argv[1]
+site, smiles = sys.argv[1], sys.argv[2]
 captured = []
-orig = poly._build_parent_with_unsaturation
-def wrapped(total_atoms, unsaturation, fg_suffix=None):
-    out = orig(total_atoms, unsaturation, fg_suffix=fg_suffix)
-    if out:
-        captured.append(out)
-    return out
-poly._build_parent_with_unsaturation = wrapped
+if site == "parent":
+    orig = poly._build_parent_with_unsaturation
+    def wrapped(total_atoms, unsaturation, fg_suffix=None):
+        out = orig(total_atoms, unsaturation, fg_suffix=fg_suffix)
+        if out:
+            captured.append(out)
+        return out
+    poly._build_parent_with_unsaturation = wrapped
+else:  # candidate
+    orig = cp_mod.CandidatePool.add
+    def wrapped(self, name, handler_id, features, *a, **kw):
+        if handler_id == "complex_ring" and name:
+            captured.append(name)
+        return orig(self, name, handler_id, features, *a, **kw)
+    cp_mod.CandidatePool.add = wrapped
 Orthonym(general_fallback=True, general_fallback_unverified=True,
           allow_aromatic_general=True).name(smiles)
-print("PARENT_NAMES_JSON:" + json.dumps(captured))
+print("CAPTURED_JSON:" + json.dumps(captured))
 '''
 
 
-def _capture_parent_names(smiles):
-    """Build the whole-cage candidate in a SUBPROCESS with the macrocycle-hang work
-    budget disabled via env (read at import; otherwise these 53-atom cages fast-abstain
-    before the candidate is built). Returns every parent-name string built by
-    ``_build_parent_with_unsaturation`` — the site F2 changes. Subprocess isolation keeps
-    the disabled budget out of the rest of the suite. ~90 s (hence ``@slow``)."""
+def _capture(site, smiles):
+    """Build the whole-cage candidate in a SUBPROCESS (budget off) and return the strings
+    captured at ``site`` ("parent" or "candidate"). ~90 s (hence ``@slow``)."""
     import subprocess
     import sys
-    proc = subprocess.run([sys.executable, "-c", _SUBPROC, smiles],
+    proc = subprocess.run([sys.executable, "-c", _SUBPROC, site, smiles],
                           capture_output=True, text=True, timeout=300)
     for line in proc.stdout.splitlines():
-        if line.startswith("PARENT_NAMES_JSON:"):
-            return json.loads(line[len("PARENT_NAMES_JSON:"):])
+        if line.startswith("CAPTURED_JSON:"):
+            return json.loads(line[len("CAPTURED_JSON:"):])
     return []
 
 
@@ -78,8 +88,29 @@ def test_f2_ring_double_bond_uses_compound_locant():
     RED at HEAD before F2 (parent name `...tetracosa-1,11-diene...`, bare); GREEN after
     (`...tetracosa-1(24),11-diene...`)."""
     import re
-    names = _capture_parent_names(_SMILES[F2_WITNESS_CID])
+    names = _capture("parent", _SMILES[F2_WITNESS_CID])
     assert names, f"{F2_WITNESS_CID}: no polycyclic parent name was built"
     assert any(re.search(r"\d+\(\d+\)", n) for n in names), (
         f"{F2_WITNESS_CID}: expected a P-31.1.4.2(1) compound ring-ene locant N(M) in a "
         f"built parent name; got {names!r}")
+
+
+@pytest.mark.unit
+@pytest.mark.slow
+def test_f1_compound_substituent_prefix_is_enclosed():
+    """v41 F1 (P-16.3.3 / P-29.6.1): a COMPOUND substituent prefix on the whole-cage
+    candidate (e.g. the ylidene ``3-methoxy-3-oxopropan-2-ylidene``) is cited in
+    enclosing marks — ``20-(3-methoxy-3-oxopropan-2-ylidene)`` — not bare. The bare form
+    leaves OPSIN unable to assign the substituent's internal locants.
+
+    RED at HEAD before F1 (candidate carries `...-20-3-methoxy-3-oxopropan-2-ylidene-...`,
+    unbracketed); GREEN after (`...-20-(3-methoxy-3-oxopropan-2-ylidene)-...`)."""
+    import re
+    cands = _capture("candidate", _SMILES[F2_WITNESS_CID])
+    assert cands, f"{F2_WITNESS_CID}: no complex_ring candidate was built"
+    # A compound '-ylidene' prefix (it carries an internal locant) must be bracketed:
+    # look for '(' immediately before a compound propan-2-ylidene-style prefix.
+    assert any(re.search(r"\(\d*-?\w*methoxy\w*ylidene\)", c) or
+               re.search(r"-\(\S+ylidene\)", c) for c in cands), (
+        f"{F2_WITNESS_CID}: expected the compound ylidene prefix in enclosing marks "
+        f"(P-16.3.3); got {cands!r}")

@@ -3723,6 +3723,16 @@ def _assemble_substituent_prefix(
     sorted_names = sorted(grouped.keys(), key=alpha_sort_key)
 
     # Build prefix parts
+    # v41 macrocycle F1 (P-16.3.3 / P-29.6.1): a COMPOUND substituent prefix (one that
+    # carries an internal locant or is multi-token, e.g. the ylidene
+    # ``3-methoxy-3-oxopropan-2-ylidene``) is cited in enclosing marks —
+    # ``20-(3-methoxy-3-oxopropan-2-ylidene)`` — not bare; the bare form leaves OPSIN
+    # unable to assign the substituent's internal locants. ``enclose_if_compound`` is the
+    # shared primitive: it wraps iff compound/complex and leaves a SIMPLE prefix
+    # (``methyl``, ``oxo``) bare (byte-identical), and the multiplier stays OUTSIDE the
+    # marks (``bis(...)``) because it is emitted before the enclosed name. The alpha-sort
+    # + multiplier are computed on the RAW name above, unchanged.
+    from ..assembly.naming_utils import enclose_if_compound
     parts = []
     for name in sorted_names:
         locants = grouped[name]
@@ -3730,7 +3740,7 @@ def _assemble_substituent_prefix(
         multiplier = get_multiplier_prefix(count, name)
 
         locant_str = ','.join(str(loc) for loc in locants)
-        parts.append(f"{locant_str}-{multiplier}{name}")
+        parts.append(f"{locant_str}-{multiplier}{enclose_if_compound(name)}")
 
     return '-'.join(parts) + '-' if parts else ""
 
