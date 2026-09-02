@@ -334,14 +334,21 @@ def test_subpart2_finding_b_main_bridge_direction(
 
 
 @pytest.mark.unit
-@pytest.mark.xfail(strict=True, reason=(
-    "v41 M4#2 Fix A pending: these two need the branched-component / dependent-bridge "
-    "discovery fix (Finding A). Their PIN attachment positions exceed the main-bicycle "
-    "atom count -> a genuine dependent bridge. Until Fix A the engine DEGRADES (legacy "
-    "non-preferred name, or abstain) rather than emit these PINs -- never a wrong name "
-    "(0-wrong). Fix B (main-bridge direction) is already shipped."))
 @pytest.mark.parametrize(
     "bb_line,bb_desc,smiles,atoms,rings,mr,mb,bal", BB_SUBPART2_FINDING_A_CASES)
-def test_descriptor_equals_blue_book_pending_subpart2(
+def test_subpart2_finding_a_dependent_bridge(
         bb_line, bb_desc, smiles, atoms, rings, mr, mb, bal):
-    assert _our_descriptor(smiles) == bb_desc
+    """v41 M4#2 Fix A (P-23.1.8 / P-23.2.6.3): a branched secondary-bridge component
+    (≥3 assigned endpoints) is decomposed into an independent bridge + dependent
+    bridge(s) instead of collapsing to one 2-endpoint path that dropped an atom. The
+    dependent bridge lands on an interior atom of the independent bridge, and the
+    existing Step-6 resolver numbers it -- so the descriptor is legal and equals the
+    Blue Book PIN."""
+    mol, cage = _cage_of(smiles)
+    desc = VonBaeyerAnalyzer().analyze(mol, cage)
+    assert desc is not None and desc.legality is True, (
+        f"BlueBookV2.md:{bb_line}: expected legal PIN, got "
+        f"{getattr(desc, 'descriptor_string', None)!r} "
+        f"legality={getattr(desc, 'legality', None)}")
+    assert desc.descriptor_string == bb_desc, (
+        f"BlueBookV2.md:{bb_line}: {bb_desc!r} vs {desc.descriptor_string!r}")

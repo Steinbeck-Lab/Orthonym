@@ -1644,6 +1644,99 @@ class VonBaeyerAnalyzer:
     # VB-6: Secondary Bridges
     # ========================================================================
 
+    def _walk_to_covered(self, ep, comp, covered, adj):
+        """From assigned endpoint ``ep``, BFS through UNCOVERED component atoms to
+        the nearest already-covered atom (the junction where a dependent bridge lands
+        on an existing bridge, P-23.1.8). Returns ``(junction, chain)`` where ``chain``
+        is the uncovered component atoms on the path (excluding ``ep`` and the
+        junction), or ``(None, [])`` if no covered atom is reachable.
+
+        Deterministic: sorted neighbours, shortest path. v41 M4#2 Fix A.
+        """
+        # Direct length-0 dependent bond: ep is adjacent to a covered atom already.
+        direct = [nb for nb in sorted(adj.get(ep, [])) if nb in covered]
+        if direct and not any(nb in comp and nb not in covered
+                              for nb in adj.get(ep, [])):
+            return direct[0], []
+        q = deque()
+        visited = {ep}
+        for nb in sorted(adj.get(ep, [])):
+            if nb in comp and nb not in covered:
+                q.append((nb, [nb]))
+                visited.add(nb)
+        while q:
+            cur, path = q.popleft()
+            covered_nbrs = [nb for nb in sorted(adj.get(cur, [])) if nb in covered]
+            if covered_nbrs:
+                return covered_nbrs[0], path
+            for nb in sorted(adj.get(cur, [])):
+                if nb in comp and nb not in covered and nb not in visited:
+                    visited.add(nb)
+                    q.append((nb, path + [nb]))
+        return None, []
+
+    def _decompose_branched_component(self, mol, component, endpoints, assigned, adj):
+        """v41 M4#2 Fix A: decompose a BRANCHED secondary-bridge component (one that
+        attaches to ≥3 assigned endpoints, or whose 2-endpoint longest path leaves
+        component atoms uncovered) into an independent bridge plus dependent
+        bridge(s).
+
+        The independent (trunk) bridge is the longest path between two assigned
+        endpoints that covers the most component atoms. Each remaining assigned
+        endpoint then anchors a dependent bridge whose far end is an interior atom of
+        an already-placed bridge (P-23.1.8 "a secondary bridge that links at least one
+        bridgehead that is part of a secondary bridge"); the existing Step-6 resolver
+        in ``_order_and_number_secondary_bridges`` numbers these once the trunk's
+        atoms are numbered.
+
+        Returns a ``list[BridgeInfo]`` covering EVERY component atom (fail-closed:
+        returns ``None`` if it cannot, so the caller degrades rather than silently
+        dropping an atom -- the old bug this replaces). Deterministic: lowest-index
+        endpoint pair for the trunk, remaining endpoints in ascending order.
+
+        Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-23.1.8 / P-23.2.6.3.
+        """
+        comp = set(component)
+        eps = sorted(endpoints)
+        # Trunk (independent bridge): longest endpoint-to-endpoint path covering the
+        # most component atoms; tie-break by (ep_lo, ep_hi, path) for determinism.
+        best = None
+        for i in range(len(eps)):
+            for j in range(i + 1, len(eps)):
+                a, b = eps[i], eps[j]
+                path = find_longest_path(mol, a, b, comp | {a, b})
+                if not path or len(path) < 2:
+                    continue
+                interior = path[1:-1]
+                if not set(interior) <= comp:
+                    continue
+                key = (-len(interior), a, b, tuple(path))
+                if best is None or key < best[0]:
+                    best = (key, a, b, interior)
+        if best is None:
+            return None
+        _, ta, tb, trunk_interior = best
+        bridges = [BridgeInfo(atoms=list(trunk_interior),
+                              length=len(trunk_interior),
+                              start_bh=ta, end_bh=tb, is_secondary=True)]
+        covered = set(trunk_interior)
+        used_eps = {ta, tb}
+        # Dependent bridges: each remaining endpoint walks inward to a covered atom.
+        for ep in eps:
+            if ep in used_eps:
+                continue
+            junction, chain = self._walk_to_covered(ep, comp, covered, adj)
+            if junction is None:
+                return None
+            bridges.append(BridgeInfo(atoms=list(chain), length=len(chain),
+                                      start_bh=ep, end_bh=junction,
+                                      is_secondary=True))
+            covered |= set(chain)
+        # Completeness invariant (fail-closed): every component atom must be covered.
+        if not comp <= covered:
+            return None
+        return bridges
+
     def _find_secondary_bridges(
         self,
         mol,
@@ -1723,33 +1816,47 @@ class VonBaeyerAnalyzer:
                 if len(endpoints) >= 2:
                     # This component forms a bridge between endpoints
                     ep_list = sorted(endpoints)
-                    # For a simple bridge with 2 endpoints:
                     ep1, ep2 = ep_list[0], ep_list[1]
-
-                    # Find the path through this component between endpoints
                     component_plus_endpoints = component | {ep1, ep2}
                     path = find_longest_path(mol, ep1, ep2, component_plus_endpoints)
 
-                    if path and len(path) >= 2:
-                        bridge_atoms = path[1:-1]
-                        bridge = BridgeInfo(
-                            atoms=bridge_atoms,
-                            length=len(bridge_atoms),
-                            start_bh=ep1,
-                            end_bh=ep2,
-                            is_secondary=True,
-                        )
-                        secondary_bridges.append(bridge)
+                    # v41 M4#2 Fix A: a SIMPLE component has exactly 2 endpoints and a
+                    # path that covers every component atom -- keep that byte-identical.
+                    # A BRANCHED component (≥3 endpoints, or a 2-endpoint path that
+                    # leaves atoms uncovered) previously collapsed to this one path and
+                    # silently dropped the rest; decompose it into an independent bridge
+                    # + dependent bridge(s) instead (P-23.1.8).
+                    simple = (
+                        len(endpoints) == 2
+                        and ((path and set(path[1:-1]) == component)
+                             or (not path and not component)))
+                    if simple:
+                        if path and len(path) >= 2:
+                            bridge_atoms = path[1:-1]
+                            secondary_bridges.append(BridgeInfo(
+                                atoms=bridge_atoms, length=len(bridge_atoms),
+                                start_bh=ep1, end_bh=ep2, is_secondary=True))
+                        else:
+                            # Zero-length bridge (direct connection between endpoints)
+                            secondary_bridges.append(BridgeInfo(
+                                atoms=[], length=0, start_bh=ep1, end_bh=ep2,
+                                is_secondary=True))
                     else:
-                        # Zero-length bridge (direct connection between endpoints)
-                        bridge = BridgeInfo(
-                            atoms=[],
-                            length=0,
-                            start_bh=ep1,
-                            end_bh=ep2,
-                            is_secondary=True,
-                        )
-                        secondary_bridges.append(bridge)
+                        decomposed = self._decompose_branched_component(
+                            mol, component, endpoints, assigned, adj)
+                        if decomposed is not None:
+                            secondary_bridges.extend(decomposed)
+                        elif path and len(path) >= 2:
+                            # Fail-closed fallback: the old single-path bridge (may
+                            # fail the audit and degrade, never silently drops here
+                            # because the audit re-checks coverage).
+                            secondary_bridges.append(BridgeInfo(
+                                atoms=path[1:-1], length=len(path[1:-1]),
+                                start_bh=ep1, end_bh=ep2, is_secondary=True))
+                        else:
+                            secondary_bridges.append(BridgeInfo(
+                                atoms=[], length=0, start_bh=ep1, end_bh=ep2,
+                                is_secondary=True))
                 elif len(endpoints) == 1:
                     # This shouldn't happen in a proper polycyclic system,
                     # but handle it as a zero-length anomaly

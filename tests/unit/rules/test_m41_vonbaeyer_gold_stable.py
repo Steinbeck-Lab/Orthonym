@@ -96,34 +96,32 @@ _PIN_WINS = [
     ("C12CC34CCCC(CC(CCCC1)CCC2)(CC3)C4", "tetracyclo[7.4.3.2^3,7.1^3,7]nonadecane"),
 ]
 
-# v41 M4#2 Fix B (main-bridge numbering direction, BlueBookV2.md:9749 / 9753 / 9731):
-# re-deriving the main bridge for the orientation _select_pin_orientation chooses lets
-# these three emit their exact Blue Book PIN (they previously degraded to a legacy
-# non-preferred name because the main-bridge numbering ran backwards and the
-# reconstruction audit rejected the byte-correct descriptor). 9731's PIN carries a
-# dependent bridge (0^11,25) the existing Step-6 resolver numbers correctly.
-_PIN_WINS_M42_FIX_B = [
-    ("C12C3C4CCC(CC(CCC1)CCC2)(CC4)C3", "tetracyclo[6.3.3.2^3,6.1^2,6]heptadecane"),
-    ("C12C3C4CCC(CC(CCC1)CCC2)(C4)CC3", "tetracyclo[6.3.3.2^2,6.1^3,6]heptadecane"),
-    ("C12C3C4CCCC5CCCC(C(C6CCCC(CCC1)CC26)C3)C4C5",
+# v41 M4#2 makes all four subpart-#2 cases emit their exact Blue Book PIN.
+# Fix B (main-bridge numbering direction, BlueBookV2.md:9749 / 9753 / 9731): re-deriving
+# the main bridge for the orientation _select_pin_orientation chooses (they previously
+# degraded because the main-bridge numbering ran backwards and the reconstruction audit
+# rejected the byte-correct descriptor). 9731's PIN carries a dependent bridge (0^11,25).
+# Fix A (branched-component / dependent-bridge discovery, BlueBookV2.md:9739): a >=3-
+# endpoint secondary-bridge component is decomposed into an independent + dependent
+# bridge (1^13,28) instead of collapsing to one path that dropped an atom.
+_PIN_WINS_M42 = [
+    (9749, "C12C3C4CCC(CC(CCC1)CCC2)(CC4)C3", "tetracyclo[6.3.3.2^3,6.1^2,6]heptadecane"),
+    (9753, "C12C3C4CCC(CC(CCC1)CCC2)(C4)CC3", "tetracyclo[6.3.3.2^2,6.1^3,6]heptadecane"),
+    (9731, "C12C3C4CCCC5CCCC(C(C6CCCC(CCC1)CC26)C3)C4C5",
      "hexacyclo[15.3.2.2^3,7.1^2,12.0^13,21.0^11,25]pentacosane"),
+    (9739, "C12CC3CCCCC4CCCCC(CC(CCC5CC5CC1)CCCC2)CC(C4)C3",
+     "pentacyclo[13.7.4.3^3,8.0^18,20.1^13,28]triacontane"),
 ]
 
 
-@pytest.mark.parametrize("smiles,pin", _PIN_WINS + _PIN_WINS_M42_FIX_B)
+@pytest.mark.parametrize("smiles,pin", _PIN_WINS)
 def test_subpart1_pin_win(smiles, pin):
     assert name_compound(smiles) == pin
 
 
-# Only 9739 still degrades (needs Fix A -- the branched-component / dependent-bridge
-# discovery fix). It abstains cleanly -- never a wrong name (0-wrong) -- identical to
-# the HEAD output before M4#2.
-_DEGRADES = [
-    ("C12CC3CCCCC4CCCCC(CC(CCC5CC5CC1)CCCC2)CC(C4)C3",
-     "unknown organic compound"),
-]
-
-
-@pytest.mark.parametrize("smiles,expected", _DEGRADES)
-def test_subpart2_degrades_without_regression(smiles, expected):
-    assert name_compound(smiles) == expected
+@pytest.mark.parametrize("bb_line,smiles,pin", _PIN_WINS_M42)
+def test_subpart2_pin_win(bb_line, smiles, pin):
+    """v41 M4#2: all four subpart-#2 cases now emit their exact Blue Book PIN
+    (BlueBookV2.md:{bb_line}). 0-wrong preserved: each descriptor is validated by
+    the reconstruction audit before emission."""
+    assert name_compound(smiles) == pin
