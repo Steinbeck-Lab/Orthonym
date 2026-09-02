@@ -4846,18 +4846,20 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     if base_name in _HETERO_ANE_RINGS:
         return name[:-1] + "yl"  # replace -e with -yl
 
-    # ---- Heteroatom mononuclear-hydride family (P-21.2.2 / P-29.3.3) ----
-    # v41 macrocycle F3b: oxidane/sulfane/azane/... form their -yl by eliding ONLY
-    # the final 'e' (oxidane -> oxidanyl, dioxidane -> dioxidanyl, azane -> azanyl) --
-    # the systematic hydride STEM keeps the 'an' (cf. _ONIUM_PREFIX_STEM 'O':'oxidan').
-    # Only CARBON alkanes (methane -> methyl) elide the whole 'ane' below. Without this,
-    # a hydroperoxy substituent -OOH (parent 'dioxidane') became the OPSIN-unparseable
-    # 'dioxidyl' instead of 'dioxidanyl'. Multiplied forms (di/tri...) share the stem, so
-    # match on the stem suffix.
+    # ---- Heteroatom mononuclear-hydride family, method (2) (P-29.3.3) ----
+    # v41 macrocycle F3b: the chalcogen (O/S/Se/Te), pnictogen (N/P/As/Sb/Bi) and
+    # Group-13 (B/Al/Ga/In/Tl) mononuclear hydrides form their -yl by eliding ONLY the
+    # final 'e' (oxidane -> oxidanyl, dioxidane -> dioxidanyl, azane -> azanyl,
+    # borane -> boranyl) -- the systematic hydride STEM keeps the 'an'
+    # (cf. _ONIUM_PREFIX_STEM 'O':'oxidan'). Without this, a hydroperoxy substituent -OOH
+    # (parent 'dioxidane') became the OPSIN-unparseable 'dioxidyl' instead of 'dioxidanyl'.
+    # ⚠ Group 14 (Si/Ge/Sn/Pb) is EXCLUDED: P-29.3.1 keeps them on method (1) -- the
+    # retained silyl/germyl/stannyl/plumbyl (elide the whole 'ane'), NOT silanyl/stannanyl
+    # (FABLE 5.1: silane->silanyl et al. is a PIN regression). Multiplied forms share the
+    # stem, so match on the stem suffix.
     if name.endswith(('oxidane', 'sulfane', 'selane', 'tellane', 'azane',
-                      'phosphane', 'arsane', 'stibane', 'bismuthane', 'silane',
-                      'germane', 'stannane', 'plumbane', 'borane', 'alumane',
-                      'gallane', 'indigane', 'thallane')):
+                      'phosphane', 'arsane', 'stibane', 'bismuthane', 'borane',
+                      'alumane', 'gallane', 'indigane', 'thallane')):
         return name[:-1] + "yl"  # elide only 'e' -> '...oxidan' + 'yl' = '...oxidanyl'
 
     # ---- Alkane: -ane or -e ending ----

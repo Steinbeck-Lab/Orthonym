@@ -2923,24 +2923,40 @@ def get_polycyclic_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            # v41 macrocycle F3: a branch that carries a HETEROATOM beyond a plain
-            # C/H alkyl (an ester/acyloxy -O-C(=O)-, an acyl -C(=O)-, a hydroxymethyl
-            # -CH2OH), OR a 0-carbon heteroatom branch (a hydroperoxy -OOH), is named
-            # by the GENERAL CASCADE, which carries the _is_acyloxy guard and produces
-            # the correct token (acetyloxy / methoxycarbonyl / hydroperoxy...). The naive
-            # _ALKOXY_NAMES / get_alkyl_name paths below are a drifted second detector
-            # that mis-named these by carbon count alone (acetate -> 'ethoxy' dropping
-            # the carbonyl O; -OOH -> dropped entirely) -- a WRONG CONSTITUTION that
-            # SELF-01 then abstained on. Route them to the cascade instead. Pure
-            # hydrocarbyl branches (no non-C/H heteroatom) keep the existing fast path
-            # (byte-identical). Fail-open: a cascade None/refusal falls through to the
-            # legacy paths (which may still be lossy -> SELF-01 abstains, never wrong).
-            # Skip the exocyclic =C ylidene branch (handled above at :2894); this only
-            # sees SINGLE-bond branches here.
-            _branch_has_hetero = any(
-                mol.GetAtomWithIdx(i).GetAtomicNum() not in (1, 6)
-                for i in sub_atoms)
-            if _branch_has_hetero or carbon_count == 0:
+            # v41 macrocycle F3: an OXYGEN-attached ACYLOXY (-O-C(=O)-, an ester) or
+            # PEROXY (-O-O-, a hydroperoxy) branch is named by the GENERAL CASCADE, which
+            # produces the correct token (acetyloxy / hydroperoxy). The naive _ALKOXY_NAMES
+            # path below is a drifted detector that mis-named these by carbon count alone
+            # (acetate -O-C(=O)-CH3 -> 'ethoxy', dropping the carbonyl O; -OOH -> dropped) --
+            # a WRONG CONSTITUTION that SELF-01 then abstained on.
+            #
+            # SCOPE (FABLE 5.1): fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
+            # acyloxy/peroxy branches, so it can NEVER change a default/PIN-tier name.
+            #  - best-effort gate: at the PIN tier these cages correctly ABSTAIN (a
+            #    substituent-prefix form of an ester/hydroperoxy is not the PIN); F3 must
+            #    not emit a non-PIN prefix at the PIN tier ("non-PIN forms are best-effort
+            #    only"). A carbon-attached ester (-C(=O)OMe) is NOT diverted -- it keeps its
+            #    functional-class ester PIN ('methyl ...carboxylate'), which F3 must not
+            #    displace with '(methoxycarbonyl)'.
+            #  - O-attached acyloxy/peroxy only: simple alkoxy (-O-alkyl) and every
+            #    carbon-attached branch keep the existing paths (byte-identical).
+            # Fail-open: a cascade None/refusal falls through to the legacy paths.
+            from ..metrics.provenance import best_effort_ctx as _f3_be_ctx
+            _first = mol.GetAtomWithIdx(nbr_idx)
+            _f3_route = False
+            if bool(_f3_be_ctx.get()) and _first.GetSymbol() == 'O':
+                _sub_set = set(sub_atoms)
+                for _n in _first.GetNeighbors():
+                    if _n.GetIdx() not in _sub_set:
+                        continue
+                    if _n.GetSymbol() == 'O':           # peroxy -O-O-
+                        _f3_route = True
+                    elif _n.GetSymbol() == 'C' and any(
+                            b.GetBondTypeAsDouble() == 2.0
+                            and b.GetOtherAtom(_n).GetSymbol() in ('O', 'S', 'N')
+                            for b in _n.GetBonds()):     # acyloxy -O-C(=O)-
+                        _f3_route = True
+            if _f3_route:
                 from ..assembly.substituent_enumerator import name_substituent
                 _tok = None
                 try:
