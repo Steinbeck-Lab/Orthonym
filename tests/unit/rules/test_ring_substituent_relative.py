@@ -1,20 +1,17 @@
-"""v41 M2.3 — descriptor-override parameter on ``decorated_ring_substituent_name``.
+"""PIN byte-identity guard for ``decorated_ring_substituent_name``.
 
-Task 2 adds an OPTIONAL ``relative_override`` parameter that, when set to
-``'cis'`` / ``'trans'``, makes the ring-substituent renderer emit that
-OPSIN-parseable RELATIVE prefix (e.g. ``trans-4-methylcyclohexyl``) in place of
-the ring's OPSIN-ungrammatical PSEUDOASYMMETRIC ``(1r,4r)-`` CIP block. Task 3
-will call it from the T4 best-effort floor with both senses and let round-trip
-pick.
+The default path of this renderer is PIN-PATH-LIVE (``rules/amides.py`` /
+``rules/benzene.py`` / ``rules/heterocycles.py`` call it) and pins the gold row
+``[(1r,4r)-4-methylcyclohexyl]benzene`` (BB 48117 family, ``gold_pins.json``
+def_id ``W4-S2``): the ring's own pseudoasymmetric ``(1r,4r)-`` CIP block, keyed
+to the substituent's numbering, must be emitted byte-identically. If any change
+moves that block, the tests here fail BEFORE the change reaches the gate.
 
-The BLOCKER-2 guard here is load-bearing: the default (no-override) path is
-PIN-PATH-LIVE (``rules/amides.py`` / ``rules/benzene.py`` / ``rules/heterocycles.py``
-call it) and pins the gold row ``[(1r,4r)-4-methylcyclohexyl]benzene`` (BB
-48117 family, ``gold_pins.json`` def_id ``W4-S2``). If the override ever leaks
-into the default path, that gold row moves — this test fails BEFORE it reaches
-the gate.
+(This file formerly exercised a v41 M2.3 ``relative_override`` parameter; the
+cis/trans reclaim was implemented at ``assembly/universal_substituent.py``'s
+``_stereo_prefix`` instead, so the parameter was removed as dead code. The
+byte-identity guards below are kept — they are still load-bearing.)
 """
-import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
@@ -69,8 +66,7 @@ def _cyclohexyl_call_args(smiles: str):
 
 
 # --------------------------------------------------------------------------- #
-# Step 1 — BLOCKER-2 PIN-safety guard: the DEFAULT path is byte-identical.     #
-# MUST pass before AND after the parameter is added.                          #
+# BLOCKER-2 PIN-safety guard: the default renderer path is byte-identical.     #
 # --------------------------------------------------------------------------- #
 def test_default_pipeline_pin_row_byte_identical():
     """The full name_compound pipeline still emits the pinned gold PIN."""
@@ -78,35 +74,9 @@ def test_default_pipeline_pin_row_byte_identical():
 
 
 def test_default_decorated_ring_substituent_byte_identical():
-    """The renderer with NO override is byte-identical for a cyclohexyl."""
+    """The renderer is byte-identical for a pseudoasymmetric cyclohexyl."""
     mol, ring, att, exp = _cyclohexyl_call_args(GOLD_SMILES)
     assert (
         decorated_ring_substituent_name(mol, ring, att, expected_atoms=exp)
         == GOLD_SUBSTITUENT
     )
-
-
-def test_default_via_explicit_none_override():
-    """Passing relative_override=None explicitly is the default path."""
-    mol, ring, att, exp = _cyclohexyl_call_args(GOLD_SMILES)
-    assert (
-        decorated_ring_substituent_name(
-            mol, ring, att, expected_atoms=exp, relative_override=None
-        )
-        == GOLD_SUBSTITUENT
-    )
-
-
-# --------------------------------------------------------------------------- #
-# Step 2 — override path: emit the relative cis/trans WORD, suppress (1r,4r).  #
-# --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("sense", ["cis", "trans"])
-def test_relative_override_emits_word_and_suppresses_pseudoasym(sense):
-    mol, ring, att, exp = _cyclohexyl_call_args(GOLD_SMILES)
-    out = decorated_ring_substituent_name(
-        mol, ring, att, expected_atoms=exp, relative_override=sense
-    )
-    assert out == f"{sense}-4-methylcyclohexyl"
-    # the ring's OWN pseudoasymmetric CIP block must be gone
-    assert "1r,4r" not in out
-    assert "(" not in out  # no ring CIP parenthesis at all

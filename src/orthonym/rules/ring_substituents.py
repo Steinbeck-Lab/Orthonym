@@ -3811,29 +3811,11 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
 
 
 def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
-                                    expected_atoms: Optional[Set[int]] = None,
-                                    relative_override: Optional[str] = None
+                                    expected_atoms: Optional[Set[int]] = None
                                     ) -> Optional[str]:
     """PIN substituent name for a MONOCYCLIC ring substituent carrying its own
     substituent prefixes: ``2-nitrothiophen-3-yl``, ``2-oxocyclohexyl``,
     ``3-chloro-2-methylphenyl``.
-
-    ``relative_override`` (v41 M2.3, best-effort tier only) selects the STEREO
-    layer emitted for the ring:
-
-      * ``None`` (default) — **byte-identical current behaviour**: the ring's own
-        pseudoasymmetric ``(1r,4r)-`` / relative CIP block, computed from the ring
-        atoms' ``_CIPCode`` labels. This is the PIN path; nothing on it changes.
-      * ``'cis'`` / ``'trans'`` — emit that OPSIN-parseable RELATIVE prefix as a
-        leading word (``trans-4-methylcyclohexyl``) and SUPPRESS the ring's
-        pseudoasymmetric block entirely. The word is UNLOCANTED (P-31.1.4). Only
-        the RING's own descriptor is replaced — absolute/branch descriptors on
-        the substituent's side chains live in ``prefix_str`` and are unchanged.
-
-    The override never fires on the default path (``relative_override is None``),
-    so every PIN-path caller (``rules/amides.py`` / ``rules/benzene.py`` /
-    ``rules/heterocycles.py``) is provably unaffected. Task 3 calls it from the
-    T4 floor with both senses and lets round-trip pick the correct one.
 
     When ``expected_atoms`` is given, the name is returned only if the ring
     plus the detected decoration atoms account for EXACTLY that set — callers
@@ -3862,10 +3844,6 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         their existing forms — this function only DECORATES);
       * the stem is not confidently known.
     """
-    if relative_override is not None and relative_override not in ('cis', 'trans'):
-        raise ValueError(
-            "relative_override must be None, 'cis', or 'trans', "
-            f"got {relative_override!r}")
     ring_list = list(ring_atoms)
     n = len(ring_list)
     ring_set = set(ring_list)
@@ -4133,17 +4111,8 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     # OPSIN's generation grammar rejects the r/s cyclohexane layer, but the
     # constitutional form parses, so the DEF-9 stereo carve-out in the validity
     # gate (namer.py) ships the full PIN — cf. `(1s,4s)-cyclohexane-1,4-diol`.
-    #
-    # v41 M2.3 (best-effort tier): when a RELATIVE cis/trans override is
-    # requested, emit that OPSIN-parseable word in place of the ring's
-    # OPSIN-ungrammatical pseudoasymmetric block. Unlocanted per P-31.1.4
-    # ('cis'/'trans' as a stereo descriptor prefix takes no locant on a
-    # 1,n-disubstituted monocycle). This branch is unreachable on the default
-    # PIN path (relative_override is None there), so the gold set is byte-identical.
     _stereo_prefix = ''
-    if relative_override is not None:
-        _stereo_prefix = f'{relative_override}-'
-    elif any(mol.GetAtomWithIdx(i).HasProp('_CIPCode') for i in ring_list):
+    if any(mol.GetAtomWithIdx(i).HasProp('_CIPCode') for i in ring_list):
         from .stereochemistry import (
             collect_stereodescriptors as _collect_sd,
             format_stereodescriptor_string as _fmt_sd,
