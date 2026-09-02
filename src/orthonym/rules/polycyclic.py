@@ -2930,7 +2930,7 @@ def get_polycyclic_substituents(
             # (acetate -O-C(=O)-CH3 -> 'ethoxy', dropping the carbonyl O; -OOH -> dropped) --
             # a WRONG CONSTITUTION that SELF-01 then abstained on.
             #
-            # SCOPE (FABLE 5.1): fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
+            # SCOPE (): fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
             # acyloxy/peroxy branches, so it can NEVER change a default/PIN-tier name.
             #  - best-effort gate: at the PIN tier these cages correctly ABSTAIN (a
             #    substituent-prefix form of an ester/hydroperoxy is not the PIN); F3 must
@@ -3634,7 +3634,7 @@ def name_polycyclic_complete(mol, features=None):
     # ``hi == lo + 1``), which is every ring ene in the PIN gold corpus.
     from .ring_unsaturation import render_ring_unsaturation
     # Restrict to ring_atoms exactly as get_polycyclic_unsaturation did (both endpoints
-    # in the ring system), NOT render's numbering-only domain (Fable RISK: numbering may
+    # in the ring system), NOT render's numbering-only domain (numbering may
     # carry non-ring VB-framework atoms). Do NOT kekulize a fresh mol -- both renderers
     # skip AROMATIC bonds, so pass the same mol; kekulizing would fabricate ring enes.
     _ring_numbering = {a: loc for a, loc in desc.numbering.items() if a in ring_atoms}

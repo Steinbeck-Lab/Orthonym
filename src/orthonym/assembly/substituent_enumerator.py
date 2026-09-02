@@ -1012,8 +1012,7 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
                           best_effort_val):
     """Complete cache key for :func:`name_substituent` (v41 M1 Lever C1).
 
-    Every component is a proven wrong-name mechanism if omitted
-    (``.planning/audit-v40/PERF-OPTIMIZATION-PLAN.md`` Part 1 Lever C):
+    Every component is a proven wrong-name mechanism if omitted:
 
     1. rooted canonical isomeric fragment SMILES -- structure, stereo parities,
        charges, isotopes AND attachment position (``pentyl`` vs ``pentan-2-yl``);
@@ -1186,7 +1185,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                     and _root.GetTotalNumHs() == 0
                     and not _root.IsInRing()):  # a ring O spanning the parent would
                     # cut the ring if named as an acyclic alkoxy -> a DIFFERENT
-                    # molecule; exclude by construction (fable finding 5 -- no
+                    # molecule; exclude by construction ( finding 5 -- no
                     # reachable case found, but this makes the intercept airtight
                     # rather than relying on the recovery-lane RT to catch it).
                 _o_nbrs = list(_root.GetNeighbors())
@@ -1411,7 +1410,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
         # a different (stereo-dropped) molecule. Legacy alkenyl tiers emit an
         # `Xethenyl` form without the descriptor (e.g. -CH=CH-OMe -> `methoxyethenyl`);
         # the OPSIN validity gate's stereo carve-out then SHIPS it as a wrong molecule
-        # (invariant 9 -- fable-b2 BLOCKER 1). Decline so the caller fails closed. The
+        # (invariant 9 -- -b2 BLOCKER 1). Decline so the caller fails closed. The
         # descriptor block is `(1E)`/`(E)`/`(1E,2R)`; a legitimate stereogenic-C=C name
         # always carries it, so this can only turn a wrong output into an abstention.
         if token and token != "substituent":
@@ -1504,7 +1503,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     # ``ORTHONYM_MEMO=verify``. Key construction is fail-open: any error, or an
     # unavailable canonical output-order prop, skips the cache and recomputes (a
     # miss can never corrupt). Scope + modes live in ``assembly/memo.py``; plan in
-    # ``.planning/audit-v40/PERF-OPTIMIZATION-PLAN.md`` Step 1.
+    #  Step 1.
     try:
         _memo_key = _substituent_memo_key(
             mol, frag_atoms, attach_idx, allow_mancude, _best_effort_val)
@@ -4937,7 +4936,7 @@ def _name_amino_ring_branch(mol, frag_set, root_idx, parent_set):
         # substituent — it is hydrazine (-N-N-), hydroxylamine (-N-O-), nitroso
         # (-N=O) etc., a different retained nomenclature class. name_substituent
         # names such a branch with an OPSIN-lenient but INVALID replacement string
-        # ('2-oxa-1-azaeth-1-en-1-yl' for -N=O; fable RISK 5) that the per-branch
+        # ('2-oxa-1-azaeth-1-en-1-yl' for -N=O;  RISK 5) that the per-branch
         # re-anchor accepts (constitution-correct). Require each R to be
         # carbon-rooted so those classes fall through to their own producers.
         if battach.GetSymbol() != 'C':
@@ -5167,7 +5166,7 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
             # The carbonyl's own =O must be excluded, or the predicate reads it
             # as a hetero decoration and refuses every acyl.
             #
-            # Coverage guard (fable review of 9bb3a532): the count fallback below
+            # Coverage guard ( review of 9bb3a532): the count fallback below
             # spells ONLY this one acyl branch as `{stem}anoylamino`, so if the N
             # carries a SECOND substituent (`-N(CH3)C(=O)R`, or the diacyl imide
             # `-N(C(=O)R)2`) that substituent is silently DROPPED -> a different

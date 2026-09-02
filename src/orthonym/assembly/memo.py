@@ -5,7 +5,7 @@ call. The engine re-names the same substituent fragments many times inside one
 molecule -- the dispatch cascade, the ``_retry_cascade_on_gate_rejection``
 re-entries and the recursive Tier-4 cascade all re-derive the same fragment
 prefixes -- so a per-call cache removes that redundant work without changing any
-emitted name. See ``.planning/audit-v40/PERF-OPTIMIZATION-PLAN.md`` Part 2.
+emitted name.
 
 Design invariants (each is load-bearing for the 0-wrong / byte-identity contract):
 

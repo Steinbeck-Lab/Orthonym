@@ -686,7 +686,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
         # name_pipeline_only has no `style` parameter, so it can only honour the
         # default 'pin' request; for a 'systematic' request skip it (returning a
         # pin fallback would answer the wrong question) and fall through to the
-        # abstention below. Cache under the style-aware key. (Fable review NIT 9.)
+        # abstention below. Cache under the style-aware key.
         fallback_name = (name_pipeline_only(canonical) if style == 'pin'
                          else None)
         if fallback_name is not None and not is_refusal_sentinel(fallback_name):

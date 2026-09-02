@@ -1265,13 +1265,13 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         pass
     # D-13 fail-OPEN: probe the JAR FIRST.
     if not _validity_gate_jar_present():
-        # task-JAR-ABSENT (FABLE 0-wrong hole): a GENUINELY absent jar means no
+        # task-JAR-ABSENT ( 0-wrong hole): a GENUINELY absent jar means no
         # constitutional verification is possible for this name -- no OPSIN, and
         # the Wave-0 reconstructor needs a NameFacts extractor that does not yet
         # exist for an arbitrary emitted name (verify_or_none(name_facts=None) is
         # provably None on every jar-absent call). At BEST-EFFORT tier
         # (general_fallback_unverified) that unverified branch is exactly the
-        # class FABLE showed ships WRONG-molecule names in a no-Java deployment
+        # class  showed ships WRONG-molecule names in a no-Java deployment
         # (COS(=O)(=O)O -> methane; ClP(Cl)(=O)OC1=CC=CC=C1 ->
         # (phosphonooxy)benzene, Cl2 silently swapped for (OH)2). 0-wrong is
         # ABSOLUTE, so fail CLOSED to the honest fallback rather than ship it.
@@ -1367,7 +1367,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # RT-verified tiers a correct-but-OPSIN-unparseable name is an honest abstain,
     # never a stereo-stripped or unparseable emission (accuracy #1: a name that
     # does not round-trip is not a shippable name). Closes the precision leak that
-    # let 5/1435 OPSIN-unparseable names ship at best-effort (FABLE + the 1500-mol
+    # let 5/1435 OPSIN-unparseable names ship at best-effort ( + the 1500-mol
     # head-to-head). PIN path untouched.
     if general_fallback_tier:
         from .metrics.abstention import AbstentionCode, record_suppression
@@ -4141,10 +4141,10 @@ class Orthonym:
             # v25 G3: explicit verification ladder. verified = OPSIN parsed
             # the name AND it round-trips to the input structure. A parsed-
             # but-MISMATCHED name is NEVER shipped, at any tier. task-JAR-ABSENT
-            # (FABLE 0-wrong hole): the no-jar best-effort branch below no
+            # ( 0-wrong hole): the no-jar best-effort branch below no
             # longer ships unverified -- the old claim that "no-jar transience
             # ships ONLY behind the T4 opt-in ... a genuine environment gap,
-            # not a proof gap" mischaracterized the hole (FABLE's witnesses were
+            # not a proof gap" mischaracterized the hole ('s witnesses were
             # demonstrably WRONG-molecule, not merely-unprovable-but-correct),
             # so the branch now routes through `verify_or_none` and abstains.
             # v33 no-abstain Phase A: when the jar IS present but OPSIN
@@ -4156,12 +4156,12 @@ class Orthonym:
             elif not _validity_gate_jar_present():
                 if not self._general_fallback_unverified:
                     return None
-                # v33 no-abstain / task-JAR-ABSENT (FABLE 0-wrong hole): a
+                # v33 no-abstain / task-JAR-ABSENT ( 0-wrong hole): a
                 # jar-absent best-effort emission must NOT ship `cand`
                 # unverified. Before this fix control fell straight through
                 # this whole if/elif/else to the emit at the bottom with
                 # opsin_status="unverified" and ZERO verification of any kind
-                # -- FABLE measured 7/7 WRONG-molecule ships in a no-Java
+                # --  measured 7/7 WRONG-molecule ships in a no-Java
                 # deployment (`COS(=O)(=O)O`->`methane`;
                 # `ClP(Cl)(=O)OC1=CC=CC=C1`->`(phosphonooxy)benzene` with Cl2
                 # silently swapped for (OH)2, a wrong constitution). Route
@@ -5686,7 +5686,7 @@ class Orthonym:
                         # name flagged stereo_unexpressed.
                         #
                         # v33 no-abstain Phase A fix-round-1, Finding 4 (HIGH,
-                        # FABLE adversarial review): the OLD comment here claimed
+                        #  adversarial review): the OLD comment here claimed
                         # the downstream `_final_opsin_validity_gate` "verifies at
                         # the granularity [a flagged emission] asserts" -- WRONG.
                         # That gate is CONSTITUTIONAL ONLY (InChIKey skeleton +
@@ -5704,7 +5704,7 @@ class Orthonym:
                         # check at all. Route a FLAGGED emission through the
                         # SAME `_rt_match` superset gate the late-recovery site
                         # (`_try_general_engine_recovery`) already uses for this
-                        # exact purpose -- proven (FABLE's Q1,
+                        # exact purpose -- proven ('s Q1,
                         # , 13/14 probed
                         # cases) to ACCEPT a genuine omission while REJECTING a
                         # conflict/fabrication/wrong-enantiomer. An unflagged
@@ -5714,7 +5714,7 @@ class Orthonym:
                         # jar-PRESENT-only; the jar-ABSENT best-effort case no
                         # longer fail-opens -- see the task-JAR-ABSENT
                         # verify_or_none gate just before the emit below, which
-                        # closed the FABLE 0-wrong hole here.)
+                        # closed the  0-wrong hole here.)
                         _permitted, _stereo_flagged = self._stereo_emit_decision(
                             mol, _eng.name)
                         if (_permitted and _stereo_flagged
@@ -5726,7 +5726,7 @@ class Orthonym:
                                     or not self._rt_match(
                                         smiles, _g1_opsin_smi, True)):
                                 _permitted = False
-                        # task-JAR-ABSENT (FABLE 0-wrong hole, inline-G1
+                        # task-JAR-ABSENT ( 0-wrong hole, inline-G1
                         # sibling of the late-recovery ladder site above):
                         # `_no_jar_abstain` only fires for the COMPLETE tier
                         # (`allow_aromatic_general and not
@@ -7281,7 +7281,7 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
     # the ambient tier contextvars (1 same-key-different-result observed), so those
     # four vars are IN the key. push_scope creates a scope iff none is open (a
     # standalone call), else shares the outer name() scope. Fail-open + verify-mode
-    # checked; plan .planning/audit-v40/PERF-OPTIMIZATION-PLAN.md Step 2.
+    # checked; plan  Step 2.
     from .assembly.memo import push_scope, pop_scope, cache_or_compute
     from .metrics.provenance import (
         general_fallback_ctx, best_effort_ctx,

@@ -2635,7 +2635,7 @@ def _unsaturated_substituent_name(
         R/S once this name leads with a ``(...)`` block, so a merged R/S+E/Z case
         can't be expressed and must fail closed. When no C=C geometry is defined
         (no descriptor emitted) the R/S is left for ``_stereo_route`` to add, so it
-        is ALLOWED (fable-b2 RISK 3: e.g. ``(S)-3-hydroxybut-1-en-1-yl``);
+        is ALLOWED (e.g. ``(S)-3-hydroxybut-1-en-1-yl``);
       * a stereo bond that is not a backbone C=C (off-chain geometry);
       * a stereogenic C=C whose CIP code is neither E nor Z.
     Constitution is correct by construction (the prefixes were enumerated from the
@@ -2689,7 +2689,7 @@ def _unsaturated_substituent_name(
     # an E/Z block. So fail closed when EITHER we emit an E/Z descriptor and any R/S
     # exists (double-apply guard would drop the R/S), OR there are >=2 R/S centres
     # (`_add_substituent_stereo`'s multi-centre branch returns the name UNCHANGED,
-    # dropping ALL R/S -> a stereo-dropped WRONG molecule; fable-polyene BLOCKER 2,
+    # dropping ALL R/S -> a stereo-dropped WRONG molecule; -polyene BLOCKER 2,
     # invariant 9). A single centre with no descriptor is left for `_stereo_route`
     # to locate (RT-verified, e.g. `(S)-...`).
     n_chiral = sum(
@@ -3760,7 +3760,7 @@ def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
     if ({n_idx} | acyl_sub | rp_sub) != sub_set:
         return None
 
-    # Isotope hole (fable review of the first F-amido cut): `linear_acyl_amido_prefix`
+    # Isotope hole ( review of the first F-amido cut): `linear_acyl_amido_prefix`
     # checks charge/radical on chain carbons but NOT isotope, and this producer must be
     # honest without the gate (the 8afa533c lesson). An amido stem drops any label, so a
     # labelled fragment would name a wrong isotopologue -- fail closed.
@@ -3771,7 +3771,7 @@ def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
     # double-bonded to a chalcogen (=O/=S/=Se/=Te). `-N(C=O)(C=S)` is a mixed imide,
     # not P-66.1.1.4.3 method (1); `name_substituent` would spell the thioacyl as
     # replacement-nomenclature junk (`1-methyl-2-thiaeth-1-en-1-yl`, non-PIN, gate-blind
-    # because it round-trips). Mirror the 2-acyl imide refusal (fable review).
+    # because it round-trips). Mirror the 2-acyl imide refusal ( review).
     rp_atom = mol.GetAtomWithIdx(r_prime)
     if rp_atom.GetAtomicNum() == 6 and any(
         nb.GetAtomicNum() in (8, 16, 34, 52)
@@ -3794,7 +3794,7 @@ def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
     # (a) regressed a valid RT-exact emission to an abstention (unparseable
     # `N-2,2-dimethylpropylacetamido` -> SELF-01 suppressed -> the general fallback never
     # ran) and (b) shipped an OPSIN-unparseable stereo name via the stereo carve-out
-    # (fable review). `_name_n_substituent` wants the attach atom first in the list.
+    # ( review). `_name_n_substituent` wants the attach atom first in the list.
     from ..rules.amides import _name_n_substituent, format_n_substitution
     rp_list = [r_prime] + [i for i in rp_sub if i != r_prime]
     carbon_count = sum(
@@ -3816,7 +3816,7 @@ def n_substituted_acyl_amido_prefix(mol, n_idx: int, sub_atoms,
     # honest on its own). `name_substituent` can MIS-NAME R': e.g. `-CH2-S-CH3` ->
     # `methylsulfanyl` (a pre-existing fragment-namer defect that drops the CH2; the O
     # analog `-CH2-O-CH3` -> `methoxymethyl` is correct), so the composed prefix would
-    # denote a DIFFERENT molecule (fable re-review BLOCKER: gate-on it regressed 2
+    # denote a DIFFERENT molecule ( re-review BLOCKER: gate-on it regressed 2
     # HEAD-RT-exact rows to abstention, gate-off it shipped the wrong molecule). Re-anchor:
     # build the corresponding AMIDE (this prefix's parent characteristic group,
     # `...amido`->`...amide`), OPSIN-parse it, and require the SAME InChIKey as the
@@ -3887,7 +3887,7 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
     n_atom = mol.GetAtomWithIdx(n_idx)
     # This is a SHARED primitive: one caller (`_name_compound_substituent`) guards
     # only `GetSymbol()=='N'`, so the helper must self-guard every way a fragment
-    # can be a non-`-NH-` attachment (fable review of b5e4d3da). A monovalent
+    # can be a non-`-NH-` attachment ( review of b5e4d3da). A monovalent
     # `-NH-SO2R` prefix requires: uncharged/unradical/unlabelled N, NOT a ring
     # member, ALL single bonds (an `=N-SO2R` sulfonimidoyl is a different bond
     # order / H count), and EXACTLY one bond into the parent (a bridging
@@ -4855,7 +4855,7 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # (parent 'dioxidane') became the OPSIN-unparseable 'dioxidyl' instead of 'dioxidanyl'.
     # ⚠ Group 14 (Si/Ge/Sn/Pb) is EXCLUDED: P-29.3.1 keeps them on method (1) -- the
     # retained silyl/germyl/stannyl/plumbyl (elide the whole 'ane'), NOT silanyl/stannanyl
-    # (FABLE 5.1: silane->silanyl et al. is a PIN regression). Multiplied forms share the
+    # (: silane->silanyl et al. is a PIN regression). Multiplied forms share the
     # stem, so match on the stem suffix.
     if name.endswith(('oxidane', 'sulfane', 'selane', 'tellane', 'azane',
                       'phosphane', 'arsane', 'stibane', 'bismuthane', 'borane',

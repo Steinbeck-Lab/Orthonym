@@ -631,7 +631,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         # When the two stereocentres sit in DIFFERENT rings of a fused/spiro spine,
         # a leading cis-/trans- denotes ring-FUSION stereo, not the substituent
         # relation, so it must not be offered there -- guard on same-ring
-        # membership (FABLE review #6). The offer full-InChIKey gate would still
+        # membership ( review #6). The offer full-InChIKey gate would still
         # veto a wrong sense, but a coincidental match could ship an ill-defined
         # name; this keeps the descriptor semantically correct by construction.
         same_ring = (len(ring_stereo_centres) == 2
