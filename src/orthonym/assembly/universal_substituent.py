@@ -145,6 +145,7 @@ ships a name; the caller (a later wiring task) is responsible for gating.
 """
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from typing import Dict, FrozenSet, List, Optional, Tuple
 
@@ -559,9 +560,10 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     the ORIGINAL input's FULL InChIKey (constitution AND stereo AND charge) via
     ``validation.reconstruct.verify_or_none``. A wrong/uncertain descriptor
     fails that gate and the cascade falls through -- it can only ever IMPROVE a
-    name (block-1 -> full), never make one wrong. Up to FOUR OPSIN verifies (full,
-    ring cis-, ring trans-, top-only — the user-chosen cascade cost); ``plain``
-    needs none.
+    name (block-1 -> full), never make one wrong. Up to EIGHT OPSIN verifies
+    (full; rung-1b top-ring cis-/trans-; rung-1c substituent-ring cis/trans, the
+    sense cartesian product of <=2 relative rings, so <=4; top-only), returning on
+    the FIRST match; ``plain`` needs none.
     """
     from ..validation.reconstruct import verify_or_none
 
@@ -640,6 +642,49 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
                 rel_name = rel + comp_full.name
                 if rel_name not in candidates:
                     candidates.append(rel_name)
+    # rung 1c (v41 M2.3): RING relative-stereo for a ring the spine carries as a
+    # SUBSTITUENT (not the top spine, which rung 1b owns). The floor renders a
+    # ring substituent's stereo through ``_stereo_prefix`` (line ~1081), which
+    # emits the ring's ABSOLUTE pseudoasymmetric block (``(1s,3R)-``) INSIDE the
+    # substituent bracket -- OPSIN cannot parse that on a saturated ring, so the
+    # whole ``comp_full`` candidate fails RT and the molecule abstains even though
+    # its stereo IS expressible as the relative ``cis``/``trans`` (P-31.1.4).
+    #
+    # Mirror rung 1b's mechanism, one level down: for each qualifying substituent
+    # ring (saturated 3-6-ring, EXACTLY 2 same-ring stereocentres, >=1
+    # pseudoasymmetric lowercase ``_CIPCode`` -- the lowercase gate is REQUIRED,
+    # it keeps a genuine absolute pair like a ``(3S,4S)`` pyrrolidine on its
+    # absolute descriptor, which cis/trans cannot express), re-render the whole
+    # component with that ring's descriptor OVERRIDDEN to ``cis-``/``trans-`` and
+    # offer BOTH senses. The full-InChIKey gate below keeps whichever round-trips,
+    # so offering both is 0-wrong by construction (a wrong sense fails the gate).
+    # The override is scoped per-ring (a dict keyed by the ring's atom set), so an
+    # independent absolute centre elsewhere in the name is untouched. Capped at 2
+    # relative rings to bound the sense cartesian product (k=1 -> 2 candidates,
+    # k=2 -> 4); 3+ ring stereocentres in one ring -> P-93.5.1.3 r/c/t, skipped by
+    # the exactly-2 requirement.
+    if comp_full is not None:
+        top_spine_atoms = frozenset(comp.spine_atom_to_locant or ())
+        relative_rings = _detect_relative_substituent_rings(ctx.mol, top_spine_atoms)
+        if 1 <= len(relative_rings) <= 2:
+            for senses in itertools.product(("cis", "trans"),
+                                            repeat=len(relative_rings)):
+                override = dict(zip(relative_rings, senses))
+                saved_budget_rel = ctx.budget
+                try:
+                    ctx.budget = _Budget(atom_work_budget)
+                    comp_rel = _name_component(
+                        ctx, heavy, attach_hint=None, is_top=True,
+                        emit_branch_stereo=True, relative_ring_override=override)
+                except Exception:
+                    comp_rel = None
+                finally:
+                    ctx.budget = saved_budget_rel
+                if comp_rel is not None:
+                    rel_full = ((top_block + comp_rel.name) if top_block
+                                else comp_rel.name)
+                    if rel_full != plain and rel_full not in candidates:
+                        candidates.append(rel_full)
     # rung 2: top-spine-only stereo (the previous WS-STEREO candidate)
     if top_block:
         top_name = top_block + plain
@@ -655,6 +700,62 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         if verified is not None:
             return verified
     return plain
+
+
+def _detect_relative_substituent_rings(
+    mol, top_spine_atoms: FrozenSet[int],
+) -> List[FrozenSet[int]]:
+    """Rings the spine carries as a SUBSTITUENT that bear a relative (P-31.1.4
+    cis/trans) 2-centre stereo relation the floor cannot spell absolutely.
+
+    A qualifying ring (see rung 1c in ``_resolve_floor_stereo``) is:
+      * NOT part of the top spine (which rung 1b owns) -- disjoint from
+        ``top_spine_atoms``;
+      * saturated (no aromatic atom, every ring bond single) and of size 3-6
+        (the small-ring cis/trans domain);
+      * carrying EXACTLY 2 ring stereocentres (``_CIPCode`` set), and those two
+        in the SAME ring (``AreAtomsInSameRing``) -- cis/trans is the relation of
+        a PAIR; 3+ needs the r/c/t reference system (P-93.5.1.3), out of scope;
+      * with >=1 pseudoasymmetric centre (a lowercase ``_CIPCode``) -- the signal
+        that the absolute block is an OPSIN-unparseable ``(1s,3R)``-style
+        descriptor. A ring whose 2 centres are BOTH uppercase is a genuine
+        absolute pair (e.g. a ``(3S,4S)`` pyrrolidine); its absolute descriptor
+        DOES round-trip and cis/trans would MIS-describe it, so it is excluded.
+
+    Returns the qualifying rings as ``frozenset(atom_ids)``, deterministically
+    ordered. ``mol`` must already carry ``_CIPCode`` (set in ``_build_ctx`` via
+    ``assign_stereochemistry``). Order only sequences the sense enumeration; the
+    round-trip gate selects the shipped name, never this order.
+    """
+    ri = mol.GetRingInfo()
+    out: List[FrozenSet[int]] = []
+    for ring in ri.AtomRings():
+        n = len(ring)
+        if not (3 <= n <= 6):
+            continue
+        ring_set = frozenset(ring)
+        if ring_set & top_spine_atoms:
+            continue  # top spine (or fused to it): rung 1b's scope, not this
+        if any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring):
+            continue
+        if not all(
+            mol.GetBondBetweenAtoms(ring[i], ring[(i + 1) % n]).GetBondTypeAsDouble()
+            == 1.0
+            for i in range(n)
+        ):
+            continue  # not saturated: cis/trans on a ring double bond is E/Z
+        centres = [a for a in ring if mol.GetAtomWithIdx(a).HasProp("_CIPCode")]
+        if len(centres) != 2:
+            continue
+        if not ri.AreAtomsInSameRing(centres[0], centres[1]):
+            continue
+        if not any(
+            mol.GetAtomWithIdx(a).GetProp("_CIPCode").islower() for a in centres
+        ):
+            continue  # both absolute: keep the absolute descriptor (rung 1)
+        out.append(ring_set)
+    out.sort(key=lambda s: sorted(s))
+    return out
 
 
 def _neutralize_semipolar_chalcogenides(mol):
@@ -925,6 +1026,7 @@ def _name_universal_substituent_prefix_unsafe(
 def _name_component(
     ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[int], is_top: bool,
     emit_branch_stereo: bool = False,
+    relative_ring_override: Optional[Dict[FrozenSet[int], str]] = None,
 ) -> Optional[_ComponentResult]:
     """Name one component -- the whole molecule (``is_top``) or one branch.
 
@@ -942,6 +1044,16 @@ def _name_component(
     candidate that is then FULL-InChIKey verified (see
     ``_resolve_floor_stereo``). The flag is threaded unchanged into the
     recursive call so it reaches every depth.
+
+    v41 M2.3 -- ``relative_ring_override``: an optional ``{frozenset(ring_atoms)
+    -> 'cis'|'trans'}`` map (only meaningful with ``emit_branch_stereo=True``).
+    When a branch rendered as a substituent IS one of those rings (its spine's
+    atom set equals a key), its branch-stereo prefix is the relative
+    ``cis-``/``trans-`` word instead of ``_stereo_prefix``'s absolute
+    pseudoasymmetric block -- expressing the P-31.1.4 relation OPSIN can parse.
+    Scoped per-ring, so an independent absolute centre elsewhere is unaffected.
+    Threaded unchanged into the recursion so it reaches a ring at any depth.
+    ``None`` (the default) -> byte-identical prior behaviour.
     """
     ctx.budget.charge(len(component))
     if not component:
@@ -1066,7 +1178,8 @@ def _name_component(
         mol, spine_atoms, component,
     ):
         sub = _name_component(ctx, branch_atoms, attach_hint=root, is_top=False,
-                              emit_branch_stereo=emit_branch_stereo)
+                              emit_branch_stereo=emit_branch_stereo,
+                              relative_ring_override=relative_ring_override)
         if sub is None:
             return None  # never ship a partial name: whole call voids
         rendered = _render_as_substituent(sub, order)
@@ -1078,7 +1191,16 @@ def _name_component(
         # and ``format_substituent_prefix`` supplies the enclosing marks the
         # now-complex prefix needs (``4-[(3R)-3-hydroxy...yl]``).
         if emit_branch_stereo and sub.spine_atom_to_locant:
-            branch_stereo = _stereo_prefix(ctx.mol, sub.spine_atom_to_locant)
+            # v41 M2.3: if THIS branch is an override ring (its spine's atom set
+            # is a key), spell the relative ``cis-``/``trans-`` word in place of
+            # the absolute pseudoasymmetric block ``_stereo_prefix`` would emit.
+            rel = None
+            if relative_ring_override:
+                rel = relative_ring_override.get(frozenset(sub.spine_atom_to_locant))
+            if rel is not None:
+                branch_stereo = f"{rel}-"
+            else:
+                branch_stereo = _stereo_prefix(ctx.mol, sub.spine_atom_to_locant)
             if branch_stereo:
                 rendered = branch_stereo + rendered
         loc = spine_atom_to_locant[s_atom]
