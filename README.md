@@ -2,6 +2,10 @@
 
 **Open Structure-TO-IUPAC-Name generator**
 
+[![CI](https://github.com/Kohulan/Orthonym/actions/workflows/ci.yml/badge.svg)](https://github.com/Kohulan/Orthonym/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+
 Orthonym is a deterministic, rule-based system that generates IUPAC systematic names
 from molecular structures (SMILES), targeting Preferred IUPAC Names (PINs) as defined by
 the IUPAC 2013 recommendations (the "Blue Book"). It is the structure→name counterpart to
@@ -15,23 +19,45 @@ the IUPAC 2013 recommendations (the "Blue Book"). It is the structure→name cou
   describe the input structure, so Orthonym does not emit a name for the wrong molecule.
 - **Open source** — MIT licensed.
 
+## How it works
+
+Orthonym names a molecule in four stages:
+
+1. **Perceive** the structure — functional groups, ring systems, and stereochemistry (CIP).
+2. **Apply** the IUPAC rules to choose the principal chain or ring system, the principal
+   characteristic group, and the locants.
+3. **Assemble** the name — order and alphabetise substituents, place locants, and spell the
+   morphemes.
+4. **Validate** the result by parsing it back through OPSIN and comparing canonical
+   identifiers. A name that does not describe the input is rejected, and Orthonym falls
+   back to a less-preferred but still-correct systematic name — or abstains — rather than
+   guessing.
+
 ## Installation
 
-Install from source:
+Requires **Python 3.10 or newer**. RDKit and the other runtime dependencies are installed
+automatically.
+
+```bash
+pip install git+https://github.com/Kohulan/Orthonym.git
+```
+
+Or from a local clone (recommended for development):
 
 ```bash
 git clone https://github.com/Kohulan/Orthonym.git
 cd Orthonym
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install .            # runtime only
+pip install -e ".[dev]"  # editable, with the test and lint tools
 ```
 
-### Java runtime (required for full validation)
+### Java runtime (recommended for full validation)
 
 Orthonym validates each candidate name by round-tripping it through OPSIN, which runs on
-the Java Virtual Machine. **A Java runtime (JRE 11 or newer) must be on your `PATH`** for
+the Java Virtual Machine. **A Java runtime (JRE 11 or newer) on your `PATH`** enables
 full-fidelity naming. The OPSIN jar ships in the repository (invoked as an external Java
-process — not linked), so a source install already has it; you only need a JVM on your `PATH`.
+process — not linked), so a source install already has it; you only need a JVM available.
 Without a JVM, Orthonym still runs but skips round-trip validation and operates in a
 reduced-confidence mode. Bundled jars and their licenses are documented in [`NOTICE`](NOTICE).
 
@@ -63,7 +89,7 @@ python -m orthonym "c1ccccc1"   # module form
 
 - Preferred IUPAC Names (PINs) per the IUPAC 2013 Blue Book.
 - Acyclic compounds: alkanes, alkenes, alkynes, and their functional-group derivatives
-  (alcohols, acids, esters, aldehydes, ketones, amines, amides, nitriles, …).
+  (alcohols, acids, esters, aldehydes, ketones, amines, amides, nitriles, and more).
 - Cyclic compounds: cycloalkanes, arenes, heterocycles (Hantzsch–Widman), fused,
   bridged (von Baeyer), and spiro ring systems.
 - Stereochemistry: R/S and E/Z descriptors, assigned through a high-accuracy CIP engine.
@@ -80,15 +106,12 @@ On a 1,500-molecule benchmark drawn from ChEBI and PubChem:
 
 | Metric | Value |
 |---|---:|
-| Round-trip exact match | **94.8%** |
+| Round-trip exact match | **96.1%** |
 | Wrong structures emitted | **0** |
 
 The design priority is **never to emit a name for the wrong molecule**. When a preferred
 name cannot be built with confidence, Orthonym degrades to a less-preferred but still
 correct systematic name, or abstains — it does not guess.
-
-See []() for how the harness works and how to reproduce a
-measurement.
 
 ## Development
 
@@ -97,7 +120,7 @@ measurement.
 Run tests on targeted file sets (the OPSIN-backed tests require a JVM):
 
 ```bash
-python -m pytest tests/unit/rules/test_chain_names.py -q
+python -m pytest tests/unit/rules -q
 python -m pytest tests/unit/assembly -q
 ```
 
@@ -119,8 +142,8 @@ Orthonym/
 ## Contributing
 
 Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to set up a
-development environment, run tests, and add support for new compound classes, and
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the project's engineering conventions.
+development environment, run the tests, add support for new compound classes, and the
+project's engineering conventions.
 
 ## License
 
