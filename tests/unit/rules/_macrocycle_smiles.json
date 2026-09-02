@@ -1,0 +1,7 @@
+{
+"25180764": "C/C/1=C\\COC(=O)CCC(=O)OCC2=C3C[C@@H]4[C@]([C@@H]5C[C@@H]5[C@]4(COC1=O)O)([C@H]6[C@@]3([C@@H]\\7C8=C(C6)[C@H]9C[C@H]9[C@@]8([C@H](C(=O)/C7=C(\\C)/C(=O)OC)O)C)OC2=O)C",
+"44240916": "C/C/1=C\\COC(=O)CCC(=O)OCC2=C3C[C@@H]4[C@]([C@@H]5C[C@@H]5[C@]4(COC1=O)O)([C@H]6[C@@]3([C@@H]\\7C8C(C6)[C@H]9C[C@H]9[C@@]8([C@H](C(=O)/C7=C(/C)\\C(=O)OC)O)C)OC2=O)C",
+"44240961": "C/C/1=C\\C(=O)OC[C@@]2([C@H]3C[C@H]3[C@]4([C@H]2CC5=C(COC(=O)CCC(=O)OC1)C(=O)O[C@]56[C@H]4CC7[C@H]8C[C@H]8[C@]9(C7[C@@H]6/C(=C(\\C)/C(=O)OC)/C(=O)[C@@H]9O)C)C)O",
+"44627382": "C/C/1=C\\COC(=O)[C@H](CC(=O)OCC2=C3C[C@@H]4[C@]([C@@H]5C[C@@H]5[C@]4(COC1=O)O)([C@H]6[C@@]3([C@@H]\\7C8=C(C6)[C@H]9C[C@H]9[C@@]8([C@H](C(=O)/C7=C(/C)\\C(=O)OC)O)C)OC2=O)C)OC(=O)C",
+"129908197": "C/C/1=C\\COC(=O)[C@H](CC(=O)COCC2=C3C[C@@H]4[C@]([C@@H]5C[C@@H]5[C@]4(COC1=O)O)([C@H]6[C@@]3([C@H]7/C(=C(\\C)/C(=O)OC)/C(=O)[C@@H]([C@@]8([C@]7(C(=C6)[C@@H]9[C@H]8C9)OO)C)O)OC2=O)C)O"
+}

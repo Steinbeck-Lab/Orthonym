@@ -3573,8 +3573,35 @@ def name_polycyclic_complete(mol, features=None):
         mol, ring_atoms, desc.numbering, exclude_atoms=fg_atoms
     )
 
-    # 4. Get unsaturation
-    unsaturation = get_polycyclic_unsaturation(mol, ring_atoms, desc.numbering)
+    # 4. Get unsaturation.
+    # v41 macrocycle F2 (P-31.1.4.2(1)): a ring double bond whose two locants are NOT
+    # consecutive (it spans a bridge, e.g. (15,36)) must be cited with the compound
+    # locant ``15(36)``, not the bare ``min`` — the bare form makes OPSIN read the wrong
+    # (15=16) bond and, when 16 is a carbonyl, raises ``C valency: 5`` (a cumulated
+    # ketene). ``render_ring_unsaturation`` already produces the compound form (and is
+    # the same primitive ``vonbaeyer_universal.analyze_cage_universal`` uses); route this
+    # path through it instead of ``get_polycyclic_unsaturation``'s bare ``min(loc1,loc2)``.
+    # Byte-identical for CONSECUTIVE ring enes (``_locant`` returns the bare int when
+    # ``hi == lo + 1``), which is every ring ene in the PIN gold corpus.
+    from .ring_unsaturation import render_ring_unsaturation
+    # Restrict to ring_atoms exactly as get_polycyclic_unsaturation did (both endpoints
+    # in the ring system), NOT render's numbering-only domain (Fable RISK: numbering may
+    # carry non-ring VB-framework atoms). Do NOT kekulize a fresh mol -- both renderers
+    # skip AROMATIC bonds, so pass the same mol; kekulizing would fabricate ring enes.
+    _ring_numbering = {a: loc for a, loc in desc.numbering.items() if a in ring_atoms}
+    _ring_unsat = render_ring_unsaturation(mol, _ring_numbering)
+    if _ring_unsat is None:
+        # Non-citable (a non-consecutively-numbered yne) -> keep the legacy bare emission
+        # (SELF-01/gate-caught downstream; fail-closed, never a wrong-bond citation).
+        unsaturation = get_polycyclic_unsaturation(mol, ring_atoms, desc.numbering)
+    else:
+        # STRING locants, already P-31.1.4.2(1)-formatted and sorted by (lo,hi); pass
+        # them through unchanged (``_build_parent_with_unsaturation`` str()-formats and
+        # must not re-sort them lexically).
+        unsaturation = {
+            'double_bonds': list(_ring_unsat.double_locants),
+            'triple_bonds': list(_ring_unsat.triple_locants),
+        }
 
     # 5. Get heteroatom replacement prefix
     hetero_prefix = get_heteroatom_replacement_prefix(mol, desc.numbering, ring_atoms)
