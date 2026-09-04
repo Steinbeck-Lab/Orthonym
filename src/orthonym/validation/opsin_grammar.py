@@ -1,10 +1,10 @@
 """
-OPSIN-grammar pre-validator.
+OPSIN-grammar pre-validator (Phase 156).
 
 OPSIN-XML-driven authoritative validator + round-trip-gated suggest_fix.
-Layered ON TOP format_validator heuristics per CONTEXT.md.
+Layered ON TOP OF Phase 138 format_validator heuristics per CONTEXT.md.
 
-Architecture (deliverable):
+Architecture (Plan-02 deliverable):
     - Module-import-time XML loader: parses
       `opsin/.../regexTokens.xml`, expands `%name%` placeholders to fixed
       point, and compiles each into a Python `re.Pattern`. Loud
@@ -22,7 +22,7 @@ Architecture (deliverable):
       `(repaired, repair_class)` on success or `(None, None)`
       otherwise. One repair attempt only — no retry loop
       (AP-5).
-    - Per-instance `_stats` counter (AP-19) — never module-
+    - Per-instance `_stats` counter (, AP-19) — never module-
       global mutable state.
 
 Anti-pattern hygiene (CONTEXT.md):
@@ -69,7 +69,7 @@ _REGEX_TOKENS_PATH = (
     / "opsin/opsin-core/src/main/resources/uk/ac/cam/ch/wwmm/opsin/resources/regexTokens.xml"
 )
 
-# Logical name -> OPSIN regex name in regexTokens.xml.
+# Logical name (Phase 156) -> OPSIN regex name in regexTokens.xml.
 # Source: 156-AUDIT.md § 1 (Surfaces A/B/C). Adapter table per.
 _REGEX_TOKEN_MAP: Dict[str, str] = {
     # Surface A — Bracket nesting (P-16.5.4.1)
@@ -227,7 +227,7 @@ def _check_jar_version_drift() -> None:
         if jar is None:
             logger.warning(
                 "OPSIN JAR version %s not found at project root; "
-                " grammar layer remains active but the round-"
+                "Phase 156 grammar layer remains active but the round-"
                 "trip oracle for suggest_fix() will be unavailable.",
                 OPSIN_GRAMMAR_VERSION,
             )
@@ -246,7 +246,7 @@ class OpsinGrammar:
     Three responsibilities (CONTEXT.md `<domain>`):
         1. `validate(name) -> bool` — fast OPSIN-XML-driven check across
            three surfaces (bracket nesting, stereo position, hyphen
-           placement). Layered ON TOP's
+           placement). Layered ON TOP OF Phase 138's
            `format_validator.validate_name_format` heuristic pre-screen
            per.
         2. `suggest_fix(name, source_smiles=None)` — bounded repair
@@ -254,7 +254,7 @@ class OpsinGrammar:
            repair candidate is gated through `validate()` AND
            `opsin_roundtrip_check(smiles, candidate)` (AP-8 SMILES-first
            inside the oracle). One attempt per repair class; NO retry
-           loop (AP-5).
+           loop (/ AP-5).
         3. Per-instance telemetry via `self._stats` and
            `get_validation_stats()`.
 
@@ -275,7 +275,7 @@ class OpsinGrammar:
     )
 
     def __init__(self, stats: Optional[Dict[str, int]] = None) -> None:
-        # Per-instance counter (AP-19). When `stats` is supplied
+        # Per-instance counter (/ AP-19). When `stats` is supplied
         # the caller (e.g., Orthonym) shares the same dict by reference
         # so its `get_validation_stats()` reads the live counters.
         if stats is None:
@@ -308,7 +308,7 @@ class OpsinGrammar:
         if not name:
             return False, "format_validator: empty_name"
 
-        # Layer 1: heuristic pre-screen.
+        # Layer 1: Phase 138 heuristic pre-screen.
         from .format_validator import validate_name_format
         ok, reason = validate_name_format(name)
         if not ok:
@@ -349,7 +349,7 @@ class OpsinGrammar:
 
         Notes:
             - Tries each repair class once in deterministic order
-              [bracket, hyphen, stereo]. NO retry loop (AP-5).
+              [bracket, hyphen, stereo]. NO retry loop (/ AP-5).
             - The round-trip oracle is called as
               `opsin_roundtrip_check(source_smiles, candidate)` —
               SMILES-first per AP-8. The (smiles, name) arg order to
@@ -371,7 +371,7 @@ class OpsinGrammar:
             if candidate is None or candidate == name:
                 continue
 
-            # Gate 1: candidate must pass validate().
+            # Gate 1: candidate must pass validate.
             if not self.validate(candidate):
                 self._stats["repair_failed_validate"] = (
                     self._stats.get("repair_failed_validate", 0) + 1
@@ -438,7 +438,7 @@ class OpsinGrammar:
 
         Indicated-hydrogen `(1H)` (P-16.5.4.1.1) and fusion brackets
         `[2,3-b]` (P-16.5.4.1.2) are non-nesting and are stripped via
-        the existing -02 regexes (consumed under / AP-11
+        the existing Phase 137-02 regexes (consumed under / AP-11
         — not redefined here).
 
         Per CONTEXT.md (permissive on uncovered surfaces): we do
@@ -545,7 +545,7 @@ class OpsinGrammar:
         # contains many names where `oxa-tetracyclo` / `aza-tricyclo`
         # is the canonical expected form. A blanket detection here
         # over-fires and causes name-stability regressions across
-        # the canary set (verified empirically during
+        # the canary set (verified empirically during Plan-02
         # implementation). The HY-6 repair regex is RETAINED in
         # `_suggest_hyphen_normalization` so it remains a documented
         # candidate when other surface checks have already flagged a
@@ -560,7 +560,7 @@ class OpsinGrammar:
     # -----------------------------------------------------------------
 
     def _suggest_bracket_renest(self, name: str) -> Optional[str]:
-        """Bracket re-nesting via -02 `apply_enclosing_marks`.
+        """Bracket re-nesting via Phase 137-02 `apply_enclosing_marks`.
 
         Implements 156-AUDIT.md § 4.A rows BR-1, BR-2, BR-5. Returns
         `None` when no audit row matches (BR-4 sanity).
@@ -583,7 +583,7 @@ class OpsinGrammar:
         # AP-3: 156-AUDIT.md § 4.A BR-1 / BR-2 (top-level `((...))`).
         # BR-2's `(1H)` containment is handled inside
         # `apply_enclosing_marks` via `compute_nesting_depth`; we do
-        # NOT re-derive depth here (AP-11).
+        # NOT re-derive depth here (/ AP-11).
         m = re.match(r"^\(\((?P<inner>.+)\)\)(?P<rest>.*)$", name)
         if m:
             return (
@@ -598,7 +598,7 @@ class OpsinGrammar:
         """Stereo position-only repair per 156-AUDIT.md § 4.B.
 
         Each repair preserves the (locant, descriptor) tuple verbatim;
-        only the token POSITION changes (AP-13). Source SMILES
+        only the token POSITION changes (/ AP-13). Source SMILES
         is NEVER read here (AP-20); the round-trip gate (in
         `suggest_fix`) is the sole consumer.
         """

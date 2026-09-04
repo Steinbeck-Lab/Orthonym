@@ -48,7 +48,7 @@ Four specific refusals follow from that contract, and each is deliberate:
   components SHARE their fusion atoms, so a fusion prefix's atoms cannot be
   summed with the base component's at all.
 
-WHY AGREEMENT IS NOT ENOUGH
+WHY AGREEMENT IS NOT ENOUGH (the v29 confident-wrong defect)
 ------------------------------------------------------------
 "Enumerate every decomposition and require agreement" is sound only if the
 correct decomposition is among those enumerated. When a morpheme is MISSING
@@ -95,29 +95,29 @@ A VIEW OVER SHIPPED DATA, NOT A NEW CATALOG
 Every count below is derived from a table this project already ships, so the
 oracle cannot drift away from the tables the namer itself names from:
 
-=========================== =========================================
-Morpheme class Source
-=========================== =========================================
-chain stems (meth-, dec-) ``data.chain_names.get_chain_prefix``
+===========================  =========================================
+Morpheme class               Source
+===========================  =========================================
+chain stems (meth-, dec-)    ``data.chain_names.get_chain_prefix``
                              (inverted over n=1..``_MAX_CHAIN``)
-suffix particles (-ol, -ic) ``data.opsin_imports.suffix_rules`` --
+suffix particles (-ol, -ic)  ``data.opsin_imports.suffix_rules`` --
                              ``OPSIN_SUFFIX_APPLICABILITY`` bridges the
                              surface morpheme to a rule, whose
                              ``addgroup`` SMILES gives the atom count
-substituent prefixes ``data.opsin_imports`` group tables
-(hydroxy-, nitro-, chloro-) (SMILES per entry)
-retained/trivial names ``data.ALL_RETAINED_NAMES`` (inverted) and
+substituent prefixes         ``data.opsin_imports`` group tables
+(hydroxy-, nitro-, chloro-)  (SMILES per entry)
+retained/trivial names       ``data.ALL_RETAINED_NAMES`` (inverted) and
                              ``data/iupac_2013_pin_list.json``
-ring systems, aryl groups ``data.opsin_imports`` aryl/cyclic tables
-ring substituents (phenyl-) ``rules.ring_substituents`` chained to the
+ring systems, aryl groups    ``data.opsin_imports`` aryl/cyclic tables
+ring substituents (phenyl-)  ``rules.ring_substituents`` chained to the
                              parent ring's own count
-fusion prefixes (benzo-) ``data.fusion_componentsring_size``
-Hantzsch-Widman stems ``data.hw_stems.HW_STEMS`` (inverted)
-replacement prefixes (aza-) ``rules.skeletal_replacement``
-multipliers (di-, bis-) ``assembly.naming_utils`` (inverted)
-elided stems (thiazol-) terminal-'e' elision (P-16.7.1(a)) of the
+fusion prefixes (benzo-)     ``data.fusion_components`` ``ring_size``
+Hantzsch-Widman stems        ``data.hw_stems.HW_STEMS`` (inverted)
+replacement prefixes (aza-)  ``rules.skeletal_replacement``
+multipliers (di-, bis-)      ``assembly.naming_utils`` (inverted)
+elided stems (thiazol-)      terminal-'e' elision (P-16.7.1(a)) of the
                              skeletons the tables above agreed on
-=========================== =========================================
+===========================  =========================================
 
 Only morphemes that NO shipped table covers are written by hand, in
 ``_STRUCTURAL_AFFIXES`` below, and each carries a comment saying why it is not
@@ -220,7 +220,7 @@ _STEREO_GROUP = re.compile(
     r")\)-?"
 )
 
-# Hypervalence: out of scope (see module docstring).
+# Hypervalence: out of scope for Phase 1 (see module docstring).
 _LAMBDA = re.compile(r"lambda|λ")
 
 # von Baeyer / spiro heads. 'cyclo' alone is monocyclic and needs no
@@ -299,7 +299,7 @@ _CARB_FORM_SURFACES: Dict[str, str] = {
 }
 
 # OPSIN group_type whose suffix semantics are the ordinary chain/ring ones.
-# The other types (acidStem, aminoAcid, carbohydrate,...) attach the SAME
+# The other types (acidStem, aminoAcid, carbohydrate, ...) attach the SAME
 # surface morpheme with a different atom accounting -- e.g. surface 'yl' is
 # the 0-atom radical suffix on a standardGroup but the 1-atom 'oyl' rule on an
 # acidStem. Restricting to standardGroup is what makes the surface->count map
@@ -528,7 +528,9 @@ def _add_suffix_morphemes(general: _Lexicon) -> None:
     hydride, rather than being hidden from the enumeration.
     """
     from orthonym.data.opsin_imports.suffix_rules import (
-        OPSIN_SUFFIX_APPLICABILITY, OPSIN_SUFFIX_RULES)
+        OPSIN_SUFFIX_APPLICABILITY,
+        OPSIN_SUFFIX_RULES,
+    )
 
     rules = {r["value"]: r.get("transformations", []) for r in OPSIN_SUFFIX_RULES}
 
@@ -834,8 +836,7 @@ def _multipliers() -> Dict[str, int]:
     """Multiplying prefixes, inverted from the tables the namer emits with."""
     result: Dict[str, int] = {}
     try:
-        from orthonym.assembly.naming_utils import (COMPLEX_MULTIPLIERS,
-                                                     SIMPLE_MULTIPLIERS)
+        from orthonym.assembly.naming_utils import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS
     except ImportError:
         return result
     for count, word in SIMPLE_MULTIPLIERS.items():
@@ -845,8 +846,129 @@ def _multipliers() -> Dict[str, int]:
     return result
 
 
+# ---------------------------------------------------------------------------
+# On-disk cache of the built lexicon (audit 2026-09-03, item S3)
+#
+# The table below is a pure function of the package's own source (the data
+# tables and the derivation steps in _LEXICON_SOURCES), yet every process
+# rebuilt it: 530 ms per CLI call, per pytest worker, per batch shard. A pickle
+# of the 2,546-entry table is 116 KB and loads in 3 ms.
+#
+# Invariants (each is load-bearing for byte-identity):
+# * A cache HIT must equal a fresh build. The key is a SHA-256 over every source
+#   file the build reads, the derivation-step tuple, the package version, the
+#   Python major.minor and the RDKit version, so any change to any input yields
+#   a new file name; stale files are simply never opened.
+# * Anything unexpected -> build fresh and try to rewrite. A missing directory, an
+#   unreadable or corrupt file, a wrong-shaped payload, a read-only filesystem:
+#   none of these may change the returned table or raise.
+# * Writes are atomic (tmp file + os.replace) because 40 shards start at once.
+# * ORTHONYM_LEXICON_CACHE=off disables it; ORTHONYM_CACHE_DIR moves it
+#   (default: $XDG_CACHE_HOME/orthonym or ~/.cache/orthonym).
+# The file is a pickle from the user's own cache directory; the build reads no
+# untrusted input, so this is the same trust boundary as the installed package.
+# ---------------------------------------------------------------------------
+import hashlib as _hashlib
+import os as _os
+import pickle as _pickle
+import sys as _sys
+import tempfile as _tempfile
+
+_PKG_ROOT = Path(__file__).resolve().parents[1]
+_LEXICON_SOURCE_FILES: Tuple[str, ...] = (
+    "validation/name_morphemes.py",
+    "assembly/naming_utils.py",
+    "rules/ring_substituents.py",
+    "rules/skeletal_replacement.py",
+)
+
+
+def lexicon_cache_key() -> str:
+    """SHA-256 identifying the exact inputs of the lexicon build."""
+    h = _hashlib.sha256()
+    files = [_PKG_ROOT / rel for rel in _LEXICON_SOURCE_FILES]
+    files += sorted((_PKG_ROOT / "data").rglob("*.py"))
+    for f in files:
+        try:
+            h.update(f.read_bytes())
+        except OSError:
+            h.update(b"<unreadable>")
+    try:
+        from orthonym import __version__ as _ver
+    except Exception:  # pragma: no cover - only during a broken partial import
+        _ver = "?"
+    try:
+        import rdkit
+        _rd = getattr(rdkit, "__version__", "?")
+    except Exception:  # pragma: no cover
+        _rd = "?"
+    h.update(repr(_LEXICON_SOURCES).encode())
+    h.update(f"{_ver}|py{_sys.version_info[0]}.{_sys.version_info[1]}|rdkit{_rd}".encode())
+    return h.hexdigest()
+
+
+def _lexicon_cache_enabled() -> bool:
+    return _os.environ.get("ORTHONYM_LEXICON_CACHE", "on").strip().lower() not in ("off", "0", "no")
+
+
+def _lexicon_cache_path() -> Path:
+    base = _os.environ.get("ORTHONYM_CACHE_DIR")
+    if not base:
+        xdg = _os.environ.get("XDG_CACHE_HOME")
+        base = str(Path(xdg) / "orthonym") if xdg else str(Path.home() / ".cache" / "orthonym")
+    return Path(base) / f"lexicon-{lexicon_cache_key()}.pkl"
+
+
+def _well_shaped_lexicon(obj) -> bool:
+    return (isinstance(obj, dict) and len(obj) > 0
+            and all(isinstance(k, str) and isinstance(v, _Morph) for k, v in obj.items()))
+
+
+def _load_lexicon_cache(path: Path) -> Optional[Dict[str, _Morph]]:
+    try:
+        obj = _pickle.loads(path.read_bytes())
+    except Exception:
+        return None
+    return obj if _well_shaped_lexicon(obj) else None
+
+
+def _store_lexicon_cache(path: Path, table: Dict[str, _Morph]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = _tempfile.mkstemp(dir=str(path.parent), prefix=path.name, suffix=".tmp")
+        try:
+            with _os.fdopen(fd, "wb") as fh:
+                _pickle.dump(table, fh, protocol=_pickle.HIGHEST_PROTOCOL)
+            _os.replace(tmp, path)
+        except Exception:
+            try:
+                _os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+    except Exception:
+        return  # a cache that cannot be written is simply not a cache
+
+
 @lru_cache(maxsize=1)
 def _lexicon() -> Dict[str, _Morph]:
+    """The one morpheme table (see :func:`_build_lexicon`), served from the
+    on-disk cache when a file for exactly this code exists."""
+    if not _lexicon_cache_enabled():
+        return _build_lexicon()
+    try:
+        path = _lexicon_cache_path()
+    except Exception:
+        return _build_lexicon()
+    cached = _load_lexicon_cache(path)
+    if cached is not None:
+        return cached
+    table = _build_lexicon()
+    _store_lexicon_cache(path, table)
+    return table
+
+
+def _build_lexicon() -> Dict[str, _Morph]:
     """The one morpheme table, used for every binding kind.
 
     There is deliberately only ONE. An earlier revision consulted a narrowed
@@ -1234,7 +1356,7 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
         # count already includes -- "heptyl" is 7 atoms whether or not two of
         # them are relabelled O by "1,3-dioxa"), so a locant-count multiplier
         # in front of one can never add atoms, unlike a multiplier in front of
-        # a genuine SUBST/ATTACH group ("dimethylamino"). Task 2b
+        # a genuine SUBST/ATTACH group ("dimethylamino"). Phase 0c Task 2b
         # regression: without this, a SUBST prefix earlier in the SAME
         # composite token (e.g. "2-hydroxy-2-oxo-1,3-dioxa-6-aza-2-phosphaheptyl")
         # set ``seen_content`` before the multiplier was reached, so the
@@ -1312,7 +1434,7 @@ def _evaluate(segments: List[_Seg]) -> Optional[int]:
 def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
     """How many heavy atoms does ``token`` spell?
 
-    ``kind`` may be a:class:`~orthonym.validation.binding_spine.BindingKind`
+    ``kind`` may be a :class:`~orthonym.validation.binding_spine.BindingKind`
     or the equivalent plain string. It does NOT select a lexicon -- there is one
     lexicon and every reading is always enumerated (see ``_lexicon``). It settles
     one positional question only: whether a characteristic-group suffix may open
@@ -1437,16 +1559,16 @@ def lexicon_sources() -> Tuple[str, ...]:
 
 
 # ---------------------------------------------------------------------------
-# P-29.2 free-valence morphology
+# P-29.2 free-valence morphology (Phase 1b)
 # ---------------------------------------------------------------------------
 #
 # A second, much smaller text oracle with the same contract as ``token_arity``:
 # it reads a prefix token's ENDING and reports how many free valences that text
 # asserts. IUPAC 2013 P-29.2:
 #
-# -yl one free valence
-# -ylidene two on the same skeletal atom
-# -ylidyne three on the same skeletal atom
+#     -yl       one free valence
+#     -ylidene  two on the same skeletal atom
+#     -ylidyne  three on the same skeletal atom
 #
 # It lives here, next to ``token_arity``, because it is pure text analysis with
 # no knowledge of any graph, and because it is SHARED: the substituent producer
@@ -1481,7 +1603,7 @@ _MULTIPLIED_FREE_VALENCE = re.compile(
 class FreeValenceEstimate:
     """How many free valences a token's text asserts, or an explicit refusal.
 
-    Mirrors:class:`ArityEstimate`: ``confident`` is the only field a caller
+    Mirrors :class:`ArityEstimate`: ``confident`` is the only field a caller
     may branch on, ``free_valences`` is meaningful ONLY when it is True and is
     ``None`` otherwise, and ``basis`` always explains the answer.
     """

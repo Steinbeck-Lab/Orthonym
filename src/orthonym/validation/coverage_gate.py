@@ -1,8 +1,8 @@
-""" Part A: the SINGLE certification gate for a general-engine result,
+"""Phase 1 Part A: the SINGLE certification gate for a general-engine result,
 shared by every best-effort emission lane.
 
-Root-cause of the per-lane drift named
-(`` follow-on #1): three lanes ran
+Root-cause of the per-lane drift
+(follow-on #1): three lanes ran
 ``name_general`` and gated its ``GeneralEngineResult`` DIFFERENTLY --
 ``assembly/t4_coverage.py`` ran E1 + ``verify_spine`` (escalated), while the
 inline G1 lane (``namer.py:3900``) and the multifragment/recovery lane
@@ -29,8 +29,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from . import binding_spine as _bs
-from .binding_spine import (BindingSpine, STRICT_STEREO_CHARGE_AXES,
-                            verify_spine)
+from .binding_spine import STRICT_STEREO_CHARGE_AXES, BindingSpine, verify_spine
 from .e1_certificate import verify_certificate
 
 if TYPE_CHECKING:  # type-only; no runtime dependency on general_engine
@@ -75,7 +74,7 @@ _STRUCTURAL_BLOCKING_CODES = frozenset({
     _bs.SUBSTITUENT_STEREO_MISMATCH,                                    # P8 (provable)
 })
 
-# : ST.3: the stereo PROOF-GAP codes -- a rejection here means the
+#: ST.3: the stereo PROOF-GAP codes -- a rejection here means the
 #: binding-spine could NOT decide (it could not positionally anchor which
 #: leading descriptor block is the parent's, because ``stereo_atom_to_locant``
 #: is int-locant-only and a compound/primed spiro locant is unmappable), NOT
@@ -109,6 +108,7 @@ def _full_inchikey_roundtrips(mol, name: str) -> bool:
         return False
     try:
         from rdkit import Chem
+
         from .opsin_roundtrip import opsin_roundtrip_check
         smiles = Chem.MolToSmiles(mol)  # canonical, isomeric (stereo retained)
         if not smiles:
@@ -129,7 +129,7 @@ def certify_general_result(mol, result: "GeneralEngineResult", *,
     ``self._allow_aromatic_general`` so a legitimately-charged complete-tier
     name (``-ylium``/``-ide`` suffix on a bound atom) is NOT voided.
 
-    ``structural_only`` (B4, the broad-lane wiring) blocks ONLY on the
+    ``structural_only`` (Phase 1 B4, the broad-lane wiring) blocks ONLY on the
     structural axes (``_STRUCTURAL_BLOCKING_CODES``: atom partition / bond
     totality / charge / stereo -- the swap-witness class) and treats the
     name-spelling axes (P4/P5/P6) as advisory, because on the best-effort lanes

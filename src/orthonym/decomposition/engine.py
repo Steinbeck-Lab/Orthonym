@@ -16,18 +16,17 @@ from typing import Dict, List, Optional
 
 from rdkit import Chem
 
-
 # ---------------------------------------------------------------------------
 # Performance guard
 # ---------------------------------------------------------------------------
 
-MAX_CLEAVABLE_BONDS = 20  # : raised from 12, with structural complexity check
+MAX_CLEAVABLE_BONDS = 20  # Phase 099: raised from 12, with structural complexity check
 MAX_BOND_RETRY_ATTEMPTS = 5  # Max bonds to try when multi-bond retry is active
-MAX_DECOMP_LEVELS = 3  # : max iterative decomposition levels for mixed bond types
+MAX_DECOMP_LEVELS = 3  # Phase 107: max iterative decomposition levels for mixed bond types
 
 
 # ---------------------------------------------------------------------------
-# Fragment naming with fallback
+# Fragment naming with fallback (Phase 127)
 # ---------------------------------------------------------------------------
 
 
@@ -35,7 +34,7 @@ def _name_fragment_with_fallback(smiles: str):
     """Name a fragment: recursive naming first, pipeline-only fallback, then
     a T4/general-engine best-effort rescue.
 
-    Per: When name_fragment_recursively() returns None (depth/cycle limit hit),
+    Per: When name_fragment_recursively returns None (depth/cycle limit hit),
     fall back to name_pipeline_only() instead of aborting the entire decomposition.
     name_pipeline_only() uses the full IUPAC pipeline without triggering decomposition
     recursion, preserving all substituents.
@@ -79,7 +78,7 @@ def _name_fragment_with_fallback(smiles: str):
 def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
     """Best-effort (T4/general-engine) rescue for a fragment PIN could not name.
 
-     (secondary
+    , secondary
     lever): every fragment named during decomposition previously went through
     ``name_pipeline_only``, whose fresh ``Orthonym`` defaults
     ``general_fallback=False`` (``namer.py:2047``) -- so the T4/general-engine
@@ -169,14 +168,14 @@ _FUNCTIONAL_CLASS_TYPES = frozenset({"ester", "amide", "glycosidic", "carbamate"
 
 
 # ---------------------------------------------------------------------------
-# Bond-type-specific thresholds for multi-bond decomposition (-04)
+# Bond-type-specific thresholds for multi-bond decomposition (Phase 099-04)
 # ---------------------------------------------------------------------------
 
 # Glycosidic bonds: threshold 2 (disaccharide + aglycone benefits from multi-bond).
 # Ester/amide: threshold 3 (2-bond molecules better handled by single-bond).
-# -02 confirmed count>=2 causes regressions on 2-ester phospholipids.
+# Phase 099-02 confirmed count>=2 causes regressions on 2-ester phospholipids.
 _MULTI_BOND_THRESHOLD = {
-    "ester": 2,       # Lowered from 3 per DECO-22/: enables diester decomposition
+    "ester": 2,       # Lowered from 3 per DECO-22/D-07: enables diester decomposition
     "glycosidic": 2,
     "amide": 3,
 }
@@ -189,18 +188,18 @@ _MULTI_BOND_THRESHOLD = {
 # Known retained names that correctly identify a core substructure even
 # in large molecules (nucleotide cofactors, natural products, etc.).
 # These bypass the "no digits and no hyphens" rejection for heavy_atoms > 25.
-# Expanded with fused heterocycle names.
+# Expanded in Phase 099 with fused heterocycle names.
 _RETAINED_CORE_NAMES = frozenset({
     'adenine', 'guanine', 'thymine', 'cytosine', 'uracil',
     'xanthine', 'hypoxanthine', 'purine', 'pyrimidine',
     'indole', 'quinoline', 'isoquinoline', 'acridine',
     'phenothiazine', 'xanthene', 'phenoxazine', 'thianthrene',
     '1h-indole',
-    # additions: fused heterocycles and polycyclics
+    # Phase 099 additions: fused heterocycles and polycyclics
     'flavone', 'chromone', 'coumarin', 'pteridine', 'phenazine',
     'carbazole', 'phenanthridine',
     # Cluster B: the PIN forms carry the [b,d] fusion descriptor; the exact
-    # match at:377/:425 needs them so a >25-heavy-atom core still passes the
+    # match at :377/:425 needs them so a >25-heavy-atom core still passes the
     # quality gate. Bare forms kept (harmless) for any legacy path.
     'dibenzo[b,d]furan', 'dibenzo[b,d]thiophene',
     'dibenzofuran', 'dibenzothiophene',
@@ -231,7 +230,7 @@ _RING_SYSTEM_TOKENS = frozenset({
 
 
 # ---------------------------------------------------------------------------
-# Bond-type token matching for quality gate (- DECO-20)
+# Bond-type token matching for quality gate (Phase 132 - DECO-20)
 # ---------------------------------------------------------------------------
 
 # Token mapping: what name tokens indicate each bond type.
@@ -347,7 +346,7 @@ def _name_has_ring_system_token(name: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# The real coverage oracle
+# The real coverage oracle (Task Z3)
 # ---------------------------------------------------------------------------
 
 # (name, canonical SMILES) -> "does this name denote exactly this molecule?"
@@ -384,7 +383,7 @@ def _name_is_proven_complete(name: str, mol) -> bool:
 
     2. **It answers CONSTITUTION, not PIN-preference.** A True here means "the
        same atoms, bonded the same way" and nothing more -- OPSIN proves a name
-       VALID, never PREFERRED (the contributor guide). ``ethyl stearate`` is proven
+       VALID, never PREFERRED (CLAUDE.md). ``ethyl stearate`` is proven
        complete by this function and is NOT the PIN (``BlueBookV2.md:29791``
        puts ``(PIN)`` on ``octadecanoic acid``). That is acceptable *here* only
        because this predicate's question is "should we DECOMPOSE this
@@ -430,13 +429,13 @@ def _name_is_proven_complete(name: str, mol) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Name-size coverage heuristic (-04)
+# Name-size coverage heuristic (Phase 099-04)
 # ---------------------------------------------------------------------------
 
 def _name_covers_molecule(name: str, mol) -> bool:
     """Check if a pipeline name plausibly covers the whole molecule.
 
-    ⚠ NOT a coverage measurement. The "estimated coverage" below is
+    ⚠ NOT a coverage measurement (Task Z2). The "estimated coverage" below is
     ``len(name) / 1.5 / heavy_atoms`` -- a CHARACTER COUNT rescaled by a
     constant. It is anti-correlated with real coverage: the correct retained
     name ``cholesterol`` scores 0.393 on its own 28-atom molecule, while a name
@@ -457,7 +456,7 @@ def _name_covers_molecule(name: str, mol) -> bool:
     (a), (d) and (e) are the LIVE constants, re-read from the code 2026-08-02.
     This docstring previously said "> 15", "below 55%" and "< 0.55"; none of
     those values exists in the body, and the 0.55 was copied into the
-    outward-facing from
+    outward-facing `docs/ORTHONYM-vs-AUTONOM-COMPARATIVE-ANALYSIS.md` from
     here. Measured: (d) alone bypasses this function on 10 of the 16 molecules
     that reach it, and the rejection at (e) fired 0 times across 40 molecules.
 
@@ -514,7 +513,7 @@ def _name_covers_molecule(name: str, mol) -> bool:
         # "5-chloroquinoline" (0.44) and "(22E)-stigmasta-7,22-diene" (0.42)
         # while accepting legitimate decomposition names.
         if coverage < 0.45:
-            # : everything above is a CHARACTER COUNT, so it selects
+            # Task Z3: everything above is a CHARACTER COUNT, so it selects
             # WHICH names to measure -- it does not get to be the verdict.
             # The measurement decides.
             if _name_is_proven_complete(name, mol):
@@ -534,7 +533,7 @@ def _name_covers_molecule(name: str, mol) -> bool:
 def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
     """True when a bare ``N-<acyl>-`` float onto this amine fragment is AMBIGUOUS.
 
-     (acylspy). The float prepends ``N-`` to the amine PARENT name without
+    task 24 (acylspy). The float prepends ``N-`` to the amine PARENT name without
     saying WHICH nitrogen carries the acyl. If the amine fragment has >=2 ACYLATABLE
     nitrogens (an N bearing >=1 hydrogen, i.e. one that could accept the acyl), the
     name denotes >=2 distinct molecules -- OPSIN resolves it to one by its own rule, so
@@ -552,7 +551,7 @@ def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
         # acyl) OR an AROMATIC RING nitrogen: OPSIN will DEAROMATIZE a ring N to
         # host the acyl (measured: `N-formyl-2-(methylamino)-1,3-thiazole-5-
         # carboxylic acid` parsed with the formyl on the thiazole ring N, not the
-        # exocyclic amino N). #29--BLOCKER: the H-only count missed the
+        # exocyclic amino N). #29-fable-BLOCKER: the H-only count missed the
         # 0-H aromatic ring N, so a heteroaromatic amine parent + an exocyclic
         # amino floated an ambiguous `N-<acyl>` that shipped a WRONG constitution
         # at gate-off. Counting aromatic ring N as a target fails the float closed.
@@ -594,7 +593,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # substructure even in large molecules (e.g., adenine in nucleotide
     # cofactors).
     #
-    # Coverage guard (-03): retained names are valid only if they
+    # Coverage guard (Phase 099-03): retained names are valid only if they
     # plausibly describe the whole molecule. "adenine" (7 chars) naming a
     # 58-HA molecule (ratio 0.12) indicates a partial match -- OPSIN
     # round-trips to adenine (10 HA), proving the name only covers 17%.
@@ -612,7 +611,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
 
     # Suspiciously short name for a complex molecule.
     #
-    # ⚠ THIS IS THE DOMINANT GUARD IN THIS FUNCTION. It is a
+    # ⚠ THIS IS THE DOMINANT GUARD IN THIS FUNCTION (Task Z2). It is a
     # character count -- `len(name) < heavy_atoms // 2` is `chars/HA < ~0.5`
     # written without a division, which is why a grep for `len(name) /` misses
     # it. Because it runs first and is stricter than the chars/HA tests below,
@@ -621,7 +620,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # function. Before re-tuning anything below, check whether this line has
     # already returned.
     if heavy_atoms > 15 and len(name) < heavy_atoms // 2:
-        # : this character count refuses CORRECT names in bulk. Asked
+        # Task Z3: this character count refuses CORRECT names in bulk. Asked
         # directly, it rejects `pyrene` (PIN, 16 HA), `coronene` (PIN, 24 HA),
         # `picene` (PIN, 22 HA) -- Blue Book P-25.1.1 "Retained names for
         # hydrocarbons used for parent ring components", Table 2.7, each marked
@@ -633,7 +632,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             return True
         return False
 
-    # : chars/HA check for medium molecules (15-30 HA).
+    #: chars/HA check for medium molecules (15-30 HA).
     #
     # ⚠ The example this comment used to give -- "catches names like
     # 'quinoline' (0.39 chars/HA) for a 23 HA molecule" -- is FALSE, measured
@@ -654,31 +653,31 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             try:
                 bonds = find_cleavable_bonds(mol)
                 if bonds:
-                    # : measure before discarding (see the X guard above).
+                    # Task Z3: measure before discarding (see the X guard above).
                     if _name_is_proven_complete(name, mol):
                         return True
                     return False  # Low ratio + cleavable bonds -> try decomposition
             except Exception:
                 return False  # On error, still reject
 
-    # REMOVED: a `heavy_atoms > 25 and
+    # REMOVED (Task Z2, 2026-08-02): a `heavy_atoms > 25 and
     # len(name)/heavy_atoms < 0.45 -> return False` test stood here. It was
     # UNREACHABLE, and provably so rather than by sampling: any name short
     # enough to trip it (len < 0.45*HA) is also short enough to trip the
     # `len(name) < heavy_atoms // 2` test above (len < HA//2), which returns
     # first. Checked exhaustively for every HA in 26..4000 -- no value admits
-    # the one without the other. The agreed: 68 evaluations across 17 of
+    # the one without the other. The spy agreed: 68 evaluations across 17 of
     # 40 molecules, 0 rejections. Deleting it changes no name.
     # Do not reintroduce a ratio test here; re-derive from the guard above.
 
     # Large molecule with no digits and no hyphens: likely just a retained
     # name for one fragment (e.g., "benzene" for a 25-atom ester).
-    # : expanded _RETAINED_CORE_NAMES handles known ring-system
+    # Phase 099: expanded _RETAINED_CORE_NAMES handles known ring-system
     # retained names (phenothiazine, carbazole, flavone, etc.) via early
     # whitelist bypass above. For other names, the no-digits/no-hyphens
     # check remains at HA>20 to catch incomplete names.
     #
-    # Fragment-aware threshold (-02): when naming a fragment during
+    # Fragment-aware threshold (Phase 099-02): when naming a fragment during
     # decomposition (visited set non-empty), use HA>30 to be more lenient --
     # medium-sized fragments with retained names are valid in decomposition
     # context. At top level (visited set empty), keep HA>20 for strictness.
@@ -689,7 +688,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
         has_digits = any(c.isdigit() for c in name)
         has_hyphens = "-" in name
         if not has_digits and not has_hyphens:
-            # : "no locants" is a NAME-SHAPE proxy for under-coverage,
+            # Task Z3: "no locants" is a NAME-SHAPE proxy for under-coverage,
             # and it is wrong for a whole legitimate class -- an unbranched
             # parent hydride or acid needs no locants at all. MEASURED: this
             # exact line, and no other, refuses `henicosane` (21 HA),
@@ -844,7 +843,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                         # two ring systems requires substantially more chars
                         # than naming one ring + simple substituents.
                         #
-                        # ⚠ MEASURED INERT: reached 3
+                        # ⚠ MEASURED INERT (Task Z2, 2026-08-02): reached 3
                         # times on 1 of 40 molecules, rejected 0 times. Unlike
                         # the 0.45 test deleted above, this is NOT provably
                         # unreachable -- it is a character count that happens
@@ -856,7 +855,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
                         # a terse name naming BOTH fails.
                         ratio = len(name) / heavy_atoms if heavy_atoms else 999
                         if ratio < 1.5:
-                            # : measure before discarding. This ratio is
+                            # Task Z3: measure before discarding. This ratio is
                             # anti-correlated with what it claims to check -- a
                             # verbose name covering ONE ring passes it, a terse
                             # name covering BOTH fails -- so it must not be the
@@ -867,7 +866,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     except Exception:
         pass  # Guard: never let ring detection crash the quality gate
 
-    # Multi-bond under-coverage detection (-03): if molecule has
+    # Multi-bond under-coverage detection (Phase 099-03): if molecule has
     # multiple distinct cleavable bond types but the name references fewer
     # than half, the name likely describes only one fragment of a
     # multi-component molecule.
@@ -883,14 +882,14 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
     # Only pipeline names with low coverage (< 0.8) are suspect.
     #
     # ⚠ THE PRE-FILTER IS A CHARACTER COUNT AND IT KEEPS THIS BLOCK SHUT
-    # . `coverage_ratio` is `len(name)/heavy_atoms`, so
+    # (Task Z2, 2026-08-02). `coverage_ratio` is `len(name)/heavy_atoms`, so
     # what "< 0.8" actually buys is: a name VERBOSE enough is exempt from the
     # bond-token check below -- which is a real structural test. Measured: the
     # ratio is computed 34 times across 13 of 40 molecules and the branch is
     # entered ZERO times. Neither of the two tests that name this block reach
     # it either -- test_quality_gate.py:360 is rejected earlier by the
     # `len(name) < heavy_atoms // 2` guard (its own comment concedes this) and
-    # :331 by the chars/HA reject. So this block has no test coverage and
+    #:331 by the chars/HA reject. So this block has no test coverage and
     # no observed execution.
     # NOT removed: a reachable window exists (ratio in [0.65, 0.8) for
     # 15 < HA <= 30), so unlike the 0.45 test deleted above it is not provably
@@ -904,7 +903,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
         if bonds and heavy_atoms > 15 and coverage_ratio < 0.8:
             distinct_bond_types = set(b["type"] for b in bonds)
             if len(distinct_bond_types) >= 2:
-                # Use module-level boundary-aware token matching
+                # Use module-level boundary-aware token matching (Phase 132)
                 # instead of substring matching to prevent false positives
                 # like "polyester" triggering "ester" token.
                 name_lower = name.lower()
@@ -946,7 +945,7 @@ def _name_quality_is_acceptable(name: str, mol) -> bool:
             if _dcnt >= 2 and any(_dw.endswith(sfx) for sfx in _PARENT_SUFFIXES):
                 return False
 
-    # Name-size coverage heuristic (-04): reject names that
+    # Name-size coverage heuristic (Phase 099-04): reject names that
     # describe less than ~55% of molecule heavy atoms when cleavable bonds
     # exist and decomposition hasn't been attempted yet.
     if not _name_covers_molecule(name, mol):
@@ -1023,7 +1022,7 @@ def _decomposition_is_worse(decomp_name: str, existing_name: str, mol) -> bool:
 def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
     """Check if a decomposed name covers enough of the molecule.
 
-    ⚠ THE LENGTH TEST HERE IS A PRE-FILTER, NOT THE VERDICT. A name
+    ⚠ THE LENGTH TEST HERE IS A PRE-FILTER, NOT THE VERDICT (Task Z3). A name
     that clears the character threshold is accepted on the threshold alone; a
     name that FAILS it is then MEASURED against the real oracle
     (``_name_is_proven_complete``) and kept if the measurement proves it
@@ -1034,7 +1033,7 @@ def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
     molecule should have roughly 2+ characters per heavy atom (locants,
     prefixes, parent name, substituents).
 
-    Tiered thresholds:
+    Tiered thresholds (Phase 099):
     - Functional-class types (ester, amide, glycosidic, carbamate, thioester)
       use 0.6 chars/HA -- these produce compact names like "phenyl palmitate".
     - Substitutive types (sulfonamide, phosphodiester, ether, default)
@@ -1067,7 +1066,7 @@ def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
     threshold = 0.6 if bond_type in _FUNCTIONAL_CLASS_TYPES else 0.8
     expected_min = int(heavy_atoms * threshold)
 
-    # : Retained-name coverage bonus.
+    # Phase 107: Retained-name coverage bonus.
     # Names containing retained-name tokens (adenine, cholesterol, etc.)
     # describe more structure than their character count suggests -- retained
     # names are intentionally shorter than systematic names. Apply a 1.5x
@@ -1085,10 +1084,10 @@ def _coverage_is_adequate(name: str, mol, bond_type: str = "") -> bool:
     if effective_length >= expected_min:
         return True
 
-    # : the comparison above is a CHARACTER COUNT written WITHOUT a
+    # Task Z3: the comparison above is a CHARACTER COUNT written WITHOUT a
     # division -- `len(name) * bonus >= int(heavy_atoms * threshold)` -- which
     # is why neither a `len(name) /` grep nor a `heavy_atoms //` grep finds it,
-    # and why the audit of this class missed this function entirely
+    # and why the Task Z2 audit of this class missed this function entirely
     # despite its four production call sites. Same treatment as its siblings:
     # the count selects what to measure, the measurement decides.
     return _name_is_proven_complete(name, mol)
@@ -1288,8 +1287,8 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         Assembled multi-component IUPAC name, or None if decomposition
         fails at any step (capping, size guard, fragment naming, assembly).
     """
-    from .fragment_capping import cleave_and_cap
     from .fragment_assembly import assemble_fragment_name
+    from .fragment_capping import cleave_and_cap
 
     # Cleave and cap
     # For ether bonds, the acid side (larger fragment) gets H-cap (no OH),
@@ -1314,8 +1313,8 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         return frag_mol.GetNumHeavyAtoms() if frag_mol else 999
     fragments.sort(key=_frag_sort_key)
 
-    # Name each fragment with fallback
-    # /: build a parallel fragment_smiles dict in lockstep with
+    # Name each fragment with fallback (Phase 127:)
+    # Phase 176 /: build a parallel fragment_smiles dict in lockstep with
     # fragment_names, keyed by the SAME frag["side"], so the glycoside assembler
     # can inspect fragment structure (the sugar-skeleton deriver and the
     # aglycone seniority guard both need the SMILES, not just the names). This
@@ -1397,8 +1396,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         acid_has_pg = any(acid_name.lower().endswith(ind) for ind in _PG_INDICATORS)
 
         if acid_has_pg:
-            from .fragment_assembly import (_alcohol_to_alkyl, _amine_to_prefix,
-                                            _join_components)
+            from .fragment_assembly import _alcohol_to_alkyl, _amine_to_prefix, _join_components
             alkyl_name = fragment_names.get("alkyl") or fragment_names.get("amine")
             if alkyl_name:
                 sub_prefix = _alcohol_to_alkyl(alkyl_name) or _amine_to_prefix(alkyl_name)
@@ -1425,12 +1423,12 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             if acid_frag and amine_frag:
                 if not acid_is_more_senior(acid_frag["smiles"], amine_frag["smiles"]):
                     # Amine is more senior -> substitutive naming
-                    from .fragment_assembly import _acid_to_acyl, _join_components
                     from ..assembly.naming_utils import _wrap_n_substituent
+                    from .fragment_assembly import _acid_to_acyl, _join_components
                     acid_name = fragment_names.get("acid", "")
                     amine_name = fragment_names.get("amine", "")
                     acyl = _acid_to_acyl(acid_name)
-                    # : a bare 'N-<acyl>-' prefix names WHICH nitrogen bears
+                    # task 24: a bare 'N-<acyl>-' prefix names WHICH nitrogen bears
                     # the acyl only by position in the parent name -- so if the amine
                     # fragment has >=2 ACYLATABLE nitrogens (N with >=1 H) the float is
                     # AMBIGUOUS (denotes >=2 molecules; OPSIN guesses one). Refuse to
@@ -1447,7 +1445,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             pass  # Any failure: fall through to normal assembly
 
     # Assemble (delegate to fragment_assembly module)
-    # /: thread fragment_smiles additively; only the glycoside
+    # Phase 176 /: thread fragment_smiles additively; only the glycoside
     # assembler reads it, every other assembler ignores the kwarg.
     # Incr-1a: thread the parent SMILES too -- the glycoside assembler
     # RT-gates the STRUCTURAL aglycone-substituent fallback against it (0-wrong).
@@ -1488,12 +1486,12 @@ def _try_multi_bond_decompose(
     if not all(b["type"] == bond_type for b in bonds):
         return None
 
-    from .fragment_capping import cleave_and_cap
     from .fragment_assembly import (
+        _assemble_multi_amide,
         _assemble_multi_ester,
         _assemble_multi_glycoside,
-        _assemble_multi_amide,
     )
+    from .fragment_capping import cleave_and_cap
 
     # Cleave with acid_side_oh = True for ester/amide/glycosidic, False for ether
     acid_oh = bond_type != "ether"
@@ -1539,7 +1537,7 @@ def _try_multi_bond_decompose(
                          frag["smiles"], frag.get("side", "?"))
             continue
 
-        # : Fragment naming size validation -- reject names that cover
+        #: Fragment naming size validation -- reject names that cover
         # less than 60% of the fragment's heavy atoms.
         # Bypass for retained core names (adenine, purine, etc.) which correctly
         # identify the key structural feature even when the fragment includes
@@ -1558,12 +1556,12 @@ def _try_multi_bond_decompose(
 
         named_fragments.append((frag, frag_name))
 
-    # (fail-closed, /9 -- never partial-ship): a
+    # (fail-closed, invariants 1/9 -- never partial-ship): a
     # fragment that STILL could not be named or adequately covered even after
     # `_name_fragment_with_fallback`'s T4/general-engine rescue rung is a
     # genuinely unnameable residue. Shipping a name built from `named_fragments`
     # alone would describe a SMALLER molecule than the input -- exactly the
-    # SELF-01-suppressed-partial shape `phase2-shared-mechanism-.md`
+    # SELF-01-suppressed-partial shape `phase2-shared-.md`
     # identified (a complete, well-formed name for the WRONG, smaller
     # molecule). Decline the whole assembly instead of ever silently dropping
     # atoms; the molecule then either abstains honestly or a different
@@ -1600,7 +1598,7 @@ def _try_multi_bond_decompose(
 
 
 # ---------------------------------------------------------------------------
-# Iterative mixed-type decomposition
+# Iterative mixed-type decomposition (Phase 107)
 # ---------------------------------------------------------------------------
 
 def _try_iterative_mixed_decompose(
@@ -1629,6 +1627,7 @@ def _try_iterative_mixed_decompose(
         Assembled name string, or None if decomposition fails or is worse.
     """
     import logging
+
     from .bond_cleavage import find_cleavable_bonds
     from .fragment_capping import cleave_and_cap
 
@@ -1658,7 +1657,7 @@ def _try_iterative_mixed_decompose(
 
     parent_heavy = mol.GetNumHeavyAtoms()
 
-    # Iterative decomposition across levels (conditional levels)
+    # Iterative decomposition across levels (Phase 127: conditional levels)
     max_levels = _get_max_decomp_levels(mol)
     for level in range(max_levels - 1):  # Already did level 0
         new_fragments = []
@@ -1703,7 +1702,7 @@ def _try_iterative_mixed_decompose(
         if not changed:
             break
 
-    # Name each fragment (fallback)
+    # Name each fragment (Phase 127: fallback)
     # DECO-17/Pitfall 5: use list-of-tuples to preserve identical SMILES duplicates
     # DECO-25: partial assembly -- collect successful fragments, track failures
     named_fragments = []
@@ -1718,7 +1717,7 @@ def _try_iterative_mixed_decompose(
             logger.debug("Mixed-decomp fragment naming failed for %s", frag["smiles"])
             continue
 
-        # : Fragment naming size validation (with retained core name bypass)
+        #: Fragment naming size validation (with retained core name bypass)
         frag_mol = Chem.MolFromSmiles(frag["smiles"])
         if frag_mol:
             frag_ha = frag_mol.GetNumHeavyAtoms()
@@ -1733,12 +1732,12 @@ def _try_iterative_mixed_decompose(
 
         named_fragments.append((frag, frag_name))
 
-    # (fail-closed, /9 -- never partial-ship): same
+    # (fail-closed, invariants 1/9 -- never partial-ship): same
     # discipline as `_try_multi_bond_decompose` above -- a fragment that still
     # could not be named/covered after the T4 rescue rung is genuinely
     # unnameable, and shipping a name for `named_fragments` alone would
     # describe a SMALLER molecule than the input (the exact
-    # "Mixed-decomp partial assembly" shape `phase2-shared-mechanism-.md`
+    # "Mixed-decomp partial assembly" shape `phase2-shared-.md`
     # traced live: GPI-mannoside -> 3/4 named -> SELF-01-suppressed). Decline
     # rather than silently drop atoms.
     if failed_count > 0:
@@ -1844,8 +1843,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # If this SMILES is already in the visited set (being named up the
     # call stack), skip the probe — the caller already determined the
     # assembled name was inadequate, so proceed directly to decomposition.
-    from ..namer import name_pipeline_only
     from ..assembly.fragment_naming import _get_visited
+    from ..namer import name_pipeline_only
 
     existing_smiles = Chem.MolToSmiles(mol)
     visited = _get_visited()
@@ -1877,7 +1876,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
 
     if quality_ok and not glycoside_bypass:
         # Step 2 (the assembly WEAVER,
-        # ): the length/token
+        #): the length/token
         # heuristic `_name_quality_is_acceptable` uses to decide "good
         # enough, skip decomposition" can be FOOLED by a wrong whole-molecule
         # PARENT choice that happens to be long enough to look complete --
@@ -1950,7 +1949,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 continue
             return alt_result
 
-    # : Iterative mixed-type decomposition.
+    # Phase 107: Iterative mixed-type decomposition.
     # If single-bond retry produced no acceptable result AND the molecule has
     # cleavable bonds of multiple types, try iterative decomposition.
     if not single_result or not _name_quality_is_acceptable(single_result, mol):
@@ -1961,10 +1960,10 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 if not (existing_name and _decomposition_is_worse(iterative_result, existing_name, mol)):
                     return iterative_result
 
-    # MULTI-BOND SAME-TYPE cleavage: if N+ bonds of the same
+    # MULTI-BOND SAME-TYPE cleavage (Phase 099): if N+ bonds of the same
     # type exist, try cleaving all same-type bonds simultaneously
     # (IUPAC P-65.6.3.4 polyesters / triglycerides, P-68 glycosides).
-    # Bond-type-specific thresholds (-04):
+    # Bond-type-specific thresholds (Phase 099-04):
     # - glycosidic: 2 (disaccharide + aglycone)
     # - ester/amide: 3 (2-bond molecules better handled by single-bond)
     # Only attempt when single-bond produced no result at all.
@@ -1980,7 +1979,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                     if not (existing_name and _decomposition_is_worse(multi_result, existing_name, mol)):
                         return multi_result
 
-    # : Mixed-bond threshold relaxation.
+    # Phase 107: Mixed-bond threshold relaxation.
     # When total cleavable bonds >= 3 across all types and no single type
     # reached its threshold above, relax the ester threshold to 2 for
     # mixed-type molecules (e.g., 2 esters + 1 glycosidic).
@@ -2011,7 +2010,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                     return multi_result
 
     # Step 2 -- the assembly WEAVER
-    # : a core-and-arms composer
+    #: a core-and-arms composer
     # for star-topology multi-linkage molecules (glycerophospholipids and
     # relatives) that none of the flat assemblers above could weave into ONE
     # connected name (each fragment named fine on its own, but the suffix-
@@ -2019,21 +2018,21 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # demoted fragment, so the molecule either space-joins -- SELF-01 sees
     # disconnected OPSIN components -- or silently drops the fragment).
     #
-    # Gating (PIN byte-identity + 0-wrong): reached only here,
+    # Gating (PIN byte-identity + 0-wrong,: reached only here,
     # after every earlier attempt in this function has already had its
     # chance to return. The decision to PREFER the weave candidate over
     # whatever `single_result` already holds is never a heuristic quality
     # check -- it is a full OPSIN round-trip on BOTH candidates. So:
-    # - a `single_result` that is ALREADY correct (round-trips) is kept
-    # UNCHANGED -- the weaver is not even consulted for a preference,
-    # zero regression risk on any molecule this function already names
-    # correctly.
-    # - only when `single_result` does NOT round-trip (None, or the exact
-    # "complete name for a smaller/different molecule" shape the
-    # traced) does a weave candidate get a chance, and even then ONLY if
-    # IT independently round-trips (`weave_is_verified`, Part C -- the
-    # atom-complete-or-abstain guard). A weave candidate that fails to
-    # verify is discarded; the function falls through unchanged.
+    #   - a `single_result` that is ALREADY correct (round-trips) is kept
+    #     UNCHANGED -- the weaver is not even consulted for a preference,
+    #     zero regression risk on any molecule this function already names
+    #     correctly.
+    #   - only when `single_result` does NOT round-trip (None, or the exact
+    #     "complete name for a smaller/different molecule" shape the spy
+    #     traced) does a weave candidate get a chance, and even then ONLY if
+    #     IT independently round-trips (`weave_is_verified`, Part C -- the
+    #     atom-complete-or-abstain guard). A weave candidate that fails to
+    #     verify is discarded; the function falls through unchanged.
     # Symmetric with site 1 (above): protect a round-tripping `existing_name`
     # from being replaced too, not just `single_result` -- otherwise a
     # correct-but-heuristically-"too short" existing_name could be swapped

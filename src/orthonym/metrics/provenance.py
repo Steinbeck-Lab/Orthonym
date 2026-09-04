@@ -1,4 +1,4 @@
-""" G3: per-call naming provenance (tier derivation inputs).
+"""v25 G3: per-call naming provenance (tier derivation inputs).
 
 Observation-only contextvars — the default naming path's BEHAVIOR is
 untouched; sites merely record where the shipped name came from.
@@ -9,16 +9,16 @@ import contextvars
 from typing import Optional
 
 # ---------------------------------------------------------------------------
-# : what the OPSIN validity gate ACTUALLY DID for this name
+# Task 1: what the OPSIN validity gate ACTUALLY DID for this name
 # ---------------------------------------------------------------------------
 # `name_tiered` used to derive `opsin`/`gates_passed` from
-# gate_active = (not self._disable_opsin_validity_gate
-# and _validity_gate_jar_present())
+#     gate_active = (not self._disable_opsin_validity_gate
+#                    and _validity_gate_jar_present())
 # i.e. from *jar presence*. That is not evidence that THIS name passed
 # anything: `namer._final_opsin_validity_gate` has ten `return name`
 # carve-outs that never reach `_self_consistency_decision`, plus an OPSIN-validity stereo carve-out
 # branch that judges only the stereo-STRIPPED parse. Measured at
-# (§2): three names
+# `a6cf6157` (§2): three names
 # OPSIN cannot parse at all reported `gates_passed: ['SELF-01']`.
 #
 # The gate now records its per-name outcome here and the report is derived
@@ -54,6 +54,14 @@ GATE_OUTCOME_SELF01_INCONCLUSIVE = "self_consistency_inconclusive"
 GATE_OUTCOME_SELF01_SKIPPED = "self_consistency_skipped"
 #: SELF-01 PROVED a different molecule but `_SC_MODE == "warn"` shipped it.
 GATE_OUTCOME_SELF01_WARN_MISMATCH = "self_consistency_warn_mismatch"
+#:: the general-fallback stereo-OMISSION reclaim COMPOSED the input's
+#: dropped stereo back onto a constitution-verified flat name and re-verified
+#: that the composed name recomputes to the input's FULL InChIKey. That check is
+#: strictly STRONGER than SELF-01 (it compares the full stereo layer, not just
+#: the skeleton), so this is a genuine VERIFIED state — not a by-design carve-out
+#: that ships unproven. (It used to be recorded as ``carveout:stereo_omission_reanchor``,
+#: which mislabels a full-key-verified name as ``unverified`` — F3.)
+GATE_OUTCOME_STEREO_RECOMPOSED = "stereo_omission_full_key_recomposed"
 #: prefix for the ten by-design `return name` carve-outs: `carveout:<slug>`.
 GATE_OUTCOME_CARVEOUT_PREFIX = "carveout:"
 
@@ -64,6 +72,9 @@ GATE_OUTCOME_CARVEOUT_PREFIX = "carveout:"
 _VERIFIED_GATE_OUTCOMES = {
     GATE_OUTCOME_SELF01: "verified",
     GATE_OUTCOME_SELF01_CONSTITUTION_ONLY: "verified_constitution_only",
+    # Full-InChIKey recomposition is a stronger proof than SELF-01, so it claims
+    # the plain "verified" label (full stereo AND constitution match the input).
+    GATE_OUTCOME_STEREO_RECOMPOSED: "verified",
 }
 
 #: `gates_passed` token per verified outcome. `SELF-01(constitution)` is
@@ -72,6 +83,7 @@ _VERIFIED_GATE_OUTCOMES = {
 _GATE_TOKENS = {
     GATE_OUTCOME_SELF01: "self_consistency",
     GATE_OUTCOME_SELF01_CONSTITUTION_ONLY: "self_consistency_constitution_only",
+    GATE_OUTCOME_STEREO_RECOMPOSED: "stereo_omission_full_key_recomposed",
 }
 
 _SOURCE = contextvars.ContextVar("orthonym_prov_source", default=None)
@@ -83,7 +95,7 @@ _OPSIN = contextvars.ContextVar("orthonym_prov_opsin", default=None)
 # tiers abstain on dropped stereo — P-91.2.1).
 _STEREO_UNEXPRESSED = contextvars.ContextVar(
     "orthonym_prov_stereo_unexpressed", default=False)
-# : this emission cites the principal characteristic group as a detachable
+# this emission cites the principal characteristic group as a detachable
 # PREFIX with NO suffix (``…-5-oxo-…-4-oxabicyclo[6.4.0]dodeca-…`` for a ketone).
 #
 # That is ILL-FORMED, not merely non-preferred. `BlueBookV2.md:25009`, P-41
@@ -93,8 +105,8 @@ _STEREO_UNEXPRESSED = contextvars.ContextVar(
 # So the suffix is REQUIRED and these names omit it; OPSIN tolerates them and
 # they denote the right structure, but they are not valid IUPAC.
 #
-# Shipped deliberately on T4 ONLY, where the alternative is silence (the contributor guide
-# : for T4 an abstention is a DEFECT and a table miss must degrade to
+# Shipped deliberately on T4 ONLY, where the alternative is silence (CLAUDE.md
+#: for T4 an abstention is a DEFECT and a table miss must degrade to
 # an uglier name). Recorded per row rather than merely counted, because a number
 # in a report is not recoverable and a field is: this is precisely the spelling
 # blind spot the BB-conformance audit sized at 516 rows, and the reason it went
@@ -105,7 +117,7 @@ _SUFFIX_FREE_PREFIX_NAME = contextvars.ContextVar(
 # component recursion (name_compound inherits it).
 general_fallback_ctx = contextvars.ContextVar(
     "orthonym_general_fallback", default=False)
-# : the BEST-EFFORT discriminator (`general_fallback_unverified`), published
+# the BEST-EFFORT discriminator (`general_fallback_unverified`), published
 # for code that must choose a VOCABULARY by tier but is called from handlers that
 # do not know the tier.
 #
@@ -122,7 +134,7 @@ general_fallback_ctx = contextvars.ContextVar(
 # and break hard bound H3 (PIN default byte-identical) at the tier above PIN.
 best_effort_ctx = contextvars.ContextVar(
     "orthonym_best_effort", default=False)
-# b: the ``allow_aromatic_general`` opt-in propagated into fragment /
+# SP1.1b: the ``allow_aromatic_general`` opt-in propagated into fragment /
 # component recursion, exactly as ``general_fallback_ctx`` / ``best_effort_ctx``
 # above. ``name_compound`` (the recursive re-entry point, namer.py) builds a FRESH
 # namer, so a top-level ``allow_aromatic_general=True`` was silently lost on
@@ -134,24 +146,24 @@ best_effort_ctx = contextvars.ContextVar(
 # tier the value is False, so PIN/complete output is byte-identical.
 allow_aromatic_general_ctx = contextvars.ContextVar(
     "orthonym_allow_aromatic_general", default=False)
-# : the ``full_coverage`` opt-in (``--emit-tier full-coverage``)
+# SP5.4: the ``full_coverage`` opt-in (``--emit-tier full-coverage``)
 # propagated into fragment / component recursion, exactly as the three
 # contextvars above. This is the SINGLE bit that arms the D2 general P-69
 # coordination-additive namer (donor-set perception + additive renderer),
 # which lives strictly ABOVE best-effort: full-coverage is best-effort's
 # production superset PLUS this marker. Default False EVERYWHERE, so with the
 # flag off (the default) D2 dispatch is never reached and every tier's output
-# is byte-identical -- the load-bearing isolation property tests. Read
+# is byte-identical -- the load-bearing isolation property SP5.4 tests. Read
 # back ONLY by the recursive re-entry (``name_compound``) and D2's own dispatch
 # guard; never used as a naming-vocabulary discriminator, so it cannot alter
 # pin/valid/complete/best-effort output.
 full_coverage_ctx = contextvars.ContextVar(
     "orthonym_full_coverage", default=False)
-# : a composer (``pin_path``) name whose ring substituent prefix could
+# a composer (``pin_path``) name whose ring substituent prefix could
 # only be produced by the GENERAL tier -- see ``record_general_ring_prefix``.
 _GENERAL_RING_PREFIX = contextvars.ContextVar(
     "orthonym_prov_general_ring_prefix", default=False)
-# P7 T1: the validity gate's per-name outcome, and the name string it was
+# T1: the validity gate's per-name outcome, and the name string it was
 # recorded FOR. Defaults fail closed (NOT_RUN / no name).
 _GATE_OUTCOME = contextvars.ContextVar(
     "orthonym_prov_gate_outcome", default=GATE_OUTCOME_NOT_RUN)
@@ -163,14 +175,14 @@ def clear_provenance() -> None:
     _SOURCE.set(None)
     _OPSIN.set(None)
     _STEREO_UNEXPRESSED.set(False)
-    # P7 T1: a gate outcome left over from the PREVIOUS molecule would
+    # T1: a gate outcome left over from the PREVIOUS molecule would
     # mislabel this one, so it resets with the rest of the provenance.
     _GATE_OUTCOME.set(GATE_OUTCOME_NOT_RUN)
     _GATE_OUTCOME_NAME.set(None)
-    # : same reason -- a flag left from the previous molecule would
+    # same reason -- a flag left from the previous molecule would
     # demote this one's tier for a prefix it does not contain.
     _GENERAL_RING_PREFIX.set(False)
-    # : same reason again -- a suffix-free flag left from the previous
+    # same reason again -- a suffix-free flag left from the previous
     # molecule would tag this one's name as ill-formed when it is not.
     _SUFFIX_FREE_PREFIX_NAME.set(False)
 
@@ -178,7 +190,7 @@ def clear_provenance() -> None:
 def restore_provenance(snapshot: dict) -> None:
     """Re-set every provenance ContextVar from a ``get_provenance()`` dict.
 
-    The inverse of:func:`get_provenance`. A caller that speculatively runs a
+    The inverse of :func:`get_provenance`. A caller that speculatively runs a
     producer which records provenance (``record_source`` et al.) and then
     REJECTS its candidate must restore the pre-attempt provenance, otherwise the
     kept emission carries the rejected producer's label. Used by the
@@ -201,14 +213,14 @@ def record_source(source: str, opsin: Optional[str] = None) -> None:
 
 
 def record_stereo_unexpressed(flag: bool) -> None:
-    """ P6 T6.4: mark the current emission as constitution-only (stereo
+    """.4: mark the current emission as constitution-only (stereo
     defined on the input but not expressed in the name). Set at the flagged
     best-effort ship site; read by ``name_tiered``."""
     _STEREO_UNEXPRESSED.set(bool(flag))
 
 
 def record_suffix_free_prefix_name(flag: bool) -> None:
-    """: mark the current emission as citing the principal characteristic
+    """mark the current emission as citing the principal characteristic
     group as a PREFIX with no suffix -- ill-formed per P-41 (see the ContextVar
     comment). Set only at the T4 PG-suppressed assembly site; read by
     ``name_tiered`` and surfaced per row so can enumerate the debt."""
@@ -216,7 +228,7 @@ def record_suffix_free_prefix_name(flag: bool) -> None:
 
 
 def record_gate_outcome(outcome: str, name: Optional[str]) -> None:
-    """ P7 T1: record what `_final_opsin_validity_gate` DID, and for WHICH
+    """: record what `_final_opsin_validity_gate` DID, and for WHICH
     string. Called at every return of the gate (and of
     `_self_consistency_decision`, which owns the gate's SELF-01 exits).
 

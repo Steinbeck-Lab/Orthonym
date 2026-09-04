@@ -21,7 +21,6 @@ from rdkit import Chem
 from ..perception.functional_groups import detect_functional_groups
 from ..rules.seniority import SENIORITY_ORDER, get_principal_group
 
-
 # Sentinel rank for fragments with no detectable principal group
 _NO_FG_RANK = 999
 

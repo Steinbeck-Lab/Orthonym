@@ -5,15 +5,15 @@ Tools for validating generated IUPAC names against external resolvers
 (OPSIN, PubChem) and measuring name quality (atom coverage).
 """
 
-from .pubchem_validator import load_cache, lookup_name_pubchem, save_cache
 from .dual_validator import DualResult, validate_compound
 from .format_validator import validate_name_format
-from .opsin_roundtrip import opsin_parse, opsin_roundtrip_check
 from .opsin_grammar import (
     OpsinGrammar,
     opsin_grammar_suggest_fix,
     opsin_grammar_validate,
 )
+from .opsin_roundtrip import opsin_parse, opsin_roundtrip_check
+from .pubchem_validator import load_cache, lookup_name_pubchem, save_cache
 
 __all__ = [
     "lookup_name_pubchem",

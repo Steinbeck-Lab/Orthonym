@@ -5,7 +5,7 @@ Validates how completely a generated IUPAC name describes the input molecule
 by parsing the name back to a structure (OPSIN) and comparing that structure
 to the input.
 
- residue, Task X -- this module used to compare heavy-atom COUNTS, which
+v29 residue, Task X -- this module used to compare heavy-atom COUNTS, which
 made it unsound in three separate ways, all measured:
 
   * ``ratio = min(parsed_heavy / total_heavy, 1.0)`` clamped away atom GAIN,
@@ -14,25 +14,25 @@ made it unsound in three separate ways, all measured:
   * ``is_complete = ratio >= 0.80`` passed a genuine atom DROP
     (``CS(=O)(=O)NC`` -> ``methanesulfonamide`` scored 0.833 -> complete);
   * a count cannot distinguish *the same atoms* from *the same number of
-    atoms*. ``CNCC(=O)O`` (sarcosine) named ``2-aminopropanoic acid``
+    atoms*.  ``CNCC(=O)O`` (sarcosine) named ``2-aminopropanoic acid``
     (alanine) matches on heavy count AND on molecular formula AND on the
     heavy-atom element multiset, and is a different molecule.
 
 ``is_complete`` is therefore decided by CONSTITUTION -- the InChIKey skeleton
 block of the input compared with that of the parse-back -- and never by a
-threshold on a count. The counts survive only as diagnostics, and atom gain
+threshold on a count.  The counts survive only as diagnostics, and atom gain
 is reported explicitly as ``extra_atoms``.
 
-DECLARED SCOPE. The skeleton block fixes the molecular formula, the
-connectivity and the hydrogen layer. It does NOT fix stereochemistry,
+DECLARED SCOPE.  The skeleton block fixes the molecular formula, the
+connectivity and the hydrogen layer.  It does NOT fix stereochemistry,
 isotopes or net charge, which live in the second InChIKey block; a
 stereo-blind name still covers every atom and is reported complete here.
 Both full InChIKeys are exposed on the result so a caller needing the
-stricter comparison can make it without re-parsing. This module answers
+stricter comparison can make it without re-parsing.  This module answers
 "are these the same atoms, bonded the same way" and nothing more.
 
 This is a diagnostic tool -- it reports coverage but never blocks naming
-output. The load-bearing in-process no-silent-atom-drop gate is the E1
+output.  The load-bearing in-process no-silent-atom-drop gate is the E1
 atom->token partition certificate in ``validation/e1_certificate.py``; E1
 needs a ``GeneralEngineResult`` and so cannot serve callers that hold only
 (mol, name), which is what this module is for.
@@ -52,6 +52,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Set
 
 from rdkit import Chem
+
 from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 
@@ -65,26 +66,26 @@ class CoverageResult:
             counted as the size of the element-multiset intersection.
         unclaimed_atoms: Input heavy atoms with NO counterpart (atoms the name
             dropped) = total_heavy_atoms - claimed_atoms.
-        coverage_ratio: claimed / total (0.0 to 1.0). Diagnostic only -- it
+        coverage_ratio: claimed / total (0.0 to 1.0).  Diagnostic only -- it
             is NOT what decides ``is_complete``, and by construction it cannot
             see atom gain (see ``extra_atoms``) or a rearrangement (see
             ``constitution_match``).
         is_complete: True only when the parse-back has the SAME CONSTITUTION
-            as the input, i.e. ``constitution_match``. Never a threshold on
+            as the input, i.e. ``constitution_match``.  Never a threshold on
             a count.
         method: 'parse_back', 'trivial', 'parse_back_no_inchi', or
             'unavailable'.
-        claimed_atom_indices: Indices of atoms accounted for. Empty on the
+        claimed_atom_indices: Indices of atoms accounted for.  Empty on the
             parse-back path, which compares whole structures rather than
             mapping atom to atom.
-        unclaimed_atom_indices: Indices of atoms NOT accounted for. Empty on
+        unclaimed_atom_indices: Indices of atoms NOT accounted for.  Empty on
             the parse-back path, as above.
         extra_atoms: Heavy atoms present in the parse-back that the INPUT does
-            not have -- atoms the name invented. Zero for a faithful name.
+            not have -- atoms the name invented.  Zero for a faithful name.
         parsed_heavy_atoms: Raw heavy-atom count of the parse-back, unclamped,
             so a caller can recover the true count ratio (which may exceed 1).
         constitution_match: InChIKey skeleton block of input == that of the
-            parse-back. Fixes formula, connectivity and H layer; does not
+            parse-back.  Fixes formula, connectivity and H layer; does not
             fix stereo, isotopes or charge (module docstring, DECLARED SCOPE).
         input_inchikey: Full InChIKey of the input molecule ('' if unavailable).
         parsed_inchikey: Full InChIKey of the parse-back ('' if unavailable).
@@ -108,9 +109,9 @@ class CoverageResult:
 def find_opsin_jar() -> Optional[str]:
     """Find OPSIN JAR file in project root or standard locations.
 
-    Uses the same search patterns as ``.
+    Uses the same search patterns as ``scripts/benchmark_chebi500.py``.
     """
-    # Determine project root (go up from src/orthonym/validation)
+    # Determine project root (go up from src/orthonym/validation/)
     this_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(this_dir, "..", "..", ".."))
 
@@ -146,7 +147,7 @@ _OPSIN_PARSE_CACHE_MAX = 16384
 
 
 def _parse_name_with_opsin(name: str, opsin_jar: str) -> Optional[str]:
-    """Memoizing wrapper over:func:`_parse_name_with_opsin_uncached`.
+    """Memoizing wrapper over :func:`_parse_name_with_opsin_uncached`.
 
     See the note above ``_OPSIN_PARSE_CACHE`` for why a process-global memo is
     sound. Bounded to ``_OPSIN_PARSE_CACHE_MAX`` distinct names; once full it stops
@@ -170,7 +171,7 @@ _CACHE_MISS = object()
 def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
     """Parse a single IUPAC name to SMILES using OPSIN JAR.
 
-    Mirrors the batch approach from ``
+    Mirrors the batch approach from ``scripts/benchmark_chebi500.py``
     (stdin/stdout mode with a single name written to a temp file).
 
     Args:
@@ -186,7 +187,7 @@ def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
     # PERF: prefer the ONE lazily-started in-process JVM (jvm_bridge,
     # JPype) over a fresh ~0.82 s cold `java -jar` launch per name -- that
     # cold-start dominated atom-coverage wall time. ``opsin_stdout`` returns
-    # EXACTLY the bytes this ``java -jar... -osmi`` invocation would have
+    # EXACTLY the bytes this ``java -jar ... -osmi`` invocation would have
     # written to stdout, so the parsing below is SHARED verbatim between the two
     # sources and cannot drift. ``served`` is False whenever the in-process path
     # cannot serve the call (jpype absent, jar unresolvable or a different OPSIN
@@ -279,7 +280,7 @@ def _inchikey(mol) -> str:
 def _skeleton(inchikey: str) -> str:
     """First (connectivity) block of an InChIKey; ``''`` if malformed.
 
-    The skeleton block encodes formula + connectivity + H layer. Stereo,
+    The skeleton block encodes formula + connectivity + H layer.  Stereo,
     isotope and charge live in the second block and are deliberately outside
     this validator's scope (see the module docstring).
     """
@@ -297,7 +298,7 @@ def validate_atom_coverage(
     """Validate how completely *name* describes *mol*.
 
     Parses *name* back to a molecule via OPSIN and compares that molecule to
-    *mol* by CONSTITUTION (InChIKey skeleton block). Heavy-atom counts are
+    *mol* by CONSTITUTION (InChIKey skeleton block).  Heavy-atom counts are
     reported as diagnostics -- dropped atoms as ``unclaimed_atoms``, invented
     atoms as ``extra_atoms`` -- but never decide ``is_complete``, because a
     count cannot distinguish the same atoms from the same number of atoms.
@@ -309,15 +310,15 @@ def validate_atom_coverage(
             If OPSIN is unavailable, returns a result with method='unavailable'.
 
     Returns:
-        A:class:`CoverageResult` with coverage metrics.
+        A :class:`CoverageResult` with coverage metrics.
     """
     total_heavy = mol.GetNumHeavyAtoms()
 
     if total_heavy == 0:
         # A molecule with no heavy atoms has an empty heavy-atom set, so that
-        # set is vacuously covered. NOTE (pre-existing, deliberately left):
+        # set is vacuously covered.  NOTE (pre-existing, deliberately left):
         # this branch does not consult *name* at all, so it is the one exit
-        # that does not prove constitution. Reachable only for inputs such
+        # that does not prove constitution.  Reachable only for inputs such
         # as [H][H]; kept as-is rather than widened unmeasured.
         return CoverageResult(
             total_heavy_atoms=0,
@@ -349,7 +350,7 @@ def validate_atom_coverage(
                 parsed_heavy = parsed_mol.GetNumHeavyAtoms()
 
                 # Per-ELEMENT intersection, not a bare count: a carbon in the
-                # name cannot stand in for a nitrogen in the molecule. The
+                # name cannot stand in for a nitrogen in the molecule.  The
                 # intersection is <= total_heavy by construction, so the old
                 # `min(..., 1.0)` clamp -- which is what made atom GAIN
                 # invisible -- is not merely removed but unnecessary.
@@ -390,7 +391,7 @@ def validate_atom_coverage(
                     claimed_atoms=claimed,
                     unclaimed_atoms=unclaimed,
                     coverage_ratio=claimed / total_heavy,
-                    # NOT a threshold on the ratio. Identical constitution is
+                    # NOT a threshold on the ratio.  Identical constitution is
                     # the only thing that establishes the name covers exactly
                     # these atoms -- see the module docstring for what that
                     # does and does not fix.

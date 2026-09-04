@@ -1,12 +1,12 @@
-""" P0.3 — the corrected three-metric coverage instrument.
+""".3 — the corrected three-metric coverage instrument.
 
 Pure classifiers + aggregator. NO Java and NO Orthonym naming happen in
 this module: the round-trip is performed by an injected callable
 (``name_to_smiles: str -> Optional[str]``), so the unit tests exercise every
 branch with a dict-backed fake OPSIN. The production runner
-(``) supplies the real OPSIN subprocess.
+(``scripts/coverage_metrics.py``) supplies the real OPSIN subprocess.
 
-Corrected metric contract (binds the ship gate — see the master plan
+Corrected metric contract (binds the v25 ship gate — see the master plan
 "Metric definitions"):
 
 * ``coverage`` = emitted / total. "Emitted" = Orthonym produced a real
@@ -56,7 +56,7 @@ presented as commensurable with coverage.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, Optional, Sequence
 
 from rdkit import Chem
 from rdkit.Chem import inchi

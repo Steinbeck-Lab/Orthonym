@@ -14,15 +14,16 @@ substituent patterns).
 import os
 import subprocess
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 from rdkit.Chem.inchi import MolToInchi
 
-from .pubchem_validator import lookup_name_pubchem
 from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
+
+from .pubchem_validator import lookup_name_pubchem
 
 
 @dataclass

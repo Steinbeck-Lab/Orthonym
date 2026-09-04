@@ -15,7 +15,7 @@ Public API:
 """
 
 from .bond_cleavage import find_cleavable_bonds
-from .fragment_capping import cleave_and_cap
 from .engine import try_decompose
+from .fragment_capping import cleave_and_cap
 
 __all__ = ["try_decompose", "find_cleavable_bonds", "cleave_and_cap"]

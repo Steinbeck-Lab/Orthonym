@@ -1,4 +1,4 @@
-"""Named limit/error catalog for out-of-scope inputs (HYG-02).
+"""Named limit/error catalog for out-of-scope inputs (HYG-02, Phase 173).
 
 Orthonym's default posture is *always-emit*: it returns a name (or a
 descriptive fallback string) for every input. That reaches inputs a
@@ -7,15 +7,15 @@ result is a confident name or a plausible-but-wrong guess for something
 Orthonym genuinely cannot handle (the §5.1C failure mode — e.g. a bare atom or
 a wildcard structure named as if it were a real molecule).
 
-This module adds HERITAGE-style *named limit codes* so a caller can distinguish
+This module adds AUTONOM-style *named limit codes* so a caller can distinguish
 **"can't handle"** from **"got it wrong"** WITHOUT changing the default
 always-emit behaviour. The structured `OrthonymLimitError` is surfaced only via
 opt-in paths (`Orthonym.name(..., raise_on_limit=True)`,
 `name_with_confidence()['limit']`, and `classify_limit()`); the default string
 path is byte-identical to before.
 
-Provenance (each code cites the HERITAGE analog it mirrors):
- §10`
+Provenance (each code cites the AUTONOM analog it mirrors):
+
 ("Hard limits & error catalog"): 40 codes in 0x104–0x18f, limits table
 (125 total atoms / 44 per chain·ring·assembly / 32 stem candidates /
 2 components / 255 chars), representative refusals ERR-210 (out of organic
@@ -27,8 +27,7 @@ from typing import Dict, Optional
 
 from rdkit import Chem
 
-
-# HERITAGE total-atoms hard limit (code 212): 125 atoms / structure.
+# AUTONOM total-atoms hard limit (code 212): 125 atoms / structure.
 ATOM_LIMIT = 125
 
 # Elements Orthonym names as organic skeletons / substituents. Single source
@@ -91,7 +90,7 @@ def _build_descriptive_fallback_names() -> frozenset:
 _DESCRIPTIVE_FALLBACK_NAMES: frozenset = _build_descriptive_fallback_names()
 
 
-# Symbolic Orthonym codes -> (generic message, HERITAGE analog). The per-instance
+# Symbolic Orthonym codes -> (generic message, AUTONOM analog). The per-instance
 # message may be more specific (e.g. the metal name); these are the defaults.
 LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
     'WILDCARD_ATOMS': {
@@ -114,7 +113,7 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
         'message': 'unknown organic compound',
         'design_note_ref': 'ERR-270/274',
     },
-    # G0 fail-closed safety (S1): a ring system Orthonym recognises as
+    # G0 fail-closed safety (DD7 S1): a ring system Orthonym recognises as
     # complex (polycomponent-fused, bridged-fused, or aromatic-in-a-von-Baeyer
     # cage) but cannot yet name CORRECTLY. Raised mid-assembly to refuse rather
     # than emit a structurally-wrong de-aromatised cage / phantom substituent.
@@ -133,7 +132,7 @@ class OrthonymLimitError(Exception):
     """Raised (opt-in) when an input is provably out of Orthonym's scope.
 
     Carries a symbolic ``code`` (a key of ``LIMIT_CATALOG``), a human-readable
-    ``message``, the mirrored HERITAGE ``design_note_ref``, and the offending
+    ``message``, the mirrored AUTONOM ``design_note_ref``, and the offending
     ``smiles`` when available. A caller that catches this knows Orthonym
     *cannot handle* the input — as opposed to a returned name, which is a
     best-effort *attempt*.
@@ -169,7 +168,7 @@ def _make(code: str, message: Optional[str] = None,
 
 def unsupported_ring_system(smiles: Optional[str] = None) -> OrthonymLimitError:
     """Build the G0 fail-closed refusal for a complex ring system Orthonym
-    cannot yet name correctly (S1). Raised mid-assembly by the von-Baeyer /
+    cannot yet name correctly (DD7 S1). Raised mid-assembly by the von-Baeyer /
     bicyclo / polycomponent-fusion paths; caught once at ``Orthonym.name``
     (default path returns ``.message`` = 'unknown organic compound';
     ``raise_on_limit=True`` re-raises this error)."""
@@ -233,7 +232,7 @@ def is_refusal_sentinel(name: Optional[str]) -> bool:
 
     This is the slot-level predicate. It is deliberately built ON TOP of
     ``is_failure_name`` rather than beside it: that function already recognises
-    three of the four sentinel families exactly (empty, ``'unknown...'``, and the
+    three of the four sentinel families exactly (empty, ``'unknown ...'``, and the
     ``'... (not supported)'`` descriptive fallbacks), and duplicating them is how
     this class of bug reached six copies in the first place. What it does NOT
     recognise is the substituent cascade's bare ``'substituent'`` placeholder,

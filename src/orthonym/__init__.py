@@ -15,9 +15,9 @@ Example usage:
 __version__ = "1.0.0"
 __author__ = "Kohulan Rajan"
 
-from .namer import name_compound, Orthonym, name_with_tree, classify_limit
 from .assembly.name_tree import NameTreeNode, NamingResult
 from .errors import OrthonymLimitError
+from .namer import Orthonym, classify_limit, name_compound, name_with_tree
 
 __all__ = [
     "name_compound",

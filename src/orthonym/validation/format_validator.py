@@ -12,8 +12,6 @@ so upstream fixes can be applied at the root cause.
 import re
 from typing import Tuple
 
-from orthonym.data.opsin_imports.word_rules import OPSIN_WORD_RULES
-
 
 # -------------------------------------------------------------------------
 # Known OPSIN word rule patterns (simplified for heuristic matching)
@@ -228,10 +226,10 @@ def _matches_known_multiword_pattern(words: list) -> bool:
 
 
 def _check_bracket_nesting(name: str) -> Tuple[bool, str]:
-    """Verify P-16.5.4.1 bracket hierarchy: inside [] inside {}.
+    """Verify P-16.5.4.1 bracket hierarchy: () inside [] inside {}.
 
     IUPAC enclosing marks hierarchy:
-    - Level 0: parentheses
+    - Level 0: parentheses ()
     - Level 1: brackets []
     - Level 2: braces {}
     - Then repeat: (()) [[]] {{}}
@@ -307,7 +305,7 @@ def validate_name_format(name: str) -> Tuple[bool, str]:
     Checks performed:
         1. Empty name
         2. Unbalanced brackets (parentheses, square brackets, braces)
-        3. Empty parentheses
+        3. Empty parentheses ()
         4. Bare 'oxy' prefix (not part of a larger word)
         5. Double hyphens -- (except within VB descriptors)
         6. Multi-word name validation against OPSIN word rules (FMT-05)

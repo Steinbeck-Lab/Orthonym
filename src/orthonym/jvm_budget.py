@@ -2,9 +2,9 @@
 
 Replaces the blanket folk rule "never run two OPSIN jobs concurrently" with a
 measured budget and real enforcement. The rule it replaces was never measured;
-worse, it did not describe the code -- `` has always run
+worse, it did not describe the code -- ``eval/harness.py`` has always run
 ``mp.Pool(cpu_count() - 4)`` = 12 concurrent JPype JVMs on this host.
-Measurements and citations: ``.
+Measurements and citations:.
 
 Why a budget at all, given memory is not the constraint
 -------------------------------------------------------
@@ -67,7 +67,7 @@ from typing import Iterator, List, Optional
 logger = logging.getLogger(__name__)
 
 #: Slots reserved for the interactive shell, RDKit, and the coordinating Python
-#: process itself. `:454`` independently arrived at the same
+#: process itself. ``eval/harness.py:454`` independently arrived at the same
 #: ``cpu_count() - 4``; keeping the identical formula means wiring the budget in
 #: does not change that tool's existing default degree of parallelism.
 _RESERVED_CPUS = 4
@@ -78,7 +78,7 @@ _ENV_OFF = "ORTHONYM_JVM_BUDGET"
 
 
 class BudgetTimeout(RuntimeError):
-    """Raised by:func:`jvm_slots` when ``on_timeout='raise'`` and the wait expired."""
+    """Raised by :func:`jvm_slots` when ``on_timeout='raise'`` and the wait expired."""
 
 
 def is_enabled() -> bool:
@@ -267,7 +267,7 @@ def jvm_slots(count: int = 1, *, purpose: str = "unnamed",
 def status() -> dict:
     """Report which slots are currently held, and by what.
 
-    The supported replacement for ``pgrep -f "\\.py"``: it counts,
+    The supported replacement for ``pgrep -f "scripts/v22_gate\\.py"``: it counts,
     it names the holder, and it cannot self-match the checking command.
     """
     total = total_slots()
@@ -314,12 +314,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     """``python -m orthonym.jvm_budget`` -- show the current budget."""
     st = status()
     print(f"JVM budget: {st['total'] - st['free']}/{st['total']} slots held "
-          f"({'enabled' if st['enabled'] else 'DISABLED'}) dir={st['slot_dir']}")
+          f"({'enabled' if st['enabled'] else 'DISABLED'})  dir={st['slot_dir']}")
     for h in st["held"]:
         age = f"{h.get('age_s')}s" if h.get("age_s") is not None else "?"
-        print(f" slot {h['slot']:>3} pid={h.get('pid')} {h.get('purpose')} age={age}")
+        print(f"  slot {h['slot']:>3}  pid={h.get('pid')}  {h.get('purpose')}  age={age}")
     if not st["held"]:
-        print(" (all slots free -- no OPSIN/JVM job is running)")
+        print("  (all slots free -- no OPSIN/JVM job is running)")
     return 0
 
 

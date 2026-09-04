@@ -1,15 +1,15 @@
-""" ClassFirstRouter — dispatch substrate at _name_impl integration site.
+"""Phase 158 ClassFirstRouter — dispatch substrate at _name_impl integration site.
 
 Architecture (158-CONTEXT.md):
-- ``dispatch()`` — two-tier predicate evaluation (Tier-1 mol-only first;
+- ``dispatch`` — two-tier predicate evaluation (Tier-1 mol-only first;
   perception ONCE between tiers; Tier-2 features-required last; GENERAL
-  catch-all per). the perception step lives INSIDE the
-  GENERAL handler's caller (``_name_impl`` body) per -02-01 design
+  catch-all per). For Phase 158 the perception step lives INSIDE the
+  GENERAL handler's caller (``_name_impl`` body) per Task 158-02-01 design
   choice (a) — the dispatcher itself never invokes ``_perceive`` directly,
   preserving ``routing/`` as decoupled from ``composer.py`` (boundary).
-- ``get_dispatch_stats()`` / ``reset_dispatch_stats()`` — per-instance
+- ``get_dispatch_stats`` / ``reset_dispatch_stats`` — per-instance
   histogram counter accessor. Per-instance (NOT module-global) per AP-6.
-- ``_invoke_audit_log()`` — ``ORTHONYM_DISPATCH_AUDIT`` env-var-gated
+- ``_invoke_audit_log`` — ``ORTHONYM_DISPATCH_AUDIT`` env-var-gated
   INFO-level log. Default-OFF preserves CFR-04 stdout-byte-identical canary.
 
 Anti-pattern hygiene (158-AUDIT-CFR.md AP-block):
@@ -23,7 +23,7 @@ Anti-pattern hygiene (158-AUDIT-CFR.md AP-block):
 - AP-19: feature-flag-controlled CFR routing path -> NO opt-out flag per
   CONTEXT; CFR is the only routing path post-Phase-158.
 
-Per CONTEXT honest-fail-on-data: ``dispatch()`` raises RuntimeError if
+Per CONTEXT honest-fail-on-data: ``dispatch`` raises RuntimeError if
 the GENERAL catch-all is unreachable (impossible by construction; defensive).
 """
 
@@ -35,11 +35,10 @@ import os
 from collections import Counter
 from typing import Any, Dict, Optional
 
-from rdkit import Chem  # noqa: F401 -- type annotation only
+from rdkit import Chem  # noqa: F401  -- type annotation only
 
 from .dispatch_table import (
     DISPATCH_TABLE,
-    ClassDispatchEntry,
     ClassDispatchResult,
     StoutClass,
 )
@@ -52,7 +51,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 ORTHONYM_DISPATCH_AUDIT_ENV_VAR: str = "ORTHONYM_DISPATCH_AUDIT"
-_DISPATCH_P99_BUDGET_MS: float = 1.0  # hard gate (informational; benchmark in)
+_DISPATCH_P99_BUDGET_MS: float = 1.0  # D-15 hard gate (informational; benchmark in Plan-03)
 
 
 # ---------------------------------------------------------------------------
@@ -69,26 +68,26 @@ class ClassFirstRouter:
        Returns a frozen ``ClassDispatchResult`` whose ``handler`` field the
        caller invokes to produce the name string. The dispatcher does NOT
        call the handler itself per AP-9 +.
-    2. ``get_dispatch_stats()`` — per-instance histogram counter accessor.
+    2. ``get_dispatch_stats`` — per-instance histogram counter accessor.
        Returns a defensive copy so callers cannot mutate internal state.
-    3. ``reset_dispatch_stats()`` — explicit reset for batch-run
+    3. ``reset_dispatch_stats`` — explicit reset for batch-run
        boundaries.
 
     Construction: ``ClassFirstRouter()`` with no args. Reads
     ``ORTHONYM_DISPATCH_AUDIT`` env var by default for the audit-log gate
-    (); the constructor kwarg ``_audit_log`` overrides for testing.
+    ; the constructor kwarg ``_audit_log`` overrides for testing.
     """
 
     # Class-level constant: pre-seeded counter buckets (one per StoutClass).
-    # Mirrors OpsinGrammar.STAT_KEYS pattern.
+    # Mirrors Phase 156 OpsinGrammar.STAT_KEYS pattern.
     STAT_KEYS: tuple = tuple(c.value for c in StoutClass)
 
     def __init__(self, *, _audit_log: Optional[bool] = None) -> None:
-        # : env-var-gated audit log (default-OFF per CFR-04 byte-identical-stdout)
+        #: env-var-gated audit log (default-OFF per CFR-04 byte-identical-stdout)
         if _audit_log is None:
             _audit_log = os.environ.get(ORTHONYM_DISPATCH_AUDIT_ENV_VAR) == "1"
         self._audit_log: bool = _audit_log
-        # : per-instance counter (no module-global state per AP-6)
+        #: per-instance counter (no module-global state per AP-6)
         self._dispatch_stats: Counter = Counter()
 
     # -----------------------------------------------------------------------
@@ -119,7 +118,7 @@ class ClassFirstRouter:
                 GENERAL ``lambda *_: True`` always matches as the catch-all).
                 Defensive raise per honest-fail-on-data.
         """
-        # : explicit sort makes priority-ordering invariant (defense
+        #: explicit sort makes priority-ordering invariant (defense
         # against RL-1 ordering drift).
         for entry in sorted(DISPATCH_TABLE.values(), key=lambda e: e.priority):
             # Predicate evaluation; signature is

@@ -43,8 +43,7 @@ from __future__ import annotations
 import contextvars
 from typing import Any, Dict, NamedTuple, Optional
 
-from orthonym.validation.binding_spine import (BindingSpine, Finding,
-                                                SpineProof, verify_spine)
+from orthonym.validation.binding_spine import BindingSpine, Finding, SpineProof, verify_spine
 
 # The ledger's own finding code: the proof machinery itself failed, so
 # nothing was established. Distinct from every binding_spine code, all of
@@ -132,9 +131,9 @@ def finalize(final_name: str, *, mode: str = "audit") -> Optional[SpineProof]:
 
 
 def get_proof() -> Dict[str, Any]:
-    """The ledger's current state, for telemetry and the census.
+    """The ledger's current state, for telemetry and the Task 7 census.
 
-    ``ok is None`` and ``codes ==`` mean no verdict exists yet (nothing
+    ``ok is None`` and ``codes == ()`` mean no verdict exists yet (nothing
     recorded, or recorded but not finalized) -- deliberately distinct from
     ``ok is False`` with codes, which is a real failed proof.
     """

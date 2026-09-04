@@ -1,4 +1,4 @@
-""" dispatch table for class-first routing (CFR-02).
+"""Phase 158 dispatch table for class-first routing (CFR-02).
 
 Authoritative source for v18 outer-cascade dispatch decisions. The DISPATCH_TABLE
 is built at module-import time by 19 explicit ``_register_dispatch(...)`` calls
@@ -9,7 +9,7 @@ registration via the ``_REGISTRATION_FROZEN`` sentinel).
 Architecture (158-CONTEXT.md):
 - StoutClass(StrEnum) — explicit type-safe enum; one member per dispatch
   class. v19 sibling-phase slots are commented out per // (NOT
-  registered in DISPATCH_TABLE; reserved / 162 / 163).
+  registered in DISPATCH_TABLE; reserved for Phase 161 / 162 / 163).
 - ClassDispatchEntry — frozen dataclass; immutable; serializable for the
    audit log.
 - DISPATCH_TABLE: OrderedDict[StoutClass, ClassDispatchEntry] — +
@@ -35,9 +35,9 @@ Anti-pattern hygiene (158-AUDIT-CFR.md AP-block):
 - AP-8: predicate side effects -> ``side_effect_inventory`` MUST be ``()``
   for every entry (hard invariant).
 - AP-15: padding § 1 with inner ``_classify`` classes -> Path-(b) reconciliation
-  per RESEARCH § 8.4; inner classes are / territory.
+  per RESEARCH § 8.4; inner classes are Phase 160 / territory.
 - AP-21: predicate that mutates ``mol`` / ``MolecularFeatures`` / global state
-  -> the integrity test ``test_side_effect_inventory_is_empty``
+  -> the integrity test ``test_side_effect_inventory_is_empty`` (Plan-03)
   parametrizes over ``list(StoutClass)`` and asserts ``()`` for every entry.
 
 IUPAC P-section cites for each StoutClass live in the per-row docstring
@@ -50,7 +50,7 @@ import logging
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +59,7 @@ logger = logging.getLogger(__name__)
 # per ``namer.py:853`` precedent to avoid the circular
 # ``orthonym.routing -> orthonym.rules -> orthonym.namer -> orthonym.routing``
 # load order. ``rdkit.Chem`` is a third-party module so eager import is safe.
-from rdkit import Chem  # noqa: F401 -- type annotation only
-
+from rdkit import Chem  # noqa: F401  -- type annotation only
 
 # ---------------------------------------------------------------------------
 # Section 2: StoutClass(StrEnum)
@@ -68,7 +67,7 @@ from rdkit import Chem  # noqa: F401 -- type annotation only
 # One member per audit § 1 row (Path-(b) reconciliation: 18 outer-cascade
 # entries + GENERAL catch-all = 19 active members). v19 sibling-phase slots
 # are commented out per CONTEXT / / — they are NOT registered
-# in DISPATCH_TABLE.
+# in DISPATCH_TABLE in Phase 158.
 # ---------------------------------------------------------------------------
 
 
@@ -84,12 +83,12 @@ class _StrEnumBase(str, Enum):
 
 
 class StoutClass(_StrEnumBase):
-    """ dispatch class identifiers (CONTEXT).
+    """Phase 158 dispatch class identifiers (CONTEXT).
 
     Per CONTEXT + audit § 1 Path-(b) reconciliation: 18 outer-cascade
     entries (rows 1-18 of audit § 1) + 1 GENERAL catch-all = 19 enum members.
     v19 sibling-phase slots are commented out (audit § 4) and inserted by
-     / 162 / 163 as 1-line ``_register_dispatch(...)`` additions.
+    Phase 161 / 162 / 163 as 1-line ``_register_dispatch(...)`` additions.
     """
 
     # --- Tier-1 charged-species + dot-disconnected (audit § 1 rows 1-8) ---
@@ -98,15 +97,15 @@ class StoutClass(_StrEnumBase):
     ZWITTERION = "zwitterion"                 # row 3; namer.py:858-860; P-74
     ANION_RETAINED = "anion_retained"         # row 4; namer.py:861-871; P-72
     CATION_RETAINED = "cation_retained"       # row 5; namer.py:872-875; P-73
-    CATION_QUATERNARY = "cation_quaternary"   # WS-E.1 (P-73.1.2.1 quaternary aminium; priority 480, tier 1 — below ZWITTERION@300/LIPID@250, above CATION_RETAINED@500)
-    ESTER_ANION_ZWITTERION = "ester_anion_zwitterion"  # B1 (P-72.2.2.2.1.2 choline-family acid-ester-anion zwitterion; priority 301, tier 1 — right after ZWITTERION@300). A mono-ester P-oxoacid DIANION whose owner arm carries a quaternary cation (e.g. R-O-PO3^2-) has NET CHARGE != 0, so `detect_species_type` returns 'ion' (not 'zwitterion') and ZWITTERION@300's predicate never sees it, even though `charged_router`'s OWN internal zwitterion test (site presence, not net charge) already names it correctly once reached. This entry is the missing dispatch-level door for that net-charged variant; predicate-IS-handler pattern (mirrors ANION_RETAINED@400).
-    MIXED_SIGN_ZWITTERION = "mixed_sign_zwitterion"  # charged Slice B (P-74.2.1.2 azaniumyl PIN; priority 302, tier 1 — right after ESTER_ANION_ZWITTERION@301). The GENERAL net-charged door for a single-fragment, metal-free MIXED-SIGN organic (>=1 cation site AND >=1 anion site) that `detect_species_type` buckets as 'ion' (net charge != 0), e.g. a protonated diamino-acid `[NH3+]CCCC([NH3+])C(=O)[O-]` (net +1) -> `2,5-bis(azaniumyl)pentanoate`. `charged_router.route_charged` routes such a fragment to `_route_zwitterion` (its zwitterion test is site-presence, not net charge), which builds the RT-gated azaniumyl PIN; predicate-IS-handler (mirrors ESTER_ANION_ZWITTERION@301). Net-zero mixed-sign is already ZWITTERION@300's; this is strictly the net-charged variant.
+    CATION_QUATERNARY = "cation_quaternary"   # Phase 184 WS-E.1 (P-73.1.2.1 quaternary aminium; priority 480, tier 1 — below ZWITTERION@300/LIPID@250, above CATION_RETAINED@500)
+    ESTER_ANION_ZWITTERION = "ester_anion_zwitterion"  # v33 Phase 3 B1 (P-72.2.2.2.1.2 choline-family acid-ester-anion zwitterion; priority 301, tier 1 — right after ZWITTERION@300). A mono-ester P-oxoacid DIANION whose owner arm carries a quaternary cation (e.g. R-O-PO3^2-) has NET CHARGE != 0, so `detect_species_type` returns 'ion' (not 'zwitterion') and ZWITTERION@300's predicate never sees it, even though `charged_router`'s OWN internal zwitterion test (site presence, not net charge) already names it correctly once reached. This entry is the missing dispatch-level door for that net-charged variant; predicate-IS-handler pattern (mirrors ANION_RETAINED@400).
+    MIXED_SIGN_ZWITTERION = "mixed_sign_zwitterion"  # v33 charged Slice B (P-74.2.1.2 azaniumyl PIN; priority 302, tier 1 — right after ESTER_ANION_ZWITTERION@301). The GENERAL net-charged door for a single-fragment, metal-free MIXED-SIGN organic (>=1 cation site AND >=1 anion site) that `detect_species_type` buckets as 'ion' (net charge != 0), e.g. a protonated diamino-acid `[NH3+]CCCC([NH3+])C(=O)[O-]` (net +1) -> `2,5-bis(azaniumyl)pentanoate`. `charged_router.route_charged` routes such a fragment to `_route_zwitterion` (its zwitterion test is site-presence, not net charge), which builds the RT-gated azaniumyl PIN; predicate-IS-handler (mirrors ESTER_ANION_ZWITTERION@301). Net-zero mixed-sign is already ZWITTERION@300's; this is strictly the net-charged variant.
     ANION_SMALL = "anion_small"               # row 6; namer.py:877-914; P-72.2.1
     POLY_ANION = "poly_anion"                 # row 7; namer.py:916-956; P-72.2.1
     MULTI_COMPONENT_NEUTRAL = "multi_component_neutral"  # row 8; namer.py:967-998
 
     # --- Tier-2 multiplicative + class-routed handlers (audit § 1 rows 9-16) ---
-    MULTIPLICATIVE = "multiplicative"         # row 9; namer.py:1040-1043; P-51.3
+    MULTIPLICATIVE = "multiplicative"         # row 9;  namer.py:1040-1043; P-51.3
     CARBOHYDRATE_LOOKUP = "carbohydrate_lookup"  # row 10; namer.py:1051-1062; P-10
     NATURAL_PRODUCT = "natural_product"       # row 11; namer.py:1070-1073; P-10
     PEPTIDE = "peptide"                       # row 12; namer.py:1078-1083; P-66.6.3
@@ -117,28 +116,28 @@ class StoutClass(_StrEnumBase):
 
     # --- Decomposition + general catch-all (audit § 1 rows 17-18 + GENERAL) ---
     DECOMPOSITION_PRE_GENERAL = "decomposition_pre_general"  # row 17; namer.py:1118-1122
-    GENERAL = "general"                       # row 18; namer.py:1124-1131; CFR-02
+    GENERAL = "general"                       # row 18; namer.py:1124-1131; CFR-02 D-08
 
     # --- v19 sibling-phase reservations (audit § 4); commented-out -> NOT registered ---
-    INORGANIC_ACID = "inorganic_acid"             # G2 COV-02 (P-67/P-65.2.1; priority 40, before ORGANOMETALLIC@50)
-    ORGANOMETALLIC = "organometallic"             # (P-69; priority 50)
-    LIPID = "lipid"                               # (P-107 lipid backbone; priority 250, tier 1 — before ZWITTERION@300, RESOLVED A1)
-    MONONUCLEAR_HYDRIDE = "mononuclear_hydride"    # /7 (P-68 / P-31.1.4.2 λ-convention + Group-15 As/Sb/Bi; priority 45, between INORGANIC_ACID@40 and ORGANOMETALLIC@50)
-    CHALCOGEN_CHAIN = "chalcogen_chain"           # (P-21.2.2 homogeneous chalcogen-chain parent hydrides: trisulfane/trioxidane; priority 46)
-    POLYAZANE = "polyazane"                       # (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
+    INORGANIC_ACID = "inorganic_acid"             # v22 G2 COV-02 (P-67/P-65.2.1; priority 40, before ORGANOMETALLIC@50)
+    ORGANOMETALLIC = "organometallic"             # Phase 161 (P-69; priority 50)
+    LIPID = "lipid"                               # Phase 180 (P-107 lipid backbone; priority 250, tier 1 — before ZWITTERION@300, RESOLVED A1)
+    MONONUCLEAR_HYDRIDE = "mononuclear_hydride"    # v23 Phase 6/7 (P-68 / P-31.1.4.2 λ-convention + Group-15 As/Sb/Bi; priority 45, between INORGANIC_ACID@40 and ORGANOMETALLIC@50)
+    CHALCOGEN_CHAIN = "chalcogen_chain"           # v23 Phase 7 (P-21.2.2 homogeneous chalcogen-chain parent hydrides: trisulfane/trioxidane; priority 46)
+    POLYAZANE = "polyazane"                       # v23 Phase 7 (P-68.3.1.1/.3 hydrazine/diazene/triazane/azo; priority 47)
     FREE_HOMONUCLEAR_G14_HYDRIDE = "free_homonuclear_g14_hydride"  # Wave-3 (P-21.2.3/P-68.2.3 disilane/trisilane/digermene; priority 47.7)
-    DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
+    DINUCLEAR_HYDRIDE = "dinuclear_hydride"        # v23 Phase 10 (P-69.5.3 Group-14/Group-15 catenated hydride: germylstibane; priority 48)
     KETENE = "ketene"                               # Wave-2 completion (P-64.2.2.4 ethenone/dibromoethenone; priority 49)
     RING_CHALCOGEN_OXIDE = "ring_chalcogen_oxide"   # Wave-2 completion (P-25.6/P-74.3.1.3 dibenzothiophene 5-oxide/5,5-dioxide; priority 49.5)
     HYDRO_FUSED_PEROXOL = "hydro_fused_peroxol"     # W2E-P1FG (P-63.4.1 1,2,3,4-tetrahydronaphthalene-1-peroxol; priority 49.6)
     THIOIMIDE = "thioimide"                          # W2E-D3 (P-66.1.4.2 acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' -> N-(ethanethioyl)ethanethioamide; priority 49.7 — after HYDRO_FUSED_PEROXOL@49.6, before ORGM@50)
-    NITRAMIDE_SUBSTITUTED = "nitramide_substituted"  # B3 (P-66.1.1.3.1.1 substitutive nitramide/N-nitro: N-(hydroxymethyl)nitramide / N,N-bis(hydroxymethyl)nitramide / N,N'-dinitromethanediamine; priority 49.75 — after THIOIMIDE@49.7, before CYCLIC_POLYESTER@49.8)
+    NITRAMIDE_SUBSTITUTED = "nitramide_substituted"  # v36 B3 (P-66.1.1.3.1.1 substitutive nitramide/N-nitro: N-(hydroxymethyl)nitramide / N,N-bis(hydroxymethyl)nitramide / N,N'-dinitromethanediamine; priority 49.75 — after THIOIMIDE@49.7, before CYCLIC_POLYESTER@49.8)
     CYCLIC_POLYESTER = "cyclic_polyester"            # W3-P08 (P-65.6.3.5.3 lactide / cyclic di-/polyester -> 1,4-dioxane-2,5-dione; priority 49.8 — after THIOIMIDE@49.7, before ORGM@50)
     AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C (P-61.5.3 ethylideneazinic acid; priority 48.3)
     HETERONE = "heterone"                            # Wave-2 completion C (P-64.4.1 dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C (P-64.4.2 propylidene-lambda4-sulfanone; priority 48.5)
     CUMULATIVE_ZWITTERION = "cumulative_zwitterion"  # W4-I4 (P-74.1.1 same-parent -ium-...-ide on a homogeneous heteroatom chain: 1,2,2,2-tetramethylhydrazin-2-ium-1-ide / triaz-2-en-2-ium-1-ide / dioxidan-2-ium-1-ide; priority 48.35 — before HETERONE@48.4)
-    YLIDE = "ylide"                                  # W4-I4 (P-74.2.1.1 onium cation + adjacent carbanion: 2-(trimethylazaniumyl)propan-2-ide /...phosphaniumyl / dimethyloxidaniumyl / dimethylsulfaniumyl; priority 48.36 — before HETERONE@48.4)
+    YLIDE = "ylide"                                  # W4-I4 (P-74.2.1.1 onium cation + adjacent carbanion: 2-(trimethylazaniumyl)propan-2-ide / ...phosphaniumyl / dimethyloxidaniumyl / dimethylsulfaniumyl; priority 48.36 — before HETERONE@48.4)
     PSEUDOKETONE_HETERO = "pseudoketone_hetero"      # Wave-2 completion C (P-64.1.2.1(b)/P-64.5.2.2 1-silylethan-1-one; priority 48.6)
     ACYL_CHALCOGENCHAIN_PSEUDOKETONE = "acyl_chalcogenchain_pseudoketone"  # W3-P14 (P-68.4.1.3 acyl on a homogeneous >=3-chalcogen chain: CH3CH2-CO-O-O-OH -> 1-trioxidanylpropan-1-one; priority 48.65 — after PSEUDOKETONE_HETERO@48.6, before HETEROIMINE@48.7)
     LAMBDA5_PHOSPHANIMINE = "lambda5_phosphanimine"  # W4-I4 (P-74.2.1.5 phosphine imide R3X=N-R at lambda5: N-ethyl-P,P,P-triphenyl-lambda5-phosphanimine; priority 48.66 — before HETEROIMINE@48.7)
@@ -149,13 +148,13 @@ class StoutClass(_StrEnumBase):
     HETEROCHALCOGEN_ABA = "heterochalcogen_aba"      # W3-P14 (P-68.4.2.1/P-21.2.3.1 pure-chalcogen a[ba]n parent hydride: HS-O-SH -> dithioxane, CH3-S-O-SH -> methyldithioxane; priority 47.55 — after CATENATED_HYDRIDE@47.5, BEFORE SKELETAL_REPLACEMENT@1500 so the preselected dithioxane parent pre-empts the '3-oxa-2,4-dithiapentane' skeletal name)
     HOMONUCLEAR_PNICTOGEN_CHAIN = "homonuclear_pnictogen_chain"  # W3-P14 (P-68.3.2.2 homonuclear Group-15 catenated hydride: PP -> diphosphane, pentaarsane, dibismuthane; priority 47.6 — pnictogen analogue of POLYAZANE@47)
     PNICTOGEN_CARBOXYLIC_ACID = "pnictogen_carboxylic_acid"  # W3-P14 (P-68.3.2.3.1 added-carbon -carboxylic acid on a P/As/Sb parent hydride: H2P-COOH -> phosphanecarboxylic acid; priority 47.65 — ahead of the generic acid namer in GENERAL)
-    INOSITOL = "inositol"                          # follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
-    NUCLEOSIDE = "nucleoside"                       # (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
-    # FRN attaches via SENIORITY_ORDER extension (for chalcogen
+    INOSITOL = "inositol"                          # v23 Phase 12 follow-on (P-104.2.1 cyclitol retained names myo-/scyllo-/.../chiro-inositol; name-exact, OPSIN-unparseable; priority 1700 — above CYCLOPHANE@1600, below DECOMP_PRE_GENERAL@99000; no free dense slot)
+    NUCLEOSIDE = "nucleoside"                       # v23 Phase 14 (P-105.2/P-106 decorated nucleosides/nucleotides: 5'-mono/di/tri-phosphate + O-acyl ester; priority 1800 — after RETAINED@1300 so bare nucleosides + AMP/adenylic stay retained; before DECOMP_PRE_GENERAL@99000; strip-and-recognise, OPSIN-RT, fail-closed)
+    # Phase 163 FRN attaches via SENIORITY_ORDER extension (for chalcogen
     # acid/amide/aldehyde/ketone analogs that route through GENERAL@99999) +
     # INNER_DISPATCH entry for imidate (functional-class naming for
-    # iminoesters). NO new OUTER CFR rows. See */
-    # 163-AUDIT-FRN.md` § 8 for the full intercept analysis.
+    # iminoesters). NO new OUTER CFR rows. See `
+    # 163-AUDIT-FRN.md` § 8 for the full intercept analysis. Phase 161
     # priority-placeholder-correction precedent.
 
 
@@ -166,27 +165,27 @@ class StoutClass(_StrEnumBase):
 
 @dataclass(frozen=True)
 class ClassDispatchEntry:
-    """ +: frozen dataclass row of DISPATCH_TABLE.
+    """Phase 158 +: frozen dataclass row of DISPATCH_TABLE.
 
-    ``side_effect_inventory`` MUST be ``()`` per the hard invariant; the
-    integrity test ``test_side_effect_inventory_is_empty`` asserts
+    ``side_effect_inventory`` MUST be ```` per the hard invariant; the
+    integrity test ``test_side_effect_inventory_is_empty`` (Plan-03) asserts
     this for every entry. AP-21 explicitly bans any predicate that mutates
     ``mol``, ``MolecularFeatures``, module-global state, or thread-local state.
     """
 
     class_id: StoutClass
-    priority: int                                                  # : spaced in 100s for v19 insertability
+    priority: int                                                  # D-06: spaced in 100s for v19 insertability
     tier: int                                                      # 1 = pre-perception (mol-only); 2 = post-perception
     predicate: Callable[..., bool]
     handler: Callable[..., Optional[str]]                          # may return None to signal cascade-continuation
     iupac_section: str
     description: str
-    side_effect_inventory: Tuple[str, ...] = ()                    # hard invariant
+    side_effect_inventory: Tuple[str, ...] = ()                    # D-26 hard invariant
 
 
 @dataclass(frozen=True)
 class ClassDispatchResult:
-    """: returned by ``ClassFirstRouter.dispatch()``.
+    """Phase 158: returned by ``ClassFirstRouter.dispatch``.
 
     Caller invokes ``result.handler(...)`` to get the name string. Frozen so
     a single dispatch result can be safely passed across recursive call
@@ -217,7 +216,7 @@ def _register_dispatch(
     description: str,
     side_effect_inventory: Tuple[str, ...] = (),
 ) -> None:
-    """: private helper; module-import time only.
+    """Phase 158: private helper; module-import time only.
 
     Raises:
         RuntimeError: if called after ``_REGISTRATION_FROZEN`` is set;
@@ -233,7 +232,7 @@ def _register_dispatch(
     if any(e.priority == priority for e in DISPATCH_TABLE.values()):
         raise RuntimeError(
             f"Priority {priority} is already assigned; pick a different value "
-            f"(priorities are spaced in 100s per CONTEXT)."
+            f"(priorities are spaced in 100s per CONTEXT D-06)."
         )
     DISPATCH_TABLE[class_id] = ClassDispatchEntry(
         class_id=class_id,
@@ -283,7 +282,7 @@ def _is_zwitterion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
 
 
 def _is_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ B1 (P-72.2.2.2.1.2): the missing dispatch door for a NET-
+    """.2.2.2.1.2): the missing dispatch door for a NET-
     CHARGED choline-family acid-ester-anion zwitterion (a mono-ester P/S
     oxoacid whose owner arm bears a quaternary cation -- e.g. a phosphate
     mono-ester DIANION, ``C[N+](C)(C)CCOP(=O)([O-])[O-]``). ``get_ion_sites``
@@ -310,7 +309,7 @@ def _is_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None, **k
 
 
 def _is_mixed_sign_zwitterion(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ charged Slice B (P-74.2.1.2): the GENERAL dispatch door for a NET-
+    """charged Slice B (P-74.2.1.2): the GENERAL dispatch door for a NET-
     CHARGED, single-fragment, metal-free MIXED-SIGN organic (a protonated
     diamino-acid, etc.). ``detect_species_type`` buckets any net charge != 0 as
     ``'ion'`` (never ``'zwitterion'``, which is net-0-gated), so ZWITTERION@300's
@@ -337,7 +336,7 @@ def _is_mixed_sign_zwitterion(mol, smiles, canonical_smiles, features=None, **kw
     sites = get_ion_sites(mol)
     if not (sites['cations'] and sites['anions']):
         return False
-    from orthonym.rules.charged_router import route_charged, _full_inchikey_rt_ok
+    from orthonym.rules.charged_router import _full_inchikey_rt_ok, route_charged
     name = route_charged(mol, "pin")
     # 0-wrong for a NET-CHARGED species: route_charged's azaniumyl builder
     # RT-gates itself, but its betaine/polyacid/ester sub-paths rely on the outer
@@ -391,7 +390,7 @@ def _is_cation_retained(mol, smiles, canonical_smiles, features=None, *, _style:
 
 
 def _is_cation_quaternary(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ WS-E.1 (P-73.1.2.1): narrow predicate for a STANDALONE quaternary
+    """Phase 184 WS-E.1 (P-73.1.2.1): narrow predicate for a STANDALONE quaternary
     ammonium cation that should get the systematic ``-aminium`` PIN.
 
     Fires ONLY for: exactly one cation site, NO anion sites (a mixed-sign
@@ -419,7 +418,7 @@ def _is_cation_quaternary(mol, smiles, canonical_smiles, features=None, **kwargs
 def _is_anion_small(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """Tier-1; mirrors namer.py:877-914 (audit § 1 row 6; § 2.6 purity proof).
 
-    169.6-04: the ``<= 25 HA`` size-cutoff band-aid was REMOVED — it
+    169.6-04 (Task 3): the ``<= 25 HA`` size-cutoff band-aid was REMOVED — it
     excluded large single anions from this handler so their charge was dropped
     downstream. route_charged (reached via the handler -> name_anion delegation)
     now names large anions structurally (neutralize -> re-enter -> -oate/-olate/
@@ -496,13 +495,13 @@ def _is_multiplicative(mol, smiles, canonical_smiles, features=None, **kwargs) -
 def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """Tier-2; mirrors namer.py:1051-1062 (audit § 1 row 10; § 2.10 purity proof).
 
-    : the carbohydrate tier (priority 1000, above the
+    Phase 183: the carbohydrate tier (priority 1000, above the
     oxane/heterocycle handler) now fires for THREE recognized-sugar cases, gated
     narrowly so it fires ONLY where a sugar is recognized:
 
     1. cataloged sugars (``lookup_sugar`` is not None — unchanged fast-path);
     2. a clean/decorated SINGLE sugar ring the systematic-mono engine can name
-       (``name_monosaccharide_systematic`` is not None — deoxy/amino/uronic);
+       (``name_monosaccharide_systematic`` is not None — deoxy/amino/uronic,);
     3. >= 2 LINKED recognized sugar rings the disaccharide assembler can name
        (``oligosaccharides.name_disaccharide`` via ``_classify_units`` is not None,
        ).
@@ -526,20 +525,20 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
         if name_monosaccharide_systematic(mol) is not None:
             return True
     # W6 structural detectors (cheap RDKit ring-walks, NO OPSIN — the handler
-    # RT-gates every name). These run EVEN when the sugar-ring SMARTS pre-gate
+    # RT-gates every name).  These run EVEN when the sugar-ring SMARTS pre-gate
     # misses: a fully-O-methylated ring has no free ring-OH for the SMARTS, yet is
-    # a bona-fide O-methyl sugar. Each fast-fails on a non-sugar ring shape.
+    # a bona-fide O-methyl sugar.  Each fast-fails on a non-sugar ring shape.
     from orthonym.data.sugar_names import (
-        _find_sugar_oxoacid_ester,     # W6-P1 phosphate/sulfate ester
-        _find_sugar_acyl_esters,       # W6B-T2 O-acyl ester (acetate/benzoate/...)
-        _has_anomeric_hetero_sugar,    # W6-P2 glycosylamine / glycosyl halide
-        _has_o_methyl_sugar,           # W6-P3 O-methyl ether
+        _find_sugar_acyl_esters,  # W6B-T2 O-acyl ester (acetate/benzoate/...)
+        _find_sugar_oxoacid_ester,  # W6-P1 phosphate/sulfate ester
+        _has_anomeric_hetero_sugar,  # W6-P2 glycosylamine / glycosyl halide
+        _has_o_methyl_sugar,  # W6-P3 O-methyl ether
     )
     if _find_sugar_oxoacid_ester(mol) is not None:
         return True
     if _find_sugar_acyl_esters(mol) is not None:
         return True
-    # .4: N-acyl (amide) ring decoration has no O/S/P-ester
+    # Task 1.4: N-acyl (amide) ring decoration has no O/S/P-ester
     # equivalent, so none of the ester detectors above ever see it.
     from orthonym.data.sugar_names import _has_sugar_n_acyl_amide
     if _has_sugar_n_acyl_amide(mol):
@@ -565,7 +564,7 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
     # W6B-T11 linear reducing oligosaccharide (3+ units / 1->6 links the binary
     # disaccharide SMARTS misses) -> the handler's name_disaccharide falls back to
     # name_linear_oligosaccharide (RT-gated).
-    from orthonym.rules.oligosaccharides import _has_oligo_chain, _has_extended_oligo
+    from orthonym.rules.oligosaccharides import _has_extended_oligo, _has_oligo_chain
     if _has_oligo_chain(mol):
         return True
     # glyco slices 1-2: NON-REDUCING (raffinose) and BRANCHED oligosaccharides
@@ -597,7 +596,7 @@ def _is_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, **kwar
 
 
 def _is_lipid(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """Tier-1; predicate IS handler (P-107). PURE: no mol mutation beyond
+    """Tier-1; predicate IS handler (Phase 180 P-107). PURE: no mol mutation beyond
     the idempotent CIP prop that the deriver owns. RESOLVED A1: registered
     Tier-1 @250 so phosphatidylcholine (zwitterion) is reached before ZWITTERION@300,
     which returns '' (not None) and would otherwise terminate the cascade."""
@@ -661,12 +660,12 @@ def _is_cyclophane(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
 
 
 def _is_inositol(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ follow-on; hard-gated cyclitol recognizer (P-104.2.1). Fires
+    """; hard-gated cyclitol recognizer (P-104.2.1). Fires
     for the seven meso inositols (named) AND the chiral chiro pair (refused — see
     _handle_inositol); both are detected order-stably from the cyclohexanehexol
     skeleton + stereo layer. The undefined-stereo hexol does NOT match (keeps the
     systematic name)."""
-    from orthonym.rules.inositols import name_inositol, is_chiral_inositol
+    from orthonym.rules.inositols import is_chiral_inositol, name_inositol
     return name_inositol(mol) is not None or is_chiral_inositol(mol)
 
 
@@ -706,7 +705,7 @@ def _is_general(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
 def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """Tier-1; CFR priority 50; ORGM-03 + purity (audit § 2.20).
 
-    PURE per CONTEXT + hard invariant:
+    PURE per CONTEXT + Phase 158 hard invariant:
     - mol is None guard early-exit.
     - Lazy-import detect_metal_complex from perception.metals.
     - Returns True iff detect_metal_complex(mol) is not None.
@@ -721,18 +720,18 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
     # senior characteristic group; ORGM@50 would otherwise claim the Si FIRST and
     # emit a garbage silane ('(acetaldehydoxy)tri(methyl)silane', OPSIN-suppressed
     # to 'unknown'). Decline so the pseudoester principal-group routes to the
-    # noncarbon_ester handler. Read-only (purity preserved).
+    # noncarbon_ester handler. Read-only (/ purity preserved).
     from orthonym.perception.functional_groups import detect_functional_groups
     if detect_functional_groups(mol).get('pseudoester'):
         return False
-    # F-T6: a single-anion ion centred on a Group-13/14 metalloid is a
+    # F-T6 (DD3): a single-anion ion centred on a Group-13/14 metalloid is a
     # charged parent-hydride anion owned by the ANION_SMALL -> route_charged
     # emitter path, NOT the neutral P-69 organometallic handler (priority 50) which
     # would otherwise claim it FIRST and DROP the charge (`C[Si-](C)C` ->
     # 'trimethylsilane' instead of 'trimethylsilanide'; `C[B-](C)(C)C` -> 'unknown'
     # instead of 'tetramethylboranuide'). Decline here so the charged path wins:
-    # - 'heteroatom_hydride_anion' (P/As/Sb/Si/Ge/Sn/Pb) -> the -ide path;
-    # - 'uide_anion' (B/Si/P/… ate-complex) -> the -uide path.
+    #   - 'heteroatom_hydride_anion' (P/As/Sb/Si/Ge/Sn/Pb) -> the -ide path;
+    #   - 'uide_anion'               (B/Si/P/… ate-complex) -> the -uide path.
     # PURE: only read-only perception/classification calls, no mutation.
     from orthonym.perception.ions import detect_species_type, get_ion_sites
     if detect_species_type(mol) == 'ion':
@@ -772,9 +771,18 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
 
 def _handle_salt(mol, smiles, canonical_smiles, features=None, *,
                  style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:853-854."""
+    """Mirrors namer.py:853-854.
+
+    : forward the best-effort flags (populated by the dispatch caller
+    at namer.py:5551/5583) so name_salt can name a complex organic ion via a
+    fresh best-effort instance. PIN tier passes them all False -> unchanged.
+    """
     from orthonym.rules.salts import name_salt
-    return name_salt(mol, style=style)
+    return name_salt(
+        mol, style=style,
+        general_fallback=kwargs.get("general_fallback", False),
+        general_fallback_unverified=kwargs.get("general_fallback_unverified", False),
+        allow_aromatic_general=kwargs.get("allow_aromatic_general", False))
 
 
 def _handle_radical(mol, smiles, canonical_smiles, features=None, *,
@@ -803,7 +811,7 @@ def _handle_zwitterion(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None, *,
                                    style: str = "pin", **kwargs) -> Optional[str]:
-    """ B1 thin shim: re-runs the SAME naming function
+    """: re-runs the SAME naming function
     ``_is_ester_anion_zwitterion`` already validated (predicate-is-handler
     pattern), so this is never called on a shape that would fail."""
     from orthonym.perception.ions import get_ion_sites
@@ -815,14 +823,14 @@ def _handle_ester_anion_zwitterion(mol, smiles, canonical_smiles, features=None,
 
 def _handle_mixed_sign_zwitterion(mol, smiles, canonical_smiles, features=None, *,
                                   style: str = "pin", **kwargs) -> Optional[str]:
-    """ charged Slice B thin shim: the P-74.2.1.2 azaniumyl PIN parent decision
+    """charged Slice B thin shim: the P-74.2.1.2 azaniumyl PIN parent decision
     is owned by ``route_charged`` -> ``_route_zwitterion`` (which full-InChIKey
     RT-gates every emission). Re-runs the SAME call ``_is_mixed_sign_zwitterion``
     validated (predicate-is-handler), returning None on no-match so the dispatcher
     falls through to ANION_SMALL@600 / POLY_ANION@700 / GENERAL. Re-applies the
     same full-InChIKey RT gate the predicate used (0-wrong for the net-charged
     species; never ship a neutralised molecule)."""
-    from orthonym.rules.charged_router import route_charged, _full_inchikey_rt_ok
+    from orthonym.rules.charged_router import _full_inchikey_rt_ok, route_charged
     name = route_charged(mol, style)
     if name and _full_inchikey_rt_ok(mol, name):
         return name
@@ -852,7 +860,7 @@ def _handle_cation_retained(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_cation_quaternary(mol, smiles, canonical_smiles, features=None, *,
                               style: str = "pin", **kwargs) -> Optional[str]:
-    """ WS-E.1 thin shim: the parent decision + ``-aminium`` assembly is
+    """Phase 184 WS-E.1 thin shim: the parent decision + ``-aminium`` assembly is
     owned by the ``route_charged`` chokepoint (which dispatches the 'quaternary'
     cation kind to ``ions.name_quaternary_aminium`` and applies the mono-cation
     OPSIN RT-gate backstop). Returns None on no-match so the dispatcher falls
@@ -868,14 +876,14 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
     Per audit § 3.1 RL-4 fresh-instance pattern: the recursive
     ``Orthonym(style).name(neutral_smi)`` call hits a FRESH router with
     empty dispatch_stats. Returns None on no-match; the dispatcher falls
-    through to the next entry (v18 byte-identical to namer.py:913-914).
+    through to the next entry.
 
     169.6-03 (CHOKE-01): the parent decision is owned by the route_charged
     chokepoint (reached via name_anion's single-anion delegation below); this
     handler stays a thin shim over name_anion + the v18 neutralize-recurse
     fallback.
 
-     (glucosinolate/thiohydroximate O-sulfate anion): P-72.2.2.2.1.2
+    : P-72.2.2.2.1.2
     acid-ester anion (phosphate/sulfate ester ``[O-]``, including the oxime-N-owner
     sibling ``name_oxime_o_sulfate_anion``) is tried FIRST here, mirroring the
     ordering ``name_anion`` already applies INTERNALLY to its own single-anion
@@ -926,8 +934,9 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
     # Ion pipeline returned empty -- try neutralize-then-name (audit § 3.1)
     try:
         from rdkit.Chem import RWMol
-        from orthonym.rules.ions import classify_anion, _acid_name_to_carboxylate
+
         from orthonym.perception.ions import _get_internal_charge_atoms, get_ion_sites
+        from orthonym.rules.ions import _acid_name_to_carboxylate, classify_anion
         sites = get_ion_sites(mol)
         anion_type = classify_anion(mol, sites['anions'][0])
         if anion_type == 'carboxylate':
@@ -962,7 +971,7 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
         # bugs (e.g. an AttributeError or a malformed SuffixInfo from the SUB-01
         # routing change) as a quiet cascade-to-GENERAL with zero telemetry.
         # Surface it LOUDLY (WARNING + stack) but still fall through, because
-        # name() has no top-level safety net and the v18 contract is no-crash.
+        # name has no top-level safety net and the v18 contract is no-crash.
         logger.warning("anion_small handler UNEXPECTED error (possible bug): %s: %s",
                        type(exc).__name__, exc, exc_info=True)
     return None  # signal dispatcher to continue cascade
@@ -1026,7 +1035,7 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
     # declined on.
     # #3 (hardening): mirror the SAME full-InChIKey RT gate the
     # MIXED_SIGN_ZWITTERION door applies to this identical name_anion()
-    # fallback (_handle_mixed_sign_zwitterion,:832-835 / its predicate
+    # fallback (_handle_mixed_sign_zwitterion, :832-835 / its predicate
     # :359-361) -- in-handler, not relying solely on the outer SELF-01 gate
     # (constitution-only) to catch a wrong/neutralised emission here.
     from orthonym.rules.charged_router import _full_inchikey_rt_ok
@@ -1036,8 +1045,9 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
         return ion_result
     try:
         from rdkit.Chem import RWMol
-        from orthonym.rules.ions import classify_anion, _acid_name_to_carboxylate
+
         from orthonym.perception.ions import _get_internal_charge_atoms, get_ion_sites
+        from orthonym.rules.ions import _acid_name_to_carboxylate, classify_anion
         sites = get_ion_sites(mol)
         # CR-02 (code review 2026-06-02): a fully-deprotonated S/P-oxoacid dianion
         # (e.g. CP(=O)([O-])[O-], -2) reaches this poly-anion handler and MUST NOT
@@ -1121,7 +1131,7 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
         # WR-07 (code review 2026-06-02): surface a genuinely-unexpected exception
         # loudly instead of the old silent ``except Exception: pass`` that masked
         # SUB-01-routing logic bugs as a quiet cascade-to-GENERAL. Still falls
-        # through (no top-level safety net in name(); v18 contract is no-crash).
+        # through (no top-level safety net in name; v18 contract is no-crash).
         logger.warning("poly_anion handler UNEXPECTED error (possible bug): %s: %s",
                        type(exc).__name__, exc, exc_info=True)
     return None
@@ -1138,7 +1148,7 @@ def _handle_multi_component_neutral(mol, smiles, canonical_smiles, features=None
     Orthonym(style) — audit § 3.3 RL-4 pattern — so the per-fragment
     OPSIN validity gate stays on). The ONLY preserved legacy behavior is
     the all-identical-fragments space-join ('CCO.OCC' -> 'ethanol
-    ethanol', the byte-identical representative): identical
+    ethanol', the Plan-01 byte-identical representative): identical
     entities are not an adduct of SEPARATE molecular entities (P-14.8.1
     definition). The old silent skip of unnameable fragments (a
     structure-dropping hazard) is removed — partial sets refuse.
@@ -1162,11 +1172,27 @@ def _handle_multi_component_neutral(mol, smiles, canonical_smiles, features=None
         return None
     try:
         from orthonym.namer import Orthonym
-        frag_name = Orthonym(style=style).name(frags[0])
+        frag_name = Orthonym(
+            style=style,
+            general_fallback=kwargs.get("general_fallback", False),
+            general_fallback_unverified=kwargs.get("general_fallback_unverified", False),
+            allow_aromatic_general=kwargs.get("allow_aromatic_general", False),
+        ).name(frags[0])
     except Exception:
         return None
-    if not frag_name or frag_name.startswith("unknown"):
+    from orthonym.errors import is_failure_name
+    if not frag_name or is_failure_name(frag_name):
         return None
+    # the reclaim comes from threading the best-effort flags into the
+    # fresh instance above (a hard identical fragment -- e.g. a silabicyclic ring --
+    # now names, where the PIN-tier instance abstained). The emitted form is the
+    # frozen space-join, which OPSIN parses to the multi-copy structure and
+    # round-trips to the input full InChIKey (verified). It is byte-identical on the
+    # PIN path, so no PIN-tier / labelling change. (An earlier revision emitted a
+    # P-14.8.1 em-dash 'A—A (1/1)' form here on the false premise that the space-join
+    # did not parse; the review refuted that -- 'ethanol ethanol' RTs FULL --
+    # and the em-dash form wrongly asserts an adduct relation P-14.8.1 excludes for
+    # identical entities and shipped labelled PIN, so it was reverted.)
     return ' '.join([frag_name] * len(frags))
 
 
@@ -1179,11 +1205,11 @@ def _handle_multiplicative(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
                                 style: str = "pin", **kwargs) -> Optional[str]:
-    """Catalog-first carbohydrate cascade (+).
+    """Catalog-first carbohydrate cascade (Phase 183 +).
 
     The v18 cascade at namer.py:1051-1062 inlined a plain lookup-then-join. This
     handler keeps that fast-path FIRST and extends it with two new
-    engines, behind the broadened predicate:func:`_is_carbohydrate_lookup`:
+    engines, behind the broadened predicate :func:`_is_carbohydrate_lookup`:
 
     1. **Catalog (``lookup_sugar``) FIRST.** If it returns ``(anomer, config,
        base_name)``:
@@ -1196,7 +1222,7 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
          ``"urono" in base_name`` we route to
          :func:`~orthonym.data.sugar_names.uronic_free_acid_name`, which emits
          the P-102.5.6.6.4 free-acid form ``beta-D-glucopyranuronic acid``.
-         A ``None`` from it cascade-continues (fail-closed).
+         A ``None`` from it cascade-continues (fail-closed,).
        * **Otherwise** the existing plain ``"-".join(parts)`` is UNCHANGED, so
          every non-uronic cataloged sugar (incl. simple glycosides handled
          elsewhere and the cataloged amino sugars) stays byte-identical.
@@ -1213,7 +1239,7 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     The first non-None wins; otherwise ``None`` (cascade-continue -> the existing
     pipeline names it byte-identically). All imports are lazy/in-function.
     """
-    # Catalog-join (/F-CATALOG-JOIN) then systematic monosaccharide
+    # Catalog-join (//F-CATALOG-JOIN) then systematic monosaccharide
     # — factored into sugar_names.name_free_sugar so the free-sugar-ester
     # path names its residual through the SAME cascade (DRY). Byte-identical.
     from orthonym.data.sugar_names import name_free_sugar
@@ -1229,7 +1255,7 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     if ester is not None:
         return ester
 
-    # .4: free sugar bearing N-acyl (no functional-class analog for
+    # Task 1.4: free sugar bearing N-acyl (no functional-class analog for
     # an amide) or O-acyl+N-acyl combined decoration that ``name_sugar_ester``'s
     # functional-class ester route cannot express (see the function's own
     # docstring for why). Tried ONLY after the two functional-class routes
@@ -1241,7 +1267,7 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
 
     # W6-P2: glycosylamine (anomeric -NH2, P-102.6.1.3) and glycosyl halide
     # (anomeric halogen, P-102.6.1.5). Each fail-closed on any non-exact shape.
-    from orthonym.data.sugar_names import name_glycosylamine, name_glycosyl_halide
+    from orthonym.data.sugar_names import name_glycosyl_halide, name_glycosylamine
     for _fn in (name_glycosylamine, name_glycosyl_halide):
         _nm = _fn(mol, canonical_smiles)
         if _nm is not None:
@@ -1299,7 +1325,7 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     # namers cannot handle would otherwise drop the sugar (a wrong name) via the
     # general chain namer -> refuse ('' -> unknown), never ship a sugar-dropping name.
     #
-    # .1: KEPT as '' (does NOT cascade to T4), unlike the ulosonic veto
+    # Task 1.1: KEPT as '' (does NOT cascade to T4), unlike the ulosonic veto
     # below. `name_glycosyloxy_yl_parent` (above) recognises the identical n-O-yl
     # shape and structurally dominates this predicate for every constructed
     # witness tried (plain alkyl/acid aglycones all resolved upstream) -- but that
@@ -1308,7 +1334,7 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     # declines while this cheap RDKit-only predicate still fires True. Flipping to
     # `None` in exactly that gap would let the cascade fall through to the general
     # chain namer, which drops the whole sugar (the wrong name this veto exists to
-    # prevent) -- (a fail-closed removal can unmask a worse
+    # prevent) --(a fail-closed removal can unmask a worse
     # generator). No real witness that reaches this site with all upstream
     # producers declined was found in the 413-row glycan backlog (structural
     # signal is 0/413) or constructed by hand, so the flip's safety here is
@@ -1327,7 +1353,7 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
     # to the general ring-carboxylic namer (which drops side-chain stereo -> a
     # wrong, RT-failing name).
     #
-    # .1: '' -> None on the BEST-EFFORT tier ONLY (cascades to T4/general
+    # Task 1.1: '' -> None on the BEST-EFFORT tier ONLY (cascades to T4/general
     # instead of terminating); PIN/default stays '' -- BYTE-IDENTICAL, proven by
     # `tests/unit/rules/test_systematic_carbohydrate.py::TestW6bUlosonicAcid::
     # test_uncataloged_ulosonic_fails_closed`, which calls the PIN-tier
@@ -1391,8 +1417,9 @@ def _rt_full_match(name: str, mol) -> bool:
     reject a substitutive sub-name that silently dropped a backbone atom before
     trusting it over the retained peptide name (0-wrong)."""
     try:
-        from orthonym.validation.opsin_roundtrip import opsin_parse
         from rdkit import Chem
+
+        from orthonym.validation.opsin_roundtrip import opsin_parse
         osmi = opsin_parse(name)
         if not osmi:
             return False
@@ -1406,7 +1433,7 @@ def _rt_full_match(name: str, mol) -> bool:
 
 def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
                     style: str = "pin", **kwargs) -> Optional[str]:
-    """: peptide / N-acyl-amino-acid PINs are the SUBSTITUTIVE form.
+    """peptide / N-acyl-amino-acid PINs are the SUBSTITUTIVE form.
 
     Chapter P-10 identifies NO preferred IUPAC names (P-100, BlueBookV2.md:2052:
     "Preferred IUPAC names (PINs) for the natural products in Chapter P-10 are
@@ -1415,18 +1442,18 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
     and retained amino-acid parents are NON-PIN. PREFER the general substitutive
     amido PIN by re-naming with the PEPTIDE class excluded (which routes the
     molecule through the general/composer path -> '(pyrrolidine-2-carboxamido)
-    acetic acid', '(2S)-2-[(2S)-2-aminopropanamido]propanoic acid',...). The
+    acetic acid', '(2S)-2-[(2S)-2-aminopropanamido]propanoic acid', ...). The
     sub-name is RT-gated AND independently full-InChIKey re-verified (the
     general/composer path can SILENTLY DROP a backbone substituent --
     universal_pipeline_unnameable_substituent --
     and ship a partial name the PIN-path gate misses, the E1-scoping hole; e.g.
     Arg-Gly -> 'aminoguanidinoacetic acid', a DIFFERENT molecule). A residue the
     general path cannot yet build a clean PIN for (branched/exotic side chains --
-    leucyl, arginyl,...) fails that check and falls back to the retained peptide
+    leucyl, arginyl, ...) fails that check and falls back to the retained peptide
     name, so the peptide never silently abstains (breadth-preserving). 0-wrong is
     unaffected."""
-    from orthonym.rules.peptides import name_peptide
     from orthonym.errors import is_failure_name
+    from orthonym.rules.peptides import name_peptide
     # Re-entrancy guard: the substitutive sub-namer routes the whole molecule
     # through the general/composer path, whose fragment-level naming can re-reach
     # this handler on a sub-fragment that is itself a small peptide. Without this
@@ -1479,7 +1506,7 @@ def _handle_cyclophane(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors namer.py:1111-1113.
 
-    Wave-8 P8 (.12): OPSIN 2.9.0 still cannot parse ANY phane name, so
+    Wave-8 P8 (Task 8.12): OPSIN 2.9.0 still cannot parse ANY phane name, so
     there is no RT oracle -- but `rules.phane.build_phane_pin` now builds a
     BB-name-exact, correct-by-construction P-26.2/.3 simplified-skeletal PIN
     for the monocyclic all-benzene-homophane class (verified against the Blue
@@ -1509,11 +1536,11 @@ def _handle_cyclophane(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_inositol(mol, smiles, canonical_smiles, features=None, *,
                      style: str = "pin", **kwargs) -> Optional[str]:
-    """ follow-on: retained inositol PIN (P-104.2.1) for the seven
+    """: retained inositol PIN (P-104.2.1) for the seven
     meso inositols; the chiral chiro pair is REFUSED to a deterministic
     descriptive fallback (RDKit perceives its absolute config non-deterministically,
     so a systematic CIP name would flip the enantiomer by atom order)."""
-    from orthonym.rules.inositols import name_inositol, is_chiral_inositol
+    from orthonym.rules.inositols import is_chiral_inositol, name_inositol
     nm = name_inositol(mol)
     if nm is not None:
         return nm
@@ -1524,7 +1551,7 @@ def _handle_inositol(mol, smiles, canonical_smiles, features=None, *,
 
 
 def _is_nucleoside(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ — decorated nucleoside / nucleotide recogniser (P-105.2/P-106).
+    """v23 Phase 14 — decorated nucleoside / nucleotide recogniser (P-105.2/P-106).
     Fires only for a furanose-N-glycoside bearing a recognised sugar decoration
     (5'-phosphate chain or O-acyl ester) whose bare nucleoside is a retained
     name; bare nucleosides + the retained adenylic/inosinic monophosphates are
@@ -1535,7 +1562,7 @@ def _is_nucleoside(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
 
 def _handle_nucleoside(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
-    """ — decorated nucleoside/nucleotide PIN (P-105.2/P-106)."""
+    """v23 Phase 14 — decorated nucleoside/nucleotide PIN (P-105.2/P-106)."""
     from orthonym.rules.nucleosides import name_nucleoside
     return name_nucleoside(mol)
 
@@ -1571,7 +1598,7 @@ def _handle_general(mol, smiles, canonical_smiles, features=None, *,
 
 
 def _is_inorganic_acid(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ G2 COV-02; priority 40 (before ORGANOMETALLIC@50 so silicic acid is
+    """v22 G2 COV-02; priority 40 (before ORGANOMETALLIC@50 so silicic acid is
     not claimed as a Si organometallic).
 
     PURE: exact full-molecule canonical-SMILES match only (zero false positives;
@@ -1591,11 +1618,11 @@ def _handle_inorganic_acid(mol, smiles, canonical_smiles, features=None, **kwarg
 
 
 def _is_mononuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ /7 (P-68 / P-21.1 / P-31.1.4.2); priority 45 (after
+    """.1 / P-31.1.4.2); priority 45 (after
     INORGANIC_ACID@40 so an oxoacid is never claimed here, before ORGANOMETALLIC@50
     so a Group-15 As/Sb/Bi parent hydride is named substitutively, not as ORGM).
 
-    PURE graph classifier (generalised): a mononuclear parent
+    PURE graph classifier (Phase 7 generalised Phase 6): a mononuclear parent
     hydride — all-halogen hub (SF6/PF5 -> λ; PCl3/SF2/AsCl3 -> no λ) OR an
     organyl/bare Group-15 As/Sb/Bi hub (trimethylarsane / triphenylarsane /
     arsane). Fail-closed; no mutation.
@@ -1614,7 +1641,7 @@ def _handle_mononuclear_hydride(mol, smiles, canonical_smiles, features=None, **
 
 
 def _is_chalcogen_chain(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ (P-21.2.2); priority 46. A homogeneous O/S/Se/Te chain parent
+    """.2.2); priority 46. A homogeneous O/S/Se/Te chain parent
     hydride (trisulfane/trioxidane). PURE graph classifier, fail-closed."""
     if mol is None:
         return False
@@ -1631,7 +1658,7 @@ def _handle_chalcogen_chain(mol, smiles, canonical_smiles, features=None, **kwar
 def _is_polychalcogen_oxide(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """W3-P13 (P-68.4.3.2); priority 46.5. A di-/polysulfoxide-sulfone: a chain
     of >=2 identical S/Se/Te (each lambda4/lambda6) every one bearing >=1 =O
-    (CH3-S(=O)-S(=O)-CH3 ->...disulfane-1,2-dione). PURE graph classifier,
+    (CH3-S(=O)-S(=O)-CH3 -> ...disulfane-1,2-dione). PURE graph classifier,
     fail-closed."""
     if mol is None:
         return False
@@ -1647,7 +1674,7 @@ def _handle_polychalcogen_oxide(mol, smiles, canonical_smiles, features=None, **
 
 
 def _is_polyazane(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ (P-68.3.1.1/.3); priority 47. A polyazane-family parent hydride
+    """.3.1.1/.3); priority 47. A polyazane-family parent hydride
     (hydrazine/diazene/triazane/azo). PURE graph classifier, fail-closed."""
     if mol is None:
         return False
@@ -1679,7 +1706,7 @@ def _handle_free_homonuclear_g14_hydride(mol, smiles, canonical_smiles, features
 
 
 def _is_dinuclear_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """ (P-69.5.3); priority 48. A two-atom Group-14/Group-15 catenated
+    """.5.3); priority 48. A two-atom Group-14/Group-15 catenated
     parent hydride (germylstibane). PURE graph classifier, fail-closed."""
     if mol is None:
         return False
@@ -1952,7 +1979,7 @@ def _handle_thioimide(mol, smiles, canonical_smiles, features=None, **kwargs) ->
 
 def _is_nitramide_substituted(mol, smiles, canonical_smiles, features=None,
                               *, _style: str = "pin", **kwargs) -> bool:
-    """ B3 (P-66.1.1.3.1.1); priority 49.75. An N-substituted nitramide
+    """(P-66.1.1.3.1.1); priority 49.75. An N-substituted nitramide
     (``nitramide`` parent + N-substituent prefixes) or an N,N'-dinitro
     methylenediamine. PURE graph classifier, fail-closed."""
     if mol is None:
@@ -2041,7 +2068,7 @@ def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
 
     Cascade-continuation on None per CONTEXT: if name_organometallic
     returns None (compound not actually ORGM or cannot be named), the CFR
-    cascade falls through to SALT@100 →... → GENERAL@99999.
+    cascade falls through to SALT@100 → ... → GENERAL@99999.
     """
     from orthonym.assembly.handlers.organometallic import name_organometallic
     result = name_organometallic(features, mol, style=style)
@@ -2056,7 +2083,7 @@ def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
 # byte-identical.
 # ---------------------------------------------------------------------------
 
-# --- G2 COV-02: INORGANIC_ACID at priority 40 (intercepts BEFORE ---
+# --- v22 G2 COV-02: INORGANIC_ACID at priority 40 (intercepts BEFORE ---
 # ORGANOMETALLIC@50 so silicic acid O[Si](O)(O)O is named, not claimed as a Si
 # organometallic; and before GENERAL so free phosphoric/sulfuric/carbonic acids
 # stop returning 'trihydrophosphate'/'unknown'/'methane'). Exact canonical-SMILES
@@ -2071,14 +2098,14 @@ _register_dispatch(
 )
 
 
-# --- /7: MONONUCLEAR_HYDRIDE at priority 45 (intercepts BETWEEN ---
+# ---: MONONUCLEAR_HYDRIDE at priority 45 (intercepts BETWEEN ---
 # INORGANIC_ACID@40 and ORGANOMETALLIC@50). A mononuclear parent hydride (P-68 /
 # P-21.1 / P-31.1.4.2): an all-halogen hub on any of S/Se/Te/P/As/Sb/Bi/I (SF6 ->
 # hexafluoro-lambda6-sulfane, PF5 -> pentafluoro-λ5; standard valence PCl3 ->
 # trichlorophosphane, SF2 -> difluorosulfane, AsCl3 -> trichloroarsane), OR an
 # organyl/bare Group-15 As/Sb/Bi hub (C[As](C)C -> trimethylarsane, [AsH3] ->
 # arsane) — all 'unknown' / ORGM-mangled before these phases. Graph classifier,
-# fail-closed; cascade-continuation on None per. dropped 's
+# fail-closed; cascade-continuation on None per. Phase 7 dropped Phase 6's
 # "λ REQUIRED" gate and added the As/Sb/Bi stems + the organyl regime. ---
 _register_dispatch(
     class_id=StoutClass.MONONUCLEAR_HYDRIDE, priority=45, tier=1,
@@ -2397,7 +2424,7 @@ _register_dispatch(
     description="Acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' on the "
                 "N-(alkanethioyl)alkanethioamide PIN; fail-closed",
 )
-# --- B3: NITRAMIDE_SUBSTITUTED at priority 49.75 (after THIOIMIDE@49.7,
+# --- NITRAMIDE_SUBSTITUTED at priority 49.75 (after THIOIMIDE@49.7,
 # before CYCLIC_POLYESTER@49.8). ``nitramide`` (H2N-NO2) exists only as an
 # exact-whole-molecule retained-name entry, so any N-substituted nitramide
 # (or N,N'-dinitro methylenediamine) had a different canonical SMILES, missed
@@ -2430,14 +2457,14 @@ _register_dispatch(
 )
 
 
-# ---: ORGANOMETALLIC at priority 50 (intercepts BEFORE SALT@100) ---
+# --- Phase 161: ORGANOMETALLIC at priority 50 (intercepts BEFORE SALT@100) ---
 # Per CONTEXT: ferrocene/ruthenocene/all sandwich complexes are
 # dot-separated [M+n].[ligand-]...[ligand-] SMILES that would otherwise
 # route to SALT@100 and produce nonsense (verified empirically:
 # Orthonym().name('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1') returns
 # 'iron(II) dipentanide' today; Orthonym().name('C[Li]') returns
 # 'methane'; etc. per RESEARCH executive summary line 89).
-# Priority 50 sits BELOW the prior CFR minimum (SALT@100); free
+# Priority 50 sits BELOW the prior CFR minimum (SALT@100); free per Phase 158
 # audit log. Cascade-continuation on None preserved per.
 _register_dispatch(
     class_id=StoutClass.ORGANOMETALLIC, priority=50, tier=1,
@@ -2591,7 +2618,7 @@ _register_dispatch(
     side_effect_inventory=(),
 )
 
-# --- follow-on: INOSITOL at priority 1700 (after CYCLOPHANE@1600, ---
+# ---: INOSITOL at priority 1700 (after CYCLOPHANE@1600, ---
 # before DECOMPOSITION_PRE_GENERAL@99000 / GENERAL@99999). The nine inositol
 # (cyclohexane-1,2,3,4,5,6-hexol) retained names are the PIN (P-104.2.1) and are
 # OPSIN-UNPARSEABLE, so this is a NAME-EXACT recogniser. Hard-gated InChIKey
@@ -2637,9 +2664,9 @@ _register_dispatch(
     class_id=StoutClass.GENERAL, priority=99999, tier=2,
     predicate=_is_general, handler=_handle_general,
     iupac_section="impl routing — GENERAL pipeline (composer.assemble_name); D-08 catch-all",
-    description="Catch-all per; handler returns None to signal _name_impl runs legacy pipeline",
+    description="Catch-all per D-08; handler returns None to signal _name_impl runs legacy pipeline",
     side_effect_inventory=(),
 )
 
-# --- Lock the table at module-import end (AP-21 mutation prevention) ---
+# --- Lock the table at module-import end (; AP-21 mutation prevention) ---
 _REGISTRATION_FROZEN = True
