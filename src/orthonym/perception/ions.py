@@ -14,9 +14,11 @@ IUPAC 2013 rules:
 """
 
 import weakref
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
+
 from rdkit import Chem
 
+from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
 # IUPAC P-59 Table 5.1: prefix-only groups with internal formal charges.
 # These are bonding features, NOT ionic charges.
@@ -32,13 +34,13 @@ _INTERNAL_CHARGE_SMARTS = [
 _INTERNAL_CHARGE_SMARTS = [p for p in _INTERNAL_CHARGE_SMARTS if p is not None]
 
 
-# O, S, Se, Te. This is not a hand-picked element list: it is the Blue Book's
+# O, S, Se, Te.  This is not a hand-picked element list: it is the Blue Book's
 # OWN enumeration of the class in P-74.2.1.4 "Phosphine oxides and chalcogen
 # analogues" (":43041") -- "Chalcogen analogues are phosphine sulfides,
 # phosphine selenides, and phosphine telluride (where O is replaced by S, Se,
 # and Te, respectively)" -- and in P-74.2.1.2 (":43008") "chalcogen analogues
 # are amine sulfides, imine selenides, etc. (where O is replaced by S, Se, or
-# Te)". The ANION element is what the Blue Book uses to draw the boundary; see
+# Te)".  The ANION element is what the Blue Book uses to draw the boundary; see
 # _semipolar_chalcogenide_atoms.
 _CHALCOGEN_ATOMIC_NUMS = frozenset({8, 16, 34, 52})
 
@@ -55,7 +57,7 @@ def _semipolar_chalcogenide_atoms(mol) -> Set[int]:
     **P-74.2 "DIPOLAR COMPOUNDS"** (heading, ``BlueBookV2.md:42501``): *"Dipolar
     compounds are electrically neutral molecules carrying a negative and a
     positive charge in at least one of their major canonical resonance
-    structures.... 1,2-Dipolar compounds have the opposite charges on adjacent
+    structures. ... 1,2-Dipolar compounds have the opposite charges on adjacent
     atoms."*
 
     **P-74.2.1.1 "'Ylides'"** (heading, ``:42509``) explains why the SMARTS list
@@ -63,20 +65,20 @@ def _semipolar_chalcogenide_atoms(mol) -> Set[int]:
     clause is the last one: *"If 'X' is a saturated atom of an element from the
     second row of the periodic system, the 'ylide' is commonly represented by a
     charge-separated form; if 'X' is a third, fourth, etc. row element uncharged
-    canonical forms are usually shown, RmX=YRn."* A second-row cation (N) has
+    canonical forms are usually shown, RmX=YRn."*  A second-row cation (N) has
     no uncharged depiction, so nitro / N-oxide / azide / diazo are ALWAYS drawn
-    charge-separated and each earned an explicit SMARTS. A third/fourth-row
+    charge-separated and each earned an explicit SMARTS.  A third/fourth-row
     cation (P, S, As, Se, Sb, Te, I...) is *usually* drawn uncharged -- which is
     why no SMARTS was ever written for it -- but nothing prevents an input from
     being drawn charge-separated, and when it is, the pair used to read as a
     genuine ionic centre.
 
     **P-74.2.1.4** (heading ``:43041``) settles what the pair means: *"Phosphine
-    oxides have the generic formula R3P+ -O- <-> R3P=O."* The Blue Book's own
+    oxides have the generic formula R3P+ -O- <-> R3P=O."*  The Blue Book's own
     double-headed arrow says the two depictions are one compound, and *"Method
     (3) leads to preferred IUPAC names"* makes the NEUTRAL name (a
-    ``l5``-phosphanone) the PIN. Likewise **P-74.2.1.2** (``:43015``): *"Method
-    (2) leads to preferred IUPAC names when one amine oxide is present....
+    ``l5``-phosphanone) the PIN.  Likewise **P-74.2.1.2** (``:43015``): *"Method
+    (2) leads to preferred IUPAC names when one amine oxide is present. ...
     Hence, zwitterionic compounds are never PINs"*.
 
     THE BOUNDARY -- the Blue Book draws it by the ANION, and the other side of
@@ -84,32 +86,32 @@ def _semipolar_chalcogenide_atoms(mol) -> Set[int]:
 
     * anion on CARBON is an ylide. **P-74.2.1.1** ``:42513``: *"Method (1) is
       applicable to all 'ylides' and leads to preferred IUPAC names"*, method
-      (1) being *"as zwitterionic compounds"*. So an ylide's PIN IS the
+      (1) being *"as zwitterionic compounds"*.  So an ylide's PIN IS the
       zwitterion name -- masking it would emit a valid but non-preferred
-      ``l5`` name. (Measured: ``C[P+](C)(C)[CH2-]`` already emits the correct
+      ``l5`` name.  (Measured: ``C[P+](C)(C)[CH2-]`` already emits the correct
       ``(trimethylphosphaniumyl)methanide``.)
     * anion on NITROGEN under a nitrogen cation is an amine imide.
       **P-74.2.1.3** (heading ``:43022``): *"Method (1) leads to preferred IUPAC
       names"*, method (1) being *"as a zwitterion based on hydrazine"*.
       (Measured: already emits ``1,2,2,2-tetramethylhydrazin-2-ium-1-ide``.)
     * anion on a CHALCOGEN is the oxide / chalcogenide class -- neutral PIN, so
-      the charges are internal. That is this function.
+      the charges are internal.  That is this function.
 
     Two guards keep it from swallowing a genuine oxoanion, and neither is a
     count standing in for a structure proof:
 
-    1. **Local charge balance.** The cation's positive charge must be exactly
+    1. **Local charge balance.**  The cation's positive charge must be exactly
        cancelled by the terminal chalcogenide anions bonded to it, per P-74.2's
-       "electrically neutral" above. ``[O-][I+]([O-])(O)(O)(O)O`` puts two
+       "electrically neutral" above.  ``[O-][I+]([O-])(O)(O)(O)O`` puts two
        ``O-`` on a ``+1`` iodine and ``[O-][Cl+3]([O-])([O-])[O-]`` four on a
        ``+3`` chlorine; both are genuine anions and both are refused here.
-    2. **The uncharged form must denote the SAME SPECIES.** The pair is
+    2. **The uncharged form must denote the SAME SPECIES.**  The pair is
        rewritten as the multiple bond of the uncharged depiction and the result
-       must both sanitise and carry the same standard InChIKey. This is what
+       must both sanitise and carry the same standard InChIKey.  This is what
        replaces the cation element list a local workaround used to carry: an
        element list cannot tell a semipolar oxide from an oxoanion, whereas this
        proof is exactly the claim being relied on -- that naming the neutral
-       form names the input molecule. ``CC1CO[PH+](C1)[O-]`` and
+       form names the input molecule.  ``CC1CO[PH+](C1)[O-]`` and
        ``CC1CP(OC1)=O`` share ``DWXZAVJWXATXAG-UHFFFAOYSA-N``, which is why
        ``4-methyl-2-oxo-1,2-oxaphospholane`` is the correct name for it.
 
@@ -117,7 +119,7 @@ def _semipolar_chalcogenide_atoms(mol) -> Set[int]:
     """
     # Cheap pre-filter -- the overwhelming majority of molecules leave here.
     by_cation: Dict[int, List[tuple]] = {}
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         begin, end = bond.GetBeginAtom(), bond.GetEndAtom()
         for cation, anion in ((begin, end), (end, begin)):
             if cation.GetFormalCharge() < 1 or anion.GetFormalCharge() != -1:
@@ -226,7 +228,7 @@ def _get_internal_charge_atoms_impl(mol) -> Set[int]:
     Note: Only organic azides [N]=[N+]=[N-] are filtered, NOT the azide anion
     [N-]=[N+]=[N-] which is a genuine ion.
 
-     B3 (root cause, mirrors errors.py's carbon-free structural honesty
+    (root cause, mirrors errors.py's carbon-free structural honesty
     floor): every class above is, by its own P-59/P-74.2 definition, a
     SUBSTITUENT GROUP hung off a carbon-bearing organic skeleton -- Table 5.1
     lists nitro/N-oxide/azide/diazo as prefix-only groups, never as a
@@ -238,7 +240,7 @@ def _get_internal_charge_atoms_impl(mol) -> Set[int]:
     the other -- verified). That falsely marks nitrate's own three charge
     centres "P-59 internal", so ``get_ion_sites`` reports it as carrying NO
     ionic sites at all and ``route_charged`` bails before the correct
-    ``_name_inorganic_oxoacid_anion`` ever runs. A carbon-
+    ``_name_inorganic_oxoacid_anion`` ever runs (V36-SPY-B3 §4c). A carbon-
     free molecule is never a substituent on anything -- it IS the whole ion --
     so short-circuit to "nothing is internal" for it. This is deliberately
     NOT a per-SMARTS carbon constraint (e.g. requiring `[#6]` on the nitro
@@ -266,8 +268,8 @@ def _resonance_twin_internal_atoms(mol) -> Set[int]:
     ``[N;+0]=[N+]=[N-]`` (azide) and ``[#6]=[N+]=[N-]`` (diazo) both assume
     ONE literal bond-order pattern; RDKit does not normalise resonance forms,
     so the charge-separated twin (``R-[N-]-[N+]#N``) is invisible to them and
-    used to fall through to the zwitterion path (
-    `` Q1/Q2). ADDITIVE: this is
+    used to fall through to the zwitterion path (Phase 3B SPY,
+     Q1/Q2). ADDITIVE: this is
     consulted alongside the SMARTS above, not instead of them -- a molecule
     the SMARTS already handle just gets the same atoms added again to a set
     (a no-op).
@@ -321,7 +323,7 @@ def detect_species_type(mol) -> str:
     net_charge = Chem.GetFormalCharge(mol)
     has_any_charge = False
     has_radical = False
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0:
             has_any_charge = True
         if atom.GetNumRadicalElectrons() > 0:
@@ -340,7 +342,7 @@ def detect_species_type(mol) -> str:
                 return 'salt'
 
         if net_charge != 0:
-            # 169.6-04: the >10-HA size-cutoff band-aid that
+            # 169.6-04 (Task 3): the >10-HA size-cutoff band-aid that
             # reclassified a large single-charge ion (protonated amine /
             # quaternary N) as ``neutral`` was REMOVED. It DROPPED the charge
             # (``CCCCCCCCCCCC[NH3+]`` -> ``dodecane``, discarding the amine).
@@ -363,11 +365,11 @@ def detect_species_type(mol) -> str:
     # azide, diazo), molecule is neutral — not a zwitterion.
     if has_any_charge and net_charge == 0:
         internal_atoms = _get_internal_charge_atoms(mol)
-        all_charged = {a.GetIdx() for a in mol.GetAtoms() if a.GetFormalCharge() != 0}
+        all_charged = {a.GetIdx() for a in atoms_of(mol) if a.GetFormalCharge() != 0}
         if all_charged and all_charged.issubset(internal_atoms):
             return 'neutral'
 
-    # 169.6-04: the >20-HA quaternary-N zwitterion size-cutoff band-aid
+    # 169.6-04 (Task 3): the >20-HA quaternary-N zwitterion size-cutoff band-aid
     # (which reclassified large quat-N net-zero zwitterions — phosphatidyl-
     # cholines etc. — as ``neutral``) was REMOVED. name_zwitterion now delegates
     # to route_charged GUARD 4 (P-74.0 anion-is-parent), and where GUARD 4
@@ -401,7 +403,7 @@ def _has_true_zwitterion_character(mol) -> bool:
     - Sulfonyl groups with charge separation
 
     True zwitterions:
-    - Amino acid zwitterions: [NH3+]... [COO-] separated by carbon(s)
+    - Amino acid zwitterions: [NH3+] ... [COO-] separated by carbon(s)
     - Betaines: [N+](C)(C)(C)....[O-] separated by carbons
 
     Args:
@@ -423,7 +425,7 @@ def _has_true_zwitterion_character(mol) -> bool:
     positive_atoms = []
     negative_atoms = []
 
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetIdx() in internal:
             continue
         charge = atom.GetFormalCharge()
@@ -522,7 +524,7 @@ def get_ion_sites(mol, exclude_internal=True) -> Dict[str, List[Dict[str, Any]]]
         - atom_idx: int - atom index in molecule
         - charge: int - formal charge (+1, -1, +2, etc.)
         - element: str - element symbol (N, O, C, etc.)
-        - hybridization: str - hybridization state
+        - hybridization: str - hybridization state (SP3, SP2, etc.)
         - n_hydrogens: int - number of attached hydrogens
 
     Example:

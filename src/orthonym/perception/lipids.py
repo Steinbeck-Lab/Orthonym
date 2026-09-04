@@ -1,9 +1,9 @@
-"""Lipid backbone detection for the P-107 backbone-aware assembler (WSC-01).
+"""Lipid backbone detection for the P-107 backbone-aware assembler (Phase 180, WSC-01).
 
 `detect_lipid_backbone(mol)` is a PURE, hard-gated structural deriver: it recognizes
 the three lipid backbone families and classifies each backbone position, or returns
 ``None`` on any dirty/unrecognized decoration so the molecule defers to the general
-pipeline (fail-safe → zero non-lipid regression). It is the acyclic
+pipeline (, fail-safe → zero non-lipid regression). It is the acyclic
 generalization of the Phase-176 ``recognize_sugar_skeleton`` ring deriver.
 
 The detector does NOT name anything — it produces a structured ``BackboneMatch`` that
@@ -11,9 +11,9 @@ the Form-B assembler (``rules/lipids.py``) consumes. The only mutation is the
 idempotent CIP-label assignment (the accepted sugar-deriver seam).
 
 Families (Blue Book P-107):
-  - "glyceride" — propane-1,2,3-triyl core, O's acylated / phospho / free-OH (P-107.2)
-  - "phospholipid" — glyceride where one primary O is a phosphate diester to a head group (P-107.3)
-  - "sphingolipid" — long-chain 2-amino-1,3-diol (sphinganine/sphingosine); N-acyl = ceramide (P-107.4.3)
+  - "glyceride"     — propane-1,2,3-triyl core, O's acylated / phospho / free-OH (P-107.2)
+  - "phospholipid"  — glyceride where one primary O is a phosphate diester to a head group (P-107.3)
+  - "sphingolipid"  — long-chain 2-amino-1,3-diol (sphinganine/sphingosine); N-acyl = ceramide (P-107.4.3)
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ _CIP_ASSIGNED_PROP = "_orthonym_cip_assigned"
 # Anchor: three contiguous sp3 carbons, each bearing exactly one O — the
 # propane-1,2,3-triyl-O core. (Terminal-internal-terminal CH2-CH-CH2.)
 _GLYCEROL_ANCHOR = Chem.MolFromSmarts("[CH2X4][CHX4][CH2X4]")
-# Sphingoid: HO-CH2(C1)-CH(N)(C2)-CH(O)(C3)-; C1-O may be OH or O-glycosyl.
+# Sphingoid: HO-CH2(C1)-CH(N)(C2)-CH(O)(C3)- ; C1-O may be OH or O-glycosyl.
 _SPHINGOID_ANCHOR = Chem.MolFromSmarts("[OX2][CH2X4][CHX4]([NX3])[CHX4][OX2H1]")
 
 
@@ -110,7 +110,7 @@ def _classify_oxygen_site(mol, c_idx, o_idx):
             if sugar is not None:
                 return ("glycosyl", o_idx, sugar)
             return None  # ring carbon we can't resolve as a clean sugar → defer
-        # plain ether (O-alkyl) or vinyl-ether → defer (ether/plasmalogen)
+        # plain ether (O-alkyl) or vinyl-ether → defer (ether/plasmalogen,)
         return None
 
     return None
@@ -119,18 +119,34 @@ def _classify_oxygen_site(mol, c_idx, o_idx):
 def _recognize_attached_sugar(mol, o_idx, anomeric_idx):
     """Run recognize_sugar_skeleton on the sugar fragment reached through `o_idx`.
 
-    Splits the glycosidic O-C(anomeric) bond and CAPS the anomeric carbon with a
-    fresh -OH so the isolated fragment is a free sugar (anomeric -OH present, the
-    form recognize_sugar_skeleton expects). Returns (anomer, config, base) or None.
+    Turns the glycosidic ``O`` into the anomeric ``-OH`` by detaching its
+    AGLYCONE-side neighbour, KEEPING that oxygen bonded to the anomeric carbon,
+    so the isolated fragment is a free sugar. Returns (anomer, config, base) or
+    None.
+
+    ⚠ The anomeric carbon's chirality (which fixes the anomer α vs β) is stored
+    as a parity RELATIVE TO ITS NEIGHBOUR ORDER. The former implementation removed
+    the anomeric ``C-O`` bond and APPENDED a fresh ``O`` in its place; appending
+    re-orders that carbon's neighbours, and an odd permutation flips the chiral
+    tag CW<->CCW, so the perceived anomer flipped with RDKit atom order (the v22
+    "baseline order-dependence" non-determinism -- a β-D-galactosyl ceramide was
+    named β on some atom orders and α on others, the α form then failing the
+    round-trip gate and dropping the whole molecule to a wrong von-Baeyer/oxane
+    fallback). Detaching the aglycone instead leaves the anomeric carbon's
+    neighbour SET AND ORDER untouched, so the parity -- and thus the anomer -- is
+    deterministic (and correct).
     """
     from orthonym.data.sugar_names import recognize_sugar_skeleton
     bond = mol.GetBondBetweenAtoms(o_idx, anomeric_idx)
     if bond is None:
         return None
+    aglycone = [n.GetIdx() for n in mol.GetAtomWithIdx(o_idx).GetNeighbors()
+                if n.GetIdx() != anomeric_idx]
+    if not aglycone:
+        return None
     rw = Chem.RWMol(mol)
-    rw.RemoveBond(o_idx, anomeric_idx)
-    new_o = rw.AddAtom(Chem.Atom(8))            # restore the anomeric -OH
-    rw.AddBond(anomeric_idx, new_o, Chem.BondType.SINGLE)
+    for ag in aglycone:
+        rw.RemoveBond(o_idx, ag)  # detach the aglycone; O stays on the anomeric C -> -OH
     m2 = rw.GetMol()
     try:
         Chem.SanitizeMol(m2)
@@ -341,11 +357,11 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
                     if nb.GetAtomicNum() == 6 and nb.GetIdx() != prev and nb.GetIdx() not in chain]
             if len(nxts) != 1:
                 if len(nxts) > 1:
-                    return None  # branched sphingoid → honest-gate
+                    return None  # branched sphingoid → honest-gate (D-06/D-11)
                 break
             prev, cur = cur, nxts[0]
             chain.append(cur)
-        chain_pos = {idx: i + 1 for i, idx in enumerate(chain)}  # C1=1...
+        chain_pos = {idx: i + 1 for i, idx in enumerate(chain)}  # C1=1 ...
         double_bonds = []
         for i in range(len(chain) - 1):
             b = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
@@ -371,7 +387,7 @@ def _detect_sphingoid(mol) -> Optional[BackboneMatch]:
 # Public entry point
 # --------------------------------------------------------------------------- #
 def detect_lipid_backbone(mol) -> Optional[BackboneMatch]:
-    """Detect a clean lipid backbone, or return None (hard gate / fail-safe)."""
+    """Detect a clean lipid backbone, or return None (hard gate / fail-safe,)."""
     if mol is None:
         return None
     # sphingoid first (its 1,3-diol-2-amino core is more specific than the glycerol triol)

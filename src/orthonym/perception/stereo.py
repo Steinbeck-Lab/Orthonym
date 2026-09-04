@@ -7,15 +7,18 @@ Chem.AssignStereochemistry() which fails on complex molecules.
 
 import logging
 import os
-from typing import List, Dict, Iterable, Optional
+from typing import Dict, Iterable, List, Optional
+
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
+
+from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
 logger = logging.getLogger(__name__)
 
 _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 
-# WSB-03: centres CIP engine. Read once at import time
+# WSB-03 (Phase 177,): centres CIP engine. Read once at import time
 # (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
 #
 # STER-02 (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
@@ -27,7 +30,7 @@ _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 # UNCHANGED -- a missing JVM never hard-fails a name. Set
 # ORTHONYM_USE_CENTRES_CIP=0/off to force the legacy RDKit-only path.
 #
-# CIP-UPDATE: engine refreshed 1.2.1 -> 1.5 (SiMolecule/centres
+# CIP-UPDATE (2026-06-27): engine refreshed 1.2.1 -> 1.5 (SiMolecule/centres
 # develop @ d4b3cf0). All R/S/E/Z labels are byte-identical to 1.2.1; the only
 # delta is 2 exotic CYCLIC-CUMULENE axial M/P labels (suite 281->279), which
 # Orthonym does NOT consume (allene/axial CIP is computed independently in
@@ -55,7 +58,7 @@ def _fill_missing_bond_cip_from_rdkit(mol) -> None:
     fail-open: any error leaves the primary labels unchanged.
     """
     try:
-        needs = [b.GetIdx() for b in mol.GetBonds()
+        needs = [b.GetIdx() for b in bonds_of(mol)
                  if b.GetBondType() == Chem.BondType.DOUBLE
                  and not (b.HasProp('_CIPCode') and b.GetProp('_CIPCode') in ('E', 'Z'))]
         if not needs:
@@ -81,14 +84,14 @@ def assign_stereochemistry(mol) -> None:
     Assign CIP stereochemistry labels to a molecule (idempotent guard).
 
     Uses a private marker property to track whether rdCIPLabeler has
-    already been called on this mol object. This is more reliable than
+    already been called on this mol object.  This is more reliable than
     checking for _CIPCode because RDKit's MolFromSmiles() automatically
     sets atom _CIPCode from @/@@ notation, but does NOT set bond _CIPCode
     for E/Z -- so an atom-based check would short-circuit and skip the
     bond labels.
 
     The authoritative call site in namer.py:_perceive() sets the marker
-    after calling rdCIPLabeler. Handler modules call this function for
+    after calling rdCIPLabeler.  Handler modules call this function for
     safety (e.g., natural_products runs BEFORE _perceive()).
 
     Args:
@@ -132,10 +135,10 @@ def assign_stereochemistry(mol) -> None:
 def get_stereocenters(mol) -> List[Dict]:
     """
     Get all stereocenters with their CIP labels.
-
+    
     Args:
         mol: RDKit Mol object (stereochemistry should be assigned first)
-
+        
     Returns:
         List of dicts with keys:
         - idx: atom index
@@ -145,7 +148,7 @@ def get_stereocenters(mol) -> List[Dict]:
     """
     # Ensure stereochemistry is assigned
     assign_stereochemistry(mol)
-    
+
     centers = []
     for atom in mol.GetAtoms():
         if atom.HasProp('_CIPCode'):
@@ -158,7 +161,7 @@ def get_stereocenters(mol) -> List[Dict]:
                 'symbol': atom.GetSymbol(),
                 'neighbors': [n.GetIdx() for n in atom.GetNeighbors()],
             })
-    
+
     return centers
 
 
@@ -167,7 +170,7 @@ def get_double_bond_stereo(mol) -> List[Dict]:
     Get E/Z configuration of double bonds.
 
     Uses the _CIPCode property set by rdCIPLabeler as the sole source
-    of E/Z labels. BondStereo fallback was removed-03.
+    of E/Z labels. BondStereo fallback was removed in Phase 92-03.
 
     Args:
         mol: RDKit Mol object (stereochemistry should be assigned via
@@ -197,26 +200,26 @@ def get_double_bond_stereo(mol) -> List[Dict]:
 def has_stereochemistry(mol) -> bool:
     """
     Check if molecule has any defined stereochemistry.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         True if molecule has stereocenters or double bond stereo
     """
     assign_stereochemistry(mol)
-    
+
     # Check for atom stereocenters
     for atom in mol.GetAtoms():
         if atom.HasProp('_CIPCode'):
             return True
-    
+
     # Check for defined double bond stereochemistry via _CIPCode
     for bond in mol.GetBonds():
         if bond.GetBondType() == Chem.BondType.DOUBLE:
             if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z'):
                 return True
-    
+
     return False
 
 
@@ -259,10 +262,10 @@ def get_stereodescriptor_string(
 def count_stereocenters(mol) -> int:
     """
     Count the number of stereocenters in a molecule.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Number of defined stereocenters
     """
@@ -272,10 +275,10 @@ def count_stereocenters(mol) -> int:
 def count_double_bond_stereo(mol) -> int:
     """
     Count the number of double bonds with defined E/Z stereochemistry.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Number of E/Z defined double bonds
     """
@@ -285,10 +288,10 @@ def count_double_bond_stereo(mol) -> int:
 def is_chiral(mol) -> bool:
     """
     Check if molecule has any chiral centers.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         True if molecule has at least one defined stereocenter
     """
@@ -359,11 +362,11 @@ def input_stereo_undefined(mol, atom_indices: Optional[Iterable[int]] = None) ->
 #: The axial descriptor in GENERAL nomenclature, keyed by the PIN (helicity)
 #: descriptor. P-91.2.1.1 "Cahn-Ingold-Prelog (CIP) stereodescriptors"
 #: (BlueBookV2.md:44582) lists under *"The following stereodescriptors are used
-# : as preferred stereodescriptors"* clause (c) (44588) *"'M' and 'P', to specify
+#: as preferred stereodescriptors"* clause (c) (:44588) *"'M' and 'P', to specify
 #: the absolute configuration of an axial or planar entity using the helicity
 #: rule"*; 'Ra'/'Sa' appear only under *"The following stereodescriptors are
-# : recommended for general nomenclature"* (44594). The two describe the same
-# : sense: P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'" (44812)
+#: recommended for general nomenclature"* (:44594). The two describe the same
+#: sense: P-92.1.2.2 "The helicity rule: stereodescriptors 'M' and 'P'" (:44812)
 #: -- *"the chirality is described by the symbols 'M' if the path is
 #: anticlockwise; the symbol is 'P' if the path is clockwise"* -- is the same
 #: clockwise/anticlockwise test the Ra/Sa elongated-tetrahedron model applies,
@@ -383,7 +386,7 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
     representation. Does NOT attempt to infer chirality where the input
     is silent.
 
-    Descriptor (P-91.2.1.1,:44582 -- see ``AXIAL_GENERAL_FORM``): the helicity
+    Descriptor (P-91.2.1.1, :44582 -- see ``AXIAL_GENERAL_FORM``): the helicity
     letters 'M'/'P' are the PREFERRED (PIN) stereodescriptors for an axial
     entity, so they are what this returns by default. 'Ra'/'Sa' are recommended
     for GENERAL nomenclature only and are produced with ``style="general"``.
@@ -410,12 +413,12 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
     results = []
 
     # 1. Atropisomers: check bonds for STEREOATROPCW/STEREOATROPCCW
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         stereo = bond.GetStereo()
         if stereo in (Chem.BondStereo.STEREOATROPCW,
                       Chem.BondStereo.STEREOATROPCCW):
             # RDKit already reports the helicity letter for an atropisomeric
-            # bond, which IS the PIN descriptor (P-91.2.1.1(c),:44588) -- it is
+            # bond, which IS the PIN descriptor (P-91.2.1.1(c), :44588) -- it is
             # passed through rather than re-lettered to Ra/Sa.
             cip = None
             if bond.HasProp('_CIPCode'):
@@ -430,7 +433,7 @@ def detect_axial_chirality(mol, style: str = "pin") -> List[Dict]:
             })
 
     # 2. Allenes: find atoms with CHI_ALLENE chiral tag
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetChiralTag() == Chem.ChiralType.CHI_ALLENE:
             # rdCIPLabeler does not assign CIP to allene atoms in RDKit 2025.09
             # Use manual CIP determination
@@ -484,8 +487,8 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
     arranged in pairs. When proceeding from the nearer ligand having priority in
     the pair to the further away atom or group having priority in the pair, the
     chirality is described by the symbols 'M' if the path is anticlockwise; the
-    symbol is 'P' if the path is clockwise."* So clockwise -> P, anticlockwise
-    -> M; these are the PIN descriptors (P-91.2.1.1(c),:44588). The general
+    symbol is 'P' if the path is clockwise."*  So clockwise -> P, anticlockwise
+    -> M; these are the PIN descriptors (P-91.2.1.1(c), :44588). The general
     forms Ra/Sa are derived by the caller via ``AXIAL_GENERAL_FORM``.
 
     Uses true CIP priority based on atomic number (primary) and neighbor
@@ -591,7 +594,7 @@ def _manual_allene_cip(mol, central_idx: int) -> Optional[str]:
 
     # Determine sense based on the elongated tetrahedron model:
     # View along the allene axis from the near terminal to the far terminal.
-    # P-92.1.2.2 (44812): clockwise -> 'P', anticlockwise -> 'M'.
+    # P-92.1.2.2 (:44812): clockwise -> 'P', anticlockwise -> 'M'.
     if near_high_priority > far_high_priority:
         return 'P'
     elif near_high_priority < far_high_priority:

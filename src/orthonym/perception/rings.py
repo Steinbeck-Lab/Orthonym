@@ -9,17 +9,18 @@ Handles detection of:
 - Heterocyclic rings
 """
 
-from typing import List, Set, Tuple, Dict
+from typing import Dict, List, Set, Tuple
+
 from rdkit import Chem
 
 
 def get_ring_info(mol) -> Dict:
     """
     Get basic ring information from RDKit.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Dictionary with ring information:
         - atom_rings: tuple of tuples of atom indices
@@ -37,15 +38,15 @@ def get_ring_info(mol) -> Dict:
 def get_ring_systems(mol, include_spiro: bool = False) -> List[Set[int]]:
     """
     Find connected ring systems.
-
+    
     Groups rings that share atoms into ring systems:
     - Fused rings share >1 atom
     - Spiro rings share exactly 1 atom
-
+    
     Args:
         mol: RDKit Mol object
         include_spiro: If True, spiro-connected rings are in same system
-
+        
     Returns:
         List of sets, each set contains atom indices in one ring system
     """
@@ -57,17 +58,17 @@ def get_ring_systems(mol, include_spiro: bool = False) -> List[Set[int]]:
 
         # Threshold: >1 for fused only, >0 to include spiro
         threshold = 0 if include_spiro else 1
-        
+
         # Find systems sharing atoms with this ring
         merged = [s for s in systems if len(ring_atoms & s) > threshold]
-        
+
         if merged:
             # Merge all overlapping systems
             new_system = ring_atoms.union(*merged)
             systems = [s for s in systems if s not in merged] + [new_system]
         else:
             systems.append(ring_atoms)
-    
+
     return systems
 
 
@@ -119,11 +120,11 @@ def get_containing_ring_system(mol, ring_atoms) -> frozenset:
 def is_aromatic_ring(mol, ring_atoms) -> bool:
     """
     Check if all atoms in a ring are aromatic.
-
+    
     Args:
         mol: RDKit Mol object
         ring_atoms: Iterable of atom indices
-
+        
     Returns:
         True if all atoms in the ring are aromatic
     """
@@ -133,10 +134,10 @@ def is_aromatic_ring(mol, ring_atoms) -> bool:
 def get_aromatic_rings(mol) -> List[Tuple[int, ...]]:
     """
     Get all aromatic rings in the molecule.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         List of tuples, each tuple contains atom indices of an aromatic ring
     """
@@ -147,11 +148,11 @@ def get_aromatic_rings(mol) -> List[Tuple[int, ...]]:
 def get_ring_size(mol, atom_idx: int) -> int:
     """
     Get the smallest ring size containing an atom.
-
+    
     Args:
         mol: RDKit Mol object
         atom_idx: Index of atom
-
+        
     Returns:
         Smallest ring size, or 0 if atom is not in any ring
     """
@@ -163,11 +164,11 @@ def get_ring_size(mol, atom_idx: int) -> int:
 def is_in_ring(mol, atom_idx: int) -> bool:
     """
     Check if an atom is in any ring.
-
+    
     Args:
         mol: RDKit Mol object
         atom_idx: Index of atom
-
+        
     Returns:
         True if atom is in a ring
     """
@@ -177,11 +178,11 @@ def is_in_ring(mol, atom_idx: int) -> bool:
 def atoms_in_same_ring(mol, idx1: int, idx2: int) -> bool:
     """
     Check if two atoms are in the same ring.
-
+    
     Args:
         mol: RDKit Mol object
         idx1, idx2: Atom indices
-
+        
     Returns:
         True if atoms share at least one ring
     """
@@ -195,24 +196,24 @@ def atoms_in_same_ring(mol, idx1: int, idx2: int) -> bool:
 def get_ring_heteroatoms(mol, ring_atoms) -> List[Tuple[int, str]]:
     """
     Get heteroatoms (non-carbon) in a ring.
-
+    
     Args:
         mol: RDKit Mol object
         ring_atoms: Iterable of atom indices
-
+        
     Returns:
         List of (position_in_ring, element_symbol) tuples
         Position is 0-indexed within the ring
     """
     heteroatoms = []
     ring_list = list(ring_atoms)
-    
+
     for pos, idx in enumerate(ring_list):
         atom = mol.GetAtomWithIdx(idx)
         symbol = atom.GetSymbol()
         if symbol != 'C':
             heteroatoms.append((pos, symbol))
-    
+
     return heteroatoms
 
 
@@ -269,11 +270,11 @@ def get_ring_double_bond_atoms(mol, ring_atoms) -> List[Tuple[int, int]]:
 def is_saturated_ring(mol, ring_atoms) -> bool:
     """
     Check if a ring is fully saturated (no double bonds).
-
+    
     Args:
         mol: RDKit Mol object
         ring_atoms: Iterable of atom indices
-
+        
     Returns:
         True if ring has no double bonds
     """
@@ -283,11 +284,11 @@ def is_saturated_ring(mol, ring_atoms) -> bool:
 def is_heterocyclic(mol, ring_atoms) -> bool:
     """
     Check if a ring contains heteroatoms.
-
+    
     Args:
         mol: RDKit Mol object
         ring_atoms: Iterable of atom indices
-
+        
     Returns:
         True if ring contains non-carbon atoms
     """
@@ -300,20 +301,20 @@ def is_heterocyclic(mol, ring_atoms) -> bool:
 def get_spiro_atoms(mol) -> Set[int]:
     """
     Find atoms that are spiro centers (shared by exactly 2 rings).
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Set of atom indices that are spiro centers
     """
     ri = mol.GetRingInfo()
     atom_ring_count = {}
-    
+
     for ring in ri.AtomRings():
         for atom_idx in ring:
             atom_ring_count[atom_idx] = atom_ring_count.get(atom_idx, 0) + 1
-    
+
     # Spiro atoms are in exactly 2 rings and only share with themselves
     spiro_atoms = set()
     for atom_idx, count in atom_ring_count.items():
@@ -324,7 +325,7 @@ def get_spiro_atoms(mol) -> Set[int]:
                 shared = set(rings_containing[0]) & set(rings_containing[1])
                 if shared == {atom_idx}:
                     spiro_atoms.add(atom_idx)
-    
+
     return spiro_atoms
 
 
@@ -417,16 +418,16 @@ def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
         'aromatic', 'cycloalkane', or 'cycloalkene'
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCCCC1') # cyclohexane
+        >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
         >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
         'cycloalkane'
-        >>> mol = Chem.MolFromSmiles('c1ccccc1') # benzene
+        >>> mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
         >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
         'aromatic'
-        >>> mol = Chem.MolFromSmiles('c1ccncc1') # pyridine
+        >>> mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine
         >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
         'heterocyclic_aromatic'
-        >>> mol = Chem.MolFromSmiles('C1CCNCC1') # piperidine
+        >>> mol = Chem.MolFromSmiles('C1CCNCC1')  # piperidine
         >>> classify_ring(mol, mol.GetRingInfo().AtomRings()[0])
         'heterocyclic_saturated'
     """

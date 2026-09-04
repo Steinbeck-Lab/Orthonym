@@ -1,11 +1,11 @@
 """
-Organometallic complex detection + hapticity perception (v19).
+Organometallic complex detection + hapticity perception (Phase 161 v19).
 
 This module provides RDKit-graph-based detection of metal-organometallic
 complexes per IUPAC 2013 Blue Book §P-69 + IUPAC Red Book §IR-10 + Salzer
 1999 IUPAC Recommendations.
 
-All functions are PREDICATE-PURE per CONTEXT + + Phase
+All functions are PREDICATE-PURE per CONTEXT + Phase 158 + Phase
 160 hard invariant:
 - NO mol mutation (no SanitizeMol, no UpdatePropertyCache, no
   AssignStereochemistry, no any other RDKit mutating method).
@@ -15,17 +15,20 @@ All functions are PREDICATE-PURE per CONTEXT + + Phase
 
 The integrity test ``test_side_effect_inventory_is_empty`` parametrized
 over ``list(StoutClass)`` at ``tests/unit/routing/test_dispatch_table.py``
-will auto-extend to ORGANOMETALLIC after ships and assert ``()``
+will auto-extend to ORGANOMETALLIC after Plan-02 ships and assert ``()``
 for the new entry.
 
- (v19 first scope-expansion phase per).
+Phase 161.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import FrozenSet, List, Optional, Tuple
+
 from rdkit import Chem
 
+from .molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
 # Allowlist for is_metal_element() per RESEARCH §3.1.
 # Groups 1-17 metals/semimetals. Hydrogen EXCLUDED (never metal).
@@ -54,7 +57,7 @@ METAL_ELEMENT_SYMBOLS: FrozenSet[str] = frozenset({
     'Ni', 'Pd', 'Pt', 'Ds',
     'Cu', 'Ag', 'Au', 'Rg',
     'Zn', 'Cd', 'Hg', 'Cn',
-    # Lanthanides + Actinides (.X scope-deferred but allowlist anyway)
+    # Lanthanides + Actinides (Phase 161.X scope-deferred but allowlist anyway)
     'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu',
     'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
 })
@@ -70,8 +73,8 @@ _GROUP_14_13_RING_DEFER: FrozenSet[str] = frozenset({'Si', 'Ge', 'Sn', 'Pb', 'B'
 
 
 # P-69.5 metal classification for mixed-metal covalent compounds:
-# (1) metals of Groups 1 through 12 -> central-atom eligible;
-# (2) metals of Groups 13 through 16 -> cited as a substituent group.
+#   (1) metals of Groups 1 through 12  -> central-atom eligible;
+#   (2) metals of Groups 13 through 16 -> cited as a substituent group.
 # When exactly ONE class-1 metal and >=1 class-2 metalloid are present in a single
 # covalent component, the class-1 metal is the central atom and the class-2
 # metalloid sits inside a ligand (P-69.5.2: e.g. C6H5-Hg-C6H4-Sb(C6H5)2 ->
@@ -98,7 +101,7 @@ class LigandGroup:
 
 @dataclass(frozen=True)
 class MetallacycleInfo:
-    """W8-P9.5 (P-69.4): a metal atom that is itself a RING member.
+    """W8-P9 Task 9.5 (P-69.4): a metal atom that is itself a RING member.
 
     ``ring_atom_indices`` lists the ring atoms in TRAVERSAL order starting at
     the metal (index 0), in one of the two possible ring-walk directions
@@ -132,10 +135,10 @@ def is_metal_element(symbol: str) -> bool:
 def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     """Detect any organometallic complex in the given mol.
 
-     Tier-1 implementation: detects dot-separated metallocene
+    Plan-03 Tier-1 implementation: detects dot-separated metallocene
     topology (1 metal cation + 2 anionic Cp rings = sandwich complex).
 
-     commits 03-02/03/04 extend with Tier-3 (σ-bonded
+    Plan-03 commits 03-02/03/04 extend with Tier-3 (σ-bonded
     single-component main-group), Tier-2 (dot-separated metal carbonyls),
     and Tier-4 (mixed η-bonded / half-sandwich) topology branches.
 
@@ -152,7 +155,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     # Collect metal atom indices + formal charges
     metal_atom_indices = []
     formal_charges = []
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if is_metal_element(atom.GetSymbol()):
             metal_atom_indices.append(atom.GetIdx())
             formal_charges.append(atom.GetFormalCharge())
@@ -169,7 +172,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
     # central metal + >=1 class-2 (Groups 13-16) metalloid, all in ONE covalent
     # component. The class-1 metal is the sole central atom; the class-2 metalloid
     # is named as a substituent inside a ligand. This is NOT a multinuclear bridge
-    # (.3 deferred). class-2/class-2 catenated hydrides (0 class-1 metals)
+    # (Phase 161.3 deferred). class-2/class-2 catenated hydrides (0 class-1 metals)
     # and ionic dot-separated salts (len(frags) > 1) are excluded by construction.
     _class1 = [i for i in metal_atom_indices
                if mol.GetAtomWithIdx(i).GetSymbol() in _CLASS_1_METALS]
@@ -182,7 +185,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
         and len(_class1) + len(_class2) == len(metal_atom_indices)
     )
 
-    # .3 deferred: multinuclear bridged complexes (but NOT the mixed-class
+    # Phase 161.3 deferred: multinuclear bridged complexes (but NOT the mixed-class
     # single-centred case above, which is genuinely single-centred).
     is_multimetal = len(metal_atom_indices) > 1 and not _mixed_class_central
     if len(frags) >= 2 and not is_multimetal:
@@ -290,7 +293,7 @@ def detect_metal_complex(mol: "Chem.Mol") -> Optional[MetalComplex]:
             )
 
     # Tier-2 (dot-separated metal carbonyls) and Tier-4 (mixed η-bonded /
-    # half-sandwich) topologies land in subsequent commits.
+    # half-sandwich) topologies land in subsequent Plan-03 commits.
     return None
 
 
@@ -353,7 +356,7 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
         ligand_atoms = _collect_organic_component(
             mol, neighbor_idx, metal_idx, walk_through)
         # Refuse to collect atoms already in another ligand (e.g., a bridging
-        # carbon would belong to two metals —.3 territory)
+        # carbon would belong to two metals — Phase 161.3 territory)
         if any(a in seen_atoms for a in ligand_atoms):
             return None
         seen_atoms.update(ligand_atoms)
@@ -574,7 +577,7 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
                       ligand_atom_indices: Tuple[int, ...]) -> int:
     """Compute the hapticity of a ligand group bound to a metal.
 
-     implementation per CONTEXT hybrid:
+    Plan-03 implementation per CONTEXT hybrid:
     1. SMARTS-template fast path: consult LIGAND_ETA_DEFAULTS from
        data/organometallics.py; on hit, return catalog value.
     2. Graph-walk fallback (added in 03-04 Tier-4 commit): BFS over
@@ -615,12 +618,12 @@ def compute_hapticity(mol: "Chem.Mol", metal_atom_idx: int,
     if ligand_smi and ligand_smi in LIGAND_ETA_DEFAULTS:
         return LIGAND_ETA_DEFAULTS[ligand_smi][0]
 
-    # Graph-walk fallback (Tier-4 implementation lands in)
+    # Graph-walk fallback (Tier-4 implementation lands in commit 03-04)
     # For Tier-1 (Cp via SMARTS fast path), this never executes.
     return 1
 
 
-# W8-P9.2: the TRUE-METAL subset of METAL_ELEMENT_SYMBOLS used by
+# W8-P9 Task 9.2: the TRUE-METAL subset of METAL_ELEMENT_SYMBOLS used by
 # has_covalent_metal_carbon_bond — Groups 1, 2, and 3-12 (+ lanthanides/
 # actinides), per BB P-69.0's own three-way split: "(1) elements of Groups 1
 # and 2; (2) elements of Groups 3-12 (the transition metals); (3) elements
@@ -645,8 +648,40 @@ _TRUE_METAL_SYMBOLS_FOR_VETO: FrozenSet[str] = METAL_ELEMENT_SYMBOLS - frozenset
 })
 
 
+# (levers 1b/1d): alkali + alkaline-earth (Groups 1-2). A net-0 salt or a
+# net-charged assembly of one of these with an organic ion is IN scope (P-12 binary
+# salt / P-14.8 adduct). Any OTHER true metal is out of scope by default (P-69), and
+# any true metal co-present with a carbanion/hydride is P-69 organometallic.
+_ALKALI_ALKALINE_EARTH: FrozenSet[str] = frozenset({
+    'Li', 'Na', 'K', 'Rb', 'Cs', 'Fr',       # Group 1
+    'Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra',      # Group 2
+})
+
+
+def assembly_has_out_of_scope_metal(mol: "Chem.Mol") -> bool:
+    """True if a multi-fragment ionic assembly contains a P-69 out-of-scope true
+    metal, so the:
+    never render a coordination complex / organometallic as a salt or adduct).
+
+    OUT ⇔ (i) any true metal (``_TRUE_METAL_SYMBOLS_FOR_VETO``) that is NOT
+    alkali/alkaline-earth (the default boundary), OR (ii) an alkali/alkaline-earth
+    true metal co-present with a carbanion/hydride (P-69 organometallic).
+    Metalloids (Si/Ge/Sn/B/As/... — excluded from ``_TRUE_METAL_SYMBOLS_FOR_VETO``)
+    are IN scope (P-68) and never trip this.
+    """
+    true_metals = [a.GetSymbol() for a in mol.GetAtoms()
+                   if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO]
+    if not true_metals:
+        return False
+    if any(s not in _ALKALI_ALKALINE_EARTH for s in true_metals):
+        return True
+    return any((a.GetSymbol() == 'C' and a.GetFormalCharge() < 0)
+               or (a.GetSymbol() == 'H' and a.GetFormalCharge() < 0)
+               for a in mol.GetAtoms())
+
+
 def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
-    """W8-P9.2: True iff a TRUE metal atom (see
+    """W8-P9 Task 9.2: True iff a TRUE metal atom (see
     ``_TRUE_METAL_SYMBOLS_FOR_VETO``) shares a DIRECT bond with a carbon atom
     (same connected fragment) — the structural definition of a P-69
     organometallic compound (BB P-69.0: "Organometallic compounds are
@@ -680,7 +715,7 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
     """
     if mol is None:
         return False
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         a1, a2 = b.GetBeginAtom(), b.GetEndAtom()
         s1, s2 = a1.GetSymbol(), a2.GetSymbol()
         if s1 == 'C' and s2 in _TRUE_METAL_SYMBOLS_FOR_VETO:
@@ -691,7 +726,7 @@ def has_covalent_metal_carbon_bond(mol: "Chem.Mol") -> bool:
 
 
 def has_metal_coordination_bond(mol: "Chem.Mol") -> bool:
-    """ (ChEBI 3-way, 2026-08-28): True iff a TRUE metal atom (the SAME
+    """(ChEBI 3-way, 2026-08-28): True iff a TRUE metal atom (the SAME
     ``_TRUE_METAL_SYMBOLS_FOR_VETO`` set as ``has_covalent_metal_carbon_bond``)
     is an endpoint of a DATIVE (coordination) bond -- a P-69 coordination
     compound whose metal binds via O/N/P dative bonds rather than a covalent
@@ -716,7 +751,7 @@ def has_metal_coordination_bond(mol: "Chem.Mol") -> bool:
     from rdkit import Chem as _Chem
     _dative = (_Chem.BondType.DATIVE, _Chem.BondType.DATIVEONE,
                _Chem.BondType.DATIVEL, _Chem.BondType.DATIVER)
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         if b.GetBondType() in _dative and (
                 b.GetBeginAtom().GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO
                 or b.GetEndAtom().GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO):
@@ -725,7 +760,7 @@ def has_metal_coordination_bond(mol: "Chem.Mol") -> bool:
 
 
 def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
-    """W8-P9.5 (P-69.4): detect a metallacycle — a metal atom (Group
+    """W8-P9 Task 9.5 (P-69.4): detect a metallacycle — a metal atom (Group
     2-12, per ``data.organometallics.METALLACYCLE_A_PREFIX``) that is itself
     a RING member.
 
@@ -792,10 +827,10 @@ def detect_metallacycle(mol: "Chem.Mol") -> Optional["MetallacycleInfo"]:
 def enumerate_metal_ligand_groups(mol: "Chem.Mol") -> Tuple[LigandGroup, ...]:
     """For each metal atom in mol, partition coordinated atoms into ligand groups.
 
-    STUB BODY: returns always. implements per
+    STUB BODY (Plan-02): returns () always. Plan-03 implements per
     RESEARCH §3.2 lines 549-567.
 
-    Algorithm (implementation):
+    Algorithm (Plan-03 implementation):
     1. Identify all metal atoms via is_metal_element(atom.GetSymbol()).
     2. For each metal: collect bond-distance-1 neighbors (ligand-shell).
     3. For each ligand-shell atom: BFS over non-metal bonds to find
@@ -804,7 +839,7 @@ def enumerate_metal_ligand_groups(mol: "Chem.Mol") -> Tuple[LigandGroup, ...]:
 
     PURE per CONTEXT. O(V+E) per metal.
     """
-    # implementation lands here per RESEARCH §3.2 + AUDIT § 5
+    # Plan-03 implementation lands here per RESEARCH §3.2 + AUDIT § 5
     return ()
 
 
