@@ -34,29 +34,39 @@ classifiers = [
 dependencies = [
     "rdkit>=2023.03.1",
     "lxml>=4.6",  # OPSIN grammar XML parsing on the default naming path
+    # In-process JVM for OPSIN + CIP (src/orthonym/jvm_bridge.py). Default since
+    # 2026-09-03: measured 36 ms vs 297 ms per molecule (leucine) against the
+    # `java -jar` subprocess path, byte-identical output. Every bridge keeps its
+    # subprocess fallback when jpype or the JVM is unavailable; set
+    # ORTHONYM_DISABLE_JPYPE=1 to force it. The [jvm] extra below stays as a
+    # no-op alias so existing `pip install orthonym[jvm]` commands keep working.
+    "jpype1>=1.5",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "pytest-benchmark>=5.0",  # sub-50ms p99 timing gate
+    "pytest-benchmark>=5.0",  # NEW per Phase 156 D-16 < 50ms p99 hard gate
     "pytest-cov>=4.0",
     "pytest-xdist>=3.0",
     "black>=23.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
-    "rapidfuzz>=3.14.0",  # eval-only: Damerau-Levenshtein secondary metric; not used on the naming path
+    "rapidfuzz>=3.14.0",  # eval-only: Damerau-Levenshtein secondary metric (eval/harness.py); not used on the naming path
     "requests>=2.25",  # optional PubChem PUG-REST lookup (validation/pubchem_validator.py)
 ]
-# Optional ML fallback extra.
-# STOUT-pypi 2.0.5 hard-pins tensorflow==2.10.1, which has no Python 3.12
-# wheel (TF Python 3.12 support requires TF >= 2.16.0), so the [ml] optional
-# extra requires Python <= 3.11. The default rule-based pipeline keeps full
-# Python 3.10/3.11/3.12 compatibility.
+# Phase 162 ML Fallback Gate (MLF-01 + CONTEXT D-02 optional extra).
+# Per 162-AUDIT-MLF.md § 1.2 R-01 AUTO-PICK resolution (b):
+# STOUT-pypi 2.0.5 hard-pins tensorflow==2.10.1 which has no Python 3.12
+# wheel (TF Python 3.12 support requires TF >= 2.16.0). The [ml] optional
+# extra therefore requires Python <= 3.11.
 #
-# Alternatively, users may vendor the model via git-LFS under
-# models/stout-v2-2.0.5/ and set ORTHONYM_STOUT_MODEL_ROOT to bypass the
-# upstream download path.
+# Default-OFF rule-based pipeline preserves FULL Python 3.10/3.11/3.12
+# compat (CONTEXT line 50 public API stability promise upheld).
+#
+# Fallback (a) per audit § 1.3: users may vendor the model via git-LFS
+# under models/stout-v2-2.0.5/ and set ORTHONYM_STOUT_MODEL_ROOT env var,
+# bypassing the upstream Zenodo download path while R-02 is unresolved.
 ml = [
     "STOUT-pypi==2.0.5; python_version < '3.12'",
 ]
@@ -70,7 +80,7 @@ ml = [
 # against the real CLI (217 names x 2 OPSIN configs, 508 centres SMILES, 0
 # mismatches). Set ORTHONYM_DISABLE_JPYPE=1 to force the subprocess path.
 jvm = [
-    "jpype1>=1.5",
+    "jpype1>=1.5",  # kept as an alias; jpype1 is a core dependency since 2026-09-03
 ]
 
 [project.scripts]
@@ -104,6 +114,8 @@ target-version = ["py310", "py311", "py312"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 ignore = ["E501"]
 
