@@ -10,13 +10,10 @@ The nitrile carbon (C of -C#N) IS counted in the chain length.
 Based on IUPAC 2013 Blue Book P-66.1.
 """
 
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
-from rdkit import Chem
 
-from ..assembly.naming_utils import get_alkyl_name
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
-
 
 
 def is_ring_attached_nitrile(mol, nitrile_atoms: tuple) -> bool:

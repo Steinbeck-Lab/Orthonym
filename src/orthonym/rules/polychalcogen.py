@@ -4,14 +4,14 @@ A chain of *n* IDENTICAL chalcogen atoms (O / S / Se / Te) singly bonded
 end-to-end and terminated by H (potential terminal -OH/-SH functionality is
 ignored, P-21.2.2) is a preselected parent hydride named ``<multiplier><stem>``::
 
-    OO -> dioxidane (H2O2) OOO -> trioxidane (H2O3)
-    SS -> disulfane (H2S2) SSSS -> tetrasulfane (H2S4)
-    [SeH][SeH] -> diselane [TeH][TeH] -> ditellane
+    OO    -> dioxidane     (H2O2)      OOO  -> trioxidane    (H2O3)
+    SS    -> disulfane     (H2S2)      SSSS -> tetrasulfane   (H2S4)
+    [SeH][SeH] -> diselane             [TeH][TeH] -> ditellane
 
 When the two TERMINAL chalcogens instead bear a simple organyl group, the chain
 is named substitutively with locants — but ONLY for chains of **>=3** chalcogens::
 
-    CSSS -> 1-methyltrisulfane CSSSC -> 1,3-dimethyltrisulfane
+    CSSS  -> 1-methyltrisulfane          CSSSC -> 1,3-dimethyltrisulfane
 
 A 1-chalcogen "chain" (CSC) is a sulfide and a 2-chalcogen one (CSSC) a
 disulfide — both named by sulfanyl-ether nomenclature elsewhere, NOT as a
@@ -169,8 +169,7 @@ def _l4_omits_locants(mol, chain: List[int],
     (``P-14.3.3``). Fail-closed on every import or read failure.
     """
     try:
-        from ..assembly.handlers._handler_shared import \
-            locant_scope_is_a_name_component
+        from ..assembly.handlers._handler_shared import locant_scope_is_a_name_component
         from ..assembly.locant_omission import l4_no_isomer_by_relocation
     except Exception:                          # noqa: BLE001 -- deny-by-default
         return False
@@ -207,16 +206,15 @@ def _cite_unlocanted_prefixes(subs: List[Tuple[int, str]]) -> Optional[str]:
     subsequent simple substituents (see P-16.5.1.3.1)"* -- with
     ``bromo(chloro)acetic acid (PIN)`` among its examples, acetic acid being no more
     mononuclear than a trisulfane. And this family supplies the direct witness:
-    ``:39341C6H5-Se-Se-Se-CH3 methyl(phenyl)triselane (PIN)``.
+    ``:39341`` ``C6H5-Se-Se-Se-CH3 methyl(phenyl)triselane (PIN)``.
 
     So ``ethyl`` + ``methyl`` on a trisulfane is ``ethyl(methyl)trisulfane``, never
     ``ethylmethyltrisulfane``; one kind stays bare, ``dimethyltrisulfane``
-    (``:39339``). Sibling of:func:`_cite_locanted_prefixes`, sharing its P-14.5.2
+    (``:39339``). Sibling of :func:`_cite_locanted_prefixes`, sharing its P-14.5.2
     citation order and its shared multiplier/enclosure primitives; returns None
     (fail closed, caller keeps the locants) when the arity is off the table.
     """
-    from ..assembly.naming_utils import (enclose_if_compound,
-                                         multiplied_component)
+    from ..assembly.naming_utils import enclose_if_compound, multiplied_component
     counts: dict = {}
     for _pos, name in subs:
         counts[name] = counts.get(name, 0) + 1
@@ -261,12 +259,11 @@ def _cite_locanted_prefixes(by_name: dict) -> str:
       ``1,3-di(propan-2-yl)`` (BB 25719 ``1,4-di(propan-2-yl)cyclohexane`` (PIN):
       SIMPLE multiplier OUTSIDE the marks) and ``tert-butyl`` keeps its hyphen.
     """
-    from ..assembly.naming_utils import (enclose_if_compound,
-                                         multiplied_component)
+    from ..assembly.naming_utils import enclose_if_compound, multiplied_component
     parts = []
     for name in _cited_order(by_name):
         locs = sorted(by_name[name])
-        # P3-CLOSEOUT Item A: the multiplier WORD comes from the shared
+        # Item A: the multiplier WORD comes from the shared
         # primitive, which knows P-16.3.5(a); the local `_SUB_MULTIPLIER` table
         # could only ever say di/tri, so a SUBSTITUTED prefix on a polysulfane
         # could not take bis/tris. The arity bound stays local (fail closed).
@@ -281,7 +278,7 @@ def _cite_locanted_prefixes(by_name: dict) -> str:
 
 # P-63.1.2 / P-63.4 chalcogen functional-group suffixes for the P-68.4.2.2/.3
 # heterogeneous-chalcogen parent+suffix layer. Suffix seniority follows the
-# element order O > S > Se > Te (-ol senior to -thiol senior to...).
+# element order O > S > Se > Te (-ol senior to -thiol senior to ...).
 _CHALCOGEN_SUFFIX_NAME = {'O': 'ol', 'S': 'thiol', 'Se': 'selenol', 'Te': 'tellurol'}
 _SUFFIX_SENIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3}
 
@@ -289,7 +286,7 @@ _SUFFIX_SENIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3}
 def _all_chalcogen_chain(mol) -> Optional[List[int]]:
     """Return every chalcogen atom (O/S/Se/Te, ANY element) ordered as a single
     unbranched single-bonded path, or None (branch, ring, fork, multi-component,
-    double bond). Heterogeneous sibling of:func:`_chalcogen_chain`."""
+    double bond). Heterogeneous sibling of :func:`_chalcogen_chain`."""
     chal = [a.GetIdx() for a in mol.GetAtoms()
             if a.GetSymbol() in _CHALCOGEN_STEMS]
     if len(chal) < 2:
@@ -326,8 +323,8 @@ def _name_chalcogen_chain_with_suffix(mol) -> Optional[str]:
     ``-ol``/``-thiol``/``-selenol``/``-tellurol`` suffix (the terminal ``-XH`` on a
     DIFFERENT chalcogen)::
 
-        HS-OH -> sulfanol (parent sulfane; oxidane is never a parent)
-        CH3-SS-OH -> methyldisulfanol (parent disulfane, -ol, methyl prefix)
+        HS-OH      -> sulfanol         (parent sulfane; oxidane is never a parent)
+        CH3-SS-OH  -> methyldisulfanol (parent disulfane, -ol, methyl prefix)
 
     The senior functional group (-OH > -SH > -SeH > -TeH) is expressed as the
     suffix; the remaining atoms are the parent hydride. A run of 2-3 identical
@@ -378,7 +375,7 @@ def _name_chalcogen_chain_with_suffix(mol) -> Optional[str]:
         candidates.append(endpt)
     if not candidates:
         return None
-    # Express the SENIOR suffix (-ol > -thiol >...); junior chalcogen -> parent.
+    # Express the SENIOR suffix (-ol > -thiol > ...); junior chalcogen -> parent.
     suffix_pos = min(candidates, key=lambda p: _SUFFIX_SENIORITY[syms[p]])
     suffix_elem = syms[suffix_pos]
 
@@ -537,7 +534,7 @@ def name_polysulfoxide_sulfone(mol) -> Optional[str]:
     lambda-<multiplier><stem> parent hydride (method (1), the PIN)::
 
         CH3-S(=O)-S(=O)-CH3 -> 1,2-dimethyl-1lambda4,2lambda4-disulfane-1,2-dione
-        CH3CH2-SO2-SO2-CH3 -> 1-ethyl-2-methyl-1lambda6,2lambda6-disulfane-1,1,2,2-tetrone
+        CH3CH2-SO2-SO2-CH3  -> 1-ethyl-2-methyl-1lambda6,2lambda6-disulfane-1,1,2,2-tetrone
 
     Each lambda4 centre contributes one oxo (one ``one`` at its locant); each
     lambda6 centre contributes two. The molecule orientation is chosen for lowest

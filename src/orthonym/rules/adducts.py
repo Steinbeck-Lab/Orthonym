@@ -26,18 +26,32 @@ from rdkit import Chem
 
 EM_DASH = "—"
 
-# P-14.8.2 single-heavy-atom inorganic components. Water is cited last; the
-# hydracids use the binary names the Blue Book's own P-14.8.2 examples use
-# ("3-[(2S)-1-methylpyrrolidin-2-yl]pyridine—hydrogen chloride (1/1)",
-# BlueBookV2.md line 4677). Any OTHER single-atom fragment (bare metals,
-# ammonia is deliberately excluded) makes the input NOT an adduct for this
-# namer -> decline (fail-closed).
+# Single-heavy-atom NEUTRAL molecular components of a P-14.8 adduct, keyed by
+# the fragment's element symbol and mapped to the component's own name. Water
+# is cited last; the hydracids use the binary names the Blue Book's own
+# P-14.8.2 examples use ("3-[(2S)-1-methylpyrrolidin-2-yl]pyridine—hydrogen
+# chloride (1/1)", BlueBookV2.md line 4677).
+#
+# The nonmetal hydrides below (methane/hydrogen sulfide/phosphane) are genuine
+# neutral molecular species that occur as adduct partners in the corpus; each
+# name was verified OPSIN-parseable in em-dash adduct notation
+# ("benzene—methane (1/1)" etc.). Without them a row whose only single-atom
+# component is a bare C/S/P declined outright -- a table-miss-degrades-to-
+# refusal defect that abstained instead of naming the P-14.8 adduct.
+#
+# STILL excluded (fail-closed): bare metals (organometallic routing owns them,
+# never swallowed here) and bare N/ammonia (a bare nitrogen fragment is more
+# often a perception artefact than a genuine ammoniate; the exclusion is
+# deliberate and left in place until a corpus-grounded reason to add it).
 SINGLE_ATOM_COMPONENT_NAMES: Dict[str, str] = {
     "O": "water",
     "F": "hydrogen fluoride",
     "Cl": "hydrogen chloride",
     "Br": "hydrogen bromide",
     "I": "hydrogen iodide",
+    "C": "methane",           # v43 P1-1a: CH4, the dominant nonmetal co-component
+    "S": "hydrogen sulfide",  # v43 P1-1a: H2S
+    "P": "phosphane",         # v43 P1-1a: PH3 (phosphane is the P-21 PIN, not phosphine)
 }
 
 
@@ -69,7 +83,8 @@ def split_components(mol) -> Optional[List[Tuple[str, int]]]:
 def _name_component(frag_smi: str, style: str, *,
                     general_fallback: bool = False,
                     allow_aromatic_general: bool = False,
-                    general_fallback_unverified: bool = False) -> Optional[str]:
+                    general_fallback_unverified: bool = False,
+                    charged_ok: bool = False) -> Optional[str]:
     """Name ONE component fragment, or None (fail-closed).
 
     Single-heavy-atom fragments come ONLY from the P-14.8.2 table above.
@@ -78,7 +93,7 @@ def _name_component(frag_smi: str, style: str, *,
     same as routing/dispatch_table._handle_multi_component_neutral), so the
     per-fragment OPSIN validity gate stays ON in production.
 
-     P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    : ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN behaviour) select the ``complete`` tier for the
     per-component namer, so a component nameable only by the general engine
     (e.g. a silyl-heteroarene, a von-Baeyer polyene cage) is named rather than
@@ -88,10 +103,15 @@ def _name_component(frag_smi: str, style: str, *,
     frag_mol = Chem.MolFromSmiles(frag_smi)
     if frag_mol is None:
         return None
-    if Chem.GetFormalCharge(frag_mol) != 0:
+    is_charged = Chem.GetFormalCharge(frag_mol) != 0
+    if is_charged and not charged_ok:
         return None  # charged fragments belong to the salt/ion router
+    # a multi-atom charged ion (charged_ok) is named as a substitutive
+    # ion word (…-ium / …-ide) by the fresh best-effort instance below, exactly as
+    # a neutral multi-atom fragment. A single charged atom (a bare ion) stays out
+    # of the P-14.8.2 single-atom table and refuses.
     if frag_mol.GetNumHeavyAtoms() == 1:
-        return SINGLE_ATOM_COMPONENT_NAMES.get(
+        return None if is_charged else SINGLE_ATOM_COMPONENT_NAMES.get(
             Chem.MolToSmiles(frag_mol, canonical=True))
     from orthonym.namer import Orthonym  # lazy: avoid import cycle
     try:
@@ -173,7 +193,7 @@ def _hydrate_word_form(named: List[Tuple[str, int]],
 
     Defined ONLY when every non-water component shares one count p; the
     prefix encodes the reduced water:parent ratio w/p — n/1 -> mono/di/
-    tri/..., 1/2 -> hemi, 3/2 -> sesqui (P-14.8.2 line 4657; BB line 4686
+    tri/... , 1/2 -> hemi, 3/2 -> sesqui (P-14.8.2 line 4657; BB line 4686
     pairs (2/2/3) with 'sesquihydrate'). Anything else returns None and
     the caller emits the always-valid proportion notation instead.
     """
@@ -228,11 +248,11 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
       * any charged fragment (salt/ion routing owns charged input);
       * ANY component the single-component pipeline cannot name.
 
-     P4: ``general_fallback`` / ``allow_aromatic_general`` (default False ->
+    : ``general_fallback`` / ``allow_aromatic_general`` (default False ->
     byte-identical PIN output) select the ``complete`` tier for the
-    per-component namer (see:func:`_name_component`), so a multi-fragment
+    per-component namer (see :func:`_name_component`), so a multi-fragment
     input whose only unnameable part was a general-engine-only component
-    (silyl-heteroarene, von-Baeyer polyene cage,...) is named under
+    (silyl-heteroarene, von-Baeyer polyene cage, ...) is named under
     ``complete`` instead of abstaining. All other scope (charge / single-atom /
     proportion assembly / P-14.8 ordering) is unchanged.
     """
@@ -244,8 +264,21 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         return None
     if not any(fm.GetNumHeavyAtoms() >= 2 for fm in frag_mols.values()):
         return None
+    # under best-effort, a net-charged multi-fragment assembly composes
+    # as a P-14.8.1-notation adduct of its (charged) ion components -- 'cation—anion
+    # (1/1)' (measured 65% RT_FULL, 0 wrong). OPSIN preserves the net charge when a
+    # cation IS present, but it PROTONATES a lone anion (e.g. 'acetate—water (1/1)'
+    # -> neutral acetic acid), so 0-wrong is delivered by the full-InChIKey
+    # SELF-01/general-fallback gate (namer.py), NOT by OPSIN or this producer -- the
+    # charge-mismatch cases are emitted here and SUPPRESSED downstream. PIN tier
+    # keeps the charge refusal. Out-of-scope metal assemblies are EXCLUDED (0-wrong:
+    # never render a coordination complex / organometallic).
+    _best_effort = (general_fallback or general_fallback_unverified
+                    or allow_aromatic_general)
+    from ..perception.metals import assembly_has_out_of_scope_metal
+    _charged_ok = _best_effort and not assembly_has_out_of_scope_metal(mol)
     for smi, fm in frag_mols.items():
-        if Chem.GetFormalCharge(fm) != 0:
+        if Chem.GetFormalCharge(fm) != 0 and not _charged_ok:
             return None
         if (fm.GetNumHeavyAtoms() == 1
                 and smi not in SINGLE_ATOM_COMPONENT_NAMES):
@@ -256,7 +289,8 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         component_name = _name_component(
             smi, style, general_fallback=general_fallback,
             allow_aromatic_general=allow_aromatic_general,
-            general_fallback_unverified=general_fallback_unverified)
+            general_fallback_unverified=general_fallback_unverified,
+            charged_ok=_charged_ok)
         if component_name is None:
             return None  # fail-closed: never drop or placeholder a component
         named.append((component_name, count))

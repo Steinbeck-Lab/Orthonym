@@ -76,8 +76,8 @@ logger = logging.getLogger(__name__)
 
 #: Shared with the von Baeyer sibling so the two halves of the terminal namer
 #: cannot drift into two different ceilings.
-from .vonbaeyer_universal import MAX_CAGE_ATOMS, MAX_CAGE_RINGS  # noqa: E402
 from .lambda_convention import LAMBDA  # noqa: E402
+from .vonbaeyer_universal import MAX_CAGE_ATOMS, MAX_CAGE_RINGS  # noqa: E402
 
 __all__ = [
     "TerminalRingName",
@@ -93,13 +93,13 @@ __all__ = [
 class TerminalRingName:
     """One audited terminal ring name.
 
-    ``name`` the emitted string -- the parent hydride when
+    ``name``      the emitted string -- the parent hydride when
                   ``free_valence`` is None, else the ``…-<loc>-yl`` substituent
                   token.
-    ``numbering`` atom idx -> ring locant, the SAME map the name was spelled
+    ``numbering``  atom idx -> ring locant, the SAME map the name was spelled
                   from (never re-derived), so a consumer can place its own
                   substituent locants consistently.
-    ``basis`` which generator + audit produced it: ``'monocycle'``,
+    ``basis``      which generator + audit produced it: ``'monocycle'``,
                   ``'von_baeyer'`` or ``'spiro'``.
     """
 
@@ -636,7 +636,8 @@ def terminal_ring_name(
 def _polycyclic_terminal_name(mol, ring, free_valence_atom):
     """Delegate to the existing audited cage / spiro analyzers."""
     from .vonbaeyer_universal import (
-        analyze_cage_universal, analyze_spiro_universal,
+        analyze_cage_universal,
+        analyze_spiro_universal,
         audit_von_baeyer_descriptor,
     )
     for basis, fn in (('von_baeyer', analyze_cage_universal),

@@ -3,7 +3,7 @@ purine numbering; indicated H derived from the graph; P-62/P-66 amine suffix).
 
 Names a SUBSTITUTED purine ring system -- the adenine/hypoxanthine/purine
 skeleton carrying ring-N substituents and/or exocyclic characteristic groups --
-as a whole-molecule parent (`9-methyl-9H-purin-6-amine`) and as a
+as a whole-molecule parent (`9-methyl-9H-purin-6-amine`) and (Task 3) as a
 `-yl` substituent (`6-amino-9H-purin-9-yl`). Declines the bare retained bases
 (adenine/guanine/hypoxanthine) for their standard tautomers, which keep their
 retained names via another path.
@@ -24,7 +24,7 @@ from typing import Optional
 from rdkit import Chem
 
 # Bare purine skeleton, IUPAC locants encoded as atom-map numbers.
-# 6-ring: N1-C2-N3-C4... C5-C6-N1 5-ring: C4-N9-C8-N7-C5 (fused C4-C5)
+#   6-ring: N1-C2-N3-C4 ... C5-C6-N1   5-ring: C4-N9-C8-N7-C5 (fused C4-C5)
 # ``~`` (any bond) makes the match Kekule/aromatic independent. The carbon
 # skeleton is asymmetric (N1 neighbours the degree-2 C6; N3 neighbours the
 # degree-3 fusion C4), so the match orientation -- hence the numbering -- is
@@ -65,12 +65,11 @@ def name_substituted_purine(mol) -> Optional[str]:
     if not matches:
         return None
 
-    from .fused_rings import (
-        get_fused_heterocycle_substituents,
-        _assemble_fused_heterocycle_name,
-        _exocyclic_atoms_accounted,
-    )
     from ..perception.rings import get_ring_systems
+    from .fused_rings import (
+        _assemble_fused_heterocycle_name,
+        get_fused_heterocycle_substituents,
+    )
 
     for match in matches:
         atom_mapping = _purine_atom_mapping(match)
@@ -195,8 +194,8 @@ def _best_effort_augment_purine_subs(mol, atom_mapping, core_atoms, subs):
     if not best_effort_ctx.get():
         return None  # PIN/default: fail closed, exactly as before this fix
 
-    from .ring_substituents import name_ring_system_substituent
     from ..errors import is_refusal_sentinel
+    from .ring_substituents import name_ring_system_substituent
 
     exocyclic = {
         a.GetIdx() for a in mol.GetAtoms()
@@ -304,12 +303,11 @@ def name_purine_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
     if not matches:
         return None
 
-    from .fused_rings import (
-        get_fused_heterocycle_substituents,
-        _assemble_fused_heterocycle_name,
-        _exocyclic_atoms_accounted,
-    )
     from ..perception.rings import get_ring_systems
+    from .fused_rings import (
+        _assemble_fused_heterocycle_name,
+        get_fused_heterocycle_substituents,
+    )
 
     for match in matches:
         if set(match) != frag_set:
@@ -527,12 +525,12 @@ def name_oxo_purine(mol) -> Optional[str]:
     if not matches:
         return None
 
+    from ..perception.rings import get_ring_systems
     from .fused_rings import (
-        _identify_fused_substituent,
         _assemble_fused_heterocycle_name,
+        _identify_fused_substituent,
     )
     from .purine_oxo import _has_aliphatic_unsaturation
-    from ..perception.rings import get_ring_systems
 
     for match in matches:
         core_atoms = set(match)

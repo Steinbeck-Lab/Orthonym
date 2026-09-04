@@ -1,8 +1,8 @@
-""": Von Baeyer naming for tetracyclic and pentacyclic systems.
+"""Phase 151: Von Baeyer naming for tetracyclic and pentacyclic systems.
 
 Replaces the routing helpers at tricyclo.py:556 (_generate_higher_polycyclo_
 descriptor) and tricyclo.py:636 (_name_higher_polycyclo_system) with a
-dedicated module that exposes the cascade-step-6 supplier
+dedicated module that exposes the cascade-step-6 supplier Phase 147
 reserved as a stub. bicyclo.py and tricyclo.py REMAIN authoritative for
 their proven 2-ring and 3-ring cases per CONTEXT.
 
@@ -19,9 +19,9 @@ IUPAC Reference: Blue Book 2013 P-23.3 (tricyclic and higher), P-23.2.5
 (numbering cascade), P-25.2 (heteroatom 'a'-prefix replacement).
 
 Source:
- - */151-CONTEXT.md (,,,,).
- - */151-RESEARCH.md §"Existing Code Audit", §"Risk Landmines".
- - */151-AUDIT-A.md verdict THIN_WRAPPER.
+ - (,,,,,,).
+ - §"Existing Code Audit", §"Risk Landmines".
+ - verdict THIN_WRAPPER.
  - §3 (symmetric-ring locant
    generation), §4 (hybrid dictionary + algorithmic).
 
@@ -50,29 +50,29 @@ logger = logging.getLogger(__name__)
 # Future v19 P-23.2.5(a) tiebreak refinement will use it.
 from .locants import compare_locant_sets  # noqa: F401
 
+# Engine — VonBaeyerAnalyzer (audit verdict THIN_WRAPPER per 151-AUDIT-A.md).
+from .polycyclic import VonBaeyerAnalyzer
+
 # anti-canary lock — bicyclo / tricyclo input must NOT be re-routed
 # through the new module; bicyclo.py and tricyclo.py keep authority on
 # their 99 + 13 canary blast-radius compounds (RESEARCH "Risk Landmines").
 from .polycyclic_bridged import classify_bridged_system
 
-# Engine — VonBaeyerAnalyzer (audit verdict THIN_WRAPPER per 151-AUDIT-A.md).
-from .polycyclic import VonBaeyerAnalyzer
+# retained-name passthrough (AUTONOM §4 hybrid pattern).
+# adamantane / twistane stay served by tricyclo.get_retained_tricyclo_name
+# regardless of cycle-rank. Plan 151-01 keeps this delegation explicit.
+from .tricyclo import (
+    _generate_heteroatom_prefix,  # D-12 hetero-prefix reuse
+    _get_alkane_name,
+    get_retained_tricyclo_name,
+)
 
 # Task S — the Java-free legality floor: the emitted descriptor STRING must
 # rebuild the input's cage. Shared with ``vonbaeyer_universal`` so the PIN-side
 # wrapper and the general-engine cage analyzer apply ONE proof, not two.
 from .vonbaeyer_universal import audit_von_baeyer_descriptor
 
-# retained-name passthrough (HERITAGE §4 hybrid pattern).
-# adamantane / twistane stay served by tricyclo.get_retained_tricyclo_name
-# regardless of cycle-rank. Plan 151-01 keeps this delegation explicit.
-from .tricyclo import (
-    _generate_heteroatom_prefix,  # hetero-prefix reuse
-    _get_alkane_name,
-    get_retained_tricyclo_name,
-)
-
-# Type alias: locants are int OR (int, str) tuple-aware
+# Type alias: locants are int OR (int, str) per Phase 147 tuple-aware
 # format used for superscripted bridge locants like 8a.
 _Locant = Union[int, Tuple[int, str]]
 
@@ -141,7 +141,7 @@ def is_higher_polycyclo(mol) -> bool:
 def name_higher_polycyclo(mol) -> Optional[str]:
     """Generate the IUPAC name for a Von Baeyer ≥4-ring system.
 
-    Algorithm (CONTEXT, HERITAGE §4):
+    Algorithm (CONTEXT, AUTONOM §4):
       1. Retained-name dictionary lookup FIRST. tricyclo.get_retained_
          tricyclo_name is consulted on the canonical SMILES regardless
          of ring count — adamantane / twistane stay retained.
@@ -176,7 +176,7 @@ def name_higher_polycyclo(mol) -> Optional[str]:
         # bracketed atoms, ``dodecane`` = 12) gets built here. Both OPSIN gates
         # are documented FAIL-OPEN with no Java, so this must not rely on them.
         #
-        # also wired this proof into ``analyze`` itself, which now
+        # Task S2 also wired this proof into ``analyze`` itself, which now
         # publishes the same verdict as ``result.legality``. This call is kept
         # rather than replaced by the flag: it is the guard this module's own
         # tests exercise, it re-proves against the ring-atom set THIS function
@@ -212,8 +212,8 @@ def name_higher_polycyclo(mol) -> Optional[str]:
             return f"{prefix}{descriptor}{parent_name}"
         return f"{descriptor}{parent_name}"
     except (ValueError, KeyError, IndexError) as e:
-        # -04 WR-10: narrowed exception clause per the contributor guide /
-        # ./skills/fix-methodology.md. Real bugs (AttributeError,
+        # Phase 151-04 WR-10: narrowed exception clause per CLAUDE.md /
+        # .claude/skills/fix-methodology.md. Real bugs (AttributeError,
         # TypeError) propagate so they surface during testing instead
         # of being silently masked.
         logger.debug(
@@ -224,7 +224,7 @@ def name_higher_polycyclo(mol) -> Optional[str]:
 
 
 # ============================================================================
-# Cascade-step-6 supplier (+; lock)
+# Cascade-step-6 supplier (+; Phase 147 SC-7 lock)
 # ============================================================================
 
 
@@ -233,12 +233,12 @@ def get_higher_polycyclo_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
 
     Returns Optional[Dict[atom_idx -> int | (int, str)]] covering ALL
     ring atoms, or None if the predicate fails / coverage is partial.
-    Partial maps are NEVER returned — / Pitfall 7 gate.
+    Partial maps are NEVER returned — Phase 147 SC-7 / Pitfall 7 gate.
 
     Naming note (CONTEXT deviation; RESEARCH Q-01):
       Distinct from polycyclics.py::get_polycyclic_iupac_locants which
       serves cataloged PAHs by ``pah_name`` lookup. This function is the
-       cascade-step-6 supplier for non-cataloged ≥4-ring
+      Phase 147 cascade-step-6 supplier for non-cataloged ≥4-ring
       bridged systems where retained-name passthrough did not match.
     """
     if not is_higher_polycyclo(mol):
@@ -270,8 +270,8 @@ def get_higher_polycyclo_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
         # for some downstream uses; the cascade gate cares about ring set).
         return {idx: numbering[idx] for idx in ring_atoms if idx in numbering}
     except (ValueError, KeyError, IndexError) as e:
-        # -04 WR-10: narrowed exception clause per the contributor guide /
-        # ./skills/fix-methodology.md.
+        # Phase 151-04 WR-10: narrowed exception clause per CLAUDE.md /
+        # .claude/skills/fix-methodology.md.
         logger.debug(
             "get_higher_polycyclo_iupac_locants declined %s: %s",
             Chem.MolToSmiles(mol, canonical=True), e,

@@ -30,7 +30,7 @@ polyol, already named by the composer, is never intercepted).
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 from rdkit import Chem
 
@@ -54,12 +54,12 @@ def name_acyclic_polyol_polyester(mol) -> Optional[str]:
         return None
 
     # --- Classify every oxygen. ---
-    # free_oh[core_c] -> a -OH on that core carbon
-    # ether_arm[(core_c, o)] -> a bridging ether O to an arm (alkoxy prefix)
-    # acyloxy[(core_c, o, cc)] -> an -O-C(=O)- ester (acyloxy prefix)
+    # free_oh[core_c]           -> a -OH on that core carbon
+    # ether_arm[(core_c, o)]    -> a bridging ether O to an arm (alkoxy prefix)
+    # acyloxy[(core_c, o, cc)]  -> an -O-C(=O)- ester (acyloxy prefix)
     # Any oxygen that does not fit exactly one role -> decline.
     # --- Ester carbonyl carbons (-C(=O)-O-): excluded from the parent carbon
-    # skeleton so an arm's ester O separates the arm from the core cleanly. ---
+    #     skeleton so an arm's ester O separates the arm from the core cleanly. ---
     def _is_ester_carbonyl(a) -> bool:
         if a.GetSymbol() != 'C':
             return False
@@ -114,9 +114,9 @@ def name_acyclic_polyol_polyester(mol) -> Optional[str]:
         return None  # branched core beyond a single chain -> decline (v1)
 
     # --- Classify EACH CORE CARBON's own substituents. Arm-internal oxygens
-    # (an -OH or ester INSIDE an arm) are named by name_substituent on the
-    # arm, never classified here -- only the O directly bonded to a core
-    # carbon is a core role (suffix -ol / alkoxy prefix / acyloxy prefix). ---
+    #     (an -OH or ester INSIDE an arm) are named by name_substituent on the
+    #     arm, never classified here -- only the O directly bonded to a core
+    #     carbon is a core role (suffix -ol / alkoxy prefix / acyloxy prefix). ---
     core_set = set(core)
     prefix_on: Dict[int, List[str]] = {}
     suffix_carbons: Set[int] = set()
@@ -254,8 +254,8 @@ def _acyloxy_name(mol, carbonyl_c: int, ester_o: int) -> Optional[str]:
             return None
     if oxo != 1 or r_side > 1:
         return None
-    from .lipids import _acyloxy_for_site
     from ..assembly.naming_utils import enclose_if_compound
+    from .lipids import _acyloxy_for_site
     ax = _acyloxy_for_site(mol, ('acyl', carbonyl_c, ester_o))
     if not ax or ' ' in ax:
         return None
@@ -278,9 +278,8 @@ def _number_parent(parent: List[int], suffix_carbons: Set[int],
 
 
 def _assemble(mol, parent, numbering, suffix_carbons, prefix_on) -> Optional[str]:
+    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS, alpha_sort_key
     from ..data.chain_names import get_chain_prefix
-    from ..assembly.naming_utils import alpha_sort_key
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS, COMPLEX_MULTIPLIERS
 
     n = len(parent)
     stem = get_chain_prefix(n)

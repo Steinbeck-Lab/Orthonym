@@ -11,40 +11,47 @@ Based on IUPAC 2013 Blue Book P-41 to P-43.
 
 import logging
 from collections import defaultdict
-from typing import Optional, List, Dict, Tuple, Any, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
 from ..assembly.naming_utils import (
-    alpha_sort_key,
-    prefix_citation_sort_key,
-    get_multiplier_prefix,
-    get_suffix_multiplier_prefix,
+    BRANCH_HANDLED_FGS,
     format_suffix_with_locants,
     get_alkyl_name,
-    ALKYL_NAMES,
-    BRANCH_HANDLED_FGS,
+    get_multiplier_prefix,
+    get_suffix_multiplier_prefix,
+    prefix_citation_sort_key,
 )
-from .seniority import (
-    get_principal_group,
-    get_prefix,
-    SENIORITY_ORDER,
-    PREFIX_FORMS,
+from ..assembly.substituent_prefix_forms import (
+    get_alkoxy_prefix as _ASSEMBLY_get_alkoxy_prefix,
 )
-# .1 CONTEXT: lift the 5 prefix-form generators + dispatcher to
+from ..assembly.substituent_prefix_forms import (
+    get_alkoxycarbonyl_prefix as _ASSEMBLY_get_alkoxycarbonyl_prefix,
+)
+
+# Phase 160.1 CONTEXT: lift the 5 prefix-form generators + dispatcher to
 # assembly/substituent_prefix_forms.py. The functions below remain as thin
 # re-exports preserving the existing polyfunctional.py public API.
 from ..assembly.substituent_prefix_forms import (
     get_substituent_prefix_form as _ASSEMBLY_get_substituent_prefix_form,
-    get_alkoxycarbonyl_prefix as _ASSEMBLY_get_alkoxycarbonyl_prefix,
-    get_alkoxy_prefix as _ASSEMBLY_get_alkoxy_prefix,
-    get_sulfinyl_prefix as _ASSEMBLY_get_sulfinyl_prefix,
-    get_sulfonyl_prefix as _ASSEMBLY_get_sulfonyl_prefix,
+)
+from ..assembly.substituent_prefix_forms import (
     get_sulfanyl_prefix as _ASSEMBLY_get_sulfanyl_prefix,
 )
-from .ring_unsaturation import render_ring_unsaturation
+from ..assembly.substituent_prefix_forms import (
+    get_sulfinyl_prefix as _ASSEMBLY_get_sulfinyl_prefix,
+)
+from ..assembly.substituent_prefix_forms import (
+    get_sulfonyl_prefix as _ASSEMBLY_get_sulfonyl_prefix,
+)
 from ..errors import is_refusal_sentinel
-
+from .ring_unsaturation import render_ring_unsaturation
+from .seniority import (
+    PREFIX_FORMS,
+    get_prefix,
+    get_principal_group,
+)
 
 # Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra…), P-31.1.4.
 _RING_UNSAT_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
@@ -55,8 +62,8 @@ def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
     locant strings (``render_ring_unsaturation`` already applies the P-31.1.4.2(1)
     compound ``lo(hi)`` form), leaving the trailing 'e' to the suffix formatter.
 
-    ``cyclohex`` + ene=['2'] -> ``cyclohex-2-en``
-    ``cyclohex`` + ene=['2','4'] -> ``cyclohexa-2,4-dien`` (euphonic 'a')
+    ``cyclohex`` + ene=['2']          -> ``cyclohex-2-en``
+    ``cyclohex`` + ene=['2','4']      -> ``cyclohexa-2,4-dien`` (euphonic 'a')
     Per P-31.1.4: the stem keeps its 'a' before a multiplied unsaturation infix
     but elides it before a single 'ene'.
     """
@@ -71,7 +78,7 @@ def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
     return out
 
 
-# (P-65.6.3.3.5 method (1)): the composite-FG split runs by DEFAULT for
+# W2F-P2 (P-65.6.3.3.5 method (1)): the composite-FG split runs by DEFAULT for
 # exactly this principal-group class (acid-principal partial (thio)esters whose
 # carbonyl is a chain member). v1 scope; extensible. Every default split is
 # per-candidate OPSIN-RT gated in split_composite_fg (fail-closed).
@@ -139,7 +146,7 @@ def _drop_union_class_subtypes(
 ) -> Dict[str, List[tuple]]:
     """Remove non-principal FGs already absorbed into the principal multiplied suffix.
 
-     RC-4 / SEN-03 parity (audit fix 2026-06-22): ``get_principal_group`` unions
+    DD5 RC-4 / SEN-03 parity (audit fix 2026-06-22): ``get_principal_group`` unions
     every present subtype of the principal group's equal-seniority *union* class
     (alcohols, ``_RC4_UNION_CLASSES``) into ``principal_group_atoms``, so a mixed
     primary+secondary OH chain is expressed as ONE multiplied suffix
@@ -156,7 +163,7 @@ def _drop_union_class_subtypes(
     """
     if not principal_group:
         return non_principal
-    from .seniority import _SENIORITY_PARENT, _RC4_UNION_CLASSES
+    from .seniority import _RC4_UNION_CLASSES, _SENIORITY_PARENT
     pclass = _SENIORITY_PARENT.get(principal_group, principal_group)
     if pclass not in _RC4_UNION_CLASSES:
         return non_principal
@@ -199,7 +206,7 @@ def detect_polyfunctional(mol, functional_groups: Dict[str, List[tuple]]) -> boo
         if fg_name in exclude_groups:
             continue
 
-        # Normalize to parent class before counting (PERC-06)
+        # Normalize to parent class before counting (PERC-06 /)
         parent = PARENT_CLASS_MAP.get(fg_name, fg_name)
         distinct_groups.add(parent)
 
@@ -218,7 +225,7 @@ def get_fg_prefix_form(
     For most groups, uses the standard prefix from seniority.py.
     For ethers, determines the alkoxy prefix based on substituent size.
 
-    .1 CONTEXT: chemistry rules lifted to
+    Phase 160.1 CONTEXT: chemistry rules lifted to
     assembly/substituent_prefix_forms.py. This shim consults the new
     dispatcher first; on None (out-of-14-row-set), falls back to the
     static PREFIX_FORMS lookup via get_prefix() — preserving the original
@@ -234,13 +241,13 @@ def get_fg_prefix_form(
     Returns:
         Prefix string (e.g., "hydroxy", "oxo", "methoxy") or None if no prefix
     """
-    # .1: consult the 14-row dispatcher first (P-65 / P-66 forms).
+    # Phase 160.1: consult the 14-row dispatcher first (P-65 / P-66 forms).
     result = _ASSEMBLY_get_substituent_prefix_form(fg_name, mol, atoms, principal_chain)
     if result is not None:
         return result
 
     # Fall through to the static PREFIX_FORMS table for FGs not in the
-    # 14-row.1 closed-set (e.g., carboxylic_acid → "carboxy",
+    # 14-row Phase 160.1 closed-set (e.g., carboxylic_acid → "carboxy",
     # primary_alcohol → "hydroxy", primary_amine → "amino").
     return get_prefix(fg_name)
 
@@ -252,7 +259,7 @@ def _get_alkoxy_prefix(
 ) -> Optional[str]:
     """Thin re-export — see assembly/substituent_prefix_forms.get_alkoxy_prefix.
 
-    .1 CONTEXT: chemistry rule lifted to
+    Phase 160.1 CONTEXT: chemistry rule lifted to
     assembly/substituent_prefix_forms.py. This shim preserves the
     polyfunctional.py public API for existing callers.
     """
@@ -266,7 +273,7 @@ def _get_alkoxycarbonyl_prefix(
 ) -> Optional[str]:
     """Thin re-export — see assembly/substituent_prefix_forms.get_alkoxycarbonyl_prefix.
 
-    .1 CONTEXT: chemistry rule lifted to
+    Phase 160.1 CONTEXT: chemistry rule lifted to
     assembly/substituent_prefix_forms.py. This shim preserves the
     polyfunctional.py public API for existing callers.
     """
@@ -280,7 +287,7 @@ def _get_sulfinyl_prefix(
 ) -> Optional[str]:
     """Thin re-export — see assembly/substituent_prefix_forms.get_sulfinyl_prefix.
 
-    .1 CONTEXT: chemistry rule lifted to
+    Phase 160.1 CONTEXT: chemistry rule lifted to
     assembly/substituent_prefix_forms.py. This shim preserves the
     polyfunctional.py public API for existing callers.
     """
@@ -294,7 +301,7 @@ def _get_sulfonyl_prefix(
 ) -> Optional[str]:
     """Thin re-export — see assembly/substituent_prefix_forms.get_sulfonyl_prefix.
 
-    .1 CONTEXT: chemistry rule lifted to
+    Phase 160.1 CONTEXT: chemistry rule lifted to
     assembly/substituent_prefix_forms.py. This shim preserves the
     polyfunctional.py public API for existing callers.
     """
@@ -308,7 +315,7 @@ def _get_sulfanyl_prefix(
 ) -> Optional[str]:
     """Thin re-export — see assembly/substituent_prefix_forms.get_sulfanyl_prefix.
 
-    .1 CONTEXT: chemistry rule lifted to
+    Phase 160.1 CONTEXT: chemistry rule lifted to
     assembly/substituent_prefix_forms.py. This shim preserves the
     polyfunctional.py public API for existing callers.
     """
@@ -377,22 +384,25 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
         Formatted prefix string (e.g., "2-hydroxy", "3-oxo", "2-(methylsulfinyl)")
     """
     from ..assembly.naming_utils import (
-        needs_brackets, COMPLEX_MULTIPLIERS, apply_enclosing_marks,
-        is_substituted_substituent, _is_fully_enclosed,
+        COMPLEX_MULTIPLIERS,
+        _is_fully_enclosed,
+        apply_enclosing_marks,
+        is_substituted_substituent,
+        needs_brackets,
     )
 
     def _enclose(_p: str) -> str:
         """Give ``_p`` its outermost enclosing marks — and only if it lacks them.
 
-         P3-REGRESSION. Callers legitimately hand over a PRE-ENCLOSED prefix
+        . Callers legitimately hand over a PRE-ENCLOSED prefix
         (`:1693` passes ``f"({_oxa}imino)"`` verbatim), and such a prefix already
         satisfies `**P-16.5.1.1**` (BlueBookV2.md:7232), verbatim: "*Parentheses
         are used around compound (see P-29.1.2) and complex (see P-29.1.3)
-        prefixes; after the multiplicative prefixes 'bis', 'tris', etc.*" The next
+        prefixes; after the multiplicative prefixes 'bis', 'tris', etc.*"  The next
         level out is taken only when one is required — `### **P-16.5.4** Multiple
-        types of enclosing marks` (7444), verbatim at:7446: "*When multiple types
+        types of enclosing marks` (:7444), verbatim at :7446: "*When multiple types
         of enclosing marks are required, the nesting order is as follows:
-        {[({[( )]})]}, etc.*" Here no second type is required, so none is taken.
+        {[({[( )]})]}, etc.*"  Here no second type is required, so none is taken.
 
         Idempotence lives in this ONE place because THREE independent branches
         below reach the enclosure step — `compound`, `_compound_nl`, and
@@ -406,7 +416,7 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
         if _is_fully_enclosed(_p):
             return _p
         # Auto-detect nesting depth: no inner marks -> '(p)'; already contains
-        # '()' -> '[p]'. Byte-identical to the previous hard-coded '(p)' for
+        # '()' -> '[p]'.  Byte-identical to the previous hard-coded '(p)' for
         # prefixes without inner enclosing marks.
         return apply_enclosing_marks(_p, -1)
 
@@ -431,21 +441,21 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
                      and prefix_form.endswith((')', ']')))
         )
         # I13: `is_substituted_substituent` is consulted TOO, so the
-        # enclosing marks are no longer held by the multiplier WORD. Before this,
+        # enclosing marks are no longer held by the multiplier WORD.  Before this,
         # `needs_brackets('phosphonooxy')` was False and the marks survived only
         # because the multiplier happened to be derived; the moment the multiplier
         # became basic, `1,3-bis(phosphonooxy)propan-2-ol` collapsed to
         # `1,3-diphosphonooxypropan-2-ol`, and `format_fg_prefix('methoxymethyl',
         # [1,3], 2)` gave `1,3-dimethoxymethyl` -- a string that reads as
-        # -CH(OMe)2, a DIFFERENT GROUP. BB:36333 carries the marks even at count
-        # 1: `(phosphonooxy)acetic acid (PIN)`. Enclosure (P-16.3.4 / P-16.5.1.1)
+        # -CH(OMe)2, a DIFFERENT GROUP.  BB :36333 carries the marks even at count
+        # 1: `(phosphonooxy)acetic acid (PIN)`.  Enclosure (P-16.3.4 / P-16.5.1.1)
         # and multiplier choice (P-16.3.2/P-16.3.5) are different questions and
         # must not be coupled in EITHER direction.
         #
-        # ⚠ P3-REGRESSION: this disjunct asks the MULTIPLIER question, and
+        # ⚠: this disjunct asks the MULTIPLIER question, and
         # `is_substituted_substituent` deliberately looks THROUGH enclosing marks
         # ("A fully enclosed token is a single component: decide on its interior"),
-        # so `is_substituted_substituent('(dimethylamino)')` is True. It may
+        # so `is_substituted_substituent('(dimethylamino)')` is True.  It may
         # therefore say "needs marks" about a prefix that already HAS them; the
         # idempotence that makes that harmless is in `_enclose`.
         _compound_nl = (needs_brackets(prefix_form) or _partially_enclosed
@@ -488,8 +498,8 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # Check if prefix is a compound substituent needing parentheses (P-16.5.1.1).
     # A prefix that already carries inner enclosing marks but is not itself
     # fully wrapped (e.g. '(methylcarbamoyl)amino', the N-substituted urea
-    # prefix) is compound and needs an ESCALATED outer enclosure
-    # ('[(methylcarbamoyl)amino]') per the P-16.3.3 nesting order (-> [ ]).
+    # prefix, W2F-P6) is compound and needs an ESCALATED outer enclosure
+    # ('[(methylcarbamoyl)amino]') per the P-16.3.3 nesting order (( ) -> [ ]).
     _partially_enclosed = (
         (')' in prefix_form or ']' in prefix_form)
         and not (prefix_form.startswith(('(', '['))
@@ -499,11 +509,11 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # ask the substituted predicate as well, so the marks are not held by the
     # multiplier word.
     #
-    # P3-REGRESSION: four gold targets broke here (gate 1641 -> 1637) because
+    # four gold targets broke here (gate 1641 -> 1637) because
     # this verdict was then used to ADD a level to a prefix that already carried
     # one — `methyl 4-(dimethylamino)-4-(ethylimino)butanoate` shipped as
     # `methyl 4-[(dimethylamino)]4-[(ethylimino)]butanoate`, OPSIN-clean in BOTH
-    # forms, so only the exact-match PIN gate could see it. The verdict is
+    # forms, so only the exact-match PIN gate could see it.  The verdict is
     # unchanged; `_enclose` is now idempotent, which is where the fix belongs
     # because `_is_derived(multiplier)` below reaches the enclosure step without
     # consulting `compound` at all.
@@ -539,7 +549,7 @@ def _name_amidine_chain_side(
     hard-coded parentheses it produced `'((4-chlorophenyl)methylamino)'` — a `(`
     directly inside a `(` — for any N-substituent that already carried marks of
     its own. `### **P"16.5.4** Multiple!types!of!enclosing!marks`
-    (BlueBookV2.md:7444), verbatim at:7446: "*When multiple types of enclosing
+    (BlueBookV2.md:7444), verbatim at :7446: "*When multiple types of enclosing
     marks are required, the nesting order is as follows: {[({[( )]})]}*". The
     idempotent `_enclose` then had no way to tell that malformed pre-enclosure
     from a legitimate one and shipped it verbatim.
@@ -547,8 +557,8 @@ def _name_amidine_chain_side(
     The INNER level is this function's job, and it was missing entirely: a
     COMPOUND N-substituent (P-16.5.1.1 / P-29.1.2) needs its own marks before
     `{base}` is glued on, or the boundary is lost. Blue Book, on point —
-    `4-{[(4-chlorophenyl)methylidene]amino}aniline (PIN)` (26529) under
-    `## **P-62.3.1** Substitutive names for imines` (26508): same aryl, same
+    `4-{[(4-chlorophenyl)methylidene]amino}aniline (PIN)` (:26529) under
+    `## **P-62.3.1** Substitutive names for imines` (:26508): same aryl, same
     N-attached prefix, spelled brace / bracket / paren from the outside in.
 
     Losing that boundary was not merely cosmetic. For
@@ -557,8 +567,9 @@ def _name_amidine_chain_side(
     abstained to `unknown organic compound`, so the malformation was costing
     coverage as well as conformance.
     """
-    from ..assembly.composer import _name_r_group
     from collections import Counter as _C
+
+    from ..assembly.composer import _name_r_group
 
     _names = []
     for _nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
@@ -591,7 +602,7 @@ def _name_amidine_chain_side(
     return f"{''.join(_parts)}{base}"
 
 
-# WS-A / P-66.6.1.2: FGs whose PREFIX_FORMS string ('oxo',
+# WS-A task 9 / P-66.6.1.2: FGs whose PREFIX_FORMS string ('oxo',
 # 'hydroxy') decorates a SKELETAL atom — valid only when the FG center
 # carbon is part of the parent ring. Carbon-including prefixes
 # (carboxylic_acid->carboxy, nitrile->cyano, amide->carbamoyl) are correct
@@ -650,7 +661,7 @@ def _name_exocyclic_decoration(
             return None, comp
         if mol.GetAtomWithIdx(a).IsInRing():
             return None, comp
-    # (P-59.2.1.8, fail-closed): the 'n-hydroxyalkyl' / 'n-oxoalkyl' /
+    # W2F-P3 (P-59.2.1.8, fail-closed): the 'n-hydroxyalkyl' / 'n-oxoalkyl' /
     # 'formyl' table rows each express EXACTLY ONE oxygen functional group over an
     # otherwise-plain carbon chain. A branch bearing MORE than one O-FG (e.g. a
     # hydroxymethyl branch AND a ketone) would be named from the single FG's view
@@ -941,7 +952,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         _em = getattr(features, 'ester_match', None)
         if not _em:
             return None
-        from .esters import parse_ester_fragments, get_alkyl_fragment_name
+        from .esters import get_alkyl_fragment_name, parse_ester_fragments
         _acid_atoms, _alkyl_atoms = parse_ester_fragments(mol, _em)
         if not _alkyl_atoms:
             return None
@@ -958,7 +969,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
 
     # --- Step 5: Generate non-principal FG prefixes with ring locants ---
     all_prefixes = []
-    # WS-A consumption plumbing: atoms named by an exocyclic
+    # WS-A task 9 consumption plumbing: atoms named by an exocyclic
     # carbon-including prefix (formyl/n-oxoalkyl/...) must be consumed even
     # when outside the SMARTS match (the CH2 of -CH2CHO); atoms of a branch
     # we could NOT faithfully name must NOT be consumed (the universal
@@ -996,7 +1007,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             fg_locants = []
             _diverted = 0
             for match in matches:
-                # WS-A / P-66.6.1.2: skeleton-decoration prefixes
+                # WS-A task 9 / P-66.6.1.2: skeleton-decoration prefixes
                 # ('oxo', 'hydroxy') are valid ONLY when the FG center carbon
                 # is IN the ring skeleton. The old context-blind path rewrote
                 # an exocyclic -CHO as a ring ketone '4-oxo...' — a
@@ -1098,7 +1109,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             # disjoint code path) -- so deferring here can only ever apply to
             # a genuine non-principal branch. This is direction-agnostic: it
             # also defers the mirror shape Ring-C(=O)-O-R (a mono-alkyl ester
-            # of a ring diacid, e.g. 'methyl... carboxylic acid' ->
+            # of a ring diacid, e.g. 'methyl ... carboxylic acid' ->
             # '2-(methoxycarbonyl)cyclohexane-1-carboxylic acid'), which is
             # correct extra breadth, not a leak -- see
             # test_mirror_shape_methoxycarbonyl_ring_diacid_monoester.
@@ -1107,7 +1118,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             for idx in match:
                 if idx not in ring_set:
                     consumed_atoms.add(idx)
-    # WS-A: see Step-5 plumbing comment.
+    # WS-A task 9: see Step-5 plumbing comment.
     consumed_atoms |= _extra_consumed
     consumed_atoms |= _ester_consumed
     consumed_atoms -= _do_not_consume
@@ -1229,9 +1240,10 @@ def _acyl_is_simple_saturated_chain(mol, acyl_c: int, n_atom: Optional[int]) -> 
     only hand such an amide to ``name_amide`` when the acyl is a simple chain;
     otherwise it falls through to the chain machinery (on-chain) or fails closed
     (off-chain). This is a producer-honesty guard that holds gate-OFF, per the
-    `` lesson (honesty must not depend on the SELF-01 gate it backstops).
+    ``8afa533c`` lesson (honesty must not depend on the SELF-01 gate it backstops).
     """
     from collections import deque
+
     from rdkit import Chem  # module has no top-level Chem import (only a local _Chem)
     seen = {acyl_c}
     q = deque([acyl_c])
@@ -1277,7 +1289,7 @@ def _acyl_ring_is_simple_unsub_carbocycle(
     acyl ring, and (c) MISNAMES a heteroaromatic acyl ring as a carbocycle
     (isonicotinoyl -> ``cyclohexanecarboxamide``, dropping the ring N). Those
     must NOT be delegated — a producer-honesty guard that holds gate-OFF (the
-    `` standard), exactly as ``_acyl_is_simple_saturated_chain`` guards
+    ``8afa533c`` standard), exactly as ``_acyl_is_simple_saturated_chain`` guards
     the chain path.
     """
     from rdkit import Chem  # module has no top-level Chem import (only a local _Chem)
@@ -1369,7 +1381,11 @@ def _name_ring_attached_anilide(features: Any) -> Optional[str]:
     n_atom = next(
         (i for i in match if mol.GetAtomWithIdx(i).GetSymbol() == 'N'), None)
     from .amides import (
-        name_amide as _ramide, get_n_substituents, is_ring_attached_amide,
+        get_n_substituents,
+        is_ring_attached_amide,
+    )
+    from .amides import (
+        name_amide as _ramide,
     )
     if not is_ring_attached_amide(mol, tuple(match)):
         return None
@@ -1438,7 +1454,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     non_principal = _drop_union_class_subtypes(non_principal, principal_group)
 
     if not principal_chain or not atom_to_locant:
-        # --- -02: Ring-as-parent polyfunctional path ---
+        # --- Phase 86-02: Ring-as-parent polyfunctional path ---
         # When principal_chain is None but the molecule is cyclic, attempt
         # ring-as-parent naming. Conservative guards prevent intercepting
         # compounds better handled by specialized fallthrough handlers:
@@ -1458,7 +1474,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # If the ring is < 40% of heavy atoms, it's likely a
                 # substituent on a chain parent, not the parent itself.
                 # E.g., sphingolipid with cyclohexane ring but 50+ chain atoms.
-                # (P-44.1.1): EXCEPT when the principal characteristic
+                # W2F-P3 (P-44.1.1): EXCEPT when the principal characteristic
                 # group is attached to the ring — then the ring necessarily
                 # holds the PCG and MUST be the parent (the acyclic branch bears
                 # only junior groups), regardless of relative size. Without this
@@ -1529,14 +1545,11 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 None,
             )
             if _acyl_c is not None:
-                from .amides import (
-                    name_amide as _rules_name_amide, get_n_substituents,
-                )
                 # Fail closed on any DEFINED stereocentre/stereobond: the
                 # delegated path emits no parent-level descriptors (the T3d
                 # oxime-decline precedent).
                 #
-                # (E3 follow-on): `Chem.FindMolChiralCenters`
+                # (E3 Task 5 follow-on): `Chem.FindMolChiralCenters`
                 # has an undocumented DESTRUCTIVE side effect — its internal
                 # legacy re-perception pass clears every bond's `_CIPCode`
                 # property (the E/Z label `rdCIPLabeler.AssignCIPLabels` /
@@ -1557,6 +1570,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # mol's already-assigned CIP labels; `_has_stereo` itself is
                 # unaffected (chirality centres are copy-invariant).
                 from rdkit import Chem as _Chem
+
+                from .amides import (
+                    get_n_substituents,
+                )
+                from .amides import (
+                    name_amide as _rules_name_amide,
+                )
                 _has_stereo = bool(
                     _Chem.FindMolChiralCenters(
                         _Chem.Mol(mol), includeUnassigned=False)
@@ -1619,9 +1639,11 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 if _amide_guards_ok and _acyl_c in set(principal_chain):
                     from ..assembly.composer import (
                         _assemble_amide_name as _composer_name_amide,
+                    )
+                    from ..assembly.composer import (
                         _generate_prefixes as _gen_prefixes_am,
                     )
-                    # BLOCKER guard: _assemble_amide_name appends
+                    # guard: _assemble_amide_name appends
                     # _generate_prefixes(features) at PARENT level. That set is
                     # honest for a LOCATED acyl-chain substituent (a '2-methyl'
                     # branch, locant 2) but RE-EXPRESSES a junior FG that lives
@@ -1672,7 +1694,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # (The legacy EL-02 fallback below DEMOTED the ester and promoted a LESS
     # senior group to PCG -- a different, wrong molecule; kept only as a
     # fail-closed fallback for cases the acid-analog path declines.)
-    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC): the acyl HALIDE of a
+    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): the acyl HALIDE of a
     # mono-ester of carbonic acid, X-C(=O)-O-R, is perceived here as ester +
     # acid_halide on the SAME carbonyl and would otherwise be mis-built as
     # 'ethyl 1-chloro-1-oxomethanoate' (OPSIN-invalid). It is the functional-
@@ -1687,7 +1709,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 and any(features.functional_groups.get(h)
                         for h in _halide_fgs)):
             from ..rules.acid_halides import (
-                name_carbonic_monoester_acyl_halide, HALIDE_WORDS,
+                HALIDE_WORDS,
+                name_carbonic_monoester_acyl_halide,
             )
             _em = _ester_matches_all[0]
             _acyl_c = _em[0]
@@ -1729,7 +1752,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             # the junior hydroxy class to principal (inverting P-41: ester
             # class 9 outranks hydroxy class 17). Fail-closed: declines
             # (None) for anything outside its narrow scope (a tied acid
-            # length, a ring acid, an off-chain decoration,...), falling
+            # length, a ring acid, an off-chain decoration, ...), falling
             # through to EL-02 unchanged.
             from ..rules.esters import name_polyfunctional_diester_free_hydroxy
             _diester_pin = name_polyfunctional_diester_free_hydroxy(
@@ -1774,7 +1797,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # alkyl-substituent walk (else double-counted as (ethylamino)/(dimethylamino)).
     _amidine_excluded_n: Set[int] = set()
 
-    # W2E-P1FG (P-66.1.1.4.5.1): pre-pass to suppress the primary_amide
+    # W2E-P1FG Task 10 (P-66.1.1.4.5.1): pre-pass to suppress the primary_amide
     # FG whose H2N-CO-CO- unit is consumed by an '(oxamoylimino)' prefix on a
     # chain imine. The amide FG is a SEPARATE perception match that would
     # otherwise emit a spurious 'carbamoyl'; drop those matches whose amide C
@@ -1804,9 +1827,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # Add ester acyloxy prefixes if esters were demoted
     if ester_acyloxy_prefixes:
         # Group identical acyloxy prefixes for multipliers
-        from collections import Counter as _Ctr
+
         # (B): enclose the acyloxy prefix via the shared escalation
-        # primitive (-> [ -> { instead of a raw f"({acyloxy_name})", which
+        # primitive ( -> [ -> { instead of a raw f"({acyloxy_name})", which
         # produced a double `((...)...)` when the name already held an inner
         # mark (e.g. an '(9Z)-octadec-9-enoyloxy' glycerolipid arm).
         from ..assembly.naming_utils import apply_enclosing_marks as _enc
@@ -1854,7 +1877,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     )
 
     # ------------------------------------------------------------------------- #
-    # P-14.3.4.3 (BB:2939) -- the THIRD handler that reaches this licence class. #
+    # P-14.3.4.3 (BB:2939) -- the THIRD handler that reaches this licence class.  #
     # ------------------------------------------------------------------------- #
     # Measured 2026-07-30: `OC(=O)C(N)C(=O)O` and `OC(=O)C(O)C(=O)O` are named by
     # THIS handler (POOL source `polyfunctional`), not by `general_acyclic`, because
@@ -1948,7 +1971,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # BUG-B guard: Skip FG matches located entirely on a small substituent
         # branch (<=3 carbons) when the substituent naming path demonstrably
         # handles them (producing e.g. "hydroxymethyl", "chloromethyl").
-        # Uses shared BRANCH_HANDLED_FGS from naming_utils (unified).
+        # Uses shared BRANCH_HANDLED_FGS from naming_utils (unified in Phase 113).
         if _branch_atoms and fg_name in BRANCH_HANDLED_FGS:
             filtered_matches = []
             for match in matches:
@@ -1986,7 +2009,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # HYG-04 site#2 double-count guard: a secondary/tertiary amine whose
         # nitrogen sits in a substituent branch is named IN FULL by the
         # substituent-naming path as a single "(...amino)" prefix
-        # (methylamino / dimethylamino /...). Emitting a bare "amino" FG-prefix
+        # (methylamino / dimethylamino / ...). Emitting a bare "amino" FG-prefix
         # for the same nitrogen here double-counts it, producing geminal-diamine
         # artifacts like "2-amino-2-(dimethylamino)ethan-1-ol". Drop such matches
         # so the substituent walk owns the naming. Primary -NH2 is unaffected:
@@ -1994,7 +2017,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # FG-prefix remains its sole, correct name. Mirrors the BUG-B guard above
         # but keyed on the nitrogen (the amine match also spans the chain carbon,
         # so an "entirely on branch" test would miss it).
-        # AM-2 ROOT-2 (plan P1AM, P-66.1.1.3 / P-41): an amine match
+        # AM-2 ROOT-2 (plan P1AM Task 11, P-66.1.1.3 / P-41): an amine match
         # whose nitrogen IS the nitrogen of a perceived amide FG double-
         # expresses that N (suffix 'amide' + '(dimethylamino)' prefix = a
         # DIFFERENT molecule, e.g. '2-amino-1-(dimethylamino)ethanamide' for
@@ -2043,9 +2066,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
         # Non-principal acyl halide on a CHAIN parent (P-65.5.4): the
         # acyl-halide carbon is a chain member, expressed as 'oxo' (=O) +
-        # 'halo' (X), NOT the 'carbonochloridoyl' prefix. Blue Book worked
+        # 'halo' (X), NOT the 'carbonochloridoyl' prefix.  Blue Book worked
         # examples: "4-chloro-4-oxobutanoic acid" (PIN, line 5108),
-        # "3-chloro-3-oxopropanoic acid" (PIN, line 31531). The
+        # "3-chloro-3-oxopropanoic acid" (PIN, line 31531).  The
         # 'carbonochloridoyl' prefix is the PIN only on a RING parent (the
         # carbon cannot join the ring, e.g. "2-carbonochloridoylbenzoic acid",
         # line 31533) — handled elsewhere; here we fall through to it only when
@@ -2103,8 +2126,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # whose carbonyl C terminates an ACYCLIC chain parent (a senior group
         # present, e.g. COOH) is expressed as 'oxo' (=O) + 'hydroperoxy' (-OOH)
         # at that carbon's locant -- '6-hydroperoxy-6-oxohexanoic acid' (PIN,
-        # L30193: "the combination of the simple prefixes hydroperoxy and oxo...
-        # is used in preferred IUPAC names rather than... carbonoperoxoyl-").
+        # L30193: "the combination of the simple prefixes hydroperoxy and oxo ...
+        # is used in preferred IUPAC names rather than ... carbonoperoxoyl-").
         # Mirrors the acid-halide oxo+halo and amide oxo+amino splits above.
         # Fires only when every peroxy-acid C is a chain member; else falls
         # through (PREFIX_FORMS['peroxy_acid'] is None -> the RING/off-chain
@@ -2231,7 +2254,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             if not _s_on_chain:
                 continue
 
-        # P-66.1.4.4 (BB 33196, W2E-P1FG): a thioamide carbon on the
+        # P-66.1.4.4 (BB 33196, W2E-P1FG Task 9): a thioamide carbon on the
         # principal chain, junior to a senior suffix (acid/ester), is expressed
         # by 'amino' (the single-bonded N; '({alkyl}amino)' if substituted) +
         # 'sulfanylidene' (the =S) at that C's locant — BB verbatim
@@ -2265,7 +2288,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         _amidine_excluded_n.add(_tan)
                     continue
 
-        # P-66.1.1.4.5.1 (BB 33071/55479, W2E-P1FG): a chain imine C
+        # P-66.1.1.4.5.1 (BB 33071/55479, W2E-P1FG Task 10): a chain imine C
         # whose =N bears the exact H2N-CO-CO- branch is cited as the preferred
         # composite prefix '(oxamoylimino)' at the imine C's locant. A =N
         # carrying ANY OTHER heavy substituent the recognizer cannot name is
@@ -2342,7 +2365,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 _am_hydrazinyl_tails = {}
                 for _amc, (_dbl, _sgl) in _seen_amc.items():
                     _loc = atom_to_locant.get(_amc)
-                    # P-66.4.2.3.1 (BB 34490, plan P1AM): when the
+                    # P-66.4.2.3.1 (BB 34490, plan P1AM Task 6): when the
                     # single-bonded N's sole heavy branch is a terminal NH2,
                     # the -NH-NH2 unit is ONE 'hydrazinyl' prefix (PIN
                     # '3-hydrazinyl-3-iminopropanoic acid'), never the
@@ -2376,7 +2399,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                             _amidine_excluded_n.add(_am_hydrazinyl_tails[_amc])
                     continue
 
-        # P-66.4.2.3.2 (BB 34498, plan P1AM): an amidrazone carbon
+        # P-66.4.2.3.2 (BB 34498, plan P1AM Task 6): an amidrazone carbon
         # -C(=N-NH2)-NH2 that TERMINATES a chain parent is expressed with
         # -NH2 -> 'amino' and =N-NH2 -> 'hydrazinylidene'. Fires only when
         # every match's amidrazone C is a chain member, the =N-NH2 hydrazono
@@ -2432,11 +2455,11 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         _amidine_excluded_n.update({_dbl, _nh2, _sgl})
                     continue
 
-        # P-66.4.2.3.1 (BB 34490, plan P1AM /7): the imidohydrazide
+        # P-66.4.2.3.1 (BB 34490, plan P1AM Task 6/7): the imidohydrazide
         # tautomer -C(=NH)-NH-NH2 that TERMINATES a chain parent is the same
         # chain-end split as the amidine hydrazinyl case: =NH -> 'imino' and
         # -NH-NH2 -> 'hydrazinyl' ('3-hydrazinyl-3-iminopropanoic acid' for
-        # N=C(NN)CC(=O)O). Perception reclassified this molecule from
+        # N=C(NN)CC(=O)O). Perception (Task 7) reclassified this molecule from
         # amidine+hydrazine_fg to imidohydrazide, so the amidine block above no
         # longer catches it — handle the same shape here. SMARTS
         # [CX3](=[NX2;D1])[NX3][NX3H2]: match[0]=C, [1]==NH, [2]=NH, [3]=NH2.
@@ -2594,13 +2617,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             fg_name, mol, matches[0], principal_chain
         )
         if not prefix_form:
-            # tier-3 fallback (POLY-01): when a composite loser FG
+            # Phase 169 tier-3 fallback (POLY-01): when a composite loser FG
             # has no clean strict-IUPAC prefix (the substituent_no_prefix_form case), decompose it into
             # its ordered sub-group prefix components instead of dropping it. Gated
             # behind the default-OFF flag (Stage A byte-identical); the split only
             # fires for table-listed composites (ester/thioester/iminoester) and is
-            # OPSIN-RT gated (FAIL-CLOSED). Lazy import (Pattern-S3) avoids a
-            # cycle.: iminoester -> imino + alkoxy (P-65.1.3.1.2(2), the chain-
+            # OPSIN-RT gated (FAIL-CLOSED,). Lazy import (Pattern-S3) avoids a
+            # cycle. iminoester -> imino + alkoxy (P-65.1.3.1.2(2), the chain-
             # end simple-prefix form '4-imino-4-methoxybutanoic acid').
             components = None
             _anchored = []
@@ -2610,10 +2633,10 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             )
             if getattr(features, "_enable_group_splitting", False) or _split_default:
                 from ..assembly.group_splitting import (
-                    split_composite_fg,
                     _get_default_oracle,
+                    split_composite_fg,
                 )
-                # (P-65.6.3.3.5): split ONLY the match whose carbonyl C
+                # W2F-P2 (P-65.6.3.3.5): split ONLY the match whose carbonyl C
                 # is IN the principal chain (in-chain ester C -> oxo + R-oxy /
                 # R-sulfanyl); acyloxy-orientation matches (carbonyl off-chain)
                 # keep today's continue (composer acyloxy path owns them). The
@@ -2661,7 +2684,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             mol, matches, principal_chain, atom_to_locant, fg_name
         )
 
-        # (defect a, fail-closed, P-14.3.2): get_non_principal_fg_locants
+        # W2F-P3 (defect a, fail-closed, P-14.3.2): get_non_principal_fg_locants
         # returns exactly one locant per on-chain / chain-adjacent match (no short-chain
         # empty-return special case — 'nitromethane' locant omission happens later via
         # should_omit_locant). After the BUG-B branch filter has already skipped
@@ -2745,8 +2768,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # (e.g. "N,N-tetramethyl"). Multi-N principal amines fall back to the prior
     # path (the substituent walk names each "(dimethylamino)"), avoiding a drop.
     if len(_principal_amine_n_atoms) == 1:
-        from ..assembly.composer import _name_r_group, _wrap_n_substituent
         from collections import Counter as _NCounter
+
+        from ..assembly.composer import _name_r_group, _wrap_n_substituent
 
         _amine_n_atom = next(iter(_principal_amine_n_atoms))
         _chain_set_amine = set(principal_chain)
@@ -2769,9 +2793,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # None here and the emitted name was
                 # '1-((11Z,14Z)-icosa-11,14-dienoyloxy)-N-methyl-2-'
                 # '(stearoyloxy)propanamine' -- a molecule with no phosphate at
-                # all. Before T2 the same arm was FABRICATED as
+                # all. Before T2 (56833b46) the same arm was FABRICATED as
                 # 'N-tritetracontyl', a C43 chain; removing the fabrication made
-                # the refusal honest and exposed this caller (the contributor guide #9).
+                # the refusal honest and exposed this caller (CLAUDE.md #9).
                 return None
             _n_sub_names.append(_rn)
         if _n_sub_names:
@@ -2786,7 +2810,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         f"N,N-{_rmult}{_wrap_n_substituent(_rn)}"
                     )
 
-    # --- (E3): N-substituent prefix for a PRINCIPAL AMIDE
+    # ---: N-substituent prefix for a PRINCIPAL AMIDE
     # whose acyl carbon carries stereo the earlier delegation cannot render ---
     # The dedicated amide delegate a few hundred lines above this
     # (`rules.amides.name_amide` / `composer._assemble_amide_name`) already
@@ -2837,9 +2861,10 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             if (_amide_n_atom_ns is not None
                     and _amide_acyl_c_ns is not None
                     and _amide_acyl_c_ns in set(principal_chain)):
+                from collections import Counter as _NCounterAmide
+
                 from ..assembly.composer import _name_r_group, _wrap_n_substituent
                 from ..assembly.naming_utils import enclose_if_compound
-                from collections import Counter as _NCounterAmide
 
                 _an_sub_names: List[str] = []
                 for _anb in mol.GetAtomWithIdx(_amide_n_atom_ns).GetNeighbors():
@@ -2920,7 +2945,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             _name = f"{_pfx}{_parent}"
         if features.stereocenters or getattr(features, 'double_bond_stereo', None):
             from .stereochemistry import (
-                collect_stereodescriptors, format_stereodescriptor_string,
+                collect_stereodescriptors,
+                format_stereodescriptor_string,
             )
             _desc = collect_stereodescriptors(mol, atom_to_locant)
             if _desc:
@@ -2934,15 +2960,15 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     stem = get_chain_prefix(chain_length)
 
     # Get suffix for principal group
-    from .seniority import get_suffix
     from ..rules.locants import get_functional_group_locants
+    from .seniority import get_suffix
 
     suffix = get_suffix(principal_group, is_ring=False)
     if not suffix:
         return None
 
     # Get locants for principal group.
-    # : count ONLY the principal-group instances that actually sit on the
+    # count ONLY the principal-group instances that actually sit on the
     # PARENT CHAIN. An instance wholly off the chain (all its atoms outside
     # principal_chain) belongs to a substituent and is spelled by that
     # substituent's own name -- counting it in the suffix multiplicity
@@ -3001,6 +3027,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # Detect suffix-prefix locant collisions (safety net for ring parents)
     if suffix_locants and all_prefixes:
         import re as _re
+
         from .locant_validation import detect_locant_collisions
 
         # Extract prefix locants from formatted prefix strings
@@ -3069,20 +3096,20 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # 2026-07-30: removing either changes no name), for two DIFFERENT reasons:
     #
     # * `not suffix_locants` is over-determined today by the orbit test inside the
-    # licence -- a parent compound with only ONE kind of substitutable hydrogen and
-    # a suffix that still cites a locant does not occur, because the one-orbit chain
-    # parents are the diacids, whose terminal suffix locants P-14.3.4.1 has already
-    # withdrawn. `OC(=O)CC(O)C` (suffix locant 3, one prefix) is refused by the
-    # orbit test on butanoic acid instead. It is the direct statement of P-14.3.3
-    # for the suffix half of the scope, and what would stop the licence the moment
-    # either the orbit test or P-14.3.4.1 changed.
+    #   licence -- a parent compound with only ONE kind of substitutable hydrogen and
+    #   a suffix that still cites a locant does not occur, because the one-orbit chain
+    #   parents are the diacids, whose terminal suffix locants P-14.3.4.1 has already
+    #   withdrawn. `OC(=O)CC(O)C` (suffix locant 3, one prefix) is refused by the
+    #   orbit test on butanoic acid instead. It is the direct statement of P-14.3.3
+    #   for the suffix half of the scope, and what would stop the licence the moment
+    #   either the orbit test or P-14.3.4.1 changed.
     #
     # * `len(all_prefixes) == 1` covers a case the structural monosubstitution proof
-    # canNOT: ONE substituent component matched by TWO different FG types would
-    # append two prefixes while `_one_substituent_removed` still measures one
-    # component. No witness for that shape was found, so it survives mutation, but
-    # it is not redundant with the structural proof -- do not remove it on the
-    # strength of the mutation result.
+    #   canNOT: ONE substituent component matched by TWO different FG types would
+    #   append two prefixes while `_one_substituent_removed` still measures one
+    #   component. No witness for that shape was found, so it survives mutation, but
+    #   it is not redundant with the structural proof -- do not remove it on the
+    #   strength of the mutation result.
     if (_l3_render_from is not None and len(all_prefixes) == 1
             and not suffix_locants
             and not double_locants and not triple_locants):
@@ -3137,9 +3164,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 missing_fgs, name, getattr(features, 'canonical_smiles', '?'),
             )
 
-    # M2 fail-closed splice guard: a prefix built from a substituent
+    # M2 Task 3 fail-closed splice guard: a prefix built from a substituent
     # sub-call can carry the cascade's refusal sentinel (bare 'substituent',
-    # 'unknown...', '(not supported)') into `all_prefixes` and from there into
+    # 'unknown ...', '(not supported)') into `all_prefixes` and from there into
     # this assembled `name`. Never ship that -- void the candidate so the
     # caller abstains or falls through to another producer, instead of
     # emitting a name with the placeholder woven in.
@@ -3219,11 +3246,11 @@ def _enumerate_pure_c_branch_name(mol, sub_atoms, features, position):
     ring_info = mol.GetRingInfo()
     if any(ring_info.NumAtomRings(idx) > 0 for idx in sub_atoms):
         return None
+    from ..assembly.naming_utils import needs_brackets
     from ..assembly.substituent_enumerator import (
         SubstituentInfo,
         classify_and_name_fragment,
     )
-    from ..assembly.naming_utils import needs_brackets
     chain = features.principal_chain
     chain_set = set(chain) if chain else set()
     frag_info = SubstituentInfo(
@@ -3290,7 +3317,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
     # in name_polyfunctional). Di-/polyamines fall back to the prior path.
     _exclude_principal_amine = len(_principal_amine_n) == 1
 
-    # (E3): mirror of the amine exclusion above for a
+    # (E3 Task 5): mirror of the amine exclusion above for a
     # PRINCIPAL AMIDE (secondary_amide / tertiary_amide) whose acyl carbon sits
     # ON the principal chain but whose N-substituent(s) are named via the
     # "N-substituent prefix for a PRINCIPAL AMIDE" block later in
@@ -3323,7 +3350,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
             # substituent — its N-substituents are emitted as N,N- prefixes.
             if _exclude_principal_amine and (_principal_amine_n & set(sub_atoms)):
                 continue
-            # (E3): same exclusion for a principal amide's
+            # (E3 Task 5): same exclusion for a principal amide's
             # own N-branch — see comment above.
             if _exclude_principal_amide and (_principal_amide_n & set(sub_atoms)):
                 continue
@@ -3353,9 +3380,9 @@ def _generate_alkyl_prefixes_for_polyfunctional(
 
             # Skip substituent branches entirely covered by a single non-principal
             # FG match ONLY for FG types whose prefix form includes the carbon
-            # (carbamoyl, carboxy, carbonochloridoyl, etc.). These are the FG itself
+            # (carbamoyl, carboxy, carbonochloridoyl, etc.).  These are the FG itself
             # (e.g., -C(=O)NH2 for amide) and are emitted as FG prefixes by the
-            # FG prefix loop above. Processing them here would produce incorrect
+            # FG prefix loop above.  Processing them here would produce incorrect
             # compound substituent names like "(aminomethyl)".
             # IUPAC P-66.1(c): non-principal amide = carbamoyl prefix.
             # NOTE: Only applies to specific terminal-C FG types. Other FGs
@@ -3380,8 +3407,8 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 # which mis-read the heterocumulene/guanidine atoms and emit
                 # a phantom co-substituent on the same locant
                 # ('8-formamido-8-isocyanatooctanoic acid',
-                # '8-isothiocyanato-8-(methylamino)octanoic acid',
-                # '4-guanidino-4-(methylamino)butanoic acid') — a different,
+                #  '8-isothiocyanato-8-(methylamino)octanoic acid',
+                #  '4-guanidino-4-(methylamino)butanoic acid') — a different,
                 # often unparseable molecule. Subset test: each SMARTS spans
                 # the whole branch (isocyanate/isothiocyanate/isocyanide
                 # include the chain-anchor C; guanidine IS the branch).
@@ -3405,7 +3432,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                     if _sub_set.issubset(_fg_set):
                         _skip_fg_branch = True
                         break
-                    # (P-66.1.6.1.1.3): when the urea/thiourea DISTAL N is
+                    # W2F-P6 (P-66.1.6.1.1.3): when the urea/thiourea DISTAL N is
                     # substituted (-NH-CO-NHR), the R atoms lie OUTSIDE the
                     # 4-atom [NX3][CX3](=O)[NX3] match, so branch-subset-of-match
                     # fails. The whole branch is still named by the
@@ -3437,7 +3464,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            # (P-68.3): a CARBON-FREE phosphanyl substituent (-PH2) on a
+            # W2F-P7 (P-68.3): a CARBON-FREE phosphanyl substituent (-PH2) on a
             # polyfunctional parent (e.g. the acid OC(=O)CCP) is dropped by the
             # carbon_count==0 guard below and is NOT recoverable via the FG-prefix
             # loop ('phosphanyl' is a substituent prefix, not a functional group)
@@ -3538,12 +3565,13 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                             mol, _attach, set(sub_atoms))
                     if (not sub_has_ring and not _o_owned_by_fg_prefix
                             and not _skip_s_branch):
+                        from ..assembly.naming_utils import (
+                            apply_enclosing_marks,
+                            needs_brackets,
+                        )
                         from ..assembly.substituent_enumerator import (
                             SubstituentInfo,
                             classify_and_name_fragment,
-                        )
-                        from ..assembly.naming_utils import (
-                            apply_enclosing_marks, needs_brackets,
                         )
                         chain_set = set(features.principal_chain) if features.principal_chain else set()
                         frag_info = SubstituentInfo(
@@ -3554,7 +3582,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         )
                         het_name = classify_and_name_fragment(mol, frag_info, chain_set, features)
                         if het_name and needs_brackets(het_name):
-                            # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): the marks go->[]->{} outward, so
+                            # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): the marks go ()->[]->{} outward, so
                             # a prefix that ALREADY carries parentheses must be
                             # wrapped in SQUARE brackets. The literal f"({...})"
                             # here produced the doubled-paren
@@ -3600,7 +3628,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 )
                 return None
 
-            # (defect b-pure-C, P-29.2): get_alkyl_name(carbon_count) is
+            # W2F-P3 (defect b-pure-C, P-29.2): get_alkyl_name(carbon_count) is
             # correct ONLY for a linear terminal branch. A branched / secondary pure-C
             # branch (propan-2-yl, butan-2-yl) would be mis-named as the straight chain
             # of its carbon COUNT ('propyl' for propan-2-yl = a different constitution).
@@ -3621,8 +3649,7 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         for nb in mol.GetAtomWithIdx(si).GetNeighbors())),
                 None)
             if _fv_attach is not None:
-                from ..assembly.substituent_enumerator import (
-                    carbon_free_valence_prefix)
+                from ..assembly.substituent_enumerator import carbon_free_valence_prefix
                 _fv = carbon_free_valence_prefix(mol, sub_atoms, _fv_attach)
                 if _fv.prefix is not None:
                     substituent_groups[_fv.prefix].append(position)
@@ -3806,7 +3833,7 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
                 first_char == 'N' and len(current) > 1 and current[1] in (',', '-')
             )
             # SUB-05/ (4b): a bare detachable oxo-acid prefix (phosphono,
-            # sulfo,...) glued letter->letter to a preceding substituent must
+            # sulfo, ...) glued letter->letter to a preceding substituent must
             # be separated ("3-oxo"+"phosphono" -> "3-oxo-phosphono", NOT
             # "3-oxophosphono"). GATED to an exact detachable-prefix token set
             # so legitimately-fused single tokens are NEVER split:
@@ -3815,15 +3842,15 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
             current_tail = current.split('-')[-1]
             is_detachable = (current in _DETACHABLE_LETTER_PREFIXES
                              or current_tail in _DETACHABLE_LETTER_PREFIXES)
-            # P3-REGRESSION: `)`, `]` and `}` are ONE rule at three depths.
+            # `)`, `]` and `}` are ONE rule at three depths.
             # `### **P-16.5.4** Multiple types of enclosing marks`
             # (BlueBookV2.md:7444) makes them the same device taken in the nesting
-            # order `{[({[( )]})]}` (7446), so a term ending in ANY of them
+            # order `{[({[( )]})]}` (:7446), so a term ending in ANY of them
             # separates from a following locant identically.
             # Testing only `)` dropped the separator after an escalated prefix:
             # `_join_prefixes(['2-[(methylcarbamoyl)amino]', '4-methyl'])` gave
             # `2-[(methylcarbamoyl)amino]4-methyl`, reachable on the escalated
-            # prefix documented at:407 and independent of any multiplier.
+            # W2F-P6 prefix documented at :407 and independent of any multiplier.
             # (The `)`-then-LETTER rule below is a separate, pre-existing choice
             # and is deliberately left as it is.)
             closes_enclosure = last_char in ')]}'

@@ -10,7 +10,7 @@ sulfonamides (``rules/sulfonamides.py``) and thioimides
 (``rules/thioimides.py``):
 
     "Substituted primary amides, with general structures such as R-CO-NHR'
-    and R-CO-NR'R''... are named by citing the substituents R' and R'' as
+    and R-CO-NR'R'' ... are named by citing the substituents R' and R'' as
     prefixes preceded by the locant *N* when one amide group is present."
 
 THE DEFECT THIS CLOSES
@@ -22,7 +22,7 @@ to GENERAL/decomposition (which named a *fragment*, e.g. ``methanol`` for
 ``O=[N+]([O-])NCO``, dropping the nitro-amide unit) and was suppressed by
 SELF-01 to the ``unknown organic compound`` sentinel.
 
---B3 section 2 ("N-nitro" rows) verified every target form below
+V36-SPY-B3 section 2 ("N-nitro" rows) verified every target form below
 OPSIN-round-trip-exact (full InChIKey match, constitution + charge).
 
 TWO SHAPES BUILT HERE (fails closed on everything else -- never a
@@ -34,8 +34,8 @@ per-molecule special case)
    guard: an N-heteroatom substituent is a different construction and is
    refused)::
 
-       O=[N+]([O-])NCO -> N-(hydroxymethyl)nitramide
-       O=[N+]([O-])N(CO)CO -> N,N-bis(hydroxymethyl)nitramide
+       O=[N+]([O-])NCO      -> N-(hydroxymethyl)nitramide
+       O=[N+]([O-])N(CO)CO  -> N,N-bis(hydroxymethyl)nitramide
 
 2. **``N,N'-dinitro<diamine>``.** EXACTLY two nitro-bearing amide nitrogens,
    each with NO other substituent, both attached to the SAME bridging heavy

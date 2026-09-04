@@ -1,4 +1,4 @@
-""" G2: universal von-Baeyer cage analysis.
+"""v25 G2: universal von-Baeyer cage analysis.
 
 Names ANY bridged/fused polycyclic cage — including AROMATIC cages — by
 kekulizing a canonical copy and expressing every former-aromatic bond as an
@@ -36,8 +36,8 @@ class _Malformed(Exception):
 #: this module -- the default PIN path (``polycyclic.name_polycyclic_complete``)
 #: caps nothing above ``ring_count < 2``.
 #:
-# : T3b measured what raising them buys, over the 1203 ring molecules
-#: of ``, and the answer is NOTHING: with both caps
+#:, over the 1203 ring molecules
+#: of ``benchmarks/pubchem_2000.csv``, and the answer is NOTHING: with both caps
 #: set to 200 the emitted name is byte-identical for every molecule the caps
 #: touch. So the VALUES stay and the fix went to what was being COUNTED --
 #: ``MAX_CAGE_RINGS`` was compared against RDKit's symmetrized ring-set
@@ -66,10 +66,10 @@ class RingAnalysis:
     TWICE -- ``SpiroSystem`` re-declared ``UniversalCage``'s fields by hand --
     and the two copies drifted every time either producer was touched:
 
-    * ``: the skeletal-replacement TOTALITY gate was added to the
+    * ``4e0a13d1``: the skeletal-replacement TOTALITY gate was added to the
       spiro analyzer only, so a mercury von-Baeyer ring shipped as
       ``bicyclo[3.3.0]octane`` -- a hydrocarbon name;
-    * ``: ``hetero_per_atom`` was added to the cage only, so the
+    * ``c931432a``: ``hetero_per_atom`` was added to the cage only, so the
       spiro sibling kept the ``UNBOUND_MORPHEME`` finding that commit existed
       to remove.
 
@@ -84,7 +84,7 @@ class RingAnalysis:
 
     descriptor: str                 # e.g. "bicyclo[2.2.1]" / "spiro[4.5]"
     total_atoms: int
-    hetero_prefix: str              # "" | "7-oxa" | "2,5-diaza"...
+    hetero_prefix: str              # "" | "7-oxa" | "2,5-diaza" ...
     unsaturation: dict              # {'double_bonds': [...], 'triple_bonds': [...]}
     cage_atoms: Tuple[int, ...]     # ORIGINAL (input-mol) indices
     atom_to_locant: Dict[int, int]  # ORIGINAL idx -> ring locant
@@ -94,13 +94,13 @@ class RingAnalysis:
                                     # (allow_mancude), where it emits as a
                                     # kekulized polyene
     # T5: which ORIGINAL atom each morpheme of ``hetero_prefix``
-    # spells -- (orig idx, morpheme), e.g. ((6, 'oxa')). Carried so a consumer
+    # spells -- (orig idx, morpheme), e.g. ((6, 'oxa'),). Carried so a consumer
     # can bind one token per replacement morpheme instead of letting the parent
     # token over-claim the heteroatoms it does not spell. MUST come from the
     # same builder that spelled ``hetero_prefix`` (never a second, differently
     # -spelling one) so the decomposition agrees with the string by
-    # construction. Defaults to so a hand-built or foreign-shaped analysis
-    # stays valid; means "not reported" and consumers must fall back to
+    # construction. Defaults to () so a hand-built or foreign-shaped analysis
+    # stays valid; () means "not reported" and consumers must fall back to
     # whole-parent attribution, NOT assume the ring is all-carbon.
     hetero_per_atom: Tuple[Tuple[int, str], ...] = ()
 
@@ -113,7 +113,7 @@ class UniversalCage(RingAnalysis):
     """
 
 
-# : ``bicyclo[`` / ``tricyclo[`` /... head, capturing the bracket body.
+#: ``bicyclo[`` / ``tricyclo[`` / ... head, capturing the bracket body.
 _VB_HEAD_RE = re.compile(r'^[a-z]+cyclo\[(.+)\]$')
 #: one secondary-bridge term: ``2^3,7`` (PIN typography) or ``2(3,7)`` (the
 #: older parenthesis form ``_build_descriptor`` also emits; OPSIN parses both).
@@ -317,7 +317,7 @@ def audit_von_baeyer_descriptor(
     # number of rings equal to the minimum number of scissions required to
     # convert the system into an acyclic skeleton. The number of rings is
     # indicated by the nondetachable prefix 'bicyclo' (not dicyclo), 'tricyclo',
-    # 'tetracyclo', etc."* The word is part of the name, so a descriptor whose
+    # 'tetracyclo', etc."*  The word is part of the name, so a descriptor whose
     # brackets are right but whose ring-count word is wrong still denotes the
     # wrong system -- ``tetracyclo[3.3.1.1^3,7]`` for adamantane passed every
     # other clause of this audit.
@@ -368,7 +368,7 @@ def analyze_cage_universal(
     used internally before being threaded to ``VonBaeyerAnalyzer.analyze``. Every
     whole-molecule caller leaves it None, and the result is byte-identical.
 
-     P2: when ``allow_mancude`` is True the aromatic/mancude-cage refusal
+    : when ``allow_mancude`` is True the aromatic/mancude-cage refusal
     below is LIFTED -- the cage is kekulized (already done above) and every
     former-aromatic bond is emitted as an explicit von-Baeyer polyene ene
     locant (P-23 unsaturation). When False (the default / PIN path) the
@@ -381,7 +381,8 @@ def analyze_cage_universal(
     what makes the mancude polyene emission trustworthy independent of OPSIN.
     """
     from .polycyclic import (
-        VonBaeyerAnalyzer, _get_largest_connected_ring_component,
+        VonBaeyerAnalyzer,
+        _get_largest_connected_ring_component,
         von_baeyer_ring_count,
     )
     from .ring_replacement import build_replacement_prefix
@@ -528,7 +529,7 @@ def analyze_cage_universal(
         return None
     hetero = replacement.prefix
 
-    # G5-A / T1: cite each ring double bond with the von-Baeyer
+    # G5-A /: cite each ring double bond with the von-Baeyer
     # COMPOUND locant n(m) when its two atoms are NOT consecutively numbered (a
     # fusion/bridge ene, e.g. octalin 1(6)); plain n when m == n+1. The bare
     # min(n,m) model mislabels non-consecutive enes (and, adjacent to an oxo,
@@ -556,7 +557,7 @@ def analyze_cage_universal(
     cage_orig = tuple(sorted(match[c] for c in cage_canon))
     atom_to_locant = {match[c]: loc for c, loc in desc.numbering.items()}
 
-    # G5-A / P2: a cage carrying an AROMATIC ring atom (original-mol
+    # G5-A /: a cage carrying an AROMATIC ring atom (original-mol
     # perception) is mancude. On the DEFAULT / PIN path (allow_mancude=False)
     # its PIN is a fused/retained parent (P-25) + added/indicated H (P-58.2.2),
     # NOT a von-Baeyer polyene, so we still refuse (fail-closed, byte-identical
@@ -602,9 +603,9 @@ def analyze_cage_universal(
 
 
 # =====================================================================
-# P3 (P-24.2): general SPIRO analysis — a sibling to the von-Baeyer
+# (P-24.2): general SPIRO analysis — a sibling to the von-Baeyer
 # cage engine above. ``analyze_cage_universal`` deliberately refuses spiro
-# (``<2 bridgeheads`` at:156); this analyzer names monospiro / linear &
+# (``<2 bridgeheads`` at :156); this analyzer names monospiro / linear &
 # branched polyspiro / heterocyclic spiro ring SYSTEMS, returning the SAME
 # dataclass shape (``SpiroSystem`` mirrors ``UniversalCage``) so the general
 # engine's suffix+substituent+stereo emission tail consumes it unchanged.
@@ -633,9 +634,9 @@ def audit_spiro_descriptor(
 
     Mirrors ``audit_von_baeyer_descriptor``'s set-equality contract, adapted to
     spiro topology. Fail-closed (``False``) on any of:
-      (bijection) numbering is not a 1-1 map of the cage atoms onto {1..N}
+      (bijection)  numbering is not a 1-1 map of the cage atoms onto {1..N}
                    (rejects a numbering that maps two atoms to the same locant);
-      (coverage) the SSSR rings contained in the cage do not union to exactly
+      (coverage)   the SSSR rings contained in the cage do not union to exactly
                    the cage atom set (a ring atom silently dropped);
       (pure-spiro) two cage rings share >1 atom (fused/bridged mis-routed here),
                    a shared atom is not a declared spiro atom, a spiro atom is
@@ -749,12 +750,15 @@ def analyze_spiro_universal(
     ``audit_spiro_descriptor`` (fail-closed on any structural mismatch).
     """
     from ..perception.rings import get_spiro_atoms
-    from .spiro import (
-        generate_spiro_descriptor, get_spiro_numbering,
-        _get_polyspiro_numbering, _build_hetero_prefix,
-    )
     from .polycyclic import (  # noqa: F401 (_get_alkane_name = parity import)
-        _get_alkane_name, von_baeyer_ring_count,
+        _get_alkane_name,
+        von_baeyer_ring_count,
+    )
+    from .spiro import (
+        _build_hetero_prefix,
+        _get_polyspiro_numbering,
+        generate_spiro_descriptor,
+        get_spiro_numbering,
     )
 
     if mol is None:

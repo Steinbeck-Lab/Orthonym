@@ -1,12 +1,12 @@
-""" G1: unified Blue Book P-44 parent-structure scorer.
+"""v25 G1: unified Blue Book P-44 parent-structure scorer.
 
 ONE deterministic comparator over a POOLED ring+chain candidate list,
-replacing the staged class-specific ``select_parent`` cascade (the P0
+replacing the staged class-specific ``select_parent`` cascade (the
 root-cause coverage gap: staged branches + fail-open default-to-ring).
 
 Rule grounding (BlueBookV2/BlueBookV2.md, verified 2026-07-19):
-- P-44.1.1 (~18850): max count of principal characteristic group as suffix.
-- P-44.1.2 (18917): class order N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B>Al>Ga>In>Tl>
+- P-44.1.1  (~18850): max count of principal characteristic group as suffix.
+- P-44.1.2  (18917): class order N>P>As>Sb>Bi>Si>Ge>Sn>Pb>B>Al>Ga>In>Tl>
   O>S>Se>Te>C; chooses between rings and chains, NOT among rings/'a'-chains.
 - P-44.1.2.2(1) (19340): same class -> ring senior to chain, regardless of
   hydrogenation (heptylbenzene PIN) or chain length (BB 35011:
@@ -27,7 +27,7 @@ Expressibility principle (class rank + P-44.3 hetero criteria): a chain
 heteroatom only counts as SKELETON when the name can express it as such --
 a pure non-carbon hydride chain (silane, phosphane, hydrazine: P-21) or a
 P-51.4 replacement-admissible mixed chain. Below that, a mixed C/het chain
-is a carbon parent with functionalized bridges (.1 semantics) and
+is a carbon parent with functionalized bridges (Phase 91.1 semantics) and
 ranks as carbon. Principal-group match atoms are suffix, never skeleton.
 """
 from __future__ import annotations
@@ -79,19 +79,22 @@ def pool_candidates(mol, ring_systems, principal_chain,
     - a longer PG-bearing skeletal hetero chain is admitted ONLY in the
       tied-PG context (PG on BOTH the ring system and the carbon principal
       chain) with a bridging heteroatom - exactly the branch where the
-      legacy staged cascade considered it (.1 / P-44.3(b)).
+      legacy staged cascade considered it (Phase 91.1 / P-44.3(b)).
       Outside that context the skeletal chain must not displace the
       carbon-chain parent (e.g. the secondary-amine C-N-C shape);
     - with no principal group, a longer skeletal chain is admitted at
       >= 4 bridging hetero units (P-51.4 replacement admission).
     """
-    from .parent_selection import (
-        _count_pg_on_ring, _count_pg_on_chain,
-        is_principal_group_on_ring, is_principal_group_on_chain,
-        _has_bridging_heteroatom, _count_bridging_heteroatoms,
-    )
     from ..perception.chains import find_longest_skeletal_chain
     from ..perception.functional_groups import get_chain_excluded_atoms
+    from .parent_selection import (
+        _count_bridging_heteroatoms,
+        _count_pg_on_chain,
+        _count_pg_on_ring,
+        _has_bridging_heteroatom,
+        is_principal_group_on_chain,
+        is_principal_group_on_ring,
+    )
 
     pool: List[ParentCandidate] = []
     all_ring_atoms = set()
@@ -189,7 +192,7 @@ def _n_multiple_bonds(mol, atom_set) -> Tuple[int, int]:
 
 
 def _locant_sort_key(v):
-    """ cleanup T3: TOTAL, crash-proof sort key for the locant
+    """: TOTAL, crash-proof sort key for the locant
     values `_candidate_locants` collects (below).
 
     The `_Locant` type contract (`locants.py`) only ever admits ``int`` or
@@ -201,7 +204,7 @@ def _locant_sort_key(v):
     coerced to ``(3, 'a')``) in that dict and every one of ``cand.atoms``
     still happens to be a key, the fast path takes it uncoerced -- and
     plain ``sorted(locs)`` then compares that string against an ``int``/
-    ``tuple`` neighbour and raises ``TypeError`` (measured, L3-2/L3-3:
+    ``tuple`` neighbour and raises ``TypeError`` (measured, L3-2/L3-3 SPY:
     crashes ``_classify`` -> the molecule abstains; 0-wrong-safe but a
     robustness defect).
 
@@ -262,7 +265,7 @@ def _candidate_locants(mol, cand: ParentCandidate, target_atoms,
             pos = iupac
     if pos is None:
         pos = _build_ring_pos(set(cand.atoms), ring_info=ring_info)
-    # homogeneity: raw iupac_locants (and thus the fast path
+    # Phase 147 homogeneity: raw iupac_locants (and thus the fast path
     # above) can mix int locants (2) with (int, str) fusion/prime tuples
     # ((4, 'a'), (2, "'")). Coerce ints to (n, '') when any tuple is
     # present so BOTH this sort AND the downstream compare_locant_sets stay
@@ -474,27 +477,28 @@ def select_parent_unified(
     Pre-empts (admission/priority rules) are preserved from the staged
     implementation; everything else is ONE pooled P-44 comparator sort.
 
-     (offer-not-return): ``_offer_rank`` selects WHICH
+    (offer-not-return,: ``_offer_rank`` selects WHICH
     member of the P-44-ranked pool becomes the parent. ``_offer_rank == 0`` (the
     default at every normal call site) commits to ``ranked[0]`` — byte-identical
-    to the pre- behaviour for every molecule. A best-effort retry may pass
+    to the pre-SP1.3 behaviour for every molecule. A best-effort retry may pass
     ``_offer_rank == k`` to force the k-th-ranked candidate ONLY after
     ``ranked[0]`` has already abstained; the P-44 ranking is NEVER reordered and
     an out-of-range rank clamps back to ``ranked[0]``. Every returned result
     carries ``parent_pool_size`` so the caller can bound its retry.
     """
+    from ..perception.natural_products import detect_natural_product
     from .parent_selection import (
-        ParentSelectionResult, SKELETAL_SUFFIX_PGS,
+        SKELETAL_SUFFIX_PGS,
+        ParentSelectionResult,
         is_principal_group_on_ring,
     )
-    from ..perception.natural_products import detect_natural_product
 
     all_ring_atoms = set()
     for ring in ring_systems:
         all_ring_atoms.update(ring)
     ring_tuples = [tuple(sorted(r)) for r in ring_systems]
 
-    # --- Pre-empt 1: no chain -> ring (legacy:735) ---
+    # --- Pre-empt 1: no chain -> ring (legacy :735) ---
     if not principal_chain:
         return ParentSelectionResult(
             parent_type='ring',
@@ -503,7 +507,7 @@ def select_parent_unified(
             reasoning="P-44.1 unified: no chain provided - ring is parent",
         )
 
-    # --- Pre-empt 2: single-carbon chain (legacy:752-776, verbatim rule) ---
+    # --- Pre-empt 2: single-carbon chain (legacy :752-776, verbatim rule) ---
     if len(principal_chain) == 1:
         _single = principal_chain[0]
         _single_ring_attached = any(
@@ -523,7 +527,7 @@ def select_parent_unified(
             )
         # else fall through: the 1-carbon PCG chain joins the pool below.
 
-    # --- Pre-empt 3: natural-product backbone (P-31.1.3.4, legacy:779) ---
+    # --- Pre-empt 3: natural-product backbone (P-31.1.3.4, legacy :779) ---
     np_info = detect_natural_product(mol)
     if np_info is not None and ring_systems:
         pool = pool_candidates(mol, ring_systems, [], principal_group,
@@ -562,7 +566,7 @@ def select_parent_unified(
     else:
         label = "only candidate"
 
-    # : OFFER the ranked pool. ``_offer_rank == 0`` -> ``chosen`` IS
+    # SP1.3: OFFER the ranked pool. ``_offer_rank == 0`` -> ``chosen`` IS
     # ``best`` (byte-identical). A best-effort retry may force a junior member;
     # an out-of-range rank clamps to ``best`` so the offer can never fabricate a
     # parent that was not in the P-44-ranked pool.

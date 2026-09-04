@@ -18,13 +18,13 @@ Bridge prefixes (FR-8.3):
 Reference: IUPAC 2013 Blue Book, P-25.7 (Bridged Fused Ring Systems)
 """
 
-from typing import Dict, List, Optional, Set, Tuple, Any
 from collections import defaultdict, deque
 from itertools import combinations
+from typing import Any, Dict, List, Optional, Set, Tuple
+
 from rdkit import Chem
 
-from .fused_rings import classify_fused_system, get_shared_atoms
-
+from .fused_rings import get_shared_atoms
 
 # ============================================================================
 # Constants
@@ -108,12 +108,12 @@ def detect_bridged_fused(mol) -> bool:
         True if molecule is a bridged fused system, False otherwise
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         >>> detect_bridged_fused(mol)
-        False # pure fused, no bridges
-        >>> mol = Chem.MolFromSmiles("C1CC2CCC1C2") # norbornane
+        False  # pure fused, no bridges
+        >>> mol = Chem.MolFromSmiles("C1CC2CCC1C2")  # norbornane
         >>> detect_bridged_fused(mol)
-        False # pure bridged, no fused core
+        False  # pure bridged, no fused core
     """
     if mol is None:
         return False
@@ -317,7 +317,7 @@ def identify_fused_core(mol) -> Optional[Dict[str, Any]]:
         Or None if no fused core found
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         >>> core = identify_fused_core(mol)
         >>> len(core['core_atoms'])
         10
@@ -472,10 +472,10 @@ def identify_bridges(mol, fused_core_atoms: Set[int]) -> List[Dict[str, Any]]:
         - 'heteroatom': Heteroatom type if not all carbon
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         >>> bridges = identify_bridges(mol, set(range(10)))
         >>> len(bridges)
-        0 # No bridges in pure naphthalene
+        0  # No bridges in pure naphthalene
     """
     if mol is None or not fused_core_atoms:
         return []
@@ -635,9 +635,9 @@ def name_bridged_fused_system(mol):
         discover substituents), or None if not a bridged fused system.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1") # naphthalene
+        >>> mol = Chem.MolFromSmiles("c1ccc2ccccc2c1")  # naphthalene
         >>> name_bridged_fused_system(mol)
-        None # Not bridged fused
+        None  # Not bridged fused
     """
     if mol is None:
         return None
@@ -744,21 +744,21 @@ def is_bridged_fused(mol) -> bool:
 #
 # A bridged fused ring system (P-25.4.1.1) = a recognised fused parent (the
 # "main ring system", e.g. naphthalene) + one or more bridges across it.
-# The G0 fail-closed safety (S1) currently refuses these (von Baeyer would
+# The G0 fail-closed safety (DD7 S1) currently refuses these (von Baeyer would
 # drop the benzo aromaticity). This constructor names the dominant, well-defined
 # sub-class CORRECTLY and returns None (-> caller stays fail-closed) for anything
 # outside it, so we never emit a wrong bridged-fused name.
 #
 # Handled class (this phase):
-# * a SINGLE divalent bridge (1-2 skeletal atoms; C or a single O/S/NH),
-# * across a NAPHTHALENE residual (10 C, two ortho-fused 6-rings, one benzo),
-# * with the parent ring system carrying NO substituents (bare ring systems).
+#   * a SINGLE divalent bridge (1-2 skeletal atoms; C or a single O/S/NH),
+#   * across a NAPHTHALENE residual (10 C, two ortho-fused 6-rings, one benzo),
+#   * with the parent ring system carrying NO substituents (bare ring systems).
 # Anything else (anthracene+ residual, multi-bridge, polyvalent/composite/cyclic
 # bridge, substituted, heteroaromatic parent) -> None -> G0 fail-closed (G1b/G2+).
 
 
 def name_bridged_fused_pin(mol):
-    """Name a bridged-fused ring system by the P-25.4 cascade (COV-01).
+    """Name a bridged-fused ring system by the P-25.4 cascade (DD7 COV-01).
 
     Returns the standard complex-ring tuple ``(name, ring_atoms, atom_to_locant,
     substituents_included)`` for the handled class, else ``None`` (the caller then
@@ -1598,7 +1598,7 @@ _HETEROATOM_BRIDGE_PREFIX_SET = frozenset({'epoxy', 'epithio', 'epimino',
 def _order_two_bridges(entries: List[Tuple[str, List[int]]]):
     """P-25.4.4.1(a) + P-25.4.3.2.2: order two bridge (prefix, ring-local-locants)
     entries for citation. Heteroatom bridges sort before carbon bridges; within a
-    tier, alphanumerically by prefix. Returns the ordered [(prefix, locants),...]
+    tier, alphanumerically by prefix. Returns the ordered [(prefix, locants), ...]
     list (the low-locant assignment is applied by _assemble_two_bridge_name)."""
     def key(e):
         het = 0 if e[0] in _HETEROATOM_BRIDGE_PREFIX_SET else 1
@@ -1909,7 +1909,7 @@ def get_bridged_fused_info(mol) -> Optional[Dict[str, Any]]:
         - 'name': Generated IUPAC name
 
     Examples:
-        >>> mol = Chem.MolFromSmiles("...") # bridged fused system
+        >>> mol = Chem.MolFromSmiles("...")  # bridged fused system
         >>> info = get_bridged_fused_info(mol)
         >>> info['is_bridged_fused']
         True

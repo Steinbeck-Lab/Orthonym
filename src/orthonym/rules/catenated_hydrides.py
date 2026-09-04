@@ -5,12 +5,12 @@ Group-14 atoms {Si, Ge, Sn, Pb} linked by identical bridge heteroatoms
 {O, N, S, Se, Te}, terminated at both ends by a Group-14 atom, everything else
 saturated with hydrogen::
 
-    [SiH3]O[SiH3] -> disiloxane (2 Si, 1 O)
-    [SiH3]O[SiH2]O[SiH3] -> trisiloxane (3 Si, 2 O)
-    [SiH3]N[SiH3] -> disilazane (N bridge)
-    [SiH3]S[SiH3] -> disilathiane (S bridge; linking 'a')
-    [SnH3]O[SnH3] -> distannoxane (Sn)
-    [GeH3]O[GeH3] -> digermoxane (Ge)
+    [SiH3]O[SiH3]              -> disiloxane        (2 Si, 1 O)
+    [SiH3]O[SiH2]O[SiH3]       -> trisiloxane       (3 Si, 2 O)
+    [SiH3]N[SiH3]              -> disilazane        (N bridge)
+    [SiH3]S[SiH3]              -> disilathiane      (S bridge; linking 'a')
+    [SnH3]O[SnH3]              -> distannoxane      (Sn)
+    [GeH3]O[GeH3]              -> digermoxane       (Ge)
 
 Every emitted name round-trips through OPSIN 2.9.0.
 
@@ -107,8 +107,8 @@ def name_catenated_hydride(mol) -> Optional[str]:
 # an unbranched chain of >=2 IDENTICAL Group-15 atoms, fully H-saturated,
 # neutral, acyclic, standard valence -> <multiplier><stem> (P-21.2.2, no elision
 # of the multiplier vowel):
-# PP -> diphosphane (BB 39081; not 'diphosphine')
-# AsAsAsAsAs -> pentaarsane (BB 39083) H2Bi-BiH2 -> dibismuthane (BB 39278)
+#     PP -> diphosphane (BB 39081; not 'diphosphine')
+#     AsAsAsAsAs -> pentaarsane (BB 39083)   H2Bi-BiH2 -> dibismuthane (BB 39278)
 # Mirrors polyazane's saturated homonuclear-chain logic. Nitrogen deliberately
 # routes to polyazane (higher functionality of amines, P-21.2.3.1); this family
 # is P/As/Sb/Bi only.
@@ -187,9 +187,9 @@ def name_homonuclear_pnictogen_chain(mol) -> Optional[str]:
 # distinct elements and TERMINATED at both ends by the element coming LATER in
 # the seniority order O > S > Se > Te (the JUNIOR terminal element)::
 #
-# HS-O-SH -> dithioxane (2 terminal S junior, 1 central O senior)
-# CH3-S-O-SH -> methyldithioxane (BB: not methylsulfane-OS-thioperoxol)
-# CH3-S-O-S-CH3 -> dimethyldithioxane
+#     HS-O-SH        -> dithioxane          (2 terminal S junior, 1 central O senior)
+#     CH3-S-O-SH     -> methyldithioxane    (BB: not methylsulfane-OS-thioperoxol)
+#     CH3-S-O-S-CH3  -> dimethyldithioxane
 #
 # Name (P-21.2.3.1) = <multiplier(# terminal atoms)> + 'a'-term of the JUNIOR
 # terminal element + 'a'-term of the SENIOR central element + 'ane' (with 'a'
@@ -319,32 +319,34 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
         return None
     base = _join_aterms([_CHALCOGEN_ATERM[terminal_elem],
                          _CHALCOGEN_ATERM[central_elem], 'ane'])
-    parent = f"{mult}{base}"                      # dithioxane / trithioxane...
+    parent = f"{mult}{base}"                      # dithioxane / trithioxane ...
     if not subs:
         return parent
 
     # Terminal organyls: no locants (the terminal positions are symmetric — BB
     # methyldithioxane / dimethyldithioxane / methyl(phenyl)dithioxane).
     #
-    # P3: the organyl guard above is now the shared chokepoint, so a prefix
+    # the organyl guard above is now the shared chokepoint, so a prefix
     # reaching here may carry LOCANTS ('propan-2-yl'), a retained italicized
     # prefix ('tert-butyl') or its own enclosing marks ('(4-bromophenyl)methyl').
     # Raw `sorted()` + bare concatenation was correct only for the letters-only
     # class the retired narrow walker could return, so ordering and marks are
     # delegated to the shared primitives — no local copy of either decision:
-    # * P-14.5.2/P-14.5.4 `prefix_citation_sort_key` — alphanumerical citation
-    # order, which ignores enclosing marks and the italicized prefix;
-    # * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) — a compound prefix is
-    # enclosed and the SIMPLE multiplier sits OUTSIDE the marks;
-    # * BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN) + P-16.3.4 — a retained
-    # italicized prefix is cited bare and keeps its hyphen under a multiplier
-    # ('di-tert-butyl', never 'ditert-butyl').
+    #   * P-14.5.2/P-14.5.4 `prefix_citation_sort_key` — alphanumerical citation
+    #     order, which ignores enclosing marks and the italicized prefix;
+    #   * BB 25719 `1,4-di(propan-2-yl)cyclohexane` (PIN) — a compound prefix is
+    #     enclosed and the SIMPLE multiplier sits OUTSIDE the marks;
+    #   * BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN) + P-16.3.4 — a retained
+    #     italicized prefix is cited bare and keeps its hyphen under a multiplier
+    #     ('di-tert-butyl', never 'ditert-butyl').
     from collections import Counter
 
-    from ..assembly.naming_utils import (apply_enclosing_marks,
-                                         enclose_if_compound,
-                                         multiplier_needs_hyphen,
-                                         prefix_citation_sort_key)
+    from ..assembly.naming_utils import (
+        apply_enclosing_marks,
+        enclose_if_compound,
+        multiplier_needs_hyphen,
+        prefix_citation_sort_key,
+    )
     counts = Counter(subs)
     uniq = sorted(counts, key=prefix_citation_sort_key)
     parts = []

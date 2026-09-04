@@ -5,7 +5,7 @@ to a common nitrogen, ``R-C(=S)-NH-C(=S)-R'``. The Blue Book PIN names one
 thioacyl group as the parent alkanethioamide suffix and cites the other as an
 ``N-(alkanethioyl)`` acyl substituent prefix (BB verbatim example)::
 
-    CC(=S)NC(C)=S -> N-(ethanethioyl)ethanethioamide (PIN)
+    CC(=S)NC(C)=S  ->  N-(ethanethioyl)ethanethioamide   (PIN)
 
 This mirrors the shipped O-imide behaviour, which the decomposition engine
 produces (``CCC(=O)NC=O -> N-propanoylformamide``): the LESS-senior (shorter)
@@ -34,6 +34,7 @@ from typing import List, Optional
 
 from rdkit import Chem
 
+from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .amides import _get_chain_prefix, get_amide_parent_name
 
 
@@ -112,7 +113,7 @@ def name_thioimide(mol) -> Optional[str]:
         return None
 
     # No charged / radical / isotopic species anywhere.
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
         if atom.GetIsotope() != 0:
@@ -120,7 +121,7 @@ def name_thioimide(mol) -> Optional[str]:
 
     # Locate the thioimide nitrogen: an acyclic N bonded to exactly two
     # thiocarbonyl carbons C(=S) and otherwise only H.
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'N' or atom.IsInRing():
             continue
         if atom.GetFormalCharge() != 0:
@@ -180,7 +181,7 @@ def name_thioimide(mol) -> Optional[str]:
 
         # Coverage: the whole molecule must be exactly this thioimide unit.
         covered = _covered_atoms(mol, atom.GetIdx(), acyl_cs)
-        heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+        heavy = {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
         if covered != heavy:
             continue
 

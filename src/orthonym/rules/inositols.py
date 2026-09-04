@@ -1,6 +1,6 @@
 """Inositol (cyclitol) retained names — P-104.2.1.
 
- follow-on (Blue Book audit unit p104-106, finding F1).
+, finding F1).
 
 The nine stereoisomers of cyclohexane-1,2,3,4,5,6-hexol each have a retained
 italic-prefix name (``myo-``, ``scyllo-``, ``cis-``, ``epi-``, ``neo-``,
@@ -33,9 +33,7 @@ substituted/deoxy/larger ring never reaches the table.
 
 from typing import Optional
 
-from rdkit import Chem
 from rdkit.Chem import inchi
-
 
 # Standard-InChIKey -> retained PIN (P-104.2.1). The shared skeleton block is
 # CDAISMWEOUEBRE; the nine distinct stereo blocks are the nine inositols.

@@ -3,7 +3,7 @@
 References:
 - IUPAC 2013 Blue Book P-25.3.2.4
 - https://iupac.qmul.ac.uk/fusedring/FR23.html
-- HERITAGE-1990 §4 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
+- AUTONOM-1990 §4 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
 - V18_MILESTONE_PLAN.md Appendix A.6 lines 2280-2422
 
 Complete 10-criterion cascade:
@@ -18,12 +18,12 @@ Complete 10-criterion cascade:
 (i) Locant ordering by heteroatom type
 (j) Lower bridgehead carbon locants
 
-Implementation depth:
+Implementation depth (Phase 149):
   - (a)-(f) FULL implementation per IUPAC P-25.3.2.4 + V18 Appendix A.6.
-  - (g)-(j) deterministic stubs (returning constants); fills with
+  - (g)-(j) deterministic stubs (returning constants); Phase 155 fills with
     FR-5.2 orientation + peripheral numbering.
 
-DRY discipline:
+DRY discipline (Phase 149 /):
   - _HETEROATOM_SENIORITY (P-18(b) errata-correct, 20 entries) is REUSED via
     a relative import from ring_selection for FR-2.3(a) — see imports below.
   - _FR23_HETEROATOM_ALT (NEW, 19 entries) lives here for FR-2.3(f); it is
@@ -35,8 +35,7 @@ from typing import FrozenSet, List, Set, Tuple
 
 from rdkit import Chem
 
-from .ring_selection import _HETEROATOM_SENIORITY  # P-18(b) errata-correct, 20 entries;
-
+from .ring_selection import _HETEROATOM_SENIORITY  # P-18(b) errata-correct, 20 entries; D-04
 
 # ============================================================================
 # FR-2.3(f) Alt Heteroatom Order
@@ -77,8 +76,8 @@ class ComponentRank:
     Order of fields matches FR-2.3 criteria (a)-(j); Python dataclass
     ``order=True`` generates lexicographic comparison in declaration order.
 
-    Stubs (g)-(j) are deterministic constants per;
-     fills with FR-5.2 orientation + peripheral numbering.
+    Stubs (g)-(j) are deterministic constants in Phase 149 per;
+    Phase 155 fills with FR-5.2 orientation + peripheral numbering.
 
     Source: V18_MILESTONE_PLAN Appendix A.6 lines 2328-2341.
     Source: 149-CONTEXT.md,.
@@ -89,14 +88,14 @@ class ComponentRank:
     het_count_neg: int                                                        # (d)
     het_variety_neg: int                                                      # (e)
     alt_het_tuple: Tuple[int, ...] = field(default_factory=tuple)             # (f)
-    orient_stub: int = 0                                                      # (g) — fills
-    het_locants_stub: Tuple[int, ...] = field(default_factory=tuple)          # (h) — fills
-    het_type_locants_stub: Tuple[int, ...] = field(default_factory=tuple)     # (i) — fills
-    bridgehead_locants_stub: Tuple[int, ...] = field(default_factory=tuple)   # (j) — fills
+    orient_stub: int = 0                                                      # (g) — Phase 155 fills
+    het_locants_stub: Tuple[int, ...] = field(default_factory=tuple)          # (h) — Phase 155 fills
+    het_type_locants_stub: Tuple[int, ...] = field(default_factory=tuple)     # (i) — Phase 155 fills
+    bridgehead_locants_stub: Tuple[int, ...] = field(default_factory=tuple)   # (j) — Phase 155 fills
 
 
 # ============================================================================
-# Public API + Internal Helpers (-02 / 01-03 fill bodies)
+# Public API + Internal Helpers (Task 01-02 / 01-03 fill bodies)
 # ============================================================================
 
 
@@ -285,18 +284,18 @@ def _enumerate_components(mol: Chem.Mol) -> List[FrozenSet[int]]:
     """Enumerate fusion components per IUPAC P-25.3.1.3.
 
     Per: SSSR rings as base; multi-piece decomposition deferred
-    to (spiro / fused-polycyclic + side-ring scope).
+    to Phase 151 (spiro / fused-polycyclic + side-ring scope).
 
     Each SSSR ring is one "component". MONOCYCLIC_COMPONENTS recognition
     happens INSIDE _rank when computing per-component descriptors; recognition
     is NOT a hard gate — FR-2.3 ranks any component, recognized or not (per
     RESEARCH §"Critical insight" line 274).
 
-    Returns list of frozensets per (frozenset for hashability +
-    ordering stability.2 determinism doctrine).
+    Returns list of frozensets per CD-04 (frozenset for hashability +
+    ordering stability per Phase 145.2 determinism doctrine).
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html P-25.3.1.3
-    Source: 149-CONTEXT.md,.
+    Source: 149-CONTEXT.md, CD-04.
     Source: 149-RESEARCH.md "Component Decomposition Algorithm".
     """
     ri = mol.GetRingInfo()
@@ -320,7 +319,7 @@ def select_base_component(
     Raises:
         ValueError: if fewer than 2 components.
 
-    Source: V18_MILESTONE_PLAN §6 SC #1.
+    Source: V18_MILESTONE_PLAN §6 Phase 149 SC #1.
     Source: 149-CONTEXT.md.
     """
     if len(fused_components) < 2:

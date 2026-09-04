@@ -18,29 +18,16 @@ Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 import re
 from typing import Dict, List, Optional, Set, Tuple
 
-from rdkit import Chem
 
-from ..data.polycyclic_data import (
-    get_polycyclic_by_smiles,
-    get_polycyclic_by_name,
-    POLYCYCLIC_DATA,
-)
-from ..data.fused_heterocycles import (
-    FUSED_HETEROCYCLE_DATA,
-)
 from ..data.fusion_components import (
     MONOCYCLIC_COMPONENTS,
     get_component_by_pattern,
     get_component_seniority,
-    get_component_prefix,
 )
 from ..perception.rings import (
-    get_ring_info,
-    get_ring_systems,
-    is_heterocyclic,
     is_aromatic_ring,
+    is_heterocyclic,
 )
-
 
 # Letters for edge designation (a=first edge, b=second, etc.)
 EDGE_LETTERS = 'abcdefghijklmnopqrstuvwxyz'
@@ -91,7 +78,7 @@ FUSION_PREFIXES: Dict[str, str] = {
     'triazine': 'triazino',
     # 6-membered O/S/Se/Te heterocycles. P-25.3.2.4 (BlueBookV2.md:11905): the
     # attached-component prefix ADDS 'o' when there is no final 'e' -- "pyrano
-    # from pyran".:12030 gives "selenopyrano (from selenopyran, PIN)". These
+    # from pyran". :12030 gives "selenopyrano (from selenopyran, PIN)". These
     # were NOT in this table, so get_fusion_prefix's old general rule truncated
     # '-an' -> 'pyro'/'thiopyro' (OPSIN-unparseable). Cross-checked against
     # OPSIN's own fusionComponents token list (pyrano/thiopyrano/selenopyrano/
@@ -138,7 +125,7 @@ def get_fusion_edge(parent_ring: List[int], atom1: int, atom2: int) -> int:
         0
         >>> get_fusion_edge([0, 1, 2, 3, 4, 5], 1, 2)
         1
-        >>> get_fusion_edge([0, 1, 2, 3, 4, 5], 5, 0) # wraparound
+        >>> get_fusion_edge([0, 1, 2, 3, 4, 5], 5, 0)  # wraparound
         5
     """
     ring_size = len(parent_ring)
@@ -355,22 +342,22 @@ def get_fusion_prefix(ring_name: str) -> str:
     core = re.sub(r'^\d+[Hh]-', '', ring_name)
 
     # 1) Curated contracted retained forms (P-25.3.2.2): benzo, furo, thieno,
-    # pyrido, pyrano,...
+    #    pyrido, pyrano, ...
     if core in FUSION_PREFIXES:
         return FUSION_PREFIXES[core]
 
     # 2) The authoritative monocyclic registry is the source of truth for the
-    # attached-component prefix (pyran -> pyrano). This function historically
-    # kept its OWN lookup table that lacked 'pyran', so the general rule below
-    # truncated it to the OPSIN-unparseable 'pyro'. Consult the registry the
-    # rest of the fusion machinery already trusts (get_component_prefix).
+    #    attached-component prefix (pyran -> pyrano). This function historically
+    #    kept its OWN lookup table that lacked 'pyran', so the general rule below
+    #    truncated it to the OPSIN-unparseable 'pyro'. Consult the registry the
+    #    rest of the fusion machinery already trusts (get_component_prefix).
     if core in MONOCYCLIC_COMPONENTS:
         return MONOCYCLIC_COMPONENTS[core]['prefix']
 
     # 3) General rules for names not covered above. P-25.3.2.4
-    # (BlueBookV2.md:11905): "The names of attached components are formed by
-    # replacing the last letter 'e' by 'o'... (or by ADDING the letter 'o'
-    # when no final letter 'e' is present, i.e., pyrano from pyran)."
+    #    (BlueBookV2.md:11905): "The names of attached components are formed by
+    #    replacing the last letter 'e' by 'o' ... (or by ADDING the letter 'o'
+    #    when no final letter 'e' is present, i.e., pyrano from pyran)."
     name = core.lower()
     if name.endswith('ene'):
         return name[:-3] + 'o'
@@ -451,7 +438,7 @@ def identify_parent_and_child(
         Tuple of (parent_name, child_name, parent_ring_list, child_ring_list)
         Returns ('', '', [], []) if rings cannot be identified
     """
-    # : route base-component decision through FR-2.3 cascade.
+    # Phase 149: route base-component decision through FR-2.3 cascade.
     # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
     # Source: 149-CONTEXT.md,.
     from .fused_ring_selection import select_base_component
@@ -467,7 +454,7 @@ def identify_parent_and_child(
     if not name_a and not name_b:
         return ('', '', [], [])
 
-    # primary: FR-2.3 cascade.
+    # Phase 149 primary: FR-2.3 cascade.
     # The returned base_atoms determines parent/child ordering.
     base_atoms, _others = select_base_component(mol, [set(ring_a), set(ring_b)])
     if base_atoms == set(ring_a):
@@ -518,14 +505,14 @@ def _hetero_gap(mol, ring_atoms: List[int], hetero_indices: List[int]) -> int:
         return -1
 
     # Walk from pos0 to pos1 in both directions, count non-hetero atoms
-    # Direction 1: pos0 -> pos0+1 ->... -> pos1
+    # Direction 1: pos0 -> pos0+1 -> ... -> pos1
     gap_cw = 0
     i = (pos0 + 1) % ring_size
     while i != pos1:
         gap_cw += 1
         i = (i + 1) % ring_size
 
-    # Direction 2: pos0 -> pos0-1 ->... -> pos1
+    # Direction 2: pos0 -> pos0-1 -> ... -> pos1
     gap_ccw = 0
     i = (pos0 - 1) % ring_size
     while i != pos1:
@@ -780,7 +767,7 @@ def edge_position_to_letter(parent_ring: List[int], edge: Tuple[int, int]) -> st
         edge: Tuple of (atom1, atom2) defining the edge
 
     Returns:
-        Letter designator ('a', 'b', 'c',...) or empty string if not found
+        Letter designator ('a', 'b', 'c', ...) or empty string if not found
 
     Examples:
         >>> edge_position_to_letter([0,1,2,3,4,5], (0, 1))
@@ -807,7 +794,7 @@ def handle_duplicate_edge_fusion(edge_letters: List[str]) -> List[str]:
 
     Returns:
         List of letters with primes applied where needed, sorted canonically
-        Order: a, b, c,... a', b',... a'', b'',...
+        Order: a, b, c, ... a', b', ... a'', b'', ...
 
     Examples:
         >>> handle_duplicate_edge_fusion(['a', 'c'])
@@ -923,8 +910,8 @@ def generate_multi_fusion_descriptor(
     Examples:
         >>> # dibenzo[a,c]anthracene: two benzene rings at edges a and c
         >>> generate_multi_fusion_descriptor('anthracene', [
-        ... ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {0, 1}),
-        ... ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {4, 5})
+        ...     ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {0, 1}),
+        ...     ('benzene', [0,1,2,3,4,5,6,7,8,9,10,11,12,13], {4, 5})
         ... ])
         '[a,c]'
     """
@@ -1201,7 +1188,7 @@ def generate_systematic_name_for_fused_pair(
         Systematic fusion name, or None if name cannot be generated
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2cc3ccccc3cc2c1') # anthracene
+        >>> mol = Chem.MolFromSmiles('c1ccc2cc3ccccc3cc2c1')  # anthracene
         >>> ri = mol.GetRingInfo()
         >>> # Would generate 'benzo[a]naphthalene' for benzene fused to naphthalene
     """
@@ -1264,7 +1251,7 @@ def generate_multi_fusion_name(
     Examples:
         >>> # For dibenzo[a,c]anthracene
         >>> generate_multi_fusion_name(mol, anthracene_atoms, 'anthracene',
-        ... [(benzene1_atoms, {0,1}), (benzene2_atoms, {4,5})])
+        ...     [(benzene1_atoms, {0,1}), (benzene2_atoms, {4,5})])
         'dibenzo[a,c]anthracene'
     """
     if not fused_rings:

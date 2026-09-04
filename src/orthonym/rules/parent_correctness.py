@@ -1,28 +1,28 @@
-"""Parent-correctness scorer.1.
+"""Parent-correctness scorer for Phase 145.1.
 
 Scaffolds the 5th confidence factor (`parent_correctness`) in the candidate
-scoring pipeline..1 wires this into FACTOR_WEIGHTS with weight 0.0
+scoring pipeline. Phase 145.1 wires this into FACTOR_WEIGHTS with weight 0.0
 so the factor is computed and logged but does NOT influence selection
-(byte-identical safe by IEEE 754 + Python 3.7+ dict-order).
+(byte-identical safe by IEEE 754 + Python 3.7+ dict-order). Phase 146
 raises the weight after 80/20 train/test calibration to activate it.
 
-REFERENCE SOURCE (locked in 145.1-CONTEXT.md):
+REFERENCE SOURCE (, locked in 145.1-CONTEXT.md):
     OPSIN round-trip of the reference name. The only non-circular option:
     - Option A (chosen): OPSIN parses the reference name -> reference SMILES.
       OPSIN is the inverse of Orthonym; reference names from ChEBI / PubChem
       / OPSIN self-test are external ground truth when they parse.
-    - Option B (rejected -- 's work): a separate rule-based selector
-      would pre-empt.
+    - Option B (rejected -- Phase 146's work): a separate rule-based selector
+      would pre-empt Phase 146.
     - Option C (rejected -- too narrow): hand-curated parent map covers only
       the 500-compound opsin_selftest corpus.
 
-EXTRACTION PIPELINE (-- locked from RESEARCH §4.2):
+EXTRACTION PIPELINE (, CD-01 -- locked from RESEARCH §4.2):
     E1: regex parent-token + OPSIN re-parse + RDKit substructure match +
         canonical-rank tiebreak. Pure Python + subprocess + RDKit;
         no Java<->Python bridge dependency. Verified on 6/9 test cases;
         remaining 3 fall back to 0.5 (no-decision = safe).
 
-THREAD-LOCAL I/O (locked):
+THREAD-LOCAL I/O (, locked):
     Module-level _pc_context = threading.local() mirrors the established
     coverage_scoring._confidence_store pattern at coverage_scoring.py:404.
     Benchmark runners call set_reference_name(name) BEFORE orthonym.name(smiles).
@@ -57,8 +57,9 @@ from typing import Any, Optional, Set
 
 from rdkit import Chem
 
-from ..assembly.coverage_scoring import CandidateName
 from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
+
+from ..assembly.coverage_scoring import CandidateName
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ def _resolve_opsin_jar() -> Path:
 
 OPSIN_JAR = _resolve_opsin_jar()
 
-# Match / benchmark_multi_corpus.py:DEFAULT_OPSIN_TIMEOUT
+# Match Phase 145 / benchmark_multi_corpus.py:DEFAULT_OPSIN_TIMEOUT (CD-05)
 OPSIN_TIMEOUT: float = 10.0
 
 
@@ -113,7 +114,7 @@ def clear_reference_name() -> None:
 
 
 # ---------------------------------------------------------------------------
-# OPSIN subprocess wrapper (-- match benchmark_multi_corpus.py defaults)
+# OPSIN subprocess wrapper (CD-05 -- match benchmark_multi_corpus.py defaults)
 # ---------------------------------------------------------------------------
 
 def _opsin_to_smi(name: str) -> Optional[str]:
@@ -139,7 +140,7 @@ def _opsin_to_smi(name: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Parent-token extraction (-- regex heuristic per RESEARCH §4.2)
+# Parent-token extraction (CD-01 -- regex heuristic per RESEARCH §4.2)
 # ---------------------------------------------------------------------------
 
 # Strip leading locant cluster (e.g. "1,2-", "3a-", "2-")
@@ -149,7 +150,7 @@ _LOCANT_PREFIX_RE = re.compile(r'^\d+[a-z]?,?(\d+[a-z]?,?)*-?')
 def _extract_parent_token(name: Optional[str]) -> Optional[str]:
     """Extract the parent-hydride token from an IUPAC name.
 
-    Heuristic: the parent token starts after the LAST top-level
+    Heuristic (CD-01): the parent token starts after the LAST top-level
     closing parenthesis (substituents are bracketed; parent is unbracketed
     at the end of the name). Strips leading locant clusters.
 
@@ -162,7 +163,7 @@ def _extract_parent_token(name: Optional[str]) -> Optional[str]:
         "3-(2-methoxyethyl)hexan-1-ol" -> "hexan-1-ol"
         "4-(4-chlorophenyl)butan-2-one" -> "butan-2-one"
         "benzene-1,2-diol" -> "benzene-1,2-diol"
-        "1H-indole" -> "indole" (1H- stripped)
+        "1H-indole" -> "indole"  (1H- stripped)
         "2-methylpropanal" -> "methylpropanal" (no parens -- heuristic fails;
                               caller should treat as no-decision via OPSIN
                               re-parse downstream)
@@ -188,11 +189,11 @@ def _extract_parent_token(name: Optional[str]) -> Optional[str]:
 def opsin_reference_mol(ref_name: str) -> Optional[Any]:
     """OPSIN-parse the FULL reference name once -> reference RDKit mol.
 
-     (A1 strategy, 166-AUDIT §A1 OPSIN-Cost Prototype):
+    Phase 166 SCORE-03 (A1 strategy, 166-AUDIT §A1 OPSIN-Cost Prototype):
     the per-node scorer parses the reference name ONCE per compound, then
     does RDKit fragment-submol matching per node (NOT one OPSIN call per
     node). Returns None on any OPSIN/parse failure (mirrors _opsin_to_smi's
-    caught-exception contract at:135-137). Reference names come from
+    caught-exception contract at :135-137). Reference names come from
     trusted corpora; OPSIN runs on STDIN (no shell), OPSIN_TIMEOUT=10.0.
     """
     smi = _opsin_to_smi(ref_name)
@@ -205,7 +206,7 @@ def match_token_atoms_in_mol(token: str, input_mol: Any) -> Optional[Set[int]]:
     """OPSIN-parse a parent-stem/fragment token and substructure-match it
     into input_mol, returning the matched atom-index set (or None).
 
-    : the reusable per-node generalization of the
+    Phase 166 SCORE-03: the reusable per-node generalization of the
     atom-alignment step (extracted verbatim from the old inline body of
     _extract_reference_parent_atoms). 0 hits -> None; >1 hits ->
     CanonicalRankAtoms(breakTies=True) deterministic tiebreak (load-bearing
@@ -271,9 +272,9 @@ class ParentCorrectnessScorer:
     """Computes the parent_correctness factor for a candidate name.
 
     Returns:
-      1.0 if candidate's parent atoms match OPSIN-extracted reference parent
-      0.0 if mismatch
-      0.5 on no-decision (any failure mode -- see module docstring)
+      1.0  if candidate's parent atoms match OPSIN-extracted reference parent
+      0.0  if mismatch
+      0.5  on no-decision (any failure mode -- see module docstring)
 
     Production callers (no _pc_context.reference_name set) immediately
     return 0.5 with zero OPSIN cost. Benchmark runners that have called

@@ -1,4 +1,4 @@
-"""Steroid ring-face α/β configurational descriptors (IUPAC P-101.2.6, WSC-02).
+"""Steroid ring-face α/β configurational descriptors (IUPAC P-101.2.6, Phase 181 WSC-02).
 
 Generate ring-face α/β descriptors (``3beta``, ``5alpha``) for steroid scaffolds by
 INVERTING OPSIN's own forward parser. OPSIN parses α/β names by applying a parity to a
@@ -18,12 +18,16 @@ Root-cause-only: no postprocessor, no regex on the existing ``(3R,5S,...)`` stri
 no seniority/dispatch edit. All logic is parity arithmetic + dict lookups + set math.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple
 
 from rdkit import Chem
 
-# Empirically pinned sign convention (this session): OPSIN parity +1 → beta, −1 → alpha.
-_SIGN = {1: 'beta', -1: 'alpha'}
+# Empirically pinned sign convention (this session): OPSIN parity +1 → β, −1 → α.
+# emit the Blue-Book GREEK symbols (P-101.2.6, BlueBookV2.md:51045), not the
+# ASCII words — routed through the shared source of truth (RT-identical in OPSIN).
+from .greek_stereo_descriptors import ALPHA, BETA
+
+_SIGN = {1: BETA, -1: ALPHA}
 BRIDGEHEADS = {8, 9, 10, 13, 14}
 
 _TETRAHEDRAL = (Chem.ChiralType.CHI_TETRAHEDRAL_CW, Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
@@ -154,7 +158,7 @@ def _reference_profile(scaffold_smiles, ringorder):
 
 
 def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
-    """Return {'ring_ab': {locant: 'alpha'/'beta'}, 'side_rs': [(locant, cip),...]} for a
+    """Return {'ring_ab': {locant: 'alpha'/'beta'}, 'side_rs': [(locant, cip), ...]} for a
     steroid, or None to signal the per-molecule no-mix fallback.
 
     - ring_ab cites: C-5 when chiral (D-04a) ∪ substituent/suffix-bearing ring stereocentres
@@ -173,7 +177,7 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
 
     wiring = _ring_wiring(scaffold_info)
     if wiring is None:
-        return None                                          # /: fall back to R/S
+        return None                                          # D-03/D-08: fall back to R/S
     ringorder, loc2idx, idx2loc = wiring
     ringset = set(ringorder)
 
@@ -211,7 +215,7 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
         if loc in loc2idx and mol.GetAtomWithIdx(loc2idx[loc]).GetChiralTag() in _TETRAHEDRAL
     ]
 
-    # NO-MIX FALLBACK (Pitfall 2): every DEFINED ring stereocentre must resolve to α/β,
+    # NO-MIX FALLBACK (, Pitfall 2): every DEFINED ring stereocentre must resolve to α/β,
     # else discard all α/β and emit the whole-graph R/S string.
     target_ab = {}
     for loc in ring_stereo_locants:
@@ -250,11 +254,11 @@ def collect_steroid_alpha_beta(mol, scaffold_info, numbering):
 
     ring_ab = {loc: target_ab[loc] for loc in cited}
 
-    # SIDE-CHAIN R/S (Pitfall 3): stereocentres whose locant is NOT in the ABO.
+    # SIDE-CHAIN R/S (, Pitfall 3): stereocentres whose locant is NOT in the ABO.
     side_map = {idx: loc for idx, loc in numbering.items() if loc not in ringset}
     side_rs: List[Tuple[int, str]] = collect_stereodescriptors(mol, side_map) if side_map else []
 
-    # (WSC-03): suppress side-chain stereocentres whose CIP matches the canonical
+    # Phase 182 (WSC-03): suppress side-chain stereocentres whose CIP matches the canonical
     # stereoparent reference AND that bear no decoration — they are IMPLIED by the stem name
     # (e.g. cholestane implies C-20 R; ChEBI omits it: `cholest-5-en-3beta-yl sulfate`). This
     # mirrors the ring D-04c suppression for the acyclic side chain. A side-chain centre is

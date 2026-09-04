@@ -4,8 +4,8 @@ Ketene is the class name for H2C=C=O and its derivatives. The unsubstituted
 structure and its halogen derivatives are named on the ``ethenone`` parent
 (BB verbatim examples)::
 
-    C=C=O -> ethenone (PIN)
-    BrC(Br)=C=O -> dibromoethenone (PIN; "not dibromoketene")
+    C=C=O          -> ethenone         (PIN)
+    BrC(Br)=C=O    -> dibromoethenone  (PIN; "not dibromoketene")
 
 SCOPE (fail-closed, accuracy-first): the exact terminal heterocumulene
 O=C=C< where the sp carbon carries NOTHING else and the terminal carbon
@@ -24,6 +24,8 @@ from collections import deque
 from typing import Optional
 
 from rdkit import Chem
+
+from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 
 _HALO_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
 
@@ -52,13 +54,13 @@ def name_ketene(mol) -> Optional[str]:
     # NOTE: rings ARE allowed now — Branch 3 (cyclohexylidenemethanone) and
     # Branch 2 (diphenylethenone) need ring substituents. The halogen branch
     # still fails closed on any ring atom via its own coverage check.
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
     # Locate the cumulated sp carbon: C(=O)(=C), degree exactly 2, no H.
     sp_carbon = None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetAtomicNum() != 6 or atom.GetTotalNumHs() != 0:
             continue
         nbrs = atom.GetNeighbors()
@@ -86,7 +88,7 @@ def name_ketene(mol) -> Optional[str]:
     # (cyclohexylidenemethanone). Ring must be a plain cycloalkane fragment
     # nameable as an '-ylidene' substituent; else fail closed.
     if terminal_c.IsInRing():
-        ring_atoms = ({a.GetIdx() for a in mol.GetAtoms()}
+        ring_atoms = ({a.GetIdx() for a in atoms_of(mol)}
                       - {sp_carbon.GetIdx(), oxygen.GetIdx()})
         from ..assembly.substituent_enumerator import name_ylidene_substituent
         # The ring is DOUBLE-bonded to the sp carbon, so the pipeline returns
@@ -127,7 +129,7 @@ def name_ketene(mol) -> Optional[str]:
             covered |= frag
         if names[0] != names[1]:
             return None
-        if covered != {a.GetIdx() for a in mol.GetAtoms()}:
+        if covered != {a.GetIdx() for a in atoms_of(mol)}:
             return None
         return f"di{names[0]}ethenone"
 

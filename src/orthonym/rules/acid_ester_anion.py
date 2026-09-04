@@ -101,7 +101,7 @@ def name_oxime_o_sulfate_anion(mol, sulfur_idx: int) -> Optional[str]:
     class whose ester owner is anchored at an oxime NITROGEN, not the usual
     ester-oxygen-to-carbon owner ``name_sulfate_ester_anion`` handles).
 
-    : confirmed ``name_sulfate_ester_anion`` declines this
+    SPY: confirmed ``name_sulfate_ester_anion`` declines this
     shape at its OWN oxygen-classification loop (``acid_ester_anion.py``
     lines ~60-73) -- the ester oxygen's non-sulfur neighbour is an ``N``, not
     a ``C``/``S``, so it falls straight to that loop's ``else: return None``
@@ -122,7 +122,7 @@ def name_oxime_o_sulfate_anion(mol, sulfur_idx: int) -> Optional[str]:
     enclosure logic ``enclose_if_compound`` already applies elsewhere (BB
     verbatim precedent for the ``[(...ylidene)amino]`` construction:
     ``4-{[(4-chlorophenyl)methylidene]amino}aniline (PIN)`` under P-62.3.1,
-    ``polyfunctional.py_name_amidine_chain_side`` docstring).
+    ``polyfunctional.py`` ``_name_amidine_chain_side`` docstring).
 
     Fail-closed (``None``) off the clean single-centre shape so a wrong
     molecule is never emitted -- notably a FULL glucosinolate (the oxime
@@ -250,7 +250,7 @@ def name_acid_ester_anion(mol) -> Optional[str]:
     poly-phosphate / multi-centre species fails closed (``None`` -> the caller
     falls through). For sulfur, ``name_sulfate_ester_anion`` (the plain
     C-anchored ester owner) is tried FIRST so its byte-identical behaviour is
-    unchanged; ``name_oxime_o_sulfate_anion`` (the N-anchored
+    unchanged; ``name_oxime_o_sulfate_anion`` (, the N-anchored
     oxime owner -- glucosinolate-type thiohydroximate/oxime O-sulfate anions)
     is only reached when that declines. ``None`` when nothing qualifies.
     """

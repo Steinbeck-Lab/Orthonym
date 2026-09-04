@@ -1,10 +1,10 @@
-"""P-107 lipid backbone-aware Form-B assembler (WSC-01).
+"""P-107 lipid backbone-aware Form-B assembler (Phase 180, WSC-01).
 
 Consumes the structured ``BackboneMatch`` from ``perception.lipids.detect_lipid_backbone``
 and builds the fully systematic substitutive / functional-class (Form B) name — the
 empirically OPSIN-round-trip-verified target form (180-CONTEXT.md). Every gate
 failure returns ``None`` so the molecule cascade-continues to the general pipeline
-(, fail-safe → zero non-lipid regression).
+(/, fail-safe → zero non-lipid regression).
 
 Acyl groups are named by the robust acid-fragment-reuse strategy: isolate the fatty
 acid, name it with the proven acid pipeline (systematic + E/Z), then convert
@@ -203,7 +203,7 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
     # --- prefixes (free-OH, glycosyl, phosphoryloxy) on the non-acyl positions ---
     prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms)
     if prefix is None:
-        return None  # unrecognized neutral phospho head group → defer
+        return None  # unrecognized neutral phospho head group → defer (D-11)
 
     name = f"{prefix}{attach} {suffix}"
 
@@ -219,9 +219,20 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
 
 
 def _alpha_key(acylate: str) -> str:
-    """Alphabetization key: strip enclosing marks, locants, and stereo blocks."""
+    """Alphabetization key (P-14.5): strip enclosing marks, locants, and the
+    non-alphabetising stereo/config noise.
+
+    route the descriptor strip through the SHARED ``strip_alphanumerical_noise``
+    primitive, which removes the Greek α/β/ξ stereodescriptors and the D/L
+    configuration that the old bare regex kept — so a sugar substituent
+    alphabetises by its stem regardless of its descriptor SPELLING. The old form
+    left the leading ``β`` in the key (Greek β = U+03B2 sorts AFTER ASCII letters),
+    so switching the anomer emit from ``beta-`` to ``β-`` flipped a glycosyloxy vs
+    hydroxy citation order (the glycosphingolipid greek-emit regression).
+    """
     import re
-    s = re.sub(r"^\([0-9EZRSdlDL,\s]+\)-?", "", acylate)   # leading (9Z)- block
+    from ..assembly.naming_utils import strip_alphanumerical_noise
+    s = strip_alphanumerical_noise(acylate)
     s = re.sub(r"[\[\]()]", "", s)
     s = re.sub(r"[0-9,\-]", "", s)
     return s.lower()
@@ -236,7 +247,7 @@ _HEAD_GROUP_ALKOXY = {
 def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms=()) -> Optional[str]:
     """Build the detachable-prefix string (hydroxy / glycosyloxy / phosphoryloxy)
     preceding the attachment. Returns None if a phospho head group is unrecognized
-    in the substitutive (neutral) regime (honest-gate)."""
+    in the substitutive (neutral) regime (honest-gate,)."""
     subs = []  # (alpha_key, rendered)
     if oh_atoms:
         locs = sorted(num[a] for a in oh_atoms)
@@ -251,7 +262,7 @@ def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atom
         head_desc = atom_site[a][3]
         head_alkoxy = _HEAD_GROUP_ALKOXY.get(head_desc)
         if head_alkoxy is None:
-            return None  # neutral substitutive form not RT-verified for this head → defer
+            return None  # neutral substitutive form not RT-verified for this head → defer (D-11)
         # P-16.5.4 nesting ORDER (BB 7444; escalation P-16.5.4.1.5, BB 7509) under the P-16.5.1.1 marks requirement (BB 7232): {[(<head-alkoxy>)hydroxyphosphoryl]oxy}
         rendered = f"{num[a]}-{{[({head_alkoxy})hydroxyphosphoryl]oxy}}"
         subs.append(("phosphoryl", rendered))
@@ -268,7 +279,7 @@ def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atom
 # Phospholipid assembler (P-107.3) — functional-class phosphate diester
 # --------------------------------------------------------------------------- #
 # Cationic head groups that use the P-68 functional-class "phosphate" (zwitterion) form.
-# Neutral heads (ethanolamine,...) route to the substitutive 'hydroxyphosphoryl-oxy'
+# Neutral heads (ethanolamine, ...) route to the substitutive 'hydroxyphosphoryl-oxy'
 # form instead (see _build_glycerol_prefixes / _HEAD_GROUP_ALKOXY).
 _HEAD_GROUP_ALKYL = {
     "choline": "2-(trimethylazaniumyl)ethyl",
@@ -355,13 +366,13 @@ def _assemble_phospholipid(mol, match, style) -> Optional[str]:
     head_desc = atom_site[phospho_atom][3]
 
     # Cationic head (choline): the internal N+/[O-] zwitterion is captured by the
-    # P-68 functional-class "phosphate" form. Neutral heads (ethanolamine,...) need
+    # P-68 functional-class "phosphate" form. Neutral heads (ethanolamine, ...) need
     # the substitutive 'hydroxyphosphoryl-oxy' prefix form → route to the glyceride
     # assembler (phospho handled as a C-3 prefix). RESOLVED: OPSIN's functional-class
     # "phosphate" yields the anionic/zwitterion form (matches PC, not neutral PE).
     head_alkyl = _HEAD_GROUP_ALKYL.get(head_desc)
     if head_alkyl is None:
-        # : a FREE phosphatidic acid (no head group beyond the
+        # a FREE phosphatidic acid (no head group beyond the
         # phosphate) is named as the functional-class phosphate monoester
         # '<2,3-bis(acyloxy)propyl> dihydrogen phosphate' (P-107.3.1). The
         # detector tags the bare -OPO(OH)2 site head_desc='phosphate'.

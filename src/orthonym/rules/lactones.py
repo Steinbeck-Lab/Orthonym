@@ -18,10 +18,10 @@ Naming algorithm:
 Reference: IUPAC 2013 Blue Book, P-25.5.2 (Lactones), P-31.1.3 (Replacement)
 
 Examples:
-    O=C1CCO1 (beta-propiolactone) -> oxetan-2-one
-    O=C1CCCO1 (gamma-butyrolactone) -> oxolan-2-one
-    O=C1CCCCO1 (delta-valerolactone) -> oxan-2-one
-    O=C1CCCCCO1 (epsilon-caprolactone) -> oxepan-2-one
+    O=C1CCO1      (beta-propiolactone)    -> oxetan-2-one
+    O=C1CCCO1     (gamma-butyrolactone)   -> oxolan-2-one
+    O=C1CCCCO1    (delta-valerolactone)   -> oxan-2-one
+    O=C1CCCCCO1   (epsilon-caprolactone)  -> oxepan-2-one
     O=C1CCCCCCCCCO1 (10-membered lactone) -> oxacycloundecan-2-one
 """
 
@@ -30,8 +30,11 @@ from typing import Dict, List, Optional
 
 from rdkit import Chem
 
+from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
+    atoms_of,
+    bonds_of,
+)
 from ..rules.heterocycles import build_hw_name
-
 
 # ---------------------------------------------------------------------------
 # Lactone detection
@@ -66,10 +69,10 @@ def is_monocyclic_lactone(mol) -> Optional[Dict]:
     # single-bonded ester O. The double-bond partner may be O (ordinary
     # lactone) or S/Se/Te (thiono / seleno / telluro lactone, P-65.6.3.5.1);
     # the ester O stays O in every case (the ring oxygen).
-    # [CX3](=[O,S,#34,#52])[OX2]
-    # match[0] = carbonyl carbon
-    # match[1] = carbonyl chalcogen (=O/=S/=Se/=Te, exocyclic)
-    # match[2] = ester oxygen (-O-, must be in ring)
+    #   [CX3](=[O,S,#34,#52])[OX2]
+    #   match[0] = carbonyl carbon
+    #   match[1] = carbonyl chalcogen (=O/=S/=Se/=Te, exocyclic)
+    #   match[2] = ester oxygen (-O-, must be in ring)
     pattern = Chem.MolFromSmarts("[CX3](=[O,S,#34,#52])[OX2]")
     matches = mol.GetSubstructMatches(pattern)
 
@@ -240,7 +243,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
             3 (the only geometry this namer describes), builds the
             1,3-dioxa Hantzsch-Widman parent (1,3-dioxan-2-one). Any other
             value returns None (fail closed).
-        ene_locants: (A). Sorted list of the lower-numbered
+        ene_locants:. Sorted list of the lower-numbered
             locant of each in-ring C=C, on the SAME fixed O=1/C=2 numbering
             this function already uses. Ring sizes 11+ ONLY (the HW range
             has no replacement-nomenclature ring stem to attach an ene
@@ -439,13 +442,13 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
         return parent_name
 
     # Collect stereodescriptors using lactone ring locant mapping
-    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
     from ..perception.stereo import assign_stereochemistry
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 
     assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, atom_to_locant)
 
-    # Discover exocyclic substituents via universal pipeline.
+    # Discover exocyclic substituents via universal pipeline (Phase 86).
     # Parent atoms = ring atoms; exclude = carbonyl O (=O of the lactone).
     # The _integrate_universal_prefixes helper adds exclude_atoms to the
     # effective parent set so they are never discovered as substituents.
@@ -484,9 +487,9 @@ def name_cyclic_polyester(mol) -> Optional[str]:
     heterocycle whose acyl carbons are expressed with a ``-dione``/``-trione``
     suffix::
 
-        O=C1COC(=O)CO1 (glycolide) -> 1,4-dioxane-2,5-dione (PIN)
+        O=C1COC(=O)CO1   (glycolide)  -> 1,4-dioxane-2,5-dione (PIN)
 
-    The single-carbonyl lactone namer (func:`name_monocyclic_lactone`) fails
+    The single-carbonyl lactone namer (:func:`name_monocyclic_lactone`) fails
     closed on this class because a SECOND ring oxygen is itself an ester O
     bearing its own ring carbonyl. Here every ring O is an ester oxygen (bonded
     to exactly ONE ring carbonyl C) and there are >=2 such carbonyls, so the
@@ -505,7 +508,7 @@ def name_cyclic_polyester(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
@@ -523,7 +526,7 @@ def name_cyclic_polyester(mol) -> Optional[str]:
         at = mol.GetAtomWithIdx(i)
         if at.GetSymbol() not in ("C", "O") or at.GetIsAromatic():
             return None
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
         if i in ring_set and j in ring_set and b.GetBondType() != Chem.BondType.SINGLE:
             return None
@@ -627,8 +630,8 @@ def name_cyclic_polyester(mol) -> Optional[str]:
     core = f"{stem}-{loc_str}-{suffix}"
 
     # Substituents (fail-closed) — mirror rules.anhydrides._name_saturated_oxa_dione.
+    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix
     from ..assembly.substituent_enumerator import name_substituent
-    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
     subs = []  # (locant, name)
     for a in sub_atoms:
         for attach in _exo_heavy(a):
@@ -646,9 +649,8 @@ def name_cyclic_polyester(mol) -> Optional[str]:
                 return None  # unnameable substituent -> fail closed
             subs.append((loc[a], nm))
 
-    from .stereochemistry import (collect_stereodescriptors,
-                                  format_stereodescriptor_string)
     from ..perception.stereo import assign_stereochemistry
+    from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
     assign_stereochemistry(mol)
     stereo_descriptors = collect_stereodescriptors(mol, loc)
 

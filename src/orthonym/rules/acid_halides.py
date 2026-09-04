@@ -5,27 +5,27 @@ Acid halides use two-word "functional class" naming:
     {acyl name} {halide word}
 
 Examples:
-    CC(=O)Cl -> acetyl chloride (retained acyl name for C2)
-    CCC(=O)Cl -> propanoyl chloride
+    CC(=O)Cl     -> acetyl chloride (retained acyl name for C2)
+    CCC(=O)Cl    -> propanoyl chloride
     O=C(Cl)c1ccccc1 -> benzoyl chloride (retained acyl name for benzene)
     ClC(=O)CCCC(=O)Cl -> pentanedioyl dichloride (diacid halide)
 
 The acyl name derives from the corresponding acid:
-    ethanoic acid -> ethanoyl (systematic)
-    acetic acid -> acetyl (retained, preferred for C2)
-    formic acid -> formyl (retained, preferred for C1)
-    benzoic acid -> benzoyl (retained, preferred for benzene-attached)
+    ethanoic acid  -> ethanoyl  (systematic)
+    acetic acid    -> acetyl    (retained, preferred for C2)
+    formic acid    -> formyl    (retained, preferred for C1)
+    benzoic acid   -> benzoyl   (retained, preferred for benzene-attached)
 
 Reference: IUPAC 2013 Blue Book, P-65.5.1 (Acyl halides)
 """
 
-from collections import deque, defaultdict
-from typing import Optional, Dict, List
+from collections import defaultdict, deque
+from typing import Dict, List, Optional
+
 from rdkit import Chem
 
-from ..data.chain_names import get_chain_prefix
 from ..assembly.naming_utils import get_multiplier_prefix
-
+from ..data.chain_names import get_chain_prefix
 
 # Retained acyl names (chain length -> retained acyl prefix)
 RETAINED_ACYL_NAMES = {
@@ -72,7 +72,7 @@ _CARBONO_HALIDATE_WORDS = {
 def name_carbonic_monoester_acyl_halide(
     mol, match, halide_word: str
 ) -> Optional[str]:
-    """P-35.4.2/P-65.2.1: X-C(=O)-O-R -> '<R> carbono<halide>idate'.
+    """P-35.4.2/P-65.2.1: X-C(=O)-O-R  ->  '<R> carbono<halide>idate'.
 
     ``match`` is the acyl-halide SMARTS tuple (carbonyl C, carbonyl O, halide).
     Returns None (fail-closed) unless the carbonyl C is a genuine carbonic-acid
@@ -159,13 +159,13 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
             ``scope_out['parent_scope'] = 'chain' | 'ring'`` for the branch it
             actually took, or leaves it absent when the parent is neither (or is
             not provably ``features.principal_chain``). Only the branch that
-            picks the parent can know this -- P7 measured that it cannot be
+            picks the parent can know this --
             recovered downstream from ``features.principal_chain`` or
             ``features.chain_is_parent``, both of which report "chain" on
             ring-parented names. Consumed by ``handlers.acid_halide`` to tell
             ``_inject_stereo_if_missing`` which numbering a front-of-name
             stereodescriptor block is read in (P-91.3, BB:44639 "NAMING OF
-            STEREOISOMERS", deciding sentence:44643).
+            STEREOISOMERS", deciding sentence :44643).
 
     Returns:
         IUPAC name string, or None if not an acid halide.
@@ -189,18 +189,18 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
 
     num_halide_groups = len(acid_halide_matches)
 
-    # W3-P06 /2 (P-65.5.1): aggregate acyl-halide matches across ALL halide
+    # W3-P06 Task 1/2 (P-65.5.1): aggregate acyl-halide matches across ALL halide
     # FG types. name_acid_halide's ``pg`` is a SINGLE senior halide type, so a
     # MIXED diacyl halide (Br-CO-...-CO-Cl) or a mixed ring dicarbonyl would
     # otherwise see only one end and mis-name the other as an oxo+halo
-    # substituent. ``combined`` = [(match, halide_symbol),...] over every type.
+    # substituent. ``combined`` = [(match, halide_symbol), ...] over every type.
     _combined = []
     for _ft, _sym in (("acid_chloride", "Cl"), ("acid_bromide", "Br"),
                       ("acid_fluoride", "F"), ("acid_iodide", "I")):
         for _m in features.functional_groups.get(_ft, []):
             _combined.append((_m, _sym))
 
-    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC): the acyl halide of a
+    # P-35.4.2 / P-65.2.1 (BB 18114, W2E-P1FC Task 7): the acyl halide of a
     # MONO-ester of carbonic acid, X-C(=O)-O-R, is the functional-class name
     # '<R> carbono<halide>idate' (benzyl carbonochloridate, ethyl
     # carbonochloridate). The carbonyl C bears exactly: one =O, one halide, and
@@ -212,7 +212,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
         if _cc is not None:
             return _cc
 
-    # W3-P06 (P-65.5.1): TWO OR MORE acyl halides on the SAME benzene ring
+    # W3-P06 Task 1 (P-65.5.1): TWO OR MORE acyl halides on the SAME benzene ring
     # -> 'benzene-{locants}-{mult}carbonyl {mult}{halide}' (benzene-1,2-dicarbonyl
     # dichloride). Uses the combined cross-type list; same-halide only (mixed ring
     # halides fail closed -> fall through). Checked before the single-ring path,
@@ -272,7 +272,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
         chain_length = _count_acyl_chain(mol, acid_halide_matches[0][0], consumed_atoms)
 
     # For diacid halides (acyl halide at BOTH chain ends) — same OR mixed halides,
-    # via the combined cross-type list (W3-P06). Handles the pre-existing
+    # via the combined cross-type list (W3-P06 Task 2). Handles the pre-existing
     # same-halide case (pentanedioyl dichloride) AND mixed (butanedioyl bromide
     # chloride, halide words alphabetical). A single-carbon 2-halide (Cl-CO-Cl,
     # carbonyl dichloride) is EXCLUDED by the distinct-chain-ends guard inside.
@@ -284,7 +284,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
 
     # Single acid halide: build acyl name.
     #
-    # P7: `_build_acyl_name`'s `unsaturation` parameter (and the
+    # `_build_acyl_name`'s `unsaturation` parameter (and the
     # `get_enoate_name` grammar behind it) existed but had NO caller, so every
     # acyl chain was spelled saturated and the C=C was SILENTLY DROPPED --
     # `C[C@@H]1C[C@H]1/C=C/C(Cl)=O` was named `3-[...]propanoyl chloride`, which
@@ -292,7 +292,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
     # carbonyl carbon = 1 (P-65.5.1). Geometry is left EMPTY here on purpose: the
     # E/Z block is a stereodescriptor and belongs to the stereo layer, which
     # cites it at the front of the complete name (P-91.3, BB:44639 "NAMING OF
-    # STEREOISOMERS",:44643); emitting it here too would double-cite it.
+    # STEREOISOMERS", :44643); emitting it here too would double-cite it.
     _acyl_atoms = [a for a in chain
                    if a not in consumed_atoms or a in _carbonyl_cs] if chain else []
     if len(_acyl_atoms) > 1 and _acyl_atoms[0] not in _carbonyl_cs:
@@ -308,7 +308,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
                 _unsaturation.append((_i + 1, ''))
     acyl_name = _build_acyl_name(chain_length, _unsaturation or None)
 
-    # Discover substituents on the acyl chain via universal pipeline.
+    # Discover substituents on the acyl chain via universal pipeline (Phase 86).
     # Parent atoms = chain; exclude = all atoms consumed by acid halide groups
     # (carbonyl C, carbonyl O, halogen). This replaces the old
     # _get_chain_substituent_prefix() which only handled halogen substituents.
@@ -616,7 +616,6 @@ def _get_chain_substituent_prefix(mol, features, chain, consumed_atoms) -> str:
         return ""
 
     # Group by prefix name for multipliers
-    from collections import Counter
     prefix_groups = {}
     for locant, prefix_name in sorted(substituent_parts):
         if prefix_name not in prefix_groups:

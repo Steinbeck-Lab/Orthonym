@@ -8,8 +8,8 @@ THE DEFECT THIS CLOSES
 N-substituent. Every path that reached one emitted a name for a DIFFERENT
 molecule and was killed downstream by the OPSIN self-consistency gate:
 
-* ``CS(=O)(=O)NC`` -> ``methanesulfonamide`` (N-methyl carbon DROPPED)
-* ``c1ccccc1S(=O)(=O)NC`` -> ``sulfanylbenzene`` (both =O, N and C dropped)
+* ``CS(=O)(=O)NC``        -> ``methanesulfonamide``   (N-methyl carbon DROPPED)
+* ``c1ccccc1S(=O)(=O)NC`` -> ``sulfanylbenzene``      (both =O, N and C dropped)
 * ``C1CCCCC1S(=O)(=O)NC`` -> ``carbamoylcyclohexane-1-sulfonamide`` (fabricated)
 
 So the class did not "fail closed by design" — it fail-closed by ACCIDENT, one
@@ -22,7 +22,7 @@ amides" (``BlueBookV2/BlueBookV2.md:32746``):
 
     "Sulfonamides, sulfinamides, and the analogous selenium and tellurium
     amides are named substitutively using the following suffixes: -SO2-NH2
-    sulfonamide (preselected suffix)... These suffixes may be assigned to any
+    sulfonamide (preselected suffix) ... These suffixes may be assigned to any
     position of a parent hydride."
 
 with ``CH3-SO2-NH2 methanesulfonamide (PIN)`` (``:32752``).
@@ -49,7 +49,7 @@ so the anilide contraction must never be emitted for an N-phenyl sulfonamide.
 
 DESIGN — no count stands in for a structure proof
 -------------------------------------------------
-Per `` the parent is
+Per the parent is
 never derived from an atom count. Instead the N-substituent branches are
 EXCISED from the real molecule and the residual R-SO2-NH2 is named by
 re-entering the naming pipeline, exactly as ``handlers/hydroximic_acid.py:92``
@@ -128,7 +128,7 @@ def _sulfonyl_nitrogen(mol: Any) -> Optional[Tuple[int, int]]:
     n_atom = mol.GetAtomWithIdx(n_idx)
 
     # -- sulfur must be a clean sulfonyl: exactly two terminal =O, exactly one
-    # amide N, and exactly one other (the R of R-SO2-).
+    #    amide N, and exactly one other (the R of R-SO2-).
     dbl_o = [
         nb.GetIdx() for nb in s_atom.GetNeighbors()
         if nb.GetAtomicNum() == 8
@@ -174,10 +174,10 @@ def _sulfonyl_on_benzene(mol: Any, s_idx: int) -> bool:
             if nb.GetIdx() not in ring or len(ring) != 6:
                 continue
             # An ISOLATED benzene only: every ring atom aromatic carbon AND a member
-            # of exactly one ring. A FUSED arene (naphthalene, indane,...) has a
+            # of exactly one ring. A FUSED arene (naphthalene, indane, ...) has a
             # shared bond -> NumAtomRings > 1 for the bridgeheads, and delegating it
             # to the benzene namer would rename it as benzene, DROPPING the fused
-            # carbons (a wrong molecule; F-B BLOCKER 1). Reject those here.
+            # carbons (a wrong molecule; F-B fable BLOCKER 1). Reject those here.
             if all(mol.GetAtomWithIdx(i).GetAtomicNum() == 6
                    and mol.GetAtomWithIdx(i).GetIsAromatic()
                    and ring_info.NumAtomRings(i) == 1
@@ -415,7 +415,7 @@ def n_substituted_sulfonamide_name(
         # a substituted-ring parent is refused there anyway (never a wrong name).
 
     # A substituted parent hydride needs the N and numerical locants merged into
-    # one ordered prefix list (P-66.1.1.3.1.1; `N,4-dimethyl...` at:32879),
+    # one ordered prefix list (P-66.1.1.3.1.1; `N,4-dimethyl...` at :32879),
     # which prefixing a delegated parent name cannot do. Refuse.
     if not _parent_hydride_is_unsubstituted(mol, s_idx):
         return None

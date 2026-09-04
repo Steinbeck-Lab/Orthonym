@@ -59,13 +59,13 @@ This is the trap that governs which of Table 1.5's 25 rows this module may emit.
 The Blue Book gives three seniority orders over 'a'-prefix elements and they do
 NOT cover the same elements:
 
-=============== =========================================== ======== ==========
-rule governs elements citation
-=============== =========================================== ======== ==========
-P-15.4.1.2 general / chains, "naming and numbering" **25** [BBv2:6446]
-P-23.3.1 citation order INSIDE a von Baeyer name **22** [BBv2:9765]
-P-23.3.2.2 numbering seniority when there is a CHOICE **18** [BBv2:9789]
-=============== =========================================== ======== ==========
+===============  ===========================================  ========  ==========
+rule             governs                                      elements  citation
+===============  ===========================================  ========  ==========
+P-15.4.1.2       general / chains, "naming and numbering"      **25**   [BBv2:6446]
+P-23.3.1         citation order INSIDE a von Baeyer name       **22**   [BBv2:9765]
+P-23.3.2.2       numbering seniority when there is a CHOICE    **18**   [BBv2:9789]
+===============  ===========================================  ========  ==========
 
 P-23.3.1 drops ``At``, ``Po`` and ``C``; P-23.3.2.2 drops those three **and** the
 four halogens. Emitting a replacement prefix needs BOTH a citation position and a
@@ -98,7 +98,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
-
 
 # ---------------------------------------------------------------------------
 # Blue Book Table 1.5, COMPLETE -- element -> (prefix, STANDARD bonding number).
@@ -185,7 +184,7 @@ VB_INADMISSIBLE: Dict[str, str] = {
 # O, and ``VB_CITATION_ORDER`` records that) but not how to number them against
 # another heteroatom, and we cannot currently spell their mandatory lambda. The
 # Blue Book's only skeletal-halogen replacement examples are lambda-convention
-# monocycles and fused systems -- ``lambda3-iodane`` [BBv2:7968,:23561] and
+# monocycles and fused systems -- ``lambda3-iodane`` [BBv2:7968, :23561] and
 # ``3H-3lambda3,2,4-benziodadioxepine`` (PIN) [BBv2:14557] -- both outside this
 # builder. Closing this needs (a) a sanctioned numbering rule for halogens and
 # (b) the ring lambda question resolved; until then they fail closed like any
@@ -209,14 +208,14 @@ HETEROATOM_PREFIXES: Dict[str, Tuple[str, int]] = {
 class ReplacementPrefix:
     """Result of ``build_replacement_prefix``.
 
-    ``prefix`` the replacement block exactly as it is concatenated onto the
+    ``prefix``      the replacement block exactly as it is concatenated onto the
                     ring descriptor -- ``"3-oxa"``, ``"2,4-dioxa"``,
                     ``"5-oxa-3-sila"``, ``""`` when nothing is expressed. NO
                     trailing hyphen (P-23.3.1: the 'a'-prefix attaches directly
                     to the descriptor, ``2-oxabicyclo[2.2.2]octane``). Always
                     byte-identical to the legacy inline builder, INCLUDING its
                     malformed >20 multiplier fallback -- see ``unexpressed``.
-    ``per_atom(atom_idx, morpheme)`` for every heteroatom the prefix
+    ``per_atom``    ``(atom_idx, morpheme)`` for every heteroatom the prefix
                     spells CORRECTLY, ascending by atom index. One entry per
                     atom, so a consumer can bind each spelled morpheme to the
                     single atom it claims.

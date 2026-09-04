@@ -1,4 +1,4 @@
-""" Phase B: the TERMINAL FRAGMENT namer -- the complete-by-construction
+""": the TERMINAL FRAGMENT namer -- the complete-by-construction
 fallback that stands where a declining producer used to DROP a substituent.
 
 Why this module exists
@@ -14,7 +14,7 @@ SELF-01 then correctly rejects the atom-short name.
 So the lever is not a fix list. It is one fallback that always accounts for every
 atom -- the generalisation of the doctrine ``rules/terminal_ring.py`` already
 states: *a table miss degrades to an UGLIER name instead of a refusal*
-(the contributor guide, T4 clause).
+(CLAUDE.md, T4 clause).
 
 Contract
 --------
@@ -46,7 +46,7 @@ from .ring_replacement import build_replacement_prefix
 # halogen is a terminal substituent expressed as a fluoro/chloro/... prefix, so
 # the backbone walk must not step onto one -- doing so miscounts the chain length
 # and drops halogens (``-O-CH2-CF3`` -> ``3,3-difluoro-1-oxabutan-1-yl``, a
-# 4-atom/2-F WRONG constitution for the real 3-atom/3-F chain). Wave F.
+# 4-atom/2-F WRONG constitution for the real 3-atom/3-F chain)..
 _HALOGEN_ATOMIC_NUMS = frozenset({9, 17, 35, 53, 85})
 
 logger = logging.getLogger(__name__)
@@ -60,13 +60,13 @@ MAX_FRAGMENT_ATOMS = 40
 class TerminalFragmentName:
     """One audited terminal fragment name.
 
-    ``name`` the emitted substituent prefix token ('2-oxabutyl').
-    ``numbering`` atom idx -> backbone locant, the SAME map the name was
+    ``name``       the emitted substituent prefix token ('2-oxabutyl').
+    ``numbering``  atom idx -> backbone locant, the SAME map the name was
                    spelled from (never re-derived), so a consumer can place
                    further locants consistently.
-    ``basis`` which generator produced it: 'chain' (this task), later
+    ``basis``      which generator produced it: 'chain' (this task), later
                    'ring' or 'composite'.
-    ``atoms`` every fragment atom the name accounts for. The completeness
+    ``atoms``      every fragment atom the name accounts for. The completeness
                    invariant is ``atoms == frozenset(frag_atoms)``; it is
                    asserted before returning, because an atom-short name is
                    exactly the defect this module removes.
@@ -109,7 +109,7 @@ def _backbone_from(mol, atoms: Set[int], start: int,
         children = [nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
                     if nb.GetIdx() in atoms and nb.GetIdx() not in seen
                     # A monovalent halogen is a substituent, never a skeletal
-                    # backbone step (Wave F: fixes the trifluoroethoxy
+                    # backbone step (: fixes the trifluoroethoxy
                     # miscount -- see _HALOGEN_ATOMIC_NUMS).
                     and nb.GetAtomicNum() not in _HALOGEN_ATOMIC_NUMS
                     and not (stop_at_ring
@@ -146,7 +146,7 @@ def _has_defined_stereo(mol, frag: Set[int]) -> bool:
     COMPOUND with every gate green. Nothing downstream catches it.
 
     Keys on DEFINED stereo, not on the presence of a double bond: an undefined
-    double bond is ordinary unsaturation and must still name, or the guard
+    double bond is ordinary Task 3 unsaturation and must still name, or the guard
     would swallow that whole feature.
 
     Only stereo INSIDE the fragment matters. A centre elsewhere in the molecule
@@ -187,8 +187,8 @@ def _single_heteroatom_branch_prefix(mol, comp: Set[int]) -> Optional[str]:
     which is a **wrong molecule**, not merely an ugly name. Asked what it denotes,
     OPSIN answers:
 
-        (1-oxamethyl)benzene -> OC1=CC=CC=C1 i.e. PHENOL
-        (2-(1-oxamethyl)butyl)benzene -> OC(CC1=CC=CC=C1)CC i.e. an ALCOHOL
+        (1-oxamethyl)benzene           -> OC1=CC=CC=C1        i.e. PHENOL
+        (2-(1-oxamethyl)butyl)benzene  -> OC(CC1=CC=CC=C1)CC  i.e. an ALCOHOL
 
     So ``1-oxamethyl`` denotes ``-OH``: emitting it for ``=O`` loses the double bond
     *and* the carbon, turning a ketone into an alcohol. Measured, the construction was
@@ -241,7 +241,7 @@ def _branches_off(mol, frag: Set[int], skeleton: Sequence[int],
     position-based; for a ring system it is the ring's own numbering, which skips
     ``4 -> 4a -> 5``, so a position-derived locant would silently disagree with
     the numbering the ring name was actually spelled from -- the same defect class
-    as ``.
+    as.
     """
     on_backbone = set(skeleton)
     backbone = skeleton
@@ -336,7 +336,7 @@ def _chain_stem_with_unsaturation(n: int, ene: List[int],
     nothing.
     """
     from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-    from ..data.chain_names import get_chain_prefix    # 'but' for 4
+    from ..data.chain_names import get_chain_prefix  # 'but' for 4
 
     if not ene and not yne:
         return get_alkyl_name(n)
@@ -374,8 +374,8 @@ def _join_prefix_block(block: str, stem: str) -> str:
     A hyphen goes in IFF the stem begins with a LOCANT, because a locant is
     always separated from preceding alphabetic text:
 
-        '2-methyl' + 'propyl' -> '2-methylpropyl' (isobutyl)
-        '3-methyl' + '2-oxabutyl' -> '3-methyl-2-oxabutyl'
+        '2-methyl'  + 'propyl'      -> '2-methylpropyl'     (isobutyl)
+        '3-methyl'  + '2-oxabutyl'  -> '3-methyl-2-oxabutyl'
 
     Both malformed directions were produced while getting this right: always
     appending a hyphen gave '2-methyl-propyl', and never appending one gave
@@ -597,7 +597,7 @@ def _terminal_fragment_name(
     # decoration recursed through _composite_fragment_name. The ring is spelled
     # by terminal_ring (REPLACEMENT nomenclature), so -C(=O)-Ph emits the
     # ugly-but-RT-correct `1-(cyclohexa-1,3,5-trien-1-yl)-2-oxaeth-1-en-1-yl`
-    # and -CH2CH2-cyclohexyl emits `2-(cyclohexan-1-yl)ethyl` ('s T4
+    # and -CH2CH2-cyclohexyl emits `2-(cyclohexan-1-yl)ethyl` 's T4
     # clause; retained ring names are a follow-on). The pure-acyclic case (no
     # ring) is stop_at_ring=False -> byte-identical.
     _frag_has_ring = not _is_acyclic(mol, frag)
@@ -721,12 +721,12 @@ def _terminal_fragment_name(
                                   enclose_if_compound(_het)))
             continue
         # 0-WRONG guard: a branch joined to the backbone by a NON-single bond is a
-        # =/# -attached substituent (methylidene, cyclohexylidene,...). Recursing
+        # =/# -attached substituent (methylidene, cyclohexylidene, ...). Recursing
         # it yields a `-yl` (single free valence) token that ASSERTS a single bond
         # -- a wrong CONSTITUTION (`-CH=C<ring` named `...(cyclohexan-1-yl)...`).
         # This module has no -ylidene/-ylidyne constructor, so fail closed. Fixes
         # the ring-ylidene class this lever newly reaches AND the pre-existing
-        # acyclic methylidene one (ring-review R1).
+        # acyclic methylidene one (fable ring-review R1).
         _bbn = next((n.GetIdx() for n in mol.GetAtomWithIdx(battach).GetNeighbors()
                      if n.GetIdx() in _backbone_set), None)
         if (_bbn is not None and mol.GetBondBetweenAtoms(battach, _bbn)
@@ -743,7 +743,7 @@ def _terminal_fragment_name(
                         "refusing the whole fragment", locant)
             return None
         accounted |= set(sub.atoms)
-        # P-16.5.1.1 (BlueBookV2.md:7232): "Parentheses (round brackets)...
+        # P-16.5.1.1 (BlueBookV2.md:7232): "Parentheses (round brackets) ...
         # are used around compound (P-29.1.2) and complex (P-29.1.3) prefixes"
         # -- a recursively-named branch must be enclosed BEFORE it is spliced
         # in as a token, or the assembled name reads as an unparseable run-on

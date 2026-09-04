@@ -4,9 +4,9 @@ A NEUTRAL ring sulfur/selenium/tellurium bearing 1-2 exocyclic terminal =O
 is named additively on the intact ring parent — the S-oxide sibling of the
 established ``pyridine 1-oxide`` N-oxide path::
 
-    O=S1c2ccccc2-c2ccccc21 -> dibenzo[b,d]thiophene 5-oxide
-    O=S1(=O)c2ccccc2-c2ccccc21 -> dibenzo[b,d]thiophene 5,5-dioxide
-    O=S1CCCC1 -> thiolane 1-oxide
+    O=S1c2ccccc2-c2ccccc21        -> dibenzo[b,d]thiophene 5-oxide
+    O=S1(=O)c2ccccc2-c2ccccc21    -> dibenzo[b,d]thiophene 5,5-dioxide
+    O=S1CCCC1                     -> thiolane 1-oxide
 
 SCOPE (fail-closed, accuracy-first): a single oxidised ring chalcogen; every
 non-ring heavy atom of the molecule is one of its oxide oxygens (bare ring
@@ -21,6 +21,11 @@ from typing import Optional
 
 from rdkit import Chem
 
+from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
+    atoms_of,
+    bonds_of,
+)
+
 _CHALCOGENS = {'S', 'Se', 'Te'}
 
 _HW_RING_SIZES = frozenset(range(3, 11))
@@ -32,8 +37,8 @@ def _name_sultone(mol) -> Optional[str]:
     to a ring S(=O)2 — named on the Hantzsch-Widman oxathiolane/oxathiane parent
     bearing the λ6 convention on the S and a ``-2,2-dione`` suffix::
 
-        O=S1(=O)CCCO1 -> 1,2lambda6-oxathiolane-2,2-dione
-        CC1CCCS(=O)(=O)O1 -> 3-methyl-1,2lambda6-oxathiane-2,2-dione
+        O=S1(=O)CCCO1        -> 1,2lambda6-oxathiolane-2,2-dione
+        CC1CCCS(=O)(=O)O1    -> 3-methyl-1,2lambda6-oxathiane-2,2-dione
 
     This is the PREFERRED form; the additive functional-class '1,2-oxathiolane
     2,2-dioxide' (method 3) is BB's explicit non-PIN alternative.
@@ -50,7 +55,7 @@ def _name_sultone(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
@@ -64,7 +69,7 @@ def _name_sultone(mol) -> Optional[str]:
     ring_set = set(ring)
 
     # Saturated ring skeleton (the S=O bonds are exocyclic).
-    for b in mol.GetBonds():
+    for b in bonds_of(mol):
         i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
         if i in ring_set and j in ring_set:
             if b.GetIsAromatic() or b.GetBondType() != Chem.BondType.SINGLE:
@@ -146,8 +151,8 @@ def _name_sultone(mol) -> Optional[str]:
     core = f"{parent}-2,2-dione"  # 'dione' is consonant-initial: no elision
 
     # Substituents on the ring carbons (fail-closed).
+    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix
     from ..assembly.substituent_enumerator import name_substituent
-    from ..assembly.naming_utils import get_multiplier_prefix, alpha_sort_key
     oxide_set = set(oxide_os)
     subs = []
     for a in order:
@@ -199,7 +204,7 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
 
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
@@ -213,7 +218,7 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
     # Locate the oxidised ring chalcogen and its terminal =O oxygens.
     site = None
     oxide_oxygens = []
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() not in _CHALCOGENS:
             continue
         if atom.GetIdx() not in ring_atoms:
@@ -237,7 +242,7 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
         return None
 
     # Bare ring system: every non-ring heavy atom must be an oxide oxygen.
-    non_ring = {a.GetIdx() for a in mol.GetAtoms()} - ring_atoms
+    non_ring = {a.GetIdx() for a in atoms_of(mol)} - ring_atoms
     if non_ring != set(oxide_oxygens):
         return None
 
@@ -271,8 +276,7 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
     if base_site is None:
         return None
     try:
-        from ..namer import (_build_ring_info_for_parent_selection,
-                             compute_features)
+        from ..namer import _build_ring_info_for_parent_selection, compute_features
         feats = compute_features(base)
         rinfo = _build_ring_info_for_parent_selection(feats)
     except Exception:

@@ -18,12 +18,9 @@ from typing import List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..perception.rings import (
-    get_ring_info,
     get_ring_systems,
     get_spiro_atoms,
-    is_heterocyclic,
 )
-
 
 # ============================================================================
 # P-44.2.2 Ring System Type Hierarchy
@@ -156,7 +153,7 @@ def classify_ring_system_type(
     if spiro_in_system:
         return RingSystemType.SPIRO
 
-    # .A +: Cyclophane classification fires after spiro and
+    # Phase 155.A +: Cyclophane classification fires after spiro and
     # before bridged-fused (P-44.2.2 hierarchy: SPIRO=1 < CYCLIC_PHANE=2 < FUSED=3).
     # Source: 155-CONTEXT.md,,; ring_selection.py:48 enum.
     # NOTE (root-cause-only, ISS-005): narrow exception scope to ImportError
@@ -179,15 +176,15 @@ def classify_ring_system_type(
     # 1. bridged-fused (detect_bridged_fused) FIRST
     # 2. bicyclo (is_bicyclo_system) -- pure 2-ring bridged
     # 3. classify_fused_system 'bridged-fused' -- catches cases missed by
-    # detect_bridged_fused (e.g., benzonorbornadiene). Must come BEFORE
-    # is_polycyclic_system because that function would catch these as VB.
+    #    detect_bridged_fused (e.g., benzonorbornadiene). Must come BEFORE
+    #    is_polycyclic_system because that function would catch these as VB.
     # 4. polycyclic-bridged (is_polycyclic_system) -- tricyclo+ pure VB
-    # Must come after bridged-fused checks to avoid misclassification.
+    #    Must come after bridged-fused checks to avoid misclassification.
     # 5. fused (ortho-fused/ortho-peri-fused)
 
+    from .bicyclo import is_bicyclo_system
     from .bridged_fused import detect_bridged_fused
     from .fused_rings import classify_fused_system
-    from .bicyclo import is_bicyclo_system
     from .polycyclic import is_polycyclic_system
 
     # Step 1: Check bridged-fused via the dedicated detector
@@ -361,7 +358,7 @@ def _spiro_atom_locant_set(mol: Chem.Mol, system_atoms: Set[int]) -> Tuple[int, 
     if not spiro_in:
         return tuple(pad)
     try:
-        from .spiro import get_spiro_numbering, _get_polyspiro_numbering
+        from .spiro import _get_polyspiro_numbering, get_spiro_numbering
         if len(spiro_in) == 1:
             numbering = get_spiro_numbering(mol, spiro_in[0])
         else:
@@ -568,15 +565,15 @@ def ring_system_score(
     Tuple ordering (39 elements; Tasks 12-17 + the P-44.2.2.2.4 pre-bridge
     metrics append P-44.2.2.2.x tiebreakers AFTER the P-44.4.1 tier so they only
     break within-type ties):
-    - [0] -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
-    - [1] -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
-    - [2] -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
-    - [3] -num_rings: P-44.2.1(d) more rings = senior (negated)
-    - [4] -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
-    - [5] -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
+    - [0]  -has_heteroatom: P-44.2.1(a) heterocyclic preferred (negated)
+    - [1]  -has_nitrogen: P-44.2.1(b) N-containing preferred (negated)
+    - [2]  -senior_heteroatom_rank: P-44.2.1(c) most senior heteroatom (negated)
+    - [3]  -num_rings: P-44.2.1(d) more rings = senior (negated)
+    - [4]  -num_skeletal_atoms: P-44.2.1(e) more atoms = senior (negated)
+    - [5]  -num_heteroatoms: P-44.2.1(f) more heteroatoms = senior (negated)
     - [6..25] heteroatom_variety_tuple: P-44.2.1(g) term-by-term comparison
               (20 elements: -count_N, -count_F, -count_Cl, -count_Br, -count_I,
-               -count_O, -count_S, -count_Se, -count_Te, -count_P,...)
+               -count_O, -count_S, -count_Se, -count_Te, -count_P, ...)
     - [26] type_rank: P-44.2.2 type hierarchy (tiebreaker, lower = senior)
     - [27] -num_multiple_bonds: P-44.4.1.1 max ring multiple bonds (negated)
     - [28] -num_double_bonds: P-44.4.1.2 then max double bonds (negated)
@@ -589,7 +586,7 @@ def ring_system_score(
            het-locant set — quinoline<isoquinoline)
     - [35..38] bridged-fused pre-bridge metrics (a,b,c,n): P-44.2.2.2.4
 
-    The unsaturation tier (S1, WS-A.1) breaks the among-equal-carbocycle
+    The unsaturation tier (S1, V21 WS-A.1) breaks the among-equal-carbocycle
     tie that previously made ``C1CCCCC1c1ccccc1`` resolve to the arbitrary
     list-order winner ``phenylcyclohexane``; benzene now wins on unsaturation
     (P-44.4.1.1) -> ``cyclohexylbenzene``. Appended AFTER type_rank so it can
@@ -664,19 +661,19 @@ def ring_system_score(
                 num_double_bonds += 1
 
     # P-44.2.1(g): heteroatom variety -- term-by-term comparison by seniority
-    # Build tuple: (-count_of_N, -count_of_F,..., -count_of_P)
+    # Build tuple: (-count_of_N, -count_of_F, ..., -count_of_P)
     # Negated so min() selects ring with MORE of the most-senior element
     heteroatom_variety_tuple = tuple(
         -heteroatom_counts.get(elem, 0)
         for elem in _HETEROATOM_VARIETY_ORDER
     )
 
-    # P-44.2.2.2.1.1: number of spiro fusions (more = senior). Appended
+    # P-44.2.2.2.1.1 (Task 12): number of spiro fusions (more = senior). Appended
     # AFTER the P-44.4.1 unsaturation tier so it only breaks a WITHIN-spiro tie
     # and never overrides type/unsaturation seniority. Deterministic (atom-set
     # only), so it introduces no spelling dependence.
     spiro_fusions = _spiro_fusion_count(mol, system_atoms)
-    # P-44.2.2.2.1.2: (b) all-saturated-monocyclic-spiro preferred,
+    # P-44.2.2.2.1.2 (Task 13): (b) all-saturated-monocyclic-spiro preferred,
     # then the lower spiro-atom locant set. Applied AFTER the Task-12 spiro-
     # fusion term (P-44.2.2.2.1 "applied successively"). Both are deterministic.
     sat_mono = _is_saturated_monocyclic_spiro(mol, system_atoms)
@@ -782,7 +779,7 @@ def _ylidene_linked_parent_ring(
 def _is_carbon_fused_system(mol, atoms: Set[int]) -> bool:
     """True iff ``atoms`` form an all-carbon ring system of >=2 fused rings
     (a triterpene/steroid-type aglycone core). Used ONLY by the best-effort
-    glycoside-parent preference in:func:`select_principal_ring_system`."""
+    glycoside-parent preference in :func:`select_principal_ring_system`."""
     ri = mol.GetRingInfo()
     n_rings = sum(1 for r in ri.AtomRings() if set(r) <= set(atoms))
     if n_rings < 2:

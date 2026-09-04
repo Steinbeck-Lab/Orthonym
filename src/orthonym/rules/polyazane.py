@@ -2,8 +2,8 @@
 
 Acyclic chains of nitrogen atoms joined by N-N bonds:
 
-    saturated: NN -> hydrazine, NNN -> triazane, NNNN -> tetraazane,...
-    unsaturated: N=N -> diazene, N=NN -> triaz-1-ene, N=NNN -> tetraaz-1-ene
+    saturated    : NN -> hydrazine, NNN -> triazane, NNNN -> tetraazane, ...
+    unsaturated  : N=N -> diazene, N=NN -> triaz-1-ene, N=NNN -> tetraaz-1-ene
     azo (P-68.3.1.3.2): R-N=N-R -> 1,2-dimethyldiazene / 1,2-diphenyldiazene
     substituted hydrazine: CNN -> methylhydrazine
 
@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .substituent_purity import organyl_prefix_name
 
 # Saturated homogeneous N-chain PINs (P-21.2.2). n=2 is the retained "hydrazine".
@@ -45,7 +46,7 @@ def _ene_parent(n: int, locant: int) -> Optional[str]:
 
 def _nitrogen_chain(mol) -> Optional[List[int]]:
     """Return the N atom indices ordered as a simple N-N path, else None."""
-    nitrogens = [a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'N']
+    nitrogens = [a.GetIdx() for a in atoms_of(mol) if a.GetSymbol() == 'N']
     if len(nitrogens) < 2:
         return None
     nset = set(nitrogens)
@@ -120,9 +121,11 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     symmetric 2-N parent is unambiguous): ``methylhydrazine`` / ``phenylhydrazine``
     (BB PINs, P-68.3.1.2), NOT ``1-methylhydrazine``. Two or more substituents
     are located to distinguish 1,1- from 1,2- (``1,2-dimethyldiazene``)."""
-    from ..assembly.naming_utils import (enclose_if_compound,
-                                         multiplied_component,
-                                         prefix_citation_sort_key)
+    from ..assembly.naming_utils import (
+        enclose_if_compound,
+        multiplied_component,
+        prefix_citation_sort_key,
+    )
     if len(subs) == 1:
         return enclose_if_compound(subs[0][1])
     # Lowest locant set, then the P-14.4 (g) tie-break (BB 3307): "lowest locants
@@ -149,7 +152,7 @@ def _format_n2_substituents(subs: List[Tuple[int, str]]) -> str:
     parts = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        # P3-CLOSEOUT Item A: multiplier word from the shared primitive
+        # Item A: multiplier word from the shared primitive
         # (P-16.3.5(a) bis/tris for a SUBSTITUTED prefix); the local table
         # could only say di/tri, so `1,2-di(cyclohexylmethyl)hydrazine`
         # shipped where `1,2-bis(...)` is required.
@@ -171,15 +174,17 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     to the detachable substituent prefixes; cites organyl substituents with
     N-chain locants. Returns the full substituted name, or None (fail-closed).
 
-        Ph-N=N-NH-Ph -> 1,3-diphenyltriaz-1-ene (P-68.3.1.4.2)
-        CH3-NH-NH-NH2 -> 1-methyltriazane (P-68.3.1.4.1)
+        Ph-N=N-NH-Ph  ->  1,3-diphenyltriaz-1-ene   (P-68.3.1.4.2)
+        CH3-NH-NH-NH2 ->  1-methyltriazane          (P-68.3.1.4.1)
 
     A locant-bearing / substituted substituent name is enclosed in parentheses
     and multiplied with the SIMPLE multiplier ('di', not 'bis' — BB verbatim
     '1,3-di(naphthalen-2-yl)triaz-1-ene')."""
-    from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
-                                         multiplied_component,
-                                         prefix_citation_sort_key)
+    from ..assembly.naming_utils import (
+        enclose_if_compound,
+        multiplied_component,
+        prefix_citation_sort_key,
+    )
 
     def _analyse(rev: bool):
         def loc(p: int) -> int:
@@ -218,7 +223,7 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     # Cite prefixes in P-14.5 alphanumerical order, each with its locant set;
     # join with a hyphen between a letter and a following locant digit.
     #
-    # P3-FIX Item 8: this used `alpha_sort_key`, while the ORIENTATION
+    # Item 8: this used `alpha_sort_key`, while the ORIENTATION
     # tie-break 25 lines up (`_analyse`) uses `prefix_citation_sort_key`. Two
     # different orders in one code path: the direction was chosen to give the
     # lowest locant to the prefix cited first under one rule, and then the
@@ -233,7 +238,7 @@ def _format_substituted_polyazane(n: int, dbpos: int,
     parts: List[str] = []
     for name in sorted(by_name, key=prefix_citation_sort_key):
         locs = sorted(by_name[name])
-        # P3-CLOSEOUT Item A: arity bound stays local (fail closed); the
+        # Item A: arity bound stays local (fail closed); the
         # multiplier WORD comes from the shared primitive so a SUBSTITUTED
         # prefix here can take bis/tris (P-16.3.5(a)).
         if len(locs) not in _SUB_MULTIPLIER:
@@ -256,7 +261,7 @@ def _name_azoxy(mol) -> Optional[str]:
     ([O-]-[N+]=N-): one chain nitrogen is a degree-3 [N+] bearing an -O(-), the
     other a degree-2 neutral =N; each nitrogen bears one organyl group.
 
-        C6H5-N=N(O)-C6H5 -> diphenyldiazene oxide (BB 38857)
+        C6H5-N=N(O)-C6H5  ->  diphenyldiazene oxide   (BB 38857)
 
     SCOPE (fail-closed -> None): only the SYMMETRIC diaryl/dialkyl case
     (R == R'), which per the BB example omits the oxide locant
@@ -265,9 +270,9 @@ def _name_azoxy(mol) -> Optional[str]:
     unbuilt (returns None) rather than emitting a locant-ambiguous name. Also
     fail-closed for a non-organyl R, a ring N, or any extra charge. Pure."""
     from rdkit import Chem
-    if sum(a.GetFormalCharge() for a in mol.GetAtoms()) != 0:
+    if sum(a.GetFormalCharge() for a in atoms_of(mol)) != 0:
         return None
-    n_plus = [a for a in mol.GetAtoms()
+    n_plus = [a for a in atoms_of(mol)
               if a.GetSymbol() == 'N' and a.GetFormalCharge() == 1]
     if len(n_plus) != 1:
         return None
@@ -306,7 +311,7 @@ def _name_azoxy(mol) -> Optional[str]:
     if c_b is None:
         return None
     # No charge anywhere but the N+/O- zwitterion pair.
-    if any(a.GetFormalCharge() != 0 for a in mol.GetAtoms()
+    if any(a.GetFormalCharge() != 0 for a in atoms_of(mol)
            if a.GetIdx() not in (na.GetIdx(), o_minus.GetIdx())):
         return None
     ra = organyl_prefix_name(mol, c_a.GetIdx(), na.GetIdx())
@@ -315,8 +320,7 @@ def _name_azoxy(mol) -> Optional[str]:
         return None
     if ra != rb:
         return None                          # unsymmetric -> NNO/ONN machinery
-    from ..assembly.naming_utils import (enclose_if_compound,
-                                         multiplier_needs_hyphen)
+    from ..assembly.naming_utils import enclose_if_compound, multiplier_needs_hyphen
     enclosed = enclose_if_compound(ra)
     if enclosed == ra and multiplier_needs_hyphen(ra):
         return f"di-{enclosed}diazene oxide"      # P-16.3.3(b)/P-16.2.4.1(d) di-tert-butyl...
@@ -327,7 +331,6 @@ def _formazan_terminal_n(mol, inner_n, central_c, bond_type):
     """Return the terminal-N neighbour of a formazan inner nitrogen ``inner_n``
     (the neighbour that is NOT ``central_c``, joined by ``bond_type`` and being
     an acyclic N), or None."""
-    from rdkit import Chem
     other = None
     for nb in inner_n.GetNeighbors():
         if nb.GetIdx() == central_c.GetIdx():
@@ -370,7 +373,7 @@ def name_formazan(mol) -> Optional[str]:
     hydrazinyl-terminal N (C3=N4-N5). Organyl substituents on N1/C3/N5 are cited
     by those locants:
 
-        Ph-NH-N=CH-N=N-Ph -> 1,5-diphenylformazan (BB 38938)
+        Ph-NH-N=CH-N=N-Ph  ->  1,5-diphenylformazan   (BB 38938)
 
     Fail-closed (returns None): the UNSUBSTITUTED parent (kept on the retained
     RETAINED_NAME table), any charge/radical, a ring skeleton atom, a
@@ -379,10 +382,10 @@ def name_formazan(mol) -> Optional[str]:
     from rdkit import Chem
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
-    for a in mol.GetAtoms():
+    for a in atoms_of(mol):
         if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
             return None
-    for c in mol.GetAtoms():
+    for c in atoms_of(mol):
         if c.GetSymbol() != 'C' or c.IsInRing():
             continue
         n_dbl, n_sgl, bad = [], [], False
@@ -419,7 +422,7 @@ def name_formazan(mol) -> Optional[str]:
         placed = [(loc, nm) for loc, nm in ((1, s1), (3, s3), (5, s5)) if nm]
         if not placed:
             return None                    # bare formazan -> retained table
-        # P3-FIX Item 5: this site was WIDENED by organyl
+        # Item 5: this site was WIDENED by the Phase 3 organyl
         # migration but its composer was left on pre-migration raw code, so the
         # newly-admitted compound prefixes were mis-spelled three ways at once:
         # a local `_SUB_MULTIPLIER` table that knows neither the P-16.3.5(a)
@@ -439,8 +442,7 @@ def name_formazan(mol) -> Optional[str]:
         # `format_substituent_prefix` is documented as THE one correct
         # substituent-prefix + enclosing-mark reference; the sibling
         # `_name_diazene_oxide` 100 lines up already does it this way.
-        from ..assembly.naming_utils import (format_substituent_prefix,
-                                             prefix_citation_sort_key)
+        from ..assembly.naming_utils import format_substituent_prefix, prefix_citation_sort_key
         from ..assembly.substituent_naming import _joined_prefix_parts
         by_name: Dict[str, List[int]] = {}
         for loc, nm in placed:
@@ -470,7 +472,7 @@ def _name_azane_carboxylic_acid(mol) -> Optional[str]:
     # degree 3 (no other heavy neighbour).
     carboxyl_c = terminal_n = None
     n_carboxyls = 0
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'C':
             continue
         nbrs = atom.GetNeighbors()
@@ -556,7 +558,7 @@ def name_polyazane(mol) -> Optional[str]:
     _formazan = name_formazan(mol)
     if _formazan is not None:
         return _formazan
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
@@ -583,7 +585,7 @@ def name_polyazane(mol) -> Optional[str]:
     # Every heavy atom is an N of the chain or a carbon (organyl). Any other
     # heteroatom (O -> hydroxylamine/oxime, etc.) -> decline.
     if any(a.GetSymbol() not in ('N', 'C')
-           for a in mol.GetAtoms() if a.GetSymbol() != 'H'):
+           for a in atoms_of(mol) if a.GetSymbol() != 'H'):
         return None
 
     dbpos = _chain_double_bond(mol, chain)

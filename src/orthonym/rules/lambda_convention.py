@@ -13,11 +13,11 @@ halogen namers all share one fail-closed implementation rather than each
 re-deriving Table 2.8.
 
 References:
-    IUPAC 2013 Blue Book, P-14.1.2/3 (standard / nonstandard bonding number)
-    IUPAC 2013 Blue Book, P-15.4.1.3 (λ placement: after the locant, no hyphen)
-    IUPAC 2013 Blue Book, Table 1.5 (standard bonding numbers) [BBv2:6436]
-    IUPAC 2013 Blue Book, P-21.2.4 (λ in chains / replacement nomenclature)
-    IUPAC 2013 Blue Book, P-68 / P-69 (mononuclear hydrides bearing λ)
+    IUPAC 2013 Blue Book, P-14.1.2/3     (standard / nonstandard bonding number)
+    IUPAC 2013 Blue Book, P-15.4.1.3     (λ placement: after the locant, no hyphen)
+    IUPAC 2013 Blue Book, Table 1.5      (standard bonding numbers) [BBv2:6436]
+    IUPAC 2013 Blue Book, P-21.2.4       (λ in chains / replacement nomenclature)
+    IUPAC 2013 Blue Book, P-68 / P-69    (mononuclear hydrides bearing λ)
 
 Fail-closed contract: a λ is emitted ONLY for a neutral atom present in
 ``STANDARD_BONDING_NUMBER`` whose actual valence differs from its standard
@@ -26,7 +26,6 @@ value. Charged atoms and elements absent from the table are treated as standard
 """
 
 from typing import Optional
-
 
 # Greek small letter lambda (IUPAC P-15.4.1.3). The Blue Book spells the
 # lambda-convention descriptor with the Greek letter (533 occurrences in the

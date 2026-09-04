@@ -17,41 +17,36 @@ IUPAC 2013 Rules for fused systems:
 Reference: IUPAC 2013 Blue Book, Section P-25 (Fused Ring Systems)
 """
 
-from typing import Dict, List, Optional, Set, Tuple, Any
 from collections import defaultdict, deque
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
-from ..perception.stereo import assign_stereochemistry
+
+from ..assembly.naming_utils import (
+    alpha_sort_key,
+    get_alkyl_name,
+)
+from ..data import get_retained_name as _get_global_retained_name
 from ..data.fused_heterocycles import (
     get_fused_heterocycle_name,
     match_fused_heterocycle_core,
-    FUSED_HETEROCYCLE_DATA,
 )
 from ..data.xanthine_derivatives import (
-    identify_xanthine,
     get_xanthine_name,
-    is_xanthine_derivative,
 )
-from ..data import get_retained_name as _get_global_retained_name
 from ..perception.rings import (
-    get_ring_info,
     get_ring_systems,
     is_aromatic_ring,
     is_heterocyclic,
 )
-from ..assembly.naming_utils import (
-    get_alkyl_name,
-    alpha_sort_key,
-    get_multiplier_prefix,
-)
+from ..perception.stereo import assign_stereochemistry
 from .stereochemistry import (
-    get_bridgehead_atoms,
     collect_ring_junction_stereo,
-    format_ring_junction_stereo,
     determine_simple_cis_trans,
+    format_ring_junction_stereo,
+    get_bridgehead_atoms,
     get_junction_locants_for_fused_system,
 )
-
 
 # Simple multiplicative prefixes for substituent naming
 SIMPLE_MULTIPLIERS = {
@@ -357,7 +352,7 @@ def _saturation_indicated_h_sets(sat_atoms, adj):
 
 
 def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: str):
-    """BP-4 (full): name a partially-saturated 2-component ortho-fused
+    """BP-4 Phase 3 (full): name a partially-saturated 2-component ortho-fused
     mancude system as ``<hydro>-<indicatedH>-<mancude parent>`` (P-25.7.1.1 /
     P-14.4 / P-58.2), bare or prefix-substituted.
 
@@ -443,7 +438,7 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
         return None
 
     # --- 3. Substituents (case c). Suffix-forming groups need P-58.2.2 added
-    # indicated-H -> out of scope. Prefix-only proceeds. ---
+    #        indicated-H -> out of scope. Prefix-only proceeds. ---
     has_sub = any(at.GetIdx() not in ring_atom_set and at.GetAtomicNum() != 1
                   for at in mol.GetAtoms())
     if has_sub and not _exocyclic_atoms_accounted(mol, ring_atom_set):
@@ -548,20 +543,20 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if len(atom_rings) < 2:
         return None
 
-    # : route base decision through select_base_component
+    # Phase 149: route base decision through select_base_component
     # for any N>=2. The naming engine remains 2-ring-only.
     #
     # Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
     # Source: 149-CONTEXT.md.
-    from .fused_ring_selection import select_base_component, _enumerate_components
+    from .fused_ring_selection import _enumerate_components, select_base_component
     components = _enumerate_components(mol)
     base_atoms, _others = select_base_component(mol, components)
 
     if len(atom_rings) != 2:
         # 3+ component case (trade-off): emit decision-only.
-        # base_atoms is consumed by namer.Branch 6.5 (-03) via
+        # base_atoms is consumed by namer.Branch 6.5 (Task 02-03) via
         # features.parent_selection_result; full systematic-name assembly
-        # deferred to 149.x or.
+        # deferred to 149.x or Phase 155.
         logger.debug(
             "FR-2.3 base decision for 3+ component system %s: %s",
             Chem.MolToSmiles(mol), base_atoms,
@@ -592,7 +587,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if not ring1_aromatic and not ring2_aromatic:
         return None
 
-    # BP-4 (P-25): a SUBSTITUTED 2-component ortho-fused mancude system
+    # BP-4 Phase 1 (P-25): a SUBSTITUTED 2-component ortho-fused mancude system
     # is named by discovering substituents against the algorithmic locant map
     # (the same machinery cataloged cores use), NOT refused. Record whether any
     # exocyclic heavy atom is present; the substituted branch runs below, after
@@ -606,7 +601,6 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     from .fusion_descriptors import (
         generate_systematic_name_for_fused_pair,
         identify_parent_and_child,
-        _get_iupac_ring_order_for_fusion,
     )
 
     # Try to generate systematic name
@@ -617,7 +611,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if not name:
         return None
 
-    # BP-4 (P-31.1.4): a partially-saturated fused pair is named as
+    # BP-4 Phase 3 (P-31.1.4): a partially-saturated fused pair is named as
     # '<locants>-<multiplier>hydro-<mancude parent>'. `name` here is the mancude
     # descriptor (generate_systematic_name_for_fused_pair is aromaticity-
     # agnostic). Try the dihydro path first; on None fall through to the legacy
@@ -636,14 +630,14 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     )
 
     # Build the atom->locant map that drives indicated-H, lambda, and (BP-4
-    # ) substituent placement.
-    # - BARE systems keep the legacy descriptor-order map -> byte-identical
-    # output, zero regression risk.
-    # - SUBSTITUTED systems use the deterministic P-25.3.3 peripheral-numbering
-    # engine (compute_fused_numbering) + the P-59.2.3 lowest-substituent-
-    # locant tie-break; the legacy map does NOT reproduce OPSIN's canonical
-    # numbering (it placed substituents on the wrong ring position). Fail
-    # closed if the engine or the completeness check declines.
+    # Phase 1) substituent placement.
+    #   - BARE systems keep the legacy descriptor-order map -> byte-identical
+    #     output, zero regression risk.
+    #   - SUBSTITUTED systems use the deterministic P-25.3.3 peripheral-numbering
+    #     engine (compute_fused_numbering) + the P-59.2.3 lowest-substituent-
+    #     locant tie-break; the legacy map does NOT reproduce OPSIN's canonical
+    #     numbering (it placed substituents on the wrong ring position). Fail
+    #     closed if the engine or the completeness check declines.
     substituents = None
     if has_substituents:
         if not _exocyclic_atoms_accounted(mol, ring_atom_set):
@@ -665,7 +659,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     # P-22.2.7.1). Fail-closed: a lambda atom without a determinate NUMERIC
     # fused locant (or on skeletal carbon) invalidates the whole name — the
     # lambda-less name would denote a DIFFERENT molecule.
-    from .lambda_convention import nonstandard_bonding_number, LAMBDA
+    from .lambda_convention import LAMBDA, nonstandard_bonding_number
     lam_entries = []
     for idx in sorted(ring_atom_set):
         lam = nonstandard_bonding_number(mol, idx)
@@ -690,7 +684,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     elif lam_prefix:
         name = f"{lam_prefix}{name}"
 
-    # BP-4 (P-25): attach the substituents discovered above against the
+    # BP-4 Phase 1 (P-25): attach the substituents discovered above against the
     # canonical numbering, reusing the exact assembler the catalog path uses.
     # The bare-parent `name` (with any indicated-H/lambda prefix already
     # assembled) is the parent the assembler decorates.
@@ -708,7 +702,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
 
 
 # ============================================================================
-# Polycomponent ortho-fusion constructor (P-25.3.4) — Phase G1b (COV-01)
+# Polycomponent ortho-fusion constructor (P-25.3.4) —
 # ============================================================================
 #
 # Builds systematic fusion PINs for the cata-fused single-base monocyclic-
@@ -723,7 +717,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
 # components, bridged-AND-fused, or carbocyclic children (those are deferred, A10).
 #
 # Source: IUPAC 2013 Blue Book P-25.3.1.3 (descriptor construction),
-# P-25.3.2 (base component), https://iupac.qmul.ac.uk/fusedring/FR23.html
+#         P-25.3.2 (base component), https://iupac.qmul.ac.uk/fusedring/FR23.html
 
 # Carbocyclic attached components (benzo/cyclopenta...) are refused: nearly all
 # 3-ring benzo-fused systems are RETAINED (acridine/carbazole/dibenzofuran) and
@@ -943,7 +937,7 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
     ring_atom_set = set()
     for r in atom_rings:
         ring_atom_set.update(r)
-    # BP-4 (P-25): a SUBSTITUTED star system is decorated below against
+    # BP-4 Phase 2 (P-25): a SUBSTITUTED star system is decorated below against
     # the deterministic P-25.3.3 final-system numbering (was: hard-refused).
     # Record whether any exocyclic heavy atom is present; the bare descriptor
     # name is computed first (the `_pcf_*` path is substituent-agnostic — it
@@ -1003,7 +997,7 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
     if not has_substituents:
         return bare_name
 
-    # BP-4 (P-25): decorate the bare star name with substituents against
+    # BP-4 Phase 2 (P-25): decorate the bare star name with substituents against
     # the canonical P-25.3.3 numbering, reusing the Phase-1 machinery. Fail
     # closed at source: every exocyclic heavy atom must be an identifiable
     # substituent, and the numbering engine must produce a determinate map,
@@ -1048,7 +1042,7 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     InChI before it can be returned).
 
     Fusion nomenclature is not derived de-novo here; instead — matching what do (an offline OPSIN-validated template index) and
-    the contributor guide (OFFER many, keep the one that round-trips) — a bounded
+    CLAUDE.md(OFFER many, keep the one that round-trips) — a bounded
     candidate set is generated from the actual ring components (a max-ring retained
     BASE named from a fused sub-core per P-25.3.2, plus the remaining monocycle as a
     fusion PREFIX with enumerated attachment locants/letters) and each is OPSIN-
@@ -1057,13 +1051,14 @@ def _name_ortho_fused_generate_and_test(mol) -> Optional[str]:
     Fail-CLOSED (None) on anything outside the handled sub-class, so it never emits
     an unverified name; the caller keeps its existing behaviour.
 
-    Scope (this session, -C1C2C6 Build 2): exactly 3 SSSR rings, the whole
+    Scope (this session, C1C2C6 Build 2): exactly 3 SSSR rings, the whole
     molecule is that one cata-fused (no atom in >=3 rings) neutral fully-aromatic
     ring system with >=1 ring heteroatom, no exocyclic heavy atoms. Higher
     component counts, peri-fused interior atoms, substituted cores and carbocyclic
     parents are a NAMED follow-on (see test_c_waveC_v36.py Build-2 xfail)."""
     import itertools
     from collections import Counter as _Counter
+
     from rdkit.Chem.inchi import MolToInchi
 
     ri = mol.GetRingInfo()
@@ -1183,8 +1178,8 @@ def _rings_connected(subset: Set[int], adj: Dict[int, Set[int]]) -> bool:
 def _name_naphtho_fused_generate_and_test(mol) -> Optional[str]:
     """CT.4: general N-component ortho-fused MANCUDE PIN construction for
     the deferred CARBOCYCLIC-CHILD topology that ``_try_polycomponent_fusion_name``
-    (907) explicitly defers (A10): a senior heterocyclic 2-ring BASE
-    (quinoxaline / quinoline / quinazoline /...) ortho-fused to a NAPHTHALENE
+    (:907) explicitly defers (A10): a senior heterocyclic 2-ring BASE
+    (quinoxaline / quinoline / quinazoline / ...) ortho-fused to a NAPHTHALENE
     2-ring carbocyclic PREFIX -> e.g. ``naphtho[2,3-g]quinoxaline``.
 
     This UPGRADES the RT-true von-Baeyer degradation (a valid T3 name) to the
@@ -1213,6 +1208,7 @@ def _name_naphtho_fused_generate_and_test(mol) -> Optional[str]:
     """
     import itertools
     from collections import Counter as _Counter
+
     from rdkit.Chem.inchi import MolToInchi
 
     ri = mol.GetRingInfo()
@@ -1393,11 +1389,11 @@ def get_shared_atoms(mol, ring1: Tuple[int, ...], ring2: Tuple[int, ...]) -> Set
         Set of atom indices shared by both rings
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         >>> ri = mol.GetRingInfo()
         >>> rings = ri.AtomRings()
         >>> shared = get_shared_atoms(mol, rings[0], rings[1])
-        >>> len(shared) # 2 atoms shared in ortho-fused system
+        >>> len(shared)  # 2 atoms shared in ortho-fused system
         2
     """
     set1 = set(ring1)
@@ -1422,10 +1418,10 @@ def classify_fused_system(mol) -> str:
         Classification string
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         >>> classify_fused_system(mol)
         'ortho-fused'
-        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34') # pyrene
+        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34')  # pyrene
         >>> classify_fused_system(mol)
         'ortho-peri-fused'
     """
@@ -1492,10 +1488,10 @@ def is_fused_bicyclic(mol) -> bool:
         True if exactly 2 rings sharing exactly 2 atoms
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         >>> is_fused_bicyclic(mol)
         True
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)[nH]c1ccccc12') # carbazole (tricyclic)
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)[nH]c1ccccc12')  # carbazole (tricyclic)
         >>> is_fused_bicyclic(mol)
         False
     """
@@ -1534,7 +1530,7 @@ def name_fused_heterocycle(mol):
         or None if not a recognized fused heterocycle.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         >>> result = name_fused_heterocycle(mol)
         >>> result[0]
         '1H-indole'
@@ -1553,7 +1549,8 @@ def name_fused_heterocycle(mol):
     # mandatory lambda tokens). Catalog and core-substructure matches are
     # standard-valence structures — matching one here would name a different
     # molecule. Fail closed if the algorithmic path declines.
-    from .lambda_convention import nonstandard_bonding_number as _nsbn, LAMBDA as _LAMBDA
+    from .lambda_convention import LAMBDA as _LAMBDA
+    from .lambda_convention import nonstandard_bonding_number as _nsbn
     if any(_nsbn(mol, i) is not None for i in ring_atoms):
         _lam_name = _try_algorithmic_fusion_name(mol)
         if _lam_name and _LAMBDA in _lam_name:
@@ -1634,7 +1631,7 @@ def name_fused_heterocycle(mol):
         poly = _try_polycomponent_fusion_name(mol)
         if poly:
             return (poly, ring_atoms, {}, True)
-        # -C1C2C6 Build 2 (P-25.3): bounded 3-component ortho/ortho-peri-fused
+        # Build 2 (P-25.3): bounded 3-component ortho/ortho-peri-fused
         # mancude namer for a novel system whose senior BASE is a 2-ring retained
         # component (e.g. pyrimido[4,5-b]quinoline) -- the case _try_polycomponent_
         # fusion_name cannot reach (it only builds star-of-monocycles bases).
@@ -1651,7 +1648,7 @@ def name_fused_heterocycle(mol):
         naphtho = _name_naphtho_fused_generate_and_test(mol)
         if naphtho:
             return (naphtho, ring_atoms, {}, True)
-        # Wave-2 P5 fused FAIL-CLOSED follow-up: interior-heteroatom
+        # Wave-2 P5 fused (Task 7) FAIL-CLOSED follow-up: interior-heteroatom
         # ortho-/peri-fused systems (P-25.3.3.2/.2.1/.2.2/.2.3/.3.3.2) require
         # a superscript interior locant (e.g. 3a1 / 2a1H). OPSIN 2.9 CANNOT
         # parse any name carrying that token (verified: '2a1H-cyclopenta[cd]-
@@ -1690,18 +1687,18 @@ def name_fused_heterocycle(mol):
         # phantom-then-veto path keeps the molecule in the fused-naming lane and
         # yields a cleaner 'unknown'. Truly fail-closing at the source needs the
         # benzene/monocyclic handlers to decline fused-to-heteroaromatic systems
-        # (a dispatch-level change, polycomponent-fusion scope).
+        # (a dispatch-level change, Phase 13 polycomponent-fusion scope).
 
     # NOTE: General indicated hydrogen (_compute_general_indicated_h) is
     # implemented but NOT wired here. Dictionary-matched fused systems handle
     # indicated H via tautomer_locant in fused_heterocycles.py entries.
     # The general algorithm is reserved for future systematic fusion naming
-    # of non-retained fused systems (deferred).
+    # of non-retained fused systems (deferred from Phase 107).
 
     # Find substituents on the core
     substituents = get_fused_heterocycle_substituents(mol, atom_mapping)
 
-    # P3 (fail-closed routing): get_fused_heterocycle_substituents silently
+    # (fail-closed routing): get_fused_heterocycle_substituents silently
     # skips any exocyclic branch _identify_fused_substituent cannot name
     # (``sub_info is None -> continue``), so the assembled name can DROP a whole
     # substituent and denote a DIFFERENT molecule (a boronate / methanesulfonyl /
@@ -1829,7 +1826,7 @@ def get_fused_heterocycle_substituents(
         - 'other': List[Dict] - Other substituents (halogens, etc.)
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1') # 5-methylindole
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')  # 5-methylindole
         >>> core_match = match_fused_heterocycle_core(mol)[1]
         >>> subs = get_fused_heterocycle_substituents(mol, core_match)
         >>> 'methyl' in subs['c_substituents']
@@ -1907,7 +1904,7 @@ def get_fused_heterocycle_substituents(
                 # senior characteristic group. `4-methoxy-N-phenylaniline (PIN)`
                 # (BlueBookV2.md:21610) is the shape required.
                 #
-                # `anilino` is a genuine preferred PREFIX (6371
+                # `anilino` is a genuine preferred PREFIX (:6371
                 # `4-[(4-hydroxyanilino)methyl]phenol (PIN)`), but only on a parent
                 # whose own characteristic group outranks the amine -- there, a
                 # phenol. With no senior group present the amine cannot be demoted.
@@ -2002,15 +1999,15 @@ def _identify_fused_substituent(
             return func_chain
 
         # General fallback: collect all substituent atoms and delegate to
-        # universal naming (USUB-05 gap closure; WS-A extends
+        # universal naming (Phase 85 USUB-05 gap closure; WS-A task 9 extends
         # it to RING-SYSTEM substituents — the old blanket ring guards
         # silently DROPPED the fragment, naming 2-(pyridin-2-yl)quinoline as
         # bare 'quinoline').
         # Guards kept (retargeted precisely):
-        # 1. A ring that STRADDLES the core boundary means the core mapping
-        # is incomplete (coumarin 3-ring case) -> not a substituent.
-        # 2. Only common organic elements, no exotic (As, Se, etc.)
-        # 3. Modest size (<=25 atoms)
+        #   1. A ring that STRADDLES the core boundary means the core mapping
+        #      is incomplete (coumarin 3-ring case) -> not a substituent.
+        #   2. Only common organic elements, no exotic (As, Se, etc.)
+        #   3. Modest size (<=25 atoms)
         _ring_info = mol.GetRingInfo()
         _COMMON_ORGANIC = {'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'}
         sub_atoms = _bfs_collect_all(mol, start_idx, excluded)
@@ -2030,7 +2027,7 @@ def _identify_fused_substituent(
 
         if any(_ring_info.NumAtomRings(a) > 0 for a in sub_atoms):
             # Ring-containing substituent (pyridinyl, naphthalenyl, indolyl,
-            # naphthalenylmethyl,...) -> the single WS-A delegate.
+            # naphthalenylmethyl, ...) -> the single WS-A delegate.
             #
             # core-namer: thread the best-effort tier's ``allow_mancude``
             # into the delegate exactly as the sibling enumerator already does at
@@ -2249,7 +2246,8 @@ def _identify_fused_substituent(
                     # molecule pipeline abstains on these -- but it is a fabrication
                     # inside this class, so the ring is named as a ring here.
                     from .ring_substituents import (
-                        anilino_preferred_prefix, anilino_prefix_from_n_branch,
+                        anilino_preferred_prefix,
+                        anilino_prefix_from_n_branch,
                     )
                     _anilino = anilino_prefix_from_n_branch(
                         mol, start_idx, [start_idx] + alkyl_atoms)
@@ -3130,7 +3128,9 @@ def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
     # to prevent locant ambiguity (e.g., 8-(2-methylpropyl) not 8-2-methylpropyl)
     display_name = name
     from ..assembly.naming_utils import (
-        is_complex_substituent, _is_fully_enclosed, enclose_if_compound,
+        _is_fully_enclosed,
+        enclose_if_compound,
+        is_complex_substituent,
     )
     if name.startswith('('):
         # A name that opens with '(' was formerly left bare unconditionally --
@@ -3374,8 +3374,8 @@ def _name_saturated_fused_carbocyclic(mol) -> Optional[str]:
 
 # P-31.1.4.3.4(j) preference rank for the junction-locant tie-break in
 # _saturated_fused_junction_prefix: "the lower locant is assigned to CIP
-# stereodescriptors... R... and r (pseudoasymmetry) that are preferred
-# to... S... and s, respectively" (BlueBookV2.md:3346). Lower rank wins
+# stereodescriptors ... R ... and r (pseudoasymmetry) that are preferred
+# to ... S ... and s, respectively" (BlueBookV2.md:3346). Lower rank wins
 # the lower locant.
 _JUNCTION_CIP_RANK = {'R': 0, 'r': 1, 'S': 2, 's': 3}
 
@@ -3478,10 +3478,10 @@ def is_fused_aromatic_system(mol) -> bool:
         True if fused aromatic system detected
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
         >>> is_fused_aromatic_system(mol)
         True
-        >>> mol = Chem.MolFromSmiles('c1ccccc1') # benzene
+        >>> mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
         >>> is_fused_aromatic_system(mol)
         False
     """
@@ -3520,7 +3520,7 @@ def is_fused_heterocyclic_system(mol) -> bool:
         True if fused heterocyclic system detected
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         >>> is_fused_heterocyclic_system(mol)
         True
     """
@@ -3566,7 +3566,7 @@ def get_fused_ring_sizes(mol) -> Tuple[int, int]:
         Tuple of (ring1_size, ring2_size), sorted largest first
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1') # decalin
+        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin
         >>> get_fused_ring_sizes(mol)
         (6, 6)
     """
@@ -3600,10 +3600,10 @@ def name_saturated_fused_bicyclic(mol, parent_name: str = "decahydronaphthalene"
         IUPAC name with stereodescriptor prefix, or None if cannot determine
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@@H]2C1') # cis-decalin
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@@H]2C1')  # cis-decalin
         >>> name_saturated_fused_bicyclic(mol)
         '(4as,8as)-decahydronaphthalene'
-        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@H]2C1') # trans-decalin
+        >>> mol = Chem.MolFromSmiles('C1CC[C@@H]2CCCC[C@H]2C1')  # trans-decalin
         >>> name_saturated_fused_bicyclic(mol)
         '(4ar,8ar)-decahydronaphthalene'
     """

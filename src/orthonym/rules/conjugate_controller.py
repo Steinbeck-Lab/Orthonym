@@ -1,4 +1,4 @@
-"""Class-agnostic conjugate-fragment classifier (WSC-03).
+"""Class-agnostic conjugate-fragment classifier (Phase 182, WSC-03,).
 
 A NEW standalone, class-agnostic primitive: given a molecule, a scaffold attachment
 atom, the linker atom (``first_idx``) reached through it, and the scaffold atom set, it
@@ -8,16 +8,16 @@ plus the consumed-atom set. Returns ``None`` (fail-closed) for anything else.
 
 This is the cross-class deliverable (WSC-03 crit #2): the signature is
 ``classify_conjugate(mol, attach_idx, first_idx, scaffold_atoms)`` with NO
-steroid-specific branch, so the glycoside and lipid paths can
+steroid-specific branch, so the glycoside (Phase 176) and lipid (Phase 180) paths can
 call the SAME primitive later. This phase *wires* it into the NP subsystem (182-02);
 the *logic* here is class-agnostic.
 
 Charge -> word is derived **in place** from the protonation/ionisation state of the
 acid centre on the ORIGINAL molecule — never neutralize-then-rename (the WS-E
 failure mode), never a per-molecule hardcode:
-  -OSO2[O-] -> "sulfate" -OSO2OH -> "hydrogen sulfate"
-  -OPO(OH)2 -> "dihydrogen phosphate" mono-anion -> "hydrogen phosphate"
-  di-anion -> "phosphate"
+  -OSO2[O-]  -> "sulfate"            -OSO2OH    -> "hydrogen sulfate"
+  -OPO(OH)2  -> "dihydrogen phosphate"  mono-anion -> "hydrogen phosphate"
+  di-anion   -> "phosphate"
   (BB P-65.6.3.3.5 @31935 partial esters/salts; P-102.5.6.1.2 @53199 phosphate
    ionisation; word examples @35968 / @35940 / @41005.)
 
@@ -27,7 +27,7 @@ capped fragment canonicalizes to a ``URONIC_ACID_NAMES`` key — NO string surge
 sugar head (RESEARCH Open Q2 RESOLVED). The uronic head form comes from the explicit
 ``data.sugar_names.uronic_glycoside_head`` map (BB P-102.5.6.6.4.2 @53789).
 
-Root-cause-only (the contributor guide): no postprocessor, no regex on any existing name string,
+Root-cause-only (CLAUDE.md): no postprocessor, no regex on any existing name string,
 no neutralize-then-rename, no per-molecule hardcode. All logic is RDKit atom/bond
 walks + dict lookups + set math; the function is pure (no global state, no mol
 mutation — the NP dispatch calls the path twice, Pitfall 5).

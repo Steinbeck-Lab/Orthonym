@@ -1,4 +1,4 @@
-"""Pseudoketone routing for acyl-on-ring-nitrogen "hidden amides" (Fix 3,
+"""Pseudoketone routing for acyl-on-ring-nitrogen "hidden amides" (DD1 Fix 3,
 Blue Book P-66.1.3 / P-64.3.2 / P-66.1.4.3).
 
 An acyl group on a *ring-system* nitrogen (or any skeletal heteroatom that is not
@@ -7,9 +7,9 @@ ring parent hydride, so the C=O carbon becomes the principal group as a KETONE
 (pseudoketone) and the ring fragment is cited as an N-yl substituent on the
 carbonyl carbon::
 
-    CC(=O)N1CCCCC1 -> 1-(piperidin-1-yl)ethan-1-one (P-66.1.3)
-    CCC(=O)N1CCCCC1 -> 1-(piperidin-1-yl)propan-1-one
-    CC(=S)N1CCCC1 -> 1-(pyrrolidin-1-yl)ethane-1-thione (P-66.1.4.3)
+    CC(=O)N1CCCCC1   -> 1-(piperidin-1-yl)ethan-1-one      (P-66.1.3)
+    CCC(=O)N1CCCCC1  -> 1-(piperidin-1-yl)propan-1-one
+    CC(=S)N1CCCC1    -> 1-(pyrrolidin-1-yl)ethane-1-thione  (P-66.1.4.3)
 
 Detection is on the original graph: the amide N must be a RING member and the
 carbonyl carbon must be EXOCYCLIC to that ring (so a lactam, whose C=O is itself
@@ -29,6 +29,7 @@ from typing import Any, Optional, Tuple
 from ..assembly.naming_utils import apply_vowel_elision
 from ..data.chain_names import get_chain_prefix
 from ..perception.chains import find_longest_carbon_chain
+from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .ring_substituents import name_ring_system_substituent
 
 # Amide-family principal groups that can be a hidden amide (the N is bonded to
@@ -190,7 +191,7 @@ def name_pseudoketone(features: Any, style: str = "pin") -> Optional[str]:
         return None
 
     length = len(chain)
-    base = f"{get_chain_prefix(length)}ane"  # 'ethane', 'propane',...
+    base = f"{get_chain_prefix(length)}ane"  # 'ethane', 'propane', ...
     joined = apply_vowel_elision(base, ketone_suffix)  # 'ethanone' / 'ethanethione'
     stem_part = joined[: len(joined) - len(ketone_suffix)]  # 'ethan' / 'ethane'
     parent = f"{stem_part}-1-{ketone_suffix}"  # 'ethan-1-one' / 'ethane-1-thione'
@@ -217,7 +218,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
     _HUBS = {'Si', 'Ge', 'P', 'As'}
@@ -230,7 +231,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
     _ALL_HUBS = _HUBS | _CHALCOGEN_HUBS
 
     carbonyls = []
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != 'C' or atom.IsInRing():
             continue
         oxo = hub = chain_c = None
@@ -333,16 +334,16 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             if len(hub_frag) == 1:
                 hubyl = base
         else:
-            # P3: the organyl guard is the shared chokepoint, so a hub organyl
+            # the organyl guard is the shared chokepoint, so a hub organyl
             # may now be cyclic, branched, unsaturated or long — and its prefix may
-            # carry locants, a retained italicized prefix, or its own marks. The
+            # carry locants, a retained italicized prefix, or its own marks.  The
             # hub is a MONONUCLEAR skeleton, so composition follows P-16.5.1.3.1
             # (BB 7272, verbatim): "the first cited substituent never has enclosing
-            # marks unless it includes a locant. The second and further
+            # marks unless it includes a locant.  The second and further
             # substituents are each enclosed with parentheses even for simple
-            # substituents. When the simple substituent groups are accompanied by
+            # substituents.  When the simple substituent groups are accompanied by
             # multiplicative prefixes such as 'di' and 'tri', the multiplicative
-            # prefixes are not included in the parentheses." BB 39228
+            # prefixes are not included in the parentheses."  BB 39228
             # `4-[ethyl(methyl)phosphanyl]-1H-imidazole` (PIN) shows the rule
             # holding for this SUBSTITUENT-PREFIX shape (silyl analogue: BB 3545
             # `3-[amino(methyl)silyl]...` (PIN)), which is why the bare-concatenated
@@ -353,10 +354,12 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             # carve-out (P-16.3.4) and the mark escalation (P-16.5.4.1).
             from collections import Counter
 
-            from ..assembly.naming_utils import (apply_enclosing_marks,
-                                                 enclose_if_compound,
-                                                 multiplied_component,
-                                                 prefix_citation_sort_key)
+            from ..assembly.naming_utils import (
+                apply_enclosing_marks,
+                enclose_if_compound,
+                multiplied_component,
+                prefix_citation_sort_key,
+            )
             from .substituent_purity import organyl_prefix_name
             names = []
             for n in organyls:
@@ -365,7 +368,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
                     return None
                 names.append(nm)
             counts = Counter(names)
-            # P3-CLOSEOUT Item A: arity bound local, multiplier word from
+            # Item A: arity bound local, multiplier word from
             # the shared primitive (P-16.3.5(a) bis/tris when SUBSTITUTED).
             _SUPPORTED_COUNTS = frozenset((1, 2, 3))
             parts = []
@@ -380,8 +383,8 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
     if not hubyl:
         return None
     # Compound hub names take enclosing marks (1-(trimethylsilyl)propan-2-one
-    # engine precedent); the bare silyl/phosphanyl forms stay unmarked. The marks
-    # ESCALATE (-> [ over an inner pair (P-16.5.4.1), which a raw f"({hubyl})"
+    # engine precedent); the bare silyl/phosphanyl forms stay unmarked.  The marks
+    # ESCALATE ( -> [ over an inner pair (P-16.5.4.1), which a raw f"({hubyl})"
     # could not do: BB 39228 writes `[ethyl(methyl)phosphanyl]`, never
     # `(ethyl(methyl)phosphanyl)`.
     from ..assembly.naming_utils import apply_enclosing_marks as _marks
@@ -423,12 +426,12 @@ def name_acyl_chalcogenchain_pseudoketone(mol) -> Optional[str]:
     from rdkit import Chem
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
     carbonyls = []
-    for atom in mol.GetAtoms():
+    for atom in atoms_of(mol):
         if atom.GetSymbol() != "C" or atom.IsInRing():
             continue
         oxo = hub = chain_c = None
@@ -508,7 +511,7 @@ def name_acyl_chalcogenchain_pseudoketone(mol) -> Optional[str]:
     # Whole molecule = acyl chain + oxo + chalcogen chain (+H).
     covered = chain_set | {oxo.GetIdx()} | hub_frag
     if any(a.GetIdx() not in covered
-           for a in mol.GetAtoms() if a.GetAtomicNum() > 1):
+           for a in atoms_of(mol) if a.GetAtomicNum() > 1):
         return None
 
     n = len(chain_idxs)

@@ -27,18 +27,17 @@ Numbering rules:
 6. Number secondary bridges (from higher-numbered bridgehead)
 """
 
-from typing import List, Optional, Set, Tuple, Dict
 from collections import deque
+from typing import Dict, List, Optional, Set, Tuple
+
 from rdkit import Chem
 
 from .polycyclic_bridged import (
-    get_ring_count,
     classify_bridged_system,
     find_all_bridgeheads,
     get_ring_atoms,
-    BridgeInfo,
+    get_ring_count,
 )
-
 
 # ============================================================================
 # Alkane Parent Names
@@ -76,10 +75,10 @@ def _get_alkane_name(carbon_count: int) -> str:
 def is_tricyclo_system(mol) -> bool:
     """
     Check if molecule is a tricyclo (3-ring bridged) system.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         True if molecule has exactly 3 rings
     """
@@ -93,27 +92,27 @@ def is_tricyclo_system(mol) -> bool:
 def _find_main_bicyclic_skeleton(mol, bridgeheads: Set[int]) -> Optional[Dict]:
     """
     Identify the main bicyclic skeleton within a tricyclo system.
-
+    
     The main skeleton consists of:
     - Two "main" bridgeheads (furthest apart)
     - The largest ring containing them
     - The primary bridge between them
-
+    
     Returns:
         Dict with 'main_bh1', 'main_bh2', 'main_ring_atoms', 'main_bridge'
     """
     ring_atoms = get_ring_atoms(mol)
-    
+
     # For tricyclic systems like adamantane, we need to find paths that may
     # pass through other bridgeheads. Use SSSR (smallest rings)
     ri = mol.GetRingInfo()
     rings = ri.AtomRings()
-    
+
     # Find the largest ring containing exactly 2 bridgeheads
     best_ring = None
     best_size = 0
     ring_bridgeheads = None
-    
+
     for ring in rings:
         ring_set = set(ring)
         bhs_in_ring = ring_set & bridgeheads
@@ -121,30 +120,30 @@ def _find_main_bicyclic_skeleton(mol, bridgeheads: Set[int]) -> Optional[Dict]:
             best_size = len(ring)
             best_ring = list(ring)
             ring_bridgeheads = list(bhs_in_ring)
-    
+
     if not best_ring or not ring_bridgeheads:
         return None
-    
+
     # Pick first two bridgeheads in the ring as main bridgeheads
     bh1, bh2 = ring_bridgeheads[0], ring_bridgeheads[1]
-    
+
     # Find the two paths between these bridgeheads within the ring
     # Split the ring at the bridgeheads
     bh1_idx = best_ring.index(bh1)
     bh2_idx = best_ring.index(bh2)
-    
+
     # Ensure bh1_idx < bh2_idx
     if bh1_idx > bh2_idx:
         bh1_idx, bh2_idx = bh2_idx, bh1_idx
         bh1, bh2 = bh2, bh1
-    
+
     # Two branches of the ring
     branch1 = best_ring[bh1_idx:bh2_idx+1]  # From bh1 to bh2
     branch2 = best_ring[bh2_idx:] + best_ring[:bh1_idx+1]  # From bh2 back to bh1
-    
+
     # Find the main bridge (third path not in the ring)
     main_bridge = _find_bridge_between(mol, bh1, bh2, ring_atoms, set(best_ring))
-    
+
     return {
         'main_bh1': bh1,
         'main_bh2': bh2,
@@ -157,38 +156,38 @@ def _find_main_bicyclic_skeleton(mol, bridgeheads: Set[int]) -> Optional[Dict]:
 def _find_bridge_between(
     mol,
     bh1: int,
-    bh2: int, 
+    bh2: int,
     ring_atoms: Set[int],
     exclude_atoms: Set[int]
 ) -> Optional[List[int]]:
     """Find a bridge path between two bridgeheads, excluding certain atoms."""
     queue = deque([(bh1, [bh1])])
-    
+
     while queue:
         current, path = queue.popleft()
-        
+
         if current == bh2 and len(path) > 1:
             return path
-        
+
         if len(path) > 10:
             continue
-            
+
         atom = mol.GetAtomWithIdx(current)
         for neighbor in atom.GetNeighbors():
             n_idx = neighbor.GetIdx()
-            
+
             if n_idx in path and n_idx != bh2:
                 continue
-            
+
             if n_idx not in ring_atoms:
                 continue
-            
+
             # Skip atoms in the main ring (except endpoints)
             if n_idx in exclude_atoms and n_idx not in (bh1, bh2):
                 continue
-            
+
             queue.append((n_idx, path + [n_idx]))
-    
+
     return None
 
 
@@ -201,39 +200,39 @@ def _find_paths_between_bridgeheads(
 ) -> List[List[int]]:
     """
     Find all simple paths between two bridgeheads.
-
+    
     Paths don't pass through other bridgeheads.
     """
     all_paths: List[List[int]] = []
     queue = deque([(start, [start])])
-    
+
     while queue:
         current, path = queue.popleft()
-        
+
         if current == end and len(path) > 1:
             all_paths.append(path)
             continue
-        
+
         # Limit path length to prevent infinite loops
         if len(path) > 20:
             continue
-        
+
         atom = mol.GetAtomWithIdx(current)
         for neighbor in atom.GetNeighbors():
             n_idx = neighbor.GetIdx()
-            
+
             if n_idx in path and n_idx != end:
                 continue
-            
+
             if n_idx not in ring_atoms:
                 continue
-            
+
             # Don't pass through other bridgeheads
             if n_idx in bridgeheads and n_idx != end:
                 continue
-            
+
             queue.append((n_idx, path + [n_idx]))
-    
+
     return all_paths
 
 
@@ -244,47 +243,47 @@ def _find_paths_between_bridgeheads(
 def generate_tricyclo_descriptor(mol) -> Optional[str]:
     """
     Generate the tricyclo[a.b.c.d^e,f] descriptor for a molecule.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Descriptor string like "tricyclo[3.3.1.1^3,7]", or None
-
+        
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
         >>> generate_tricyclo_descriptor(mol)
         'tricyclo[3.3.1.1^3,7]'
     """
     if not is_tricyclo_system(mol):
         return None
-    
+
     bridgeheads = find_all_bridgeheads(mol)
     skeleton = _find_main_bicyclic_skeleton(mol, bridgeheads)
-    
+
     if not skeleton:
         return None
-    
+
     # Calculate bridge lengths (exclude bridgeheads)
     branch1_len = len(skeleton['branch1']) - 2  # Exclude both bridgeheads
     branch2_len = len(skeleton['branch2']) - 2
-    
+
     # Sort so first is >= second
     if branch2_len > branch1_len:
         branch1_len, branch2_len = branch2_len, branch1_len
-    
+
     main_bridge_len = 0
     if skeleton['main_bridge']:
         main_bridge_len = len(skeleton['main_bridge']) - 2
-    
+
     # For secondary bridge, we need to find the third connection
     # This is more complex and requires full numbering
     # For now, use simplified approach
     secondary_bridge_len = _find_secondary_bridge_length(mol, skeleton, bridgeheads)
-    
+
     # Generate numbering to find locants
     numbering = get_tricyclo_numbering(mol)
-    
+
     if numbering and secondary_bridge_len > 0:
         # Find secondary bridge locants
         sec_locants = _find_secondary_bridge_locants(mol, skeleton, bridgeheads, numbering)
@@ -294,30 +293,30 @@ def generate_tricyclo_descriptor(mol) -> Optional[str]:
             loc_str = str(secondary_bridge_len)
     else:
         loc_str = str(secondary_bridge_len) if secondary_bridge_len >= 0 else "0"
-    
+
     return f"tricyclo[{branch1_len}.{branch2_len}.{main_bridge_len}.{loc_str}]"
 
 
 def _find_secondary_bridge_length(mol, skeleton: Dict, bridgeheads: Set[int]) -> int:
     """
     Find the length of the secondary bridge (third ring closure).
-
+    
     The secondary bridge connects the third ring to the main skeleton.
     """
     ring_atoms = get_ring_atoms(mol)
     main_atoms = set(skeleton['branch1'] + skeleton['branch2'])
-    
+
     if skeleton['main_bridge']:
         main_atoms.update(skeleton['main_bridge'])
-    
+
     # Find bridgeheads not in main skeleton
     other_bhs = [bh for bh in bridgeheads if bh not in {skeleton['main_bh1'], skeleton['main_bh2']}]
-    
+
     if not other_bhs:
         # All bridgeheads are in main skeleton
         # Secondary bridge is likely 0-length (direct connection)
         return 0
-    
+
     # Find path from main skeleton to other bridgeheads
     for other_bh in other_bhs:
         for main_bh in [skeleton['main_bh1'], skeleton['main_bh2']]:
@@ -325,7 +324,7 @@ def _find_secondary_bridge_length(mol, skeleton: Dict, bridgeheads: Set[int]) ->
             if paths:
                 # Return shortest path length
                 return min(len(p) - 2 for p in paths)
-    
+
     return 0
 
 
@@ -340,21 +339,21 @@ def _find_secondary_bridge_locants(
     """
     main_bhs = {skeleton['main_bh1'], skeleton['main_bh2']}
     other_bhs = [bh for bh in bridgeheads if bh not in main_bhs]
-    
+
     if not other_bhs:
         return None
-    
+
     # Find the locants for the secondary bridge connections
     # This is a simplification - full implementation needs path tracing
     locants = []
     for bh in other_bhs[:2]:  # Take first two
         if bh in numbering:
             locants.append(numbering[bh])
-    
+
     if len(locants) >= 2:
         locants.sort()
         return (locants[0], locants[1])
-    
+
     return None
 
 
@@ -365,69 +364,69 @@ def _find_secondary_bridge_locants(
 def get_tricyclo_numbering(mol) -> Optional[Dict[int, int]]:
     """
     Generate IUPAC numbering for a tricyclo system.
-
+    
     Numbering rules:
     1. Start at one main bridgehead (position 1)
     2. Number along longer branch of main ring to other bridgehead
     3. Number back along shorter branch toward position 1
     4. Number main bridge atoms
     5. Number secondary bridge atoms
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Dict mapping atom_idx -> IUPAC locant (1-indexed), or None
     """
     if not is_tricyclo_system(mol):
         return None
-    
+
     bridgeheads = find_all_bridgeheads(mol)
     skeleton = _find_main_bicyclic_skeleton(mol, bridgeheads)
-    
+
     if not skeleton:
         return None
-    
+
     atom_to_locant: Dict[int, int] = {}
     current_locant = 1
-    
+
     # Position 1: first main bridgehead
     bh1 = skeleton['main_bh1']
     atom_to_locant[bh1] = current_locant
     current_locant += 1
-    
+
     # Number along longer branch (excluding bridgeheads)
     branch1 = skeleton['branch1']
     for atom_idx in branch1[1:-1]:  # Exclude bridgeheads at ends
         atom_to_locant[atom_idx] = current_locant
         current_locant += 1
-    
+
     # Second bridgehead
     bh2 = skeleton['main_bh2']
     atom_to_locant[bh2] = current_locant
     current_locant += 1
-    
+
     # Number along shorter branch (excluding already numbered)
     branch2 = skeleton['branch2']
     for atom_idx in branch2[1:-1]:
         if atom_idx not in atom_to_locant:
             atom_to_locant[atom_idx] = current_locant
             current_locant += 1
-    
+
     # Number main bridge (if any atoms)
     if skeleton['main_bridge']:
         for atom_idx in skeleton['main_bridge'][1:-1]:
             if atom_idx not in atom_to_locant:
                 atom_to_locant[atom_idx] = current_locant
                 current_locant += 1
-    
+
     # Number secondary bridges
     ring_atoms = get_ring_atoms(mol)
     for atom_idx in ring_atoms:
         if atom_idx not in atom_to_locant:
             atom_to_locant[atom_idx] = current_locant
             current_locant += 1
-    
+
     return atom_to_locant
 
 
@@ -438,15 +437,15 @@ def get_tricyclo_numbering(mol) -> Optional[Dict[int, int]]:
 def name_tricyclo_system(mol) -> Optional[str]:
     """
     Generate the full IUPAC name for a tricyclo system.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Full IUPAC name like "tricyclo[3.3.1.1^3,7]decane", or None
-
+        
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3') # adamantane
+        >>> mol = Chem.MolFromSmiles('C1C2CC3CC1CC(C2)C3')  # adamantane
         >>> name_tricyclo_system(mol)
         'tricyclo[3.3.1.1^3,7]decane'
     """
@@ -455,21 +454,21 @@ def name_tricyclo_system(mol) -> Optional[str]:
     retained = get_retained_tricyclo_name(canonical)
     if retained:
         return retained
-    
+
     # Generate descriptor
     descriptor = generate_tricyclo_descriptor(mol)
     if not descriptor:
         return None
-    
+
     # Count carbons in ring system
     ring_atoms = get_ring_atoms(mol)
     carbon_count = sum(
         1 for idx in ring_atoms
         if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
     )
-    
+
     parent_name = _get_alkane_name(carbon_count)
-    
+
     return f"{descriptor}{parent_name}"
 
 
@@ -481,7 +480,7 @@ TRICYCLO_RETAINED_NAMES = {
     # Adamantane: tricyclo[3.3.1.1^3,7]decane
     'C1C2CC3CC1CC(C2)C3': 'adamantane',
     'C1C2CC3CC(C2)CC1C3': 'adamantane',  # Alternative SMILES
-    
+
     # Twistane: tricyclo[4.4.0.0^3,8]decane
     'C1CC2CC3CCCC1C23': 'twistane',
 }
@@ -490,10 +489,10 @@ TRICYCLO_RETAINED_NAMES = {
 def get_retained_tricyclo_name(canonical_smiles: str) -> Optional[str]:
     """
     Look up retained name for a tricyclo compound.
-
+    
     Args:
         canonical_smiles: Canonical SMILES string
-
+        
     Returns:
         Retained name if found, None otherwise
     """
@@ -501,9 +500,9 @@ def get_retained_tricyclo_name(canonical_smiles: str) -> Optional[str]:
     mol = Chem.MolFromSmiles(canonical_smiles)
     if not mol:
         return None
-    
+
     canonical = Chem.CanonSmiles(Chem.MolToSmiles(mol))
-    
+
     # Check each retained name
     for smiles, name in TRICYCLO_RETAINED_NAMES.items():
         ref_mol = Chem.MolFromSmiles(smiles)
@@ -511,7 +510,7 @@ def get_retained_tricyclo_name(canonical_smiles: str) -> Optional[str]:
             ref_canonical = Chem.CanonSmiles(Chem.MolToSmiles(ref_mol))
             if canonical == ref_canonical:
                 return name
-    
+
     return None
 
 
@@ -527,29 +526,29 @@ def is_retained_tricyclo(canonical_smiles: str) -> bool:
 def generate_polycyclo_descriptor(mol) -> Optional[str]:
     """
     Generate descriptor for any bridged polycyclic system.
-
+    
     Handles bicyclo, tricyclo, tetracyclo, etc.
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         Descriptor string or None
     """
     classification = classify_bridged_system(mol)
-    
+
     if classification == 'bicyclo':
         # Use existing bicyclo module
         from .bicyclo import generate_bicyclo_descriptor
         return generate_bicyclo_descriptor(mol)
-    
+
     if classification == 'tricyclo':
         return generate_tricyclo_descriptor(mol)
-    
+
     # For tetracyclo and higher, use generalized algorithm
     if classification:
         return _generate_higher_polycyclo_descriptor(mol, classification)
-    
+
     return None
 
 
@@ -590,18 +589,18 @@ def _ring_path_length(ring: Tuple[int, ...], bh1: int, bh2: int) -> int:
     ring_list = list(ring)
     if bh1 not in ring_list or bh2 not in ring_list:
         return -1
-    
+
     idx1 = ring_list.index(bh1)
     idx2 = ring_list.index(bh2)
-    
+
     # Ensure idx1 < idx2
     if idx1 > idx2:
         idx1, idx2 = idx2, idx1
-    
+
     # Two possible paths: direct and wrap-around
     path1_len = idx2 - idx1 - 1  # Atoms between (exclusive)
     path2_len = len(ring_list) - idx2 + idx1 - 1  # Wrap around
-    
+
     return max(path1_len, path2_len)
 
 
@@ -626,7 +625,7 @@ def name_polycyclo_system(mol) -> Optional[str]:
     if classification == 'tricyclo':
         return name_tricyclo_system(mol)
 
-    # routing: ≥4-ring (tetracyclo / pentacyclo / higher)
+    # Phase 151 routing: ≥4-ring (tetracyclo / pentacyclo / higher)
     # systems delegate to the dedicated polycyclic_von_baeyer module which
     # owns is_higher_polycyclo + name_higher_polycyclo + the
     # cascade-step-6 supplier. See 151-AUDIT-A.md verdict THIN_WRAPPER.
@@ -779,40 +778,40 @@ def _generate_heteroatom_prefix(
 def name_polycyclo_with_functional_groups(mol) -> Optional[str]:
     """
     Name a polycyclic system that also has functional groups.
-
+    
     This handles cases like the diterpenoid where we have:
     - Hexacyclo ring system
     - Multiple ester groups
     - Lactone ring
-
+    
     Args:
         mol: RDKit Mol object
-
+        
     Returns:
         IUPAC name combining polycyclic parent with functional group suffixes
     """
     from .polycyclic_bridged import analyze_polycyclic_system
-    
+
     info = analyze_polycyclic_system(mol)
     if not info:
         return None
-    
+
     # Get base polycyclic name
     base_name = name_polycyclo_system(mol)
     if not base_name:
         return None
-    
+
     # Detect functional groups
     from ..perception.functional_groups import detect_functional_groups
     fgs = detect_functional_groups(mol)
-    
+
     # Find principal group
     from .seniority import get_principal_group
     pg_name, pg_atoms = get_principal_group(mol, fgs)
-    
+
     if not pg_name or pg_name == 'hydrocarbon':
         return base_name
-    
+
     # For esters, format as "X-yl Y-oate"
     if pg_name == 'ester':
         # Count esters
@@ -821,7 +820,7 @@ def name_polycyclo_with_functional_groups(mol) -> Optional[str]:
             return f"{base_name}yl acetate"
         else:
             return f"{base_name} {_get_ester_suffix(ester_count)}"
-    
+
     # For carboxylic acids
     if pg_name == 'carboxylic_acid':
         acid_count = len(fgs.get('carboxylic_acid', []))
@@ -829,7 +828,7 @@ def name_polycyclo_with_functional_groups(mol) -> Optional[str]:
             return f"{base_name}oic acid"
         elif acid_count == 2:
             return f"{base_name}dioic acid"
-    
+
     # For alcohols - use IUPAC multiplicative prefixes (di, tri, tetra, etc.)
     if pg_name == 'alcohol':
         oh_count = len(fgs.get('alcohol', []))
@@ -846,7 +845,7 @@ def name_polycyclo_with_functional_groups(mol) -> Optional[str]:
             }
             mult = _OH_MULTIPLIERS.get(oh_count, f"{oh_count}")
             return f"{base_name}{_join_multiplied_suffix(mult, 'ol')}"
-    
+
     return base_name
 
 

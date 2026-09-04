@@ -12,12 +12,12 @@ IUPAC P-66.6.6.2: peptide naming convention uses N->C direction,
 with acyl (glycyl, alanyl...) forms for all residues except C-terminal.
 
 Examples (P-103.3.4 omits the L descriptor for Table-10.4 amino acids):
-    Gly-Gly -> glycylglycine
-    L-Ala-Gly -> alanylglycine
+    Gly-Gly         -> glycylglycine
+    L-Ala-Gly       -> alanylglycine
     Gly-L-Ala-L-Leu -> glycylalanylleucine
-    D-Ala-Gly -> D-alanylglycine (D IS cited)
+    D-Ala-Gly       -> D-alanylglycine   (D IS cited)
 
- (breadth, phase2e --):
+, phase2e SPY --):
 two ADDITIVE fallbacks, tried only when the flat acylamino convention above
 declines, and gated behind an explicit OPSIN round-trip (``_rt_verified``) so
 a table/topology miss degrades to abstention, never a wrong or atom-dropping
@@ -34,12 +34,12 @@ name (0-wrong ABSOLUTE):
   among the standard 20) -- glutathione's linkage type. Builds the fully
   SYSTEMATIC substitutive acyl/amido construction (P-66.1.1.4.3) instead of
   the flat chain shorthand, because OPSIN's flat-chain grammar mis-parses a
-  non-retained continuing acyl word (-verified) and a bare 'glutamyl'
+  non-retained continuing acyl word (SPY-verified) and a bare 'glutamyl'
   shorthand imposes an L-configuration OPSIN does not know is undefined.
 
- L3-2e (stereo honesty): P-103.1.3.1 "The stereodescriptors 'D'
+: P-103.1.3.1 "The stereodescriptors 'D'
 and 'L'" (BlueBookV2.md:54291) -- "The stereodescriptor 'xi' (Greek letter
-xi) indicates unknown configuration" -- and P-103.3.4 itself (54715) --
+xi) indicates unknown configuration" -- and P-103.3.4 itself (:54715) --
 "A residue of unknown configuration is indicated by the prefix xi". A bare
 retained residue name is therefore NOT a safe default for an undefined
 alpha-carbon: the flat acylamino path (``_identify_residues`` with
@@ -50,9 +50,9 @@ B's donor-residue recovery is deliberately exempt: it builds its own
 locant-based descriptor and already treats an unresolved centre as "omit the
 descriptor" with no implied configuration.
 
-:.0 (dispatch SMARTS fix) +.1 (Lever C, capped
+: Task 2.0 (dispatch SMARTS fix) + Task 2.1 (Lever C, capped
 termini -- ``_try_capped_termini``) closed the two largest decline buckets.
-.2 adds ``_try_backbone_substitutive``, the general BACKBONE-
+Task 2.2 adds ``_try_backbone_substitutive``, the general BACKBONE-
 SUBSTITUTIVE producer for the residual (giant / non-standard-residue
 chains): the C-terminal residue's own free acid is the parent, and every
 other residue is folded in one at a time (PREPEND for a standard/closed
@@ -64,24 +64,24 @@ C-terminus, or a genuine side-chain acid on a non-parent residue -- the
 "side-chain-acid trap") ABSTAINS rather than misplace an amidation.
 """
 
-from typing import Optional, List, Dict, Tuple
 import re
+from typing import Dict, List, Optional, Tuple
+
 from rdkit import Chem
-from ..perception.stereo import assign_stereochemistry
+
 from ..data.amino_acids import (
     STANDARD_AMINO_ACIDS,
-    AMINO_ACID_ACYL_NAMES,
-    get_amino_acid_name,
     get_amino_acid_acyl_name,
+    get_amino_acid_name,
 )
-
+from ..perception.stereo import assign_stereochemistry
 
 # SMARTS patterns
 # Peptide bond: carbonyl_C - amide_N. H1 is the ordinary secondary-amide backbone
 # bond; H0 also admits the TERTIARY amide formed when a cyclic imino acid (proline,
 # hydroxyproline) is the AMINE component — its ring N loses its only H on bonding,
 # so `[NX3;H1]` alone missed every X-Pro / X-Pro-Y peptide (`alanyl-L-proline`,
-# `Glu-Pro-Phe`,...). Proline as the ACYL (N-terminal) residue already worked.
+# `Glu-Pro-Phe`, ...). Proline as the ACYL (N-terminal) residue already worked.
 # Broadening to H0 is safe: `_is_alpha_carboxyl_bond` still requires the bond be
 # alpha on BOTH sides, and `_extract_residues`/`_identify_residues` fail closed
 # unless every cleaved fragment reconstructs to a STANDARD amino acid — so an
@@ -166,14 +166,14 @@ def name_peptide(mol) -> Optional[str]:
     # Step 1: Verify this is a true peptide
     if not _is_valid_peptide(mol):
         # Lever A: an acylated (non-free) N-terminus may still be a
-        # nameable N-acyl-capped peptide (§3a). Fails closed to None
+        # nameable N-acyl-capped peptide (SPY §3a). Fails closed to None
         # (unchanged behaviour) unless the cap is a genuine plain acyl group
         # AND the residues behind it are a fully standard >=2-residue chain
         # AND the assembled candidate OPSIN-round-trips to this exact mol.
         result = _rt_verified(mol, _try_n_acyl_cap(mol))
         if result is not None:
             return result
-        # .1 Lever C: a capped-terminus shape `_is_valid_peptide`
+        # Task 2.1 Lever C: a capped-terminus shape `_is_valid_peptide`
         # rejects for a DIFFERENT reason than Lever A covers -- most often a
         # C-terminal PRIMARY AMIDE (no free -COOH anywhere in the molecule,
         # so `_is_valid_peptide`'s COOH check fails and Lever A's own COOH
@@ -182,7 +182,7 @@ def name_peptide(mol) -> Optional[str]:
         result = _rt_verified(mol, _try_capped_termini(mol))
         if result is not None:
             return result
-        # .2: the general backbone-substitutive producer -- also
+        # Task 2.2: the general backbone-substitutive producer -- also
         # self-contained (re-walks via `_extract_residues`), tried last.
         return _rt_verified(mol, _try_backbone_substitutive(mol))
 
@@ -190,7 +190,7 @@ def name_peptide(mol) -> Optional[str]:
     residue_smiles_list = _extract_residues(mol)
     if residue_smiles_list is None or len(residue_smiles_list) < 2:
         # Lever B: a single non-alpha ('gamma'/'beta') bond from a
-        # standard amino acid's own side-chain carboxyl (§3b). Same
+        # standard amino acid's own side-chain carboxyl (SPY §3b). Same
         # fail-closed-to-None-unless-round-tripped guarantee as Lever A.
         return _rt_verified(mol, _try_gamma_link_whole(mol))
 
@@ -200,7 +200,7 @@ def name_peptide(mol) -> Optional[str]:
     # ``_identify_residues``'s docstring.
     named_residues = _identify_residues(residue_smiles_list, strict_stereo=True)
     if named_residues is None:
-        # .1 Lever C: the whole-molecule gate passed (free termini
+        # Task 2.1 Lever C: the whole-molecule gate passed (free termini
         # SMARTS matched -- a mono-N-methylated N-terminus is still `[NX3;H1]`,
         # so it slips through `_is_valid_peptide`'s free-NH2 check), but a
         # per-residue trivial-name lookup then failed -- typically the
@@ -211,7 +211,7 @@ def name_peptide(mol) -> Optional[str]:
         result = _rt_verified(mol, _try_capped_termini(mol))
         if result is not None:
             return result
-        # .2: the general backbone-substitutive producer -- also
+        # Task 2.2: the general backbone-substitutive producer -- also
         # self-contained, tried last (e.g. a non-standard/undefined-stereo
         # residue that made `_identify_residues` decline here).
         return _rt_verified(mol, _try_backbone_substitutive(mol))
@@ -220,11 +220,11 @@ def name_peptide(mol) -> Optional[str]:
     # was the one candidate-emission site in this file NOT verified against
     # the input mol -- every breadth lever (A/B, below) already routes
     # through `_rt_verified`, but the ORIGINAL flat/acylamino-convention path
-    # never did, because before.0 the dispatch predicate
+    # never did, because before Task 2.0 the dispatch predicate
     # (`amino_acids.is_peptide`) silently protected it from ever reaching a
     # C-terminal cyclic-imino-acid (proline) chain at all. Unblocking that
-    # dispatch (.0's SMARTS fix) now routes 9 more molecules here, and
-    # the Phase-0 measured 1/9 of them assembles a WRONG name (an
+    # dispatch (Task 2.0's SMARTS fix) now routes 9 more molecules here, and
+    # the Phase-0 SPY measured 1/9 of them assembles a WRONG name (an
     # 11-residue chain with an internal Gln + Asp -- likely a stereo/CIP
     # mis-mapping), caught only incidentally by a downstream gate today.
     # `_rt_verified` fails CLOSED on any mismatch/parse-error/no-OPSIN, so a
@@ -235,7 +235,7 @@ def name_peptide(mol) -> Optional[str]:
     result = _rt_verified(mol, candidate)
     if result is not None:
         return result
-    # .2: last resort when the flat candidate itself failed
+    # Task 2.2: last resort when the flat candidate itself failed
     # round-trip (a rare pre-existing bug elsewhere in this file, e.g. a
     # mis-mapped stereo prefix) -- self-contained, re-walks independently.
     return _rt_verified(mol, _try_backbone_substitutive(mol))
@@ -398,7 +398,7 @@ def _extract_residues(mol) -> Optional[List[str]]:
             return None
 
         cside_labels = set()  # labels on THIS residue's carbonyl C (its C-terminus)
-        nside_labels = set()  # labels on THIS residue's amide N (its N-terminus)
+        nside_labels = set()  # labels on THIS residue's amide N  (its N-terminus)
         for atom in frag.GetAtoms():
             if atom.GetAtomicNum() != 0:  # dummy only
                 continue
@@ -596,7 +596,7 @@ def _identify_residues(
 
         # STEREO HONESTY (P-103.1.3.1 "The stereodescriptors 'D' and 'L'",
         # BlueBookV2.md:54291, + P-103.3.4 "Indication of configuration in
-        # peptides",:54715): a bare retained residue name asserts a SPECIFIC
+        # peptides", :54715): a bare retained residue name asserts a SPECIFIC
         # configuration -- P-103.3.4's own text: "A residue of unknown
         # configuration is indicated by the prefix xi (Greek letter xi)".
         # Orthonym does not emit xi-prefixed names, so a residue whose
@@ -731,7 +731,7 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
       of Table-10.4 amino acids (the only ones Orthonym names -- non-standard
       residues fail closed in _identify_residues). Only 'D' is cited, at the front
       of each acyl group / name that has that configuration. (BB verbatim:
-      "The stereodescriptor 'L' is not indicated in the names... of peptides
+      "The stereodescriptor 'L' is not indicated in the names ... of peptides
       composed of amino acids listed in Table 10.4. In contrast, the
       stereodescriptor 'D' is indicated at the front of the acyl group or name of
       each component having that configuration.")
@@ -740,13 +740,13 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
       display rule applied here, so a standalone amino acid (P-103.1) still shows L.
 
     Examples (P-103.3.2 / P-103.3.4):
-        glycyl + glycine -> glycylglycine
-        L-alanyl + glycine -> alanylglycine
-        glycyl + L-alanine -> glycylalanine
-        L-alanyl + L-alanine -> alanylalanine
+        glycyl + glycine        -> glycylglycine
+        L-alanyl + glycine      -> alanylglycine
+        glycyl + L-alanine      -> glycylalanine
+        L-alanyl + L-alanine    -> alanylalanine
         L-valyl+L-tyrosyl+L-Ile -> valyltyrosylisoleucine
-        D-alanyl + glycine -> D-alanylglycine
-        glycyl + D-alanine -> glycyl-D-alanine
+        D-alanyl + glycine      -> D-alanylglycine
+        glycyl + D-alanine      -> glycyl-D-alanine
     """
     parts = []
     for i, res in enumerate(named_residues):
@@ -780,7 +780,7 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
 # donor (Lever B). Both are ADDITIVE fallbacks tried only after the ordinary
 # flat acylamino convention above declines, and both are gated by
 # ``_rt_verified`` -- a table/topology miss degrades to abstention, never a
-# wrong or atom-dropping name. See phase2e for the derivation and the
+# wrong or atom-dropping name. See phase2e SPY for the derivation and the
 # corpus-scale sizing.
 # ============================================================================
 
@@ -899,7 +899,7 @@ def _name_standard_chain(smi: str):
 
 
 def _try_n_acyl_cap(mol) -> Optional[str]:
-    """Lever A (§3a): name an N-acyl-capped peptide.
+    """Lever A (SPY §3a): name an N-acyl-capped peptide.
 
     Scoped to a cap in front of a genuine >=2-residue standard alpha chain
     (NOT a single free N-acyl amino acid, e.g. N-acetylglycine -- that shape
@@ -956,8 +956,8 @@ def _try_n_acyl_cap(mol) -> Optional[str]:
         return None
     remainder_name = _assemble_peptide_name(named)
 
-    from ..namer import Orthonym
     from ..errors import is_failure_name
+    from ..namer import Orthonym
     try:
         cap_acid_name = Orthonym(
             style="pin", _disable_opsin_validity_gate=True).name(cap_smi)
@@ -980,7 +980,7 @@ def _try_n_acyl_cap(mol) -> Optional[str]:
 # Table 10.4 -- mapped to the carbon-chain LENGTH from that side-chain
 # carboxyl (counted as C1) to the alpha carbon (inclusive of both ends).
 # Glutamic acid: C(=O)-CH2-CH2-CH(NH2)(COOH) -> 4 carbons ('butan-').
-# Aspartic acid: C(=O)-CH2-CH(NH2)(COOH) -> 3 carbons ('propan-').
+# Aspartic acid: C(=O)-CH2-CH(NH2)(COOH)      -> 3 carbons ('propan-').
 _OMEGA_CARBOXYL_CHAIN_LENGTH = {"glutamic acid": 4, "aspartic acid": 3}
 
 # The leading, ADDRESSABLE 'amino' substituent prefix of a parent/residue acid
@@ -1024,7 +1024,7 @@ def _swap_amino_for_amido(name: str, amido_group: str) -> Optional[str]:
     -> '1-(4-amino-4-carboxybutanamido)cyclopropane...', and (with a stereo
     descriptor on both sides) '(2S)-2-aminohexanoic acid' +
     '(2S)-2-aminopropanamido' -> '(2S)-2-[(2S)-2-aminopropanamido]hexanoic
-    acid'. The enclosing marks escalate (-> [ -> { when ``amido_group`` itself
+    acid'. The enclosing marks escalate ( -> [ -> { when ``amido_group`` itself
     already carries brackets (a stereodescriptor's parentheses), per
     P-16.5.4.1. Declines (returns None) when ``name`` has no addressable
     leading 'amino' -- ambiguous, so never guessed."""
@@ -1043,7 +1043,7 @@ def _name_gamma_acceptor(remainder_smi: str) -> Optional[Tuple[str, str]]:
         residue flat acylamino chain (via ``_name_standard_chain``) -- no
         'amino' token to swap, the acyl group is simply prepended.
       - 'swap': ``name`` is a NON-standard residue named via the general/
-        systematic namer (an already-existing capability, -verified),
+        systematic namer (an already-existing capability, SPY-verified),
         with a leading 'amino' substituent prefix to be replaced by the
         donor's acyl-amido group (validated by ``_swap_amino_for_amido``,
         called later by the caller once the acyl-amido text is built).
@@ -1053,8 +1053,8 @@ def _name_gamma_acceptor(remainder_smi: str) -> Optional[Tuple[str, str]]:
     if named is not None:
         return named, 'flat'
 
-    from ..namer import Orthonym
     from ..errors import is_failure_name
+    from ..namer import Orthonym
     try:
         general_name = Orthonym(
             style="pin", _disable_opsin_validity_gate=True).name(remainder_smi)
@@ -1094,7 +1094,7 @@ def _find_single_nonalpha_bond(mol) -> Optional[Tuple[int, int]]:
 
 
 def _try_gamma_donor_link(mol, carbonyl_c: int, amide_n: int) -> Optional[str]:
-    """Lever B core (§3b): build the systematic acyl/amido construction
+    """Lever B core (SPY §3b): build the systematic acyl/amido construction
     for a single gamma/beta side-chain-carboxyl amide bond. Returns an
     UNVERIFIED candidate string; the caller gates it through ``_rt_verified``.
     """
@@ -1121,8 +1121,8 @@ def _try_gamma_donor_link(mol, carbonyl_c: int, amide_n: int) -> Optional[str]:
     cip_letter = {"L-": "S", "D-": "R", "": None}.get(donor_stereo)
     stereo_prefix = f"({n}{cip_letter})-" if cip_letter else ""
 
-    from ..data.chain_names import get_chain_prefix
     from ..assembly.substituent_naming import acyl_carbons_to_amido_prefix
+    from ..data.chain_names import get_chain_prefix
     stem = get_chain_prefix(n)
     amido_stem = acyl_carbons_to_amido_prefix(n)
     if not stem or amido_stem is None:
@@ -1156,17 +1156,17 @@ def _try_gamma_link_whole(mol) -> Optional[str]:
 
 
 # ============================================================================
-# .1: Lever C -- capped termini. Extends the flat acylamino
-# convention to accept two shapes the ordinary path declines on (
+# Task 2.1: Lever C -- capped termini. Extends the flat acylamino
+# convention to accept two shapes the ordinary path declines on (SPY:
 # sec.3 -- 71% of the true-
 # peptide backlog is exactly one or both of these, the single dominant
 # blocker):
-# - a C-TERMINAL PRIMARY AMIDE (``-C(=O)NH2``) instead of the free
-# ``-COOH`` the acylamino convention assumes -- rendered as the standard
-# amino-acid-amide suffix ("...amide", e.g. ``glycinamide``).
-# - a mono-N-METHYLATED (free, non-acylated) N-terminus -- rendered as an
-# "N-methyl" substituent prefix on the whole assembled name (the same
-# convention as the well-known ``N-methyl-D-aspartic acid``).
+#   - a C-TERMINAL PRIMARY AMIDE (``-C(=O)NH2``) instead of the free
+#     ``-COOH`` the acylamino convention assumes -- rendered as the standard
+#     amino-acid-amide suffix ("...amide", e.g. ``glycinamide``).
+#   - a mono-N-METHYLATED (free, non-acylated) N-terminus -- rendered as an
+#     "N-methyl" substituent prefix on the whole assembled name (the same
+#     convention as the well-known ``N-methyl-D-aspartic acid``).
 # Both caps are stripped from an ISOLATED COPY of just the one residue
 # fragment they live on (never the whole molecule) -- ``_extract_residues``
 # already walks the backbone and hands back each residue's OWN reconstructed
@@ -1206,7 +1206,7 @@ _PRIMARY_CARBOXAMIDE_SMARTS = "[CX3](=O)[NX3H2]"
 # the true parent suffix, and the flat acylamino convention has no way to
 # express that (it would need a `carbamoyl`-prefix construction instead of
 # a suffix swap). Explicitly excluded rather than relying solely on the
-# RT-gate to catch the resulting wrong-shaped name (the the contributor guide-flagged
+# RT-gate to catch the resulting wrong-shaped name (the CLAUDE.md-flagged
 # "side-chain-acid trap"). Asparagine/glutamine are listed defensively too
 # (their OWN side-chain amide already makes `_strip_terminal_amide` decline
 # via the two-match ambiguity above; this is belt-and-suspenders).
@@ -1332,7 +1332,7 @@ def _try_capped_termini(mol) -> Optional[str]:
     if amide_applied:
         cterm_name = named[-1]['name']
         if cterm_name in _COMPETING_SIDE_CHAIN_AMINO_ACIDS:
-            # Side-chain-acid trap (the contributor guide): the free side-chain acid/
+            # Side-chain-acid trap (CLAUDE.md): the free side-chain acid/
             # amide would outrank a suffix-amide swap under P-41 seniority.
             # Abstain rather than misplace.
             return None
@@ -1354,11 +1354,11 @@ def _try_capped_termini(mol) -> Optional[str]:
 
 
 # ============================================================================
-# .2: the general BACKBONE-SUBSTITUTIVE producer -- the
+# Task 2.2: the general BACKBONE-SUBSTITUTIVE producer -- the
 # real breadth lever for the ~214-row residual (giant / non-standard-residue
 # peptides Levers A/B/C cannot name). Tried LAST, only when every path above
 # has declined. See and the
-# plan's.2 for the derivation.
+# plan's Phase 2 Task 2.2 for the derivation.
 #
 # Mechanism (P-66.6.6 generalised to a non-standard/mixed chain): the
 # C-TERMINAL residue's own free acid is the parent (P-41 senior principal
@@ -1388,7 +1388,7 @@ def _try_capped_termini(mol) -> Optional[str]:
 # another residue conservatively ABSTAINS rather than guess; this is the
 # SAME conservative behaviour Lever B already has, reused unchanged).
 #
-# Side-chain-acid trap (the contributor guide; 57/226 backlog carry >=2 free -COOH): the
+# Side-chain-acid trap (CLAUDE.md; 57/226 backlog carry >=2 free -COOH): the
 # parent must carry EXACTLY one free -COOH, and every OTHER residue's own
 # isolated fragment must ALSO show exactly one (the one `_extract_residues`
 # artificially frees at its own alpha-carboxyl cut point) -- an ADDITIONAL
@@ -1453,8 +1453,8 @@ def _resolve_free_residue_acid_name(
             atom.SetIsotope(0)
     clean_smi = Chem.MolToSmiles(mol, canonical=True)
 
-    from ..namer import Orthonym
     from ..errors import is_failure_name
+    from ..namer import Orthonym
     kwargs = dict(style="pin", _disable_opsin_validity_gate=True)
     if systematic:
         kwargs["_seed_excluded_dispatch_classes"] = ["amino_acid"]
@@ -1498,7 +1498,7 @@ def _systematic_amido_form(smi: str) -> Optional[str]:
 
 def _name_ester_parent_systematic(parent_frag) -> Optional[str]:
     """Fully SYSTEMATIC name of a C-terminal ESTER parent (exactly one
-    -C(=O)-O-C ester and NO free -COOH) as '<alkyl>...oate', with an
+    -C(=O)-O-C ester and NO free -COOH) as '<alkyl> ...oate', with an
     addressable leading '(stereo)-N-amino' splice point exposed. Built by
     reconstructing the parent's OWN free acid, naming it systematically, and
     re-esterifying with the ester's O-alkyl word (taken from the ordinary
@@ -1601,8 +1601,8 @@ def _residue_open_forms(
     acid_name = _resolve_free_residue_acid_name(smi)
     if acid_name is None:
         return None
-    from ..decomposition.fragment_assembly import _acid_to_acyl
     from ..assembly.substituent_naming import acid_name_to_amido_prefix
+    from ..decomposition.fragment_assembly import _acid_to_acyl
     acyl = _acid_to_acyl(acid_name)
     amido = acid_name_to_amido_prefix(acid_name)
     if acyl is None and amido is None:
@@ -1630,7 +1630,7 @@ def _try_backbone_substitutive(mol) -> Optional[str]:
     # Parent scope: the C-terminal residue is the parent skeleton and must
     # carry EXACTLY one senior acid-class group -- either one free carboxylic
     # acid, OR (no free acid at all) exactly one carboxylic-ESTER C-terminus
-    # (a 'methyl...oate' parent). An aldehyde / primary-amide / dual-acid
+    # (a 'methyl ...oate' parent). An aldehyde / primary-amide / dual-acid
     # C-terminus is out of THIS producer's scope (never guess a different
     # principal group / parent skeleton); it declines here and the RT-gate is
     # the final backstop for anything that slips through.

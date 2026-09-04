@@ -62,7 +62,6 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
-
 #: Whether a non-consecutively-numbered triple bond may be cited with the compound
 #: ``x(y)`` locant. Must stay False: P-31.1.4.2(1) grants the compound locant to
 #: DOUBLE bonds only and no compound ``-yne`` locant exists in the Blue Book, so

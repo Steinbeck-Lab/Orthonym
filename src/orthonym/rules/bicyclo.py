@@ -17,14 +17,16 @@ Examples:
 """
 
 import logging
-from typing import List, Optional, Set, Tuple, Dict
 from collections import deque
 from functools import cmp_to_key
 from itertools import permutations
+from typing import Dict, List, Optional, Set, Tuple
+
 from rdkit import Chem
 from rdkit.Chem import BondType
 
-from ..perception.rings import get_bridgehead_atoms, get_spiro_atoms, find_ring_bridgeheads
+from ..perception.molcache import bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
+from ..perception.rings import find_ring_bridgeheads, get_spiro_atoms
 from .locants import compare_locant_sets
 
 logger = logging.getLogger(__name__)
@@ -80,9 +82,9 @@ def find_true_bridgeheads(mol) -> Set[int]:
         Set of atom indices that are true bridgeheads
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> find_true_bridgeheads(mol)
-        {2, 5} # or similar indices for the bridgehead carbons
+        {2, 5}  # or similar indices for the bridgehead carbons
     """
     # SUB-02/+: delegate to the SINGLE consolidated predicate
     # (perception.rings.find_ring_bridgeheads, ring_neighbours >= 3). The old
@@ -123,16 +125,16 @@ def is_bicyclo_system(mol) -> bool:
         True if molecule is a bicyclo system suitable for bicyclo[x.y.z] naming
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> is_bicyclo_system(mol)
         True
-        >>> mol = Chem.MolFromSmiles('C1CCCCC1') # cyclohexane
+        >>> mol = Chem.MolFromSmiles('C1CCCCC1')  # cyclohexane
         >>> is_bicyclo_system(mol)
         False
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene (aromatic fused)
+        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene (aromatic fused)
         >>> is_bicyclo_system(mol)
         False
-        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1') # decalin (zero-bridge fused)
+        >>> mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin (zero-bridge fused)
         >>> is_bicyclo_system(mol)
         False
     """
@@ -157,7 +159,7 @@ def is_bicyclo_system(mol) -> bool:
     ring_atoms_set = _get_largest_connected_ring_component(mol, ring_atoms_set)
 
     ring_bond_count = 0
-    for bond in mol.GetBonds():
+    for bond in bonds_of(mol):
         if bond.IsInRing() and bond.GetBeginAtomIdx() in ring_atoms_set and bond.GetEndAtomIdx() in ring_atoms_set:
             ring_bond_count += 1
     cycle_rank = ring_bond_count - len(ring_atoms_set) + 1
@@ -235,7 +237,7 @@ def find_bridge_paths(mol, bridgehead1: int, bridgehead2: int) -> List[List[int]
         including both bridgeheads
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> bridgeheads = list(find_true_bridgeheads(mol))
         >>> paths = find_bridge_paths(mol, bridgeheads[0], bridgeheads[1])
         >>> len(paths)
@@ -302,10 +304,10 @@ def get_bridge_lengths(mol, bridgehead1: int, bridgehead2: int) -> List[int]:
         List of bridge lengths sorted descending
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> bridgeheads = list(find_true_bridgeheads(mol))
         >>> get_bridge_lengths(mol, bridgeheads[0], bridgeheads[1])
-        [2, 2, 1] # bicyclo[2.2.1]
+        [2, 2, 1]  # bicyclo[2.2.1]
     """
     paths = find_bridge_paths(mol, bridgehead1, bridgehead2)
 
@@ -333,10 +335,10 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
         Descriptor string like "bicyclo[2.2.1]", or None if not a bicyclo system
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> generate_bicyclo_descriptor(mol)
         'bicyclo[2.2.1]'
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1CC2') # bicyclo[2.2.2]octane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1CC2')  # bicyclo[2.2.2]octane
         >>> generate_bicyclo_descriptor(mol)
         'bicyclo[2.2.2]'
     """
@@ -344,7 +346,7 @@ def generate_bicyclo_descriptor(mol) -> Optional[str]:
         return None
 
     # Scope the bridgehead count to the connected ring component (same fix
-    # as is_bicyclo_system, lead b): a pendant ring single-bonded
+    # as is_bicyclo_system,: a pendant ring single-bonded
     # to the core must not inflate the whole-molecule bridgehead count and
     # falsely disqualify a genuinely bicyclic core.
     ri = mol.GetRingInfo()
@@ -390,9 +392,9 @@ def name_bicyclo_system(mol) -> Optional[str]:
         or None if not a bicyclo system
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> name_bicyclo_system(mol)
-        'norbornane' # or 'bicyclo[2.2.1]heptane' depending on retained name preference
+        'norbornane'  # or 'bicyclo[2.2.1]heptane' depending on retained name preference
         >>> mol = Chem.MolFromSmiles('C1CC2CCC1CC2')
         >>> name_bicyclo_system(mol)
         'bicyclo[2.2.2]octane'
@@ -474,7 +476,7 @@ def get_bicyclo_ring_atoms(mol) -> Optional[Set[int]]:
         Set of atom indices in the ring system, or None if not bicyclo
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> get_bicyclo_ring_atoms(mol)
         {0, 1, 2, 3, 4, 5, 6}
     """
@@ -526,7 +528,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
         Dict mapping atom_idx -> IUPAC locant (1-indexed), or None if not bicyclo
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2') # norbornane
+        >>> mol = Chem.MolFromSmiles('C1CC2CCC1C2')  # norbornane
         >>> numbering = get_bicyclo_numbering(mol)
         >>> len(numbering)
         7
@@ -578,7 +580,7 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
 
     # P-23.3.2.2 [BBv2:9789], verbatim at ring_replacement.py:150-152: "If there
     # is still a choice, low locants are assigned in accord with the decreasing
-    # seniority order of heteroatoms O > S > Se > Te > N > P >... > B...". This
+    # seniority order of heteroatoms O > S > Se > Te > N > P > ... > B ...". This
     # element-seniority sub-tiebreak sits BETWEEN the heteroatom locant-SET tier
     # (P-31.1.4.3.4, the `het` list) and the suffix tier: when two admissible
     # numberings share the same heteroatom locant SET (e.g. {2,6}), the SENIOR
@@ -632,7 +634,7 @@ def _legacy_bicyclo_numbering(mol) -> Optional[Dict[int, int]]:
     shortest bridge). Preserved verbatim as the tie-break default so
     unsubstituted / symmetric bicyclics stay byte-identical.
 
-    P-23.2.3 direction fix (cephem von Baeyer defect): the
+    P-23.2.3 direction fix (cephem von Baeyer defect,: the
     SECONDARY (second-longest) bridge must be numbered continuing FROM the
     second bridgehead BACK toward the first -- see this module's own
     ``get_bicyclo_numbering`` docstring example for norbornane, "Second
@@ -758,7 +760,7 @@ def get_bicyclo_substituents(mol, ring_atoms: Set[int]) -> Dict[int, List[Dict]]
     re-deriving it (or forgetting to).
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('CC1CC2CCC1C2') # methylnorbornane
+        >>> mol = Chem.MolFromSmiles('CC1CC2CCC1C2')  # methylnorbornane
         >>> ring_atoms = get_bicyclo_ring_atoms(mol)
         >>> subs = get_bicyclo_substituents(mol, ring_atoms)
         >>> # Should find methyl substituent
@@ -868,7 +870,7 @@ def detect_bicyclo_unsaturation(mol, ring_atoms: Set[int]) -> Dict:
         - 'triple_bonds': list of (atom_idx1, atom_idx2) tuples for triple bonds
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('C1=CC2CCC1C2') # norbornene
+        >>> mol = Chem.MolFromSmiles('C1=CC2CCC1C2')  # norbornene
         >>> ring_atoms = get_bicyclo_ring_atoms(mol)
         >>> unsat = detect_bicyclo_unsaturation(mol, ring_atoms)
         >>> len(unsat['double_bonds'])

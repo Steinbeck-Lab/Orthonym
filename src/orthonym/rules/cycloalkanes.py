@@ -14,13 +14,14 @@ IUPAC 2013 Rules:
 - Substituent locants: use first-point-of-difference rule
 """
 
-from typing import Dict, List, Tuple, Optional, Set
 from collections import defaultdict, deque
+from typing import Dict, List, Optional, Set, Tuple
+
 from rdkit import Chem
 
-from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name as _canonical_get_alkyl_name
+from ..assembly.naming_utils import alpha_sort_key
+from ..assembly.naming_utils import get_alkyl_name as _canonical_get_alkyl_name
 from .locants import compare_locant_sets as _compare_locant_sets  # IM-02
-
 
 
 def get_ring_double_bonds(mol, ring_atoms: Tuple[int, ...]) -> List[Tuple[int, int]]:
@@ -160,7 +161,7 @@ def orient_cycloalkane(
     - Multiple substituents: apply first-point-of-difference rule
 
     When the principal characteristic group sits on ring atoms (expressed as
-    a suffix: -ol, -one, -amine,...), P-31.1.4 numbering applies instead:
+    a suffix: -ol, -one, -amine, ...), P-31.1.4 numbering applies instead:
     the suffix anchor takes the lowest locant before any detachable prefix.
 
     Args:
@@ -273,7 +274,7 @@ def _orient_cycloalkane_with_pg(
 ) -> List[int]:
     """
     P-31.1.4 numbering for a saturated ring whose principal characteristic
-    group sits on ring atoms (suffix expression: -ol, -one, -amine,...).
+    group sits on ring atoms (suffix expression: -ol, -one, -amine, ...).
 
     Tier order, first-decision-wins (P-31.1.4.2.4 / P-31.1.4.3.4):
       (c) lowest locants to the suffix anchor atoms,
