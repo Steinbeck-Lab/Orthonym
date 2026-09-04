@@ -1,9 +1,9 @@
-"""WSD-05 nitrite-ester handler — P-67 functional-class naming.
+"""WSD-05 (Phase 175) nitrite-ester handler — P-67 functional-class naming.
 
 A nitrite ester R-O-N=O is named in the two-word functional-class form
 ``<R> nitrite`` (P-67 / P-65.5; e.g. ``ethyl nitrite``), NOT as a C-nitroso
 compound. This handler is the genuinely-missing emitter co-shipped with the
-PERC-03 ``nitroso[#6]`` guard: without it, guarding ``nitroso`` would leave
+PERC-03 ``nitroso`` ``[#6]`` guard: without it, guarding ``nitroso`` would leave
 ``CCON=O`` nameless (there is no nitrite/nitrous seniority entry; the
 ``nitric acid -> nitrate`` mapping was deferred — resolvers.py:299).
 

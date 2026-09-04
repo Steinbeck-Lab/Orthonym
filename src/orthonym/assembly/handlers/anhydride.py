@@ -1,4 +1,4 @@
-""" anhydride handler — direct-return shim.
+"""Phase 160 anhydride handler — direct-return shim.
 
 1-line wrapper around ``rules.anhydrides.name_anhydride``. Verbatim move
 of composer.py:921-934 dispatch logic.
@@ -29,9 +29,9 @@ def name_anhydride(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return anhydride handler."""
+    from ...rules.anhydrides import name_anhydride as _name_anhydride
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.anhydrides import name_anhydride as _name_anhydride
 
     anhydride_name = _name_anhydride(features)
     if not anhydride_name:

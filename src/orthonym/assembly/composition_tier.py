@@ -5,9 +5,9 @@ it: it computes which heavy atoms the parent actually accounts for, isolates the
 remainder, and (in a later step) names that remainder as substituent prefixes and composes a
 whole-molecule name.
 
-Design + provenance: ``
-and ``. The covered-atom
-source was settled by the Task-1/2: ``features.principal_chain`` ALONE undercounts (it misses
+Design + provenance: ``docs/superpowers/specs/2026-08-05-best-effort-composition-tier-design.md``
+and ``docs/superpowers/plans/2026-08-05-best-effort-composition-slice1.md``. The covered-atom
+source was settled by the Task-1/2 spy: ``features.principal_chain`` ALONE undercounts (it misses
 the ``-ol`` oxygen of ``propan-1-ol`` → 3/4), so coverage must also include the principal-group
 atoms. Every function here is pure (no OPSIN, no I/O).
 """
@@ -29,7 +29,7 @@ def parent_covered_atoms(mol, features: Any) -> Set[int]:
 
     ⚠ This is what the parent NAME covers, not what perception saw — a dropped substituent is
     perceived (it lives in ``features.substituents``) but is NOT in this set, which is exactly
-    how:func:`uncovered_fragments` finds the remainder.
+    how :func:`uncovered_fragments` finds the remainder.
     """
     n = mol.GetNumHeavyAtoms()
     covered: Set[int] = set()

@@ -1,4 +1,4 @@
-""" phosphate_ester handler — direct-return shim.
+"""Phase 160 phosphate_ester handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphate_ester``. Verbatim
 move of composer.py:992-1013 dispatch logic; handles the three phosphate
@@ -40,9 +40,9 @@ def name_phosphate_ester(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return phosphate-ester handler."""
+    from ...rules.phosphorus import name_phosphate_ester as _name_phosphate_ester
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.phosphorus import name_phosphate_ester as _name_phosphate_ester
 
     fg_key = features.principal_group
     matches = features.functional_groups.get(fg_key, [])

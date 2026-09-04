@@ -1,4 +1,4 @@
-""" ring_assembly handler — direct-return shim.
+"""Phase 160 ring_assembly handler — direct-return shim.
 
 1-line wrapper around ``rules.ring_assemblies.name_ring_assembly``. Verbatim
 move of composer.py:979-993 dispatch logic.
@@ -39,9 +39,9 @@ def name_ring_assembly(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return ring_assembly handler."""
+    from ...rules.ring_assemblies import name_ring_assembly as _name_ring_assembly
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.ring_assemblies import name_ring_assembly as _name_ring_assembly
 
     assembly_info = getattr(features, 'ring_assembly_info', None)
     if not assembly_info:

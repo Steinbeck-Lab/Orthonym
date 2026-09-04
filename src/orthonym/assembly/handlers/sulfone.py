@@ -1,4 +1,4 @@
-""" sulfone handler — Tier B shim (gate 0.40).
+"""Phase 160 sulfone handler — Tier B shim (gate 0.40).
 
 1-line wrapper around ``rules.sulfur.name_sulfone``. Verbatim move
 of composer.py:966-978 dispatch logic (sulfone branch parallel to
@@ -31,13 +31,15 @@ def name_sulfone(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Tier-B sulfone handler."""
-    from ..candidate_pool import get_current_pool
-    from ..composer import _enrich_handler_name, _inject_stereo_if_missing
     from ...rules.sulfur import (
         chalcogen_oxide_fc_covers_molecule,
         name_chalcogen_oxide_substitutive,
+    )
+    from ...rules.sulfur import (
         name_sulfone as _name_sulfone,
     )
+    from ..candidate_pool import get_current_pool
+    from ..composer import _enrich_handler_name, _inject_stereo_if_missing
 
     matches = features.functional_groups.get('sulfone', [])
     if not matches:

@@ -1,8 +1,8 @@
-""" guanidine handler — Tier B retained-name (gate 0.40).
+"""Phase 160 guanidine handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:892-901 (inline branch) +
 composer.py:2760-2906 (_try_name_guanidine body). Per CONTEXT,
-body stays in composer.py until.
+body stays in composer.py until Plan-03 commit 03-10.
 
 IUPAC cite: P-66.6 (guanidines; retained name with N-substitution).
 
@@ -27,10 +27,12 @@ def _is_guanidine(features: Any) -> bool:
 def name_guanidine(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ Tier-B guanidine handler."""
+    """Phase 160 Tier-B guanidine handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _try_name_guanidine, _enrich_handler_name, _inject_stereo_if_missing,
+        _enrich_handler_name,
+        _inject_stereo_if_missing,
+        _try_name_guanidine,
     )
 
     guanidine_name = _try_name_guanidine(features)

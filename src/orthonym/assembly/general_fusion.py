@@ -1,4 +1,4 @@
-""" P5: general fusion-nomenclature PARENT producer (P-25.3), a PIN-quality
+""": general fusion-nomenclature PARENT producer (P-25.3), a PIN-quality
 upgrade over the von-Baeyer polyene the complete-tier engine ships for mancude
 fused ring systems.
 
@@ -97,8 +97,8 @@ def _benzo_annulation_name(mol, target_smiles: str) -> Optional[str]:
     fusion-orientation derivation entirely). Fail-closed (None) without OPSIN, on
     no clean single-benzo decomposition, or if no candidate round-trips.
     """
-    from ..rules.vonbaeyer_universal import _extract_spiro_submol
     from ..rules.fused_rings import name_fused_heterocycle
+    from ..rules.vonbaeyer_universal import _extract_spiro_submol
 
     ri = mol.GetRingInfo()
     rings = [set(r) for r in ri.AtomRings()]

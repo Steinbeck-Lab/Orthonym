@@ -1,4 +1,4 @@
-""" thioether handler — Tier B shim (gate 0.40).
+"""Phase 160 thioether handler — Tier B shim (gate 0.40).
 
 Verbatim move of composer.py:970-992 dispatch logic. Wraps
 ``rules.sulfur.name_sulfide`` with the cyclic-thioether + fused-heterocycle
@@ -36,10 +36,10 @@ def name_thioether(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Tier-B thioether handler with cyclic + fused-heterocycle skip guards."""
-    from ..candidate_pool import get_current_pool
-    from ..composer import _enrich_handler_name, _inject_stereo_if_missing
     from ...data.fused_heterocycles import match_fused_heterocycle_core
     from ...rules.sulfur import name_sulfide
+    from ..candidate_pool import get_current_pool
+    from ..composer import _enrich_handler_name, _inject_stereo_if_missing
 
     # Skip cyclic thioethers (named as heterocycles).
     ring_type = getattr(features, 'ring_type', None)
@@ -54,7 +54,7 @@ def name_thioether(
     if not matches:
         return None
 
-    # SEN-02 (P-41 cls 40 > 41/42): the functional-class `R R' sulfide` silently
+    # DD5 SEN-02 (P-41 cls 40 > 41/42): the functional-class `R R' sulfide` silently
     # DROPS any co-substituent the substituent characteriser can't express — e.g. the
     # ether of COCSC -> "dimethyl sulfide". DECLINE for such LOSSY cases so the
     # substitutive carbon-parent path names it (COCSC -> methoxy(methylsulfanyl)methane,
@@ -62,12 +62,12 @@ def name_thioether(
     #
     # SCOPED (to keep this surgical and avoid the broad sulfide -> substitutive PIN
     # migration, which is a separate follow-on with a large test/corpus surface):
-    # - NEUTRAL only — a charged species (dithiocarbamate ammonium) would route to a
-    # wrong partial substitutive name; keep the legacy path (byte-identical to HEAD);
-    # - only when the molecule carries a non-C/H/S heteroatom (an ether O, etc.) that
-    # the functional-class sulfide name would DROP. A pure C/H/S sulfide
-    # (dimethyl sulfide, methyl phenyl sulfide) keeps its established functional-class
-    # name — unchanged from HEAD.
+    #   - NEUTRAL only — a charged species (dithiocarbamate ammonium) would route to a
+    #     wrong partial substitutive name; keep the legacy path (byte-identical to HEAD);
+    #   - only when the molecule carries a non-C/H/S heteroatom (an ether O, etc.) that
+    #     the functional-class sulfide name would DROP. A pure C/H/S sulfide
+    #     (dimethyl sulfide, methyl phenyl sulfide) keeps its established functional-class
+    #     name — unchanged from HEAD.
     _neutral = all(a.GetFormalCharge() == 0 for a in features.mol.GetAtoms())
     _has_dropped_heteroatom = any(
         a.GetSymbol() not in ('C', 'H', 'S') for a in features.mol.GetAtoms()

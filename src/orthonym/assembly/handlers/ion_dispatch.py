@@ -1,4 +1,4 @@
-""" ion_dispatch handler — pre-pool bypass wrapper.
+"""Phase 160 ion_dispatch handler — pre-pool bypass wrapper.
 
 Per CONTEXT, ion / salt / zwitterion / radical species use a
 PRE-POOL bypass at composer.py:751-768. The pre-pool call site STAYS
@@ -12,13 +12,13 @@ ion). All four sub-types share the same body (the inner switch on
 
 IUPAC cites:
 - P-65.6.2.1 / P-63.8.1 / P-77 + P-72/P-73 (salts: cation word(s) + anion)
-  (corrected 169.6-04 — the old conjunctive-nomenclature cite was wrong)
+  (: corrected 169.6-04 — the old conjunctive-nomenclature cite was wrong)
 - P-74 (zwitterions)
 - P-71 (radicals)
 - P-72 + P-73 (anions / cations)
 
 Byte-identical contract: the inline pre-pool call site at composer.py:
-751-768 stays IDENTICAL — those 4 ``if species_type...`` blocks are the
+751-768 stays IDENTICAL — those 4 ``if species_type ...`` blocks are the
 actual control-flow paths in production. The inner-dispatch registration
 of ion_dispatch at priority 50 is structurally complete (so future
 architectural reviewers see ion_dispatch in the table) but unreachable
@@ -26,7 +26,7 @@ in practice because the inline bypass runs FIRST.
 
 References:
 - composer.py:751-768 (inline pre-pool call site; PRESERVED per CONTEXT).
-- composer.py:assemble_ion_name (body STAYS until).
+- composer.py:assemble_ion_name (body STAYS until Plan-03 commit 03-10).
 - 160-AUDIT-DECOMP.md § 1 row 'ion_dispatch' + § 2.1 purity proof.
 """
 from __future__ import annotations

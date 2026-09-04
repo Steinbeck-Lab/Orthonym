@@ -1,20 +1,20 @@
-""".2 general_acyclic catch-all handler (closure).
+"""Phase 160.2 general_acyclic catch-all handler (DECOMP-01 closure).
 
-Per CONTEXT + §3.1 + CONTEXT RESEARCH §10: explicit
+Per CONTEXT + ADR-19-02 §3.1 + CONTEXT RESEARCH §10: explicit
 catch-all (priority 99999, predicate=lambda *_: True) closing the
- fallthrough gap so dispatch_inner first-match-AND-succeeds-wins
- ALWAYS returns a non-None InnerDispatchResult.
+Plan-02 fallthrough gap so dispatch_inner first-match-AND-succeeds-wins
+(ADR-19-04) ALWAYS returns a non-None InnerDispatchResult.
 
 LIFT SOURCE: composer.py:951-1055 chain-fallback section (verbatim, with
 helper calls re-routed from local composer scope to
-``from._handler_shared import _generate_chain_parent, _generate_ring_parent,
+``from ._handler_shared import _generate_chain_parent, _generate_ring_parent,
 _generate_suffix, _generate_prefixes, _generate_stereodescriptors,
 _assemble_fragments``; final ``return candidate_name`` replaced by a
-pool-carried ``NamingResult(name=best.name, tree=best.tree,...)``).
+pool-carried ``NamingResult(name=best.name, tree=best.tree, ...)``).
 
 IUPAC cite: P-14 + P-23 + P-44 (catch-all substitutive nomenclature).
 
-: emits a STRUCTURED NameTreeNode derived from its own
+Phase 165 SCORE-01: emits a STRUCTURED NameTreeNode derived from its own
 fragment list via ``fragments_to_tree`` (Path A), attached through the
 CandidatePool ``tree=`` carry. The returned tree is read off the winning
 candidate (``best().tree``) so a higher-priority handler's win is never
@@ -32,14 +32,13 @@ from typing import Any, Optional
 
 from ..name_tree import NamingResult
 
-
 logger = logging.getLogger(__name__)
 
 
 def _is_general_acyclic(features: Any) -> bool:
-    """Catch-all predicate per CONTEXT +.
+    """Catch-all predicate per CONTEXT + AP-160-08.
 
-     CASE B refinement (.2 -03 honest-fail-on-data):
+    AP-160.2-06 CASE B refinement (Phase 160.2 Plan-02-03 honest-fail-on-data):
     the catch-all MUST mirror the chain-fallback section's effective domain
     in composer.py:_assemble_name_impl. The inline cascade still contains
     amide+amine branches (composer.py:917-931) that the handler-side
@@ -48,7 +47,7 @@ def _is_general_acyclic(features: Any) -> bool:
     True-always catch-all would preempt those inline branches and break
     byte-identical for polyfunctional amide / amine cases.
 
-    Pure read-only per CONTEXT +.
+    Pure read-only per CONTEXT + AP-160-26.
 
     Inline-cascade-order mirror — returns False (defer to inline cascade) when:
     1. principal_group is amide AND pg_count == 1
@@ -57,7 +56,7 @@ def _is_general_acyclic(features: Any) -> bool:
        (inline amine branch at composer.py:919-931 handles this).
     Otherwise returns True (general acyclic catch-all fires).
 
-    Refinement REVERTS automatically when -04 ships in CASE A
+    Refinement REVERTS automatically when Plan-02-04 ships in CASE A
     (predicate parity verified for amide / amine handlers); at that point
     the inline cascade is deleted and this predicate can collapse back to
     `return True` per the original CONTEXT catch-all spec.
@@ -78,15 +77,15 @@ def _is_general_acyclic(features: Any) -> bool:
 def name_general_acyclic(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """General catch-all chain/ring fallback (closure;.2).
+    """General catch-all chain/ring fallback (DECOMP-01 closure; Phase 160.2).
 
     Verbatim lift of composer.py:951-1055 (chain-fallback section). Helper
     calls re-routed from composer.py local scope to ``_handler_shared``
-    imports. String output MUST be byte-identical per contract.
+    imports. String output MUST be byte-identical per DECOMP-03 contract.
 
     Returns NamingResult(name=..., tree=<structured NameTreeNode>,
     atom_to_locant_hint=None); the tree is read off the winning pool candidate
-    .
+    (Phase 165 SCORE-01).
     """
     # Lazy imports per PATTERNS § Lazy Import — break the
     # composer.py <-> general_acyclic.py cycle that the inner_dispatch
@@ -121,7 +120,7 @@ def name_general_acyclic(
     # Wave2 T3a conservation: an EMPTY parent stem cannot describe any
     # molecule — the assembler would glue suffixes onto the bare 'ane'
     # filler ('anedicarboxylic acid' for the Si-bridge witness once the
-    # benzene handler learned to decline it). Per the handler
+    # benzene handler learned to decline it). Per the ADR-19-04 handler
     # contract, return None to cascade (-> honest unknown) instead.
     if not parent.text:
         logger.debug(
@@ -144,7 +143,7 @@ def name_general_acyclic(
                 list(suffix.locants), parent_size, suffix.count
             )
             if validated_locants != list(suffix.locants) or validated_count != suffix.count:
-                # M3: carry `atoms` through the rebuild -- omitting it
+                # M3 Task 1: carry `atoms` through the rebuild -- omitting it
                 # would silently re-null the just-populated suffix atoms and
                 # revert this molecule to the coverage close's skip default.
                 suffix = NameFragment(
@@ -177,7 +176,8 @@ def name_general_acyclic(
     # print-time flag, so every renderer downstream agrees -- see the helper's
     # docstring § "Why the fragments and not a flag".
     from ._handler_shared import (
-        _l5_prefix_locants_omitted, _prefix_fragments_without_locants,
+        _l5_prefix_locants_omitted,
+        _prefix_fragments_without_locants,
     )
     if _l5_prefix_locants_omitted(features, fragments):
         fragments = _prefix_fragments_without_locants(fragments)
@@ -263,15 +263,15 @@ def name_general_acyclic(
     if _w2_atom_coverage_declines(features, fragments, assembled):
         return None  # task-W2 Witness-B: name silently DROPPED atoms → decline
 
-    # .1: route chain-naming through pool.
+    # Phase 145.1: route chain-naming through pool.
     # In first_applicable mode, pool.best() returns the FIRST added
     # candidate. If a higher-priority handler already added one above,
     # pool.best() is that one (chain naming computed but not returned).
     # If no other handler fired (this is the only candidate), pool.best()
     # is the chain candidate.: chain has priority=fallback in 145.1
-    # (preserves byte-identical); raises priority for competition.
+    # (preserves byte-identical); Phase 146 raises priority for competition.
     pool = get_current_pool()
-    # : derive a structured tree from the SAME fragment list
+    # Phase 165 SCORE-01: derive a structured tree from the SAME fragment list
     # built above and attach it to the chain candidate. Reading best().tree
     # (NOT the local `tree`) guarantees the returned tree corresponds to the
     # RETURNED name: if a higher-priority handler's candidate wins, best.tree is
@@ -285,14 +285,14 @@ def name_general_acyclic(
     pool.add(assembled, "chain", features, tree=tree)
     best = pool.best()
 
-    # G0 fail-closed safety: general_acyclic is the @99999 catch-all, but
+    # G0 fail-closed safety (DD7): general_acyclic is the @99999 catch-all, but
     # the pool can still be empty when NO candidate could be built (e.g. an
     # all-aromatic-ring + two-metal species like the P-69 gold
-    # c1ccc(cc1)[Hg]c1ccc(cc1)[Sb]c1ccccc1, which has no nameable
-    # acyclic parent). Per the handler contract ("return None on
+    # c1ccc(cc1)[Hg]c1ccc(cc1)[Sb](c1ccccc1)c1ccccc1, which has no nameable
+    # acyclic parent). Per the ADR-19-04 handler contract ("return None on
     # gate-fail, never raise"), return None to cascade rather than crash on
     # ``best.name`` — that AttributeError was masked by name_compound's broad
-    # except but propagated raw (NoneType.name) through the direct.name() /
+    # except but propagated raw (NoneType .name) through the direct .name() /
     # raise_on_limit API.
     if best is None:
         return None

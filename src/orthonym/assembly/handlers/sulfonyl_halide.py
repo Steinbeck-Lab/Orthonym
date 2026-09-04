@@ -33,9 +33,9 @@ def name_sulfonyl_halide(
     """Direct-return sulfonyl/sulfinyl-halide handler (cap-and-rename body in
     rules.sulfur.name_sulfonyl_halide). Lazy import keeps the
     handlers -> rules.sulfur -> namer chain off the import-time graph."""
+    from ...rules.sulfur import name_sulfonyl_halide as _name_sulfonyl_halide
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.sulfur import name_sulfonyl_halide as _name_sulfonyl_halide
 
     halide_name = _name_sulfonyl_halide(features, style=style)
     if not halide_name:

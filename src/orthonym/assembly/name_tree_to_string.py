@@ -1,12 +1,12 @@
-""" Pass-2 serializer (+ CONTEXT).
+"""Phase 160 Pass-2 serializer (DECOMP-02 + CONTEXT).
 
-Single source of truth for ``NameTreeNode -> str`` going forward.
+Single source of truth for ``NameTreeNode -> str`` going forward. Plan-02
 substrate ships this module ALONGSIDE the legacy ``_assemble_fragments``
-path at composer.py:7591 — the legacy path STAYS until thinning
-per CONTEXT incremental-migration discipline. /03 first-wave
-handlers return ``NamingResult(name=<existing string>, tree=None,...)``;
+path at composer.py:7591 — the legacy path STAYS until commit 03-10 thinning
+per CONTEXT incremental-migration discipline. Plan-02/03 first-wave
+handlers return ``NamingResult(name=<existing string>, tree=None, ...)``;
 the legacy path is what actually produces those names. The Pass-2
-serializer here is exercised by ``--dump-tree`` integration tests in
+serializer here is exercised by ``--dump-tree`` integration tests in Plan-04
 and by v19+ handlers that populate trees explicitly.
 
 Contract per CONTEXT + 160-AUDIT-DECOMP.md § 5.4:
@@ -14,7 +14,7 @@ Contract per CONTEXT + 160-AUDIT-DECOMP.md § 5.4:
 * If ``node.fragment_legacy is not None``: delegate to the legacy assembly
   path by wrapping the fragment list as
   ``_assemble_fragments([node.fragment_legacy], style)``. This is the
-  first-wave compatibility mode that lets ship byte-identical
+  first-wave compatibility mode that lets Phase 160 ship byte-identical
   even before any handler emits a real tree.
 * If ``node.fragment_legacy is None`` AND ``node.parent_stem`` is populated:
   assemble the name from the explicit fields in the order::
@@ -26,18 +26,18 @@ Contract per CONTEXT + 160-AUDIT-DECOMP.md § 5.4:
   P-14.5 + P-14.2.2.
 * If ``node.fragment_legacy is None`` AND ``node.parent_stem == ""``: raise
   an explicit ``NameTreeSerializerError`` — this is a malformed tree per
-   honest-fail-on-data.
+  DECOMP-02 honest-fail-on-data.
 
-Byte-identical contract: for every input ``node`` whose
+Byte-identical contract (DECOMP-03): for every input ``node`` whose
 ``fragment_legacy`` round-trips through the legacy path, the output of
 ``name_tree_to_string(node, style)`` MUST equal the corresponding
 ``_assemble_fragments(fragments, style)`` output.
 
 Anti-pattern hygiene:
-- /: no postprocessor band-aid on inner-dispatch
+- AP-160-05 / AP-160-23: no postprocessor band-aid on inner-dispatch
   output; the explicit-field branch below assembles deterministically
   from the IR fields.
--: NameTreeNode field shape is locked — adding new fields to
+- AP-160-27: NameTreeNode field shape is locked — adding new fields to
   the serializer here without a corresponding NameTreeNode field
   addition is a Rule 4 architectural decision.
 
@@ -50,7 +50,7 @@ References:
 """
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from .name_tree import NameTreeNode, _alphabetize_prefixes
 
@@ -58,14 +58,14 @@ from .name_tree import NameTreeNode, _alphabetize_prefixes
 class NameTreeSerializerError(ValueError):
     """Raised when a malformed NameTreeNode is passed to name_tree_to_string.
 
-    Per honest-fail-on-data (CONTEXT): a node with
+    Per DECOMP-02 honest-fail-on-data (CONTEXT): a node with
     ``parent_stem == ""`` and ``fragment_legacy is None`` cannot serialize
     deterministically. The fix is upstream in the handler that produced
     the malformed node, not a band-aid string default.
     """
 
 
-# (WSA-03): the set of class_ids whose ``NameTreeNode`` carries a BARE
+# Phase 179 (WSA-03): the set of class_ids whose ``NameTreeNode`` carries a BARE
 # parent-hydride stem ("but", "meth", "cyclodec") and is therefore assembled by
 # the full hydride grammar (-ane/-ene/-yne + suffix infix). Every OTHER node
 # reaching ``_assemble_explicit_fields`` carries a COMPLETE name in ``parent_stem``
@@ -74,12 +74,12 @@ class NameTreeSerializerError(ValueError):
 # pass-through branch (no hydride ending appended). This is ALSO the production
 # flip set: Plan 02 couples the carrier-drop + seam routing to this SAME frozenset
 # (single source of truth — prevents "flip does nothing"). Defined here so the
-# serializer's two-branch dispatch and the flip share one definition.
+# serializer's two-branch dispatch and the Plan-02 flip share one definition.
 SERIALIZER_PRODUCTION_CLASSES = frozenset({"general_acyclic"})
 
 
 def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
-    """ + IUPAC P-14.5 Pass-2 serializer.
+    """Phase 160 + IUPAC P-14.5 Pass-2 serializer.
 
     Composition order::
 
@@ -97,17 +97,17 @@ def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
     Raises:
         NameTreeSerializerError: if ``node.parent_stem == ""`` AND
             ``node.fragment_legacy is None`` (malformed tree per
-             honest-fail-on-data).
+            DECOMP-02 honest-fail-on-data).
     """
     # First-wave compatibility mode (per 160-AUDIT-DECOMP.md § 5.4 first
     # bullet): if the legacy NameFragment is present, route through the
     # legacy assembly path to preserve byte-identical output even before
     # any handler emits a real tree. This is the SOLE wave-1 production
-    # path; the explicit-field branch below is exercised by
+    # path; the explicit-field branch below is exercised by Plan-04
     # --dump-tree integration tests + by v19+ handlers that populate
     # trees.
     if node.fragment_legacy is not None:
-        # final-string carrier: a ``str`` fragment_legacy
+        # Phase 165 (SCORE-01) final-string carrier: a ``str`` fragment_legacy
         # holds the pre-assembled final name and is returned verbatim. A single
         # synthetic NameFragment cannot reproduce a multi-fragment concatenation
         # (the parent path appends 'ane' via _build_hydrocarbon_name), so the
@@ -121,7 +121,7 @@ def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
             # to the explicit-field / honest-fail path below). This str branch is
             # reached only when ``fragment_legacy is not None`` (outer guard), so
             # ``""`` short-circuits BEFORE the ``parent_stem`` honest-fail at the
-            # bottom. The boundary only synthesizes a node when ``name`` is
+            # bottom. The SC-3 boundary only synthesizes a node when ``name`` is
             # truthy (namer.py ``if name:``), so an empty name never reaches here
             # in production; this is documented, not a behavioral guard.
             return node.fragment_legacy
@@ -130,7 +130,7 @@ def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
         from .composer import _assemble_fragments
         return _assemble_fragments([node.fragment_legacy], style)
 
-    # Honest-fail-on-data per (CONTEXT): a node without
+    # Honest-fail-on-data per DECOMP-02 (CONTEXT): a node without
     # both fragment_legacy AND parent_stem cannot serialize. The fix is
     # upstream in the handler.
     if not node.parent_stem:
@@ -140,7 +140,7 @@ def name_tree_to_string(node: NameTreeNode, style: str = "pin") -> str:
             f"on-data: fix the upstream handler that produced this node."
         )
 
-    # Explicit-field assembly (+ + v19 path). The body below mirrors
+    # Explicit-field assembly (Plan-04+ + v19 path). The body below mirrors
     # the IUPAC P-14.5 composition order; collision detection per
     # IUPAC P-14.7 (suffix has priority over substituent locants) is
     # implemented per RESEARCH § "Name-Tree IR Semantic Contract".
@@ -154,7 +154,7 @@ def _prefix_node_text(sub: NameTreeNode, style: str) -> str:
     carry the FULL substituent string in ``parent_stem`` with
     ``fragment_legacy=None`` — used DIRECTLY here (NOT run through the hydride
     builder, which would wrongly append 'ane' to a substituent like 'methyl').
-    A ``strfragment_legacy`` carrier short-circuits (other trees). A nested
+    A ``str`` ``fragment_legacy`` carrier short-circuits (other trees). A nested
     complex substituent (one carrying its own prefixes/suffix) recurses through
     the full serializer.
     """
@@ -167,7 +167,7 @@ def _prefix_node_text(sub: NameTreeNode, style: str) -> str:
 
 def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
     """Assemble a name from explicit ``NameTreeNode`` fields, byte-identically to
-    the legacy ``_assemble_fragments`` (CONTEXT /, WSA-03).
+    the legacy ``_assemble_fragments`` (CONTEXT /, Phase 179 WSA-03).
 
     Mirrors ``handlers/_handler_shared.py:_assemble_fragments`` term-for-term,
     reusing the SAME shared grammar from ``composition_primitives`` (one
@@ -186,19 +186,20 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
     import re
 
     from .composition_primitives import (
-        _build_unsaturation_infix,
-        _build_hydrocarbon_name,
-        _join_prefixes,
-        _join_prefix_to_name,
-        _estimate_parent_size_from_name,
-        apply_mononuclear_enclosing,
-        resolve_suffix_prefix_collision,
-        is_ring_parent_name,
         _MONONUCLEAR_STEMS,
+        _build_hydrocarbon_name,
+        _build_unsaturation_infix,
+        _estimate_parent_size_from_name,
+        _join_prefix_to_name,
+        _join_prefixes,
+        apply_mononuclear_enclosing,
+        is_ring_parent_name,
+        resolve_suffix_prefix_collision,
     )
-    from .naming_utils import (format_suffix_with_locants,
-                               get_multiplier_prefix,
-                               get_suffix_multiplier_prefix)
+    from .naming_utils import (
+        format_suffix_with_locants,
+        get_suffix_multiplier_prefix,
+    )
 
     stem = node.parent_stem
 
@@ -330,7 +331,7 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
         ih_str = ",".join(f"{i}H" for i in node.indicated_h)
         name = f"{ih_str}-{name}"
 
-    # gap #7: prefix -> parent hyphenation (hyphen between a letter) and a digit).
+    # gap #7: prefix -> parent hyphenation (hyphen between a letter/) and a digit).
     if prefix_str:
         name = _join_prefix_to_name(prefix_str, name)
 
@@ -357,7 +358,7 @@ def _format_locant_set(locants: Tuple[int, ...]) -> str:
     return ",".join(str(l) for l in sorted(locants))
 
 
-# (WSA-03): the placeholder ``_apply_unsaturation_infix``,
+# Phase 179 (WSA-03): the placeholder ``_apply_unsaturation_infix``,
 # ``_unsaturation_multiplier``, and ``_format_suffix`` stubs were DELETED.
 # Their (divergent, never-production-exercised) logic is superseded by the
 # shared ``composition_primitives`` grammar (``_build_unsaturation_infix`` /

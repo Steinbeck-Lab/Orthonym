@@ -1,4 +1,4 @@
-""" phosphine_oxide handler — direct-return shim.
+"""Phase 160 phosphine_oxide handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphine_oxide``. Verbatim
 move of composer.py:974-989 dispatch logic.
@@ -29,9 +29,9 @@ def name_phosphine_oxide(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return phosphine_oxide handler."""
+    from ...rules.phosphorus import name_phosphine_oxide as _name_phosphine_oxide
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.phosphorus import name_phosphine_oxide as _name_phosphine_oxide
 
     matches = features.functional_groups.get('phosphine_oxide', [])
     if not matches:

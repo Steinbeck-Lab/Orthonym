@@ -1,4 +1,4 @@
-""" phosphine handler — direct-return shim with benzene skip guard.
+"""Phase 160 phosphine handler — direct-return shim with benzene skip guard.
 
 Verbatim move of composer.py:1016-1061 dispatch logic. Covers tertiary,
 secondary, and primary phosphine principal-group variants and preserves
@@ -31,7 +31,7 @@ def _is_phosphine(features: Any) -> bool:
 
     Tier-A ring mutex (D4 / P-22.2.2.1): if the molecule is cyclic and the
     chain is NOT the parent, decline so tier_a_ring@4500 handles it via the
-    Hantzsch-Widman builder. Mirrors amine.py lines 55-58 exactly.
+    Hantzsch-Widman builder.  Mirrors amine.py lines 55-58 exactly.
     """
     if getattr(features, 'principal_group', None) not in _PHOSPHINE_GROUPS:
         return False
@@ -46,9 +46,9 @@ def name_phosphine(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return phosphine handler with benzene-parent skip guard."""
+    from ...rules.phosphorus import name_phosphine as _name_phosphine
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.phosphorus import name_phosphine as _name_phosphine
 
     fg_key = features.principal_group
     matches = features.functional_groups.get(fg_key, [])

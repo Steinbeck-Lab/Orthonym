@@ -1,9 +1,9 @@
-""" isothiocyanate handler — Tier B retained-name (gate 0.40).
+"""Phase 160 isothiocyanate handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:842-850 (inline branch) +
 composer.py:2192-2202 (_name_isothiocyanate body) + composer.py:2204-2230
 (shared _name_iso_x_cyanate helper). Per CONTEXT, bodies stay in
-composer.py until.
+composer.py until Plan-03 commit 03-10.
 
 IUPAC cite: P-66.5.4.3 (isothiocyanates; functional class naming).
 
@@ -29,13 +29,15 @@ def _is_isothiocyanate(features: Any) -> bool:
 def name_isothiocyanate(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ Tier-B isothiocyanate handler.
+    """Phase 160 Tier-B isothiocyanate handler.
 
     Verbatim semantics of composer.py:842-850 (inline branch).
     """
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _name_isothiocyanate, _enrich_handler_name, _inject_stereo_if_missing,
+        _enrich_handler_name,
+        _inject_stereo_if_missing,
+        _name_isothiocyanate,
     )
 
     # Wave2 T2a (P-61.8): functional-class 'R isothiocyanate' is general

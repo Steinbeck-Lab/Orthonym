@@ -95,8 +95,8 @@ def name_chain_diamide_handler(
     Delegates to ``rules.amides.name_chain_diamide``. Returns ``None`` (falls
     through to the next handler) when the naming body fails closed.
     """
-    from ..candidate_pool import get_current_pool
     from ...rules.amides import name_chain_diamide
+    from ..candidate_pool import get_current_pool
 
     matches = _collect_amide_matches(features)
     result = name_chain_diamide(

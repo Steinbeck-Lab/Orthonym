@@ -1,14 +1,14 @@
-""" (02) — pure ``fragments_to_tree`` deriver.
+"""Phase 165 (SCORE-01/02) — pure ``fragments_to_tree`` deriver.
 
 The single genuinely-new artifact of Plan 165-01. A side-effect-free transform
 ``List[NameFragment] -> NameTreeNode`` that mirrors the ``_assemble_fragments``
 classification loop (``handlers/_handler_shared.py:779-787``) and parent
 unsaturation-locant unpacking (``:877-880``), producing the structured Name-Tree
-IR consumed by / per-substring scoring.
+IR consumed by SCORE-02 / Phase 166 per-substring scoring.
 
  DUAL-CARRY: every derived node ALSO carries ``fragment_legacy`` — the
 pre-assembled final name string — so ``name_tree_to_string`` round-trips
-byte-identically. A single synthetic ``NameFragment`` CANNOT reproduce a
+byte-identically (SC-1). A single synthetic ``NameFragment`` CANNOT reproduce a
 multi-fragment concatenation (the parent path appends ``"ane"`` via
 ``_build_hydrocarbon_name``), so the byte-identical carrier is the final string
 itself, returned verbatim by the ``name_tree_to_string`` str short-circuit
@@ -16,7 +16,7 @@ itself, returned verbatim by the ``name_tree_to_string`` str short-circuit
 string"). The structured fields and the string view both derive from the SAME
 fragment list, so they cannot disagree.
 
-Purity: NO mutation of ``fragments``, its elements, or module
+Purity (AP-160-15 /): NO mutation of ``fragments``, its elements, or module
 globals. ``NameFragment`` instances are read, never rewritten.
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ def _synthesize_root_fragment(
 ) -> str:
     """Pre-assemble the final name string for the byte-identical ``fragment_legacy``.
 
-    ``name_tree_to_string`` short-circuits on a ``strfragment_legacy`` by
+    ``name_tree_to_string`` short-circuits on a ``str`` ``fragment_legacy`` by
     returning it verbatim. ``_assemble_fragments`` does not use its ``style``
     argument today, so the carried string is style-independent and
     byte-identical to the production path. ``_assemble_fragments`` does not
@@ -101,7 +101,7 @@ def fragments_to_tree(
         tuple(
             NameTreeNode(
                 parent_stem=p.text,
-                # (WSA-03): preserve prefix locants VERBATIM (order +
+                # Phase 179 (WSA-03): preserve prefix locants VERBATIM (order +
                 # repeats), matching the legacy ``",".join(f.locants)`` at
                 # _handler_shared.py:1032. ``_normalize_locants`` (sorted+set-
                 # deduped) silently dropped the repeated locants a polysubstituted
@@ -115,12 +115,12 @@ def fragments_to_tree(
         )
     )
 
-    # (WSA-03): preserve the suffix-group multiplicity so the
+    # Phase 179 (WSA-03): preserve the suffix-group multiplicity so the
     # name-tree serializer (_assemble_explicit_fields) can reproduce a TERMINAL
     # multi-group suffix (dioic acid / dial / dinitrile) whose locants are
     # omitted. The legacy assembler computes the multiplier from
     # ``max(len(suffix_locants), suffix_frag.count)`` at assembly time; that
-    # count is otherwise lost when the locked 12-field schema drops
+    # count is otherwise lost when the locked 12-field schema (AP-160-27) drops
     # it. It is carried on the root's otherwise-unused ``multiplicative_prefix``
     # — a coherent semantic (the multiplier of THIS node's head term, here the
     # principal characteristic group). Empty/1-count suffixes carry None
@@ -135,7 +135,7 @@ def fragments_to_tree(
             from .naming_utils import get_suffix_multiplier_prefix
             suffix_multiplier = get_suffix_multiplier_prefix(_suffix_count, suffix_frag.text)
 
-    # (WSA-03) production flip: for a class in
+    # Phase 179 (WSA-03) production flip: for a class in
     # SERIALIZER_PRODUCTION_CLASSES the str carrier is DROPPED (fragment_legacy
     # =None) so name_tree_to_string runs the explicit-field path (the structured
     # fields above are byte-identical-complete per Plan 01) instead of returning

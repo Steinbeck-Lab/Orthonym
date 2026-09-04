@@ -1,15 +1,15 @@
-""": Group-splitting polyfunctional rescue (POLY-01/02).
+"""Phase 169 Plan-02: Group-splitting polyfunctional rescue (POLY-01/02).
 
 When a non-principal **composite** functional group (today only the
 empirically-firing ``ester`` / ``thioester`` — see ``data/group_split_rules``)
 has no clean strict-IUPAC prefix and would otherwise be **dropped** at the
-``polyfunctional.py:get_fg_prefix_form()`` / ``substituent_no_prefix_form`` site (CONTEXT /F2),
+``polyfunctional.py:get_fg_prefix_form`` / ``substituent_no_prefix_form`` site (CONTEXT /F2),
 ``split_composite_fg`` decomposes it into its ordered sub-group prefix
 **components** instead of dropping it:
 
-* ``ester-C(=O)-O-R`` → ``oxo`` (the ``=O`` chalcogen) + ``R-oxy`` (the
+* ``ester``  ``-C(=O)-O-R``  →  ``oxo`` (the ``=O`` chalcogen) + ``R-oxy`` (the
   ``-O-R`` linker, e.g. ``ethoxy``)
-* ``thioester-C(=O)-S-R`` → ``oxo`` + ``R-sulfanyl`` (e.g. ``ethylsulfanyl``)
+* ``thioester`` ``-C(=O)-S-R`` → ``oxo`` + ``R-sulfanyl`` (e.g. ``ethylsulfanyl``)
 
 The carbonyl carbon stays in the chain and carries the locant; both components
 share it (CONTEXT worked example ``4-(ethylsulfanyl)-4-oxobutanoic acid``). The
@@ -20,7 +20,7 @@ caller appends each component to ``all_prefixes`` so they re-enter the EXISTING
 resolved through the EXISTING authority — ``oxo`` via ``seniority.get_prefix``,
 the alkoxy/sulfanyl forms via ``assembly.substituent_prefix_forms`` — NEVER
 hardcoded and NEVER a string-rewrite (no regex substitution, no string-replace
-call, no postprocessor pass; ``./skills/fix-methodology.md``). The
+call, no postprocessor pass; ``.claude/skills/fix-methodology.md``). The
 decomposition acts at the FG-prefix-resolution layer and returns structured
 components.
 
@@ -58,7 +58,7 @@ _IN_SPLIT_PROBE = threading.local()
 _PROBE_NAME_CACHE: dict = {}
 
 
-# : lazy module-level oracle for the narrow DEFAULT-ON split branch
+# W2F-P2: lazy module-level oracle for the narrow DEFAULT-ON split branch
 # (polyfunctional.py). The per-instance features._split_oracle exists only when
 # the legacy flag is ON; the default-ON class must still be RT-gated. Jar
 # resolution mirrors namer.py; a missing jar leaves OpsinOracle(_jar=None)
@@ -109,7 +109,7 @@ class SplitComponent:
 
 @dataclass(frozen=True)
 class SplitEvent:
-    """ diagnostic event (the reach-report data source)."""
+    """Phase 169 diagnostic event (the reach-report data source)."""
 
     kind: str            # "split_emit" | "split_reject_rt_unsafe" | "passthrough_not_in_table"
     fg_name: str
@@ -138,7 +138,7 @@ def _decompose_carbonyl_ester(
         return None
     carbonyl_c, _double_o, linker_x, alkyl_c = match[0], match[1], match[2], match[3]
 
-    # hardening (P-65.6.3.3.5): the oxo locant of this decomposition is
+    # W2F-P2 hardening (P-65.6.3.3.5): the oxo locant of this decomposition is
     # only meaningful for a CHAIN-MEMBER carbonyl. When the caller provides a
     # chain, decline off-chain carbonyls; principal_chain=None (unit-level
     # pure-decomposition mode, TestEsterSplit contract) keeps prior behavior.
@@ -163,7 +163,7 @@ def _decompose_carbonyl_ester(
     if not linker_prefix:
         return None
 
-    # v1 conservatism (P-16.5 / P-29.6.2.1): a linker prefix that carries
+    # W2F-P2 v1 conservatism (P-16.5 / P-29.6.2.1): a linker prefix that carries
     # INNER enclosing marks without being fully wrapped (a substituted-aryl-
     # methoxy such as '(4-hydroxyphenyl)methoxy') needs NESTED brackets '[...]'
     # that the split emit path (format_fg_prefix, single-level parens) cannot
@@ -290,7 +290,7 @@ def split_composite_fg(
       * the per-split OPSIN-RT gate rejects the assembled split name
         (FAIL-CLOSED, CONTEXT — never a worse name).
 
-    Otherwise returns the ordered ``[SplitComponent,...]`` list (e.g.
+    Otherwise returns the ordered ``[SplitComponent, ...]`` list (e.g.
     ``[oxo, ethoxy]``) the caller appends to ``all_prefixes`` (POLY-02 native).
     """
     # Deny-path first (short-circuits before touching mol — so a functional-class

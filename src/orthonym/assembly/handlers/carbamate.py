@@ -1,8 +1,8 @@
-""" carbamate handler — Tier B retained-name (gate 0.40).
+"""Phase 160 carbamate handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:865-874 (inline branch) +
 composer.py:2561-2671 (_name_carbamate body). Per CONTEXT, body
-stays in composer.py until.
+stays in composer.py until Plan-03 commit 03-10.
 
 IUPAC cite: P-66.5.5.1 (carbamates; functional class naming).
 
@@ -27,10 +27,12 @@ def _is_carbamate(features: Any) -> bool:
 def name_carbamate(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ Tier-B carbamate handler."""
+    """Phase 160 Tier-B carbamate handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _name_carbamate, _enrich_handler_name, _inject_stereo_if_missing,
+        _enrich_handler_name,
+        _inject_stereo_if_missing,
+        _name_carbamate,
     )
 
     carb_name = _name_carbamate(features)

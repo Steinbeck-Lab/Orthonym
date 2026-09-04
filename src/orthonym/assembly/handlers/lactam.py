@@ -1,4 +1,4 @@
-""" lactam handler — direct-return shim with coverage gate.
+"""Phase 160 lactam handler — direct-return shim with coverage gate.
 
 Parallel to lactone handler; verbatim lift of composer.py:830-852
 (inline branch) wrapping ``rules.lactams.is_monocyclic_lactam`` +
@@ -34,9 +34,9 @@ def name_lactam(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return lactam handler with coverage guard."""
+    from ...rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.lactams import is_monocyclic_lactam, name_monocyclic_lactam
 
     lactam_info = is_monocyclic_lactam(features.mol)
     if not lactam_info:

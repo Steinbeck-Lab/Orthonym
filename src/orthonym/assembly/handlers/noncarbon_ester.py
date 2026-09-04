@@ -4,9 +4,9 @@ Dispatches the three ester classes whose acid or alcohol component is not the
 ordinary carbon-on-oxygen carboxylic ester, and which therefore never match the
 generic ``[CX3](=O)[OX2][#6]`` 'ester' perception:
 
-  * pseudoester R-CO-O-Z (Z a Group-13/14/15 organyl) -> 'trimethylsilyl acetate'
-  * sulfonic ester R-SO2-O-R' -> 'methyl methanesulfonate'
-  * sulfinic ester R-S(=O)-O-R' -> 'methyl methanesulfinate'
+  * pseudoester    R-CO-O-Z  (Z a Group-13/14/15 organyl) -> 'trimethylsilyl acetate'
+  * sulfonic ester R-SO2-O-R'                            -> 'methyl methanesulfonate'
+  * sulfinic ester R-S(=O)-O-R'                          -> 'methyl methanesulfinate'
 
 The body is the single shared ``rules.esters.name_noncarbon_ester`` mechanism
 (build the neutral free acid -> '-ate' + O-side organyl). Fail-closed: returns

@@ -1,13 +1,13 @@
-"""functional-group perception fix (.7) hydroxylamine handler.
+"""functional-group perception fix (Phase 169.7) hydroxylamine handler.
 
 Names substituted hydroxylamines on the retained parent hydride ``hydroxylamine``
 (H2N-OH, P-68.3.1.1). Substituents on the nitrogen take the ``N-`` locant; those
 on the oxygen take ``O-`` (P-68.3.1.2.1):
 
-    CCCNO -> N-propylhydroxylamine
-    CCCN(O)C -> N-methyl-N-propylhydroxylamine
-    CON -> O-methylhydroxylamine
-    CN(C)O -> N,N-dimethylhydroxylamine
+    CCCNO        -> N-propylhydroxylamine
+    CCCN(O)C     -> N-methyl-N-propylhydroxylamine
+    CON          -> O-methylhydroxylamine
+    CN(C)O       -> N,N-dimethylhydroxylamine
 
 Without this handler the perceived ``hydroxylamine`` FG (added to
 ``functional_groups.py`` in 169.7) is dropped and the molecule names as the bare
@@ -194,14 +194,14 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
 
 
 # P-63.2.2.2 verbatim, the complete retained R-O– contraction list ("Some
-# contracted names are retained for R-O– substituent groups... they are used both
+# contracted names are retained for R-O– substituent groups ... they are used both
 # as preferred IUPAC prefixes"): methoxy, ethoxy, propoxy, butoxy, phenoxy, and
 #
-# (CH3)3C-O– *tert*-butoxy (preferred prefix) (no substitution)
+#     (CH3)3C-O–   *tert*-butoxy (preferred prefix) (no substitution)
 #
 # so the (CH3)3C-O– prefix is 'tert-butoxy', NOT 'tert-butyloxy' (the index at
 # BlueBookV2.md:55662 spells the rejection out: "tert-butoxy* (unsubstituted) =
-# (2-methylpropan-2-yl)oxy = 1,1-dimethylethoxy (not tert-butyloxy)", and:55671
+# (2-methylpropan-2-yl)oxy = 1,1-dimethylethoxy (not tert-butyloxy)", and :55671
 # "tert-butyloxy: see tert-butoxy*"), and certainly not the over-enclosed
 # '(tert-butyl)oxy' this module used to emit.
 #
@@ -218,7 +218,7 @@ _CONTRACTED_ALKOXY = {
 
 def _alkoxy_prefix(mol, o_idx: int, r_c_idx: int) -> Optional[str]:
     """Name the ``-O-R'`` group as an alkoxy/aryloxy substituent prefix
-    (P-63.2.2.2): methyl -> methoxy, ethyl -> ethoxy,...; longer / complex R'
+    (P-63.2.2.2): methyl -> methoxy, ethyl -> ethoxy, ...; longer / complex R'
     -> ``{R'}oxy`` or ``({R'})oxy``. None if R' cannot be named."""
     from ..substituent_naming import name_substituent_fragment
     frag = _collect_substituent_fragment(mol, r_c_idx, o_idx)
@@ -298,7 +298,7 @@ def _name_no_disub_hydroxylamine(features: Any) -> Optional[NamingResult]:
     except Exception:
         return None
     # The fragment is a clean primary amine (R-NH2), so its PIN is an amine parent
-    # ('methanamine', 'ethanamine', 'aniline',...). Reject only a failure sentinel.
+    # ('methanamine', 'ethanamine', 'aniline', ...). Reject only a failure sentinel.
     if not base or "unknown" in base or "not supported" in base:
         return None
     name = f"N-{alkoxy}{base}"

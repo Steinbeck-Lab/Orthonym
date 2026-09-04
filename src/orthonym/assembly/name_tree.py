@@ -1,33 +1,33 @@
-""" name-tree IR (+ CONTEXT).
+"""Phase 160 name-tree IR (DECOMP-02 + CONTEXT).
 
 Authoritative ordered-n-ary tree intermediate representation between
 handler computation (Pass-1) and final string emission (Pass-2). Per
 CONTEXT: 12-field frozen dataclass; per CONTEXT: handlers
 return ``NamingResult(name, tree, atom_to_locant_hint)`` and may emit
-``tree=None`` during the incremental migration (byte-identical
+``tree=None`` during the incremental migration (DECOMP-03 byte-identical
 lock binds the ``name`` field only).
 
 Architecture (160-CONTEXT.md):
 - ``NameTreeNode`` — 12-field frozen dataclass; immutable;
   serializable for ``--dump-tree``. Tree shape is ordered n-ary
-  (``prefixes: Tuple[NameTreeNode,...]`` is variadic per IUPAC P-23
+  (``prefixes: Tuple[NameTreeNode, ...]`` is variadic per IUPAC P-23
   "complex prefixes are themselves names").
 - ``NamingResult`` — NamedTuple returned by every handler.
 - Field-coverage map: 160-AUDIT-DECOMP.md § 5.
 
-The 12-field schema is LOCKED at audit time per CONTEXT /:
+The 12-field schema is LOCKED at audit time per CONTEXT / AP-160-27:
 adding or removing fields mid-Phase-160 is a Rule 4 architectural
 decision, not a silent edit.
 
 Anti-pattern hygiene:
-- /: predicate purity invariant; NameTreeNode itself
+- AP-160-15 / AP-160-26: predicate purity invariant; NameTreeNode itself
   has no side effects by construction (frozen value type).
--: NameTreeNode field additions/removals mid-Phase-160 banned;
+- AP-160-27: NameTreeNode field additions/removals mid-Phase-160 banned;
   the 12-field schema is the locked spec per CONTEXT.
-- Predicate purity inheritance: NO mutable defaults;
+- Predicate purity inheritance from Phase 158: NO mutable defaults;
   every field defaults to ``None`` / ``()`` / ``False``.
 - IUPAC P-section cites for each field-slot live in
-  160-AUDIT-DECOMP.md § 5 (audit-as-locked-spec).
+  160-AUDIT-DECOMP.md § 5 (audit-as-locked-spec per Phase 156).
 
 References:
 - 160-AUDIT-DECOMP.md § 5 — NameTreeNode Field-Coverage Map.
@@ -42,7 +42,7 @@ from typing import Dict, NamedTuple, Optional, Tuple
 
 @dataclass(frozen=True)
 class NameTreeNode:
-    """: 12-field frozen ordered-n-ary IR node.
+    """Phase 160: 12-field frozen ordered-n-ary IR node.
 
     Composition order per IUPAC P-14.5::
 
@@ -51,7 +51,7 @@ class NameTreeNode:
 
     ``fragment_legacy`` carries the legacy ``NameFragment`` leaf rep
     (composer.py:537) for incremental migration; handlers MAY return
-    ``tree=None`` per (byte-identical lock binds the
+    ``tree=None`` per (DECOMP-03 byte-identical lock binds the
     ``name`` field only).
 
     Per CONTEXT: 12 fields exactly; frozen; immutable. Attempting
@@ -60,31 +60,31 @@ class NameTreeNode:
     Field-coverage map (per 160-AUDIT-DECOMP.md § 5):
 
     +-------------------------------+--------------------------+---------------+
-    | field_name | iupac_p_section_cite | required? |
+    | field_name                    | iupac_p_section_cite     | required?     |
     +===============================+==========================+===============+
-    | parent_stem | P-14.5 / P-23 / P-44 | REQUIRED |
+    | parent_stem                   | P-14.5 / P-23 / P-44     | REQUIRED      |
     +-------------------------------+--------------------------+---------------+
-    | locants | P-14.5 / P-14.7 | optional |
+    | locants                       | P-14.5 / P-14.7          | optional      |
     +-------------------------------+--------------------------+---------------+
-    | suffix | P-65 / P-14.5 | optional |
+    | suffix                        | P-65 / P-14.5            | optional      |
     +-------------------------------+--------------------------+---------------+
-    | prefixes | P-23 / P-14.2.2 | optional |
+    | prefixes                      | P-23 / P-14.2.2          | optional      |
     +-------------------------------+--------------------------+---------------+
-    | stereo | P-91 / P-14.5 | optional |
+    | stereo                        | P-91 / P-14.5            | optional      |
     +-------------------------------+--------------------------+---------------+
-    | indicated_h | P-25.7 / P-31.1.4.3 | optional |
+    | indicated_h                   | P-25.7 / P-31.1.4.3      | optional      |
     +-------------------------------+--------------------------+---------------+
-    | unsaturation_locants | P-14.5 / P-31.1 | optional |
+    | unsaturation_locants          | P-14.5 / P-31.1          | optional      |
     +-------------------------------+--------------------------+---------------+
-    | class_id | (audit metadata) | optional |
+    | class_id                      | (audit metadata)         | optional      |
     +-------------------------------+--------------------------+---------------+
-    | multiplicative_prefix | P-14.2.2 / P-14.5.1 | optional |
+    | multiplicative_prefix         | P-14.2.2 / P-14.5.1      | optional      |
     +-------------------------------+--------------------------+---------------+
-    | parenthesization_hint | P-51.3.5 / P-14.5.1 | optional |
+    | parenthesization_hint         | P-51.3.5 / P-14.5.1      | optional      |
     +-------------------------------+--------------------------+---------------+
-    | iupac_section_cite | (audit metadata) | optional |
+    | iupac_section_cite            | (audit metadata)         | optional      |
     +-------------------------------+--------------------------+---------------+
-    | fragment_legacy | (migration handle) | optional |
+    | fragment_legacy               | (migration handle)       | optional      |
     +-------------------------------+--------------------------+---------------+
     """
     parent_stem: str
@@ -102,7 +102,7 @@ class NameTreeNode:
 
 
 class NamingResult(NamedTuple):
-    """: handler return shape.
+    """Phase 160: handler return shape.
 
     Per: handlers return ``NamingResult(name, tree, atom_to_locant_hint)``;
     ``tree`` is Optional during incremental migration; ``atom_to_locant_hint``
@@ -110,12 +110,12 @@ class NamingResult(NamedTuple):
     (composer.py:807, 1681-1683 today).
 
     Fields:
-        name: REQUIRED — byte-identical contract per. This is the
+        name: REQUIRED — byte-identical contract per DECOMP-03. This is the
             single source of truth at first wave; handlers SHOULD route this
             through the existing composer.py pool.add() / _inject_stereo_if_missing
             pipeline for byte-identical preservation.
         tree: Optional first-wave; populated incrementally per v19+ phases.
-            ``None`` is the DEFAULT for /03 ship (per 160-AUDIT-DECOMP.md
+            ``None`` is the DEFAULT for Plan-02/03 ship (per 160-AUDIT-DECOMP.md
             § 5.2). When non-None, the tree's serialization via
             ``name_tree_to_string()`` MUST equal the ``name`` field byte-for-byte.
         atom_to_locant_hint: Forwarded to the post-handler stereo injector
@@ -160,7 +160,7 @@ def _alphabetize_prefixes(
         >>> a = NameTreeNode(parent_stem="methyl")
         >>> b = NameTreeNode(parent_stem="ethyl")
         >>> _alphabetize_prefixes((a, b))
-        (NameTreeNode(parent_stem='ethyl',...), NameTreeNode(parent_stem='methyl',...))
+        (NameTreeNode(parent_stem='ethyl', ...), NameTreeNode(parent_stem='methyl', ...))
     """
     # Lazy import to avoid an import cycle if naming_utils imports back from
     # name_tree (unlikely today, but mirrors the lazy-import pattern in
@@ -170,7 +170,7 @@ def _alphabetize_prefixes(
 
 
 def is_coarse_node(node: NameTreeNode) -> bool:
-    """ (WR-1): single source of truth for the coarse/structured
+    """Phase 165 SCORE-02 (WR-1): single source of truth for the coarse/structured
     classification used by BOTH the coarse-bucket metric script and the handler
     contract test.
 

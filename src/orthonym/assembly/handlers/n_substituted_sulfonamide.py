@@ -14,7 +14,7 @@ Why this is NOT enriched: ``n_substituted_sulfonamide_name`` already spells the
 parent AND every N-substituent, so running the generic enricher over it could
 only re-discover the handler's own core and spell an atom twice — the second
 anti-pattern recorded in
-``. Same reasoning as
+. Same reasoning as
 ``handlers/thiourea.py``.
 """
 from __future__ import annotations
@@ -45,8 +45,8 @@ def name_n_substituted_sulfonamide(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Tier-B N-substituted sulfonamide handler (P-66.1.1.3.1.1)."""
-    from ..candidate_pool import get_current_pool
     from ...rules.sulfonamides import n_substituted_sulfonamide_name
+    from ..candidate_pool import get_current_pool
 
     _mol = mol if mol is not None else getattr(features, 'mol', None)
     if _mol is None:

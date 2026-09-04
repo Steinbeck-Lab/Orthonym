@@ -1,16 +1,16 @@
-""" (WSA-03 / CONTEXT) — shared name-composition primitives.
+"""Phase 179 (WSA-03 / CONTEXT) — shared name-composition primitives.
 
 Single source of truth for the IUPAC P-14.5 / P-16 / P-31.1 string-composition
 grammar, called by BOTH the legacy fragment assembler
 (``handlers/_handler_shared.py:_assemble_fragments``) and the Name-Tree
 serializer (``name_tree_to_string._assemble_explicit_fields``). There is ONE
 implementation of each rule — not two — so the legacy path and the production
-flip path cannot drift (the no-band-aid mandate in
-``./skills/fix-methodology.md``).
+flip path cannot drift (; the no-band-aid mandate in
+``.claude/skills/fix-methodology.md``).
 
 The five core helpers (``_estimate_parent_size_from_name``,
 ``_build_unsaturation_infix``, ``_build_hydrocarbon_name``, ``_join_prefixes``,
-``_join_prefix_to_name``) were LIFTED VERBATIM from ``composer.py``
+``_join_prefix_to_name``) were LIFTED VERBATIM from ``composer.py`` (Phase 179)
 — their bodies are unchanged so the legacy carrier stays byte-identical.
 ``composer.py`` re-exports them under their original names for back-compat.
 
@@ -26,12 +26,13 @@ import re
 from typing import List, Optional, Tuple
 
 from .naming_utils import (
-    SIMPLE_MULTIPLIERS, italicized_prefix_is_bare, should_omit_locant_one,
+    SIMPLE_MULTIPLIERS,
+    italicized_prefix_is_bare,
+    should_omit_locant_one,
 )
 
-
 # ---------------------------------------------------------------------------
-# Core helpers — LIFTED VERBATIM from composer.py (byte-identical).
+# Core helpers — LIFTED VERBATIM from composer.py (Phase 179, byte-identical).
 # ---------------------------------------------------------------------------
 
 
@@ -39,7 +40,7 @@ def _estimate_parent_size_from_name(parent_name: str) -> int:
     """Estimate the number of atoms in the parent from its name.
 
     Used by collision detection to determine if a locant exceeds the parent
-    structure capacity. Returns a conservative estimate; unknown parents
+    structure capacity.  Returns a conservative estimate; unknown parents
     default to 100 (effectively disabling capacity validation).
 
     Args:
@@ -346,7 +347,7 @@ def _join_prefixes(prefix_texts: List[str]) -> str:
         if result and current:
             last_char = result[-1]
             first_char = current[0]
-            # Item 4: `}` was missing from both tuples,
+            # Item 4 (MINOR 8): `}` was missing from both tuples,
             # so this copy dropped the separator after a brace-enclosed prefix
             # ('2-{[(methylcarbamoyl)amino]methyl}4-methyl') while the
             # `polyfunctional._join_prefixes` copy already hyphenated it. A closing
@@ -407,10 +408,10 @@ def retained_acetic_from_prefixes(prefix_texts: List[str], stereo: str = "") -> 
     substituent locants are omitted while multipliers and any INTERNAL locants of
     a complex substituent are preserved::
 
-        ['2-chloro'] -> 'chloroacetic acid'
-        ['2,2-difluoro'] -> 'difluoroacetic acid' (BB 3037)
-        ['2-phenyl'] -> 'phenylacetic acid' (BB 6694)
-        ['2-(4-chlorophenoxy)'] -> '(4-chlorophenoxy)acetic acid'
+        ['2-chloro']              -> 'chloroacetic acid'
+        ['2,2-difluoro']          -> 'difluoroacetic acid'   (BB 3037)
+        ['2-phenyl']              -> 'phenylacetic acid'      (BB 6694)
+        ['2-(4-chlorophenoxy)']   -> '(4-chlorophenoxy)acetic acid'
 
     The caller is responsible for gating this to the substituted-2-carbon-monoacid
     context (carboxylic-acid PCG, saturated ethane parent, single -COOH); this
@@ -481,7 +482,7 @@ def apply_mononuclear_enclosing(
         # simple = no locant prefix, no existing enclosing marks, no compound
         # hyphen, no multiplicative prefix; bromo/chloro/fluoro/iodo/nitro etc.
         # A locant-bearing first substituent already routes through the
-        # `re.match(r'^\d',...)` path in the caller and is excluded here (the
+        # `re.match(r'^\d', ...)` path in the caller and is excluded here (the
         # Blue Book exempts only the locant-bearing first prefix from this rule).
         #
         # The italicized-prefix carve-out is the SHARED primitive, never a raw

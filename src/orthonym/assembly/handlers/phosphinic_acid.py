@@ -1,4 +1,4 @@
-""" phosphinic_acid handler — direct-return shim.
+"""Phase 160 phosphinic_acid handler — direct-return shim.
 
 1-line wrapper around ``rules.phosphorus.name_phosphinic_acid``. Verbatim
 move of composer.py:1064-1079 dispatch logic.
@@ -29,9 +29,9 @@ def name_phosphinic_acid(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return phosphinic_acid handler."""
+    from ...rules.phosphorus import name_phosphinic_acid as _name_phosphinic_acid
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.phosphorus import name_phosphinic_acid as _name_phosphinic_acid
 
     matches = features.functional_groups.get('phosphinic_acid', [])
     if not matches:

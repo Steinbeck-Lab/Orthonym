@@ -1,8 +1,8 @@
-""" urea handler — Tier B retained-name (gate 0.40).
+"""Phase 160 urea handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of composer.py:876-885 (inline branch) +
 composer.py:2672-2759 (_try_name_urea body). Per CONTEXT, body
-stays in composer.py until.
+stays in composer.py until Plan-03 commit 03-10.
 
 IUPAC cite: P-66.6 (ureas; retained name with N-substitution).
 
@@ -27,14 +27,16 @@ def _is_urea(features: Any) -> bool:
 def name_urea(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ Tier-B urea handler."""
+    """Phase 160 Tier-B urea handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _try_name_urea, _try_name_semicarbazone,
-        _enrich_handler_name, _inject_stereo_if_missing,
+        _enrich_handler_name,
+        _inject_stereo_if_missing,
+        _try_name_semicarbazone,
+        _try_name_urea,
     )
 
-    # P-15.2.2 (W2E-P1FG): a semicarbazone (R2C=N-NH-CO-NH2) is a urea
+    # P-15.2.2 (W2E-P1FG Task 12): a semicarbazone (R2C=N-NH-CO-NH2) is a urea
     # FG with principal_group None; name it substitutively BEFORE the plain
     # urea path (which would drop the ylidene). Fail-closed -> falls through.
     urea_name = _try_name_semicarbazone(features)

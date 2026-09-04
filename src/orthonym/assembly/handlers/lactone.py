@@ -1,4 +1,4 @@
-""" lactone handler — direct-return shim with coverage gate.
+"""Phase 160 lactone handler — direct-return shim with coverage gate.
 
 Verbatim lift of composer.py:826-848 (inline branch) wrapping
 ``rules.lactones.is_monocyclic_lactone`` + ``rules.lactones.name_monocyclic_lactone``.
@@ -30,10 +30,10 @@ def _is_lactone(features: Any) -> bool:
 
     Lazy import per PATTERNS § Lazy Import. The SMARTS substruct match is
     cheap; duplicate call between predicate + handler is acceptable for
-     byte-identical preservation. performance benchmark
+    Plan-02 byte-identical preservation. Plan-04 performance benchmark
     can identify if memoization is needed.
 
-    Pure read-only per CONTEXT /: reads features.mol via
+    Pure read-only per CONTEXT / AP-160-26: reads features.mol via
     Chem.MolFromSmarts + GetSubstructMatches; no mutation.
     """
     mol = getattr(features, 'mol', None)
@@ -52,9 +52,9 @@ def name_lactone(
     coverage guard rejects (large substituted lactone where the bare
     name would be incomplete).
     """
+    from ...rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.lactones import is_monocyclic_lactone, name_monocyclic_lactone
 
     lactone_info = is_monocyclic_lactone(features.mol)
     if not lactone_info:

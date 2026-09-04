@@ -1,10 +1,10 @@
-""" hydrazone handler — Tier B retained-name (gate 0.40).
+"""Phase 160 hydrazone handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of the hydrazone dispatch logic from composer.py:785-794
 (inline branch) + composer.py:1906-2042 (shared body of
 _name_oxime_or_hydrazone with second arg ``'hydrazone'``). Per CONTEXT
  incremental-migration discipline, the body stays in composer.py
-until thinning.
+until Plan-03 commit 03-10 thinning.
 
 IUPAC cite: P-66.6 (hydrazone functional class naming).
 
@@ -24,7 +24,7 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_hydrazone(features: Any) -> bool:
     """Mirrors composer.py:785 (``features.principal_group == 'hydrazone'``).
 
-    Pure read-only per CONTEXT /.
+    Pure read-only per CONTEXT / AP-160-26.
     """
     return getattr(features, 'principal_group', None) == 'hydrazone'
 
@@ -32,7 +32,7 @@ def _is_hydrazone(features: Any) -> bool:
 def name_hydrazone(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ Tier-B hydrazone handler.
+    """Phase 160 Tier-B hydrazone handler.
 
     Verbatim semantics of composer.py:785-794 (inline branch). Returns
     ``NamingResult(name, tree=None, atom_to_locant_hint=None)`` on success;
@@ -41,12 +41,14 @@ def name_hydrazone(
     # Lazy imports per PATTERNS § Lazy Import.
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _name_oxime_or_hydrazone, _try_name_semicarbazone,
+        _enrich_handler_name,
+        _inject_stereo_if_missing,
+        _name_oxime_or_hydrazone,
         _try_name_hydrazone_substitutive,
-        _enrich_handler_name, _inject_stereo_if_missing,
+        _try_name_semicarbazone,
     )
 
-    # P-15.2.2 (W2E-P1FG): a semicarbazone R2C=N-NH-CO-NH2 is
+    # P-15.2.2 (W2E-P1FG Task 12): a semicarbazone R2C=N-NH-CO-NH2 is
     # perceived as principal_group='hydrazone' (the C=N-N arm) whose N-NH2
     # tail is acylated by a carbamoyl. Name it substitutively as
     # '2-(ylidene)hydrazine-1-carboxamide' BEFORE the generic hydrazone

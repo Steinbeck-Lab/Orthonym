@@ -1,12 +1,12 @@
-""" polycyclic handler — direct-return shim (LIFT body alongside).
+"""Phase 160 polycyclic handler — direct-return shim (LIFT body alongside).
 
 Verbatim move of composer.py:1100-1114 dispatch logic. Wraps the inline
 ``_assemble_polycyclic_name(features, style)`` call + ``pool.add()`` +
 ``pool.best().name`` return.
 
 Per CONTEXT incremental migration: the underlying
-``_assemble_polycyclic_name`` body STAYS in composer.py during and
-moves to this module in (composer.py thinning).
+``_assemble_polycyclic_name`` body STAYS in composer.py during Plan-02 and
+moves to this module in Plan-03 commit 03-10 (composer.py thinning).
 
 IUPAC cite: P-25 (polycyclic aromatics + retained names).
 

@@ -1,18 +1,18 @@
-""" handler enrichment helpers.
+"""Phase 160 handler enrichment helpers (DECOMP-01).
 
-Substrate: lazy re-export wrappers around the canonical
+Substrate commit 02-00: lazy re-export wrappers around the canonical
 implementations in ``composer.py``. Per CONTEXT incremental-migration
 discipline, composer.py STILL OWNS ``_enrich_handler_name`` (composer.py:191-277)
 and ``_integrate_universal_prefixes`` (composer.py:109-183) at this commit;
-those functions stay until (composer.py thinning).
+those functions stay until Plan-03 commit 03-10 (composer.py thinning).
 
 The substrate ships THIS module so handler files can write the
 forward-looking import path::
 
-    from.._enrichment import enrich_handler_name # eventual public path
+    from .._enrichment import enrich_handler_name  # eventual public path
 
 while internally the symbols delegate (via lazy import inside each
-function body) to composer.py. When lands, the
+function body) to composer.py. When Plan-03 commit 03-10 lands, the
 function BODIES move here verbatim and composer.py's `_enrich_handler_name`
 + `_integrate_universal_prefixes` definitions delete. The re-export
 shape ensures handler files do NOT need to change import paths at thinning
@@ -24,11 +24,11 @@ composer path now to minimize commit-02-00 risk: zero copy of composer.py
 logic; zero risk of stale-closure drift; the byte-identical canary delta
 gate is trivially satisfied.
 
-Anti-pattern hygiene (inheritance):
-- banned: pure read-only on ``features``; never mutates
+Anti-pattern hygiene (Phase 158 inheritance):
+- AP-160-04 banned: pure read-only on ``features``; never mutates
   ``features.mol`` or ``features.functional_groups``. (The lazy delegate
   inherits composer.py's purity verbatim.)
-- banned: no regex band-aid / postprocessor on inner-dispatch
+- AP-160-23 banned: no regex band-aid / postprocessor on inner-dispatch
   output — the helpers are pure wrappers.
 - ``logger.debug`` for HANDLER_COVERAGE telemetry; default-OFF.
 - IUPAC P-31.1 cite stays in ``_integrate_universal_prefixes`` docstring
@@ -70,7 +70,7 @@ def enrich_handler_name(
 
     See Also:
         composer.py:_enrich_handler_name — canonical implementation;
-            moves here verbatim at (composer.py thinning).
+            moves here verbatim at Plan-03 commit 03-10 (composer.py thinning).
     """
     # Lazy import per PATTERNS § Lazy Import (avoid composer.py -> handlers
     # -> composer.py cycle at module load).

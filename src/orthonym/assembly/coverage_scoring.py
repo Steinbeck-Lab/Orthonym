@@ -1,15 +1,15 @@
 """Graduated confidence scoring for coverage gate candidate selection.
 
 Replaces the binary accept/reject coverage gate (binary_accept_reject_coverage_gate) with a continuous
-multi-factor scoring system. Each handler (complex_ring, heterocycle, benzene)
+multi-factor scoring system.  Each handler (complex_ring, heterocycle, benzene)
 produces a CandidateName with a 0.0-1.0 confidence score derived from four
-factors. The best candidate is selected and returned; no computed name is
+factors.  The best candidate is selected and returned; no computed name is
 ever discarded.
 
 Four scoring factors:
-  1. ratio -- name-length / heavy-atom-count heuristic (normalised 0-1)
+  1. ratio         -- name-length / heavy-atom-count heuristic (normalised 0-1)
   2. atom_coverage -- fraction of heavy atoms covered by the parent structure
-     ONLY when ``compute_confidence`` is given ``parent_atom_indices``. See
+     ONLY when ``compute_confidence`` is given ``parent_atom_indices``.  See
      the PROVENANCE WARNING below: in the production path it never is.
   3. fg_recognition -- fraction of detected FGs with known naming forms
   4. substituent_completeness -- fraction of substituents reflected in the name
@@ -18,11 +18,11 @@ Thread-local confidence store allows callers to retrieve metadata after
 assemble_name() returns without changing its str return type.
 
 PROVENANCE WARNING -- ``factors['atom_coverage']`` is NOT a coverage
-measurement in the production path. ``CandidatePool.add()``
+measurement in the production path.  ``CandidatePool.add()``
 (``candidate_pool.py``, "Risk 1" mitigation) deliberately calls
 ``compute_confidence`` WITHOUT ``parent_atom_indices`` in order to keep
 confidence byte-identical, and attaches ``parent_atom_indices`` to the
-CandidateName only POST-HOC. Consequently ``atom_coverage`` is either
+CandidateName only POST-HOC.  Consequently ``atom_coverage`` is either
 
   * ``ratio_score`` -- a pure name-LENGTH proxy, numerically identical to
     ``factors['ratio']`` (provenance ``estimated_name_length``), or
@@ -32,10 +32,10 @@ CandidateName only POST-HOC. Consequently ``atom_coverage`` is either
 It is a real fraction-of-atoms measurement (provenance ``measured``) only when
 a caller passes ``parent_atom_indices`` -- which no production caller does.
 Every record therefore carries ``coverage_provenance`` so that no consumer can
-mistake the estimate for a measurement. Do not remove that field, and do not
+mistake the estimate for a measurement.  Do not remove that field, and do not
 present ``atom_coverage`` as verified coverage without checking it.
 
-MEASURED REACH -- fresh process per molecule, 40
+MEASURED REACH (Task Z2, 2026-08-02) -- fresh process per molecule, 40
 molecules, 20 of them over 25 heavy atoms:
 
   * ``ratio_raw`` (the name-length proxy) is computed **114 times across 29 of
@@ -45,15 +45,15 @@ molecules, 20 of them over 25 heavy atoms:
   * ``composer._confidence_gate`` -- the function whose docstring defines the
     accept/reject rule -- recorded **0 calls**; it is off the execution path
     entirely. ``candidate_pool.py`` Tier B (``policy.tier == 'ring_b'``) also
-    recorded **0**. Both re-confirmed by (48 molecules, 0 and 0).
+    recorded **0**. Both re-confirmed by Task Z3 (48 molecules, 0 and 0).
 
-⚠ CORRECTION -- THIS RATIO **DOES** GATE A LIVE DECISION.
- concluded "nothing observed acted on the result" after checking those
+⚠ CORRECTION (Task Z3, 2026-08-02) -- THIS RATIO **DOES** GATE A LIVE DECISION.
+Task Z2 concluded "nothing observed acted on the result" after checking those
 two sites. It checked the wrong two. The live consumer is **``namer.py:3810``**:
 
-    atom_cov = _factors.get('atom_coverage') # namer.py:3802
-    elif atom_cov < 0.55: # namer.py:3810
-        ... return decomp_name # namer.py:3827
+    atom_cov = _factors.get('atom_coverage')      # namer.py:3802
+    elif atom_cov < 0.55:                          # namer.py:3810
+        ... return decomp_name                     # namer.py:3827
 
 It reads ``factors['atom_coverage']`` DIRECTLY, so it never touches
 ``confidence`` and neither of the two gates Z2 examined could ever have
@@ -61,7 +61,7 @@ revealed it. Because that factor is ``ratio_score`` in the production path,
 ``atom_cov < 0.55`` is exactly ``len(name) / heavy_atoms < 0.825`` -- a
 character-count gate stricter than any of the three in
 ``decomposition/engine.py``, wearing the name "atom coverage". Measured by
- over 48 molecules, fresh process each: ``ratio_raw`` computed **205
+Task Z3 over 48 molecules, fresh process each: ``ratio_raw`` computed **205
 times across 32 molecules**; ``namer.py:3810`` **REACHED 6 times on 6
 molecules** and rejected **0**. So it is live and reachable, and merely
 happened not to fire on that sample -- which is a different and much weaker
@@ -76,9 +76,8 @@ candidate selection, which requires a full gate run to certify. Do not "fix"
 the factor without one, and do not cite ``factors['ratio']`` or
 ``factors['atom_coverage']`` as evidence about atoms. Real coverage:
 ``validation/atom_coverage.py`` (constitution by InChIKey skeleton) -- wired
-into the ``decomposition/engine.py`` guards by. Full audits:
-`` and
-``.
+into the ``decomposition/engine.py`` guards by Task Z3. Full audits:
+ and
 """
 
 import logging
@@ -152,12 +151,12 @@ class CandidateName:
     name: str
     handler: str  # 'complex_ring', 'heterocycle', 'benzene', 'chain'
     # 0.0-1.0 aggregate score, or None for "nothing scored this candidate"
-    # . None is NOT a low score -- consumers must branch on it, never
+    #. None is NOT a low score -- consumers must branch on it, never
     # coerce it to 0.0 (a fabricated FAIL) or 1.0 (a fabricated PASS).
     confidence: Optional[float] = 0.0
     factors: Dict[str, float] = field(default_factory=dict)
     # factors keys: 'ratio', 'atom_coverage', 'fg_recognition',
-    # 'substituent_completeness'
+    #               'substituent_completeness'
     # C4: provenance of factors['atom_coverage'] -- one of
     # COVERAGE_MEASURED / COVERAGE_ESTIMATED_NAME_LENGTH /
     # COVERAGE_RETAINED_NAME_BOOST, or None when factors is empty. Set by
@@ -166,7 +165,7 @@ class CandidateName:
     # treating atom_coverage as a coverage measurement -- in the production
     # path it is never COVERAGE_MEASURED (see module PROVENANCE WARNING).
     coverage_provenance: Optional[str] = None
-    # New.1: parent atom indices populated POST-HOC by
+    # New in Phase 145.1: parent atom indices populated POST-HOC by
     # CandidatePool.add() (see candidate_pool.py). Used by
     # ParentCorrectnessScorer to compare against OPSIN-extracted
     # reference parent. None when handler doesn't report parent atoms
@@ -178,7 +177,7 @@ class CandidateName:
     # changes atom_coverage and breaks byte-identical (see RESEARCH §9.1
     # Risk 3 / PATTERNS Risk 1).
     parent_atom_indices: Optional[set] = None
-    # : principal-characteristic-group count for the parent
+    # Phase 146 CD-01: principal-characteristic-group count for the parent
     # structure. Populated POST-HOC by CandidatePool.add() via
     # _count_pcgs_in_parent. Same Risk 1 mitigation as parent_atom_indices:
     # NEVER passed into compute_confidence() — that would break the
@@ -187,7 +186,7 @@ class CandidateName:
     # Default None means "not yet computed" (the cascade treats None as 0).
     # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1
     parent_pcg_count: Optional[int] = None
-    # : ring-type authoritative IUPAC locants used by
+    # Phase 147: ring-type authoritative IUPAC locants used by
     # Tier-1 cascade step 6 (_filter_lowest_locants) per P-44.4.1.4+.
     # Populated POST-HOC by CandidatePool.add() — same Risk 1 mitigation
     # as parent_atom_indices: NEVER passed into compute_confidence()
@@ -198,28 +197,28 @@ class CandidateName:
     # via _has_iupac_locants probe at candidate_pool.py:501-514.
     # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.4+
     ring_info: Optional[Dict[str, Any]] = None
-    # : structured Name-Tree IR for this candidate. Populated
+    # Phase 165 SCORE-01: structured Name-Tree IR for this candidate. Populated
     # POST-HOC by CandidatePool.add(tree=...) — same Risk 1 mitigation as
     # parent_atom_indices / ring_info: NEVER passed into compute_confidence()
     # (would break the byte-identical guarantee). None means "no tree yet"
     # (coarse-bucket counted in Plan 04). pool.best().tree surfaces the winner's.
     tree: Optional["NameTreeNode"] = None
-    # : POST-HOC per-node {id(node): NodeScores}, same Risk 1
+    # Phase 166 SCORE-03: POST-HOC per-node {id(node): NodeScores}, same Risk 1
     # mitigation as tree / parent_atom_indices / ring_info: NEVER passed into
     # compute_confidence() (would break the byte-identical guarantee). None / {}
     # means "no per-substring signal" — the production no-reference path, or a
     # coarse tree. pool.best().node_scores surfaces the winner's map for the
-    # Plan 04 measurement.
+    # Plan 04 SCORE-06 measurement.
     node_scores: Optional[dict] = None
-    # WSB-01: authoritative {atom_idx: 1-indexed locant} for the
+    # Phase 177 WSB-01: authoritative {atom_idx: 1-indexed locant} for the
     # parent structure, threaded to the namer backstop _final_stereo_check so it
     # can inject stereodescriptors on the chain / non-phenol-benzene cohort.
     # POST-HOC — NEVER passed into compute_confidence() (byte-identity Risk 1),
     # same mitigation as parent_atom_indices / ring_info / tree / node_scores.
     # None for direct-return handlers / complex_ring / polycyclic / phenol benzene
-    # (no authoritative map -> backstop stays log-only there,).
+    # (no authoritative map -> backstop stays log-only there, /).
     atom_to_locant: Optional[Dict[int, int]] = None
-    # WSB-01: True when the benzene parent is a PHENOL, so the
+    # Phase 177 WSB-01: True when the benzene parent is a PHENOL, so the
     # backstop excludes it from the inject allowlist (phenol benzene stays
     # log-only). None/False otherwise. POST-HOC, never into compute_confidence.
     is_phenol_benzene: Optional[bool] = None
@@ -268,7 +267,7 @@ HANDLER_PRIORITY: Dict[str, int] = {
     'ring_assembly': 5,
     'ring_nitrile': 5,
     'amide': 5,
-    # .1 ADDS (ISS-002 remediation): single source of truth for
+    # Phase 145.1 ADDS (ISS-002 remediation): single source of truth for
     # candidate_pool.HANDLER_POLICIES. Plan 01's HANDLER_POLICIES dict pulls
     # every priority from this dict; missing entries break with KeyError.
     # n_oxide and amine handlers exist at composer.py:740 and composer.py:1383
@@ -284,11 +283,11 @@ HANDLER_PRIORITY: Dict[str, int] = {
 
 # Confidence threshold for Tier B handler gating.
 # Handlers producing names with confidence below this threshold fall through
-# to the next handler in the cascade. Calibrated on ChEBI 500.
+# to the next handler in the cascade. Calibrated in Phase 81 on ChEBI 500.
 CONFIDENCE_GATE_THRESHOLD: float = 0.40
 
 # Calibrated weights for multi-factor confidence scoring
-# Derivation:
+# Derivation: scripts/calibrate_coverage_gate.py
 # Benchmark: ChEBI 500-sample, seed=123, n=500
 # Date: 2026-02-27
 # Grid steps: 11, cross-validated (400 train / 100 test)
@@ -297,27 +296,27 @@ CONFIDENCE_GATE_THRESHOLD: float = 0.40
 # single-candidate under current architecture, so weights affect confidence
 # quality rather than selection outcomes). Weights proportional to per-factor
 # discriminative power between InChI-matching and non-matching names:
-# fg_recognition (0.062) > substituent_completeness (0.047) >
-# ratio (0.042) = atom_coverage (0.042)
+#   fg_recognition (0.062) > substituent_completeness (0.047) >
+#   ratio (0.042) = atom_coverage (0.042)
 # Pre-calibration baseline: ratio=0.30, atom_cov=0.30, fg=0.25, sub=0.15
 #
-# : two dicts FACTOR_WEIGHTS_V17 and FACTOR_WEIGHTS_V18 are
+# Phase 146: two dicts FACTOR_WEIGHTS_V17 and FACTOR_WEIGHTS_V18 are
 # declared; FACTOR_WEIGHTS is bound to one or the other at module-import time
 # based on the ORTHONYM_USE_V18_WEIGHTS env var (default 'false' = V17).
-# The V18 dict adds the multiple_bond_count factor (P-44.4.1.2).
+# The V18 dict adds the multiple_bond_count factor (, P-44.4.1.2).
 # Calibrated weight values are written by Plan 04 grid search.
 #
 # ----------------------------------------------------------------
-# /: feature-flag-controlled FACTOR_WEIGHTS dispatch.
+# Phase 146 /: feature-flag-controlled FACTOR_WEIGHTS dispatch.
 # ORTHONYM_USE_V18_WEIGHTS env var read at module-import time.
 # Default 'false' (V17 active) during the post-148 soak week per.
 # Rollback one-liner:
-# ORTHONYM_USE_V18_WEIGHTS=false ORTHONYM_SELECTION_MODE=first_applicable pytest tests/
+#   ORTHONYM_USE_V18_WEIGHTS=false ORTHONYM_SELECTION_MODE=first_applicable pytest tests/
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.1.1, P-44.4.1.2
 # ----------------------------------------------------------------
 _USE_V18 = os.getenv('ORTHONYM_USE_V18_WEIGHTS', 'false').strip().lower() == 'true'
 
-# V17 weights (.1 + 145.2 baseline — byte-identical preserved).
+# V17 weights (Phase 145.1 + 145.2 baseline — byte-identical preserved).
 # ratio=0.0 from 145.2 -a.1 (zero IUPAC justification per Blue Book grep).
 # parent_correctness=0.0 from 145.1 (scaffolded; raised to calibrated value in V18).
 #
@@ -325,8 +324,8 @@ _USE_V18 = os.getenv('ORTHONYM_USE_V18_WEIGHTS', 'false').strip().lower() == 'tr
 # - Python 3.7+ dict iteration is insertion-order-deterministic.
 # - compute_confidence's sum-loop iterates FACTOR_WEIGHTS in insertion order.
 # - parent_correctness inserted LAST so the existing 4 weighted-sum terms
-# accumulate first; the 5th term (0.0 * factor) contributes exactly 0.0
-# by IEEE 754 (x + 0.0 = x for finite x).
+#   accumulate first; the 5th term (0.0 * factor) contributes exactly 0.0
+#   by IEEE 754 (x + 0.0 = x for finite x).
 # - Therefore confidence values are byte-identical to pre-145.1 code.
 #
 # RISK 2 (PATTERNS Risk 2): inserting parent_correctness in the MIDDLE would
@@ -340,29 +339,29 @@ FACTOR_WEIGHTS_V17: Dict[str, float] = {
     'parent_correctness': 0.0,
 }
 
-# V18 weights (calibrated by grid search in Plan 04).
-# CALIBRATED by Plan 04 grid search.
-# Grid: 5^5 with sum-to-1.0 constraint; parent_correctness DROPPED per
-# (std=0.0 until wires features.parent_selection_result); 52 surviving
+# V18 weights (Phase 146 calibrated by grid search in Plan 04).
+# CALIBRATED by Plan 04 grid search (2026-04-24, 52 configs, anti-overfit delta=0.0).
+# Grid: 5^5 with sum-to-1.0 constraint; parent_correctness DROPPED per CD-03
+# (std=0.0 until Phase 148 wires features.parent_selection_result); 52 surviving
 # configs evaluated over ~2.5 hrs wall-clock on 4 workers.
 # multiple_bond_count is the NEW factor per (P-44.4.1.2) — calibration
 # retained it at 0.25 (NOT triggered; factor has meaningful discriminative
-# signal even under 's production path).
+# signal even under CD-03's production path).
 # Insertion order: multiple_bond_count is APPENDED LAST per IEEE 754
 # invariant (when V17 loop encounters this dict via reload, the 6th term
 # is added LAST so prior 5 sums are byte-identical to V17).
 # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html P-44.4.1.2
 FACTOR_WEIGHTS_V18: Dict[str, float] = {
-    'ratio': 0.0,                       # permanent 0.0 (.2 -a.1)
-    'atom_coverage': 0.05,              # RECALIBRATED via.2 boundary-extension grid
+    'ratio': 0.0,                       # permanent 0.0 (Phase 145.2 D-09-a.1)
+    'atom_coverage': 0.05,              # RECALIBRATED via Phase 148.2 boundary-extension grid
     'fg_recognition': 0.25,             # RECALIBRATED (post-148 cascade unblock shifts optimum)
     'substituent_completeness': 0.25,   # RECALIBRATED
-    'parent_correctness': 0.35,         # RECALIBRATED —.2 INTERIOR optimum (was 0.25 at 148.1 corner)
+    'parent_correctness': 0.35,         # RECALIBRATED — Phase 148.2 INTERIOR optimum (was 0.25 at 148.1 corner)
     'multiple_bond_count': 0.10,        # RECALIBRATED (lowered to keep sum-to-1.0)
 }
 # Sum = 1.00 (0.00 + 0.05 + 0.25 + 0.25 + 0.35 + 0.10); sum-to-1.0 constraint satisfied.
-# .2 partial (100/255 configs; 5-hr abort): Wilson-95-LB winner;
-# SATISFIED: parent_correctness=0.35 is INTERIOR to [0.30, 0.50] grid; no further
+# Phase 148.2 partial (100/255 configs; 5-hr abort): Wilson-95-LB winner;
+# CD-02 SATISFIED: parent_correctness=0.35 is INTERIOR to [0.30, 0.50] grid; no further
 # boundary extension needed. Top-10 cluster: PC=0.30 (5/10), PC=0.35 (3/10), PC=0.40 (1/10), PC=0.45 (1/10).
 
 # Active weights — flipped via ORTHONYM_USE_V18_WEIGHTS env var.
@@ -391,7 +390,7 @@ def _is_retained_scaffold_name(name: str) -> bool:
     """
     name_lower = name.lower()
 
-    # Check RETAINED_NAMES (consult merged ALL_RETAINED_NAMES)
+    # Check RETAINED_NAMES (Phase 150: consult merged ALL_RETAINED_NAMES)
     try:
         from ..data import ALL_RETAINED_NAMES as RETAINED_NAMES
         for _smi, retained in RETAINED_NAMES.items():
@@ -440,7 +439,7 @@ def _compute_fg_recognition(features: Any) -> float:
     """Fraction of detected functional groups with known naming forms.
 
     The principal group is always counted as recognised (it becomes the
-    suffix). Non-principal groups are counted if they have a known prefix
+    suffix).  Non-principal groups are counted if they have a known prefix
     form via ``get_prefix()``.
 
     Returns 1.0 when there are no functional groups to miss.
@@ -517,7 +516,7 @@ def _compute_multiple_bond_count(
 ) -> float:
     """Count (double + triple) bonds where both endpoints are in parent_atom_indices.
 
-    : parent atoms ONLY (NOT entire molecule), per P-44.4.1.2
+    Phase 146: parent atoms ONLY (NOT entire molecule), per P-44.4.1.2
     which says "ring system or chain" = the parent skeleton. Substituent
     multiple bonds (e.g. a nitrile substituent's C#N triple bond) do NOT
     contribute because the bond's endpoints are not both in parent_atom_indices.
@@ -599,13 +598,13 @@ def compute_confidence(
     # factors to 1.0. Two tiers:
     #
     # 1. Core retained names (is_retained_name=True in fused heterocycle
-    # data, e.g. adenine): boosted ALWAYS, regardless of molecule size.
-    # These identify biologically significant scaffolds that are valid
-    # as names even in large molecules (nucleotides, cofactors).
+    #    data, e.g. adenine): boosted ALWAYS, regardless of molecule size.
+    #    These identify biologically significant scaffolds that are valid
+    #    as names even in large molecules (nucleotides, cofactors).
     #
     # 2. Regular retained names (benzene, toluene, indole, etc.): boosted
-    # only for small molecules (total_heavy <= 15) to prevent incorrect
-    # boosting of e.g. "1H-indole" on a 36-atom benzamide.
+    #    only for small molecules (total_heavy <= 15) to prevent incorrect
+    #    boosting of e.g. "1H-indole" on a 36-atom benzamide.
     is_retained = _is_retained_scaffold_name(name)
     is_core = _is_core_retained_name(name) if is_retained else False
 
@@ -629,14 +628,14 @@ def compute_confidence(
         'atom_coverage': round(min(atom_cov, 1.0), 4),
         'fg_recognition': round(fg_recognition, 4),
         'substituent_completeness': round(sub_completeness, 4),
-        # .1: placeholder set to 0.0 so the sum-loop at lines 324-326
+        # Phase 145.1: placeholder set to 0.0 so the sum-loop at lines 324-326
         # doesn't raise KeyError on the new FACTOR_WEIGHTS key. CandidatePool.add()
         # overwrites this POST-HOC with the real ParentCorrectnessScorer.score()
         # result. With FACTOR_WEIGHTS['parent_correctness'] = 0.0, the placeholder
         # contributes exactly 0.0 to confidence (IEEE 754) -- byte-identical safe.
         'parent_correctness': 0.0,
     }
-    # : multiple_bond_count factor (V18-only).
+    # Phase 146: multiple_bond_count factor (V18-only).
     # Guard ensures V17 path (where the key is absent from FACTOR_WEIGHTS)
     # produces byte-identical factors dict. POST-HOC overwrite in pool.add()
     # for V18 mode handles the case where this is initially 0.0
@@ -716,9 +715,9 @@ def select_best_candidate(candidates: List[CandidateName]) -> CandidateName:
 def log_confidence(candidate: CandidateName) -> None:
     """Log confidence at structured severity levels.
 
-    - confidence >= CONFIDENCE_HIGH: DEBUG
+    - confidence >= CONFIDENCE_HIGH:   DEBUG
     - confidence >= CONFIDENCE_MEDIUM: INFO
-    - confidence < CONFIDENCE_MEDIUM: WARNING
+    - confidence <  CONFIDENCE_MEDIUM: WARNING
     """
     if candidate.confidence >= CONFIDENCE_HIGH:
         logger.debug(
@@ -785,7 +784,7 @@ def retrieve_confidence() -> dict:
         'factors': dict(candidate.factors),
         'coverage_provenance': provenance,
         'handler': candidate.handler,
-        # WSB-01: surface the POST-HOC authoritative parent
+        # Phase 177 WSB-01: surface the POST-HOC authoritative parent
         # locant map + phenol flag for the namer backstop.
         'atom_to_locant': getattr(candidate, 'atom_to_locant', None),
         'is_phenol_benzene': getattr(candidate, 'is_phenol_benzene', None),

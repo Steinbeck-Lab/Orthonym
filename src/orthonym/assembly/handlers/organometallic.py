@@ -1,10 +1,10 @@
-""" organometallic handler — P-69 + IR-10 + Salzer 1999.
+"""Phase 161 organometallic handler — P-69 + IR-10 + Salzer 1999.
 
 SECOND tree-emitting handler in Orthonym (first was simple_molecule.py
-.2). Mirrors that file's shape per CONTEXT +
+from Phase 160.2 Plan-10). Mirrors that file's shape per CONTEXT +
  + 161-AUDIT-ORGM.md § 5.
 
-The handler is OUTER-CFR-only (per ORGM-03 + CFR-02): it does
+The handler is OUTER-CFR-only (per ORGM-03 + Phase 158 CFR-02): it does
 NOT add an inner-dispatch entry; the CFR-level ORGANOMETALLIC entry at
 priority 50 routes here BEFORE SALT@100.
 
@@ -14,7 +14,7 @@ Byte-identical contract per CONTEXT: name_tree_to_string(result.tree)
 Cascade-continuation on None preserved per CONTEXT: any failure
 (mol is None; metal_complex is None; multimetal compound; ValueError
 from hapticity; result is None) returns None so CFR cascade falls
-through to SALT@100 →... → GENERAL@99999.
+through to SALT@100 → ... → GENERAL@99999.
 
 Anti-patterns to avoid (PATTERNS lines 499-503):
 - NEVER mutate features or mol inside the handler — predicate + handler
@@ -26,6 +26,7 @@ Anti-patterns to avoid (PATTERNS lines 499-503):
 """
 
 from __future__ import annotations
+
 from typing import Any, Optional
 
 from ..name_tree import NameTreeNode, NamingResult
@@ -34,7 +35,7 @@ from ..name_tree import NameTreeNode, NamingResult
 def name_organometallic(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ ORGM handler; CFR-routed at priority 50.
+    """Phase 161 ORGM handler; CFR-routed at priority 50.
 
     Per CONTEXT: returns Optional[NamingResult] with tree populated
     when result is non-None. The CFR shim _handle_organometallic in
@@ -47,7 +48,7 @@ def name_organometallic(
     Cascade-continuation on None per CONTEXT: any failure (mol is
     None; metal_complex is None; multimetal; ValueError from hapticity;
     result is None) returns None so CFR cascade falls through to
-    SALT@100 →... → GENERAL@99999.
+    SALT@100 → ... → GENERAL@99999.
     """
     from rdkit import Chem
 
@@ -55,18 +56,19 @@ def name_organometallic(
         return None
 
     # Lazy imports avoid circular dependency at module import time.
+    from ...data.organometallics import RETAINED_METALLOCENES
     from ...perception.metals import detect_metal_complex, detect_metallacycle
     from ...rules.organometallics import (
-        assemble_organometallic_name, _assemble_metallacycle,
+        _assemble_metallacycle,
+        assemble_organometallic_name,
     )
-    from ...data.organometallics import RETAINED_METALLOCENES
 
-    # W8-P9.5 (P-69.4): a metal RING atom (metallacycle) is checked
+    # W8-P9 Task 9.5 (P-69.4): a metal RING atom (metallacycle) is checked
     # FIRST — detect_metal_complex's Tier-3 sigma-ligand walker would
     # otherwise try to fold the whole ring backbone into one "ligand"
     # fragment (a topology _ligand_name_from_atoms cannot name), returning
     # None and cascading past this handler entirely (the Pt-metallacycle
-    # atom-drop leak; backstopped by the.2 veto, but the metallacycle
+    # atom-drop leak; backstopped by the Task 9.2 veto, but the metallacycle
     # namer below now supplies the correct name instead of just failing
     # closed).
     metallacycle_info = detect_metallacycle(mol)
@@ -76,7 +78,7 @@ def name_organometallic(
         except ValueError:
             return None
         if mc_result is None:
-            return None  # narrow builder declined -- cascade (.2 backstops)
+            return None  # narrow builder declined -- cascade (Task 9.2 backstops)
         full_name, _metal_part, _tree_nodes = mc_result
         tree = NameTreeNode(
             parent_stem=full_name,
@@ -89,7 +91,7 @@ def name_organometallic(
     if metal_complex is None:
         return None
     if metal_complex.is_multimetal:
-        return None  # Risk R-08:.3 territory
+        return None  # Risk R-08: Phase 161.3 territory
 
     # Tier-1 fast path: retained PIN lookup for style="pin"
     canon_smi = Chem.MolToSmiles(mol)
@@ -119,7 +121,7 @@ def name_organometallic(
     # round-trip contract (name_tree_to_string(tree) == result.name).
     # CONTEXT allows the metal_name_part + prefixes structure too; the
     # flat representation is the minimal compliant form. Sub-tree structure
-    # can be refined.1+ if downstream consumers need it.
+    # can be refined in Phase 161.1+ if downstream consumers need it.
     tree = NameTreeNode(
         parent_stem=full_name,
         class_id='organometallic',

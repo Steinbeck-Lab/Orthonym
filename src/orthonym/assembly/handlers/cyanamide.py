@@ -29,7 +29,8 @@ def name_cyanamide(
     """AM-1 Tier-B cyanamide handler."""
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _try_name_cyanamide, _enrich_handler_name, _inject_stereo_if_missing,
+        _inject_stereo_if_missing,
+        _try_name_cyanamide,
     )
 
     cyanamide_name = _try_name_cyanamide(features)

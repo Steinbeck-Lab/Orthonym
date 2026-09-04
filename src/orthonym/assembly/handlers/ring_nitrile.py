@@ -1,11 +1,11 @@
-""" ring_nitrile handler — Tier-2 mid-tier direct-return.
+"""Phase 160 ring_nitrile handler — Tier-2 mid-tier direct-return.
 
 Verbatim lift of composer.py:1337-1348 (inline dispatch branch) + the
 composer.py:4537-4605 (``_assemble_ring_nitrile_name``, 69 LOC) body via
-lazy import. Per CONTEXT the body STAYS in composer.py during
-commits 03-01..03-09; deletes the redundant body.
+lazy import. Per CONTEXT the body STAYS in composer.py during Plan-03
+commits 03-01..03-09; Plan-03 commit 03-10 deletes the redundant body.
 
-Byte-identical contract per CONTEXT: handler's behavior
+Byte-identical contract per CONTEXT (DECOMP-03): handler's behavior
 on every canary fixture MUST equal the inline branch's behavior bit-for-bit.
 
 IUPAC cite: P-66.5.1 (ring-nitriles / carbonitriles on rings).
@@ -33,7 +33,7 @@ def _is_ring_nitrile(features: Any) -> bool:
     Predicate: ``principal_group == 'nitrile'`` AND ``is_cyclic`` AND
     ``not chain_is_parent``.
 
-    Pure read-only per CONTEXT /.
+    Pure read-only per CONTEXT / AP-160-26.
     """
     if getattr(features, 'principal_group', None) != 'nitrile':
         return False
@@ -59,7 +59,7 @@ def name_ring_nitrile(
 
     _rn_name = _assemble_ring_nitrile_name(features, style)
     if not _rn_name:
-        # CR-03: matches sibling ring_ester handler pattern. pool.add(None,...)
+        # CR-03: matches sibling ring_ester handler pattern. pool.add(None, ...)
         # would violate the `name: str` contract per CONTEXT;
         # _inject_stereo_if_missing at the next step would then receive
         # None or a wrong handler's name from pool.best().
@@ -71,7 +71,7 @@ def name_ring_nitrile(
             "ring_nitrile", _ha, (_rn_name or "")[:60],
         )
 
-    # .1: route through pool.add() — direct_return handler.
+    # Phase 145.1: route through pool.add() — direct_return handler.
     pool = get_current_pool()
     pool.add(_rn_name, "ring_nitrile", features)
     final_name = _inject_stereo_if_missing(features, pool.best().name)

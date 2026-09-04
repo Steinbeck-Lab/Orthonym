@@ -1,4 +1,4 @@
-""" phosphonic_acid handler — substituent-prefix PIN (P-67.1.1.2).
+"""v23 Phase 9 phosphonic_acid handler — substituent-prefix PIN (P-67.1.1.2).
 
 Parallel to ``handlers.phosphinic_acid``. Without this handler an organyl
 phosphonic acid R-P(=O)(OH)2 falls through to the generic suffix assembler and
@@ -31,9 +31,9 @@ def name_phosphonic_acid(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return phosphonic_acid handler (substituent-prefix PIN)."""
+    from ...rules.phosphorus import name_phosphonic_acid as _name_phosphonic_acid
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing
-    from ...rules.phosphorus import name_phosphonic_acid as _name_phosphonic_acid
 
     matches = features.functional_groups.get('phosphonic_acid', [])
     if not matches:

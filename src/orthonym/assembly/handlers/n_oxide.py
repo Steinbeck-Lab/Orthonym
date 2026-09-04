@@ -1,9 +1,9 @@
-""" N-oxide handler — direct-return; recursive name_compound() permitted.
+"""Phase 160 N-oxide handler — direct-return; recursive name_compound() permitted.
 
 Verbatim lift of the N-oxide dispatch logic from composer.py:813-820
 (inline branch) + composer.py:2044-2174 (body of _try_name_n_oxide +
 _name_aromatic_n_oxide + _name_aliphatic_n_oxide). Per CONTEXT,
-the body stays in composer.py until thinning.
+the body stays in composer.py until Plan-03 commit 03-10 thinning.
 
 IUPAC cite: P-62.5 (N-oxides; functional class naming).
 
@@ -12,7 +12,7 @@ Special case (per CONTEXT + 160-AUDIT-DECOMP.md § 2.4):
   on a reduced (N-oxide → parent amine) RWMol copy. The recursion is
   PERMITTED because:
   (a) the recursive call instantiates a FRESH push_pool/pop_pool lifecycle
-      .1;
+      per Phase 145.1;
   (b) RWMol mutation operates on a COPY (Chem.RWMol(features.mol)),
       NOT the input features.mol;
   (c) the recursive name_fragment_recursively() runs in an isolated
@@ -56,7 +56,7 @@ def _is_n_oxide(features: Any) -> bool:
     dispatch_inner can proceed to the next priority entry for non-N-oxide
     molecules.
 
-    Pure read-only per CONTEXT /: reads
+    Pure read-only per CONTEXT / AP-160-26: reads
     ``features.functional_groups`` dict (set by perception layer before
     assembly); no writes.
     """
@@ -68,7 +68,7 @@ def _is_n_oxide(features: Any) -> bool:
 def name_n_oxide(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ direct-return N-oxide handler.
+    """Phase 160 direct-return N-oxide handler.
 
     Verbatim semantics of composer.py:813-820 (inline branch). Returns
     ``NamingResult(name, tree=None, atom_to_locant_hint=<heterocycle locant
@@ -76,12 +76,12 @@ def name_n_oxide(
 
     Per 160-AUDIT-DECOMP.md § 2.4: the recursive name_fragment_recursively
     call inside _try_name_n_oxide is PERMITTED under because it
-    instantiates a fresh push_pool/pop_pool lifecycle.1
+    instantiates a fresh push_pool/pop_pool lifecycle per Phase 145.1
     and operates on a COPY of features.mol (no outer mutation).
     """
     # Lazy imports per PATTERNS § Lazy Import.
     from ..candidate_pool import get_current_pool
-    from ..composer import _try_name_n_oxide, _inject_stereo_if_missing
+    from ..composer import _inject_stereo_if_missing, _try_name_n_oxide
 
     n_oxide_name = _try_name_n_oxide(features)
     if not n_oxide_name:
@@ -94,7 +94,7 @@ def name_n_oxide(
         or features.atom_to_locant
     )
 
-    # .1: direct_return handler routes through pool.add()
+    # Phase 145.1: direct_return handler routes through pool.add()
     # (composer.py:818-819 inline equivalent).
     pool = get_current_pool()
     cand = pool.add(n_oxide_name, "n_oxide", features)

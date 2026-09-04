@@ -3,8 +3,8 @@
 Exact analogues of ``handlers.phosphonic_acid`` / ``handlers.phosphinic_acid``.
 The Blue Book gives all four as PRESELECTED names (BB L36051-36054)::
 
-    AsH(O)(OH)2 arsonic acid AsH2(O)OH arsinic acid
-    SbH(O)(OH)2 stibonic acid SbH2(O)OH stibinic acid
+    AsH(O)(OH)2  arsonic acid    AsH2(O)OH  arsinic acid
+    SbH(O)(OH)2  stibonic acid   SbH2(O)OH  stibinic acid
 
 and the substituent-prefix PIN forms verbatim -- ``ethylstibinic acid``
 (BB L36064), ``methyl(phenyl)arsinic acid`` (BB L36066),
@@ -49,9 +49,9 @@ def _make_pnictogen_oxoacid_handlers(fg_name: str) -> Tuple[Callable, Callable]:
     def _handler(
         features: Any, mol: Any = None, style: str = "pin",
     ) -> Optional[NamingResult]:
+        from ...rules import phosphorus as _phosphorus
         from ..candidate_pool import get_current_pool
         from ..composer import _inject_stereo_if_missing
-        from ...rules import phosphorus as _phosphorus
 
         matches = features.functional_groups.get(fg_name, [])
         if not matches:

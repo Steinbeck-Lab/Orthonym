@@ -18,12 +18,11 @@ Design principles:
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List
 
-from ..rules.seniority import get_suffix
 from ..rules.locants import get_functional_group_locants
+from ..rules.seniority import get_suffix
 from .naming_utils import TERMINAL_FG_TYPES, should_omit_locant_one
-
 
 # Polycyclic aromatic names that have fixed IUPAC numbering
 _NAMED_PAH_SYSTEMS = {
@@ -46,9 +45,9 @@ class ParentInfo:
     Attributes:
         parent_label: Classification tag (e.g., "cyclohexane", "indole", "propane").
                       Used to select the naming handler. NOT the final IUPAC name.
-        parent_type: One of "chain", "ring", "benzene", "fused_heterocycle",
+        parent_type:  One of "chain", "ring", "benzene", "fused_heterocycle",
                       "polycyclic", "complex_ring", "polycyclic_aromatic".
-        atom_count: Number of atoms in parent (chain length or ring size).
+        atom_count:   Number of atoms in parent (chain length or ring size).
         atom_to_locant: Atom index -> IUPAC locant mapping.
         is_named_ring: True for benzene, naphthalene, indole (fixed numbering).
     """
@@ -64,9 +63,9 @@ class SuffixInfo:
     """Describes the resolved suffix for the principal functional group.
 
     Attributes:
-        text: Suffix text (e.g., "ol", "one", "oic acid", "").
-        locants: Locant positions (e.g., [1,3] for diol, [2] for ketone).
-        count: Number of suffix instances (e.g., 2 for diol).
+        text:        Suffix text (e.g., "ol", "one", "oic acid", "").
+        locants:     Locant positions (e.g., [1,3] for diol, [2] for ketone).
+        count:       Number of suffix instances (e.g., 2 for diol).
         is_terminal: True if suffix group is always terminal (e.g., -oic acid, -al).
     """
     text: str = ""
@@ -291,12 +290,12 @@ _ANION_SUFFIX_MAP = {
     # the oxoacid-anion routing upstream (classify_anion sends them to 'alkoxide',
     # not 'phosphonate'/'phosphate'), so no neutral name ending in "phosphoric
     # acid" currently reaches _ionize_acid_name. Kept for completeness/future use.
-    "phosphoric acid": "phosphate",  # SUB-01/
-    # P-72.2.2.2.1.1 (169.6-02): "the 'ic acid' or 'ous acid' ending... by
+    "phosphoric acid": "phosphate",  # SUB-01/D-02
+    # P-72.2.2.2.1.1 (169.6-02): "the 'ic acid' or 'ous acid' ending ... by
     # 'ate' or 'ite', respectively" — the -ous-acid anion takes -ite, parallel
     # to the -ic-acid -> -ate transforms above.
     "ous acid": "ite",
-    # : "nitric acid": "nitrate" DEFERRED — reach = 2/7,500; the
+    #: "nitric acid": "nitrate" DEFERRED — Plan-01 reach = 2/7,500; the
     # internal-charge-filter precision change (protecting every nitro) is not
     # justified at that frequency.
     "carboxylic acid": "carboxylate",  # P-72.2.2.2.1.1 (CORRECT — stays)
@@ -535,10 +534,10 @@ def _check_complex_ring_system(mol: Any) -> bool:
     Uses function-level imports to avoid circular dependency.
     """
     from ..rules.bicyclo import is_bicyclo_system
-    from ..rules.spiro import is_spiro_system
+    from ..rules.bridged_fused import detect_bridged_fused
     from ..rules.fused_rings import classify_fused_system
     from ..rules.polycyclic import is_polycyclic_system
-    from ..rules.bridged_fused import detect_bridged_fused
+    from ..rules.spiro import is_spiro_system
 
     if detect_bridged_fused(mol):
         return True
@@ -573,9 +572,9 @@ def _get_complex_ring_label(mol: Any, features: Any, is_fused_het: bool) -> str:
 
     # Classify the ring system type
     from ..rules.bicyclo import is_bicyclo_system
-    from ..rules.spiro import is_spiro_system
-    from ..rules.polycyclic import is_polycyclic_system
     from ..rules.bridged_fused import detect_bridged_fused
+    from ..rules.polycyclic import is_polycyclic_system
+    from ..rules.spiro import is_spiro_system
 
     if detect_bridged_fused(mol):
         return "bridged-fused"

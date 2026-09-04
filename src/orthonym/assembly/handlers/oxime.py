@@ -1,16 +1,16 @@
-""" oxime handler — Tier B retained-name (gate 0.40).
+"""Phase 160 oxime handler — Tier B retained-name (gate 0.40).
 
 Verbatim lift of the oxime dispatch logic from composer.py:771-782
 (inline branch) + composer.py:1906-2042 (body of _name_oxime_or_hydrazone).
 The body itself STAYS in composer.py per CONTEXT incremental-migration
 discipline — this handler module is a thin wrapper that invokes the
-existing composer.py logic via lazy import.
+existing composer.py logic via lazy import. Plan-03 commit 03-10
 (composer.py thinning) deletes the inline body from composer.py once
 the inner-dispatch substrate is fully wired.
 
-Byte-identical lock per CONTEXT: the handler's behavior
+Byte-identical lock per CONTEXT (DECOMP-03): the handler's behavior
 on every canary fixture MUST equal the inline branch's behavior bit-for-bit;
-verified by `python --mode delta`
+verified by `python scripts/verify_decomp_byte_identical.py --mode delta`
 at the atomic commit gate.
 
 IUPAC cite: P-66.6 (oxime functional class naming).
@@ -32,7 +32,7 @@ from ..name_tree import NameTreeNode, NamingResult
 def _is_oxime(features: Any) -> bool:
     """Mirrors composer.py:771 (``features.principal_group == 'oxime'``).
 
-    Pure read-only per CONTEXT /: reads
+    Pure read-only per CONTEXT / AP-160-26: reads
     ``features.principal_group`` attribute set by perception layer; no
     mutation of features, mol, or module-global state.
     """
@@ -42,7 +42,7 @@ def _is_oxime(features: Any) -> bool:
 def name_oxime(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
-    """ Tier-B oxime handler.
+    """Phase 160 Tier-B oxime handler.
 
     Verbatim semantics of composer.py:771-782 (inline branch). Returns
     ``NamingResult(name=<final string>, tree=None, atom_to_locant_hint=None)``
@@ -53,7 +53,7 @@ def name_oxime(
     (``_name_oxime_or_hydrazone``) and the enrichment helper
     (``_enrich_handler_name``); call them with the same arguments the
     inline branch used; route through the same ``pool.add()`` call so
-    .1 byte-identical lock methodology is preserved.
+    Phase 145.1 byte-identical lock methodology is preserved.
 
     The ``mol`` parameter is accepted for API uniformity per CONTEXT
      but not used here (composer.py:_name_oxime_or_hydrazone reads
@@ -69,20 +69,21 @@ def name_oxime(
     Returns:
         NamingResult on success, or None on gate-fail. Per CONTEXT
         the ``tree`` field is None for first-wave handlers; the ``name``
-        field is the byte-identical contract per.
+        field is the byte-identical contract per DECOMP-03.
     """
     # Lazy imports per PATTERNS § Lazy Import (avoid composer.py -> handlers
     # -> composer.py cycle at module load).
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _name_oxime_or_hydrazone, _enrich_handler_name,
+        _enrich_handler_name,
         _inject_stereo_if_missing,
+        _name_oxime_or_hydrazone,
     )
 
     # Wave2 T2a (P-66.6.5(f), BB VERBATIM): 'Oximes are named substitutively
     # as N-hydroxy derivatives of imines and not by functional class
     # nomenclature as in previous recommendations' — 'CH3-CH2-CH=N-OH
-    # propanal oxime... N-hydroxypropan-1-imine (PIN)'. Try the substitutive
+    # propanal oxime ... N-hydroxypropan-1-imine (PIN)'. Try the substitutive
     # PIN first; the functional-class form remains the fallback (and the
     # --trivial rendering) when the bounded substitutive builder declines.
     if style == "pin":
@@ -106,7 +107,7 @@ def name_oxime(
 
     oxime_name = _enrich_handler_name(features, oxime_name, "oxime")
 
-    # .1: route through pool.add() — returns None on gate-fail.
+    # Phase 145.1: route through pool.add() — returns None on gate-fail.
     pool = get_current_pool()
     cand = pool.add(oxime_name, "oxime", features)
     if cand is None:
@@ -116,7 +117,7 @@ def name_oxime(
     # composer.py:781 wrapped the name in _inject_stereo_if_missing — we
     # preserve that byte-identical behavior here. The NamingResult.name
     # field is the FINAL name (post-stereo-injection); the dispatch caller
-    # returns it directly without further processing per the
+    # returns it directly without further processing per the Plan-02
     # dispatch contract.
     final_name = _inject_stereo_if_missing(
         features, cand.name, atom_to_locant=None,

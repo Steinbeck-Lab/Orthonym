@@ -1,4 +1,4 @@
-""" partial_sat handler — Tier B shim (gate 0.40).
+"""Phase 160 partial_sat handler — Tier B shim (gate 0.40).
 
 Verbatim move of composer.py:1116-1131 dispatch logic. Wraps the inline
 ``_try_partially_saturated_carbocycle(features.mol)`` check + enrichment +
@@ -6,13 +6,13 @@ pool.add gate.
 
 Per CONTEXT incremental migration: the underlying
 ``_try_partially_saturated_carbocycle`` body STAYS in composer.py during
- and moves to this module in.
+Plan-02 and moves to this module in Plan-03 commit 03-10.
 
 Byte-identical contract: same mutex as polycyclic — the inline gate is
 nested under ``if not _complex_ring_accepted and not chain_is_parent`` so
 the predicate here uses ``not _is_complex_ring_system`` for the fast-path.
 The fallback for complex-ring-rejection cases lives in the inline
-partial_sat block at composer.py:1112+ (unchanged in).
+partial_sat block at composer.py:1112+ (unchanged in Plan-02).
 
 IUPAC cite: P-25.3 (partially saturated carbocycles; tetrahydronaphthalene).
 
@@ -114,13 +114,13 @@ def name_partial_sat(
 
     # Inherit BOTH halves of the producer's answer:
     #
-    # * its numbering -- the parent name, its hydro locants and any
-    # principal-characteristic-group suffix were all spelled from THIS map,
-    # so enrichment must place its substituent prefixes on the same one or it
-    # spells a different molecule (`1-methyl-` for a 2-substituted tetralin);
-    # * what it already spelled -- this producer names AROMATIC-ring
-    # substituents itself and leaves only the sp3-ring ones to enrichment,
-    # so re-citing them yields `6-methyl-6-methyl-...`.
+    #  * its numbering -- the parent name, its hydro locants and any
+    #    principal-characteristic-group suffix were all spelled from THIS map,
+    #    so enrichment must place its substituent prefixes on the same one or it
+    #    spells a different molecule (`1-methyl-` for a 2-substituted tetralin);
+    #  * what it already spelled -- this producer names AROMATIC-ring
+    #    substituents itself and leaves only the sp3-ring ones to enrichment,
+    #    so re-citing them yields `6-methyl-6-methyl-...`.
     #
     # Both were suppressed by SELF-01 rather than shipped, i.e. each cost a
     # correct name. P-58.2.5 / P-15.1.5.3.
@@ -130,7 +130,7 @@ def name_partial_sat(
         already_spelled_atoms=produced.spelled_offring_atoms or None,
     )
 
-    # .1: route through pool.add() — Tier B gate-fall-through.
+    # Phase 145.1: route through pool.add() — Tier B gate-fall-through.
     pool = get_current_pool()
     cand = pool.add(partial_sat_name, "partial_sat", features)
     if cand is None:

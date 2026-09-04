@@ -1,8 +1,8 @@
-""" ring_ester handler — Tier-2 mid-tier direct-return.
+"""Phase 160 ring_ester handler — Tier-2 mid-tier direct-return.
 
 Verbatim lift of composer.py:850-865 (inline dispatch branch). Body
 ``_assemble_ring_with_ester_prefixes`` at composer.py:3204-3455 (254 LOC)
-STAYS until (composer.py thinning) per CONTEXT.
+STAYS until Plan-03 commit 03-10 (composer.py thinning) per CONTEXT.
 
 Predicate gates on:
 1. ``principal_group == 'ester'``
@@ -12,9 +12,9 @@ Predicate gates on:
 ring_ester fires BEFORE polyfunctional + ester-family + Tier-A in the inline
 cascade order (composer.py:850), so no additional mutex is needed.
 
-Byte-identical contract per CONTEXT: handler's behavior
+Byte-identical contract per CONTEXT (DECOMP-03): handler's behavior
 on every canary fixture MUST equal the inline branch's behavior bit-for-bit;
-verified by `python --mode delta`
+verified by `python scripts/verify_decomp_byte_identical.py --mode delta`
 at the atomic commit gate.
 
 IUPAC cite: P-66.6.3 (cyclic ester with exocyclic substituents).
@@ -44,7 +44,7 @@ def _is_ring_ester(features: Any) -> bool:
     complex_ring mutex are NOT pure boolean attribute reads — they call
     ``rules.esters.detect_exocyclic_esters(mol)`` and
     ``composer._is_complex_ring_system(mol)`` respectively. Both helpers are
-    pure (read-only) per CONTEXT /.
+    pure (read-only) per CONTEXT / AP-160-26.
     """
     if getattr(features, 'principal_group', None) != 'ester':
         return False
@@ -128,19 +128,20 @@ def name_ring_ester(
     on success. Wraps the result in ``_inject_stereo_if_missing`` per the
     inline branch behavior at composer.py:865.
     """
+    from ...rules.esters import detect_exocyclic_esters
     from ..candidate_pool import get_current_pool
     from ..composer import (
-        _assemble_ring_with_ester_prefixes, _inject_stereo_if_missing,
+        _assemble_ring_with_ester_prefixes,
+        _inject_stereo_if_missing,
     )
-    from ...rules.esters import detect_exocyclic_esters
 
     exocyclic = detect_exocyclic_esters(features.mol)
     if not exocyclic:
         return None
 
-    # P7 C1: record WHICH parent this handler numbered the name in, so the
+    # C1: record WHICH parent this handler numbered the name in, so the
     # stereo injector does not have to guess it (P-91.3, BB:44639 "NAMING OF
-    # STEREOISOMERS",:44643 -- a front-of-name block is read in the parent's
+    # STEREOISOMERS", :44643 -- a front-of-name block is read in the parent's
     # numbering). Neither features.principal_chain nor features.chain_is_parent
     # recovers it here: both say "chain" on the ring-parented rows this handler
     # emits (see composer._inject_stereo_if_missing).
@@ -150,7 +151,7 @@ def name_ring_ester(
         # P-65.6.3.2.1 functional class `<R>yl <acyl>ate`. The front-of-name
         # descriptor is numbered in the ALCOHOL component, so the ring is the
         # scope only when the alkoxy carbon is the ring atom. When it is not
-        # (`methyl...oate`, acid-side parent) the scope stays undeclared and the
+        # (`methyl ...oate`, acid-side parent) the scope stays undeclared and the
         # injector fails closed rather than cite the ring's numbering.
         parent_scope = _alcohol_is_ring(features.mol)
     else:

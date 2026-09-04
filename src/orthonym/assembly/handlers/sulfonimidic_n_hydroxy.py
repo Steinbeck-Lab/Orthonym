@@ -81,9 +81,9 @@ def name_sulfonimidic_n_hydroxy(
     """
     from rdkit import Chem
 
-    from ..candidate_pool import get_current_pool
     from ...errors import is_failure_name
     from ...namer import name_compound
+    from ..candidate_pool import get_current_pool
 
     _mol = mol if mol is not None else getattr(features, 'mol', None)
     if _mol is None:
