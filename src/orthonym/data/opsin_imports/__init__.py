@@ -1,11 +1,11 @@
 # Derived from OPSIN (Open Parser for Systematic IUPAC Nomenclature),
 # MIT License, Copyright (c) Daniel Lowe and contributors.
-# Source project: https://github.com/dan2097/opsin — see the repository NOTICE file.
+# Source project: https://github.com/dan2097/opsin  — see the repository NOTICE file.
 """
 OPSIN XML Data Imports - consolidated exports.
 
 Auto-generated data modules from OPSIN XML resource files.
-See for the generation pipeline.
+See scripts/import_opsin_xml.py for the generation pipeline.
 
 Main export: OPSIN_RETAINED_NAMES -- merged SMILES-to-name lookup
 from aryl_groups, simple_groups, cyclic_groups, and natural_products.
@@ -15,19 +15,20 @@ Individual module exports available for specialized use.
 
 from typing import Dict, List, Optional
 
+from .amino_acids_opsin import OPSIN_AMINO_ACIDS
+
 # Import all generated module dicts
 from .aryl_groups import OPSIN_ARYL_GROUPS
-from .simple_groups import OPSIN_SIMPLE_GROUPS
+from .carbohydrates_opsin import OPSIN_CARBOHYDRATE_SUFFIXES, OPSIN_CARBOHYDRATES
 from .carboxylic_acids_opsin import OPSIN_ACID_STEMS
-from .substituent_names_opsin import OPSIN_SUBSTITUENT_NAMES
-from .amino_acids_opsin import OPSIN_AMINO_ACIDS
-from .carbohydrates_opsin import OPSIN_CARBOHYDRATES, OPSIN_CARBOHYDRATE_SUFFIXES
-from .natural_products_opsin import OPSIN_NATURAL_PRODUCTS
 from .cyclic_groups import OPSIN_CYCLIC_GROUPS
-from .suffix_rules import OPSIN_SUFFIX_RULES, OPSIN_SUFFIX_APPLICABILITY
-from .word_rules import OPSIN_WORD_RULES
 from .functional_terms import OPSIN_FUNCTIONAL_TERMS
 from .fusion_components_opsin import OPSIN_FUSION_COMPONENTS
+from .natural_products_opsin import OPSIN_NATURAL_PRODUCTS
+from .simple_groups import OPSIN_SIMPLE_GROUPS
+from .substituent_names_opsin import OPSIN_SUBSTITUENT_NAMES
+from .suffix_rules import OPSIN_SUFFIX_APPLICABILITY, OPSIN_SUFFIX_RULES
+from .word_rules import OPSIN_WORD_RULES
 
 
 def _select_primary_name(names):
@@ -49,9 +50,9 @@ def _select_primary_name(names):
 def _build_retained_names() -> Dict[str, str]:
     """Build consolidated SMILES-to-name lookup from 4 OPSIN sources.
 
-    : broadened from 2 sources (cyclic + NP) to 4
+    Phase 150: broadened from 2 sources (cyclic + NP) to 4
     (adds aryl + simple). Stem-vs-PIN classification + round-trip gate
-    happens DOWNSTREAM in data/__init__.py:_is_promotable ('s
+    happens DOWNSTREAM in data/__init__.py:_is_promotable (Phase 150's
     3-signal AND classifier).
 
     Source: 150-CONTEXT.md.
@@ -59,14 +60,14 @@ def _build_retained_names() -> Dict[str, str]:
     """
     merged: Dict[str, str] = {}
 
-    # 4-source merge per CONTEXT (broadens from 2 to 4
+    # 4-source merge per CONTEXT (Phase 150 broadens from 2 to 4
     # sources). Cyclic + NP first (higher-quality data); aryl + simple
     # appended.
     sources = [
         OPSIN_CYCLIC_GROUPS,
         OPSIN_NATURAL_PRODUCTS,
-        OPSIN_ARYL_GROUPS,           # NEW per
-        OPSIN_SIMPLE_GROUPS,         # NEW per
+        OPSIN_ARYL_GROUPS,           # NEW per D-02
+        OPSIN_SIMPLE_GROUPS,         # NEW per D-02
     ]
 
     for source in sources:
@@ -76,7 +77,7 @@ def _build_retained_names() -> Dict[str, str]:
             # sense.
             if meta.get("subType") in ("saltComponent", "chalcogenide"):
                 continue
-            # REVIEW CR-02 root-cause fix: skip composite-key
+            # Phase 150 REVIEW CR-02 root-cause fix: skip composite-key
             # entries. The "||" discriminator records OPSIN parser-side
             # transformations (addGroup / addBond / addHeteroAtom) that
             # would need the full OPSIN parser to materialise the actual
@@ -93,7 +94,7 @@ def _build_retained_names() -> Dict[str, str]:
             # of acenaphthoquinone et al. falls back to systematic naming
             # until a future phase implements OPSIN-style addGroup
             # materialisation. Source: 150-REVIEW.md CR-02 +
-            # the contributor guide fix-methodology.md (root-cause-only fixes).
+            # CLAUDE.md fix-methodology.md (root-cause-only fixes).
             if "||" in key:
                 continue
             smiles = meta.get("smiles", key)

@@ -17,7 +17,7 @@ RETAINED_NAMES = {
     "CC": "ethane",
     "CCC": "propane",
     "CCCC": "butane",
-    
+
     # === AROMATIC HYDROCARBONS ===
     "c1ccccc1": "benzene",
     "Cc1ccccc1": "toluene",
@@ -27,7 +27,7 @@ RETAINED_NAMES = {
     # NOTE: xylene isomers are NOT retained names in IUPAC 2013 PIN
     # Use systematic: 1,2-dimethylbenzene, 1,3-dimethylbenzene, 1,4-dimethylbenzene
     "c1ccc2ccccc2c1": "naphthalene",
-    # : pentalene (PIN per Blue Book line 11459; bicyclo[3.3.0] fully
+    # pentalene (PIN per Blue Book line 11459; bicyclo[3.3.0] fully
     # mancude non-benzenoid). HEAD dropped one ring -> 'cyclopenta-1,3-diene'
     # (SELF-01-suppressed to 'unknown'); the retained name keeps both rings.
     # OPSIN-RT verified ('pentalene' -> same molecule).
@@ -46,19 +46,19 @@ RETAINED_NAMES = {
     "CO": "methanol",
     "CCO": "ethanol",
     "OCC(O)CO": "glycerol",
-    
+
     # === CARBOXYLIC ACIDS ===
     "O=CO": "formic acid",  # Canonical SMILES for HCOOH
     "CC(=O)O": "acetic acid",
     "CCC(=O)O": "propanoic acid",  # propionic acid is also accepted
     "CCCC(=O)O": "butanoic acid",  # butyric acid is also accepted
-    # .10 (PIN-policy): canonicalized key fix. The old non-canonical
+    # Task 1.10 (PIN-policy): canonicalized key fix. The old non-canonical
     # key OC(=O)C(O)=O never matched (every input canonicalizes to
     # O=C(O)C(=O)O), so the canonical SMILES resolved to the OPSIN-import
     # 'dihydroxalate' instead. Re-key to canonical + deny 'dihydroxalate' in
     # iupac_2013_pin_list.json so this retained PIN (P-65.1.1.1) wins the merge.
     "O=C(O)C(=O)O": "oxalic acid",
-    # .10 (PIN-policy): oxamic acid is a retained PIN (P-65.1.1.1) with no
+    # Task 1.10 (PIN-policy): oxamic acid is a retained PIN (P-65.1.1.1) with no
     # prior key (systematic engine emits '1-carbamoylmethanoic acid' otherwise).
     "NC(=O)C(=O)O": "oxamic acid",
     "OC(=O)CC(=O)O": "malonic acid",
@@ -67,68 +67,68 @@ RETAINED_NAMES = {
     "OC(=O)CCCCC(=O)O": "adipic acid",
     "O=C(O)c1ccccc1": "benzoic acid",  # Canonical SMILES (was OC(=O)c1ccccc1)
     "OC(=O)CC(O)(CC(=O)O)C(=O)O": "citric acid",
-    
+
     # === ALDEHYDES ===
     "C=O": "formaldehyde",
     "CC=O": "acetaldehyde",
     "O=Cc1ccccc1": "benzaldehyde",
-    
+
     # === KETONES ===
     # NOTE: acetone removed -- IUPAC 2013 P-31.1.3 PIN is "propan-2-one"
     # Task L: `chalcone` is the ONE retained ketone name that is a PIN.
-    # P-64.2.1.1 (BlueBookV2.md:28297), under `### **P-64.2.1** Retained names`:
-    # "The name 'chalcone' is the only retained name as a preferred IUPAC name
-    # and is limited to ring substitution only by characteristic groups lower
-    # than 'ketone'. Chalcone refers only to the trans- or (E)- stereoisomer."
-    # The (PIN) line follows at:28299 -- `chalcone (PIN) (2E)-1,3-diphenyl-
-    # prop-2-en-1-one`. P-64.2.1.2 (28307) then closes the GENERAL-only ketone
-    # list and ends "Substitutive names, systematically constructed, are the
-    # preferred IUPAC names for ketones" -- which is why acetophenone and
-    # benzophenone below are `_PIN_DENY_HC`-demoted to general-only while this
-    # row is not.
+    #   P-64.2.1.1 (BlueBookV2.md:28297), under `### **P-64.2.1** Retained names`:
+    #   "The name 'chalcone' is the only retained name as a preferred IUPAC name
+    #   and is limited to ring substitution only by characteristic groups lower
+    #   than 'ketone'. Chalcone refers only to the trans- or (E)- stereoisomer."
+    #   The (PIN) line follows at :28299 -- `chalcone (PIN) (2E)-1,3-diphenyl-
+    #   prop-2-en-1-one`. P-64.2.1.2 (:28307) then closes the GENERAL-only ketone
+    #   list and ends "Substitutive names, systematically constructed, are the
+    #   preferred IUPAC names for ketones" -- which is why acetophenone and
+    #   benzophenone below are `_PIN_DENY_HC`-demoted to general-only while this
+    #   row is not.
     #
-    # The key is the ISOMERIC canonical SMILES (`_name_impl` builds its lookup
-    # key with `Chem.MolToSmiles(mol, canonical=True)`, isomeric by default), so
-    # this single row enforces ALL THREE limits the rule imposes, exactly rather
-    # than approximately:
-    # (1) (E) only -- the (Z) isomer canonicalises to
-    # `O=C(C=C\c1ccccc1)c1ccccc1` and the stereo-
-    # UNSPECIFIED molecule to `O=C(C=Cc1ccccc1)c1ccccc1`;
-    # three distinct keys, so neither can match.
-    # (2) ring substitution only, by groups junior to ketone, and
-    # (3) no chain substitution
-    # -- ANY substituent changes the whole-molecule key, so
-    # the BB's own worked counter-example
-    # `2',4'-dihydroxychalcone-4-carboxamide` (28305,
-    # "(not...)"; also in bluebook_not_names.py:171) is
-    # structurally unreachable from here.
+    #   The key is the ISOMERIC canonical SMILES (`_name_impl` builds its lookup
+    #   key with `Chem.MolToSmiles(mol, canonical=True)`, isomeric by default), so
+    #   this single row enforces ALL THREE limits the rule imposes, exactly rather
+    #   than approximately:
+    #     (1) (E) only      -- the (Z) isomer canonicalises to
+    #                          `O=C(/C=C\c1ccccc1)c1ccccc1` and the stereo-
+    #                          UNSPECIFIED molecule to `O=C(C=Cc1ccccc1)c1ccccc1`;
+    #                          three distinct keys, so neither can match.
+    #     (2) ring substitution only, by groups junior to ketone, and
+    #     (3) no chain substitution
+    #                       -- ANY substituent changes the whole-molecule key, so
+    #                          the BB's own worked counter-example
+    #                          `2',4'-dihydroxychalcone-4-carboxamide` (:28305,
+    #                          "(not ...)"; also in bluebook_not_names.py:171) is
+    #                          structurally unreachable from here.
     #
-    # SCOPE: substituted chalcones that ARE PINs (e.g. `2',4'-dihydroxy-3,3'-
-    # dimethoxychalcone`,:28303) are deliberately NOT emitted -- they need
-    # primed-locant machinery across two rings plus a ketone-seniority test, and
-    # a wrong construction would ship a WRONG name where falling through ships
-    # the valid systematic one. Fail-open to systematic is the safe direction.
+    #   SCOPE: substituted chalcones that ARE PINs (e.g. `2',4'-dihydroxy-3,3'-
+    #   dimethoxychalcone`, :28303) are deliberately NOT emitted -- they need
+    #   primed-locant machinery across two rings plus a ketone-seniority test, and
+    #   a wrong construction would ship a WRONG name where falling through ships
+    #   the valid systematic one. Fail-open to systematic is the safe direction.
     #
-    # NB the OPSIN import surface already carries this exact SMILES key as the
-    # STEM `chalcon` (no trailing 'e'); it never promoted because
-    # `_is_complete_name('chalcon')` is False. Hand-curated wins the merge
-    # (`ALL_RETAINED_NAMES = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}`), so this
-    # row is what ships. OPSIN 2.9.0 parses `chalcone` -> InChIKey
-    # DQFBYFPFKXHELB-VAWYXSNFSA-N, identical to the input's (round-trip verified).
+    #   NB the OPSIN import surface already carries this exact SMILES key as the
+    #   STEM `chalcon` (no trailing 'e'); it never promoted because
+    #   `_is_complete_name('chalcon')` is False. Hand-curated wins the merge
+    #   (`ALL_RETAINED_NAMES = {**_OPSIN_NAMES, **_HAND_CURATED_GATED}`), so this
+    #   row is what ships. OPSIN 2.9.0 parses `chalcone` -> InChIKey
+    #   DQFBYFPFKXHELB-VAWYXSNFSA-N, identical to the input's (round-trip verified).
     "O=C(/C=C/c1ccccc1)c1ccccc1": "chalcone",
     "CC(=O)c1ccccc1": "acetophenone",
     "O=C(c1ccccc1)c1ccccc1": "benzophenone",
-    
+
     # === AMINES ===
     # P-62.2.1.2 / P-15.2: methylamine / ethylamine / trimethylamine /
     # triethylamine are GENERAL-nomenclature functional-class names, NOT PINs.
     # The PINs are the substitutive forms (methanamine, ethanamine,
     # N,N-dimethylmethanamine, N,N-diethylethanamine), which the systematic
     # path already produces once these retained entries are absent. Removed from
-    # the PIN-headline path (Fix 4 / H5). 'aniline' IS a retained PIN
+    # the PIN-headline path (DD1 Fix 4 / H5). 'aniline' IS a retained PIN
     # (P-62.2.1.1.1) and stays.
     "Nc1ccccc1": "aniline",
-    
+
     # === PHENOLS ===
     "Oc1ccccc1": "phenol",
     # NOTE: cresol isomers removed -- IUPAC 2013 PINs are "2-methylphenol",
@@ -136,14 +136,14 @@ RETAINED_NAMES = {
     "Oc1ccc(O)cc1": "hydroquinone",
     "Oc1cccc(O)c1": "resorcinol",
     "Oc1ccccc1O": "catechol",
-    
+
     # === 5-MEMBERED AROMATIC HETEROCYCLES ===
     "c1ccoc1": "furan",
     "c1ccsc1": "thiophene",
     # Azoles carry a leading indicated hydrogen in the PIN (P-25.7.1.3): the
     # NH is the indicated-H position, cited as 1H-. Each SMILES key fixes a
     # specific tautomer, so the indicated-H locant is determined per key
-    # (all OPSIN-2.9.0 round-trip verified, IH-01).
+    # (all OPSIN-2.9.0 round-trip verified, v23 IH-01).
     "c1cc[nH]c1": "1H-pyrrole",
     "c1c[nH]cn1": "1H-imidazole",
     "c1cnc[nH]1": "1H-imidazole",
@@ -189,7 +189,7 @@ RETAINED_NAMES = {
     "c1cnccn1": "pyrazine",
     "c1cnncn1": "1,2,4-triazine",
     "c1ncncn1": "1,3,5-triazine",
-    
+
     # === FUSED HETEROCYCLES ===
     # IUPAC 2013 PIN includes tautomer locant (indicated hydrogen) where applicable
     "c1ccc2ncccc2c1": "quinoline",
@@ -201,7 +201,7 @@ RETAINED_NAMES = {
     "c1cnc2ccccc2n1": "quinazoline",
     "c1ccc2nccnc2c1": "quinoxaline",
     "c1ncnc2[nH]cnc12": "7H-purine",  # 7H-purine is IUPAC 2013 PIN
-    
+
     # === UNSATURATED 6-MEMBERED O-HETEROCYCLES (pyrans) ===
     # IUPAC 2013 prefers "2H-pyran" / "4H-pyran" over HW systematic "oxine"
     # OPSIN does not recognize "oxine"; these retained names ensure compatibility
@@ -240,7 +240,7 @@ RETAINED_NAMES = {
     "C1CCCCC1": "cyclohexane",
     "C1CCCCCC1": "cycloheptane",
     "C1CCCCCCC1": "cyclooctane",
-    
+
     # === AMIDES ===
     "NC=O": "formamide",
     "CC(=O)N": "acetamide",
@@ -281,24 +281,24 @@ RETAINED_NAMES = {
     # denying the trivial name ALONE does not fail closed here -- it unmasks
     # pre-existing generators that emit a WRONG name, several of which silently
     # DROP atoms. Measured, deny-only, before these rows were added:
-    # N=C=N -> "methane" (loses N2!)
-    # [C-]#[N+]O -> "methane" (loses N,O!)
-    # NC(=S)SC(N)=S -> "methanamine" (loses most of it!)
-    # OCC(CO)(CO)CO -> "2,2-di(hydroxymethyl)propane-1,2,3-triol"
-    # (a 5-OH structure)
-    # CC(=O)N(C(C)=O)C(C)=O -> "N-acetyl-1-acetamidoethan-1-imide"
-    # N=C(N)NC(=N)NC(=N)N -> "N-guanidinomethaniminylguanidine"
-    # N=C(N)S -> "sulfanylmethanimidamide" (right structure,
-    # not the PIN)
-    # NC(=S)SSC(N)=S -> "1-aminosulfanylidenemethyldisulfanyl
-    # disulfanediylmethanamine"
+    #     N=C=N                  -> "methane"                       (loses N2!)
+    #     [C-]#[N+]O             -> "methane"                       (loses N,O!)
+    #     NC(=S)SC(N)=S          -> "methanamine"                   (loses most of it!)
+    #     OCC(CO)(CO)CO          -> "2,2-di(hydroxymethyl)propane-1,2,3-triol"
+    #                                                               (a 5-OH structure)
+    #     CC(=O)N(C(C)=O)C(C)=O  -> "N-acetyl-1-acetamidoethan-1-imide"
+    #     N=C(N)NC(=N)NC(=N)N    -> "N-guanidinomethaniminylguanidine"
+    #     N=C(N)S                -> "sulfanylmethanimidamide"  (right structure,
+    #                                                            not the PIN)
+    #     NC(=S)SSC(N)=S         -> "1-aminosulfanylidenemethyldisulfanyl
+    #                                 disulfanediylmethanamine"
     # So a deny-only change would have replaced 8 deprecated names with 8 names
     # that are worse. Supplying the PIN word-form is the root-cause fix; the
     # underlying generator defects are logged separately as their own work items.
     # (fulminic acid, diacetamide and pinacol are NOT listed here -- their
     # systematic engines already derive the correct PIN unaided, verified.)
     #
-    # P-66.5.4.1 / P-61.10 -- HO-N=C:; BB:26052 'N-hydroxy-λ2-methanamine (PIN)'
+    # P-66.5.4.1 / P-61.10 -- HO-N=C: ; BB:26052 'N-hydroxy-λ2-methanamine (PIN)'
     # for the structure drawn at BB:26050. The trivial 'isofulminic acid' is
     # state (c) NOT ACCEPTABLE (BB:26038). The λ-superscript is rendered with a
     # plain digit exactly as the on-disk Blue Book renders it in running text
@@ -317,7 +317,7 @@ RETAINED_NAMES = {
     # (not 'thiuram disulfide')".
     "NC(=S)SSC(N)=S": "2-dithioperoxy-1,3-dithiodicarbonic diamide",
     # P-66.4.1.2.1 -- BB:34298 'The names biguanide, triguanide, etc., are no
-    # longer recommended... named systematically as the diamides of
+    # longer recommended ... named systematically as the diamides of
     # imidodicarbonimidic acid, diimidotricarbonimidic acid, and
     # triimidotetracarbonimidic acid.' triguanide is n=3. The sibling n=2
     # (N=C(N)NC(=N)N) already emits 'imidodicarbonimidic diamide' unaided, which
@@ -332,7 +332,7 @@ RETAINED_NAMES = {
     # different structure, so this row is a correctness fix and not cosmetic.
     "OCC(CO)(CO)CO": "2,2-bis(hydroxymethyl)propane-1,3-diol",
     # P-31.1.2.1 -- BB:16523 'The name carbodiimide, for HN=C=NH, is retained but
-    # only for general nomenclature... The systematic name, methanediimine, is
+    # only for general nomenclature ... The systematic name, methanediimine, is
     # the preferred IUPAC name.'
     "N=C=N": "methanediimine",
 
@@ -340,7 +340,7 @@ RETAINED_NAMES = {
     "ClCCl": "dichloromethane",
     "ClC(Cl)Cl": "chloroform",
     "ClC(Cl)(Cl)Cl": "carbon tetrachloride",
-    # .10 (PIN-policy): carbonyl dichloride IS the P-65.5.5.1 PIN for
+    # Task 1.10 (PIN-policy): carbonyl dichloride IS the P-65.5.5.1 PIN for
     # phosgene (functional-class name the substitutive engine cannot derive;
     # it goes to unknown otherwise). Canonical key of ClC(=O)Cl. The trivial
     # 'phosgene' (OPSIN import) is denied in iupac_2013_pin_list.json.
@@ -369,7 +369,7 @@ RETAINED_NAMES = {
     "CC#N": "acetonitrile",
     "CN(C)C=O": "N,N-dimethylformamide",
 
-    # === SULFUR COMPOUNDS ===
+    # === SULFUR COMPOUNDS (Phase 10) ===
     # Disulfane (S-S bond, no carbon)
     "SS": "disulfane",
     # Thiols
@@ -387,7 +387,7 @@ RETAINED_NAMES = {
     "CCS(=O)(=O)O": "ethanesulfonic acid",
     "O=S(=O)(O)c1ccccc1": "benzenesulfonic acid",
 
-    # === PHOSPHORUS COMPOUNDS ===
+    # === PHOSPHORUS COMPOUNDS (Phase 11) ===
     # Phosphines (use IUPAC 2013 "phosphane" not "phosphine")
     "CP": "methylphosphane",
     "CCP": "ethylphosphane",
@@ -398,7 +398,7 @@ RETAINED_NAMES = {
     "CP(C)(C)=O": "trimethylphosphane oxide",
     "CCP(=O)(CC)CC": "triethylphosphane oxide",
     "O=P(c1ccccc1)(c1ccccc1)c1ccccc1": "triphenylphosphane oxide",
-    # Phosphonic acids (substituent-prefix PIN P-67.1.1.2 — the
+    # Phosphonic acids (: substituent-prefix PIN P-67.1.1.2 — the
     # 'methane'/'ethane' parent-hydride-stem forms are explicitly rejected)
     "CP(=O)(O)O": "methylphosphonic acid",
     "CCP(=O)(O)O": "ethylphosphonic acid",
@@ -412,13 +412,13 @@ RETAINED_NAMES = {
     # denote the ANION (OPSIN parses them back to the deprotonated dianion),
     # not the neutral acid-ester SMILES these rows were keyed on. The neutral
     # forms need the free -OH cited ("methyl dihydrogen phosphate", "dimethyl
-    # hydrogen phosphate",...) which `rules/phosphorus.py::name_phosphate_ester`
+    # hydrogen phosphate", ...) which `rules/phosphorus.py::name_phosphate_ester`
     # already produces correctly (per-OH protonation word derived from the
     # structure) once dispatch is no longer shadowed by this table. The
     # tri-ester rows below are correct as-is (0 free -OH -> no protonation word).
     "COP(=O)(OC)OC": "trimethyl phosphate",
     "CCOP(=O)(OCC)OCC": "triethyl phosphate",
-    
+
     # === RETAINED NITROGEN COMPOUNDS ===
     "NC(N)=O": "urea",
     # Wave-2 completion (P-66.1.6.1.3 / P-15.5.3.4.3): thiourea is the retained
@@ -451,17 +451,17 @@ RETAINED_NAMES = {
     "N#N": "dinitrogen",
     "O=O": "dioxygen",
 
-    # === INORGANIC ACIDS (fix) ===
+    # === INORGANIC ACIDS (Phase 25 fix) ===
     "O=[N+]([O-])O": "nitric acid",
     "O=[N+]([O-])OO": "peroxynitric acid",
 
-    # === NITRILES - AROMATIC (.6 BUG-2 fix) ===
+    # === NITRILES - AROMATIC (Phase 14.6 BUG-2 fix) ===
     "N#Cc1ccccc1": "benzonitrile",  # C6H5CN - PIN per P-66.1.1.1
 
-    # === AMIDES - AROMATIC (suffix FG fix) ===
+    # === AMIDES - AROMATIC (Phase 20 suffix FG fix) ===
     "NC(=O)c1ccccc1": "benzamide",  # C6H5CONH2 - PIN per P-66.1.1.1
 
-    # === THIAZOLIDINES (.6 BUG-6 fix) ===
+    # === THIAZOLIDINES (Phase 14.6 BUG-6 fix) ===
     # 1,3-thiazolidine: S at 1, N at 3 (not adjacent)
     "C1CSCN1": "thiazolidine",
     # 1,2-isothiazolidine: S at 1, N at 2 (adjacent)
@@ -496,7 +496,7 @@ RETAINED_NAMES = {
     # stereo-blind copy at its root and costs no coverage -- every deleted key
     # has a live equivalent in `STANDARD_AMINO_ACIDS`.
 
-    # === ADDITIONAL SATURATED HETEROCYCLES (expansion) ===
+    # === ADDITIONAL SATURATED HETEROCYCLES (Phase 8 expansion) ===
     "C1COCCO1": "1,4-dioxane",
     # P-15.5.3.1 / Table 2.3: morpholine chalcogen-replacement parents.
     "C1CSCCO1": "1,4-oxathiane",        # O+S ring (was MISLABELED thiomorpholine)
@@ -515,7 +515,7 @@ RETAINED_NAMES = {
     # emission is a separate decision (the 2013 PIN would carry the full hydro
     # locant set, P-31.1.4.2) and this change must not smuggle one in.
 
-    # === FATTY ACIDS (expansion) ===
+    # === FATTY ACIDS (Phase 8 expansion) ===
     "CCCCC(=O)O": "pentanoic acid",
     "CCCCCC(=O)O": "hexanoic acid",
     "CCCCCCCC(=O)O": "octanoic acid",
@@ -525,48 +525,48 @@ RETAINED_NAMES = {
     "CCCCCCCCCCCCCCCC(=O)O": "hexadecanoic acid",
     "CCCCCCCCCCCCCCCCCC(=O)O": "octadecanoic acid",
 
-    # === BRANCHED CARBOXYLIC ACIDS (expansion) ===
+    # === BRANCHED CARBOXYLIC ACIDS (Phase 8 expansion) ===
     # NOTE: isobutyric acid removed -- PIN is "2-methylpropanoic acid"
     # NOTE: isovaleric acid removed -- PIN is "3-methylbutanoic acid"
     # NOTE: pivalic acid removed -- PIN is "2,2-dimethylpropanoic acid"
 
-    # === UNSATURATED ACIDS (expansion) ===
-    # PF sweep: `crotonic acid` and `sorbic acid` DELETED, and `crotonaldehyde`
+    # === UNSATURATED ACIDS (Phase 8 expansion) ===
+    # sweep: `crotonic acid` and `sorbic acid` DELETED, and `crotonaldehyde`
     # below with them. Two independent reasons, either sufficient:
     #
-    # 1. NOT BLUE BOOK NAMES. All three occur **0** times in BlueBookV2.md under a
-    # markup/OCR-tolerant search whose known-positive control passes in the same
-    # run (acetic acid 178, benzoic acid 185, but-2-enoic acid 4). Their PIN
-    # status is therefore unestablished -- the same ground on which `isobutyric
-    # acid`, `isovaleric acid`, `pivalic acid` and `pinacolone` were removed
-    # above. And the replacement is not merely systematic, it is marked PIN
-    # verbatim: "but-2-enoic acid (PIN)".
-    # 2. EACH OVER-ASSERTS DOUBLE-BOND GEOMETRY THE KEY LEAVES UNDEFINED. The keys
-    # `CC=CC(=O)O` / `CC=CC=CC(=O)O` / `CC=CC=O` specify no geometry, while
-    # crotonic acid IS (E)-but-2-enoic acid (the Z isomer is isocrotonic acid)
-    # and sorbic acid IS (2E,4E). So the name named a stereoisomer the input
-    # never claimed -- invisible to SELF-01, which compares the InChIKey
-    # skeleton block and is stereo-insensitive by design.
+    #  1. NOT BLUE BOOK NAMES. All three occur **0** times in BlueBookV2.md under a
+    #     markup/OCR-tolerant search whose known-positive control passes in the same
+    #     run (acetic acid 178, benzoic acid 185, but-2-enoic acid 4). Their PIN
+    #     status is therefore unestablished -- the same ground on which `isobutyric
+    #     acid`, `isovaleric acid`, `pivalic acid` and `pinacolone` were removed
+    #     above. And the replacement is not merely systematic, it is marked PIN
+    #     verbatim: "but-2-enoic acid (PIN)".
+    #  2. EACH OVER-ASSERTS DOUBLE-BOND GEOMETRY THE KEY LEAVES UNDEFINED. The keys
+    #     `CC=CC(=O)O` / `CC=CC=CC(=O)O` / `CC=CC=O` specify no geometry, while
+    #     crotonic acid IS (E)-but-2-enoic acid (the Z isomer is isocrotonic acid)
+    #     and sorbic acid IS (2E,4E). So the name named a stereoisomer the input
+    #     never claimed -- invisible to SELF-01, which compares the InChIKey
+    #     skeleton block and is stereo-insensitive by design.
     #
     # Measured at 27160d6a: all three now emit the PIN and round-trip EXACTLY to the
     # input (but-2-enoic acid, hexa-2,4-dienoic acid, but-2-enal); +3 round-trip, 0
     # lost, and 0 gold-oracle rows assert any of the three names.
     #
     # ⚠ DO NOT extend this deletion to the 19 unqualified amino-acid entries
-    # (alanine, leucine, isoleucine, threonine,...). They look identical to a
+    # (alanine, leucine, isoleucine, threonine, ...). They look identical to a
     # round-trip metric -- OPSIN resolves a bare `isoleucine` to the L-form, so they
     # fail RT too -- but they are BLUE-BOOK-CORRECT. P-103.1.3.1 "The
     # stereodescriptors 'D' and 'L'" (BlueBookV2.md:54291) spells configuration with
-    # the prefix: ":54324 L-isoleucine (symbols 'Ile', 'I') (2S,3S)-2-amino-3-
-    # methylpentanoic acid", and the P-103 amino-acid table at:54191 lists bare
+    # the prefix: ":54324  L-isoleucine (symbols 'Ile', 'I') (2S,3S)-2-amino-3-
+    # methylpentanoic acid", and the P-103 amino-acid table at :54191 lists bare
     # `alanine` against a structure drawn WITHOUT stereochemistry
     # ("CH3-CH(NH2)-COOH"). Deleting them would buy 2 round-trip points by emitting
     # a less preferred name -- Goodharting the metric against conformance.
 
-    # === ALDEHYDES (expansion) ===
+    # === ALDEHYDES (Phase 8 expansion) ===
     # Note: butanal/pentanal preferred over butyraldehyde/valeraldehyde for consistency
 
-    # === KETONES (expansion) ===
+    # === KETONES (Phase 8 expansion) ===
     # PA1 sweep: the row `"CC(=O)CC(C)(C)C": "pinacolone"` was DELETED. WRONG
     # STRUCTURE, and unambiguously so -- the formulae differ: that key is C7H14O
     # (4,4-dimethylpentan-2-one, AZASWMGVGQEVCS), while pinacolone is C6H12O
@@ -581,36 +581,36 @@ RETAINED_NAMES = {
     # gets its systematic name.
     "CC(=O)C=C(C)C": "mesityl oxide",
 
-    # === DIOLS AND POLYOLS (expansion) ===
-    # HYG-03: ethylene/propylene/trimethylene glycol removed (deprecated
+    # === DIOLS AND POLYOLS (Phase 8 expansion) ===
+    # Phase 167 HYG-03: ethylene/propylene/trimethylene glycol removed (deprecated
     # "glycol" names, not PINs). Systematic ethane-1,2-diol / propane-1,2-diol /
     # propane-1,3-diol now emitted; also enforced by _PIN_DENY (recurrence guard).
-    # See § "".
+    # See docs/retained_name_conflicts.md § "Phase 167".
     "OCCCCO": "butane-1,4-diol",
 
-    # === UNSATURATED ALCOHOLS (expansion) ===
+    # === UNSATURATED ALCOHOLS (Phase 8 expansion) ===
     "C=CCO": "allyl alcohol",
     "C#CCO": "propargyl alcohol",
 
-    # === TERPENES (expansion) ===
+    # === TERPENES (Phase 8 expansion) ===
     "C=C(C)C1CC=C(C)CC1": "limonene",
     "CC12CCC(CC1=O)C2(C)C": "camphor",
 
-    # === NAPHTHOLS AND BIPHENYLS (expansion) ===
+    # === NAPHTHOLS AND BIPHENYLS (Phase 8 expansion) ===
     "Oc1ccc2ccccc2c1": "2-naphthol",
     "Oc1ccc(-c2ccccc2)cc1": "4-phenylphenol",
 
-    # === COMMON PHARMACEUTICALS (expansion) ===
-    # HYG-03: "aspirin" (brand name) removed; PIN 2-acetyloxybenzoic
+    # === COMMON PHARMACEUTICALS (Phase 8 expansion) ===
+    # Phase 167 HYG-03: "aspirin" (brand name) removed; PIN 2-acetyloxybenzoic
     # acid now emitted; also enforced by _PIN_DENY. See retained_name_conflicts.md.
 
-    # === CYCLIC IMIDES (expanded.1) ===
+    # === CYCLIC IMIDES (Phase 49, expanded Phase 91.1) ===
     "O=C1CCC(=O)N1": "succinimide",
     "O=C1C=CC(=O)N1": "maleimide",
     "O=C1CCCC(=O)N1": "glutarimide",
     "O=C1NC(=O)c2ccccc21": "phthalimide",
 
-    # === COMMONLY ENCOUNTERED RETAINED NAMES ===
+    # === COMMONLY ENCOUNTERED RETAINED NAMES (Phase 94) ===
     # Source: IUPAC 2013 Blue Book, various sections
     # OPSIN RT verified 2026-03-08
     "c1ccc(-c2ccccc2)cc1": "biphenyl",  # P-31.1.2.4 general nomenclature
@@ -628,7 +628,7 @@ RETAINED_NAMES = {
     # licenses nothing of the sort. `caprolactam` has 0 BlueBookV2.md hits.
     "O=C1CCCCCN1": "caprolactam",
 
-    # === NUCLEOSIDES ===
+    # === NUCLEOSIDES (Phase 94) ===
     # Retained names per carbohydrate nomenclature conventions
     # Each nucleoside has fixed beta stereochemistry at anomeric position
     # OPSIN RT verified 2026-03-08 (all 8 pass)
@@ -637,7 +637,7 @@ RETAINED_NAMES = {
     "Nc1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1": "cytidine",
     "Cc1cn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]c1=O": "thymidine",
     "O=c1ccn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)[nH]1": "uridine",
-    # : 2'-deoxynucleoside PINs (the prime is REQUIRED — 'deoxyadenosine'
+    # 2'-deoxynucleoside PINs (the prime is REQUIRED — 'deoxyadenosine'
     # is ambiguous; '2'-deoxyadenosine' is the PIN, P-105.2.1 / carbohydrate P-102.5).
     # All four OPSIN-RT; 2'-deoxyuridine was MISSING. Old bare 'deoxy…' keys renamed.
     "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1": "2'-deoxyadenosine",
@@ -657,7 +657,7 @@ RETAINED_NAMES = {
     "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1OP(=O)(O)O": "2'-adenylic acid",
     "Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](OP(=O)(O)O)[C@H]1O": "3'-adenylic acid",
     "O=c1[nH]cnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O": "5'-inosinic acid",
-    # : inosine (the hypoxanthine nucleoside) was MISSING (adenosine/
+    # inosine (the hypoxanthine nucleoside) was MISSING (adenosine/
     # guanosine/cytidine/uridine all present) -> 'unknown'. Added via the KETO
     # tautomer canonical (mirrors hypoxanthine and 5'-inosinic acid above): RDKit
     # canonicalises a keto input to this form, while OPSIN normalises the name
@@ -666,7 +666,7 @@ RETAINED_NAMES = {
     # NON-PIN retained name (PIN is systematic); OPSIN-RT (skeleton) verified.
     "O=c1[nH]cnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O": "inosine",
 
-    # === DISACCHARIDES ===
+    # === DISACCHARIDES (Phase 94) ===
     # NOTE: OPSIN cannot parse most disaccharide names -- InChI validation used
     # instead of OPSIN RT. Canonical SMILES from PubChem + RDKit canonicalization.
     "OC[C@@H]1O[C@@](CO)(O[C@H]2[C@H](O)[C@@H](O)[C@@H](O)O[C@@H]2CO)[C@@H](O)[C@H]1O": "sucrose",
@@ -675,19 +675,19 @@ RETAINED_NAMES = {
     "OC[C@H]1O[C@@H](O[C@@H]2[C@@H](O)[C@H](O)[C@@H](O)O[C@@H]2CO)[C@H](O)[C@@H](O)[C@@H]1O": "cellobiose",
     "OC[C@H]1O[C@H](O[C@H]2O[C@H](CO)[C@H](O)[C@H](O)[C@H]2O)[C@H](O)[C@H](O)[C@H]1O": "trehalose",
 
-    # === MODIFIED SUGARS ===
+    # === MODIFIED SUGARS (Phase 94) ===
     # N-acetylneuraminic acid (sialic acid / Neu5Ac)
     # Unique 9-carbon structure, not standard pyranose/furanose
     # OPSIN RT verified 2026-03-08
     "CC(=O)N[C@H]1[C@H]([C@H](O)[C@H](O)CO)OC(O)(C(=O)O)C[C@@H]1O": "N-acetylneuraminic acid",
 
-    # === ADDITIONAL POLYCYCLIC AROMATICS (expansion) ===
+    # === ADDITIONAL POLYCYCLIC AROMATICS (Phase 109 expansion) ===
     # All canonical SMILES verified via Chem.CanonSmiles + OPSIN RT 2026-03-16
     "c1ccc2c(c1)c1ccccc1c1ccccc21": "triphenylene",
     "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61": "coronene",
     "c1ccc2c(c1)-c1cccc3cccc-2c13": "fluoranthene",
 
-    # === BENZOIC ACID DERIVATIVES (expansion) ===
+    # === BENZOIC ACID DERIVATIVES (Phase 109 expansion) ===
     # Note: salicylic acid and gallic acid omitted -- existing tests expect
     # systematic names (2-hydroxybenzoic acid, 3,4,5-trihydroxybenzoic acid)
     "O=C(O)c1cccc(C(=O)O)c1": "isophthalic acid",
@@ -713,7 +713,7 @@ RETAINED_NAMES = {
     # matches this key exactly.
     "O=C1SC(=O)c2ccccc21": "2-benzothiophene-1,3-dione",
 
-    # === HETEROCYCLE DERIVATIVES (expansion) ===
+    # === HETEROCYCLE DERIVATIVES (Phase 109 expansion) ===
     "O=c1ccc2ccccc2o1": "coumarin",       # 2H-chromen-2-one
     "O=c1ccoc2ccccc12": "chromone",       # 4H-chromen-4-one
     "O=c1c2ccccc2oc2ccccc12": "xanthone",  # 9H-xanthen-9-one
@@ -723,22 +723,22 @@ RETAINED_NAMES = {
     "NC(=O)c1cccnc1": "nicotinamide",     # pyridine-3-carboxamide
     "O=C1NS(=O)(=O)c2ccccc21": "saccharin",  # 1,1-dioxo-1,2-benzothiazol-3-one
 
-    # === ADDITIONAL AMINES (expansion) ===
+    # === ADDITIONAL AMINES (Phase 109 expansion) ===
     "NCCCCN": "putrescine",    # butane-1,4-diamine
     "NCCCCCN": "cadaverine",   # pentane-1,5-diamine
 
-    # === ADDITIONAL SOLVENTS (expansion) ===
+    # === ADDITIONAL SOLVENTS (Phase 109 expansion) ===
     "C1COCO1": "1,3-dioxolane",
 
-    # === NUCLEOBASES (expansion) ===
+    # === NUCLEOBASES (Phase 109 expansion) ===
     "O=c1cc[nH]c(=O)[nH]1": "uracil",
     "Cc1c[nH]c(=O)[nH]c1=O": "thymine",
     "Nc1cc[nH]c(=O)n1": "cytosine",
     "Nc1ncnc2[nH]cnc12": "adenine",
     "Nc1nc2[nH]cnc2c(=O)[nH]1": "guanine",
-    "Nc1nc(=O)c2[nH]cnc2[nH]1": "guanine",  # alternate tautomer
+    "Nc1nc(=O)c2[nH]cnc2[nH]1": "guanine",  # alternate tautomer (Phase 142)
 
-    # === PURINE DERIVATIVES (expansion) ===
+    # === PURINE DERIVATIVES (Phase 142 expansion) ===
     "O=c1[nH]c(=O)c2[nH]cnc2[nH]1": "xanthine",  # 3,7-dihydro-1H-purine-2,6-dione
     "O=c1[nH]c(=O)c2nc[nH]c2[nH]1": "xanthine",  # alternate tautomer
     "O=c1[nH]cnc2[nH]cnc12": "hypoxanthine",  # 1,9-dihydro-6H-purine-6-one
@@ -746,32 +746,32 @@ RETAINED_NAMES = {
     "O=C(O)c1cc(=O)[nH]c(=O)[nH]1": "orotic acid",  # pyrimidine-2,4(1H,3H)-dione-6-carboxylic acid
     "c1ccc2nc3ccccc3cc2c1": "acridine",  # dibenzo[b,e]pyridine
 
-    # === LONG-CHAIN DIACIDS (expansion) ===
+    # === LONG-CHAIN DIACIDS (Phase 109 expansion) ===
     "O=C(O)CCCCCCC(=O)O": "suberic acid",   # octanedioic acid
     "O=C(O)CCCCCCCC(=O)O": "azelaic acid",  # nonanedioic acid
     "O=C(O)CCCCCCCCC(=O)O": "sebacic acid",  # decanedioic acid
 
-    # === AROMATIC DERIVATIVES (expansion) ===
+    # === AROMATIC DERIVATIVES (Phase 109 expansion) ===
     "c1ccc(Nc2ccccc2)cc1": "diphenylamine",
 
-    # === BENZALDEHYDE DERIVATIVES (expansion) ===
+    # === BENZALDEHYDE DERIVATIVES (Phase 109 expansion) ===
     "COc1cc(C=O)ccc1O": "vanillin",           # 4-hydroxy-3-methoxybenzaldehyde
     "O=Cc1ccc(O)cc1": "4-hydroxybenzaldehyde",
     "COc1ccc(C=O)cc1": "anisaldehyde",        # 4-methoxybenzaldehyde
     "O=Cc1cccnc1": "nicotinaldehyde",         # pyridine-3-carbaldehyde
     "O=Cc1ccncc1": "isonicotinaldehyde",      # pyridine-4-carbaldehyde
 
-    # === NAPHTHOL (expansion) ===
+    # === NAPHTHOL (Phase 109 expansion) ===
     "Oc1cccc2ccccc12": "1-naphthol",
 
-    # === MISCELLANEOUS AROMATICS (expansion) ===
+    # === MISCELLANEOUS AROMATICS (Phase 109 expansion) ===
     "OC(c1ccccc1)c1ccccc1": "benzhydrol",             # diphenylmethanol
     "O=c1cc(-c2ccccc2)oc2ccccc12": "flavone",         # 2-phenyl-4H-chromen-4-one
     "Nc1ccc(N)cc1": "1,4-phenylenediamine",           # benzene-1,4-diamine
     "Oc1cccc(O)c1O": "pyrogallol",                    # benzene-1,2,3-triol
     "CC(=O)c1ccc(O)cc1": "4-hydroxyacetophenone",
 
-    # === ADDITIONAL COMMON COMPOUNDS (expansion) ===
+    # === ADDITIONAL COMMON COMPOUNDS (Phase 109 expansion) ===
     # All canonical SMILES verified via Chem.CanonSmiles 2026-03-16
     "C1CCC2CCCCC2C1": "decahydronaphthalene",         # decalin
     "O=C(O)c1ccco1": "furan-2-carboxylic acid",       # furoic acid
@@ -805,7 +805,7 @@ def get_retained_name(canonical_smiles: str) -> Optional[str]:
     """
     Get retained name for a canonical SMILES if one exists.
 
-     + RESEARCH ADDITION 1 root-cause fix: consults the
+    Phase 150 + RESEARCH ADDITION 1 root-cause fix: consults the
     merged ALL_RETAINED_NAMES dict via late binding (avoids circular
     import at module load time). Resolves 2 function-import consumers
     in one edit: ring_assemblies.py:296, heterocycles.py:36.
@@ -827,7 +827,7 @@ def is_retained_name_compound(canonical_smiles: str) -> bool:
     """
     Check if compound has a retained name.
 
-     + RESEARCH ADDITION 1 root-cause fix: consults
+    Phase 150 + RESEARCH ADDITION 1 root-cause fix: consults
     merged ALL_RETAINED_NAMES via late binding.
 
     Args:
@@ -846,7 +846,7 @@ def is_retained_name_compound(canonical_smiles: str) -> bool:
 def add_retained_name(canonical_smiles: str, name: str) -> None:
     """DEPRECATED: prefer ``orthonym.data.register_retained_name``.
 
-     + REVIEW CR-01 root-cause fix: ``ALL_RETAINED_NAMES``
+    Phase 150 + REVIEW CR-01 root-cause fix: ``ALL_RETAINED_NAMES``
     is built once at import time (``data/__init__.py``); runtime mutators
     must keep the HC dict and the merged dict synchronised so the public
     ``get_retained_name`` lookup sees new entries.

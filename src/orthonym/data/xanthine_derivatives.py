@@ -14,9 +14,9 @@ IUPAC naming for xanthines:
 Reference: IUPAC 2013 Blue Book P-25.3 (Purines and xanthines)
 """
 
-from typing import Dict, Optional, Any, List
-from rdkit import Chem
+from typing import Any, Dict, List, Optional
 
+from rdkit import Chem
 
 # Xanthine derivatives mapping
 # Keys are canonical SMILES (without explicit H), values contain naming info
@@ -87,7 +87,7 @@ XANTHINE_DERIVATIVES: Dict[str, Dict[str, Any]] = {
     # Paraxanthine: 1,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione
     # N-1 and N-7 methylated, N-3 has H
     # Major caffeine metabolite
-    # Canonical: Cn1c(=O)[nH]c2ncn(C)c2c1=O (OPSIN-authoritative; the previous
+    # Canonical: Cn1c(=O)[nH]c2ncn(C)c2c1=O  (OPSIN-authoritative; the previous
     # key was a wrong-regiochemistry structure that never matched -> abstained)
     # =========================================================================
     'Cn1c(=O)[nH]c2ncn(C)c2c1=O': {
@@ -176,7 +176,7 @@ def identify_xanthine(mol: Chem.Mol) -> Optional[str]:
         None otherwise.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(C)c(=O)n2C') # caffeine
+        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(C)c(=O)n2C')  # caffeine
         >>> identify_xanthine(mol)
         'Cn1cnc2c1c(=O)n(C)c(=O)n2C'
     """
@@ -211,10 +211,10 @@ def get_xanthine_name(mol: Chem.Mol, use_common: bool = False) -> Optional[str]:
         None if molecule is not a known xanthine.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('O=c1[nH]c(=O)c2[nH]cnc2[nH]1') # xanthine
+        >>> mol = Chem.MolFromSmiles('O=c1[nH]c(=O)c2[nH]cnc2[nH]1')  # xanthine
         >>> get_xanthine_name(mol)
         'xanthine'
-        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(C)c(=O)n2C') # caffeine
+        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(C)c(=O)n2C')  # caffeine
         >>> get_xanthine_name(mol)
         '1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione'
         >>> get_xanthine_name(mol, use_common=True)
@@ -247,7 +247,7 @@ def get_xanthine_info(mol: Chem.Mol) -> Optional[Dict[str, Any]]:
         or None if not a known xanthine.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(C)c(=O)n2C') # caffeine
+        >>> mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(C)c(=O)n2C')  # caffeine
         >>> info = get_xanthine_info(mol)
         >>> info['n_positions']
         [1, 3, 7]

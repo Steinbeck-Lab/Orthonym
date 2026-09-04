@@ -15,7 +15,7 @@ a per-style switch -- ``glycerol``, ``catechol`` and ``nicotinic acid`` have
 emitted their systematic names under ``--style general`` since the deny list
 shipped, and Task E does not introduce a second, differently-behaving mechanism.
 
-⚠ The OPSIN ``is_pin`` field is NOT an input here. ``
+⚠ The OPSIN ``is_pin`` field is NOT an input here. ``scripts/import_opsin_xml.py``
 hard-codes ``"is_pin": False`` (lines 268, 742, 847), so all 232 entries in
 ``amino_acids_opsin.py`` and all 423 in ``simple_groups.py`` carry False. The
 flag is a generator default with zero per-entry information; gating on it would
@@ -56,7 +56,7 @@ PIN_DENY: FrozenSet[str] = frozenset(
 
 #: Deny subset that ALSO filters the hand-curated dicts. Excludes ``hc_override``
 #: rows (cumene/quinuclidine/acetylene), whose deny applies only to OPSIN-side
-# : promotion (HYG-03).
+#: promotion (Phase 150 / Phase 167 HYG-03).
 PIN_DENY_HC: FrozenSet[str] = frozenset(
     e["name"].lower() for e in ENTRIES
     if e.get("pin") is False and not e.get("hc_override")

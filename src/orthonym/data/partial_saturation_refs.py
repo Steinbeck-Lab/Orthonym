@@ -15,9 +15,9 @@ Key aromatic systems covered:
 - Monocyclic: furan, pyrrole, pyridine (for simple dihydro cases)
 """
 
-from typing import Dict, Optional, Tuple, Any
-from rdkit import Chem
+from typing import Any, Dict, Optional, Tuple
 
+from rdkit import Chem
 
 # Aromatic reference SMILES for common fused heterocycles
 # Maps ring system family names to canonical SMILES of the aromatic parent
@@ -247,7 +247,7 @@ AROMATIC_REFERENCES: Dict[str, Dict[str, Any]] = {
     },
 
     # =========================================================================
-    # ADDITIONAL MONOCYCLIC AND POLYCYCLIC REFERENCES
+    # ADDITIONAL MONOCYCLIC AND POLYCYCLIC REFERENCES (Phase 89)
     # =========================================================================
 
     'pyrazine': {
@@ -316,11 +316,11 @@ def get_aromatic_reference(mol: Chem.Mol) -> Optional[Tuple[str, str]]:
         None otherwise.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2') # tetrahydroquinoline
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2')  # tetrahydroquinoline
         >>> get_aromatic_reference(mol)
         ('quinoline', 'c1ccc2ncccc2c1')
 
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2') # dihydroindole
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # dihydroindole
         >>> get_aromatic_reference(mol)
         ('indole', 'c1ccc2[nH]ccc2c1')
     """
@@ -401,7 +401,7 @@ def get_carbocyclic_aromatic_reference(mol: Chem.Mol) -> Optional[Tuple[str, str
         None otherwise.
 
     Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2') # tetrahydronaphthalene
+        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')  # tetrahydronaphthalene
         >>> get_carbocyclic_aromatic_reference(mol)
         ('naphthalene', 'c1ccc2ccccc2c1')
     """

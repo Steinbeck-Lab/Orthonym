@@ -14,12 +14,18 @@ Keys are canonical SMILES (verified with RDKit), values contain:
 """
 
 from collections import Counter
-from typing import Dict, Optional, Tuple, List, Any, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 from rdkit import Chem
 
-from ..assembly.fragment_naming import (  # macrocycle-hang budgets
-    spend_perf_work, spend_analysis_call)
-
+from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
+    spend_analysis_call,
+    spend_perf_work,
+)
+from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
+    atoms_of,
+    bonds_of,
+)
 
 # Fused heterocycle data - canonical SMILES verified with RDKit
 # Format: canonical_smiles -> {name, tautomer_locant, ring_system, parent_atoms, iupac_locants}
@@ -28,7 +34,7 @@ from ..assembly.fragment_naming import (  # macrocycle-hang budgets
 # - Maps canonical SMILES atom index -> IUPAC peripheral locant
 # - Fusion atoms get string locants like '3a', '7a', '4a', '8a'
 # - Peripheral atoms get integer locants 1, 2, 3, etc.
-# - Used by match_fused_heterocycle_core for correct substituent position naming
+# - Used by match_fused_heterocycle_core() for correct substituent position naming
 
 FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # 1H-indole
@@ -267,7 +273,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '9a', 5: 1, 6: 9, 7: '8a', 8: 8, 9: 7, 10: 6, 11: 5, 12: '10a', 13: 10},
     },
     # 6H-benzo[c]chromene -> PIN 6H-dibenzo[b,d]pyran (BB line 13463 '6H-dibenzo[b,d]pyran (PIN)
-    #... not... 6H-benzo[c]chromene'). Same ring system + numbering (OPSIN extendedsmi verified) -> rename only.
+    # ... not ... 6H-benzo[c]chromene'). Same ring system + numbering (OPSIN extendedsmi verified) -> rename only.
     'c1ccc2c(c1)COc1ccccc1-2': {
         'name': '6H-dibenzo[b,d]pyran',
         'tautomer_locant': 6,
@@ -359,7 +365,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'systematic': '2,3-dihydro-1-benzofuran',
     },
     # 2H-chromene -> PIN 2H-1-benzopyran (P-19(d) line 1736; line 24647 '2H-1-benzopyran (PIN)';
-    # line 19453 '2H-1-benzopyran (PIN) 2H-chromene'). Same ring system => iupac_locants unchanged.
+    # line 19453 '2H-1-benzopyran (PIN)  2H-chromene'). Same ring system => iupac_locants unchanged.
     'C1=Cc2ccccc2OC1': {
         'name': '2H-1-benzopyran',
         'tautomer_locant': 2,
@@ -478,7 +484,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         # system with hydrogen cited OUTSIDE it -- so the bare rename produced
         # `1,2'-spirobi[2,3-dihydro-1H-indene]`. The obvious shortcut is WORSE, not
         # merely wrong: `1,2'-spirobi[1H-indene]` denotes the UNSATURATED molecule --
-        # a wrong STRUCTURE, not a wrong spelling.
+        # a wrong STRUCTURE, not a wrong spelling (session.
         #
         # ✅ UNBLOCKED. `_name_spirobi_core` no longer reads saturation
         # out of this string at all: it derives the hydro prefixes and any indicated
@@ -511,7 +517,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         # system with hydrogen cited OUTSIDE it -- so the bare rename produced
         # `1,2'-spirobi[2,3-dihydro-1H-indene]`. The obvious shortcut is WORSE, not
         # merely wrong: `1,2'-spirobi[1H-indene]` denotes the UNSATURATED molecule --
-        # a wrong STRUCTURE, not a wrong spelling.
+        # a wrong STRUCTURE, not a wrong spelling (session.
         #
         # ✅ UNBLOCKED. `_name_spirobi_core` no longer reads saturation
         # out of this string at all: it derives the hydro prefixes and any indicated
@@ -832,7 +838,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         # 'dibenzofuran' is general/retained-style. dibenzofuran is NOT in
         # Table 2.8 retained heterocycles, so PIN style needs the descriptor.
         # BB verbatim: 'dibenzo[b,d]furan-1-yl (PIN)' (line 7475, 'not
-        #...dibenzofuran'). The fixed skeleton always fuses on sides b (2,3)
+        # ...dibenzofuran'). The fixed skeleton always fuses on sides b (2,3)
         # and d (4,5), so [b,d] is a constant of this entry.
         'name': 'dibenzo[b,d]furan',
         'tautomer_locant': None,
@@ -840,7 +846,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 13,
         'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '9b', 4: '4a', 5: 4, 6: 5, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a'},
     },
-    # dibenzo[b,d]thiophene (same skeleton, S substitutes for O at idx 6 -> identical grid)
+    # dibenzo[b,d]thiophene  (same skeleton, S substitutes for O at idx 6 -> identical grid)
     # PIN needs the [b,d] descriptor (P-25.3.1.3); not in Table 2.8. BB verbatim
     # 'dibenzo[b,d]thiophene] (PIN)' (line 11250).
     'c1ccc2c(c1)sc1ccccc12': {
@@ -968,7 +974,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
     },
-    # Wave2 the best-effort tier (P-25.2.2.4 benzo-heterocycles + P-25.7.1.3.2 fused indicated-H):
+    # Wave2 T4 (P-25.2.2.4 benzo-heterocycles + P-25.7.1.3.2 fused indicated-H):
     # bare fused-name catalog entries that were fail-closed 'unknown' at HEAD.
     # OPSIN-RT + numbering verified (extendedsmi mapped onto RDKit-canonical,
     # confirmed via methyl-isomer attachment). The benzoxepines/benzothiepine
@@ -1108,7 +1114,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         # system with hydrogen cited OUTSIDE it -- so the bare rename produced
         # `1,2'-spirobi[2,3-dihydro-1H-indene]`. The obvious shortcut is WORSE, not
         # merely wrong: `1,2'-spirobi[1H-indene]` denotes the UNSATURATED molecule --
-        # a wrong STRUCTURE, not a wrong spelling.
+        # a wrong STRUCTURE, not a wrong spelling (session.
         #
         # ✅ UNBLOCKED. `_name_spirobi_core` no longer reads saturation
         # out of this string at all: it derives the hydro prefixes and any indicated
@@ -1572,7 +1578,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # ── Wave-2 completion C (P-25.3.4/.5/.6/.8 BB-cited multi-component
     # fusion parents; the general multi-prime descriptor ENGINE remains
     # unbuilt — these are the specific BB-named parents, locants
-    # OPSIN-extendedsmi-derived; the best-effort tier pentaphene/hexahelicene precedent). ──
+    # OPSIN-extendedsmi-derived; T4 pentaphene/hexahelicene precedent). ──
     'c1ccc2nc3cc4nc5c(nc4cc3nc2c1)nc1ccccn15': {
         'name': "pyrido[1'',2'':1',2']imidazo[4',5':5,6]pyrazino[2,3-b]phenazine",
         'tautomer_locant': None,
@@ -1643,10 +1649,10 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 16,
         'iupac_locants': {0: 7, 1: 6, 2: '5a', 3: 5, 4: 4, 5: '3a', 6: 3, 7: 2, 8: 1, 9: '10a', 10: 10, 11: 9, 12: '8a', 13: 8, 14: '10c', 15: '10b'},
     },
-    # Kind-C catalog expansion: 2-ring fused cores measured
+    # M6 Kind-C catalog expansion (2026-08-29): 2-ring fused cores measured
     # ABSENT from this catalog (`fused_component_uncatalogued`, guard
     # spiro.py:1468 / composer.py's plain ortho-fused branch), sized in
-    # + -KINDB-CONFIRM.md. The routing
+    # + M6-KINDB-CONFIRM.md. The routing
     # to `match_fused_heterocycle_core` already exists and self-activates once
     # these are cataloged. Each name below OPSIN-round-trips (constitution-only
     # InChI match) to exactly this bare core before being added; the
@@ -1655,7 +1661,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # substructure isomorphism onto this canonical SMILES), never hand-derived.
     #
     # 9H-fluorene (bare parent; witness ring system from an N-triflyloxime
-    # substituent, e.g. O=S(=O)(ON=CCc1ccccc1-2)C(F)(F)F)C(F)(F)F).
+    # substituent, e.g. O=S(=O)(ON=C(c1ccc2c(c1)Cc1ccccc1-2)C(F)(F)F)C(F)(F)F).
     'c1ccc2c(c1)Cc1ccccc1-2': {
         'name': '9H-fluorene',
         'tautomer_locant': 9,
@@ -1665,7 +1671,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # 3,4-dihydro-2H-1,4-benzoxazine (benzomorpholine parent; witness ring
     # system from a spiro-decorated derivative, e.g.
-    # CN1CCC(n2ccOCC3(...)N4)cn2)CC1). OPSIN also accepts the
+    # CN1CCC(n2cc(-c3ccc4c(c3)OCC3(...)N4)cn2)CC1). OPSIN also accepts the
     # bracket form "3,4-dihydro-2H-benzo[b][1,4]oxazine" for the same
     # structure; this catalog uses the classical-locant spelling to match
     # the sibling entries '3,4-dihydro-2H-1-benzopyran' /
@@ -1678,7 +1684,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {9: 1, 8: 2, 7: 3, 6: 4, 4: '4a', 3: '8a', 2: 8, 1: 7, 0: 6, 5: 5},
     },
     # pyrazolo[1,5-a]pyrazine (bridgehead-N 5-6 fusion; witness ring system
-    # from Cn1ccc(c2cn3nccc3c(...)n2)n1). Bridgehead N takes a plain
+    # from Cn1ccc(-c2cn3nccc3c(...)n2)n1). Bridgehead N takes a plain
     # peripheral locant (8) and the carbon fusion atom takes the lettered
     # locant ('3a'), matching the indolizine / imidazo[1,2-a]pyridine
     # convention already in this table.
@@ -1707,7 +1713,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
 
 
 # =========================================================================
-# PREFIX STEM DERIVATION
+# PREFIX STEM DERIVATION (Phase 78)
 # =========================================================================
 
 
@@ -1734,7 +1740,7 @@ def _derive_prefix_stem(name: str) -> str:
 
 # Entries that should not be included in prefix stems:
 # - Retained names (adenine, hypoxanthine): functional derivatives, not ring systems
-# - Lactones (coumarin): need special "oxo-chromen" prefix, deferred to
+# - Lactones (coumarin): need special "oxo-chromen" prefix, deferred to Phase 80
 _PREFIX_STEM_EXCLUDES = {'is_retained_name', 'benzo-6-membered-lactone'}
 
 # Module-level derivation: compute all prefix stems at import time (O(1) lookup)
@@ -1755,13 +1761,13 @@ def get_fused_heterocycle_prefix(
 
     Static O(1) dict lookup — no recursive naming calls.
     Returns the IUPAC P-57.1.5 systematic prefix form:
-      stem-locant-yl (e.g., "quinolin-2-yl", "1H-indol-3-yl")
+      stem-locant-yl  (e.g., "quinolin-2-yl", "1H-indol-3-yl")
 
     Args:
         core_smiles: Canonical SMILES of the matched fused heterocycle core.
         attachment_atom_idx: Mol atom index where the ring attaches to parent.
         atom_mapping: Mapping from mol atom index → IUPAC locant (from
-            match_fused_heterocycle_core).
+            match_fused_heterocycle_core()).
 
     Returns:
         Prefix string like "quinolin-2-yl" or None if core_smiles not recognized
@@ -1853,7 +1859,7 @@ def _get_substructure_patterns() -> Dict[str, Chem.Mol]:
 
 
 # =========================================================================
-# HYG-01: connectivity-hash-bucketed ring lookup
+# HYG-01 (Phase 173): connectivity-hash-bucketed ring lookup
 # -------------------------------------------------------------------------
 # match_fused_heterocycle_core previously scanned ALL ~150 catalog patterns
 # with HasSubstructMatch for every query (O(N)). HYG-01 buckets the
@@ -1866,13 +1872,13 @@ def _get_substructure_patterns() -> Dict[str, Chem.Mol]:
 # ever discarded; candidates are scanned in catalog insertion order with the
 # same strict-`>` largest-match-wins / first-at-max tie-break as the old loop.
 # Proofs (each a necessary condition for pattern ⊑ query):
-# * cycle rank: circuit rank is monotonic under subgraph (the cycle space of
-# a subgraph is a subspace of the host's) ⇒ rank(pattern) ≤ rank(query).
-# * per-element heavy-atom count: each pattern atom maps to a distinct query
-# atom of the SAME element ⇒ count(e, pattern) ≤ count(e, query) ∀e
-# (this subsumes the heteroatom-set ⊆ condition used for bucketing).
-# * total heavy-atom count: ≤, for the same reason.
-# A HARD old-vs-new equivalence test (tests/unit/data) gates this.
+#   * cycle rank: circuit rank is monotonic under subgraph (the cycle space of
+#     a subgraph is a subspace of the host's) ⇒ rank(pattern) ≤ rank(query).
+#   * per-element heavy-atom count: each pattern atom maps to a distinct query
+#     atom of the SAME element ⇒ count(e, pattern) ≤ count(e, query) ∀e
+#     (this subsumes the heteroatom-set ⊆ condition used for bucketing).
+#   * total heavy-atom count: ≤, for the same reason.
+# A HARD old-vs-new equivalence test (tests/unit/data/) gates this.
 # =========================================================================
 
 class _PatternRec:
@@ -1984,7 +1990,7 @@ def ring_skeleton_key(mol: Chem.Mol) -> Optional[str]:
     if not ring_atoms:
         return None
     ring_bonds = [
-        b.GetIdx() for b in mol.GetBonds()
+        b.GetIdx() for b in bonds_of(mol)
         if b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms
     ]
     if not ring_bonds:
@@ -2021,11 +2027,11 @@ def get_fused_heterocycle_name(mol: Chem.Mol) -> Optional[Tuple[str, Optional[in
         or None if no tautomeric hydrogen.
 
     Example:
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
+        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
         >>> get_fused_heterocycle_name(mol)
         ('1H-indole', 1)
 
-        >>> mol = Chem.MolFromSmiles('c1ccc2ncccc2c1') # quinoline
+        >>> mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')  # quinoline
         >>> get_fused_heterocycle_name(mol)
         ('quinoline', None)
     """
@@ -2049,14 +2055,14 @@ def _match_covers_ring_systems(mol, atom_mapping) -> bool:
 
     Mirrors ``rules.fused_rings._core_covers_ring_system`` (kept local to avoid a
     data->rules import); ``get_ring_systems`` is imported lazily (perception does
-    not import data, so there is no cycle). ``int`` keys in ``atom_mapping`` are
+    not import data, so there is no cycle).  ``int`` keys in ``atom_mapping`` are
     the matched core atoms; a pendant ring joined by a single (non-ring) bond is a
     SEPARATE ring system, so a legitimate cyclic substituent does not trip this.
 
     This is the guard that stops a SMALLER catalog pattern from matching a LARGER
     fused ring system as a substructure (e.g. the 4-ring naphthacene pattern
     matching inside 5-ring pentacene, or chrysene inside picene) — a structure-
-    loss hallucination that otherwise yields a wrong parent name. 13B(a).
+    loss hallucination that otherwise yields a wrong parent name. v23 13B(a).
     """
     core_atoms = {k for k in (atom_mapping or {}) if isinstance(k, int)}
     if not core_atoms:
@@ -2077,9 +2083,9 @@ def match_fused_heterocycle_core(
     Thin coverage-guarded wrapper over ``_match_fused_heterocycle_core_impl``: a
     catalog match is accepted ONLY if it covers the whole fused ring system it
     touches (P-25.3 — a base/retained ring system name must span the entire fused
-    system, not a sub-part). Without this, a larger non-cataloged PAH whose
+    system, not a sub-part).  Without this, a larger non-cataloged PAH whose
     skeleton contains a cataloged subset (pentacene contains naphthacene, picene
-    contains chrysene) spuriously matched the smaller entry. 13B(a) S1.
+    contains chrysene) spuriously matched the smaller entry. v23 13B(a) S1.
     """
     result = _match_fused_heterocycle_core_impl(mol)
     if result is None:
@@ -2090,6 +2096,61 @@ def match_fused_heterocycle_core(
 
 
 def _match_fused_heterocycle_core_impl(
+    mol: Chem.Mol
+) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
+    """perf lever — a per-molecule memo over the fused-core matcher.
+
+    Within ONE molecule's naming this matcher is re-run on the SAME ring-bearing
+    fragment 100-390x (measured: the recursive substituent enumeration re-derives
+    the same fragment thousands of times — vancomycin 1059 core-matcher calls, a
+    thiopeptide 1198, and the perf-lever probe found 10-392x redundancy over 1-15
+    distinct fragments per molecule). Each call charges the per-molecule
+    ``spend_analysis_call`` / ``spend_perf_work`` macrocycle-hang budgets, so the
+    redundancy alone exhausts them and abstains a NAMEABLE macrocycle. The cache
+    turns a repeat into an O(1) hit that does no work and charges no budget, so the
+    molecule finishes under budget and reclaims.
+
+    0-wrong / byte-identity: the key is ``(non-canonical SMILES, atom OUTPUT ORDER)``
+    (see the key line below) — the non-canonical SMILES alone does NOT pin the
+    index->atom correspondence, so the output order is required to
+    make the key COMPLETE for the atom-INDEX-keyed ``atom_mapping``. Validated:
+    ``ORTHONYM_MEMO=on`` vs ``off`` emits the identical name over 258 PubChem-ORDERED
+    fused molecules (atom order != RDKit DFS — the class that exposed the bug), and
+    ``ORTHONYM_MEMO=verify`` records **0** ``fused_core`` mismatches over the same set
+    via ``memo.verify_mismatch_count()`` (the raised ``MemoMismatch`` is swallowed by
+    the naming cascade, so the COUNTER — not the exception — is the real detector,
+    Crit-2). A cache MISS or no open scope simply recomputes; a hit can never ship a
+    wrong name once the key is complete. Deterministic: the key (string + output
+    order) is deterministic for a given input and the cache is per-top-level-call.
+    The compute is unchanged below.
+    """
+    if mol is None:
+        return None
+    from ..assembly.memo import cache_or_compute
+    try:
+        _smi = Chem.MolToSmiles(mol, canonical=False)
+        # the non-canonical SMILES ALONE does NOT pin the
+        # index->atom correspondence -- RDKit's non-canonical writer DFS-walks from
+        # atom 0 taking the lowest-index neighbour, so any two labelings that make
+        # the same branch choices produce the SAME string with DIFFERENT atom
+        # numbers. The result's ``atom_mapping`` is index-keyed, so a bare-string hit
+        # would ship the FIRST caller's mapping to a differently-labeled mol -- a
+        # WRONG LOCANT (measured: a PubChem-ordered quinazolinone got locant 4 vs 3;
+        # the engine presents one molecule as both MolFromSmiles(input) and
+        # MolFromSmiles(canonical) within one scope). Pin the labeling with the atom
+        # OUTPUT ORDER ``MolToSmiles`` just recorded -- same key construction the
+        # substituent memo uses (assembly/substituent_enumerator.py). Same
+        # string + same output order == identical indexed graph.
+        key = (_smi, mol.GetProp("_smilesAtomOutputOrder"))
+    except Exception:
+        # An unkeyable mol (should not happen) -> recompute, never cache-corrupt.
+        return _match_fused_heterocycle_core_compute(mol)
+    return cache_or_compute(
+        "fused_core", key,
+        lambda: _match_fused_heterocycle_core_compute(mol))
+
+
+def _match_fused_heterocycle_core_compute(
     mol: Chem.Mol
 ) -> Optional[Tuple[str, Dict[int, Union[int, str]], str]]:
     """
@@ -2108,12 +2169,12 @@ def _match_fused_heterocycle_core_impl(
         core_smiles is the canonical SMILES of the matched core.
 
     Example:
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1') # 5-methylindole
+        >>> mol = Chem.MolFromSmiles('Cc1ccc2[nH]ccc2c1')  # 5-methylindole
         >>> name, mapping, smiles = match_fused_heterocycle_core(mol)
         >>> name
         '1H-indole'
-        >>> mapping[1] # mol atom idx 1 (where methyl attaches)
-        5 # IUPAC position 5 - correct for 5-methylindole!
+        >>> mapping[1]  # mol atom idx 1 (where methyl attaches)
+        5  # IUPAC position 5 - correct for 5-methylindole!
     """
     if mol is None:
         return None
@@ -2125,17 +2186,17 @@ def _match_fused_heterocycle_core_impl(
         # necessary condition means none can match an acyclic query. The old
         # full scan returned None here too — fast exit, byte-identical.
         return None
-    q_elem = Counter(a.GetSymbol() for a in mol.GetAtoms())
+    q_elem = Counter(a.GetSymbol() for a in atoms_of(mol))
     q_hetset = frozenset(s for s in q_elem if s not in ('C', 'H'))
     q_heavy = mol.GetNumAtoms()
 
     candidates = _gather_candidates(q_rank, q_hetset)
 
-    # charge one ANALYSIS-CALL unit per core-matcher call. This matcher is
+    # M2.5: charge one ANALYSIS-CALL unit per core-matcher call. This matcher is
     # re-run per ring-bearing fragment throughout the recursive substituent
     # enumeration; a large cyclic glyco-/thio-peptide re-invokes it THOUSANDS of
     # times (measured: vancomycin 1059, thiopeptide 1198 vs chlorophyll 128).
-    # The call budget is armed at the outermost name and shared with the
+    # The call budget is armed at the outermost name() and shared with the
     # von-Baeyer analyze site, so the call-count explosion class exhausts it.
     spend_analysis_call()
 
@@ -2178,7 +2239,7 @@ def _match_fused_heterocycle_core_impl(
                 # substituent-locant minimization (the acridine 2-vs-7 bug).
                 skel_matches = mol.GetSubstructMatches(skel_rec.pattern, uniquify=False)
                 if skel_matches:
-                    # E1/: choose the automorphism minimizing substituent
+                    # E1/DD4: choose the automorphism minimizing substituent
                     # locants (was matches[0] — non-deterministic for symmetric
                     # cores like acridine; byte-identical for asymmetric ones).
                     skel_iul = FUSED_HETEROCYCLE_DATA[skel_rec.smiles].get('iupac_locants') or {}
@@ -2197,7 +2258,7 @@ def _match_fused_heterocycle_core_impl(
             continue
         if not _prefilter(rec):
             continue
-        spend_perf_work()  # charge each (post-prefilter) substructure match attempt
+        spend_perf_work()  # M2.5: charge each (post-prefilter) substructure match attempt
         if mol.HasSubstructMatch(rec.pattern):
             # uniquify=False so symmetry-equivalent automorphic matches are all
             # available for the substituent-locant minimization (see fast-path).
@@ -2207,7 +2268,7 @@ def _match_fused_heterocycle_core_impl(
 
                 # Keep the largest matching core
                 if best_match is None or core_size > best_match[2]:
-                    # E1/: choose the automorphism minimizing substituent
+                    # E1/DD4: choose the automorphism minimizing substituent
                     # locants (was matches[0]). Byte-identical when only one
                     # match (asymmetric core) or no substituent.
                     rec_iul = FUSED_HETEROCYCLE_DATA[rec.smiles].get('iupac_locants') or {}
@@ -2222,7 +2283,7 @@ def _match_fused_heterocycle_core_impl(
 
 
 def _coerce_locant_for_compare(locant):
-    """Coerce a catalog locant ('4a', 3,...) to the int / (int, str) form that
+    """Coerce a catalog locant ('4a', 3, ...) to the int / (int, str) form that
     ``compare_locant_sets`` orders. Returns None for an unparseable value."""
     import re as _re
     if isinstance(locant, int):
@@ -2310,10 +2371,10 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
     """Pick the automorphic substructure match giving the substituent-bearing
     core atoms the lowest locants (P-14.3.5 / P-14.4 / P-25.3.3.1.2(a)).
 
-    /. For an asymmetric core there is exactly one match, so
+    . For an asymmetric core there is exactly one match, so
     this returns ``matches[0]`` (byte-identical to the legacy first-match
     behaviour). For a C2v/Cs-symmetric core (acridine, carbazole,
-    phenanthridine,...) with a substituent, the multiple automorphic matches
+    phenanthridine, ...) with a substituent, the multiple automorphic matches
     map the substituted atom onto its symmetry orbit; choosing the match that
     minimizes the substituent locant set yields the deterministic PIN
     numbering instead of an input-order-dependent first match.

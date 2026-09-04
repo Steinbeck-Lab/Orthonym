@@ -27,7 +27,6 @@ Reference: IUPAC 2013 Blue Book, **Table 2.4** (P-22.2.2.1.1) [BBv2:8234-8250].
 
 from typing import Dict, Optional
 
-
 # Hantzsch-Widman 'a' term prefixes for heteroatoms
 # Maps element symbol to the standard HW prefix
 HW_PREFIXES: Dict[str, str] = {
@@ -91,12 +90,12 @@ HW_PREFIXES: Dict[str, str] = {
 # Heteroatom priority for ring numbering
 # Lower number = higher priority (gets position 1)
 # Table 2.4 order [BBv2:8236]: F > Cl > Br > I > O > S > Se > Te > N > P > As
-# > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl. Identical, element for
-# element, to P-23.3.1's von Baeyer citation order [BBv2:9765] -- which is why
-# the Table-1.5 spiro sites that sort with this table have never disagreed with
-# ``ring_replacement.HETEROATOM_PREFIXES``'s ranks. Only the SPELLINGS diverge
-# (aluma/indiga), and those come from HW_PREFIXES above, never from here.
-# -04 WR-01: halogens included per IUPAC P-25.3.1.3 (skeletal
+#   > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl. Identical, element for
+#   element, to P-23.3.1's von Baeyer citation order [BBv2:9765] -- which is why
+#   the Table-1.5 spiro sites that sort with this table have never disagreed with
+#   ``ring_replacement.HETEROATOM_PREFIXES``'s ranks. Only the SPELLINGS diverge
+#   (aluma/indiga), and those come from HW_PREFIXES above, never from here.
+# Phase 151-04 WR-01: halogens included per IUPAC P-25.3.1.3 (skeletal
 # replacement nomenclature priority). Negative values keep them strictly
 # more senior than O without renumbering downstream callers that depend
 # on the relative ordering of O..B established before halogens were added.
@@ -178,9 +177,9 @@ def get_hw_prefix(element: str) -> Optional[str]:
         'oxa'
         >>> get_hw_prefix('N')
         'aza'
-        >>> get_hw_prefix('C') # Carbon has no HW prefix
+        >>> get_hw_prefix('C')  # Carbon has no HW prefix
         None
-        >>> get_hw_prefix('Hg') # deleted from HW by P-22.2.2
+        >>> get_hw_prefix('Hg')  # deleted from HW by P-22.2.2
         None
     """
     return HW_PREFIXES.get(element)
@@ -206,7 +205,7 @@ def get_heteroatom_priority(element: str) -> int:
         5
         >>> get_heteroatom_priority('O') < get_heteroatom_priority('N')
         True
-        >>> get_heteroatom_priority('X') # Unknown element
+        >>> get_heteroatom_priority('X')  # Unknown element
         999
     """
     return HETEROATOM_PRIORITY.get(element, 999)
@@ -227,11 +226,11 @@ def compare_heteroatom_priority(element1: str, element2: str) -> int:
 
     Examples:
         >>> compare_heteroatom_priority('O', 'N')
-        -1 # O has higher priority
+        -1  # O has higher priority
         >>> compare_heteroatom_priority('N', 'O')
-        1 # O has higher priority
+        1   # O has higher priority
         >>> compare_heteroatom_priority('O', 'O')
-        0 # Same priority
+        0   # Same priority
     """
     p1 = get_heteroatom_priority(element1)
     p2 = get_heteroatom_priority(element2)

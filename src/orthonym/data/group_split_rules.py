@@ -1,13 +1,13 @@
-""": Group-split topology-table loader.
+"""Phase 169 Plan-01: Group-split topology-table loader.
 
 Loads ``group_split_rules.json`` — the locked, TOPOLOGY-ONLY split-decomposition
-table (CONTEXT) — into a ``Dict[str, SplitRule]`` keyed by ``fg_name``.
+table (CONTEXT /) — into a ``Dict[str, SplitRule]`` keyed by ``fg_name``.
 
 The split fires at the ``polyfunctional.py:get_fg_prefix_form()`` /
 ``substituent_no_prefix_form`` site (CONTEXT /F2 — a coarse string path,
 NOT an IR tree visitor). When a
 non-principal composite functional group has no clean strict-IUPAC prefix and
-would otherwise be dropped, the splitter decomposes it into its
+would otherwise be dropped, the splitter (Plan-02) decomposes it into its
 component sub-prefixes per the topology recorded here.
 
 **Single source of truth (CONTEXT):** this table records ONLY the
@@ -15,15 +15,15 @@ decomposition TOPOLOGY — which sub-fragments (chalcogen / heteroatom linker) t
 composite splits into, and a ``resolves_via`` pointer naming the existing
 ``fg_name`` / dispatcher key whose ``seniority.PREFIX_FORMS`` /
 ``assembly.substituent_prefix_forms`` entry supplies the prefix STRING at
-runtime. The prefix output strings (``oxo``, the alkoxy/sulfanyl forms,...) are
+runtime. The prefix output strings (``oxo``, the alkoxy/sulfanyl forms, ...) are
 NEVER stored here — duplicating them would fork the authority and invite drift.
 
-Frozen-dataclass discipline mirrors SACRED + 's
+Frozen-dataclass discipline mirrors Phase 165 SACRED + Phase 168's
 ``triviality_controller_seed.py``: ``SplitRule`` / ``SplitComponent`` are
 ``@dataclass(frozen=True)`` and are never mutated after construction.
 
 Graceful degradation (PATTERNS correction): a missing JSON or schema error
-degrades ``SPLIT_RULES`` to ``{}`` so the splitter sees no rules and
+degrades ``SPLIT_RULES`` to ``{}`` so the Plan-02 splitter sees no rules and
 every ``substituent_no_prefix_form`` still drops (status quo) — never a crash. This is the
 no-crash invariant.
 
@@ -41,13 +41,13 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import rdkit
+
 from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class SplitComponent:
 class SplitRule:
     """One locked split-decomposition entry, keyed by ``fg_name`` (CONTEXT).
 
-    Immutable by SACRED discipline. Holds ONLY topology +
+    Immutable by Phase 165 SACRED discipline. Holds ONLY topology +
     provenance — no prefix output strings (CONTEXT).
     """
 
@@ -89,8 +89,8 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
     """Load the topology table into an ``fg_name``-keyed dict.
 
     Warns (does not fail) if the table's ``rdkit_version_pin`` differs from the
-    running RDKit — re-run ` --rt`` to
-    re-confirm round-trips (mirrors R-10 warning).
+    running RDKit — re-run ``scripts/lint_group_split_rules.py --rt`` to
+    re-confirm round-trips (mirrors the Phase 168 R-10 warning).
 
     With ``validate=True`` additionally runs the CONTEXT design-time
     OPSIN-RT re-confirmation of each entry's documented example (off by default —
@@ -104,8 +104,8 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
     pinned = data.get("rdkit_version_pin")
     if pinned and pinned != rdkit.__version__:
         logger.warning(
-            " split table was OPSIN-RT-verified against rdkit %s but "
-            "this process runs rdkit %s; re-run "
+            "Phase 169 split table was OPSIN-RT-verified against rdkit %s but "
+            "this process runs rdkit %s; re-run scripts/lint_group_split_rules.py "
             "--rt to re-confirm round-trips.",
             pinned, rdkit.__version__,
         )
@@ -143,18 +143,18 @@ def _opsin_rt_validate_examples(entries) -> None:
 
     Parses each entry's documented example name through OPSIN ``-osmi`` and
     confirms it is non-empty. The connectivity-InChI equality check the full
-    audit uses lives in ``; this lightweight gate
+    audit uses lives in ``scripts/audit_drop23_reach.py``; this lightweight gate
     just asserts OPSIN accepts the documented form. Skips gracefully when java /
     the jar are unavailable (mirrors the seed loader's graceful-fallback).
     """
     import shutil
 
     if shutil.which("java") is None:
-        logger.warning("java not on PATH; skipping OPSIN-RT re-confirmation.")
+        logger.warning("java not on PATH; skipping D-04 OPSIN-RT re-confirmation.")
         return
     jar = Path(__file__).resolve().parents[3] / "opsin-cli-2.9.0-jar-with-dependencies.jar"
     if not jar.exists():
-        logger.warning("OPSIN jar not found; skipping OPSIN-RT re-confirmation.")
+        logger.warning("OPSIN jar not found; skipping D-04 OPSIN-RT re-confirmation.")
         return
     for raw in entries:
         # Pull the documented example name out of the notes ("-> <name> (").
@@ -184,6 +184,6 @@ try:
     SPLIT_RULES: Dict[str, SplitRule] = load_split_rules(_RULES_PATH, validate=False)
 except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
     logger.error(
-        " split-table load failed: %s; group-splitting will be a no-op", e,
+        "Phase 169 split-table load failed: %s; group-splitting will be a no-op", e,
     )
     SPLIT_RULES = {}

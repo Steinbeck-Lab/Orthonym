@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "generated_at": "2026-05-31T07:28:27Z",
-  "source": "Phase 169 Plan-01 audit per CONTEXT D-02/D-03; TOPOLOGY ONLY; prefix output strings resolve through seniority.PREFIX_FORMS / assembly.substituent_prefix_forms at runtime and are NEVER duplicated here. Scope bounded to the empirically-firing splittable composites measured by  (ester 482 + thioester 24 events). Citations: QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook) + offline IUPAC_BlueBook_Organic_Naming_Guide.docx.",
+  "source": "Phase 169 Plan-01 audit per CONTEXT D-02/D-03; TOPOLOGY ONLY; prefix output strings resolve through seniority.PREFIX_FORMS / assembly.substituent_prefix_forms at runtime and are NEVER duplicated here. Scope bounded to the empirically-firing splittable composites measured by scripts/audit_drop23_reach.py (ester 482 + thioester 24 events). Citations: QMUL Blue Book (https://iupac.qmul.ac.uk/BlueBook) + offline IUPAC_BlueBook_Organic_Naming_Guide.docx.",
   "rdkit_version_pin": "2026.03.1",
   "opsin_jar_sha256": "c2e29326c281f87b59a05d934d8589adac6e9d17b95b984931b3e739111b360f",
   "total_entries": 3,
